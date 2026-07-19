@@ -1,10 +1,12 @@
-import type { AudioDevice, EngineEvent, SessionConfig } from './contracts'
+import type { AudioDevice, EngineEvent, ResourceRecord, ResourceSnapshot, SessionConfig } from './contracts'
 import type { AppSettings, AppSettingsPatch } from './settings'
 
 export type SessionStartResult = { sessionId: string }
 
 export type FluentCaptionsApi = {
   listDevices(): Promise<AudioDevice[]>
+  listResources(): Promise<ResourceSnapshot>
+  manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel'): Promise<ResourceRecord>
   startSession(config: SessionConfig): Promise<SessionStartResult>
   stopSession(sessionId: string): Promise<void>
   onEngineEvent(listener: (event: EngineEvent) => void): () => void

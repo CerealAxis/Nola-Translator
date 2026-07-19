@@ -73,8 +73,26 @@ class ShutdownCommand(Envelope):
     type: Literal["shutdown"]
 
 
+class ListResourcesCommand(Envelope):
+    type: Literal["listResources"]
+
+
+class ManageResourceCommand(Envelope):
+    type: Literal["manageResource"]
+    resourceId: str = Field(min_length=1, max_length=256)
+    action: Literal["install", "remove", "cancel"]
+
+
 EngineCommand = Annotated[
-    Union[HelloCommand, ListDevicesCommand, StartSessionCommand, StopSessionCommand, ShutdownCommand],
+    Union[
+        HelloCommand,
+        ListDevicesCommand,
+        StartSessionCommand,
+        StopSessionCommand,
+        ShutdownCommand,
+        ListResourcesCommand,
+        ManageResourceCommand,
+    ],
     Field(discriminator="type"),
 ]
 
@@ -140,6 +158,41 @@ class ModelProgressEvent(Envelope):
     state: Literal["running", "complete", "failed"]
 
 
+class ResourceRecord(ProtocolModel):
+    resourceId: str = Field(min_length=1, max_length=256)
+    kind: Literal["recognitionModel", "translationPackage"]
+    provider: Literal["sherpa-onnx", "faster-whisper", "argos"]
+    name: str = Field(min_length=1, max_length=256)
+    description: str = Field(min_length=1, max_length=1024)
+    languages: list[str] = Field(max_length=16)
+    sourceLanguage: str | None = Field(default=None, max_length=32)
+    targetLanguage: str | None = Field(default=None, max_length=32)
+    installed: bool
+    installedBytes: int = Field(ge=0)
+    downloadBytes: int | None = Field(default=None, ge=0)
+    state: Literal["idle", "running", "cancelling", "failed"] = "idle"
+    phase: Literal["resolve", "download", "verify", "install", "remove", "cleanup"] | None = None
+    progress: float | None = Field(default=None, ge=0, le=1)
+    cancellable: bool = False
+    errorCode: str | None = Field(default=None, min_length=1, max_length=128)
+
+
+class ResourcesEvent(Envelope):
+    type: Literal["resources"]
+    storagePath: str = Field(min_length=1, max_length=2048)
+    resources: list[ResourceRecord] = Field(max_length=64)
+
+
+class ResourceActionResultEvent(Envelope):
+    type: Literal["resourceActionResult"]
+    resource: ResourceRecord
+
+
+class ResourceChangedEvent(Envelope):
+    type: Literal["resourceChanged"]
+    resource: ResourceRecord
+
+
 class StatusEvent(Envelope):
     type: Literal["status"]
     code: Literal["idle", "starting", "ready", "listening", "stopping"]
@@ -154,6 +207,10 @@ ErrorCode = Literal[
     "sessionAlreadyRunning",
     "audioDeviceUnavailable",
     "modelUnavailable",
+    "resourceUnavailable",
+    "resourceNotFound",
+    "resourceBusy",
+    "resourceInUse",
     "lineTooLarge",
     "internalError",
 ]
@@ -178,6 +235,9 @@ EngineEvent = Annotated[
         SessionStoppedEvent,
         CaptionEvent,
         ModelProgressEvent,
+        ResourcesEvent,
+        ResourceActionResultEvent,
+        ResourceChangedEvent,
         StatusEvent,
         ErrorEvent,
         ShutdownCompleteEvent,

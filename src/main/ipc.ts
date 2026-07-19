@@ -8,6 +8,8 @@ import type { EngineProcess } from './engine-process'
 
 export const IPC_CHANNELS = {
   listDevices: 'engine:list-devices',
+  listResources: 'engine:list-resources',
+  manageResource: 'engine:manage-resource',
   startSession: 'engine:start-session',
   stopSession: 'engine:stop-session',
   event: 'engine:event',
@@ -34,6 +36,36 @@ export function registerEngineIpc(
     )
     return response.devices
   })
+
+  ipcMain.handle(IPC_CHANNELS.listResources, async () => {
+    await ensureReady()
+    const response = await engine.request(
+      { protocolVersion: 1, type: 'listResources', requestId: `resources-${randomUUID()}` },
+      'resources'
+    )
+    return { storagePath: response.storagePath, resources: response.resources }
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.manageResource,
+    async (_event, resourceId: unknown, action: unknown) => {
+      if (typeof resourceId !== 'string' || !['install', 'remove', 'cancel'].includes(String(action))) {
+        throw new Error('资源操作参数无效')
+      }
+      await ensureReady()
+      const response = await engine.request(
+        {
+          protocolVersion: 1,
+          type: 'manageResource',
+          requestId: `resource-action-${randomUUID()}`,
+          resourceId,
+          action: action as 'install' | 'remove' | 'cancel',
+        },
+        'resourceActionResult'
+      )
+      return response.resource
+    }
+  )
 
   ipcMain.handle(IPC_CHANNELS.startSession, async (_event, rawConfig: unknown) => {
     await ensureReady()
@@ -92,6 +124,8 @@ export function registerEngineIpc(
     engine.off('event', forwardEvent)
     for (const channel of [
       IPC_CHANNELS.listDevices,
+      IPC_CHANNELS.listResources,
+      IPC_CHANNELS.manageResource,
       IPC_CHANNELS.startSession,
       IPC_CHANNELS.stopSession,
       IPC_CHANNELS.showOverlay,

@@ -19,9 +19,12 @@ sequenceDiagram
     participant P as Python 引擎
     E->>P: hello
     P-->>E: ready
-    E->>P: listDevices / startSession
-    P-->>E: devices / sessionStarted
-    P-->>E: caption / status / modelProgress
+    E->>P: listDevices / listResources
+    P-->>E: devices / resources
+    E->>P: manageResource（用户明确操作）
+    P-->>E: resourceActionResult / resourceChanged
+    E->>P: startSession
+    P-->>E: sessionStarted / caption / status
     E->>P: stopSession
     P-->>E: sessionStopped
     E->>P: shutdown
@@ -48,6 +51,14 @@ sequenceDiagram
 ```
 
 `translationProvider` 可为 `argos`、`microsoft`、`openai` 或 `ollama`。联网 Provider 的地址、区域和模型放在 `translationOptions`；API 密钥由 Electron 主进程从 Windows 加密存储读取，只在发送 `startSession` 时注入，不暴露给渲染进程。
+
+## 资源管理
+
+`listResources` 只扫描本地文件，返回识别模型和 Argos 有向语言包的安装状态、占用空间与当前操作。`manageResource` 只接受内置 `resourceId`，动作可为 `install`、`remove` 或 `cancel`；渲染进程不能传入下载 URL 或任意文件路径。
+
+资源操作先返回 `resourceActionResult`，后台状态变化通过 `resourceChanged` 推送。已知总大小时 `progress` 为 0 到 1；下载源不提供总大小时省略进度，界面显示不定进度条，不伪造百分比。
+
+`startSession` 不会隐式下载、更新或安装资源。缺少识别模型时立即返回 `resourceUnavailable`，并在 `details.missingResourceIds` 中给出缺失项。Argos 在运行中发现缺包时只把对应译文标记为失败，不影响原文识别，也不会联网补包。
 
 ## 字幕事件
 

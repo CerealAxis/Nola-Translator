@@ -59,6 +59,13 @@ const captionSegmentSchema = z
 export const engineCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...envelope, type: z.literal('hello'), clientVersion: z.string().min(1).max(64) }).strip(),
   z.object({ ...envelope, type: z.literal('listDevices') }).strip(),
+  z.object({ ...envelope, type: z.literal('listResources') }).strip(),
+  z.object({
+    ...envelope,
+    type: z.literal('manageResource'),
+    resourceId: z.string().min(1).max(256),
+    action: z.enum(['install', 'remove', 'cancel']),
+  }).strip(),
   z.object({ ...envelope, type: z.literal('startSession'), config: sessionConfigSchema }).strip(),
   z.object({ ...envelope, type: z.literal('stopSession'), sessionId: z.string().min(1).max(128) }).strip(),
   z.object({ ...envelope, type: z.literal('shutdown') }).strip(),
@@ -81,9 +88,34 @@ const errorCodes = [
   'sessionAlreadyRunning',
   'audioDeviceUnavailable',
   'modelUnavailable',
+  'resourceUnavailable',
+  'resourceNotFound',
+  'resourceBusy',
+  'resourceInUse',
   'lineTooLarge',
   'internalError',
 ] as const
+
+const resourceSchema = z
+  .object({
+    resourceId: z.string().min(1).max(256),
+    kind: z.enum(['recognitionModel', 'translationPackage']),
+    provider: z.enum(['sherpa-onnx', 'faster-whisper', 'argos']),
+    name: z.string().min(1).max(256),
+    description: z.string().min(1).max(1024),
+    languages: z.array(z.string().min(1).max(32)).max(16),
+    sourceLanguage: z.string().max(32).optional(),
+    targetLanguage: z.string().max(32).optional(),
+    installed: z.boolean(),
+    installedBytes: z.number().int().nonnegative(),
+    downloadBytes: z.number().int().nonnegative().optional(),
+    state: z.enum(['idle', 'running', 'cancelling', 'failed']),
+    phase: z.enum(['resolve', 'download', 'verify', 'install', 'remove', 'cleanup']).optional(),
+    progress: z.number().min(0).max(1).optional(),
+    cancellable: z.boolean(),
+    errorCode: z.string().min(1).max(128).optional(),
+  })
+  .strip()
 
 export const engineEventSchema = z.discriminatedUnion('type', [
   z
@@ -95,6 +127,14 @@ export const engineEventSchema = z.discriminatedUnion('type', [
     })
     .strip(),
   z.object({ ...envelope, type: z.literal('devices'), devices: z.array(audioDeviceSchema).max(256) }).strip(),
+  z.object({
+    ...envelope,
+    type: z.literal('resources'),
+    storagePath: z.string().min(1).max(2048),
+    resources: z.array(resourceSchema).max(64),
+  }).strip(),
+  z.object({ ...envelope, type: z.literal('resourceActionResult'), resource: resourceSchema }).strip(),
+  z.object({ ...envelope, type: z.literal('resourceChanged'), resource: resourceSchema }).strip(),
   z.object({ ...envelope, type: z.literal('sessionStarted'), sessionId: z.string().min(1).max(128) }).strip(),
   z.object({ ...envelope, type: z.literal('sessionStopped'), sessionId: z.string().min(1).max(128) }).strip(),
   z

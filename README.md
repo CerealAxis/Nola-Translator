@@ -9,7 +9,8 @@ FluentCaptions 是一款面向 Windows 11 的实时字幕与翻译应用。它�
 - 高精度模式：faster-whisper + Silero VAD，以完整语音片段输出，优先使用 CUDA/FP16，失败时回退 CPU/INT8；
 - 支持自动识别、中文、英文、日文，以及 Whisper 模型支持的其他语言；
 - 同时选择中文、英文、日文等多个目标语言；
-- Argos Translate 本地翻译与语言包按需安装，可选择是否允许英语中转；
+- 独立“模型与语言包”页面显示真实安装状态，由用户明确安装或删除识别模型和 Argos 有向语言包；
+- Argos Translate 本地翻译，可选择是否允许英语中转；
 - 可选 Microsoft Translator、OpenAI 兼容接口和本地 Ollama；
 - API 密钥使用 Electron `safeStorage` 调用 Windows 加密能力保存，不写入普通设置文件；
 - 独立字幕浮层支持顶部、底部和自由位置，置顶、锁定、点击穿透、拖动、缩放；
@@ -30,11 +31,13 @@ Set-ExecutionPolicy -Scope Process Bypass
 npm run dev
 ```
 
-第一次开始字幕时会按需下载模型：
+首次使用前，请打开“模型与语言包”页面并明确安装需要的资源：
 
 - 实时模式下载 sherpa-onnx 中英双语流式模型；
 - 高精度模式下载 faster-whisper `small` 模型；
-- Argos 在第一次使用某个语言方向时下载对应语言包。
+- Argos 语言包按翻译方向分别安装，例如 English → 简体中文与简体中文 → English 是两个包。
+
+“开始字幕”只检查本地资源，不会下载、更新或安装任何内容；缺少模型时会给出明确提示并引导到资源页。
 
 下载完成后，本地识别和 Argos/Ollama 翻译可以离线运行。Microsoft Translator 和 OpenAI 兼容接口只有在用户主动选择并配置后才联网。
 
@@ -61,7 +64,7 @@ npm run build
 npm run dist:win
 ```
 
-安装包输出到 `release\`。打包版自带 Python sidecar，最终用户不需要安装 Node.js 或 Python。识别模型和 Argos 语言包仍按需下载，不放入安装包。
+安装包输出到 `release\`。打包版自带 Python sidecar，最终用户不需要安装 Node.js 或 Python。识别模型和 Argos 语言包不放入安装包，由用户在资源页明确下载。
 
 ## 隐私与数据位置
 

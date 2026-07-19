@@ -5,6 +5,8 @@ import type { EngineEvent, SessionConfig } from '../shared/contracts'
 
 const channels = {
   listDevices: 'engine:list-devices',
+  listResources: 'engine:list-resources',
+  manageResource: 'engine:manage-resource',
   startSession: 'engine:start-session',
   stopSession: 'engine:stop-session',
   event: 'engine:event',
@@ -18,6 +20,8 @@ const channels = {
 
 const api: FluentCaptionsApi = {
   listDevices: () => ipcRenderer.invoke(channels.listDevices),
+  listResources: () => ipcRenderer.invoke(channels.listResources),
+  manageResource: (resourceId, action) => ipcRenderer.invoke(channels.manageResource, resourceId, action),
   startSession: (config: SessionConfig) => ipcRenderer.invoke(channels.startSession, config),
   stopSession: (sessionId: string) => ipcRenderer.invoke(channels.stopSession, sessionId),
   onEngineEvent: (listener: (event: EngineEvent) => void) => {

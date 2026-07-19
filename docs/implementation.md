@@ -29,7 +29,7 @@ flowchart LR
 
 ## 实时识别
 
-实时模式使用 sherpa-onnx OnlineRecognizer。音频以 20 ms 帧连续送入解码器；文本变化时最多每 100 ms 发送一次中间结果，检测到端点后发送最终结果并重置流。首版内置模型目录指向官方中英双语 Zipformer Small INT8 模型，压缩包下载后同时校验字节数和 MD5，再原子安装。
+实时模式使用 sherpa-onnx OnlineRecognizer。音频以 20 ms 帧连续送入解码器；文本变化时最多每 100 ms 发送一次中间结果，检测到端点后发送最终结果并重置流。首版内置模型目录指向官方中英双语 Zipformer Small INT8 模型。只有用户在“模型与语言包”页面点击安装后才下载，压缩包同时校验字节数和 MD5，再原子安装。
 
 ## 高精度识别
 
@@ -50,4 +50,4 @@ flowchart LR
 
 ## 进程与安全边界
 
-Electron 主进程管理 Python sidecar，通过 UTF-8 JSONL 通信。渲染进程启用沙箱、上下文隔离并禁用 Node.js；preload 只暴露白名单 API。普通设置使用原子 JSON 写入，API 密钥使用 Windows 加密能力保存。打包版使用 `resources\engine\FluentCaptionsEngine.exe`，模型位于用户数据目录并按需下载。
+Electron 主进程管理 Python sidecar，通过 UTF-8 JSONL 通信。渲染进程启用沙箱、上下文隔离并禁用 Node.js；preload 只暴露白名单 API。普通设置使用原子 JSON 写入，API 密钥使用 Windows 加密能力保存。打包版使用 `resources\engine\FluentCaptionsEngine.exe`，模型位于用户数据目录。资源查询和字幕启动均不联网，只有显式资源安装命令允许下载。

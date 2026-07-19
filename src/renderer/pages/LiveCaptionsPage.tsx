@@ -7,7 +7,9 @@ import { CaptionPreview } from '../components/CaptionPreview'
 
 type SessionState = 'idle' | 'starting' | 'listening' | 'stopping' | 'error'
 
-export function LiveCaptionsPage(): React.JSX.Element {
+type LiveCaptionsPageProps = { onOpenResources: () => void }
+
+export function LiveCaptionsPage({ onOpenResources }: LiveCaptionsPageProps): React.JSX.Element {
   const [state, setState] = useState<SessionState>('idle')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [devices, setDevices] = useState<AudioDevice[]>([])
@@ -21,6 +23,7 @@ export function LiveCaptionsPage(): React.JSX.Element {
   const [caption, setCaption] = useState<CaptionSegment | null>(null)
   const [modelProgress, setModelProgress] = useState<number | null>(null)
   const [notice, setNotice] = useState('正在连接本地引擎…')
+  const [missingResource, setMissingResource] = useState(false)
 
   const api = window.fluentCaptions
   useEffect(() => {
@@ -72,6 +75,7 @@ export function LiveCaptionsPage(): React.JSX.Element {
     setState('starting')
     setCaption(null)
     setModelProgress(null)
+    setMissingResource(false)
     setNotice('正在启动本地字幕引擎…')
     const config: SessionConfig = {
       audioSource: selectedDevice
@@ -91,13 +95,25 @@ export function LiveCaptionsPage(): React.JSX.Element {
             : undefined,
     }
     try {
+      const snapshot = await api.listResources()
+      const requiredId = recognitionMode === 'realtime' ? 'sherpa-zh-en-small' : 'faster-whisper-small'
+      const required = snapshot.resources.find((item) => item.resourceId === requiredId)
+      if (!required?.installed) {
+        setState('error')
+        setMissingResource(true)
+        setNotice(`${recognitionMode === 'realtime' ? '实时识别' : '高精度识别'}模型尚未安装，请先到“模型与语言包”页面安装。`)
+        return
+      }
       const result = await api.startSession(config)
       setSessionId(result.sessionId)
       setState('listening')
       setNotice('正在监听音频')
     } catch (error) {
       setState('error')
-      setNotice(error instanceof Error ? error.message : '字幕会话启动失败')
+      const message = error instanceof Error ? error.message : '字幕会话启动失败'
+      const unavailable = message.includes('resourceUnavailable') || message.includes('modelUnavailable')
+      setMissingResource(unavailable)
+      setNotice(unavailable ? '所选识别模型不可用，请到“模型与语言包”页面检查或重新安装。' : message)
     }
   }
 
@@ -172,6 +188,7 @@ export function LiveCaptionsPage(): React.JSX.Element {
           <footer className="session-footer">
             <div className={`audio-level ${listening ? 'is-active' : ''}`} aria-hidden="true"><i /><i /><i /><i /><i /></div>
             <div className="session-status" role="status" aria-live="polite"><span className="status-dot" aria-hidden="true" />{notice}</div>
+            {missingResource && <button className="text-button" onClick={onOpenResources} type="button">打开模型管理</button>}
             <button
               className={`button ${listening ? 'secondary-button' : 'primary-button'} start-button`}
               disabled={busy || !api}

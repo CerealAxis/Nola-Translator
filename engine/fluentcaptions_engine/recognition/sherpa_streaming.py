@@ -43,6 +43,12 @@ class SherpaOnnxDecoder:
         self.recognizer = recognizer
         self.stream = recognizer.create_stream()
 
+    @staticmethod
+    def _result_text(result: Any) -> str:
+        if isinstance(result, str):
+            return result
+        return str(result.text)
+
     @classmethod
     def from_transducer(cls, config: SherpaModelConfig) -> "SherpaOnnxDecoder":
         import sherpa_onnx
@@ -66,13 +72,15 @@ class SherpaOnnxDecoder:
         while self.recognizer.is_ready(self.stream):
             self.recognizer.decode_stream(self.stream)
         result = self.recognizer.get_result(self.stream)
-        return DecoderResult(result.text, self.recognizer.is_endpoint(self.stream))
+        return DecoderResult(
+            self._result_text(result), self.recognizer.is_endpoint(self.stream)
+        )
 
     def finish(self) -> DecoderResult:
         self.stream.input_finished()
         while self.recognizer.is_ready(self.stream):
             self.recognizer.decode_stream(self.stream)
-        text = self.recognizer.get_result(self.stream).text
+        text = self._result_text(self.recognizer.get_result(self.stream))
         return DecoderResult(text, bool(text.strip()))
 
     def reset(self) -> None:

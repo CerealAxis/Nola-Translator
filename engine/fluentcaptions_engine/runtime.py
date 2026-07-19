@@ -17,7 +17,10 @@ from .protocol import (
     EngineCommand,
     EngineEvent,
     ErrorEvent,
-    ModelProgressEvent,
+    ListResourcesCommand,
+    ManageResourceCommand,
+    ResourceActionResultEvent,
+    ResourcesEvent,
     ShutdownCommand,
     StartSessionCommand,
     StopSessionCommand,
@@ -30,6 +33,12 @@ from .recognition.accurate import (
 )
 from .recognition.base import RecognitionUpdate, Recognizer
 from .recognition.sherpa_streaming import SherpaOnnxDecoder, SherpaStreamingRecognizer
+from .resources import (
+    ACCURATE_RESOURCE_ID,
+    REALTIME_RESOURCE_ID,
+    ResourceActionError,
+    ResourceManager,
+)
 from .service import EngineService
 from .translation.argos import ArgosTranslationProvider
 from .translation.packages import ArgosPackageManager
@@ -49,6 +58,7 @@ class EngineRuntime:
         self.service = EngineService()
         self.models = ModelManager(model_root)
         self.emit = emit
+        self.resources = ResourceManager(model_root, emit)
         self.capture: PortAudioCapture | None = None
         self.recognizer: Recognizer | None = None
         self.session_task: asyncio.Task[None] | None = None
@@ -60,6 +70,34 @@ class EngineRuntime:
         self.argos_packages: ArgosPackageManager | None = None
 
     async def handle(self, command: EngineCommand) -> list[EngineEvent]:
+        if isinstance(command, ListResourcesCommand):
+            return [
+                ResourcesEvent(
+                    protocolVersion=1,
+                    type="resources",
+                    requestId=command.requestId,
+                    storagePath=str(self.models.model_root),
+                    resources=self.resources.list(),
+                )
+            ]
+        if isinstance(command, ManageResourceCommand):
+            if (
+                command.action == "remove"
+                and self.service.session_id is not None
+            ):
+                return [self._resource_error(command.requestId, "resourceInUse")]
+            try:
+                resource = await self.resources.manage(command.resourceId, command.action)
+            except ResourceActionError as error:
+                return [self._resource_error(command.requestId, error.code, error.details)]
+            return [
+                ResourceActionResultEvent(
+                    protocolVersion=1,
+                    type="resourceActionResult",
+                    requestId=command.requestId,
+                    resource=resource,
+                )
+            ]
         if isinstance(command, StartSessionCommand):
             return await self._start(command)
         if isinstance(command, StopSessionCommand):
@@ -80,6 +118,20 @@ class EngineRuntime:
     async def _start(self, command: StartSessionCommand) -> list[EngineEvent]:
         if self.service.session_id is not None:
             return self.service.handle(command)
+
+        required_resource = (
+            REALTIME_RESOURCE_ID
+            if command.config.recognitionMode == "realtime"
+            else ACCURATE_RESOURCE_ID
+        )
+        if not self.resources.is_installed(required_resource):
+            return [
+                self._resource_error(
+                    command.requestId,
+                    "resourceUnavailable",
+                    {"missingResourceIds": [required_resource]},
+                )
+            ]
 
         try:
             self._configure_translation(command)
@@ -179,73 +231,19 @@ class EngineRuntime:
         self.translation_scheduler = TranslationScheduler(provider)
 
     async def _create_recognizer(self, command: StartSessionCommand) -> Recognizer:
-        loop = asyncio.get_running_loop()
-
-        def progress(current: int, total: int) -> None:
-            ratio = current / total if total else 0.0
-            loop.call_soon_threadsafe(
-                self.emit,
-                ModelProgressEvent(
-                    protocolVersion=1,
-                    type="modelProgress",
-                    requestId=command.requestId,
-                    modelId=STREAMING_ZH_EN_SMALL.model_id,
-                    operation="download",
-                    progress=max(0.0, min(1.0, ratio)),
-                    state="running",
-                ),
-            )
-
         language = None if command.config.sourceLanguage == "auto" else command.config.sourceLanguage
         if command.config.recognitionMode == "realtime":
             if language not in (None, "zh", "en"):
                 raise ValueError("实时模型当前只支持中文和英文")
-            directory = await asyncio.to_thread(
-                self.models.ensure_archive, STREAMING_ZH_EN_SMALL, progress
-            )
-            self.emit(
-                ModelProgressEvent(
-                    protocolVersion=1,
-                    type="modelProgress",
-                    requestId=command.requestId,
-                    modelId=STREAMING_ZH_EN_SMALL.model_id,
-                    operation="download",
-                    progress=1.0,
-                    state="complete",
-                )
-            )
+            directory = self.models.model_path(STREAMING_ZH_EN_SMALL)
             decoder = await asyncio.to_thread(
                 SherpaOnnxDecoder.from_transducer, streaming_config(directory)
             )
             return SherpaStreamingRecognizer(decoder, language=language)
 
-        whisper_root = self.models.model_root / "faster-whisper"
-        self.emit(
-            ModelProgressEvent(
-                protocolVersion=1,
-                type="modelProgress",
-                requestId=command.requestId,
-                modelId="faster-whisper-small",
-                operation="download",
-                progress=0.0,
-                state="running",
-            )
-        )
         backend = await asyncio.to_thread(
             create_faster_whisper_backend,
-            "small",
-            download_root=str(whisper_root),
-        )
-        self.emit(
-            ModelProgressEvent(
-                protocolVersion=1,
-                type="modelProgress",
-                requestId=command.requestId,
-                modelId="faster-whisper-small",
-                operation="download",
-                progress=1.0,
-                state="complete",
-            )
+            str(self.resources.whisper_path),
         )
         return AccurateRecognizer(
             SileroVadSegmenter(), backend, source_language=language
@@ -312,52 +310,16 @@ class EngineRuntime:
         if self.translation_scheduler.provider.name == "argos" and self.argos_packages is None:
             self.argos_packages = await asyncio.to_thread(ArgosPackageManager)
         for target in targets if self.translation_scheduler.provider.name == "argos" else []:
-            model_id = f"argos-{source}-{target}"
-            self.emit(
-                ModelProgressEvent(
-                    protocolVersion=1,
-                    type="modelProgress",
-                    requestId=self.session_request_id,
-                    modelId=model_id,
-                    operation="download",
-                    progress=0.0,
-                    state="running",
-                )
+            path = await asyncio.to_thread(
+                self.argos_packages.installed_path,
+                source,
+                target,
+                allow_intermediate=bool(
+                    getattr(config, "allowIntermediateTranslation", False)
+                ),
             )
-            try:
-                await asyncio.to_thread(
-                    self.argos_packages.ensure_path,
-                    source,
-                    target,
-                    allow_intermediate=bool(
-                        getattr(config, "allowIntermediateTranslation", False)
-                    ),
-                )
-            except Exception as error:
-                package_errors[target] = type(error).__name__
-                self.emit(
-                    ModelProgressEvent(
-                        protocolVersion=1,
-                        type="modelProgress",
-                        requestId=self.session_request_id,
-                        modelId=model_id,
-                        operation="download",
-                        progress=0.0,
-                        state="failed",
-                    )
-                )
-            else:
-                self.emit(
-                    ModelProgressEvent(
-                        protocolVersion=1,
-                        type="modelProgress",
-                        requestId=self.session_request_id,
-                        modelId=model_id,
-                        operation="download",
-                        progress=1.0,
-                        state="complete",
-                    )
-                )
+            if path is None:
+                package_errors[target] = "resourceUnavailable"
 
         available_targets = [target for target in targets if target not in package_errors]
         scheduled = await self.translation_scheduler.translate(
@@ -469,3 +431,18 @@ class EngineRuntime:
                     sessionId=self.service.session_id,
                 )
             )
+
+    @staticmethod
+    def _resource_error(
+        request_id: str,
+        code: str,
+        details: dict[str, object] | None = None,
+    ) -> ErrorEvent:
+        return ErrorEvent(
+            protocolVersion=1,
+            type="error",
+            requestId=request_id,
+            code=code,
+            recoverable=True,
+            details=details,
+        )

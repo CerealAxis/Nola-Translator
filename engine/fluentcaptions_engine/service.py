@@ -52,7 +52,7 @@ class EngineService:
                     type="ready",
                     requestId=command.requestId,
                     engineVersion=__version__,
-                    capabilities=["devices", "captions", "translation"],
+                    capabilities=["devices", "captions", "translation", "resources"],
                 )
             ]
 

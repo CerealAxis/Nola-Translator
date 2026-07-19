@@ -5,6 +5,8 @@ Object.defineProperty(window, 'fluentCaptions', {
   writable: true,
   value: {
     listDevices: async () => [],
+    listResources: async () => ({ storagePath: 'C:\\FluentCaptions\\models', resources: [{ resourceId: 'sherpa-zh-en-small', kind: 'recognitionModel', provider: 'sherpa-onnx', name: '实时识别', description: '测试模型', languages: ['zh', 'en'], installed: true, installedBytes: 1, state: 'idle', cancellable: false }] }),
+    manageResource: async () => { throw new Error('测试未配置资源操作') },
     startSession: async () => ({ sessionId: 'test-session' }),
     stopSession: async () => undefined,
     onEngineEvent: () => () => undefined,

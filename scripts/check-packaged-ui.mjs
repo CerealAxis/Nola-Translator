@@ -158,6 +158,39 @@ try {
   })()`);
   await delay(150);
   const overlayHidden = await evaluate(overlayTarget, 'document.visibilityState === "hidden"');
+  const resourcePageProbe = await evaluate(target, `(async () => {
+    const findButton = (name) => Array.from(document.querySelectorAll('button'))
+      .find((button) => button.textContent?.trim() === name || button.getAttribute('aria-label') === name);
+    findButton('模型与语言包')?.click();
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      if (document.querySelectorAll('.resource-card').length >= 2) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return {
+      heading: document.querySelector('h1')?.textContent ?? '',
+      recognitionCards: document.querySelectorAll('.resource-card').length,
+      packageRows: document.querySelectorAll('.package-row').length,
+      installButtons: Array.from(document.querySelectorAll('button'))
+        .filter((button) => button.textContent?.trim() === '安装').length,
+      hasStoragePath: Boolean(document.querySelector('.storage-path'))
+    };
+  })()`);
+  const translationSwitchProbe = await evaluate(target, `(async () => {
+    const findButton = (name) => Array.from(document.querySelectorAll('button'))
+      .find((button) => button.textContent?.trim() === name || button.getAttribute('aria-label') === name);
+    findButton('翻译')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const row = document.querySelector('.setting-toggle-row');
+    const toggle = row?.querySelector('input[type="checkbox"]');
+    const result = {
+      hasLabel: row?.textContent?.includes('允许经 English 中转') ?? false,
+      rowDisplay: row ? getComputedStyle(row).display : '',
+      toggleWidth: toggle ? getComputedStyle(toggle).width : ''
+    };
+    findButton('模型与语言包')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    return result;
+  })()`);
 
   const failed = result.bridgeType !== 'object'
     || result.engineUnavailable
@@ -176,9 +209,16 @@ try {
     || !overlayWindowProbe.hasFinish
     || !overlayWindowProbe.hasHide
     || !overlayWindowProbe.hasResizeCue
-    || !overlayHidden;
+    || !overlayHidden
+    || resourcePageProbe.heading !== '模型与语言包'
+    || resourcePageProbe.recognitionCards !== 2
+    || resourcePageProbe.packageRows < 4
+    || !resourcePageProbe.hasStoragePath
+    || !translationSwitchProbe.hasLabel
+    || translationSwitchProbe.rowDisplay !== 'flex'
+    || translationSwitchProbe.toggleWidth !== '40px';
 
-  console.log(JSON.stringify({ ...result, bridgeProbe, overlayPageProbe, overlayWindowProbe, overlayHidden }));
+  console.log(JSON.stringify({ ...result, bridgeProbe, overlayPageProbe, overlayWindowProbe, overlayHidden, resourcePageProbe, translationSwitchProbe }));
   console.log(failed ? 'PACKAGED_UI_REPRO=FAIL' : 'PACKAGED_UI_REPRO=PASS');
   if (process.env.FLUENTCAPTIONS_SCREENSHOT) {
     const screenshot = await sendCommand(target, 'Page.captureScreenshot', { format: 'png' });

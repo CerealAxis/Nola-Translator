@@ -48,6 +48,11 @@ type Envelope<TType extends string> = {
 export type EngineCommand =
   | (Envelope<'hello'> & { clientVersion: string })
   | Envelope<'listDevices'>
+  | Envelope<'listResources'>
+  | (Envelope<'manageResource'> & {
+      resourceId: string
+      action: 'install' | 'remove' | 'cancel'
+    })
   | (Envelope<'startSession'> & { config: SessionConfig })
   | (Envelope<'stopSession'> & { sessionId: string })
   | Envelope<'shutdown'>
@@ -59,6 +64,30 @@ export type AudioDevice = {
   isDefault: boolean
 }
 
+export type ResourceRecord = {
+  resourceId: string
+  kind: 'recognitionModel' | 'translationPackage'
+  provider: 'sherpa-onnx' | 'faster-whisper' | 'argos'
+  name: string
+  description: string
+  languages: string[]
+  sourceLanguage?: string
+  targetLanguage?: string
+  installed: boolean
+  installedBytes: number
+  downloadBytes?: number
+  state: 'idle' | 'running' | 'cancelling' | 'failed'
+  phase?: 'resolve' | 'download' | 'verify' | 'install' | 'remove' | 'cleanup'
+  progress?: number
+  cancellable: boolean
+  errorCode?: string
+}
+
+export type ResourceSnapshot = {
+  storagePath: string
+  resources: ResourceRecord[]
+}
+
 export type EngineErrorCode =
   | 'invalidMessage'
   | 'unsupportedProtocol'
@@ -67,12 +96,19 @@ export type EngineErrorCode =
   | 'sessionAlreadyRunning'
   | 'audioDeviceUnavailable'
   | 'modelUnavailable'
+  | 'resourceUnavailable'
+  | 'resourceNotFound'
+  | 'resourceBusy'
+  | 'resourceInUse'
   | 'lineTooLarge'
   | 'internalError'
 
 export type EngineEvent =
   | (Envelope<'ready'> & { engineVersion: string; capabilities: string[] })
   | (Envelope<'devices'> & { devices: AudioDevice[] })
+  | (Envelope<'resources'> & ResourceSnapshot)
+  | (Envelope<'resourceActionResult'> & { resource: ResourceRecord })
+  | (Envelope<'resourceChanged'> & { resource: ResourceRecord })
   | (Envelope<'sessionStarted'> & { sessionId: string })
   | (Envelope<'sessionStopped'> & { sessionId: string })
   | (Envelope<'caption'> & { sessionId: string; segment: CaptionSegment })

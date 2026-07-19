@@ -40,4 +40,21 @@ describe('JSONL 协议校验', () => {
     })
     expect(() => parseCommandLine(oversized)).toThrow(/32 KiB/)
   })
+
+  it('校验显式资源管理命令和状态事件', () => {
+    expect(parseCommandLine(JSON.stringify({
+      protocolVersion: 1, type: 'manageResource', requestId: 'install-1',
+      resourceId: 'sherpa-zh-en-small', action: 'install'
+    }))).toMatchObject({ type: 'manageResource', action: 'install' })
+
+    expect(parseEventLine(JSON.stringify({
+      protocolVersion: 1, type: 'resourceChanged', requestId: 'resource-1',
+      resource: {
+        resourceId: 'sherpa-zh-en-small', kind: 'recognitionModel', provider: 'sherpa-onnx',
+        name: '实时识别', description: '低延迟模型', languages: ['zh', 'en'],
+        installed: false, installedBytes: 0, downloadBytes: 458187351,
+        state: 'running', phase: 'download', progress: 0.5, cancellable: true
+      }
+    }))).toMatchObject({ type: 'resourceChanged', resource: { progress: 0.5 } })
+  })
 })

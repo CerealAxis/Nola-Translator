@@ -181,6 +181,7 @@ p { color: var(--text-secondary); line-height: 1.55; }
 .primary-button:hover { background: var(--accent-hover); }
 .secondary-button { background: var(--control); }
 .secondary-button:hover { background: var(--control-hover); }
+.button:disabled { cursor: default; opacity: .55; }
 .text-button { min-height: 28px; padding: 2px 5px; border: 0; background: transparent; color: var(--accent); }
 .compact-button { min-height: 30px; padding: 3px 10px; }
 
@@ -264,6 +265,42 @@ th { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
 .settings-surface { display: grid; gap: 18px; padding: 22px; }
 .settings-surface h2 { margin-bottom: 0; }
 .switch-label { color: var(--text-primary); }
+.settings-surface > label.setting-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 0 2px;
+  border-top: 1px solid var(--border);
+  color: var(--text-primary);
+}
+.setting-toggle-row > span { display: grid; gap: 4px; }
+.setting-toggle-row small { color: var(--text-secondary); line-height: 1.45; }
+.setting-toggle-row input[type="checkbox"] {
+  position: relative;
+  width: 40px;
+  height: 20px;
+  flex: none;
+  margin: 0;
+  appearance: none;
+  border: 1px solid var(--text-secondary);
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+.setting-toggle-row input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: transform 120ms cubic-bezier(.1, .9, .2, 1);
+}
+.setting-toggle-row input[type="checkbox"]:checked { border-color: var(--accent); background: var(--accent); }
+.setting-toggle-row input[type="checkbox"]:checked::before { background: var(--accent-foreground); transform: translateX(20px); }
 .color-label { grid-template-columns: 1fr auto !important; align-items: center; }
 .color-label input { width: 42px; height: 30px; padding: 2px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--control); }
 .button-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -285,6 +322,54 @@ th { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
 .diagnostic-card span, .diagnostic-card small { color: var(--text-secondary); }
 .diagnostic-card strong { font-size: 20px; }
 
+.storage-summary, .resource-shortcut {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+}
+.summary-icon, .resource-provider-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.summary-icon svg, .resource-provider-icon svg { width: 21px; height: 21px; }
+.storage-summary > div:nth-child(2) { min-width: 0; display: grid; gap: 3px; }
+.storage-path { overflow: hidden; color: var(--text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.storage-size { display: grid; justify-items: end; gap: 2px; }
+.storage-size small { color: var(--text-secondary); }
+.resource-section { margin-top: 28px; }
+.resource-section .section-heading-row p { margin: 4px 0 0; }
+.recognition-resource-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.resource-card { min-width: 0; padding: 20px; }
+.resource-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.resource-card h3 { margin: 0 0 7px; font-size: 17px; font-weight: 600; }
+.resource-card p { min-height: 50px; margin-bottom: 18px; font-size: 13px; }
+.resource-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; }
+.resource-status { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-secondary); font-size: 12px; }
+.resource-status svg { width: 16px; height: 16px; }
+.installed-status { color: #0f7b0f; }
+.working-status { color: var(--accent); }
+.error-status { color: #c42b1c; }
+.resource-progress { position: relative; height: 3px; margin-top: 13px; overflow: hidden; border-radius: 2px; background: var(--border-strong); }
+.resource-progress-fill { height: 100%; border-radius: inherit; background: var(--accent); transition: width 120ms linear; }
+.resource-progress-fill.indeterminate { width: 35%; animation: progress-indeterminate 1.4s ease-in-out infinite; }
+@keyframes progress-indeterminate { from { transform: translateX(-110%); } to { transform: translateX(390%); } }
+.package-surface { margin-top: 28px; padding: 20px; }
+.package-list { display: grid; }
+.package-row { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(190px, .7fr) auto; align-items: center; gap: 16px; padding: 13px 4px; border-top: 1px solid var(--border); }
+.package-title { min-width: 0; display: grid; gap: 3px; }
+.package-title small { color: var(--text-secondary); }
+.package-row .resource-progress { grid-column: 1 / -1; width: 100%; margin-top: -7px; }
+.resource-shortcut h2 { margin: 0 0 3px; }
+.resource-shortcut p { margin: 0; }
+
 @media (min-width: 1450px) {
   .live-layout { grid-template-columns: minmax(540px, .95fr) minmax(480px, 1.05fr); align-items: start; }
   .preview-section { position: sticky; top: 0; }
@@ -299,9 +384,14 @@ th { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
 }
 
 @media (max-width: 700px) {
-  .form-grid, .choice-grid, .settings-layout, .diagnostic-grid { grid-template-columns: 1fr; }
+  .form-grid, .choice-grid, .settings-layout, .diagnostic-grid, .recognition-resource-grid { grid-template-columns: 1fr; }
   .content-inner { padding: 18px; }
   .page-heading { flex-direction: column; }
+  .storage-summary, .resource-shortcut { grid-template-columns: auto minmax(0, 1fr); }
+  .storage-size, .resource-shortcut .button { grid-column: 2; justify-items: start; }
+  .package-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .package-row > .resource-status { grid-column: 1; }
+  .package-row > .button { grid-column: 2; grid-row: 1 / span 2; }
 }
 
 @media (max-height: 650px) {

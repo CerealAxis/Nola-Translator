@@ -102,7 +102,7 @@ class FakeOnlineRecognizer:
         self.decode_count += 1
 
     def get_result(self, _stream: FakeOnlineStream):
-        return type("Result", (), {"text": "decoded"})()
+        return "decoded"
 
     def is_endpoint(self, _stream: FakeOnlineStream) -> bool:
         return True
@@ -121,3 +121,10 @@ def test_sherpa_decoder_adapter_feeds_16khz_and_exposes_endpoint() -> None:
     assert online.stream.accepted[0][0] == 16_000
     decoder.reset()
     assert online.reset_count == 1
+
+
+def test_sherpa_decoder_finish_accepts_string_results_from_current_api() -> None:
+    online = FakeOnlineRecognizer()
+    decoder = SherpaOnnxDecoder(online)
+
+    assert decoder.finish() == DecoderResult("decoded", True)

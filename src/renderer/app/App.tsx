@@ -6,16 +6,8 @@ import { DiagnosticsPage } from '../pages/DiagnosticsPage'
 import { HistoryPage } from '../pages/HistoryPage'
 import { LiveCaptionsPage } from '../pages/LiveCaptionsPage'
 import { RecognitionPage } from '../pages/RecognitionPage'
+import { ResourcesPage } from '../pages/ResourcesPage'
 import { TranslationPage } from '../pages/TranslationPage'
-
-const pages: Record<PageId, React.JSX.Element> = {
-  captions: <LiveCaptionsPage />,
-  recognition: <RecognitionPage />,
-  translation: <TranslationPage />,
-  appearance: <AppearancePage />,
-  history: <HistoryPage />,
-  diagnostics: <DiagnosticsPage />
-}
 
 export function App(): React.JSX.Element {
   const [activePage, setActivePage] = useState<PageId>('captions')
@@ -31,6 +23,18 @@ export function App(): React.JSX.Element {
     return api.onSettingsChanged((settings) => apply(settings.theme))
   }, [])
 
+  const page = (): React.JSX.Element => {
+    switch (activePage) {
+      case 'captions': return <LiveCaptionsPage onOpenResources={() => setActivePage('resources')} />
+      case 'recognition': return <RecognitionPage />
+      case 'resources': return <ResourcesPage />
+      case 'translation': return <TranslationPage onOpenResources={() => setActivePage('resources')} />
+      case 'appearance': return <AppearancePage />
+      case 'history': return <HistoryPage />
+      case 'diagnostics': return <DiagnosticsPage />
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="titlebar">
@@ -39,7 +43,7 @@ export function App(): React.JSX.Element {
         <span className="local-mode"><span className="status-dot" aria-hidden="true" />本地模式</span>
       </header>
       <Navigation activePage={activePage} onNavigate={setActivePage} />
-      <main className="content"><div className="content-inner">{pages[activePage]}</div></main>
+      <main className="content"><div className="content-inner">{page()}</div></main>
     </div>
   )
 }

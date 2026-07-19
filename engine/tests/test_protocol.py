@@ -72,3 +72,12 @@ def test_serialization_omits_optional_none_fields() -> None:
         code="listening",
     )
     assert "details" not in json.loads(serialize_event(event))
+
+
+def test_accepts_explicit_resource_management_command() -> None:
+    command = parse_command_line(
+        '{"protocolVersion":1,"type":"manageResource","requestId":"install-1",'
+        '"resourceId":"sherpa-zh-en-small","action":"install"}'
+    )
+    assert command.type == "manageResource"
+    assert command.action == "install"

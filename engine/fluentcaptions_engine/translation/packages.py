@@ -1,4 +1,4 @@
-"""Argos `.argosmodel` 语言包发现和按需安装。"""
+"""Argos `.argosmodel` 语言包发现和显式安装。"""
 
 from __future__ import annotations
 
@@ -32,6 +32,52 @@ class ArgosPackageManager:
             if first and second:
                 return (source, "en", target)
         raise ArgosPackageUnavailable(f"没有可安装的 Argos 路径：{source} -> {target}")
+
+    def installed_path(
+        self, source: str, target: str, *, allow_intermediate: bool = False
+    ) -> tuple[str, ...] | None:
+        """只检查已安装包；该方法绝不刷新索引或访问网络。"""
+        if self._installed(source, target):
+            return (source, target)
+        if (
+            allow_intermediate
+            and source != "en"
+            and target != "en"
+            and self._installed(source, "en")
+            and self._installed("en", target)
+        ):
+            return (source, "en", target)
+        return None
+
+    def install(self, source: str, target: str) -> None:
+        """在用户明确要求后安装一个有向语言包。"""
+        if self._installed(source, target):
+            return
+        self._update_index()
+        if not self._install_edge(source, target):
+            raise ArgosPackageUnavailable(f"没有可安装的 Argos 包：{source} -> {target}")
+
+    def remove(self, source: str, target: str) -> None:
+        package = next(
+            (
+                item
+                for item in self.api.get_installed_packages()
+                if item.from_code == source and item.to_code == target
+            ),
+            None,
+        )
+        if package is not None:
+            self.api.uninstall(package)
+
+    def installed_package(self, source: str, target: str) -> Any | None:
+        return next(
+            (
+                item
+                for item in self.api.get_installed_packages()
+                if item.from_code == source and item.to_code == target
+            ),
+            None,
+        )
 
     def _update_index(self) -> None:
         if self.index_updated:

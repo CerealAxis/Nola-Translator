@@ -88,4 +88,15 @@ describe('App', () => {
     expect(await screen.findByText('引擎状态')).toBeInTheDocument()
     expect(screen.getByText('ready')).toBeInTheDocument()
   })
+
+  it('shows a dedicated resource page and a labeled Argos routing switch', async () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: '模型与语言包' }))
+    expect(screen.getByRole('heading', { name: '模型与语言包', level: 1 })).toBeInTheDocument()
+    expect(await screen.findByText('实时识别')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '翻译' }))
+    expect(screen.getByRole('checkbox', { name: '允许经 English 中转' })).toBeInTheDocument()
+  })
 })
