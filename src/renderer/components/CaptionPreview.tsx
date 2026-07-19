@@ -1,5 +1,6 @@
 import { LockClosedRegular } from '@fluentui/react-icons'
 import type { CaptionSegment } from '../../shared/contracts'
+import { DEFAULT_SETTINGS, type OverlaySettings } from '../../shared/settings'
 
 type CaptionPreviewProps = {
   listening?: boolean
@@ -7,6 +8,7 @@ type CaptionPreviewProps = {
   translationVisible?: boolean
   caption?: CaptionSegment | null
   modelProgress?: number | null
+  overlay?: Pick<OverlaySettings, 'backgroundOpacity' | 'sourceColor' | 'translationColor'>
 }
 
 export function CaptionPreview({
@@ -14,7 +16,8 @@ export function CaptionPreview({
   sourceVisible = true,
   translationVisible = true,
   caption = null,
-  modelProgress = null
+  modelProgress = null,
+  overlay = DEFAULT_SETTINGS.overlay,
 }: CaptionPreviewProps): React.JSX.Element {
   const completeTranslations = caption?.translations.filter((item) => item.state === 'complete') ?? []
   const hasPendingTranslation = caption?.translations.some((item) => item.state === 'pending')
@@ -27,7 +30,15 @@ export function CaptionPreview({
         <span className="secondary-text">底部 · 已置顶 · 点击穿透</span>
       </div>
       <div className="preview-stage">
-        <div className="caption-overlay">
+        <div
+          className="caption-overlay"
+          data-transparent-background={overlay.backgroundOpacity <= 0}
+          style={{
+            '--preview-background-opacity': overlay.backgroundOpacity,
+            '--preview-source-color': overlay.sourceColor,
+            '--preview-translation-color': overlay.translationColor,
+          } as React.CSSProperties}
+        >
           <div className="caption-meta">
             <span className="caption-state">
               <span className="status-dot" aria-hidden="true" />

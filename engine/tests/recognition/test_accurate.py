@@ -38,7 +38,7 @@ async def test_accurate_recognizer_only_emits_final_segment() -> None:
     assert len(updates) == 1
     assert updates[0].is_final is True
     assert updates[0].revision == 0
-    assert updates[0].source_text == "Hello world"
+    assert updates[0].source_text == "Hello world."
     assert updates[0].language == "en"
 
 

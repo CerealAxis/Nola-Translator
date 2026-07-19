@@ -9,6 +9,66 @@ import unicodedata
 from .base import RecognitionUpdate
 
 
+_ENGLISH_TERMINAL_PUNCTUATION = (".", "?", "!", "…")
+_ENGLISH_NAMES = {
+    "ai": "AI",
+    "api": "API",
+    "amazon": "Amazon",
+    "chatgpt": "ChatGPT",
+    "cpu": "CPU",
+    "gpu": "GPU",
+    "i": "I",
+    "microsoft": "Microsoft",
+    "nasa": "NASA",
+    "openai": "OpenAI",
+    "uk": "UK",
+    "usa": "USA",
+    "windows": "Windows",
+    "youtube": "YouTube",
+}
+
+
+def _looks_english(text: str, language: str | None) -> bool:
+    if language is not None:
+        return language.split("-")[0].casefold() == "en"
+    letters = [character for character in text if character.isalpha()]
+    return bool(letters) and all(character.isascii() for character in letters)
+
+
+def _format_caption_text(text: str, language: str | None, is_final: bool) -> str:
+    normalized = unicodedata.normalize("NFKC", text).strip()
+    if not normalized or not _looks_english(normalized, language):
+        return normalized
+
+    letters = [character for character in normalized if character.isalpha()]
+    uppercase_ratio = (
+        sum(character.isupper() for character in letters) / len(letters)
+        if letters
+        else 0.0
+    )
+    if len(letters) >= 4 and uppercase_ratio >= 0.8:
+        normalized = normalized.lower()
+        normalized = re.sub(
+            r"\b[a-z][a-z0-9]*\b",
+            lambda match: _ENGLISH_NAMES.get(match.group(0), match.group(0)),
+            normalized,
+        )
+        first_letter = next(
+            (index for index, character in enumerate(normalized) if character.isalpha()),
+            None,
+        )
+        if first_letter is not None:
+            normalized = (
+                normalized[:first_letter]
+                + normalized[first_letter].upper()
+                + normalized[first_letter + 1 :]
+            )
+
+    if is_final and not normalized.endswith(_ENGLISH_TERMINAL_PUNCTUATION):
+        normalized += "."
+    return normalized
+
+
 class RecognitionStabilizer:
     def __init__(self, segment_id: str, started_at_ms: float) -> None:
         self.segment_id = segment_id
@@ -28,7 +88,7 @@ class RecognitionStabilizer:
     ) -> RecognitionUpdate | None:
         if self.finalized:
             return None
-        normalized = unicodedata.normalize("NFKC", text).strip() if is_final else text.strip()
+        normalized = _format_caption_text(text, language or self.language, is_final)
         if not normalized:
             return None
         if normalized == self.last_text and not is_final:

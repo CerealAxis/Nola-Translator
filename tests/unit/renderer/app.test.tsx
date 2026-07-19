@@ -28,6 +28,16 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('准备就绪'))
   })
 
+  it('keeps a global stop action available after navigating away from captions', async () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: '开始字幕' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('正在监听音频'))
+    fireEvent.click(screen.getByRole('button', { name: '外观' }))
+
+    expect(screen.getByRole('button', { name: '停止字幕服务' })).toBeInTheDocument()
+  })
+
   it('navigates to translation, appearance, and history pages', () => {
     render(<App />)
 

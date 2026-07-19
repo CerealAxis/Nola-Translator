@@ -84,7 +84,7 @@ export function AppearancePage(): React.JSX.Element {
           <label><span>浮层位置</span><select value={overlay.mode} onChange={(event) => void updateOverlay({ mode: event.target.value as OverlaySettings['mode'] })}><option value="bottom">屏幕底部</option><option value="top">屏幕顶部</option><option value="free">自由位置</option></select></label>
           <label><span>字号 · {overlay.fontSize} px</span><input type="range" min="14" max="72" value={overlay.fontSize} onChange={(event) => void updateOverlay({ fontSize: Number(event.target.value) })} /></label>
           <label><span>字重 · {overlay.fontWeight}</span><input type="range" min="300" max="800" step="100" value={overlay.fontWeight} onChange={(event) => void updateOverlay({ fontWeight: Number(event.target.value) })} /></label>
-          <label><span>背景不透明度 · {Math.round(overlay.backgroundOpacity * 100)}%</span><input type="range" min="20" max="100" value={overlay.backgroundOpacity * 100} onChange={(event) => void updateOverlay({ backgroundOpacity: Number(event.target.value) / 100 })} /></label>
+          <label><span>背景不透明度 · {Math.round(overlay.backgroundOpacity * 100)}%</span><input type="range" min="0" max="100" value={overlay.backgroundOpacity * 100} onChange={(event) => void updateOverlay({ backgroundOpacity: Number(event.target.value) / 100 })} /></label>
           <label><span>最大行数 · {overlay.maxLines}</span><input type="range" min="1" max="10" value={overlay.maxLines} onChange={(event) => void updateOverlay({ maxLines: Number(event.target.value) })} /></label>
           <label className="color-label"><span>原文颜色</span><input aria-label="原文颜色" type="color" value={overlay.sourceColor} onChange={(event) => void updateOverlay({ sourceColor: event.target.value })} /></label>
           <label className="color-label"><span>译文颜色</span><input aria-label="译文颜色" type="color" value={overlay.translationColor} onChange={(event) => void updateOverlay({ translationColor: event.target.value })} /></label>
@@ -94,7 +94,7 @@ export function AppearancePage(): React.JSX.Element {
           <label className="switch-label"><input checked={overlay.locked} onChange={(event) => void updateOverlay({ locked: event.target.checked })} type="checkbox" />锁定并点击穿透</label>
           <p className="setting-hint">需要移动或缩放时，点击页面顶部的“调整位置和大小”；完成后可在浮层中重新锁定。</p>
         </section>
-        <CaptionPreview sourceVisible={overlay.showSource} translationVisible={overlay.showTranslation} />
+        <CaptionPreview overlay={overlay} sourceVisible={overlay.showSource} translationVisible={overlay.showTranslation} />
       </div>
     </div>
   )

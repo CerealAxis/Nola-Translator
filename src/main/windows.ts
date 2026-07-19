@@ -55,8 +55,10 @@ export function createOverlayWindowOptions(preload: string): BrowserWindowConstr
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
-    backgroundMaterial: 'acrylic',
-    hasShadow: true,
+    // 不能在窗口级使用 Acrylic：即使内容背景为 0%，Windows 仍会把整个
+    // 窗口渲染成磨砂色块。半透明效果只由网页中的字幕卡片负责。
+    backgroundMaterial: 'none',
+    hasShadow: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     focusable: false,

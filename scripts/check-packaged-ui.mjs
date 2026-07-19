@@ -158,6 +158,23 @@ try {
   })()`);
   await delay(150);
   const overlayHidden = await evaluate(overlayTarget, 'document.visibilityState === "hidden"');
+  await evaluate(target, `(async () => {
+    await window.fluentCaptions.updateSettings({ overlay: { backgroundOpacity: 0, locked: true } });
+    await window.fluentCaptions.showOverlay();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    return true;
+  })()`);
+  const transparentOverlayProbe = await evaluate(overlayTarget, `(() => {
+    const overlay = document.querySelector('.standalone-overlay');
+    const styles = overlay ? getComputedStyle(overlay) : null;
+    return {
+      visible: document.visibilityState === 'visible',
+      transparentFlag: overlay?.dataset.transparentBackground,
+      backgroundColor: styles?.backgroundColor,
+      backdropFilter: styles?.backdropFilter,
+      boxShadow: styles?.boxShadow,
+    };
+  })()`);
   const resourcePageProbe = await evaluate(target, `(async () => {
     const findButton = (name) => Array.from(document.querySelectorAll('button'))
       .find((button) => button.textContent?.trim() === name || button.getAttribute('aria-label') === name);
@@ -210,6 +227,11 @@ try {
     || !overlayWindowProbe.hasHide
     || !overlayWindowProbe.hasResizeCue
     || !overlayHidden
+    || !transparentOverlayProbe.visible
+    || transparentOverlayProbe.transparentFlag !== 'true'
+    || transparentOverlayProbe.backgroundColor !== 'rgba(0, 0, 0, 0)'
+    || transparentOverlayProbe.backdropFilter !== 'none'
+    || transparentOverlayProbe.boxShadow !== 'none'
     || resourcePageProbe.heading !== '模型与语言包'
     || resourcePageProbe.recognitionCards !== 2
     || resourcePageProbe.packageRows < 4
@@ -218,7 +240,7 @@ try {
     || translationSwitchProbe.rowDisplay !== 'flex'
     || translationSwitchProbe.toggleWidth !== '40px';
 
-  console.log(JSON.stringify({ ...result, bridgeProbe, overlayPageProbe, overlayWindowProbe, overlayHidden, resourcePageProbe, translationSwitchProbe }));
+  console.log(JSON.stringify({ ...result, bridgeProbe, overlayPageProbe, overlayWindowProbe, overlayHidden, transparentOverlayProbe, resourcePageProbe, translationSwitchProbe }));
   console.log(failed ? 'PACKAGED_UI_REPRO=FAIL' : 'PACKAGED_UI_REPRO=PASS');
   if (process.env.FLUENTCAPTIONS_SCREENSHOT) {
     const screenshot = await sendCommand(target, 'Page.captureScreenshot', { format: 'png' });

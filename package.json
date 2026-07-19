@@ -1,7 +1,7 @@
 {
   "name": "fluentcaptions",
   "productName": "FluentCaptions",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "面向 Windows 11 的本地实时字幕与翻译工具",
   "author": "FluentCaptions Contributors",
   "private": true,

@@ -94,10 +94,12 @@ class SherpaStreamingRecognizer:
         *,
         language: str | None,
         partial_interval_ms: float = 100,
+        max_segment_duration_ms: float = 8_000,
     ) -> None:
         self.decoder = decoder
         self.language = language
         self.partial_interval_ms = partial_interval_ms
+        self.max_segment_duration_ms = max_segment_duration_ms
         self.stabilizer: RecognitionStabilizer | None = None
         self.last_partial_at_ms: float | None = None
         self.last_frame_end_ms = 0.0
@@ -109,23 +111,29 @@ class SherpaStreamingRecognizer:
             self.stabilizer = RecognitionStabilizer(f"segment-{uuid4()}", frame.started_at_ms)
 
         updates: list[RecognitionUpdate] = []
+        force_endpoint = False
         if self.stabilizer is not None and result.text.strip():
+            force_endpoint = (
+                self.last_frame_end_ms - self.stabilizer.started_at_ms
+                >= self.max_segment_duration_ms
+            )
             can_emit_partial = (
                 self.last_partial_at_ms is None
                 or frame.started_at_ms - self.last_partial_at_ms >= self.partial_interval_ms
             )
-            if result.is_endpoint or can_emit_partial:
+            is_final = result.is_endpoint or force_endpoint
+            if is_final or can_emit_partial:
                 update = self.stabilizer.update(
                     result.text,
                     language=self.language,
-                    is_final=result.is_endpoint,
-                    ended_at_ms=self.last_frame_end_ms if result.is_endpoint else None,
+                    is_final=is_final,
+                    ended_at_ms=self.last_frame_end_ms if is_final else None,
                 )
                 if update is not None:
                     updates.append(update)
                     self.last_partial_at_ms = frame.started_at_ms
 
-        if result.is_endpoint:
+        if result.is_endpoint or force_endpoint:
             self.decoder.reset()
             self.stabilizer = None
             self.last_partial_at_ms = None

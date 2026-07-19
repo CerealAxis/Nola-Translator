@@ -71,7 +71,53 @@ async def test_stop_flushes_an_existing_partial() -> None:
     updates = await recognizer.flush(ended_at_ms=600)
     assert len(updates) == 1
     assert updates[0].is_final is True
-    assert updates[0].source_text == "unfinished"
+    assert updates[0].source_text == "unfinished."
+
+
+@pytest.mark.asyncio
+async def test_english_results_are_sentence_cased_and_finally_punctuated() -> None:
+    decoder = FakeDecoder(
+        [
+            DecoderResult("HELLO WORLD", False),
+            DecoderResult("HELLO WORLD THIS IS A TEST", True),
+        ]
+    )
+    recognizer = SherpaStreamingRecognizer(
+        decoder, language="en", partial_interval_ms=100
+    )
+
+    updates = []
+    for timestamp in (0, 100):
+        updates.extend(await recognizer.accept(frame(timestamp)))
+
+    assert [update.source_text for update in updates] == [
+        "Hello world",
+        "Hello world this is a test.",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_long_continuous_speech_is_forced_into_readable_segments() -> None:
+    decoder = FakeDecoder(
+        [
+            DecoderResult("ONE TWO", False),
+            DecoderResult("ONE TWO THREE FOUR FIVE SIX", False),
+        ]
+    )
+    recognizer = SherpaStreamingRecognizer(
+        decoder,
+        language="en",
+        partial_interval_ms=100,
+        max_segment_duration_ms=8_000,
+    )
+
+    first = await recognizer.accept(frame(0))
+    forced = await recognizer.accept(frame(8_000))
+
+    assert first[0].is_final is False
+    assert forced[0].is_final is True
+    assert forced[0].source_text.endswith(".")
+    assert decoder.reset_count == 1
 
 
 class FakeOnlineStream:

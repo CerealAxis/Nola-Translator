@@ -131,6 +131,9 @@ button { color: inherit; }
 }
 
 .navigation-item:hover { background: var(--control); }
+.session-stop-navigation { color: #c42b1c; background: color-mix(in srgb, #c42b1c 8%, transparent); }
+.session-stop-navigation:hover { background: color-mix(in srgb, #c42b1c 14%, transparent); }
+.session-stop-navigation svg { color: currentColor; }
 .navigation-item[data-active="true"] { background: var(--control-hover); position: relative; }
 .navigation-item[data-active="true"]::before {
   content: "";
@@ -239,12 +242,13 @@ input[type="checkbox"] { accent-color: var(--accent); }
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 13%, transparent), transparent 58%), var(--navigation);
   overflow: hidden;
 }
-.caption-overlay { width: min(760px, 94%); padding: 14px 18px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface-strong); box-shadow: 0 14px 32px var(--shadow); backdrop-filter: blur(28px) saturate(130%); }
-.caption-meta { display: flex; justify-content: space-between; gap: 14px; margin-bottom: 9px; color: var(--text-secondary); font-size: 12px; }
+.caption-overlay { width: min(760px, 94%); padding: 14px 18px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 12px; background: rgba(24, 24, 24, var(--preview-background-opacity, .84)); box-shadow: 0 14px 32px var(--shadow); backdrop-filter: blur(28px) saturate(130%); }
+.caption-overlay[data-transparent-background="true"] { background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none; }
+.caption-meta { display: flex; justify-content: space-between; gap: 14px; margin-bottom: 9px; color: rgba(255, 255, 255, .72); font-size: 12px; }
 .caption-state, .caption-position { display: flex; align-items: center; gap: 7px; }
 .caption-position svg { width: 14px; height: 14px; }
-.caption-source { margin-bottom: 5px; color: var(--text-primary); font-weight: 600; }
-.caption-translation { margin-bottom: 0; }
+.caption-source { margin-bottom: 5px; color: var(--preview-source-color, #fff); font-weight: 600; }
+.caption-translation { margin-bottom: 0; color: var(--preview-translation-color, #e6f2ff); }
 
 .choice-grid, .diagnostic-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .choice-card { padding: 22px; }
@@ -415,6 +419,13 @@ html[data-overlay="true"], html[data-overlay="true"] body, html[data-overlay="tr
   border: 1px solid var(--border-strong); border-radius: 14px; background: rgba(24, 24, 24, var(--overlay-background-opacity, .84));
   box-shadow: 0 14px 38px var(--shadow); backdrop-filter: blur(30px) saturate(135%);
 }
+.standalone-overlay[data-transparent-background="true"] {
+  /* 透明时也必须移除模糊、边框与阴影，否则会仍然看到一块灰色玻璃。 */
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
 .standalone-overlay[data-locked="false"] { border-color: color-mix(in srgb, var(--accent) 75%, white); -webkit-app-region: drag; cursor: move; }
 .overlay-edit-bar { position: absolute; inset: 8px 10px auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #f4f4f4; font-size: 12px; }
 .overlay-drag-hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -424,6 +435,6 @@ html[data-overlay="true"], html[data-overlay="true"] body, html[data-overlay="tr
 .overlay-resize-cue { position: absolute; right: 5px; bottom: 5px; width: 13px; height: 13px; border-right: 2px solid rgba(255, 255, 255, .8); border-bottom: 2px solid rgba(255, 255, 255, .8); pointer-events: none; }
 .overlay-status { display: flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 12px; }
 .overlay-lines { min-width: 0; text-align: center; }
-.overlay-source, .overlay-translation { margin: 0; overflow-wrap: anywhere; text-wrap: balance; }
+.overlay-source, .overlay-translation { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; text-wrap: balance; }
 .overlay-source { color: var(--overlay-source-color, #fff); font-size: var(--overlay-font-size, 28px); font-weight: var(--overlay-font-weight, 600); line-height: var(--overlay-line-height, 1.3); display: -webkit-box; -webkit-line-clamp: var(--overlay-max-lines, 3); -webkit-box-orient: vertical; overflow: hidden; }
 .overlay-translation { margin-top: 4px; color: var(--overlay-translation-color, #e6f2ff); font-size: calc(var(--overlay-font-size, 28px) * .78); line-height: var(--overlay-line-height, 1.3); display: -webkit-box; -webkit-line-clamp: var(--overlay-max-lines, 3); -webkit-box-orient: vertical; overflow: hidden; }

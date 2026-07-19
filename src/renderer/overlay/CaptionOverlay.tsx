@@ -28,6 +28,9 @@ export function CaptionOverlay(): React.JSX.Element {
           }
           return next.slice(-3)
         })
+      } else if (event.type === 'sessionStarted') {
+        setSegments([])
+        setStatus('正在识别')
       } else if (event.type === 'sessionStopped') {
         setStatus('字幕会话已停止')
       } else if (event.type === 'error') {
@@ -48,10 +51,24 @@ export function CaptionOverlay(): React.JSX.Element {
   }
 
   const current = segments.at(-1)
+  const visibleSegments = segments.slice(-Math.max(1, Math.min(settings.overlay.maxLines, 3)))
+  const sourceLines = visibleSegments.map((segment) => segment.sourceText).filter(Boolean).join('\n')
+  const completeTranslations = new Map<string, string[]>()
+  for (const segment of visibleSegments) {
+    for (const translation of segment.translations) {
+      if (translation.state !== 'complete' || !translation.text) continue
+      const lines = completeTranslations.get(translation.targetLanguage) ?? []
+      lines.push(translation.text)
+      completeTranslations.set(translation.targetLanguage, lines)
+    }
+  }
+  const pendingTargets = current?.translations.filter((translation) => translation.state === 'pending') ?? []
+  const failedTargets = current?.translations.filter((translation) => translation.state === 'failed') ?? []
   return (
     <main
       className="standalone-overlay"
       data-locked={settings.overlay.locked}
+      data-transparent-background={settings.overlay.backgroundOpacity <= 0}
       aria-live="polite"
       style={{
         '--overlay-background-opacity': settings.overlay.backgroundOpacity,
@@ -75,11 +92,15 @@ export function CaptionOverlay(): React.JSX.Element {
       )}
       <div className="overlay-status"><span className="status-dot" aria-hidden="true" />{status}</div>
       <div className="overlay-lines">
-        {settings.overlay.showSource && <p className="overlay-source">{current?.sourceText || '开始字幕后，原文会显示在这里。'}</p>}
-        {settings.overlay.showTranslation && current?.translations.map((translation) => (
-          <p className="overlay-translation" key={translation.targetLanguage}>
-            {translation.state === 'complete' ? translation.text : translation.state === 'pending' ? '正在翻译…' : `翻译不可用：${translation.errorCode}`}
-          </p>
+        {settings.overlay.showSource && <p className="overlay-source">{sourceLines || '开始字幕后，原文会显示在这里。'}</p>}
+        {settings.overlay.showTranslation && [...completeTranslations].map(([targetLanguage, lines]) => (
+          <p className="overlay-translation" key={targetLanguage}>{lines.join('\n')}</p>
+        ))}
+        {settings.overlay.showTranslation && pendingTargets.map((translation) => (
+          !completeTranslations.has(translation.targetLanguage) && <p className="overlay-translation" key={translation.targetLanguage}>正在翻译…</p>
+        ))}
+        {settings.overlay.showTranslation && failedTargets.map((translation) => (
+          !completeTranslations.has(translation.targetLanguage) && <p className="overlay-translation" key={translation.targetLanguage}>翻译不可用：{translation.errorCode}</p>
         ))}
       </div>
       {!settings.overlay.locked && <span aria-hidden="true" className="overlay-resize-cue" />}

@@ -27,7 +27,7 @@ const settingsPatchSchema = z.object({
     alwaysOnTop: z.boolean().optional(), fontFamily: z.string().max(128).optional(),
     fontSize: z.number().min(14).max(72).optional(), fontWeight: z.number().min(300).max(800).optional(),
     sourceColor: z.string().max(32).optional(), translationColor: z.string().max(32).optional(),
-    backgroundOpacity: z.number().min(0.2).max(1).optional(), maxLines: z.number().int().min(1).max(10).optional(),
+    backgroundOpacity: z.number().min(0).max(1).optional(), maxLines: z.number().int().min(1).max(10).optional(),
     lineHeight: z.number().min(1).max(2).optional(), showSource: z.boolean().optional(), showTranslation: z.boolean().optional(),
   }).partial().optional(),
   translation: z.object({

@@ -37,7 +37,7 @@ def test_flush_finalizes_existing_partial_but_not_empty_segment() -> None:
     final = stabilizer.flush(ended_at_ms=500)
     assert final is not None
     assert final.is_final is True
-    assert final.source_text == "hello"
+    assert final.source_text == "hello."
 
 
 def test_deduplicator_rejects_overlapping_duplicate_final_segments() -> None:

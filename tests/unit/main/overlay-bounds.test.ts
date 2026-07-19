@@ -45,6 +45,10 @@ describe('字幕浮层位置', () => {
       resizable: true,
       movable: true,
       thickFrame: true,
+      // 背景由渲染层按用户选择的透明度绘制。窗口本身不能套系统 Acrylic，
+      // 否则 0% 时仍会留下整块磨砂底色。
+      backgroundMaterial: 'none',
+      hasShadow: false,
     })
   })
 })

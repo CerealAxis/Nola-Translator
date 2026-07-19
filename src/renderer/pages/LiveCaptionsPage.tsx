@@ -7,11 +7,15 @@ import { CaptionPreview } from '../components/CaptionPreview'
 
 type SessionState = 'idle' | 'starting' | 'listening' | 'stopping' | 'error'
 
-type LiveCaptionsPageProps = { onOpenResources: () => void }
+type LiveCaptionsPageProps = {
+  activeSessionId: string | null
+  onSessionStarted: (sessionId: string) => void
+  onStopSession: () => Promise<void>
+  onOpenResources: () => void
+}
 
-export function LiveCaptionsPage({ onOpenResources }: LiveCaptionsPageProps): React.JSX.Element {
+export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSession, onOpenResources }: LiveCaptionsPageProps): React.JSX.Element {
   const [state, setState] = useState<SessionState>('idle')
-  const [sessionId, setSessionId] = useState<string | null>(null)
   const [devices, setDevices] = useState<AudioDevice[]>([])
   const [audioSource, setAudioSource] = useState('defaultOutput')
   const [recognitionMode, setRecognitionMode] = useState<'realtime' | 'accurate'>('realtime')
@@ -65,6 +69,15 @@ export function LiveCaptionsPage({ onOpenResources }: LiveCaptionsPageProps): Re
     }
   }, [api])
 
+  useEffect(() => {
+    if (activeSessionId) {
+      setState('listening')
+      setNotice('正在监听音频')
+    } else {
+      setState((current) => current === 'listening' || current === 'stopping' ? 'idle' : current)
+    }
+  }, [activeSessionId])
+
   const selectedDevice = useMemo(
     () => devices.find((device) => device.deviceId === audioSource),
     [audioSource, devices]
@@ -105,7 +118,7 @@ export function LiveCaptionsPage({ onOpenResources }: LiveCaptionsPageProps): Re
         return
       }
       const result = await api.startSession(config)
-      setSessionId(result.sessionId)
+      onSessionStarted(result.sessionId)
       setState('listening')
       setNotice('正在监听音频')
     } catch (error) {
@@ -118,12 +131,11 @@ export function LiveCaptionsPage({ onOpenResources }: LiveCaptionsPageProps): Re
   }
 
   const stop = async (): Promise<void> => {
-    if (!api || !sessionId) return
+    if (!api || !activeSessionId) return
     setState('stopping')
     setNotice('正在停止并整理最后一句字幕…')
     try {
-      await api.stopSession(sessionId)
-      setSessionId(null)
+      await onStopSession()
       setState('idle')
       setNotice('准备就绪')
     } catch (error) {
@@ -132,7 +144,7 @@ export function LiveCaptionsPage({ onOpenResources }: LiveCaptionsPageProps): Re
     }
   }
 
-  const listening = state === 'listening'
+  const listening = Boolean(activeSessionId) || state === 'listening'
   const busy = state === 'starting' || state === 'stopping'
 
   return (

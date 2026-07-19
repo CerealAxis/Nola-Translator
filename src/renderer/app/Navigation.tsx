@@ -7,7 +7,8 @@ import {
   LocalLanguageRegular,
   MicRegular,
   PulseRegular,
-  SettingsRegular
+  SettingsRegular,
+  StopRegular
 } from '@fluentui/react-icons'
 
 export type PageId =
@@ -21,6 +22,9 @@ export type PageId =
 
 type NavigationProps = {
   activePage: PageId
+  activeSessionId: string | null
+  sessionStopping: boolean
+  onStopSession: () => Promise<void>
   onNavigate: (page: PageId) => void
 }
 
@@ -40,7 +44,7 @@ const navigationItems: NavigationItem[] = [
   { id: 'diagnostics', label: '诊断', icon: PulseRegular }
 ]
 
-export function Navigation({ activePage, onNavigate }: NavigationProps): React.JSX.Element {
+export function Navigation({ activePage, activeSessionId, sessionStopping, onStopSession, onNavigate }: NavigationProps): React.JSX.Element {
   const [engineStatus, setEngineStatus] = useState('正在连接引擎')
   useEffect(() => {
     const api = window.fluentCaptions
@@ -79,6 +83,10 @@ export function Navigation({ activePage, onNavigate }: NavigationProps): React.J
       </div>
 
       <div className="navigation-footer">
+        {activeSessionId && <button className="navigation-item session-stop-navigation" disabled={sessionStopping} onClick={() => void onStopSession().catch(() => undefined)} type="button" aria-label="停止字幕服务">
+          <StopRegular aria-hidden />
+          <span className="navigation-label">{sessionStopping ? '正在停止字幕' : '停止字幕服务'}</span>
+        </button>}
         <button className="navigation-item" onClick={() => onNavigate('appearance')} type="button" aria-label="设置">
           <SettingsRegular aria-hidden />
           <span className="navigation-label">设置</span>
