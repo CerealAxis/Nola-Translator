@@ -10,6 +10,8 @@ describe('renderer content security policy', () => {
     expect(html).toContain('http-equiv="Content-Security-Policy"')
     expect(html).toContain("default-src 'self'")
     expect(html).toContain("script-src 'self'")
+    expect(html).toContain("style-src 'self' 'unsafe-inline'")
+    expect(html).not.toContain("script-src 'self' 'unsafe-inline'")
     expect(html).not.toContain("'unsafe-eval'")
   })
 })

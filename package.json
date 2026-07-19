@@ -1,7 +1,7 @@
 {
   "name": "fluentcaptions",
   "productName": "FluentCaptions",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "面向 Windows 11 的本地实时字幕与翻译工具",
   "author": "FluentCaptions Contributors",
   "private": true,
@@ -15,6 +15,7 @@
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:ui": "electron tests/e2e/capture-ui.mjs",
+    "test:packaged-ui": "node scripts/check-packaged-ui.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit"

@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { BrowserWindowConstructorOptions } from 'electron'
 
 export function resolvePreloadPath(mainDirectory: string): string {
-  return join(mainDirectory, '../preload/index.mjs')
+  return join(mainDirectory, '../preload/index.cjs')
 }
 
 export function createMainWindowOptions(preload: string): BrowserWindowConstructorOptions {

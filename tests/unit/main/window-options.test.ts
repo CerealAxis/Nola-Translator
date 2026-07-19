@@ -27,7 +27,7 @@ describe('createMainWindowOptions', () => {
 })
 
 describe('resolvePreloadPath', () => {
-  it('points to the ESM preload artifact emitted by electron-vite', () => {
-    expect(resolvePreloadPath('C:\\app\\out\\main')).toBe('C:\\app\\out\\preload\\index.mjs')
+  it('points to the CommonJS preload artifact supported by sandboxed renderers', () => {
+    expect(resolvePreloadPath('C:\\app\\out\\main')).toBe('C:\\app\\out\\preload\\index.cjs')
   })
 })
