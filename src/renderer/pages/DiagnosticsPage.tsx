@@ -1,12 +1,14 @@
+import { useEffect, useState } from 'react'
+
 export function DiagnosticsPage(): React.JSX.Element {
+  const [diagnostics, setDiagnostics] = useState<Record<string, string | number>>({})
+  const [copied, setCopied] = useState(false)
+  const api = window.fluentCaptions
+  useEffect(() => { void api?.getDiagnostics().then(setDiagnostics) }, [api])
   return (
     <div className="page">
-      <header className="page-heading"><div><h1>诊断</h1><p>查看运行状态，不记录字幕正文。</p></div><button className="button secondary-button" type="button">复制诊断信息</button></header>
-      <div className="diagnostic-grid">
-        <section className="surface diagnostic-card"><span>Python 引擎</span><strong>等待接入</strong><small>将使用本机 Conda Python 3.13</small></section>
-        <section className="surface diagnostic-card"><span>识别后端</span><strong>尚未启动</strong><small>sherpa-onnx / faster-whisper</small></section>
-        <section className="surface diagnostic-card"><span>翻译后端</span><strong>尚未启动</strong><small>Argos Translate · 本地</small></section>
-      </div>
+      <header className="page-heading"><div><h1>诊断</h1><p>只显示运行环境与引擎状态，不包含字幕正文。</p></div><button className="button secondary-button" onClick={() => void api?.copyDiagnostics().then(() => setCopied(true))} type="button">{copied ? '已复制' : '复制诊断信息'}</button></header>
+      <div className="diagnostic-grid">{Object.entries(diagnostics).map(([label, value]) => <section className="surface diagnostic-card" key={label}><span>{label}</span><strong>{value}</strong></section>)}</div>
     </div>
   )
 }

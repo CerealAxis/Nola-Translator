@@ -33,11 +33,21 @@ class DeviceSource(ProtocolModel):
 AudioSource = Annotated[Union[DefaultOutputSource, DeviceSource], Field(discriminator="kind")]
 
 
+class TranslationOptions(ProtocolModel):
+    endpoint: str | None = Field(default=None, min_length=1, max_length=2048)
+    apiKey: str | None = Field(default=None, max_length=4096)
+    region: str | None = Field(default=None, max_length=128)
+    model: str | None = Field(default=None, max_length=256)
+
+
 class SessionConfig(ProtocolModel):
     audioSource: AudioSource
     recognitionMode: Literal["realtime", "accurate"]
     sourceLanguage: str = Field(min_length=1, max_length=32)
     targetLanguages: list[str] = Field(max_length=8)
+    allowIntermediateTranslation: bool = False
+    translationProvider: Literal["argos", "microsoft", "openai", "ollama"] = "argos"
+    translationOptions: TranslationOptions | None = None
 
 
 class HelloCommand(Envelope):

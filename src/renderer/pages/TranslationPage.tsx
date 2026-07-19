@@ -1,27 +1,60 @@
-import { ArrowDownloadRegular, ShieldCheckmarkRegular } from '@fluentui/react-icons'
+import { useEffect, useState } from 'react'
+import { ShieldCheckmarkRegular } from '@fluentui/react-icons'
+
+import { DEFAULT_SETTINGS, type TranslationSettings } from '../../shared/settings'
 
 export function TranslationPage(): React.JSX.Element {
+  const [settings, setSettings] = useState<TranslationSettings>(DEFAULT_SETTINGS.translation)
+  const [credential, setCredential] = useState('')
+  const [hasCredential, setHasCredential] = useState(false)
+  const [notice, setNotice] = useState('Argos 默认在本机运行。')
+  const api = window.fluentCaptions
+
+  useEffect(() => {
+    if (!api) return
+    let active = true
+    void api.getSettings().then((value) => active && setSettings(value.translation))
+    return () => { active = false }
+  }, [api])
+
+  useEffect(() => {
+    if (!api || (settings.provider !== 'microsoft' && settings.provider !== 'openai')) {
+      setHasCredential(false)
+      return
+    }
+    void api.hasTranslationCredential(settings.provider).then(setHasCredential)
+  }, [api, settings.provider])
+
+  const update = async (patch: Partial<TranslationSettings>): Promise<void> => {
+    if (!api) return
+    const next = { ...settings, ...patch }
+    setSettings(next)
+    setSettings((await api.updateSettings({ translation: patch })).translation)
+    setNotice('翻译设置已保存，将从下一次字幕会话开始生效。')
+  }
+  const saveCredential = async (): Promise<void> => {
+    if (!api || (settings.provider !== 'microsoft' && settings.provider !== 'openai')) return
+    await api.setTranslationCredential(settings.provider, credential)
+    setHasCredential(Boolean(credential))
+    setCredential('')
+    setNotice(credential ? 'API 密钥已使用 Windows 加密存储。' : '已删除保存的 API 密钥。')
+  }
+
   return (
     <div className="page">
-      <header className="page-heading">
-        <div><h1>翻译</h1><p>Argos Translate 默认在本机运行，语言包按需安装。</p></div>
-      </header>
-      <section className="surface table-surface">
-        <div className="card-heading-row">
-          <div><h2>本地语言包</h2><p>直接翻译优先；中转路线会在选择时明确提示。</p></div>
-          <span className="badge"><ShieldCheckmarkRegular aria-hidden /> Argos · 离线</span>
-        </div>
-        <div className="table-scroll">
-          <table>
-            <thead><tr><th>语言方向</th><th>路径</th><th>大小</th><th>状态</th><th>操作</th></tr></thead>
-            <tbody>
-              <tr><td>English → 简体中文</td><td>直接翻译</td><td>87 MB</td><td><span className="badge">已安装</span></td><td><button className="text-button" type="button">管理</button></td></tr>
-              <tr><td>简体中文 → English</td><td>直接翻译</td><td>79 MB</td><td><span className="badge">已安装</span></td><td><button className="text-button" type="button">管理</button></td></tr>
-              <tr><td>日本語 → 简体中文</td><td>经 English 中转</td><td>126 MB</td><td>未安装</td><td><button className="button secondary-button compact-button" type="button"><ArrowDownloadRegular aria-hidden />下载</button></td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <header className="page-heading"><div><h1>翻译</h1><p>{notice}</p></div><span className="badge"><ShieldCheckmarkRegular aria-hidden />{settings.provider === 'argos' ? '离线' : '用户主动联网'}</span></header>
+      <div className="translation-layout">
+        <section className="surface settings-surface">
+          <h2>翻译后端</h2>
+          <label><span>Provider</span><select aria-label="翻译后端" value={settings.provider} onChange={(event) => void update({ provider: event.target.value as TranslationSettings['provider'] })}><option value="argos">Argos Translate · 本地</option><option value="microsoft">Microsoft Translator</option><option value="openai">OpenAI 兼容接口</option><option value="ollama">Ollama · 本地</option></select></label>
+          {settings.provider === 'argos' && <><p>语言包会在第一次使用对应语言方向时自动下载；安装完成后可完全离线。</p><label className="switch-label"><input checked={settings.allowIntermediate} onChange={(event) => void update({ allowIntermediate: event.target.checked })} type="checkbox" />没有直译包时，允许经 English 中转</label></>}
+          {settings.provider === 'microsoft' && <><label><span>服务地址</span><input className="text-input" value={settings.microsoftEndpoint} onChange={(event) => setSettings({ ...settings, microsoftEndpoint: event.target.value })} onBlur={() => void update({ microsoftEndpoint: settings.microsoftEndpoint })} /></label><label><span>资源区域（全局资源可留空）</span><input className="text-input" value={settings.microsoftRegion} onChange={(event) => setSettings({ ...settings, microsoftRegion: event.target.value })} onBlur={() => void update({ microsoftRegion: settings.microsoftRegion })} /></label></>}
+          {settings.provider === 'openai' && <><label><span>兼容接口根地址</span><input className="text-input" value={settings.openaiEndpoint} onChange={(event) => setSettings({ ...settings, openaiEndpoint: event.target.value })} onBlur={() => void update({ openaiEndpoint: settings.openaiEndpoint })} /></label><label><span>模型</span><input className="text-input" value={settings.openaiModel} onChange={(event) => setSettings({ ...settings, openaiModel: event.target.value })} onBlur={() => void update({ openaiModel: settings.openaiModel })} /></label></>}
+          {settings.provider === 'ollama' && <><label><span>Ollama 地址</span><input className="text-input" value={settings.ollamaEndpoint} onChange={(event) => setSettings({ ...settings, ollamaEndpoint: event.target.value })} onBlur={() => void update({ ollamaEndpoint: settings.ollamaEndpoint })} /></label><label><span>模型</span><input className="text-input" value={settings.ollamaModel} onChange={(event) => setSettings({ ...settings, ollamaModel: event.target.value })} onBlur={() => void update({ ollamaModel: settings.ollamaModel })} /></label></>}
+          {(settings.provider === 'microsoft' || settings.provider === 'openai') && <label><span>API 密钥 · {hasCredential ? '已保存' : '未保存'}</span><div className="credential-row"><input className="text-input" type="password" autoComplete="off" placeholder={hasCredential ? '输入新密钥以替换；留空并保存可删除' : '输入 API 密钥'} value={credential} onChange={(event) => setCredential(event.target.value)} /><button className="button secondary-button" onClick={() => void saveCredential()} type="button">保存密钥</button></div></label>}
+        </section>
+        <section className="surface table-surface"><div className="card-heading-row"><div><h2>Argos 本地语言包</h2><p>下载过程会在实时字幕页显示，首包可能需要几分钟。</p></div></div><div className="table-scroll"><table><thead><tr><th>语言方向</th><th>路径</th><th>状态</th></tr></thead><tbody><tr><td>English ↔ 简体中文</td><td>优先直译</td><td><span className="badge">按需安装</span></td></tr><tr><td>English ↔ 日本語</td><td>优先直译</td><td><span className="badge">按需安装</span></td></tr><tr><td>日本語 ↔ 简体中文</td><td>可经 English 中转</td><td>需明确允许</td></tr></tbody></table></div></section>
+      </div>
     </div>
   )
 }

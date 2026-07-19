@@ -1,57 +1,75 @@
 # FluentCaptions
 
-FluentCaptions 是一款面向 Windows 11 的本地实时字幕与翻译工具。目前处于早期开发阶段，Electron + React 主界面已经可以运行，Electron 与 Python 引擎的通信底座已经接通；音频、识别和翻译能力将在此基础上逐步接入。
+FluentCaptions 是一款面向 Windows 11 的实时字幕与翻译应用。它使用 Electron + React 构建 Fluent 风格界面，使用独立 Python 引擎完成 Windows 音频捕获、语音识别和翻译。
 
-## 当前能力
+## 已实现功能
 
-- Windows 11 Fluent 风格的主界面；
-- 主窗口自由拉伸，默认 `1180 × 780`，最小 `760 × 560`；
-- 窄窗口自动收起导航文字，宽窗口自动扩展内容布局；
-- 实时字幕、语音识别、翻译、外观、历史记录和诊断页面；
-- 开始/停止字幕的界面状态与字幕浮层预览；
-- 浅色、深色、高对比度、系统文字缩放和减少动画适配；
-- Electron 渲染进程沙箱、上下文隔离和内容安全策略。
-- TypeScript/Zod 与 Python/Pydantic 双端校验的版本化 JSONL 协议；
-- Python sidecar 握手、串行写入、字幕中间结果合并、异常退避重启和优雅退出。
-- WASAPI 系统输出/麦克风枚举、稳定设备映射，以及 16 kHz 单声道标准帧管线；
+- 捕获 Windows 默认系统输出、指定输出设备或麦克风；
+- 实时模式：sherpa-onnx 中英双语流式识别，持续输出中间结果；
+- 高精度模式：faster-whisper + Silero VAD，以完整语音片段输出，优先使用 CUDA/FP16，失败时回退 CPU/INT8；
+- 支持自动识别、中文、英文、日文，以及 Whisper 模型支持的其他语言；
+- 同时选择中文、英文、日文等多个目标语言；
+- Argos Translate 本地翻译与语言包按需安装，可选择是否允许英语中转；
+- 可选 Microsoft Translator、OpenAI 兼容接口和本地 Ollama；
+- API 密钥使用 Electron `safeStorage` 调用 Windows 加密能力保存，不写入普通设置文件；
+- 独立字幕浮层支持顶部、底部和自由位置，置顶、锁定、点击穿透、拖动、缩放；
+- 支持主题、字体、字号、字重、颜色、背景透明度、最大行数、原文/译文显示；
+- 默认仅在内存中保留字幕；用户明确开启后才写入磁盘；
+- 导出 TXT、SRT 和 WebVTT；
+- 支持浅色、深色、高对比度、系统文字缩放、减少动画、多显示器与独立 DPI；
+- 首版只构建 Windows x64，Electron 与 Python 协议保持架构无关。
 
-## 本机开发环境
+## 直接运行开发版
 
-- Node.js 24；
-- npm 11；
-- Electron 43；
-- Python 使用本机 Conda Python 3.13，接入引擎时创建项目内 `.venv`；
-- npm 包默认通过 `https://registry.npmmirror.com` 安装；
-- Electron 运行时通过 `https://npmmirror.com/mirrors/electron/` 下载。
-
-## 安装
+本项目统一使用 npm，不使用 pnpm 或 Yarn。脚本优先使用项目现有 `.venv`，缺少时才用本机 `python` 创建；npm 使用 npmmirror，Python 使用阿里云 PyPI 镜像。
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 .\scripts\install.ps1
 .\scripts\install-engine.ps1
+npm run dev
 ```
 
-项目统一使用 npm，不使用 pnpm 或 Yarn。`scripts/install.ps1` 会先执行 `npm install`，并在本地缺少 Electron 运行时时通过镜像安装。
+第一次开始字幕时会按需下载模型：
 
-## 开发与验证
+- 实时模式下载 sherpa-onnx 中英双语流式模型；
+- 高精度模式下载 faster-whisper `small` 模型；
+- Argos 在第一次使用某个语言方向时下载对应语言包。
+
+下载完成后，本地识别和 Argos/Ollama 翻译可以离线运行。Microsoft Translator 和 OpenAI 兼容接口只有在用户主动选择并配置后才联网。
+
+## 验证与构建
 
 ```powershell
-npm run dev
 npm test
 npm run typecheck
+.\.venv\Scripts\python.exe -m pytest engine\tests
 npm run build
-npm run test:ui
 ```
 
-`npm run test:ui` 会使用真实 Electron 分别渲染默认尺寸和最小尺寸，截图写入被 Git 忽略的 `artifacts/ui/`。
+构建 Windows x64 安装包：
 
-通信格式、错误码和生命周期说明见 `docs/protocol.md`，Windows 音频实现见 `docs/audio.md`。
+```powershell
+npm run dist:win
+```
 
-## 隐私原则
+安装包输出到 `release\`。打包版自带 Python sidecar，最终用户不需要安装 Node.js 或 Python。识别模型和 Argos 语言包仍按需下载，不放入安装包。
 
-默认不保存字幕正文，不录制原始音频。模型安装完成后，Argos 翻译、本地语音识别及字幕显示均可离线工作；任何联网翻译 Provider 都必须由用户主动配置和启用。
+## 隐私与数据位置
 
-## 设计稿
+- 原始音频从不写入磁盘；
+- 字幕历史默认关闭，只保留在当前进程内存；
+- 开启保存后，最终字幕写入 Electron `userData` 目录；
+- 模型、Argos 包、普通设置与加密凭据分别存放；
+- 诊断信息不包含音频、字幕正文或 API 密钥；
+- 清空历史会清除内存记录，并在持久化开启时清空历史文件。
 
-首轮审阅用的静态交互稿保留在 `ui-demo.html`，正式实现位于 `src/`，两者不会共享运行时代码。
+## 文档
+
+- [实现说明](docs/implementation.md)
+- [界面与窗口规范](docs/design-system.md)
+- [Windows 音频管线](docs/audio.md)
+- [Electron 与 Python 协议](docs/protocol.md)
+- [第三方组件声明](THIRD_PARTY_NOTICES.md)
+
+`ui-demo.html` 是早期静态审阅稿；正式应用位于 `src/` 和 `engine/`，运行时不依赖该文件。

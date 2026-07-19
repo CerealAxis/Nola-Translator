@@ -10,6 +10,14 @@ export type SessionConfig = {
   recognitionMode: 'realtime' | 'accurate'
   sourceLanguage: string
   targetLanguages: string[]
+  allowIntermediateTranslation?: boolean
+  translationProvider?: 'argos' | 'microsoft' | 'openai' | 'ollama'
+  translationOptions?: {
+    endpoint?: string
+    apiKey?: string
+    region?: string
+    model?: string
+  }
 }
 
 export type Translation = {

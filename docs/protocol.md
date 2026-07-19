@@ -32,6 +32,23 @@ sequenceDiagram
 
 开发态使用项目已有的 `.venv\\Scripts\\python.exe -m fluentcaptions_engine`；打包后使用 `resources\\engine\\FluentCaptionsEngine.exe`，最终用户无需安装 Python。
 
+## 会话配置
+
+`startSession.config` 包含音频来源、识别模式、源语言、最多八个目标语言和翻译 Provider。例如：
+
+```json
+{
+  "audioSource": { "kind": "defaultOutput" },
+  "recognitionMode": "realtime",
+  "sourceLanguage": "auto",
+  "targetLanguages": ["zh", "ja"],
+  "translationProvider": "argos",
+  "allowIntermediateTranslation": false
+}
+```
+
+`translationProvider` 可为 `argos`、`microsoft`、`openai` 或 `ollama`。联网 Provider 的地址、区域和模型放在 `translationOptions`；API 密钥由 Electron 主进程从 Windows 加密存储读取，只在发送 `startSession` 时注入，不暴露给渲染进程。
+
 ## 字幕事件
 
 `caption` 携带以下稳定结构：

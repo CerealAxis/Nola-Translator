@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import {
   ClosedCaptionRegular,
   ColorRegular,
@@ -38,6 +38,24 @@ const navigationItems: NavigationItem[] = [
 ]
 
 export function Navigation({ activePage, onNavigate }: NavigationProps): React.JSX.Element {
+  const [engineStatus, setEngineStatus] = useState('正在连接引擎')
+  useEffect(() => {
+    const api = window.fluentCaptions
+    if (!api) {
+      setEngineStatus('引擎接口不可用')
+      return
+    }
+    void api.getDiagnostics().then((value) => {
+      const state = String(value['引擎状态'] ?? '')
+      setEngineStatus(state === 'ready' ? '引擎已就绪' : state === 'failed' ? '引擎启动失败' : `引擎${state || '正在启动'}`)
+    })
+    return api.onEngineEvent((event) => {
+      if (event.type === 'ready') setEngineStatus('引擎已就绪')
+      else if (event.type === 'sessionStarted') setEngineStatus('引擎正在识别')
+      else if (event.type === 'sessionStopped') setEngineStatus('引擎已就绪')
+      else if (event.type === 'error' && !event.recoverable) setEngineStatus('引擎发生错误')
+    })
+  }, [])
   return (
     <nav className="navigation" aria-label="主导航">
       <div className="navigation-items">
@@ -58,13 +76,13 @@ export function Navigation({ activePage, onNavigate }: NavigationProps): React.J
       </div>
 
       <div className="navigation-footer">
-        <button className="navigation-item" type="button" aria-label="设置">
+        <button className="navigation-item" onClick={() => onNavigate('appearance')} type="button" aria-label="设置">
           <SettingsRegular aria-hidden />
           <span className="navigation-label">设置</span>
         </button>
         <div className="engine-ready">
           <span className="status-dot" aria-hidden="true" />
-          <span className="navigation-label">引擎等待接入</span>
+          <span className="navigation-label">{engineStatus}</span>
         </div>
       </div>
     </nav>

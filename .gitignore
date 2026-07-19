@@ -2,7 +2,8 @@ node_modules/
 out/
 dist/
 coverage/
-artifacts/ui/
+/artifacts/
+/models/
 .vite/
 .env
 .env.*
@@ -13,6 +14,7 @@ Thumbs.db
 .venv/
 engine/build/
 engine/dist/
+release/
 __pycache__/
 *.py[cod]
 *.egg-info/

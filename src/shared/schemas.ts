@@ -16,12 +16,20 @@ const audioSourceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('microphone'), deviceId: z.string().min(1).max(512) }).strip(),
 ])
 
-const sessionConfigSchema = z
+export const sessionConfigSchema = z
   .object({
     audioSource: audioSourceSchema,
     recognitionMode: z.enum(['realtime', 'accurate']),
     sourceLanguage: z.string().min(1).max(32),
     targetLanguages: z.array(z.string().min(1).max(32)).max(8),
+    allowIntermediateTranslation: z.boolean().optional(),
+    translationProvider: z.enum(['argos', 'microsoft', 'openai', 'ollama']).optional(),
+    translationOptions: z.object({
+      endpoint: z.string().min(1).max(2048).optional(),
+      apiKey: z.string().max(4096).optional(),
+      region: z.string().max(128).optional(),
+      model: z.string().max(256).optional(),
+    }).strip().optional(),
   })
   .strip()
 

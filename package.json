@@ -3,12 +3,15 @@
   "productName": "FluentCaptions",
   "version": "0.1.0",
   "description": "面向 Windows 11 的本地实时字幕与翻译工具",
+  "author": "FluentCaptions Contributors",
   "private": true,
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
+    "build:engine": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-engine.ps1",
+    "dist:win": "npm run build && npm run build:engine && electron-builder --win nsis --x64",
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:ui": "electron tests/e2e/capture-ui.mjs",
@@ -30,6 +33,7 @@
     "@vitejs/plugin-react": "5.2.0",
     "@vitest/coverage-v8": "4.1.10",
     "electron": "43.1.1",
+    "electron-builder": "26.15.3",
     "electron-vite": "5.0.0",
     "jsdom": "29.1.1",
     "typescript": "7.0.2",
@@ -45,5 +49,30 @@
     "electron@43.1.1": true,
     "esbuild@0.25.12": true,
     "esbuild@0.28.1": true
+  },
+  "build": {
+    "appId": "com.fluentcaptions.app",
+    "productName": "FluentCaptions",
+    "asar": true,
+    "npmRebuild": false,
+    "buildDependenciesFromSource": false,
+    "electronDist": "node_modules/electron/dist",
+    "directories": { "output": "release" },
+    "files": ["out/**/*", "package.json"],
+    "extraResources": [
+      { "from": "engine/dist/FluentCaptionsEngine", "to": "engine" }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "artifactName": "FluentCaptions-${version}-Setup-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }

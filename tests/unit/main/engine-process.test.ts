@@ -80,6 +80,7 @@ describe('Python 引擎进程', () => {
       command: python,
       args: ['-m', 'fluentcaptions_engine'],
       cwd: resolve('engine'),
+      env: { FLUENTCAPTIONS_PROTOCOL_ONLY: '1' },
       startupTimeoutMs: 3_000,
       restartDelaysMs: [10, 20, 30],
     })

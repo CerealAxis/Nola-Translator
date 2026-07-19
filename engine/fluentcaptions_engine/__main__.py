@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import os
+from pathlib import Path
 import sys
 from uuid import uuid4
 
@@ -40,9 +43,35 @@ def _write_error(request_id: str, code: str, details: dict[str, object] | None =
     print(serialize_event(event), flush=True)
 
 
-def main() -> int:
-    service = EngineService()
-    for raw_line in sys.stdin.buffer:
+async def _run() -> int:
+    def write_event(event) -> None:
+        print(serialize_event(event), flush=True)
+
+    protocol_only = os.environ.get("FLUENTCAPTIONS_PROTOCOL_ONLY") == "1"
+    if protocol_only:
+        service = EngineService()
+
+        async def handle(command):
+            return service.handle(command)
+
+        async def close() -> None:
+            return None
+    else:
+        from .runtime import EngineRuntime
+
+        model_root = Path(
+            os.environ.get(
+                "FLUENTCAPTIONS_MODEL_DIR",
+                Path(os.environ.get("LOCALAPPDATA", Path.home())) / "FluentCaptions" / "models",
+            )
+        )
+        runtime = EngineRuntime(model_root, write_event)
+        service = runtime.service
+        handle = runtime.handle
+        close = runtime.close
+
+    while raw_with_newline := await asyncio.to_thread(sys.stdin.buffer.readline):
+        raw_line = raw_with_newline
         raw_line = raw_line.rstrip(b"\r\n")
         request_id = _request_id(raw_line)
         if len(raw_line) > MAX_PROTOCOL_LINE_BYTES:
@@ -61,7 +90,7 @@ def main() -> int:
             continue
 
         try:
-            events = service.handle(command)
+            events = await handle(command)
         except Exception as error:  # 防止单个命令让 sidecar 无响应；详细异常只写 stderr。
             print(f"engine command failed: {type(error).__name__}", file=sys.stderr, flush=True)
             _write_error(request_id, "internalError")
@@ -70,8 +99,43 @@ def main() -> int:
         for event in events:
             print(serialize_event(event), flush=True)
         if service.should_exit:
+            await close()
             return 0
+    await close()
     return 0
+
+
+def main() -> int:
+    if os.environ.get("FLUENTCAPTIONS_SELF_TEST") == "1":
+        checks: dict[str, object] = {}
+        stage = "imports"
+        try:
+            import ctranslate2
+            import faster_whisper
+            import onnxruntime
+            import sherpa_onnx
+
+            from .audio.devices import AudioDeviceRegistry
+            from .translation.argos import _installed_lookup
+
+            stage = "devices"
+            checks["devices"] = len(AudioDeviceRegistry().refresh())
+            stage = "versions"
+            checks["cudaDevices"] = ctranslate2.get_cuda_device_count()
+            checks["sherpaOnnx"] = getattr(sherpa_onnx, "__version__", "loaded")
+            checks["fasterWhisper"] = getattr(faster_whisper, "__version__", "loaded")
+            checks["onnxRuntime"] = onnxruntime.__version__
+            stage = "argos"
+            checks["argos"] = _installed_lookup("zz", "yy") is None
+        except Exception as error:
+            checks["stage"] = stage
+            checks["error"] = type(error).__name__
+            checks["message"] = str(error)[:256]
+            print(json.dumps(checks, ensure_ascii=False), flush=True)
+            return 1
+        print(json.dumps(checks, ensure_ascii=False), flush=True)
+        return 0
+    return asyncio.run(_run())
 
 
 if __name__ == "__main__":

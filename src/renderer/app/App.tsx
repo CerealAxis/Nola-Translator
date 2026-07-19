@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Navigation, type PageId } from './Navigation'
 import { AppearancePage } from '../pages/AppearancePage'
@@ -19,6 +19,17 @@ const pages: Record<PageId, React.JSX.Element> = {
 
 export function App(): React.JSX.Element {
   const [activePage, setActivePage] = useState<PageId>('captions')
+
+  useEffect(() => {
+    const api = window.fluentCaptions
+    if (!api) return
+    const apply = (theme: 'system' | 'light' | 'dark'): void => {
+      document.documentElement.dataset.theme = theme
+      document.documentElement.style.colorScheme = theme === 'system' ? 'light dark' : theme
+    }
+    void api.getSettings().then((settings) => apply(settings.theme))
+    return api.onSettingsChanged((settings) => apply(settings.theme))
+  }, [])
 
   return (
     <div className="app-shell">
