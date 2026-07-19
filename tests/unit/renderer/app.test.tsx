@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { App } from '../../../src/renderer/app/App'
+import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 
 describe('App', () => {
   it('renders the primary caption session controls', () => {
@@ -38,6 +39,43 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '历史记录' }))
     expect(screen.getByText('默认不保存任何字幕内容。')).toBeInTheDocument()
+  })
+
+  it('offers explicit controls to hide and adjust the subtitle overlay', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: '外观' }))
+
+    expect(screen.getByRole('button', { name: '隐藏浮层' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '调整位置和大小' })).toBeInTheDocument()
+  })
+
+  it('hides the overlay and enters free unlocked adjustment mode', async () => {
+    const api = window.fluentCaptions!
+    const hideOverlay = vi.spyOn(api, 'hideOverlay')
+    const showOverlay = vi.spyOn(api, 'showOverlay')
+    const updateSettings = vi.spyOn(api, 'updateSettings').mockImplementation(async (patch) => ({
+      ...DEFAULT_SETTINGS,
+      ...patch,
+      overlay: { ...DEFAULT_SETTINGS.overlay, ...patch.overlay },
+      translation: { ...DEFAULT_SETTINGS.translation, ...patch.translation },
+    }))
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '外观' }))
+
+    fireEvent.click(screen.getByRole('button', { name: '隐藏浮层' }))
+    await waitFor(() => expect(hideOverlay).toHaveBeenCalledOnce())
+
+    fireEvent.click(screen.getByRole('button', { name: '调整位置和大小' }))
+    await waitFor(() => {
+      expect(updateSettings).toHaveBeenCalledWith({ overlay: { mode: 'free', locked: false } })
+      expect(showOverlay).toHaveBeenCalledOnce()
+    })
+
+    hideOverlay.mockRestore()
+    showOverlay.mockRestore()
+    updateSettings.mockRestore()
   })
 
   it('navigates to recognition and diagnostics pages', async () => {

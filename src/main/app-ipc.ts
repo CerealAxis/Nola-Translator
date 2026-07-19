@@ -7,7 +7,7 @@ import { exportSrt, exportText, exportWebVtt, type HistoryStore } from './histor
 import type { EngineProcess } from './engine-process'
 import type { SettingsStore } from './settings-store'
 import type { SecureCredentialStore } from './secure-store'
-import { computeOverlayBounds } from './windows'
+import { computeOverlayBounds, getOverlayInteractionPolicy } from './windows'
 import type { AppSettings, AppSettingsPatch } from '../shared/settings'
 
 const channels = {
@@ -64,9 +64,12 @@ export function registerAppIpc(options: {
   const applyOverlay = (): void => {
     const window = options.getOverlayWindow()
     if (!window) return
+    const interaction = getOverlayInteractionPolicy(current.overlay.locked)
     window.setAlwaysOnTop(current.overlay.alwaysOnTop, 'screen-saver')
-    window.setIgnoreMouseEvents(current.overlay.locked, { forward: true })
-    window.setFocusable(!current.overlay.locked)
+    window.setIgnoreMouseEvents(interaction.ignoreMouseEvents, { forward: true })
+    window.setFocusable(interaction.focusable)
+    window.setMovable(interaction.movable)
+    window.setResizable(interaction.resizable)
     const display = screen.getDisplayMatching(window.getBounds())
     window.setBounds(computeOverlayBounds(current.overlay.mode, display.workArea, window.getBounds()))
     window.webContents.send('settings:changed', current)

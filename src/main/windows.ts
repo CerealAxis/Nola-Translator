@@ -4,6 +4,20 @@ export type OverlayMode = 'free' | 'top' | 'bottom'
 
 type OverlaySize = { width: number; height: number; x?: number; y?: number }
 
+export function getOverlayInteractionPolicy(locked: boolean): {
+  focusable: boolean
+  ignoreMouseEvents: boolean
+  movable: boolean
+  resizable: boolean
+} {
+  return {
+    focusable: !locked,
+    ignoreMouseEvents: locked,
+    movable: !locked,
+    resizable: !locked,
+  }
+}
+
 export function computeOverlayBounds(
   mode: OverlayMode,
   workArea: Rectangle,
@@ -37,6 +51,7 @@ export function createOverlayWindowOptions(preload: string): BrowserWindowConstr
     minHeight: 100,
     resizable: true,
     movable: true,
+    thickFrame: true,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',

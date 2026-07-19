@@ -1,4 +1,4 @@
-import { computeOverlayBounds } from '../../../src/main/windows'
+import { computeOverlayBounds, createOverlayWindowOptions, getOverlayInteractionPolicy } from '../../../src/main/windows'
 
 const workArea = { x: 100, y: 50, width: 1920, height: 1040 }
 
@@ -22,5 +22,29 @@ describe('字幕浮层位置', () => {
     expect(
       computeOverlayBounds('free', workArea, { width: 900, height: 180, x: -500, y: 2000 })
     ).toEqual({ x: 100, y: 910, width: 900, height: 180 })
+  })
+
+  it('只在调整模式中接收鼠标并允许移动和缩放', () => {
+    expect(getOverlayInteractionPolicy(false)).toEqual({
+      focusable: true,
+      ignoreMouseEvents: false,
+      movable: true,
+      resizable: true,
+    })
+    expect(getOverlayInteractionPolicy(true)).toEqual({
+      focusable: false,
+      ignoreMouseEvents: true,
+      movable: false,
+      resizable: false,
+    })
+  })
+
+  it('为 Windows 无边框浮层保留原生边缘缩放框', () => {
+    expect(createOverlayWindowOptions('C:\\app\\preload.cjs')).toMatchObject({
+      frame: false,
+      resizable: true,
+      movable: true,
+      thickFrame: true,
+    })
   })
 })

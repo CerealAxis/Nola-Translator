@@ -77,7 +77,7 @@ export function registerEngineIpc(
     activeSessionId = null
   })
 
-  ipcMain.handle(IPC_CHANNELS.showOverlay, () => getOverlayWindow()?.showInactive())
+  ipcMain.handle(IPC_CHANNELS.showOverlay, () => getOverlayWindow()?.show())
   ipcMain.handle(IPC_CHANNELS.hideOverlay, () => getOverlayWindow()?.hide())
 
   const forwardEvent = (event: EngineEvent): void => {

@@ -33,10 +33,49 @@ export function AppearancePage(): React.JSX.Element {
     }
   }
 
+  const showOverlay = async (): Promise<void> => {
+    if (!api) return
+    try {
+      await api.showOverlay()
+      setNotice('字幕浮层已显示')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '显示浮层失败')
+    }
+  }
+
+  const hideOverlay = async (): Promise<void> => {
+    if (!api) return
+    try {
+      await api.hideOverlay()
+      setNotice('字幕浮层已隐藏')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '隐藏浮层失败')
+    }
+  }
+
+  const beginOverlayAdjustment = async (): Promise<void> => {
+    if (!api) return
+    try {
+      const next = await api.updateSettings({ overlay: { mode: 'free', locked: false } })
+      setSettings(next)
+      await api.showOverlay()
+      setNotice('调整模式：拖动浮层移动，拖动窗口边缘或右下角改变大小')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '无法进入浮层调整模式')
+    }
+  }
+
   const overlay = settings.overlay
   return (
     <div className="page">
-      <header className="page-heading"><div><h1>外观</h1><p>{notice}</p></div><button className="button secondary-button" onClick={() => void api?.showOverlay()} type="button">显示浮层</button></header>
+      <header className="page-heading">
+        <div><h1>外观</h1><p>{notice}</p></div>
+        <div className="button-row overlay-page-actions">
+          <button className="button primary-button" onClick={() => void beginOverlayAdjustment()} type="button">调整位置和大小</button>
+          <button className="button secondary-button" onClick={() => void showOverlay()} type="button">显示浮层</button>
+          <button className="button secondary-button" onClick={() => void hideOverlay()} type="button">隐藏浮层</button>
+        </div>
+      </header>
       <div className="settings-layout">
         <section className="surface settings-surface">
           <h2>字幕样式</h2>
@@ -53,6 +92,7 @@ export function AppearancePage(): React.JSX.Element {
           <label className="switch-label"><input checked={overlay.showTranslation} onChange={(event) => void updateOverlay({ showTranslation: event.target.checked })} type="checkbox" />显示译文</label>
           <label className="switch-label"><input checked={overlay.alwaysOnTop} onChange={(event) => void updateOverlay({ alwaysOnTop: event.target.checked })} type="checkbox" />始终置顶</label>
           <label className="switch-label"><input checked={overlay.locked} onChange={(event) => void updateOverlay({ locked: event.target.checked })} type="checkbox" />锁定并点击穿透</label>
+          <p className="setting-hint">需要移动或缩放时，点击页面顶部的“调整位置和大小”；完成后可在浮层中重新锁定。</p>
         </section>
         <CaptionPreview sourceVisible={overlay.showSource} translationVisible={overlay.showTranslation} />
       </div>

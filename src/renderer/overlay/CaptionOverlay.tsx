@@ -37,6 +37,16 @@ export function CaptionOverlay(): React.JSX.Element {
     return () => { unsubscribeSettings(); unsubscribeEvents() }
   }, [])
 
+  const finishAdjustment = async (): Promise<void> => {
+    const api = window.fluentCaptions
+    if (!api) return
+    setSettings(await api.updateSettings({ overlay: { locked: true } }))
+  }
+
+  const hideOverlay = async (): Promise<void> => {
+    await window.fluentCaptions?.hideOverlay()
+  }
+
   const current = segments.at(-1)
   return (
     <main
@@ -54,6 +64,15 @@ export function CaptionOverlay(): React.JSX.Element {
         fontFamily: settings.overlay.fontFamily,
       } as React.CSSProperties}
     >
+      {!settings.overlay.locked && (
+        <div className="overlay-edit-bar">
+          <span className="overlay-drag-hint">拖动浮层移动 · 拖动边缘或右下角缩放</span>
+          <span className="overlay-edit-actions">
+            <button onClick={() => void finishAdjustment()} type="button">完成调整</button>
+            <button onClick={() => void hideOverlay()} type="button">隐藏浮层</button>
+          </span>
+        </div>
+      )}
       <div className="overlay-status"><span className="status-dot" aria-hidden="true" />{status}</div>
       <div className="overlay-lines">
         {settings.overlay.showSource && <p className="overlay-source">{current?.sourceText || '开始字幕后，原文会显示在这里。'}</p>}
@@ -63,6 +82,7 @@ export function CaptionOverlay(): React.JSX.Element {
           </p>
         ))}
       </div>
+      {!settings.overlay.locked && <span aria-hidden="true" className="overlay-resize-cue" />}
     </main>
   )
 }
