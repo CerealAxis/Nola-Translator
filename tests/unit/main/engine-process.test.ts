@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -91,7 +91,7 @@ describe('Python 引擎进程', () => {
       { protocolVersion: 1, type: 'listDevices', requestId: 'devices-1' },
       'devices'
     )
-    expect(devices.devices).toEqual([])
+    expect(Array.isArray(devices.devices)).toBe(true)
 
     const started = await engine.request(
       {
@@ -138,6 +138,26 @@ describe('Python 引擎进程', () => {
       expect(engine.currentState).toBe('ready')
       expect(engine.restartCount).toBe(1)
       await engine.stop()
+    } finally {
+      await rm(work, { recursive: true, force: true })
+    }
+  })
+
+  it('收到关机确认后等待 sidecar 自行退出', async () => {
+    const work = await mkdtemp(join(tmpdir(), 'fluentcaptions-shutdown-'))
+    const marker = join(work, 'shutdown-complete')
+    const engine = new EngineProcess({
+      command: python,
+      args: [resolve('tests/fixtures/protocol/fake-engine.py'), '--shutdown-marker', marker],
+      cwd: resolve('.'),
+      startupTimeoutMs: 2_000,
+      restartDelaysMs: [10, 20, 30],
+    })
+
+    try {
+      await engine.start()
+      await engine.stop()
+      expect(await readFile(marker, 'utf8')).toBe('graceful')
     } finally {
       await rm(work, { recursive: true, force: true })
     }

@@ -1,12 +1,15 @@
 ﻿annotated-types==0.7.0
 colorama==0.4.6
 iniconfig==2.3.0
+numpy==2.5.1
 packaging==26.2
 pluggy==1.6.0
+PyAudioWPatch==0.2.12.8
 pydantic==2.13.4
 pydantic_core==2.46.4
 Pygments==2.20.0
 pytest==9.1.1
 pytest-asyncio==1.4.0
+scipy==1.18.0
 typing-inspection==0.4.2
 typing_extensions==4.16.0

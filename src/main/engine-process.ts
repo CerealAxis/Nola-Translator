@@ -173,6 +173,7 @@ export class EngineProcess extends EventEmitter {
 
     const wasReady = this.state === 'ready'
     this.setState('stopping')
+    const exited = this.waitForChildExit(child, 2_000)
     if (wasReady) {
       try {
         await this.request(
@@ -185,7 +186,7 @@ export class EngineProcess extends EventEmitter {
       }
     }
 
-    if (this.child === child && child.exitCode === null) child.kill()
+    if (!(await exited) && this.child === child && child.exitCode === null) child.kill()
     this.detachChild(child)
     this.rejectPending(new Error('引擎已停止'))
     this.coalescer.reset()
@@ -342,6 +343,20 @@ export class EngineProcess extends EventEmitter {
       }
       this.cancelRetry = finish
       this.retryTimer = setTimeout(finish, delayMs)
+    })
+  }
+
+  private waitForChildExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<boolean> {
+    if (child.exitCode !== null) return Promise.resolve(true)
+    return new Promise((resolve) => {
+      const finish = (exited: boolean): void => {
+        clearTimeout(timer)
+        child.off('exit', onExit)
+        resolve(exited)
+      }
+      const onExit = (): void => finish(true)
+      const timer = setTimeout(() => finish(false), timeoutMs)
+      child.once('exit', onExit)
     })
   }
 

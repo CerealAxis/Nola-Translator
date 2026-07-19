@@ -6,8 +6,10 @@ from pydantic import ValidationError
 
 from fluentcaptions_engine.protocol import (
     MAX_PROTOCOL_LINE_BYTES,
+    StatusEvent,
     parse_command_line,
     parse_event_line,
+    serialize_event,
 )
 
 
@@ -60,3 +62,13 @@ def test_rejects_lines_larger_than_32_kib() -> None:
     )
     with pytest.raises(ValueError, match="32 KiB"):
         parse_command_line(oversized)
+
+
+def test_serialization_omits_optional_none_fields() -> None:
+    event = StatusEvent(
+        protocolVersion=1,
+        type="status",
+        requestId="status-1",
+        code="listening",
+    )
+    assert "details" not in json.loads(serialize_event(event))

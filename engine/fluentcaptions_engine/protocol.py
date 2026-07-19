@@ -194,4 +194,8 @@ def parse_event_line(line: str) -> EngineEvent:
 
 
 def serialize_event(event: EngineEvent) -> str:
-    return json.dumps(_EVENT_ADAPTER.dump_python(event, mode="json"), ensure_ascii=False, separators=(",", ":"))
+    return json.dumps(
+        _EVENT_ADAPTER.dump_python(event, mode="json", exclude_none=True),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )

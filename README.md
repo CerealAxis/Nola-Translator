@@ -13,6 +13,7 @@ FluentCaptions 是一款面向 Windows 11 的本地实时字幕与翻译工具�
 - Electron 渲染进程沙箱、上下文隔离和内容安全策略。
 - TypeScript/Zod 与 Python/Pydantic 双端校验的版本化 JSONL 协议；
 - Python sidecar 握手、串行写入、字幕中间结果合并、异常退避重启和优雅退出。
+- WASAPI 系统输出/麦克风枚举、稳定设备映射，以及 16 kHz 单声道标准帧管线；
 
 ## 本机开发环境
 
@@ -45,7 +46,7 @@ npm run test:ui
 
 `npm run test:ui` 会使用真实 Electron 分别渲染默认尺寸和最小尺寸，截图写入被 Git 忽略的 `artifacts/ui/`。
 
-通信格式、错误码和生命周期说明见 `docs/protocol.md`。
+通信格式、错误码和生命周期说明见 `docs/protocol.md`，Windows 音频实现见 `docs/audio.md`。
 
 ## 隐私原则
 

@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "FluentCaptions 本地音频、识别与翻译引擎"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-  "pydantic==2.13.4"
+  "numpy==2.5.1",
+  "pydantic==2.13.4",
+  "PyAudioWPatch==0.2.12.8",
+  "scipy==1.18.0"
 ]
 
 [project.optional-dependencies]

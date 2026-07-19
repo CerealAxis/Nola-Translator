@@ -3,11 +3,13 @@
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--crash-once", type=Path)
+parser.add_argument("--shutdown-marker", type=Path)
 args = parser.parse_args()
 
 if args.crash_once and not args.crash_once.exists():
@@ -34,4 +36,7 @@ for line in sys.stdin:
         continue
     print(json.dumps(event, separators=(",", ":")), flush=True)
     if event["type"] == "shutdownComplete":
+        if args.shutdown_marker:
+            time.sleep(0.05)
+            args.shutdown_marker.write_text("graceful", encoding="utf-8")
         break

@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from uuid import uuid4
 
 from . import __version__
+from .audio.devices import (
+    AudioDeviceRecord,
+    AudioDeviceRegistry,
+    AudioDeviceUnavailableError,
+    enumerate_wasapi_devices,
+)
 from .protocol import (
+    AudioDevice,
     DevicesEvent,
     EngineCommand,
     EngineEvent,
@@ -26,9 +34,15 @@ from .protocol import (
 class EngineService:
     """处理已经通过协议校验的命令，并返回零个或多个事件。"""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        device_enumerator: Callable[[], list[AudioDeviceRecord]] = enumerate_wasapi_devices,
+    ) -> None:
         self.session_id: str | None = None
         self.should_exit = False
+        self.device_enumerator = device_enumerator
+        self.device_registry = AudioDeviceRegistry(device_enumerator)
+        self.active_device: AudioDeviceRecord | None = None
 
     def handle(self, command: EngineCommand) -> list[EngineEvent]:
         if isinstance(command, HelloCommand):
@@ -43,18 +57,50 @@ class EngineService:
             ]
 
         if isinstance(command, ListDevicesCommand):
+            try:
+                devices = self.device_enumerator()
+            except Exception as error:
+                return [
+                    self._error(
+                        command.requestId,
+                        "audioDeviceUnavailable",
+                        {"reason": type(error).__name__},
+                    )
+                ]
             return [
                 DevicesEvent(
                     protocolVersion=1,
                     type="devices",
                     requestId=command.requestId,
-                    devices=[],
+                    devices=[
+                        AudioDevice(
+                            deviceId=device.device_id,
+                            name=device.name,
+                            kind=device.kind,
+                            isDefault=device.is_default,
+                        )
+                        for device in devices
+                    ],
                 )
             ]
 
         if isinstance(command, StartSessionCommand):
             if self.session_id is not None:
                 return [self._error(command.requestId, "sessionAlreadyRunning")]
+            source = command.config.audioSource
+            try:
+                if source.kind == "defaultOutput":
+                    self.active_device = self.device_registry.resolve("systemOutput")
+                else:
+                    self.active_device = self.device_registry.resolve(source.kind, source.deviceId)
+            except (AudioDeviceUnavailableError, OSError) as error:
+                return [
+                    self._error(
+                        command.requestId,
+                        "audioDeviceUnavailable",
+                        {"kind": source.kind, "reason": type(error).__name__},
+                    )
+                ]
             self.session_id = f"session-{uuid4()}"
             return [
                 SessionStartedEvent(
@@ -76,6 +122,7 @@ class EngineService:
                 return [self._error(command.requestId, "sessionNotRunning")]
             stopped_session = self.session_id
             self.session_id = None
+            self.active_device = None
             return [
                 SessionStoppedEvent(
                     protocolVersion=1,
@@ -93,6 +140,7 @@ class EngineService:
 
         if isinstance(command, ShutdownCommand):
             self.session_id = None
+            self.active_device = None
             self.should_exit = True
             return [
                 ShutdownCompleteEvent(
@@ -105,11 +153,16 @@ class EngineService:
         return [self._error(command.requestId, "invalidMessage")]
 
     @staticmethod
-    def _error(request_id: str, code: str) -> ErrorEvent:
+    def _error(
+        request_id: str,
+        code: str,
+        details: dict[str, object] | None = None,
+    ) -> ErrorEvent:
         return ErrorEvent(
             protocolVersion=1,
             type="error",
             requestId=request_id,
             code=code,
             recoverable=True,
+            details=details,
         )
