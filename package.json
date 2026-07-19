@@ -1,0 +1,49 @@
+{
+  "name": "fluentcaptions",
+  "productName": "FluentCaptions",
+  "version": "0.1.0",
+  "description": "面向 Windows 11 的本地实时字幕与翻译工具",
+  "private": true,
+  "type": "module",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "preview": "electron-vite preview",
+    "test": "vitest run",
+    "test:ui": "electron tests/e2e/capture-ui.mjs",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fluentui/react-icons": "2.0.316",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.2.0",
+    "@vitest/coverage-v8": "4.1.10",
+    "electron": "43.1.1",
+    "electron-vite": "5.0.0",
+    "jsdom": "29.1.1",
+    "typescript": "7.0.2",
+    "vite": "7.3.6",
+    "vitest": "4.1.10"
+  },
+  "packageManager": "npm@11.17.0",
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11 <12"
+  },
+  "allowScripts": {
+    "electron@43.1.1": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.1": true
+  }
+}
