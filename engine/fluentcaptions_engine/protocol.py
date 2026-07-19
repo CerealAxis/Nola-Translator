@@ -1,0 +1,197 @@
+"""Electron 与本地引擎之间的版本化 JSONL 协议。"""
+
+from __future__ import annotations
+
+import json
+from typing import Annotated, Literal, Union
+
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+
+
+PROTOCOL_VERSION = 1
+MAX_PROTOCOL_LINE_BYTES = 32 * 1024
+
+
+class ProtocolModel(BaseModel):
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+
+class Envelope(ProtocolModel):
+    protocolVersion: Literal[1]
+    requestId: str = Field(min_length=1, max_length=128)
+
+
+class DefaultOutputSource(ProtocolModel):
+    kind: Literal["defaultOutput"]
+
+
+class DeviceSource(ProtocolModel):
+    kind: Literal["systemOutput", "microphone"]
+    deviceId: str = Field(min_length=1, max_length=512)
+
+
+AudioSource = Annotated[Union[DefaultOutputSource, DeviceSource], Field(discriminator="kind")]
+
+
+class SessionConfig(ProtocolModel):
+    audioSource: AudioSource
+    recognitionMode: Literal["realtime", "accurate"]
+    sourceLanguage: str = Field(min_length=1, max_length=32)
+    targetLanguages: list[str] = Field(max_length=8)
+
+
+class HelloCommand(Envelope):
+    type: Literal["hello"]
+    clientVersion: str = Field(min_length=1, max_length=64)
+
+
+class ListDevicesCommand(Envelope):
+    type: Literal["listDevices"]
+
+
+class StartSessionCommand(Envelope):
+    type: Literal["startSession"]
+    config: SessionConfig
+
+
+class StopSessionCommand(Envelope):
+    type: Literal["stopSession"]
+    sessionId: str = Field(min_length=1, max_length=128)
+
+
+class ShutdownCommand(Envelope):
+    type: Literal["shutdown"]
+
+
+EngineCommand = Annotated[
+    Union[HelloCommand, ListDevicesCommand, StartSessionCommand, StopSessionCommand, ShutdownCommand],
+    Field(discriminator="type"),
+]
+
+
+class Translation(ProtocolModel):
+    targetLanguage: str = Field(min_length=1, max_length=32)
+    text: str | None = Field(default=None, max_length=16_384)
+    state: Literal["pending", "complete", "failed"]
+    provider: str = Field(min_length=1, max_length=64)
+    errorCode: str | None = Field(default=None, min_length=1, max_length=128)
+
+
+class CaptionSegment(ProtocolModel):
+    segmentId: str = Field(min_length=1, max_length=128)
+    revision: int = Field(ge=0)
+    startedAtMs: float = Field(ge=0)
+    endedAtMs: float | None = Field(default=None, ge=0)
+    sourceLanguage: str | None = Field(default=None, min_length=1, max_length=32)
+    sourceText: str = Field(max_length=16_384)
+    isFinal: bool
+    translations: list[Translation] = Field(max_length=8)
+
+
+class ReadyEvent(Envelope):
+    type: Literal["ready"]
+    engineVersion: str = Field(min_length=1, max_length=64)
+    capabilities: list[str] = Field(max_length=32)
+
+
+class AudioDevice(ProtocolModel):
+    deviceId: str = Field(min_length=1, max_length=512)
+    name: str = Field(min_length=1, max_length=512)
+    kind: Literal["systemOutput", "microphone"]
+    isDefault: bool
+
+
+class DevicesEvent(Envelope):
+    type: Literal["devices"]
+    devices: list[AudioDevice] = Field(max_length=256)
+
+
+class SessionStartedEvent(Envelope):
+    type: Literal["sessionStarted"]
+    sessionId: str = Field(min_length=1, max_length=128)
+
+
+class SessionStoppedEvent(Envelope):
+    type: Literal["sessionStopped"]
+    sessionId: str = Field(min_length=1, max_length=128)
+
+
+class CaptionEvent(Envelope):
+    type: Literal["caption"]
+    sessionId: str = Field(min_length=1, max_length=128)
+    segment: CaptionSegment
+
+
+class ModelProgressEvent(Envelope):
+    type: Literal["modelProgress"]
+    modelId: str = Field(min_length=1, max_length=256)
+    operation: Literal["download", "install", "remove"]
+    progress: float = Field(ge=0, le=1)
+    state: Literal["running", "complete", "failed"]
+
+
+class StatusEvent(Envelope):
+    type: Literal["status"]
+    code: Literal["idle", "starting", "ready", "listening", "stopping"]
+    details: dict[str, object] | None = None
+
+
+ErrorCode = Literal[
+    "invalidMessage",
+    "unsupportedProtocol",
+    "invalidConfiguration",
+    "sessionNotRunning",
+    "sessionAlreadyRunning",
+    "audioDeviceUnavailable",
+    "modelUnavailable",
+    "lineTooLarge",
+    "internalError",
+]
+
+
+class ErrorEvent(Envelope):
+    type: Literal["error"]
+    code: ErrorCode
+    recoverable: bool
+    details: dict[str, object] | None = None
+
+
+class ShutdownCompleteEvent(Envelope):
+    type: Literal["shutdownComplete"]
+
+
+EngineEvent = Annotated[
+    Union[
+        ReadyEvent,
+        DevicesEvent,
+        SessionStartedEvent,
+        SessionStoppedEvent,
+        CaptionEvent,
+        ModelProgressEvent,
+        StatusEvent,
+        ErrorEvent,
+        ShutdownCompleteEvent,
+    ],
+    Field(discriminator="type"),
+]
+
+_COMMAND_ADAPTER = TypeAdapter(EngineCommand)
+_EVENT_ADAPTER = TypeAdapter(EngineEvent)
+
+
+def _load_line(line: str) -> object:
+    if len(line.encode("utf-8")) > MAX_PROTOCOL_LINE_BYTES:
+        raise ValueError("协议单行不能超过 32 KiB")
+    return json.loads(line)
+
+
+def parse_command_line(line: str) -> EngineCommand:
+    return _COMMAND_ADAPTER.validate_python(_load_line(line))
+
+
+def parse_event_line(line: str) -> EngineEvent:
+    return _EVENT_ADAPTER.validate_python(_load_line(line))
+
+
+def serialize_event(event: EngineEvent) -> str:
+    return json.dumps(_EVENT_ADAPTER.dump_python(event, mode="json"), ensure_ascii=False, separators=(",", ":"))

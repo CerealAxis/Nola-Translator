@@ -1,0 +1,92 @@
+{
+  "commands": [
+    {
+      "protocolVersion": 1,
+      "type": "hello",
+      "requestId": "req-hello",
+      "clientVersion": "0.1.0"
+    },
+    {
+      "protocolVersion": 1,
+      "type": "listDevices",
+      "requestId": "req-devices"
+    },
+    {
+      "protocolVersion": 1,
+      "type": "startSession",
+      "requestId": "req-start",
+      "config": {
+        "audioSource": { "kind": "defaultOutput" },
+        "recognitionMode": "realtime",
+        "sourceLanguage": "auto",
+        "targetLanguages": ["zh-CN", "ja-JP"]
+      }
+    },
+    {
+      "protocolVersion": 1,
+      "type": "stopSession",
+      "requestId": "req-stop",
+      "sessionId": "session-1"
+    },
+    {
+      "protocolVersion": 1,
+      "type": "shutdown",
+      "requestId": "req-shutdown"
+    }
+  ],
+  "events": [
+    {
+      "protocolVersion": 1,
+      "type": "ready",
+      "requestId": "req-hello",
+      "engineVersion": "0.1.0",
+      "capabilities": ["devices", "captions", "translation"]
+    },
+    {
+      "protocolVersion": 1,
+      "type": "caption",
+      "requestId": "event-caption-1",
+      "sessionId": "session-1",
+      "segment": {
+        "segmentId": "segment-1",
+        "revision": 2,
+        "startedAtMs": 120,
+        "endedAtMs": 940,
+        "sourceLanguage": "en",
+        "sourceText": "Hello world",
+        "isFinal": true,
+        "translations": [
+          {
+            "targetLanguage": "zh-CN",
+            "text": "你好，世界",
+            "state": "complete",
+            "provider": "argos"
+          }
+        ]
+      }
+    },
+    {
+      "protocolVersion": 1,
+      "type": "modelProgress",
+      "requestId": "event-model-1",
+      "modelId": "sherpa-zh-en",
+      "operation": "download",
+      "progress": 0.5,
+      "state": "running"
+    },
+    {
+      "protocolVersion": 1,
+      "type": "status",
+      "requestId": "event-status-1",
+      "code": "listening"
+    },
+    {
+      "protocolVersion": 1,
+      "type": "error",
+      "requestId": "req-start",
+      "code": "invalidConfiguration",
+      "recoverable": true,
+      "details": { "field": "sourceLanguage" }
+    }
+  ]
+}
