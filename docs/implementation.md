@@ -7,29 +7,35 @@ flowchart LR
     A[Windows 系统输出或麦克风] --> B[WASAPI 采集]
     B --> C[16 kHz 单声道 float32]
     C --> D{识别模式}
-    D -->|实时| E[sherpa-onnx 流式识别]
-    D -->|高精度| F[Silero VAD 分段]
-    F --> G[faster-whisper]
-    E --> H[字幕 revision 稳定器]
-    G --> H
-    H --> I[原文字幕事件]
-    H --> J{翻译 Provider}
-    J --> K[Argos]
-    J --> L[Microsoft Translator]
-    J --> M[OpenAI 兼容接口]
-    J --> N[Ollama]
-    K --> O[多目标并发调度]
-    L --> O
-    M --> O
-    N --> O
-    O --> P[带译文的新 revision]
-    I --> Q[主界面与独立浮层]
-    P --> Q
+    D -->|实时流式| E[sherpa-onnx 流式识别]
+    D -->|SenseVoice| F[SenseVoiceSmall + Silero VAD]
+    D -->|高精度| G[Silero VAD 分段]
+    G --> H[faster-whisper]
+    E --> I[字幕 revision 稳定器]
+    F --> I
+    H --> I
+    I --> J[原文字幕事件]
+    I --> K{翻译 Provider}
+    K --> L[Argos]
+    K --> M[Microsoft Translator]
+    K --> N[OpenAI 兼容接口]
+    K --> O[Ollama]
+    L --> P[多目标并发调度]
+    M --> P
+    N --> P
+    O --> P
+    P --> Q[带译文的新 revision]
+    J --> R[主界面与独立浮层]
+    Q --> R
 ```
 
 ## 实时识别
 
-实时模式使用 sherpa-onnx OnlineRecognizer。音频以 20 ms 帧连续送入解码器；文本变化时最多每 100 ms 发送一次中间结果，检测到端点后发送最终结果并重置流。首版内置模型目录指向官方中英双语 Zipformer Small INT8 模型。只有用户在“模型与语言包”页面点击安装后才下载，压缩包同时校验字节数和 MD5，再原子安装。
+实时流式模式使用 sherpa-onnx OnlineRecognizer。音频以 20 ms 帧连续送入解码器；文本变化时最多每 100 ms 发送一次中间结果，检测到端点后发送最终结果并重置流。内置模型目录指向官方中英双语 Zipformer Small INT8 模型。只有用户在“模型与语言包”页面点击安装后才下载，压缩包同时校验字节数和 MD5，再原子安装。
+
+## SenseVoice 识别
+
+SenseVoiceSmall 使用 sherpa-onnx 的 `OfflineRecognizer.from_sense_voice`，配合同一套 Silero VAD。在语音片段尚未结束时，按约 280 ms 对当前音频快照重新解码并发送中间 revision；片段结束后再发送带标点的最终 revision。为避免长时间说话导致重复推理越来越慢，中间结果最多回看 12 秒；模型资源页提供中、粤、英、日、韩五种语言的选择提示，识别页会根据模型能力收窄源语言选项。模型文件只在用户点击“安装”后下载，安装完成后可离线使用。
 
 ## 高精度识别
 

@@ -10,7 +10,7 @@ from time import monotonic
 from uuid import uuid4
 
 from .audio.capture import AudioDeviceDisconnectedError, PortAudioCapture
-from .models.catalog import STREAMING_ZH_EN_SMALL, streaming_config
+from .models.catalog import SENSEVOICE_SMALL, STREAMING_ZH_EN_SMALL, streaming_config
 from .models.manager import ModelManager
 from .protocol import (
     CaptionEvent,
@@ -29,7 +29,9 @@ from .protocol import (
 )
 from .recognition.accurate import (
     AccurateRecognizer,
+    SenseVoiceBackend,
     SileroVadSegmenter,
+    StreamingSenseVoiceRecognizer,
     create_faster_whisper_backend,
 )
 from .recognition.base import RecognitionUpdate, Recognizer
@@ -37,6 +39,7 @@ from .recognition.sherpa_streaming import SherpaOnnxDecoder, SherpaStreamingReco
 from .resources import (
     ACCURATE_RESOURCE_ID,
     REALTIME_RESOURCE_ID,
+    SENSEVOICE_RESOURCE_ID,
     ResourceActionError,
     ResourceManager,
 )
@@ -133,11 +136,8 @@ class EngineRuntime:
         if self.service.session_id is not None:
             return self.service.handle(command)
 
-        required_resource = (
-            REALTIME_RESOURCE_ID
-            if command.config.recognitionMode == "realtime"
-            else ACCURATE_RESOURCE_ID
-        )
+        model_id = self._model_id(command)
+        required_resource = model_id
         if not self.resources.is_installed(required_resource):
             return [
                 self._resource_error(
@@ -246,7 +246,8 @@ class EngineRuntime:
 
     async def _create_recognizer(self, command: StartSessionCommand) -> Recognizer:
         language = None if command.config.sourceLanguage == "auto" else command.config.sourceLanguage
-        if command.config.recognitionMode == "realtime":
+        model_id = self._model_id(command)
+        if model_id == REALTIME_RESOURCE_ID:
             if language not in (None, "zh", "en"):
                 raise ValueError("实时模型当前只支持中文和英文")
             directory = self.models.model_path(STREAMING_ZH_EN_SMALL)
@@ -255,12 +256,37 @@ class EngineRuntime:
             )
             return SherpaStreamingRecognizer(decoder, language=language)
 
+        if model_id == SENSEVOICE_RESOURCE_ID:
+            if language not in (None, "zh", "yue", "en", "ja", "ko"):
+                raise ValueError("SenseVoice 当前支持中文、粤语、英文、日文和韩文")
+            directory = self.models.model_path(SENSEVOICE_SMALL)
+            backend = await asyncio.to_thread(
+                SenseVoiceBackend,
+                str(directory / "model.int8.onnx"),
+                str(directory / "tokens.txt"),
+                language=language,
+            )
+            return StreamingSenseVoiceRecognizer(
+                SileroVadSegmenter(), backend, source_language=language
+            )
+
         backend = await asyncio.to_thread(
             create_faster_whisper_backend,
             str(self.resources.whisper_path),
         )
         return AccurateRecognizer(
             SileroVadSegmenter(), backend, source_language=language
+        )
+
+    @staticmethod
+    def _model_id(command: StartSessionCommand) -> str:
+        configured = getattr(command.config, "recognitionModelId", None)
+        if configured:
+            return configured
+        return (
+            REALTIME_RESOURCE_ID
+            if command.config.recognitionMode == "realtime"
+            else ACCURATE_RESOURCE_ID
         )
 
     async def _run_session(self) -> None:

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ClosedCaptionRegular, PlayRegular, StopRegular } from '@fluentui/react-icons'
 
 import type { AudioDevice, CaptionSegment, EngineEvent, SessionConfig } from '../../shared/contracts'
-import { DEFAULT_SETTINGS, type TranslationSettings } from '../../shared/settings'
+import { DEFAULT_SETTINGS, type OverlaySettings, type RecognitionModelId, type TranslationSettings } from '../../shared/settings'
 import { CaptionPreview } from '../components/CaptionPreview'
 
 type SessionState = 'idle' | 'starting' | 'listening' | 'stopping' | 'error'
@@ -18,10 +18,11 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
   const [state, setState] = useState<SessionState>('idle')
   const [devices, setDevices] = useState<AudioDevice[]>([])
   const [audioSource, setAudioSource] = useState('defaultOutput')
-  const [recognitionMode, setRecognitionMode] = useState<'realtime' | 'accurate'>('realtime')
+  const [recognitionModelId, setRecognitionModelId] = useState<RecognitionModelId>(DEFAULT_SETTINGS.recognition.modelId)
   const [sourceLanguage, setSourceLanguage] = useState('auto')
   const [targetLanguages, setTargetLanguages] = useState<string[]>(['zh'])
   const [translationSettings, setTranslationSettings] = useState<TranslationSettings>(DEFAULT_SETTINGS.translation)
+  const [overlaySettings, setOverlaySettings] = useState<OverlaySettings>(DEFAULT_SETTINGS.overlay)
   const [sourceVisible, setSourceVisible] = useState(true)
   const [translationVisible, setTranslationVisible] = useState(true)
   const [caption, setCaption] = useState<CaptionSegment | null>(null)
@@ -40,7 +41,9 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
     void Promise.all([api.listDevices(), api.getSettings()]).then(([items, settings]) => {
       if (active) {
         setDevices(items)
+        setRecognitionModelId(settings.recognition.modelId)
         setTranslationSettings(settings.translation)
+        setOverlaySettings(settings.overlay)
         setNotice((current) => current === '正在连接本地引擎…' ? '准备就绪' : current)
       }
     }).catch((error: unknown) => {
@@ -48,6 +51,12 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
         setState('error')
         setNotice(error instanceof Error ? error.message : '无法读取音频设备')
       }
+    })
+    const unsubscribeSettings = api.onSettingsChanged((settings) => {
+      if (!active) return
+      setTranslationSettings(settings.translation)
+      setOverlaySettings(settings.overlay)
+      setRecognitionModelId(settings.recognition.modelId)
     })
     const unsubscribe = api.onEngineEvent((event: EngineEvent) => {
       if (event.type === 'caption') {
@@ -66,6 +75,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
     return () => {
       active = false
       unsubscribe()
+      unsubscribeSettings()
     }
   }, [api])
 
@@ -94,7 +104,8 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
       audioSource: selectedDevice
         ? { kind: selectedDevice.kind, deviceId: selectedDevice.deviceId }
         : { kind: 'defaultOutput' },
-      recognitionMode,
+      recognitionMode: recognitionModelId === 'faster-whisper-small' ? 'accurate' : 'realtime',
+      recognitionModelId,
       sourceLanguage,
       targetLanguages: translationVisible ? targetLanguages : [],
       allowIntermediateTranslation: translationSettings.allowIntermediate,
@@ -109,12 +120,12 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
     }
     try {
       const snapshot = await api.listResources()
-      const requiredId = recognitionMode === 'realtime' ? 'sherpa-zh-en-small' : 'faster-whisper-small'
+      const requiredId = recognitionModelId
       const required = snapshot.resources.find((item) => item.resourceId === requiredId)
       if (!required?.installed) {
         setState('error')
         setMissingResource(true)
-        setNotice(`${recognitionMode === 'realtime' ? '实时识别' : '高精度识别'}模型尚未安装，请先到“模型与语言包”页面安装。`)
+        setNotice(`${required?.name ?? '所选识别'}模型尚未安装，请先到“模型与语言包”页面安装。`)
         return
       }
       const result = await api.startSession(config)
@@ -146,6 +157,13 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
 
   const listening = Boolean(activeSessionId) || state === 'listening'
   const busy = state === 'starting' || state === 'stopping'
+  const realtimeModel = recognitionModelId === 'sherpa-zh-en-small'
+  const senseVoiceModel = recognitionModelId === 'sensevoice-small'
+  const sourceLanguageOptions = senseVoiceModel
+    ? ['auto', 'zh', 'yue', 'en', 'ja', 'ko']
+    : realtimeModel
+      ? ['auto', 'zh', 'en']
+      : ['auto', 'zh', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'ru']
 
   return (
     <div className="page live-page">
@@ -170,21 +188,23 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
                 {devices.map((device) => <option key={device.deviceId} value={device.deviceId}>{device.name}{device.isDefault ? '（默认）' : ''}</option>)}
               </select>
             </label>
-            <label><span>识别模式</span>
-              <select aria-label="识别模式" value={recognitionMode} onChange={(event) => { const mode = event.target.value as 'realtime' | 'accurate'; setRecognitionMode(mode); if (mode === 'realtime' && !['auto', 'zh', 'en'].includes(sourceLanguage)) setSourceLanguage('auto') }}>
-                <option value="realtime">实时模式 · sherpa-onnx</option>
-                <option value="accurate">高精度模式 · Whisper</option>
+            <label><span>识别模型</span>
+              <select aria-label="识别模式" value={recognitionModelId} onChange={(event) => { const modelId = event.target.value as RecognitionModelId; setRecognitionModelId(modelId); if (!((modelId === 'sensevoice-small' && ['auto', 'zh', 'yue', 'en', 'ja', 'ko'].includes(sourceLanguage)) || (modelId === 'sherpa-zh-en-small' && ['auto', 'zh', 'en'].includes(sourceLanguage)) || (modelId === 'faster-whisper-small' && ['auto', 'zh', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'ru'].includes(sourceLanguage)))) setSourceLanguage('auto'); void api?.updateSettings({ recognition: { modelId } }) }}>
+                <option value="sherpa-zh-en-small">实时流式 · sherpa-onnx（中英）</option>
+                <option value="sensevoice-small">推荐 · SenseVoiceSmall 流式（中英日韩粤）</option>
+                <option value="faster-whisper-small">高精度 · Whisper Small（多语言）</option>
               </select>
             </label>
             <label><span>源语言</span>
               <select aria-label="源语言" value={sourceLanguage} onChange={(event) => setSourceLanguage(event.target.value)}>
                 <option value="auto">自动识别</option><option value="zh">中文</option><option value="en">English</option>
-                <option value="ja" disabled={recognitionMode === 'realtime'}>日本語（高精度模式）</option>
-                <option value="ko" disabled={recognitionMode === 'realtime'}>한국어（高精度模式）</option>
-                <option value="fr" disabled={recognitionMode === 'realtime'}>Français（高精度模式）</option>
-                <option value="de" disabled={recognitionMode === 'realtime'}>Deutsch（高精度模式）</option>
-                <option value="es" disabled={recognitionMode === 'realtime'}>Español（高精度模式）</option>
-                <option value="ru" disabled={recognitionMode === 'realtime'}>Русский（高精度模式）</option>
+                <option value="yue" disabled={!sourceLanguageOptions.includes('yue')}>粤语（SenseVoice）</option>
+                <option value="ja" disabled={!sourceLanguageOptions.includes('ja')}>日本語{senseVoiceModel ? '（SenseVoice）' : '（Whisper）'}</option>
+                <option value="ko" disabled={!sourceLanguageOptions.includes('ko')}>한국어{senseVoiceModel ? '（SenseVoice）' : '（Whisper）'}</option>
+                <option value="fr" disabled={!sourceLanguageOptions.includes('fr')}>Français（Whisper）</option>
+                <option value="de" disabled={!sourceLanguageOptions.includes('de')}>Deutsch（Whisper）</option>
+                <option value="es" disabled={!sourceLanguageOptions.includes('es')}>Español（Whisper）</option>
+                <option value="ru" disabled={!sourceLanguageOptions.includes('ru')}>Русский（Whisper）</option>
               </select>
             </label>
             <fieldset className="language-targets"><legend>目标语言（可多选）</legend>
@@ -213,7 +233,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
           </footer>
         </section>
 
-        <CaptionPreview caption={caption} listening={listening} modelProgress={modelProgress} sourceVisible={sourceVisible} translationVisible={translationVisible} />
+        <CaptionPreview caption={caption} listening={listening} modelProgress={modelProgress} overlay={overlaySettings} sourceVisible={sourceVisible} translationVisible={translationVisible} />
       </div>
     </div>
   )

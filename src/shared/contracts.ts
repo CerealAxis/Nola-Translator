@@ -8,6 +8,8 @@ export type AudioSource =
 export type SessionConfig = {
   audioSource: AudioSource
   recognitionMode: 'realtime' | 'accurate'
+  /** 选择具体识别模型；recognitionMode 保留用于旧版本协议兼容。 */
+  recognitionModelId?: 'sherpa-zh-en-small' | 'sensevoice-small' | 'faster-whisper-small'
   sourceLanguage: string
   targetLanguages: string[]
   allowIntermediateTranslation?: boolean

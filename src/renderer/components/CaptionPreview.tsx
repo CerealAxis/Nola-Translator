@@ -1,4 +1,3 @@
-import { LockClosedRegular } from '@fluentui/react-icons'
 import type { CaptionSegment } from '../../shared/contracts'
 import { DEFAULT_SETTINGS, type OverlaySettings } from '../../shared/settings'
 
@@ -8,7 +7,7 @@ type CaptionPreviewProps = {
   translationVisible?: boolean
   caption?: CaptionSegment | null
   modelProgress?: number | null
-  overlay?: Pick<OverlaySettings, 'backgroundOpacity' | 'sourceColor' | 'translationColor'>
+  overlay?: Pick<OverlaySettings, 'backgroundOpacity' | 'backgroundColor' | 'colorScheme' | 'sourceColor' | 'translationColor' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'maxLines' | 'translationFontSize' | 'translationFontWeight' | 'translationLineHeight' | 'translationMaxLines'>
 }
 
 export function CaptionPreview({
@@ -16,53 +15,43 @@ export function CaptionPreview({
   sourceVisible = true,
   translationVisible = true,
   caption = null,
-  modelProgress = null,
+  modelProgress: _modelProgress = null,
   overlay = DEFAULT_SETTINGS.overlay,
 }: CaptionPreviewProps): React.JSX.Element {
   const completeTranslations = caption?.translations.filter((item) => item.state === 'complete') ?? []
-  const hasPendingTranslation = caption?.translations.some((item) => item.state === 'pending')
-  const failedTranslation = caption?.translations.find((item) => item.state === 'failed')
 
   return (
     <section className="preview-section" aria-label="字幕浮层预览">
       <div className="section-heading-row">
         <h2>字幕浮层预览</h2>
-        <span className="secondary-text">底部 · 已置顶 · 点击穿透</span>
+        <span className="secondary-text">仅显示原文与译文</span>
       </div>
       <div className="preview-stage">
         <div
           className="caption-overlay"
+          data-color-scheme={overlay.colorScheme}
           data-transparent-background={overlay.backgroundOpacity <= 0}
           style={{
-            '--preview-background-opacity': overlay.backgroundOpacity,
+            '--preview-background-alpha': `${overlay.backgroundOpacity * 100}%`,
+            '--preview-background-color': overlay.backgroundColor,
             '--preview-source-color': overlay.sourceColor,
             '--preview-translation-color': overlay.translationColor,
+            '--preview-font-size': `${overlay.fontSize}px`,
+            '--preview-font-weight': overlay.fontWeight,
+            '--preview-line-height': overlay.lineHeight,
+            '--preview-max-lines': overlay.maxLines,
+            '--preview-translation-font-size': `${overlay.translationFontSize}px`,
+            '--preview-translation-font-weight': overlay.translationFontWeight,
+            '--preview-translation-line-height': overlay.translationLineHeight,
+            '--preview-translation-max-lines': overlay.translationMaxLines,
           } as React.CSSProperties}
         >
-          <div className="caption-meta">
-            <span className="caption-state">
-              <span className="status-dot" aria-hidden="true" />
-              {listening ? '正在识别' : '等待字幕'}
-            </span>
-            <span className="caption-position">
-              <LockClosedRegular aria-hidden /> English → 简体中文
-            </span>
-          </div>
           {sourceVisible && (
-            <p className="caption-source">{caption?.sourceText || '开始会话后，识别原文会显示在这里。'}</p>
+            <p className="caption-source">{caption?.sourceText || (listening ? '正在识别语音…' : '开始会话后，识别原文会显示在这里。')}</p>
           )}
           {translationVisible && completeTranslations.map((translation) => (
             <p className="caption-translation" key={translation.targetLanguage}>{translation.text}</p>
           ))}
-          {translationVisible && hasPendingTranslation && (
-            <p className="caption-translation secondary-text">正在准备本地翻译…</p>
-          )}
-          {translationVisible && failedTranslation && (
-            <p className="caption-translation secondary-text">翻译暂不可用：{failedTranslation.errorCode}</p>
-          )}
-          {modelProgress !== null && modelProgress < 1 && (
-            <p className="caption-translation secondary-text">正在准备模型 · {Math.round(modelProgress * 100)}%</p>
-          )}
         </div>
       </div>
     </section>

@@ -134,14 +134,12 @@ try {
   await delay(250);
   const overlayWindowProbe = await evaluate(overlayTarget, `(() => {
     const overlay = document.querySelector('.standalone-overlay');
-    const findButton = (name) => Array.from(document.querySelectorAll('button'))
-      .find((button) => button.textContent?.trim() === name);
     return {
       locked: overlay?.dataset.locked,
       dragRegion: overlay ? getComputedStyle(overlay).getPropertyValue('-webkit-app-region') : '',
-      hasFinish: Boolean(findButton('完成调整')),
-      hasHide: Boolean(findButton('隐藏浮层')),
-      hasResizeCue: Boolean(document.querySelector('.overlay-resize-cue')),
+      buttonCount: document.querySelectorAll('button').length,
+      hasStatus: Boolean(document.querySelector('.overlay-status')),
+      hasEditBar: Boolean(document.querySelector('.overlay-edit-bar')),
       visibility: document.visibilityState
     };
   })()`);
@@ -151,11 +149,7 @@ try {
     writeFileSync(process.env.FLUENTCAPTIONS_OVERLAY_SCREENSHOT, Buffer.from(overlayScreenshot.data, 'base64'));
   }
 
-  await evaluate(overlayTarget, `(() => {
-    Array.from(document.querySelectorAll('button'))
-      .find((button) => button.textContent?.trim() === '隐藏浮层')?.click();
-    return true;
-  })()`);
+  await evaluate(target, 'window.fluentCaptions.hideOverlay()');
   await delay(150);
   const overlayHidden = await evaluate(overlayTarget, 'document.visibilityState === "hidden"');
   await evaluate(target, `(async () => {
@@ -180,12 +174,13 @@ try {
       .find((button) => button.textContent?.trim() === name || button.getAttribute('aria-label') === name);
     findButton('模型与语言包')?.click();
     for (let attempt = 0; attempt < 60; attempt += 1) {
-      if (document.querySelectorAll('.resource-card').length >= 2) break;
+      if (document.querySelectorAll('.resource-card').length >= 3) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     return {
       heading: document.querySelector('h1')?.textContent ?? '',
-      recognitionCards: document.querySelectorAll('.resource-card').length,
+    recognitionCards: document.querySelectorAll('.resource-card').length,
+    hasSenseVoice: document.body.innerText.includes('SenseVoiceSmall'),
       packageRows: document.querySelectorAll('.package-row').length,
       installButtons: Array.from(document.querySelectorAll('button'))
         .filter((button) => button.textContent?.trim() === '安装').length,
@@ -223,9 +218,9 @@ try {
     || overlayPageProbe.locked !== false
     || overlayWindowProbe.locked !== 'false'
     || overlayWindowProbe.dragRegion !== 'drag'
-    || !overlayWindowProbe.hasFinish
-    || !overlayWindowProbe.hasHide
-    || !overlayWindowProbe.hasResizeCue
+    || overlayWindowProbe.buttonCount !== 0
+    || overlayWindowProbe.hasStatus
+    || overlayWindowProbe.hasEditBar
     || !overlayHidden
     || !transparentOverlayProbe.visible
     || transparentOverlayProbe.transparentFlag !== 'true'
@@ -233,7 +228,8 @@ try {
     || transparentOverlayProbe.backdropFilter !== 'none'
     || transparentOverlayProbe.boxShadow !== 'none'
     || resourcePageProbe.heading !== '模型与语言包'
-    || resourcePageProbe.recognitionCards !== 2
+    || resourcePageProbe.recognitionCards < 3
+    || !resourcePageProbe.hasSenseVoice
     || resourcePageProbe.packageRows < 4
     || !resourcePageProbe.hasStoragePath
     || !translationSwitchProbe.hasLabel

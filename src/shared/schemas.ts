@@ -20,6 +20,7 @@ export const sessionConfigSchema = z
   .object({
     audioSource: audioSourceSchema,
     recognitionMode: z.enum(['realtime', 'accurate']),
+    recognitionModelId: z.enum(['sherpa-zh-en-small', 'sensevoice-small', 'faster-whisper-small']).optional(),
     sourceLanguage: z.string().min(1).max(32),
     targetLanguages: z.array(z.string().min(1).max(32)).max(8),
     allowIntermediateTranslation: z.boolean().optional(),

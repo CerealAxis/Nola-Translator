@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from hashlib import md5
+from hashlib import md5, sha256
 import os
 from pathlib import Path
 import shutil
@@ -26,9 +26,11 @@ class ModelSpec:
     model_id: str
     url: str
     archive_size: int
-    archive_md5: str
+    # 部分上游发布只提供文件大小，没有单独发布摘要；这时仍校验大小并校验解压后的必要文件。
+    archive_md5: str | None
     directory: str
     required_files: tuple[str, ...]
+    archive_sha256: str | None = None
 
 
 def _download(url: str, destination: Path, progress: ProgressCallback) -> None:
@@ -92,9 +94,17 @@ class ModelManager:
     def _verify_archive(archive: Path, spec: ModelSpec) -> None:
         if archive.stat().st_size != spec.archive_size:
             raise ModelIntegrityError("模型压缩包大小不匹配")
-        digest = md5()
-        with archive.open("rb") as source:
-            while chunk := source.read(1024 * 1024):
-                digest.update(chunk)
-        if digest.hexdigest().casefold() != spec.archive_md5.casefold():
-            raise ModelIntegrityError("模型压缩包摘要不匹配")
+        if spec.archive_md5:
+            digest = md5()
+            with archive.open("rb") as source:
+                while chunk := source.read(1024 * 1024):
+                    digest.update(chunk)
+            if digest.hexdigest().casefold() != spec.archive_md5.casefold():
+                raise ModelIntegrityError("模型压缩包摘要不匹配")
+        if spec.archive_sha256:
+            digest = sha256()
+            with archive.open("rb") as source:
+                while chunk := source.read(1024 * 1024):
+                    digest.update(chunk)
+            if digest.hexdigest().casefold() != spec.archive_sha256.casefold():
+                raise ModelIntegrityError("模型压缩包摘要不匹配")

@@ -43,6 +43,9 @@ class TranslationOptions(ProtocolModel):
 class SessionConfig(ProtocolModel):
     audioSource: AudioSource
     recognitionMode: Literal["realtime", "accurate"]
+    recognitionModelId: Literal[
+        "sherpa-zh-en-small", "sensevoice-small", "faster-whisper-small"
+    ] | None = None
     sourceLanguage: str = Field(min_length=1, max_length=32)
     targetLanguages: list[str] = Field(max_length=8)
     allowIntermediateTranslation: bool = False

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
+import re
 from typing import Any, Protocol
 from uuid import uuid4
 
@@ -159,6 +160,23 @@ class SileroVadSegmenter:
         self.pending = np.empty(0, dtype=np.float32)
         return self._finalize(end_sample, trim_samples=0)
 
+    def current_segment(self) -> SpeechSegment | None:
+        """返回当前正在说话片段的快照，供伪流式识别器生成中间结果。"""
+        if self.active_audio.size == 0:
+            return None
+        samples = (
+            np.concatenate((self.active_audio, self.pending))
+            if self.pending.size
+            else self.active_audio.copy()
+        )
+        if samples.size == 0:
+            return None
+        return SpeechSegment(
+            samples=samples.astype(np.float32, copy=False),
+            started_at_ms=self._time_ms(self.active_start_sample),
+            ended_at_ms=self._time_ms(self.received_samples),
+        )
+
     def _time_ms(self, sample: int) -> float:
         return (self.origin_ms or 0.0) + sample * 1000 / 16_000
 
@@ -184,6 +202,51 @@ class FasterWhisperBackend:
         )
         text = "".join(segment.text for segment in segments)
         return text, getattr(info, "language", language)
+
+
+class SenseVoiceBackend:
+    """sherpa-onnx 的 SenseVoiceSmall 离线识别后端。
+
+    SenseVoice 是按完整语音片段解码的非自回归模型，和本模块的 VAD 分段器组合后
+    仍能持续输出字幕。use_itn=True 让模型恢复标点和常见数字格式。
+    """
+
+    TAG_PATTERN = re.compile(r"<\|[^>]+\|>")
+    LANGUAGE_PATTERN = re.compile(r"<\|(zh|yue|en|ja|ko)\|>")
+
+    def __init__(
+        self,
+        model_path: str,
+        tokens_path: str,
+        *,
+        language: str | None = None,
+        num_threads: int = 2,
+    ) -> None:
+        import sherpa_onnx
+
+        self.recognizer = sherpa_onnx.OfflineRecognizer.from_sense_voice(
+            model=model_path,
+            tokens=tokens_path,
+            num_threads=num_threads,
+            sample_rate=16_000,
+            provider="cpu",
+            language=language or "auto",
+            use_itn=True,
+        )
+
+    def transcribe(
+        self, samples: NDArray[np.float32], language: str | None
+    ) -> tuple[str, str | None]:
+        stream = self.recognizer.create_stream()
+        stream.accept_waveform(16_000, samples)
+        self.recognizer.decode_stream(stream)
+        raw_result = stream.result
+        raw_text = getattr(raw_result, "text", raw_result)
+        text = str(raw_text).strip()
+        detected = self.LANGUAGE_PATTERN.search(text)
+        detected_language = language or (detected.group(1) if detected else None)
+        text = self.TAG_PATTERN.sub("", text).strip()
+        return text, detected_language
 
 
 def create_faster_whisper_backend(
@@ -251,3 +314,134 @@ class AccurateRecognizer:
 
     async def close(self) -> None:
         return None
+
+
+class StreamingSenseVoiceRecognizer:
+    """使用离线 SenseVoice 模型模拟流式输出。
+
+    SenseVoiceSmall 本身不是 sherpa-onnx OnlineRecognizer；这里在 VAD 语音片段
+    仍未结束时，按固定间隔对当前音频快照重新解码并发送中间 revision。这样不需要
+    引入 FunASR/Torch 专用运行时，同时保留句尾的最终标点结果。
+    """
+
+    def __init__(
+        self,
+        vad: SileroVadSegmenter,
+        backend: TranscriptionBackend,
+        *,
+        source_language: str | None,
+        partial_interval_ms: int = 280,
+        min_partial_ms: int = 420,
+        max_partial_seconds: float = 12,
+    ) -> None:
+        self.vad = vad
+        self.backend = backend
+        self.source_language = source_language
+        self.partial_interval_samples = max(320, int(16_000 * partial_interval_ms / 1000))
+        self.min_partial_samples = max(320, int(16_000 * min_partial_ms / 1000))
+        self.max_partial_samples = max(
+            self.min_partial_samples, int(16_000 * max_partial_seconds)
+        )
+        self.stabilizer: RecognitionStabilizer | None = None
+        self.decode_task: asyncio.Task[tuple[str, str, str | None] | None] | None = None
+        self.last_scheduled_samples = 0
+
+    async def accept(self, frame: AudioFrame) -> list[RecognitionUpdate]:
+        completed = self.vad.accept(frame)
+        if completed:
+            updates: list[RecognitionUpdate] = []
+            for segment in completed:
+                updates.extend(await self._finish_segment(segment))
+            return updates
+
+        updates = await self._collect_decode_task(wait=False)
+        current = self.vad.current_segment()
+        if current is not None:
+            self._ensure_stabilizer(current)
+            samples = self._partial_samples(current.samples)
+            if (
+                self.decode_task is None
+                and samples.size >= self.min_partial_samples
+                and samples.size - self.last_scheduled_samples
+                >= self.partial_interval_samples
+            ):
+                self.last_scheduled_samples = samples.size
+                assert self.stabilizer is not None
+                self.decode_task = asyncio.create_task(
+                    self._decode_partial(self.stabilizer.segment_id, samples)
+                )
+        return updates
+
+    async def flush(self, ended_at_ms: float) -> list[RecognitionUpdate]:
+        del ended_at_ms
+        updates: list[RecognitionUpdate] = []
+        for segment in self.vad.flush():
+            updates.extend(await self._finish_segment(segment))
+        return updates
+
+    async def _finish_segment(self, segment: SpeechSegment) -> list[RecognitionUpdate]:
+        updates = await self._collect_decode_task(wait=True)
+        self._ensure_stabilizer(segment)
+        assert self.stabilizer is not None
+        text, language = await asyncio.to_thread(
+            self.backend.transcribe, segment.samples, self.source_language
+        )
+        final = self.stabilizer.update(
+            text,
+            language=language,
+            is_final=True,
+            ended_at_ms=segment.ended_at_ms,
+        )
+        if final is not None:
+            updates.append(final)
+        self.stabilizer = None
+        self.last_scheduled_samples = 0
+        return updates
+
+    async def _collect_decode_task(self, *, wait: bool) -> list[RecognitionUpdate]:
+        task = self.decode_task
+        if task is None or (not wait and not task.done()):
+            return []
+        self.decode_task = None
+        try:
+            result = await task
+        except asyncio.CancelledError:
+            return []
+        except Exception:
+            return []
+        if result is None or self.stabilizer is None:
+            return []
+        segment_id, text, language = result
+        if segment_id != self.stabilizer.segment_id:
+            return []
+        update = self.stabilizer.update(
+            text,
+            language=language,
+            is_final=False,
+        )
+        return [update] if update is not None else []
+
+    async def _decode_partial(
+        self, segment_id: str, samples: NDArray[np.float32]
+    ) -> tuple[str, str, str | None] | None:
+        text, language = await asyncio.to_thread(
+            self.backend.transcribe, samples, self.source_language
+        )
+        return segment_id, text, language
+
+    def _ensure_stabilizer(self, segment: SpeechSegment) -> None:
+        if self.stabilizer is None:
+            self.stabilizer = RecognitionStabilizer(
+                f"segment-{uuid4()}", segment.started_at_ms
+            )
+
+    def _partial_samples(self, samples: NDArray[np.float32]) -> NDArray[np.float32]:
+        if samples.size <= self.max_partial_samples:
+            return samples.astype(np.float32, copy=True)
+        return samples[-self.max_partial_samples :].astype(np.float32, copy=True)
+
+    async def close(self) -> None:
+        if self.decode_task is not None:
+            self.decode_task.cancel()
+            await asyncio.gather(self.decode_task, return_exceptions=True)
+            self.decode_task = None

@@ -37,18 +37,21 @@ sequenceDiagram
 
 ## 会话配置
 
-`startSession.config` 包含音频来源、识别模式、源语言、最多八个目标语言和翻译 Provider。例如：
+`startSession.config` 包含音频来源、识别模式、具体识别模型、源语言、最多八个目标语言和翻译 Provider。例如：
 
 ```json
 {
   "audioSource": { "kind": "defaultOutput" },
   "recognitionMode": "realtime",
+  "recognitionModelId": "sensevoice-small",
   "sourceLanguage": "auto",
   "targetLanguages": ["zh", "ja"],
   "translationProvider": "argos",
   "allowIntermediateTranslation": false
 }
 ```
+
+`recognitionModelId` 可选值为 `sherpa-zh-en-small`（中英流式）、`sensevoice-small`（中英日韩粤、VAD 伪流式、带标点）和 `faster-whisper-small`（多语言高精度）。旧客户端省略该字段时，Python 引擎按 `recognitionMode` 回退到原有模型。
 
 `translationProvider` 可为 `argos`、`microsoft`、`openai` 或 `ollama`。联网 Provider 的地址、区域和模型放在 `translationOptions`；API 密钥由 Electron 主进程从 Windows 加密存储读取，只在发送 `startSession` 时注入，不暴露给渲染进程。
 

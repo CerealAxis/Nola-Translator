@@ -19,6 +19,7 @@ export class SettingsStore {
         ...structuredClone(DEFAULT_SETTINGS),
         ...raw,
         version: 1,
+        recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}) },
         overlay: { ...DEFAULT_SETTINGS.overlay, ...(raw.overlay ?? {}) },
         translation: { ...DEFAULT_SETTINGS.translation, ...(raw.translation ?? {}) },
       }
@@ -33,6 +34,7 @@ export class SettingsStore {
       ...this.settings,
       ...patch,
       version: 1,
+      recognition: { ...this.settings.recognition, ...(patch.recognition ?? {}) },
       overlay: { ...this.settings.overlay, ...(patch.overlay ?? {}) },
       translation: { ...this.settings.translation, ...(patch.translation ?? {}) },
     }

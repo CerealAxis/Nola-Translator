@@ -26,6 +26,22 @@ STREAMING_ZH_EN_SMALL = ModelSpec(
 )
 
 
+# SenseVoiceSmall：中文、粤语、英语、日语、韩语。GitHub release 提供 SHA-256 摘要，
+# ModelManager 会校验下载大小、摘要以及解压后的 tokens/model 文件。
+SENSEVOICE_SMALL = ModelSpec(
+    model_id="sensevoice-small",
+    url=(
+        "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/"
+        "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2"
+    ),
+    archive_size=163_002_883,
+    archive_md5=None,
+    directory="sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+    required_files=("tokens.txt", "model.int8.onnx"),
+    archive_sha256="7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e",
+)
+
+
 def streaming_config(model_directory: Path) -> SherpaModelConfig:
     return SherpaModelConfig(
         tokens=str(model_directory / "tokens.txt"),

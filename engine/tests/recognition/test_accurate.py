@@ -1,3 +1,4 @@
+import asyncio
 import numpy as np
 import pytest
 
@@ -6,6 +7,7 @@ from fluentcaptions_engine.recognition.accurate import (
     AccurateRecognizer,
     SileroVadSegmenter,
     SpeechSegment,
+    StreamingSenseVoiceRecognizer,
     create_faster_whisper_backend,
 )
 
@@ -29,6 +31,43 @@ class FakeBackend:
         return ("  Hello world  ", "en")
 
 
+class FakeStreamingVad:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.active: SpeechSegment | None = SpeechSegment(
+            np.zeros(640, dtype=np.float32), 0, 40
+        )
+
+    def accept(self, _frame: AudioFrame) -> list[SpeechSegment]:
+        self.calls += 1
+        assert self.active is not None
+        self.active = SpeechSegment(
+            np.concatenate((self.active.samples, np.zeros(320, dtype=np.float32))),
+            self.active.started_at_ms,
+            self.active.ended_at_ms + 20,
+        )
+        if self.calls == 2:
+            completed = self.active
+            self.active = None
+            return [completed]
+        return []
+
+    def current_segment(self) -> SpeechSegment | None:
+        return self.active
+
+    def flush(self) -> list[SpeechSegment]:
+        return []
+
+
+class FakeStreamingBackend:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def transcribe(self, _samples: np.ndarray, _language: str | None) -> tuple[str, str]:
+        self.calls += 1
+        return ("hello" if self.calls == 1 else "hello world", "en")
+
+
 @pytest.mark.asyncio
 async def test_accurate_recognizer_only_emits_final_segment() -> None:
     segment = SpeechSegment(np.zeros(16_000, dtype=np.float32), 0, 1000)
@@ -40,6 +79,27 @@ async def test_accurate_recognizer_only_emits_final_segment() -> None:
     assert updates[0].revision == 0
     assert updates[0].source_text == "Hello world."
     assert updates[0].language == "en"
+
+
+@pytest.mark.asyncio
+async def test_sensevoice_streaming_emits_intermediate_then_final_revision() -> None:
+    recognizer = StreamingSenseVoiceRecognizer(
+        FakeStreamingVad(),
+        FakeStreamingBackend(),
+        source_language=None,
+        partial_interval_ms=20,
+        min_partial_ms=20,
+    )
+
+    assert await recognizer.accept(AudioFrame(np.zeros(320, dtype=np.float32), 0)) == []
+    await asyncio.sleep(0.02)
+    updates = await recognizer.accept(AudioFrame(np.zeros(320, dtype=np.float32), 20))
+
+    assert [item.is_final for item in updates] == [False, True]
+    assert updates[0].segment_id == updates[1].segment_id
+    assert updates[0].revision == 0
+    assert updates[1].revision == 1
+    assert updates[1].source_text == "hello world."
 
 
 def test_whisper_backend_falls_back_from_cuda_to_cpu_int8() -> None:

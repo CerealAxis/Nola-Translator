@@ -22,13 +22,19 @@ export const APP_IPC_CHANNELS = channels
 const settingsPatchSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']).optional(),
   historyEnabled: z.boolean().optional(),
+  recognition: z.object({
+    modelId: z.enum(['sherpa-zh-en-small', 'sensevoice-small', 'faster-whisper-small']).optional(),
+  }).partial().optional(),
   overlay: z.object({
     mode: z.enum(['free', 'top', 'bottom']).optional(), locked: z.boolean().optional(),
+    colorScheme: z.enum(['dark', 'light']).optional(),
     alwaysOnTop: z.boolean().optional(), fontFamily: z.string().max(128).optional(),
     fontSize: z.number().min(14).max(72).optional(), fontWeight: z.number().min(300).max(800).optional(),
-    sourceColor: z.string().max(32).optional(), translationColor: z.string().max(32).optional(),
+    translationFontSize: z.number().min(12).max(72).optional(), translationFontWeight: z.number().min(300).max(800).optional(),
+    sourceColor: z.string().max(32).optional(), translationColor: z.string().max(32).optional(), backgroundColor: z.string().max(32).optional(),
     backgroundOpacity: z.number().min(0).max(1).optional(), maxLines: z.number().int().min(1).max(10).optional(),
-    lineHeight: z.number().min(1).max(2).optional(), showSource: z.boolean().optional(), showTranslation: z.boolean().optional(),
+    lineHeight: z.number().min(1).max(2).optional(), translationMaxLines: z.number().int().min(1).max(10).optional(),
+    translationLineHeight: z.number().min(1).max(2).optional(), showSource: z.boolean().optional(), showTranslation: z.boolean().optional(),
   }).partial().optional(),
   translation: z.object({
     provider: z.enum(['argos', 'microsoft', 'openai', 'ollama']).optional(),
@@ -45,7 +51,7 @@ function diagnostics(engine: EngineProcess): Record<string, string | number> {
     Chromium: process.versions.chrome, Node: process.versions.node,
     操作系统: `${process.platform} ${process.getSystemVersion()}`,
     引擎状态: engine.currentState, 引擎重启次数: engine.restartCount,
-    语音识别: 'sherpa-onnx / faster-whisper',
+    语音识别: 'sherpa-onnx / SenseVoice / faster-whisper',
     本地翻译: 'Argos Translate',
     数据目录: app.getPath('userData'),
   }
@@ -61,7 +67,7 @@ export function registerAppIpc(options: {
   getMainWindow: () => BrowserWindow | null
 }): () => void {
   let current = options.initialSettings
-  const applyOverlay = (): void => {
+  const applyOverlay = (reposition = false): void => {
     const window = options.getOverlayWindow()
     if (!window) return
     const interaction = getOverlayInteractionPolicy(current.overlay.locked)
@@ -70,8 +76,11 @@ export function registerAppIpc(options: {
     window.setFocusable(interaction.focusable)
     window.setMovable(interaction.movable)
     window.setResizable(interaction.resizable)
-    const display = screen.getDisplayMatching(window.getBounds())
-    window.setBounds(computeOverlayBounds(current.overlay.mode, display.workArea, window.getBounds()))
+    // 只有用户改动位置模式时才重设窗口边界。外观滑块不应改变用户已调整的尺寸。
+    if (reposition) {
+      const display = screen.getDisplayMatching(window.getBounds())
+      window.setBounds(computeOverlayBounds(current.overlay.mode, display.workArea, window.getBounds()))
+    }
     window.webContents.send('settings:changed', current)
   }
   const broadcastSettings = (): void => {
@@ -80,14 +89,15 @@ export function registerAppIpc(options: {
     }
   }
   const applyTheme = (): void => {
-    nativeTheme.themeSource = current.theme
+    // 主程序始终遵循 Windows；“字幕主题”仅控制字幕浮层，二者不能互相影响。
+    nativeTheme.themeSource = 'system'
     options.getMainWindow()?.setTitleBarOverlay({
       color: '#00000000',
       symbolColor: nativeTheme.shouldUseDarkColors ? '#ffffff' : '#1f1f1f',
       height: 48,
     })
   }
-  applyOverlay()
+  applyOverlay(true)
   applyTheme()
 
   ipcMain.handle(channels.getSettings, () => current)
@@ -95,7 +105,7 @@ export function registerAppIpc(options: {
     const patch = settingsPatchSchema.parse(raw) as AppSettingsPatch
     current = await options.settings.update(patch)
     await options.history.setEnabled(current.historyEnabled)
-    applyOverlay()
+    applyOverlay(patch.overlay?.mode !== undefined)
     applyTheme()
     broadcastSettings()
     return current

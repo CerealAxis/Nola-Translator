@@ -17,12 +17,10 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     const api = window.fluentCaptions
     if (!api) return
-    const apply = (theme: 'system' | 'light' | 'dark'): void => {
-      document.documentElement.dataset.theme = theme
-      document.documentElement.style.colorScheme = theme === 'system' ? 'light dark' : theme
-    }
-    void api.getSettings().then((settings) => apply(settings.theme))
-    return api.onSettingsChanged((settings) => apply(settings.theme))
+    // 主程序外观跟随 Windows；字幕配色仅作用于独立浮层。
+    document.documentElement.dataset.theme = 'system'
+    document.documentElement.style.colorScheme = 'light dark'
+    return undefined
   }, [])
 
   useEffect(() => {

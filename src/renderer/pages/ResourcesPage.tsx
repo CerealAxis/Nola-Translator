@@ -10,6 +10,7 @@ import {
 } from '@fluentui/react-icons'
 
 import type { EngineEvent, ResourceRecord, ResourceSnapshot } from '../../shared/contracts'
+import { DEFAULT_SETTINGS, type RecognitionModelId } from '../../shared/settings'
 
 const phaseLabels: Record<NonNullable<ResourceRecord['phase']>, string> = {
   resolve: '正在查找下载资源',
@@ -53,10 +54,11 @@ function ResourceStatus({ resource }: { resource: ResourceRecord }): React.JSX.E
 
 type ResourceActionProps = {
   resource: ResourceRecord
+  selected?: boolean
   onAction: (resource: ResourceRecord, action: 'install' | 'remove' | 'cancel') => void
 }
 
-function ResourceAction({ resource, onAction }: ResourceActionProps): React.JSX.Element {
+function ResourceAction({ resource, selected = false, onAction }: ResourceActionProps): React.JSX.Element {
   if (resource.state !== 'idle' && resource.state !== 'failed') {
     if (resource.cancellable) {
       return <button className="button secondary-button compact-button" onClick={() => onAction(resource, 'cancel')} type="button"><DismissRegular aria-hidden />取消</button>
@@ -64,6 +66,7 @@ function ResourceAction({ resource, onAction }: ResourceActionProps): React.JSX.
     return <button className="button secondary-button compact-button" disabled type="button">处理中</button>
   }
   if (resource.installed) {
+    if (selected) return <button className="button secondary-button compact-button" disabled type="button">当前使用</button>
     return <button className="button secondary-button compact-button" onClick={() => onAction(resource, 'remove')} type="button"><DeleteRegular aria-hidden />删除</button>
   }
   return <button className="button primary-button compact-button" onClick={() => onAction(resource, 'install')} type="button"><ArrowDownloadRegular aria-hidden />{resource.state === 'failed' ? '重试' : '安装'}</button>
@@ -80,6 +83,7 @@ function ResourceProgress({ resource }: { resource: ResourceRecord }): React.JSX
 
 export function ResourcesPage(): React.JSX.Element {
   const [snapshot, setSnapshot] = useState<ResourceSnapshot>({ storagePath: '正在读取…', resources: [] })
+  const [selectedModelId, setSelectedModelId] = useState<RecognitionModelId>(DEFAULT_SETTINGS.recognition.modelId)
   const [notice, setNotice] = useState('此页面只在你点击“安装”后访问网络。')
   const [loading, setLoading] = useState(true)
   const api = window.fluentCaptions
@@ -88,7 +92,9 @@ export function ResourcesPage(): React.JSX.Element {
     if (!api) return
     setLoading(true)
     try {
-      setSnapshot(await api.listResources())
+      const [nextSnapshot, settings] = await Promise.all([api.listResources(), api.getSettings()])
+      setSnapshot(nextSnapshot)
+      setSelectedModelId(settings.recognition.modelId)
       setNotice('资源状态已刷新。字幕启动时不会自动下载任何内容。')
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '无法读取资源状态')
@@ -104,7 +110,7 @@ export function ResourcesPage(): React.JSX.Element {
       return
     }
     void refresh()
-    return api.onEngineEvent((event: EngineEvent) => {
+    const unsubscribeEngine = api.onEngineEvent((event: EngineEvent) => {
       if (event.type !== 'resourceChanged') return
       setSnapshot((current) => ({
         ...current,
@@ -116,6 +122,11 @@ export function ResourcesPage(): React.JSX.Element {
         setNotice(event.resource.installed ? `${event.resource.name} 已安装。` : `${event.resource.name} 已删除。`)
       }
     })
+    const unsubscribeSettings = api.onSettingsChanged((settings) => setSelectedModelId(settings.recognition.modelId))
+    return () => {
+      unsubscribeEngine()
+      unsubscribeSettings()
+    }
   }, [api, refresh])
 
   const recognition = useMemo(() => snapshot.resources.filter((item) => item.kind === 'recognitionModel'), [snapshot.resources])
@@ -134,6 +145,17 @@ export function ResourcesPage(): React.JSX.Element {
     }
   }
 
+  const selectModel = async (resource: ResourceRecord): Promise<void> => {
+    if (!api || !resource.installed || resource.state !== 'idle') return
+    try {
+      const settings = await api.updateSettings({ recognition: { modelId: resource.resourceId as RecognitionModelId } })
+      setSelectedModelId(settings.recognition.modelId)
+      setNotice(`${resource.name} 已设为字幕默认识别模型。`)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '无法保存识别模型选择')
+    }
+  }
+
   return (
     <div className="page resources-page">
       <header className="page-heading">
@@ -148,13 +170,19 @@ export function ResourcesPage(): React.JSX.Element {
       </section>
 
       <section className="resource-section" aria-labelledby="recognition-resources">
-        <div className="section-heading-row"><div><h2 id="recognition-resources">语音识别模型</h2><p>安装后才能选择对应模式；开始字幕只做本地校验。</p></div></div>
+        <div className="section-heading-row"><div><h2 id="recognition-resources">语音识别模型</h2><p>先在这里安装并选择模型；开始字幕只做本地校验，不会悄悄下载。</p></div><span className="badge">当前：{recognition.find((item) => item.resourceId === selectedModelId)?.name ?? '未选择'}</span></div>
         <div className="recognition-resource-grid">
           {recognition.map((resource) => (
             <article className="surface resource-card" key={resource.resourceId}>
               <div className="resource-card-top"><span className="resource-provider-icon"><FolderRegular aria-hidden /></span><span className="badge">{resource.provider}</span></div>
               <h3>{resource.name}</h3><p>{resource.description}</p>
-              <div className="resource-card-footer"><ResourceStatus resource={resource} /><ResourceAction resource={resource} onAction={(item, action) => void act(item, action)} /></div>
+              <div className="resource-card-footer"><ResourceStatus resource={resource} /><ResourceAction resource={resource} selected={selectedModelId === resource.resourceId} onAction={(item, action) => void act(item, action)} /></div>
+              <div className="resource-select-row">
+                <button className={`button ${selectedModelId === resource.resourceId ? 'secondary-button selected-resource-button' : 'secondary-button'} compact-button`} disabled={!resource.installed || resource.state !== 'idle' || selectedModelId === resource.resourceId} onClick={() => void selectModel(resource)} type="button">
+                  {selectedModelId === resource.resourceId ? <><CheckmarkCircleRegular aria-hidden />当前使用</> : '选择此模型'}
+                </button>
+                {resource.resourceId === 'sensevoice-small' && <small>流式中间结果 · 标点 · 中文/粤语/English/日本語/한국어</small>}
+              </div>
               <ResourceProgress resource={resource} />
             </article>
           ))}

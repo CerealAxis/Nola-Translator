@@ -12,13 +12,14 @@ import threading
 from typing import Literal
 from uuid import uuid4
 
-from .models.catalog import STREAMING_ZH_EN_SMALL
+from .models.catalog import SENSEVOICE_SMALL, STREAMING_ZH_EN_SMALL
 from .models.manager import ModelManager
 from .protocol import ResourceChangedEvent, ResourceRecord
 from .translation.packages import ArgosPackageManager
 
 
 REALTIME_RESOURCE_ID = STREAMING_ZH_EN_SMALL.model_id
+SENSEVOICE_RESOURCE_ID = SENSEVOICE_SMALL.model_id
 ACCURATE_RESOURCE_ID = "faster-whisper-small"
 WHISPER_REQUIRED_FILES = ("config.json", "model.bin", "tokenizer.json")
 
@@ -80,6 +81,15 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "低延迟流式模型，可输出中间结果；适合会议、视频和直播。",
             ("zh", "en"),
             STREAMING_ZH_EN_SMALL.archive_size,
+        ),
+        ResourceDefinition(
+            SENSEVOICE_RESOURCE_ID,
+            "recognitionModel",
+            "sherpa-onnx",
+            "推荐 · SenseVoiceSmall · 流式中英日韩粤",
+            "VAD 期间持续输出中间结果，支持中文、粤语、English、日本語、한국어，并启用标点恢复。",
+            ("zh", "yue", "en", "ja", "ko"),
+            SENSEVOICE_SMALL.archive_size,
         ),
         ResourceDefinition(
             ACCURATE_RESOURCE_ID,
@@ -145,6 +155,8 @@ class ResourceManager:
         definition = self._definition(resource_id)
         if resource_id == REALTIME_RESOURCE_ID:
             return self.models.is_installed(STREAMING_ZH_EN_SMALL)
+        if resource_id == SENSEVOICE_RESOURCE_ID:
+            return self.models.is_installed(SENSEVOICE_SMALL)
         if resource_id == ACCURATE_RESOURCE_ID:
             return all((self.whisper_path / name).is_file() for name in WHISPER_REQUIRED_FILES)
         assert definition.source_language and definition.target_language
@@ -158,6 +170,8 @@ class ResourceManager:
         installed_bytes = 0
         if resource_id == REALTIME_RESOURCE_ID:
             installed_bytes = _directory_size(self.models.model_path(STREAMING_ZH_EN_SMALL))
+        elif resource_id == SENSEVOICE_RESOURCE_ID:
+            installed_bytes = _directory_size(self.models.model_path(SENSEVOICE_SMALL))
         elif resource_id == ACCURATE_RESOURCE_ID:
             installed_bytes = _directory_size(self.whisper_path)
         elif installed:
@@ -262,6 +276,9 @@ class ResourceManager:
                 self.models.ensure_archive, STREAMING_ZH_EN_SMALL, progress
             )
             return
+        if resource_id == SENSEVOICE_RESOURCE_ID:
+            await asyncio.to_thread(self.models.ensure_archive, SENSEVOICE_SMALL)
+            return
         if resource_id == ACCURATE_RESOURCE_ID:
             await asyncio.to_thread(self._install_whisper)
             return
@@ -297,6 +314,12 @@ class ResourceManager:
             await asyncio.to_thread(
                 shutil.rmtree,
                 self.models.model_path(STREAMING_ZH_EN_SMALL),
+                True,
+            )
+        elif resource_id == SENSEVOICE_RESOURCE_ID:
+            await asyncio.to_thread(
+                shutil.rmtree,
+                self.models.model_path(SENSEVOICE_SMALL),
                 True,
             )
         elif resource_id == ACCURATE_RESOURCE_ID:

@@ -67,6 +67,7 @@ describe('App', () => {
     const updateSettings = vi.spyOn(api, 'updateSettings').mockImplementation(async (patch) => ({
       ...DEFAULT_SETTINGS,
       ...patch,
+      recognition: { ...DEFAULT_SETTINGS.recognition, ...patch.recognition },
       overlay: { ...DEFAULT_SETTINGS.overlay, ...patch.overlay },
       translation: { ...DEFAULT_SETTINGS.translation, ...patch.translation },
     }))
