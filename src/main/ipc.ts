@@ -123,7 +123,7 @@ export function registerEngineIpc(
     const workArea = screen.getDisplayMatching(bounds).workArea
     window.setBounds(computeOverlayBounds('free', workArea, { ...bounds,
       width: Math.min(workArea.width, Math.max(420, Math.round(width as number))),
-      height: Math.min(workArea.height, Math.max(76, Math.round(height as number))),
+      height: Math.min(workArea.height, Math.max(52, Math.round(height as number))),
     }))
   })
 

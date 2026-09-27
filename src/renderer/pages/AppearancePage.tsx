@@ -151,9 +151,9 @@ export function AppearancePage(): React.JSX.Element {
     const isDark = colorScheme === 'dark'
     await updateOverlay({
       colorScheme,
-      backgroundColor: isDark ? '#111111' : '#F3F3F3',
-      sourceColor: isDark ? '#FFFFFF' : '#1B1B1B',
-      translationColor: isDark ? '#FFFFFF' : '#005FB8',
+      backgroundColor: isDark ? '#0D0E10' : '#F3F3F3',
+      sourceColor: isDark ? '#F7F7F7' : '#1B1B1B',
+      translationColor: isDark ? '#BFC2C8' : '#005FB8',
     })
   }
 

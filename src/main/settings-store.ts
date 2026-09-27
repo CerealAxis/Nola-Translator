@@ -41,7 +41,16 @@ export class SettingsStore {
         overlay.backgroundOpacity = DEFAULT_SETTINGS.overlay.backgroundOpacity
         if (raw.overlay.fontSize === 26) overlay.fontSize = DEFAULT_SETTINGS.overlay.fontSize
         if (raw.overlay.translationFontSize === 22) overlay.translationFontSize = DEFAULT_SETTINGS.overlay.translationFontSize
+        if (raw.overlay.sourceColor === '#FFFFFF') overlay.sourceColor = DEFAULT_SETTINGS.overlay.sourceColor
+        if (raw.overlay.translationColor === '#FFFFFF') overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
         overlay.locked = false
+      }
+      if (raw.overlay?.backgroundColor === '#30343A' && raw.overlay.backgroundOpacity === 0.62) {
+        overlay.backgroundColor = DEFAULT_SETTINGS.overlay.backgroundColor
+        overlay.backgroundOpacity = DEFAULT_SETTINGS.overlay.backgroundOpacity
+        if (raw.overlay.fontSize === 20) overlay.fontSize = DEFAULT_SETTINGS.overlay.fontSize
+        if (raw.overlay.sourceColor === '#FFFFFF') overlay.sourceColor = DEFAULT_SETTINGS.overlay.sourceColor
+        if (raw.overlay.translationColor === '#FFFFFF') overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
       }
     } catch {
       this.settings = structuredClone(DEFAULT_SETTINGS)

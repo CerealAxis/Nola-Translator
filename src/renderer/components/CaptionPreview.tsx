@@ -1,4 +1,5 @@
 import { CaptionText } from './CaptionText'
+import { ChevronDownRegular, DesktopRegular, DismissRegular, LockOpenRegular, MicRegular, MoreHorizontalRegular, PinRegular, SubtractRegular } from '@fluentui/react-icons'
 import type { CaptionSegment } from '../../shared/contracts'
 import { DEFAULT_SETTINGS, type OverlaySettings } from '../../shared/settings'
 import { useI18n } from '../i18n'
@@ -50,12 +51,12 @@ export function CaptionPreview({
             '--preview-translation-max-lines': overlay.translationMaxLines,
           } as React.CSSProperties}
         >
-          {sourceVisible && (
-            <CaptionText className="caption-source">{caption?.sourceText || (listening ? t('正在识别语音…') : t('开始会话后，识别原文会显示在这里。'))}</CaptionText>
-          )}
-          {translationVisible && completeTranslations.map((translation) => (
-            <CaptionText className="caption-translation" key={translation.targetLanguage}>{translation.text!}</CaptionText>
-          ))}
+          <div className="caption-preview-text">
+            {sourceVisible && <CaptionText className="caption-source">{caption?.sourceText || (listening ? t('正在识别语音…') : t('开始会话后，识别原文会显示在这里。'))}</CaptionText>}
+            {translationVisible && completeTranslations.map((translation) => <CaptionText className="caption-translation" key={translation.targetLanguage}>{translation.text!}</CaptionText>)}
+          </div>
+          <div className="caption-preview-actions" aria-hidden="true"><DesktopRegular /><LockOpenRegular /><PinRegular /><i /><MoreHorizontalRegular /><SubtractRegular /><DismissRegular /></div>
+          <div className="caption-preview-controls" aria-hidden="true"><span className="caption-preview-mic"><MicRegular /></span><span className="caption-preview-pill">{t('本地字幕')}<ChevronDownRegular /></span><span className="caption-preview-pill">{t('原文')}</span><span className="caption-preview-pill">{t('译文')}</span></div>
         </div>
       </div>
     </section>

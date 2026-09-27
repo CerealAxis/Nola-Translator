@@ -14,6 +14,8 @@ export type FluentCaptionsApi = {
   showOverlay(): Promise<void>
   hideOverlay(): Promise<void>
   resizeOverlay(width: number, height: number): Promise<void>
+  openAppearance(): Promise<void>
+  onOpenAppearance(listener: () => void): () => void
   getSettings(): Promise<AppSettings>
   getModelStorage(): Promise<ModelStorageInfo>
   chooseModelStorageDirectory(): Promise<ModelStorageInfo | null>

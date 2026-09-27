@@ -334,7 +334,7 @@ class StreamingSenseVoiceRecognizer:
         backend: TranscriptionBackend,
         *,
         source_language: str | None,
-        partial_interval_ms: int = 280,
+        partial_interval_ms: int = 650,
         min_partial_ms: int = 420,
         max_partial_seconds: float = 12,
     ) -> None:

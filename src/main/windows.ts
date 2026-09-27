@@ -44,15 +44,15 @@ export function computeOverlayBounds(
 }
 
 export function createOverlayWindowOptions(preload: string, workAreaWidth?: number): BrowserWindowConstructorOptions {
-  // 参考讯飞同传：字幕条默认约占屏幕宽度的 2/3，居中显示。
+  // The reference console is a compact bar near the lower center of the display.
   const width = workAreaWidth
-    ? Math.min(1100, Math.max(720, Math.round(workAreaWidth * 0.52)))
-    : 900
+    ? Math.min(940, Math.max(560, Math.round(workAreaWidth * 0.46)))
+    : 820
   return {
     width,
-    height: 110,
+    height: 118,
     minWidth: 420,
-    minHeight: 76,
+    minHeight: 52,
     resizable: true,
     movable: true,
     thickFrame: true,

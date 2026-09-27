@@ -14,6 +14,7 @@ import { validateModelStorageDirectory } from './model-storage'
 
 const channels = {
   getSettings: 'app:get-settings', updateSettings: 'app:update-settings',
+  openAppearance: 'app:open-appearance',
   getModelStorage: 'storage:get', chooseModelStorageDirectory: 'storage:choose', restartApp: 'app:restart',
   listHistory: 'history:list', clearHistory: 'history:clear', exportHistory: 'history:export',
   getDiagnostics: 'diagnostics:get', copyDiagnostics: 'diagnostics:copy',
@@ -110,6 +111,14 @@ export function registerAppIpc(options: {
   applyTheme()
 
   ipcMain.handle(channels.getSettings, () => current)
+  ipcMain.handle(channels.openAppearance, () => {
+    const window = options.getMainWindow()
+    if (!window) return
+    if (window.isMinimized()) window.restore()
+    window.show()
+    window.focus()
+    window.webContents.send('app:appearance-requested')
+  })
   ipcMain.handle(channels.getModelStorage, () => storageInfo())
   ipcMain.handle(channels.chooseModelStorageDirectory, async () => {
     const result = await dialog.showOpenDialog({

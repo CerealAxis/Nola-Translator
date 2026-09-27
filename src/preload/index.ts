@@ -13,6 +13,8 @@ const channels = {
   showOverlay: 'overlay:show',
   hideOverlay: 'overlay:hide',
   resizeOverlay: 'overlay:resize',
+  openAppearance: 'app:open-appearance',
+  appearanceRequested: 'app:appearance-requested',
   getSettings: 'app:get-settings', updateSettings: 'app:update-settings', settingsChanged: 'settings:changed',
   getModelStorage: 'storage:get', chooseModelStorageDirectory: 'storage:choose', restartApp: 'app:restart',
   listHistory: 'history:list', clearHistory: 'history:clear', exportHistory: 'history:export',
@@ -34,6 +36,12 @@ const api: FluentCaptionsApi = {
   showOverlay: () => ipcRenderer.invoke(channels.showOverlay),
   hideOverlay: () => ipcRenderer.invoke(channels.hideOverlay),
   resizeOverlay: (width, height) => ipcRenderer.invoke(channels.resizeOverlay, width, height),
+  openAppearance: () => ipcRenderer.invoke(channels.openAppearance),
+  onOpenAppearance: (listener) => {
+    const wrapped = (): void => listener()
+    ipcRenderer.on(channels.appearanceRequested, wrapped)
+    return () => ipcRenderer.off(channels.appearanceRequested, wrapped)
+  },
   getSettings: () => ipcRenderer.invoke(channels.getSettings),
   getModelStorage: () => ipcRenderer.invoke(channels.getModelStorage),
   chooseModelStorageDirectory: () => ipcRenderer.invoke(channels.chooseModelStorageDirectory),

@@ -31,7 +31,8 @@ contextBridge.exposeInMainWorld('fluentCaptions', {
   listHistory:async()=>[], clearHistory:async()=>{},exportHistory:async()=>null,
   getDiagnostics:async()=>({'引擎状态':'ready','语音识别':'sherpa-onnx / SenseVoice / faster-whisper','数据目录':'D:/Models/FluentCaptions/very-long-folder-name-for-model-downloads'}),
   copyDiagnostics:async()=>{}, hasTranslationCredential:async()=>false,setTranslationCredential:async()=>{},
-  showOverlay:async()=>{},hideOverlay:async()=>{},startSession:async()=>({sessionId:'layout'}),stopSession:async()=>{}
+  showOverlay:async()=>{},hideOverlay:async()=>{},startSession:async()=>({sessionId:'layout'}),stopSession:async()=>{},
+  resizeOverlay:async()=>{},openAppearance:async()=>{},onOpenAppearance:()=>()=>{}
 });
 contextBridge.exposeInMainWorld('layoutFixture', {emit: e=>eventListeners.forEach(fn=>fn(e))});
 `
@@ -128,7 +129,7 @@ async function main() {
   await overlay.webContents.executeJavaScript(`window.layoutFixture.emit(${JSON.stringify({ protocolVersion: 1, type: 'caption', requestId: 'qa', sessionId: 'layout', segment })})`)
   await settle(overlay)
   const overlayState = await overlay.webContents.executeJavaScript(`(() => {
-    const panel = document.querySelector('.standalone-overlay')
+    const panel = document.querySelector('.caption-console')
     const text = panel?.innerText ?? ''
     return {
       hasZh: text.includes('我们可能会意识到'), hasJa: text.includes('気づくかもしれません'),
@@ -141,20 +142,21 @@ async function main() {
   await overlay.webContents.executeJavaScript(`window.layoutFixture.emit(${JSON.stringify({ protocolVersion: 1, type: 'caption', requestId: 'qa2', sessionId: 'layout', segment: nextSegment })})`)
   await new Promise((resolve) => setTimeout(resolve, 110))
   const rolling = await overlay.webContents.executeJavaScript(`({
-    leaving: document.querySelectorAll('.overlay-caption-leaving').length,
-    active: document.querySelectorAll('.overlay-caption-row:not(.overlay-caption-leaving)').length,
-    oldVisible: (document.querySelector('.overlay-caption-leaving')?.textContent ?? '').includes('We might realize'),
+    leaving: document.querySelectorAll('.overlay-track-source .overlay-track-out').length,
+    active: document.querySelectorAll('.overlay-track-source .overlay-track-in').length,
+    oldVisible: (document.querySelector('.overlay-track-source .overlay-track-out')?.textContent ?? '').includes('We might realize'),
+    translationHeld: (document.querySelector('.overlay-track-translation .overlay-track-in')?.textContent ?? '').includes('我们可能会意识到'),
   })`)
-  if (rolling.leaving !== 1 || rolling.active !== 1 || !rolling.oldVisible) failures.push({ language: 'overlay', page: 'roll-transition', rolling })
+  if (rolling.leaving !== 1 || rolling.active !== 1 || !rolling.oldVisible || !rolling.translationHeld) failures.push({ language: 'overlay', page: 'roll-transition', rolling })
   await writeFile(resolve(output, 'overlay-roll-transition.png'), (await overlay.webContents.capturePage()).toPNG())
   await new Promise((resolve) => setTimeout(resolve, 300))
-  const settled = await overlay.webContents.executeJavaScript(`document.querySelectorAll('.overlay-caption-row').length`)
+  const settled = await overlay.webContents.executeJavaScript(`document.querySelectorAll('.overlay-track-source .overlay-track-in').length`)
   if (settled !== 1) failures.push({ language: 'overlay', page: 'roll-settled', rows: settled })
   await writeFile(resolve(output, 'overlay-bilingual.png'), (await overlay.webContents.capturePage()).toPNG())
   await overlay.webContents.executeJavaScript(`window.fluentCaptions.updateSettings({overlay:{fontSize:72,translationFontSize:72,locked:false}})`)
   await settle(overlay)
   const largeState = await overlay.webContents.executeJavaScript(`(() => {
-    const panel = document.querySelector('.standalone-overlay')
+    const panel = document.querySelector('.caption-console')
     return { overflowX: !!panel && panel.scrollWidth > panel.clientWidth + 2, overflowY: !!panel && panel.scrollHeight > panel.clientHeight + 2 }
   })()`)
   if (largeState.overflowX || largeState.overflowY) failures.push({ language: 'overlay', page: 'large-font', largeState })

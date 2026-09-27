@@ -195,3 +195,23 @@ async def test_partial_continues_after_window_limit_and_skips_busy_snapshots() -
     assert snapshots == before
     blocker.set()
     await recognizer.close()
+
+
+@pytest.mark.asyncio
+async def test_default_sensevoice_preview_limits_full_window_redecodes() -> None:
+    vad = SileroVadSegmenter(probability_model=lambda _: 0.9, max_speech_duration_s=30)
+    backend = FakeBackend()
+    recognizer = StreamingSenseVoiceRecognizer(vad, backend, source_language=None)
+    count = 0
+    original = vad.current_segment
+    def snapshot():
+        nonlocal count
+        count += 1
+        return original()
+    vad.current_segment = snapshot
+    for index in range(500):
+        await recognizer.accept(AudioFrame(np.zeros(320, dtype=np.float32), index * 20))
+        if recognizer.decode_task is not None:
+            await recognizer.decode_task
+    assert count <= 17
+    await recognizer.close()

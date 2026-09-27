@@ -69,7 +69,7 @@ describe('设置存储', () => {
       }), 'utf8')
       const migrated = await new SettingsStore(path).load()
       expect(migrated.overlay.backgroundColor).toBe(DEFAULT_SETTINGS.overlay.backgroundColor)
-      expect(migrated.overlay.translationColor).toBe('#FFFFFF')
+      expect(migrated.overlay.translationColor).toBe(DEFAULT_SETTINGS.overlay.translationColor)
       expect(migrated.overlay.fontSize).toBe(30)
 
       await writeFile(path, JSON.stringify({
@@ -80,6 +80,15 @@ describe('设置存储', () => {
       expect(oldDefault.overlay.backgroundColor).toBe(DEFAULT_SETTINGS.overlay.backgroundColor)
       expect(oldDefault.overlay.fontSize).toBe(DEFAULT_SETTINGS.overlay.fontSize)
       expect(oldDefault.overlay.locked).toBe(false)
+
+      await writeFile(path, JSON.stringify({
+        version: 1,
+        overlay: { backgroundColor: '#30343A', backgroundOpacity: 0.62, fontSize: 20, sourceColor: '#FFFFFF', translationColor: '#FFFFFF' },
+      }), 'utf8')
+      const previousBar = await new SettingsStore(path).load()
+      expect(previousBar.overlay.backgroundColor).toBe(DEFAULT_SETTINGS.overlay.backgroundColor)
+      expect(previousBar.overlay.backgroundOpacity).toBe(DEFAULT_SETTINGS.overlay.backgroundOpacity)
+      expect(previousBar.overlay.fontSize).toBe(DEFAULT_SETTINGS.overlay.fontSize)
 
       await writeFile(path, JSON.stringify({
         version: 1,

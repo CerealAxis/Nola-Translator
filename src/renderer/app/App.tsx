@@ -49,6 +49,8 @@ function AppContent(): React.JSX.Element {
     })
   }, [])
 
+  useEffect(() => window.fluentCaptions?.onOpenAppearance(() => setActivePage('appearance')), [])
+
   const stopActiveSession = async (): Promise<void> => {
     const api = window.fluentCaptions
     const sessionId = activeSessionId

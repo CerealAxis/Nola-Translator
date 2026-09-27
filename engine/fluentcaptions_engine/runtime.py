@@ -343,6 +343,7 @@ class EngineRuntime:
         targets = [] if config is None else [self._language_code(item) for item in config.targetLanguages]
         source = self._language_code(update.language or self._detect_language(update.source_text))
         targets = list(dict.fromkeys(item for item in targets if item != source))
+        previous_update = self.latest_updates.get(update.segment_id)
         self.latest_updates[update.segment_id] = update
         if not targets:
             self.emit(self._caption_event(update, []))
@@ -354,7 +355,7 @@ class EngineRuntime:
             for item in self.latest_translations.get(update.segment_id, [])
         }
         visible = [
-            previous.get(target)
+            (previous.get(target) if previous_update and previous_update.source_text == update.source_text else None)
             or Translation(
                 targetLanguage=target,
                 state="pending",

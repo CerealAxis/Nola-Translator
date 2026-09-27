@@ -7,6 +7,7 @@ from fluentcaptions_engine.recognition.base import RecognitionUpdate
 from fluentcaptions_engine.runtime import EngineRuntime
 from fluentcaptions_engine.translation.base import ProviderTranslation
 from fluentcaptions_engine.translation.scheduler import TranslationScheduler
+from fluentcaptions_engine.protocol import Translation
 
 
 class ImmediateProvider:
@@ -27,6 +28,30 @@ class ControlledProvider:
         self.started.set()
         await self.release.wait()
         return ProviderTranslation(f"{target}:{text}", (source, target))
+
+
+@pytest.mark.asyncio
+async def test_changed_source_does_not_pair_with_previous_revision_translation(tmp_path) -> None:
+    emitted = []
+    runtime = EngineRuntime(tmp_path / "models", emitted.append)
+    runtime.service.session_id = "session-live"
+    runtime.active_config = SimpleNamespace(targetLanguages=["zh"], allowIntermediateTranslation=False)
+    runtime.translation_scheduler = TranslationScheduler(ControlledProvider())
+    runtime.latest_updates["segment-live"] = RecognitionUpdate(
+        "segment-live", 1, 0, None, "First words", "en", False
+    )
+    runtime.latest_translations["segment-live"] = [
+        Translation(targetLanguage="zh", state="complete", provider="controlled", text="第一句")
+    ]
+
+    await runtime._emit_update(RecognitionUpdate(
+        "segment-live", 2, 0, None, "Second words", "en", False
+    ))
+    assert emitted[0].segment.translations[0].state == "pending"
+    assert emitted[0].segment.translations[0].text is None
+    for task in runtime.translation_tasks.values():
+        task.cancel()
+    await asyncio.gather(*runtime.translation_tasks.values(), return_exceptions=True)
 
 
 @pytest.mark.asyncio
