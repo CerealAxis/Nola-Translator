@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -11,7 +12,6 @@ from time import monotonic
 from uuid import uuid4
 
 from .audio.capture import AudioDeviceDisconnectedError, PortAudioCapture
-from .models.catalog import SENSEVOICE_SMALL, STREAMING_ZH_EN_SMALL, streaming_config
 from .models.manager import ModelManager
 from .protocol import (
     CaptionEvent,
@@ -28,25 +28,22 @@ from .protocol import (
     StopSessionCommand,
     Translation,
 )
-from .recognition.accurate import (
-    AccurateRecognizer,
-    SenseVoiceBackend,
-    SileroVadSegmenter,
-    StreamingSenseVoiceRecognizer,
-    create_faster_whisper_backend,
-)
 from .recognition.base import RecognitionUpdate, Recognizer
-from .recognition.sherpa_streaming import SherpaOnnxDecoder, SherpaStreamingRecognizer
+from .recognition.qwen_runtime import QwenModelUnavailable, get_qwen_runtime
+from .recognition.qwen_streaming import create_qwen_recognizer
 from .resources import (
-    ACCURATE_RESOURCE_ID,
-    REALTIME_RESOURCE_ID,
-    SENSEVOICE_RESOURCE_ID,
+    HYMT2_RESOURCE_ID,
+    QWEN_RESOURCE_ID,
     ResourceActionError,
     ResourceManager,
 )
 from .service import EngineService
-from .translation.argos import ArgosTranslationProvider
-from .translation.packages import ArgosPackageManager
+from .translation.hymt2 import (
+    HyMt2TranslationProvider,
+    is_supported,
+    validate_session_languages,
+)
+from .translation.llama_server import LlamaServerError, LlamaServerManager
 from .translation.network import (
     MicrosoftTranslatorProvider,
     OllamaTranslationProvider,
@@ -78,9 +75,9 @@ class EngineRuntime:
         self.session_request_id = ""
         self.session_started_at_ms = 0.0
         self.active_config = None
-        self.translation_provider = ArgosTranslationProvider(allow_intermediate=False)
+        self.llama_manager = LlamaServerManager(gguf_path=self.resources.hymt2_gguf_path)
+        self.translation_provider = HyMt2TranslationProvider(self.llama_manager)
         self.translation_scheduler = TranslationScheduler(self.translation_provider)
-        self.argos_packages: ArgosPackageManager | None = None
         self.translation_tasks: dict[str, asyncio.Task[None]] = {}
         self.translation_requests: dict[str, TranslationRequest] = {}
         self.latest_updates: dict[str, RecognitionUpdate] = {}
@@ -91,8 +88,8 @@ class EngineRuntime:
         self.partial_translation_interval = 0.3
         self.translation_last_started: dict[str, float] = {}
         self.translation_wake: dict[str, asyncio.Event] = {}
-        self.argos_path_cache: dict[tuple[str, str, bool], bool] = {}
-        self.argos_path_lock = asyncio.Lock()
+        self._status_cache: str | None = None
+        self._write_engine_status()
 
 
     async def handle(self, command: EngineCommand) -> list[EngineEvent]:
@@ -158,6 +155,7 @@ class EngineRuntime:
 
         try:
             self._configure_translation(command)
+            await self._ensure_translation_server(command)
             recognizer = await self._create_recognizer(command)
         except ValueError as error:
             return [
@@ -220,6 +218,7 @@ class EngineRuntime:
         self.session_started_at_ms = monotonic() * 1000
         self.active_config = command.config
         self.session_task = asyncio.create_task(self._run_session())
+        self._write_engine_status()
         return events
 
     def _configure_translation(self, command: StartSessionCommand) -> None:
@@ -229,10 +228,20 @@ class EngineRuntime:
         api_key = options.apiKey if options and options.apiKey else ""
         region = options.region if options and options.region else ""
         model = options.model if options and options.model else ""
-        if config.translationProvider == "argos":
-            provider = ArgosTranslationProvider(
-                allow_intermediate=config.allowIntermediateTranslation
+        if config.translationProvider == "hymt2":
+            source = (
+                None
+                if config.sourceLanguage == "auto"
+                else self._language_code(config.sourceLanguage)
             )
+            targets = [self._language_code(item) for item in config.targetLanguages]
+            unsupported = validate_session_languages(source, targets)
+            if unsupported:
+                raise ValueError(
+                    "unsupportedTranslationLanguage (hymt2): "
+                    + ", ".join(unsupported)
+                )
+            provider = HyMt2TranslationProvider(self.llama_manager)
         elif config.translationProvider == "microsoft":
             provider = MicrosoftTranslatorProvider(
                 api_key,
@@ -245,60 +254,39 @@ class EngineRuntime:
                 model=model or "gpt-4.1-mini",
                 api_key=api_key,
             )
-        else:
+        elif config.translationProvider == "ollama":
             provider = OllamaTranslationProvider(
                 endpoint=endpoint or "http://127.0.0.1:11434",
                 model=model or "qwen3:4b",
             )
-        self.argos_path_cache.clear()
-        self.argos_packages = None
+        else:
+            raise ValueError(f"未知翻译 Provider: {config.translationProvider}")
         self.translation_provider = provider
         self.translation_scheduler = TranslationScheduler(provider)
 
+    async def _ensure_translation_server(self, command: StartSessionCommand) -> None:
+        """会话启动时拉起 Hy-MT2 的 llama-server；缺模型或启动失败都不阻断识别。"""
+        if command.config.translationProvider != "hymt2":
+            return
+        if not self.resources.is_installed(HYMT2_RESOURCE_ID):
+            return
+        try:
+            await self.llama_manager.start()
+        except LlamaServerError:
+            # 服务不可用时会话继续，译文按目标标记失败（llamaServerUnavailable）。
+            pass
+
     async def _create_recognizer(self, command: StartSessionCommand) -> Recognizer:
-        language = None if command.config.sourceLanguage == "auto" else command.config.sourceLanguage
-        model_id = self._model_id(command)
-        if model_id == REALTIME_RESOURCE_ID:
-            if language not in (None, "zh", "en"):
-                raise ValueError("实时模型当前只支持中文和英文")
-            directory = self.models.model_path(STREAMING_ZH_EN_SMALL)
-            decoder = await asyncio.to_thread(
-                SherpaOnnxDecoder.from_transducer, streaming_config(directory)
-            )
-            return SherpaStreamingRecognizer(decoder, language=language)
-
-        if model_id == SENSEVOICE_RESOURCE_ID:
-            if language not in (None, "zh", "yue", "en", "ja", "ko"):
-                raise ValueError("SenseVoice 当前支持中文、粤语、英文、日文和韩文")
-            directory = self.models.model_path(SENSEVOICE_SMALL)
-            backend = await asyncio.to_thread(
-                SenseVoiceBackend,
-                str(directory / "model.int8.onnx"),
-                str(directory / "tokens.txt"),
-                language=language,
-            )
-            return StreamingSenseVoiceRecognizer(
-                SileroVadSegmenter(), backend, source_language=language
-            )
-
-        backend = await asyncio.to_thread(
-            create_faster_whisper_backend,
-            str(self.resources.whisper_path),
+        language = (
+            None
+            if command.config.sourceLanguage == "auto"
+            else self._language_code(command.config.sourceLanguage)
         )
-        return AccurateRecognizer(
-            SileroVadSegmenter(), backend, source_language=language
-        )
+        return create_qwen_recognizer(self.resources.qwen_path, source_language=language)
 
     @staticmethod
     def _model_id(command: StartSessionCommand) -> str:
-        configured = getattr(command.config, "recognitionModelId", None)
-        if configured:
-            return configured
-        return (
-            REALTIME_RESOURCE_ID
-            if command.config.recognitionMode == "realtime"
-            else ACCURATE_RESOURCE_ID
-        )
+        return command.config.recognitionModelId or QWEN_RESOURCE_ID
 
     async def _run_session(self) -> None:
         capture = self.capture
@@ -324,6 +312,18 @@ class EngineRuntime:
                     details={"reason": "disconnected"},
                 )
             )
+        except QwenModelUnavailable as error:
+            # 模型加载失败后不再继续采集循环，避免每帧重复报错。
+            self.emit(
+                ErrorEvent(
+                    protocolVersion=1,
+                    type="error",
+                    requestId=self.session_request_id,
+                    code="modelUnavailable",
+                    recoverable=True,
+                    details={"reason": str(error)[:512]},
+                )
+            )
         except asyncio.CancelledError:
             raise
         except Exception as error:
@@ -339,6 +339,7 @@ class EngineRuntime:
             )
 
     async def _emit_update(self, update: RecognitionUpdate) -> None:
+        self._write_engine_status()
         config = self.active_config
         targets = [] if config is None else [self._language_code(item) for item in config.targetLanguages]
         source = self._language_code(update.language or self._detect_language(update.source_text))
@@ -383,6 +384,10 @@ class EngineRuntime:
         try:
             while segment_id in self.translation_requests:
                 request = self.translation_requests[segment_id]
+                if not request.update.is_final and not request.allow_intermediate:
+                    # 默认只翻译最终字幕；中间结果翻译需用户显式开启。
+                    self.translation_requests.pop(segment_id, None)
+                    continue
                 delay = self.partial_translation_interval - (
                     monotonic() - self.translation_last_started.get(segment_id, 0)
                 )
@@ -423,31 +428,32 @@ class EngineRuntime:
         self, request: TranslationRequest
     ) -> list[Translation]:
         targets = list(request.targets)
+        provider_name = self.translation_scheduler.provider.name
 
-        package_errors: dict[str, str] = {}
-        if self.translation_scheduler.provider.name == "argos":
-            async with self.argos_path_lock:
-                if self.argos_packages is None:
-                    self.argos_packages = await asyncio.to_thread(ArgosPackageManager)
+        target_errors: dict[str, str] = {}
+        if provider_name == "hymt2":
+            if not self.resources.is_installed(HYMT2_RESOURCE_ID):
+                target_errors = dict.fromkeys(targets, "resourceUnavailable")
+            elif not is_supported(request.source):
+                target_errors = dict.fromkeys(targets, "unsupportedLanguagePair")
+            else:
                 for target in targets:
-                    key = (request.source, target, request.allow_intermediate)
-                    if key not in self.argos_path_cache:
-                        path = await asyncio.to_thread(
-                            self.argos_packages.installed_path,
-                            request.source, target,
-                            allow_intermediate=request.allow_intermediate,
-                        )
-                        self.argos_path_cache[key] = path is not None
-                    if not self.argos_path_cache[key]:
-                        package_errors[target] = "resourceUnavailable"
+                    if not is_supported(target):
+                        target_errors[target] = "unsupportedLanguagePair"
+                if not target_errors and not self.llama_manager.ready:
+                    target_errors = dict.fromkeys(targets, "llamaServerUnavailable")
 
-        available_targets = [target for target in targets if target not in package_errors]
-        scheduled = await self.translation_scheduler.translate(
-            request.update.segment_id,
-            request.update.revision,
-            request.update.source_text,
-            request.source,
-            available_targets,
+        available_targets = [target for target in targets if target not in target_errors]
+        scheduled = (
+            await self.translation_scheduler.translate(
+                request.update.segment_id,
+                request.update.revision,
+                request.update.source_text,
+                request.source,
+                available_targets,
+            )
+            if available_targets
+            else []
         )
         completed_by_target = {item.target_language: item for item in scheduled}
         translations = []
@@ -458,8 +464,8 @@ class EngineRuntime:
                     Translation(
                         targetLanguage=target,
                         state="failed",
-                        provider="argos",
-                        errorCode=package_errors.get(target, "translationUnavailable"),
+                        provider=provider_name,
+                        errorCode=target_errors.get(target, "translationUnavailable"),
                     )
                 )
             else:
@@ -560,11 +566,11 @@ class EngineRuntime:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         await self.translation_scheduler.close()
+        await self.llama_manager.stop()
         self.translation_tasks.clear()
         self.translation_last_started.clear()
         self.translation_wake.clear()
         self.completed_segments.clear()
-        self.argos_path_cache.clear()
         self.latest_updates.clear()
         self.latest_translations.clear()
         self.caption_revisions.clear()
@@ -572,6 +578,7 @@ class EngineRuntime:
         self.recognizer = None
         self.session_task = None
         self.active_config = None
+        self._write_engine_status()
         return self.service.handle(command)
 
     async def close(self) -> None:
@@ -584,6 +591,50 @@ class EngineRuntime:
                     sessionId=self.service.session_id,
                 )
             )
+        await self.llama_manager.stop()
+        self._remove_engine_status()
+
+    def _engine_status_payload(self) -> dict[str, object]:
+        qwen_runtime = get_qwen_runtime(self.resources.qwen_path)
+        device = self.llama_manager.device
+        return {
+            "qwen": {
+                "quant": qwen_runtime.quant or "unloaded",
+                "loaded": bool(qwen_runtime.loaded),
+            },
+            "hymt2": {
+                "device": device or "unknown",
+                "ready": bool(self.llama_manager.ready),
+            },
+        }
+
+    def _write_engine_status(self) -> None:
+        """原子维护诊断状态文件（.runtime/engine-status.json）；写失败绝不影响会话。"""
+        try:
+            text = json.dumps(
+                self._engine_status_payload(),
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            if text == self._status_cache:
+                return
+            target_dir = self.models.model_root / ".runtime"
+            target_dir.mkdir(parents=True, exist_ok=True)
+            tmp_path = target_dir / "engine-status.json.tmp"
+            tmp_path.write_text(text, encoding="utf-8")
+            tmp_path.replace(target_dir / "engine-status.json")
+        except OSError:
+            return
+        self._status_cache = text
+
+    def _remove_engine_status(self) -> None:
+        status_dir = self.models.model_root / ".runtime"
+        for name in ("engine-status.json", "engine-status.json.tmp"):
+            try:
+                (status_dir / name).unlink(missing_ok=True)
+            except OSError:
+                pass
+        self._status_cache = None
 
     @staticmethod
     def _resource_error(

@@ -55,7 +55,7 @@ async def test_changed_source_does_not_pair_with_previous_revision_translation(t
 
 
 @pytest.mark.asyncio
-async def test_partial_recognition_is_translated_without_blocking_until_endpoint(tmp_path) -> None:
+async def test_partial_is_not_translated_until_final_by_default(tmp_path) -> None:
     emitted = []
     runtime = EngineRuntime(tmp_path / "models", emitted.append)
     runtime.service.session_id = "session-live"
@@ -64,21 +64,52 @@ async def test_partial_recognition_is_translated_without_blocking_until_endpoint
         targetLanguages=["zh"], allowIntermediateTranslation=False
     )
     runtime.translation_scheduler = TranslationScheduler(ImmediateProvider())
-    update = RecognitionUpdate(
-        segment_id="segment-live",
-        revision=3,
-        started_at_ms=0,
-        ended_at_ms=None,
-        source_text="Hello world",
-        language="en",
-        is_final=False,
-    )
 
-    await runtime._emit_update(update)
+    await runtime._emit_update(RecognitionUpdate(
+        segment_id="segment-live", revision=3, started_at_ms=0, ended_at_ms=None,
+        source_text="Hello world", language="en", is_final=False,
+    ))
     await asyncio.sleep(0.05)
 
     captions = [event for event in emitted if event.type == "caption"]
     assert captions[0].segment.translations[0].state == "pending"
+    assert all(
+        event.segment.translations[0].state != "complete"
+        for event in captions
+    ), "默认关闭时中间字幕不应提交翻译"
+
+    await runtime._emit_update(RecognitionUpdate(
+        segment_id="segment-live", revision=4, started_at_ms=0, ended_at_ms=900,
+        source_text="Hello world.", language="en", is_final=True,
+    ))
+    await asyncio.gather(*runtime.translation_tasks.values())
+
+    captions = [event for event in emitted if event.type == "caption"]
+    final = captions[-1].segment
+    assert final.isFinal is True
+    assert final.translations[0].state == "complete"
+    assert final.translations[0].text == "zh:Hello world."
+
+
+@pytest.mark.asyncio
+async def test_allow_intermediate_translates_partials(tmp_path) -> None:
+    emitted = []
+    runtime = EngineRuntime(tmp_path / "models", emitted.append)
+    runtime.service.session_id = "session-live"
+    runtime.session_started_at_ms = 0
+    runtime.active_config = SimpleNamespace(
+        targetLanguages=["zh"], allowIntermediateTranslation=True
+    )
+    runtime.translation_scheduler = TranslationScheduler(ImmediateProvider())
+
+    await runtime._emit_update(RecognitionUpdate(
+        segment_id="segment-live", revision=3, started_at_ms=0, ended_at_ms=None,
+        source_text="Hello world", language="en", is_final=False,
+    ))
+    await asyncio.gather(*runtime.translation_tasks.values())
+
+    captions = [event for event in emitted if event.type == "caption"]
+    assert captions[-1].segment.translations[0].state == "complete"
     assert captions[-1].segment.translations[0].text == "zh:Hello world"
     assert captions[-1].segment.isFinal is False
 
@@ -123,7 +154,7 @@ async def test_partial_updates_coalesce_and_final_wakes_throttle(tmp_path) -> No
             return await super().translate(text, source, target)
     runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
     runtime.service.session_id = 'session'
-    runtime.active_config = SimpleNamespace(targetLanguages=['zh'], allowIntermediateTranslation=False)
+    runtime.active_config = SimpleNamespace(targetLanguages=['zh'], allowIntermediateTranslation=True)
     runtime.translation_scheduler = TranslationScheduler(Provider())
     runtime.partial_translation_interval = 60
     update = RecognitionUpdate('segment', 0, 0, None, 'hello', 'en', False)
@@ -148,31 +179,12 @@ async def test_completed_caption_state_is_bounded_and_korean_detected(tmp_path) 
     assert runtime._detect_language('안녕하세요') == 'ko'
 
 @pytest.mark.asyncio
-async def test_argos_path_scan_is_cached_for_session(tmp_path) -> None:
-    from fluentcaptions_engine.runtime import TranslationRequest
-    runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
-    class Packages:
-        def __init__(self):
-            self.calls = 0
-        def installed_path(self, source, target, *, allow_intermediate):
-            self.calls += 1
-            return None
-    packages = Packages()
-    runtime.argos_packages = packages
-    for index in range(3):
-        update = RecognitionUpdate('segment', index, 0, None, 'hello', 'en', False)
-        result = await runtime._translate_request(TranslationRequest(update, 'en', ('zh',), False))
-        assert result[0].errorCode == 'resourceUnavailable'
-    assert packages.calls == 1
-
-
-@pytest.mark.asyncio
 async def test_stale_translation_completion_is_not_emitted(tmp_path) -> None:
     emitted = []
     runtime = EngineRuntime(tmp_path / 'models', emitted.append)
     runtime.service.session_id = 'session'
     runtime.active_config = SimpleNamespace(
-        targetLanguages=['zh'], allowIntermediateTranslation=False
+        targetLanguages=['zh'], allowIntermediateTranslation=True
     )
     provider = ControlledProvider()
     runtime.translation_scheduler = TranslationScheduler(provider)
@@ -196,3 +208,61 @@ async def test_stale_translation_completion_is_not_emitted(tmp_path) -> None:
     ]
     assert 'zh:old words' not in completed, '旧 revision 的翻译完成后不能覆盖新句'
     assert completed == ['zh:final words']
+
+
+@pytest.mark.asyncio
+async def test_hymt2_missing_model_fails_targets_without_network(tmp_path) -> None:
+    from fluentcaptions_engine.runtime import TranslationRequest
+    from fluentcaptions_engine.translation.hymt2 import HyMt2TranslationProvider
+    from fluentcaptions_engine.translation.llama_server import LlamaServerManager
+
+    runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
+    runtime.translation_scheduler = TranslationScheduler(
+        HyMt2TranslationProvider(LlamaServerManager())
+    )
+    update = RecognitionUpdate('segment', 0, 0, 10, 'hello', 'en', True)
+    for _ in range(3):
+        result = await runtime._translate_request(
+            TranslationRequest(update, 'en', ('zh',), False)
+        )
+        assert result[0].state == 'failed'
+        assert result[0].errorCode == 'resourceUnavailable'
+        assert result[0].provider == 'hymt2'
+
+
+@pytest.mark.asyncio
+async def test_hymt2_server_not_ready_fails_targets(tmp_path, monkeypatch) -> None:
+    from fluentcaptions_engine.runtime import TranslationRequest
+    from fluentcaptions_engine.translation.hymt2 import HyMt2TranslationProvider
+    from fluentcaptions_engine.translation.llama_server import LlamaServerManager
+
+    runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
+    monkeypatch.setattr(runtime.resources, 'is_installed', lambda _rid: True)
+    runtime.translation_scheduler = TranslationScheduler(
+        HyMt2TranslationProvider(LlamaServerManager())
+    )
+    update = RecognitionUpdate('segment', 0, 0, 10, 'hello', 'en', True)
+    result = await runtime._translate_request(
+        TranslationRequest(update, 'en', ('zh',), False)
+    )
+    assert result[0].state == 'failed'
+    assert result[0].errorCode == 'llamaServerUnavailable'
+
+
+@pytest.mark.asyncio
+async def test_hymt2_unsupported_target_language_fails_that_target(tmp_path, monkeypatch) -> None:
+    from fluentcaptions_engine.runtime import TranslationRequest
+    from fluentcaptions_engine.translation.hymt2 import HyMt2TranslationProvider
+    from fluentcaptions_engine.translation.llama_server import LlamaServerManager
+
+    runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
+    monkeypatch.setattr(runtime.resources, 'is_installed', lambda _rid: True)
+    runtime.translation_scheduler = TranslationScheduler(
+        HyMt2TranslationProvider(LlamaServerManager())
+    )
+    update = RecognitionUpdate('segment', 0, 0, 10, 'hello', 'en', True)
+    result = await runtime._translate_request(
+        TranslationRequest(update, 'en', ('zz',), False)
+    )
+    assert result[0].state == 'failed'
+    assert result[0].errorCode == 'unsupportedLanguagePair'

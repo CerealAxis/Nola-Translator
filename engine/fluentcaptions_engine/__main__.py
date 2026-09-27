@@ -110,23 +110,20 @@ def main() -> int:
         checks: dict[str, object] = {}
         stage = "imports"
         try:
-            import ctranslate2
-            import faster_whisper
-            import onnxruntime
-            import sherpa_onnx
+            import torch
+
+            import bitsandbytes
+            import transformers
 
             from .audio.devices import AudioDeviceRegistry
-            from .translation.argos import _installed_lookup
 
             stage = "devices"
             checks["devices"] = len(AudioDeviceRegistry().refresh())
             stage = "versions"
-            checks["cudaDevices"] = ctranslate2.get_cuda_device_count()
-            checks["sherpaOnnx"] = getattr(sherpa_onnx, "__version__", "loaded")
-            checks["fasterWhisper"] = getattr(faster_whisper, "__version__", "loaded")
-            checks["onnxRuntime"] = onnxruntime.__version__
-            stage = "argos"
-            checks["argos"] = _installed_lookup("zz", "yy") is None
+            checks["cudaDevices"] = torch.cuda.device_count()
+            checks["torch"] = torch.__version__
+            checks["transformers"] = transformers.__version__
+            checks["bitsandbytes"] = getattr(bitsandbytes, "__version__", "loaded")
         except Exception as error:
             checks["stage"] = stage
             checks["error"] = type(error).__name__
