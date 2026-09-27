@@ -70,6 +70,10 @@
       {
         "from": "engine/dist/FluentCaptionsEngine",
         "to": "engine"
+      },
+      {
+        "from": "vendor/llama",
+        "to": "llama"
       }
     ],
     "win": {

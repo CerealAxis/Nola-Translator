@@ -12,22 +12,24 @@ FluentCaptions 使用或分发以下主要第三方组件；完整传递依赖�
 ## Python 引擎
 
 - PyAudioWPatch / PyAudio：MIT；
-- sherpa-onnx：Apache-2.0；
-- faster-whisper：MIT；
-- CTranslate2：MIT；
-- ONNX Runtime：MIT；
-- Argos Translate：MIT 或 CC0 双许可；
+- PyTorch（torch）：BSD-3-Clause；
+- transformers：Apache-2.0；
+- bitsandbytes：MIT；
+- accelerate：Apache-2.0；
 - NumPy：BSD-3-Clause；
 - SciPy：BSD-3-Clause；
 - Pydantic：MIT；
 - PyInstaller：GPL-2.0-or-later，并带有允许分发生成程序的 bootloader exception。
 
+## 本地推理运行时
+
+- llama.cpp（`llama-server` b11211 及 CUDA 运行时 DLL，打包于 `resources\llama\`）：MIT，来自 ggml-org/llama.cpp 官方 release。
+
 ## 按需下载的模型
 
-- sherpa-onnx 中英双语 Zipformer 模型从 k2-fsa 官方 release 下载；
-- faster-whisper 模型从 Hugging Face 的 Systran/faster-whisper 模型仓库下载；
-- Argos `.argosmodel` 从 Argos 官方包索引下载。
+- Qwen3-ASR 1.7B（`Qwen/Qwen3-ASR-1.7B-hf`，BF16 权重，加载时 NF4/8bit 量化）：Apache-2.0，见 [Hugging Face 模型卡](https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf)；
+- Hy-MT2 1.8B GGUF（`tencent/Hy-MT2-1.8B-GGUF` 的 `Hy-MT2-1.8B-Q4_K_M.gguf`）：Apache-2.0，见 [Hugging Face 模型卡](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF)。
 
-模型和语言包不直接提交到本仓库或安装包。其许可证及元数据由各自发布方提供，用户首次下载前应遵循对应条款。
+模型不直接提交到本仓库或安装包。其许可证及元数据由各自发布方提供，用户首次下载前应遵循对应条款。
 
 本文件只记录第三方声明，不代表 FluentCaptions 项目自身已经选择开源许可证。

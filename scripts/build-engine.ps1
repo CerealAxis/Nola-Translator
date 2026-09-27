@@ -27,22 +27,9 @@ if (-not (Test-Path $python)) {
     --add-binary "$systemDirectory\vcruntime140.dll;." `
     --add-binary "$systemDirectory\vcruntime140_1.dll;." `
     --add-binary "$systemDirectory\vcruntime140_threads.dll;." `
-    --collect-all sherpa_onnx `
-    --collect-all faster_whisper `
-    --collect-all ctranslate2 `
-    --collect-all onnxruntime `
-    --collect-all minisbd `
-    --collect-data argostranslate `
-    --hidden-import argostranslate.package `
-    --hidden-import argostranslate.translate `
-    --hidden-import argostranslate.sbd `
-    --hidden-import argostranslate.settings `
-    --hidden-import argostranslate.networking `
-    --hidden-import argostranslate.models `
-    --hidden-import argostranslate.apis `
-    --hidden-import argostranslate.fewshot `
-    --exclude-module stanza `
-    --exclude-module spacy `
-    --exclude-module torch `
+    --collect-all torch `
+    --collect-all transformers `
+    --collect-all bitsandbytes `
+    --collect-all accelerate `
     --hidden-import pyaudiowpatch `
     (Join-Path $engineRoot 'engine_entry.py')

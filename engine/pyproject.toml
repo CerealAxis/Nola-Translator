@@ -4,13 +4,14 @@ version = "0.1.0"
 description = "FluentCaptions 本地音频、识别与翻译引擎"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-  "argostranslate==1.11.0",
-  "faster-whisper==1.2.1",
+  "accelerate==1.15.0",
+  "bitsandbytes==0.50.2",
   "numpy==2.5.1",
   "pydantic==2.13.4",
   "PyAudioWPatch==0.2.12.8",
   "scipy==1.18.0",
-  "sherpa-onnx==1.13.4"
+  "torch==2.13.0",
+  "transformers==5.17.0"
 ]
 
 [project.optional-dependencies]
