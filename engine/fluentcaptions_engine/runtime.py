@@ -89,6 +89,7 @@ class EngineRuntime:
         self.translation_last_started: dict[str, float] = {}
         self.translation_wake: dict[str, asyncio.Event] = {}
         self._status_cache: str | None = None
+        self._dropped_chunks = 0
         self._write_engine_status()
 
 
@@ -580,6 +581,8 @@ class EngineRuntime:
         self.latest_updates.clear()
         self.latest_translations.clear()
         self.caption_revisions.clear()
+        if self.capture is not None:
+            self._dropped_chunks = self.capture.dropped_chunks
         self.capture = None
         self.recognizer = None
         self.session_task = None
@@ -603,6 +606,11 @@ class EngineRuntime:
     def _engine_status_payload(self) -> dict[str, object]:
         qwen_runtime = get_qwen_runtime(self.resources.qwen_path)
         device = self.llama_manager.device
+        dropped = (
+            self.capture.dropped_chunks
+            if self.capture is not None
+            else self._dropped_chunks
+        )
         return {
             "qwen": {
                 "quant": qwen_runtime.quant or "unloaded",
@@ -612,6 +620,7 @@ class EngineRuntime:
                 "device": device or "unknown",
                 "ready": bool(self.llama_manager.ready),
             },
+            "audio": {"droppedChunks": int(dropped)},
         }
 
     def _write_engine_status(self) -> None:
