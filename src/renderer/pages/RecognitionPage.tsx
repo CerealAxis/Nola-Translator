@@ -11,24 +11,16 @@ export function RecognitionPage(): React.JSX.Element {
       <div className="choice-grid">
         <section className="surface choice-card">
           <div className="choice-icon"><MicRegular aria-hidden /></div>
-          <div className="card-heading-row"><h2>SenseVoiceSmall</h2><span className="badge">{t("推荐")}</span></div>
-          <p>{t("sherpa-onnx SenseVoiceSmall，VAD 期间持续输出中间字幕，覆盖中文、粤语、English、日本語和 한국어。")}</p>
-          <ul className="feature-list"><li><CheckmarkCircleRegular aria-hidden />{t("识别准确率与多语言覆盖更均衡")}</li><li><CheckmarkCircleRegular aria-hidden />{t("句子结束时输出带标点的最终结果")}</li></ul>
-          <span className="secondary-text">{t("请先在“模型与语言包”页面安装并选择")}</span>
-        </section>
-        <section className="surface choice-card">
-          <div className="choice-icon"><MicRegular aria-hidden /></div>
-          <div className="card-heading-row"><h2>{t("实时模式")}</h2><span className="badge">{t("推荐")}</span></div>
-          <p>{t("sherpa-onnx 流式模型，边说边显示中间结果。")}</p>
-          <ul className="feature-list"><li><CheckmarkCircleRegular aria-hidden />{t("目标首字延迟低于 1 秒")}</li><li><CheckmarkCircleRegular aria-hidden />{t("适合直播、视频和日常对话")}</li></ul>
-          <span className="secondary-text">{t("在“模型与语言包”页面安装后选择")}</span>
-        </section>
-        <section className="surface choice-card">
-          <div className="choice-icon"><MicRegular aria-hidden /></div>
-          <div className="card-heading-row"><h2>{t("高精度模式")}</h2><span className="badge">{t("自动检测 GPU")}</span></div>
-          <p>{t("faster-whisper 完整语音片段识别，适合课程和会议。")}</p>
-          <ul className="feature-list"><li><CheckmarkCircleRegular aria-hidden />{t("CUDA 可用时优先使用 FP16")}</li><li><CheckmarkCircleRegular aria-hidden />{t("初始化失败时自动回退 CPU INT8")}</li></ul>
-          <span className="secondary-text">{t("在“模型与语言包”页面安装后选择")}</span>
+          <div className="card-heading-row"><h2>Qwen3-ASR 1.7B</h2><span className="badge">{t("推荐")}</span></div>
+          <p>{t("Qwen3-ASR 1.7B 本地流式识别，边说边显示中间结果。")}</p>
+          <ul className="feature-list">
+            <li><CheckmarkCircleRegular aria-hidden />{t("本地流式识别")}</li>
+            <li><CheckmarkCircleRegular aria-hidden />{t("多语言")}</li>
+            <li><CheckmarkCircleRegular aria-hidden />{t("加载时 NF4 4-bit 量化运行")}</li>
+            <li><CheckmarkCircleRegular aria-hidden />{t("安装后可离线")}</li>
+            <li><CheckmarkCircleRegular aria-hidden />{t("首条中间字幕约需 2 秒语音加推理时间")}</li>
+          </ul>
+          <span className="secondary-text">{t("请先在“模型与资源”页面安装")}</span>
         </section>
       </div>
     </div>

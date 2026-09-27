@@ -2,7 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react'
 import { ClosedCaptionRegular, PlayRegular, StopRegular } from '@fluentui/react-icons'
 
 import type { AudioDevice, EngineEvent, SessionConfig } from '../../shared/contracts'
-import { DEFAULT_SETTINGS, type OverlaySettings, type RecognitionModelId, type TranslationSettings } from '../../shared/settings'
+import { DEFAULT_SETTINGS, type OverlaySettings, type TranslationSettings } from '../../shared/settings'
 import { EMPTY_CAPTION, receiveCaption } from '../components/caption-state'
 import { CaptionPreview } from '../components/CaptionPreview'
 import { useI18n, type TranslationValues } from '../i18n'
@@ -21,7 +21,6 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
   const [state, setState] = useState<SessionState>('idle')
   const [devices, setDevices] = useState<AudioDevice[]>([])
   const [audioSource, setAudioSource] = useState('defaultOutput')
-  const [recognitionModelId, setRecognitionModelId] = useState<RecognitionModelId>(DEFAULT_SETTINGS.recognition.modelId)
   const [sourceLanguage, setSourceLanguage] = useState('auto')
   const [targetLanguages, setTargetLanguages] = useState<string[]>(['zh'])
   const [translationSettings, setTranslationSettings] = useState<TranslationSettings>(DEFAULT_SETTINGS.translation)
@@ -46,7 +45,6 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
     void Promise.all([api.listDevices(), api.getSettings()]).then(([items, settings]) => {
       if (active) {
         setDevices(items)
-        setRecognitionModelId(settings.recognition.modelId)
         setTranslationSettings(settings.translation)
         setOverlaySettings(settings.overlay)
         setNotice((current) => current === '正在连接本地引擎…' ? '准备就绪' : current)
@@ -61,7 +59,6 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
       if (!active) return
       setTranslationSettings(settings.translation)
       setOverlaySettings(settings.overlay)
-      setRecognitionModelId(settings.recognition.modelId)
     })
     const unsubscribe = api.onEngineEvent((event: EngineEvent) => {
       if (event.type === 'caption' || event.type === 'sessionStarted') {
@@ -112,11 +109,11 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
       audioSource: selectedDevice
         ? { kind: selectedDevice.kind, deviceId: selectedDevice.deviceId }
         : { kind: 'defaultOutput' },
-      recognitionMode: recognitionModelId === 'faster-whisper-small' ? 'accurate' : 'realtime',
-      recognitionModelId,
+      recognitionMode: 'realtime',
+      recognitionModelId: 'qwen3-asr-1.7b-hf',
       sourceLanguage,
       targetLanguages,
-      allowIntermediateTranslation: translationSettings.allowIntermediate,
+      allowIntermediateTranslation: translationSettings.translateIntermediate,
       translationProvider: translationSettings.provider,
       translationOptions: translationSettings.provider === 'microsoft'
         ? { endpoint: translationSettings.microsoftEndpoint, region: translationSettings.microsoftRegion }
@@ -128,12 +125,11 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
     }
     try {
       const snapshot = await api.listResources()
-      const requiredId = recognitionModelId
-      const required = snapshot.resources.find((item) => item.resourceId === requiredId)
+      const required = snapshot.resources.find((item) => item.resourceId === 'qwen3-asr-1.7b-hf')
       if (!required?.installed) {
         setState('error')
         setMissingResource(true)
-        setNotice('{name}模型尚未安装，请先到“模型与语言包”页面安装。')
+        setNotice('{name}模型尚未安装，请先到“模型与资源”页面安装。')
         setNoticeValues({ name: required?.name ?? '所选识别' })
         return
       }
@@ -146,7 +142,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
       const message = error instanceof Error ? error.message : '字幕会话启动失败'
       const unavailable = message.includes('resourceUnavailable') || message.includes('modelUnavailable')
       setMissingResource(unavailable)
-      setNotice(unavailable ? '所选识别模型不可用，请到“模型与语言包”页面检查或重新安装。' : message)
+      setNotice(unavailable ? '所选识别模型不可用，请到“模型与资源”页面检查或重新安装。' : message)
     }
   }
 
@@ -155,7 +151,6 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
     try {
       const saved = await api.updateSettings(patch)
       setOverlaySettings(saved.overlay)
-      setRecognitionModelId(saved.recognition.modelId)
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '设置保存失败')
     }
@@ -177,13 +172,8 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
 
   const listening = Boolean(activeSessionId) || state === 'listening'
   const busy = state === 'starting' || state === 'stopping'
-  const realtimeModel = recognitionModelId === 'sherpa-zh-en-small'
-  const senseVoiceModel = recognitionModelId === 'sensevoice-small'
-  const sourceLanguageOptions = senseVoiceModel
-    ? ['auto', 'zh', 'yue', 'en', 'ja', 'ko']
-    : realtimeModel
-      ? ['auto', 'zh', 'en']
-      : ['auto', 'zh', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'ru']
+  // 识别模型固定为 Qwen3-ASR；能力清单待验证任务敲定，暂保留 auto/zh/en/ja。
+  const sourceLanguageOptions = ['auto', 'zh', 'en', 'ja']
 
   const displayNoticeValues: TranslationValues = { ...noticeValues }
   if (typeof displayNoticeValues.name === 'string') {
@@ -203,7 +193,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
         <section className="surface session-card">
           <div className="card-heading-row">
             <div><h2>{t('新建字幕会话')}</h2><p>{t('模型安装完成后可完全离线运行。')}</p></div>
-            <span className="badge">{t('翻译')} · {translationSettings.provider === 'argos' ? t('Argos 本地') : translationSettings.provider}</span>
+            <span className="badge">{translationSettings.provider === 'hymt2' ? t('翻译 · Hy-MT2 本地') : `${t('翻译')} · ${translationSettings.provider}`}</span>
           </div>
 
           <div className="form-grid">
@@ -213,23 +203,13 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
                 {devices.map((device) => <option key={device.deviceId} value={device.deviceId}>{device.name}{device.isDefault ? t('（默认）') : ''}</option>)}
               </select>
             </label>
-            <label><span>{t('识别模型')}</span>
-              <select aria-label={t('识别模式')} value={recognitionModelId} onChange={(event) => { const modelId = event.target.value as RecognitionModelId; setRecognitionModelId(modelId); if (!((modelId === 'sensevoice-small' && ['auto', 'zh', 'yue', 'en', 'ja', 'ko'].includes(sourceLanguage)) || (modelId === 'sherpa-zh-en-small' && ['auto', 'zh', 'en'].includes(sourceLanguage)) || (modelId === 'faster-whisper-small' && ['auto', 'zh', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'ru'].includes(sourceLanguage)))) setSourceLanguage('auto'); void saveSettings({ recognition: { modelId } }) }}>
-                <option value="sherpa-zh-en-small">{t('实时流式 · sherpa-onnx（中英）')}</option>
-                <option value="sensevoice-small">{t('推荐 · SenseVoiceSmall 流式（中英日韩粤）')}</option>
-                <option value="faster-whisper-small">{t('高精度 · Whisper Small（多语言）')}</option>
-              </select>
-            </label>
             <label><span>{t('源语言')}</span>
               <select aria-label={t('源语言')} value={sourceLanguage} onChange={(event) => setSourceLanguage(event.target.value)}>
-                <option value="auto">{t('自动识别')}</option><option value="zh">{t('中文')}</option><option value="en">English</option>
-                <option value="yue" disabled={!sourceLanguageOptions.includes('yue')}>{t('粤语')}{t('（SenseVoice）')}</option>
-                <option value="ja" disabled={!sourceLanguageOptions.includes('ja')}>{t('日本語')}{senseVoiceModel ? t('（SenseVoice）') : t('（Whisper）')}</option>
-                <option value="ko" disabled={!sourceLanguageOptions.includes('ko')}>{t('한국어')}{senseVoiceModel ? t('（SenseVoice）') : t('（Whisper）')}</option>
-                <option value="fr" disabled={!sourceLanguageOptions.includes('fr')}>{t('Français')}{t('（Whisper）')}</option>
-                <option value="de" disabled={!sourceLanguageOptions.includes('de')}>{t('Deutsch')}{t('（Whisper）')}</option>
-                <option value="es" disabled={!sourceLanguageOptions.includes('es')}>{t('Español')}{t('（Whisper）')}</option>
-                <option value="ru" disabled={!sourceLanguageOptions.includes('ru')}>{t('Русский')}{t('（Whisper）')}</option>
+                {sourceLanguageOptions.map((code) => (
+                  <option key={code} value={code}>
+                    {code === 'auto' ? t('自动识别') : code === 'zh' ? t('中文') : code === 'en' ? 'English' : t('日本語')}
+                  </option>
+                ))}
               </select>
             </label>
             <fieldset className="language-targets"><legend>{t('目标语言（可多选）')}</legend>

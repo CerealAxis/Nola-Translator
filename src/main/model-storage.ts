@@ -1,20 +1,47 @@
-import { mkdir, mkdtemp, rmdir } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rmdir } from 'node:fs/promises'
 import { isAbsolute, join, normalize } from 'node:path'
 
 export function modelStorageEnvironment(userData: string, configuredPath = ''): Record<string, string> {
   const root = configuredPath && isAbsolute(configuredPath) ? normalize(configuredPath) : userData
   return {
     FLUENTCAPTIONS_MODEL_DIR: join(root, 'models'),
-    XDG_DATA_HOME: join(root, 'argos', 'data'),
-    XDG_CONFIG_HOME: join(root, 'argos', 'config'),
-    XDG_CACHE_HOME: join(root, 'argos', 'cache'),
-    HF_HOME: join(root, 'cache', 'huggingface'),
-    HF_HUB_CACHE: join(root, 'cache', 'huggingface', 'hub'),
     TMP: join(root, 'cache', 'tmp'),
     TEMP: join(root, 'cache', 'tmp'),
     TMPDIR: join(root, 'cache', 'tmp'),
-    ARGOS_CHUNK_TYPE: 'MINISBD',
-    ARGOS_DEVICE_TYPE: 'cpu',
+    // 模型经应用自带下载管理器进入 FLUENTCAPTIONS_MODEL_DIR；加载时强制离线，禁止回落到网络。
+    HF_HUB_OFFLINE: '1',
+    TRANSFORMERS_OFFLINE: '1',
+  }
+}
+
+export type EngineRuntimeStatus = {
+  qwen?: { quant: string; loaded: boolean }
+  hymt2?: { device: string; ready: boolean }
+}
+
+export async function readEngineStatus(modelDir: string): Promise<EngineRuntimeStatus | null> {
+  try {
+    const raw: unknown = JSON.parse(await readFile(join(modelDir, '.runtime', 'engine-status.json'), 'utf8'))
+    if (!raw || typeof raw !== 'object') return null
+    const source = raw as Record<string, unknown>
+    const status: EngineRuntimeStatus = {}
+    const qwen = source.qwen
+    if (qwen && typeof qwen === 'object') {
+      const record = qwen as Record<string, unknown>
+      if (typeof record.quant === 'string' && typeof record.loaded === 'boolean') {
+        status.qwen = { quant: record.quant, loaded: record.loaded }
+      }
+    }
+    const hymt2 = source.hymt2
+    if (hymt2 && typeof hymt2 === 'object') {
+      const record = hymt2 as Record<string, unknown>
+      if (typeof record.device === 'string' && typeof record.ready === 'boolean') {
+        status.hymt2 = { device: record.device, ready: record.ready }
+      }
+    }
+    return status
+  } catch {
+    return null
   }
 }
 

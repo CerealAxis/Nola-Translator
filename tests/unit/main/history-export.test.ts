@@ -2,7 +2,7 @@ import type { CaptionSegment } from '../../../src/shared/contracts'
 import { exportSrt, exportText, exportWebVtt } from '../../../src/main/history-store'
 
 const segments: CaptionSegment[] = [
-  { segmentId: '1', revision: 1, startedAtMs: 0, endedAtMs: 1000, sourceText: 'Hello', isFinal: true, translations: [{ targetLanguage: 'zh', text: '你好', state: 'complete', provider: 'argos' }] },
+  { segmentId: '1', revision: 1, startedAtMs: 0, endedAtMs: 1000, sourceText: 'Hello', isFinal: true, translations: [{ targetLanguage: 'zh', text: '你好', state: 'complete', provider: 'hymt2' }] },
   { segmentId: '2', revision: 1, startedAtMs: 1200, sourceText: 'World', isFinal: true, translations: [] },
 ]
 

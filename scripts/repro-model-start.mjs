@@ -38,7 +38,7 @@ output.on('line', (line) => {
   if (event.type === 'ready') {
     send({ protocolVersion: 1, type: 'listResources', requestId: 'repro-resources' });
   } else if (event.type === 'resources') {
-    const model = event.resources.find((item) => item.resourceId === 'sherpa-zh-en-small');
+    const model = event.resources.find((item) => item.resourceId === 'qwen3-asr-1.7b-hf');
     if (!model?.installed) {
       verdict = 1;
       send({ protocolVersion: 1, type: 'shutdown', requestId: 'repro-shutdown' });
@@ -51,9 +51,10 @@ output.on('line', (line) => {
       config: {
         audioSource: { kind: 'defaultOutput' },
         recognitionMode: 'realtime',
+        recognitionModelId: 'qwen3-asr-1.7b-hf',
         sourceLanguage: 'auto',
         targetLanguages: ['zh-CN'],
-        translationProvider: 'argos',
+        translationProvider: 'hymt2',
         allowIntermediateTranslation: false,
       },
     });

@@ -101,4 +101,46 @@ describe('设置存储', () => {
       await rm(directory, { recursive: true, force: true })
     }
   })
+
+  it('迁移旧识别模型 ID 与翻译 provider，并丢弃旧中转开关', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'fluentcaptions-settings-'))
+    const path = join(directory, 'settings.json')
+    try {
+      for (const legacyModelId of ['sherpa-zh-en-small', 'sensevoice-small', 'faster-whisper-small', 'totally-unknown-model']) {
+        await writeFile(path, JSON.stringify({
+          version: 1,
+          recognition: { modelId: legacyModelId },
+          translation: { provider: 'argos', allowIntermediate: true, translateIntermediate: true },
+        }), 'utf8')
+        const migrated = await new SettingsStore(path).load()
+        expect(migrated.recognition.modelId).toBe('qwen3-asr-1.7b-hf')
+        expect(migrated.translation.provider).toBe('hymt2')
+        expect(migrated.translation).not.toHaveProperty('allowIntermediate')
+        expect(migrated.translation.translateIntermediate).toBe(true)
+      }
+
+      for (const provider of ['microsoft', 'openai', 'ollama']) {
+        await writeFile(path, JSON.stringify({ version: 1, translation: { provider } }), 'utf8')
+        const preserved = await new SettingsStore(path).load()
+        expect(preserved.translation.provider).toBe(provider)
+      }
+
+      await writeFile(path, JSON.stringify({ version: 1, translation: { provider: 'unknown-provider' } }), 'utf8')
+      const unknown = await new SettingsStore(path).load()
+      expect(unknown.translation.provider).toBe('hymt2')
+
+      await writeFile(path, JSON.stringify({ version: 1, translation: { allowIntermediate: true } }), 'utf8')
+      const pivotDropped = await new SettingsStore(path).load()
+      expect(pivotDropped.translation).not.toHaveProperty('allowIntermediate')
+      expect(pivotDropped.translation.translateIntermediate).toBe(false)
+
+      await writeFile(path, JSON.stringify({ version: 1 }), 'utf8')
+      const defaults = await new SettingsStore(path).load()
+      expect(defaults.recognition.modelId).toBe('qwen3-asr-1.7b-hf')
+      expect(defaults.translation.provider).toBe('hymt2')
+      expect(defaults.translation.translateIntermediate).toBe(false)
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
 })

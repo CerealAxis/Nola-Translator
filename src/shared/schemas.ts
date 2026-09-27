@@ -20,11 +20,11 @@ export const sessionConfigSchema = z
   .object({
     audioSource: audioSourceSchema,
     recognitionMode: z.enum(['realtime', 'accurate']),
-    recognitionModelId: z.enum(['sherpa-zh-en-small', 'sensevoice-small', 'faster-whisper-small']).optional(),
+    recognitionModelId: z.enum(['qwen3-asr-1.7b-hf']).optional(),
     sourceLanguage: z.string().min(1).max(32),
     targetLanguages: z.array(z.string().min(1).max(32)).max(8),
     allowIntermediateTranslation: z.boolean().optional(),
-    translationProvider: z.enum(['argos', 'microsoft', 'openai', 'ollama']).optional(),
+    translationProvider: z.enum(['hymt2', 'microsoft', 'openai', 'ollama']).optional(),
     translationOptions: z.object({
       endpoint: z.string().min(1).max(2048).optional(),
       apiKey: z.string().max(4096).optional(),
@@ -100,8 +100,8 @@ const errorCodes = [
 const resourceSchema = z
   .object({
     resourceId: z.string().min(1).max(256),
-    kind: z.enum(['recognitionModel', 'translationPackage']),
-    provider: z.enum(['sherpa-onnx', 'faster-whisper', 'argos']),
+    kind: z.enum(['recognitionModel', 'translationModel']),
+    provider: z.enum(['qwen3-asr', 'hy-mt2']),
     name: z.string().min(1).max(256),
     description: z.string().min(1).max(1024),
     languages: z.array(z.string().min(1).max(32)).max(16),

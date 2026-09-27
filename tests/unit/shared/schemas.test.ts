@@ -44,17 +44,46 @@ describe('JSONL 协议校验', () => {
   it('校验显式资源管理命令和状态事件', () => {
     expect(parseCommandLine(JSON.stringify({
       protocolVersion: 1, type: 'manageResource', requestId: 'install-1',
-      resourceId: 'sherpa-zh-en-small', action: 'install'
+      resourceId: 'qwen3-asr-1.7b-hf', action: 'install'
     }))).toMatchObject({ type: 'manageResource', action: 'install' })
 
     expect(parseEventLine(JSON.stringify({
       protocolVersion: 1, type: 'resourceChanged', requestId: 'resource-1',
       resource: {
-        resourceId: 'sherpa-zh-en-small', kind: 'recognitionModel', provider: 'sherpa-onnx',
-        name: '实时识别', description: '低延迟模型', languages: ['zh', 'en'],
+        resourceId: 'qwen3-asr-1.7b-hf', kind: 'recognitionModel', provider: 'qwen3-asr',
+        name: 'Qwen3-ASR 1.7B', description: '本地流式识别模型', languages: ['zh', 'en'],
         installed: false, installedBytes: 0, downloadBytes: 458187351,
         state: 'running', phase: 'download', progress: 0.5, cancellable: true
       }
     }))).toMatchObject({ type: 'resourceChanged', resource: { progress: 0.5 } })
+  })
+
+  it('校验本地翻译模型资源记录的枚举', () => {
+    expect(parseEventLine(JSON.stringify({
+      protocolVersion: 1, type: 'resourceChanged', requestId: 'resource-2',
+      resource: {
+        resourceId: 'hy-mt2-1.8b-q4-k-m', kind: 'translationModel', provider: 'hy-mt2',
+        name: 'Hy-MT2 1.8B Q4_K_M', description: '本地翻译模型', languages: ['zh', 'en'],
+        installed: true, installedBytes: 1130000000,
+        state: 'idle', cancellable: false
+      }
+    }))).toMatchObject({ type: 'resourceChanged', resource: { kind: 'translationModel', provider: 'hy-mt2' } })
+  })
+
+  it('拒绝旧识别模型与已移除的 argos 翻译提供方', () => {
+    expect(() => parseCommandLine(JSON.stringify({
+      protocolVersion: 1, type: 'startSession', requestId: 'start-1',
+      config: {
+        audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime',
+        recognitionModelId: 'sensevoice-small', sourceLanguage: 'auto', targetLanguages: ['zh'],
+      }
+    }))).toThrow()
+    expect(() => parseCommandLine(JSON.stringify({
+      protocolVersion: 1, type: 'startSession', requestId: 'start-2',
+      config: {
+        audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime',
+        sourceLanguage: 'auto', targetLanguages: ['zh'], translationProvider: 'argos',
+      }
+    }))).toThrow()
   })
 })

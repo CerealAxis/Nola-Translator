@@ -139,7 +139,7 @@ export function ResourcesPage(): React.JSX.Element {
   }, [api, refresh])
 
   const recognition = useMemo(() => snapshot.resources.filter((item) => item.kind === 'recognitionModel'), [snapshot.resources])
-  const translation = useMemo(() => snapshot.resources.filter((item) => item.kind === 'translationPackage'), [snapshot.resources])
+  const translation = useMemo(() => snapshot.resources.filter((item) => item.kind === 'translationModel'), [snapshot.resources])
   const installedBytes = useMemo(() => snapshot.resources.reduce((total, item) => total + item.installedBytes, 0), [snapshot.resources])
 
   const act = async (resource: ResourceRecord, action: 'install' | 'remove' | 'cancel'): Promise<void> => {
@@ -170,7 +170,7 @@ export function ResourcesPage(): React.JSX.Element {
   return (
     <div className="page resources-page">
       <header className="page-heading">
-        <div><h1>{t("模型与语言包")}</h1><p>{t(notice, { ...noticeValues, name: resourceName(String(noticeValues.name ?? '')) })}</p></div>
+        <div><h1>{t("模型与资源")}</h1><p>{t(notice, { ...noticeValues, name: resourceName(String(noticeValues.name ?? '')) })}</p></div>
         <button className="button secondary-button" disabled={loading} onClick={() => void refresh()} type="button"><ArrowClockwiseRegular aria-hidden />{t("刷新")}</button>
       </header>
 
@@ -194,7 +194,7 @@ export function ResourcesPage(): React.JSX.Element {
                 <button className={`button ${selectedModelId === resource.resourceId ? 'secondary-button selected-resource-button' : 'secondary-button'} compact-button`} disabled={!resource.installed || resource.state !== 'idle' || selectedModelId === resource.resourceId} onClick={() => void selectModel(resource)} type="button">
                   {selectedModelId === resource.resourceId ? <><CheckmarkCircleRegular aria-hidden />{t("当前使用")}</> : t('选择此模型')}
                 </button>
-                {resource.resourceId === 'sensevoice-small' && <small>{t("流式中间结果 · 标点 · 中文/粤语/English/日本語/한국어")}</small>}
+                {resource.provider === 'qwen3-asr' && <small>{t("下载原始 BF16 权重，加载时以 NF4 4-bit 量化运行。")}</small>}
               </div>
               <ResourceProgress resource={resource} />
             </article>
@@ -203,11 +203,12 @@ export function ResourcesPage(): React.JSX.Element {
       </section>
 
       <section className="surface package-surface" aria-labelledby="translation-resources">
-        <div className="card-heading-row"><div><h2 id="translation-resources">{t("Argos 本地翻译语言包")}</h2><p>{t("语言包是有方向的；例如 English → 简体中文不包含反向翻译。")}</p></div><span className="badge">{translation.filter((item) => item.installed).length}{t(" 已安装")}</span></div>
+        <div className="card-heading-row"><div><h2 id="translation-resources">{t("本地翻译模型")}</h2><p>{t("单个预量化文件，在本机 llama.cpp 上运行；开始字幕不会自动下载。")}</p></div><span className="badge">{translation.filter((item) => item.installed).length}{t(" 已安装")}</span></div>
         <div className="package-list">
           {translation.map((resource) => (
             <div className="package-row" key={resource.resourceId}>
-              <div className="package-title"><strong>{resourceName(resource.name)}</strong><small>{t("Argos Translate · 离线")}</small></div>
+              <div className="package-title"><strong>{resourceName(resource.name)}</strong><small>{t(resource.provider === 'hy-mt2' ? 'Hy-MT2 · 预量化文件' : 'Qwen3-ASR · 加载时量化')}</small></div>
+              {resource.provider === 'hy-mt2' && <small>{t("预量化 Q4_K_M 文件，约 1.13GB。")}</small>}
               <ResourceStatus resource={resource} />
               <ResourceAction resource={resource} onAction={(item, action) => void act(item, action)} />
               <ResourceProgress resource={resource} />

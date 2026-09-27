@@ -38,7 +38,7 @@ type NavigationItem = {
 const navigationItems: NavigationItem[] = [
   { id: 'captions', label: '实时字幕', icon: ClosedCaptionRegular },
   { id: 'recognition', label: '语音识别', icon: MicRegular },
-  { id: 'resources', label: '模型与语言包', icon: ArrowDownloadRegular },
+  { id: 'resources', label: '模型与资源', icon: ArrowDownloadRegular },
   { id: 'translation', label: '翻译', icon: LocalLanguageRegular },
   { id: 'appearance', label: '外观', icon: ColorRegular },
   { id: 'history', label: '历史记录', icon: HistoryRegular },

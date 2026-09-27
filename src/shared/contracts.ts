@@ -9,11 +9,11 @@ export type SessionConfig = {
   audioSource: AudioSource
   recognitionMode: 'realtime' | 'accurate'
   /** 选择具体识别模型；recognitionMode 保留用于旧版本协议兼容。 */
-  recognitionModelId?: 'sherpa-zh-en-small' | 'sensevoice-small' | 'faster-whisper-small'
+  recognitionModelId?: 'qwen3-asr-1.7b-hf'
   sourceLanguage: string
   targetLanguages: string[]
   allowIntermediateTranslation?: boolean
-  translationProvider?: 'argos' | 'microsoft' | 'openai' | 'ollama'
+  translationProvider?: 'hymt2' | 'microsoft' | 'openai' | 'ollama'
   translationOptions?: {
     endpoint?: string
     apiKey?: string
@@ -68,8 +68,8 @@ export type AudioDevice = {
 
 export type ResourceRecord = {
   resourceId: string
-  kind: 'recognitionModel' | 'translationPackage'
-  provider: 'sherpa-onnx' | 'faster-whisper' | 'argos'
+  kind: 'recognitionModel' | 'translationModel'
+  provider: 'qwen3-asr' | 'hy-mt2'
   name: string
   description: string
   languages: string[]

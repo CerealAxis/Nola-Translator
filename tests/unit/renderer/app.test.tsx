@@ -10,7 +10,6 @@ describe('App', () => {
 
     expect(screen.getByRole('heading', { name: '实时字幕', level: 1 })).toBeInTheDocument()
     expect(screen.getByLabelText('音频来源')).toBeInTheDocument()
-    expect(screen.getByLabelText('识别模式')).toBeInTheDocument()
     expect(screen.getByLabelText('源语言')).toBeInTheDocument()
     expect(screen.getByRole('group', { name: '目标语言（可多选）' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '开始字幕' })).toBeInTheDocument()
@@ -42,7 +41,7 @@ describe('App', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: '翻译' }))
-    expect(screen.getByRole('heading', { name: 'Argos 本地语言包' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '本地翻译模型' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '外观' }))
     expect(screen.getByRole('heading', { name: '字幕样式' })).toBeInTheDocument()
@@ -93,21 +92,23 @@ describe('App', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: '语音识别' }))
-    expect(screen.getByRole('heading', { name: '实时模式' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Qwen3-ASR 1.7B' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '诊断' }))
     expect(await screen.findByText('引擎状态')).toBeInTheDocument()
     expect(screen.getByText('ready')).toBeInTheDocument()
   })
 
-  it('shows a dedicated resource page and a labeled Argos routing switch', async () => {
+  it('shows a dedicated resources page with the local translation model section', async () => {
     render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: '模型与语言包' }))
-    expect(screen.getByRole('heading', { name: '模型与语言包', level: 1 })).toBeInTheDocument()
-    expect(await screen.findByText('实时识别')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '模型与资源' }))
+    expect(screen.getByRole('heading', { name: '模型与资源', level: 1 })).toBeInTheDocument()
+    expect(await screen.findByText('Qwen3-ASR 1.7B')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '本地翻译模型' })).toBeInTheDocument()
+    expect(await screen.findByText('Hy-MT2 1.8B Q4_K_M')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '翻译' }))
-    expect(screen.getByRole('checkbox', { name: '允许经 English 中转' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: '翻译中间结果' })).toBeInTheDocument()
   })
 })

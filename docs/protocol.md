@@ -43,25 +43,25 @@ sequenceDiagram
 {
   "audioSource": { "kind": "defaultOutput" },
   "recognitionMode": "realtime",
-  "recognitionModelId": "sensevoice-small",
+  "recognitionModelId": "qwen3-asr-1.7b-hf",
   "sourceLanguage": "auto",
   "targetLanguages": ["zh", "ja"],
-  "translationProvider": "argos",
+  "translationProvider": "hymt2",
   "allowIntermediateTranslation": false
 }
 ```
 
-`recognitionModelId` 可选值为 `sherpa-zh-en-small`（中英流式）、`sensevoice-small`（中英日韩粤、VAD 伪流式、带标点）和 `faster-whisper-small`（多语言高精度）。旧客户端省略该字段时，Python 引擎按 `recognitionMode` 回退到原有模型。
+`recognitionModelId` 可选值为 `qwen3-asr-1.7b-hf`；旧客户端省略该字段时，Python 引擎同样按该模型处理。`recognitionMode` 为消息结构兼容字段，不再决定识别模型。
 
-`translationProvider` 可为 `argos`、`microsoft`、`openai` 或 `ollama`。联网 Provider 的地址、区域和模型放在 `translationOptions`；API 密钥由 Electron 主进程从 Windows 加密存储读取，只在发送 `startSession` 时注入，不暴露给渲染进程。
+`translationProvider` 可为 `hymt2`（本地 llama.cpp + Hy-MT2）、`microsoft`、`openai` 或 `ollama`。联网 Provider 的地址、区域和模型放在 `translationOptions`；API 密钥由 Electron 主进程从 Windows 加密存储读取，只在发送 `startSession` 时注入，不暴露给渲染进程。`allowIntermediateTranslation` 默认 `false`——只翻译最终字幕；为 `true` 时对变化中的中间字幕限频提交翻译，最终字幕始终优先。`hymt2` 在 `startSession` 前校验目标语言，不支持的组合返回 `invalidConfiguration`。
 
 ## 资源管理
 
-`listResources` 只扫描本地文件，返回识别模型和 Argos 有向语言包的安装状态、占用空间与当前操作。`manageResource` 只接受内置 `resourceId`，动作可为 `install`、`remove` 或 `cancel`；渲染进程不能传入下载 URL 或任意文件路径。
+`listResources` 只扫描本地文件，返回识别模型（`kind: "recognitionModel"`，`provider: "qwen3-asr"`）与本地翻译模型（`kind: "translationModel"`，`provider: "hy-mt2"`）的安装状态、占用空间与当前操作。`manageResource` 只接受内置 `resourceId`（`qwen3-asr-1.7b-hf`、`hy-mt2-1.8b-q4-k-m`），动作可为 `install`、`remove` 或 `cancel`；渲染进程不能传入下载 URL 或任意文件路径。两类资源的安装均支持取消与逐文件校验，`phase` 依次经过 `download`、`verify`、`install`。
 
 资源操作先返回 `resourceActionResult`，后台状态变化通过 `resourceChanged` 推送。已知总大小时 `progress` 为 0 到 1；下载源不提供总大小时省略进度，界面显示不定进度条，不伪造百分比。
 
-`startSession` 不会隐式下载、更新或安装资源。缺少识别模型时立即返回 `resourceUnavailable`，并在 `details.missingResourceIds` 中给出缺失项。Argos 在运行中发现缺包时只把对应译文标记为失败，不影响原文识别，也不会联网补包。
+`startSession` 不会隐式下载、更新或安装资源。缺少识别模型时立即返回 `resourceUnavailable`，并在 `details.missingResourceIds` 中给出缺失项。缺少本地翻译模型时不阻断识别；对应译文标记为失败（`resourceUnavailable`），不影响原文识别，也不会联网补包。
 
 ## 字幕事件
 
@@ -86,7 +86,7 @@ sequenceDiagram
         "targetLanguage": "zh-CN",
         "text": "你好，世界",
         "state": "complete",
-        "provider": "argos"
+        "provider": "hymt2"
       }
     ]
   }

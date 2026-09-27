@@ -10,7 +10,7 @@ import type { SettingsStore } from './settings-store'
 import type { SecureCredentialStore } from './secure-store'
 import { computeOverlayBounds, getOverlayInteractionPolicy } from './windows'
 import type { AppSettings, AppSettingsPatch } from '../shared/settings'
-import { validateModelStorageDirectory } from './model-storage'
+import { modelStorageEnvironment, readEngineStatus, validateModelStorageDirectory } from './model-storage'
 
 const channels = {
   getSettings: 'app:get-settings', updateSettings: 'app:update-settings',
@@ -28,7 +28,7 @@ const settingsPatchSchema = z.object({
   uiLanguage: z.enum(['zh-CN', 'en']).optional(),
   historyEnabled: z.boolean().optional(),
   recognition: z.object({
-    modelId: z.enum(['sherpa-zh-en-small', 'sensevoice-small', 'faster-whisper-small']).optional(),
+    modelId: z.enum(['qwen3-asr-1.7b-hf']).optional(),
   }).partial().optional(),
   overlay: z.object({
     mode: z.enum(['free', 'top', 'bottom']).optional(), locked: z.boolean().optional(),
@@ -42,22 +42,30 @@ const settingsPatchSchema = z.object({
     translationLineHeight: z.number().min(1).max(2).optional(), showSource: z.boolean().optional(), showTranslation: z.boolean().optional(),
   }).partial().optional(),
   translation: z.object({
-    provider: z.enum(['argos', 'microsoft', 'openai', 'ollama']).optional(),
+    provider: z.enum(['hymt2', 'microsoft', 'openai', 'ollama']).optional(),
     microsoftEndpoint: z.string().min(1).max(2048).optional(), microsoftRegion: z.string().max(128).optional(),
     openaiEndpoint: z.string().min(1).max(2048).optional(), openaiModel: z.string().min(1).max(256).optional(),
     ollamaEndpoint: z.string().min(1).max(2048).optional(), ollamaModel: z.string().min(1).max(256).optional(),
-    allowIntermediate: z.boolean().optional(),
+    translateIntermediate: z.boolean().optional(),
   }).partial().optional(),
 }).strict()
 
-function diagnostics(engine: EngineProcess): Record<string, string | number> {
+async function diagnostics(engine: EngineProcess, settings: AppSettings): Promise<Record<string, string | number>> {
+  const modelDir = modelStorageEnvironment(settings.modelStoragePath || app.getPath('userData')).FLUENTCAPTIONS_MODEL_DIR
+  const status = await readEngineStatus(modelDir)
+  const qwen = status?.qwen
+  const hymt2 = status?.hymt2
   return {
     应用版本: app.getVersion(), Electron: process.versions.electron,
     Chromium: process.versions.chrome, Node: process.versions.node,
     操作系统: `${process.platform} ${process.getSystemVersion()}`,
     引擎状态: engine.currentState, 引擎重启次数: engine.restartCount,
-    语音识别: 'sherpa-onnx / SenseVoice / faster-whisper',
-    本地翻译: 'Argos Translate',
+    语音识别: qwen?.loaded && (qwen.quant === 'nf4' || qwen.quant === '8bit')
+      ? `Qwen3-ASR 1.7B（${qwen.quant}）`
+      : '未运行',
+    本地翻译: hymt2?.ready && hymt2.device
+      ? `Hy-MT2 · llama.cpp（${hymt2.device}）`
+      : '未运行',
     数据目录: app.getPath('userData'),
   }
 }
@@ -160,8 +168,8 @@ export function registerAppIpc(options: {
     await writeFile(result.filePath, content, 'utf8')
     return result.filePath
   })
-  ipcMain.handle(channels.getDiagnostics, () => diagnostics(options.engine))
-  ipcMain.handle(channels.copyDiagnostics, () => clipboard.writeText(JSON.stringify(diagnostics(options.engine), null, 2)))
+  ipcMain.handle(channels.getDiagnostics, () => diagnostics(options.engine, current))
+  ipcMain.handle(channels.copyDiagnostics, async () => clipboard.writeText(JSON.stringify(await diagnostics(options.engine, current), null, 2)))
   ipcMain.handle(channels.hasTranslationCredential, (_event, provider: unknown) => {
     if (provider !== 'microsoft' && provider !== 'openai') throw new Error('凭据类型无效')
     return options.credentials.has(provider)

@@ -172,15 +172,15 @@ try {
   const resourcePageProbe = await evaluate(target, `(async () => {
     const findButton = (name) => Array.from(document.querySelectorAll('button'))
       .find((button) => button.textContent?.trim() === name || button.getAttribute('aria-label') === name);
-    findButton('模型与语言包')?.click();
+    findButton('模型与资源')?.click();
     for (let attempt = 0; attempt < 60; attempt += 1) {
-      if (document.querySelectorAll('.resource-card').length >= 3) break;
+      if (document.querySelectorAll('.resource-card').length >= 1) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     return {
       heading: document.querySelector('h1')?.textContent ?? '',
     recognitionCards: document.querySelectorAll('.resource-card').length,
-    hasSenseVoice: document.body.innerText.includes('SenseVoiceSmall'),
+    hasQwen: document.body.innerText.includes('Qwen3-ASR'),
       packageRows: document.querySelectorAll('.package-row').length,
       installButtons: Array.from(document.querySelectorAll('button'))
         .filter((button) => button.textContent?.trim() === '安装').length,
@@ -195,11 +195,11 @@ try {
     const row = document.querySelector('.setting-toggle-row');
     const toggle = row?.querySelector('input[type="checkbox"]');
     const result = {
-      hasLabel: row?.textContent?.includes('允许经 English 中转') ?? false,
+      hasLabel: row?.textContent?.includes('翻译中间结果') ?? false,
       rowDisplay: row ? getComputedStyle(row).display : '',
       toggleWidth: toggle ? getComputedStyle(toggle).width : ''
     };
-    findButton('模型与语言包')?.click();
+    findButton('模型与资源')?.click();
     await new Promise((resolve) => setTimeout(resolve, 150));
     return result;
   })()`);
@@ -227,10 +227,10 @@ try {
     || transparentOverlayProbe.backgroundColor !== 'rgba(0, 0, 0, 0)'
     || transparentOverlayProbe.backdropFilter !== 'none'
     || transparentOverlayProbe.boxShadow !== 'none'
-    || resourcePageProbe.heading !== '模型与语言包'
-    || resourcePageProbe.recognitionCards < 3
-    || !resourcePageProbe.hasSenseVoice
-    || resourcePageProbe.packageRows < 4
+    || resourcePageProbe.heading !== '模型与资源'
+    || resourcePageProbe.recognitionCards !== 1
+    || !resourcePageProbe.hasQwen
+    || resourcePageProbe.packageRows !== 1
     || !resourcePageProbe.hasStoragePath
     || !translationSwitchProbe.hasLabel
     || translationSwitchProbe.rowDisplay !== 'flex'

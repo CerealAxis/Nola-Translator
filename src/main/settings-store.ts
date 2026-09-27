@@ -18,7 +18,12 @@ export class SettingsStore {
 
   async load(): Promise<AppSettings> {
     try {
-      const raw = JSON.parse(await readFile(this.path, 'utf8')) as Partial<AppSettings>
+      const raw = JSON.parse(await readFile(this.path, 'utf8')) as Partial<AppSettings> & {
+        translation?: Partial<AppSettings['translation']> & { allowIntermediate?: unknown }
+      }
+      // 旧 Argos 中转开关语义不同，直接丢弃，不映射到 translateIntermediate。
+      const rawTranslation = { ...(raw.translation ?? {}) }
+      delete rawTranslation.allowIntermediate
       this.settings = {
         ...structuredClone(DEFAULT_SETTINGS),
         ...raw,
@@ -27,7 +32,21 @@ export class SettingsStore {
         modelStoragePath: typeof raw.modelStoragePath === 'string' && isAbsolute(raw.modelStoragePath) ? raw.modelStoragePath : '',
         recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}) },
         overlay: { ...DEFAULT_SETTINGS.overlay, ...(raw.overlay ?? {}) },
-        translation: { ...DEFAULT_SETTINGS.translation, ...(raw.translation ?? {}) },
+        translation: {
+          ...DEFAULT_SETTINGS.translation,
+          ...rawTranslation,
+          translateIntermediate: typeof rawTranslation.translateIntermediate === 'boolean'
+            ? rawTranslation.translateIntermediate
+            : DEFAULT_SETTINGS.translation.translateIntermediate,
+        },
+      }
+      // 三个旧识别模型 ID 与未知值统一迁移到 Qwen3-ASR。
+      if (this.settings.recognition.modelId !== 'qwen3-asr-1.7b-hf') {
+        this.settings.recognition = { modelId: 'qwen3-asr-1.7b-hf' }
+      }
+      // 翻译 provider：microsoft/openai/ollama 保持原值，其余（含 argos）迁移到 hymt2。
+      if (!['microsoft', 'openai', 'ollama'].includes(this.settings.translation.provider)) {
+        this.settings.translation.provider = 'hymt2'
       }
       // 旧版字幕配色默认值升级为视频参考样式；仅当两项都未被自定义时才迁移。
       const overlay = this.settings.overlay

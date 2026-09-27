@@ -8,11 +8,12 @@ const output = resolve('artifacts/layout')
 const pages = ['captions', 'recognition', 'resources', 'translation', 'appearance', 'history', 'diagnostics']
 const settings = {
   version: 1, theme: 'system', uiLanguage: 'zh-CN', modelStoragePath: '', historyEnabled: false,
-  recognition: { modelId: 'sensevoice-small' },
+  recognition: { modelId: 'qwen3-asr-1.7b-hf' },
   overlay: { mode: 'bottom', colorScheme: 'dark', locked: true, alwaysOnTop: true, fontFamily: 'Segoe UI Variable', fontSize: 26, fontWeight: 600, translationFontSize: 22, translationFontWeight: 500, sourceColor: '#FFFFFF', translationColor: '#FFFFFF', backgroundColor: '#111111', backgroundOpacity: 0.84, maxLines: 2, lineHeight: 1.3, translationMaxLines: 2, translationLineHeight: 1.35, showSource: true, showTranslation: true },
-  translation: { provider: 'argos', microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '', openaiEndpoint: 'https://api.openai.com/v1', openaiModel: 'gpt-4.1-mini', ollamaEndpoint: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b', allowIntermediate: false },
+  translation: { provider: 'hymt2', microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '', openaiEndpoint: 'https://api.openai.com/v1', openaiModel: 'gpt-4.1-mini', ollamaEndpoint: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b', translateIntermediate: false },
 }
-const resource = { resourceId: 'sensevoice-small', kind: 'recognitionModel', provider: 'sherpa-onnx', name: '推荐 · SenseVoiceSmall · 流式中英日韩粤', description: 'VAD 期间持续输出中间结果，支持中文、粤语、English、日本語、한국어，并启用标点恢复。', languages: ['zh', 'en', 'ja', 'ko', 'yue'], installed: true, installedBytes: 234000000, state: 'idle', cancellable: false }
+const recognitionResource = { resourceId: 'qwen3-asr-1.7b-hf', kind: 'recognitionModel', provider: 'qwen3-asr', name: 'Qwen3-ASR 1.7B', description: '本地流式识别模型，加载时以 NF4 4-bit 量化运行。', languages: ['zh', 'en', 'ja'], installed: true, installedBytes: 4300000000, state: 'idle', cancellable: false }
+const translationResource = { resourceId: 'hy-mt2-1.8b-q4-k-m', kind: 'translationModel', provider: 'hy-mt2', name: 'Hy-MT2 1.8B Q4_K_M', description: '预量化 Q4_K_M 翻译模型，在本机 llama.cpp 上运行。', languages: ['zh', 'en'], installed: true, installedBytes: 1130000000, state: 'idle', cancellable: false }
 const preloadSource = `
 const {contextBridge} = require('electron');
 let settings = ${JSON.stringify(settings)};
@@ -25,11 +26,11 @@ contextBridge.exposeInMainWorld('fluentCaptions', {
   getSettings:async()=>settings, updateSettings:update,
   onSettingsChanged:fn=>{settingsListeners.add(fn); return ()=>settingsListeners.delete(fn)},
   onEngineEvent:fn=>{eventListeners.add(fn); return ()=>eventListeners.delete(fn)},
-  listDevices:async()=>[], listResources:async()=>({storagePath:'D:/Models/FluentCaptions/very-long-folder-name-for-model-downloads/models',resources:[${JSON.stringify(resource)}]}),
+  listDevices:async()=>[], listResources:async()=>({storagePath:'D:/Models/FluentCaptions/very-long-folder-name-for-model-downloads/models',resources:[${JSON.stringify(recognitionResource)},${JSON.stringify(translationResource)}]}),
   getModelStorage:async()=>({activePath:'D:/Models/FluentCaptions', configuredPath:'E:/Downloads/models-and-translation-packages/another-long-directory',restartRequired:true}),
   chooseModelStorageDirectory:async()=>null, restartApp:async()=>{},
   listHistory:async()=>[], clearHistory:async()=>{},exportHistory:async()=>null,
-  getDiagnostics:async()=>({'引擎状态':'ready','语音识别':'sherpa-onnx / SenseVoice / faster-whisper','数据目录':'D:/Models/FluentCaptions/very-long-folder-name-for-model-downloads'}),
+  getDiagnostics:async()=>({'引擎状态':'ready','语音识别':'Qwen3-ASR 1.7B（nf4）','本地翻译':'Hy-MT2 · llama.cpp（cuda）','数据目录':'D:/Models/FluentCaptions/very-long-folder-name-for-model-downloads'}),
   copyDiagnostics:async()=>{}, hasTranslationCredential:async()=>false,setTranslationCredential:async()=>{},
   showOverlay:async()=>{},hideOverlay:async()=>{},startSession:async()=>({sessionId:'layout'}),stopSession:async()=>{},
   resizeOverlay:async()=>{},openAppearance:async()=>{},onOpenAppearance:()=>()=>{}
@@ -123,8 +124,8 @@ async function main() {
   await overlay.loadFile(resolve('out/renderer/index.html'), { query: { overlay: '1' } })
   await settle(overlay)
   const segment = { segmentId: 'current', revision: 1, startedAtMs: 0, isFinal: true, sourceText: 'We might realize that doing nothing is not only okay, but also important for a healthy, balanced life.', translations: [
-    { targetLanguage: 'zh', text: '我们可能会意识到，适当放松不仅没有问题，也对健康、平衡的生活十分重要。', state: 'complete', provider: 'argos' },
-    { targetLanguage: 'ja', text: '何もしないことも問題ではないし、健康でバランスの取れた生活に重要だと気づくかもしれません。', state: 'complete', provider: 'argos' },
+    { targetLanguage: 'zh', text: '我们可能会意识到，适当放松不仅没有问题，也对健康、平衡的生活十分重要。', state: 'complete', provider: 'hymt2' },
+    { targetLanguage: 'ja', text: '何もしないことも問題ではないし、健康でバランスの取れた生活に重要だと気づくかもしれません。', state: 'complete', provider: 'hymt2' },
   ] }
   await overlay.webContents.executeJavaScript(`window.layoutFixture.emit(${JSON.stringify({ protocolVersion: 1, type: 'caption', requestId: 'qa', sessionId: 'layout', segment })})`)
   await settle(overlay)

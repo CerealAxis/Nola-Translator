@@ -73,7 +73,7 @@ export function registerEngineIpc(
     await ensureReady()
     if (activeSessionId) throw new Error('已有字幕会话正在运行')
     const parsed = sessionConfigSchema.parse(rawConfig) as SessionConfig
-    const provider = parsed.translationProvider ?? 'argos'
+    const provider = parsed.translationProvider ?? 'hymt2'
     const apiKey = provider === 'microsoft' || provider === 'openai'
       ? await getTranslationCredential(provider)
       : ''

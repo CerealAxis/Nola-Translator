@@ -31,21 +31,21 @@ export type AppSettings = {
   translation: TranslationSettings
 }
 
-export type RecognitionModelId = 'sherpa-zh-en-small' | 'sensevoice-small' | 'faster-whisper-small'
+export type RecognitionModelId = 'qwen3-asr-1.7b-hf'
 
 export type RecognitionSettings = {
   modelId: RecognitionModelId
 }
 
 export type TranslationSettings = {
-  provider: 'argos' | 'microsoft' | 'openai' | 'ollama'
+  provider: 'hymt2' | 'microsoft' | 'openai' | 'ollama'
   microsoftEndpoint: string
   microsoftRegion: string
   openaiEndpoint: string
   openaiModel: string
   ollamaEndpoint: string
   ollamaModel: string
-  allowIntermediate: boolean
+  translateIntermediate: boolean
 }
 
 export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'overlay' | 'translation' | 'modelStoragePath' | 'version'> & {
@@ -61,7 +61,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   modelStoragePath: '',
   historyEnabled: false,
   recognition: {
-    modelId: 'sherpa-zh-en-small',
+    modelId: 'qwen3-asr-1.7b-hf',
   },
   overlay: {
     mode: 'bottom',
@@ -85,13 +85,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
     showTranslation: true,
   },
   translation: {
-    provider: 'argos',
+    provider: 'hymt2',
     microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com',
     microsoftRegion: '',
     openaiEndpoint: 'https://api.openai.com/v1',
     openaiModel: 'gpt-4.1-mini',
     ollamaEndpoint: 'http://127.0.0.1:11434',
     ollamaModel: 'qwen3:4b',
-    allowIntermediate: false,
+    translateIntermediate: false,
   },
 }
