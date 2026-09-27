@@ -3,6 +3,7 @@ out/
 dist/
 coverage/
 /artifacts/
+/vendor/
 /models/
 .vite/
 .env

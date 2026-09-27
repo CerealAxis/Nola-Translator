@@ -43,13 +43,11 @@ class TranslationOptions(ProtocolModel):
 class SessionConfig(ProtocolModel):
     audioSource: AudioSource
     recognitionMode: Literal["realtime", "accurate"]
-    recognitionModelId: Literal[
-        "sherpa-zh-en-small", "sensevoice-small", "faster-whisper-small"
-    ] | None = None
+    recognitionModelId: Literal["qwen3-asr-1.7b-hf"] | None = None
     sourceLanguage: str = Field(min_length=1, max_length=32)
     targetLanguages: list[str] = Field(max_length=8)
     allowIntermediateTranslation: bool = False
-    translationProvider: Literal["argos", "microsoft", "openai", "ollama"] = "argos"
+    translationProvider: Literal["hymt2", "microsoft", "openai", "ollama"] = "hymt2"
     translationOptions: TranslationOptions | None = None
 
 
@@ -163,8 +161,8 @@ class ModelProgressEvent(Envelope):
 
 class ResourceRecord(ProtocolModel):
     resourceId: str = Field(min_length=1, max_length=256)
-    kind: Literal["recognitionModel", "translationPackage"]
-    provider: Literal["sherpa-onnx", "faster-whisper", "argos"]
+    kind: Literal["recognitionModel", "translationModel"]
+    provider: Literal["qwen3-asr", "hy-mt2"]
     name: str = Field(min_length=1, max_length=256)
     description: str = Field(min_length=1, max_length=1024)
     languages: list[str] = Field(max_length=16)

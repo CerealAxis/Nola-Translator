@@ -60,7 +60,7 @@
             "targetLanguage": "zh-CN",
             "text": "你好，世界",
             "state": "complete",
-            "provider": "argos"
+            "provider": "hymt2"
           }
         ]
       }
@@ -69,7 +69,7 @@
       "protocolVersion": 1,
       "type": "modelProgress",
       "requestId": "event-model-1",
-      "modelId": "sherpa-zh-en",
+      "modelId": "qwen3-asr-1.7b-hf",
       "operation": "download",
       "progress": 0.5,
       "state": "running"
