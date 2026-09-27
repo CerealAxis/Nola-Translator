@@ -1,10 +1,12 @@
 import { join } from 'node:path'
+import { mkdir } from 'node:fs/promises'
 
 import { app, BrowserWindow, safeStorage, screen, shell } from 'electron'
 
 import { registerAppIpc } from './app-ipc'
 import { createEngineLaunchSpec, EngineProcess } from './engine-process'
 import { HistoryStore } from './history-store'
+import { modelStorageEnvironment } from './model-storage'
 import { registerEngineIpc } from './ipc'
 import { SettingsStore } from './settings-store'
 import { SecureCredentialStore } from './secure-store'
@@ -43,11 +45,11 @@ function createMainWindow(): void {
 
 function createOverlayWindow(): void {
   const preload = resolvePreloadPath(__dirname)
-  const window = new BrowserWindow(createOverlayWindowOptions(preload))
+  const display = screen.getPrimaryDisplay()
+  const window = new BrowserWindow(createOverlayWindowOptions(preload, display.workArea.width))
   overlayWindow = window
   window.setAlwaysOnTop(true, 'screen-saver')
   window.setIgnoreMouseEvents(true, { forward: true })
-  const display = screen.getPrimaryDisplay()
   window.setBounds(computeOverlayBounds('bottom', display.workArea, window.getBounds()))
   window.on('closed', () => {
     if (overlayWindow === window) overlayWindow = null
@@ -83,6 +85,10 @@ if (!hasSingleInstanceLock) {
     const credentials = new SecureCredentialStore(join(userData, 'credentials.json'), safeStorage)
     await history.setEnabled(initialSettings.historyEnabled)
     await history.restore()
+    const resourceEnvironment = modelStorageEnvironment(userData, initialSettings.modelStoragePath)
+    // A disconnected custom drive must not prevent the settings UI from opening.
+    // Keep the chosen location so downloads never silently fall back to C:.
+    await mkdir(resourceEnvironment.TMP, { recursive: true }).catch((error) => console.error('model storage is unavailable', error))
     engine = new EngineProcess({
       ...createEngineLaunchSpec({
         isPackaged: app.isPackaged,
@@ -90,12 +96,7 @@ if (!hasSingleInstanceLock) {
         resourcesPath: process.resourcesPath,
       }),
       env: {
-        FLUENTCAPTIONS_MODEL_DIR: join(userData, 'models'),
-        XDG_DATA_HOME: join(userData, 'argos', 'data'),
-        XDG_CONFIG_HOME: join(userData, 'argos', 'config'),
-        XDG_CACHE_HOME: join(userData, 'argos', 'cache'),
-        ARGOS_CHUNK_TYPE: 'MINISBD',
-        ARGOS_DEVICE_TYPE: 'cpu',
+        ...resourceEnvironment,
       },
     })
     createMainWindow()

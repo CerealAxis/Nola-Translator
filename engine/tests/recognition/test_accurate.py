@@ -52,6 +52,10 @@ class FakeStreamingVad:
             return [completed]
         return []
 
+    @property
+    def current_sample_count(self) -> int:
+        return self.active.samples.size if self.active is not None else 0
+
     def current_segment(self) -> SpeechSegment | None:
         return self.active
 
@@ -159,3 +163,35 @@ def test_silero_vad_flushes_active_speech() -> None:
     segments = vad.flush()
     assert len(segments) == 1
     assert segments[0].ended_at_ms == pytest.approx(40)
+
+@pytest.mark.asyncio
+async def test_partial_continues_after_window_limit_and_skips_busy_snapshots() -> None:
+    vad = SileroVadSegmenter(probability_model=lambda _: 0.9, max_speech_duration_s=30)
+    snapshots = 0
+    original_snapshot = vad.current_segment
+    def snapshot():
+        nonlocal snapshots
+        snapshots += 1
+        return original_snapshot()
+    vad.current_segment = snapshot
+    recognizer = StreamingSenseVoiceRecognizer(
+        vad, FakeBackend(), source_language=None,
+        partial_interval_ms=280, min_partial_ms=420,
+    )
+    for index in range(660):
+        await recognizer.accept(AudioFrame(np.zeros(320, dtype=np.float32), index * 20))
+        if recognizer.decode_task is not None:
+            await recognizer.decode_task
+    assert recognizer.last_scheduled_samples > 12 * 16_000
+    assert snapshots < 50
+    blocker = asyncio.Event()
+    async def blocked():
+        await blocker.wait()
+        return None
+    recognizer.decode_task = asyncio.create_task(blocked())
+    before = snapshots
+    for index in range(10):
+        await recognizer.accept(AudioFrame(np.zeros(320, dtype=np.float32), 13200 + index * 20))
+    assert snapshots == before
+    blocker.set()
+    await recognizer.close()

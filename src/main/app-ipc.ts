@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises'
+import { normalize } from 'node:path'
 
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, screen } from 'electron'
 import { z } from 'zod'
@@ -9,9 +10,11 @@ import type { SettingsStore } from './settings-store'
 import type { SecureCredentialStore } from './secure-store'
 import { computeOverlayBounds, getOverlayInteractionPolicy } from './windows'
 import type { AppSettings, AppSettingsPatch } from '../shared/settings'
+import { validateModelStorageDirectory } from './model-storage'
 
 const channels = {
   getSettings: 'app:get-settings', updateSettings: 'app:update-settings',
+  getModelStorage: 'storage:get', chooseModelStorageDirectory: 'storage:choose', restartApp: 'app:restart',
   listHistory: 'history:list', clearHistory: 'history:clear', exportHistory: 'history:export',
   getDiagnostics: 'diagnostics:get', copyDiagnostics: 'diagnostics:copy',
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
@@ -21,6 +24,7 @@ export const APP_IPC_CHANNELS = channels
 
 const settingsPatchSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']).optional(),
+  uiLanguage: z.enum(['zh-CN', 'en']).optional(),
   historyEnabled: z.boolean().optional(),
   recognition: z.object({
     modelId: z.enum(['sherpa-zh-en-small', 'sensevoice-small', 'faster-whisper-small']).optional(),
@@ -67,6 +71,11 @@ export function registerAppIpc(options: {
   getMainWindow: () => BrowserWindow | null
 }): () => void {
   let current = options.initialSettings
+  const activeStoragePath = normalize(current.modelStoragePath || app.getPath('userData'))
+  const storageInfo = () => {
+    const configuredPath = normalize(current.modelStoragePath || app.getPath('userData'))
+    return { activePath: activeStoragePath, configuredPath, restartRequired: activeStoragePath.toLowerCase() !== configuredPath.toLowerCase() }
+  }
   const applyOverlay = (reposition = false): void => {
     const window = options.getOverlayWindow()
     if (!window) return
@@ -101,6 +110,23 @@ export function registerAppIpc(options: {
   applyTheme()
 
   ipcMain.handle(channels.getSettings, () => current)
+  ipcMain.handle(channels.getModelStorage, () => storageInfo())
+  ipcMain.handle(channels.chooseModelStorageDirectory, async () => {
+    const result = await dialog.showOpenDialog({
+      title: current.uiLanguage === 'en' ? 'Choose model storage folder' : '选择模型存储文件夹',
+      defaultPath: storageInfo().configuredPath,
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    const modelStoragePath = await validateModelStorageDirectory(result.filePaths[0])
+    current = await options.settings.update({ modelStoragePath })
+    broadcastSettings()
+    return storageInfo()
+  })
+  ipcMain.handle(channels.restartApp, () => {
+    app.relaunch()
+    app.quit()
+  })
   ipcMain.handle(channels.updateSettings, async (_event, raw: unknown) => {
     const patch = settingsPatchSchema.parse(raw) as AppSettingsPatch
     current = await options.settings.update(patch)
@@ -116,7 +142,7 @@ export function registerAppIpc(options: {
     if (!['txt', 'srt', 'vtt'].includes(String(format))) throw new Error('导出格式无效')
     const value = String(format) as 'txt' | 'srt' | 'vtt'
     const result = await dialog.showSaveDialog({
-      title: '导出字幕', defaultPath: `FluentCaptions.${value === 'vtt' ? 'vtt' : value}`,
+      title: current.uiLanguage === 'en' ? 'Export captions' : '导出字幕', defaultPath: `FluentCaptions.${value === 'vtt' ? 'vtt' : value}`,
       filters: [{ name: value.toUpperCase(), extensions: [value] }],
     })
     if (result.canceled || !result.filePath) return null

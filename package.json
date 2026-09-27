@@ -15,6 +15,7 @@
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:ui": "electron tests/e2e/capture-ui.mjs",
+    "test:layout": "electron tests/e2e/check-layout.mjs",
     "test:packaged-ui": "node scripts/check-packaged-ui.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

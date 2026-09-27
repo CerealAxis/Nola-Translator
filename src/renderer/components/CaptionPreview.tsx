@@ -1,5 +1,7 @@
+import { CaptionText } from './CaptionText'
 import type { CaptionSegment } from '../../shared/contracts'
 import { DEFAULT_SETTINGS, type OverlaySettings } from '../../shared/settings'
+import { useI18n } from '../i18n'
 
 type CaptionPreviewProps = {
   listening?: boolean
@@ -7,7 +9,7 @@ type CaptionPreviewProps = {
   translationVisible?: boolean
   caption?: CaptionSegment | null
   modelProgress?: number | null
-  overlay?: Pick<OverlaySettings, 'backgroundOpacity' | 'backgroundColor' | 'colorScheme' | 'sourceColor' | 'translationColor' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'maxLines' | 'translationFontSize' | 'translationFontWeight' | 'translationLineHeight' | 'translationMaxLines'>
+  overlay?: Pick<OverlaySettings, 'fontFamily' | 'backgroundOpacity' | 'backgroundColor' | 'colorScheme' | 'sourceColor' | 'translationColor' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'maxLines' | 'translationFontSize' | 'translationFontWeight' | 'translationLineHeight' | 'translationMaxLines'>
 }
 
 export function CaptionPreview({
@@ -18,13 +20,14 @@ export function CaptionPreview({
   modelProgress: _modelProgress = null,
   overlay = DEFAULT_SETTINGS.overlay,
 }: CaptionPreviewProps): React.JSX.Element {
-  const completeTranslations = caption?.translations.filter((item) => item.state === 'complete') ?? []
+  const { t } = useI18n()
+  const completeTranslations = caption?.translations.filter((item) => item.state === 'complete' && item.text) ?? []
 
   return (
-    <section className="preview-section" aria-label="字幕浮层预览">
+    <section className="preview-section" aria-label={t('字幕浮层预览')}>
       <div className="section-heading-row">
-        <h2>字幕浮层预览</h2>
-        <span className="secondary-text">仅显示原文与译文</span>
+        <h2>{t('字幕浮层预览')}</h2>
+        <span className="secondary-text">{t('仅显示原文与译文')}</span>
       </div>
       <div className="preview-stage">
         <div
@@ -32,6 +35,7 @@ export function CaptionPreview({
           data-color-scheme={overlay.colorScheme}
           data-transparent-background={overlay.backgroundOpacity <= 0}
           style={{
+            fontFamily: overlay.fontFamily,
             '--preview-background-alpha': `${overlay.backgroundOpacity * 100}%`,
             '--preview-background-color': overlay.backgroundColor,
             '--preview-source-color': overlay.sourceColor,
@@ -47,10 +51,10 @@ export function CaptionPreview({
           } as React.CSSProperties}
         >
           {sourceVisible && (
-            <p className="caption-source">{caption?.sourceText || (listening ? '正在识别语音…' : '开始会话后，识别原文会显示在这里。')}</p>
+            <CaptionText className="caption-source">{caption?.sourceText || (listening ? t('正在识别语音…') : t('开始会话后，识别原文会显示在这里。'))}</CaptionText>
           )}
           {translationVisible && completeTranslations.map((translation) => (
-            <p className="caption-translation" key={translation.targetLanguage}>{translation.text}</p>
+            <CaptionText className="caption-translation" key={translation.targetLanguage}>{translation.text!}</CaptionText>
           ))}
         </div>
       </div>

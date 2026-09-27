@@ -160,6 +160,10 @@ class SileroVadSegmenter:
         self.pending = np.empty(0, dtype=np.float32)
         return self._finalize(end_sample, trim_samples=0)
 
+    @property
+    def current_sample_count(self) -> int:
+        return int(self.active_audio.size + self.pending.size) if self.active_audio.size else 0
+
     def current_segment(self) -> SpeechSegment | None:
         """返回当前正在说话片段的快照，供伪流式识别器生成中间结果。"""
         if self.active_audio.size == 0:
@@ -355,20 +359,22 @@ class StreamingSenseVoiceRecognizer:
             return updates
 
         updates = await self._collect_decode_task(wait=False)
-        current = self.vad.current_segment()
-        if current is not None:
-            self._ensure_stabilizer(current)
-            samples = self._partial_samples(current.samples)
-            if (
-                self.decode_task is None
-                and samples.size >= self.min_partial_samples
-                and samples.size - self.last_scheduled_samples
-                >= self.partial_interval_samples
-            ):
-                self.last_scheduled_samples = samples.size
+        if self.decode_task is not None:
+            return updates
+        sample_count = self.vad.current_sample_count
+        if (
+            sample_count >= self.min_partial_samples
+            and sample_count - self.last_scheduled_samples >= self.partial_interval_samples
+        ):
+            current = self.vad.current_segment()
+            if current is not None:
+                self._ensure_stabilizer(current)
+                self.last_scheduled_samples = sample_count
                 assert self.stabilizer is not None
                 self.decode_task = asyncio.create_task(
-                    self._decode_partial(self.stabilizer.segment_id, samples)
+                    self._decode_partial(
+                        self.stabilizer.segment_id, self._partial_samples(current.samples)
+                    )
                 )
         return updates
 

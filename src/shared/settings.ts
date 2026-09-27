@@ -23,6 +23,8 @@ export type OverlaySettings = {
 export type AppSettings = {
   version: 1
   theme: 'system' | 'light' | 'dark'
+  uiLanguage: 'zh-CN' | 'en'
+  modelStoragePath: string
   historyEnabled: boolean
   recognition: RecognitionSettings
   overlay: OverlaySettings
@@ -46,7 +48,7 @@ export type TranslationSettings = {
   allowIntermediate: boolean
 }
 
-export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'overlay' | 'translation'> & {
+export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'overlay' | 'translation' | 'modelStoragePath' | 'version'> & {
   recognition?: Partial<RecognitionSettings>
   overlay?: Partial<OverlaySettings>
   translation?: Partial<TranslationSettings>
@@ -55,6 +57,8 @@ export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'overl
 export const DEFAULT_SETTINGS: AppSettings = {
   version: 1,
   theme: 'system',
+  uiLanguage: 'zh-CN',
+  modelStoragePath: '',
   historyEnabled: false,
   recognition: {
     modelId: 'sherpa-zh-en-small',
@@ -65,17 +69,17 @@ export const DEFAULT_SETTINGS: AppSettings = {
     locked: true,
     alwaysOnTop: true,
     fontFamily: 'Segoe UI Variable',
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: 600,
     translationFontSize: 22,
     translationFontWeight: 500,
     sourceColor: '#FFFFFF',
-    translationColor: '#E6F2FF',
-    backgroundColor: '#202020',
+    translationColor: '#FFFFFF',
+    backgroundColor: '#111111',
     backgroundOpacity: 0.84,
-    maxLines: 3,
+    maxLines: 2,
     lineHeight: 1.3,
-    translationMaxLines: 3,
+    translationMaxLines: 2,
     translationLineHeight: 1.35,
     showSource: true,
     showTranslation: true,

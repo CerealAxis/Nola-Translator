@@ -55,37 +55,55 @@ class ArgosTranslationProvider:
         self.lookup = lookup
         self.allow_intermediate = allow_intermediate
         self.lock = asyncio.Lock()
-        self.translators: dict[tuple[str, str], Translator] = {}
+        self.translators: dict[tuple[str, str], Translator | None] = {}
+        self.workers: set[asyncio.Task[ProviderTranslation]] = set()
 
     async def translate(self, text: str, source: str, target: str) -> ProviderTranslation:
-        async with self.lock:
-            return await self._translate_locked(text, source, target)
+        started = False
 
-    async def _translate_locked(
+        async def run() -> ProviderTranslation:
+            nonlocal started
+            async with self.lock:
+                started = True
+                return await asyncio.to_thread(self._translate_locked, text, source, target)
+
+        worker = asyncio.create_task(run())
+        self.workers.add(worker)
+        def finished(task: asyncio.Task[ProviderTranslation]) -> None:
+            self.workers.discard(task)
+            if not task.cancelled():
+                task.exception()  # Retrieve failures even after a caller times out.
+        worker.add_done_callback(finished)
+        try:
+            return await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            if not started:
+                worker.cancel()
+            raise
+
+    def _translate_locked(
         self, text: str, source: str, target: str
     ) -> ProviderTranslation:
         if source == target:
             return ProviderTranslation(text, (source, target))
         direct = self._translator(source, target)
         if direct is not None:
-            translated = await asyncio.to_thread(direct, text)
+            translated = direct(text)
             return ProviderTranslation(translated, (source, target))
 
         if self.allow_intermediate and source != "en" and target != "en":
             to_english = self._translator(source, "en")
             from_english = self._translator("en", target)
             if to_english is not None and from_english is not None:
-                english = await asyncio.to_thread(to_english, text)
-                translated = await asyncio.to_thread(from_english, english)
+                english = to_english(text)
+                translated = from_english(english)
                 return ProviderTranslation(translated, (source, "en", target))
         raise TranslationPathError(f"没有已安装的翻译路径：{source} -> {target}")
 
     def _translator(self, source: str, target: str) -> Translator | None:
         key = (source, target)
-        cached = self.translators.get(key)
-        if cached is not None:
-            return cached
+        if key in self.translators:
+            return self.translators[key]
         translator = self.lookup(source, target)
-        if translator is not None:
-            self.translators[key] = translator
+        self.translators[key] = translator
         return translator

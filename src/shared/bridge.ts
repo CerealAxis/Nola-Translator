@@ -2,6 +2,7 @@ import type { AudioDevice, EngineEvent, ResourceRecord, ResourceSnapshot, Sessio
 import type { AppSettings, AppSettingsPatch } from './settings'
 
 export type SessionStartResult = { sessionId: string }
+export type ModelStorageInfo = { activePath: string; configuredPath: string; restartRequired: boolean }
 
 export type FluentCaptionsApi = {
   listDevices(): Promise<AudioDevice[]>
@@ -13,6 +14,9 @@ export type FluentCaptionsApi = {
   showOverlay(): Promise<void>
   hideOverlay(): Promise<void>
   getSettings(): Promise<AppSettings>
+  getModelStorage(): Promise<ModelStorageInfo>
+  chooseModelStorageDirectory(): Promise<ModelStorageInfo | null>
+  restartApp(): Promise<void>
   updateSettings(patch: AppSettingsPatch): Promise<AppSettings>
   onSettingsChanged(listener: (settings: AppSettings) => void): () => void
   listHistory(): Promise<import('./contracts').CaptionSegment[]>

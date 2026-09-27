@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -85,6 +86,14 @@ class EngineRuntime:
         self.latest_updates: dict[str, RecognitionUpdate] = {}
         self.latest_translations: dict[str, list[Translation]] = {}
         self.caption_revisions: dict[str, int] = {}
+        self.completed_segments: OrderedDict[str, None] = OrderedDict()
+        self.completed_segment_limit = 512
+        self.partial_translation_interval = 0.3
+        self.translation_last_started: dict[str, float] = {}
+        self.translation_wake: dict[str, asyncio.Event] = {}
+        self.argos_path_cache: dict[tuple[str, str, bool], bool] = {}
+        self.argos_path_lock = asyncio.Lock()
+
 
     async def handle(self, command: EngineCommand) -> list[EngineEvent]:
         if isinstance(command, ListResourcesCommand):
@@ -241,6 +250,8 @@ class EngineRuntime:
                 endpoint=endpoint or "http://127.0.0.1:11434",
                 model=model or "qwen3:4b",
             )
+        self.argos_path_cache.clear()
+        self.argos_packages = None
         self.translation_provider = provider
         self.translation_scheduler = TranslationScheduler(provider)
 
@@ -335,6 +346,7 @@ class EngineRuntime:
         self.latest_updates[update.segment_id] = update
         if not targets:
             self.emit(self._caption_event(update, []))
+            self._retire_completed(update)
             return
 
         previous = {
@@ -359,6 +371,7 @@ class EngineRuntime:
                 getattr(config, "allowIntermediateTranslation", False)
             ),
         )
+        self.translation_wake.setdefault(update.segment_id, asyncio.Event()).set()
         task = self.translation_tasks.get(update.segment_id)
         if task is None or task.done():
             self.translation_tasks[update.segment_id] = asyncio.create_task(
@@ -367,7 +380,21 @@ class EngineRuntime:
 
     async def _translation_worker(self, segment_id: str) -> None:
         try:
-            while request := self.translation_requests.pop(segment_id, None):
+            while segment_id in self.translation_requests:
+                request = self.translation_requests[segment_id]
+                delay = self.partial_translation_interval - (
+                    monotonic() - self.translation_last_started.get(segment_id, 0)
+                )
+                if not request.update.is_final and delay > 0:
+                    wake = self.translation_wake[segment_id]
+                    wake.clear()
+                    try:
+                        await asyncio.wait_for(wake.wait(), timeout=delay)
+                    except TimeoutError:
+                        pass
+                    continue
+                self.translation_requests.pop(segment_id)
+                self.translation_last_started[segment_id] = monotonic()
                 translations = await self._translate_request(request)
                 latest = self.latest_updates.get(segment_id)
                 if (
@@ -378,10 +405,14 @@ class EngineRuntime:
                     continue
                 self.latest_translations[segment_id] = translations
                 self.emit(self._caption_event(latest, translations))
+                self._retire_completed(latest)
         except asyncio.CancelledError:
             raise
         finally:
             self.translation_tasks.pop(segment_id, None)
+            latest = self.latest_updates.get(segment_id)
+            if latest is not None and latest.is_final:
+                self._retire_completed(latest)
             if segment_id in self.translation_requests and self.service.session_id is not None:
                 self.translation_tasks[segment_id] = asyncio.create_task(
                     self._translation_worker(segment_id)
@@ -393,17 +424,21 @@ class EngineRuntime:
         targets = list(request.targets)
 
         package_errors: dict[str, str] = {}
-        if self.translation_scheduler.provider.name == "argos" and self.argos_packages is None:
-            self.argos_packages = await asyncio.to_thread(ArgosPackageManager)
-        for target in targets if self.translation_scheduler.provider.name == "argos" else []:
-            path = await asyncio.to_thread(
-                self.argos_packages.installed_path,
-                request.source,
-                target,
-                allow_intermediate=request.allow_intermediate,
-            )
-            if path is None:
-                package_errors[target] = "resourceUnavailable"
+        if self.translation_scheduler.provider.name == "argos":
+            async with self.argos_path_lock:
+                if self.argos_packages is None:
+                    self.argos_packages = await asyncio.to_thread(ArgosPackageManager)
+                for target in targets:
+                    key = (request.source, target, request.allow_intermediate)
+                    if key not in self.argos_path_cache:
+                        path = await asyncio.to_thread(
+                            self.argos_packages.installed_path,
+                            request.source, target,
+                            allow_intermediate=request.allow_intermediate,
+                        )
+                        self.argos_path_cache[key] = path is not None
+                    if not self.argos_path_cache[key]:
+                        package_errors[target] = "resourceUnavailable"
 
         available_targets = [target for target in targets if target not in package_errors]
         scheduled = await self.translation_scheduler.translate(
@@ -437,6 +472,20 @@ class EngineRuntime:
                     )
                 )
         return translations
+
+    def _retire_completed(self, update: RecognitionUpdate) -> None:
+        if not update.is_final:
+            return
+        self.completed_segments[update.segment_id] = None
+        for segment_id in list(self.completed_segments):
+            if len(self.completed_segments) <= self.completed_segment_limit:
+                break
+            if segment_id in self.translation_tasks or segment_id in self.translation_requests:
+                continue
+            self.completed_segments.pop(segment_id, None)
+            for mapping in (self.latest_updates, self.latest_translations, self.caption_revisions,
+                            self.translation_last_started, self.translation_wake):
+                mapping.pop(segment_id, None)
 
     def _caption_event(
         self,
@@ -480,6 +529,9 @@ class EngineRuntime:
 
     @staticmethod
     def _detect_language(text: str) -> str:
+        if any("\uac00" <= character <= "\ud7af" or "\u1100" <= character <= "\u11ff"
+               or "\u3130" <= character <= "\u318f" for character in text):
+            return "ko"
         if any("\u3040" <= character <= "\u30ff" for character in text):
             return "ja"
         if any("\u3400" <= character <= "\u9fff" for character in text):
@@ -506,7 +558,12 @@ class EngineRuntime:
             task.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
+        await self.translation_scheduler.close()
         self.translation_tasks.clear()
+        self.translation_last_started.clear()
+        self.translation_wake.clear()
+        self.completed_segments.clear()
+        self.argos_path_cache.clear()
         self.latest_updates.clear()
         self.latest_translations.clear()
         self.caption_revisions.clear()

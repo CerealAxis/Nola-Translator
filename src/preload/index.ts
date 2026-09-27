@@ -13,6 +13,7 @@ const channels = {
   showOverlay: 'overlay:show',
   hideOverlay: 'overlay:hide',
   getSettings: 'app:get-settings', updateSettings: 'app:update-settings', settingsChanged: 'settings:changed',
+  getModelStorage: 'storage:get', chooseModelStorageDirectory: 'storage:choose', restartApp: 'app:restart',
   listHistory: 'history:list', clearHistory: 'history:clear', exportHistory: 'history:export',
   getDiagnostics: 'diagnostics:get', copyDiagnostics: 'diagnostics:copy',
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
@@ -32,6 +33,9 @@ const api: FluentCaptionsApi = {
   showOverlay: () => ipcRenderer.invoke(channels.showOverlay),
   hideOverlay: () => ipcRenderer.invoke(channels.hideOverlay),
   getSettings: () => ipcRenderer.invoke(channels.getSettings),
+  getModelStorage: () => ipcRenderer.invoke(channels.getModelStorage),
+  chooseModelStorageDirectory: () => ipcRenderer.invoke(channels.chooseModelStorageDirectory),
+  restartApp: () => ipcRenderer.invoke(channels.restartApp),
   updateSettings: (patch) => ipcRenderer.invoke(channels.updateSettings, patch),
   onSettingsChanged: (listener) => {
     const wrapped = (_event: Electron.IpcRendererEvent, value: Parameters<typeof listener>[0]): void => listener(value)

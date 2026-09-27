@@ -1,11 +1,11 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 
 import { CaptionOverlay } from '../../../src/renderer/overlay/CaptionOverlay'
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 import type { EngineEvent } from '../../../src/shared/contracts'
 
-it('keeps the adjustable overlay free of status and action controls', async () => {
+it('offers adjustment controls only while the overlay is unlocked', async () => {
   const api = window.fluentCaptions!
   const settings = {
     ...DEFAULT_SETTINGS,
@@ -15,14 +15,23 @@ it('keeps the adjustable overlay free of status and action controls', async () =
   const { container } = render(<CaptionOverlay />)
 
   await waitFor(() => expect(container.querySelector('.overlay-window')).toHaveAttribute('data-adjusting', 'true'))
-  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '完成调整' })).toBeInTheDocument()
+  const hide = vi.spyOn(api, 'hideOverlay')
+  fireEvent.click(screen.getByRole('button', { name: '隐藏浮层' }))
+  await waitFor(() => expect(hide).toHaveBeenCalledOnce())
+  hide.mockRestore()
   expect(screen.queryByText('等待字幕会话')).not.toBeInTheDocument()
   expect(container.querySelector('.standalone-overlay')).toHaveAttribute('data-locked', 'false')
 
+  const save = vi.spyOn(api, 'updateSettings').mockResolvedValue({ ...settings, overlay: { ...settings.overlay, locked: true } })
+  fireEvent.click(screen.getByRole('button', { name: '完成调整' }))
+  await waitFor(() => expect(screen.queryByRole('button')).not.toBeInTheDocument())
+  expect(save).toHaveBeenCalledWith({ overlay: { locked: true } })
+  save.mockRestore()
   getSettings.mockRestore()
 })
 
-it('keeps recent caption segments on separate readable lines', async () => {
+it('shows the current sentence without accumulating previous sentences', async () => {
   const api = window.fluentCaptions!
   let listener: ((event: EngineEvent) => void) | undefined
   const onEngineEvent = vi.spyOn(api, 'onEngineEvent').mockImplementation((next) => {
@@ -53,7 +62,7 @@ it('keeps recent caption segments on separate readable lines', async () => {
   })
 
   const sources = [...document.querySelectorAll('.overlay-source')].map((item) => item.textContent)
-  expect(sources).toEqual(['First sentence.', 'Second sentence.'])
+  expect(sources).toEqual(['Second sentence.'])
   onEngineEvent.mockRestore()
 })
 
@@ -127,9 +136,15 @@ it('reuses the visible caption row when source rows are limited to one', async (
     listener?.(caption('two', 'Second sentence.'))
   })
 
+  // 当前句立即可见；旧句进入离场动画（.overlay-caption-leaving）后由计时器移除，始终只有一行当前句。
+  const activeRow = document.querySelector('.overlay-caption-row:not(.overlay-caption-leaving)')
+  expect(activeRow).not.toBe(firstRow)
+  expect(activeRow?.textContent).toContain('Second sentence.')
+  expect(activeRow?.textContent).not.toContain('First sentence.')
+  expect(document.querySelector('.overlay-caption-leaving')?.textContent).toContain('First sentence.')
+  await waitFor(() => expect(document.querySelectorAll('.overlay-caption-row')).toHaveLength(1))
   expect(document.querySelector('.overlay-lines')).toHaveTextContent('Second sentence.')
   expect(document.querySelector('.overlay-lines')).not.toHaveTextContent('First sentence.')
-  expect(document.querySelector('.overlay-caption-row')).toBe(firstRow)
   getSettings.mockRestore()
   onEngineEvent.mockRestore()
 })

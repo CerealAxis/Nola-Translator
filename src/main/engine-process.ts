@@ -53,6 +53,7 @@ export class CaptionEventCoalescer {
 
   push(event: EngineEvent): void {
     if (event.type !== 'caption') {
+      if (event.type === 'sessionStarted' || event.type === 'sessionStopped') this.reset()
       this.deliver(event)
       return
     }
@@ -61,6 +62,7 @@ export class CaptionEventCoalescer {
     if (event.segment.isFinal) {
       this.partials.delete(key)
       this.finalized.add(key)
+      if (this.finalized.size > 2048) this.finalized.delete(this.finalized.values().next().value!)
       this.deliver(event)
       return
     }

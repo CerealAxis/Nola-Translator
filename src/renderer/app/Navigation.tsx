@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n'
 import { useEffect, useState, type ComponentType } from 'react'
 import {
   ClosedCaptionRegular,
@@ -45,6 +46,7 @@ const navigationItems: NavigationItem[] = [
 ]
 
 export function Navigation({ activePage, activeSessionId, sessionStopping, onStopSession, onNavigate }: NavigationProps): React.JSX.Element {
+  const { t } = useI18n()
   const [engineStatus, setEngineStatus] = useState('正在连接引擎')
   useEffect(() => {
     const api = window.fluentCaptions
@@ -54,7 +56,7 @@ export function Navigation({ activePage, activeSessionId, sessionStopping, onSto
     }
     void api.getDiagnostics().then((value) => {
       const state = String(value['引擎状态'] ?? '')
-      setEngineStatus(state === 'ready' ? '引擎已就绪' : state === 'failed' ? '引擎启动失败' : `引擎${state || '正在启动'}`)
+      setEngineStatus(state === 'ready' ? '引擎已就绪' : state === 'failed' ? '引擎启动失败' : '引擎正在启动')
     })
     return api.onEngineEvent((event) => {
       if (event.type === 'ready') setEngineStatus('引擎已就绪')
@@ -64,36 +66,36 @@ export function Navigation({ activePage, activeSessionId, sessionStopping, onSto
     })
   }, [])
   return (
-    <nav className="navigation" aria-label="主导航">
+    <nav className="navigation" aria-label={t("主导航")}>
       <div className="navigation-items">
         {navigationItems.map(({ id, label, icon: Icon }) => (
           <button
             className="navigation-item"
             data-active={activePage === id}
             aria-current={activePage === id ? 'page' : undefined}
-            aria-label={label}
+            aria-label={t(label)}
             key={id}
             onClick={() => onNavigate(id)}
             type="button"
           >
             <Icon aria-hidden />
-            <span className="navigation-label">{label}</span>
+            <span className="navigation-label">{t(label)}</span>
           </button>
         ))}
       </div>
 
       <div className="navigation-footer">
-        {activeSessionId && <button className="navigation-item session-stop-navigation" disabled={sessionStopping} onClick={() => void onStopSession().catch(() => undefined)} type="button" aria-label="停止字幕服务">
+        {activeSessionId && <button className="navigation-item session-stop-navigation" disabled={sessionStopping} onClick={() => void onStopSession().catch(() => undefined)} type="button" aria-label={t("停止字幕服务")}>
           <StopRegular aria-hidden />
-          <span className="navigation-label">{sessionStopping ? '正在停止字幕' : '停止字幕服务'}</span>
+          <span className="navigation-label">{t(sessionStopping ? '正在停止字幕' : '停止字幕服务')}</span>
         </button>}
-        <button className="navigation-item" onClick={() => onNavigate('appearance')} type="button" aria-label="设置">
+        <button className="navigation-item" onClick={() => onNavigate('appearance')} type="button" aria-label={t("设置")}>
           <SettingsRegular aria-hidden />
-          <span className="navigation-label">设置</span>
+          <span className="navigation-label">{t("设置")}</span>
         </button>
         <div className="engine-ready">
           <span className="status-dot" aria-hidden="true" />
-          <span className="navigation-label">{engineStatus}</span>
+          <span className="navigation-label">{t(engineStatus)}</span>
         </div>
       </div>
     </nav>
