@@ -1,4 +1,4 @@
-"""显式管理语音模型与 Argos 语言包；查询和字幕启动均不会联网。"""
+"""显式管理本地识别与翻译模型；查询和字幕启动均不会联网。"""
 
 from __future__ import annotations
 
@@ -7,21 +7,32 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 import shutil
-import tempfile
 import threading
 from typing import Literal
 from uuid import uuid4
 
-from .models.catalog import SENSEVOICE_SMALL, STREAMING_ZH_EN_SMALL
-from .models.manager import ModelManager
+from .models.catalog import HYMT2_1_8B_Q4_K_M, QWEN3_ASR_1_7B_HF
+from .models.manager import ModelManager, ModelSpec
 from .protocol import ResourceChangedEvent, ResourceRecord
-from .translation.packages import ArgosPackageManager
 
 
-REALTIME_RESOURCE_ID = STREAMING_ZH_EN_SMALL.model_id
-SENSEVOICE_RESOURCE_ID = SENSEVOICE_SMALL.model_id
-ACCURATE_RESOURCE_ID = "faster-whisper-small"
-WHISPER_REQUIRED_FILES = ("config.json", "model.bin", "tokenizer.json")
+QWEN_RESOURCE_ID = QWEN3_ASR_1_7B_HF.model_id
+HYMT2_RESOURCE_ID = HYMT2_1_8B_Q4_K_M.model_id
+
+# S2.6：仅按精确已知名称清理的旧识别模型目录与残留文件。
+_LEGACY_ASR_DIRS = (
+    "sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16",
+    "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+    "faster-whisper-small",
+)
+_LEGACY_ASR_LEFTOVERS = (
+    ".sherpa-zh-en-small.part",
+    ".sensevoice-small.part",
+    ".faster-whisper-small.part",
+    ".sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16.corrupt",
+    ".sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.corrupt",
+    ".faster-whisper-small.corrupt",
+)
 
 
 class ResourceActionError(RuntimeError):
@@ -38,14 +49,12 @@ class ResourceOperationCancelled(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class ResourceDefinition:
     resource_id: str
-    kind: Literal["recognitionModel", "translationPackage"]
-    provider: Literal["sherpa-onnx", "faster-whisper", "argos"]
+    kind: Literal["recognitionModel", "translationModel"]
+    provider: Literal["qwen3-asr", "hy-mt2"]
     name: str
     description: str
     languages: tuple[str, ...]
     download_bytes: int | None = None
-    source_language: str | None = None
-    target_language: str | None = None
 
 
 @dataclass(slots=True)
@@ -59,63 +68,33 @@ class Operation:
     cancel_event: threading.Event | None = None
 
 
-LANGUAGE_NAMES = {
-    "zh": "简体中文",
-    "en": "English",
-    "ja": "日本語",
-    "ko": "한국어",
-    "fr": "Français",
-    "de": "Deutsch",
-    "es": "Español",
-    "ru": "Русский",
-}
-
-
 def _definitions() -> tuple[ResourceDefinition, ...]:
-    recognition = (
+    return (
         ResourceDefinition(
-            REALTIME_RESOURCE_ID,
+            QWEN_RESOURCE_ID,
             "recognitionModel",
-            "sherpa-onnx",
-            "实时识别 · 中文 / English",
-            "低延迟流式模型，可输出中间结果；适合会议、视频和直播。",
-            ("zh", "en"),
-            STREAMING_ZH_EN_SMALL.archive_size,
+            "qwen3-asr",
+            "Qwen3-ASR 1.7B · 本地流式识别",
+            "下载约 4GB 的 BF16 原始权重，加载时以 NF4 4-bit 量化运行；支持多语言流式字幕。",
+            (
+                "zh", "en", "yue", "ar", "de", "fr", "es", "pt",
+                "id", "it", "ko", "ru", "th", "vi", "ja", "tr",
+            ),
+            4_087_646_324,
         ),
         ResourceDefinition(
-            SENSEVOICE_RESOURCE_ID,
-            "recognitionModel",
-            "sherpa-onnx",
-            "推荐 · SenseVoiceSmall · 流式中英日韩粤",
-            "VAD 期间持续输出中间结果，支持中文、粤语、English、日本語、한국어，并启用标点恢复。",
-            ("zh", "yue", "en", "ja", "ko"),
-            SENSEVOICE_SMALL.archive_size,
-        ),
-        ResourceDefinition(
-            ACCURATE_RESOURCE_ID,
-            "recognitionModel",
-            "faster-whisper",
-            "高精度识别 · Whisper Small",
-            "完整语音片段识别，支持自动识别和多语言，可自动尝试 GPU。",
-            tuple(LANGUAGE_NAMES),
+            HYMT2_RESOURCE_ID,
+            "translationModel",
+            "hy-mt2",
+            "Hy-MT2 1.8B · 本地翻译模型",
+            "预量化 Q4_K_M 文件（约 1.13GB），由内置 llama.cpp 在本机运行。",
+            (
+                "zh", "en", "fr", "pt", "es", "ja", "tr", "ru",
+                "ar", "ko", "th", "it", "de", "vi", "ms", "id",
+            ),
+            1_133_080_448,
         ),
     )
-    packages: list[ResourceDefinition] = []
-    for language in ("zh", "ja", "ko", "fr", "de", "es", "ru"):
-        for source, target in (("en", language), (language, "en")):
-            packages.append(
-                ResourceDefinition(
-                    f"argos-{source}-{target}",
-                    "translationPackage",
-                    "argos",
-                    f"{LANGUAGE_NAMES[source]} → {LANGUAGE_NAMES[target]}",
-                    "Argos Translate 有向离线语言包；安装后翻译过程不联网。",
-                    (source, target),
-                    source_language=source,
-                    target_language=target,
-                )
-            )
-    return recognition + tuple(packages)
 
 
 RESOURCE_DEFINITIONS = _definitions()
@@ -142,46 +121,27 @@ class ResourceManager:
         self.emit = emit
         self.operations: dict[str, Operation] = {}
         self.tasks: dict[str, asyncio.Task[None]] = {}
-        self.argos: ArgosPackageManager | None = None
 
     @property
-    def whisper_path(self) -> Path:
-        return self.model_root / ACCURATE_RESOURCE_ID
+    def qwen_path(self) -> Path:
+        return self.model_root / QWEN_RESOURCE_ID
+
+    @property
+    def hymt2_gguf_path(self) -> Path:
+        return self.model_root / HYMT2_RESOURCE_ID / "Hy-MT2-1.8B-Q4_K_M.gguf"
 
     def list(self) -> list[ResourceRecord]:
         return [self.record(item.resource_id) for item in RESOURCE_DEFINITIONS]
 
     def is_installed(self, resource_id: str) -> bool:
-        definition = self._definition(resource_id)
-        if resource_id == REALTIME_RESOURCE_ID:
-            return self.models.is_installed(STREAMING_ZH_EN_SMALL)
-        if resource_id == SENSEVOICE_RESOURCE_ID:
-            return self.models.is_installed(SENSEVOICE_SMALL)
-        if resource_id == ACCURATE_RESOURCE_ID:
-            return all((self.whisper_path / name).is_file() for name in WHISPER_REQUIRED_FILES)
-        assert definition.source_language and definition.target_language
-        return self._argos().installed_package(
-            definition.source_language, definition.target_language
-        ) is not None
+        self._definition(resource_id)
+        return self.models.is_installed(self._spec(resource_id))
 
     def record(self, resource_id: str) -> ResourceRecord:
         definition = self._definition(resource_id)
-        installed = self.is_installed(resource_id)
-        installed_bytes = 0
-        if resource_id == REALTIME_RESOURCE_ID:
-            installed_bytes = _directory_size(self.models.model_path(STREAMING_ZH_EN_SMALL))
-        elif resource_id == SENSEVOICE_RESOURCE_ID:
-            installed_bytes = _directory_size(self.models.model_path(SENSEVOICE_SMALL))
-        elif resource_id == ACCURATE_RESOURCE_ID:
-            installed_bytes = _directory_size(self.whisper_path)
-        elif installed:
-            assert definition.source_language and definition.target_language
-            package = self._argos().installed_package(
-                definition.source_language, definition.target_language
-            )
-            package_path = getattr(package, "package_path", None)
-            if package_path is not None:
-                installed_bytes = _directory_size(Path(package_path))
+        spec = self._spec(resource_id)
+        installed = self.models.is_installed(spec)
+        installed_bytes = _directory_size(self.models.model_path(spec))
 
         operation = self.operations.get(resource_id)
         return ResourceRecord(
@@ -191,8 +151,8 @@ class ResourceManager:
             name=definition.name,
             description=definition.description,
             languages=list(definition.languages),
-            sourceLanguage=definition.source_language,
-            targetLanguage=definition.target_language,
+            sourceLanguage=None,
+            targetLanguage=None,
             installed=installed,
             installedBytes=installed_bytes,
             downloadBytes=definition.download_bytes,
@@ -224,11 +184,11 @@ class ResourceManager:
         if action == "remove" and not self.is_installed(resource_id):
             return self.record(resource_id)
 
-        cancellable = action == "install" and resource_id == REALTIME_RESOURCE_ID
+        cancellable = action == "install"
         operation = Operation(
             action=action,
             phase="download" if action == "install" else "remove",
-            progress=0.0 if resource_id == REALTIME_RESOURCE_ID else None,
+            progress=0.0 if action == "install" else None,
             cancellable=cancellable,
             cancel_event=threading.Event() if cancellable else None,
         )
@@ -262,81 +222,65 @@ class ResourceManager:
             self._emit_changed(resource_id)
 
     async def _install(self, resource_id: str, operation: Operation) -> None:
-        definition = self._definition(resource_id)
-        if resource_id == REALTIME_RESOURCE_ID:
-            loop = asyncio.get_running_loop()
+        spec = self._spec(resource_id)
+        loop = asyncio.get_running_loop()
 
-            def progress(current: int, total: int) -> None:
-                if operation.cancel_event and operation.cancel_event.is_set():
-                    raise ResourceOperationCancelled()
-                ratio = current / total if total else 0.0
-                loop.call_soon_threadsafe(self._set_progress, resource_id, ratio)
+        def progress(current: int, total: int) -> None:
+            if operation.cancel_event and operation.cancel_event.is_set():
+                raise ResourceOperationCancelled()
+            ratio = current / total if total else 0.0
+            loop.call_soon_threadsafe(self._set_progress, resource_id, ratio)
 
-            await asyncio.to_thread(
-                self.models.ensure_archive, STREAMING_ZH_EN_SMALL, progress
-            )
-            return
-        if resource_id == SENSEVOICE_RESOURCE_ID:
-            await asyncio.to_thread(self.models.ensure_archive, SENSEVOICE_SMALL)
-            return
-        if resource_id == ACCURATE_RESOURCE_ID:
-            await asyncio.to_thread(self._install_whisper)
-            return
-        assert definition.source_language and definition.target_language
-        await asyncio.to_thread(
-            self._argos().install,
-            definition.source_language,
-            definition.target_language,
-        )
+        def on_phase(phase: str) -> None:
+            if operation.cancel_event and operation.cancel_event.is_set():
+                raise ResourceOperationCancelled()
+            if phase not in ("download", "verify", "install"):
+                return
+            loop.call_soon_threadsafe(self._set_phase, resource_id, phase)
 
-    def _install_whisper(self) -> None:
-        if self.is_installed(ACCURATE_RESOURCE_ID):
-            return
-        from faster_whisper.utils import download_model
+        await asyncio.to_thread(self.models.ensure, spec, progress, on_phase)
+        # 安装成功后清理旧资源（S2.6）；清理失败不影响安装结果。
+        await asyncio.to_thread(self._cleanup_after_install, resource_id)
 
-        self.model_root.mkdir(parents=True, exist_ok=True)
-        temporary = Path(
-            tempfile.mkdtemp(prefix=f".{ACCURATE_RESOURCE_ID}-", dir=self.model_root)
-        )
+    def _cleanup_after_install(self, resource_id: str) -> None:
+        """按精确已知名称清理旧资源；不扫描、不触碰未知目录与 Ollama。"""
         try:
-            download_model("small", output_dir=str(temporary), local_files_only=False)
-            if not all((temporary / name).is_file() for name in WHISPER_REQUIRED_FILES):
-                raise RuntimeError("downloadIntegrityFailed")
-            if self.whisper_path.exists():
-                shutil.rmtree(self.whisper_path)
-            os.replace(temporary, self.whisper_path)
-        finally:
-            shutil.rmtree(temporary, ignore_errors=True)
+            if resource_id == QWEN_RESOURCE_ID:
+                for name in _LEGACY_ASR_DIRS:
+                    shutil.rmtree(self.model_root / name, ignore_errors=True)
+                for name in _LEGACY_ASR_LEFTOVERS:
+                    path = self.model_root / name
+                    if path.is_dir():
+                        shutil.rmtree(path, ignore_errors=True)
+                    else:
+                        path.unlink(missing_ok=True)
+            else:
+                for variable in ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
+                    value = os.environ.get(variable)
+                    if not value:
+                        continue
+                    path = Path(value)
+                    if path.exists():
+                        shutil.rmtree(path, ignore_errors=True)
+        except Exception:
+            pass
 
     async def _remove(self, resource_id: str) -> None:
-        definition = self._definition(resource_id)
-        if resource_id == REALTIME_RESOURCE_ID:
-            await asyncio.to_thread(
-                shutil.rmtree,
-                self.models.model_path(STREAMING_ZH_EN_SMALL),
-                True,
-            )
-        elif resource_id == SENSEVOICE_RESOURCE_ID:
-            await asyncio.to_thread(
-                shutil.rmtree,
-                self.models.model_path(SENSEVOICE_SMALL),
-                True,
-            )
-        elif resource_id == ACCURATE_RESOURCE_ID:
-            await asyncio.to_thread(shutil.rmtree, self.whisper_path, True)
-        else:
-            assert definition.source_language and definition.target_language
-            await asyncio.to_thread(
-                self._argos().remove,
-                definition.source_language,
-                definition.target_language,
-            )
+        spec = self._spec(resource_id)
+        await asyncio.to_thread(shutil.rmtree, self.models.model_path(spec), True)
 
     def _set_progress(self, resource_id: str, progress: float) -> None:
         operation = self.operations.get(resource_id)
         if operation is None:
             return
         operation.progress = max(0.0, min(1.0, progress))
+        self._emit_changed(resource_id)
+
+    def _set_phase(self, resource_id: str, phase: Literal["download", "verify", "install"]) -> None:
+        operation = self.operations.get(resource_id)
+        if operation is None:
+            return
+        operation.phase = phase
         self._emit_changed(resource_id)
 
     def _emit_changed(self, resource_id: str) -> None:
@@ -355,10 +299,9 @@ class ResourceManager:
             raise ResourceActionError("resourceNotFound", {"resourceId": resource_id})
         return definition
 
-    def _argos(self) -> ArgosPackageManager:
-        if self.argos is None:
-            self.argos = ArgosPackageManager()
-        return self.argos
+    def _spec(self, resource_id: str) -> ModelSpec:
+        self._definition(resource_id)
+        return QWEN3_ASR_1_7B_HF if resource_id == QWEN_RESOURCE_ID else HYMT2_1_8B_Q4_K_M
 
     @staticmethod
     def _error_code(error: Exception) -> str:
