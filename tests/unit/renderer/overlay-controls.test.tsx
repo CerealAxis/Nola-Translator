@@ -16,16 +16,38 @@ function listen(): { emit: (event: EngineEvent) => void } {
   return { emit: (event) => { act(() => listener?.(event)) } }
 }
 
-function caption(segmentId: string, sourceText: string, revision: number, translation?: string): EngineEvent {
+function caption(segmentId: string, sourceText: string, revision: number, translation?: string, isFinal = true): EngineEvent {
   return {
     protocolVersion: 1, type: 'caption', requestId: `${segmentId}-${revision}`, sessionId: 'session-live',
     segment: {
       segmentId, revision, startedAtMs: segmentId === 'one' ? 1000 : 2000,
-      sourceText, isFinal: true,
+      sourceText, isFinal,
       translations: [{ targetLanguage: 'zh', state: translation ? 'complete' : 'pending', provider: 'example', text: translation }],
     },
   }
 }
+
+it('extends a live sentence in place and keeps its translation while the next revision is pending', async () => {
+  const { emit } = listen()
+  const { container } = render(<CaptionOverlay />)
+  emit(caption('one', 'Four units in London', 1, '伦敦的四家中心', false))
+  await waitFor(() => expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toHaveTextContent('伦敦的四家中心'))
+  const sourceNode = container.querySelector('.overlay-track-source .overlay-track-in')
+  const translationNode = container.querySelector('.overlay-track-translation .overlay-track-in')
+
+  emit(caption('one', 'Four units in London, Birmingham and Newcastle are also piloting rapid genomic tests, with doctors waiting for results during surgery', 2, undefined, false))
+  expect(container.querySelector('.overlay-track-source .overlay-track-in')).toBe(sourceNode)
+  expect(sourceNode).toHaveTextContent('Newcastle are also piloting')
+  expect(container.querySelector('.overlay-track-source .overlay-track-out')).toBeNull()
+  expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toBe(translationNode)
+  expect(translationNode).toHaveTextContent('伦敦的四家中心')
+  expect(container.querySelector('.overlay-track-translation .overlay-track-out')).toBeNull()
+
+  emit(caption('one', 'Four units in London, Birmingham and Newcastle are also piloting rapid genomic tests, with doctors waiting for results during surgery', 2, '伦敦、伯明翰和纽卡斯尔的四家中心也在试用快速基因检测', false))
+  expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toBe(translationNode)
+  expect(translationNode).toHaveTextContent('纽卡斯尔')
+  expect(container.querySelector('.overlay-track-translation .overlay-track-out')).toBeNull()
+})
 
 it('shows the reference console controls and keeps close usable when locked', async () => {
   const api = window.fluentCaptions!

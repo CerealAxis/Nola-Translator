@@ -8,13 +8,24 @@ const EXIT_DURATION_MS = 280
 const TRANSLATION_LAG_MS = 180
 
 /** Each language owns its transition; a late translation never restarts the source animation. */
-export function CaptionTrack({ line, kind }: { line: TrackLine | null; kind: 'source' | 'translation' }): React.JSX.Element {
+export function CaptionTrack({ line, kind, segmentId }: { line: TrackLine | null; kind: 'source' | 'translation'; segmentId: string | null }): React.JSX.Element {
   const [shown, setShown] = useState<TrackLine | null>(line)
   const [leaving, setLeaving] = useState<TrackLine | null>(null)
   const previous = useRef<TrackLine | null>(line)
+  const currentSegment = useRef<string | null>(segmentId)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    // A revision belongs to the same spoken sentence. Keep the existing DOM node
+    // and translation while recognition or translation catches up.
+    if (currentSegment.current === segmentId) {
+      if (line) {
+        previous.current = line
+        setShown(line)
+      }
+      return
+    }
+    currentSegment.current = segmentId
     if (!line) {
       if (previous.current) {
         setLeaving(previous.current)
@@ -39,7 +50,7 @@ export function CaptionTrack({ line, kind }: { line: TrackLine | null; kind: 'so
       return () => clearTimeout(delay)
     }
     next()
-  }, [line?.key, line?.text])
+  }, [segmentId, line?.key, line?.text])
 
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
 

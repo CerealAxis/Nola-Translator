@@ -6,7 +6,6 @@ import {
 
 import type { EngineEvent } from '../../shared/contracts'
 import { DEFAULT_SETTINGS, type AppSettings, type OverlaySettings } from '../../shared/settings'
-import { captionPages } from '../components/caption-pages'
 import { EMPTY_CAPTION, receiveCaption } from '../components/caption-state'
 import { useI18n } from '../i18n'
 import { CaptionTrack, type TrackLine } from './CaptionTrack'
@@ -18,7 +17,6 @@ export function CaptionOverlay(): React.JSX.Element {
   const [active, setActive] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [notice, setNotice] = useState('')
-  const [page, setPage] = useState({ segmentId: '', index: 0 })
   const resizeStart = useRef<{ x: number; y: number; width: number; height: number } | null>(null)
   const expandedHeight = useRef(118)
 
@@ -37,36 +35,14 @@ export function CaptionOverlay(): React.JSX.Element {
   }, [])
 
   const caption = current.caption
-  const pages = captionPages(caption?.sourceText ?? '')
-  const pageIndex = caption && page.segmentId === caption.segmentId
-    ? Math.min(page.index, Math.max(0, pages.length - 1))
-    : caption?.isFinal ? 0 : Math.max(0, pages.length - 1)
-  const sourceLine: TrackLine | null = caption && pages.length
-    ? { key: `${caption.segmentId}:${pageIndex}`, text: pages[pageIndex] }
+  const sourceLine: TrackLine | null = caption?.sourceText
+    ? { key: caption.segmentId, text: caption.sourceText }
     : null
 
-  useEffect(() => {
-    if (!caption) return
-    if (page.segmentId !== caption.segmentId) {
-      setPage({ segmentId: caption.segmentId, index: caption.isFinal ? 0 : Math.max(0, pages.length - 1) })
-    } else if (!caption.isFinal && page.index !== pages.length - 1) {
-      setPage({ segmentId: caption.segmentId, index: Math.max(0, pages.length - 1) })
-    }
-  }, [caption?.segmentId, caption?.isFinal, caption?.sourceText])
-
-  useEffect(() => {
-    if (!caption?.isFinal || page.segmentId !== caption.segmentId || page.index >= pages.length - 1) return
-    const timer = setTimeout(() => setPage((value) => ({ ...value, index: value.index + 1 })),
-      Math.min(3500, Math.max(1700, pages[page.index].length * 45)))
-    return () => clearTimeout(timer)
-  }, [caption?.segmentId, caption?.isFinal, caption?.sourceText, page])
-
   const translationTracks = (caption?.translations ?? []).map((item) => {
-    const translatedPages = captionPages(item.text ?? '')
-    const index = Math.min(pageIndex, translatedPages.length - 1)
-    return { language: item.targetLanguage, line: item.state === 'complete' && translatedPages.length ? {
-      key: `${caption!.segmentId}:${index}`,
-      text: translatedPages[index] ?? '',
+    return { language: item.targetLanguage, line: item.state === 'complete' && item.text ? {
+      key: caption!.segmentId,
+      text: item.text,
     } : null }
   })
 
@@ -110,9 +86,9 @@ export function CaptionOverlay(): React.JSX.Element {
         fontFamily: settings.overlay.fontFamily,
       } as React.CSSProperties}>
       <div className="caption-console-stage">
-        {!collapsed && settings.overlay.showSource && <CaptionTrack key={`source-${current.sessionId}`} kind="source" line={sourceLine} />}
+        {!collapsed && settings.overlay.showSource && <CaptionTrack key={`source-${current.sessionId}`} kind="source" segmentId={caption?.segmentId ?? null} line={sourceLine} />}
         {!collapsed && settings.overlay.showTranslation && translationTracks.map(({ language, line }) =>
-          <CaptionTrack key={`${current.sessionId}-${language}`} kind="translation" line={line} />)}
+          <CaptionTrack key={`${current.sessionId}-${language}`} kind="translation" segmentId={caption?.segmentId ?? null} line={line} />)}
       </div>
 
       <div className="caption-console-actions" aria-label={t('字幕浮层控制')}>
