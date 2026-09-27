@@ -49,7 +49,6 @@ function createOverlayWindow(): void {
   const window = new BrowserWindow(createOverlayWindowOptions(preload, display.workArea.width))
   overlayWindow = window
   window.setAlwaysOnTop(true, 'screen-saver')
-  window.setIgnoreMouseEvents(true, { forward: true })
   window.setBounds(computeOverlayBounds('bottom', display.workArea, window.getBounds()))
   window.on('closed', () => {
     if (overlayWindow === window) overlayWindow = null

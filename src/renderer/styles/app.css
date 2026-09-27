@@ -284,7 +284,7 @@ input[type="checkbox"] { accent-color: var(--accent); }
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 13%, transparent), transparent 58%), var(--navigation);
   overflow: hidden;
 }
-.caption-overlay { width: min(760px, 94%); padding: 14px 18px; border: 0; border-radius: 12px; text-align: center; background: color-mix(in srgb, var(--preview-background-color, #111111) var(--preview-background-alpha, 84%), transparent); box-shadow: 0 4px 12px rgba(0, 0, 0, .5); }
+.caption-overlay { width: min(760px, 94%); padding: 14px 18px; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; text-align: left; background: color-mix(in srgb, var(--preview-background-color, #30343a) var(--preview-background-alpha, 62%), transparent); box-shadow: 0 3px 16px rgba(0, 0, 0, .12); }
 .caption-overlay[data-transparent-background="true"] { background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none; }
 .caption-source, .caption-translation { overflow-wrap: anywhere; white-space: pre-wrap; text-wrap: wrap; }
 .caption-source { margin-bottom: 5px; color: var(--preview-source-color, #fff); font-size: var(--preview-font-size, 28px); font-weight: var(--preview-font-weight, 600); line-height: var(--preview-line-height, 1.3); max-height: calc(var(--preview-max-lines, 3) * 1lh); overflow: hidden; }
@@ -460,11 +460,12 @@ th { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
 }
 
 html[data-overlay="true"], html[data-overlay="true"] body, html[data-overlay="true"] #root { width: 100%; height: 100%; overflow: hidden; background: transparent; }
-.overlay-window { width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; padding: 16px 22px; background: transparent; }
+.overlay-window { width: 100%; height: 100%; display: flex; align-items: stretch; justify-content: center; padding: 4px; background: transparent; }
 .standalone-overlay {
-  width: 100%; min-width: 0; padding: 14px 18px;
-  border: 0; border-radius: 14px; background: color-mix(in srgb, var(--overlay-background-color, #111111) var(--overlay-background-alpha, 84%), transparent);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, .5);
+  position: relative; width: 100%; min-width: 0; min-height: 0; padding: 13px 22px;
+  border: 1px solid rgba(255,255,255,.14); border-radius: 9px;
+  background: color-mix(in srgb, var(--overlay-background-color, #30343a) var(--overlay-background-alpha, 62%), transparent);
+  box-shadow: 0 3px 16px rgba(0,0,0,.12); backdrop-filter: blur(8px);
 }
 .standalone-overlay[data-transparent-background="true"] {
   /* 透明时也必须移除模糊、边框与阴影，否则会仍然看到一块灰色玻璃。 */
@@ -474,8 +475,8 @@ html[data-overlay="true"], html[data-overlay="true"] body, html[data-overlay="tr
   backdrop-filter: none;
 }
 .standalone-overlay[data-locked="false"] { -webkit-app-region: drag; cursor: move; }
-.overlay-window[data-adjusting="true"] .standalone-overlay { outline: 1px solid color-mix(in srgb, var(--accent) 85%, white); outline-offset: 3px; }
-.overlay-lines { min-width: 0; display: grid; gap: 8px; text-align: center; }
+.overlay-window[data-adjusting="true"] .standalone-overlay:hover { border-color: rgba(255,255,255,.38); }
+.overlay-lines { min-width: 0; display: grid; gap: 4px; text-align: left; }
 .overlay-caption-row { display: grid; gap: 4px; min-width: 0; }
 .overlay-source, .overlay-translation { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; text-wrap: wrap; }
 .overlay-source { color: var(--overlay-source-color, #fff); font-size: var(--overlay-font-size, 28px); font-weight: var(--overlay-font-weight, 600); line-height: var(--overlay-line-height, 1.3); }
@@ -483,11 +484,11 @@ html[data-overlay="true"], html[data-overlay="true"] body, html[data-overlay="tr
 /* 参考讯飞同传：深色字幕加轻微投影，换句时短淡入。 */
 .standalone-overlay[data-color-scheme="dark"], .caption-overlay[data-color-scheme="dark"] { text-shadow: 0 1px 3px rgba(0, 0, 0, .8); }
 /* 参考视频：换句时旧句上移约 1 行高淡出、新句从下方滚入，260ms ease-out，原文/译文同步。 */
-.overlay-caption-row > .overlay-source, .overlay-caption-row > .overlay-translation { animation: caption-roll-in 260ms cubic-bezier(0.16, 0.84, 0.44, 1); }
+.overlay-caption-entering { animation: caption-roll-in 300ms cubic-bezier(.2,.7,.2,1); }
 .overlay-caption-leaving { position: absolute; inset: 0 0 auto; width: 100%; pointer-events: none; }
-.overlay-caption-leaving > .overlay-source, .overlay-caption-leaving > .overlay-translation { animation: caption-roll-out 260ms cubic-bezier(0.16, 0.84, 0.44, 1) forwards; }
-@keyframes caption-roll-in { from { opacity: 0; transform: translateY(1lh); } to { opacity: 1; transform: none; } }
-@keyframes caption-roll-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-1lh); } }
+.overlay-caption-leaving { animation: caption-roll-out 300ms cubic-bezier(.2,.7,.2,1) forwards; }
+@keyframes caption-roll-in { from { opacity: 0; transform: translateY(70%); } to { opacity: 1; transform: none; } }
+@keyframes caption-roll-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-70%); } }
 
 /* Layout follows available content width, including either sidebar state. */
 .page-heading, .card-heading-row, .section-heading-row, .session-footer,
@@ -519,20 +520,23 @@ html[data-overlay="true"], html[data-overlay="true"] body, html[data-overlay="tr
 .caption-overlay { width: 100%; padding: 12px 16px; border-radius: 10px; }
 .caption-source, .caption-translation { margin: 0; }
 .caption-translation { margin-top: 4px; }
-.overlay-window { padding: 8px 12px; }
-.standalone-overlay { max-height: 100%; display: flex; padding: 12px 16px; border-radius: 10px; }
+.standalone-overlay { max-height: 100%; display: flex; }
 .overlay-lines { width: 100%; min-height: 0; display: flex; position: relative; overflow: hidden; }
 .overlay-caption-row { width: 100%; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
 .overlay-source, .overlay-translation { min-height: 0; flex: 0 1 auto; overflow: hidden; }
 .overlay-source { max-height: calc(var(--overlay-max-lines, 3) * 1lh); }
 
-.overlay-source { font-size: min(var(--overlay-font-size, 28px), calc((100dvh - 44px) / var(--caption-track-count, 2) / var(--overlay-line-height, 1.3))); }
-.overlay-translation { font-size: min(var(--overlay-translation-font-size, 22px), calc((100dvh - 44px) / var(--caption-track-count, 2) / var(--overlay-translation-line-height, 1.35))); }
+.overlay-source { font-size: min(var(--overlay-font-size, 20px), calc((100dvh - 30px) / var(--caption-track-count, 2) / var(--overlay-line-height, 1.3))); }
+.overlay-translation { font-size: min(var(--overlay-translation-font-size, 16px), calc((100dvh - 30px) / var(--caption-track-count, 2) / var(--overlay-translation-line-height, 1.35))); }
 
 .model-storage-settings { padding: 20px; margin-bottom: 24px; }
 .model-storage-settings p { margin-bottom: 10px; }
-.standalone-overlay { flex-direction: column; gap: 6px; }
-.overlay-adjustment-controls { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; flex-shrink: 0; color: var(--overlay-source-color); font: 12px "Segoe UI", sans-serif; -webkit-app-region: no-drag; }
-.overlay-adjustment-controls button { padding: 3px 8px; border: 1px solid currentColor; border-radius: 5px; background: transparent; color: inherit; cursor: pointer; opacity: .8; }
-.overlay-adjustment-controls button:hover { opacity: 1; }
+.standalone-overlay { flex-direction: column; justify-content: center; gap: 5px; }
+.overlay-adjustment-controls { position: absolute; right: 8px; top: 5px; display: flex; align-items: center; gap: 5px; color: #fff; font: 12px "Segoe UI", sans-serif; opacity: 0; transition: opacity 130ms; -webkit-app-region: no-drag; }
+.standalone-overlay:hover .overlay-adjustment-controls, .overlay-adjustment-controls:focus-within { opacity: 1; }
+.overlay-adjustment-controls button { padding: 3px 7px; border: 0; border-radius: 5px; background: rgba(0,0,0,.55); color: inherit; cursor: pointer; }
+.overlay-adjustment-controls button:hover { background: rgba(0,0,0,.8); }
 .overlay-adjustment-controls span { margin-right: auto; overflow-wrap: anywhere; }
+.overlay-resize-grip { position: absolute; right: 0; bottom: 0; width: 20px; height: 20px; cursor: nwse-resize; -webkit-app-region: no-drag; opacity: .45; }
+.overlay-resize-grip::after { content: ''; position: absolute; right: 5px; bottom: 5px; width: 8px; height: 8px; border-right: 2px solid white; border-bottom: 2px solid white; }
+.standalone-overlay:hover .overlay-resize-grip { opacity: 1; }

@@ -24,7 +24,7 @@ describe('字幕浮层位置', () => {
     ).toEqual({ x: 100, y: 910, width: 900, height: 180 })
   })
 
-  it('只在调整模式中接收鼠标并允许移动和缩放', () => {
+  it('锁定时仍可点击关闭和解锁，解锁后可移动和缩放', () => {
     expect(getOverlayInteractionPolicy(false)).toEqual({
       focusable: true,
       ignoreMouseEvents: false,
@@ -32,8 +32,8 @@ describe('字幕浮层位置', () => {
       resizable: true,
     })
     expect(getOverlayInteractionPolicy(true)).toEqual({
-      focusable: false,
-      ignoreMouseEvents: true,
+      focusable: true,
+      ignoreMouseEvents: false,
       movable: false,
       resizable: false,
     })

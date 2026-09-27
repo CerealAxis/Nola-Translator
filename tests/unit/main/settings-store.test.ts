@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { SettingsStore } from '../../../src/main/settings-store'
+import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 
 describe('设置存储', () => {
   it('serializes concurrent patches and restores language/storage choices', async () => {
@@ -67,9 +68,18 @@ describe('设置存储', () => {
         overlay: { backgroundColor: '#202020', translationColor: '#E6F2FF', fontSize: 30 },
       }), 'utf8')
       const migrated = await new SettingsStore(path).load()
-      expect(migrated.overlay.backgroundColor).toBe('#111111')
+      expect(migrated.overlay.backgroundColor).toBe(DEFAULT_SETTINGS.overlay.backgroundColor)
       expect(migrated.overlay.translationColor).toBe('#FFFFFF')
       expect(migrated.overlay.fontSize).toBe(30)
+
+      await writeFile(path, JSON.stringify({
+        version: 1,
+        overlay: { backgroundColor: '#111111', backgroundOpacity: 0.84, fontSize: 26, translationFontSize: 22, locked: true },
+      }), 'utf8')
+      const oldDefault = await new SettingsStore(path).load()
+      expect(oldDefault.overlay.backgroundColor).toBe(DEFAULT_SETTINGS.overlay.backgroundColor)
+      expect(oldDefault.overlay.fontSize).toBe(DEFAULT_SETTINGS.overlay.fontSize)
+      expect(oldDefault.overlay.locked).toBe(false)
 
       await writeFile(path, JSON.stringify({
         version: 1,

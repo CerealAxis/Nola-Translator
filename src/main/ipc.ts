@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
 
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, ipcMain, screen } from 'electron'
 
 import type { EngineEvent, SessionConfig } from '../shared/contracts'
 import { sessionConfigSchema } from '../shared/schemas'
 import type { EngineProcess } from './engine-process'
+import { computeOverlayBounds } from './windows'
 
 export const IPC_CHANNELS = {
   listDevices: 'engine:list-devices',
@@ -15,6 +16,7 @@ export const IPC_CHANNELS = {
   event: 'engine:event',
   showOverlay: 'overlay:show',
   hideOverlay: 'overlay:hide',
+  resizeOverlay: 'overlay:resize',
 } as const
 
 export function registerEngineIpc(
@@ -89,6 +91,7 @@ export function registerEngineIpc(
       30 * 60 * 1000
     )
     activeSessionId = response.sessionId
+    getOverlayWindow()?.showInactive()
     return { sessionId: response.sessionId }
   })
 
@@ -107,16 +110,31 @@ export function registerEngineIpc(
       'sessionStopped'
     )
     activeSessionId = null
+    getOverlayWindow()?.hide()
   })
 
   ipcMain.handle(IPC_CHANNELS.showOverlay, () => getOverlayWindow()?.show())
   ipcMain.handle(IPC_CHANNELS.hideOverlay, () => getOverlayWindow()?.hide())
+  ipcMain.handle(IPC_CHANNELS.resizeOverlay, (event, width: unknown, height: unknown) => {
+    const window = getOverlayWindow()
+    if (!window || event.sender !== window.webContents) return
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return
+    const bounds = window.getBounds()
+    const workArea = screen.getDisplayMatching(bounds).workArea
+    window.setBounds(computeOverlayBounds('free', workArea, { ...bounds,
+      width: Math.min(workArea.width, Math.max(420, Math.round(width as number))),
+      height: Math.min(workArea.height, Math.max(76, Math.round(height as number))),
+    }))
+  })
 
   const forwardEvent = (event: EngineEvent): void => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(IPC_CHANNELS.event, event)
     }
-    if (event.type === 'sessionStopped') activeSessionId = null
+    if (event.type === 'sessionStopped') {
+      activeSessionId = null
+      getOverlayWindow()?.hide()
+    }
   }
   engine.on('event', forwardEvent)
 
@@ -130,6 +148,7 @@ export function registerEngineIpc(
       IPC_CHANNELS.stopSession,
       IPC_CHANNELS.showOverlay,
       IPC_CHANNELS.hideOverlay,
+      IPC_CHANNELS.resizeOverlay,
     ]) {
       ipcMain.removeHandler(channel)
     }

@@ -11,8 +11,8 @@ export function getOverlayInteractionPolicy(locked: boolean): {
   resizable: boolean
 } {
   return {
-    focusable: !locked,
-    ignoreMouseEvents: locked,
+    focusable: true,
+    ignoreMouseEvents: false,
     movable: !locked,
     resizable: !locked,
   }
@@ -46,13 +46,13 @@ export function computeOverlayBounds(
 export function createOverlayWindowOptions(preload: string, workAreaWidth?: number): BrowserWindowConstructorOptions {
   // 参考讯飞同传：字幕条默认约占屏幕宽度的 2/3，居中显示。
   const width = workAreaWidth
-    ? Math.min(1600, Math.max(760, Math.round(workAreaWidth * 0.66)))
+    ? Math.min(1100, Math.max(720, Math.round(workAreaWidth * 0.52)))
     : 900
   return {
     width,
-    height: 180,
+    height: 110,
     minWidth: 420,
-    minHeight: 100,
+    minHeight: 76,
     resizable: true,
     movable: true,
     thickFrame: true,

@@ -197,8 +197,8 @@ export function AppearancePage(): React.JSX.Element {
           <label className="switch-label"><input checked={overlay.showSource} onChange={(event) => void updateOverlay({ showSource: event.target.checked })} type="checkbox" />{t('显示原文')}</label>
           <label className="switch-label"><input checked={overlay.showTranslation} onChange={(event) => void updateOverlay({ showTranslation: event.target.checked })} type="checkbox" />{t('显示译文')}</label>
           <label className="switch-label"><input checked={overlay.alwaysOnTop} onChange={(event) => void updateOverlay({ alwaysOnTop: event.target.checked })} type="checkbox" />{t('始终置顶')}</label>
-          <label className="switch-label"><input checked={overlay.locked} onChange={(event) => void updateOverlay({ locked: event.target.checked })} type="checkbox" />{t('锁定并点击穿透')}</label>
-          <p className="setting-hint">{t('主程序始终跟随 Windows 主题。调整位置和大小时，拖动字幕区域移动、拖动浮层窗口边缘缩放；完成操作请回到本页。')}</p>
+          <label className="switch-label"><input checked={overlay.locked} onChange={(event) => void updateOverlay({ locked: event.target.checked })} type="checkbox" />{t('锁定位置和大小')}</label>
+          <p className="setting-hint">{t('拖动字幕横条可移动浮层，拖动右下角可调整大小；悬停横条可关闭或锁定。')}</p>
         </section>
         <CaptionPreview caption={{ segmentId: 'appearance-example', revision: 1, startedAtMs: 0, isFinal: true, sourceText: 'Take a moment to listen. Every word brings us closer.', translations: [{ targetLanguage: 'zh', state: 'complete', provider: 'example', text: '用心聆听，让每一句话拉近彼此。' }] }} overlay={overlay} sourceVisible={overlay.showSource} translationVisible={overlay.showTranslation} />
       </div>

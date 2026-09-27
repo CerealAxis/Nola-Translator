@@ -5,7 +5,7 @@ import { CaptionOverlay } from '../../../src/renderer/overlay/CaptionOverlay'
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 import type { EngineEvent } from '../../../src/shared/contracts'
 
-it('offers adjustment controls only while the overlay is unlocked', async () => {
+it('keeps close and unlock controls available when the overlay is locked', async () => {
   const api = window.fluentCaptions!
   const settings = {
     ...DEFAULT_SETTINGS,
@@ -25,7 +25,8 @@ it('offers adjustment controls only while the overlay is unlocked', async () => 
 
   const save = vi.spyOn(api, 'updateSettings').mockResolvedValue({ ...settings, overlay: { ...settings.overlay, locked: true } })
   fireEvent.click(screen.getByRole('button', { name: '完成调整' }))
-  await waitFor(() => expect(screen.queryByRole('button')).not.toBeInTheDocument())
+  await waitFor(() => expect(screen.getByRole('button', { name: '调整浮层' })).toBeInTheDocument())
+  expect(screen.getByRole('button', { name: '隐藏浮层' })).toBeInTheDocument()
   expect(save).toHaveBeenCalledWith({ overlay: { locked: true } })
   save.mockRestore()
   getSettings.mockRestore()

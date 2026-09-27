@@ -35,6 +35,14 @@ export class SettingsStore {
         overlay.backgroundColor = DEFAULT_SETTINGS.overlay.backgroundColor
         overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
       }
+      // Upgrade the previous default floating bar without overriding custom colors or sizes.
+      if (raw.overlay?.backgroundColor === '#111111' && raw.overlay.backgroundOpacity === 0.84) {
+        overlay.backgroundColor = DEFAULT_SETTINGS.overlay.backgroundColor
+        overlay.backgroundOpacity = DEFAULT_SETTINGS.overlay.backgroundOpacity
+        if (raw.overlay.fontSize === 26) overlay.fontSize = DEFAULT_SETTINGS.overlay.fontSize
+        if (raw.overlay.translationFontSize === 22) overlay.translationFontSize = DEFAULT_SETTINGS.overlay.translationFontSize
+        overlay.locked = false
+      }
     } catch {
       this.settings = structuredClone(DEFAULT_SETTINGS)
     }
