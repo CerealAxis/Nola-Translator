@@ -302,6 +302,12 @@ class EngineRuntime:
             for update in await recognizer.flush(last_ended_at):
                 await self._emit_update(update)
         except AudioDeviceDisconnectedError:
+            # 设备断开同样要提交已采集的尾音（尽力而为，失败不掩盖断开错误）。
+            try:
+                for update in await recognizer.flush(last_ended_at):
+                    await self._emit_update(update)
+            except Exception:
+                pass
             self.emit(
                 ErrorEvent(
                     protocolVersion=1,
