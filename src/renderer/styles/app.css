@@ -297,6 +297,8 @@ input[type="checkbox"] { accent-color: var(--accent); }
 .caption-source, .caption-translation { overflow-wrap: anywhere; white-space: pre-wrap; text-wrap: wrap; }
 .caption-source { margin-bottom: 3px; color: var(--preview-source-color, #f7f7f7); font-size: var(--preview-font-size, 17px); font-weight: var(--preview-font-weight, 500); line-height: var(--preview-line-height, 1.24); max-height: calc(var(--preview-max-lines, 2) * 1lh); overflow: hidden; }
 .caption-translation { margin-bottom: 0; color: var(--preview-translation-color, #bfc2c8); font-size: var(--preview-translation-font-size, 16px); font-weight: var(--preview-translation-font-weight, 400); line-height: var(--preview-translation-line-height, 1.28); max-height: calc(var(--preview-translation-max-lines, 2) * 1lh); overflow: hidden; }
+/* 译文失败要和正常译文区分开，否则用户看到的永远是一片空白。 */
+.caption-translation-failed { color: #c42b1c; }
 
 .choice-grid, .diagnostic-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .choice-card { padding: 22px; }

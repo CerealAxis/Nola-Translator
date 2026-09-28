@@ -2,6 +2,7 @@ import { CaptionText } from './CaptionText'
 import { ChevronDownRegular, DesktopRegular, DismissRegular, LockOpenRegular, MicRegular, MoreHorizontalRegular, PinRegular, SubtractRegular } from '@fluentui/react-icons'
 import type { CaptionSegment } from '../../shared/contracts'
 import { DEFAULT_SETTINGS, type OverlaySettings } from '../../shared/settings'
+import { failedTranslations, translationErrorLabel } from './translation-status'
 import { useI18n } from '../i18n'
 
 type CaptionPreviewProps = {
@@ -23,6 +24,7 @@ export function CaptionPreview({
 }: CaptionPreviewProps): React.JSX.Element {
   const { t } = useI18n()
   const completeTranslations = caption?.translations.filter((item) => item.state === 'complete' && item.text) ?? []
+  const failed = failedTranslations(caption)
 
   return (
     <section className="preview-section" aria-label={t('字幕浮层预览')}>
@@ -54,6 +56,7 @@ export function CaptionPreview({
           <div className="caption-preview-text">
             {sourceVisible && <CaptionText className="caption-source">{caption?.sourceText || (listening ? t('正在识别语音…') : t('开始会话后，识别原文会显示在这里。'))}</CaptionText>}
             {translationVisible && completeTranslations.map((translation) => <CaptionText className="caption-translation" key={translation.targetLanguage}>{translation.text!}</CaptionText>)}
+            {translationVisible && failed.map((translation) => <CaptionText className="caption-translation caption-translation-failed" key={translation.targetLanguage}>{translationErrorLabel(t, translation)}</CaptionText>)}
           </div>
           <div className="caption-preview-actions" aria-hidden="true"><DesktopRegular /><LockOpenRegular /><PinRegular /><i /><MoreHorizontalRegular /><SubtractRegular /><DismissRegular /></div>
           <div className="caption-preview-controls" aria-hidden="true"><span className="caption-preview-mic"><MicRegular /></span><span className="caption-preview-pill">{t('本地字幕')}<ChevronDownRegular /></span><span className="caption-preview-pill">{t('原文')}</span><span className="caption-preview-pill">{t('译文')}</span></div>

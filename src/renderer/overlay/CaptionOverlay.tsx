@@ -7,6 +7,7 @@ import {
 import type { EngineEvent } from '../../shared/contracts'
 import { DEFAULT_SETTINGS, type AppSettings, type OverlaySettings } from '../../shared/settings'
 import { EMPTY_CAPTION, receiveCaption } from '../components/caption-state'
+import { translationErrorLabel } from '../components/translation-status'
 import { useI18n } from '../i18n'
 import { CaptionTrack, type TrackLine } from './CaptionTrack'
 
@@ -40,10 +41,13 @@ export function CaptionOverlay(): React.JSX.Element {
     : null
 
   const translationTracks = (caption?.translations ?? []).map((item) => {
-    return { language: item.targetLanguage, line: item.state === 'complete' && item.text ? {
-      key: caption!.segmentId,
-      text: item.text,
-    } : null }
+    const line = item.state === 'complete' && item.text
+      ? { key: caption!.segmentId, text: item.text }
+      : item.state === 'failed'
+        // 失败不能和「还在翻译」一样静默，否则看不出是密钥、网络还是模型没就绪。
+        ? { key: caption!.segmentId, text: translationErrorLabel(t, item) }
+        : null
+    return { language: item.targetLanguage, line }
   })
 
   const updateOverlay = async (overlay: Partial<OverlaySettings>): Promise<void> => {
