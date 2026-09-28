@@ -51,6 +51,20 @@ void app.whenReady().then(async () => {
   await writeFile(resolve(root, 'artifacts/ui/overlay-source-transition.png'), (await window.webContents.capturePage()).toPNG())
   await new Promise((done) => setTimeout(done, 110))
   await writeFile(resolve(root, 'artifacts/ui/overlay-translation-transition.png'), (await window.webContents.capturePage()).toPNG())
+  settings.overlay.showTranslation = false
+  window.webContents.send('settings:changed', settings)
+  await new Promise((done) => setTimeout(done, 350))
+  await writeFile(resolve(root, 'artifacts/ui/overlay-source-only.png'), (await window.webContents.capturePage()).toPNG())
+  window.webContents.send('engine:event', {
+    protocolVersion: 1, type: 'caption', requestId: 'preview-roll', sessionId: 'preview',
+    segment: {
+      segmentId: 'preview-next', revision: 2, startedAtMs: 2000, isFinal: false,
+      sourceText: 'Taking a break is important for a healthy, balanced life. We can return to our work with a clearer mind and more energy than before.',
+      translations: [{ targetLanguage: 'zh', state: 'pending', provider: 'example' }],
+    },
+  })
+  await new Promise((done) => setTimeout(done, 70))
+  await writeFile(resolve(root, 'artifacts/ui/overlay-line-roll.png'), (await window.webContents.capturePage()).toPNG())
   console.log(output)
   window.destroy()
   app.quit()

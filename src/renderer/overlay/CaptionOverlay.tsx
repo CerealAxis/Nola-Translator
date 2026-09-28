@@ -18,6 +18,7 @@ export function CaptionOverlay(): React.JSX.Element {
   const [active, setActive] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [notice, setNotice] = useState('')
+  const [overlayWidth, setOverlayWidth] = useState(() => window.innerWidth)
   const resizeStart = useRef<{ x: number; y: number; width: number; height: number } | null>(null)
   const expandedHeight = useRef(118)
 
@@ -35,6 +36,12 @@ export function CaptionOverlay(): React.JSX.Element {
     return () => { offSettings(); offEngine() }
   }, [])
 
+  useEffect(() => {
+    const onResize = (): void => setOverlayWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   const caption = current.caption
   const sourceLine: TrackLine | null = caption?.sourceText
     ? { key: caption.segmentId, text: caption.sourceText }
@@ -49,6 +56,8 @@ export function CaptionOverlay(): React.JSX.Element {
         : null
     return { language: item.targetLanguage, line }
   })
+  const sourceOnly = settings.overlay.showSource && (!settings.overlay.showTranslation || translationTracks.length === 0)
+  const lineWidth = Math.max(160, overlayWidth - 50)
 
   const updateOverlay = async (overlay: Partial<OverlaySettings>): Promise<void> => {
     try {
@@ -89,10 +98,10 @@ export function CaptionOverlay(): React.JSX.Element {
         '--overlay-translation-max-lines': settings.overlay.translationMaxLines,
         fontFamily: settings.overlay.fontFamily,
       } as React.CSSProperties}>
-      <div className="caption-console-stage">
-        {!collapsed && settings.overlay.showSource && <CaptionTrack key={`source-${current.sessionId}`} kind="source" segmentId={caption?.segmentId ?? null} line={sourceLine} />}
+      <div className="caption-console-stage" data-source-only={sourceOnly}>
+        {!collapsed && settings.overlay.showSource && <CaptionTrack key={`source-${current.sessionId}`} kind="source" segmentId={caption?.segmentId ?? null} line={sourceLine} maxWidth={lineWidth} fontSize={settings.overlay.fontSize} />}
         {!collapsed && settings.overlay.showTranslation && translationTracks.map(({ language, line }) =>
-          <CaptionTrack key={`${current.sessionId}-${language}`} kind="translation" segmentId={caption?.segmentId ?? null} line={line} />)}
+          <CaptionTrack key={`${current.sessionId}-${language}`} kind="translation" segmentId={caption?.segmentId ?? null} line={line} maxWidth={lineWidth} fontSize={settings.overlay.translationFontSize} />)}
       </div>
 
       <div className="caption-console-actions" aria-label={t('字幕浮层控制')}>
