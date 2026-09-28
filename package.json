@@ -2,6 +2,7 @@
   "name": "nola-translator",
   "productName": "Nola Translator",
   "version": "0.1.5",
+  "license": "GPL-3.0-only",
   "description": "面向 Windows 11 的本地实时字幕与翻译工具",
   "author": "Nola Translator Contributors",
   "private": true,

@@ -32,4 +32,4 @@ Nola Translator 使用或分发以下主要第三方组件；完整传递依赖�
 
 模型不直接提交到本仓库或安装包。其许可证及元数据由各自发布方提供，用户首次下载前应遵循对应条款。
 
-本文件只记录第三方声明，不代表 Nola Translator 项目自身已经选择开源许可证。
+Nola Translator 自有代码采用 GNU General Public License v3.0 only（GPL-3.0-only），完整条款见仓库根目录 `LICENSE`。本文件列出的第三方依赖、运行时和模型不因此自动改用 GPL；分发时须分别遵守各自的许可证与声明。

@@ -78,7 +78,7 @@ npm run dist:win
 - 原始音频从不写入磁盘；
 - 字幕历史默认关闭，只保留在当前进程内存；
 - 开启保存后，最终字幕写入 Electron `userData` 目录；
-- 模型、普通设置与加密凭据分别存放；模型与下载缓存目录可改到其他磁盘，旧目录文件保留不自动搬迁；
+- 模型、普通设置与加密凭据分别存放；模型与下载缓存目录可改到其他磁盘；首次启动会把旧版应用数据复制到新目录，且不会覆盖已存在的文件；
 - 诊断信息不包含音频、字幕正文或 API 密钥；
 - 清空历史会清除内存记录，并在持久化开启时清空历史文件。
 
@@ -90,4 +90,6 @@ npm run dist:win
 - [Electron 与 Python 协议](docs/protocol.md)
 - [第三方组件声明](THIRD_PARTY_NOTICES.md)
 
-`ui-demo.html` 是早期静态审阅稿；正式应用位于 `src/` 和 `engine/`，运行时不依赖该文件。
+## 许可证
+
+Nola Translator 自有代码采用 GNU General Public License v3.0 only（GPL-3.0-only），完整条款见 [LICENSE](LICENSE)。GPL 允许商业使用；若分发软件或其修改版，必须遵守 GPL 的源码提供和相同许可要求。第三方依赖、运行时及模型仍适用各自的许可证，详见 [第三方组件声明](THIRD_PARTY_NOTICES.md)。

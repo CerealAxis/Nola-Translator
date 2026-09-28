@@ -2,6 +2,7 @@
 name = "nola-translator-engine"
 version = "0.1.0"
 description = "Nola Translator 本地音频、识别与翻译引擎"
+license = "GPL-3.0-only"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "accelerate==1.15.0",
