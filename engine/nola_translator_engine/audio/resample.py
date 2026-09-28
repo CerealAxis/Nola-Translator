@@ -85,3 +85,25 @@ class StreamingAudioNormalizer:
             self.delivered_samples += FRAME_SAMPLES
             frames.append(AudioFrame(samples=frame_samples, started_at_ms=started_at_ms))
         return frames
+
+    def silence(self, duration_ms: float) -> list[AudioFrame]:
+        """补齐静默期的 20 ms 零帧，沿用同一条按已投递样本数推算的时间轴。
+
+        WASAPI loopback 在没有播放时不会推数据，时间轴也不会自己前进；不补帧的话
+        音量门永远累计不出 600 ms 静音，段落无法收尾，final 与随之而来的翻译都
+        不会触发。``origin_ms`` 未建立时（还没收到第一块音频）无锚点可补，返回空。
+        """
+        if self.origin_ms is None or duration_ms < FRAME_DURATION_MS:
+            return []
+        count = int(duration_ms * TARGET_SAMPLE_RATE / 1000) // FRAME_SAMPLES
+        frames: list[AudioFrame] = []
+        for _ in range(count):
+            started_at_ms = self.origin_ms + self.delivered_samples * 1000 / TARGET_SAMPLE_RATE
+            self.delivered_samples += FRAME_SAMPLES
+            frames.append(
+                AudioFrame(
+                    samples=np.zeros(FRAME_SAMPLES, dtype=np.float32),
+                    started_at_ms=started_at_ms,
+                )
+            )
+        return frames

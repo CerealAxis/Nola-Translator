@@ -12,7 +12,7 @@ import pyaudiowpatch as pyaudio
 import numpy as np
 
 from .devices import AudioDeviceRecord
-from .resample import AudioFrame, StreamingAudioNormalizer
+from .resample import AudioFrame, FRAME_DURATION_MS, StreamingAudioNormalizer
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,13 +123,25 @@ class PortAudioCapture:
         self.stream.start_stream()
 
     async def frames(self) -> AsyncIterator[AudioFrame]:
+        # 静默期回看窗口：只有满一个帧长才补零帧，避免为亚帧抖动分配数组。
+        last_seen_ms = monotonic() * 1000
         while self.running or not self.queue.empty():
             try:
                 chunk = await asyncio.to_thread(self.queue.get, 0.1)
             except Empty:
+                if self.running and self.stream is not None and self.stream.is_active():
+                    gap = monotonic() * 1000 - last_seen_ms
+                    if gap >= FRAME_DURATION_MS:
+                        # loopback 在无播放时不推数据：补零帧让音量门能看到静音，
+                        # 否则段落永远收不了尾，final 与翻译都不会触发。
+                        for frame in self.normalizer.silence(gap):
+                            yield frame
+                        last_seen_ms = monotonic() * 1000
+                    continue
                 if self.running and self.stream is not None and not self.stream.is_active():
                     raise AudioDeviceDisconnectedError(self.device.device_id)
                 continue
+            last_seen_ms = monotonic() * 1000
             samples = self.normalizer.accept_float32(np.frombuffer(chunk.data, dtype="<f4"), chunk.captured_at_ms)
             for frame in samples:
                 yield frame

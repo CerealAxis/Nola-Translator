@@ -1,3 +1,5 @@
+import asyncio
+
 import numpy as np
 import pytest
 
@@ -8,6 +10,7 @@ from nola_translator_engine.audio.capture import (
     RawAudioQueue,
 )
 from nola_translator_engine.audio.devices import AudioDeviceRecord
+from nola_translator_engine.audio.resample import FRAME_DURATION_MS
 
 
 def test_bounded_callback_queue_drops_oldest_chunk_without_blocking() -> None:
@@ -110,3 +113,27 @@ async def test_capture_reports_device_disconnect_instead_of_waiting_forever() ->
     with pytest.raises(AudioDeviceDisconnectedError):
         await anext(capture.frames())
     capture.stop()
+
+
+@pytest.mark.asyncio
+async def test_capture_fills_silence_while_loopback_stops_pushing_data() -> None:
+    """loopback 在无播放时不推数据；必须补零帧，否则音量门收不了段、final 不触发。"""
+    backend = FakeBackend()
+    capture = PortAudioCapture(_device(), backend_factory=lambda: backend)
+    capture.start()
+    frames: list = []
+    try:
+        stream = capture.frames().__aiter__()
+        deadline = asyncio.get_running_loop().time() + 0.6
+        while asyncio.get_running_loop().time() < deadline and len(frames) < 12:
+            frames.append(await asyncio.wait_for(stream.__anext__(), timeout=3.0))
+    finally:
+        capture.stop()
+
+    assert len(frames) >= 4, "静默期应该持续产出补零帧"
+    # 首帧来自真实音频，其后 loopback 不再推数据，全部是补出的静音
+    silence = [frame for frame in frames[1:] if np.all(frame.samples == 0)]
+    assert len(silence) >= 3
+    starts = [frame.started_at_ms for frame in frames]
+    assert starts == sorted(starts), "时间轴必须单调推进"
+    assert np.diff(starts) == pytest.approx(np.full(len(starts) - 1, float(FRAME_DURATION_MS)))
