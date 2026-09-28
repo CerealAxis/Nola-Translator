@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/brand/nola-logo.svg" alt="Nola Translator Logo" width="112" height="112">
   <h1>Nola Translator · 诺拉翻译</h1>
-  <p>适用于 Windows 11 的实时字幕与翻译应用。</p>
+  <p>实时字幕与翻译。</p>
   <p><a href="docs/implementation.md"><strong>查看项目文档 »</strong></a></p>
   <p><a href="#功能特性">功能特性</a> · <a href="#快速开始">快速开始</a> · <a href="#参与贡献">参与贡献</a></p>
   <p><a href="README.md">English</a> · 简体中文</p>
@@ -18,7 +18,6 @@
 - [快速开始](#快速开始)
 - [使用方法](#使用方法)
 - [项目结构](#项目结构)
-- [技术架构](#技术架构)
 - [开发与构建](#开发与构建)
 - [参与贡献](#参与贡献)
 - [许可证](#许可证)
@@ -52,14 +51,8 @@ Nola Translator 可以捕获系统音频或麦克风输入，识别语音，并�
 在项目根目录执行：
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\install.ps1
-.\scripts\install-engine.ps1
-.\scripts\fetch-llama.ps1
 npm run dev
 ```
-
-安装脚本会准备 JavaScript 和 Python 依赖。`fetch-llama.ps1` 会安装 Hy-MT2 本地翻译所需的固定版本 llama.cpp 运行时。
 
 打开应用的“模型与资源”页面，安装需要的识别和翻译模型。模型仅在你从该页面选择安装时下载；模型目录和下载缓存目录也可以在此修改。
 
@@ -86,17 +79,6 @@ src/renderer/                   React 界面
 src/shared/                     共享协议与设置
 tests/                          应用测试
 ```
-
-## 技术架构
-
-```text
-React 界面 ── preload IPC ── Electron 主进程 ── JSONL 协议 ── Python 引擎
-                                                          ├─ 音频捕获
-                                                          ├─ Qwen3-ASR
-                                                          └─ 翻译
-```
-
-详细设计见[实现说明](docs/implementation.md)、[音频管线](docs/audio.md)和[进程间协议](docs/protocol.md)。
 
 ## 开发与构建
 

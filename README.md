@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/brand/nola-logo.svg" alt="Nola Translator logo" width="112" height="112">
   <h1>Nola Translator</h1>
-  <p>Real-time captions and translation for Windows 11.</p>
+  <p>Real-time captions and translation.</p>
   <p><a href="docs/implementation.md"><strong>Explore the documentation »</strong></a></p>
   <p><a href="#features">Features</a> · <a href="#getting-started">Get started</a> · <a href="#contributing">Contribute</a></p>
   <p>English · <a href="README.zh-CN.md">简体中文</a></p>
@@ -18,7 +18,6 @@
 - [Getting started](#getting-started)
 - [Usage](#usage)
 - [Project structure](#project-structure)
-- [Architecture](#architecture)
 - [Development](#development)
 - [Contributing](#contributing)
 - [License](#license)
@@ -52,14 +51,8 @@ Nola Translator captures system audio or microphone input, transcribes speech, a
 From the project root, run:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\install.ps1
-.\scripts\install-engine.ps1
-.\scripts\fetch-llama.ps1
 npm run dev
 ```
-
-The install scripts set up the JavaScript and Python dependencies. `fetch-llama.ps1` installs the pinned local llama.cpp runtime used by Hy-MT2.
 
 Open **Models & Resources** in the app to install the recognition and translation models you want to use. Model downloads start only when you select them there. The model and download-cache locations can be changed on that page.
 
@@ -86,17 +79,6 @@ src/renderer/                   React interface
 src/shared/                     Shared contracts and settings
 tests/                          Application tests
 ```
-
-## Architecture
-
-```text
-React UI ── preload IPC ── Electron main ── JSONL protocol ── Python engine
-                                                       ├─ audio capture
-                                                       ├─ Qwen3-ASR
-                                                       └─ translation
-```
-
-See [implementation notes](docs/implementation.md), the [audio pipeline](docs/audio.md), and the [Electron–Python protocol](docs/protocol.md).
 
 ## Development
 
