@@ -1,10 +1,27 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute } from 'node:path'
 
-import { DEFAULT_SETTINGS, RECOGNITION_MODEL_IDS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
+import { DEFAULT_SETTINGS, MAX_TARGET_LANGUAGES, RECOGNITION_MODEL_IDS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
 
 // Store-internal patches may also touch fields the IPC schema exposes only through their own channels.
 export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 1 }
+
+/** 源语言：必须是下拉里的项，否则回落到自动识别。 */
+function sanitizeSourceLanguage(value: unknown): string {
+  return typeof value === 'string' && (SOURCE_LANGUAGE_OPTIONS as readonly string[]).includes(value)
+    ? value
+    : DEFAULT_SETTINGS.recognition.sourceLanguage
+}
+
+/** 目标语言：去重、按下拉顺序排序、截到协议上限。空数组是用户主动不选，保留；
+ *  非空却全被滤掉说明文件已损坏，才回落默认。 */
+function sanitizeTargetLanguages(value: unknown): string[] {
+  if (!Array.isArray(value)) return [...DEFAULT_SETTINGS.translation.targetLanguages]
+  const requested = new Set(value.filter((item): item is string => typeof item === 'string'))
+  const valid = TARGET_LANGUAGE_OPTIONS.filter((code) => requested.has(code))
+  if (!valid.length && value.length) return [...DEFAULT_SETTINGS.translation.targetLanguages]
+  return valid.slice(0, MAX_TARGET_LANGUAGES)
+}
 
 export class SettingsStore {
   private settings: AppSettings = structuredClone(DEFAULT_SETTINGS)
@@ -40,10 +57,15 @@ export class SettingsStore {
             : DEFAULT_SETTINGS.translation.translateIntermediate,
         },
       }
-      // 三个旧识别模型 ID 与未知值统一迁移到 Qwen3-ASR。
+      // 三个旧识别模型 ID 与未知值统一迁移到 Qwen3-ASR（保留同级的语言设置）。
       if (!RECOGNITION_MODEL_IDS.includes(this.settings.recognition.modelId)) {
-        this.settings.recognition = { modelId: 'qwen3-asr-1.7b-hf' }
+        this.settings.recognition = { ...this.settings.recognition, modelId: 'qwen3-asr-1.7b-hf' }
       }
+      this.settings.recognition = {
+        ...this.settings.recognition,
+        sourceLanguage: sanitizeSourceLanguage(this.settings.recognition.sourceLanguage),
+      }
+      this.settings.translation.targetLanguages = sanitizeTargetLanguages(this.settings.translation.targetLanguages)
       // 翻译 provider：本地两个与三个网络 provider 保持原值，其余（含 argos）迁移到 hymt2。
       if (!TRANSLATION_PROVIDERS.includes(this.settings.translation.provider)) {
         this.settings.translation.provider = 'hymt2'
@@ -93,6 +115,9 @@ export class SettingsStore {
       overlay: { ...this.settings.overlay, ...(patch.overlay ?? {}) },
       translation: { ...this.settings.translation, ...(patch.translation ?? {}) },
     }
+    // 写档与读档共用同一套白名单校验，任何写入路径都不能留下非法语言码。
+    next.recognition.sourceLanguage = sanitizeSourceLanguage(next.recognition.sourceLanguage)
+    next.translation.targetLanguages = sanitizeTargetLanguages(next.translation.targetLanguages)
     await mkdir(dirname(this.path), { recursive: true })
     const temporary = `${this.path}.tmp`
     await writeFile(temporary, JSON.stringify(next, null, 2), 'utf8')

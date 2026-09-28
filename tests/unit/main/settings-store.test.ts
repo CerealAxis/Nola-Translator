@@ -137,8 +137,79 @@ describe('设置存储', () => {
       await writeFile(path, JSON.stringify({ version: 1 }), 'utf8')
       const defaults = await new SettingsStore(path).load()
       expect(defaults.recognition.modelId).toBe('qwen3-asr-1.7b-hf')
+      expect(defaults.recognition.sourceLanguage).toBe('auto')
       expect(defaults.translation.provider).toBe('hymt2')
+      expect(defaults.translation.targetLanguages).toEqual(['zh'])
       expect(defaults.translation.translateIntermediate).toBe(false)
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('源语言与目标语言写入后重新加载不被重置回默认', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
+    const path = join(directory, 'settings.json')
+    try {
+      const store = new SettingsStore(path)
+      await store.update({
+        recognition: { sourceLanguage: 'ja' },
+        translation: { targetLanguages: ['en', 'fr'] },
+      })
+
+      const reloaded = await new SettingsStore(path).load()
+
+      expect(reloaded.recognition.sourceLanguage).toBe('ja')
+      expect(reloaded.translation.targetLanguages).toEqual(['en', 'fr'])
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('语言白名单同时约束读档与写档，非法码不落盘', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
+    const path = join(directory, 'settings.json')
+    try {
+      // 读档：坏值回落，用户主动清空则保留
+      await writeFile(path, JSON.stringify({
+        version: 1,
+        recognition: { sourceLanguage: 'klingon' },
+        translation: { targetLanguages: ['xx', 'yy'] },
+      }), 'utf8')
+      const read = await new SettingsStore(path).load()
+      expect(read.recognition.sourceLanguage).toBe('auto')
+      expect(read.translation.targetLanguages).toEqual(['zh'])
+
+      await writeFile(path, JSON.stringify({ version: 1, translation: { targetLanguages: [] } }), 'utf8')
+      const cleared = await new SettingsStore(path).load()
+      expect(cleared.translation.targetLanguages).toEqual([])
+
+      // 写档：顺序按白名单归一化、去重、截到协议上限 8 个
+      const store = new SettingsStore(path)
+      const written = await store.update({
+        translation: { targetLanguages: ['id', 'zh', 'zh', 'bogus', 'fr', 'en', 'ja', 'ko', 'de', 'es', 'pt', 'it'] },
+      })
+      expect(written.translation.targetLanguages).toEqual(['zh', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'pt'])
+      expect(JSON.parse(await readFile(path, 'utf8')).translation.targetLanguages).toEqual(
+        ['zh', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'pt'],
+      )
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('迁移旧识别模型 ID 时保留同级的源语言', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
+    const path = join(directory, 'settings.json')
+    try {
+      await writeFile(path, JSON.stringify({
+        version: 1,
+        recognition: { modelId: 'sherpa-zh-en-small', sourceLanguage: 'ko' },
+      }), 'utf8')
+
+      const migrated = await new SettingsStore(path).load()
+
+      expect(migrated.recognition.modelId).toBe('qwen3-asr-1.7b-hf')
+      expect(migrated.recognition.sourceLanguage).toBe('ko')
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

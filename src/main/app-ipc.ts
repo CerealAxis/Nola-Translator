@@ -30,6 +30,7 @@ const settingsPatchSchema = z.object({
   historyEnabled: z.boolean().optional(),
   recognition: z.object({
     modelId: z.enum(['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf', 'sensevoice-small']).optional(),
+    sourceLanguage: z.string().min(1).max(32).optional(),
   }).partial().optional(),
   overlay: z.object({
     mode: z.enum(['free', 'top', 'bottom']).optional(), locked: z.boolean().optional(),
@@ -48,6 +49,7 @@ const settingsPatchSchema = z.object({
     openaiEndpoint: z.string().min(1).max(2048).optional(), openaiModel: z.string().min(1).max(256).optional(),
     ollamaEndpoint: z.string().min(1).max(2048).optional(), ollamaModel: z.string().min(1).max(256).optional(),
     translateIntermediate: z.boolean().optional(),
+    targetLanguages: z.array(z.string().min(1).max(32)).max(8).optional(),
   }).partial().optional(),
 }).strict()
 

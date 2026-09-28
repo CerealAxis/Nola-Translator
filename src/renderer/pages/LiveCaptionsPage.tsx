@@ -2,7 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react'
 import { ChevronDownRegular, ClosedCaptionRegular, PlayRegular, StopRegular } from '@fluentui/react-icons'
 
 import type { AudioDevice, EngineEvent, SessionConfig } from '../../shared/contracts'
-import { DEFAULT_SETTINGS, type OverlaySettings, type RecognitionModelId, type TranslationSettings } from '../../shared/settings'
+import { DEFAULT_SETTINGS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, type OverlaySettings, type RecognitionModelId, type TranslationSettings } from '../../shared/settings'
 import { EMPTY_CAPTION, receiveCaption } from '../components/caption-state'
 import { CaptionPreview } from '../components/CaptionPreview'
 import { useI18n, type TranslationValues } from '../i18n'
@@ -16,9 +16,6 @@ const LANGUAGE_LABELS: Record<string, string> = {
   ar: 'العربية', pt: 'Português', id: 'Indonesia', it: 'Italiano',
   th: 'ไทย', vi: 'Tiếng Việt', tr: 'Türkçe', ms: 'Melayu',
 }
-const SOURCE_LANGUAGE_OPTIONS = ['auto', 'zh', 'yue', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'pt', 'it', 'ru', 'ar', 'th', 'vi', 'tr', 'id']
-const TARGET_LANGUAGE_OPTIONS = ['zh', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'ru', 'pt', 'it', 'tr', 'ar', 'th', 'vi', 'ms', 'id']
-
 type LiveCaptionsPageProps = {
   activeSessionId: string | null
   onSessionStarted: (sessionId: string) => void
@@ -61,6 +58,8 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
         setTranslationSettings(settings.translation)
         setOverlaySettings(settings.overlay)
         setRecognitionModelId(settings.recognition.modelId)
+        setSourceLanguage(settings.recognition.sourceLanguage)
+        setTargetLanguages(settings.translation.targetLanguages)
         setSettingsReady(true)
         setNotice((current) => current === '正在连接本地引擎…' ? '准备就绪' : current)
       }
@@ -75,6 +74,8 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
       setTranslationSettings(settings.translation)
       setOverlaySettings(settings.overlay)
       setRecognitionModelId(settings.recognition.modelId)
+      setSourceLanguage(settings.recognition.sourceLanguage)
+      setTargetLanguages(settings.translation.targetLanguages)
     })
     const unsubscribe = api.onEngineEvent((event: EngineEvent) => {
       if (event.type === 'caption' || event.type === 'sessionStarted') {
@@ -236,7 +237,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
               </select>
             </label>
             <label><span>{t('源语言')}</span>
-              <select aria-label={t('源语言')} value={sourceLanguage} onChange={(event) => setSourceLanguage(event.target.value)}>
+              <select aria-label={t('源语言')} value={sourceLanguage} onChange={(event) => { setSourceLanguage(event.target.value); void saveSettings({ recognition: { sourceLanguage: event.target.value } }) }}>
                 {SOURCE_LANGUAGE_OPTIONS.map((code) => (
                   <option key={code} value={code}>{code === 'auto' ? t('自动识别') : languageLabel(code)}</option>
                 ))}
@@ -269,7 +270,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
                     <label className="multi-select-option" key={code} role="option" aria-selected={targetLanguages.includes(code)}>
                       <input
                         checked={targetLanguages.includes(code)}
-                        onChange={(event) => setTargetLanguages((current) => event.target.checked ? [...new Set([...current, code])] : current.filter((item) => item !== code))}
+                        onChange={(event) => { const next = event.target.checked ? [...new Set([...targetLanguages, code])] : targetLanguages.filter((item) => item !== code); setTargetLanguages(next); void saveSettings({ translation: { targetLanguages: next } }) }}
                         type="checkbox"
                       />
                       {languageLabel(code)}
