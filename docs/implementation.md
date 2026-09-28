@@ -25,14 +25,28 @@ flowchart LR
     Q --> R
 ```
 
-## Qwen3-ASR 识别运行时
+## 识别运行时
 
-识别使用单一模型 `Qwen/Qwen3-ASR-1.7B-hf`（`recognitionModelId` 固定为 `qwen3-asr-1.7b-hf`）。运行时以 `AutoProcessor` + `Qwen3ASRForConditionalGeneration` 从本地安装目录 `from_pretrained(..., local_files_only=True)` 加载，进程内缓存：首次“开始字幕”加载一次，引擎退出时释放，会话期间不重复加载；同一时刻只运行一个 ASR 请求（单飞锁，排队请求由调度器合并）。加载默认使用 bitsandbytes NF4（`load_in_4bit`），NF4 失败时回退 8bit，两者都失败则后续启动返回 `modelUnavailable`，不会暗中换用其他模型；可用 `NOLA_TRANSLATOR_QWEN_QUANT=nf4|8bit` 强制档位。推理在 `torch.inference_mode()` 内执行，输入固定为 16 kHz 单声道 float32 数组、dtype 固定 bf16。会话启动前只检查本地资源存在性，缺失时引导到“模型与资源”页面，不联网下载。
+识别可选三个模型，`recognitionModelId` 决定用哪一套运行时；两者的加载失败都归一到 `ModelUnavailable`，由 `runtime.py` 映射为 `modelUnavailable` 错误事件。断句、分块、单飞与过期结果丢弃由 `recognition/streaming.py` 的 `StreamingRecognizer` 统一承担，模型差异只体现在「是否给续写前缀」上。
+
+### Qwen3-ASR
+
+`Qwen/Qwen3-ASR-1.7B-hf` 与 `Qwen/Qwen3-ASR-0.6B-hf`（`qwen3-asr-1.7b-hf` / `qwen3-asr-0.6b-hf`）。运行时以 `AutoProcessor` + `Qwen3ASRForConditionalGeneration` 从本地安装目录 `from_pretrained(..., local_files_only=True)` 加载，进程内缓存：首次“开始字幕”加载一次，引擎退出时释放，会话期间不重复加载；同一时刻只运行一个 ASR 请求（单飞锁，排队请求由调度器合并）。加载默认使用 bitsandbytes NF4（`load_in_4bit`），NF4 失败时回退 8bit，两者都失败则后续启动返回 `modelUnavailable`，不会暗中换用其他模型；可用 `NOLA_TRANSLATOR_QWEN_QUANT=nf4|8bit` 强制档位。推理在 `torch.inference_mode()` 内执行，输入固定为 16 kHz 单声道 float32 数组、dtype 固定 bf16。
+
+### SenseVoiceSmall
+
+`FunAudioLLM/SenseVoiceSmall`（`sensevoice-small`），由官方 FunASR 运行时加载。`AutoModel` 直接指向本地快照目录并传 `disable_update=True`，既不联网也不做版本检查；语音活动检测仍由本项目的音量门负责，不引入 fsmn-vad 额外模型。模型是非自回归的，`SenseVoiceRuntime.transcribe` 忽略前缀参数，每个分块都对累计全量音频重转写一次，因此中间字幕天然是逐次变长的完整文本。
+
+模型只覆盖中英日韩粤五种语言（funasr 的 `lid_dict`）。传入其余源语言码时回落为 `auto` 由模型自判；输出开头的 `<|lang|><|emo|><|event|><|itn|>` 标签串在运行时剥除，首个标签即检测到的语言。
+
+快照刻意不收录仓库中的 `requirements.txt`：FunASR 在 `trust_remote_code=True` 时会 pip 安装它，而那份清单钉的是 `numpy<=1.26.4`，会冲掉本项目的 numpy 钉版。
+
+会话启动前只检查本地资源存在性，缺失时引导到“模型与资源”页面，不联网下载。
 
 ## 流式调度与断句
 
 - **断句**：不依赖第三方 VAD 模型，改为音量门限 + 自适应噪声基线 + 静音迟滞：保留约 200 ms 前置音频；约 600 ms 静音结束一段；连续语音达到 30 秒强制切段；门控语音短于约 250 ms 的片段丢弃；停止会话或音频设备断开时处理已采集的尾音。
-- **分块**：每积累约 2 秒音频执行一次识别，识别对象是累计全量音频。前两块不固定已有文本；之后将上一结果末尾 5 个 token 回退，其余文本作为前缀（经 chat template 构造），避免截断多字节字符造成的重复或漏字。
+- **分块**：每积累约 2 秒音频执行一次识别，识别对象是累计全量音频。自回归的 Qwen 档位前两块不固定已有文本；之后将上一结果末尾 5 个 token 回退，其余文本作为前缀（经 chat template 构造），避免截断多字节字符造成的重复或漏字。非自回归的 SenseVoice 档位分块间隔约 1 秒且不给前缀，每个分块都是一次独立整段转写。
 - **中间与最终结果**：中间结果更新同一 `segmentId` 并递增 `revision`；语音结束时即使尾部不足 2 秒也再识别一次并提交 `isFinal=true`，空转写不产生字幕事件。
 - **解耦与过期**：采集线程持续写入有界缓冲；推理繁忙时合并尚未开始的中间识别请求（保留最新累计音频快照与最终请求）；执行中无法取消的结果按 `sessionId + segmentId + revision` 判定过期，过期结果不进入字幕、不进入翻译。
 - **性能边界（界面文案）**：首条中间字幕约需 2 秒语音加推理时间。

@@ -65,18 +65,24 @@ describe('model storage', () => {
       await writeFile(join(runtimeDir, 'engine-status.json'), '{broken', 'utf8')
       expect(await readEngineStatus(root)).toBeNull()
 
-      await writeFile(join(runtimeDir, 'engine-status.json'), JSON.stringify({ qwen: { quant: 'nf4' } }), 'utf8')
+      await writeFile(join(runtimeDir, 'engine-status.json'), JSON.stringify({ recognition: { loaded: true } }), 'utf8')
       expect(await readEngineStatus(root)).toEqual({})
 
+      // 未知模型 ID 一律丢弃，不能让诊断面板显示成一个不存在的模型。
       await writeFile(join(runtimeDir, 'engine-status.json'), JSON.stringify({
-        qwen: { quant: 'nf4', loaded: true },
+        recognition: { modelId: 'sensevoice-small', loaded: true, runtime: 'cuda:0' },
         hymt2: { device: 'cuda', ready: true },
       }), 'utf8')
       expect(await readEngineStatus(root)).toEqual({
-        qwen: { quant: 'nf4', loaded: true },
+        recognition: { modelId: 'sensevoice-small', loaded: true, runtime: 'cuda:0' },
         hymt2: { device: 'cuda', ready: true },
       })
-      expect(JSON.parse(await readFile(join(runtimeDir, 'engine-status.json'), 'utf8')).qwen.loaded).toBe(true)
+      await writeFile(join(runtimeDir, 'engine-status.json'), JSON.stringify({
+        recognition: { modelId: 'totally-unknown-model', loaded: true, runtime: 'cuda:0' },
+        hymt2: { device: 'cuda', ready: true },
+      }), 'utf8')
+      expect(await readEngineStatus(root)).toEqual({ hymt2: { device: 'cuda', ready: true } })
+      expect(JSON.parse(await readFile(join(runtimeDir, 'engine-status.json'), 'utf8')).recognition.loaded).toBe(true)
     } finally {
       await rm(root, { recursive: true, force: true })
     }

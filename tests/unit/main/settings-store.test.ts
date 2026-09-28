@@ -106,7 +106,7 @@ describe('设置存储', () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
     const path = join(directory, 'settings.json')
     try {
-      for (const legacyModelId of ['sherpa-zh-en-small', 'sensevoice-small', 'faster-whisper-small', 'totally-unknown-model']) {
+      for (const legacyModelId of ['sherpa-zh-en-small', 'faster-whisper-small', 'totally-unknown-model']) {
         await writeFile(path, JSON.stringify({
           version: 1,
           recognition: { modelId: legacyModelId },

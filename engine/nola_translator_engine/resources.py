@@ -16,6 +16,7 @@ from .models.catalog import (
     M2M100_418M,
     QWEN3_ASR_0_6B_HF,
     QWEN3_ASR_1_7B_HF,
+    SENSEVOICE_SMALL,
 )
 from .models.manager import ModelManager, ModelSpec
 from .protocol import ResourceChangedEvent, ResourceRecord
@@ -23,6 +24,7 @@ from .protocol import ResourceChangedEvent, ResourceRecord
 
 QWEN_RESOURCE_ID = QWEN3_ASR_1_7B_HF.model_id
 QWEN_06B_RESOURCE_ID = QWEN3_ASR_0_6B_HF.model_id
+SENSEVOICE_RESOURCE_ID = SENSEVOICE_SMALL.model_id
 HYMT2_RESOURCE_ID = HYMT2_1_8B_Q4_K_M.model_id
 M2M100_RESOURCE_ID = M2M100_418M.model_id
 
@@ -57,7 +59,7 @@ class ResourceOperationCancelled(RuntimeError):
 class ResourceDefinition:
     resource_id: str
     kind: Literal["recognitionModel", "translationModel"]
-    provider: Literal["qwen3-asr", "hy-mt2", "m2m100"]
+    provider: Literal["qwen3-asr", "sensevoice", "hy-mt2", "m2m100"]
     name: str
     description: str
     languages: tuple[str, ...]
@@ -100,6 +102,16 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
                 "id", "it", "ko", "ru", "th", "vi", "ja", "tr",
             ),
             1_576_381_331,
+        ),
+        ResourceDefinition(
+            SENSEVOICE_RESOURCE_ID,
+            "recognitionModel",
+            "sensevoice",
+            "SenseVoiceSmall · 本地流式识别",
+            "约 936MB 的非自回归权重，由内置 funasr 在本机运行；支持中日韩粤英五种语言，"
+            "其余源语言自动回落到模型自判。",
+            ("zh", "en", "yue", "ja", "ko"),
+            936_694_116,
         ),
         ResourceDefinition(
             HYMT2_RESOURCE_ID,
@@ -345,6 +357,7 @@ class ResourceManager:
         return {
             QWEN_RESOURCE_ID: QWEN3_ASR_1_7B_HF,
             QWEN_06B_RESOURCE_ID: QWEN3_ASR_0_6B_HF,
+            SENSEVOICE_RESOURCE_ID: SENSEVOICE_SMALL,
             HYMT2_RESOURCE_ID: HYMT2_1_8B_Q4_K_M,
             M2M100_RESOURCE_ID: M2M100_418M,
         }[resource_id]

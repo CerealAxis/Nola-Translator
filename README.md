@@ -29,7 +29,7 @@ Nola Translator captures system audio or microphone input, transcribes speech, a
 ## Features
 
 - Capture the default Windows output device, a selected output device, or a microphone.
-- Run Qwen3-ASR locally for speech recognition and Hy-MT2 or M2M100 locally for translation.
+- Run Qwen3-ASR or SenseVoiceSmall locally for speech recognition and Hy-MT2 or M2M100 locally for translation.
 - Translate into multiple target languages, with optional translation of interim captions.
 - Use Microsoft Translator, an OpenAI-compatible API, or local Ollama when configured.
 - Position, resize, lock, and make the independent caption overlay click-through.

@@ -9,7 +9,7 @@ export type SessionConfig = {
   audioSource: AudioSource
   recognitionMode: 'realtime' | 'accurate'
   /** 选择具体识别模型；recognitionMode 保留用于旧版本协议兼容。 */
-  recognitionModelId?: 'qwen3-asr-1.7b-hf' | 'qwen3-asr-0.6b-hf'
+  recognitionModelId?: 'qwen3-asr-1.7b-hf' | 'qwen3-asr-0.6b-hf' | 'sensevoice-small'
   sourceLanguage: string
   targetLanguages: string[]
   allowIntermediateTranslation?: boolean
@@ -69,7 +69,7 @@ export type AudioDevice = {
 export type ResourceRecord = {
   resourceId: string
   kind: 'recognitionModel' | 'translationModel'
-  provider: 'qwen3-asr' | 'hy-mt2' | 'm2m100'
+  provider: 'qwen3-asr' | 'sensevoice' | 'hy-mt2' | 'm2m100'
   name: string
   description: string
   languages: string[]

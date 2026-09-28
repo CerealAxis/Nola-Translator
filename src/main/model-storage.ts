@@ -1,6 +1,8 @@
 import { mkdir, mkdtemp, readFile, rmdir } from 'node:fs/promises'
 import { isAbsolute, join, normalize } from 'node:path'
 
+import { RECOGNITION_MODEL_IDS, type RecognitionModelId } from '../shared/settings'
+
 export function modelStorageEnvironment(userData: string, configuredPath = ''): Record<string, string> {
   const root = configuredPath && isAbsolute(configuredPath) ? normalize(configuredPath) : userData
   return {
@@ -15,7 +17,7 @@ export function modelStorageEnvironment(userData: string, configuredPath = ''): 
 }
 
 export type EngineRuntimeStatus = {
-  qwen?: { quant: string; loaded: boolean }
+  recognition?: { modelId: RecognitionModelId; loaded: boolean; runtime: string }
   hymt2?: { device: string; ready: boolean }
 }
 
@@ -25,11 +27,12 @@ export async function readEngineStatus(modelDir: string): Promise<EngineRuntimeS
     if (!raw || typeof raw !== 'object') return null
     const source = raw as Record<string, unknown>
     const status: EngineRuntimeStatus = {}
-    const qwen = source.qwen
-    if (qwen && typeof qwen === 'object') {
-      const record = qwen as Record<string, unknown>
-      if (typeof record.quant === 'string' && typeof record.loaded === 'boolean') {
-        status.qwen = { quant: record.quant, loaded: record.loaded }
+    const recognition = source.recognition
+    if (recognition && typeof recognition === 'object') {
+      const record = recognition as Record<string, unknown>
+      const modelId = RECOGNITION_MODEL_IDS.find((id) => id === record.modelId)
+      if (modelId && typeof record.loaded === 'boolean' && typeof record.runtime === 'string') {
+        status.recognition = { modelId, loaded: record.loaded, runtime: record.runtime }
       }
     }
     const hymt2 = source.hymt2

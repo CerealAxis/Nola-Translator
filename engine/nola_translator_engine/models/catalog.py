@@ -121,6 +121,51 @@ QWEN3_ASR_0_6B_HF = ModelSpec(
 )
 
 
+# SenseVoiceSmall 非自回归识别模型；由 funasr 从本地快照目录加载。
+# 只收录运行必需的 4 个文件（configuration.json 声明 init_param / config /
+# tokenizer_conf.bpemodel / frontend_conf.cmvn_file）加 README。刻意不收录仓库里的
+# requirements.txt：funasr 在 trust_remote_code=True 时会 pip 安装它，而那份清单
+# 钉的是 numpy<=1.26.4，会把本项目的 numpy 钉版冲掉。
+SENSEVOICE_SMALL = ModelSpec(
+    model_id="sensevoice-small",
+    directory="sensevoice-small",
+    repo="FunAudioLLM/SenseVoiceSmall",
+    revision="3847d57b6bdf2dd8875cb1508d2af43d80a16bf7",
+    files=(
+        FileEntry(
+            "README.md",
+            11_952,
+            "6add90487ea3d685b6604ad0932b565fc5cf7e9daaf8aebc674de49da4560958",
+        ),
+        FileEntry(
+            "am.mvn",
+            11_203,
+            "29b3c740a2c0cfc6b308126d31d7f265fa2be74f3bb095cd2f143ea970896ae5",
+        ),
+        FileEntry(
+            "chn_jpn_yue_eng_ko_spectok.bpe.model",
+            377_341,
+            "aa87f86064c3730d799ddf7af3c04659151102cba548bce325cf06ba4da4e6a8",
+        ),
+        FileEntry(
+            "config.yaml",
+            1_855,
+            "f71e239ba36705564b5bf2d2ffd07eece07b8e3f2bbf6d2c99d8df856339ac19",
+        ),
+        FileEntry(
+            "configuration.json",
+            396,
+            "02810a7f8e9e8aee10370a265f7e799728ce25b4c00cdbf4602b303ee395a38e",
+        ),
+        FileEntry(
+            "model.pt",
+            936_291_369,
+            "833ca2dcfdf8ec91bd4f31cfac36d6124e0c459074d5e909aec9cabe6204a3ea",
+        ),
+    ),
+)
+
+
 # Hy-MT2 1.8B 预量化 Q4_K_M 单文件；由内置 llama.cpp 在本机运行。
 HYMT2_1_8B_Q4_K_M = ModelSpec(
     model_id="hy-mt2-1.8b-q4-k-m",

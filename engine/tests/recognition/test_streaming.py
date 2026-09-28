@@ -1,4 +1,4 @@
-"""QwenStreamingRecognizer 单元测试：合成 20 ms 帧 + 真实 VolumeGateSegmenter（快速参数）。"""
+"""StreamingRecognizer 单元测试：合成 20 ms 帧 + 真实 VolumeGateSegmenter（快速参数）。"""
 
 from __future__ import annotations
 
@@ -15,9 +15,10 @@ from nola_translator_engine.recognition.qwen_runtime import (
     get_qwen_runtime,
 )
 from nola_translator_engine.recognition.qwen_streaming import (
-    QwenStreamingRecognizer,
+    UNFIXED_CHUNK_NUM,
     create_qwen_recognizer,
 )
+from nola_translator_engine.recognition.streaming import StreamingRecognizer
 from nola_translator_engine.recognition.volume_gate import VolumeGateSegmenter
 
 FRAME_SAMPLES = 320
@@ -79,17 +80,19 @@ def make_recognizer(
     source_language: str | None = None,
     segmenter: VolumeGateSegmenter | None = None,
     run_transcribe=None,
-) -> QwenStreamingRecognizer:
-    return QwenStreamingRecognizer(
+) -> StreamingRecognizer:
+    return StreamingRecognizer(
         runtime,
         source_language=source_language,
         segmenter=segmenter if segmenter is not None else fast_segmenter(),
         block_ms=block_ms,
+        prefix_builder=lambda text: runtime.rollback_text(text, 5) or None,
+        prefix_after_blocks=UNFIXED_CHUNK_NUM,
         run_transcribe=run_transcribe,
     )
 
 
-async def settle(recognizer: QwenStreamingRecognizer, timeout: float = 5.0) -> None:
+async def settle(recognizer: StreamingRecognizer, timeout: float = 5.0) -> None:
     """等待后台 worker 排空（测试辅助）。"""
     deadline = time.monotonic() + timeout
     while not recognizer._idle.is_set():
@@ -360,7 +363,7 @@ async def test_run_transcribe_injection_receives_job_fields() -> None:
 def test_create_qwen_recognizer_wires_defaults(tmp_path) -> None:
     rec = create_qwen_recognizer(tmp_path / "qwen", source_language="en")
 
-    assert isinstance(rec, QwenStreamingRecognizer)
+    assert isinstance(rec, StreamingRecognizer)
     assert rec.runtime is get_qwen_runtime(tmp_path / "qwen")
     assert isinstance(rec.segmenter, VolumeGateSegmenter)
     assert rec.block_ms == 2000

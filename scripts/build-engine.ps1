@@ -32,5 +32,11 @@ if (-not (Test-Path $python)) {
     --collect-all bitsandbytes `
     --collect-all accelerate `
     --collect-all sentencepiece `
+    --collect-all funasr `
+    --collect-all kaldi_native_fbank `
+    --collect-all modelscope `
+    --collect-all umap `
+    --collect-all hydra `
+    --hidden-import kaldi_native_fbank `
     --hidden-import pyaudiowpatch `
     (Join-Path $engineRoot 'engine_entry.py')

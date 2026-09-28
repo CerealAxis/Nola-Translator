@@ -5,11 +5,18 @@ import json
 from hashlib import sha256
 from pathlib import Path
 
+import pytest
+
 from nola_translator_engine import resources as resources_module
 from nola_translator_engine import runtime as runtime_module
 from nola_translator_engine.models.manager import FileEntry, ModelSpec
 from nola_translator_engine.protocol import parse_command_line
-from nola_translator_engine.resources import HYMT2_RESOURCE_ID, QWEN_06B_RESOURCE_ID, QWEN_RESOURCE_ID
+from nola_translator_engine.resources import (
+    HYMT2_RESOURCE_ID,
+    QWEN_06B_RESOURCE_ID,
+    QWEN_RESOURCE_ID,
+    SENSEVOICE_RESOURCE_ID,
+)
 from nola_translator_engine.runtime import EngineRuntime
 
 
@@ -163,12 +170,74 @@ def test_selected_recognition_model_gates_and_loads_that_directory(
     assert runtime.active_model_id == QWEN_06B_RESOURCE_ID
 
 
+def test_sensevoice_selection_loads_its_own_runtime(tmp_path, monkeypatch) -> None:
+    """选中 SenseVoiceSmall 时门禁、加载与识别器工厂都走 SenseVoice，不碰 Qwen 运行时。"""
+    runtime = EngineRuntime(tmp_path / "models", lambda _e: None)
+    command = parse_command_line(
+        '{"protocolVersion":1,"type":"startSession","requestId":"start-sensevoice",'
+        '"config":{"audioSource":{"kind":"defaultOutput"},"recognitionMode":"realtime",'
+        f'"recognitionModelId":"{SENSEVOICE_RESOURCE_ID}",'
+        '"sourceLanguage":"auto","targetLanguages":[]}}'
+    )
+
+    monkeypatch.setattr(runtime.resources, "is_installed", lambda _rid: True)
+    seen: list[Path] = []
+
+    class LoadedRuntime:
+        def load(self) -> None:
+            seen.append(tmp_path / "models" / SENSEVOICE_RESOURCE_ID)
+
+    monkeypatch.setattr(runtime_module, "get_sensevoice_runtime", lambda _path: LoadedRuntime())
+    monkeypatch.setattr(
+        runtime_module,
+        "get_qwen_runtime",
+        lambda _path: pytest.fail("选择 SenseVoice 时不应加载 Qwen 运行时"),
+    )
+
+    def fake_create(model_dir, *, source_language=None):
+        seen.append(Path(model_dir))
+        raise RuntimeError("stop here")
+
+    monkeypatch.setattr(runtime_module, "create_sensevoice_recognizer", fake_create)
+    asyncio.run(runtime.handle(command))
+
+    assert seen == [tmp_path / "models" / SENSEVOICE_RESOURCE_ID] * 2
+    assert runtime.active_model_id == SENSEVOICE_RESOURCE_ID
+
+
+def test_status_payload_reports_active_recognition_model(tmp_path, monkeypatch) -> None:
+    """状态文件跟随当前识别模型，SenseVoice 报设备而非量化档位。"""
+    runtime = EngineRuntime(tmp_path / "models", lambda _e: None)
+    runtime.active_model_id = SENSEVOICE_RESOURCE_ID
+
+    class SenseVoiceStub:
+        loaded = True
+
+        def describe(self) -> str:
+            return "cuda:0"
+
+    monkeypatch.setattr(
+        runtime_module, "get_sensevoice_runtime", lambda _path: SenseVoiceStub()
+    )
+    runtime._status_cache = ""
+
+    assert runtime._engine_status_payload()["recognition"] == {
+        "modelId": SENSEVOICE_RESOURCE_ID,
+        "loaded": True,
+        "runtime": "cuda:0",
+    }
+
+
 def test_engine_status_file_lifecycle(tmp_path) -> None:
     runtime = EngineRuntime(tmp_path / "models", lambda _e: None)
     status_path = tmp_path / "models" / ".runtime" / "engine-status.json"
     assert status_path.exists()
     data = json.loads(status_path.read_text(encoding="utf-8"))
-    assert data["qwen"] == {"quant": "unloaded", "loaded": False}
+    assert data["recognition"] == {
+        "modelId": QWEN_RESOURCE_ID,
+        "loaded": False,
+        "runtime": "unloaded",
+    }
     assert data["hymt2"] == {"device": "unknown", "ready": False}
 
     asyncio.run(runtime.close())

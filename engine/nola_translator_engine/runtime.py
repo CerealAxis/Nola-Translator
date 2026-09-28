@@ -28,13 +28,16 @@ from .protocol import (
     StopSessionCommand,
     Translation,
 )
-from .recognition.base import RecognitionUpdate, Recognizer
-from .recognition.qwen_runtime import QwenModelUnavailable, get_qwen_runtime
-from .recognition.qwen_streaming import QwenStreamingRecognizer, create_qwen_recognizer
+from .recognition.base import ModelUnavailable, RecognitionUpdate, Recognizer
+from .recognition.qwen_runtime import QwenRuntime, get_qwen_runtime
+from .recognition.qwen_streaming import create_qwen_recognizer
+from .recognition.sensevoice_runtime import SenseVoiceRuntime, get_sensevoice_runtime
+from .recognition.sensevoice_streaming import create_sensevoice_recognizer
 from .resources import (
     HYMT2_RESOURCE_ID,
     M2M100_RESOURCE_ID,
     QWEN_RESOURCE_ID,
+    SENSEVOICE_RESOURCE_ID,
     ResourceActionError,
     ResourceManager,
 )
@@ -328,11 +331,21 @@ class EngineRuntime:
         model_id = self._model_id(command)
         self.active_model_id = model_id
         model_path = self.resources.model_path(model_id)
-        await asyncio.to_thread(get_qwen_runtime(model_path).load)
-        recognizer = create_qwen_recognizer(model_path, source_language=language)
-        if isinstance(recognizer, QwenStreamingRecognizer):
-            recognizer.on_update = self._emit_update
+        if model_id == SENSEVOICE_RESOURCE_ID:
+            await asyncio.to_thread(get_sensevoice_runtime(model_path).load)
+            recognizer = create_sensevoice_recognizer(model_path, source_language=language)
+        else:
+            await asyncio.to_thread(get_qwen_runtime(model_path).load)
+            recognizer = create_qwen_recognizer(model_path, source_language=language)
+        recognizer.on_update = self._emit_update
         return recognizer
+
+    def _recognition_runtime(self) -> QwenRuntime | SenseVoiceRuntime:
+        """当前选中识别模型的运行时；两者都提供 load/unload/loaded/describe。"""
+        model_path = self.resources.model_path(self.active_model_id)
+        if self.active_model_id == SENSEVOICE_RESOURCE_ID:
+            return get_sensevoice_runtime(model_path)
+        return get_qwen_runtime(model_path)
 
     @staticmethod
     def _model_id(command: StartSessionCommand) -> str:
@@ -368,7 +381,7 @@ class EngineRuntime:
                     details={"reason": "disconnected"},
                 )
             )
-        except QwenModelUnavailable as error:
+        except ModelUnavailable as error:
             # 模型加载失败后不再继续采集循环，避免每帧重复报错。
             self.emit(
                 ErrorEvent(
@@ -652,7 +665,7 @@ class EngineRuntime:
 
     async def _unload_session_models(self) -> None:
         """结束会话后释放 ASR 和本地翻译权重。"""
-        runtimes = [get_qwen_runtime(self.resources.model_path(self.active_model_id))]
+        runtimes = [self._recognition_runtime()]
         if isinstance(self.translation_provider, M2M100TranslationProvider):
             runtimes.append(self.translation_provider.runtime)
         for runtime in runtimes:
@@ -673,7 +686,7 @@ class EngineRuntime:
         self._remove_engine_status()
 
     def _engine_status_payload(self) -> dict[str, object]:
-        qwen_runtime = get_qwen_runtime(self.resources.model_path(self.active_model_id))
+        recognition = self._recognition_runtime()
         device = self.llama_manager.device
         dropped = (
             self.capture.dropped_chunks
@@ -681,9 +694,10 @@ class EngineRuntime:
             else self._dropped_chunks
         )
         return {
-            "qwen": {
-                "quant": qwen_runtime.quant or "unloaded",
-                "loaded": bool(qwen_runtime.loaded),
+            "recognition": {
+                "modelId": self.active_model_id,
+                "loaded": bool(recognition.loaded),
+                "runtime": recognition.describe(),
             },
             "hymt2": {
                 "device": device or "unknown",

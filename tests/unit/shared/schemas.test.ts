@@ -70,12 +70,19 @@ describe('JSONL 协议校验', () => {
     }))).toMatchObject({ type: 'resourceChanged', resource: { kind: 'translationModel', provider: 'hy-mt2' } })
   })
 
-  it('拒绝旧识别模型与已移除的 argos 翻译提供方', () => {
+  it('接受 SenseVoiceSmall 作为识别模型并拒绝已移除的 argos 翻译提供方', () => {
+    expect(parseCommandLine(JSON.stringify({
+      protocolVersion: 1, type: 'startSession', requestId: 'start-sensevoice',
+      config: {
+        audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime',
+        recognitionModelId: 'sensevoice-small', sourceLanguage: 'auto', targetLanguages: ['zh'],
+      }
+    }))).toMatchObject({ type: 'startSession', config: { recognitionModelId: 'sensevoice-small' } })
     expect(() => parseCommandLine(JSON.stringify({
       protocolVersion: 1, type: 'startSession', requestId: 'start-1',
       config: {
         audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime',
-        recognitionModelId: 'sensevoice-small', sourceLanguage: 'auto', targetLanguages: ['zh'],
+        recognitionModelId: 'sherpa-zh-en-small', sourceLanguage: 'auto', targetLanguages: ['zh'],
       }
     }))).toThrow()
     expect(() => parseCommandLine(JSON.stringify({

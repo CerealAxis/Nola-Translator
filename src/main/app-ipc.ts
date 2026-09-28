@@ -10,6 +10,7 @@ import type { SettingsStore } from './settings-store'
 import type { SecureCredentialStore } from './secure-store'
 import { computeOverlayBounds, getOverlayInteractionPolicy } from './windows'
 import type { AppSettings, AppSettingsPatch } from '../shared/settings'
+import { RECOGNITION_MODEL_LABELS } from '../shared/settings'
 import { modelStorageEnvironment, readEngineStatus, validateModelStorageDirectory } from './model-storage'
 
 const channels = {
@@ -28,7 +29,7 @@ const settingsPatchSchema = z.object({
   uiLanguage: z.enum(['zh-CN', 'en']).optional(),
   historyEnabled: z.boolean().optional(),
   recognition: z.object({
-    modelId: z.enum(['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf']).optional(),
+    modelId: z.enum(['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf', 'sensevoice-small']).optional(),
   }).partial().optional(),
   overlay: z.object({
     mode: z.enum(['free', 'top', 'bottom']).optional(), locked: z.boolean().optional(),
@@ -53,15 +54,15 @@ const settingsPatchSchema = z.object({
 async function diagnostics(engine: EngineProcess, settings: AppSettings): Promise<Record<string, string | number>> {
   const modelDir = modelStorageEnvironment(settings.modelStoragePath || app.getPath('userData')).NOLA_TRANSLATOR_MODEL_DIR
   const status = await readEngineStatus(modelDir)
-  const qwen = status?.qwen
+  const recognition = status?.recognition
   const hymt2 = status?.hymt2
   return {
     应用版本: app.getVersion(), Electron: process.versions.electron,
     Chromium: process.versions.chrome, Node: process.versions.node,
     操作系统: `${process.platform} ${process.getSystemVersion()}`,
     引擎状态: engine.currentState, 引擎重启次数: engine.restartCount,
-    语音识别: qwen?.loaded && (qwen.quant === 'nf4' || qwen.quant === '8bit')
-      ? `${settings.recognition.modelId === 'qwen3-asr-0.6b-hf' ? 'Qwen3-ASR 0.6B' : 'Qwen3-ASR 1.7B'}（${qwen.quant}）`
+    语音识别: recognition?.loaded
+      ? `${RECOGNITION_MODEL_LABELS[recognition.modelId]}（${recognition.runtime}）`
       : '未运行',
     本地翻译: hymt2?.ready && hymt2.device
       ? `Hy-MT2 · llama.cpp（${hymt2.device}）`

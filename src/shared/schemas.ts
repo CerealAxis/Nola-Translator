@@ -20,7 +20,7 @@ export const sessionConfigSchema = z
   .object({
     audioSource: audioSourceSchema,
     recognitionMode: z.enum(['realtime', 'accurate']),
-    recognitionModelId: z.enum(['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf']).optional(),
+    recognitionModelId: z.enum(['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf', 'sensevoice-small']).optional(),
     sourceLanguage: z.string().min(1).max(32),
     targetLanguages: z.array(z.string().min(1).max(32)).max(8),
     allowIntermediateTranslation: z.boolean().optional(),
@@ -101,7 +101,7 @@ const resourceSchema = z
   .object({
     resourceId: z.string().min(1).max(256),
     kind: z.enum(['recognitionModel', 'translationModel']),
-    provider: z.enum(['qwen3-asr', 'hy-mt2', 'm2m100']),
+    provider: z.enum(['qwen3-asr', 'sensevoice', 'hy-mt2', 'm2m100']),
     name: z.string().min(1).max(256),
     description: z.string().min(1).max(1024),
     languages: z.array(z.string().min(1).max(32)).max(16),

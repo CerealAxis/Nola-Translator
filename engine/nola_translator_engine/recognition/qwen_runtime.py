@@ -13,6 +13,8 @@ import numpy as np
 import torch
 from numpy.typing import NDArray
 
+from .base import ModelUnavailable
+
 SAMPLE_RATE = 16_000
 MAX_NEW_TOKENS = 512
 QUANT_ENV_VAR = "NOLA_TRANSLATOR_QWEN_QUANT"
@@ -54,8 +56,8 @@ CODE_TO_NAME: dict[str, str] = {
 NAME_TO_CODE = {name: code for code, name in CODE_TO_NAME.items()}
 
 
-class QwenModelUnavailable(RuntimeError):
-    """模型不可用：目录缺失或 NF4/8bit 量化均加载失败。"""
+class QwenModelUnavailable(ModelUnavailable):
+    """Qwen3-ASR 不可用：目录缺失或 NF4/8bit 量化均加载失败。"""
 
 
 class CheckpointLayoutMismatch(RuntimeError):
@@ -115,6 +117,9 @@ class QwenRuntime:
     @property
     def quant(self) -> str | None:
         return self._quant
+
+    def describe(self) -> str:
+        return self._quant if self._loaded else "unloaded"
 
     def load(self) -> None:
         """线程安全的一次性加载：NF4 失败回退 8bit，均失败抛 QwenModelUnavailable。"""

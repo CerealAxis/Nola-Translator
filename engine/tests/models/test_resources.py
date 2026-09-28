@@ -15,6 +15,7 @@ from nola_translator_engine.resources import (
     M2M100_RESOURCE_ID,
     QWEN_06B_RESOURCE_ID,
     QWEN_RESOURCE_ID,
+    SENSEVOICE_RESOURCE_ID,
     ResourceActionError,
     ResourceManager,
 )
@@ -91,15 +92,17 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     assert [record.resourceId for record in records] == [
         QWEN_RESOURCE_ID,
         QWEN_06B_RESOURCE_ID,
+        SENSEVOICE_RESOURCE_ID,
         HYMT2_RESOURCE_ID,
         M2M100_RESOURCE_ID,
     ]
     assert QWEN_RESOURCE_ID == "qwen3-asr-1.7b-hf"
     assert QWEN_06B_RESOURCE_ID == "qwen3-asr-0.6b-hf"
+    assert SENSEVOICE_RESOURCE_ID == "sensevoice-small"
     assert HYMT2_RESOURCE_ID == "hy-mt2-1.8b-q4-k-m"
     assert M2M100_RESOURCE_ID == "m2m100-418m"
 
-    qwen, qwen_small, hymt2, m2m100 = records
+    qwen, qwen_small, sensevoice, hymt2, m2m100 = records
     assert qwen.kind == "recognitionModel"
     assert qwen.provider == "qwen3-asr"
     assert qwen.name == "Qwen3-ASR 1.7B · 本地流式识别"
@@ -113,6 +116,13 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     assert qwen_small.name == "Qwen3-ASR 0.6B · 本地流式识别"
     assert qwen_small.downloadBytes == 1_576_381_331
     assert qwen_small.installed is False
+
+    assert sensevoice.kind == "recognitionModel"
+    assert sensevoice.provider == "sensevoice"
+    assert sensevoice.name == "SenseVoiceSmall · 本地流式识别"
+    assert sensevoice.downloadBytes == 936_694_116
+    assert sensevoice.languages == ["zh", "en", "yue", "ja", "ko"]
+    assert sensevoice.installed is False
 
     assert hymt2.kind == "translationModel"
     assert hymt2.provider == "hy-mt2"

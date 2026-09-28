@@ -29,7 +29,7 @@ Nola Translator 可以捕获系统音频或麦克风输入，识别语音，并�
 ## 功能特性
 
 - 捕获 Windows 默认输出设备、指定输出设备或麦克风。
-- 使用本地 Qwen3-ASR 识别语音，使用本地 Hy-MT2 或 M2M100 翻译。
+- 使用本地 Qwen3-ASR 或 SenseVoiceSmall 识别语音，使用本地 Hy-MT2 或 M2M100 翻译。
 - 同时翻译为多种目标语言，可选择翻译中间字幕。
 - 按需配置 Microsoft Translator、OpenAI 兼容接口或本地 Ollama。
 - 独立字幕浮层支持定位、缩放、锁定和点击穿透。

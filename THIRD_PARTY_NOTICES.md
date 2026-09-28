@@ -19,6 +19,8 @@ Nola Translator 使用或分发以下主要第三方组件；完整传递依赖�
 - NumPy：BSD-3-Clause；
 - SciPy：BSD-3-Clause；
 - Pydantic：MIT；
+- FunASR（`funasr`，SenseVoiceSmall 的官方推理实现）：MIT，随附 ModelScope：Apache-2.0；
+- kaldi-native-fbank（FunASR 的 fbank 后端）：Apache-2.0；
 - PyInstaller：GPL-2.0-or-later，并带有允许分发生成程序的 bootloader exception。
 
 ## 本地推理运行时
@@ -28,7 +30,10 @@ Nola Translator 使用或分发以下主要第三方组件；完整传递依赖�
 ## 按需下载的模型
 
 - Qwen3-ASR 1.7B（`Qwen/Qwen3-ASR-1.7B-hf`，BF16 权重，加载时 NF4/8bit 量化）：Apache-2.0，见 [Hugging Face 模型卡](https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf)；
-- Hy-MT2 1.8B GGUF（`tencent/Hy-MT2-1.8B-GGUF` 的 `Hy-MT2-1.8B-Q4_K_M.gguf`）：Apache-2.0，见 [Hugging Face 模型卡](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF)。
+- Qwen3-ASR 0.6B（`Qwen/Qwen3-ASR-0.6B-hf`，同上）：Apache-2.0，见 [Hugging Face 模型卡](https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf)；
+- SenseVoiceSmall（`FunAudioLLM/SenseVoiceSmall`，`model.pt` 等）：FunASR Model License，见 [Hugging Face 模型卡](https://huggingface.co/FunAudioLLM/SenseVoiceSmall)；
+- Hy-MT2 1.8B GGUF（`tencent/Hy-MT2-1.8B-GGUF` 的 `Hy-MT2-1.8B-Q4_K_M.gguf`）：Apache-2.0，见 [Hugging Face 模型卡](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF)；
+- M2M100 418M（`facebook/m2m100_418M`）：MIT，见 [Hugging Face 模型卡](https://huggingface.co/facebook/m2m100_418M)。
 
 模型不直接提交到本仓库或安装包。其许可证及元数据由各自发布方提供，用户首次下载前应遵循对应条款。
 
