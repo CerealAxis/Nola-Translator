@@ -1,6 +1,6 @@
-from fluentcaptions_engine.protocol import parse_command_line
-from fluentcaptions_engine.service import EngineService
-from fluentcaptions_engine.audio.devices import AudioDeviceRecord
+from nola_translator_engine.protocol import parse_command_line
+from nola_translator_engine.service import EngineService
+from nola_translator_engine.audio.devices import AudioDeviceRecord
 
 
 def test_service_performs_handshake_and_lists_devices() -> None:

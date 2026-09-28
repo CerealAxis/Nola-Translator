@@ -7,10 +7,10 @@ import threading
 
 import pytest
 
-from fluentcaptions_engine import resources as resources_module
-from fluentcaptions_engine.models.manager import FileEntry, ModelSpec
-from fluentcaptions_engine.protocol import ResourceRecord
-from fluentcaptions_engine.resources import (
+from nola_translator_engine import resources as resources_module
+from nola_translator_engine.models.manager import FileEntry, ModelSpec
+from nola_translator_engine.protocol import ResourceRecord
+from nola_translator_engine.resources import (
     HYMT2_RESOURCE_ID,
     M2M100_RESOURCE_ID,
     QWEN_06B_RESOURCE_ID,

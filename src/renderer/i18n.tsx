@@ -25,7 +25,7 @@ export function I18nProvider({ children }: { children: ReactNode }): React.JSX.E
   const [language, updateLanguage] = useState<UiLanguage>('zh-CN')
   const revision = useRef(0)
   useEffect(() => {
-    const api = window.fluentCaptions
+    const api = window.nolaTranslator
     if (!api) return
     let active = true
     const initialRevision = revision.current
@@ -44,7 +44,7 @@ export function I18nProvider({ children }: { children: ReactNode }): React.JSX.E
     const requestRevision = ++revision.current
     updateLanguage(next)
     try {
-      await window.fluentCaptions?.updateSettings({ uiLanguage: next })
+      await window.nolaTranslator?.updateSettings({ uiLanguage: next })
     } catch (error) {
       if (revision.current === requestRevision) updateLanguage(previous)
       throw error

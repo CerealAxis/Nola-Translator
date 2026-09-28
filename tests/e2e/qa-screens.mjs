@@ -15,11 +15,11 @@ const preload = `
 const {contextBridge} = require('electron');
 let settings = ${JSON.stringify(settings)};
 const sl=new Set(), el=new Set();
-contextBridge.exposeInMainWorld('fluentCaptions', {
+contextBridge.exposeInMainWorld('nolaTranslator', {
   getSettings:async()=>settings, updateSettings:async(p)=>{settings={...settings,...p,recognition:{...settings.recognition,...p.recognition},overlay:{...settings.overlay,...p.overlay},translation:{...settings.translation,...p.translation}};sl.forEach(f=>f(settings));return settings},
   onSettingsChanged:f=>{sl.add(f);return()=>sl.delete(f)}, onEngineEvent:f=>{el.add(f);return()=>el.delete(f)},
-  listDevices:async()=>[], listResources:async()=>({storagePath:'D:/Models/FluentCaptions/models',resources:[${JSON.stringify(rec)},${JSON.stringify(rec2)},${JSON.stringify(tr)},${JSON.stringify(m2)}]}),
-  getModelStorage:async()=>({activePath:'D:/Models/FluentCaptions',configuredPath:'',restartRequired:false}),
+  listDevices:async()=>[], listResources:async()=>({storagePath:'D:/Models/Nola Translator/models',resources:[${JSON.stringify(rec)},${JSON.stringify(rec2)},${JSON.stringify(tr)},${JSON.stringify(m2)}]}),
+  getModelStorage:async()=>({activePath:'D:/Models/Nola Translator',configuredPath:'',restartRequired:false}),
   chooseModelStorageDirectory:async()=>null, restartApp:async()=>{}, listHistory:async()=>[], clearHistory:async()=>{}, exportHistory:async()=>null,
   getDiagnostics:async()=>({}), copyDiagnostics:async()=>{}, hasTranslationCredential:async()=>false, setTranslationCredential:async()=>{},
   showOverlay:async()=>{}, hideOverlay:async()=>{}, startSession:async()=>({sessionId:'x'}), stopSession:async()=>{}, resizeOverlay:async()=>{}, openAppearance:async()=>{}, onOpenAppearance:()=>()=>{}

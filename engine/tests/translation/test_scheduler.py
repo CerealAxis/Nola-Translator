@@ -2,8 +2,8 @@ import asyncio
 
 import pytest
 
-from fluentcaptions_engine.translation.base import ProviderTranslation
-from fluentcaptions_engine.translation.scheduler import TranslationScheduler
+from nola_translator_engine.translation.base import ProviderTranslation
+from nola_translator_engine.translation.scheduler import TranslationScheduler
 
 
 class CountingProvider:

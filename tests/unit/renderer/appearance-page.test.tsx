@@ -5,7 +5,7 @@ import { AppearancePage } from '../../../src/renderer/pages/AppearancePage'
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 
 it('allows setting the subtitle background to fully transparent', async () => {
-  const api = window.fluentCaptions!
+  const api = window.nolaTranslator!
   const getSettings = vi.spyOn(api, 'getSettings').mockResolvedValue(DEFAULT_SETTINGS)
   const updateSettings = vi.spyOn(api, 'updateSettings').mockImplementation(async (patch) => ({
     ...DEFAULT_SETTINGS,
@@ -30,7 +30,7 @@ it('allows setting the subtitle background to fully transparent', async () => {
 })
 
 it('applies a subtitle color scheme without changing the application theme', async () => {
-  const api = window.fluentCaptions!
+  const api = window.nolaTranslator!
   const getSettings = vi.spyOn(api, 'getSettings').mockResolvedValue(DEFAULT_SETTINGS)
   const updateSettings = vi.spyOn(api, 'updateSettings').mockImplementation(async (patch) => ({
     ...DEFAULT_SETTINGS,

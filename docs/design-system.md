@@ -1,4 +1,4 @@
-# FluentCaptions 界面与窗口基线
+# Nola Translator 界面与窗口基线
 
 ## 窗口尺寸
 

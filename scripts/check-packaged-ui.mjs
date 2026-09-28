@@ -4,19 +4,19 @@ import { resolve } from 'node:path';
 import process from 'node:process';
 
 const executablePath = process.argv[2]
-  ?? resolve('release/win-unpacked/FluentCaptions.exe');
-const port = Number(process.env.FLUENTCAPTIONS_CDP_PORT ?? 9333);
+  ?? resolve('release/win-unpacked/Nola Translator.exe');
+const port = Number(process.env.NOLA_TRANSLATOR_CDP_PORT ?? 9333);
 const expectedVersion = JSON.parse(readFileSync(resolve('package.json'), 'utf8')).version;
-const testAppData = process.env.FLUENTCAPTIONS_TEST_APPDATA ?? resolve('artifacts/packaged-ui-appdata');
+const testAppData = process.env.NOLA_TRANSLATOR_TEST_APPDATA ?? resolve('artifacts/packaged-ui-appdata');
 mkdirSync(testAppData, { recursive: true });
 
-const app = spawn(executablePath, [`--user-data-dir=${resolve(testAppData, 'FluentCaptions')}`, `--remote-debugging-port=${port}`], {
-  stdio: process.env.FLUENTCAPTIONS_DEBUG ? 'inherit' : 'ignore',
+const app = spawn(executablePath, [`--user-data-dir=${resolve(testAppData, 'Nola Translator')}`, `--remote-debugging-port=${port}`], {
+  stdio: process.env.NOLA_TRANSLATOR_DEBUG ? 'inherit' : 'ignore',
   windowsHide: true,
   env: {
     ...process.env,
     APPDATA: testAppData,
-    ELECTRON_ENABLE_LOGGING: process.env.FLUENTCAPTIONS_DEBUG ? '1' : undefined,
+    ELECTRON_ENABLE_LOGGING: process.env.NOLA_TRANSLATOR_DEBUG ? '1' : undefined,
   },
 });
 
@@ -88,7 +88,7 @@ try {
     firstButtonClass: document.querySelector('button')?.className ?? '',
     firstButtonPadding: document.querySelector('button') ? getComputedStyle(document.querySelector('button')).padding : '',
     firstButtonRadius: document.querySelector('button') ? getComputedStyle(document.querySelector('button')).borderRadius : '',
-    bridgeType: typeof window.fluentCaptions,
+    bridgeType: typeof window.nolaTranslator,
     engineUnavailable: document.body.innerText.includes('引擎接口不可用'),
     stylesheetCount: document.styleSheets.length,
     href: location.href
@@ -96,8 +96,8 @@ try {
   const bridgeProbe = await evaluate(target, `(async () => {
     try {
       const [diagnostics, devices] = await Promise.all([
-        window.fluentCaptions.getDiagnostics(),
-        window.fluentCaptions.listDevices()
+        window.nolaTranslator.getDiagnostics(),
+        window.nolaTranslator.listDevices()
       ]);
       return {
         ok: true,
@@ -122,7 +122,7 @@ try {
     findButton('调整位置和大小')?.click();
     let settings;
     for (let attempt = 0; attempt < 50; attempt += 1) {
-      settings = await window.fluentCaptions.getSettings();
+      settings = await window.nolaTranslator.getSettings();
       if (settings.overlay.mode === 'free' && !settings.overlay.locked) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
@@ -146,17 +146,17 @@ try {
     };
   })()`);
 
-  if (process.env.FLUENTCAPTIONS_OVERLAY_SCREENSHOT) {
+  if (process.env.NOLA_TRANSLATOR_OVERLAY_SCREENSHOT) {
     const overlayScreenshot = await sendCommand(overlayTarget, 'Page.captureScreenshot', { format: 'png' });
-    writeFileSync(process.env.FLUENTCAPTIONS_OVERLAY_SCREENSHOT, Buffer.from(overlayScreenshot.data, 'base64'));
+    writeFileSync(process.env.NOLA_TRANSLATOR_OVERLAY_SCREENSHOT, Buffer.from(overlayScreenshot.data, 'base64'));
   }
 
-  await evaluate(target, 'window.fluentCaptions.hideOverlay()');
+  await evaluate(target, 'window.nolaTranslator.hideOverlay()');
   await delay(150);
   const overlayHidden = await evaluate(overlayTarget, 'document.visibilityState === "hidden"');
   await evaluate(target, `(async () => {
-    await window.fluentCaptions.updateSettings({ overlay: { backgroundOpacity: 0, locked: true } });
-    await window.fluentCaptions.showOverlay();
+    await window.nolaTranslator.updateSettings({ overlay: { backgroundOpacity: 0, locked: true } });
+    await window.nolaTranslator.showOverlay();
     await new Promise((resolve) => setTimeout(resolve, 150));
     return true;
   })()`);
@@ -240,9 +240,9 @@ try {
 
   console.log(JSON.stringify({ ...result, bridgeProbe, overlayPageProbe, overlayWindowProbe, overlayHidden, transparentOverlayProbe, resourcePageProbe, translationSwitchProbe }));
   console.log(failed ? 'PACKAGED_UI_REPRO=FAIL' : 'PACKAGED_UI_REPRO=PASS');
-  if (process.env.FLUENTCAPTIONS_SCREENSHOT) {
+  if (process.env.NOLA_TRANSLATOR_SCREENSHOT) {
     const screenshot = await sendCommand(target, 'Page.captureScreenshot', { format: 'png' });
-    writeFileSync(process.env.FLUENTCAPTIONS_SCREENSHOT, Buffer.from(screenshot.data, 'base64'));
+    writeFileSync(process.env.NOLA_TRANSLATOR_SCREENSHOT, Buffer.from(screenshot.data, 'base64'));
   }
   verdict = failed ? 1 : 0;
 } catch (error) {

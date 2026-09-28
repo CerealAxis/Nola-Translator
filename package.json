@@ -1,9 +1,9 @@
 {
-  "name": "fluentcaptions",
-  "productName": "FluentCaptions",
+  "name": "nola-translator",
+  "productName": "Nola Translator",
   "version": "0.1.5",
   "description": "面向 Windows 11 的本地实时字幕与翻译工具",
-  "author": "FluentCaptions Contributors",
+  "author": "Nola Translator Contributors",
   "private": true,
   "type": "module",
   "main": "out/main/index.js",
@@ -53,8 +53,8 @@
     "esbuild@0.28.1": true
   },
   "build": {
-    "appId": "com.fluentcaptions.app",
-    "productName": "FluentCaptions",
+    "appId": "com.nola-translator.app",
+    "productName": "Nola Translator",
     "asar": true,
     "npmRebuild": false,
     "buildDependenciesFromSource": false,
@@ -68,7 +68,7 @@
     ],
     "extraResources": [
       {
-        "from": "engine/dist/FluentCaptionsEngine",
+        "from": "engine/dist/NolaTranslatorEngine",
         "to": "engine"
       },
       {
@@ -86,7 +86,7 @@
           ]
         }
       ],
-      "artifactName": "FluentCaptions-${version}-Setup-${arch}.${ext}"
+    "artifactName": "Nola-Translator-${version}-Setup-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,

@@ -1,6 +1,6 @@
 import pytest
 
-from fluentcaptions_engine.translation.network import (
+from nola_translator_engine.translation.network import (
     MicrosoftTranslatorProvider,
     OllamaTranslationProvider,
     OpenAICompatibleProvider,

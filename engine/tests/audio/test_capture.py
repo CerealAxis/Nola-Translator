@@ -1,13 +1,13 @@
 import numpy as np
 import pytest
 
-from fluentcaptions_engine.audio.capture import (
+from nola_translator_engine.audio.capture import (
     AudioDeviceDisconnectedError,
     PortAudioCapture,
     RawAudioChunk,
     RawAudioQueue,
 )
-from fluentcaptions_engine.audio.devices import AudioDeviceRecord
+from nola_translator_engine.audio.devices import AudioDeviceRecord
 
 
 def test_bounded_callback_queue_drops_oldest_chunk_without_blocking() -> None:

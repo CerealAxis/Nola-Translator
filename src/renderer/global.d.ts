@@ -1,8 +1,8 @@
-import type { FluentCaptionsApi } from '../shared/bridge'
+import type { NolaTranslatorApi } from '../shared/bridge'
 
 declare global {
   interface Window {
-    fluentCaptions?: FluentCaptionsApi
+    nolaTranslator?: NolaTranslatorApi
   }
 }
 

@@ -27,7 +27,7 @@ flowchart LR
 
 ## Qwen3-ASR 识别运行时
 
-识别使用单一模型 `Qwen/Qwen3-ASR-1.7B-hf`（`recognitionModelId` 固定为 `qwen3-asr-1.7b-hf`）。运行时以 `AutoProcessor` + `Qwen3ASRForConditionalGeneration` 从本地安装目录 `from_pretrained(..., local_files_only=True)` 加载，进程内缓存：首次“开始字幕”加载一次，引擎退出时释放，会话期间不重复加载；同一时刻只运行一个 ASR 请求（单飞锁，排队请求由调度器合并）。加载默认使用 bitsandbytes NF4（`load_in_4bit`），NF4 失败时回退 8bit，两者都失败则后续启动返回 `modelUnavailable`，不会暗中换用其他模型；可用 `FLUENTCAPTIONS_QWEN_QUANT=nf4|8bit` 强制档位。推理在 `torch.inference_mode()` 内执行，输入固定为 16 kHz 单声道 float32 数组、dtype 固定 bf16。会话启动前只检查本地资源存在性，缺失时引导到“模型与资源”页面，不联网下载。
+识别使用单一模型 `Qwen/Qwen3-ASR-1.7B-hf`（`recognitionModelId` 固定为 `qwen3-asr-1.7b-hf`）。运行时以 `AutoProcessor` + `Qwen3ASRForConditionalGeneration` 从本地安装目录 `from_pretrained(..., local_files_only=True)` 加载，进程内缓存：首次“开始字幕”加载一次，引擎退出时释放，会话期间不重复加载；同一时刻只运行一个 ASR 请求（单飞锁，排队请求由调度器合并）。加载默认使用 bitsandbytes NF4（`load_in_4bit`），NF4 失败时回退 8bit，两者都失败则后续启动返回 `modelUnavailable`，不会暗中换用其他模型；可用 `NOLA_TRANSLATOR_QWEN_QUANT=nf4|8bit` 强制档位。推理在 `torch.inference_mode()` 内执行，输入固定为 16 kHz 单声道 float32 数组、dtype 固定 bf16。会话启动前只检查本地资源存在性，缺失时引导到“模型与资源”页面，不联网下载。
 
 ## 流式调度与断句
 

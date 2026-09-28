@@ -2,12 +2,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ModelStorageSettings } from '../../../src/renderer/components/ModelStorageSettings'
 
 describe('model storage controls', () => {
-  const originalApi = window.fluentCaptions
-  afterEach(() => { window.fluentCaptions = originalApi; vi.restoreAllMocks() })
+  const originalApi = window.nolaTranslator
+  afterEach(() => { window.nolaTranslator = originalApi; vi.restoreAllMocks() })
 
   it('shows current and pending paths and restarts only after confirmation', async () => {
     const restartApp = vi.fn().mockResolvedValue(undefined)
-    window.fluentCaptions = {
+    window.nolaTranslator = {
       ...originalApi!,
       getModelStorage: vi.fn().mockResolvedValue({ activePath: 'C:\\Old', configuredPath: 'C:\\Old', restartRequired: false }),
       chooseModelStorageDirectory: vi.fn().mockResolvedValue({ activePath: 'C:\\Old', configuredPath: 'D:\\Models', restartRequired: true }),
@@ -26,7 +26,7 @@ describe('model storage controls', () => {
   })
 
   it('leaves the active location unchanged when the picker is cancelled', async () => {
-    window.fluentCaptions = {
+    window.nolaTranslator = {
       ...originalApi!,
       getModelStorage: vi.fn().mockResolvedValue({ activePath: 'D:\\Models', configuredPath: 'D:\\Models', restartRequired: false }),
       chooseModelStorageDirectory: vi.fn().mockResolvedValue(null),

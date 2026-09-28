@@ -47,7 +47,7 @@ async def _run() -> int:
     def write_event(event) -> None:
         print(serialize_event(event), flush=True)
 
-    protocol_only = os.environ.get("FLUENTCAPTIONS_PROTOCOL_ONLY") == "1"
+    protocol_only = os.environ.get("NOLA_TRANSLATOR_PROTOCOL_ONLY") == "1"
     if protocol_only:
         service = EngineService()
 
@@ -61,8 +61,8 @@ async def _run() -> int:
 
         model_root = Path(
             os.environ.get(
-                "FLUENTCAPTIONS_MODEL_DIR",
-                Path(os.environ.get("LOCALAPPDATA", Path.home())) / "FluentCaptions" / "models",
+                "NOLA_TRANSLATOR_MODEL_DIR",
+                Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Nola Translator" / "models",
             )
         )
         runtime = EngineRuntime(model_root, write_event)
@@ -106,7 +106,7 @@ async def _run() -> int:
 
 
 def main() -> int:
-    if os.environ.get("FLUENTCAPTIONS_SELF_TEST") == "1":
+    if os.environ.get("NOLA_TRANSLATOR_SELF_TEST") == "1":
         checks: dict[str, object] = {}
         stage = "imports"
         try:

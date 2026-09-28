@@ -14,7 +14,7 @@ from .base import ProviderTranslation
 
 
 MAX_NEW_TOKENS = 256
-DEVICE_ENV_VAR = "FLUENTCAPTIONS_M2M100_DEVICE"
+DEVICE_ENV_VAR = "NOLA_TRANSLATOR_M2M100_DEVICE"
 
 # FLORES-101（transformers FAIRSEQ_LANGUAGE_CODES["m2m100"]）；只用于支持性校验，不做提示词。
 FLORES_LANGUAGES = frozenset(
@@ -49,7 +49,7 @@ class M2M100ModelUnavailable(RuntimeError):
 def _resolve_device(torch: Any) -> str:
     """默认留在 CPU：识别模型已独占显存，翻译模型不再与之争抢。
 
-    需要上显卡时设 FLUENTCAPTIONS_M2M100_DEVICE=cuda；无 CUDA 时自动退回 CPU。
+    需要上显卡时设 NOLA_TRANSLATOR_M2M100_DEVICE=cuda；无 CUDA 时自动退回 CPU。
     """
     requested = os.environ.get(DEVICE_ENV_VAR, "").strip().lower()
     if requested in ("cuda", "gpu") and torch.cuda.is_available():

@@ -8,7 +8,7 @@ export function ModelStorageSettings(): React.JSX.Element | null {
   const [storage, setStorage] = useState<ModelStorageInfo | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const api = window.fluentCaptions
+  const api = window.nolaTranslator
 
   useEffect(() => {
     if (!api?.getModelStorage) return

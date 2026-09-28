@@ -5,12 +5,12 @@ import json
 from hashlib import sha256
 from pathlib import Path
 
-from fluentcaptions_engine import resources as resources_module
-from fluentcaptions_engine import runtime as runtime_module
-from fluentcaptions_engine.models.manager import FileEntry, ModelSpec
-from fluentcaptions_engine.protocol import parse_command_line
-from fluentcaptions_engine.resources import HYMT2_RESOURCE_ID, QWEN_06B_RESOURCE_ID, QWEN_RESOURCE_ID
-from fluentcaptions_engine.runtime import EngineRuntime
+from nola_translator_engine import resources as resources_module
+from nola_translator_engine import runtime as runtime_module
+from nola_translator_engine.models.manager import FileEntry, ModelSpec
+from nola_translator_engine.protocol import parse_command_line
+from nola_translator_engine.resources import HYMT2_RESOURCE_ID, QWEN_06B_RESOURCE_ID, QWEN_RESOURCE_ID
+from nola_translator_engine.runtime import EngineRuntime
 
 
 def _start_command(request_id: str, mode: str) -> str:
@@ -177,7 +177,7 @@ def test_engine_status_file_lifecycle(tmp_path) -> None:
 
 def test_m2m100_is_ready_before_session_starts(tmp_path, monkeypatch) -> None:
     """进入识别会话前，翻译模型已完成加载。"""
-    from fluentcaptions_engine.translation import m2m100 as m2m100_module
+    from nola_translator_engine.translation import m2m100 as m2m100_module
 
     runtime = EngineRuntime(tmp_path / "models", lambda _e: None)
     monkeypatch.setattr(runtime.resources, "is_installed", lambda _rid: True)
@@ -212,7 +212,7 @@ def test_m2m100_is_ready_before_session_starts(tmp_path, monkeypatch) -> None:
 
 
 def test_session_cleanup_unloads_both_local_models(tmp_path, monkeypatch) -> None:
-    from fluentcaptions_engine.translation.m2m100 import M2M100TranslationProvider
+    from nola_translator_engine.translation.m2m100 import M2M100TranslationProvider
 
     runtime = EngineRuntime(tmp_path / "models", lambda _e: None)
     unloaded: list[str] = []

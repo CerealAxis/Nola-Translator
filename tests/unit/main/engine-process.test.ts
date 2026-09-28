@@ -34,11 +34,11 @@ describe('Python 引擎进程', () => {
       createEngineLaunchSpec({ isPackaged: false, appPath: 'G:/app', resourcesPath: 'G:/resources' })
     ).toMatchObject({
       command: join('G:/app', '.venv', 'Scripts', 'python.exe'),
-      args: ['-m', 'fluentcaptions_engine'],
+      args: ['-m', 'nola_translator_engine'],
     })
     expect(
       createEngineLaunchSpec({ isPackaged: true, appPath: 'G:/app', resourcesPath: 'G:/resources' })
-    ).toMatchObject({ command: join('G:/resources', 'engine', 'FluentCaptionsEngine.exe'), args: [] })
+    ).toMatchObject({ command: join('G:/resources', 'engine', 'NolaTranslatorEngine.exe'), args: [] })
   })
 
   it('合并同一字幕段的中间版本，但不丢最终字幕、错误或模型进度', () => {
@@ -78,9 +78,9 @@ describe('Python 引擎进程', () => {
   it('完成真实 Python sidecar 的握手、请求与优雅退出', async () => {
     const engine = new EngineProcess({
       command: python,
-      args: ['-m', 'fluentcaptions_engine'],
+      args: ['-m', 'nola_translator_engine'],
       cwd: resolve('engine'),
-      env: { FLUENTCAPTIONS_PROTOCOL_ONLY: '1' },
+      env: { NOLA_TRANSLATOR_PROTOCOL_ONLY: '1' },
       startupTimeoutMs: 3_000,
       restartDelaysMs: [10, 20, 30],
     })
@@ -124,7 +124,7 @@ describe('Python 引擎进程', () => {
   })
 
   it('引擎异常退出后最多按配置退避并恢复握手', async () => {
-    const work = await mkdtemp(join(tmpdir(), 'fluentcaptions-engine-'))
+    const work = await mkdtemp(join(tmpdir(), 'nola-translator-engine-'))
     const marker = join(work, 'crashed-once')
     const engine = new EngineProcess({
       command: python,
@@ -145,7 +145,7 @@ describe('Python 引擎进程', () => {
   })
 
   it('收到关机确认后等待 sidecar 自行退出', async () => {
-    const work = await mkdtemp(join(tmpdir(), 'fluentcaptions-shutdown-'))
+    const work = await mkdtemp(join(tmpdir(), 'nola-translator-shutdown-'))
     const marker = join(work, 'shutdown-complete')
     const engine = new EngineProcess({
       command: python,

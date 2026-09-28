@@ -5,7 +5,7 @@ export function DiagnosticsPage(): React.JSX.Element {
   const { t } = useI18n()
   const [diagnostics, setDiagnostics] = useState<Record<string, string | number>>({})
   const [copied, setCopied] = useState(false)
-  const api = window.fluentCaptions
+  const api = window.nolaTranslator
   useEffect(() => { void api?.getDiagnostics().then(setDiagnostics) }, [api])
   return (
     <div className="page">

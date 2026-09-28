@@ -1,6 +1,6 @@
 import pytest
 
-from fluentcaptions_engine.audio.devices import (
+from nola_translator_engine.audio.devices import (
     AudioDeviceRecord,
     AudioDeviceRegistry,
     AudioDeviceUnavailableError,

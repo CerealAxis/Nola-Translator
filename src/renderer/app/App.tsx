@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { GlobeRegular } from '@fluentui/react-icons'
 import { I18nProvider, useI18n, type UiLanguage } from '../i18n'
+import nolaLogo from '../../../assets/brand/nola-logo.svg'
 
 import { Navigation, type PageId } from './Navigation'
 import { AppearancePage } from '../pages/AppearancePage'
@@ -22,7 +23,7 @@ function StartupGate(): React.JSX.Element {
   useEffect(() => {
     let active = true
     setState('loading')
-    const api = window.fluentCaptions
+    const api = window.nolaTranslator
     if (!api) {
       setState('error')
       return
@@ -38,8 +39,8 @@ function StartupGate(): React.JSX.Element {
   return (
     <div className="startup-screen" role="status" aria-live="polite">
       <div className="startup-card">
-        <span className="app-mark startup-mark" aria-hidden="true">F</span>
-        <strong>FluentCaptions</strong>
+        <img className="app-mark startup-mark" src={nolaLogo} alt="" />
+        <strong>Nola Translator</strong>
         {state === 'loading' ? <>
           <span className="loading-spinner" aria-hidden="true" />
           <p>{t('正在加载本地引擎与资源…')}</p>
@@ -66,7 +67,7 @@ function AppContent(): React.JSX.Element {
   const [sessionStopping, setSessionStopping] = useState(false)
 
   useEffect(() => {
-    const api = window.fluentCaptions
+    const api = window.nolaTranslator
     if (!api) return
     // 主程序外观跟随 Windows；字幕配色仅作用于独立浮层。
     document.documentElement.dataset.theme = 'system'
@@ -75,7 +76,7 @@ function AppContent(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    const api = window.fluentCaptions
+    const api = window.nolaTranslator
     if (!api) return
     return api.onEngineEvent((event) => {
       if (event.type === 'sessionStarted') setActiveSessionId(event.sessionId)
@@ -86,10 +87,10 @@ function AppContent(): React.JSX.Element {
     })
   }, [])
 
-  useEffect(() => window.fluentCaptions?.onOpenAppearance(() => setActivePage('appearance')), [])
+  useEffect(() => window.nolaTranslator?.onOpenAppearance(() => setActivePage('appearance')), [])
 
   const stopActiveSession = async (): Promise<void> => {
-    const api = window.fluentCaptions
+    const api = window.nolaTranslator
     const sessionId = activeSessionId
     if (!api || !sessionId || sessionStopping) return
     setSessionStopping(true)
@@ -116,8 +117,8 @@ function AppContent(): React.JSX.Element {
   return (
     <div className="app-shell">
       <header className="titlebar">
-        <span className="app-mark" aria-hidden="true">F</span>
-        <span className="app-name">FluentCaptions</span>
+        <img className="app-mark" src={nolaLogo} alt="" />
+        <span className="app-name">Nola Translator</span>
         <div className="language-control" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setLanguageMenuOpen(false) }} onKeyDown={(event) => { if (event.key === 'Escape') { setLanguageMenuOpen(false); event.currentTarget.querySelector('button')?.focus() } }}>
           <button className="button secondary-button language-button" type="button" aria-label={t('界面语言')} title={t('界面语言')} aria-haspopup="menu" aria-expanded={languageMenuOpen} onClick={() => setLanguageMenuOpen(!languageMenuOpen)}><GlobeRegular aria-hidden /></button>
           {languageMenuOpen && <div className="language-menu surface" role="menu" aria-label={t('界面语言')}>

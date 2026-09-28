@@ -22,7 +22,7 @@ export function CaptionOverlay(): React.JSX.Element {
 
   useEffect(() => {
     document.documentElement.dataset.overlay = 'true'
-    const api = window.fluentCaptions
+    const api = window.nolaTranslator
     if (!api) return
     void api.getSettings().then(setSettings).catch(() => undefined)
     const offSettings = api.onSettingsChanged(setSettings)
@@ -48,23 +48,23 @@ export function CaptionOverlay(): React.JSX.Element {
 
   const updateOverlay = async (overlay: Partial<OverlaySettings>): Promise<void> => {
     try {
-      const saved = await window.fluentCaptions?.updateSettings({ overlay })
+      const saved = await window.nolaTranslator?.updateSettings({ overlay })
       if (saved) setSettings(saved)
     } catch (error) { setNotice(error instanceof Error ? error.message : '无法修改浮层设置') }
   }
   const hide = async (): Promise<void> => {
-    try { await window.fluentCaptions?.hideOverlay() }
+    try { await window.nolaTranslator?.hideOverlay() }
     catch (error) { setNotice(error instanceof Error ? error.message : '隐藏浮层失败') }
   }
   const toggleCollapse = (): void => {
     if (!collapsed) expandedHeight.current = window.innerHeight
-    void window.fluentCaptions?.resizeOverlay(window.innerWidth, collapsed ? expandedHeight.current : 56)
+    void window.nolaTranslator?.resizeOverlay(window.innerWidth, collapsed ? expandedHeight.current : 56)
     setCollapsed(!collapsed)
   }
   const onResizeMove = (event: React.PointerEvent<HTMLDivElement>): void => {
     if (!resizeStart.current) return
     const { x, y, width, height } = resizeStart.current
-    void window.fluentCaptions?.resizeOverlay(width + event.screenX - x, height + event.screenY - y)
+    void window.nolaTranslator?.resizeOverlay(width + event.screenX - x, height + event.screenY - y)
   }
 
   return <main className="overlay-window">
@@ -101,7 +101,7 @@ export function CaptionOverlay(): React.JSX.Element {
           onClick={() => void updateOverlay({ alwaysOnTop: !settings.overlay.alwaysOnTop })}><PinRegular /></button>
         <span className="caption-action-divider" aria-hidden="true" />
         <button type="button" title={t('打开字幕设置')} aria-label={t('打开字幕设置')}
-          onClick={() => void window.fluentCaptions?.openAppearance()}><MoreHorizontalRegular /></button>
+          onClick={() => void window.nolaTranslator?.openAppearance()}><MoreHorizontalRegular /></button>
         <button type="button" title={collapsed ? t('展开浮层') : t('收起浮层')} aria-label={collapsed ? t('展开浮层') : t('收起浮层')}
           onClick={toggleCollapse}><SubtractRegular /></button>
         <button type="button" title={t('隐藏浮层')} aria-label={t('隐藏浮层')} onClick={() => void hide()}><DismissRegular /></button>
@@ -110,7 +110,7 @@ export function CaptionOverlay(): React.JSX.Element {
       {!collapsed && <div className="caption-console-controls">
         <span className="caption-mic" data-active={active} title={active ? t('正在监听音频') : t('等待字幕会话')}><MicRegular /></span>
         <button type="button" className="caption-control-pill caption-mode-pill" title={t('打开字幕设置')}
-          onClick={() => void window.fluentCaptions?.openAppearance()}><span className="caption-mode-dot" />{t('本地字幕')}<ChevronDownRegular /></button>
+          onClick={() => void window.nolaTranslator?.openAppearance()}><span className="caption-mode-dot" />{t('本地字幕')}<ChevronDownRegular /></button>
         <button type="button" className="caption-control-pill" data-active={settings.overlay.showSource}
           aria-pressed={settings.overlay.showSource} onClick={() => void updateOverlay({ showSource: !settings.overlay.showSource })}>{t('原文')}</button>
         <button type="button" className="caption-control-pill" data-active={settings.overlay.showTranslation}
@@ -121,7 +121,7 @@ export function CaptionOverlay(): React.JSX.Element {
         onKeyDown={(event) => {
           const dx = event.key === 'ArrowRight' ? 16 : event.key === 'ArrowLeft' ? -16 : 0
           const dy = event.key === 'ArrowDown' ? 16 : event.key === 'ArrowUp' ? -16 : 0
-          if (dx || dy) { event.preventDefault(); void window.fluentCaptions?.resizeOverlay(window.innerWidth + dx, window.innerHeight + dy) }
+          if (dx || dy) { event.preventDefault(); void window.nolaTranslator?.resizeOverlay(window.innerWidth + dx, window.innerHeight + dy) }
         }}
         onPointerDown={(event) => {
           resizeStart.current = { x: event.screenX, y: event.screenY, width: window.innerWidth, height: window.innerHeight }

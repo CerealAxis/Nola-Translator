@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from fluentcaptions_engine.translation.hymt2 import (
+from nola_translator_engine.translation.hymt2 import (
     SUPPORTED_LANGUAGES,
     HyMt2TranslationProvider,
     UnsupportedLanguagePair,
     is_supported,
     validate_session_languages,
 )
-from fluentcaptions_engine.translation.llama_server import LlamaServerError
+from nola_translator_engine.translation.llama_server import LlamaServerError
 
 
 class FakeManager:

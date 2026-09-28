@@ -51,7 +51,7 @@ const settingsPatchSchema = z.object({
 }).strict()
 
 async function diagnostics(engine: EngineProcess, settings: AppSettings): Promise<Record<string, string | number>> {
-  const modelDir = modelStorageEnvironment(settings.modelStoragePath || app.getPath('userData')).FLUENTCAPTIONS_MODEL_DIR
+  const modelDir = modelStorageEnvironment(settings.modelStoragePath || app.getPath('userData')).NOLA_TRANSLATOR_MODEL_DIR
   const status = await readEngineStatus(modelDir)
   const qwen = status?.qwen
   const hymt2 = status?.hymt2
@@ -159,7 +159,7 @@ export function registerAppIpc(options: {
     if (!['txt', 'srt', 'vtt'].includes(String(format))) throw new Error('导出格式无效')
     const value = String(format) as 'txt' | 'srt' | 'vtt'
     const result = await dialog.showSaveDialog({
-      title: current.uiLanguage === 'en' ? 'Export captions' : '导出字幕', defaultPath: `FluentCaptions.${value === 'vtt' ? 'vtt' : value}`,
+      title: current.uiLanguage === 'en' ? 'Export captions' : '导出字幕', defaultPath: `Nola Translator.${value === 'vtt' ? 'vtt' : value}`,
       filters: [{ name: value.toUpperCase(), extensions: [value] }],
     })
     if (result.canceled || !result.filePath) return null

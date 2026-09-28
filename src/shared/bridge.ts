@@ -4,7 +4,7 @@ import type { AppSettings, AppSettingsPatch } from './settings'
 export type SessionStartResult = { sessionId: string }
 export type ModelStorageInfo = { activePath: string; configuredPath: string; restartRequired: boolean }
 
-export type FluentCaptionsApi = {
+export type NolaTranslatorApi = {
   listDevices(): Promise<AudioDevice[]>
   listResources(): Promise<ResourceSnapshot>
   manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel'): Promise<ResourceRecord>

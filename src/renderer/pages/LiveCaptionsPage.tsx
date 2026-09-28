@@ -47,7 +47,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
   const [noticeValues, setNoticeValues] = useState<TranslationValues>({})
   const [missingResource, setMissingResource] = useState(false)
 
-  const api = window.fluentCaptions
+  const api = window.nolaTranslator
   useEffect(() => {
     if (!api) {
       setState('error')

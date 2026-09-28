@@ -1,6 +1,6 @@
 # Windows 音频管线
 
-FluentCaptions 使用 PyAudioWPatch 访问 Windows WASAPI。系统输出通过 loopback 设备采集，麦克风列表只包含真实输入设备，不把 loopback 重复显示为麦克风。
+Nola Translator 使用 PyAudioWPatch 访问 Windows WASAPI。系统输出通过 loopback 设备采集，麦克风列表只包含真实输入设备，不把 loopback 重复显示为麦克风。
 
 ## 设备标识
 

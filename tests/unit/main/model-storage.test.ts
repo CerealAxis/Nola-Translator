@@ -7,7 +7,7 @@ describe('model storage', () => {
   it('points the model directory at the default root and forces offline model loads', () => {
     const root = join(tmpdir(), 'user-data')
     const env = modelStorageEnvironment(root)
-    expect(env.FLUENTCAPTIONS_MODEL_DIR).toBe(join(root, 'models'))
+    expect(env.NOLA_TRANSLATOR_MODEL_DIR).toBe(join(root, 'models'))
     expect(env.HF_HUB_OFFLINE).toBe('1')
     expect(env.TRANSFORMERS_OFFLINE).toBe('1')
     // Argos XDG 变量与 HF 缓存变量不再下发；下载走应用自带管理器。
@@ -23,7 +23,7 @@ describe('model storage', () => {
   it('puts models and large temporary/cache files on the selected drive', () => {
     const root = join(tmpdir(), 'custom-models')
     const env = modelStorageEnvironment(join(tmpdir(), 'old'), root)
-    for (const key of ['FLUENTCAPTIONS_MODEL_DIR', 'TEMP', 'TMP', 'TMPDIR']) {
+    for (const key of ['NOLA_TRANSLATOR_MODEL_DIR', 'TEMP', 'TMP', 'TMPDIR']) {
       expect(env[key].startsWith(root)).toBe(true)
     }
     expect(env.HF_HUB_OFFLINE).toBe('1')
@@ -32,18 +32,18 @@ describe('model storage', () => {
 
   it('keeps absolute drive-letter roots and falls back for relative ones', () => {
     const userData = join(tmpdir(), 'user-data')
-    expect(modelStorageEnvironment(userData, 'relative/models').FLUENTCAPTIONS_MODEL_DIR).toBe(join(userData, 'models'))
+    expect(modelStorageEnvironment(userData, 'relative/models').NOLA_TRANSLATOR_MODEL_DIR).toBe(join(userData, 'models'))
     if (process.platform === 'win32') {
-      const drive = modelStorageEnvironment(userData, 'd:\\Models\\FluentCaptions')
-      expect(drive.FLUENTCAPTIONS_MODEL_DIR.startsWith('d:\\')).toBe(true)
+      const drive = modelStorageEnvironment(userData, 'd:\\Models\\Nola Translator')
+      expect(drive.NOLA_TRANSLATOR_MODEL_DIR.startsWith('d:\\')).toBe(true)
       expect(drive.TEMP.startsWith('d:\\')).toBe(true)
       const unc = modelStorageEnvironment(userData, '\\\\server\\share\\models')
-      expect(unc.FLUENTCAPTIONS_MODEL_DIR.startsWith('\\\\server\\share')).toBe(true)
+      expect(unc.NOLA_TRANSLATOR_MODEL_DIR.startsWith('\\\\server\\share')).toBe(true)
     }
   })
 
   it('checks a writable directory without leaving probe files', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'fc-storage-'))
+    const root = await mkdtemp(join(tmpdir(), 'nola-storage-'))
     try {
       expect(await validateModelStorageDirectory(root)).toBe(root)
       expect(await readdir(root)).toEqual([])
@@ -56,7 +56,7 @@ describe('model storage', () => {
   })
 
   it('reads engine runtime status with full tolerance', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'fc-engine-status-'))
+    const root = await mkdtemp(join(tmpdir(), 'nola-engine-status-'))
     try {
       expect(await readEngineStatus(root)).toBeNull()
 

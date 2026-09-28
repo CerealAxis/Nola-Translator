@@ -28,7 +28,7 @@ export function AppearancePage(): React.JSX.Element {
   const { t } = useI18n()
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS)
   const [notice, setNotice] = useState('正在读取设置…')
-  const api = window.fluentCaptions
+  const api = window.nolaTranslator
 
   const activeRef = useRef(true)
   const pendingOverlay = useRef<Partial<OverlaySettings>>({})

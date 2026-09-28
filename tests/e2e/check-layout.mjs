@@ -24,15 +24,15 @@ const update = async (patch) => {
   settings = {...settings, ...patch, recognition:{...settings.recognition,...patch.recognition}, overlay:{...settings.overlay,...patch.overlay}, translation:{...settings.translation,...patch.translation}};
   settingsListeners.forEach(fn=>fn(settings)); return settings;
 };
-contextBridge.exposeInMainWorld('fluentCaptions', {
+contextBridge.exposeInMainWorld('nolaTranslator', {
   getSettings:async()=>settings, updateSettings:update,
   onSettingsChanged:fn=>{settingsListeners.add(fn); return ()=>settingsListeners.delete(fn)},
   onEngineEvent:fn=>{eventListeners.add(fn); return ()=>eventListeners.delete(fn)},
-  listDevices:async()=>[], listResources:async()=>({storagePath:'D:/Models/FluentCaptions/very-long-folder-name-for-model-downloads/models',resources:[${JSON.stringify(recognitionResource)},${JSON.stringify(recognitionSmallResource)},${JSON.stringify(translationResource)},${JSON.stringify(m2m100Resource)}]}),
-  getModelStorage:async()=>({activePath:'D:/Models/FluentCaptions', configuredPath:'E:/Downloads/models-and-translation-packages/another-long-directory',restartRequired:true}),
+  listDevices:async()=>[], listResources:async()=>({storagePath:'D:/Models/Nola Translator/very-long-folder-name-for-model-downloads/models',resources:[${JSON.stringify(recognitionResource)},${JSON.stringify(recognitionSmallResource)},${JSON.stringify(translationResource)},${JSON.stringify(m2m100Resource)}]}),
+  getModelStorage:async()=>({activePath:'D:/Models/Nola Translator', configuredPath:'E:/Downloads/models-and-translation-packages/another-long-directory',restartRequired:true}),
   chooseModelStorageDirectory:async()=>null, restartApp:async()=>{},
   listHistory:async()=>[], clearHistory:async()=>{},exportHistory:async()=>null,
-  getDiagnostics:async()=>({'引擎状态':'ready','语音识别':'Qwen3-ASR 1.7B（nf4）','本地翻译':'Hy-MT2 · llama.cpp（cuda）','数据目录':'D:/Models/FluentCaptions/very-long-folder-name-for-model-downloads'}),
+  getDiagnostics:async()=>({'引擎状态':'ready','语音识别':'Qwen3-ASR 1.7B（nf4）','本地翻译':'Hy-MT2 · llama.cpp（cuda）','数据目录':'D:/Models/Nola Translator/very-long-folder-name-for-model-downloads'}),
   copyDiagnostics:async()=>{}, hasTranslationCredential:async()=>false,setTranslationCredential:async()=>{},
   showOverlay:async()=>{},hideOverlay:async()=>{},startSession:async()=>({sessionId:'layout'}),stopSession:async()=>{},
   resizeOverlay:async()=>{},openAppearance:async()=>{},onOpenAppearance:()=>()=>{}
@@ -63,7 +63,7 @@ async function main() {
   await window.loadFile(resolve('out/renderer/index.html'))
   const failures = []
   for (const language of ['zh-CN', 'en']) {
-    await window.webContents.executeJavaScript(`window.fluentCaptions.updateSettings({uiLanguage:${JSON.stringify(language)}})`)
+    await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings({uiLanguage:${JSON.stringify(language)}})`)
     for (const width of [760, 900, 901, 1100]) {
       window.setContentSize(width, 780)
       for (let index = 0; index < pages.length; index++) {
@@ -82,7 +82,7 @@ async function main() {
   }
   // Real mouse input: DOM .click() cannot detect the titlebar drag-region swallowing the language button.
   window.setContentSize(1100, 780)
-  await window.webContents.executeJavaScript(`window.fluentCaptions.updateSettings({uiLanguage:'zh-CN'})`)
+  await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings({uiLanguage:'zh-CN'})`)
   await settle(window)
   const clickAt = async (selector) => {
     const point = await window.webContents.executeJavaScript(`(() => {
@@ -156,7 +156,7 @@ async function main() {
   const settled = await overlay.webContents.executeJavaScript(`document.querySelectorAll('.overlay-track-source .overlay-track-in').length`)
   if (settled !== 1) failures.push({ language: 'overlay', page: 'roll-settled', rows: settled })
   await writeFile(resolve(output, 'overlay-bilingual.png'), (await overlay.webContents.capturePage()).toPNG())
-  await overlay.webContents.executeJavaScript(`window.fluentCaptions.updateSettings({overlay:{fontSize:72,translationFontSize:72,locked:false}})`)
+  await overlay.webContents.executeJavaScript(`window.nolaTranslator.updateSettings({overlay:{fontSize:72,translationFontSize:72,locked:false}})`)
   await settle(overlay)
   const largeState = await overlay.webContents.executeJavaScript(`(() => {
     const panel = document.querySelector('.caption-console')

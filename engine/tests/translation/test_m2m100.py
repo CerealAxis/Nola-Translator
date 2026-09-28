@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from fluentcaptions_engine.translation import m2m100 as m2m100_module
-from fluentcaptions_engine.translation.m2m100 import (
+from nola_translator_engine.translation import m2m100 as m2m100_module
+from nola_translator_engine.translation.m2m100 import (
     M2M100Runtime,
     M2M100TranslationProvider,
     UnsupportedLanguagePair,

@@ -92,12 +92,9 @@ button { color: inherit; }
 .app-mark {
   width: 28px;
   height: 28px;
-  display: grid;
-  place-items: center;
-  border-radius: 7px;
-  background: var(--accent);
-  color: var(--accent-foreground);
-  font-weight: 600;
+  display: block;
+  flex: none;
+  object-fit: contain;
 }
 
 .app-name { font-size: 13px; font-weight: 600; }

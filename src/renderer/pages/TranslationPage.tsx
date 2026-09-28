@@ -12,7 +12,7 @@ export function TranslationPage({ onOpenResources }: TranslationPageProps): Reac
   const [credential, setCredential] = useState('')
   const [hasCredential, setHasCredential] = useState(false)
   const [notice, setNotice] = useState('Hy-MT2 默认在本机运行。')
-  const api = window.fluentCaptions
+  const api = window.nolaTranslator
 
   useEffect(() => {
     if (!api) return

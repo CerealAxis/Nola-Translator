@@ -6,7 +6,7 @@ import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 
 describe('App', () => {
   it('waits for resource inspection before showing the main window', async () => {
-    const api = window.fluentCaptions!
+    const api = window.nolaTranslator!
     const original = api.listResources
     let finish!: (value: Awaited<ReturnType<typeof api.listResources>>) => void
     const pending = new Promise<Awaited<ReturnType<typeof api.listResources>>>((resolve) => { finish = resolve })
@@ -45,7 +45,7 @@ describe('App', () => {
   })
 
   it('starts without translation targets when translated text is hidden', async () => {
-    const api = window.fluentCaptions!
+    const api = window.nolaTranslator!
     const getSettings = vi.spyOn(api, 'getSettings').mockResolvedValue({
       ...DEFAULT_SETTINGS,
       overlay: { ...DEFAULT_SETTINGS.overlay, showTranslation: false },
@@ -96,7 +96,7 @@ describe('App', () => {
   })
 
   it('hides the overlay and enters free unlocked adjustment mode', async () => {
-    const api = window.fluentCaptions!
+    const api = window.nolaTranslator!
     const hideOverlay = vi.spyOn(api, 'hideOverlay')
     const showOverlay = vi.spyOn(api, 'showOverlay')
     const updateSettings = vi.spyOn(api, 'updateSettings').mockImplementation(async (patch) => ({

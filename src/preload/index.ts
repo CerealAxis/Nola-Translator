@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-import type { FluentCaptionsApi } from '../shared/bridge'
+import type { NolaTranslatorApi } from '../shared/bridge'
 import type { EngineEvent, SessionConfig } from '../shared/contracts'
 
 const channels = {
@@ -22,7 +22,7 @@ const channels = {
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
 } as const
 
-const api: FluentCaptionsApi = {
+const api: NolaTranslatorApi = {
   listDevices: () => ipcRenderer.invoke(channels.listDevices),
   listResources: () => ipcRenderer.invoke(channels.listResources),
   manageResource: (resourceId, action) => ipcRenderer.invoke(channels.manageResource, resourceId, action),
@@ -61,4 +61,4 @@ const api: FluentCaptionsApi = {
   setTranslationCredential: (provider, value) => ipcRenderer.invoke(channels.setTranslationCredential, provider, value),
 }
 
-contextBridge.exposeInMainWorld('fluentCaptions', api)
+contextBridge.exposeInMainWorld('nolaTranslator', api)

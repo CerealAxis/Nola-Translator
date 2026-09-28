@@ -1,6 +1,6 @@
 # Electron 与 Python 通信协议
 
-FluentCaptions 的 Electron 主进程通过标准输入和标准输出管理独立 Python 引擎。协议采用 UTF-8 JSON Lines：每条消息占一行，当前 `protocolVersion` 固定为 `1`。
+Nola Translator 的 Electron 主进程通过标准输入和标准输出管理独立 Python 引擎。协议采用 UTF-8 JSON Lines：每条消息占一行，当前 `protocolVersion` 固定为 `1`。
 
 ## 边界与安全约束
 
@@ -33,7 +33,7 @@ sequenceDiagram
 
 启动后 10 秒内没有收到 `ready` 即视为失败。异常退出最多自动重启三次，默认退避为 250 ms、1 秒和 4 秒；用户主动退出不会触发重启。
 
-开发态使用项目已有的 `.venv\\Scripts\\python.exe -m fluentcaptions_engine`；打包后使用 `resources\\engine\\FluentCaptionsEngine.exe`，最终用户无需安装 Python。
+开发态使用项目已有的 `.venv\\Scripts\\python.exe -m nola_translator_engine`；打包后使用 `resources\\engine\\NolaTranslatorEngine.exe`，最终用户无需安装 Python。
 
 ## 会话配置
 

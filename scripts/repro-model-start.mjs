@@ -3,19 +3,19 @@ import { createInterface } from 'node:readline';
 import { resolve } from 'node:path';
 import process from 'node:process';
 
-const enginePath = process.argv[2] ?? resolve('release/win-unpacked/resources/engine/FluentCaptionsEngine.exe');
+const enginePath = process.argv[2] ?? resolve('release/win-unpacked/resources/engine/NolaTranslatorEngine.exe');
 const modelDirectory = process.argv[3];
 if (!modelDirectory) {
   throw new Error('用法：node scripts/repro-model-start.mjs <engine.exe> <models目录>');
 }
 
 const isPython = /python(?:\.exe)?$/i.test(enginePath);
-const engine = spawn(enginePath, isPython ? ['-m', 'fluentcaptions_engine'] : [], {
+const engine = spawn(enginePath, isPython ? ['-m', 'nola_translator_engine'] : [], {
   stdio: ['pipe', 'pipe', 'pipe'],
   windowsHide: true,
   env: {
     ...process.env,
-    FLUENTCAPTIONS_MODEL_DIR: modelDirectory,
+    NOLA_TRANSLATOR_MODEL_DIR: modelDirectory,
     PYTHONPATH: isPython ? resolve('engine') : process.env.PYTHONPATH,
   },
 });

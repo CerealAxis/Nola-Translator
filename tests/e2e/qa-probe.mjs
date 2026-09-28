@@ -8,7 +8,7 @@ const settings = { version:1, theme:'system', uiLanguage:'zh-CN', modelStoragePa
 const preload = `
 const {contextBridge} = require('electron');
 let settings = ${JSON.stringify(settings)}; const sl=new Set(), el=new Set();
-contextBridge.exposeInMainWorld('fluentCaptions', {
+contextBridge.exposeInMainWorld('nolaTranslator', {
   getSettings:async()=>settings, updateSettings:async(p)=>{settings={...settings,...p,recognition:{...settings.recognition,...p.recognition},overlay:{...settings.overlay,...p.overlay},translation:{...settings.translation,...p.translation}};sl.forEach(f=>f(settings));return settings},
   onSettingsChanged:f=>{sl.add(f);return()=>sl.delete(f)}, onEngineEvent:f=>{el.add(f);return()=>el.delete(f)},
   listDevices:async()=>[], listResources:async()=>({storagePath:'x',resources:[]}), getModelStorage:async()=>null,

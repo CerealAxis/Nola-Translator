@@ -15,7 +15,7 @@ from numpy.typing import NDArray
 
 SAMPLE_RATE = 16_000
 MAX_NEW_TOKENS = 512
-QUANT_ENV_VAR = "FLUENTCAPTIONS_QWEN_QUANT"
+QUANT_ENV_VAR = "NOLA_TRANSLATOR_QWEN_QUANT"
 VALID_QUANTS = ("nf4", "8bit")
 
 # S4 钉值：Qwen3-ASR 支持的 30 种语言（协议码 ↔ 官方全名）。

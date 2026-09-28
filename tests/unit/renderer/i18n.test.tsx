@@ -28,7 +28,7 @@ describe('界面语言切换', () => {
   })
 
   it('保存失败时回滚语言并显示错误提示', async () => {
-    const api = window.fluentCaptions!
+    const api = window.nolaTranslator!
     const updateSettings = vi.spyOn(api, 'updateSettings').mockRejectedValueOnce(new Error('disk full'))
     render(<App />)
     await screen.findByRole('heading', { name: '实时字幕', level: 1 })
@@ -42,7 +42,7 @@ describe('界面语言切换', () => {
   })
 
   it('英文界面下字幕正文保持原文', async () => {
-    const api = window.fluentCaptions!
+    const api = window.nolaTranslator!
     vi.spyOn(api, 'getSettings').mockResolvedValue({ ...DEFAULT_SETTINGS, uiLanguage: 'en' })
     let listener: ((event: EngineEvent) => void) | undefined
     vi.spyOn(api, 'onEngineEvent').mockImplementation((next) => {

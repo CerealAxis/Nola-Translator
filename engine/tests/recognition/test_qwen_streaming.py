@@ -9,16 +9,16 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
-from fluentcaptions_engine.audio.resample import AudioFrame
-from fluentcaptions_engine.recognition.qwen_runtime import (
+from nola_translator_engine.audio.resample import AudioFrame
+from nola_translator_engine.recognition.qwen_runtime import (
     QwenModelUnavailable,
     get_qwen_runtime,
 )
-from fluentcaptions_engine.recognition.qwen_streaming import (
+from nola_translator_engine.recognition.qwen_streaming import (
     QwenStreamingRecognizer,
     create_qwen_recognizer,
 )
-from fluentcaptions_engine.recognition.volume_gate import VolumeGateSegmenter
+from nola_translator_engine.recognition.volume_gate import VolumeGateSegmenter
 
 FRAME_SAMPLES = 320
 FRAME_MS = 20

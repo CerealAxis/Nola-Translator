@@ -1,11 +1,11 @@
 import '@testing-library/jest-dom/vitest'
 
-Object.defineProperty(window, 'fluentCaptions', {
+Object.defineProperty(window, 'nolaTranslator', {
   configurable: true,
   writable: true,
   value: {
     listDevices: async () => [],
-    listResources: async () => ({ storagePath: 'C:\\FluentCaptions\\models', resources: [
+    listResources: async () => ({ storagePath: 'C:\\Nola Translator\\models', resources: [
       { resourceId: 'qwen3-asr-1.7b-hf', kind: 'recognitionModel', provider: 'qwen3-asr', name: 'Qwen3-ASR 1.7B', description: '测试模型', languages: ['zh', 'en'], installed: true, installedBytes: 1, state: 'idle', cancellable: false },
       { resourceId: 'hy-mt2-1.8b-q4-k-m', kind: 'translationModel', provider: 'hy-mt2', name: 'Hy-MT2 1.8B Q4_K_M', description: '测试翻译模型', languages: ['zh', 'en'], installed: true, installedBytes: 1, state: 'idle', cancellable: false },
     ] }),

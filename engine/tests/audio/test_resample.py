@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from fluentcaptions_engine.audio.resample import FRAME_SAMPLES, StreamingAudioNormalizer
+from nola_translator_engine.audio.resample import FRAME_SAMPLES, StreamingAudioNormalizer
 
 
 @pytest.mark.parametrize(("sample_rate", "channels"), [(44_100, 1), (48_000, 2)])

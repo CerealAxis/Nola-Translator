@@ -3,11 +3,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from fluentcaptions_engine.recognition.base import RecognitionUpdate
-from fluentcaptions_engine.runtime import EngineRuntime
-from fluentcaptions_engine.translation.base import ProviderTranslation
-from fluentcaptions_engine.translation.scheduler import TranslationScheduler
-from fluentcaptions_engine.protocol import Translation
+from nola_translator_engine.recognition.base import RecognitionUpdate
+from nola_translator_engine.runtime import EngineRuntime
+from nola_translator_engine.translation.base import ProviderTranslation
+from nola_translator_engine.translation.scheduler import TranslationScheduler
+from nola_translator_engine.protocol import Translation
 
 
 class ImmediateProvider:
@@ -212,9 +212,9 @@ async def test_stale_translation_completion_is_not_emitted(tmp_path) -> None:
 
 @pytest.mark.asyncio
 async def test_hymt2_missing_model_fails_targets_without_network(tmp_path) -> None:
-    from fluentcaptions_engine.runtime import TranslationRequest
-    from fluentcaptions_engine.translation.hymt2 import HyMt2TranslationProvider
-    from fluentcaptions_engine.translation.llama_server import LlamaServerManager
+    from nola_translator_engine.runtime import TranslationRequest
+    from nola_translator_engine.translation.hymt2 import HyMt2TranslationProvider
+    from nola_translator_engine.translation.llama_server import LlamaServerManager
 
     runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
     runtime.translation_scheduler = TranslationScheduler(
@@ -232,9 +232,9 @@ async def test_hymt2_missing_model_fails_targets_without_network(tmp_path) -> No
 
 @pytest.mark.asyncio
 async def test_hymt2_server_not_ready_fails_targets(tmp_path, monkeypatch) -> None:
-    from fluentcaptions_engine.runtime import TranslationRequest
-    from fluentcaptions_engine.translation.hymt2 import HyMt2TranslationProvider
-    from fluentcaptions_engine.translation.llama_server import LlamaServerManager
+    from nola_translator_engine.runtime import TranslationRequest
+    from nola_translator_engine.translation.hymt2 import HyMt2TranslationProvider
+    from nola_translator_engine.translation.llama_server import LlamaServerManager
 
     runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
     monkeypatch.setattr(runtime.resources, 'is_installed', lambda _rid: True)
@@ -251,9 +251,9 @@ async def test_hymt2_server_not_ready_fails_targets(tmp_path, monkeypatch) -> No
 
 @pytest.mark.asyncio
 async def test_hymt2_unsupported_target_language_fails_that_target(tmp_path, monkeypatch) -> None:
-    from fluentcaptions_engine.runtime import TranslationRequest
-    from fluentcaptions_engine.translation.hymt2 import HyMt2TranslationProvider
-    from fluentcaptions_engine.translation.llama_server import LlamaServerManager
+    from nola_translator_engine.runtime import TranslationRequest
+    from nola_translator_engine.translation.hymt2 import HyMt2TranslationProvider
+    from nola_translator_engine.translation.llama_server import LlamaServerManager
 
     runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
     monkeypatch.setattr(runtime.resources, 'is_installed', lambda _rid: True)
@@ -270,8 +270,8 @@ async def test_hymt2_unsupported_target_language_fails_that_target(tmp_path, mon
 
 @pytest.mark.asyncio
 async def test_m2m100_missing_model_fails_targets_without_network(tmp_path) -> None:
-    from fluentcaptions_engine.runtime import TranslationRequest
-    from fluentcaptions_engine.translation.m2m100 import M2M100TranslationProvider
+    from nola_translator_engine.runtime import TranslationRequest
+    from nola_translator_engine.translation.m2m100 import M2M100TranslationProvider
 
     runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
     runtime.translation_scheduler = TranslationScheduler(
@@ -290,8 +290,8 @@ async def test_m2m100_missing_model_fails_targets_without_network(tmp_path) -> N
 async def test_m2m100_unsupported_target_language_fails_that_target(
     tmp_path, monkeypatch
 ) -> None:
-    from fluentcaptions_engine.runtime import TranslationRequest
-    from fluentcaptions_engine.translation.m2m100 import M2M100TranslationProvider
+    from nola_translator_engine.runtime import TranslationRequest
+    from nola_translator_engine.translation.m2m100 import M2M100TranslationProvider
 
     runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
     monkeypatch.setattr(runtime.resources, 'is_installed', lambda _rid: True)

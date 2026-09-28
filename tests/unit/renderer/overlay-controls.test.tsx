@@ -9,7 +9,7 @@ afterEach(() => vi.restoreAllMocks())
 
 function listen(): { emit: (event: EngineEvent) => void } {
   let listener: ((event: EngineEvent) => void) | undefined
-  vi.spyOn(window.fluentCaptions!, 'onEngineEvent').mockImplementation((next) => {
+  vi.spyOn(window.nolaTranslator!, 'onEngineEvent').mockImplementation((next) => {
     listener = next
     return () => undefined
   })
@@ -50,7 +50,7 @@ it('extends a live sentence in place and keeps its translation while the next re
 })
 
 it('shows the reference console controls and keeps close usable when locked', async () => {
-  const api = window.fluentCaptions!
+  const api = window.nolaTranslator!
   const settings = { ...DEFAULT_SETTINGS, overlay: { ...DEFAULT_SETTINGS.overlay, locked: true } }
   vi.spyOn(api, 'getSettings').mockResolvedValue(settings)
   const save = vi.spyOn(api, 'updateSettings').mockResolvedValue({ ...settings, overlay: { ...settings.overlay, locked: false, mode: 'free' } })
@@ -98,7 +98,7 @@ it('delays translation rollover even when a new caption includes both languages'
 })
 
 it('applies separate typography and a fully transparent background', async () => {
-  vi.spyOn(window.fluentCaptions!, 'getSettings').mockResolvedValue({
+  vi.spyOn(window.nolaTranslator!, 'getSettings').mockResolvedValue({
     ...DEFAULT_SETTINGS,
     overlay: { ...DEFAULT_SETTINGS.overlay, backgroundOpacity: 0, maxLines: 2, translationMaxLines: 5, translationFontSize: 31 },
   })

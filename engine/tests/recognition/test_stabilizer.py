@@ -1,6 +1,6 @@
 import pytest
 
-from fluentcaptions_engine.recognition.stabilizer import (
+from nola_translator_engine.recognition.stabilizer import (
     FinalTranscriptDeduplicator,
     RecognitionStabilizer,
 )

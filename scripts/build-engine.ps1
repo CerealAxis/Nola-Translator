@@ -13,7 +13,7 @@ if (-not (Test-Path $python)) {
     --noconfirm `
     --clean `
     --onedir `
-    --name FluentCaptionsEngine `
+    --name NolaTranslatorEngine `
     --distpath (Join-Path $engineRoot 'dist') `
     --workpath (Join-Path $engineRoot 'build') `
     --specpath (Join-Path $engineRoot 'build') `

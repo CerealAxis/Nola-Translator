@@ -1,6 +1,6 @@
-# FluentCaptions
+# Nola Translator
 
-FluentCaptions 是一款面向 Windows 11 的实时字幕与翻译应用。它使用 Electron + React 构建 Fluent 风格界面，使用独立 Python 引擎完成 Windows 音频捕获、语音识别和翻译。
+Nola Translator 是一款面向 Windows 11 的实时字幕与翻译应用。它使用 Electron + React 构建 Fluent 风格界面，使用独立 Python 引擎完成 Windows 音频捕获、语音识别和翻译。
 
 ## 已实现功能
 
@@ -25,7 +25,7 @@ FluentCaptions 是一款面向 Windows 11 的实时字幕与翻译应用。它�
 
 ## 直接运行开发版
 
-本项目统一使用 npm，不使用 pnpm 或 Yarn。脚本优先使用项目现有 `.venv`，缺少时才用本机 `python` 创建；npm 使用 npmmirror，Python 使用阿里云 PyPI 镜像（torch 单独从 PyTorch CUDA 索引钉下 `2.13.0+cu126`，可编辑安装不会用 CPU 构建替换它）。
+本项目使用 Node.js 24、npm 11、Python 3.13 和 Windows 11。开发脚本优先使用项目现有 `.venv`，缺少时会创建虚拟环境。依赖从 npm、PyPI 和 PyTorch 官方源安装。
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass

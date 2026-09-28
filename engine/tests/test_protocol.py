@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from fluentcaptions_engine.protocol import (
+from nola_translator_engine.protocol import (
     MAX_PROTOCOL_LINE_BYTES,
     StatusEvent,
     parse_command_line,

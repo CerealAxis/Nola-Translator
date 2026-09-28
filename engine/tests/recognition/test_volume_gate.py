@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from fluentcaptions_engine.audio.resample import AudioFrame
-from fluentcaptions_engine.recognition.volume_gate import (
+from nola_translator_engine.audio.resample import AudioFrame
+from nola_translator_engine.recognition.volume_gate import (
     SegmentSnapshot,
     VolumeGateSegment,
     VolumeGateSegmenter,

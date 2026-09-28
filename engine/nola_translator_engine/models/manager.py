@@ -53,7 +53,7 @@ class ModelSpec:
 
 
 def _download(url: str, destination: Path, progress: ProgressCallback) -> None:
-    request = Request(url, headers={"User-Agent": "FluentCaptions/0.1"})
+    request = Request(url, headers={"User-Agent": "Nola Translator/0.1"})
     with urlopen(request, timeout=30) as response, destination.open("wb") as output:
         total = int(response.headers.get("Content-Length", 0))
         current = 0

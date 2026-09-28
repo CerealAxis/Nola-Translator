@@ -49,7 +49,7 @@ export function Navigation({ activePage, activeSessionId, sessionStopping, onSto
   const { t } = useI18n()
   const [engineStatus, setEngineStatus] = useState('正在连接引擎')
   useEffect(() => {
-    const api = window.fluentCaptions
+    const api = window.nolaTranslator
     if (!api) {
       setEngineStatus('引擎接口不可用')
       return

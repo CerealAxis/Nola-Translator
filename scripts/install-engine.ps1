@@ -7,11 +7,10 @@ if (-not (Test-Path $venvPython)) {
     python -m venv (Join-Path $projectRoot '.venv')
 }
 
-# 钉下 CUDA 版 torch：必须在可编辑安装之前，否则 pip 会从 Aliyun 镜像解析出 CPU 构建替换掉 +cu126。
+# 钉下 CUDA 版 torch：必须在可编辑安装之前，避免可编辑安装解析出 CPU 构建替换 CUDA 版。
 & $venvPython -m pip install `
     --index-url 'https://download.pytorch.org/whl/cu126' `
     'torch==2.13.0'
 
 & $venvPython -m pip install `
-    --index-url 'https://mirrors.aliyun.com/pypi/simple' `
     --editable "$projectRoot\engine[dev]"

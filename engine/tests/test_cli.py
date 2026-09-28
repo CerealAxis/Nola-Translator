@@ -2,7 +2,7 @@ import json
 import subprocess
 import sys
 
-from fluentcaptions_engine.protocol import MAX_PROTOCOL_LINE_BYTES
+from nola_translator_engine.protocol import MAX_PROTOCOL_LINE_BYTES
 
 
 def _send(process: subprocess.Popen[str], message: dict[str, object]) -> dict[str, object]:
@@ -15,7 +15,7 @@ def _send(process: subprocess.Popen[str], message: dict[str, object]) -> dict[st
 
 def test_jsonl_cli_handles_handshake_errors_size_limit_and_shutdown() -> None:
     process = subprocess.Popen(
-        [sys.executable, "-m", "fluentcaptions_engine"],
+        [sys.executable, "-m", "nola_translator_engine"],
         cwd="engine",
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,

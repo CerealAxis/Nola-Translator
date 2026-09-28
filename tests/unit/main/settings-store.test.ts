@@ -7,7 +7,7 @@ import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 
 describe('设置存储', () => {
   it('serializes concurrent patches and restores language/storage choices', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'fluentcaptions-settings-'))
+    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
     const path = join(directory, 'settings.json')
     try {
       const store = new SettingsStore(path)
@@ -26,7 +26,7 @@ describe('设置存储', () => {
   })
 
   it('损坏文件恢复默认值并原子保存更新', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'fluentcaptions-settings-'))
+    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
     const path = join(directory, 'settings.json')
     try {
       await writeFile(path, '{broken', 'utf8')
@@ -41,7 +41,7 @@ describe('设置存储', () => {
   })
 
   it('旧配置缺少新字段时回填默认值并归一化非法存储路径', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'fluentcaptions-settings-'))
+    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
     const path = join(directory, 'settings.json')
     try {
       await writeFile(path, JSON.stringify({ version: 1, theme: 'system', overlay: { mode: 'top' } }), 'utf8')
@@ -60,7 +60,7 @@ describe('设置存储', () => {
   })
 
   it('迁移旧版字幕默认配色但保留用户自定义颜色', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'fluentcaptions-settings-'))
+    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
     const path = join(directory, 'settings.json')
     try {
       await writeFile(path, JSON.stringify({
@@ -103,7 +103,7 @@ describe('设置存储', () => {
   })
 
   it('迁移旧识别模型 ID 与翻译 provider，并丢弃旧中转开关', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'fluentcaptions-settings-'))
+    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
     const path = join(directory, 'settings.json')
     try {
       for (const legacyModelId of ['sherpa-zh-en-small', 'sensevoice-small', 'faster-whisper-small', 'totally-unknown-model']) {

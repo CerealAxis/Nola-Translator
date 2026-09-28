@@ -14,7 +14,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-LLAMA_DIR_ENV = "FLUENTCAPTIONS_LLAMA_DIR"
+LLAMA_DIR_ENV = "NOLA_TRANSLATOR_LLAMA_DIR"
 DEFAULT_GGUF_RELATIVE = Path("hy-mt2-1.8b-q4-k-m") / "Hy-MT2-1.8B-Q4_K_M.gguf"
 _HOST = "127.0.0.1"
 _HEALTH_POLL_INTERVAL_S = 0.25
@@ -38,11 +38,11 @@ def resolve_llama_dir() -> Path | None:
 
 
 def default_gguf_path() -> Path:
-    """解析 Hy-MT2 GGUF 默认路径（FLUENTCAPTIONS_MODEL_DIR 或 LOCALAPPDATA）。"""
+    """解析 Hy-MT2 GGUF 默认路径（NOLA_TRANSLATOR_MODEL_DIR 或 LOCALAPPDATA）。"""
     model_root = Path(
         os.environ.get(
-            "FLUENTCAPTIONS_MODEL_DIR",
-            Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "FluentCaptions" / "models",
+            "NOLA_TRANSLATOR_MODEL_DIR",
+            Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Nola Translator" / "models",
         )
     )
     return model_root / DEFAULT_GGUF_RELATIVE

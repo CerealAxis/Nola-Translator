@@ -94,7 +94,7 @@ export function ResourcesPage(): React.JSX.Element {
   const [noticeValues, setNoticeValues] = useState<TranslationValues>({})
   const [loading, setLoading] = useState(true)
   const resourceName = (name: string): string => name.split(' · ')[0].split(' → ').map((part) => t(part)).join(' → ')
-  const api = window.fluentCaptions
+  const api = window.nolaTranslator
 
   const refresh = useCallback(async (): Promise<void> => {
     if (!api) return

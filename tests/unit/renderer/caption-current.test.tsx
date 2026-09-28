@@ -18,7 +18,7 @@ const captionEvent = (id: string, time: number, revision = 1, sessionId = 'sessi
 
 it('both surfaces keep the current sentence when an old translation or revision arrives', async () => {
   const listeners: ((event: EngineEvent) => void)[] = []
-  vi.spyOn(window.fluentCaptions!, 'onEngineEvent').mockImplementation((listener) => { listeners.push(listener); return () => undefined })
+  vi.spyOn(window.nolaTranslator!, 'onEngineEvent').mockImplementation((listener) => { listeners.push(listener); return () => undefined })
   const { container } = render(<><CaptionOverlay /><LiveCaptionsPage activeSessionId="session" onSessionStarted={() => undefined} onStopSession={async () => undefined} onOpenResources={() => undefined} /></>)
   await waitFor(() => expect(listeners).toHaveLength(2))
   act(() => {
@@ -61,7 +61,7 @@ it('applies the selected font and renders a bilingual appearance example', async
 })
 
 it('persists visibility, follows settings broadcasts and reports failed saves', async () => {
-  const api = window.fluentCaptions!
+  const api = window.nolaTranslator!
   let broadcast: Parameters<typeof api.onSettingsChanged>[0] | undefined
   vi.spyOn(api, 'onSettingsChanged').mockImplementation((listener) => { broadcast = listener; return () => undefined })
   const save = vi.spyOn(api, 'updateSettings').mockResolvedValue({ ...DEFAULT_SETTINGS, overlay: { ...DEFAULT_SETTINGS.overlay, showSource: false } })

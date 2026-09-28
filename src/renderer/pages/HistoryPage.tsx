@@ -9,7 +9,7 @@ export function HistoryPage(): React.JSX.Element {
   const [segments, setSegments] = useState<CaptionSegment[]>([])
   const [enabled, setEnabled] = useState(false)
   const [notice, setNotice] = useState('本次运行的字幕只保留在内存中。')
-  const api = window.fluentCaptions
+  const api = window.nolaTranslator
 
   const refresh = async (): Promise<void> => {
     if (!api) return

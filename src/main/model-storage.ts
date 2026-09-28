@@ -4,11 +4,11 @@ import { isAbsolute, join, normalize } from 'node:path'
 export function modelStorageEnvironment(userData: string, configuredPath = ''): Record<string, string> {
   const root = configuredPath && isAbsolute(configuredPath) ? normalize(configuredPath) : userData
   return {
-    FLUENTCAPTIONS_MODEL_DIR: join(root, 'models'),
+    NOLA_TRANSLATOR_MODEL_DIR: join(root, 'models'),
     TMP: join(root, 'cache', 'tmp'),
     TEMP: join(root, 'cache', 'tmp'),
     TMPDIR: join(root, 'cache', 'tmp'),
-    // 模型经应用自带下载管理器进入 FLUENTCAPTIONS_MODEL_DIR；加载时强制离线，禁止回落到网络。
+    // 模型经应用自带下载管理器进入 NOLA_TRANSLATOR_MODEL_DIR；加载时强制离线，禁止回落到网络。
     HF_HUB_OFFLINE: '1',
     TRANSFORMERS_OFFLINE: '1',
   }
@@ -50,7 +50,7 @@ export async function validateModelStorageDirectory(path: string): Promise<strin
   const root = normalize(path)
   await mkdir(root, { recursive: true })
   // Test actual creation instead of relying on Windows access-mode flags.
-  const probe = await mkdtemp(join(root, '.fluentcaptions-write-check-'))
+  const probe = await mkdtemp(join(root, '.nola-translator-write-check-'))
   await rmdir(probe)
   return root
 }

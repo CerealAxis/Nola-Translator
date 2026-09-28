@@ -5,13 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from fluentcaptions_engine.models.catalog import (
+from nola_translator_engine.models.catalog import (
     HYMT2_1_8B_Q4_K_M,
     M2M100_418M,
     QWEN3_ASR_0_6B_HF,
     QWEN3_ASR_1_7B_HF,
 )
-from fluentcaptions_engine.models.manager import (
+from nola_translator_engine.models.manager import (
     FileEntry,
     ModelIntegrityError,
     ModelManager,

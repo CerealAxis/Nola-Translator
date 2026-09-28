@@ -34,12 +34,12 @@ export function createEngineLaunchSpec(options: {
   resourcesPath: string
 }): EngineLaunchSpec {
   if (options.isPackaged) {
-    const command = join(options.resourcesPath, 'engine', 'FluentCaptionsEngine.exe')
+    const command = join(options.resourcesPath, 'engine', 'NolaTranslatorEngine.exe')
     return { command, args: [], cwd: dirname(command) }
   }
   return {
     command: join(options.appPath, '.venv', 'Scripts', 'python.exe'),
-    args: ['-m', 'fluentcaptions_engine'],
+    args: ['-m', 'nola_translator_engine'],
     cwd: join(options.appPath, 'engine'),
   }
 }

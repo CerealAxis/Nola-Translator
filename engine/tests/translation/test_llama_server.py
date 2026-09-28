@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from fluentcaptions_engine.translation.llama_server import (
+from nola_translator_engine.translation.llama_server import (
     LlamaServerError,
     LlamaServerManager,
     resolve_llama_dir,
@@ -322,22 +322,22 @@ async def _noop_sleep(seconds: float) -> None:
 def test_resolve_llama_dir_env_precedence(monkeypatch, tmp_path) -> None:
     custom = tmp_path / "custom-llama"
     custom.mkdir()
-    monkeypatch.setenv("FLUENTCAPTIONS_LLAMA_DIR", str(custom))
+    monkeypatch.setenv("NOLA_TRANSLATOR_LLAMA_DIR", str(custom))
     assert resolve_llama_dir() == custom
 
 
 def test_resolve_llama_dir_dev_fallback(monkeypatch) -> None:
-    monkeypatch.setenv("FLUENTCAPTIONS_LLAMA_DIR", "   ")
+    monkeypatch.setenv("NOLA_TRANSLATOR_LLAMA_DIR", "   ")
     resolved = resolve_llama_dir()
     assert resolved == Path(__file__).resolve().parents[3] / "vendor" / "llama"
 
 
 def test_resolve_llama_dir_packaged(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("FLUENTCAPTIONS_LLAMA_DIR", raising=False)
+    monkeypatch.delenv("NOLA_TRANSLATOR_LLAMA_DIR", raising=False)
     resources = tmp_path / "resources"
     engine_dir = resources / "engine"
     engine_dir.mkdir(parents=True)
-    exe = engine_dir / "FluentCaptionsEngine.exe"
+    exe = engine_dir / "NolaTranslatorEngine.exe"
     exe.write_bytes(b"MZ")
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "executable", str(exe))

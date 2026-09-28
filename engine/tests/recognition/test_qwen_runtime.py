@@ -9,8 +9,8 @@ import numpy as np
 import pytest
 import torch
 
-import fluentcaptions_engine.recognition.qwen_runtime as qwen_runtime
-from fluentcaptions_engine.recognition.qwen_runtime import (
+import nola_translator_engine.recognition.qwen_runtime as qwen_runtime
+from nola_translator_engine.recognition.qwen_runtime import (
     CheckpointLayoutMismatch,
     QwenModelUnavailable,
     QwenRuntime,
