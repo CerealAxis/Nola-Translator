@@ -1,31 +1,50 @@
 # Nola Translator
 
-Nola Translator 是一款面向 Windows 11 的实时字幕与翻译应用。它使用 Electron + React 构建 Fluent 风格界面，使用独立 Python 引擎完成 Windows 音频捕获、语音识别和翻译。
+**Real-time captions and translation for Windows 11.**
 
-## 已实现功能
+English | [简体中文](README.zh-CN.md)
 
-- 捕获 Windows 默认系统输出、指定输出设备或麦克风；
-- Qwen3-ASR 1.7B 本地流式识别：音量门限断句，识别期间持续输出中间结果，约 2 秒一块、识别对象为累计音频；
-- 单一识别模型：下载约 4GB 的 BF16 原始权重，加载时以 bitsandbytes NF4 4-bit 量化运行，支持中文、粤语、英文等 30 种语言与 22 种中文方言；
-- 首条中间字幕约需 2 秒语音加推理时间；
-- Hy-MT2 1.8B 本地翻译：预量化 Q4_K_M 单文件（约 1.13GB），由应用内置的 llama.cpp `llama-server` 在本机 GPU（CUDA）运行，显存不足时固定降级 CPU；
-- 同时选择中文、英文、日文等多个目标语言；
-- 默认只翻译最终字幕，可选开启“翻译中间结果”；
-- 可选 Microsoft Translator、OpenAI 兼容接口和本地 Ollama；
-- 独立“模型与资源”页面显示真实安装状态，由用户明确安装或删除识别模型与翻译模型；
-- 模型与下载缓存的位置可以在资源页修改，可选择其他磁盘，重启后生效；
-- 界面语言支持中文与 English，标题栏地球图标即时切换并记住选择；
-- API 密钥使用 Electron `safeStorage` 调用 Windows 加密能力保存，不写入普通设置文件；
-- 独立字幕浮层支持顶部、底部和自由位置，置顶、锁定、点击穿透、拖动、缩放；
-- 支持主题、字体、字号、字重、颜色、背景透明度、最大行数、原文/译文显示；
-- 默认仅在内存中保留字幕；用户明确开启后才写入磁盘；
-- 导出 TXT、SRT 和 WebVTT；
-- 支持浅色、深色、高对比度、系统文字缩放、减少动画、多显示器与独立 DPI；
-- 首版只构建 Windows x64，Electron 与 Python 协议保持架构无关。
+![Nola Translator interface concept](docs/images/nola-ui-preview.svg)
 
-## 直接运行开发版
+## Contents
 
-本项目使用 Node.js 24、npm 11、Python 3.13 和 Windows 11。开发脚本优先使用项目现有 `.venv`，缺少时会创建虚拟环境。依赖从 npm、PyPI 和 PyTorch 官方源安装。
+- [Overview](#overview)
+- [Features](#features)
+- [Getting started](#getting-started)
+- [Usage](#usage)
+- [Project structure](#project-structure)
+- [Architecture](#architecture)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Overview
+
+Nola Translator captures system audio or microphone input, transcribes speech, and displays original and translated captions in a separate overlay. The desktop app is built with Electron, React, and TypeScript; a Python engine handles audio capture, speech recognition, and translation.
+
+## Features
+
+- Capture the default Windows output device, a selected output device, or a microphone.
+- Run Qwen3-ASR locally for speech recognition and Hy-MT2 or M2M100 locally for translation.
+- Translate into multiple target languages, with optional translation of interim captions.
+- Use Microsoft Translator, an OpenAI-compatible API, or local Ollama when configured.
+- Position, resize, lock, and make the independent caption overlay click-through.
+- Adjust caption typography, colors, opacity, and original/translation display.
+- Export saved captions as TXT, SRT, or WebVTT.
+- Switch the app between Chinese and English; use light, dark, or high-contrast themes.
+- Keep caption history in memory by default. Disk storage is opt-in.
+
+## Getting started
+
+### Requirements
+
+- Windows 11 x64
+- Node.js 24 and npm 11
+- Python 3.13
+
+### Install and run
+
+From the project root, run:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
@@ -35,61 +54,66 @@ Set-ExecutionPolicy -Scope Process Bypass
 npm run dev
 ```
 
-`fetch-llama.ps1` 按钉死的 b11211 版本下载 llama.cpp CUDA 运行时并校验 sha256，解压到 `vendor/llama/`（gitignored，已就绪时直接跳过）；缺少它时 Hy-MT2 本地翻译不可用。
+The install scripts set up the JavaScript and Python dependencies. `fetch-llama.ps1` installs the pinned local llama.cpp runtime used by Hy-MT2.
 
-首次使用前，请打开“模型与资源”页面安装两个本地资源：
+Open **Models & Resources** in the app to install the recognition and translation models you want to use. Model downloads start only when you select them there. The model and download-cache locations can be changed on that page.
 
-- **Qwen3-ASR 1.7B · 本地流式识别**：下载约 4GB 的 BF16 原始权重（逐文件校验大小与 sha256），加载时以 NF4 4-bit 量化运行；
-- **Hy-MT2 1.8B · 本地翻译模型**：下载约 1.13GB 的预量化 Q4_K_M 单文件，同样逐文件校验。
+## Usage
 
-模型页会显示当前安装状态与描述；安装均在资源页显式触发，可随时删除后重新安装。
+1. Select an audio source, source language, and target languages on **Live Captions**.
+2. Choose the original and translated text to display, then start the session.
+3. Adjust the separate subtitle overlay on **Appearance**.
+4. Enable history saving on **History** if you want captions retained after closing the app.
 
-“开始字幕”只检查本地资源，不会下载、更新或安装任何内容；缺少模型时会给出明确提示并引导到资源页。
+Local recognition and translation can run offline after their resources are installed. Microsoft Translator and OpenAI-compatible translation require their respective services. API keys are stored through Electron `safeStorage`.
 
-下载完成后，本地识别与 Hy-MT2/Ollama 翻译可以离线运行。Microsoft Translator 和 OpenAI 兼容接口只有在用户主动选择并配置后才联网。
+## Project structure
 
-## 调整和关闭字幕浮层
+```text
+assets/brand/                  Logo and brand assets
+docs/                          Design and implementation notes
+engine/nola_translator_engine/  Python audio, recognition, and translation engine
+engine/tests/                   Python tests
+scripts/                        Setup and build scripts
+src/main/                       Electron main process
+src/preload/                    IPC bridge
+src/renderer/                   React interface
+src/shared/                     Shared contracts and settings
+tests/                          Application tests
+```
 
-在“外观”页面顶部可以直接控制独立字幕浮层：
+## Architecture
 
-- 点击“调整位置和大小”会切换到自由位置并解除点击穿透；拖动浮层可移动，拖动窗口边缘或右下角可缩放；
-- 调整完成后点击浮层右上角的“完成调整”，重新锁定并恢复点击穿透；
-- 点击主窗口或调整浮层中的“隐藏浮层”即可立即关闭浮层；需要时点击“显示浮层”重新显示。
+```text
+React UI ── preload IPC ── Electron main ── JSONL protocol ── Python engine
+                                                       ├─ audio capture
+                                                       ├─ Qwen3-ASR
+                                                       └─ translation
+```
 
-## 验证与构建
+See [implementation notes](docs/implementation.md), the [audio pipeline](docs/audio.md), and the [Electron–Python protocol](docs/protocol.md).
+
+## Development
 
 ```powershell
-npm test
 npm run typecheck
+npm test
 .\.venv\Scripts\python.exe -m pytest engine\tests
 npm run build
 ```
 
-构建 Windows x64 安装包：
+To build the Windows x64 installer:
 
 ```powershell
 npm run dist:win
 ```
 
-安装包输出到 `release\`。打包版自带 Python sidecar（包含 torch、transformers、bitsandbytes、accelerate 等识别运行时）与 llama.cpp 运行时（经 electron-builder `extraResources` 放入 `resources\llama\`），最终用户不需要安装 Node.js 或 Python。识别模型与翻译模型不放入安装包，由用户在资源页明确下载。
+The installer is written to `release\`. It bundles the Python sidecar and llama.cpp runtime; recognition and translation models are downloaded separately in the app.
 
-## 隐私与数据位置
+## Contributing
 
-- 原始音频从不写入磁盘；
-- 字幕历史默认关闭，只保留在当前进程内存；
-- 开启保存后，最终字幕写入 Electron `userData` 目录；
-- 模型、普通设置与加密凭据分别存放；模型与下载缓存目录可改到其他磁盘；首次启动会把旧版应用数据复制到新目录，且不会覆盖已存在的文件；
-- 诊断信息不包含音频、字幕正文或 API 密钥；
-- 清空历史会清除内存记录，并在持久化开启时清空历史文件。
+Fork the repository, create a branch, make your changes, and open a pull request. Include a concise description of the change and the relevant checks you ran. For design and code conventions, see the [interface guidelines](docs/design-system.md) and [implementation notes](docs/implementation.md).
 
-## 文档
+## License
 
-- [实现说明](docs/implementation.md)
-- [界面与窗口规范](docs/design-system.md)
-- [Windows 音频管线](docs/audio.md)
-- [Electron 与 Python 协议](docs/protocol.md)
-- [第三方组件声明](THIRD_PARTY_NOTICES.md)
-
-## 许可证
-
-Nola Translator 自有代码采用 GNU General Public License v3.0 only（GPL-3.0-only），完整条款见 [LICENSE](LICENSE)。GPL 允许商业使用；若分发软件或其修改版，必须遵守 GPL 的源码提供和相同许可要求。第三方依赖、运行时及模型仍适用各自的许可证，详见 [第三方组件声明](THIRD_PARTY_NOTICES.md)。
+Nola Translator's original code is licensed under [GNU GPL v3.0 only](LICENSE). Third-party components and models retain their respective licenses; see [Third-Party Notices](THIRD_PARTY_NOTICES.md).

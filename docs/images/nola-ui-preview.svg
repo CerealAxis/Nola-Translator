@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title description">
+  <title id="title">Nola Translator interface concept</title>
+  <desc id="description">Nola Translator interface concept with navigation, caption settings, and bilingual subtitles.</desc>
+  <defs>
+    <linearGradient id="canvas" x1="0" y1="0" x2="1200" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EDF5FB"/>
+      <stop offset="1" stop-color="#E4EAF5"/>
+    </linearGradient>
+    <linearGradient id="stage" x1="332" y1="531" x2="1100" y2="696" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DCEAF7"/>
+      <stop offset="1" stop-color="#F4F7FC"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="80" y1="48" x2="430" y2="410" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#168BD9"/>
+      <stop offset="1" stop-color="#2255C7"/>
+    </linearGradient>
+    <filter id="window-shadow" x="0" y="0" width="1200" height="760" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="25" flood-color="#47618A" flood-opacity="0.16"/>
+    </filter>
+    <filter id="caption-shadow" x="0" y="0" width="1200" height="760" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#10233B" flood-opacity="0.2"/>
+    </filter>
+    <clipPath id="window-clip"><rect x="40" y="86" width="1120" height="644" rx="20"/></clipPath>
+  </defs>
+
+  <rect width="1200" height="760" fill="url(#canvas)"/>
+  <circle cx="1096" cy="56" r="250" fill="#B5D5F5" opacity="0.24"/>
+  <circle cx="72" cy="715" r="210" fill="#B9D5F4" opacity="0.22"/>
+  <text x="43" y="53" fill="#537091" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="14" font-weight="700" letter-spacing="2.2">NOLA TRANSLATOR</text>
+  <text x="1157" y="53" text-anchor="end" fill="#738BA5" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="14">INTERFACE CONCEPT</text>
+
+  <g filter="url(#window-shadow)"><rect x="40" y="86" width="1120" height="644" rx="20" fill="#F8FAFD" stroke="#D8E2EC"/></g>
+  <g clip-path="url(#window-clip)">
+    <rect x="40" y="86" width="1120" height="54" fill="#F3F6FA"/>
+    <rect x="40" y="140" width="228" height="590" fill="#F0F4F8"/>
+    <rect x="268" y="140" width="892" height="590" fill="#FBFCFE"/>
+    <path d="M40 140H1160M268 140V730" stroke="#DEE6EF"/>
+
+    <!-- The mark is the same N and speech-bubble geometry used by the app logo. -->
+    <g transform="translate(63 99) scale(0.063)">
+      <path d="M144 48H368C421.019 48 464 90.981 464 144V304C464 357.019 421.019 400 368 400H226L143.2 462.1C136.607 467.045 127.2 462.341 127.2 454.1V398.53C82.221 390.6 48 351.344 48 304V144C48 90.981 90.981 48 144 48Z" fill="url(#brand)"/>
+      <path d="M168 304V144L344 304V144" fill="none" stroke="#FFFFFF" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M344 144V183" fill="none" stroke="#97F0DA" stroke-width="40" stroke-linecap="round"/>
+    </g>
+    <text x="105" y="120" fill="#16283D" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="17" font-weight="700">Nola Translator</text>
+    <text x="807" y="120" fill="#708198" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="13">中文  /  EN</text>
+    <circle cx="971" cy="114" r="4" fill="#34A57A"/>
+    <text x="984" y="119" fill="#4D6177" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="13">本地模式</text>
+    <path d="M1071 114H1083M1100 108V120H1112V108M1134 108L1147 120M1147 108L1134 120" fill="none" stroke="#7E8DA0" stroke-width="1.5" stroke-linecap="round"/>
+
+    <!-- Left navigation follows the names and order of the application. -->
+    <rect x="56" y="166" width="196" height="42" rx="9" fill="#FFFFFF" stroke="#E2EAF2"/>
+    <rect x="56" y="178" width="3" height="18" rx="1.5" fill="#1676CB"/>
+    <rect x="76" y="178" width="21" height="18" rx="4" fill="none" stroke="#1676CB" stroke-width="1.8"/>
+    <path d="M82 184H91M82 190H89" stroke="#1676CB" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="110" y="192" fill="#1B3451" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="15" font-weight="600">实时字幕</text>
+    <circle cx="86" cy="238" r="9" fill="#DDE8F2"/><text x="110" y="244" fill="#60748C" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="15">语音识别</text>
+    <circle cx="86" cy="285" r="9" fill="#DDE8F2"/><text x="110" y="291" fill="#60748C" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="15">模型与资源</text>
+    <circle cx="86" cy="332" r="9" fill="#DDE8F2"/><text x="110" y="338" fill="#60748C" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="15">翻译</text>
+    <circle cx="86" cy="379" r="9" fill="#DDE8F2"/><text x="110" y="385" fill="#60748C" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="15">外观</text>
+    <circle cx="86" cy="426" r="9" fill="#DDE8F2"/><text x="110" y="432" fill="#60748C" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="15">历史记录</text>
+    <circle cx="86" cy="473" r="9" fill="#DDE8F2"/><text x="110" y="479" fill="#60748C" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="15">诊断</text>
+    <path d="M56 661H252" stroke="#DDE6EF"/>
+    <circle cx="84" cy="690" r="5" fill="#38A980"/>
+    <text x="101" y="696" fill="#60748C" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="13">引擎已就绪</text>
+
+    <text x="310" y="184" fill="#19314D" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="27" font-weight="700">实时字幕</text>
+    <text x="311" y="210" fill="#71849B" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="14">捕获本机音频，显示原文并进行本地翻译。</text>
+    <rect x="1001" y="168" width="121" height="36" rx="7" fill="#FFFFFF" stroke="#D9E4EF"/>
+    <text x="1061" y="191" text-anchor="middle" fill="#30506E" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="14">字幕浮层</text>
+
+    <rect x="310" y="236" width="812" height="247" rx="13" fill="#FFFFFF" stroke="#DEE8F1"/>
+    <text x="335" y="272" fill="#243B54" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="19" font-weight="700">新建字幕会话</text>
+    <rect x="952" y="252" width="145" height="28" rx="14" fill="#E9F3FC"/>
+    <text x="1024" y="271" text-anchor="middle" fill="#1269B2" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="12" font-weight="600">翻译 · Hy-MT2 本地</text>
+
+    <text x="335" y="310" fill="#637790" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="13">音频来源</text>
+    <rect x="335" y="319" width="358" height="38" rx="7" fill="#FAFCFE" stroke="#D5E1EC"/>
+    <text x="350" y="343" fill="#2A435E" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="14">系统声音（Windows 默认输出）</text>
+    <path d="m669 334 5 5 5-5" fill="none" stroke="#7890A5" stroke-width="1.5"/>
+
+    <text x="717" y="310" fill="#637790" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="13">源语言</text>
+    <rect x="717" y="319" width="380" height="38" rx="7" fill="#FAFCFE" stroke="#D5E1EC"/>
+    <text x="732" y="343" fill="#2A435E" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="14">自动识别</text>
+    <path d="m1074 334 5 5 5-5" fill="none" stroke="#7890A5" stroke-width="1.5"/>
+
+    <text x="335" y="385" fill="#637790" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="13">目标语言（可多选）</text>
+    <rect x="335" y="394" width="358" height="38" rx="7" fill="#FAFCFE" stroke="#D5E1EC"/>
+    <text x="350" y="418" fill="#2A435E" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="14">中文、日本語</text>
+    <path d="m669 409 5 5 5-5" fill="none" stroke="#7890A5" stroke-width="1.5"/>
+
+    <text x="717" y="385" fill="#637790" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="13">显示内容</text>
+    <rect x="718" y="400" width="15" height="15" rx="4" fill="#1676CB"/>
+    <path d="m721 407 3 3 5-6" fill="none" stroke="#FFFFFF" stroke-width="1.6"/>
+    <text x="741" y="413" fill="#334B66" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="14">原文</text>
+    <rect x="817" y="400" width="15" height="15" rx="4" fill="#1676CB"/>
+    <path d="m820 407 3 3 5-6" fill="none" stroke="#FFFFFF" stroke-width="1.6"/>
+    <text x="840" y="413" fill="#334B66" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="14">译文</text>
+
+    <path d="M335 447H1097" stroke="#E9EFF5"/>
+    <rect x="336" y="459" width="3" height="9" rx="1.5" fill="#1676CB"/>
+    <rect x="343" y="453" width="3" height="15" rx="1.5" fill="#1676CB"/>
+    <rect x="350" y="456" width="3" height="12" rx="1.5" fill="#1676CB"/>
+    <rect x="357" y="450" width="3" height="18" rx="1.5" fill="#1676CB"/>
+    <circle cx="385" cy="460" r="4" fill="#35A980"/>
+    <text x="397" y="465" fill="#667B92" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="13">准备就绪</text>
+    <rect x="989" y="447" width="108" height="31" rx="7" fill="#086FC2"/>
+    <path d="m1010 456 9 6-9 6Z" fill="#FFFFFF"/>
+    <text x="1052" y="467" text-anchor="middle" fill="#FFFFFF" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="13" font-weight="600">开始字幕</text>
+
+    <text x="310" y="522" fill="#243B54" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="19" font-weight="700">字幕预览</text>
+    <text x="1121" y="522" text-anchor="end" fill="#70859D" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="13">效果预览</text>
+    <rect x="310" y="537" width="812" height="160" rx="13" fill="url(#stage)" stroke="#DDE8F2"/>
+    <g filter="url(#caption-shadow)"><rect x="372" y="563" width="688" height="101" rx="14" fill="#171B22"/></g>
+    <circle cx="400" cy="585" r="4" fill="#62D1AD"/>
+    <text x="413" y="590" fill="#A8B3C2" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="12">本地字幕 · 双语</text>
+    <text x="400" y="616" fill="#F7FAFD" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="18" font-weight="600">Welcome to Nola Translator.</text>
+    <text x="400" y="646" fill="#AEE8DC" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="18">欢迎使用诺拉翻译。</text>
+  </g>
+</svg>
