@@ -1,10 +1,15 @@
-# Nola Translator
+<div align="center">
+  <img src="assets/brand/nola-logo.svg" alt="Nola Translator logo" width="112" height="112">
+  <h1>Nola Translator</h1>
+  <p>Real-time captions and translation for Windows 11.</p>
+  <p><a href="docs/implementation.md"><strong>Explore the documentation »</strong></a></p>
+  <p><a href="#features">Features</a> · <a href="#getting-started">Get started</a> · <a href="#contributing">Contribute</a></p>
+  <p>English · <a href="README.zh-CN.md">简体中文</a></p>
+</div>
 
-**Real-time captions and translation for Windows 11.**
-
-English | [简体中文](README.zh-CN.md)
-
-![Nola Translator interface concept](docs/images/nola-ui-preview.svg)
+<p align="center">
+  <img src="docs/images/nola-ui-preview.svg" alt="Nola Translator interface concept" width="1000">
+</p>
 
 ## Contents
 

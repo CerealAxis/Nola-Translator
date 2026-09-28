@@ -1,10 +1,15 @@
-# Nola Translator · 诺拉翻译
+<div align="center">
+  <img src="assets/brand/nola-logo.svg" alt="Nola Translator Logo" width="112" height="112">
+  <h1>Nola Translator · 诺拉翻译</h1>
+  <p>适用于 Windows 11 的实时字幕与翻译应用。</p>
+  <p><a href="docs/implementation.md"><strong>查看项目文档 »</strong></a></p>
+  <p><a href="#功能特性">功能特性</a> · <a href="#快速开始">快速开始</a> · <a href="#参与贡献">参与贡献</a></p>
+  <p><a href="README.md">English</a> · 简体中文</p>
+</div>
 
-**适用于 Windows 11 的实时字幕与翻译应用。**
-
-[English](README.md) | 简体中文
-
-![Nola Translator 界面概念图](docs/images/nola-ui-preview.svg)
+<p align="center">
+  <img src="docs/images/nola-ui-preview.svg" alt="Nola Translator 界面概念图" width="1000">
+</p>
 
 ## 目录
 
