@@ -1,12 +1,12 @@
 import { join } from 'node:path'
-import { constants } from 'node:fs'
-import { copyFile, mkdir, readdir } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 
 import { app, BrowserWindow, safeStorage, screen, shell } from 'electron'
 
 import { registerAppIpc } from './app-ipc'
 import { createEngineLaunchSpec, EngineProcess } from './engine-process'
 import { HistoryStore } from './history-store'
+import { migrateLegacyUserData } from './legacy-migration'
 import { modelStorageEnvironment } from './model-storage'
 import { registerEngineIpc } from './ipc'
 import { SettingsStore } from './settings-store'
@@ -20,30 +20,6 @@ let engine: EngineProcess | null = null
 let disposeIpc: (() => void) | null = null
 let disposeAppIpc: (() => void) | null = null
 let quitting = false
-
-async function copyMissingFiles(source: string, destination: string): Promise<void> {
-  const entries = await readdir(source, { withFileTypes: true })
-  await mkdir(destination, { recursive: true })
-  for (const entry of entries) {
-    const sourcePath = join(source, entry.name)
-    const destinationPath = join(destination, entry.name)
-    if (entry.isDirectory()) {
-      await copyMissingFiles(sourcePath, destinationPath)
-    } else if (entry.isFile()) {
-      await copyFile(sourcePath, destinationPath, constants.COPYFILE_EXCL).catch((error: NodeJS.ErrnoException) => {
-        if (error.code !== 'EEXIST') throw error
-      })
-    }
-  }
-}
-
-async function migrateLegacyUserData(userData: string): Promise<void> {
-  const legacyUserData = join(app.getPath('appData'), 'FluentCaptions')
-  if (legacyUserData.toLowerCase() === userData.toLowerCase()) return
-  await copyMissingFiles(legacyUserData, userData).catch((error: NodeJS.ErrnoException) => {
-    if (error.code !== 'ENOENT') throw error
-  })
-}
 
 function createMainWindow(): void {
   const preload = resolvePreloadPath(__dirname)
@@ -103,7 +79,7 @@ if (!hasSingleInstanceLock) {
 
   void app.whenReady().then(async () => {
     const userData = app.getPath('userData')
-    await migrateLegacyUserData(userData)
+    await migrateLegacyUserData(app.getPath('appData'), userData)
     const settings = new SettingsStore(join(userData, 'settings.json'))
     const initialSettings = await settings.load()
     const history = new HistoryStore(join(userData, 'history.jsonl'))
