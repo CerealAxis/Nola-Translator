@@ -30,7 +30,7 @@ Nola Translator captures system audio or microphone input, transcribes speech, a
 
 - Capture the default Windows output device, a selected output device, or a microphone.
 - Run Qwen3-ASR or SenseVoiceSmall locally for speech recognition and Hy-MT2 or M2M100 locally for translation.
-- Translate into multiple target languages, with optional translation of interim captions.
+- Translate captions into a chosen target language, with optional translation of interim captions.
 - Use Microsoft Translator, an OpenAI-compatible API, or local Ollama when configured.
 - Position, resize, lock, and make the independent caption overlay click-through.
 - Adjust caption typography, colors, opacity, and original/translation display.
@@ -58,7 +58,7 @@ Open **Models & Resources** in the app to install the recognition and translatio
 
 ## Usage
 
-1. Select an audio source, source language, and target languages on **Live Captions**.
+1. Select an audio source, source language, and target language on **Live Captions**.
 2. Choose the original and translated text to display, then start the session.
 3. Adjust the separate subtitle overlay on **Appearance**.
 4. Enable history saving on **History** if you want captions retained after closing the app.

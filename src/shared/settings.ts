@@ -47,7 +47,7 @@ export type TranslationSettings = {
   ollamaEndpoint: string
   ollamaModel: string
   translateIntermediate: boolean
-  targetLanguages: string[]
+  targetLanguage: string
 }
 
 export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'overlay' | 'translation' | 'modelStoragePath' | 'version'> & {
@@ -69,11 +69,8 @@ export const TRANSLATION_PROVIDERS: readonly TranslationSettings['provider'][] =
 /** 源语言下拉项：`auto` 表示交给模型自判。与引擎 resources.py 的 languages 清单保持一致。 */
 export const SOURCE_LANGUAGE_OPTIONS = ['auto', 'zh', 'yue', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'pt', 'it', 'ru', 'ar', 'th', 'vi', 'tr', 'id'] as const
 
-/** 目标语言可选项；引擎协议最多接受 8 个（见 protocol.SessionConfig.targetLanguages）。 */
+/** 目标语言下拉项。应用每次只传一种，引擎协议本身仍接受列表。 */
 export const TARGET_LANGUAGE_OPTIONS = ['zh', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'ru', 'pt', 'it', 'tr', 'ar', 'th', 'vi', 'ms', 'id'] as const
-
-/** 协议对 targetLanguages 的上限，读档与写档都按它截断。 */
-export const MAX_TARGET_LANGUAGES = 8
 
 export const DEFAULT_SETTINGS: AppSettings = {
   version: 1,
@@ -115,6 +112,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
     ollamaEndpoint: 'http://127.0.0.1:11434',
     ollamaModel: 'qwen3:4b',
     translateIntermediate: false,
-    targetLanguages: ['zh'],
+    targetLanguage: 'zh',
   },
 }

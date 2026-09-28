@@ -49,7 +49,7 @@ const settingsPatchSchema = z.object({
     openaiEndpoint: z.string().min(1).max(2048).optional(), openaiModel: z.string().min(1).max(256).optional(),
     ollamaEndpoint: z.string().min(1).max(2048).optional(), ollamaModel: z.string().min(1).max(256).optional(),
     translateIntermediate: z.boolean().optional(),
-    targetLanguages: z.array(z.string().min(1).max(32)).max(8).optional(),
+    targetLanguage: z.string().min(1).max(32).optional(),
   }).partial().optional(),
 }).strict()
 

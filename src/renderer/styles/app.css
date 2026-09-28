@@ -249,45 +249,6 @@ select {
   color: var(--text-primary);
 }
 .text-input { width: 100%; min-height: 34px; padding: 5px 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--control); color: var(--text-primary); }
-.multi-select { position: relative; grid-column: 1 / -1; min-width: 0; display: grid; gap: 7px; color: var(--text-secondary); font-size: 13px; }
-.multi-select-label { min-width: 0; }
-.multi-select-trigger {
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 4px 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  background: var(--control);
-  color: var(--text-primary);
-  text-align: left;
-  cursor: pointer;
-}
-.multi-select-trigger:hover { background: var(--control-hover); }
-.multi-select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.multi-select-value[data-empty="true"] { color: var(--text-secondary); }
-.multi-select-caret { width: 16px; height: 16px; flex: none; color: var(--text-secondary); }
-.multi-select-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 30;
-  max-height: 232px;
-  display: grid;
-  gap: 2px;
-  padding: 6px;
-  overflow-y: auto;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  background: var(--surface-strong);
-  box-shadow: 0 6px 18px var(--shadow);
-}
-.multi-select-option { min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; color: var(--text-primary); font-size: 13px; cursor: pointer; }
-.multi-select-option:hover { background: var(--control); }
-.multi-select-option[aria-selected="true"] { color: var(--accent); font-weight: 600; }
 .translation-layout { display: grid; gap: 20px; }
 .credential-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 

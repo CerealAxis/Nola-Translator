@@ -84,7 +84,7 @@
     <text x="732" y="343" fill="#2A435E" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="14">自动识别</text>
     <path d="m1074 334 5 5 5-5" fill="none" stroke="#7890A5" stroke-width="1.5"/>
 
-    <text x="335" y="385" fill="#637790" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="13">目标语言（可多选）</text>
+    <text x="335" y="385" fill="#637790" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="13">目标语言</text>
     <rect x="335" y="394" width="358" height="38" rx="7" fill="#FAFCFE" stroke="#D5E1EC"/>
     <text x="350" y="418" fill="#2A435E" font-family="Segoe UI, Microsoft YaHei UI, sans-serif" font-size="14">中文、日本語</text>
     <path d="m669 409 5 5 5-5" fill="none" stroke="#7890A5" stroke-width="1.5"/>

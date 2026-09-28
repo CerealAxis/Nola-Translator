@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute } from 'node:path'
 
-import { DEFAULT_SETTINGS, MAX_TARGET_LANGUAGES, RECOGNITION_MODEL_IDS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
+import { DEFAULT_SETTINGS, RECOGNITION_MODEL_IDS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
 
 // Store-internal patches may also touch fields the IPC schema exposes only through their own channels.
 export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 1 }
@@ -13,14 +13,14 @@ function sanitizeSourceLanguage(value: unknown): string {
     : DEFAULT_SETTINGS.recognition.sourceLanguage
 }
 
-/** 目标语言：去重、按下拉顺序排序、截到协议上限。空数组是用户主动不选，保留；
- *  非空却全被滤掉说明文件已损坏，才回落默认。 */
-function sanitizeTargetLanguages(value: unknown): string[] {
-  if (!Array.isArray(value)) return [...DEFAULT_SETTINGS.translation.targetLanguages]
-  const requested = new Set(value.filter((item): item is string => typeof item === 'string'))
-  const valid = TARGET_LANGUAGE_OPTIONS.filter((code) => requested.has(code))
-  if (!valid.length && value.length) return [...DEFAULT_SETTINGS.translation.targetLanguages]
-  return valid.slice(0, MAX_TARGET_LANGUAGES)
+/** 目标语言：必须落在下拉白名单内。旧档可能存着曾经多选用的数组，取其中第一个合法值。 */
+function sanitizeTargetLanguage(value: unknown): string {
+  const candidates = Array.isArray(value) ? value : [value]
+  const match = candidates.find(
+    (item): item is string =>
+      typeof item === 'string' && (TARGET_LANGUAGE_OPTIONS as readonly string[]).includes(item),
+  )
+  return match ?? DEFAULT_SETTINGS.translation.targetLanguage
 }
 
 export class SettingsStore {
@@ -36,11 +36,17 @@ export class SettingsStore {
   async load(): Promise<AppSettings> {
     try {
       const raw = JSON.parse(await readFile(this.path, 'utf8')) as Partial<AppSettings> & {
-        translation?: Partial<AppSettings['translation']> & { allowIntermediate?: unknown }
+        translation?: Partial<AppSettings['translation']> & {
+          allowIntermediate?: unknown
+          /** 单选前的多选字段；读档时迁移到 targetLanguage。 */
+          targetLanguages?: unknown
+        }
       }
       // 旧 Argos 中转开关语义不同，直接丢弃，不映射到 translateIntermediate。
       const rawTranslation = { ...(raw.translation ?? {}) }
       delete rawTranslation.allowIntermediate
+      const legacyTargets = rawTranslation.targetLanguages
+      delete rawTranslation.targetLanguages
       this.settings = {
         ...structuredClone(DEFAULT_SETTINGS),
         ...raw,
@@ -65,7 +71,10 @@ export class SettingsStore {
         ...this.settings.recognition,
         sourceLanguage: sanitizeSourceLanguage(this.settings.recognition.sourceLanguage),
       }
-      this.settings.translation.targetLanguages = sanitizeTargetLanguages(this.settings.translation.targetLanguages)
+      // 旧档的多选数组优先迁移；新的单值也要过白名单。
+      this.settings.translation.targetLanguage = sanitizeTargetLanguage(
+        legacyTargets ?? this.settings.translation.targetLanguage,
+      )
       // 翻译 provider：本地两个与三个网络 provider 保持原值，其余（含 argos）迁移到 hymt2。
       if (!TRANSLATION_PROVIDERS.includes(this.settings.translation.provider)) {
         this.settings.translation.provider = 'hymt2'
@@ -117,7 +126,7 @@ export class SettingsStore {
     }
     // 写档与读档共用同一套白名单校验，任何写入路径都不能留下非法语言码。
     next.recognition.sourceLanguage = sanitizeSourceLanguage(next.recognition.sourceLanguage)
-    next.translation.targetLanguages = sanitizeTargetLanguages(next.translation.targetLanguages)
+    next.translation.targetLanguage = sanitizeTargetLanguage(next.translation.targetLanguage)
     await mkdir(dirname(this.path), { recursive: true })
     const temporary = `${this.path}.tmp`
     await writeFile(temporary, JSON.stringify(next, null, 2), 'utf8')

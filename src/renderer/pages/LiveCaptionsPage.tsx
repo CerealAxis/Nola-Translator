@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
-import { ChevronDownRegular, ClosedCaptionRegular, PlayRegular, StopRegular } from '@fluentui/react-icons'
+import { ClosedCaptionRegular, PlayRegular, StopRegular } from '@fluentui/react-icons'
 
 import type { AudioDevice, EngineEvent, SessionConfig } from '../../shared/contracts'
 import { DEFAULT_SETTINGS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, type OverlaySettings, type RecognitionModelId, type TranslationSettings } from '../../shared/settings'
@@ -30,8 +30,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
   const [devices, setDevices] = useState<AudioDevice[]>([])
   const [audioSource, setAudioSource] = useState('defaultOutput')
   const [sourceLanguage, setSourceLanguage] = useState('auto')
-  const [targetLanguages, setTargetLanguages] = useState<string[]>(['zh'])
-  const [targetsOpen, setTargetsOpen] = useState(false)
+  const [targetLanguage, setTargetLanguage] = useState<string>('zh')
   const [translationSettings, setTranslationSettings] = useState<TranslationSettings>(DEFAULT_SETTINGS.translation)
   const [recognitionModelId, setRecognitionModelId] = useState<RecognitionModelId>(DEFAULT_SETTINGS.recognition.modelId)
   const [overlaySettings, setOverlaySettings] = useState<OverlaySettings>(DEFAULT_SETTINGS.overlay)
@@ -59,7 +58,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
         setOverlaySettings(settings.overlay)
         setRecognitionModelId(settings.recognition.modelId)
         setSourceLanguage(settings.recognition.sourceLanguage)
-        setTargetLanguages(settings.translation.targetLanguages)
+        setTargetLanguage(settings.translation.targetLanguage)
         setSettingsReady(true)
         setNotice((current) => current === '正在连接本地引擎…' ? '准备就绪' : current)
       }
@@ -75,7 +74,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
       setOverlaySettings(settings.overlay)
       setRecognitionModelId(settings.recognition.modelId)
       setSourceLanguage(settings.recognition.sourceLanguage)
-      setTargetLanguages(settings.translation.targetLanguages)
+      setTargetLanguage(settings.translation.targetLanguage)
     })
     const unsubscribe = api.onEngineEvent((event: EngineEvent) => {
       if (event.type === 'caption' || event.type === 'sessionStarted') {
@@ -123,7 +122,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
     setModelProgress(null)
     setMissingResource(false)
     setNotice('正在启动本地字幕引擎…')
-    const effectiveTargets = translationVisible ? targetLanguages : []
+    const effectiveTargets = translationVisible ? [targetLanguage] : []
     const config: SessionConfig = {
       audioSource: selectedDevice
         ? { kind: selectedDevice.kind, deviceId: selectedDevice.deviceId }
@@ -243,42 +242,13 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
                 ))}
               </select>
             </label>
-            <div
-              aria-label={t('目标语言（可多选）')}
-              className="multi-select"
-              onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setTargetsOpen(false) }}
-              onKeyDown={(event) => { if (event.key === 'Escape' && targetsOpen) { setTargetsOpen(false); event.currentTarget.querySelector('button')?.focus() } }}
-              role="group"
-            >
-              <span className="multi-select-label" id="target-languages-label">{t('目标语言（可多选）')}</span>
-              <button
-                aria-expanded={targetsOpen}
-                aria-haspopup="listbox"
-                aria-labelledby="target-languages-label"
-                className="multi-select-trigger"
-                onClick={() => setTargetsOpen((current) => !current)}
-                type="button"
-              >
-                <span className="multi-select-value" data-empty={targetLanguages.length === 0}>
-                  {targetLanguages.length === 0 ? t('选择目标语言') : targetLanguages.map(languageLabel).join('、')}
-                </span>
-                <ChevronDownRegular aria-hidden className="multi-select-caret" />
-              </button>
-              {targetsOpen && (
-                <div aria-multiselectable="true" className="multi-select-menu" role="listbox">
-                  {TARGET_LANGUAGE_OPTIONS.map((code) => (
-                    <label className="multi-select-option" key={code} role="option" aria-selected={targetLanguages.includes(code)}>
-                      <input
-                        checked={targetLanguages.includes(code)}
-                        onChange={(event) => { const next = event.target.checked ? [...new Set([...targetLanguages, code])] : targetLanguages.filter((item) => item !== code); setTargetLanguages(next); void saveSettings({ translation: { targetLanguages: next } }) }}
-                        type="checkbox"
-                      />
-                      {languageLabel(code)}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
+            <label><span>{t('目标语言')}</span>
+              <select aria-label={t('目标语言')} value={targetLanguage} onChange={(event) => { setTargetLanguage(event.target.value); void saveSettings({ translation: { targetLanguage: event.target.value } }) }}>
+                {TARGET_LANGUAGE_OPTIONS.map((code) => (
+                  <option key={code} value={code}>{languageLabel(code)}</option>
+                ))}
+              </select>
+            </label>
           </div>
 
           <fieldset className="display-options"><legend>{t('显示内容')}</legend>

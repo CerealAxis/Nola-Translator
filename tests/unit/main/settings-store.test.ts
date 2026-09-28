@@ -139,7 +139,7 @@ describe('设置存储', () => {
       expect(defaults.recognition.modelId).toBe('qwen3-asr-1.7b-hf')
       expect(defaults.recognition.sourceLanguage).toBe('auto')
       expect(defaults.translation.provider).toBe('hymt2')
-      expect(defaults.translation.targetLanguages).toEqual(['zh'])
+      expect(defaults.translation.targetLanguage).toBe('zh')
       expect(defaults.translation.translateIntermediate).toBe(false)
     } finally {
       await rm(directory, { recursive: true, force: true })
@@ -153,13 +153,13 @@ describe('设置存储', () => {
       const store = new SettingsStore(path)
       await store.update({
         recognition: { sourceLanguage: 'ja' },
-        translation: { targetLanguages: ['en', 'fr'] },
+        translation: { targetLanguage: 'fr' },
       })
 
       const reloaded = await new SettingsStore(path).load()
 
       expect(reloaded.recognition.sourceLanguage).toBe('ja')
-      expect(reloaded.translation.targetLanguages).toEqual(['en', 'fr'])
+      expect(reloaded.translation.targetLanguage).toBe('fr')
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
@@ -169,29 +169,31 @@ describe('设置存储', () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
     const path = join(directory, 'settings.json')
     try {
-      // 读档：坏值回落，用户主动清空则保留
       await writeFile(path, JSON.stringify({
         version: 1,
         recognition: { sourceLanguage: 'klingon' },
-        translation: { targetLanguages: ['xx', 'yy'] },
+        translation: { targetLanguage: 'klingon' },
       }), 'utf8')
       const read = await new SettingsStore(path).load()
       expect(read.recognition.sourceLanguage).toBe('auto')
-      expect(read.translation.targetLanguages).toEqual(['zh'])
+      expect(read.translation.targetLanguage).toBe('zh')
 
-      await writeFile(path, JSON.stringify({ version: 1, translation: { targetLanguages: [] } }), 'utf8')
-      const cleared = await new SettingsStore(path).load()
-      expect(cleared.translation.targetLanguages).toEqual([])
+      // 旧档存的是曾经多选用的数组：取第一个仍在白名单里的值
+      for (const [stored, expected] of [
+        [['fr', 'en'], 'fr'],
+        [['xx', 'fr'], 'fr'],
+        [['xx', 'yy'], 'zh'],
+        [[], 'zh'],
+      ] as const) {
+        await writeFile(path, JSON.stringify({ version: 1, translation: { targetLanguages: stored } }), 'utf8')
+        expect((await new SettingsStore(path).load()).translation.targetLanguage).toBe(expected)
+      }
 
-      // 写档：顺序按白名单归一化、去重、截到协议上限 8 个
+      // 写档：非法码被拦下，不落盘
       const store = new SettingsStore(path)
-      const written = await store.update({
-        translation: { targetLanguages: ['id', 'zh', 'zh', 'bogus', 'fr', 'en', 'ja', 'ko', 'de', 'es', 'pt', 'it'] },
-      })
-      expect(written.translation.targetLanguages).toEqual(['zh', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'pt'])
-      expect(JSON.parse(await readFile(path, 'utf8')).translation.targetLanguages).toEqual(
-        ['zh', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'pt'],
-      )
+      const written = await store.update({ translation: { targetLanguage: 'klingon' } })
+      expect(written.translation.targetLanguage).toBe('zh')
+      expect(JSON.parse(await readFile(path, 'utf8')).translation.targetLanguage).toBe('zh')
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

@@ -27,7 +27,7 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: '实时字幕', level: 1 })).toBeInTheDocument()
     expect(screen.getByLabelText('音频来源')).toBeInTheDocument()
     expect(screen.getByLabelText('源语言')).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: '目标语言（可多选）' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '目标语言' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '开始字幕' })).toBeInTheDocument()
     expect(screen.getByText('开始会话后，识别原文会显示在这里。')).toBeInTheDocument()
   })

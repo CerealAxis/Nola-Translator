@@ -8,9 +8,9 @@ const output = resolve('artifacts/layout')
 const pages = ['captions', 'recognition', 'resources', 'translation', 'appearance', 'history', 'diagnostics']
 const settings = {
   version: 1, theme: 'system', uiLanguage: 'zh-CN', modelStoragePath: '', historyEnabled: false,
-  recognition: { modelId: 'qwen3-asr-1.7b-hf' },
+  recognition: { modelId: 'qwen3-asr-1.7b-hf', sourceLanguage: 'auto' },
   overlay: { mode: 'bottom', colorScheme: 'dark', locked: true, alwaysOnTop: true, fontFamily: 'Segoe UI Variable', fontSize: 26, fontWeight: 600, translationFontSize: 22, translationFontWeight: 500, sourceColor: '#FFFFFF', translationColor: '#FFFFFF', backgroundColor: '#111111', backgroundOpacity: 0.84, maxLines: 2, lineHeight: 1.3, translationMaxLines: 2, translationLineHeight: 1.35, showSource: true, showTranslation: true },
-  translation: { provider: 'hymt2', microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '', openaiEndpoint: 'https://api.openai.com/v1', openaiModel: 'gpt-4.1-mini', ollamaEndpoint: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b', translateIntermediate: false },
+  translation: { provider: 'hymt2', microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '', openaiEndpoint: 'https://api.openai.com/v1', openaiModel: 'gpt-4.1-mini', ollamaEndpoint: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b', translateIntermediate: false, targetLanguage: 'zh' },
 }
 const recognitionResource = { resourceId: 'qwen3-asr-1.7b-hf', kind: 'recognitionModel', provider: 'qwen3-asr', name: 'Qwen3-ASR 1.7B · 本地流式识别', description: '本地流式识别模型，加载时以 NF4 4-bit 量化运行。', languages: ['zh', 'en', 'ja'], installed: true, installedBytes: 4300000000, state: 'idle', cancellable: false }
 const recognitionSmallResource = { resourceId: 'qwen3-asr-0.6b-hf', kind: 'recognitionModel', provider: 'qwen3-asr', name: 'Qwen3-ASR 0.6B · 本地流式识别', description: '体积更小的同系列流式识别模型。', languages: ['zh', 'en', 'ja'], installed: false, installedBytes: 0, downloadBytes: 1880619678, state: 'idle', cancellable: false }
