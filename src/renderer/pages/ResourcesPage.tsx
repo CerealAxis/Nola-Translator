@@ -90,10 +90,10 @@ export function ResourcesPage(): React.JSX.Element {
   const { t } = useI18n()
   const [snapshot, setSnapshot] = useState<ResourceSnapshot>({ storagePath: '正在读取…', resources: [] })
   const [selectedModelId, setSelectedModelId] = useState<RecognitionModelId>(DEFAULT_SETTINGS.recognition.modelId)
-  const [notice, setNotice] = useState('此页面只在你点击“安装”后访问网络。')
+  const [notice, setNotice] = useState('')
   const [noticeValues, setNoticeValues] = useState<TranslationValues>({})
   const [loading, setLoading] = useState(true)
-  const resourceName = (name: string): string => name.split(' → ').map((part) => t(part)).join(' → ')
+  const resourceName = (name: string): string => name.split(' · ')[0].split(' → ').map((part) => t(part)).join(' → ')
   const api = window.fluentCaptions
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -103,7 +103,7 @@ export function ResourcesPage(): React.JSX.Element {
       const [nextSnapshot, settings] = await Promise.all([api.listResources(), api.getSettings()])
       setSnapshot(nextSnapshot)
       setSelectedModelId(settings.recognition.modelId)
-      setNotice('资源状态已刷新。字幕启动时不会自动下载任何内容。')
+      setNotice('资源状态已刷新。')
     } catch {
       setNotice('无法读取资源状态')
     } finally {
@@ -183,18 +183,20 @@ export function ResourcesPage(): React.JSX.Element {
       <ModelStorageSettings />
 
       <section className="resource-section" aria-labelledby="recognition-resources">
-        <div className="section-heading-row"><div><h2 id="recognition-resources">{t("语音识别模型")}</h2><p>{t("先在这里安装并选择模型；开始字幕只做本地校验，不会悄悄下载。")}</p></div><span className="badge">{t("当前：")}{resourceName(recognition.find((item) => item.resourceId === selectedModelId)?.name ?? '未选择')}</span></div>
-        <div className="recognition-resource-grid">
+        <div className="section-heading-row"><h2 id="recognition-resources">{t("语音识别模型")}</h2><span className="badge">{t("当前：")}{resourceName(recognition.find((item) => item.resourceId === selectedModelId)?.name ?? '未选择')}</span></div>
+        <div className="resource-grid">
           {recognition.map((resource) => (
             <article className="surface resource-card" key={resource.resourceId}>
-              <div className="resource-card-top"><span className="resource-provider-icon"><FolderRegular aria-hidden /></span><span className="badge">{resource.provider}</span></div>
-              <h3>{resourceName(resource.name)}</h3><p>{t(resource.description)}</p>
-              <div className="resource-card-footer"><ResourceStatus resource={resource} /><ResourceAction resource={resource} selected={selectedModelId === resource.resourceId} onAction={(item, action) => void act(item, action)} /></div>
-              <div className="resource-select-row">
-                <button className={`button ${selectedModelId === resource.resourceId ? 'secondary-button selected-resource-button' : 'secondary-button'} compact-button`} disabled={!resource.installed || resource.state !== 'idle' || selectedModelId === resource.resourceId} onClick={() => void selectModel(resource)} type="button">
-                  {selectedModelId === resource.resourceId ? <><CheckmarkCircleRegular aria-hidden />{t("当前使用")}</> : t('选择此模型')}
-                </button>
-                {resource.provider === 'qwen3-asr' && <small>{t("下载原始 BF16 权重，加载时以 NF4 4-bit 量化运行。")}</small>}
+              <span className="resource-provider-icon"><FolderRegular aria-hidden /></span>
+              <div className="resource-card-body">
+                <div className="resource-card-title"><h3>{resourceName(resource.name)}</h3><span className="badge">{resource.provider}</span></div>
+                <ResourceStatus resource={resource} />
+              </div>
+              <div className="resource-card-actions">
+                {selectedModelId !== resource.resourceId && (
+                  <button className="button secondary-button compact-button" disabled={!resource.installed || resource.state !== 'idle'} onClick={() => void selectModel(resource)} type="button">{t('选择此模型')}</button>
+                )}
+                <ResourceAction resource={resource} selected={selectedModelId === resource.resourceId} onAction={(item, action) => void act(item, action)} />
               </div>
               <ResourceProgress resource={resource} />
             </article>
@@ -202,17 +204,21 @@ export function ResourcesPage(): React.JSX.Element {
         </div>
       </section>
 
-      <section className="surface package-surface" aria-labelledby="translation-resources">
-        <div className="card-heading-row"><div><h2 id="translation-resources">{t("本地翻译模型")}</h2><p>{t("单个预量化文件，在本机 llama.cpp 上运行；开始字幕不会自动下载。")}</p></div><span className="badge">{translation.filter((item) => item.installed).length}{t(" 已安装")}</span></div>
-        <div className="package-list">
+      <section className="resource-section" aria-labelledby="translation-resources">
+        <div className="section-heading-row"><h2 id="translation-resources">{t("本地翻译模型")}</h2><span className="badge">{translation.filter((item) => item.installed).length}{t(" 已安装")}</span></div>
+        <div className="resource-grid">
           {translation.map((resource) => (
-            <div className="package-row" key={resource.resourceId}>
-              <div className="package-title"><strong>{resourceName(resource.name)}</strong><small>{t(resource.provider === 'hy-mt2' ? 'Hy-MT2 · 预量化文件' : 'Qwen3-ASR · 加载时量化')}</small></div>
-              {resource.provider === 'hy-mt2' && <small>{t("预量化 Q4_K_M 文件，约 1.13GB。")}</small>}
-              <ResourceStatus resource={resource} />
-              <ResourceAction resource={resource} onAction={(item, action) => void act(item, action)} />
+            <article className="surface resource-card" key={resource.resourceId}>
+              <span className="resource-provider-icon"><FolderRegular aria-hidden /></span>
+              <div className="resource-card-body">
+                <div className="resource-card-title"><h3>{resourceName(resource.name)}</h3><span className="badge">{resource.provider}</span></div>
+                <ResourceStatus resource={resource} />
+              </div>
+              <div className="resource-card-actions">
+                <ResourceAction resource={resource} onAction={(item, action) => void act(item, action)} />
+              </div>
               <ResourceProgress resource={resource} />
-            </div>
+            </article>
           ))}
         </div>
       </section>

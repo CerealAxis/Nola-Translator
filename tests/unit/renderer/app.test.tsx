@@ -5,9 +5,25 @@ import { App } from '../../../src/renderer/app/App'
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 
 describe('App', () => {
-  it('renders the primary caption session controls', () => {
-    render(<App />)
+  it('waits for resource inspection before showing the main window', async () => {
+    const api = window.fluentCaptions!
+    const original = api.listResources
+    let finish!: (value: Awaited<ReturnType<typeof api.listResources>>) => void
+    const pending = new Promise<Awaited<ReturnType<typeof api.listResources>>>((resolve) => { finish = resolve })
+    const listResources = vi.spyOn(api, 'listResources').mockReturnValue(pending)
 
+    render(<App />)
+    expect(screen.getByText('正在加载本地引擎与资源…')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '实时字幕' })).not.toBeInTheDocument()
+
+    finish(await original())
+    expect(await screen.findByRole('heading', { name: '实时字幕' })).toBeInTheDocument()
+    listResources.mockRestore()
+  })
+
+  it('renders the primary caption session controls', async () => {
+    render(<App />)
+    await screen.findByRole('heading', { name: '实时字幕', level: 1 })
     expect(screen.getByRole('heading', { name: '实时字幕', level: 1 })).toBeInTheDocument()
     expect(screen.getByLabelText('音频来源')).toBeInTheDocument()
     expect(screen.getByLabelText('源语言')).toBeInTheDocument()
@@ -18,7 +34,8 @@ describe('App', () => {
 
   it('changes session state when the user starts and stops captions', async () => {
     render(<App />)
-
+    await screen.findByRole('heading', { name: '实时字幕', level: 1 })
+    await waitFor(() => expect(screen.getByRole('button', { name: '开始字幕' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: '开始字幕' }))
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('正在监听音频'))
     expect(screen.getByRole('button', { name: '停止字幕' })).toBeInTheDocument()
@@ -27,9 +44,28 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('准备就绪'))
   })
 
+  it('starts without translation targets when translated text is hidden', async () => {
+    const api = window.fluentCaptions!
+    const getSettings = vi.spyOn(api, 'getSettings').mockResolvedValue({
+      ...DEFAULT_SETTINGS,
+      overlay: { ...DEFAULT_SETTINGS.overlay, showTranslation: false },
+    })
+    const startSession = vi.spyOn(api, 'startSession')
+    render(<App />)
+    await screen.findByRole('heading', { name: '实时字幕', level: 1 })
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: '译文' })).not.toBeChecked())
+    await waitFor(() => expect(screen.getByRole('button', { name: '开始字幕' })).toBeEnabled())
+
+    fireEvent.click(screen.getByRole('button', { name: '开始字幕' }))
+    await waitFor(() => expect(startSession).toHaveBeenCalledWith(expect.objectContaining({ targetLanguages: [] })))
+    getSettings.mockRestore()
+    startSession.mockRestore()
+  })
+
   it('keeps a global stop action available after navigating away from captions', async () => {
     render(<App />)
-
+    await screen.findByRole('heading', { name: '实时字幕', level: 1 })
+    await waitFor(() => expect(screen.getByRole('button', { name: '开始字幕' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: '开始字幕' }))
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('正在监听音频'))
     fireEvent.click(screen.getByRole('button', { name: '外观' }))
@@ -37,9 +73,9 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: '停止字幕服务' })).toBeInTheDocument()
   })
 
-  it('navigates to translation, appearance, and history pages', () => {
+  it('navigates to translation, appearance, and history pages', async () => {
     render(<App />)
-
+    await screen.findByRole('heading', { name: '实时字幕', level: 1 })
     fireEvent.click(screen.getByRole('button', { name: '翻译' }))
     expect(screen.getByRole('heading', { name: '本地翻译模型' })).toBeInTheDocument()
 
@@ -50,9 +86,9 @@ describe('App', () => {
     expect(screen.getByText('默认不保存任何字幕内容。')).toBeInTheDocument()
   })
 
-  it('offers explicit controls to hide and adjust the subtitle overlay', () => {
+  it('offers explicit controls to hide and adjust the subtitle overlay', async () => {
     render(<App />)
-
+    await screen.findByRole('heading', { name: '实时字幕', level: 1 })
     fireEvent.click(screen.getByRole('button', { name: '外观' }))
 
     expect(screen.getByRole('button', { name: '隐藏浮层' })).toBeInTheDocument()
@@ -72,6 +108,7 @@ describe('App', () => {
     }))
 
     render(<App />)
+    await screen.findByRole('heading', { name: '实时字幕', level: 1 })
     fireEvent.click(screen.getByRole('button', { name: '外观' }))
 
     fireEvent.click(screen.getByRole('button', { name: '隐藏浮层' }))
@@ -90,7 +127,7 @@ describe('App', () => {
 
   it('navigates to recognition and diagnostics pages', async () => {
     render(<App />)
-
+    await screen.findByRole('heading', { name: '实时字幕', level: 1 })
     fireEvent.click(screen.getByRole('button', { name: '语音识别' }))
     expect(screen.getByRole('heading', { name: 'Qwen3-ASR 1.7B' })).toBeInTheDocument()
 
@@ -101,7 +138,7 @@ describe('App', () => {
 
   it('shows a dedicated resources page with the local translation model section', async () => {
     render(<App />)
-
+    await screen.findByRole('heading', { name: '实时字幕', level: 1 })
     fireEvent.click(screen.getByRole('button', { name: '模型与资源' }))
     expect(screen.getByRole('heading', { name: '模型与资源', level: 1 })).toBeInTheDocument()
     expect(await screen.findByText('Qwen3-ASR 1.7B')).toBeInTheDocument()

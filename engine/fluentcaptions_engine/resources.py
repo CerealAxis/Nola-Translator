@@ -11,13 +11,20 @@ import threading
 from typing import Literal
 from uuid import uuid4
 
-from .models.catalog import HYMT2_1_8B_Q4_K_M, QWEN3_ASR_1_7B_HF
+from .models.catalog import (
+    HYMT2_1_8B_Q4_K_M,
+    M2M100_418M,
+    QWEN3_ASR_0_6B_HF,
+    QWEN3_ASR_1_7B_HF,
+)
 from .models.manager import ModelManager, ModelSpec
 from .protocol import ResourceChangedEvent, ResourceRecord
 
 
 QWEN_RESOURCE_ID = QWEN3_ASR_1_7B_HF.model_id
+QWEN_06B_RESOURCE_ID = QWEN3_ASR_0_6B_HF.model_id
 HYMT2_RESOURCE_ID = HYMT2_1_8B_Q4_K_M.model_id
+M2M100_RESOURCE_ID = M2M100_418M.model_id
 
 # S2.6：仅按精确已知名称清理的旧识别模型目录与残留文件。
 _LEGACY_ASR_DIRS = (
@@ -50,7 +57,7 @@ class ResourceOperationCancelled(RuntimeError):
 class ResourceDefinition:
     resource_id: str
     kind: Literal["recognitionModel", "translationModel"]
-    provider: Literal["qwen3-asr", "hy-mt2"]
+    provider: Literal["qwen3-asr", "hy-mt2", "m2m100"]
     name: str
     description: str
     languages: tuple[str, ...]
@@ -83,6 +90,18 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             4_087_646_324,
         ),
         ResourceDefinition(
+            QWEN_06B_RESOURCE_ID,
+            "recognitionModel",
+            "qwen3-asr",
+            "Qwen3-ASR 0.6B · 本地流式识别",
+            "约 1.5GB 的 BF16 原始权重，加载时以 NF4 4-bit 量化运行；与 1.7B 同系列，体积更小。",
+            (
+                "zh", "en", "yue", "ar", "de", "fr", "es", "pt",
+                "id", "it", "ko", "ru", "th", "vi", "ja", "tr",
+            ),
+            1_576_381_331,
+        ),
+        ResourceDefinition(
             HYMT2_RESOURCE_ID,
             "translationModel",
             "hy-mt2",
@@ -93,6 +112,18 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
                 "ar", "ko", "th", "it", "de", "vi", "ms", "id",
             ),
             1_133_080_448,
+        ),
+        ResourceDefinition(
+            M2M100_RESOURCE_ID,
+            "translationModel",
+            "m2m100",
+            "M2M100 418M · 本地翻译模型",
+            "约 1.9GB 的 pytorch_model.bin，由 transformers 在本机运行；支持 100 种语言互译。",
+            (
+                "zh", "en", "fr", "pt", "es", "ja", "tr", "ru",
+                "ar", "ko", "th", "it", "de", "vi", "ms", "id",
+            ),
+            1_941_936_305,
         ),
     )
 
@@ -129,6 +160,10 @@ class ResourceManager:
     @property
     def hymt2_gguf_path(self) -> Path:
         return self.model_root / HYMT2_RESOURCE_ID / "Hy-MT2-1.8B-Q4_K_M.gguf"
+
+    def model_path(self, resource_id: str) -> Path:
+        """资源 ID → 本地模型目录；未知 ID 走 definition 校验后不会走到这里。"""
+        return self.models.model_path(self._spec(resource_id))
 
     def list(self) -> list[ResourceRecord]:
         return [self.record(item.resource_id) for item in RESOURCE_DEFINITIONS]
@@ -245,6 +280,11 @@ class ResourceManager:
     def _cleanup_after_install(self, resource_id: str) -> None:
         """按精确已知名称清理旧资源；不扫描、不触碰未知目录与 Ollama。"""
         try:
+            # 换布局重装时旧权重被挪到 .<目录>.corrupt，安装成功后立即清掉。
+            shutil.rmtree(
+                self.model_root / f".{self._spec(resource_id).directory}.corrupt",
+                ignore_errors=True,
+            )
             if resource_id == QWEN_RESOURCE_ID:
                 for name in _LEGACY_ASR_DIRS:
                     shutil.rmtree(self.model_root / name, ignore_errors=True)
@@ -254,7 +294,7 @@ class ResourceManager:
                         shutil.rmtree(path, ignore_errors=True)
                     else:
                         path.unlink(missing_ok=True)
-            else:
+            elif resource_id == HYMT2_RESOURCE_ID:
                 for variable in ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
                     value = os.environ.get(variable)
                     if not value:
@@ -301,7 +341,13 @@ class ResourceManager:
 
     def _spec(self, resource_id: str) -> ModelSpec:
         self._definition(resource_id)
-        return QWEN3_ASR_1_7B_HF if resource_id == QWEN_RESOURCE_ID else HYMT2_1_8B_Q4_K_M
+        # 按模块级常量现取，测试可以替换 catalog spec。
+        return {
+            QWEN_RESOURCE_ID: QWEN3_ASR_1_7B_HF,
+            QWEN_06B_RESOURCE_ID: QWEN3_ASR_0_6B_HF,
+            HYMT2_RESOURCE_ID: HYMT2_1_8B_Q4_K_M,
+            M2M100_RESOURCE_ID: M2M100_418M,
+        }[resource_id]
 
     @staticmethod
     def _error_code(error: Exception) -> str:

@@ -31,14 +31,14 @@ export type AppSettings = {
   translation: TranslationSettings
 }
 
-export type RecognitionModelId = 'qwen3-asr-1.7b-hf'
+export type RecognitionModelId = 'qwen3-asr-1.7b-hf' | 'qwen3-asr-0.6b-hf'
 
 export type RecognitionSettings = {
   modelId: RecognitionModelId
 }
 
 export type TranslationSettings = {
-  provider: 'hymt2' | 'microsoft' | 'openai' | 'ollama'
+  provider: 'hymt2' | 'm2m100' | 'microsoft' | 'openai' | 'ollama'
   microsoftEndpoint: string
   microsoftRegion: string
   openaiEndpoint: string
@@ -53,6 +53,10 @@ export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'overl
   overlay?: Partial<OverlaySettings>
   translation?: Partial<TranslationSettings>
 }
+
+export const RECOGNITION_MODEL_IDS: readonly RecognitionModelId[] = ['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf']
+
+export const TRANSLATION_PROVIDERS: readonly TranslationSettings['provider'][] = ['hymt2', 'm2m100', 'microsoft', 'openai', 'ollama']
 
 export const DEFAULT_SETTINGS: AppSettings = {
   version: 1,

@@ -30,9 +30,10 @@ from .protocol import (
 )
 from .recognition.base import RecognitionUpdate, Recognizer
 from .recognition.qwen_runtime import QwenModelUnavailable, get_qwen_runtime
-from .recognition.qwen_streaming import create_qwen_recognizer
+from .recognition.qwen_streaming import QwenStreamingRecognizer, create_qwen_recognizer
 from .resources import (
     HYMT2_RESOURCE_ID,
+    M2M100_RESOURCE_ID,
     QWEN_RESOURCE_ID,
     ResourceActionError,
     ResourceManager,
@@ -44,6 +45,11 @@ from .translation.hymt2 import (
     validate_session_languages,
 )
 from .translation.llama_server import LlamaServerError, LlamaServerManager
+from .translation.m2m100 import (
+    M2M100TranslationProvider,
+    is_supported as m2m100_is_supported,
+    validate_session_languages as validate_m2m100_languages,
+)
 from .translation.network import (
     MicrosoftTranslatorProvider,
     OllamaTranslationProvider,
@@ -78,6 +84,7 @@ class EngineRuntime:
         self.llama_manager = LlamaServerManager(gguf_path=self.resources.hymt2_gguf_path)
         self.translation_provider = HyMt2TranslationProvider(self.llama_manager)
         self.translation_scheduler = TranslationScheduler(self.translation_provider)
+        self.active_model_id = QWEN_RESOURCE_ID
         self.translation_tasks: dict[str, asyncio.Task[None]] = {}
         self.translation_requests: dict[str, TranslationRequest] = {}
         self.latest_updates: dict[str, RecognitionUpdate] = {}
@@ -144,21 +151,33 @@ class EngineRuntime:
             return self.service.handle(command)
 
         model_id = self._model_id(command)
-        required_resource = model_id
-        if not self.resources.is_installed(required_resource):
+        required_resources = [model_id]
+        if command.config.targetLanguages:
+            if command.config.translationProvider == "hymt2":
+                required_resources.append(HYMT2_RESOURCE_ID)
+            elif command.config.translationProvider == "m2m100":
+                required_resources.append(M2M100_RESOURCE_ID)
+        missing_resources = [
+            resource_id for resource_id in required_resources
+            if not self.resources.is_installed(resource_id)
+        ]
+        if missing_resources:
             return [
                 self._resource_error(
                     command.requestId,
                     "resourceUnavailable",
-                    {"missingResourceIds": [required_resource]},
+                    {"missingResourceIds": missing_resources},
                 )
             ]
 
         try:
-            self._configure_translation(command)
-            await self._ensure_translation_server(command)
+            if command.config.targetLanguages:
+                self._configure_translation(command)
             recognizer = await self._create_recognizer(command)
+            if command.config.targetLanguages:
+                await self._ensure_translation_server(command)
         except ValueError as error:
+            await self._unload_session_models()
             return [
                 ErrorEvent(
                     protocolVersion=1,
@@ -170,6 +189,7 @@ class EngineRuntime:
                 )
             ]
         except Exception as error:
+            await self._unload_session_models()
             return [
                 ErrorEvent(
                     protocolVersion=1,
@@ -184,6 +204,7 @@ class EngineRuntime:
         events = self.service.handle(command)
         if events and events[0].type == "error":
             await recognizer.close()
+            await self._unload_session_models()
             return events
         assert self.service.active_device is not None
 
@@ -192,6 +213,7 @@ class EngineRuntime:
             capture.start()
         except Exception as error:
             await recognizer.close()
+            await self._unload_session_models()
             session_id = self.service.session_id
             if session_id is not None:
                 self.service.handle(
@@ -243,6 +265,22 @@ class EngineRuntime:
                     + ", ".join(unsupported)
                 )
             provider = HyMt2TranslationProvider(self.llama_manager)
+        elif config.translationProvider == "m2m100":
+            source = (
+                None
+                if config.sourceLanguage == "auto"
+                else self._language_code(config.sourceLanguage)
+            )
+            targets = [self._language_code(item) for item in config.targetLanguages]
+            unsupported = validate_m2m100_languages(source, targets)
+            if unsupported:
+                raise ValueError(
+                    "unsupportedTranslationLanguage (m2m100): "
+                    + ", ".join(unsupported)
+                )
+            provider = M2M100TranslationProvider(
+                self.resources.model_path(M2M100_RESOURCE_ID)
+            )
         elif config.translationProvider == "microsoft":
             provider = MicrosoftTranslatorProvider(
                 api_key,
@@ -267,6 +305,10 @@ class EngineRuntime:
 
     async def _ensure_translation_server(self, command: StartSessionCommand) -> None:
         """会话启动时拉起 Hy-MT2 的 llama-server；缺模型或启动失败都不阻断识别。"""
+        if command.config.translationProvider == "m2m100":
+            if isinstance(self.translation_provider, M2M100TranslationProvider):
+                await asyncio.to_thread(self.translation_provider.runtime.load)
+            return
         if command.config.translationProvider != "hymt2":
             return
         if not self.resources.is_installed(HYMT2_RESOURCE_ID):
@@ -283,7 +325,14 @@ class EngineRuntime:
             if command.config.sourceLanguage == "auto"
             else self._language_code(command.config.sourceLanguage)
         )
-        return create_qwen_recognizer(self.resources.qwen_path, source_language=language)
+        model_id = self._model_id(command)
+        self.active_model_id = model_id
+        model_path = self.resources.model_path(model_id)
+        await asyncio.to_thread(get_qwen_runtime(model_path).load)
+        recognizer = create_qwen_recognizer(model_path, source_language=language)
+        if isinstance(recognizer, QwenStreamingRecognizer):
+            recognizer.on_update = self._emit_update
+        return recognizer
 
     @staticmethod
     def _model_id(command: StartSessionCommand) -> str:
@@ -449,6 +498,15 @@ class EngineRuntime:
                         target_errors[target] = "unsupportedLanguagePair"
                 if not target_errors and not self.llama_manager.ready:
                     target_errors = dict.fromkeys(targets, "llamaServerUnavailable")
+        elif provider_name == "m2m100":
+            if not self.resources.is_installed(M2M100_RESOURCE_ID):
+                target_errors = dict.fromkeys(targets, "resourceUnavailable")
+            elif not m2m100_is_supported(request.source):
+                target_errors = dict.fromkeys(targets, "unsupportedLanguagePair")
+            else:
+                for target in targets:
+                    if not m2m100_is_supported(target):
+                        target_errors[target] = "unsupportedLanguagePair"
 
         available_targets = [target for target in targets if target not in target_errors]
         scheduled = (
@@ -562,6 +620,7 @@ class EngineRuntime:
                 await asyncio.wait_for(self.session_task, timeout=5)
             except TimeoutError:
                 self.session_task.cancel()
+                await asyncio.gather(self.session_task, return_exceptions=True)
             except asyncio.CancelledError:
                 pass
         if self.recognizer is not None:
@@ -574,6 +633,7 @@ class EngineRuntime:
             await asyncio.gather(*tasks, return_exceptions=True)
         await self.translation_scheduler.close()
         await self.llama_manager.stop()
+        await self._unload_session_models()
         self.translation_tasks.clear()
         self.translation_last_started.clear()
         self.translation_wake.clear()
@@ -590,6 +650,15 @@ class EngineRuntime:
         self._write_engine_status()
         return self.service.handle(command)
 
+    async def _unload_session_models(self) -> None:
+        """结束会话后释放 ASR 和本地翻译权重。"""
+        runtimes = [get_qwen_runtime(self.resources.model_path(self.active_model_id))]
+        if isinstance(self.translation_provider, M2M100TranslationProvider):
+            runtimes.append(self.translation_provider.runtime)
+        for runtime in runtimes:
+            if getattr(runtime, "loaded", False):
+                await asyncio.to_thread(runtime.unload)
+
     async def close(self) -> None:
         if self.service.session_id is not None:
             await self._stop(
@@ -604,7 +673,7 @@ class EngineRuntime:
         self._remove_engine_status()
 
     def _engine_status_payload(self) -> dict[str, object]:
-        qwen_runtime = get_qwen_runtime(self.resources.qwen_path)
+        qwen_runtime = get_qwen_runtime(self.resources.model_path(self.active_model_id))
         device = self.llama_manager.device
         dropped = (
             self.capture.dropped_chunks

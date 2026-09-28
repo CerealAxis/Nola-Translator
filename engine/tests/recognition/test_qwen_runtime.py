@@ -11,6 +11,7 @@ import torch
 
 import fluentcaptions_engine.recognition.qwen_runtime as qwen_runtime
 from fluentcaptions_engine.recognition.qwen_runtime import (
+    CheckpointLayoutMismatch,
     QwenModelUnavailable,
     QwenRuntime,
     get_qwen_runtime,
@@ -175,6 +176,23 @@ def test_both_quantizations_fail_raises_unavailable_with_chained_reason(monkeypa
     assert "8bit" in str(excinfo.value.__cause__)
     assert runtime.loaded is False
     assert runtime.quant is None
+
+
+def test_checkpoint_layout_mismatch_fails_without_quant_retry(monkeypatch) -> None:
+    def handler(quant: str):
+        raise CheckpointLayoutMismatch("708 个参数缺失")
+
+    calls = patch_loader(monkeypatch, handler)
+    runtime = QwenRuntime(Path("models/qwen"))
+
+    with pytest.raises(QwenModelUnavailable) as excinfo:
+        runtime.load()
+
+    # 布局不匹配与量化无关：换 8bit 只会再浪费一次加载。
+    assert calls == ["nf4"]
+    assert "708" in str(excinfo.value)
+    assert isinstance(excinfo.value.__cause__, CheckpointLayoutMismatch)
+    assert runtime.loaded is False
 
 
 def test_explicit_and_env_quant_resolution(monkeypatch) -> None:

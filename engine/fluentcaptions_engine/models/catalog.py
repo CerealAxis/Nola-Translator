@@ -61,6 +61,66 @@ QWEN3_ASR_1_7B_HF = ModelSpec(
 )
 
 
+# Qwen3-ASR 0.6B 原始 BF16 权重快照；与 1.7B 同一套 AutoProcessor +
+# Qwen3ASRForConditionalGeneration 加载。必须钉 -hf 仓库：Qwen/Qwen3-ASR-0.6B 是
+# thinker 布局（config 带 thinker_config、权重键带 thinker. 前缀、特征提取器是
+# WhisperFeatureExtractor），与 transformers qwen3_asr 的权重键和 n_window 补齐都对不上，
+# from_pretrained 会一个权重都静默加载不上。
+QWEN3_ASR_0_6B_HF = ModelSpec(
+    model_id="qwen3-asr-0.6b-hf",
+    directory="qwen3-asr-0.6b-hf",
+    repo="Qwen/Qwen3-ASR-0.6B-hf",
+    revision="7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c",
+    files=(
+    FileEntry(
+        ".gitattributes",
+        1570,
+        "34448b82c17d60fec9b65b1f093c115ddbaadc04beb1b0140b6bfed2e012a930",
+    ),
+    FileEntry(
+        "README.md",
+        16538,
+        "742006d0f99ce6475b1c5e7b66e4a2f166cce836dd7ce3d7f20707252859195a",
+    ),
+    FileEntry(
+        "chat_template.jinja",
+        1434,
+        "f50e6b694fbf4a683206e37869990d68333fe95d285730f084c838a34b0d98c2",
+    ),
+    FileEntry(
+        "config.json",
+        2398,
+        "9eecf6f1b383e343889c2e6010e632590fa57d4bc678e151c7d6a160a0dfb04a",
+    ),
+    FileEntry(
+        "generation_config.json",
+        165,
+        "9939fc9388b79bd70757f938b87381e817173d6a6158f5af6506c0b73e775c3c",
+    ),
+    FileEntry(
+        "model.safetensors",
+        1564928088,
+        "d3f212dd20abecd315d830bc54ae3865e56ebfc3276484e57b771288ba27fd35",
+    ),
+    FileEntry(
+        "processor_config.json",
+        487,
+        "bc0b230081b44e629dd5b9045b78495615c1831b4b9f4cffe97bd37e82a6156a",
+    ),
+    FileEntry(
+        "tokenizer.json",
+        11429653,
+        "fe1fad59be22a41ee293363fcf95fdedbc7c93f3b49270b1d2e18bd1399a7a05",
+    ),
+    FileEntry(
+        "tokenizer_config.json",
+        998,
+        "945e980986de2ca7768f3326bfdbb4fbea3406f972b8ae0be233089f2b253c11",
+    ),
+    ),
+)
+
+
 # Hy-MT2 1.8B 预量化 Q4_K_M 单文件；由内置 llama.cpp 在本机运行。
 HYMT2_1_8B_Q4_K_M = ModelSpec(
     model_id="hy-mt2-1.8b-q4-k-m",
@@ -72,6 +132,62 @@ HYMT2_1_8B_Q4_K_M = ModelSpec(
             "Hy-MT2-1.8B-Q4_K_M.gguf",
             1_133_080_448,
             "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
+        ),
+    ),
+)
+
+
+# M2M100 418M 多对多翻译模型；官方仓库只提供 pytorch_model.bin，tokenizer 走 sentencepiece。
+M2M100_418M = ModelSpec(
+    model_id="m2m100-418m",
+    directory="m2m100-418m",
+    repo="facebook/m2m100_418M",
+    revision="55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636",
+    files=(
+        FileEntry(
+            ".gitattributes",
+            690,
+            "98cf30ae2568ea1d18641cc0d1d9a2f9041cc43aea81f5d719654abd9e290e0d",
+        ),
+        FileEntry(
+            "README.md",
+            4_603,
+            "1fd660f130aedc5ecf1796b47ab47d43d3c4b36541f5387b7adb3df75cb5dfdb",
+        ),
+        FileEntry(
+            "config.json",
+            908,
+            "df0ae43e4e4b0d7e3c97b7f447857a70ef6b6a2aa1f145cedbcc730d95f67134",
+        ),
+        FileEntry(
+            "generation_config.json",
+            233,
+            "aed76366507333ddbb8bd49960f23c82fe6446b3319a46a54befdb45324ccf61",
+        ),
+        FileEntry(
+            "pytorch_model.bin",
+            1_935_796_948,
+            "d907ea45e4e4b9db163382a6674f6218b3c59566fe06d77f4055c208b4e87ed1",
+        ),
+        FileEntry(
+            "sentencepiece.bpe.model",
+            2_423_393,
+            "d8f7c76ed2a5e0822be39f0a4f95a55eb19c78f4593ce609e2edbc2aea4d380a",
+        ),
+        FileEntry(
+            "special_tokens_map.json",
+            1_140,
+            "c1a4f86c3874d279ae1b2a05162858db5dd6c61665d84223ed886cbcff08fda6",
+        ),
+        FileEntry(
+            "tokenizer_config.json",
+            298,
+            "a53e6aa83da0b82565ed90c3849056307a9453843322ac5b8439ec4b9497fe48",
+        ),
+        FileEntry(
+            "vocab.json",
+            3_708_092,
+            "b6e77e474aeea8f441363aca7614317c06381f3eacfe10fb9856d5081d1074cc",
         ),
     ),
 )

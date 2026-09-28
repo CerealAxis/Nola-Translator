@@ -147,14 +147,21 @@ class VolumeGateSegmenter:
         return [segment]
 
     def current_segment(self) -> SegmentSnapshot | None:
+        bounds = self.current_bounds()
+        if bounds is None:
+            return None
+        return SegmentSnapshot(
+            start_ms=bounds[0],
+            end_ms=bounds[1],
+            samples=np.concatenate([f.samples for f in self._active]),
+        )
+
+    def current_bounds(self) -> tuple[float, float] | None:
+        """读取活动段时间范围，避免每帧复制整段音频。"""
         if not self._active:
             return None
         last = self._active[-1]
-        return SegmentSnapshot(
-            start_ms=self._active_start_ms,
-            end_ms=last.start_ms + last.samples.size * 1000.0 / TARGET_SAMPLE_RATE,
-            samples=np.concatenate([f.samples for f in self._active]),
-        )
+        return self._active_start_ms, last.start_ms + last.samples.size * 1000.0 / TARGET_SAMPLE_RATE
 
     def _start_segment(self, frame: AudioFrame) -> None:
         opener = _Frame(frame.samples, frame.started_at_ms, True)

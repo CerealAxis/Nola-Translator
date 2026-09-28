@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import gc
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,6 +58,10 @@ class QwenModelUnavailable(RuntimeError):
     """模型不可用：目录缺失或 NF4/8bit 量化均加载失败。"""
 
 
+class CheckpointLayoutMismatch(RuntimeError):
+    """checkpoint 权重键与模型架构对不上：from_pretrained 会静默随机初始化。"""
+
+
 @dataclass(slots=True)
 class _Pipeline:
     model: Any
@@ -98,6 +103,7 @@ class QwenRuntime:
         self.model_dir = Path(model_dir)
         self._quant_param = quant
         self._load_lock = threading.Lock()
+        self._inference_lock = threading.Lock()
         self._loaded = False
         self._quant: str | None = None
         self._pipeline: _Pipeline | None = None
@@ -121,6 +127,9 @@ class QwenRuntime:
             for quant in attempts:
                 try:
                     pipeline = self._load_pipeline(quant)
+                except CheckpointLayoutMismatch as error:
+                    # 与量化无关，换 8bit 重试同样会失败，直接报不可用。
+                    raise QwenModelUnavailable(str(error)) from error
                 except Exception as error:
                     errors.append((quant, error))
                     continue
@@ -134,6 +143,19 @@ class QwenRuntime:
             raise QwenModelUnavailable(
                 f"无法从 {self.model_dir} 加载 Qwen3-ASR 模型（{detail}）"
             ) from errors[-1][1]
+
+    def unload(self) -> None:
+        """等待正在运行的推理结束，再释放权重与 CUDA 缓存。"""
+        with self._inference_lock:
+            with self._load_lock:
+                pipeline = self._pipeline
+                self._pipeline = None
+                self._loaded = False
+                self._quant = None
+            del pipeline
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
     def _resolve_quant(self) -> str:
         # 显式参数 > 环境变量 > 默认 nf4（S2.2/S4）
@@ -157,12 +179,22 @@ class QwenRuntime:
         else:
             bnb = BitsAndBytesConfig(load_in_8bit=True)
         processor = AutoProcessor.from_pretrained(str(self.model_dir), local_files_only=True)
-        model = Qwen3ASRForConditionalGeneration.from_pretrained(
+        model, loading_info = Qwen3ASRForConditionalGeneration.from_pretrained(
             str(self.model_dir),
             quantization_config=bnb,
             device_map="cuda:0" if torch.cuda.is_available() else "cpu",
             local_files_only=True,
+            output_loading_info=True,
         )
+        # 权重键布局不匹配（例如 thinker 布局的 Qwen/Qwen3-ASR-0.6B）时，
+        # from_pretrained 只会把全部参数随机初始化后照常返回，直到推理才崩。
+        missing = sorted(loading_info.get("missing_keys", ()))
+        if missing:
+            raise CheckpointLayoutMismatch(
+                f"{self.model_dir} 的权重与 Qwen3ASRForConditionalGeneration 不匹配："
+                f"{len(missing)} 个参数缺失（首个 {missing[0]}）。"
+                "请重新安装 transformers 原生的 -hf 仓库快照"
+            )
         return _Pipeline(model=model, processor=processor)
 
     def rollback_text(self, text: str, n_tokens: int = 5) -> str:
@@ -185,6 +217,16 @@ class QwenRuntime:
             keep += 1
 
     def transcribe(
+        self,
+        samples: NDArray[np.float32],
+        *,
+        prefix: str | None = None,
+        language: str | None = None,
+    ) -> tuple[str, str | None]:
+        with self._inference_lock:
+            return self._transcribe_locked(samples, prefix=prefix, language=language)
+
+    def _transcribe_locked(
         self,
         samples: NDArray[np.float32],
         *,

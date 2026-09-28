@@ -31,5 +31,6 @@ if (-not (Test-Path $python)) {
     --collect-all transformers `
     --collect-all bitsandbytes `
     --collect-all accelerate `
+    --collect-all sentencepiece `
     --hidden-import pyaudiowpatch `
     (Join-Path $engineRoot 'engine_entry.py')

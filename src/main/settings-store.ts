@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute } from 'node:path'
 
-import { DEFAULT_SETTINGS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
+import { DEFAULT_SETTINGS, RECOGNITION_MODEL_IDS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
 
 // Store-internal patches may also touch fields the IPC schema exposes only through their own channels.
 export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 1 }
@@ -41,11 +41,11 @@ export class SettingsStore {
         },
       }
       // 三个旧识别模型 ID 与未知值统一迁移到 Qwen3-ASR。
-      if (this.settings.recognition.modelId !== 'qwen3-asr-1.7b-hf') {
+      if (!RECOGNITION_MODEL_IDS.includes(this.settings.recognition.modelId)) {
         this.settings.recognition = { modelId: 'qwen3-asr-1.7b-hf' }
       }
-      // 翻译 provider：microsoft/openai/ollama 保持原值，其余（含 argos）迁移到 hymt2。
-      if (!['microsoft', 'openai', 'ollama'].includes(this.settings.translation.provider)) {
+      // 翻译 provider：本地两个与三个网络 provider 保持原值，其余（含 argos）迁移到 hymt2。
+      if (!TRANSLATION_PROVIDERS.includes(this.settings.translation.provider)) {
         this.settings.translation.provider = 'hymt2'
       }
       // 旧版字幕配色默认值升级为视频参考样式；仅当两项都未被自定义时才迁移。

@@ -10,6 +10,7 @@ dependencies = [
   "pydantic==2.13.4",
   "PyAudioWPatch==0.2.12.8",
   "scipy==1.18.0",
+  "sentencepiece==0.2.1",
   "torch==2.13.0",
   "transformers==5.17.0"
 ]

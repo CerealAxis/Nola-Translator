@@ -12,7 +12,44 @@ import { ResourcesPage } from '../pages/ResourcesPage'
 import { TranslationPage } from '../pages/TranslationPage'
 
 export function App(): React.JSX.Element {
-  return <I18nProvider><AppContent /></I18nProvider>
+  return <I18nProvider><StartupGate /></I18nProvider>
+}
+
+function StartupGate(): React.JSX.Element {
+  const { t } = useI18n()
+  const [attempt, setAttempt] = useState(0)
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  useEffect(() => {
+    let active = true
+    setState('loading')
+    const api = window.fluentCaptions
+    if (!api) {
+      setState('error')
+      return
+    }
+    void api.listResources().then(() => {
+      if (active) setState('ready')
+    }).catch(() => {
+      if (active) setState('error')
+    })
+    return () => { active = false }
+  }, [attempt])
+  if (state === 'ready') return <AppContent />
+  return (
+    <div className="startup-screen" role="status" aria-live="polite">
+      <div className="startup-card">
+        <span className="app-mark startup-mark" aria-hidden="true">F</span>
+        <strong>FluentCaptions</strong>
+        {state === 'loading' ? <>
+          <span className="loading-spinner" aria-hidden="true" />
+          <p>{t('正在加载本地引擎与资源…')}</p>
+        </> : <>
+          <p>{t('本地引擎启动失败，请重试。')}</p>
+          <button className="button primary-button" type="button" onClick={() => setAttempt((value) => value + 1)}>{t('重试')}</button>
+        </>}
+      </div>
+    </div>
+  )
 }
 
 function AppContent(): React.JSX.Element {

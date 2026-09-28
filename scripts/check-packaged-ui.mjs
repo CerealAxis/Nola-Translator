@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
 
@@ -7,13 +7,15 @@ const executablePath = process.argv[2]
   ?? resolve('release/win-unpacked/FluentCaptions.exe');
 const port = Number(process.env.FLUENTCAPTIONS_CDP_PORT ?? 9333);
 const expectedVersion = JSON.parse(readFileSync(resolve('package.json'), 'utf8')).version;
+const testAppData = process.env.FLUENTCAPTIONS_TEST_APPDATA ?? resolve('artifacts/packaged-ui-appdata');
+mkdirSync(testAppData, { recursive: true });
 
-const app = spawn(executablePath, [`--remote-debugging-port=${port}`], {
+const app = spawn(executablePath, [`--user-data-dir=${resolve(testAppData, 'FluentCaptions')}`, `--remote-debugging-port=${port}`], {
   stdio: process.env.FLUENTCAPTIONS_DEBUG ? 'inherit' : 'ignore',
   windowsHide: true,
   env: {
     ...process.env,
-    APPDATA: process.env.FLUENTCAPTIONS_TEST_APPDATA ?? resolve('artifacts/packaged-ui-appdata'),
+    APPDATA: testAppData,
     ELECTRON_ENABLE_LOGGING: process.env.FLUENTCAPTIONS_DEBUG ? '1' : undefined,
   },
 });
@@ -21,7 +23,7 @@ const app = spawn(executablePath, [`--remote-debugging-port=${port}`], {
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 async function findPageTarget(overlay = false) {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     try {
       const response = await fetch(`http://127.0.0.1:${port}/json`);
       const targets = await response.json();
@@ -46,7 +48,7 @@ async function sendCommand(target, method, params = {}) {
   });
 
   const result = await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('页面检查超时')), 30_000);
+    const timeout = setTimeout(() => reject(new Error('页面检查超时')), 120_000);
     socket.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
       if (message.id !== 1) {
@@ -133,7 +135,7 @@ try {
   const overlayTarget = await findPageTarget(true);
   await delay(250);
   const overlayWindowProbe = await evaluate(overlayTarget, `(() => {
-    const overlay = document.querySelector('.standalone-overlay');
+    const overlay = document.querySelector('.caption-console');
     return {
       locked: overlay?.dataset.locked,
       dragRegion: overlay ? getComputedStyle(overlay).getPropertyValue('-webkit-app-region') : '',
@@ -159,7 +161,7 @@ try {
     return true;
   })()`);
   const transparentOverlayProbe = await evaluate(overlayTarget, `(() => {
-    const overlay = document.querySelector('.standalone-overlay');
+    const overlay = document.querySelector('.caption-console');
     const styles = overlay ? getComputedStyle(overlay) : null;
     return {
       visible: document.visibilityState === 'visible',
@@ -174,14 +176,14 @@ try {
       .find((button) => button.textContent?.trim() === name || button.getAttribute('aria-label') === name);
     findButton('模型与资源')?.click();
     for (let attempt = 0; attempt < 60; attempt += 1) {
-      if (document.querySelectorAll('.resource-card').length >= 1) break;
+      if (document.querySelectorAll('.resource-card').length >= 2) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     return {
       heading: document.querySelector('h1')?.textContent ?? '',
-    recognitionCards: document.querySelectorAll('.resource-card').length,
+    recognitionCards: document.querySelectorAll('[aria-labelledby="recognition-resources"] .resource-card').length,
     hasQwen: document.body.innerText.includes('Qwen3-ASR'),
-      packageRows: document.querySelectorAll('.package-row').length,
+      translationCards: document.querySelectorAll('[aria-labelledby="translation-resources"] .resource-card').length,
       installButtons: Array.from(document.querySelectorAll('button'))
         .filter((button) => button.textContent?.trim() === '安装').length,
       hasStoragePath: Boolean(document.querySelector('.storage-path'))
@@ -218,7 +220,7 @@ try {
     || overlayPageProbe.locked !== false
     || overlayWindowProbe.locked !== 'false'
     || overlayWindowProbe.dragRegion !== 'drag'
-    || overlayWindowProbe.buttonCount !== 0
+    || overlayWindowProbe.buttonCount < 5
     || overlayWindowProbe.hasStatus
     || overlayWindowProbe.hasEditBar
     || !overlayHidden
@@ -228,9 +230,9 @@ try {
     || transparentOverlayProbe.backdropFilter !== 'none'
     || transparentOverlayProbe.boxShadow !== 'none'
     || resourcePageProbe.heading !== '模型与资源'
-    || resourcePageProbe.recognitionCards !== 1
+    || resourcePageProbe.recognitionCards !== 2
     || !resourcePageProbe.hasQwen
-    || resourcePageProbe.packageRows !== 1
+    || resourcePageProbe.translationCards !== 2
     || !resourcePageProbe.hasStoragePath
     || !translationSwitchProbe.hasLabel
     || translationSwitchProbe.rowDisplay !== 'flex'

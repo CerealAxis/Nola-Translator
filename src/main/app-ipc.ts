@@ -28,7 +28,7 @@ const settingsPatchSchema = z.object({
   uiLanguage: z.enum(['zh-CN', 'en']).optional(),
   historyEnabled: z.boolean().optional(),
   recognition: z.object({
-    modelId: z.enum(['qwen3-asr-1.7b-hf']).optional(),
+    modelId: z.enum(['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf']).optional(),
   }).partial().optional(),
   overlay: z.object({
     mode: z.enum(['free', 'top', 'bottom']).optional(), locked: z.boolean().optional(),
@@ -42,7 +42,7 @@ const settingsPatchSchema = z.object({
     translationLineHeight: z.number().min(1).max(2).optional(), showSource: z.boolean().optional(), showTranslation: z.boolean().optional(),
   }).partial().optional(),
   translation: z.object({
-    provider: z.enum(['hymt2', 'microsoft', 'openai', 'ollama']).optional(),
+    provider: z.enum(['hymt2', 'm2m100', 'microsoft', 'openai', 'ollama']).optional(),
     microsoftEndpoint: z.string().min(1).max(2048).optional(), microsoftRegion: z.string().max(128).optional(),
     openaiEndpoint: z.string().min(1).max(2048).optional(), openaiModel: z.string().min(1).max(256).optional(),
     ollamaEndpoint: z.string().min(1).max(2048).optional(), ollamaModel: z.string().min(1).max(256).optional(),
@@ -61,7 +61,7 @@ async function diagnostics(engine: EngineProcess, settings: AppSettings): Promis
     操作系统: `${process.platform} ${process.getSystemVersion()}`,
     引擎状态: engine.currentState, 引擎重启次数: engine.restartCount,
     语音识别: qwen?.loaded && (qwen.quant === 'nf4' || qwen.quant === '8bit')
-      ? `Qwen3-ASR 1.7B（${qwen.quant}）`
+      ? `${settings.recognition.modelId === 'qwen3-asr-0.6b-hf' ? 'Qwen3-ASR 0.6B' : 'Qwen3-ASR 1.7B'}（${qwen.quant}）`
       : '未运行',
     本地翻译: hymt2?.ready && hymt2.device
       ? `Hy-MT2 · llama.cpp（${hymt2.device}）`

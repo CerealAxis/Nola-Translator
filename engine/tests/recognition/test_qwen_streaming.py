@@ -141,6 +141,23 @@ async def test_short_speech_emits_no_intermediate_exactly_one_final() -> None:
     assert updates[0].ended_at_ms is not None
 
 
+async def test_completed_result_is_delivered_without_another_audio_frame() -> None:
+    delivered = []
+
+    async def on_update(update) -> None:
+        delivered.append(update)
+
+    rec = make_recognizer(FakeRuntime(), block_ms=40)
+    rec.on_update = on_update
+    await rec.accept(make_frame(0, 0.5))
+    await rec.accept(make_frame(1, 0.5))
+    await settle(rec)
+    assert len(delivered) == 1
+    assert delivered[0].source_text == "transcript 1"
+    assert rec._drain() == []
+    await rec.close()
+
+
 async def test_first_two_dispatches_have_no_prefix_then_rollback() -> None:
     results = [
         ("w1 w2 w3 w4 w5 w6 w7", "en"),
@@ -234,12 +251,12 @@ async def test_final_drops_pending_intermediate_and_discards_stale_result() -> N
     await settle(rec)
     updates += rec._drain()
 
-    # 在飞的中间结果因段已定而过期丢弃；待处理的中间任务被 final 顶掉
+    # 在飞的中间结果先显示，待处理的中间任务由 final 顶掉。
     assert len(runtime.calls) == 2
     finals = [u for u in updates if u.is_final]
     assert len(finals) == 1
-    assert len([u for u in updates if not u.is_final]) == 0
-    assert finals[0].revision == 0
+    assert len([u for u in updates if not u.is_final]) == 1
+    assert finals[0].revision == 1
 
 
 async def test_force_split_produces_two_segments_with_distinct_ids() -> None:
@@ -348,3 +365,10 @@ def test_create_qwen_recognizer_wires_defaults(tmp_path) -> None:
     assert isinstance(rec.segmenter, VolumeGateSegmenter)
     assert rec.block_ms == 2000
     assert rec._forced_language == "en"
+
+
+def test_06b_realtime_profile_limits_repeated_inference(tmp_path) -> None:
+    rec = create_qwen_recognizer(tmp_path / "qwen3-asr-0.6b-hf")
+
+    assert rec.block_ms == 3000
+    assert rec.segmenter.max_segment_ms == 6000

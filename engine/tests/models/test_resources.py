@@ -12,6 +12,8 @@ from fluentcaptions_engine.models.manager import FileEntry, ModelSpec
 from fluentcaptions_engine.protocol import ResourceRecord
 from fluentcaptions_engine.resources import (
     HYMT2_RESOURCE_ID,
+    M2M100_RESOURCE_ID,
+    QWEN_06B_RESOURCE_ID,
     QWEN_RESOURCE_ID,
     ResourceActionError,
     ResourceManager,
@@ -48,6 +50,24 @@ def _tiny_hymt2() -> tuple[ModelSpec, dict[str, bytes]]:
     return spec, {spec.url_for(spec.files[0]): data}
 
 
+def _tiny_m2m100() -> tuple[ModelSpec, dict[str, bytes]]:
+    payloads = {
+        "config.json": b'{"tiny": true}',
+        "pytorch_model.bin": b"M" * 64,
+    }
+    spec = ModelSpec(
+        model_id=M2M100_RESOURCE_ID,
+        directory=M2M100_RESOURCE_ID,
+        repo="facebook/m2m100_418M",
+        revision="pinned-test-revision",
+        files=tuple(
+            FileEntry(path, len(data), sha256(data).hexdigest())
+            for path, data in payloads.items()
+        ),
+    )
+    return spec, {spec.url_for(entry): payloads[entry.path] for entry in spec.files}
+
+
 def _fetcher(payloads: dict[str, bytes]):
     def fetch(url: str, destination: Path, progress) -> None:
         data = payloads[url]
@@ -64,15 +84,22 @@ def _fetcher(payloads: dict[str, bytes]):
     return fetch
 
 
-def test_list_returns_exactly_two_records(tmp_path: Path) -> None:
+def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     manager = ResourceManager(tmp_path / "models", lambda _event: None)
     records = manager.list()
 
-    assert [record.resourceId for record in records] == [QWEN_RESOURCE_ID, HYMT2_RESOURCE_ID]
+    assert [record.resourceId for record in records] == [
+        QWEN_RESOURCE_ID,
+        QWEN_06B_RESOURCE_ID,
+        HYMT2_RESOURCE_ID,
+        M2M100_RESOURCE_ID,
+    ]
     assert QWEN_RESOURCE_ID == "qwen3-asr-1.7b-hf"
+    assert QWEN_06B_RESOURCE_ID == "qwen3-asr-0.6b-hf"
     assert HYMT2_RESOURCE_ID == "hy-mt2-1.8b-q4-k-m"
+    assert M2M100_RESOURCE_ID == "m2m100-418m"
 
-    qwen, hymt2 = records
+    qwen, qwen_small, hymt2, m2m100 = records
     assert qwen.kind == "recognitionModel"
     assert qwen.provider == "qwen3-asr"
     assert qwen.name == "Qwen3-ASR 1.7B · 本地流式识别"
@@ -81,6 +108,12 @@ def test_list_returns_exactly_two_records(tmp_path: Path) -> None:
     assert qwen.installed is False
     assert qwen.state == "idle"
 
+    assert qwen_small.kind == "recognitionModel"
+    assert qwen_small.provider == "qwen3-asr"
+    assert qwen_small.name == "Qwen3-ASR 0.6B · 本地流式识别"
+    assert qwen_small.downloadBytes == 1_576_381_331
+    assert qwen_small.installed is False
+
     assert hymt2.kind == "translationModel"
     assert hymt2.provider == "hy-mt2"
     assert hymt2.name == "Hy-MT2 1.8B · 本地翻译模型"
@@ -88,8 +121,38 @@ def test_list_returns_exactly_two_records(tmp_path: Path) -> None:
     assert 0 < len(hymt2.languages) <= 16
     assert hymt2.installed is False
 
+    assert m2m100.kind == "translationModel"
+    assert m2m100.provider == "m2m100"
+    assert m2m100.name == "M2M100 418M · 本地翻译模型"
+    assert m2m100.downloadBytes == 1_941_936_305
+    assert m2m100.installed is False
+
     for record in records:
+        assert 0 < len(record.languages) <= 16
         assert ResourceRecord.model_validate(record.model_dump()) == record
+
+
+async def test_install_m2m100_leaves_xdg_dirs_untouched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M2M100 不是 Hy-MT2：安装它不得触发 Argos 时代的 XDG 清理。"""
+    spec, payloads = _tiny_m2m100()
+    monkeypatch.setattr(resources_module, "M2M100_418M", spec)
+
+    xdg_data = tmp_path / "xdg-data"
+    (xdg_data / "argos").mkdir(parents=True)
+    monkeypatch.setenv("XDG_DATA_HOME", str(xdg_data))
+
+    model_root = tmp_path / "models"
+    manager = ResourceManager(model_root, lambda _event: None)
+    manager.models.fetcher = _fetcher(payloads)
+
+    await manager.manage(M2M100_RESOURCE_ID, "install")
+    await manager.tasks[M2M100_RESOURCE_ID]
+
+    assert manager.is_installed(M2M100_RESOURCE_ID) is True
+    assert (manager.model_path(M2M100_RESOURCE_ID) / "config.json").is_file()
+    assert xdg_data.exists()
 
 
 async def test_install_qwen_phases_progress_and_cleanup(

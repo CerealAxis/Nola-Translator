@@ -73,7 +73,11 @@ class ModelManager:
 
     def is_installed(self, spec: ModelSpec) -> bool:
         target = self.model_path(spec)
-        return target.is_dir() and all((target / entry.path).is_file() for entry in spec.files)
+        return target.is_dir() and all(
+            (target / entry.path).is_file()
+            and (target / entry.path).stat().st_size == entry.size
+            for entry in spec.files
+        )
 
     def ensure(
         self,

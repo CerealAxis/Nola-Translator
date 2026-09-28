@@ -50,7 +50,8 @@ class QwenStreamingRecognizer:
     """Qwen 流式识别器：音量门断句 + 累计分块转写 + 官方前缀回退。
 
     推理全部在一个后台 asyncio worker 中执行：FINAL 优先于 INTERMEDIATE，同段
-    INTERMEDIATE 按 segment_id 合并为最新快照；已定段或过期的结果直接丢弃，
+    INTERMEDIATE 按 segment_id 合并为最新快照；在飞的中间结果即使已定段也先显示，
+    过期结果在最终结果完成后丢弃，
     ``accept()`` 只入队与收取结果，从不等待推理。
 
     模型在首个 job 的线程中惰性加载；``QwenModelUnavailable`` 等加载失败没有
@@ -67,6 +68,7 @@ class QwenStreamingRecognizer:
         block_ms: int = 2000,
         rollback_tokens: int = 5,
         run_transcribe: Callable[[_Job], Awaitable[tuple[str, str | None]]] | None = None,
+        on_update: Callable[[RecognitionUpdate], Awaitable[None]] | None = None,
     ) -> None:
         self.runtime = runtime
         self.segmenter = segmenter if segmenter is not None else VolumeGateSegmenter()
@@ -76,6 +78,7 @@ class QwenStreamingRecognizer:
             source_language if source_language not in (None, "", "auto") else None
         )
         self._run_transcribe = run_transcribe
+        self.on_update = on_update
 
         self._states: dict[str, _SegmentState] = {}
         self._current: _SegmentState | None = None
@@ -97,8 +100,8 @@ class QwenStreamingRecognizer:
             state = self._current if self._current is not None else self._new_state(segment.start_ms)
             self._finalize(state, segment, segment.end_ms)
 
-        snapshot = self.segmenter.current_segment()
-        if snapshot is None:
+        bounds = self.segmenter.current_bounds()
+        if bounds is None:
             if self._current is not None:
                 # 段被 MIN_VOICED 规则丢弃：不产生任何 job
                 self._drop_current()
@@ -106,11 +109,13 @@ class QwenStreamingRecognizer:
             state = (
                 self._current
                 if self._current is not None
-                else self._new_state(snapshot.start_ms)
+                else self._new_state(bounds[0])
             )
-            # 分块时钟用音频时钟（snapshot end），不用墙钟
-            if snapshot.end_ms - state.last_dispatch_end_ms >= self.block_ms:
-                self._dispatch_intermediate(state, snapshot)
+            # 只在真正需要发起推理时拼接音频；分块时钟使用音频时钟。
+            if bounds[1] - state.last_dispatch_end_ms >= self.block_ms:
+                snapshot = self.segmenter.current_segment()
+                if snapshot is not None:
+                    self._dispatch_intermediate(state, snapshot)
         return self._drain()
 
     async def flush(self, ended_at_ms: float) -> list[RecognitionUpdate]:
@@ -273,14 +278,20 @@ class QwenStreamingRecognizer:
             )
             self._states.pop(job.segment_id, None)
         else:
-            if state.finalized or job.generation <= state.emitted_generation:
-                # 已定段或过期的中间结果：丢弃，绝不发出
+            if state.final_done or job.generation <= state.emitted_generation:
+                # 仍在推理中的中间结果，即使随后静音定段，也先给用户显示。
                 return
             update = self._emit(state, text, language, is_final=False, ended_at_ms=None)
             if update is not None:
                 state.emitted_generation = job.generation
         if update is not None:
-            self._ready.append(update)
+            if self.on_update is None:
+                self._ready.append(update)
+            else:
+                try:
+                    await self.on_update(update)
+                except Exception as error:
+                    self._pending_error = error
 
     def _emit(
         self,
@@ -349,6 +360,11 @@ def create_qwen_recognizer(
     加载失败（QwenModelUnavailable）会从 accept()/flush() 抛出，由 runtime.py
     映射为 modelUnavailable 错误事件。
     """
-    return QwenStreamingRecognizer(
-        get_qwen_runtime(model_dir), source_language=source_language
-    )
+    if Path(model_dir).name == "qwen3-asr-0.6b-hf":
+        return QwenStreamingRecognizer(
+            get_qwen_runtime(model_dir),
+            source_language=source_language,
+            segmenter=VolumeGateSegmenter(max_segment_ms=6000),
+            block_ms=3000,
+        )
+    return QwenStreamingRecognizer(get_qwen_runtime(model_dir), source_language=source_language)

@@ -12,8 +12,10 @@ const settings = {
   overlay: { mode: 'bottom', colorScheme: 'dark', locked: true, alwaysOnTop: true, fontFamily: 'Segoe UI Variable', fontSize: 26, fontWeight: 600, translationFontSize: 22, translationFontWeight: 500, sourceColor: '#FFFFFF', translationColor: '#FFFFFF', backgroundColor: '#111111', backgroundOpacity: 0.84, maxLines: 2, lineHeight: 1.3, translationMaxLines: 2, translationLineHeight: 1.35, showSource: true, showTranslation: true },
   translation: { provider: 'hymt2', microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '', openaiEndpoint: 'https://api.openai.com/v1', openaiModel: 'gpt-4.1-mini', ollamaEndpoint: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b', translateIntermediate: false },
 }
-const recognitionResource = { resourceId: 'qwen3-asr-1.7b-hf', kind: 'recognitionModel', provider: 'qwen3-asr', name: 'Qwen3-ASR 1.7B', description: '本地流式识别模型，加载时以 NF4 4-bit 量化运行。', languages: ['zh', 'en', 'ja'], installed: true, installedBytes: 4300000000, state: 'idle', cancellable: false }
-const translationResource = { resourceId: 'hy-mt2-1.8b-q4-k-m', kind: 'translationModel', provider: 'hy-mt2', name: 'Hy-MT2 1.8B Q4_K_M', description: '预量化 Q4_K_M 翻译模型，在本机 llama.cpp 上运行。', languages: ['zh', 'en'], installed: true, installedBytes: 1130000000, state: 'idle', cancellable: false }
+const recognitionResource = { resourceId: 'qwen3-asr-1.7b-hf', kind: 'recognitionModel', provider: 'qwen3-asr', name: 'Qwen3-ASR 1.7B · 本地流式识别', description: '本地流式识别模型，加载时以 NF4 4-bit 量化运行。', languages: ['zh', 'en', 'ja'], installed: true, installedBytes: 4300000000, state: 'idle', cancellable: false }
+const recognitionSmallResource = { resourceId: 'qwen3-asr-0.6b-hf', kind: 'recognitionModel', provider: 'qwen3-asr', name: 'Qwen3-ASR 0.6B · 本地流式识别', description: '体积更小的同系列流式识别模型。', languages: ['zh', 'en', 'ja'], installed: false, installedBytes: 0, downloadBytes: 1880619678, state: 'idle', cancellable: false }
+const translationResource = { resourceId: 'hy-mt2-1.8b-q4-k-m', kind: 'translationModel', provider: 'hy-mt2', name: 'Hy-MT2 1.8B · 本地翻译模型', description: '预量化 Q4_K_M 翻译模型，在本机 llama.cpp 上运行。', languages: ['zh', 'en'], installed: true, installedBytes: 1130000000, state: 'idle', cancellable: false }
+const m2m100Resource = { resourceId: 'm2m100-418m', kind: 'translationModel', provider: 'm2m100', name: 'M2M100 418M · 本地翻译模型', description: '多对多翻译模型，由 transformers 在本机运行。', languages: ['zh', 'en'], installed: false, installedBytes: 0, downloadBytes: 1941936305, state: 'idle', cancellable: false }
 const preloadSource = `
 const {contextBridge} = require('electron');
 let settings = ${JSON.stringify(settings)};
@@ -26,7 +28,7 @@ contextBridge.exposeInMainWorld('fluentCaptions', {
   getSettings:async()=>settings, updateSettings:update,
   onSettingsChanged:fn=>{settingsListeners.add(fn); return ()=>settingsListeners.delete(fn)},
   onEngineEvent:fn=>{eventListeners.add(fn); return ()=>eventListeners.delete(fn)},
-  listDevices:async()=>[], listResources:async()=>({storagePath:'D:/Models/FluentCaptions/very-long-folder-name-for-model-downloads/models',resources:[${JSON.stringify(recognitionResource)},${JSON.stringify(translationResource)}]}),
+  listDevices:async()=>[], listResources:async()=>({storagePath:'D:/Models/FluentCaptions/very-long-folder-name-for-model-downloads/models',resources:[${JSON.stringify(recognitionResource)},${JSON.stringify(recognitionSmallResource)},${JSON.stringify(translationResource)},${JSON.stringify(m2m100Resource)}]}),
   getModelStorage:async()=>({activePath:'D:/Models/FluentCaptions', configuredPath:'E:/Downloads/models-and-translation-packages/another-long-directory',restartRequired:true}),
   chooseModelStorageDirectory:async()=>null, restartApp:async()=>{},
   listHistory:async()=>[], clearHistory:async()=>{},exportHistory:async()=>null,
@@ -68,7 +70,7 @@ async function main() {
         await window.webContents.executeJavaScript(`document.querySelectorAll('.navigation-items .navigation-item')[${index}].click()`)
         await settle(window)
         const overflow = await window.webContents.executeJavaScript(`(() => {
-          const containers = [...document.querySelectorAll('.page,.content,.settings-layout,.session-card,.resource-card,.package-row')];
+          const containers = [...document.querySelectorAll('.page,.content,.settings-layout,.session-card,.resource-card')];
           return containers.filter(el => el.scrollWidth > el.clientWidth + 2).map(el=>({class:el.className,width:el.clientWidth,scroll:el.scrollWidth}));
         })()`)
         if (overflow.length) failures.push({ language, width, page: pages[index], overflow })

@@ -43,11 +43,11 @@ class TranslationOptions(ProtocolModel):
 class SessionConfig(ProtocolModel):
     audioSource: AudioSource
     recognitionMode: Literal["realtime", "accurate"]
-    recognitionModelId: Literal["qwen3-asr-1.7b-hf"] | None = None
+    recognitionModelId: Literal["qwen3-asr-1.7b-hf", "qwen3-asr-0.6b-hf"] | None = None
     sourceLanguage: str = Field(min_length=1, max_length=32)
     targetLanguages: list[str] = Field(max_length=8)
     allowIntermediateTranslation: bool = False
-    translationProvider: Literal["hymt2", "microsoft", "openai", "ollama"] = "hymt2"
+    translationProvider: Literal["hymt2", "m2m100", "microsoft", "openai", "ollama"] = "hymt2"
     translationOptions: TranslationOptions | None = None
 
 
@@ -162,7 +162,7 @@ class ModelProgressEvent(Envelope):
 class ResourceRecord(ProtocolModel):
     resourceId: str = Field(min_length=1, max_length=256)
     kind: Literal["recognitionModel", "translationModel"]
-    provider: Literal["qwen3-asr", "hy-mt2"]
+    provider: Literal["qwen3-asr", "hy-mt2", "m2m100"]
     name: str = Field(min_length=1, max_length=256)
     description: str = Field(min_length=1, max_length=1024)
     languages: list[str] = Field(max_length=16)

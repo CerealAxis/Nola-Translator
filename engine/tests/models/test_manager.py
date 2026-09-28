@@ -5,7 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from fluentcaptions_engine.models.catalog import HYMT2_1_8B_Q4_K_M, QWEN3_ASR_1_7B_HF
+from fluentcaptions_engine.models.catalog import (
+    HYMT2_1_8B_Q4_K_M,
+    M2M100_418M,
+    QWEN3_ASR_0_6B_HF,
+    QWEN3_ASR_1_7B_HF,
+)
 from fluentcaptions_engine.models.manager import (
     FileEntry,
     ModelIntegrityError,
@@ -106,6 +111,49 @@ def test_catalog_pins_s4_values() -> None:
     )
 
 
+def test_catalog_pins_qwen3_asr_0_6b() -> None:
+    # 必须钉 -hf 仓库：Qwen/Qwen3-ASR-0.6B 的 thinker 布局权重一个都加载不上。
+    assert QWEN3_ASR_0_6B_HF.model_id == "qwen3-asr-0.6b-hf"
+    assert QWEN3_ASR_0_6B_HF.repo == "Qwen/Qwen3-ASR-0.6B-hf"
+    assert QWEN3_ASR_0_6B_HF.revision == "7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c"
+    assert len(QWEN3_ASR_0_6B_HF.files) == 9
+    assert QWEN3_ASR_0_6B_HF.total_bytes == 1_576_381_331
+    weights = next(f for f in QWEN3_ASR_0_6B_HF.files if f.path == "model.safetensors")
+    assert weights.size == 1_564_928_088
+    assert weights.sha256 == (
+        "d3f212dd20abecd315d830bc54ae3865e56ebfc3276484e57b771288ba27fd35"
+    )
+    processor = next(f for f in QWEN3_ASR_0_6B_HF.files if f.path == "processor_config.json")
+    assert processor.sha256 == "bc0b230081b44e629dd5b9045b78495615c1831b4b9f4cffe97bd37e82a6156a"
+    tokenizer_config = next(f for f in QWEN3_ASR_0_6B_HF.files if f.path == "tokenizer_config.json")
+    assert tokenizer_config.sha256 == "945e980986de2ca7768f3326bfdbb4fbea3406f972b8ae0be233089f2b253c11"
+    first = QWEN3_ASR_0_6B_HF.files[0]
+    assert QWEN3_ASR_0_6B_HF.url_for(first) == (
+        "https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf/resolve/"
+        "7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/.gitattributes"
+    )
+
+
+def test_catalog_pins_m2m100_418m() -> None:
+    assert M2M100_418M.model_id == "m2m100-418m"
+    assert M2M100_418M.revision == "55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636"
+    assert len(M2M100_418M.files) == 9
+    assert M2M100_418M.total_bytes == 1_941_936_305
+    weights = next(f for f in M2M100_418M.files if f.path == "pytorch_model.bin")
+    assert weights.size == 1_935_796_948
+    assert weights.sha256 == (
+        "d907ea45e4e4b9db163382a6674f6218b3c59566fe06d77f4055c208b4e87ed1"
+    )
+    spm = next(f for f in M2M100_418M.files if f.path == "sentencepiece.bpe.model")
+    assert spm.sha256 == (
+        "d8f7c76ed2a5e0822be39f0a4f95a55eb19c78f4593ce609e2edbc2aea4d380a"
+    )
+    assert M2M100_418M.url_for(weights) == (
+        "https://huggingface.co/facebook/m2m100_418M/resolve/"
+        "55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/pytorch_model.bin"
+    )
+
+
 def test_snapshot_install_success(tmp_path: Path) -> None:
     spec, payloads = _snapshot_spec()
     manager = ModelManager(tmp_path / "models", fetcher=_fetcher(payloads))
@@ -132,6 +180,16 @@ def test_snapshot_install_success(tmp_path: Path) -> None:
     # 无临时/暂存残留
     assert [p.name for p in _leftovers(tmp_path / "models")] == ["qwen3-asr-1.7b-hf"]
     assert not any(p.name.endswith(".part") for p in target.rglob("*"))
+
+
+def test_incomplete_existing_model_is_not_installed(tmp_path: Path) -> None:
+    spec, payloads = _snapshot_spec()
+    target = tmp_path / "models" / spec.directory
+    target.mkdir(parents=True)
+    for entry in spec.files:
+        (target / entry.path).write_bytes(payloads[spec.url_for(entry)])
+    (target / spec.files[1].path).write_bytes(b"wrong size")
+    assert ModelManager(tmp_path / "models").is_installed(spec) is False
 
 
 def test_sha256_mismatch_rejected_without_target(tmp_path: Path) -> None:

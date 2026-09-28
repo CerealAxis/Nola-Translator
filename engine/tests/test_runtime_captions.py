@@ -266,3 +266,41 @@ async def test_hymt2_unsupported_target_language_fails_that_target(tmp_path, mon
     )
     assert result[0].state == 'failed'
     assert result[0].errorCode == 'unsupportedLanguagePair'
+
+
+@pytest.mark.asyncio
+async def test_m2m100_missing_model_fails_targets_without_network(tmp_path) -> None:
+    from fluentcaptions_engine.runtime import TranslationRequest
+    from fluentcaptions_engine.translation.m2m100 import M2M100TranslationProvider
+
+    runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
+    runtime.translation_scheduler = TranslationScheduler(
+        M2M100TranslationProvider(tmp_path / 'models' / 'm2m100-418m')
+    )
+    update = RecognitionUpdate('segment', 0, 0, 10, 'hello', 'en', True)
+    result = await runtime._translate_request(
+        TranslationRequest(update, 'en', ('zh',), False)
+    )
+    assert result[0].state == 'failed'
+    assert result[0].errorCode == 'resourceUnavailable'
+    assert result[0].provider == 'm2m100'
+
+
+@pytest.mark.asyncio
+async def test_m2m100_unsupported_target_language_fails_that_target(
+    tmp_path, monkeypatch
+) -> None:
+    from fluentcaptions_engine.runtime import TranslationRequest
+    from fluentcaptions_engine.translation.m2m100 import M2M100TranslationProvider
+
+    runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
+    monkeypatch.setattr(runtime.resources, 'is_installed', lambda _rid: True)
+    runtime.translation_scheduler = TranslationScheduler(
+        M2M100TranslationProvider(tmp_path / 'models' / 'm2m100-418m')
+    )
+    update = RecognitionUpdate('segment', 0, 0, 10, 'hello', 'en', True)
+    result = await runtime._translate_request(
+        TranslationRequest(update, 'en', ('yue',), False)
+    )
+    assert result[0].state == 'failed'
+    assert result[0].errorCode == 'unsupportedLanguagePair'

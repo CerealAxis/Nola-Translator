@@ -2,10 +2,17 @@ node_modules/
 out/
 dist/
 coverage/
+/playwright-report/
+/test-results/
 /artifacts/
 /vendor/
 /models/
 .vite/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
 .env
 .env.*
 !.env.example
@@ -16,6 +23,8 @@ Thumbs.db
 engine/build/
 engine/dist/
 release/
+/build/*
+!/build/icon.ico
 __pycache__/
 *.py[cod]
 *.egg-info/

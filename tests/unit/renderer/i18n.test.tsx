@@ -10,7 +10,7 @@ import type { EngineEvent } from '../../../src/shared/contracts'
 describe('界面语言切换', () => {
   it('标题栏菜单切换 English 更新页面，并可切回中文', async () => {
     render(<App />)
-
+    await screen.findByRole('heading', { name: '实时字幕', level: 1 })
     fireEvent.click(screen.getByRole('button', { name: '界面语言' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'English' }))
     await waitFor(() => expect(document.documentElement.lang).toBe('en'))
@@ -31,7 +31,7 @@ describe('界面语言切换', () => {
     const api = window.fluentCaptions!
     const updateSettings = vi.spyOn(api, 'updateSettings').mockRejectedValueOnce(new Error('disk full'))
     render(<App />)
-
+    await screen.findByRole('heading', { name: '实时字幕', level: 1 })
     fireEvent.click(screen.getByRole('button', { name: '界面语言' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'English' }))
 
