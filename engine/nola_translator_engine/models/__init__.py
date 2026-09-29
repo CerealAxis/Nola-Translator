@@ -1,1 +1,1 @@
-"""在用户明确操作后下载和校验本地模型。"""
+"""Download and verify local models, only after an explicit user action."""

@@ -1,4 +1,4 @@
-"""Hy-MT2 本地翻译 Provider：官方提示词构造与语言校验。"""
+"""Local Hy-MT2 translation provider: official prompt construction and language validation."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import asyncio
 from .base import ProviderTranslation
 from .llama_server import LlamaServerManager
 
-# Hy-MT2 官方 README 支持语言表（39 行；S4 钉值），code → 完整英文名。
+# The language table from the official Hy-MT2 README (39 rows), code → full English name.
 SUPPORTED_LANGUAGES: dict[str, str] = {
     "zh": "Chinese",
     "en": "English",
@@ -54,7 +54,7 @@ _TRADITIONAL_ZH_SUFFIXES = {"tw", "hk", "mo"}
 
 
 class UnsupportedLanguagePair(ValueError):
-    """Hy-MT2 不支持的语言（对）。"""
+    """A language (pair) Hy-MT2 does not support."""
 
     def __init__(self, source: str, target: str) -> None:
         super().__init__(f"Hy-MT2 不支持的语言：source={source} target={target}")
@@ -63,7 +63,7 @@ class UnsupportedLanguagePair(ValueError):
 
 
 def _normalize_language_code(code: str) -> str | None:
-    """把语言码规范化到支持表键（含 zh-CN/fil 等别名）；未知返回 None。"""
+    """Normalize a language code to a key in the support table (aliases like zh-CN/fil included); None when unknown."""
     raw = code.strip()
     if not raw:
         return None
@@ -73,23 +73,23 @@ def _normalize_language_code(code: str) -> str | None:
         return matched
     primary, _, rest = folded.partition("-")
     if primary == "zh":
-        # zh-Hant / zh-TW / zh-HK / zh-MO → 繁体；其余 zh-* → 简体（zh）。
+        # zh-Hant / zh-TW / zh-HK / zh-MO → traditional; every other zh-* → zh (simplified).
         if "hant" in rest.split("-") or rest in _TRADITIONAL_ZH_SUFFIXES:
             return "zh-Hant"
         return "zh"
     if folded == "fil":
-        # Qwen 系用 fil 表示菲律宾语，官方表内代码为 tl。
+        # the Qwen family spells Filipino `fil`; the official table uses tl.
         return "tl"
     return _CASEFOLD_INDEX.get(primary)
 
 
 def is_supported(code: str) -> bool:
-    """语言码是否在 Hy-MT2 支持表内（含别名）。"""
+    """Whether a language code is in the Hy-MT2 support table (aliases included)."""
     return _normalize_language_code(code) is not None
 
 
 def validate_session_languages(source: str | None, targets: list[str]) -> list[str]:
-    """会话启动前校验：返回不支持的语言码；source 为 None/'auto' 时跳过源语言检查。"""
+    """Pre-session check returning the unsupported codes; a source of None/'auto' skips the source check."""
     unsupported: list[str] = []
     if source is not None and source.strip().casefold() != "auto":
         if _normalize_language_code(source) is None:
@@ -101,7 +101,9 @@ def validate_session_languages(source: str | None, targets: list[str]) -> list[s
 
 
 def _system_prompt(source_key: str, target_key: str) -> str:
-    """Hy-MT2 官方默认翻译提示词（完整语言名 + 只输出译文约束；正文由 user 消息携带）。"""
+    """Hy-MT2's official default translation prompt: full language names plus the
+    translate-only constraint, with the body carried by the user message.
+    """
     source_name = SUPPORTED_LANGUAGES[source_key]
     target_name = SUPPORTED_LANGUAGES[target_key]
     return (
@@ -112,7 +114,7 @@ def _system_prompt(source_key: str, target_key: str) -> str:
 
 
 class HyMt2TranslationProvider:
-    """基于 llama-server 的 Hy-MT2 本地翻译 Provider。"""
+    """Local Hy-MT2 translation provider backed by llama-server."""
 
     name = "hymt2"
 

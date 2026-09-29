@@ -10,7 +10,7 @@ export function modelStorageEnvironment(userData: string, configuredPath = ''): 
     TMP: join(root, 'cache', 'tmp'),
     TEMP: join(root, 'cache', 'tmp'),
     TMPDIR: join(root, 'cache', 'tmp'),
-    // 模型经应用自带下载管理器进入 NOLA_TRANSLATOR_MODEL_DIR；加载时强制离线，禁止回落到网络。
+    // Models arrive through the app's own download manager, so loading is forced offline and must never fall back to the network.
     HF_HUB_OFFLINE: '1',
     TRANSFORMERS_OFFLINE: '1',
   }
@@ -52,7 +52,7 @@ export async function validateModelStorageDirectory(path: string): Promise<strin
   if (!isAbsolute(path)) throw new Error('Storage path must be absolute')
   const root = normalize(path)
   await mkdir(root, { recursive: true })
-  // Test actual creation instead of relying on Windows access-mode flags.
+  // Probe with a real directory rather than Windows access-mode flags.
   const probe = await mkdtemp(join(root, '.nola-translator-write-check-'))
   await rmdir(probe)
   return root

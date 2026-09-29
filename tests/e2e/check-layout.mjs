@@ -1,4 +1,4 @@
-// Production renderer, deterministic IPC fixture: no devices, credentials or downloads required.
+// Runs the production renderer against a stub preload, so no engine, devices, credentials or downloads are needed.
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { app, BrowserWindow } from 'electron'
@@ -41,12 +41,12 @@ contextBridge.exposeInMainWorld('layoutFixture', {emit: e=>eventListeners.forEac
 `
 
 async function settle(window) {
-  // Double rAF only waits for paint; async fixtures (getSettings/listResources/getDiagnostics) need a beat too.
+  // Double rAF only covers paint; the async fixture calls (getSettings/listResources/getDiagnostics) need extra time.
   await window.webContents.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
   await new Promise((resolve) => setTimeout(resolve, 330))
 }
 
-// destroy() leaves this Electron build unable to load any later window (ERR_FAILED), so always close() and wait.
+// Never destroy(): this Electron build fails to load any later window (ERR_FAILED). Always close() and wait.
 function closeWindow(window) {
   return new Promise((resolve) => {
     if (window.isDestroyed()) { resolve(); return }
@@ -80,7 +80,7 @@ async function main() {
       }
     }
   }
-  // Real mouse input: DOM .click() cannot detect the titlebar drag-region swallowing the language button.
+  // Real mouse input: DOM .click() cannot reveal the titlebar drag-region swallowing the language button.
   window.setContentSize(1100, 780)
   await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings({uiLanguage:'zh-CN'})`)
   await settle(window)
@@ -135,20 +135,20 @@ async function main() {
     const panel = document.querySelector('.caption-console')
     const text = panel?.innerText ?? ''
     return {
-      hasZh: text.includes('我们可能会意识到'), hasJa: text.includes('気づくかもしれません'),
+      hasZh: text.includes('平衡的生活十分重要'), hasJa: text.includes('づくかもしれません'),
       overflow: panel && panel.scrollWidth > panel.clientWidth + 2,
     }
   })()`)
   if (!overlayState.hasZh || !overlayState.hasJa || overlayState.overflow) failures.push({ language: 'overlay', page: 'multitarget', overlayState })
-  // 换句滚动动画中间帧：旧句仍在离场、新句正在滚入。
+  // Mid-frame of the roll transition: 110 ms in, the old line is still leaving and the new one is rolling in.
   const nextSegment = { ...segment, segmentId: 'after-roll', revision: 1, startedAtMs: 4000, sourceText: 'Rest is not a luxury; it is how people recover attention and keep making good decisions.', translations: segment.translations }
   await overlay.webContents.executeJavaScript(`window.layoutFixture.emit(${JSON.stringify({ protocolVersion: 1, type: 'caption', requestId: 'qa2', sessionId: 'layout', segment: nextSegment })})`)
   await new Promise((resolve) => setTimeout(resolve, 110))
   const rolling = await overlay.webContents.executeJavaScript(`({
     leaving: document.querySelectorAll('.overlay-track-source .overlay-track-out').length,
     active: document.querySelectorAll('.overlay-track-source .overlay-track-in').length,
-    oldVisible: (document.querySelector('.overlay-track-source .overlay-track-out')?.textContent ?? '').includes('We might realize'),
-    translationHeld: (document.querySelector('.overlay-track-translation .overlay-track-in')?.textContent ?? '').includes('我们可能会意识到'),
+    oldVisible: (document.querySelector('.overlay-track-source .overlay-track-out')?.textContent ?? '').includes('balanced life.'),
+    translationHeld: (document.querySelector('.overlay-track-translation .overlay-track-in')?.textContent ?? '').includes('平衡的生活十分重要'),
   })`)
   if (rolling.leaving !== 1 || rolling.active !== 1 || !rolling.oldVisible || !rolling.translationHeld) failures.push({ language: 'overlay', page: 'roll-transition', rolling })
   await writeFile(resolve(output, 'overlay-roll-transition.png'), (await overlay.webContents.capturePage()).toPNG())

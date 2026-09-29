@@ -33,7 +33,7 @@ async function findPageTarget(overlay = false) {
         return page;
       }
     } catch {
-      // Electron may still be starting.
+      // The debug port only opens once Electron has started, so a refused connection just means "not ready yet".
     }
     await delay(100);
   }

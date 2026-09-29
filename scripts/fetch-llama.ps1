@@ -1,7 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
-# 拉取钉死的 llama.cpp b11211 运行时（CUDA 12.4 双 zip），解压 llama-server 及依赖 DLL 到 vendor/llama/。
-# 两个资产必须同时到位：缺 cudart 时 CUDA 后端会静默失效并回退 CPU。
+# Both assets are required: without cudart the CUDA backend silently falls back to CPU.
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $targetDir = Join-Path $projectRoot 'vendor\llama'

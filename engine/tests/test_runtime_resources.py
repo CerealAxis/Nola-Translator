@@ -1,4 +1,4 @@
-"""startSession 资源门禁、显式安装与启动期配置校验的运行时测试。"""
+"""Runtime tests for startSession resource gating, explicit install, and startup config validation."""
 
 import asyncio
 import json
@@ -12,12 +12,113 @@ from nola_translator_engine import runtime as runtime_module
 from nola_translator_engine.models.manager import FileEntry, ModelSpec
 from nola_translator_engine.protocol import parse_command_line
 from nola_translator_engine.resources import (
+    HYMT2_IQ2_RESOURCE_ID,
+    HYMT2_Q3_RESOURCE_ID,
     HYMT2_RESOURCE_ID,
     QWEN_06B_RESOURCE_ID,
     QWEN_RESOURCE_ID,
     SENSEVOICE_RESOURCE_ID,
 )
 from nola_translator_engine.runtime import EngineRuntime
+
+
+def _hymt2_command(request_id: str, model_id: str | None) -> str:
+    """Builds a startSession carrying a target language; a None model_id omits the field entirely."""
+    tail = "" if model_id is None else f'"translationModelId":"{model_id}",'
+    return (
+        '{"protocolVersion":1,"type":"startSession","requestId":"'
+        + request_id
+        + '","config":{"audioSource":{"kind":"defaultOutput"},"recognitionMode":"realtime",'
+        + f'"sourceLanguage":"auto","targetLanguages":["en"],"translationProvider":"hymt2",'
+        + tail
+        + '"recognitionModelId":"'
+        + SENSEVOICE_RESOURCE_ID
+        + '"}}'
+    )
+
+
+@pytest.mark.parametrize(
+    ("model_id", "expected"),
+    [
+        (HYMT2_Q3_RESOURCE_ID, HYMT2_Q3_RESOURCE_ID),
+        (HYMT2_IQ2_RESOURCE_ID, HYMT2_IQ2_RESOURCE_ID),
+        (HYMT2_RESOURCE_ID, HYMT2_RESOURCE_ID),
+        # Older clients omit the field and fall back to the baseline quantization.
+        (None, HYMT2_RESOURCE_ID),
+    ],
+)
+def test_session_gates_and_loads_the_selected_hymt2_quantization(
+    tmp_path, monkeypatch, model_id, expected
+) -> None:
+    runtime = EngineRuntime(tmp_path / "models", lambda _e: None)
+    command = parse_command_line(_hymt2_command("start-quant", model_id))
+
+    # Stub the ASR side first: once the gate passes, the runtime really loads the
+    # model and fires network requests.
+    class FakeLlamaManager:
+        device = "cuda"
+        ready = True
+
+        def __init__(self) -> None:
+            self.loaded: list[Path] = []
+
+        async def start(self, **_kwargs) -> str:
+            return "cuda"
+
+        async def stop(self) -> None:
+            return None
+
+        def switch_gguf(self, path: Path) -> bool:
+            self.loaded.append(Path(path))
+            return True
+
+    llama = FakeLlamaManager()
+    monkeypatch.setattr(runtime, "llama_manager", llama)
+    monkeypatch.setattr(runtime_module, "get_sensevoice_runtime", lambda _p: _Loaded())
+    monkeypatch.setattr(
+        runtime_module, "create_sensevoice_recognizer", lambda *_a, **_k: _Raising()
+    )
+
+    installed: set[str] = {
+        SENSEVOICE_RESOURCE_ID, QWEN_RESOURCE_ID, QWEN_06B_RESOURCE_ID, expected
+    }
+    monkeypatch.setattr(runtime.resources, "is_installed", lambda rid: rid in installed)
+    missing = asyncio.run(runtime.handle(command))
+    assert missing[0].code == "resourceUnavailable"
+    assert missing[0].details == {"missingResourceIds": [expected]}
+
+    # The other tier is then the missing one, which proves the gate follows the
+    # selection rather than always checking Q4_K_M.
+    if model_id is not None and model_id != HYMT2_RESOURCE_ID:
+        installed.discard(expected)
+        installed.add(HYMT2_RESOURCE_ID)
+        again = asyncio.run(runtime.handle(command))
+        assert again[0].details == {"missingResourceIds": [expected]}
+
+    installed.add(expected)
+    started = asyncio.run(runtime.handle(command))
+
+    assert started[0].type == "sessionStarted"
+    assert llama.loaded, "应把所选档位的 GGUF 交给 llama-server"
+    assert llama.loaded[0].name.startswith("Hy-MT2-1.8B-")
+
+
+class _Loaded:
+    loaded = True
+
+    def load(self) -> None:
+        return None
+
+    def unload(self) -> None:
+        return None
+
+    def describe(self) -> str:
+        return "unloaded"
+
+
+class _Raising:
+    async def close(self) -> None:
+        return None
 
 
 def _start_command(request_id: str, mode: str) -> str:
@@ -44,7 +145,6 @@ def test_start_session_reports_missing_model_without_downloading(tmp_path) -> No
             assert events[0].details == {"missingResourceIds": [QWEN_RESOURCE_ID]}
 
     asyncio.run(run())
-    # 门禁阶段不得产生模型下载产物（.runtime 诊断状态文件除外）。
     assert not (tmp_path / "models" / QWEN_RESOURCE_ID).exists()
     assert emitted == []
 
@@ -138,7 +238,6 @@ def test_start_session_rejects_unsupported_m2m100_language(tmp_path, monkeypatch
 def test_selected_recognition_model_gates_and_loads_that_directory(
     tmp_path, monkeypatch
 ) -> None:
-    """选择 0.6B 时门禁与识别器都指向 0.6B 目录，而不是默认的 1.7B。"""
     runtime = EngineRuntime(tmp_path / "models", lambda _e: None)
     command = parse_command_line(
         '{"protocolVersion":1,"type":"startSession","requestId":"start-0-6b",'
@@ -171,7 +270,6 @@ def test_selected_recognition_model_gates_and_loads_that_directory(
 
 
 def test_sensevoice_selection_loads_its_own_runtime(tmp_path, monkeypatch) -> None:
-    """选中 SenseVoiceSmall 时门禁、加载与识别器工厂都走 SenseVoice，不碰 Qwen 运行时。"""
     runtime = EngineRuntime(tmp_path / "models", lambda _e: None)
     command = parse_command_line(
         '{"protocolVersion":1,"type":"startSession","requestId":"start-sensevoice",'
@@ -206,7 +304,6 @@ def test_sensevoice_selection_loads_its_own_runtime(tmp_path, monkeypatch) -> No
 
 
 def test_status_payload_reports_active_recognition_model(tmp_path, monkeypatch) -> None:
-    """状态文件跟随当前识别模型，SenseVoice 报设备而非量化档位。"""
     runtime = EngineRuntime(tmp_path / "models", lambda _e: None)
     runtime.active_model_id = SENSEVOICE_RESOURCE_ID
 
@@ -245,7 +342,6 @@ def test_engine_status_file_lifecycle(tmp_path) -> None:
 
 
 def test_m2m100_is_ready_before_session_starts(tmp_path, monkeypatch) -> None:
-    """进入识别会话前，翻译模型已完成加载。"""
     from nola_translator_engine.translation import m2m100 as m2m100_module
 
     runtime = EngineRuntime(tmp_path / "models", lambda _e: None)

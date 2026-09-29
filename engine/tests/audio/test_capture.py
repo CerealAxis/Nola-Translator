@@ -117,7 +117,7 @@ async def test_capture_reports_device_disconnect_instead_of_waiting_forever() ->
 
 @pytest.mark.asyncio
 async def test_capture_fills_silence_while_loopback_stops_pushing_data() -> None:
-    """loopback 在无播放时不推数据；必须补零帧，否则音量门收不了段、final 不触发。"""
+    """A loopback device pushes nothing while nothing is playing, so silence must be synthesised or the volume gate can never close a segment."""
     backend = FakeBackend()
     capture = PortAudioCapture(_device(), backend_factory=lambda: backend)
     capture.start()
@@ -131,7 +131,7 @@ async def test_capture_fills_silence_while_loopback_stops_pushing_data() -> None
         capture.stop()
 
     assert len(frames) >= 4, "静默期应该持续产出补零帧"
-    # 首帧来自真实音频，其后 loopback 不再推数据，全部是补出的静音
+    # The first frame is real audio; after that loopback goes quiet and every frame is synthesised.
     silence = [frame for frame in frames[1:] if np.all(frame.samples == 0)]
     assert len(silence) >= 3
     starts = [frame.started_at_ms for frame in frames]

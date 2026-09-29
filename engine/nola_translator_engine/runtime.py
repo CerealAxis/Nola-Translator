@@ -1,4 +1,4 @@
-"""把协议命令连接到真实音频、ASR 和字幕事件。"""
+"""Wires protocol commands to real audio, ASR, and caption events."""
 
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ from .protocol import (
     ShutdownCommand,
     StartSessionCommand,
     StopSessionCommand,
+    SessionConfig,
     Translation,
 )
 from .recognition.base import ModelUnavailable, RecognitionUpdate, Recognizer
@@ -35,6 +36,7 @@ from .recognition.sensevoice_runtime import SenseVoiceRuntime, get_sensevoice_ru
 from .recognition.sensevoice_streaming import create_sensevoice_recognizer
 from .resources import (
     HYMT2_RESOURCE_ID,
+    HYMT2_RESOURCE_IDS,
     M2M100_RESOURCE_ID,
     QWEN_RESOURCE_ID,
     SENSEVOICE_RESOURCE_ID,
@@ -157,7 +159,7 @@ class EngineRuntime:
         required_resources = [model_id]
         if command.config.targetLanguages:
             if command.config.translationProvider == "hymt2":
-                required_resources.append(HYMT2_RESOURCE_ID)
+                required_resources.append(self._translation_model_id(command.config))
             elif command.config.translationProvider == "m2m100":
                 required_resources.append(M2M100_RESOURCE_ID)
         missing_resources = [
@@ -267,6 +269,10 @@ class EngineRuntime:
                     "unsupportedTranslationLanguage (hymt2): "
                     + ", ".join(unsupported)
                 )
+            # all three quantization tiers share one llama-server; load whichever the session picked.
+            self.llama_manager.switch_gguf(
+                self.resources.hymt2_gguf_path(self._translation_model_id(config))
+            )
             provider = HyMt2TranslationProvider(self.llama_manager)
         elif config.translationProvider == "m2m100":
             source = (
@@ -304,22 +310,28 @@ class EngineRuntime:
         else:
             raise ValueError(f"未知翻译 Provider: {config.translationProvider}")
         self.translation_provider = provider
-        self.translation_scheduler = TranslationScheduler(provider)
+        self.translation_scheduler = TranslationScheduler(
+            provider,
+            max_concurrency=1 if config.translationProvider in ("hymt2", "m2m100") else 3,
+        )
 
     async def _ensure_translation_server(self, command: StartSessionCommand) -> None:
-        """会话启动时拉起 Hy-MT2 的 llama-server；缺模型或启动失败都不阻断识别。"""
+        """Bring up the Hy-MT2 llama-server at session start; a missing model or a failed
+        start never blocks recognition.
+        """
         if command.config.translationProvider == "m2m100":
             if isinstance(self.translation_provider, M2M100TranslationProvider):
                 await asyncio.to_thread(self.translation_provider.runtime.load)
             return
         if command.config.translationProvider != "hymt2":
             return
-        if not self.resources.is_installed(HYMT2_RESOURCE_ID):
+        if not self.resources.is_installed(self._translation_model_id(command.config)):
             return
         try:
             await self.llama_manager.start()
         except LlamaServerError:
-            # 服务不可用时会话继续，译文按目标标记失败（llamaServerUnavailable）。
+            # the session continues when the server is unavailable; translations just
+            # fail per target (llamaServerUnavailable).
             pass
 
     async def _create_recognizer(self, command: StartSessionCommand) -> Recognizer:
@@ -341,7 +353,7 @@ class EngineRuntime:
         return recognizer
 
     def _recognition_runtime(self) -> QwenRuntime | SenseVoiceRuntime:
-        """当前选中识别模型的运行时；两者都提供 load/unload/loaded/describe。"""
+        """Runtime of the currently selected recognition model; both expose load/unload/loaded/describe."""
         model_path = self.resources.model_path(self.active_model_id)
         if self.active_model_id == SENSEVOICE_RESOURCE_ID:
             return get_sensevoice_runtime(model_path)
@@ -350,6 +362,14 @@ class EngineRuntime:
     @staticmethod
     def _model_id(command: StartSessionCommand) -> str:
         return command.config.recognitionModelId or QWEN_RESOURCE_ID
+
+    @staticmethod
+    def _translation_model_id(config: SessionConfig) -> str:
+        """The Hy-MT2 quantization the session selected; a missing or invalid id falls back to the Q4_K_M baseline."""
+        requested = config.translationModelId
+        if requested in HYMT2_RESOURCE_IDS:
+            return requested
+        return HYMT2_RESOURCE_ID
 
     async def _run_session(self) -> None:
         capture = self.capture
@@ -365,7 +385,8 @@ class EngineRuntime:
             for update in await recognizer.flush(last_ended_at):
                 await self._emit_update(update)
         except AudioDeviceDisconnectedError:
-            # 设备断开同样要提交已采集的尾音（尽力而为，失败不掩盖断开错误）。
+            # a disconnected device still gets its captured tail flushed (best effort —
+            # a failure here must not mask the disconnect).
             try:
                 for update in await recognizer.flush(last_ended_at):
                     await self._emit_update(update)
@@ -382,7 +403,7 @@ class EngineRuntime:
                 )
             )
         except ModelUnavailable as error:
-            # 模型加载失败后不再继续采集循环，避免每帧重复报错。
+            # stop the capture loop after a load failure, otherwise every frame re-reports it.
             self.emit(
                 ErrorEvent(
                     protocolVersion=1,
@@ -454,7 +475,7 @@ class EngineRuntime:
             while segment_id in self.translation_requests:
                 request = self.translation_requests[segment_id]
                 if not request.update.is_final and not request.allow_intermediate:
-                    # 默认只翻译最终字幕；中间结果翻译需用户显式开启。
+                    # only final captions get translated by default; intermediates need the user to opt in.
                     self.translation_requests.pop(segment_id, None)
                     continue
                 delay = self.partial_translation_interval - (
@@ -501,7 +522,10 @@ class EngineRuntime:
 
         target_errors: dict[str, str] = {}
         if provider_name == "hymt2":
-            if not self.resources.is_installed(HYMT2_RESOURCE_ID):
+            active = self.active_config
+            if not self.resources.is_installed(
+                self._translation_model_id(active) if active else HYMT2_RESOURCE_ID
+            ):
                 target_errors = dict.fromkeys(targets, "resourceUnavailable")
             elif not is_supported(request.source):
                 target_errors = dict.fromkeys(targets, "unsupportedLanguagePair")
@@ -664,7 +688,7 @@ class EngineRuntime:
         return self.service.handle(command)
 
     async def _unload_session_models(self) -> None:
-        """结束会话后释放 ASR 和本地翻译权重。"""
+        """Release the ASR and local translation weights once the session ends."""
         runtimes = [self._recognition_runtime()]
         if isinstance(self.translation_provider, M2M100TranslationProvider):
             runtimes.append(self.translation_provider.runtime)
@@ -707,7 +731,9 @@ class EngineRuntime:
         }
 
     def _write_engine_status(self) -> None:
-        """原子维护诊断状态文件（.runtime/engine-status.json）；写失败绝不影响会话。"""
+        """Maintain the .runtime/engine-status.json diagnostic file atomically; a write
+        failure never affects the session.
+        """
         try:
             text = json.dumps(
                 self._engine_status_payload(),

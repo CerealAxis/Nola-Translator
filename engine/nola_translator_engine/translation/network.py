@@ -1,4 +1,4 @@
-"""可选联网翻译 Provider；仅在用户主动选择后使用。"""
+"""Optional network translation providers, used only after the user explicitly picks one."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _post_json(url: str, payload: object, headers: dict[str, str]) -> object:
         method="POST",
         headers={"Content-Type": "application/json; charset=UTF-8", **headers},
     )
-    with urlopen(request, timeout=20) as response:  # noqa: S310 - URL 由用户显式配置
+    with urlopen(request, timeout=20) as response:  # noqa: S310 - the URL is explicitly configured by the user
         if response.status < 200 or response.status >= 300:
             raise RuntimeError(f"翻译服务返回 HTTP {response.status}")
         return json.loads(response.read().decode("utf-8"))

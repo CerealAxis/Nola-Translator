@@ -45,6 +45,7 @@ const settingsPatchSchema = z.object({
   }).partial().optional(),
   translation: z.object({
     provider: z.enum(['hymt2', 'm2m100', 'microsoft', 'openai', 'ollama']).optional(),
+    hymt2ModelId: z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m']).optional(),
     microsoftEndpoint: z.string().min(1).max(2048).optional(), microsoftRegion: z.string().max(128).optional(),
     openaiEndpoint: z.string().min(1).max(2048).optional(), openaiModel: z.string().min(1).max(256).optional(),
     ollamaEndpoint: z.string().min(1).max(2048).optional(), ollamaModel: z.string().min(1).max(256).optional(),
@@ -97,7 +98,7 @@ export function registerAppIpc(options: {
     window.setFocusable(interaction.focusable)
     window.setMovable(interaction.movable)
     window.setResizable(interaction.resizable)
-    // 只有用户改动位置模式时才重设窗口边界。外观滑块不应改变用户已调整的尺寸。
+    // Only reposition when the mode itself changed; appearance sliders must not resize a bar the user already sized.
     if (reposition) {
       const display = screen.getDisplayMatching(window.getBounds())
       window.setBounds(computeOverlayBounds(current.overlay.mode, display.workArea, window.getBounds()))
@@ -110,7 +111,7 @@ export function registerAppIpc(options: {
     }
   }
   const applyTheme = (): void => {
-    // 主程序始终遵循 Windows；“字幕主题”仅控制字幕浮层，二者不能互相影响。
+    // The main window always follows Windows; the caption theme setting only ever affects the overlay.
     nativeTheme.themeSource = 'system'
     options.getMainWindow()?.setTitleBarOverlay({
       color: '#00000000',

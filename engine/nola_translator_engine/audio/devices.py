@@ -1,4 +1,4 @@
-"""PyAudioWPatch 的 WASAPI 设备枚举和应用内稳定 ID 映射。"""
+"""WASAPI device enumeration via PyAudioWPatch, with stable in-app device id mapping."""
 
 from __future__ import annotations
 
@@ -36,11 +36,11 @@ class AudioDeviceRecord:
 
 
 class AudioDeviceUnavailableError(RuntimeError):
-    """用户选择的设备当前不存在。"""
+    """The user's selected device doesn't exist right now."""
 
 
 class AudioDeviceRegistry:
-    """每次刷新都重新映射临时 PortAudio index，不把 index 持久化。"""
+    """Each refresh re-maps the transient PortAudio index; the index itself is never persisted."""
 
     def __init__(
         self,
@@ -69,7 +69,7 @@ class AudioDeviceRegistry:
         device_id: str | None = None,
         poll_interval: float = 2.0,
     ) -> AudioDeviceRecord:
-        """默认源跟随新的系统默认设备；指定源只等待原 ID 恢复。"""
+        """A default source follows the new system default; a named source only waits for its own id to come back."""
 
         while True:
             try:
@@ -109,7 +109,7 @@ def _record(info: dict[str, Any], kind: DeviceKind, is_default: bool) -> AudioDe
 def enumerate_wasapi_devices(
     backend_factory: Callable[[], PyAudioBackend] = pyaudio.PyAudio,
 ) -> list[AudioDeviceRecord]:
-    """列出 WASAPI loopback 和真实输入设备，并在返回前释放 PortAudio。"""
+    """List WASAPI loopback and real input devices, releasing PortAudio before returning."""
 
     backend = backend_factory()
     try:

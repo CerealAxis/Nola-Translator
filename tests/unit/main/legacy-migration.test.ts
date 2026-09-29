@@ -24,11 +24,10 @@ describe('legacy userData 迁移', () => {
       await migrateLegacyUserData(appData, fresh)
 
       expect(MIGRATION_EXCLUDED_FILES.has('credentials.json')).toBe(true)
-      // 跨应用身份的密文读不出来，搬过去只会让 startSession 每次都解密失败。
+      // Ciphertext written under the old app identity cannot be decrypted here; carrying it over would break every startSession.
       expect(await readdir(fresh)).not.toContain('credentials.json')
       expect(await readFile(join(fresh, 'history.jsonl'), 'utf8')).toBe('{"segmentId":"a"}')
       expect(await readFile(join(legacy, 'credentials.json'), 'utf8')).toBe('{"openai":"stale-ciphertext"}')
-      // 已存在的目标文件不被覆盖。
       expect(JSON.parse(await readFile(join(fresh, 'settings.json'), 'utf8'))).toEqual({ version: 1, mine: true })
     } finally {
       await rm(root, { recursive: true, force: true })

@@ -3,9 +3,12 @@ import { copyFile, mkdir, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 /**
- * safeStorage 的密钥绑定在应用身份（userData 路径）上：改 productName、换电脑、
- * 换 Windows 用户都会让旧密文失效，而密钥无从恢复。跨身份搬 credentials.json
- * 只会搬来一份读不出的密文，让 startSession 每次都抛解密错误——迁移时直接丢弃。
+ * safeStorage binds its key to the app identity, which is the userData path:
+ * renaming productName, moving to another machine, or switching Windows users
+ * all invalidate old ciphertext, and the key itself cannot be recovered.
+ * Copying credentials.json across identities only imports ciphertext nobody
+ * can read, so startSession would fail on every launch — the migration drops
+ * the file instead.
  */
 export const MIGRATION_EXCLUDED_FILES = new Set(['credentials.json'])
 

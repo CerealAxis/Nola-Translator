@@ -8,12 +8,14 @@ export type AudioSource =
 export type SessionConfig = {
   audioSource: AudioSource
   recognitionMode: 'realtime' | 'accurate'
-  /** 选择具体识别模型；recognitionMode 保留用于旧版本协议兼容。 */
+  /** Selects the recognition model; recognitionMode is kept only for compatibility with older protocol versions. */
   recognitionModelId?: 'qwen3-asr-1.7b-hf' | 'qwen3-asr-0.6b-hf' | 'sensevoice-small'
   sourceLanguage: string
   targetLanguages: string[]
   allowIntermediateTranslation?: boolean
   translationProvider?: 'hymt2' | 'm2m100' | 'microsoft' | 'openai' | 'ollama'
+  /** Local Hy-MT2 quantization tier; only applied when translationProvider=hymt2. */
+  translationModelId?: 'hy-mt2-1.8b-q4-k-m' | 'hy-mt2-1.8b-q3-k-m' | 'hy-mt2-1.8b-iq2-m'
   translationOptions?: {
     endpoint?: string
     apiKey?: string

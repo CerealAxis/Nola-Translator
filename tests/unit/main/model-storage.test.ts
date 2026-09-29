@@ -10,7 +10,7 @@ describe('model storage', () => {
     expect(env.NOLA_TRANSLATOR_MODEL_DIR).toBe(join(root, 'models'))
     expect(env.HF_HUB_OFFLINE).toBe('1')
     expect(env.TRANSFORMERS_OFFLINE).toBe('1')
-    // Argos XDG 变量与 HF 缓存变量不再下发；下载走应用自带管理器。
+    // The Argos XDG and HF cache variables are deliberately unset: the app's own download manager owns model placement.
     expect(env).not.toHaveProperty('XDG_DATA_HOME')
     expect(env).not.toHaveProperty('XDG_CONFIG_HOME')
     expect(env).not.toHaveProperty('XDG_CACHE_HOME')
@@ -68,7 +68,6 @@ describe('model storage', () => {
       await writeFile(join(runtimeDir, 'engine-status.json'), JSON.stringify({ recognition: { loaded: true } }), 'utf8')
       expect(await readEngineStatus(root)).toEqual({})
 
-      // 未知模型 ID 一律丢弃，不能让诊断面板显示成一个不存在的模型。
       await writeFile(join(runtimeDir, 'engine-status.json'), JSON.stringify({
         recognition: { modelId: 'sensevoice-small', loaded: true, runtime: 'cuda:0' },
         hymt2: { device: 'cuda', ready: true },

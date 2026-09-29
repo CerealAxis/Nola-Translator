@@ -11,7 +11,7 @@ function NativeColorInput({ label, value, onCommit }: { label: string; value: st
     const input = inputRef.current
     if (!input) return
     const commit = (): void => onCommit(input.value)
-    // 使用原生 change 事件：系统色板关闭后才保存，避免 React 受控重绘把色板关掉。
+    // Native `change` only: commit once the system color picker closes, since a controlled re-render would dismiss it.
     input.addEventListener('change', commit)
     return () => input.removeEventListener('change', commit)
   }, [onCommit])
@@ -73,7 +73,7 @@ export function AppearancePage(): React.JSX.Element {
         const fresh = await api.getSettings()
         if (activeRef.current) setSettings({ ...fresh, overlay: { ...fresh.overlay, ...pendingOverlay.current } })
       } catch {
-        // 读取失败时保留当前乐观值，等待下次保存或设置广播纠正。
+        // A failed read leaves the optimistic values in place; the next save or settings broadcast corrects them.
       }
     }
   }

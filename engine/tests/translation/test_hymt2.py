@@ -1,4 +1,4 @@
-"""hymt2 provider 单元测试：假 manager 捕获提示词，覆盖官方模板与语言校验。"""
+"""hymt2 provider unit tests: a fake manager captures the prompt, covering the official template and language validation."""
 
 from __future__ import annotations
 
@@ -27,8 +27,8 @@ class FakeManager:
         return self.result
 
 
-def test_supported_language_table_matches_s4() -> None:
-    # S4 表格 38 个语言条目（markdown“39 行”= 38 数据行 + 表头）。
+def test_supported_language_table_matches_official_readme() -> None:
+    # 38 data rows plus a header, which is the "39 lines" the table shows in markdown.
     assert len(SUPPORTED_LANGUAGES) == 38
     assert SUPPORTED_LANGUAGES["zh"] == "Chinese"
     assert SUPPORTED_LANGUAGES["zh-Hant"] == "Traditional Chinese"

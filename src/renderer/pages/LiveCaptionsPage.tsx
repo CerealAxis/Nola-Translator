@@ -9,7 +9,7 @@ import { useI18n, type TranslationValues } from '../i18n'
 
 type SessionState = 'idle' | 'starting' | 'listening' | 'stopping' | 'error'
 
-// 与引擎 resources.py 中 Qwen3-ASR / Hy-MT2 的 languages 清单保持一致。
+// Keep in sync with the `languages` lists for Qwen3-ASR / Hy-MT2 in the engine's `resources.py`.
 const LANGUAGE_LABELS: Record<string, string> = {
   zh: '中文', en: 'English', ja: '日本語', ko: '한국어', yue: '粤语',
   fr: 'Français', de: 'Deutsch', es: 'Español', ru: 'Русский',
@@ -133,6 +133,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
       targetLanguages: effectiveTargets,
       allowIntermediateTranslation: translationSettings.translateIntermediate,
       translationProvider: translationSettings.provider,
+      translationModelId: translationSettings.hymt2ModelId,
       translationOptions: translationSettings.provider === 'microsoft'
         ? { endpoint: translationSettings.microsoftEndpoint, region: translationSettings.microsoftRegion }
         : translationSettings.provider === 'openai'
@@ -144,7 +145,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
     try {
       const snapshot = await api.listResources()
       const translationResourceId = effectiveTargets.length > 0
-        ? translationSettings.provider === 'hymt2' ? 'hy-mt2-1.8b-q4-k-m'
+        ? translationSettings.provider === 'hymt2' ? translationSettings.hymt2ModelId
           : translationSettings.provider === 'm2m100' ? 'm2m100-418m' : null
         : null
       const requiredIds = [recognitionModelId, ...(translationResourceId ? [translationResourceId] : [])]

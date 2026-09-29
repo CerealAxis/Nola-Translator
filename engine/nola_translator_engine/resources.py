@@ -1,4 +1,6 @@
-"""显式管理本地识别与翻译模型；查询和字幕启动均不会联网。"""
+"""Explicit management of local recognition and translation models; neither queries nor
+caption startup touch the network.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +14,8 @@ from typing import Literal
 from uuid import uuid4
 
 from .models.catalog import (
+    HYMT2_1_8B_IQ2_M,
+    HYMT2_1_8B_Q3_K_M,
     HYMT2_1_8B_Q4_K_M,
     M2M100_418M,
     QWEN3_ASR_0_6B_HF,
@@ -26,9 +30,14 @@ QWEN_RESOURCE_ID = QWEN3_ASR_1_7B_HF.model_id
 QWEN_06B_RESOURCE_ID = QWEN3_ASR_0_6B_HF.model_id
 SENSEVOICE_RESOURCE_ID = SENSEVOICE_SMALL.model_id
 HYMT2_RESOURCE_ID = HYMT2_1_8B_Q4_K_M.model_id
+HYMT2_Q3_RESOURCE_ID = HYMT2_1_8B_Q3_K_M.model_id
+HYMT2_IQ2_RESOURCE_ID = HYMT2_1_8B_IQ2_M.model_id
 M2M100_RESOURCE_ID = M2M100_418M.model_id
 
-# S2.6：仅按精确已知名称清理的旧识别模型目录与残留文件。
+# all three quantization tiers share one llama-server path; the resource id picks which GGUF to load.
+HYMT2_RESOURCE_IDS = (HYMT2_RESOURCE_ID, HYMT2_Q3_RESOURCE_ID, HYMT2_IQ2_RESOURCE_ID)
+
+# Legacy recognition model directories and leftover files, only ever removed by exact known name.
 _LEGACY_ASR_DIRS = (
     "sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16",
     "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
@@ -116,14 +125,38 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
         ResourceDefinition(
             HYMT2_RESOURCE_ID,
             "translationModel",
-            "hy-mt2",
-            "Hy-MT2 1.8B · 本地翻译模型",
-            "预量化 Q4_K_M 文件（约 1.13GB），由内置 llama.cpp 在本机运行。",
+            "hymt2",
+            "Hy-MT2 1.8B Q4_K_M · 本地翻译模型",
+            "预量化 Q4_K_M 文件（约 1.13GB），由内置 llama.cpp 在本机运行；质量基准档。",
             (
                 "zh", "en", "fr", "pt", "es", "ja", "tr", "ru",
                 "ar", "ko", "th", "it", "de", "vi", "ms", "id",
             ),
             1_133_080_448,
+        ),
+        ResourceDefinition(
+            HYMT2_Q3_RESOURCE_ID,
+            "translationModel",
+            "hymt2",
+            "Hy-MT2 1.8B Q3_K_M · 本地翻译模型",
+            "约 951MB，比 Q4_K_M 更小；实测专有名词（品牌、型号）保持得最好。",
+            (
+                "zh", "en", "fr", "pt", "es", "ja", "tr", "ru",
+                "ar", "ko", "th", "it", "de", "vi", "ms", "id",
+            ),
+            951_022_560,
+        ),
+        ResourceDefinition(
+            HYMT2_IQ2_RESOURCE_ID,
+            "translationModel",
+            "hymt2",
+            "Hy-MT2 1.8B UD-IQ2_M · 本地翻译模型",
+            "约 723MB，体积最小；位宽很低，专有名词可能被译成字面意思。",
+            (
+                "zh", "en", "fr", "pt", "es", "ja", "tr", "ru",
+                "ar", "ko", "th", "it", "de", "vi", "ms", "id",
+            ),
+            722_666_176,
         ),
         ResourceDefinition(
             M2M100_RESOURCE_ID,
@@ -169,12 +202,14 @@ class ResourceManager:
     def qwen_path(self) -> Path:
         return self.model_root / QWEN_RESOURCE_ID
 
-    @property
-    def hymt2_gguf_path(self) -> Path:
-        return self.model_root / HYMT2_RESOURCE_ID / "Hy-MT2-1.8B-Q4_K_M.gguf"
+    def hymt2_gguf_path(self, resource_id: str = HYMT2_RESOURCE_ID) -> Path:
+        """Absolute GGUF path for one Hy-MT2 quantization tier (the filename comes from the catalog spec)."""
+        spec = self._spec(resource_id)
+        entry = spec.files[0]
+        return self.model_root / spec.directory / entry.path
 
     def model_path(self, resource_id: str) -> Path:
-        """资源 ID → 本地模型目录；未知 ID 走 definition 校验后不会走到这里。"""
+        """Resource id → local model directory; unknown ids fail the definition lookup before reaching here."""
         return self.models.model_path(self._spec(resource_id))
 
     def list(self) -> list[ResourceRecord]:
@@ -286,13 +321,14 @@ class ResourceManager:
             loop.call_soon_threadsafe(self._set_phase, resource_id, phase)
 
         await asyncio.to_thread(self.models.ensure, spec, progress, on_phase)
-        # 安装成功后清理旧资源（S2.6）；清理失败不影响安装结果。
+        # clean up legacy resources once the install succeeds; a cleanup failure doesn't change the result.
         await asyncio.to_thread(self._cleanup_after_install, resource_id)
 
     def _cleanup_after_install(self, resource_id: str) -> None:
-        """按精确已知名称清理旧资源；不扫描、不触碰未知目录与 Ollama。"""
+        """Remove legacy resources by exact known name; never scans, never touches unknown directories or Ollama."""
         try:
-            # 换布局重装时旧权重被挪到 .<目录>.corrupt，安装成功后立即清掉。
+            # reinstalling under a new layout moves the old weights to .<dir>.corrupt,
+            # so drop them as soon as the install succeeds.
             shutil.rmtree(
                 self.model_root / f".{self._spec(resource_id).directory}.corrupt",
                 ignore_errors=True,
@@ -306,7 +342,7 @@ class ResourceManager:
                         shutil.rmtree(path, ignore_errors=True)
                     else:
                         path.unlink(missing_ok=True)
-            elif resource_id == HYMT2_RESOURCE_ID:
+            elif resource_id in HYMT2_RESOURCE_IDS:
                 for variable in ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
                     value = os.environ.get(variable)
                     if not value:
@@ -353,12 +389,14 @@ class ResourceManager:
 
     def _spec(self, resource_id: str) -> ModelSpec:
         self._definition(resource_id)
-        # 按模块级常量现取，测试可以替换 catalog spec。
+        # read from the module-level constants at call time so tests can swap the catalog spec.
         return {
             QWEN_RESOURCE_ID: QWEN3_ASR_1_7B_HF,
             QWEN_06B_RESOURCE_ID: QWEN3_ASR_0_6B_HF,
             SENSEVOICE_RESOURCE_ID: SENSEVOICE_SMALL,
             HYMT2_RESOURCE_ID: HYMT2_1_8B_Q4_K_M,
+            HYMT2_Q3_RESOURCE_ID: HYMT2_1_8B_Q3_K_M,
+            HYMT2_IQ2_RESOURCE_ID: HYMT2_1_8B_IQ2_M,
             M2M100_RESOURCE_ID: M2M100_418M,
         }[resource_id]
 

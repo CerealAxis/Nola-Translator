@@ -89,7 +89,7 @@ export class HistoryStore {
         this.segments.set(segment.segmentId, segment)
       }
     } catch {
-      // 没有历史文件或文件损坏时从空会话开始。
+      // No history file, or a corrupt one, just means starting from an empty session.
     }
   }
 }

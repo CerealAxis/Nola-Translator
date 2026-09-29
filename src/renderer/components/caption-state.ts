@@ -3,7 +3,7 @@ import type { CaptionSegment, EngineEvent } from '../../shared/contracts'
 export type CurrentCaption = { sessionId: string | null; caption: CaptionSegment | null; seen: string[] }
 export const EMPTY_CAPTION: CurrentCaption = { sessionId: null, caption: null, seen: [] }
 
-/** Revisions update a sentence; they never make an older sentence current again. */
+/** Revisions update a sentence in place; a stale or already-seen sentence never becomes current again. */
 export function receiveCaption(state: CurrentCaption, event: EngineEvent): CurrentCaption {
   if (event.type === 'sessionStarted') return { sessionId: event.sessionId, caption: null, seen: [] }
   if (event.type !== 'caption') return state

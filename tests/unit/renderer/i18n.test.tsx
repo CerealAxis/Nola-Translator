@@ -11,9 +11,13 @@ describe('界面语言切换', () => {
   it('标题栏菜单切换 English 更新页面，并可切回中文', async () => {
     render(<App />)
     await screen.findByRole('heading', { name: '实时字幕', level: 1 })
+    expect(document.title).toBe('诺拉翻译')
+    expect(document.querySelector('.app-name')).toHaveTextContent('诺拉翻译')
     fireEvent.click(screen.getByRole('button', { name: '界面语言' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'English' }))
     await waitFor(() => expect(document.documentElement.lang).toBe('en'))
+    expect(document.title).toBe('Nola Translator')
+    expect(document.querySelector('.app-name')).toHaveTextContent('Nola Translator')
 
     expect(screen.getByRole('heading', { name: 'Live captions', level: 1 })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Start captions' })).toBeInTheDocument()
@@ -24,6 +28,8 @@ describe('界面语言切换', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Interface language' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: '中文' }))
     await waitFor(() => expect(document.documentElement.lang).toBe('zh-CN'))
+    expect(document.title).toBe('诺拉翻译')
+    expect(document.querySelector('.app-name')).toHaveTextContent('诺拉翻译')
     expect(screen.getByRole('heading', { name: '字幕样式' })).toBeInTheDocument()
   })
 
@@ -37,6 +43,7 @@ describe('界面语言切换', () => {
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('语言设置保存失败，请重试。'))
     expect(document.documentElement.lang).toBe('zh-CN')
+    expect(document.title).toBe('诺拉翻译')
     expect(screen.getByRole('heading', { name: '实时字幕', level: 1 })).toBeInTheDocument()
     updateSettings.mockRestore()
   })
@@ -52,6 +59,7 @@ describe('界面语言切换', () => {
 
     render(<I18nProvider><CaptionOverlay /></I18nProvider>)
     await waitFor(() => expect(document.documentElement.lang).toBe('en'))
+    expect(document.title).toBe('Nola Translator')
 
     act(() => {
       listener?.({

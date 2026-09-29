@@ -4,6 +4,10 @@ import { english } from './locales/en'
 export type UiLanguage = 'zh-CN' | 'en'
 export type TranslationValues = Record<string, string | number>
 
+export function appNameForLanguage(language: UiLanguage): string {
+  return language === 'en' ? 'Nola Translator' : '诺拉翻译'
+}
+
 export function translate(message: string, language: UiLanguage, values: TranslationValues = {}): string {
   const template = language === 'en' ? english[message] ?? message : message
   return template.replace(/\{(\w+)\}/g, (match, key: string) => String(values[key] ?? match))
@@ -38,7 +42,10 @@ export function I18nProvider({ children }: { children: ReactNode }): React.JSX.E
     }).catch(() => undefined)
     return () => { active = false; unsubscribe() }
   }, [])
-  useEffect(() => { document.documentElement.lang = language }, [language])
+  useEffect(() => {
+    document.documentElement.lang = language
+    document.title = appNameForLanguage(language)
+  }, [language])
   const setLanguage = useCallback(async (next: UiLanguage) => {
     const previous = language
     const requestRevision = ++revision.current

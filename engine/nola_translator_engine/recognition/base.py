@@ -1,4 +1,4 @@
-"""识别器共享契约。"""
+"""Shared recognizer contracts."""
 
 from __future__ import annotations
 
@@ -23,7 +23,9 @@ class RecognitionUpdate:
 
 
 class ModelUnavailable(RuntimeError):
-    """识别模型不可用：目录缺失或权重加载失败；runtime.py 映射为 modelUnavailable。"""
+    """Recognition model unavailable: directory missing or weights failed to load;
+    runtime.py maps this to modelUnavailable.
+    """
 
 
 class Recognizer(Protocol):
@@ -33,7 +35,7 @@ class Recognizer(Protocol):
 
 
 class Transcriber(Protocol):
-    """流式调度器依赖的最小模型接口。"""
+    """The minimal model interface the streaming scheduler depends on."""
 
     @property
     def loaded(self) -> bool: ...

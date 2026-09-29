@@ -7,7 +7,7 @@ if (-not (Test-Path $venvPython)) {
     python -m venv (Join-Path $projectRoot '.venv')
 }
 
-# 钉下 CUDA 版 torch：必须在可编辑安装之前，避免可编辑安装解析出 CPU 构建替换 CUDA 版。
+# Pin the CUDA build of torch before the editable install; otherwise pip resolves a CPU build over it.
 & $venvPython -m pip install `
     --index-url 'https://download.pytorch.org/whl/cu126' `
     'torch==2.13.0'

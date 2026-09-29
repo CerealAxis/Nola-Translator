@@ -1,4 +1,4 @@
-"""标准输入/输出上的 JSONL 引擎入口。stdout 仅写协议事件。"""
+"""JSONL engine entry point on stdin/stdout. stdout carries protocol events only."""
 
 from __future__ import annotations
 
@@ -33,12 +33,13 @@ def _request_id(raw_line: bytes) -> str:
 
 
 def _redirect_third_party_stdout() -> TextIO:
-    """把 ``sys.stdout`` 改道到 stderr，返回真正的协议流。
+    """Point ``sys.stdout`` at stderr and hand back the real protocol stream.
 
-    stdout 是 JSONL 协议通道，只允许协议事件。第三方库却会直接 ``print``——
-    funasr 的 ``check_for_update`` 在判断 ``disable`` **之前**就无条件打印
-    ``funasr version: x.y.z.``。客户端遇到非 JSON 行会判定协议损坏并杀掉引擎，
-    于是选中 SenseVoiceSmall 时会话永远起不来。这些噪声一律改走 stderr。
+    stdout is the JSONL protocol channel and only protocol events may go there, yet
+    third-party libraries just ``print``. funasr's ``check_for_update`` prints
+    ``funasr version: x.y.z.`` unconditionally, *before* it looks at ``disable``; the client
+    sees a non-JSON line, declares the protocol corrupt, and kills the engine, so a session
+    with SenseVoiceSmall selected never starts. All of that noise goes to stderr instead.
     """
     protocol_out = sys.stdout
     sys.stdout = sys.stderr
@@ -107,7 +108,7 @@ async def _run() -> int:
 
         try:
             events = await handle(command)
-        except Exception as error:  # 防止单个命令让 sidecar 无响应；详细异常只写 stderr。
+        except Exception as error:  # one bad command must not wedge the sidecar; the detail only goes to stderr.
             print(f"engine command failed: {type(error).__name__}", file=sys.stderr, flush=True)
             _write_error(protocol_out, request_id, "internalError")
             continue

@@ -1,4 +1,6 @@
-"""带完整性检查和原子安装的模型管理器：支持 HF 文件列表快照与单文件两种形态。"""
+"""Model manager with integrity checking and atomic installs, covering both HF file-list
+snapshots and single-file models.
+"""
 
 from __future__ import annotations
 
@@ -23,7 +25,7 @@ class ModelIntegrityError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class FileEntry:
-    """快照内单个文件：相对路径、字节数与 sha256。"""
+    """One file in a snapshot: relative path, byte size, sha256."""
 
     path: str
     size: int
@@ -32,10 +34,10 @@ class FileEntry:
 
 @dataclass(frozen=True, slots=True)
 class ModelSpec:
-    """钉死 revision 的模型规格；files 为空列表以外的形态共用同一结构。
+    """A model spec with a pinned revision; one structure covers everything except an empty file list.
 
-    快照形式 = 多个文件（HuggingFace 仓库内相对路径）；
-    单文件形式 = files 仅含仓库根目录下的一个 GGUF。
+    Snapshot form = several files, as relative paths inside the HuggingFace repo.
+    Single-file form = files holds just one GGUF at the repo root.
     """
 
     model_id: str
@@ -85,10 +87,10 @@ class ModelManager:
         progress: ProgressCallback = lambda _current, _total: None,
         on_phase: PhaseCallback | None = None,
     ) -> Path:
-        """逐文件下载到临时目录，校验通过后整体原子切换到目标目录。
+        """Download file by file into a temp dir, then switch to the target atomically once verification passes.
 
-        进度按累计字节上报；progress 抛出异常即视为取消，临时目录随之清理。
-        阶段顺序：download → verify → install。
+        Progress is reported in cumulative bytes; an exception from progress means cancelled, and the
+        temp dir is cleaned up with it. Phases run in order: download → verify → install.
         """
         if self.is_installed(spec):
             return self.model_path(spec)
@@ -106,7 +108,7 @@ class ModelManager:
             for entry in spec.files:
                 part = temp / f".{entry.path}.part"
                 part.parent.mkdir(parents=True, exist_ok=True)
-                # 文件间取消检查点：即使 fetcher 不逐块上报也能感知取消
+                # cancellation checkpoint between files, so a fetcher that never reports per chunk still gets noticed
                 progress(done, total)
                 base = done
 

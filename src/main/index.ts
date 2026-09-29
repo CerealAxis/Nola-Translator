@@ -87,8 +87,8 @@ if (!hasSingleInstanceLock) {
     await history.setEnabled(initialSettings.historyEnabled)
     await history.restore()
     const resourceEnvironment = modelStorageEnvironment(userData, initialSettings.modelStoragePath)
-    // A disconnected custom drive must not prevent the settings UI from opening.
-    // Keep the chosen location so downloads never silently fall back to C:.
+    // A disconnected custom drive must not keep the settings UI from opening, and keeping the
+    // configured path is what stops downloads from silently falling back to C:.
     await mkdir(resourceEnvironment.TMP, { recursive: true }).catch((error) => console.error('model storage is unavailable', error))
     engine = new EngineProcess({
       ...createEngineLaunchSpec({

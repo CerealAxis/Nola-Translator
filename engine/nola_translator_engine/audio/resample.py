@@ -1,4 +1,4 @@
-"""把任意常见 WASAPI 格式标准化为 16 kHz、单声道、float32、20 ms 帧。"""
+"""Normalizes any common WASAPI format to 16 kHz mono float32 in 20 ms frames."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ class AudioFrame:
 
 
 class StreamingAudioNormalizer:
-    """以有限重叠保留重采样边界，并输出固定长度的连续音频帧。"""
+    """Keeps a bounded overlap across resampling boundaries and emits fixed-length continuous audio frames."""
 
     def __init__(self, input_rate: int, channels: int) -> None:
         if input_rate <= 0:
@@ -87,11 +87,13 @@ class StreamingAudioNormalizer:
         return frames
 
     def silence(self, duration_ms: float) -> list[AudioFrame]:
-        """补齐静默期的 20 ms 零帧，沿用同一条按已投递样本数推算的时间轴。
+        """Pad the silence with 20 ms zero frames on the same timeline, derived from samples already delivered.
 
-        WASAPI loopback 在没有播放时不会推数据，时间轴也不会自己前进；不补帧的话
-        音量门永远累计不出 600 ms 静音，段落无法收尾，final 与随之而来的翻译都
-        不会触发。``origin_ms`` 未建立时（还没收到第一块音频）无锚点可补，返回空。
+        WASAPI loopback pushes nothing while nothing is playing and the timeline doesn't
+        advance on its own, so without padding the volume gate never accumulates 600 ms of
+        silence, segments never close, and neither the final nor its translation fires.
+        Returns nothing while ``origin_ms`` is still unset (no audio has arrived yet),
+        since there's no anchor to pad against.
         """
         if self.origin_ms is None or duration_ms < FRAME_DURATION_MS:
             return []

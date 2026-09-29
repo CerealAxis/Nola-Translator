@@ -1,4 +1,4 @@
-"""Qwen3-ASR 识别运行时：本地离线加载、NF4→8bit 回退与 chat template 前缀续写。"""
+"""Qwen3-ASR runtime: offline local load, NF4→8bit fallback, chat-template prefix continuation."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ MAX_NEW_TOKENS = 512
 QUANT_ENV_VAR = "NOLA_TRANSLATOR_QWEN_QUANT"
 VALID_QUANTS = ("nf4", "8bit")
 
-# S4 钉值：Qwen3-ASR 支持的 30 种语言（协议码 ↔ 官方全名）。
+# The 30 languages Qwen3-ASR supports, protocol code ↔ official name.
 CODE_TO_NAME: dict[str, str] = {
     "zh": "Chinese",
     "en": "English",
@@ -57,11 +57,11 @@ NAME_TO_CODE = {name: code for code, name in CODE_TO_NAME.items()}
 
 
 class QwenModelUnavailable(ModelUnavailable):
-    """Qwen3-ASR 不可用：目录缺失或 NF4/8bit 量化均加载失败。"""
+    """Qwen3-ASR unavailable: directory missing, or both the NF4 and 8bit loads failed."""
 
 
 class CheckpointLayoutMismatch(RuntimeError):
-    """checkpoint 权重键与模型架构对不上：from_pretrained 会静默随机初始化。"""
+    """Checkpoint weight keys don't match the architecture: from_pretrained silently random-initializes."""
 
 
 @dataclass(slots=True)
@@ -71,7 +71,7 @@ class _Pipeline:
 
 
 def _language_name(value: str) -> str:
-    """协议码或全名 → 官方全名（用于 `language X<asr_text>` 强制提示）。"""
+    """Protocol code or full name → official name, for the `language X<asr_text>` hint."""
     text = value.strip()
     direct = CODE_TO_NAME.get(text.lower())
     if direct is not None:
@@ -83,7 +83,7 @@ def _language_name(value: str) -> str:
 
 
 def _language_code(value: str | None) -> str | None:
-    """官方全名或协议码 → 协议码；未知返回 None。"""
+    """Official name or protocol code → protocol code; None when unknown."""
     if not value:
         return None
     text = value.strip()
@@ -97,7 +97,7 @@ def _language_code(value: str | None) -> str | None:
 
 
 class QwenRuntime:
-    """Qwen3-ASR 进程内运行时：一次加载、量化回退、单飞推理入口。"""
+    """In-process Qwen3-ASR runtime: load once, fall back across quants, single-flight inference."""
 
     def __init__(self, model_dir: Path, quant: str | None = None) -> None:
         if quant is not None and quant not in VALID_QUANTS:
@@ -122,7 +122,7 @@ class QwenRuntime:
         return self._quant if self._loaded else "unloaded"
 
     def load(self) -> None:
-        """线程安全的一次性加载：NF4 失败回退 8bit，均失败抛 QwenModelUnavailable。"""
+        """Thread-safe one-shot load: NF4 falls back to 8bit; both failing raises QwenModelUnavailable."""
         with self._load_lock:
             if self._loaded:
                 return
@@ -133,7 +133,7 @@ class QwenRuntime:
                 try:
                     pipeline = self._load_pipeline(quant)
                 except CheckpointLayoutMismatch as error:
-                    # 与量化无关，换 8bit 重试同样会失败，直接报不可用。
+                    # Quantization-independent: an 8bit retry fails the same way, so report unavailable now.
                     raise QwenModelUnavailable(str(error)) from error
                 except Exception as error:
                     errors.append((quant, error))
@@ -150,7 +150,7 @@ class QwenRuntime:
             ) from errors[-1][1]
 
     def unload(self) -> None:
-        """等待正在运行的推理结束，再释放权重与 CUDA 缓存。"""
+        """Wait for in-flight inference to finish, then drop weights and clear the CUDA cache."""
         with self._inference_lock:
             with self._load_lock:
                 pipeline = self._pipeline
@@ -163,7 +163,7 @@ class QwenRuntime:
                 torch.cuda.empty_cache()
 
     def _resolve_quant(self) -> str:
-        # 显式参数 > 环境变量 > 默认 nf4（S2.2/S4）
+        # explicit arg > env var > nf4 default
         if self._quant_param is not None:
             return self._quant_param
         env_value = os.environ.get(QUANT_ENV_VAR, "").strip().lower()
@@ -172,7 +172,7 @@ class QwenRuntime:
         return "nf4"
 
     def _load_pipeline(self, quant: str) -> _Pipeline:
-        """实际 from_pretrained 块，独立成方法便于测试打桩。"""
+        """The real from_pretrained block, split into its own method so tests can stub it."""
         from transformers import (
             AutoProcessor,
             BitsAndBytesConfig,
@@ -191,8 +191,9 @@ class QwenRuntime:
             local_files_only=True,
             output_loading_info=True,
         )
-        # 权重键布局不匹配（例如 thinker 布局的 Qwen/Qwen3-ASR-0.6B）时，
-        # from_pretrained 只会把全部参数随机初始化后照常返回，直到推理才崩。
+        # On a weight-key layout mismatch (e.g. the thinker-layout Qwen/Qwen3-ASR-0.6B),
+        # from_pretrained random-initializes every parameter and returns normally — it
+        # only falls apart at inference time.
         missing = sorted(loading_info.get("missing_keys", ()))
         if missing:
             raise CheckpointLayoutMismatch(
@@ -203,7 +204,9 @@ class QwenRuntime:
         return _Pipeline(model=model, processor=processor)
 
     def rollback_text(self, text: str, n_tokens: int = 5) -> str:
-        """官方流式 5-token 回退：切碎多字节字符（U+FFFD）时再多回退一个 token。"""
+        """Official streaming 5-token rollback, backed off one extra token when that would
+        split a multibyte char (U+FFFD).
+        """
         if not text:
             return ""
         self.load()
@@ -238,7 +241,9 @@ class QwenRuntime:
         prefix: str | None = None,
         language: str | None = None,
     ) -> tuple[str, str | None]:
-        """转写 16 kHz 单声道 float32 音频；prefix 走 chat template 续写（官方流式前缀，非热词）。"""
+        """Transcribe 16 kHz mono float32 audio; prefix continues through the chat
+        template (official streaming prefix, not a hotword list).
+        """
         audio = np.asarray(samples, dtype=np.float32).reshape(-1)
         if audio.size == 0:
             return "", None
@@ -257,12 +262,12 @@ class QwenRuntime:
             inputs = pipeline.processor(
                 text=[prompt], audio=[audio], return_tensors="pt", padding=True
             )
-            # S4 陷阱 1：bnb 下首次 generate() 后 model.dtype 翻成 float32，
-            # 输入必须固定 bfloat16，绝不能用 model.dtype。
+            # bnb flips model.dtype to float32 after the first generate() call, so inputs
+            # must stay bfloat16 — never use model.dtype.
             inputs = inputs.to(pipeline.model.device, torch.bfloat16)
             output = pipeline.model.generate(**inputs, max_new_tokens=MAX_NEW_TOKENS)
 
-        # transformers 5.17 可能返回纯张量或带 .sequences 的对象（S4 陷阱 4）
+        # transformers 5.17 may return a bare tensor or an object carrying .sequences
         sequences = output.sequences if hasattr(output, "sequences") else output
         generated = sequences[:, inputs["input_ids"].shape[1] :]
         decoded = pipeline.processor.decode(generated, skip_special_tokens=True)
@@ -270,7 +275,7 @@ class QwenRuntime:
         if not isinstance(raw, str):
             raw = ""
 
-        # 官方流式语义：解析对象是 prefix + 新生成的累计原文
+        # Official streaming semantics: the parsed value is prefix + newly generated cumulative text
         parsed = pipeline.processor.parse_output(f"{prefix or ''}{raw}")
         text = str(parsed.get("transcription") or "").strip()
         if not text:
@@ -278,7 +283,9 @@ class QwenRuntime:
         return text, _language_code(parsed.get("language")) or forced_code
 
     def _build_prompt(self, *, prefix: str | None, hint: str | None) -> str:
-        """官方消息骨架：语言提示与前缀依次拼在 generation prompt 之后。"""
+        """Official message skeleton; the language hint and the prefix are appended after
+        the generation prompt, in that order.
+        """
         messages = [
             {"role": "system", "content": ""},
             {"role": "user", "content": [{"type": "audio", "audio": ""}]},
@@ -298,7 +305,7 @@ _runtimes_lock = threading.Lock()
 
 
 def get_qwen_runtime(model_dir: Path) -> QwenRuntime:
-    """按 resolved model_dir 缓存的进程级单例（会话期间只加载一次）。"""
+    """Process-wide singleton cached by resolved model_dir, so weights load once per session."""
     resolved = Path(model_dir).resolve()
     key = os.path.normcase(str(resolved))
     with _runtimes_lock:

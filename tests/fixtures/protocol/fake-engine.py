@@ -1,4 +1,4 @@
-"""仅用于验证 Electron 子进程恢复逻辑的最小 JSONL 引擎。"""
+"""Minimal JSONL engine used only to exercise Electron's subprocess recovery paths."""
 
 import argparse
 import json

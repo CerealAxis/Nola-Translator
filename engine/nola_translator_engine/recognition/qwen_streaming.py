@@ -1,4 +1,4 @@
-"""Qwen 流式字幕装配：官方 unfixed_chunk_num=2 的前缀回退档位。"""
+"""Qwen streaming caption assembly: the official unfixed_chunk_num=2 prefix-rollback tier."""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ from .qwen_runtime import QwenRuntime, get_qwen_runtime
 from .streaming import StreamingRecognizer
 from .volume_gate import VolumeGateSegmenter
 
-# 官方流式示例：前两块不带前缀让模型自由起始，之后每块回退末尾 5 个 token 续写。
+# The official streaming example lets the first blocks start free, then continues from a
+# 5-token rollback on every later block.
 UNFIXED_CHUNK_NUM = 2
 ROLLBACK_TOKENS = 5
 
@@ -23,10 +24,10 @@ def _prefix_builder(runtime: QwenRuntime):
 def create_qwen_recognizer(
     model_dir: Path, *, source_language: str | None = None
 ) -> StreamingRecognizer:
-    """构造 Qwen 流式识别器；模型在首个 job 的线程中惰性加载。
+    """Build the Qwen streaming recognizer; the model loads lazily on the first job's thread.
 
-    加载失败（ModelUnavailable）会从 accept()/flush() 抛出，由 runtime.py
-    映射为 modelUnavailable 错误事件。
+    Load failures (ModelUnavailable) surface from accept()/flush(), where runtime.py maps
+    them to a modelUnavailable error event.
     """
     runtime = get_qwen_runtime(model_dir)
     if Path(model_dir).name == "qwen3-asr-0.6b-hf":

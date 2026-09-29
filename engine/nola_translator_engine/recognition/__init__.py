@@ -1,1 +1,1 @@
-"""语音识别接口。具体运行时按需加载。"""
+"""Speech recognition interfaces. Concrete runtimes load on demand."""

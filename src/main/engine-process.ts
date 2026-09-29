@@ -184,7 +184,7 @@ export class EngineProcess extends EventEmitter {
           2_000
         )
       } catch {
-        // 退出路径继续使用进程终止兜底。
+        // The exit path below still falls back to killing the process.
       }
     }
 

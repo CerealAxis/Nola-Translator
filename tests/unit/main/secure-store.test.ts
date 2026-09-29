@@ -27,7 +27,7 @@ describe('SecureCredentialStore', () => {
     const directory = await mkdtemp(join(tmpdir(), 'fluent-secrets-'))
     const path = join(directory, 'credentials.json')
     try {
-      // 换电脑、换 Windows 用户或改 productName 后，旧密文在新身份下读不出来。
+      // After moving to another machine or Windows user, or renaming productName, old ciphertext no longer decrypts.
       await writeFile(path, JSON.stringify({ openai: Buffer.from('undecryptable').toString('base64') }), 'utf8')
       const store = new SecureCredentialStore(path, {
         ...workingEncryption,
@@ -38,10 +38,10 @@ describe('SecureCredentialStore', () => {
 
       await expect(store.get('openai')).rejects.toBeInstanceOf(StaleCredentialError)
       expect(await store.has('openai')).toBe(false)
-      // 不清掉的话每次 startSession 都会卡在同一处。
+      // Purging matters: without it every startSession would hit the same decryption failure.
       expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({})
 
-      // 清掉之后按「未保存」处理，调用方可以直接继续。
+      // Once purged, reads treat the key as unset and return '' rather than throwing.
       expect(await store.get('openai')).toBe('')
     } finally {
       await rm(directory, { recursive: true, force: true })

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 
-/** Keep the newest words in view when a physical line or window-height limit is reached. */
+/** Scroll the newest words into view whenever a line or window-height limit clips the text. */
 export function CaptionText({ className, children }: { className: string; children: string }): React.JSX.Element {
   const ref = useRef<HTMLParagraphElement>(null)
   useLayoutEffect(() => {

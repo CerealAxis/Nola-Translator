@@ -1,4 +1,4 @@
-"""StreamingRecognizer 单元测试：合成 20 ms 帧 + 真实 VolumeGateSegmenter（快速参数）。"""
+"""StreamingRecognizer unit tests: synthetic 20 ms frames plus a real VolumeGateSegmenter at fast settings."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from nola_translator_engine.recognition.qwen_streaming import (
     create_qwen_recognizer,
 )
 from nola_translator_engine.recognition.streaming import StreamingRecognizer
+from nola_translator_engine.recognition.sensevoice_streaming import create_sensevoice_recognizer
 from nola_translator_engine.recognition.volume_gate import VolumeGateSegmenter
 
 FRAME_SAMPLES = 320
@@ -28,7 +29,7 @@ FRAME_MS = 20
 def make_frame(index: int, amplitude: float) -> AudioFrame:
     start = index * FRAME_SAMPLES
     t = np.arange(start, start + FRAME_SAMPLES, dtype=np.float64)
-    # 500 Hz 在 16 kHz 下每帧恰好 10 个周期，帧内 RMS 恒定。
+    # 500 Hz is exactly 10 cycles per frame at 16 kHz, so the within-frame RMS stays constant.
     samples = (amplitude * np.sin(2.0 * np.pi * t / 32.0)).astype(np.float32)
     return AudioFrame(samples=samples, started_at_ms=float(index * FRAME_MS))
 
@@ -93,7 +94,6 @@ def make_recognizer(
 
 
 async def settle(recognizer: StreamingRecognizer, timeout: float = 5.0) -> None:
-    """等待后台 worker 排空（测试辅助）。"""
     deadline = time.monotonic() + timeout
     while not recognizer._idle.is_set():
         assert time.monotonic() < deadline, "worker 未在期限内空闲"
@@ -104,10 +104,10 @@ async def test_multiblock_speech_emits_intermediates_then_single_final() -> None
     runtime = FakeRuntime()
     rec = make_recognizer(runtime)
     updates = []
-    for index in range(30):  # 600 ms 语音 → 6 次分块派发
+    for index in range(30):  # 600 ms of speech → 6 block dispatches
         updates += await rec.accept(make_frame(index, 0.5))
         await settle(rec)
-    for index in range(30, 33):  # 60 ms 静音断句
+    for index in range(30, 33):  # 60 ms of silence closes the segment
         updates += await rec.accept(make_frame(index, 0.0))
         await settle(rec)
     updates += rec._drain()
@@ -125,14 +125,49 @@ async def test_multiblock_speech_emits_intermediates_then_single_final() -> None
     assert runtime.calls
 
 
+async def test_sensevoice_continuous_speech_has_bounded_retranscription(monkeypatch, tmp_path) -> None:
+    runtime = FakeRuntime()
+    monkeypatch.setattr(
+        "nola_translator_engine.recognition.sensevoice_streaming.get_sensevoice_runtime",
+        lambda _path: runtime,
+    )
+    rec = create_sensevoice_recognizer(tmp_path / "sensevoice-small")
+    for index in range(1500):  # 30 seconds of continuous speech
+        await rec.accept(make_frame(index, 0.5))
+        if index % 50 == 49:
+            await settle(rec)
+    await rec.flush(30_000)
+    decoded_seconds = sum(call.sample_count for call in runtime.calls) / 16_000
+    assert decoded_seconds <= 180
+    await rec.close()
+
+
+async def test_sensevoice_first_preview_is_dispatched_before_one_second(monkeypatch, tmp_path) -> None:
+    runtime = FakeRuntime()
+    monkeypatch.setattr(
+        "nola_translator_engine.recognition.sensevoice_streaming.get_sensevoice_runtime",
+        lambda _path: runtime,
+    )
+    rec = create_sensevoice_recognizer(tmp_path / "sensevoice-small")
+    for index in range(29):
+        await rec.accept(make_frame(index, 0.5))
+    await settle(rec)
+    assert runtime.calls == []
+    await rec.accept(make_frame(29, 0.5))
+    await settle(rec)
+    assert len(runtime.calls) == 1
+    assert runtime.calls[0].sample_count == 30 * FRAME_SAMPLES
+    await rec.close()
+
+
 async def test_short_speech_emits_no_intermediate_exactly_one_final() -> None:
     runtime = FakeRuntime()
     rec = make_recognizer(runtime)
     updates = []
-    for index in range(2):  # 40 ms 语音 < block_ms
+    for index in range(2):  # 40 ms of speech, under block_ms
         updates += await rec.accept(make_frame(index, 0.5))
         await settle(rec)
-    for index in range(2, 5):  # 60 ms 静音断句，断句帧先于分块阈值
+    for index in range(2, 5):  # 60 ms of silence: the segment closes before the block threshold
         updates += await rec.accept(make_frame(index, 0.0))
         await settle(rec)
     updates += rec._drain()
@@ -170,7 +205,7 @@ async def test_first_two_dispatches_have_no_prefix_then_rollback() -> None:
     ]
     runtime = FakeRuntime(results=results)
     rec = make_recognizer(runtime)
-    for index in range(15):  # 300 ms → 派发 3 次（100/200/300 ms）
+    for index in range(15):  # 300 ms → 3 dispatches (100/200/300 ms)
         await rec.accept(make_frame(index, 0.5))
         await settle(rec)
     for index in range(15, 18):
@@ -178,11 +213,11 @@ async def test_first_two_dispatches_have_no_prefix_then_rollback() -> None:
         await settle(rec)
 
     prefixes = [call.prefix for call in runtime.calls]
-    assert len(prefixes) == 4  # 3 次中间 + 1 次最终
+    assert len(prefixes) == 4
     assert prefixes[0] is None
     assert prefixes[1] is None
-    assert prefixes[2] == "x1 x2 x3"  # 回退第 2 次结果的末尾 5 个 token
-    assert prefixes[3] == "y1"  # final 同样回退
+    assert prefixes[2] == "x1 x2 x3"  # Rollback drops the last 5 tokens of the 2nd result.
+    assert prefixes[3] == "y1"
 
 
 async def test_empty_transcript_emits_nothing() -> None:
@@ -225,20 +260,21 @@ async def test_slow_transcribe_coalesces_and_latest_snapshot_wins() -> None:
     runtime = FakeRuntime(delays=[0.3])
     rec = make_recognizer(runtime)
     updates = []
-    for index in range(30):  # 600 ms → 6 次派发，全部挤在首个慢任务期间
+    for index in range(30):  # 600 ms → 6 dispatches, all landing inside the first slow task
         updates += await rec.accept(make_frame(index, 0.5))
         await asyncio.sleep(0)
-    await settle(rec)  # 首个中间结果 + 合并后的最新快照
+    await settle(rec)
     for index in range(30, 33):
         updates += await rec.accept(make_frame(index, 0.0))
         await settle(rec)
     updates += rec._drain()
 
-    # 6 次中间派发 + 1 次最终 → 实际推理只有 3 次（中间合并为最新快照）
+    # 6 intermediate dispatches plus 1 final collapse into 3 real inferences: the
+    # intermediates are coalesced into the latest snapshot.
     assert len(runtime.calls) == 3
     counts = [call.sample_count for call in runtime.calls]
-    assert counts[1] > counts[0]  # 合并后存活的是最新（最长）快照
-    assert counts[2] >= counts[1]  # final 覆盖全段
+    assert counts[1] > counts[0]
+    assert counts[2] >= counts[1]
     assert len([u for u in updates if u.is_final]) == 1
 
 
@@ -246,15 +282,14 @@ async def test_final_drops_pending_intermediate_and_discards_stale_result() -> N
     runtime = FakeRuntime(delays=[0.2])
     rec = make_recognizer(runtime)
     updates = []
-    for index in range(10):  # 200 ms → 派发 2 次，首个任务在飞
+    for index in range(10):  # 200 ms → 2 dispatches, the first still in flight
         updates += await rec.accept(make_frame(index, 0.5))
         await asyncio.sleep(0)
-    for index in range(10, 13):  # 断句：final 入队时丢弃待处理中间任务
+    for index in range(10, 13):  # Segmentation: enqueuing the final drops the pending intermediate task
         updates += await rec.accept(make_frame(index, 0.0))
     await settle(rec)
     updates += rec._drain()
 
-    # 在飞的中间结果先显示，待处理的中间任务由 final 顶掉。
     assert len(runtime.calls) == 2
     finals = [u for u in updates if u.is_final]
     assert len(finals) == 1
@@ -266,7 +301,7 @@ async def test_force_split_produces_two_segments_with_distinct_ids() -> None:
     runtime = FakeRuntime()
     rec = make_recognizer(runtime, segmenter=fast_segmenter(max_segment_ms=400))
     updates = []
-    for index in range(40):  # 800 ms 连续语音 → 400 ms 强切
+    for index in range(40):  # 800 ms of continuous speech → forced split at 400 ms
         updates += await rec.accept(make_frame(index, 0.5))
         await settle(rec)
     for index in range(40, 43):
@@ -285,7 +320,7 @@ async def test_flush_mid_speech_returns_final_and_close_cancels_worker() -> None
     runtime = FakeRuntime()
     rec = make_recognizer(runtime)
     updates = []
-    for index in range(10):  # 200 ms 语音，尚无收尾静音
+    for index in range(10):  # 200 ms of speech, no trailing silence yet
         updates += await rec.accept(make_frame(index, 0.5))
         await settle(rec)
 
@@ -294,7 +329,7 @@ async def test_flush_mid_speech_returns_final_and_close_cancels_worker() -> None
     assert len(final) == 1
     assert final[0].ended_at_ms == pytest.approx(200.0, abs=1e-6)
     assert updates[-1] is final[0]
-    assert len([u for u in updates if not u.is_final]) == 2  # 100/200 ms 两次中间结果
+    assert len([u for u in updates if not u.is_final]) == 2
 
     worker = rec._worker
     assert worker is not None
@@ -306,7 +341,7 @@ async def test_flush_mid_speech_returns_final_and_close_cancels_worker() -> None
 async def test_model_unavailable_surfaces_from_accept_and_flush() -> None:
     runtime = FakeRuntime(error=QwenModelUnavailable("model missing"))
     rec = make_recognizer(runtime)
-    for index in range(5):  # 100 ms → 派发首个任务，线程内加载失败
+    for index in range(5):  # 100 ms → dispatches the first task, which fails to load inside the worker thread
         await rec.accept(make_frame(index, 0.5))
     await settle(rec)
 
@@ -326,13 +361,13 @@ async def test_source_language_overrides_language_and_forces_hint() -> None:
         await settle(rec)
     updates += rec._drain()
 
-    assert runtime.calls[0].language == "zh"  # 强制语言提示进入 job
+    assert runtime.calls[0].language == "zh"
     assert updates and all(u.language == "zh" for u in updates)
     assert updates[0].source_text == "你好世界"
 
 
 async def test_run_transcribe_injection_receives_job_fields() -> None:
-    runtime = FakeRuntime()  # 注入后 runtime 不应被调用
+    runtime = FakeRuntime()
     seen = []
 
     async def fake_run(job):

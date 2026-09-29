@@ -1,4 +1,4 @@
-"""llama.cpp llama-server 进程生命周期：启动、就绪轮询、设备判定与 OpenAI 兼容调用。"""
+"""llama.cpp llama-server process lifecycle: start, readiness polling, device detection, OpenAI-compatible calls."""
 
 from __future__ import annotations
 
@@ -22,23 +22,23 @@ _VRAM_THRESHOLD_BYTES = 400 * 1024 * 1024
 
 
 class LlamaServerError(RuntimeError):
-    """llama-server 启动或调用失败。"""
+    """llama-server failed to start, or to serve a request."""
 
 
 def resolve_llama_dir() -> Path | None:
-    """按 env → 打包态 → 开发态顺序解析 llama.cpp 运行目录。"""
+    """Resolve the llama.cpp runtime directory: env → packaged → dev."""
     env_value = os.environ.get(LLAMA_DIR_ENV, "").strip()
     if env_value:
         return Path(env_value)
     if getattr(sys, "frozen", False):
-        # 打包态 exe 位于 <resources>/engine/，llama 运行时位于 <resources>/llama/
+        # packaged exe sits in <resources>/engine/, the llama runtime in <resources>/llama/
         return Path(sys.executable).resolve().parent.parent / "llama"
     dev_dir = Path(__file__).resolve().parents[3] / "vendor" / "llama"
     return dev_dir if dev_dir.is_dir() else None
 
 
 def default_gguf_path() -> Path:
-    """解析 Hy-MT2 GGUF 默认路径（NOLA_TRANSLATOR_MODEL_DIR 或 LOCALAPPDATA）。"""
+    """Resolve the default Hy-MT2 GGUF path (NOLA_TRANSLATOR_MODEL_DIR or LOCALAPPDATA)."""
     model_root = Path(
         os.environ.get(
             "NOLA_TRANSLATOR_MODEL_DIR",
@@ -49,9 +49,9 @@ def default_gguf_path() -> Path:
 
 
 def _default_health_get(url: str, timeout: float) -> int:
-    """GET /health；连接失败返回 0（尚未就绪），HTTP 错误返回其状态码。"""
+    """GET /health; a failed connection returns 0 (not ready yet), an HTTP error returns its status code."""
     try:
-        with urlopen(url, timeout=timeout) as response:  # noqa: S310 - 仅访问本机回环
+        with urlopen(url, timeout=timeout) as response:  # noqa: S310 - loopback only
             return int(response.status)
     except HTTPError as error:
         return int(error.code)
@@ -60,7 +60,7 @@ def _default_health_get(url: str, timeout: float) -> int:
 
 
 def _post_chat(url: str, payload: object, timeout: float) -> Any:
-    """POST JSON 到本机 llama-server；非 2xx / 网络失败抛 LlamaServerError。"""
+    """POST JSON to the local llama-server; a non-2xx response or network failure raises LlamaServerError."""
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     request = Request(
         url,
@@ -69,7 +69,7 @@ def _post_chat(url: str, payload: object, timeout: float) -> Any:
         headers={"Content-Type": "application/json; charset=UTF-8"},
     )
     try:
-        with urlopen(request, timeout=timeout) as response:  # noqa: S310 - 仅访问本机回环
+        with urlopen(request, timeout=timeout) as response:  # noqa: S310 - loopback only
             raw = response.read()
     except HTTPError as error:
         raise LlamaServerError(f"llama-server 返回 HTTP {error.code}") from error
@@ -82,7 +82,7 @@ def _post_chat(url: str, payload: object, timeout: float) -> Any:
 
 
 def _default_vram_used() -> float | None:
-    """当前已用显存字节数；torch/CUDA 不可用时返回 None。"""
+    """VRAM bytes currently in use; None when torch/CUDA is unavailable."""
     try:
         import torch
 
@@ -95,14 +95,14 @@ def _default_vram_used() -> float | None:
 
 
 def _pick_free_port() -> int:
-    """在 127.0.0.1 上取一个可用端口（绑定后立即释放）。"""
+    """Grab a free port on 127.0.0.1 (bound, then released immediately)."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
         probe.bind((_HOST, 0))
         return int(probe.getsockname()[1])
 
 
 class LlamaServerManager:
-    """llama-server 单实例管理：GPU 优先、失败固定降级 CPU、只绑回环。"""
+    """Single llama-server instance: GPU first, a fixed CPU fallback on failure, loopback only."""
 
     def __init__(
         self,
@@ -114,12 +114,13 @@ class LlamaServerManager:
         vram_delta_fn: Callable[[], float | None] | None = None,
         sleep: Callable[[float], Any] | None = None,
     ) -> None:
-        # 注入点均为测试用途：popen/health_get/vram_delta_fn/sleep
+        # injection points, all for tests: popen/health_get/vram_delta_fn/sleep
         self._llama_dir_explicit = llama_dir
         self._gguf_path_explicit = gguf_path
         self._popen = popen if popen is not None else subprocess.Popen
         self._health_get = health_get if health_get is not None else _default_health_get
-        # 返回“当前已用显存”（None=不可用）；start 在拉起前后各采样一次求增量。
+        # returns "VRAM currently in use" (None = unavailable); start() samples it once
+        # before launch and once after, and takes the difference.
         self._vram_used = vram_delta_fn if vram_delta_fn is not None else _default_vram_used
         self._sleep = sleep if sleep is not None else asyncio.sleep
         self._process: Any | None = None
@@ -135,8 +136,28 @@ class LlamaServerManager:
     def device(self) -> str | None:
         return self._device
 
+    def switch_gguf(self, gguf_path: Path) -> bool:
+        """Switch to another Hy-MT2 quantization; returns whether anything actually changed.
+
+        llama-server cannot hot-swap models, so this clears the ready flag and lets the
+        next start() relaunch with the new GGUF. stop() is async, so this only invalidates
+        synchronously and leaves the process to that same start() rebuild path — the one
+        outside the "already ready, return early" branch.
+        """
+        resolved = Path(gguf_path)
+        if self._gguf_path_explicit is not None and self._gguf_path_explicit == resolved:
+            return False
+        self._gguf_path_explicit = resolved
+        self._ready = False
+        self._device = None
+        self._port = None
+        process, self._process = self._process, None
+        if process is not None:
+            self._terminate(process)
+        return True
+
     async def start(self, *, timeout_s: float = 45.0) -> str:
-        """启动 llama-server 并等待就绪；返回实际设备，失败抛 LlamaServerError。"""
+        """Start llama-server and wait until ready; returns the actual device, raises LlamaServerError on failure."""
         if (
             self._ready
             and self._device is not None
@@ -155,9 +176,10 @@ class LlamaServerManager:
         if not gguf.is_file():
             raise LlamaServerError(f"未找到 GGUF 模型：{gguf}")
         baseline = self._vram_used()
+        cpu_threads = max(1, min(4, (os.cpu_count() or 2) // 2))
         failures: list[str] = []
-        # GPU 优先；失败固定降级 -ngl 0（CPU），超时翻倍，同一 manager 只重试一次。
-        for ngl, attempt_timeout in ((999, timeout_s), (0, timeout_s * 2)):
+        # llama.cpp picks the GPU layer count from the available device and VRAM; a failed start falls back to CPU.
+        for ngl, attempt_timeout in (("auto", timeout_s), (0, timeout_s * 2)):
             port = _pick_free_port()
             args = [
                 str(exe),
@@ -165,6 +187,12 @@ class LlamaServerManager:
                 "--host", _HOST,
                 "--port", str(port),
                 "-ngl", str(ngl),
+                "-c", "1024",
+                "-np", "1",
+                "-b", "128",
+                "-ub", "128",
+                "-t", str(cpu_threads),
+                "-tb", str(cpu_threads),
                 "--jinja",
             ]
             assert args[args.index("--host") + 1] == _HOST, "只能绑定 127.0.0.1"
@@ -188,7 +216,7 @@ class LlamaServerManager:
         raise LlamaServerError(f"llama-server 启动失败（{exe}）：" + "；".join(failures))
 
     async def stop(self) -> None:
-        """终止 llama-server 及其子进程；幂等。"""
+        """Terminate llama-server and its child processes; idempotent."""
         process, self._process = self._process, None
         self._ready = False
         self._device = None
@@ -200,7 +228,7 @@ class LlamaServerManager:
     def chat_sync(
         self, messages: list[dict], *, timeout_s: float = 10.0
     ) -> str:
-        """POST /v1/chat/completions（temperature=0），返回裁剪后的译文文本。"""
+        """POST /v1/chat/completions (temperature=0), returns the stripped translation."""
         port = self._port
         if (
             not self._ready
@@ -221,7 +249,7 @@ class LlamaServerManager:
         return str(content).strip()
 
     async def _wait_ready(self, process: Any, port: int, timeout_s: float) -> bool:
-        """轮询 /health 直到 200；进程退出或超时视为失败。"""
+        """Poll /health until 200; a dead process or a timeout counts as failure."""
         url = f"http://{_HOST}:{port}/health"
         deadline = asyncio.get_running_loop().time() + max(timeout_s, 0.0)
         while True:
@@ -237,19 +265,18 @@ class LlamaServerManager:
                 return False
             await self._sleep(_HEALTH_POLL_INTERVAL_S)
 
-    def _decide_device(self, ngl: int, baseline: float | None) -> str:
-        """ngl=0 → cpu；可测量且增量 < 400MB → cpu（静默回退）；否则 cuda。"""
-        if ngl <= 0:
+    def _decide_device(self, ngl: str | int, baseline: float | None) -> str:
+        """Decide the device from the actual VRAM delta; without CUDA or a measurement, report CPU conservatively."""
+        if ngl == 0:
             return "cpu"
         current = self._vram_used()
         if current is None or baseline is None:
-            # 显存不可测量时信任 -ngl 标志（llama.cpp 缺 cudart 时会静默落 CPU）。
-            return "cuda"
+            return "cpu"
         delta = current - baseline
         return "cuda" if delta >= _VRAM_THRESHOLD_BYTES else "cpu"
 
     def _terminate(self, process: Any) -> None:
-        """终止进程：Windows 下连子进程树一起 taskkill，否则 terminate+wait。"""
+        """Terminate the process: on Windows taskkill the whole child tree, otherwise terminate+wait."""
         pid = getattr(process, "pid", None)
         killed_tree = False
         if os.name == "nt" and isinstance(process, subprocess.Popen) and pid:

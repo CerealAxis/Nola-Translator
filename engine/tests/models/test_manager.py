@@ -1,4 +1,4 @@
-"""ModelManager 下载、校验、原子切换与取消的测试（注入假 fetcher，不联网）。"""
+"""ModelManager download, verification, atomic swap, and cancellation (fake fetcher, no network)."""
 
 from hashlib import sha256
 from pathlib import Path
@@ -20,7 +20,7 @@ from nola_translator_engine.models.manager import (
 
 
 class _Cancelled(RuntimeError):
-    """模拟资源层从 progress 回调抛出的取消异常。"""
+    """Stands in for the cancellation the resource layer raises from a progress callback."""
 
 
 def _entry(path: str, data: bytes) -> FileEntry:
@@ -57,7 +57,7 @@ def _single_file_spec() -> tuple[ModelSpec, dict[str, bytes]]:
 
 
 def _fetcher(payloads: dict[str, bytes]):
-    """按 URL 返回已知字节的假下载器；分两段写入以驱动累计进度。"""
+    """Fake fetcher serving known bytes per URL, written in two chunks to drive cumulative progress."""
 
     def fetch(url: str, destination: Path, progress) -> None:
         data = payloads[url]
@@ -80,7 +80,7 @@ def _leftovers(models_root: Path) -> list[Path]:
     return list(models_root.iterdir())
 
 
-def test_catalog_pins_s4_values() -> None:
+def test_catalog_pins_pinned_values() -> None:
     assert QWEN3_ASR_1_7B_HF.model_id == "qwen3-asr-1.7b-hf"
     assert QWEN3_ASR_1_7B_HF.revision == "bcd2b5b7f32b480ab5790554cfa8347f246a14f3"
     assert len(QWEN3_ASR_1_7B_HF.files) == 9
@@ -112,7 +112,7 @@ def test_catalog_pins_s4_values() -> None:
 
 
 def test_catalog_pins_qwen3_asr_0_6b() -> None:
-    # 必须钉 -hf 仓库：Qwen/Qwen3-ASR-0.6B 的 thinker 布局权重一个都加载不上。
+    # Must pin the -hf repo: the thinker-layout weights in Qwen/Qwen3-ASR-0.6B cannot be loaded at all.
     assert QWEN3_ASR_0_6B_HF.model_id == "qwen3-asr-0.6b-hf"
     assert QWEN3_ASR_0_6B_HF.repo == "Qwen/Qwen3-ASR-0.6B-hf"
     assert QWEN3_ASR_0_6B_HF.revision == "7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c"
@@ -170,14 +170,11 @@ def test_snapshot_install_success(tmp_path: Path) -> None:
     assert manager.is_installed(spec) is True
     for entry in spec.files:
         assert (target / entry.path).read_bytes() == payloads[spec.url_for(entry)]
-    # 进度单调累计并到达 1.0
     currents = [current for current, _ in progress]
     assert currents == sorted(currents)
     assert {total for _, total in progress} == {spec.total_bytes}
     assert progress[-1] == (spec.total_bytes, spec.total_bytes)
-    # 阶段顺序 download → verify → install
     assert phases == ["download", "verify", "install"]
-    # 无临时/暂存残留
     assert [p.name for p in _leftovers(tmp_path / "models")] == ["qwen3-asr-1.7b-hf"]
     assert not any(p.name.endswith(".part") for p in target.rglob("*"))
 
@@ -195,7 +192,7 @@ def test_incomplete_existing_model_is_not_installed(tmp_path: Path) -> None:
 def test_sha256_mismatch_rejected_without_target(tmp_path: Path) -> None:
     spec, payloads = _snapshot_spec()
     victim = spec.files[1]
-    payloads[spec.url_for(victim)] = b"\x00" * victim.size  # 长度正确、内容不同
+    payloads[spec.url_for(victim)] = b"\x00" * victim.size  # Same size, different content: isolates the checksum check from the size check.
     manager = ModelManager(tmp_path / "models", fetcher=_fetcher(payloads))
 
     with pytest.raises(ModelIntegrityError):
@@ -220,10 +217,8 @@ def test_atomic_replace_quarantines_existing_target(tmp_path: Path) -> None:
 
     assert installed == target
     assert manager.is_installed(spec) is True
-    # 旧目标内容被新安装覆盖
     assert not (target / "stale.bin").exists()
     assert (target / "config.json").is_file()
-    # 旧目标移入 .corrupt 隔离，并替换掉先前的隔离内容
     assert (corrupt / "stale.bin").read_bytes() == b"stale"
     assert not (corrupt / "old-marker").exists()
 

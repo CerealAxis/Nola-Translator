@@ -31,15 +31,12 @@ app.whenReady().then(async () => {
   const w = new BrowserWindow({ width:1120, height:820, show:false, webPreferences:{preload:p,contextIsolation:true,sandbox:true} })
   await w.loadFile(resolve('out/renderer/index.html'))
   await settle(w)
-  // 选择目标语言（单选）
   await w.webContents.executeJavaScript(`(()=>{const s=document.querySelector('select[aria-label="目标语言"]');s.value='en';s.dispatchEvent(new Event('change',{bubbles:true}))})()`)
   await settle(w)
   await writeFile(resolve(out,'qa-target-language.png'), (await w.webContents.capturePage()).toPNG())
-  // 翻译页（M2M100 已选）
   await w.webContents.executeJavaScript(`[...document.querySelectorAll('.navigation-item')].find(b=>b.textContent.includes('翻译')).click()`)
   await settle(w)
   await writeFile(resolve(out,'qa-translation-m2m100.png'), (await w.webContents.capturePage()).toPNG())
-  // 资源页
   await w.webContents.executeJavaScript(`[...document.querySelectorAll('.navigation-item')].find(b=>b.textContent.includes('模型与资源')).click()`)
   await settle(w)
   await writeFile(resolve(out,'qa-resources-four.png'), (await w.webContents.capturePage()).toPNG())

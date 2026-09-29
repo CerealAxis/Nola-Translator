@@ -1,4 +1,4 @@
-"""M2M100 418M 本地翻译 Provider：进程内 transformers 推理与 FLORES-101 语言校验。"""
+"""M2M100 418M local translation provider: in-process transformers inference and FLORES-101 language validation."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from .base import ProviderTranslation
 MAX_NEW_TOKENS = 256
 DEVICE_ENV_VAR = "NOLA_TRANSLATOR_M2M100_DEVICE"
 
-# FLORES-101（transformers FAIRSEQ_LANGUAGE_CODES["m2m100"]）；只用于支持性校验，不做提示词。
+# FLORES-101 (transformers FAIRSEQ_LANGUAGE_CODES["m2m100"]); used only to validate support, never to build a prompt.
 FLORES_LANGUAGES = frozenset(
     {
         "af", "am", "ar", "ast", "az", "ba", "be", "bg", "bn", "br", "bs",
@@ -34,7 +34,7 @@ FLORES_LANGUAGES = frozenset(
 
 
 class UnsupportedLanguagePair(ValueError):
-    """M2M100 不支持的语言（对）。"""
+    """A language (pair) M2M100 does not support."""
 
     def __init__(self, source: str, target: str) -> None:
         super().__init__(f"M2M100 不支持的语言：source={source} target={target}")
@@ -43,13 +43,13 @@ class UnsupportedLanguagePair(ValueError):
 
 
 class M2M100ModelUnavailable(RuntimeError):
-    """模型不可用：目录缺失或权重/tokenizer 加载失败。"""
+    """Model unavailable: directory missing, or the weights/tokenizer failed to load."""
 
 
 def _resolve_device(torch: Any) -> str:
-    """默认留在 CPU：识别模型已独占显存，翻译模型不再与之争抢。
+    """Stay on CPU by default: the recognition model already owns VRAM, so the translation model doesn't compete for it.
 
-    需要上显卡时设 NOLA_TRANSLATOR_M2M100_DEVICE=cuda；无 CUDA 时自动退回 CPU。
+    Set NOLA_TRANSLATOR_M2M100_DEVICE=cuda to put it on the GPU; without CUDA it falls back to CPU.
     """
     requested = os.environ.get(DEVICE_ENV_VAR, "").strip().lower()
     if requested in ("cuda", "gpu") and torch.cuda.is_available():
@@ -58,7 +58,7 @@ def _resolve_device(torch: Any) -> str:
 
 
 def _normalize_language_code(code: str) -> str | None:
-    """协议码（含 zh-CN 之类的地区后缀）→ FLORES-101 码；未知返回 None。"""
+    """Protocol code (including region suffixes like zh-CN) → FLORES-101 code; None when unknown."""
     raw = code.strip().casefold()
     if not raw:
         return None
@@ -69,12 +69,12 @@ def _normalize_language_code(code: str) -> str | None:
 
 
 def is_supported(code: str) -> bool:
-    """语言码是否在 FLORES-101 内（含地区后缀别名）。"""
+    """Whether a language code is in FLORES-101 (region-suffix aliases included)."""
     return _normalize_language_code(code) is not None
 
 
 def validate_session_languages(source: str | None, targets: list[str]) -> list[str]:
-    """会话启动前校验：返回不支持的语言码；source 为 None/'auto' 时跳过源语言检查。"""
+    """Pre-session check returning the unsupported codes; a source of None/'auto' skips the source check."""
     unsupported: list[str] = []
     if source is not None and source.strip().casefold() != "auto":
         if _normalize_language_code(source) is None:
@@ -92,7 +92,7 @@ class _Bundle:
 
 
 class M2M100Runtime:
-    """M2M100 进程内运行时：一次加载、tokenizer 状态串行化、单次推理入口。"""
+    """In-process M2M100 runtime: load once, serialize access to the stateful tokenizer, single-flight inference."""
 
     def __init__(self, model_dir: Path) -> None:
         self.model_dir = Path(model_dir)
@@ -106,7 +106,7 @@ class M2M100Runtime:
         return self._loaded
 
     def load(self) -> None:
-        """线程安全的一次性加载；失败抛 M2M100ModelUnavailable。"""
+        """Thread-safe one-shot load; failure raises M2M100ModelUnavailable."""
         with self._lock:
             if self._loaded:
                 return
@@ -120,7 +120,7 @@ class M2M100Runtime:
             self._loaded = True
 
     def unload(self) -> None:
-        """等待翻译线程完成后释放模型，不保留到下一次会话。"""
+        """Wait for translation threads, then release the model instead of keeping it for the next session."""
         with self._inference_lock:
             with self._lock:
                 bundle = self._bundle
@@ -133,7 +133,7 @@ class M2M100Runtime:
                 torch.cuda.empty_cache()
 
     def _load_bundle(self) -> _Bundle:
-        """实际 from_pretrained 块，独立成方法便于测试打桩。"""
+        """The real from_pretrained block, split into its own method so tests can stub it."""
         import torch
         from transformers import AutoTokenizer, M2M100ForConditionalGeneration
 
@@ -148,7 +148,9 @@ class M2M100Runtime:
         return _Bundle(model=model, tokenizer=tokenizer)
 
     def translate_sync(self, text: str, source: str, target: str) -> str:
-        """单条翻译；tokenizer 的源语言前缀是有状态的，取用期间持锁。"""
+        """Translate one string; the tokenizer's source-language prefix is stateful, so it
+        is held under lock while in use.
+        """
         with self._inference_lock:
             return self._translate_locked(text, source, target)
 
@@ -177,7 +179,7 @@ _runtimes_lock = threading.Lock()
 
 
 def get_m2m100_runtime(model_dir: Path) -> M2M100Runtime:
-    """按 resolved model_dir 缓存的进程级单例（会话期间只加载一次）。"""
+    """Process-wide singleton cached by resolved model_dir, so weights load once per session."""
     resolved = Path(model_dir).resolve()
     key = os.path.normcase(str(resolved))
     with _runtimes_lock:
@@ -189,7 +191,7 @@ def get_m2m100_runtime(model_dir: Path) -> M2M100Runtime:
 
 
 class M2M100TranslationProvider:
-    """基于 transformers 的 M2M100 本地翻译 Provider。"""
+    """Local M2M100 translation provider built on transformers."""
 
     name = "m2m100"
 

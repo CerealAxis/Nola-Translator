@@ -1,4 +1,4 @@
-"""PortAudio callback 与异步识别管线之间的容量受限队列。"""
+"""The capacity-bounded queue between the PortAudio callback and the async recognition pipeline."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ class RawAudioChunk:
 
 
 class RawAudioQueue:
-    """callback 仅复制字节并使用非阻塞队列；满载时淘汰最旧块。"""
+    """The callback only copies bytes through a non-blocking queue; a full queue evicts the oldest chunk."""
 
     def __init__(self, capacity: int = 100) -> None:
         if capacity <= 0:
@@ -65,11 +65,11 @@ class PortAudioStream(Protocol):
 
 
 class AudioDeviceDisconnectedError(RuntimeError):
-    """活动流因设备断开而停止。"""
+    """The active stream stopped because the device disconnected."""
 
 
 class PortAudioCapture:
-    """采集一个已解析的 WASAPI 设备，并异步产生标准 AudioFrame。"""
+    """Capture one resolved WASAPI device and produce standard AudioFrames asynchronously."""
 
     def __init__(
         self,
@@ -123,7 +123,8 @@ class PortAudioCapture:
         self.stream.start_stream()
 
     async def frames(self) -> AsyncIterator[AudioFrame]:
-        # 静默期回看窗口：只有满一个帧长才补零帧，避免为亚帧抖动分配数组。
+        # silence lookback window: pad with zero frames only once a full frame length has
+        # elapsed, so sub-frame jitter doesn't allocate arrays.
         last_seen_ms = monotonic() * 1000
         while self.running or not self.queue.empty():
             try:
@@ -132,8 +133,9 @@ class PortAudioCapture:
                 if self.running and self.stream is not None and self.stream.is_active():
                     gap = monotonic() * 1000 - last_seen_ms
                     if gap >= FRAME_DURATION_MS:
-                        # loopback 在无播放时不推数据：补零帧让音量门能看到静音，
-                        # 否则段落永远收不了尾，final 与翻译都不会触发。
+                        # loopback pushes nothing while nothing is playing, so pad zero frames
+                        # to hand the volume gate the silence — without it segments never close,
+                        # and neither the final nor its translation ever fires.
                         for frame in self.normalizer.silence(gap):
                             yield frame
                         last_seen_ms = monotonic() * 1000

@@ -1,8 +1,9 @@
-"""通用流式字幕调度：累计分块识别、单飞合并与过期结果丢弃。
+"""Streaming caption scheduler: cumulative block recognition, single-flight merging, stale-result dropping.
 
-调度本身与具体 ASR 模型无关：每个分块都重转写**整段**已累计音频，由
-``prefix_builder`` 决定是否额外给模型续写提示——自回归模型（Qwen3-ASR）用它做
-前缀回退，非自回归模型（SenseVoice）不给，于是每个分块都是一次独立整段转写。
+The scheduler itself is model-agnostic. Every block re-transcribes the *whole* accumulated
+audio, and ``prefix_builder`` decides whether the model also gets a continuation hint —
+autoregressive models (Qwen3-ASR) use it for prefix rollback, non-autoregressive ones
+(SenseVoice) don't, so each block is a standalone whole-segment transcription.
 """
 
 from __future__ import annotations
@@ -50,16 +51,18 @@ class _SegmentState:
 
 
 class StreamingRecognizer:
-    """音量门断句 + 累计分块转写。
+    """Volume-gated segmentation plus cumulative block transcription.
 
-    推理全部在一个后台 asyncio worker 中执行：FINAL 优先于 INTERMEDIATE，同段
-    INTERMEDIATE 按 segment_id 合并为最新快照；在飞的中间结果即使已定段也先显示，
-    过期结果在最终结果完成后丢弃，
-    ``accept()`` 只入队与收取结果，从不等待推理。
+    All inference runs on one background asyncio worker: FINAL outranks INTERMEDIATE,
+    and INTERMEDIATE jobs for a segment collapse to the newest snapshot per segment_id.
+    An in-flight intermediate is shown even when the segment has already been closed;
+    stale results are dropped once the final one has landed. ``accept()`` only enqueues
+    and collects — it never blocks waiting on inference.
 
-    模型在首个 job 的线程中惰性加载；``ModelUnavailable`` 等加载失败没有协议错误
-    通道，会从 ``accept()``/``flush()`` 直接抛出，由 runtime.py 映射为
-    ``modelUnavailable`` 错误事件。
+    The model loads lazily on the first job's thread. Load failures such as
+    ``ModelUnavailable`` have no protocol error channel, so they propagate straight out
+    of ``accept()``/``flush()``, where runtime.py maps them to a ``modelUnavailable``
+    error event.
     """
 
     def __init__(
@@ -69,6 +72,7 @@ class StreamingRecognizer:
         source_language: str | None = None,
         segmenter: VolumeGateSegmenter | None = None,
         block_ms: int = 2000,
+        first_block_ms: int | None = None,
         prefix_builder: Callable[[str], str | None] | None = None,
         prefix_after_blocks: int = 0,
         run_transcribe: Callable[[_Job], Awaitable[tuple[str, str | None]]] | None = None,
@@ -77,6 +81,7 @@ class StreamingRecognizer:
         self.runtime = runtime
         self.segmenter = segmenter if segmenter is not None else VolumeGateSegmenter()
         self.block_ms = block_ms
+        self.first_block_ms = first_block_ms if first_block_ms is not None else block_ms
         self._prefix_builder = prefix_builder
         self._prefix_after_blocks = prefix_after_blocks
         self._forced_language = (
@@ -97,7 +102,7 @@ class StreamingRecognizer:
         self._pending_error: Exception | None = None
 
     async def accept(self, frame: AudioFrame) -> list[RecognitionUpdate]:
-        """喂入一帧；只入队推理任务并收取已完成结果，绝不阻塞等待推理。"""
+        """Feed one frame: enqueue inference jobs and collect finished results, never blocking on inference."""
         if self._pending_error is not None:
             raise self._pending_error
 
@@ -108,7 +113,7 @@ class StreamingRecognizer:
         bounds = self.segmenter.current_bounds()
         if bounds is None:
             if self._current is not None:
-                # 段被 MIN_VOICED 规则丢弃：不产生任何 job
+                # the MIN_VOICED rule dropped this segment, so it produces no job at all
                 self._drop_current()
         else:
             state = (
@@ -116,15 +121,18 @@ class StreamingRecognizer:
                 if self._current is not None
                 else self._new_state(bounds[0])
             )
-            # 只在真正需要发起推理时拼接音频；分块时钟使用音频时钟。
-            if bounds[1] - state.last_dispatch_end_ms >= self.block_ms:
+            # audio is concatenated only when an inference job is actually due; the block clock is the audio clock.
+            interval_ms = self.first_block_ms if state.blocks_dispatched == 0 else self.block_ms
+            if bounds[1] - state.last_dispatch_end_ms >= interval_ms:
                 snapshot = self.segmenter.current_segment()
                 if snapshot is not None:
                     self._dispatch_intermediate(state, snapshot)
         return self._drain()
 
     async def flush(self, ended_at_ms: float) -> list[RecognitionUpdate]:
-        """强制结束当前段、执行尾音识别并等待 worker 排空，返回未投递的结果。"""
+        """Force the current segment closed, transcribe its tail, wait for the worker to
+        drain, and return undelivered results.
+        """
         if self._pending_error is not None:
             raise self._pending_error
 
@@ -144,7 +152,7 @@ class StreamingRecognizer:
         return self._drain()
 
     async def close(self) -> None:
-        """取消后台 worker 并清空全部状态。"""
+        """Cancel the background worker and clear all state."""
         task = self._worker
         self._worker = None
         if task is not None:
@@ -155,8 +163,6 @@ class StreamingRecognizer:
         self._pending_finals.clear()
         self._pending_intermediates.clear()
         self._ready.clear()
-
-    # ------------------------------------------------------------------ 内部
 
     def _new_state(self, started_at_ms: float) -> _SegmentState:
         state = _SegmentState(
@@ -265,7 +271,7 @@ class StreamingRecognizer:
         try:
             text, language = await self._run(job)
         except Exception as error:
-            # 协议无错误通道：暂存后由 accept()/flush() 抛出（含 ModelUnavailable）
+            # the protocol has no error channel: stash it for accept()/flush() to raise (includes ModelUnavailable)
             self._pending_error = error
             return
 
@@ -282,7 +288,7 @@ class StreamingRecognizer:
             self._states.pop(job.segment_id, None)
         else:
             if state.final_done or job.generation <= state.emitted_generation:
-                # 仍在推理中的中间结果，即使随后静音定段，也先给用户显示。
+                # an intermediate already in flight is still shown, even if silence then closed the segment.
                 return
             update = self._emit(state, text, language, is_final=False, ended_at_ms=None)
             if update is not None:
@@ -316,7 +322,7 @@ class StreamingRecognizer:
             state.last_completed_text = clean
             state.last_nonempty_text = clean
         elif is_final and state.last_nonempty_text:
-            # 段已有文本时，空 final 携带最后文本以便字幕收尾
+            # when the segment already has text, an empty final carries the last text so the caption can close cleanly
             clean = state.last_nonempty_text
         else:
             return None
@@ -334,7 +340,7 @@ class StreamingRecognizer:
     async def _run(self, job: _Job) -> tuple[str, str | None]:
         if self._run_transcribe is not None:
             return await self._run_transcribe(job)
-        # 首个 job 在线程中触发 runtime.load()（惰性加载）
+        # the first job triggers runtime.load() on this thread (lazy load)
         return await asyncio.to_thread(
             self.runtime.transcribe,
             job.samples,

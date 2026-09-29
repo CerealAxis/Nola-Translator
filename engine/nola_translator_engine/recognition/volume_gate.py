@@ -1,4 +1,6 @@
-"""音量门限断句器：以 RMS 能量、自适应噪声基线与静音迟滞切分语音段，不依赖第三方 VAD 模型。"""
+"""Volume-gate segmenter: splits speech on RMS energy, an adaptive noise baseline, and
+silence hysteresis, with no third-party VAD model.
+"""
 
 from __future__ import annotations
 
@@ -34,7 +36,9 @@ class _Frame:
 
 
 class VolumeGateSegmenter:
-    """按 20 ms 帧能量开合门限：约 200 ms 前置、600 ms 静音断句、30 s 强切、丢弃过短语音。"""
+    """Gate opens and closes on 20 ms frame energy: ~200 ms pre-roll, 600 ms of silence ends
+    a segment, 30 s force-splits, and anything under MIN_VOICED_MS is dropped.
+    """
 
     PRE_ROLL_MS = 200
     SILENCE_END_MS = 600
@@ -46,8 +50,9 @@ class VolumeGateSegmenter:
     MARGIN_ON_DB = 12.0
     HYSTERESIS_DB = 6.0
     INITIAL_NOISE_FLOOR_DB = -60.0
-    # 噪声基线 EMA：floor += α·(db − floor)；更安静时 α=0.25 快速下探、更响时
-    # α=0.02 缓慢回升，避免瞬时响声抬高阈值后漏掉真正的语音。
+    # noise floor EMA: floor += α·(db − floor). α=0.25 drops fast when the level is
+    # quieter, α=0.02 climbs slowly when it's louder, so a transient bang can't raise
+    # the threshold high enough to miss the speech after it.
     NOISE_ALPHA_FAST = 0.25
     NOISE_ALPHA_SLOW = 0.02
     DB_FLOOR = -120.0
@@ -141,7 +146,7 @@ class VolumeGateSegmenter:
             np.concatenate([f.samples for f in self._active]),
         )
         self._clear_active()
-        # 已输出的尾音不能再进入下一段的前置窗，否则会被重复识别。
+        # the trailing audio we just emitted must not re-enter the next segment's pre-roll, or it is recognized twice.
         self._pre_roll.clear()
         self._pre_roll_count = 0
         return [segment]
@@ -157,7 +162,7 @@ class VolumeGateSegmenter:
         )
 
     def current_bounds(self) -> tuple[float, float] | None:
-        """读取活动段时间范围，避免每帧复制整段音频。"""
+        """Read the active segment's time bounds without copying its audio every frame."""
         if not self._active:
             return None
         last = self._active[-1]
@@ -239,7 +244,7 @@ class VolumeGateSegmenter:
             self._silence_samples += frame.samples.size
         if right:
             self._active_start_ms = right[0].start_ms
-            # 前置窗只能保留边界之后的音频，避免下一段与刚输出的段重叠。
+            # the pre-roll keeps only audio after the boundary, so the next segment can't overlap the one just emitted.
             self._pre_roll = deque(right)
             self._pre_roll_count = self._active_samples
         else:

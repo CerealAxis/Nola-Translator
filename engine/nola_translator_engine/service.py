@@ -1,4 +1,4 @@
-"""引擎服务的轻量会话编排；识别与翻译能力在后续模块中接入。"""
+"""Lightweight session orchestration for the engine service; recognition and translation plug in from later modules."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ from .protocol import (
 
 
 class EngineService:
-    """处理已经通过协议校验的命令，并返回零个或多个事件。"""
+    """Handle a command that already passed protocol validation, returning zero or more events."""
 
     def __init__(
         self,

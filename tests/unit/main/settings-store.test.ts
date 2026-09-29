@@ -97,6 +97,10 @@ describe('设置存储', () => {
       const customized = await new SettingsStore(path).load()
       expect(customized.overlay.backgroundColor).toBe('#202020')
       expect(customized.overlay.translationColor).toBe('#123456')
+
+      await writeFile(path, JSON.stringify({ version: 1, overlay: { translationColor: '#BFC2C8' } }), 'utf8')
+      const priorDefault = await new SettingsStore(path).load()
+      expect(priorDefault.overlay.translationColor).toBe(DEFAULT_SETTINGS.overlay.translationColor)
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
@@ -139,6 +143,7 @@ describe('设置存储', () => {
       expect(defaults.recognition.modelId).toBe('qwen3-asr-1.7b-hf')
       expect(defaults.recognition.sourceLanguage).toBe('auto')
       expect(defaults.translation.provider).toBe('hymt2')
+      expect(defaults.translation.hymt2ModelId).toBe('hy-mt2-1.8b-q3-k-m')
       expect(defaults.translation.targetLanguage).toBe('zh')
       expect(defaults.translation.translateIntermediate).toBe(false)
     } finally {
@@ -178,7 +183,7 @@ describe('设置存储', () => {
       expect(read.recognition.sourceLanguage).toBe('auto')
       expect(read.translation.targetLanguage).toBe('zh')
 
-      // 旧档存的是曾经多选用的数组：取第一个仍在白名单里的值
+      // Old files hold an array from when target languages were multi-select: take the first entry still in the allowlist.
       for (const [stored, expected] of [
         [['fr', 'en'], 'fr'],
         [['xx', 'fr'], 'fr'],
@@ -189,11 +194,31 @@ describe('设置存储', () => {
         expect((await new SettingsStore(path).load()).translation.targetLanguage).toBe(expected)
       }
 
-      // 写档：非法码被拦下，不落盘
       const store = new SettingsStore(path)
       const written = await store.update({ translation: { targetLanguage: 'klingon' } })
       expect(written.translation.targetLanguage).toBe('zh')
       expect(JSON.parse(await readFile(path, 'utf8')).translation.targetLanguage).toBe('zh')
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('Hy-MT2 量化档位写入后可重载，非法值回落默认档', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
+    const path = join(directory, 'settings.json')
+    try {
+      const store = new SettingsStore(path)
+      await store.update({ translation: { hymt2ModelId: 'hy-mt2-1.8b-iq2-m' } })
+      expect((await new SettingsStore(path).load()).translation.hymt2ModelId).toBe('hy-mt2-1.8b-iq2-m')
+
+      for (const bad of ['hy-mt2-1.8b-1.25bit', '', null]) {
+        const written = await store.update({ translation: { hymt2ModelId: bad as never } })
+        expect(written.translation.hymt2ModelId).toBe('hy-mt2-1.8b-q3-k-m')
+        expect(JSON.parse(await readFile(path, 'utf8')).translation.hymt2ModelId).toBe('hy-mt2-1.8b-q3-k-m')
+      }
+
+      await writeFile(path, JSON.stringify({ version: 1, translation: { provider: 'hymt2' } }), 'utf8')
+      expect((await new SettingsStore(path).load()).translation.hymt2ModelId).toBe('hy-mt2-1.8b-q3-k-m')
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

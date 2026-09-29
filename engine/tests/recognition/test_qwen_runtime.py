@@ -1,4 +1,4 @@
-"""QwenRuntime 单元测试：全部使用打桩加载器，不触碰 GPU 与模型文件。"""
+"""QwenRuntime unit tests, entirely on stubbed loaders: no GPU and no model files."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ class FakeTokenizer:
 
 
 class FragileTokenizer(FakeTokenizer):
-    """模拟回退点切碎多字节字符：恰好 2 个 token 时解码带 U+FFFD。"""
+    """Decodes with U+FFFD at exactly 2 tokens, mimicking a rollback point that splits a multibyte character."""
 
     def decode(self, ids) -> str:
         joined = super().decode(ids)
@@ -125,9 +125,6 @@ def make_pipeline(processor=None, model=None):
     )
 
 
-# ---------------------------------------------------------------------- 加载
-
-
 def test_load_defaults_to_nf4_and_second_load_is_noop(monkeypatch) -> None:
     pipeline = make_pipeline()
     calls = patch_loader(monkeypatch, lambda quant: pipeline)
@@ -188,7 +185,7 @@ def test_checkpoint_layout_mismatch_fails_without_quant_retry(monkeypatch) -> No
     with pytest.raises(QwenModelUnavailable) as excinfo:
         runtime.load()
 
-    # 布局不匹配与量化无关：换 8bit 只会再浪费一次加载。
+    # A layout mismatch is unrelated to quantization; retrying at 8bit only wastes a second load.
     assert calls == ["nf4"]
     assert "708" in str(excinfo.value)
     assert isinstance(excinfo.value.__cause__, CheckpointLayoutMismatch)
@@ -222,11 +219,8 @@ def test_singleton_keyed_by_resolved_dir(tmp_path: Path) -> None:
     other = get_qwen_runtime(tmp_path / "other")
 
     assert first is again
-    assert first is case_variant  # Windows 路径大小写不敏感
+    assert first is case_variant  # Windows paths are case-insensitive.
     assert other is not first
-
-
-# ------------------------------------------------------------------ 回退文本
 
 
 def test_rollback_text_drops_last_tokens_like_official(monkeypatch) -> None:
@@ -248,11 +242,8 @@ def test_rollback_text_retries_when_cut_breaks_multibyte_char(monkeypatch) -> No
     runtime = QwenRuntime(Path("models/qwen"))
     runtime.load()
 
-    # 1-token 回退先落在 2-token（带 U+FFFD）上，再多退 1 个 token
+    # A 1-token rollback lands on the 2-token (U+FFFD) case first, then drops one more token.
     assert runtime.rollback_text("a b c", 1) == "a"
-
-
-# ------------------------------------------------------------------ 转写解析
 
 
 def test_transcribe_builds_official_prompt_and_parses_tensor_output(monkeypatch) -> None:
@@ -264,12 +255,12 @@ def test_transcribe_builds_official_prompt_and_parses_tensor_output(monkeypatch)
     text, language = runtime.transcribe(np.zeros(1600, dtype=np.float32))
 
     assert (text, language) == ("你好世界", "zh")
-    # 官方消息骨架：空 system + 单条 audio user
+    # Official skeleton: an empty system turn plus a single audio user turn.
     assert processor.last_messages == [
         {"role": "system", "content": ""},
         {"role": "user", "content": [{"type": "audio", "audio": ""}]},
     ]
-    # S4 陷阱 1：输入必须固定 bfloat16，而不是 model.dtype
+    # Inputs must stay bfloat16 rather than model.dtype.
     assert processor.batch.to_calls == [("cpu", torch.bfloat16)]
     assert model.generate_calls == 1
     assert processor.last_text[0] == "PROMPT|"
@@ -285,7 +276,7 @@ def test_transcribe_handles_sequences_object_and_prefix_concat(monkeypatch) -> N
         np.zeros(1600, dtype=np.float32), prefix="hello"
     )
 
-    # 官方语义：解析对象是 prefix + 新生成的累计原文
+    # Official semantics: the parsed text is the prefix plus the full cumulative generation.
     assert text == "hello, world"
     assert language is None
     assert processor.parse_inputs == ["hello, world"]
@@ -301,7 +292,7 @@ def test_transcribe_forces_language_hint_after_generation_prompt(monkeypatch) ->
         np.zeros(1600, dtype=np.float32), prefix="继续", language="zh"
     )
 
-    # 官方顺序：chat template → language 提示 → 前缀
+    # Official order: chat template, then the language hint, then the prefix.
     assert processor.last_text[0] == "PROMPT|language Chinese<asr_text>继续"
     assert (text, language) == ("继续早安", "zh")
 

@@ -11,7 +11,7 @@ import {
 } from '@fluentui/react-icons'
 
 import type { EngineEvent, ResourceRecord, ResourceSnapshot } from '../../shared/contracts'
-import { DEFAULT_SETTINGS, type RecognitionModelId } from '../../shared/settings'
+import { DEFAULT_SETTINGS, HYMT2_MODEL_IDS, type Hymt2ModelId, type RecognitionModelId } from '../../shared/settings'
 import { ModelStorageSettings } from '../components/ModelStorageSettings'
 
 const phaseLabels: Record<NonNullable<ResourceRecord['phase']>, string> = {
@@ -90,6 +90,7 @@ export function ResourcesPage(): React.JSX.Element {
   const { t } = useI18n()
   const [snapshot, setSnapshot] = useState<ResourceSnapshot>({ storagePath: '正在读取…', resources: [] })
   const [selectedModelId, setSelectedModelId] = useState<RecognitionModelId>(DEFAULT_SETTINGS.recognition.modelId)
+  const [selectedHymt2Id, setSelectedHymt2Id] = useState<Hymt2ModelId>(DEFAULT_SETTINGS.translation.hymt2ModelId)
   const [notice, setNotice] = useState('')
   const [noticeValues, setNoticeValues] = useState<TranslationValues>({})
   const [loading, setLoading] = useState(true)
@@ -103,6 +104,7 @@ export function ResourcesPage(): React.JSX.Element {
       const [nextSnapshot, settings] = await Promise.all([api.listResources(), api.getSettings()])
       setSnapshot(nextSnapshot)
       setSelectedModelId(settings.recognition.modelId)
+      setSelectedHymt2Id(settings.translation.hymt2ModelId)
       setNotice('资源状态已刷新。')
     } catch {
       setNotice('无法读取资源状态')
@@ -131,7 +133,10 @@ export function ResourcesPage(): React.JSX.Element {
         setNotice(event.resource.installed ? '{name} 已安装。' : '{name} 已删除。')
       }
     })
-    const unsubscribeSettings = api.onSettingsChanged((settings) => setSelectedModelId(settings.recognition.modelId))
+    const unsubscribeSettings = api.onSettingsChanged((settings) => {
+      setSelectedModelId(settings.recognition.modelId)
+      setSelectedHymt2Id(settings.translation.hymt2ModelId)
+    })
     return () => {
       unsubscribeEngine()
       unsubscribeSettings()
@@ -155,6 +160,8 @@ export function ResourcesPage(): React.JSX.Element {
     }
   }
 
+  const isHymt2 = (resourceId: string): boolean => (HYMT2_MODEL_IDS as readonly string[]).includes(resourceId)
+
   const selectModel = async (resource: ResourceRecord): Promise<void> => {
     if (!api || !resource.installed || resource.state !== 'idle') return
     try {
@@ -164,6 +171,20 @@ export function ResourcesPage(): React.JSX.Element {
       setNotice('{name} 已设为字幕默认识别模型。')
     } catch {
       setNotice('无法保存识别模型选择')
+    }
+  }
+
+  const selectHymt2 = async (resource: ResourceRecord): Promise<void> => {
+    if (!api || !resource.installed || resource.state !== 'idle') return
+    try {
+      const settings = await api.updateSettings({
+        translation: { provider: 'hymt2', hymt2ModelId: resource.resourceId as Hymt2ModelId },
+      })
+      setSelectedHymt2Id(settings.translation.hymt2ModelId)
+      setNoticeValues({ name: resource.name })
+      setNotice('{name} 已设为字幕默认翻译模型。')
+    } catch {
+      setNotice('无法保存翻译模型选择')
     }
   }
 
@@ -205,7 +226,7 @@ export function ResourcesPage(): React.JSX.Element {
       </section>
 
       <section className="resource-section" aria-labelledby="translation-resources">
-        <div className="section-heading-row"><h2 id="translation-resources">{t("本地翻译模型")}</h2><span className="badge">{translation.filter((item) => item.installed).length}{t(" 已安装")}</span></div>
+        <div className="section-heading-row"><h2 id="translation-resources">{t("本地翻译模型")}</h2><span className="badge">{selectedHymt2Id ? `${resourceName(translation.find((item) => item.resourceId === selectedHymt2Id)?.name ?? '未选择')}${t(" · 当前")}` : `${translation.filter((item) => item.installed).length}${t(" 已安装")}`}</span></div>
         <div className="resource-grid">
           {translation.map((resource) => (
             <article className="surface resource-card" key={resource.resourceId}>
@@ -215,6 +236,9 @@ export function ResourcesPage(): React.JSX.Element {
                 <ResourceStatus resource={resource} />
               </div>
               <div className="resource-card-actions">
+                {isHymt2(resource.resourceId) && selectedHymt2Id !== resource.resourceId && (
+                  <button className="button secondary-button compact-button" disabled={!resource.installed || resource.state !== 'idle'} onClick={() => void selectHymt2(resource)} type="button">{t('选择此模型')}</button>
+                )}
                 <ResourceAction resource={resource} onAction={(item, action) => void act(item, action)} />
               </div>
               <ResourceProgress resource={resource} />

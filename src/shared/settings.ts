@@ -38,8 +38,15 @@ export type RecognitionSettings = {
   sourceLanguage: string
 }
 
+export type TranslationProvider = 'hymt2' | 'm2m100' | 'microsoft' | 'openai' | 'ollama'
+
+/** The three local Hy-MT2 quantization tiers; only meaningful when provider=hymt2. */
+export type Hymt2ModelId = 'hy-mt2-1.8b-q4-k-m' | 'hy-mt2-1.8b-q3-k-m' | 'hy-mt2-1.8b-iq2-m'
+
 export type TranslationSettings = {
-  provider: 'hymt2' | 'm2m100' | 'microsoft' | 'openai' | 'ollama'
+  provider: TranslationProvider
+  /** Ignored unless provider=hymt2. */
+  hymt2ModelId: Hymt2ModelId
   microsoftEndpoint: string
   microsoftRegion: string
   openaiEndpoint: string
@@ -66,10 +73,19 @@ export const RECOGNITION_MODEL_LABELS: Record<RecognitionModelId, string> = {
 
 export const TRANSLATION_PROVIDERS: readonly TranslationSettings['provider'][] = ['hymt2', 'm2m100', 'microsoft', 'openai', 'ollama']
 
-/** 源语言下拉项：`auto` 表示交给模型自判。与引擎 resources.py 的 languages 清单保持一致。 */
+/** The three Hy-MT2 tiers, ordered largest to smallest, matching the engine's resources.py definitions. */
+export const HYMT2_MODEL_IDS: readonly Hymt2ModelId[] = ['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m']
+
+export const HYMT2_MODEL_LABELS: Record<Hymt2ModelId, string> = {
+  'hy-mt2-1.8b-q4-k-m': 'Q4_K_M · 1.13 GB · 质量基准',
+  'hy-mt2-1.8b-q3-k-m': 'Q3_K_M · 951 MB · 专名最稳',
+  'hy-mt2-1.8b-iq2-m': 'UD-IQ2_M · 723 MB · 体积最小',
+}
+
+/** Source language dropdown entries; `auto` leaves detection to the model. Kept in sync with the engine's resources.py language list. */
 export const SOURCE_LANGUAGE_OPTIONS = ['auto', 'zh', 'yue', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'pt', 'it', 'ru', 'ar', 'th', 'vi', 'tr', 'id'] as const
 
-/** 目标语言下拉项。应用每次只传一种，引擎协议本身仍接受列表。 */
+/** Target language dropdown entries. The app passes exactly one; the engine protocol still accepts a list. */
 export const TARGET_LANGUAGE_OPTIONS = ['zh', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'ru', 'pt', 'it', 'tr', 'ar', 'th', 'vi', 'ms', 'id'] as const
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -93,7 +109,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     translationFontSize: 16,
     translationFontWeight: 400,
     sourceColor: '#F7F7F7',
-    translationColor: '#BFC2C8',
+    translationColor: '#D7DEE8',
     backgroundColor: '#0D0E10',
     backgroundOpacity: 0.96,
     maxLines: 2,
@@ -105,6 +121,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   translation: {
     provider: 'hymt2',
+    hymt2ModelId: 'hy-mt2-1.8b-q3-k-m',
     microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com',
     microsoftRegion: '',
     openaiEndpoint: 'https://api.openai.com/v1',

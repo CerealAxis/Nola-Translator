@@ -1,4 +1,4 @@
-"""llama_server 单元测试：全部使用假 llama-server，另有一个真实本机 HTTP 服务器覆盖 JSON 路径。"""
+"""llama_server unit tests: all against a fake llama-server, plus one real local HTTP server covering the JSON path."""
 
 from __future__ import annotations
 
@@ -109,8 +109,12 @@ async def test_start_gpu_becomes_ready_with_cuda_device(tmp_path) -> None:
     assert len(popen.calls) == 1
     args = popen.calls[0]["args"]
     assert args[args.index("--host") + 1] == "127.0.0.1"
-    assert args[args.index("-ngl") + 1] == "999"
+    assert args[args.index("-ngl") + 1] == "auto"
     assert "--jinja" in args
+    assert args[args.index("-c") + 1] == "1024"
+    assert args[args.index("-np") + 1] == "1"
+    assert args[args.index("-b") + 1] == "128"
+    assert 1 <= int(args[args.index("-t") + 1]) <= 4
     assert popen.calls[0]["kwargs"]["cwd"] == str(llama_dir)
     assert health_log and all(url.startswith("http://127.0.0.1:") for url in health_log)
     assert sleeps == [0.25, 0.25]
@@ -120,7 +124,7 @@ async def test_gpu_early_exit_retries_with_cpu(tmp_path) -> None:
     processes: list[FakeProcess] = []
 
     def factory(_args):
-        process = FakeProcess(alive=bool(processes))  # 第一次已退出，重试后存活
+        process = FakeProcess(alive=bool(processes))  # The first process is already dead; the retry stays alive.
         processes.append(process)
         return process
 
@@ -155,7 +159,7 @@ async def test_gpu_health_timeout_then_cpu_failure_raises(tmp_path) -> None:
         await manager.start(timeout_s=0)
 
     message = str(info.value)
-    assert "ngl=999" in message and "ngl=0" in message
+    assert "ngl=auto" in message and "ngl=0" in message
     assert len(popen.calls) == 2
     assert all(process.terminated for process in processes)
     assert manager.ready is False and manager.device is None
@@ -176,6 +180,16 @@ async def test_silent_cpu_fallback_reports_cpu_device(tmp_path) -> None:
     assert device == "cpu"
     assert manager.ready is True
     assert len(popen.calls) == 1
+
+
+async def test_auto_layers_work_without_cuda(tmp_path) -> None:
+    popen = FakePopen()
+    manager, _llama_dir, _sleeps = make_manager(
+        tmp_path, popen, health=scripted_health([200]), vram=lambda: None
+    )
+
+    assert await manager.start(timeout_s=5) == "cpu"
+    assert popen.calls[0]["args"][popen.calls[0]["args"].index("-ngl") + 1] == "auto"
 
 
 async def test_start_is_idempotent(tmp_path) -> None:

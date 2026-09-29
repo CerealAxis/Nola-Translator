@@ -103,7 +103,6 @@ button { color: inherit; }
 
 .language-control { position: relative; -webkit-app-region: no-drag; }
 .language-button { -webkit-app-region: no-drag; }
-/* 标题栏内不加底色，悬停/展开时才显示反馈。 */
 .button.language-button { padding: 4px 8px; border-color: transparent; background: transparent; }
 .button.language-button:hover, .button.language-button[aria-expanded="true"] { background: var(--control); }
 .language-menu {
@@ -297,7 +296,7 @@ input[type="checkbox"] { accent-color: var(--accent); }
 .caption-source, .caption-translation { overflow-wrap: anywhere; white-space: pre-wrap; text-wrap: wrap; }
 .caption-source { margin-bottom: 3px; color: var(--preview-source-color, #f7f7f7); font-size: var(--preview-font-size, 17px); font-weight: var(--preview-font-weight, 500); line-height: var(--preview-line-height, 1.24); max-height: calc(var(--preview-max-lines, 2) * 1lh); overflow: hidden; }
 .caption-translation { margin-bottom: 0; color: var(--preview-translation-color, #bfc2c8); font-size: var(--preview-translation-font-size, 16px); font-weight: var(--preview-translation-font-weight, 400); line-height: var(--preview-translation-line-height, 1.28); max-height: calc(var(--preview-translation-max-lines, 2) * 1lh); overflow: hidden; }
-/* 译文失败要和正常译文区分开，否则用户看到的永远是一片空白。 */
+/* A failed translation must not read as an empty line, hence the error color. */
 .caption-translation-failed { color: #c42b1c; }
 
 .choice-grid, .diagnostic-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
@@ -509,12 +508,12 @@ html[data-overlay="true"], html[data-overlay="true"] body, html[data-overlay="tr
 .session-loading > span:last-child { color: var(--text-secondary); }
 .caption-console[data-transparent-background="true"] { background: transparent; border-color: transparent; box-shadow: none; }
 .caption-console[data-locked="false"] { -webkit-app-region: drag; }
-.caption-console-stage { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; min-height: 0; padding: 14px 22px 4px; overflow: hidden; }
-.caption-console-stage[data-source-only="true"] { justify-content: center; }
+.caption-console-stage { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px; flex: 1; min-height: 0; padding: 4px 22px; overflow: hidden; }
+.caption-console-translations { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .overlay-track { position: relative; flex: 0 1 auto; min-width: 0; min-height: 0; overflow: hidden; }
-.overlay-track-text { margin: 0; white-space: nowrap; overflow: hidden; text-align: left; }
-.overlay-source { color: var(--overlay-source-color, #f7f7f7); font-size: var(--overlay-font-size, 17px); font-weight: var(--overlay-font-weight, 500); line-height: var(--overlay-line-height, 1.24); max-height: calc(var(--overlay-max-lines, 2) * 1lh); }
-.overlay-translation { color: var(--overlay-translation-color, #bfc2c8); font-size: var(--overlay-translation-font-size, 16px); font-weight: var(--overlay-translation-font-weight, 400); line-height: var(--overlay-translation-line-height, 1.28); max-height: calc(var(--overlay-translation-max-lines, 2) * 1lh); }
+.overlay-track-text { margin: 0; white-space: pre-line; overflow-wrap: anywhere; overflow: hidden; text-align: left; max-height: calc(var(--overlay-visible-lines, 1) * 1lh); }
+.overlay-source { color: var(--overlay-source-color, #f7f7f7); font-size: var(--overlay-font-size, 17px); font-weight: var(--overlay-font-weight, 500); line-height: var(--overlay-line-height, 1.24); }
+.overlay-translation { color: var(--overlay-translation-color, #d7dee8); font-size: var(--overlay-translation-font-size, 16px); font-weight: var(--overlay-translation-font-weight, 400); line-height: var(--overlay-translation-line-height, 1.28); }
 .overlay-track-in { animation: caption-track-in 280ms cubic-bezier(.2,.7,.2,1) both; }
 .overlay-track-out { position: absolute; inset: 0 0 auto; width: 100%; pointer-events: none; animation: caption-track-out 280ms cubic-bezier(.2,.7,.2,1) both; }
 @keyframes caption-track-in { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
@@ -542,7 +541,6 @@ button.caption-control-pill[data-active="false"] { color: #8e9299; background: #
 .caption-console[data-color-scheme="light"] { border-color: #c8cbd0; color: #26282b; }
 .caption-console[data-color-scheme="light"] .caption-console-actions button, .caption-console[data-color-scheme="light"] .caption-control-pill, .caption-console[data-color-scheme="light"] .caption-mic { background: #e0e2e5; color: #33363b; }
 
-/* Layout follows available content width, including either sidebar state. */
 .page-heading, .card-heading-row, .section-heading-row, .session-footer { flex-wrap: wrap; }
 .page-heading > div, .card-heading-row > div, .section-heading-row > div,
 .form-grid > *, .settings-surface, .subtitle-typography-group, select,
@@ -564,8 +562,6 @@ button.caption-control-pill[data-active="false"] { color: #8e9299; background: #
   .storage-summary, .resource-shortcut { grid-template-columns: auto minmax(0, 1fr); }
   .storage-size, .resource-shortcut .button { grid-column: 2; justify-items: start; }
 }
-/* Each paragraph is limited by physical text lines and scrolled to its newest words. */
-/* 引擎数据目录与模型下载位置是相邻卡片，留出与其他卡片一致的间距。 */
 .model-storage-settings { padding: 20px; margin-top: 16px; margin-bottom: 24px; }
 .model-storage-settings p { margin-bottom: 10px; }
 .overlay-resize-grip { position: absolute; right: 0; bottom: 0; width: 20px; height: 20px; cursor: nwse-resize; -webkit-app-region: no-drag; opacity: .15; }

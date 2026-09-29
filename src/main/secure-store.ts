@@ -10,9 +10,10 @@ export type EncryptionAdapter = {
 type StoredSecrets = Record<string, string>
 
 /**
- * 密文存在但解不开：safeStorage 的密钥绑定在应用身份与系统账号上，换电脑、
- * 换 Windows 用户、改 productName 或 Electron 版本升级都可能让旧密文失效。
- * 密钥无法找回，只能让用户重新输入一次。
+ * The ciphertext is there but no longer decrypts: safeStorage binds its key to
+ * the app identity and the OS account, so a new machine, a different Windows
+ * user, a renamed productName, or an Electron upgrade can all invalidate it.
+ * The key is unrecoverable, so the secret has to be entered again.
  */
 export class StaleCredentialError extends Error {
   constructor(public readonly provider: string) {
@@ -28,7 +29,7 @@ export class SecureCredentialStore {
     try {
       return Boolean(await this.get(key))
     } catch {
-      // 解不开的密钥在 get() 里已被剔除；对调用方来说它就是不存在。
+      // get() drops every key it cannot decrypt, so to the caller it is simply absent.
       return false
     }
   }
@@ -41,7 +42,7 @@ export class SecureCredentialStore {
     try {
       return this.encryption.decryptString(Buffer.from(stored, 'base64'))
     } catch {
-      // 留着这条密文只会让每次启动会话都失败；清掉后下次按「未保存」处理。
+      // Keeping the ciphertext would fail every later session start; dropping it makes the next read treat the key as unset.
       await this.remove(key)
       throw new StaleCredentialError(key)
     }

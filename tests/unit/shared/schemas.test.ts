@@ -58,16 +58,36 @@ describe('JSONL 协议校验', () => {
     }))).toMatchObject({ type: 'resourceChanged', resource: { progress: 0.5 } })
   })
 
-  it('校验本地翻译模型资源记录的枚举', () => {
-    expect(parseEventLine(JSON.stringify({
+  it('校验本地翻译模型资源记录的枚举', () => {    expect(parseEventLine(JSON.stringify({
       protocolVersion: 1, type: 'resourceChanged', requestId: 'resource-2',
       resource: {
-        resourceId: 'hy-mt2-1.8b-q4-k-m', kind: 'translationModel', provider: 'hy-mt2',
+        resourceId: 'hy-mt2-1.8b-q4-k-m', kind: 'translationModel', provider: 'hymt2',
         name: 'Hy-MT2 1.8B Q4_K_M', description: '本地翻译模型', languages: ['zh', 'en'],
         installed: true, installedBytes: 1130000000,
         state: 'idle', cancellable: false
       }
-    }))).toMatchObject({ type: 'resourceChanged', resource: { kind: 'translationModel', provider: 'hy-mt2' } })
+    }))).toMatchObject({ type: 'resourceChanged', resource: { kind: 'translationModel', provider: 'hymt2' } })
+  })
+
+  it('接受三档 Hy-MT2 量化并拒绝未知档位', () => {
+    for (const id of ['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m']) {
+      expect(parseCommandLine(JSON.stringify({
+        protocolVersion: 1, type: 'startSession', requestId: `start-${id}`,
+        config: {
+          audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime',
+          sourceLanguage: 'auto', targetLanguages: ['en'],
+          translationProvider: 'hymt2', translationModelId: id,
+        }
+      }))).toMatchObject({ type: 'startSession', config: { translationModelId: id } })
+    }
+    expect(() => parseCommandLine(JSON.stringify({
+      protocolVersion: 1, type: 'startSession', requestId: 'start-bad',
+      config: {
+        audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime',
+        sourceLanguage: 'auto', targetLanguages: ['en'],
+        translationProvider: 'hymt2', translationModelId: 'hy-mt2-1.8b-1.25bit',
+      }
+    }))).toThrow()
   })
 
   it('接受 SenseVoiceSmall 作为识别模型并拒绝已移除的 argos 翻译提供方', () => {

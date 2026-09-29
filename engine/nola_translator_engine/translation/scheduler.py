@@ -1,4 +1,4 @@
-"""多目标翻译、revision 失效、超时和会话级 LRU 缓存。"""
+"""Multi-target translation, revision invalidation, timeouts, and a session-scoped LRU cache."""
 
 from __future__ import annotations
 

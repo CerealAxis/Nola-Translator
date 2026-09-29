@@ -1,4 +1,4 @@
-"""m2m100 provider 单元测试：假 runtime 捕获语言对，覆盖 FLORES-101 校验与运行时装载。"""
+"""m2m100 provider unit tests: a fake runtime captures the language pair, covering FLORES-101 validation and runtime loading."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def test_flores_table_matches_transformers_language_codes() -> None:
     from transformers.models.m2m_100.tokenization_m2m_100 import FAIRSEQ_LANGUAGE_CODES
 
     assert set(m2m100_module.FLORES_LANGUAGES) == set(FAIRSEQ_LANGUAGE_CODES["m2m100"])
-    # 粤语与藏语只在识别侧支持，翻译侧没有对应 FLORES 码。
+    # Cantonese and Tibetan are recognition-only; FLORES has no code for them.
     assert "yue" not in m2m100_module.FLORES_LANGUAGES
     assert "bo" not in m2m100_module.FLORES_LANGUAGES
 
@@ -116,7 +116,7 @@ def test_get_runtime_is_cached_per_directory(tmp_path: Path) -> None:
 
 
 def test_device_defaults_to_cpu_and_honours_opt_in(monkeypatch) -> None:
-    """识别模型已独占显存；翻译模型默认不上显卡，除非显式要求。"""
+    """The recognition model already owns the GPU, so translation stays on CPU unless asked otherwise."""
     fake_torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True))
     monkeypatch.delenv(m2m100_module.DEVICE_ENV_VAR, raising=False)
     assert m2m100_module._resolve_device(fake_torch) == "cpu"

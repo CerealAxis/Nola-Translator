@@ -25,6 +25,7 @@ export const sessionConfigSchema = z
     targetLanguages: z.array(z.string().min(1).max(32)).max(8),
     allowIntermediateTranslation: z.boolean().optional(),
     translationProvider: z.enum(['hymt2', 'm2m100', 'microsoft', 'openai', 'ollama']).optional(),
+    translationModelId: z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m']).optional(),
     translationOptions: z.object({
       endpoint: z.string().min(1).max(2048).optional(),
       apiKey: z.string().max(4096).optional(),
@@ -101,7 +102,7 @@ const resourceSchema = z
   .object({
     resourceId: z.string().min(1).max(256),
     kind: z.enum(['recognitionModel', 'translationModel']),
-    provider: z.enum(['qwen3-asr', 'sensevoice', 'hy-mt2', 'm2m100']),
+    provider: z.enum(['qwen3-asr', 'sensevoice', 'hymt2', 'm2m100']),
     name: z.string().min(1).max(256),
     description: z.string().min(1).max(1024),
     languages: z.array(z.string().min(1).max(32)).max(16),

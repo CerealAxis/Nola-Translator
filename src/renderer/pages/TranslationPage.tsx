@@ -2,7 +2,7 @@ import { useI18n } from '../i18n'
 import { useEffect, useState } from 'react'
 import { ArrowDownloadRegular, ShieldCheckmarkRegular } from '@fluentui/react-icons'
 
-import { DEFAULT_SETTINGS, type TranslationSettings } from '../../shared/settings'
+import { DEFAULT_SETTINGS, HYMT2_MODEL_IDS, HYMT2_MODEL_LABELS, type TranslationSettings } from '../../shared/settings'
 
 type TranslationPageProps = { onOpenResources: () => void }
 
@@ -52,6 +52,8 @@ export function TranslationPage({ onOpenResources }: TranslationPageProps): Reac
           <h2>{t("翻译后端")}</h2>
           <label><span>Provider</span><select aria-label={t("翻译后端")} value={settings.provider} onChange={(event) => void update({ provider: event.target.value as TranslationSettings['provider'] })}><option value="hymt2">{t("Hy-MT2 · 本地")}</option><option value="m2m100">{t("M2M100 418M · 本地")}</option><option value="microsoft">Microsoft Translator</option><option value="openai">{t("OpenAI 兼容接口")}</option><option value="ollama">{t("Ollama · 本地")}</option></select></label>
           {settings.provider === 'hymt2' && <p>{t("Hy-MT2 在本机 llama.cpp 上运行；先在“模型与资源”页面安装翻译模型。")}</p>}
+          {settings.provider === 'hymt2' && <label><span>{t("Hy-MT2 量化档位")}</span><select aria-label={t("Hy-MT2 量化档位")} value={settings.hymt2ModelId} onChange={(event) => void update({ hymt2ModelId: event.target.value as TranslationSettings['hymt2ModelId'] })}>{HYMT2_MODEL_IDS.map((id) => <option key={id} value={id}>{t(HYMT2_MODEL_LABELS[id])}</option>)}</select></label>}
+          {settings.provider === 'hymt2' && <p>{t("三档速度接近；Q3_K_M 兼顾体积与专名准确，UD-IQ2_M 最小但专名可能退化。")}</p>}
           {settings.provider === 'm2m100' && <p>{t("M2M100 418M 由 transformers 在本机运行；先在“模型与资源”页面安装翻译模型。")}</p>}
           <label className="setting-toggle-row"><span><strong>{t("翻译中间结果")}</strong><small>{t("开启后，变化中的中间字幕也会限频翻译；默认只翻译最终字幕。")}</small></span><input aria-label={t("翻译中间结果")} checked={settings.translateIntermediate} onChange={(event) => void update({ translateIntermediate: event.target.checked })} type="checkbox" /></label>
           {settings.provider === 'microsoft' && <><label><span>{t("服务地址")}</span><input className="text-input" value={settings.microsoftEndpoint} onChange={(event) => setSettings({ ...settings, microsoftEndpoint: event.target.value })} onBlur={() => void update({ microsoftEndpoint: settings.microsoftEndpoint })} /></label><label><span>{t("资源区域（全局资源可留空）")}</span><input className="text-input" value={settings.microsoftRegion} onChange={(event) => setSettings({ ...settings, microsoftRegion: event.target.value })} onBlur={() => void update({ microsoftRegion: settings.microsoftRegion })} /></label></>}

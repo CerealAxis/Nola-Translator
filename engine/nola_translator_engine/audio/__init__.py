@@ -1,1 +1,1 @@
-"""Windows 音频设备、采集和标准化。子模块按需加载，避免拖慢引擎握手。"""
+"""Windows audio devices, capture, and normalization. Submodules load on demand to keep the engine handshake fast."""

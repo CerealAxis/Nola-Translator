@@ -1,4 +1,4 @@
-"""ResourceManager 目录、安装流程与旧资源清理的测试（注入假 fetcher，不联网）。"""
+"""ResourceManager directory layout, install flow, and legacy cleanup (fake fetcher, no network)."""
 
 import asyncio
 from hashlib import sha256
@@ -12,6 +12,8 @@ from nola_translator_engine.models.manager import FileEntry, ModelSpec
 from nola_translator_engine.protocol import ResourceRecord
 from nola_translator_engine.resources import (
     HYMT2_RESOURCE_ID,
+    HYMT2_Q3_RESOURCE_ID,
+    HYMT2_IQ2_RESOURCE_ID,
     M2M100_RESOURCE_ID,
     QWEN_06B_RESOURCE_ID,
     QWEN_RESOURCE_ID,
@@ -94,6 +96,8 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
         QWEN_06B_RESOURCE_ID,
         SENSEVOICE_RESOURCE_ID,
         HYMT2_RESOURCE_ID,
+        HYMT2_Q3_RESOURCE_ID,
+        HYMT2_IQ2_RESOURCE_ID,
         M2M100_RESOURCE_ID,
     ]
     assert QWEN_RESOURCE_ID == "qwen3-asr-1.7b-hf"
@@ -102,7 +106,7 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     assert HYMT2_RESOURCE_ID == "hy-mt2-1.8b-q4-k-m"
     assert M2M100_RESOURCE_ID == "m2m100-418m"
 
-    qwen, qwen_small, sensevoice, hymt2, m2m100 = records
+    qwen, qwen_small, sensevoice, hymt2, hymt2_q3, hymt2_iq2, m2m100 = records
     assert qwen.kind == "recognitionModel"
     assert qwen.provider == "qwen3-asr"
     assert qwen.name == "Qwen3-ASR 1.7B · 本地流式识别"
@@ -125,11 +129,19 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     assert sensevoice.installed is False
 
     assert hymt2.kind == "translationModel"
-    assert hymt2.provider == "hy-mt2"
-    assert hymt2.name == "Hy-MT2 1.8B · 本地翻译模型"
+    assert hymt2.provider == "hymt2"
+    assert hymt2.name == "Hy-MT2 1.8B Q4_K_M · 本地翻译模型"
     assert hymt2.downloadBytes == 1_133_080_448
     assert 0 < len(hymt2.languages) <= 16
     assert hymt2.installed is False
+
+    assert hymt2_q3.resourceId == HYMT2_Q3_RESOURCE_ID
+    assert hymt2_q3.provider == "hymt2"
+    assert hymt2_q3.downloadBytes == 951_022_560
+
+    assert hymt2_iq2.resourceId == HYMT2_IQ2_RESOURCE_ID
+    assert hymt2_iq2.provider == "hymt2"
+    assert hymt2_iq2.downloadBytes == 722_666_176
 
     assert m2m100.kind == "translationModel"
     assert m2m100.provider == "m2m100"
@@ -145,7 +157,7 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
 async def test_install_m2m100_leaves_xdg_dirs_untouched(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """M2M100 不是 Hy-MT2：安装它不得触发 Argos 时代的 XDG 清理。"""
+    """M2M100 is not Hy-MT2, so installing it must not trigger the Argos-era XDG cleanup."""
     spec, payloads = _tiny_m2m100()
     monkeypatch.setattr(resources_module, "M2M100_418M", spec)
 
@@ -184,7 +196,6 @@ async def test_install_qwen_phases_progress_and_cleanup(
     (model_root / ".sherpa-zh-en-small.part").write_bytes(b"part")
     (model_root / ".sensevoice-small.part").write_bytes(b"part")
     (model_root / ".faster-whisper-small.corrupt").mkdir()
-    # 必须保留的无关目录
     (model_root / "user-own-model").mkdir()
     (model_root / "ollama").mkdir()
     xdg_data = tmp_path / "xdg-data"
@@ -220,13 +231,11 @@ async def test_install_qwen_phases_progress_and_cleanup(
     assert progresses == sorted(progresses)
     assert progresses[-1] == 1.0
 
-    # S2.6：qwen 安装成功 → 旧 ASR 目录与残留消失
     for name in legacy_dirs:
         assert not (model_root / name).exists()
     assert not (model_root / ".sherpa-zh-en-small.part").exists()
     assert not (model_root / ".sensevoice-small.part").exists()
     assert not (model_root / ".faster-whisper-small.corrupt").exists()
-    # 无关目录与 XDG 目录不受影响
     assert (model_root / "user-own-model").is_dir()
     assert (model_root / "ollama").is_dir()
     assert xdg_data.exists()
@@ -238,7 +247,7 @@ async def test_failed_install_skips_cleanup(
     spec, payloads = _tiny_qwen()
     victim = spec.files[0]
     original = payloads[spec.url_for(victim)]
-    payloads[spec.url_for(victim)] = b"X" * victim.size  # 长度正确、摘要不符
+    payloads[spec.url_for(victim)] = b"X" * victim.size  # Same size, different digest: isolates the checksum check from the size check.
     monkeypatch.setattr(resources_module, "QWEN3_ASR_1_7B_HF", spec)
 
     model_root = tmp_path / "models"
@@ -256,10 +265,9 @@ async def test_failed_install_skips_cleanup(
     record = manager.record(QWEN_RESOURCE_ID)
     assert record.state == "failed"
     assert record.errorCode == "integrityCheckFailed"
-    assert legacy.exists()  # 安装失败不触发清理
+    assert legacy.exists()
     assert manager.is_installed(QWEN_RESOURCE_ID) is False
 
-    # 修复数据后重试可成功，成功才触发清理
     payloads[spec.url_for(victim)] = original
     retry = await manager.manage(QWEN_RESOURCE_ID, "install")
     assert retry.state == "running"
@@ -296,11 +304,9 @@ async def test_install_hymt2_cleans_xdg_dirs_only(
     await manager.tasks[HYMT2_RESOURCE_ID]
 
     assert manager.is_installed(HYMT2_RESOURCE_ID) is True
-    assert manager.hymt2_gguf_path.is_file()
-    # XDG 三个目录按精确路径删除
+    assert manager.hymt2_gguf_path().is_file()
     for path in xdg_paths:
         assert not path.exists()
-    # 其余目录（旧 ASR、用户目录、Ollama）不受影响
     assert legacy.is_dir()
     assert (model_root / "user-own-model").is_dir()
     assert (model_root / "ollama").is_dir()
@@ -333,7 +339,6 @@ async def test_busy_and_cancel_guards(
     manager = ResourceManager(model_root, emitted.append)
     manager.models.fetcher = slow_fetch
 
-    # 未运行任何操作时取消 → 资源不可取消
     with pytest.raises(ResourceActionError) as excinfo:
         await manager.manage(QWEN_RESOURCE_ID, "cancel")
     assert excinfo.value.code == "resourceBusy"
@@ -342,7 +347,6 @@ async def test_busy_and_cancel_guards(
     await manager.manage(QWEN_RESOURCE_ID, "install")
     assert await asyncio.to_thread(started.wait, 10)
 
-    # 安装进行中重复发起 → busy
     with pytest.raises(ResourceActionError) as excinfo:
         await manager.manage(QWEN_RESOURCE_ID, "install")
     assert excinfo.value.code == "resourceBusy"
@@ -352,7 +356,6 @@ async def test_busy_and_cancel_guards(
     release.set()
     await manager.tasks[QWEN_RESOURCE_ID]
 
-    # 取消后：无目标、无临时残留、操作表清空、可再次安装
     assert manager.is_installed(QWEN_RESOURCE_ID) is False
     assert QWEN_RESOURCE_ID not in manager.operations
     assert not model_root.exists() or not any(model_root.iterdir())

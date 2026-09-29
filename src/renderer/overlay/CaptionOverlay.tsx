@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react'
 import {
   ChevronDownRegular, DesktopRegular, DismissRegular, LockClosedRegular, LockOpenRegular, MicRegular,
   MoreHorizontalRegular, PinRegular, SubtractRegular,
@@ -10,6 +10,7 @@ import { EMPTY_CAPTION, receiveCaption } from '../components/caption-state'
 import { translationErrorLabel } from '../components/translation-status'
 import { useI18n } from '../i18n'
 import { CaptionTrack, type TrackLine } from './CaptionTrack'
+import { allocateCaptionLines } from './line-budget'
 
 export function CaptionOverlay(): React.JSX.Element {
   const { t } = useI18n()
@@ -18,7 +19,9 @@ export function CaptionOverlay(): React.JSX.Element {
   const [active, setActive] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [notice, setNotice] = useState('')
-  const [overlayWidth, setOverlayWidth] = useState(() => window.innerWidth)
+  const [overlaySize, setOverlaySize] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }))
+  const [stageTextHeight, setStageTextHeight] = useState(() => Math.max(0, window.innerHeight - 52))
+  const stageRef = useRef<HTMLDivElement | null>(null)
   const resizeStart = useRef<{ x: number; y: number; width: number; height: number } | null>(null)
   const expandedHeight = useRef(118)
 
@@ -37,10 +40,18 @@ export function CaptionOverlay(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    const onResize = (): void => setOverlayWidth(window.innerWidth)
+    const onResize = (): void => setOverlaySize({ width: window.innerWidth, height: window.innerHeight })
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+
+  useLayoutEffect(() => {
+    const stage = stageRef.current
+    if (!stage || stage.clientHeight <= 0) return
+    const style = window.getComputedStyle(stage)
+    const padding = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom)
+    setStageTextHeight(Math.max(0, stage.clientHeight - padding - 2))
+  }, [overlaySize.height])
 
   const caption = current.caption
   const sourceLine: TrackLine | null = caption?.sourceText
@@ -51,13 +62,19 @@ export function CaptionOverlay(): React.JSX.Element {
     const line = item.state === 'complete' && item.text
       ? { key: caption!.segmentId, text: item.text }
       : item.state === 'failed'
-        // 失败不能和「还在翻译」一样静默，否则看不出是密钥、网络还是模型没就绪。
+        // A failed translation must not go silent like a pending one, or the user cannot tell a bad key from a missing model.
         ? { key: caption!.segmentId, text: translationErrorLabel(t, item) }
         : null
     return { language: item.targetLanguage, line }
   })
-  const sourceOnly = settings.overlay.showSource && (!settings.overlay.showTranslation || translationTracks.length === 0)
-  const lineWidth = Math.max(160, overlayWidth - 50)
+  const lineWidth = Math.max(160, overlaySize.width - 50)
+  const lineBudgets = allocateCaptionLines(stageTextHeight, lineWidth, [
+    { text: settings.overlay.showSource ? sourceLine?.text ?? null : null, fontSize: settings.overlay.fontSize,
+      lineHeight: settings.overlay.lineHeight, maxLines: settings.overlay.maxLines },
+    ...translationTracks.map(({ line }) => ({ text: settings.overlay.showTranslation ? line?.text ?? null : null,
+      fontSize: settings.overlay.translationFontSize, lineHeight: settings.overlay.translationLineHeight,
+      maxLines: settings.overlay.translationMaxLines })),
+  ])
 
   const updateOverlay = async (overlay: Partial<OverlaySettings>): Promise<void> => {
     try {
@@ -98,10 +115,10 @@ export function CaptionOverlay(): React.JSX.Element {
         '--overlay-translation-max-lines': settings.overlay.translationMaxLines,
         fontFamily: settings.overlay.fontFamily,
       } as React.CSSProperties}>
-      <div className="caption-console-stage" data-source-only={sourceOnly}>
-        {!collapsed && settings.overlay.showSource && <CaptionTrack key={`source-${current.sessionId}`} kind="source" segmentId={caption?.segmentId ?? null} line={sourceLine} maxWidth={lineWidth} fontSize={settings.overlay.fontSize} />}
-        {!collapsed && settings.overlay.showTranslation && translationTracks.map(({ language, line }) =>
-          <CaptionTrack key={`${current.sessionId}-${language}`} kind="translation" segmentId={caption?.segmentId ?? null} line={line} maxWidth={lineWidth} fontSize={settings.overlay.translationFontSize} />)}
+      <div className="caption-console-stage" ref={stageRef}>
+        {!collapsed && settings.overlay.showSource && <CaptionTrack key={`source-${current.sessionId}`} kind="source" segmentId={caption?.segmentId ?? null} line={sourceLine} maxWidth={lineWidth} fontSize={settings.overlay.fontSize} maxLines={Math.max(1, lineBudgets[0])} />}
+        {!collapsed && settings.overlay.showTranslation && <div className="caption-console-translations">{translationTracks.map(({ language, line }, index) =>
+          <CaptionTrack key={`${current.sessionId}-${language}`} kind="translation" segmentId={caption?.segmentId ?? null} line={line} maxWidth={lineWidth} fontSize={settings.overlay.translationFontSize} maxLines={Math.max(1, lineBudgets[index + 1])} />)}</div>}
       </div>
 
       <div className="caption-console-actions" aria-label={t('字幕浮层控制')}>

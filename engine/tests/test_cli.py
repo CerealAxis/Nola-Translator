@@ -11,7 +11,7 @@ from nola_translator_engine.protocol import MAX_PROTOCOL_LINE_BYTES
 
 
 def _read_line(stream, timeout: float = 15.0) -> str:
-    """带超时读一行；协议事件写错流时测试要失败，而不是无限挂死。"""
+    """Reads a line with a timeout, so a protocol event written to the wrong stream fails the test instead of hanging forever."""
     result: queue.Queue[str] = queue.Queue()
     threading.Thread(target=lambda: result.put(stream.readline()), daemon=True).start()
     try:
@@ -30,10 +30,11 @@ def _send(process: subprocess.Popen[str], message: dict[str, object]) -> dict[st
 
 
 def test_third_party_stdout_noise_never_reaches_protocol_channel() -> None:
-    """funasr 的 check_for_update 在判断 disable 之前就会 print 版本号。
+    """funasr's check_for_update prints its version before the disable flag is even consulted.
 
-    stdout 是 JSONL 协议通道，客户端遇到非 JSON 行会判定协议损坏并杀掉引擎。
-    这里锁住「噪声改走 stderr、协议事件留在原 stdout」这条不变式。
+    stdout is the JSONL protocol channel, and a non-JSON line there makes the client
+    treat the engine as protocol-corrupt and kill it. This pins the invariant that
+    third-party noise goes to stderr while protocol events stay on stdout.
     """
     protocol_out = io.StringIO()
     log_out = io.StringIO()
@@ -42,7 +43,7 @@ def test_third_party_stdout_noise_never_reaches_protocol_channel() -> None:
         assert saved is protocol_out
         assert sys.stdout is log_out
 
-        print("funasr version: 1.4.16.")  # 第三方噪声
+        print("funasr version: 1.4.16.")
         print('{"protocolVersion":1,"type":"ready"}', file=saved, flush=True)
 
     assert log_out.getvalue() == "funasr version: 1.4.16.\n"

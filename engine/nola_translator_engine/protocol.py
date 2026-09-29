@@ -1,4 +1,4 @@
-"""Electron 与本地引擎之间的版本化 JSONL 协议。"""
+"""The versioned JSONL protocol between Electron and the local engine."""
 
 from __future__ import annotations
 
@@ -48,6 +48,7 @@ class SessionConfig(ProtocolModel):
     targetLanguages: list[str] = Field(max_length=8)
     allowIntermediateTranslation: bool = False
     translationProvider: Literal["hymt2", "m2m100", "microsoft", "openai", "ollama"] = "hymt2"
+    translationModelId: str | None = Field(default=None, min_length=1, max_length=256)
     translationOptions: TranslationOptions | None = None
 
 
@@ -162,7 +163,7 @@ class ModelProgressEvent(Envelope):
 class ResourceRecord(ProtocolModel):
     resourceId: str = Field(min_length=1, max_length=256)
     kind: Literal["recognitionModel", "translationModel"]
-    provider: Literal["qwen3-asr", "sensevoice", "hy-mt2", "m2m100"]
+    provider: Literal["qwen3-asr", "sensevoice", "hymt2", "m2m100"]
     name: str = Field(min_length=1, max_length=256)
     description: str = Field(min_length=1, max_length=1024)
     languages: list[str] = Field(max_length=16)

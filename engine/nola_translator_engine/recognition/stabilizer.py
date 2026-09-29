@@ -1,4 +1,4 @@
-"""字幕 revision、最终句规范化和相邻重复抑制。"""
+"""Caption revisions, final-sentence normalization, and adjacent-duplicate suppression."""
 
 from __future__ import annotations
 
@@ -120,7 +120,9 @@ class RecognitionStabilizer:
 
 
 class FinalTranscriptDeduplicator:
-    """抑制设备重连后时间重叠且文本高度相似的相邻 final。"""
+    """Suppress adjacent finals that overlap in time and read almost identically, as
+    happens after a device reconnect.
+    """
 
     def __init__(self, similarity_threshold: float = 0.9) -> None:
         self.similarity_threshold = similarity_threshold

@@ -1,4 +1,4 @@
-"""SenseVoiceRuntime 单元测试：标签解析、语言回落与 funasr 加载桩。"""
+"""SenseVoiceRuntime unit tests: tag parsing, language fallback, and a stubbed funasr loader."""
 
 from __future__ import annotations
 
@@ -61,9 +61,6 @@ def audio(seconds: float = 0.5) -> np.ndarray:
     return np.zeros(int(16_000 * seconds), dtype=np.float32)
 
 
-# ------------------------------------------------------------------ 标签解析
-
-
 def test_parse_text_splits_language_tag_from_body() -> None:
     assert _parse_text("<|zh|><|NEUTRAL|><|Speech|><|withitn|>开饭时间早上9点至下午5点。") == (
         "开饭时间早上9点至下午5点。",
@@ -95,9 +92,6 @@ def test_parse_text_rejects_language_outside_model_vocabulary() -> None:
     )
 
 
-# ------------------------------------------------------------------ 语言回落
-
-
 def test_unsupported_source_language_falls_back_to_auto(monkeypatch) -> None:
     fake = FakeAutoModel(texts=["<|en|><|NEUTRAL|><|Speech|><|withitn|>bonjour"])
     install_fake(monkeypatch, fake)
@@ -121,9 +115,6 @@ def test_supported_source_language_is_forwarded_verbatim(monkeypatch) -> None:
 
 def test_model_vocabulary_matches_documented_languages() -> None:
     assert SUPPORTED_LANGUAGES == {"zh", "en", "yue", "ja", "ko"}
-
-
-# ------------------------------------------------------------------ 推理入口
 
 
 def test_transcribe_ignores_prefix_and_passes_whole_segment(monkeypatch) -> None:
@@ -160,9 +151,6 @@ def test_missing_result_list_yields_empty_text(monkeypatch) -> None:
     runtime = SenseVoiceRuntime("C:/models/sensevoice-small")
 
     assert runtime.transcribe(audio()) == ("", None)
-
-
-# ------------------------------------------------------------------ 加载与单例
 
 
 def test_load_is_idempotent_and_reuses_one_model(monkeypatch) -> None:

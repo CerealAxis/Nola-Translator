@@ -1,9 +1,9 @@
-"""SenseVoiceSmall 识别运行时：funasr 本地目录加载、标签解析与协议语言码映射。
+"""SenseVoiceSmall runtime: funasr local-directory load, tag parsing, protocol language-code mapping.
 
-模型是非自回归的：每次 ``transcribe`` 都对传入音频整段重转写，不接受续写前缀，
-因此 ``prefix`` 在这里被忽略。输出形如
-``<|zh|><|NEUTRAL|><|Speech|><|withitn|>开饭时间早上9点至下午5点。``，
-开头的标签串依次是语言、情感、音频事件、ITN 开关。
+The model is non-autoregressive: every ``transcribe`` re-transcribes the whole audio it is
+given and takes no continuation prefix, so ``prefix`` is ignored here. Output looks like
+``<|zh|><|NEUTRAL|><|Speech|><|withitn|>...`` — the leading tag run is language, emotion,
+audio event, ITN flag, in that order.
 """
 
 from __future__ import annotations
@@ -22,25 +22,27 @@ from numpy.typing import NDArray
 from .base import ModelUnavailable
 
 SAMPLE_RATE = 16_000
-# 单次转写的动态批量时长上限（秒）；与官方 demo 一致。
+# Per-transcribe dynamic-batch duration cap in seconds, matching the official demo.
 BATCH_SIZE_S = 60
 
-# 模型 lid_dict 覆盖的五种语言；其余协议语言码一律回落 auto 由模型自行判定。
+# The five languages the model's lid_dict covers; every other protocol code falls back to
+# auto and is decided by the model.
 SUPPORTED_LANGUAGES = frozenset({"zh", "en", "yue", "ja", "ko"})
 
 _TAG_PREFIX = re.compile(r"^(?:<\|[^|]*\|>)+")
 _TAG = re.compile(r"<\|([^|]*)\|>")
 
-# 语音活动检测由引擎自己的音量门负责，这里不引入 funasr 的 fsmn-vad 额外模型。
-# disable_update 关闭 funasr 启动时的版本检查，避免离线场景外联。
+# Voice activity detection belongs to our own volume gate, so funasr's extra fsmn-vad model
+# is deliberately not pulled in. disable_update turns off funasr's startup version check so
+# the offline path never reaches out to the network.
 
 
 class SenseVoiceModelUnavailable(ModelUnavailable):
-    """SenseVoiceSmall 不可用：目录缺失或 funasr 加载失败。"""
+    """SenseVoiceSmall unavailable: directory missing, or funasr failed to load."""
 
 
 class SenseVoiceRuntime:
-    """SenseVoiceSmall 进程内运行时：一次加载、单飞推理入口。"""
+    """In-process SenseVoiceSmall runtime: load once, single-flight inference."""
 
     def __init__(self, model_dir: Path) -> None:
         self.model_dir = Path(model_dir)
@@ -62,7 +64,7 @@ class SenseVoiceRuntime:
         return self._device if self._loaded else "unloaded"
 
     def load(self) -> None:
-        """线程安全的一次性加载；失败抛 SenseVoiceModelUnavailable。"""
+        """Thread-safe one-shot load; failure raises SenseVoiceModelUnavailable."""
         with self._load_lock:
             if self._loaded:
                 return
@@ -73,6 +75,8 @@ class SenseVoiceRuntime:
                     f"无法导入 funasr：{type(error).__name__}: {error}"
                 ) from error
             device = "cuda:0" if torch.cuda.is_available() else "cpu"
+            # funasr preprocessing still burns CPU, and the default thread pool can take the cores video playback needs.
+            torch.set_num_threads(max(1, min(4, (os.cpu_count() or 2) // 2)))
             try:
                 model = AutoModel(
                     model=str(self.model_dir), device=device, disable_update=True
@@ -87,7 +91,7 @@ class SenseVoiceRuntime:
             self._loaded = True
 
     def unload(self) -> None:
-        """等待正在运行的推理结束，再释放权重与 CUDA 缓存。"""
+        """Wait for in-flight inference to finish, then drop weights and clear the CUDA cache."""
         with self._inference_lock:
             with self._load_lock:
                 model = self._model
@@ -106,7 +110,7 @@ class SenseVoiceRuntime:
         prefix: str | None = None,
         language: str | None = None,
     ) -> tuple[str, str | None]:
-        del prefix  # 非自回归模型不接续写前缀，每块都是独立整段转写
+        del prefix  # non-autoregressive models take no continuation prefix; every block is a fresh whole-segment pass
         with self._inference_lock:
             return self._transcribe_locked(samples, language=language)
 
@@ -134,7 +138,7 @@ class SenseVoiceRuntime:
 
 
 def _parse_text(raw: str) -> tuple[str, str | None]:
-    """``<|lang|><|emo|><|event|><|itn|>正文`` → (正文, 协议语言码)。"""
+    """``<|lang|><|emo|><|event|><|itn|>body`` → (body, protocol language code)."""
     text = raw.strip()
     tags = _TAG_PREFIX.match(text)
     if tags is None:
@@ -152,7 +156,7 @@ _runtimes_lock = threading.Lock()
 
 
 def get_sensevoice_runtime(model_dir: Path) -> SenseVoiceRuntime:
-    """按 resolved model_dir 缓存的进程级单例（会话期间只加载一次）。"""
+    """Process-wide singleton cached by resolved model_dir, so weights load once per session."""
     resolved = Path(model_dir).resolve()
     key = os.path.normcase(str(resolved))
     with _runtimes_lock:

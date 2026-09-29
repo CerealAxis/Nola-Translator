@@ -1,11 +1,11 @@
-"""本地模型目录：钉死 HuggingFace revision 与逐文件校验值（取值见 spec S4）。"""
+"""Local model catalog: pinned HuggingFace revisions with a checksum per file."""
 
 from __future__ import annotations
 
 from .manager import FileEntry, ModelSpec
 
 
-# Qwen3-ASR 1.7B 原始 BF16 权重快照；加载时以 NF4 4-bit 量化运行。
+# Qwen3-ASR 1.7B: BF16 weights on disk, run NF4 4-bit quantized in memory.
 QWEN3_ASR_1_7B_HF = ModelSpec(
     model_id="qwen3-asr-1.7b-hf",
     directory="qwen3-asr-1.7b-hf",
@@ -61,11 +61,11 @@ QWEN3_ASR_1_7B_HF = ModelSpec(
 )
 
 
-# Qwen3-ASR 0.6B 原始 BF16 权重快照；与 1.7B 同一套 AutoProcessor +
-# Qwen3ASRForConditionalGeneration 加载。必须钉 -hf 仓库：Qwen/Qwen3-ASR-0.6B 是
-# thinker 布局（config 带 thinker_config、权重键带 thinker. 前缀、特征提取器是
-# WhisperFeatureExtractor），与 transformers qwen3_asr 的权重键和 n_window 补齐都对不上，
-# from_pretrained 会一个权重都静默加载不上。
+# Qwen3-ASR 0.6B, loaded through the same AutoProcessor +
+# Qwen3ASRForConditionalGeneration path as 1.7B. The -hf repo is mandatory:
+# Qwen/Qwen3-ASR-0.6B ships the thinker layout (thinker_config in config, thinker.
+# prefixed weight keys, WhisperFeatureExtractor), whose keys and n_window padding do
+# not line up with transformers qwen3_asr — from_pretrained silently loads none of them.
 QWEN3_ASR_0_6B_HF = ModelSpec(
     model_id="qwen3-asr-0.6b-hf",
     directory="qwen3-asr-0.6b-hf",
@@ -121,11 +121,11 @@ QWEN3_ASR_0_6B_HF = ModelSpec(
 )
 
 
-# SenseVoiceSmall 非自回归识别模型；由 funasr 从本地快照目录加载。
-# 只收录运行必需的 4 个文件（configuration.json 声明 init_param / config /
-# tokenizer_conf.bpemodel / frontend_conf.cmvn_file）加 README。刻意不收录仓库里的
-# requirements.txt：funasr 在 trust_remote_code=True 时会 pip 安装它，而那份清单
-# 钉的是 numpy<=1.26.4，会把本项目的 numpy 钉版冲掉。
+# SenseVoiceSmall: non-autoregressive, loaded by funasr from the local snapshot dir.
+# Only the 4 files the runtime needs (configuration.json declares init_param / config /
+# tokenizer_conf.bpemodel / frontend_conf.cmvn_file) plus README. The repo's
+# requirements.txt is deliberately left out: funasr pip-installs it under
+# trust_remote_code=True, and it pins numpy<=1.26.4, which would clobber our own pin.
 SENSEVOICE_SMALL = ModelSpec(
     model_id="sensevoice-small",
     directory="sensevoice-small",
@@ -166,7 +166,6 @@ SENSEVOICE_SMALL = ModelSpec(
 )
 
 
-# Hy-MT2 1.8B 预量化 Q4_K_M 单文件；由内置 llama.cpp 在本机运行。
 HYMT2_1_8B_Q4_K_M = ModelSpec(
     model_id="hy-mt2-1.8b-q4-k-m",
     directory="hy-mt2-1.8b-q4-k-m",
@@ -182,7 +181,45 @@ HYMT2_1_8B_Q4_K_M = ModelSpec(
 )
 
 
-# M2M100 418M 多对多翻译模型；官方仓库只提供 pytorch_model.bin，tokenizer 走 sentencepiece。
+# unsloth's Hy-MT2 1.8B quantizations (importance-matrix calibrated). All are standard
+# llama.cpp quant types readable straight from the official release, and the three tiers
+# measure at nearly the same speed (0.15~0.18s/sentence), so the only trade-off is size
+# versus terminology retention: Q3_K_M is steadiest on proper nouns (Genshin Impact,
+# Pro), UD-IQ2_M is the smallest but flattens them to literal meaning.
+_UNSLOTH_HYMT2_REPO = "unsloth/Hy-MT2-1.8B-GGUF"
+_UNSLOTH_HYMT2_REVISION = "0378cc2780f462f0fd397d0cdd244d2f769de40e"
+
+HYMT2_1_8B_Q3_K_M = ModelSpec(
+    model_id="hy-mt2-1.8b-q3-k-m",
+    directory="hy-mt2-1.8b-q3-k-m",
+    repo=_UNSLOTH_HYMT2_REPO,
+    revision=_UNSLOTH_HYMT2_REVISION,
+    files=(
+        FileEntry(
+            "Hy-MT2-1.8B-Q3_K_M.gguf",
+            951_022_560,
+            "d843f052e1adb61197156f534099cf9fb58353af7cc30999a2f1f717819936b8",
+        ),
+    ),
+)
+
+HYMT2_1_8B_IQ2_M = ModelSpec(
+    model_id="hy-mt2-1.8b-iq2-m",
+    directory="hy-mt2-1.8b-iq2-m",
+    repo=_UNSLOTH_HYMT2_REPO,
+    revision=_UNSLOTH_HYMT2_REVISION,
+    files=(
+        FileEntry(
+            "Hy-MT2-1.8B-UD-IQ2_M.gguf",
+            722_666_176,
+            "9936b5ba66523f100f18604232d88acb4b44f3c9e26eab3f0f9113d44514d0f0",
+        ),
+    ),
+)
+
+
+# M2M100 418M many-to-many translation model; the official repo ships only
+# pytorch_model.bin, and the tokenizer is sentencepiece.
 M2M100_418M = ModelSpec(
     model_id="m2m100-418m",
     directory="m2m100-418m",

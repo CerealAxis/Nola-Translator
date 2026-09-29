@@ -23,8 +23,7 @@ const channels = {
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
 } as const
 
-// Electron 会把 IPC 错误包成 "Error invoking remote method '<channel>': <原错误>"，
-// 这层传输细节不该出现在界面上的通知里。
+// Unwraps the channel prefix Electron adds to handler errors; see stripIpcErrorMessage.
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   try {
     return await ipcRenderer.invoke(channel, ...args)
