@@ -47,20 +47,16 @@ function mergeLine(stream: TrackLine[], line: TrackLine): TrackLine[] {
     if (last.key === line.key && last.text === line.text) return stream
     return [...stream.slice(0, -1), { key: line.key, text: line.text }]
   }
-  // The cut lands mid-seam, so the remainder usually opens on whitespace; `joinStream` adds its own
-  // separator and would otherwise render a double space at every sentence boundary.
+  // The cut lands mid-seam, so the remainder usually opens on whitespace, and the renderer inserts
+  // its own separator at the seam — without this trim every sentence boundary would show two spaces.
   const fresh = line.text.slice(seamOverlap(last.text, line.text)).trim()
   if (!fresh) return stream
   return [...stream, { key: line.key, text: fresh }].slice(-MAX_ENTRIES)
 }
 
 /** Sentences run together in one paragraph; only Latin scripts need a space at the seam. */
-function joinStream(entries: TrackLine[]): string {
-  return entries.reduce((text, entry) => {
-    if (!text) return entry.text
-    const seam = CJK.test(text.slice(-1)) && CJK.test(entry.text.slice(0, 1))
-    return seam ? text + entry.text : `${text} ${entry.text}`
-  }, '')
+function seamNeedsSpace(previous: string, next: string): boolean {
+  return !(CJK.test(previous.slice(-1)) && CJK.test(next.slice(0, 1)))
 }
 
 /**
@@ -140,17 +136,19 @@ export function CaptionTrack({ line, kind, maxLines, layout }: {
 
   return <div className={`overlay-track overlay-track-${kind}`} data-track={kind} data-layout="rolling" data-rolling={offset > 0}
     style={{ '--overlay-visible-lines': maxLines } as React.CSSProperties}>
-    {/* The visible block holds the whole transcript, and a live region announces its full contents
-        rather than the delta, so every streaming revision would re-read the history from the first
-        word. The visible copy is silenced and this hidden region carries only the newest sentence,
-        which is what a live caption should announce. */}
-    <div className="overlay-track-flow" ref={viewport} aria-live="off">
+    <div className="overlay-track-flow" ref={viewport}>
       <div className="overlay-track-content" ref={content} style={{ transform: offset > 0 ? `translate3d(0, -${offset}px, 0)` : 'none' }}>
-        <p className="overlay-track-entry">{joinStream(entries)}</p>
+        {/* Each sentence stays its own node inside a single paragraph, so the text still wraps and rolls
+            as one block. While `aria-atomic` is false a live region announces the node that changed
+            rather than the whole region, so a revision speaks only the sentence being revised and the
+            transcript never has to be mirrored into a second node. */}
+        <p className="overlay-track-entry" aria-live="polite" aria-atomic="false">
+          {entries.flatMap((entry, index) => [
+            index > 0 && seamNeedsSpace(entries[index - 1].text, entry.text) ? ' ' : null,
+            <span className="overlay-track-segment" key={entry.key}>{entry.text}</span>,
+          ])}
+        </p>
       </div>
     </div>
-    <span className="overlay-track-announce" aria-live="polite" aria-atomic="true">
-      {entries.length > 0 ? entries[entries.length - 1].text : ''}
-    </span>
   </div>
 }

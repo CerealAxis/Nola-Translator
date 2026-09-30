@@ -78,8 +78,6 @@ describe('界面语言切换', () => {
       })
     })
 
-    // Scoped to the visible entry: the rolling track also mirrors the newest sentence into a
-    // visually hidden live region, so the text legitimately appears twice in the document.
-    expect(document.querySelector('.overlay-track-entry')).toHaveTextContent('你好，世界。')
+    expect(screen.getByText('你好，世界。')).toBeInTheDocument()
   })
 })

@@ -532,9 +532,8 @@ html[data-overlay="true"], html[data-overlay="true"] body, html[data-overlay="tr
 /* One unbroken column: the block fills the track from the top and then rolls upward, so a full box loses its top line. */
 .overlay-track-flow { position: relative; height: 100%; overflow: hidden; }
 .overlay-track-content { transition: transform 320ms cubic-bezier(.22,.7,.2,1); will-change: transform; }
-/* Announced to screen readers but never painted. Absolutely positioned, so it contributes nothing to
-   the block's measured height and cannot disturb the roll offset the ResizeObserver computes. */
-.overlay-track-announce { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; white-space: nowrap; clip-path: inset(50%); }
+/* Inline so the per-sentence nodes still compose one flowing paragraph. */
+.overlay-track-segment { display: inline; }
 /* No top fade here: the mask gradient turned every entry's top edge grey, and the rolling translate does not need it to feel "smooth". */
 /* Sentence layout: each entry is its own block, so the flow must clip overflow vertically instead of fading. */
 .overlay-track-sentence { height: auto; max-height: 100%; overflow: hidden auto; }
