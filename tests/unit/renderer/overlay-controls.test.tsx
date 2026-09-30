@@ -192,7 +192,7 @@ it('hides a track entirely when the user turns it off', async () => {
   expect(container.querySelector('.caption-console-translations')).toBeNull()
 })
 
-it('reveals the control rows from a pointer anywhere on the card, not just over a button', () => {
+it('reveals the control rows from a pointer anywhere on the card, not just over a button', async () => {
   const { container } = render(<CaptionOverlay />)
   const card = container.querySelector('.caption-console') as HTMLElement
   vi.spyOn(card, 'getBoundingClientRect').mockReturnValue({
@@ -214,6 +214,9 @@ it('reveals the control rows from a pointer anywhere on the card, not just over 
 
   pointerAt(840, 4)
   expect(card).toHaveAttribute('data-hover', 'false')
+  // The overlay loads its settings asynchronously on mount; without this flush that update lands
+  // after the synchronous test body has finished and React reports an unwrapped act() warning.
+  await act(async () => { await Promise.resolve() })
 })
 
 it('cycles bilingual, source only and translation only from one pill', async () => {
@@ -279,15 +282,18 @@ it('sends a missing model to the resource page instead of starting a doomed sess
 
 it('opens the matching settings page from the model and language pills', async () => {
   const appearance = vi.spyOn(window.nolaTranslator!, 'openAppearance')
-  const { container } = render(<CaptionOverlay />)
-  const [, model, language] = [...container.querySelectorAll('.caption-console-controls button')]
+  render(<CaptionOverlay />)
+  // Queried by name rather than by position: the controls row gained buttons during the overlay
+  // rewrite, and an index-based binding would silently re-point at a different pill.
+  const model = screen.getByTitle(/翻译模型/)
+  const language = screen.getByRole('button', { name: '切换源语言与目标语言' })
 
   expect(model).toHaveTextContent('Hy-MT2')
   expect(language).toHaveTextContent('自动 → 中')
   fireEvent.click(model)
-  expect(appearance).toHaveBeenCalledWith('translation')
+  await waitFor(() => expect(appearance).toHaveBeenCalledWith('translation'))
   fireEvent.click(language)
-  expect(appearance).toHaveBeenCalledWith('captions')
+  await waitFor(() => expect(appearance).toHaveBeenCalledWith('captions'))
 })
 
 it('shows the reference console controls and keeps close usable when locked', async () => {

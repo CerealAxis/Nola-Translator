@@ -1,9 +1,9 @@
-﻿import { resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { app, BrowserWindow } from 'electron'
 app.disableHardwareAcceleration()
 const settings = { version:1, theme:'system', uiLanguage:'zh-CN', modelStoragePath:'', historyEnabled:false, recognition:{modelId:'qwen3-asr-1.7b-hf',sourceLanguage:'auto'},
-  overlay:{mode:'bottom',colorScheme:'dark',locked:true,alwaysOnTop:true,fontFamily:'Segoe UI Variable',fontSize:26,fontWeight:600,translationFontSize:22,translationFontWeight:500,sourceColor:'#FFFFFF',translationColor:'#FFFFFF',backgroundColor:'#111111',backgroundOpacity:0.84,maxLines:2,lineHeight:1.3,translationMaxLines:2,translationLineHeight:1.35,showSource:true,showTranslation:true},
+  overlay:{mode:'bottom',colorScheme:'dark',locked:true,alwaysOnTop:true,fontFamily:'Segoe UI Variable',fontSize:26,fontWeight:600,translationFontSize:22,translationFontWeight:500,sourceColor:'#FFFFFF',translationColor:'#FFFFFF',backgroundColor:'#111111',backgroundOpacity:0.84,lineHeight:1.3,translationLineHeight:1.35,showSource:true,showTranslation:true,layout:'rolling'},
   translation:{provider:'hymt2',microsoftEndpoint:'',microsoftRegion:'',openaiEndpoint:'',openaiModel:'',ollamaEndpoint:'',ollamaModel:'',translateIntermediate:false,targetLanguage:'zh'} }
 const preload = `
 const {contextBridge} = require('electron');

@@ -9,7 +9,7 @@ const pages = ['captions', 'recognition', 'resources', 'translation', 'appearanc
 const settings = {
   version: 1, theme: 'system', uiLanguage: 'zh-CN', modelStoragePath: '', historyEnabled: false,
   recognition: { modelId: 'qwen3-asr-1.7b-hf', sourceLanguage: 'auto', audioSource: 'defaultOutput' },
-  overlay: { mode: 'bottom', colorScheme: 'dark', locked: true, alwaysOnTop: true, fontFamily: 'Segoe UI Variable', fontSize: 26, fontWeight: 600, translationFontSize: 22, translationFontWeight: 500, sourceColor: '#FFFFFF', translationColor: '#FFFFFF', backgroundColor: '#111111', backgroundOpacity: 0.84, maxLines: 3, lineHeight: 1.3, translationMaxLines: 3, translationLineHeight: 1.35, showSource: true, showTranslation: true },
+  overlay: { mode: 'bottom', colorScheme: 'dark', locked: true, alwaysOnTop: true, fontFamily: 'Segoe UI Variable', fontSize: 26, fontWeight: 600, translationFontSize: 22, translationFontWeight: 500, sourceColor: '#FFFFFF', translationColor: '#FFFFFF', backgroundColor: '#111111', backgroundOpacity: 0.84, lineHeight: 1.3, translationLineHeight: 1.35, showSource: true, showTranslation: true, layout: 'rolling' },
   translation: { provider: 'hymt2', hymt2ModelId: 'hy-mt2-1.8b-q3-k-m', microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '', openaiEndpoint: 'https://api.openai.com/v1', openaiModel: 'gpt-4.1-mini', ollamaEndpoint: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b', translateIntermediate: false, targetLanguage: 'zh' },
 }
 const recognitionResource = { resourceId: 'qwen3-asr-1.7b-hf', kind: 'recognitionModel', provider: 'qwen3-asr', name: 'Qwen3-ASR 1.7B · 本地流式识别', description: '本地流式识别模型，加载时以 NF4 4-bit 量化运行。', languages: ['zh', 'en', 'ja'], installed: true, installedBytes: 4300000000, state: 'idle', cancellable: false }
@@ -159,7 +159,11 @@ async function main() {
       rolling: track?.dataset.rolling,
     }
   })()`)
-  if (rolling.entries !== 2 || !rolling.kept || rolling.translationEntries !== 2 || !rolling.translationHeld) {
+  // `shifted` is the geometry of the roll itself — the content block translated above the flow top —
+  // and `rolling` is the component's own overflow flag. Without both, a regression that stops the
+  // block from translating upward would still pass, because every other field is DOM structure.
+  if (rolling.entries !== 2 || !rolling.kept || rolling.translationEntries !== 2 || !rolling.translationHeld
+    || !rolling.shifted || rolling.rolling !== 'true') {
     failures.push({ language: 'overlay', page: 'roll-up', rolling })
   }
   await writeFile(resolve(output, 'overlay-roll-transition.png'), (await overlay.webContents.capturePage()).toPNG())

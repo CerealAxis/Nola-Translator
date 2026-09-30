@@ -536,10 +536,13 @@ html[data-overlay="true"], html[data-overlay="true"] body, html[data-overlay="tr
 /* Sentence layout: each entry is its own block, so the flow must clip overflow vertically instead of fading. */
 .overlay-track-sentence { height: auto; max-height: 100%; overflow: hidden auto; }
 .overlay-track-sentence .overlay-track-content { transform: none !important; }
-.overlay-track-sentence .overlay-track-entry { margin-bottom: 6px; }
+.overlay-track-sentence .overlay-track-entry { margin-bottom: 6px; animation: caption-entry-in 220ms cubic-bezier(.22,.7,.2,1) both; }
 /* text-shadow kept off on opaque cards because the dark shadow over white reads as a gray halo. */
 /* `color: inherit` and `line-height: inherit` are mandatory: the global `p` rule pins every paragraph to the secondary text color and 1.55 line-height, which would otherwise hijack the track color and the rolling-offset math. */
-.overlay-track-entry { margin: 0; color: inherit; line-height: inherit; overflow-wrap: anywhere; text-align: left; animation: caption-entry-in 220ms cubic-bezier(.22,.7,.2,1) both; }
+/* The entry fade is scoped to the sentence layout, where every entry is keyed by segment id and so
+   genuinely appears one at a time. Rolling renders the whole transcript as one unkeyed block, where
+   the animation would fire once on mount and never replay, and the upward roll is the animation. */
+.overlay-track-entry { margin: 0; color: inherit; line-height: inherit; overflow-wrap: anywhere; text-align: left; }
 @keyframes caption-entry-in {
   from { opacity: 0; transform: translateY(28%); }
   to   { opacity: 1; transform: translateY(0); }

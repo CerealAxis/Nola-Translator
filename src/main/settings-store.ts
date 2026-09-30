@@ -48,12 +48,22 @@ export class SettingsStore {
           /** The pre-single-select multi-select field; migrated to targetLanguage on load. */
           targetLanguages?: unknown
         }
+        overlay?: Partial<AppSettings['overlay']> & {
+          /** Retired when the rolling overlay began deriving its own budget from the stage height. */
+          maxLines?: unknown
+          translationMaxLines?: unknown
+        }
       }
       // The legacy Argos relay toggle meant something else, so drop it rather than mapping it onto translateIntermediate.
       const rawTranslation = { ...(raw.translation ?? {}) }
       delete rawTranslation.allowIntermediate
       const legacyTargets = rawTranslation.targetLanguages
       delete rawTranslation.targetLanguages
+      // The rolling overlay derives its own line budget from the stage height, so the two retired
+      // line-count settings are dropped rather than merged and re-serialised on every write.
+      const rawOverlay = { ...(raw.overlay ?? {}) }
+      delete rawOverlay.maxLines
+      delete rawOverlay.translationMaxLines
       this.settings = {
         ...structuredClone(DEFAULT_SETTINGS),
         ...raw,
@@ -61,7 +71,7 @@ export class SettingsStore {
         uiLanguage: raw.uiLanguage === 'en' ? 'en' : 'zh-CN',
         modelStoragePath: typeof raw.modelStoragePath === 'string' && isAbsolute(raw.modelStoragePath) ? raw.modelStoragePath : '',
         recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}) },
-        overlay: { ...DEFAULT_SETTINGS.overlay, ...(raw.overlay ?? {}) },
+        overlay: { ...DEFAULT_SETTINGS.overlay, ...rawOverlay },
         translation: {
           ...DEFAULT_SETTINGS.translation,
           ...rawTranslation,
@@ -91,7 +101,7 @@ export class SettingsStore {
       )
       // Old default caption colors are upgraded to the video-reference style, but only while the user has customized neither.
       const overlay = this.settings.overlay
-      if (raw.overlay?.translationColor?.toUpperCase() === '#BFC2C8') {
+      if (rawOverlay.translationColor?.toUpperCase() === '#BFC2C8') {
         overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
       }
       if (overlay.backgroundColor === '#202020' && (overlay.translationColor === '#E6F2FF' || overlay.translationColor === '#D6E9FF')) {
@@ -99,29 +109,29 @@ export class SettingsStore {
         overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
       }
       // Upgrade the previous default floating bar without overriding custom colors or sizes.
-      if (raw.overlay?.backgroundColor === '#111111' && raw.overlay.backgroundOpacity === 0.84) {
+      if (rawOverlay.backgroundColor === '#111111' && rawOverlay.backgroundOpacity === 0.84) {
         overlay.backgroundColor = DEFAULT_SETTINGS.overlay.backgroundColor
         overlay.backgroundOpacity = DEFAULT_SETTINGS.overlay.backgroundOpacity
-        if (raw.overlay.fontSize === 26) overlay.fontSize = DEFAULT_SETTINGS.overlay.fontSize
-        if (raw.overlay.translationFontSize === 22) overlay.translationFontSize = DEFAULT_SETTINGS.overlay.translationFontSize
-        if (raw.overlay.sourceColor === '#FFFFFF') overlay.sourceColor = DEFAULT_SETTINGS.overlay.sourceColor
-        if (raw.overlay.translationColor === '#FFFFFF') overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
+        if (rawOverlay.fontSize === 26) overlay.fontSize = DEFAULT_SETTINGS.overlay.fontSize
+        if (rawOverlay.translationFontSize === 22) overlay.translationFontSize = DEFAULT_SETTINGS.overlay.translationFontSize
+        if (rawOverlay.sourceColor === '#FFFFFF') overlay.sourceColor = DEFAULT_SETTINGS.overlay.sourceColor
+        if (rawOverlay.translationColor === '#FFFFFF') overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
         overlay.locked = false
       }
-      if (raw.overlay?.backgroundColor === '#30343A' && raw.overlay.backgroundOpacity === 0.62) {
+      if (rawOverlay.backgroundColor === '#30343A' && rawOverlay.backgroundOpacity === 0.62) {
         overlay.backgroundColor = DEFAULT_SETTINGS.overlay.backgroundColor
         overlay.backgroundOpacity = DEFAULT_SETTINGS.overlay.backgroundOpacity
-        if (raw.overlay.fontSize === 20) overlay.fontSize = DEFAULT_SETTINGS.overlay.fontSize
-        if (raw.overlay.sourceColor === '#FFFFFF') overlay.sourceColor = DEFAULT_SETTINGS.overlay.sourceColor
-        if (raw.overlay.translationColor === '#FFFFFF') overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
+        if (rawOverlay.fontSize === 20) overlay.fontSize = DEFAULT_SETTINGS.overlay.fontSize
+        if (rawOverlay.sourceColor === '#FFFFFF') overlay.sourceColor = DEFAULT_SETTINGS.overlay.sourceColor
+        if (rawOverlay.translationColor === '#FFFFFF') overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
       }
       // The earliest bar was a #202020 slab left translucent, which over any bright window reads as a
       // washed-out grey card with white text barely separating from it. Only the untouched legacy
       // colours move; a card the user actually re-tinted keeps its background and its opacity.
-      if (raw.overlay?.backgroundColor === '#202020' && (raw.overlay.sourceColor ?? '').toUpperCase() === '#FFFFFF') {
+      if (rawOverlay.backgroundColor === '#202020' && (rawOverlay.sourceColor ?? '').toUpperCase() === '#FFFFFF') {
         overlay.backgroundColor = DEFAULT_SETTINGS.overlay.backgroundColor
         overlay.backgroundOpacity = DEFAULT_SETTINGS.overlay.backgroundOpacity
-        if ((raw.overlay.translationColor ?? '').toUpperCase() === '#FFFFFF') {
+        if ((rawOverlay.translationColor ?? '').toUpperCase() === '#FFFFFF') {
           overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
         }
       }

@@ -20,6 +20,9 @@ type DisplayMode = 'bilingual' | 'source' | 'translation'
 
 type CaptionLayout = 'rolling' | 'sentence'
 
+/** How long a failure notice stays over the caption area before it clears itself. */
+const NOTICE_DURATION_MS = 6000
+
 const LAYOUT_OPTIONS: { value: CaptionLayout; label: string; hint: string }[] = [
   { value: 'rolling', label: '分区对照', hint: '转写翻译，分区显示' },
   { value: 'sentence', label: '逐句对照', hint: '按句分段，语意清晰' },
@@ -127,15 +130,25 @@ export function CaptionOverlay(): React.JSX.Element {
     })),
   ], stageBox.gap)
 
+  // A failure notice sits over the caption area, so it clears itself rather than waiting for the
+  // next session toggle — otherwise one transient failure leaves it on screen for good.
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const showNotice = (message: string): void => {
+    setNotice(message)
+    if (noticeTimer.current) clearTimeout(noticeTimer.current)
+    noticeTimer.current = setTimeout(() => setNotice(''), NOTICE_DURATION_MS)
+  }
+  useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current) }, [])
+
   const updateOverlay = async (patch: Partial<OverlaySettings>): Promise<void> => {
     try {
       const saved = await window.nolaTranslator?.updateSettings({ overlay: patch })
       if (saved) setSettings(saved)
-    } catch (error) { setNotice(error instanceof Error ? error.message : '无法修改浮层设置') }
+    } catch (error) { showNotice(error instanceof Error ? error.message : '无法修改浮层设置') }
   }
   const hide = async (): Promise<void> => {
     try { await window.nolaTranslator?.hideOverlay() }
-    catch (error) { setNotice(error instanceof Error ? error.message : '隐藏浮层失败') }
+    catch (error) { showNotice(error instanceof Error ? error.message : '隐藏浮层失败') }
   }
   const toggleCollapse = (): void => {
     if (!collapsed) expandedHeight.current = window.innerHeight
@@ -161,13 +174,13 @@ export function CaptionOverlay(): React.JSX.Element {
       const config = buildSessionConfig(settings, await resolveAudioSource(api, settings.recognition.audioSource))
       const missing = findMissingResource(await api.listResources(), config)
       if (missing) {
-        setNotice(t('{name}模型尚未安装，请先到“模型与资源”页面安装。', { name: missing.name }))
+        showNotice(t('{name}模型尚未安装，请先到“模型与资源”页面安装。', { name: missing.name }))
         await api.openAppearance('resources')
         return
       }
       setSessionId((await api.startSession(config)).sessionId)
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : '字幕会话启动失败')
+      showNotice(error instanceof Error ? error.message : '字幕会话启动失败')
     } finally {
       setSessionBusy(false)
     }
@@ -290,6 +303,9 @@ export function CaptionOverlay(): React.JSX.Element {
         }}
         onPointerMove={onResizeMove}
         onPointerUp={(event) => { resizeStart.current = null; event.currentTarget.releasePointerCapture(event.pointerId) }}
+        // A window drag, a touch gesture or an alt-tab mid-drag cancels the pointer without ever
+        // delivering pointerup, which would otherwise leave the drag anchored to a stale position.
+        onPointerCancel={() => { resizeStart.current = null }}
       />}
     </section>
   </main>

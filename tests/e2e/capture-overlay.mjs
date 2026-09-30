@@ -13,8 +13,8 @@ const settings = {
     translationFontSize: 16, translationFontWeight: 400,
     sourceColor: '#F7F7F7', translationColor: '#D7DEE8',
     backgroundColor: '#0D0E10', backgroundOpacity: 0.96,
-    maxLines: 3, lineHeight: 1.3, translationMaxLines: 3, translationLineHeight: 1.35,
-    showSource: true, showTranslation: true,
+    lineHeight: 1.3, translationLineHeight: 1.35,
+    showSource: true, showTranslation: true, layout: 'rolling',
   },
   translation: {
     provider: 'hymt2', hymt2ModelId: 'hy-mt2-1.8b-q3-k-m', targetLanguage: 'zh',
