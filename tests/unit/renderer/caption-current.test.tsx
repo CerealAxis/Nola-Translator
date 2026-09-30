@@ -1,6 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { CaptionText } from '../../../src/renderer/components/CaptionText'
 import { CaptionPreview } from '../../../src/renderer/components/CaptionPreview'
 import { CaptionOverlay } from '../../../src/renderer/overlay/CaptionOverlay'
 import { LiveCaptionsPage } from '../../../src/renderer/pages/LiveCaptionsPage'
@@ -26,7 +25,7 @@ it('both surfaces keep the current sentence when an old translation or revision 
       listeners.forEach((listener) => listener(event))
     }
   })
-  expect(container.querySelector('.overlay-source')).toHaveTextContent('current-3')
+  expect(container.querySelector('.overlay-track-source')).toHaveTextContent('current-3')
   expect(container.querySelector('.caption-source')).toHaveTextContent('current-3')
   expect(screen.queryByText('translation-old-9')).not.toBeInTheDocument()
   act(() => {
@@ -34,22 +33,8 @@ it('both surfaces keep the current sentence when an old translation or revision 
     listeners.forEach((listener) => listener(captionEvent('new', 0, 1, 'new-session')))
     listeners.forEach((listener) => listener(captionEvent('current', 20, 4)))
   })
-  expect(container.querySelector('.overlay-source')).toHaveTextContent('new-1')
+  expect(container.querySelector('.overlay-track-source')).toHaveTextContent('new-1')
   expect(container.querySelector('.caption-source')).toHaveTextContent('new-1')
-})
-
-it('reveals the tail after text changes and the available text area resizes', () => {
-  let resize: (() => void) | undefined
-  vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resize = callback } observe() {} disconnect() {} })
-  const { container, rerender } = render(<CaptionText className="caption-source">old</CaptionText>)
-  const paragraph = container.querySelector('p')!
-  Object.defineProperty(paragraph, 'scrollHeight', { configurable: true, value: 480 })
-  rerender(<CaptionText className="caption-source">current tail</CaptionText>)
-  expect(paragraph.scrollTop).toBe(480)
-  paragraph.scrollTop = 0
-  act(() => resize?.())
-  expect(paragraph.scrollTop).toBe(480)
-  vi.unstubAllGlobals()
 })
 
 it('applies the selected font and renders a bilingual appearance example', async () => {

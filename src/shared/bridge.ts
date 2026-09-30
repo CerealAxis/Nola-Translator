@@ -4,6 +4,9 @@ import type { AppSettings, AppSettingsPatch } from './settings'
 export type SessionStartResult = { sessionId: string }
 export type ModelStorageInfo = { activePath: string; configuredPath: string; restartRequired: boolean }
 
+/** Pages the caption overlay can send the main window to; must stay in sync with `OVERLAY_PAGES` in the main process. */
+export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'translation'
+
 export type NolaTranslatorApi = {
   listDevices(): Promise<AudioDevice[]>
   listResources(): Promise<ResourceSnapshot>
@@ -14,8 +17,8 @@ export type NolaTranslatorApi = {
   showOverlay(): Promise<void>
   hideOverlay(): Promise<void>
   resizeOverlay(width: number, height: number): Promise<void>
-  openAppearance(): Promise<void>
-  onOpenAppearance(listener: () => void): () => void
+  openAppearance(page?: OverlayTargetPage): Promise<void>
+  onOpenAppearance(listener: (page: OverlayTargetPage) => void): () => void
   getSettings(): Promise<AppSettings>
   getModelStorage(): Promise<ModelStorageInfo>
   chooseModelStorageDirectory(): Promise<ModelStorageInfo | null>

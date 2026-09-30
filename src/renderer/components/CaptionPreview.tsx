@@ -1,7 +1,7 @@
-import { CaptionText } from './CaptionText'
-import { ChevronDownRegular, DesktopRegular, DismissRegular, LockOpenRegular, MicRegular, MoreHorizontalRegular, PinRegular, SubtractRegular } from '@fluentui/react-icons'
+import { ChevronDownRegular, DesktopRegular, DismissRegular, LockOpenRegular, MicRegular, MoreHorizontalRegular, PinRegular, StopRegular, SubtractRegular } from '@fluentui/react-icons'
 import type { CaptionSegment } from '../../shared/contracts'
 import { DEFAULT_SETTINGS, type OverlaySettings } from '../../shared/settings'
+import { shortLanguageLabel, translationProviderLabel } from '../session'
 import { failedTranslations, translationErrorLabel } from './translation-status'
 import { useI18n } from '../i18n'
 
@@ -11,7 +11,9 @@ type CaptionPreviewProps = {
   translationVisible?: boolean
   caption?: CaptionSegment | null
   modelProgress?: number | null
-  overlay?: Pick<OverlaySettings, 'fontFamily' | 'backgroundOpacity' | 'backgroundColor' | 'colorScheme' | 'sourceColor' | 'translationColor' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'maxLines' | 'translationFontSize' | 'translationFontWeight' | 'translationLineHeight' | 'translationMaxLines'>
+  sourceLanguage?: string
+  targetLanguage?: string
+  overlay?: Pick<OverlaySettings, 'fontFamily' | 'backgroundOpacity' | 'backgroundColor' | 'colorScheme' | 'sourceColor' | 'translationColor' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'translationFontSize' | 'translationFontWeight' | 'translationLineHeight'>
 }
 
 export function CaptionPreview({
@@ -20,6 +22,8 @@ export function CaptionPreview({
   translationVisible = true,
   caption = null,
   modelProgress: _modelProgress = null,
+  sourceLanguage = DEFAULT_SETTINGS.recognition.sourceLanguage,
+  targetLanguage = DEFAULT_SETTINGS.translation.targetLanguage,
   overlay = DEFAULT_SETTINGS.overlay,
 }: CaptionPreviewProps): React.JSX.Element {
   const { t } = useI18n()
@@ -45,21 +49,26 @@ export function CaptionPreview({
             '--preview-translation-color': overlay.translationColor,
             '--preview-font-size': `${overlay.fontSize}px`,
             '--preview-font-weight': overlay.fontWeight,
-            '--preview-line-height': overlay.lineHeight,
-            '--preview-max-lines': overlay.maxLines,
+            '--preview-line-height': `${overlay.lineHeight}`,
             '--preview-translation-font-size': `${overlay.translationFontSize}px`,
             '--preview-translation-font-weight': overlay.translationFontWeight,
-            '--preview-translation-line-height': overlay.translationLineHeight,
-            '--preview-translation-max-lines': overlay.translationMaxLines,
+            '--preview-translation-line-height': `${overlay.translationLineHeight}`,
           } as React.CSSProperties}
         >
           <div className="caption-preview-text">
-            {sourceVisible && <CaptionText className="caption-source">{caption?.sourceText || (listening ? t('正在识别语音…') : t('开始会话后，识别原文会显示在这里。'))}</CaptionText>}
-            {translationVisible && completeTranslations.map((translation) => <CaptionText className="caption-translation" key={translation.targetLanguage}>{translation.text!}</CaptionText>)}
-            {translationVisible && failed.map((translation) => <CaptionText className="caption-translation caption-translation-failed" key={translation.targetLanguage}>{translationErrorLabel(t, translation)}</CaptionText>)}
+            {sourceVisible && <p className="caption-source">{caption?.sourceText || (listening ? t('正在识别语音…') : t('开始会话后，识别原文会显示在这里。'))}</p>}
+            {translationVisible && completeTranslations.map((translation) => <p className="caption-translation" key={translation.targetLanguage}>{translation.text!}</p>)}
+            {translationVisible && failed.map((translation) => <p className="caption-translation caption-translation-failed" key={translation.targetLanguage}>{translationErrorLabel(t, translation)}</p>)}
           </div>
+          <div className="caption-preview-scrim caption-preview-scrim-top" aria-hidden="true" />
+          <div className="caption-preview-scrim caption-preview-scrim-bottom" aria-hidden="true" />
           <div className="caption-preview-actions" aria-hidden="true"><DesktopRegular /><LockOpenRegular /><PinRegular /><i /><MoreHorizontalRegular /><SubtractRegular /><DismissRegular /></div>
-          <div className="caption-preview-controls" aria-hidden="true"><span className="caption-preview-mic"><MicRegular /></span><span className="caption-preview-pill">{t('本地字幕')}<ChevronDownRegular /></span><span className="caption-preview-pill">{t('原文')}</span><span className="caption-preview-pill">{t('译文')}</span></div>
+          <div className="caption-preview-controls" aria-hidden="true">
+            <span className="caption-preview-mic">{listening ? <StopRegular /> : <MicRegular />}</span>
+            <span className="caption-preview-pill">{translationProviderLabel(DEFAULT_SETTINGS.translation.provider)}<ChevronDownRegular /></span>
+            <span className="caption-preview-pill">{shortLanguageLabel(sourceLanguage)} → {shortLanguageLabel(targetLanguage)}</span>
+            <span className="caption-preview-pill">{sourceVisible && translationVisible ? t('双语') : sourceVisible ? t('原文') : t('译文')}</span>
+          </div>
         </div>
       </div>
     </section>

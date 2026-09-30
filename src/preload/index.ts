@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-import type { NolaTranslatorApi } from '../shared/bridge'
+import type { NolaTranslatorApi, OverlayTargetPage } from '../shared/bridge'
 import type { EngineEvent, SessionConfig } from '../shared/contracts'
 import { stripIpcErrorMessage } from '../shared/ipc-error'
 
@@ -47,9 +47,9 @@ const api: NolaTranslatorApi = {
   showOverlay: () => invoke(channels.showOverlay),
   hideOverlay: () => invoke(channels.hideOverlay),
   resizeOverlay: (width, height) => invoke(channels.resizeOverlay, width, height),
-  openAppearance: () => invoke(channels.openAppearance),
+  openAppearance: (page?: OverlayTargetPage) => invoke(channels.openAppearance, page),
   onOpenAppearance: (listener) => {
-    const wrapped = (): void => listener()
+    const wrapped = (_event: Electron.IpcRendererEvent, page: OverlayTargetPage): void => listener(page)
     ipcRenderer.on(channels.appearanceRequested, wrapped)
     return () => ipcRenderer.off(channels.appearanceRequested, wrapped)
   },

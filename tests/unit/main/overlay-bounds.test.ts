@@ -53,7 +53,9 @@ describe('字幕浮层位置', () => {
   })
 
   it('默认宽度接近录屏中的紧凑控制条', () => {
-    expect(createOverlayWindowOptions('C:\\app\\preload.cjs', 1920)).toMatchObject({ width: 883, height: 118 })
-    expect(createOverlayWindowOptions('C:\\app\\preload.cjs', 2560)).toMatchObject({ width: 940, height: 118 })
+    // 218px leaves room for three source lines above three translation lines once the
+    // window padding and the reserved hover control row are deducted.
+    expect(createOverlayWindowOptions('C:\\app\\preload.cjs', 1920)).toMatchObject({ width: 883, height: 218 })
+    expect(createOverlayWindowOptions('C:\\app\\preload.cjs', 2560)).toMatchObject({ width: 940, height: 218 })
   })
 })

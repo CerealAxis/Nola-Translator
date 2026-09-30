@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 import { CaptionOverlay } from '../../../src/renderer/overlay/CaptionOverlay'
 import { CaptionTrack } from '../../../src/renderer/overlay/CaptionTrack'
-import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
+import { DEFAULT_SETTINGS, type AppSettings } from '../../../src/shared/settings'
 import type { EngineEvent } from '../../../src/shared/contracts'
 
 afterEach(() => vi.restoreAllMocks())
@@ -28,70 +28,58 @@ function caption(segmentId: string, sourceText: string, revision: number, transl
   }
 }
 
-it('extends a live sentence in place and keeps its translation while the next revision is pending', async () => {
+/** Rolling tracks render one joined paragraph, so each track contributes a single block. */
+const entries = (container: HTMLElement, track: 'source' | 'translation'): string[] =>
+  [...container.querySelectorAll(`.overlay-track-${track} .overlay-track-entry`)]
+    .map((node) => node.textContent ?? '')
+    .filter((text) => text !== '')
+
+it('flows the source as one continuous block without breaking on sentence boundaries', async () => {
   const { emit } = listen()
   const { container } = render(<CaptionOverlay />)
-  emit(caption('one', 'Four units in London', 1, '伦敦的四家中心', false))
-  await waitFor(() => expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toHaveTextContent('伦敦的四家中心'))
-  const sourceNode = container.querySelector('.overlay-track-source .overlay-track-in')
-  const translationNode = container.querySelector('.overlay-track-translation .overlay-track-in')
+  emit(caption('one', 'Take a break.', 1, '休息对我们很重要。', false))
+  await waitFor(() => expect(entries(container, 'translation')).toEqual(['休息对我们很重要。']))
   const translationTrack = container.querySelector('.overlay-track-translation')
 
-  emit(caption('one', 'Four units in London, Birmingham and Newcastle', 2, undefined, false))
-  expect(container.querySelector('.overlay-track-source .overlay-track-in')).toBe(sourceNode)
-  expect(sourceNode).toHaveTextContent('Birmingham and Newcastle')
-  expect(container.querySelector('.overlay-track-source .overlay-track-out')).toBeNull()
-  expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toBe(translationNode)
-  expect(translationNode).toHaveTextContent('伦敦的四家中心')
-  expect(container.querySelector('.overlay-track-translation .overlay-track-out')).toBeNull()
-
-  emit(caption('one', 'Four units in London, Birmingham and Newcastle', 2, '伦敦、伯明翰和纽卡斯尔的四家中心也在试用快速基因检测', false))
-  expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toHaveTextContent('检测')
+  emit(caption('one', 'Take a break. Busy days make us forget to stop, tidy our thoughts and recover.', 2, undefined, false))
+  expect(entries(container, 'source')).toEqual(['Take a break. Busy days make us forget to stop, tidy our thoughts and recover.'])
+  // A pending revision keeps the finished translation on screen instead of blanking it.
+  expect(entries(container, 'translation')).toEqual(['休息对我们很重要。'])
   expect(container.querySelector('.overlay-track-translation')).toBe(translationTrack)
 })
 
-it('keeps a two-line English source together before rolling it', async () => {
+it('keeps every finished sentence in the block and grows it on each new segment', async () => {
   const { emit } = listen()
-  vi.spyOn(window.nolaTranslator!, 'getSettings').mockResolvedValue(DEFAULT_SETTINGS)
   const { container } = render(<CaptionOverlay />)
-  await waitFor(() => expect(container.querySelector('.caption-console')).toHaveStyle({ '--overlay-max-lines': '2' }))
-  emit(caption('one', 'Today we will talk about this interesting topic', 1, '今天我们讨论这个话题', false))
-  await waitFor(() => expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toHaveTextContent('今天我们讨论这个话题'))
-  const translationNode = container.querySelector('.overlay-track-translation .overlay-track-in')
-  const growing = 'Today we will talk about this interesting topic and challenge the idea that we must always be busy'
-  emit(caption('one', growing, 2, undefined, false))
-  expect(container.querySelector('.overlay-track-source .overlay-track-out')).toBeNull()
-  expect(container.querySelector('.overlay-track-source .overlay-track-in')).toHaveTextContent(growing)
-  emit(caption('one', `${growing} while we examine several other examples and explain why this matters to everyone watching today`, 3, undefined, false))
-  expect(container.querySelector('.overlay-track-source .overlay-track-out')).toHaveTextContent(growing)
-  expect(container.querySelector('.overlay-track-source .overlay-track-in')).toHaveTextContent('everyone watching today')
-  expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toBe(translationNode)
-  expect(container.querySelector('.overlay-track-translation .overlay-track-out')).toBeNull()
+  emit(caption('one', 'First sentence.', 1, '第一句。'))
+  await waitFor(() => expect(entries(container, 'translation')).toEqual(['第一句。']))
+
+  emit(caption('two', 'Second sentence.', 1))
+  // Source and translation arrive separately, so the translation still shows only the first sentence.
+  expect(entries(container, 'source')).toEqual(['First sentence. Second sentence.'])
+  expect(entries(container, 'translation')).toEqual(['第一句。'])
+
+  emit(caption('two', 'Second sentence.', 2, '第二句。'))
+  await waitFor(() => expect(entries(container, 'translation')).toEqual(['第一句。第二句。']))
 })
 
-it('rolls a filled translation line without restarting the source track', async () => {
+it('renders a failed translation instead of leaving a silent gap', async () => {
   const { emit } = listen()
-  vi.spyOn(window.nolaTranslator!, 'getSettings').mockResolvedValue({
-    ...DEFAULT_SETTINGS, overlay: { ...DEFAULT_SETTINGS.overlay, translationMaxLines: 1 },
-  })
   const { container } = render(<CaptionOverlay />)
-  await waitFor(() => expect(container.querySelector('.caption-console')).toHaveStyle({ '--overlay-translation-max-lines': '1' }))
-  emit(caption('one', 'Take a break.', 1, '休息对我们很重要。', false))
-  await waitFor(() => expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toHaveTextContent('休息对我们很重要'))
-  const sourceNode = container.querySelector('.overlay-track-source .overlay-track-in')
-  emit(caption('one', 'Take a break.', 2, '休息对我们很重要。忙碌的生活常常让我们忘记停下来，重新整理思绪和恢复精力，然后更从容地面对接下来的事情。', false))
-  expect(container.querySelector('.overlay-track-translation .overlay-track-out')).toHaveTextContent('休息对我们很重要')
-  expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toHaveTextContent('事情。')
-  expect(container.querySelector('.overlay-track-source .overlay-track-in')).toBe(sourceNode)
-  expect(container.querySelector('.overlay-track-source .overlay-track-out')).toBeNull()
+  const failed: EngineEvent = {
+    protocolVersion: 1, type: 'caption', requestId: 'failed-1', sessionId: 'session-live',
+    segment: { segmentId: 'one', revision: 1, startedAtMs: 1000, sourceText: 'Take a break.', isFinal: true,
+      translations: [{ targetLanguage: 'zh', state: 'failed', provider: 'example', errorCode: 'TimeoutError' }] },
+  }
+  emit(failed)
+  await waitFor(() => expect(entries(container, 'translation')).toEqual(['翻译失败 · 请求超时']))
 })
 
 it('shows the whole English translation containing a domain', async () => {
   const { emit } = listen()
   const { container } = render(<CaptionOverlay />)
   emit(caption('one', '京东页面上的标价是不计国补的。', 1, 'JD.com pages were not counted.'))
-  await waitFor(() => expect(container.querySelector('.overlay-track-translation .overlay-track-in'))
-    .toHaveTextContent('JD.com pages were not counted.'))
+  await waitFor(() => expect(entries(container, 'translation')).toEqual(['JD.com pages were not counted.']))
 })
 
 it('keeps both halves of an English translation visible in the same block', async () => {
@@ -99,36 +87,59 @@ it('keeps both halves of an English translation visible in the same block', asyn
   const { container } = render(<CaptionOverlay />)
   const translation = 'In addition, several models have prices before and after the national subsidy limits being very similar.'
   emit(caption('one', '另外还有几台机型，国补前后的价格非常接近。', 1, translation))
-  await waitFor(() => expect(container.querySelector('.overlay-track-translation .overlay-track-in'))
-    .toHaveTextContent(translation))
-  expect(container.querySelector('.overlay-track-translation .overlay-track-out')).toBeNull()
+  await waitFor(() => expect(entries(container, 'translation')).toEqual([translation]))
 })
 
-it('plays the first page before the remainder when a translation arrives complete', () => {
-  vi.useFakeTimers()
-  try {
-    const { container } = render(<CaptionTrack line={{ key: 'one', text: 'The first price was listed. The subsidy changed it.' }}
-      kind="translation" segmentId="one" maxWidth={900} fontSize={22} maxLines={1} />)
-    expect(container.querySelector('.overlay-track-in')).toHaveTextContent('The first price was listed.')
-    act(() => vi.advanceTimersByTime(1600))
-    expect(container.querySelector('.overlay-track-in')).toHaveTextContent('The subsidy changed it.')
-    expect(container.querySelector('.overlay-track-out')).toHaveTextContent('The first price was listed.')
-  } finally {
-    vi.useRealTimers()
-  }
+it('keeps one entry per segment and extends it in place', () => {
+  const { container, rerender } = render(<CaptionTrack line={null} kind="source" maxLines={2} layout="sentence" />)
+  expect(container.querySelectorAll('.overlay-track-entry')).toHaveLength(0)
+  rerender(<CaptionTrack line={{ key: 'a', text: 'first' }} kind="source" maxLines={2} layout="sentence" />)
+  rerender(<CaptionTrack line={{ key: 'a', text: 'first and second' }} kind="source" maxLines={2} layout="sentence" />)
+  expect(container.querySelectorAll('.overlay-track-entry')).toHaveLength(1)
+  expect(container.querySelector('.overlay-track-entry')).toHaveTextContent('first and second')
+  rerender(<CaptionTrack line={{ key: 'b', text: 'third' }} kind="source" maxLines={2} layout="sentence" />)
+  expect([...container.querySelectorAll('.overlay-track-entry')].map((node) => node.textContent)).toEqual(['first and second', 'third'])
 })
 
-it('centers a source-only line vertically while keeping it left aligned', async () => {
-  const { emit } = listen()
-  vi.spyOn(window.nolaTranslator!, 'getSettings').mockResolvedValue({
-    ...DEFAULT_SETTINGS,
-    overlay: { ...DEFAULT_SETTINGS.overlay, showTranslation: false },
-  })
-  const { container } = render(<CaptionOverlay />)
-  await waitFor(() => expect(container.querySelector('.caption-console-translations')).toBeNull())
-  emit(caption('one', 'Source only', 1))
-  expect(container.querySelector('.caption-console-stage > .overlay-track-source .overlay-track-text')).toHaveTextContent('Source only')
-  expect(container.querySelector('.caption-console-translations')).toBeNull()
+it('runs consecutive sentences together in the rolling layout', () => {
+  const { container, rerender } = render(<CaptionTrack line={null} kind="source" maxLines={2} layout="rolling" />)
+  rerender(<CaptionTrack line={{ key: 'a', text: 'First sentence.' }} kind="source" maxLines={2} layout="rolling" />)
+  rerender(<CaptionTrack line={{ key: 'b', text: 'Second sentence.' }} kind="source" maxLines={2} layout="rolling" />)
+  // One paragraph, not two blocks: the reference stream never breaks on a sentence boundary.
+  expect(container.querySelectorAll('.overlay-track-entry')).toHaveLength(1)
+  expect(container.querySelector('.overlay-track-entry')).toHaveTextContent('First sentence. Second sentence.')
+})
+
+it('joins CJK sentences without inserting a space', () => {
+  const { container, rerender } = render(<CaptionTrack line={{ key: 'a', text: '第一句。' }} kind="translation" maxLines={2} layout="rolling" />)
+  rerender(<CaptionTrack line={{ key: 'b', text: '第二句。' }} kind="translation" maxLines={2} layout="rolling" />)
+  expect(container.querySelector('.overlay-track-entry')).toHaveTextContent('第一句。第二句。')
+})
+
+it('replaces the sentence when a new segment revises what is already on screen', () => {
+  const first = 'Analyst：Just shut yourself up and make money, but now is not the time to argue about this. Some people say this is you.'
+  const second = 'Analyst：Just shut yourself up and make money is enough, but now is not the time to argue about this. Some people say, this is exactly what you are.'
+  const { container, rerender } = render(<CaptionTrack line={{ key: 'a', text: first }} kind="translation" maxLines={4} layout="rolling" />)
+  expect(container.querySelector('.overlay-track-entry')).toHaveTextContent(first)
+
+  // A revision of the same sentence arrives under a new segment id: swap it in, never stack it.
+  rerender(<CaptionTrack line={{ key: 'b', text: second }} kind="translation" maxLines={4} layout="rolling" />)
+  expect(container.querySelectorAll('.overlay-track-entry')).toHaveLength(1)
+  expect(container.querySelector('.overlay-track-entry')).toHaveTextContent(second)
+})
+
+it('appends a genuinely new sentence after what is on screen', () => {
+  const { container, rerender } = render(<CaptionTrack line={{ key: 'a', text: 'Take a break.' }} kind="source" maxLines={4} layout="rolling" />)
+  rerender(<CaptionTrack line={{ key: 'b', text: 'Busy days make us forget to stop.' }} kind="source" maxLines={4} layout="rolling" />)
+  expect(container.querySelectorAll('.overlay-track-entry')).toHaveLength(1)
+  expect(container.querySelector('.overlay-track-entry')).toHaveTextContent('Take a break. Busy days make us forget to stop.')
+})
+
+it('appends only the part of a new sentence that is not already on screen', () => {
+  const { container, rerender } = render(<CaptionTrack line={{ key: 'a', text: 'Take a break.' }} kind="source" maxLines={4} layout="rolling" />)
+  rerender(<CaptionTrack line={{ key: 'b', text: 'Take a break. Busy days make us forget to stop.' }} kind="source" maxLines={4} layout="rolling" />)
+  // The seam is stated twice otherwise, which is what used to read as a duplicated result.
+  expect(container.querySelector('.overlay-track-entry')).toHaveTextContent('Take a break. Busy days make us forget to stop.')
 })
 
 it('keeps the source in its own slot while a pending translation arrives', async () => {
@@ -137,10 +148,146 @@ it('keeps the source in its own slot while a pending translation arrives', async
   emit(caption('one', 'Source only', 1))
   const source = container.querySelector('.caption-console-stage > .overlay-track-source')
   expect(source).not.toBeNull()
-  expect(container.querySelector('.caption-console-translations .overlay-track-text')).toBeNull()
+  expect(entries(container, 'translation')).toEqual([])
   emit(caption('one', 'Source only', 2, '译文'))
-  await waitFor(() => expect(container.querySelector('.caption-console-translations .overlay-track-text')).toHaveTextContent('译文'))
+  await waitFor(() => expect(entries(container, 'translation')).toEqual(['译文']))
   expect(container.querySelector('.caption-console-stage > .overlay-track-source')).toBe(source)
+})
+
+it('keeps the translation on screen when a later segment carries none', async () => {
+  const { emit } = listen()
+  const { container } = render(<CaptionOverlay />)
+  emit(caption('one', 'Take a break.', 1, '休息一下。'))
+  await waitFor(() => expect(entries(container, 'translation')).toEqual(['休息一下。']))
+  const track = container.querySelector('.overlay-track-translation')
+
+  // Pausing the audio produces an intermediate that carries no translation at all.
+  emit({
+    protocolVersion: 1, type: 'caption', requestId: 'two-1', sessionId: 'session-live',
+    segment: {
+      segmentId: 'two', revision: 1, startedAtMs: 2000, sourceText: 'Busy days make us forget to stop.', isFinal: false,
+      translations: [],
+    },
+  })
+
+  // The track stays mounted with its transcript: an untranslated segment must not blank the history.
+  expect(container.querySelector('.overlay-track-translation')).toBe(track)
+  expect(entries(container, 'translation')).toEqual(['休息一下。'])
+  expect(entries(container, 'source')).toEqual(['Take a break. Busy days make us forget to stop.'])
+
+  emit(caption('two', 'Busy days make us forget to stop.', 2, '忙碌的日子让我们忘记停下。'))
+  await waitFor(() => expect(entries(container, 'translation')).toEqual(['休息一下。忙碌的日子让我们忘记停下。']))
+  expect(container.querySelector('.overlay-track-translation')).toBe(track)
+})
+
+it('hides a track entirely when the user turns it off', async () => {
+  const { emit } = listen()
+  vi.spyOn(window.nolaTranslator!, 'getSettings').mockResolvedValue({
+    ...DEFAULT_SETTINGS, overlay: { ...DEFAULT_SETTINGS.overlay, showTranslation: false },
+  })
+  const { container } = render(<CaptionOverlay />)
+  await waitFor(() => expect(container.querySelector('.caption-console-translations')).toBeNull())
+  emit(caption('one', 'Source only', 1))
+  expect(entries(container, 'source')).toEqual(['Source only'])
+  expect(container.querySelector('.caption-console-translations')).toBeNull()
+})
+
+it('reveals the control rows from a pointer anywhere on the card, not just over a button', () => {
+  const { container } = render(<CaptionOverlay />)
+  const card = container.querySelector('.caption-console') as HTMLElement
+  vi.spyOn(card, 'getBoundingClientRect').mockReturnValue({
+    x: 0, y: 0, left: 0, top: 0, right: 800, bottom: 200, width: 800, height: 200, toJSON: () => ({}),
+  })
+  const pointerAt = (x: number, y: number): void => {
+    act(() => { fireEvent(window, new MouseEvent('mousemove', { clientX: x, clientY: y })) })
+  }
+  expect(card).toHaveAttribute('data-hover', 'false')
+
+  // A corner of the card that no control overlaps, which is the case enter/leave used to miss.
+  pointerAt(4, 196)
+  expect(card).toHaveAttribute('data-hover', 'true')
+  pointerAt(600, 100)
+  expect(card).toHaveAttribute('data-hover', 'true')
+
+  act(() => { fireEvent(document, new MouseEvent('mouseleave')) })
+  expect(card).toHaveAttribute('data-hover', 'false')
+
+  pointerAt(840, 4)
+  expect(card).toHaveAttribute('data-hover', 'false')
+})
+
+it('cycles bilingual, source only and translation only from one pill', async () => {
+  const api = window.nolaTranslator!
+  let current: AppSettings = { ...DEFAULT_SETTINGS, overlay: { ...DEFAULT_SETTINGS.overlay } }
+  vi.spyOn(api, 'getSettings').mockImplementation(async () => current)
+  vi.spyOn(api, 'updateSettings').mockImplementation(async (patch) => {
+    current = {
+      ...current, ...patch,
+      recognition: { ...current.recognition, ...patch.recognition },
+      overlay: { ...current.overlay, ...patch.overlay },
+      translation: { ...current.translation, ...patch.translation },
+    }
+    return current
+  })
+  const { container } = render(<CaptionOverlay />)
+  const pill = (): HTMLButtonElement =>
+    container.querySelector('[data-caption-display-toggle]') as HTMLButtonElement
+
+  expect(pill()).toHaveTextContent('双语')
+  fireEvent.click(pill())
+  await waitFor(() => expect(pill()).toHaveTextContent('原文'))
+  expect(container.querySelector('.caption-console-translations')).toBeNull()
+
+  fireEvent.click(pill())
+  await waitFor(() => expect(pill()).toHaveTextContent('译文'))
+  expect(container.querySelector('.caption-console-stage > .overlay-track-source')).toBeNull()
+
+  fireEvent.click(pill())
+  await waitFor(() => expect(pill()).toHaveTextContent('双语'))
+  expect(current.overlay.showSource).toBe(true)
+  expect(current.overlay.showTranslation).toBe(true)
+})
+
+it('starts and stops a session from the mic button', async () => {
+  const api = window.nolaTranslator!
+  const start = vi.spyOn(api, 'startSession').mockResolvedValue({ sessionId: 'session-live' })
+  const stop = vi.spyOn(api, 'stopSession').mockResolvedValue(undefined)
+  const { container } = render(<CaptionOverlay />)
+  const mic = container.querySelector('.caption-mic') as HTMLButtonElement
+  expect(mic).toHaveAttribute('aria-label', '开始字幕')
+
+  fireEvent.click(mic)
+  await waitFor(() => expect(start).toHaveBeenCalledOnce())
+  expect(start.mock.calls[0][0]).toMatchObject({ sourceLanguage: 'auto', targetLanguages: ['zh'], audioSource: { kind: 'defaultOutput' } })
+  await waitFor(() => expect(container.querySelector('.caption-mic')).toHaveAttribute('aria-label', '停止字幕'))
+
+  fireEvent.click(container.querySelector('.caption-mic')!)
+  await waitFor(() => expect(stop).toHaveBeenCalledWith('session-live'))
+})
+
+it('sends a missing model to the resource page instead of starting a doomed session', async () => {
+  const api = window.nolaTranslator!
+  vi.spyOn(api, 'listResources').mockResolvedValue({ storagePath: '', resources: [] })
+  const start = vi.spyOn(api, 'startSession')
+  const appearance = vi.spyOn(api, 'openAppearance')
+  const { container } = render(<CaptionOverlay />)
+  fireEvent.click(container.querySelector('.caption-mic')!)
+  await waitFor(() => expect(appearance).toHaveBeenCalledWith('resources'))
+  expect(start).not.toHaveBeenCalled()
+  expect(container.querySelector('.caption-console-notice')).toHaveTextContent('模型尚未安装')
+})
+
+it('opens the matching settings page from the model and language pills', async () => {
+  const appearance = vi.spyOn(window.nolaTranslator!, 'openAppearance')
+  const { container } = render(<CaptionOverlay />)
+  const [, model, language] = [...container.querySelectorAll('.caption-console-controls button')]
+
+  expect(model).toHaveTextContent('Hy-MT2')
+  expect(language).toHaveTextContent('自动 → 中')
+  fireEvent.click(model)
+  expect(appearance).toHaveBeenCalledWith('translation')
+  fireEvent.click(language)
+  expect(appearance).toHaveBeenCalledWith('captions')
 })
 
 it('shows the reference console controls and keeps close usable when locked', async () => {
@@ -155,7 +302,7 @@ it('shows the reference console controls and keeps close usable when locked', as
   await waitFor(() => expect(container.querySelector('.caption-console')).toHaveAttribute('data-locked', 'true'))
   expect(screen.getByRole('button', { name: '打开字幕设置' })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '打开字幕设置' }))
-  expect(appearance).toHaveBeenCalledOnce()
+  expect(appearance).toHaveBeenCalledWith('appearance')
   expect(screen.getByRole('button', { name: '始终置顶' })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '解锁位置' }))
   await waitFor(() => expect(save).toHaveBeenCalledWith({ overlay: { mode: 'free', locked: false } }))
@@ -163,43 +310,13 @@ it('shows the reference console controls and keeps close usable when locked', as
   expect(hide).toHaveBeenCalledOnce()
 })
 
-it('moves source and translation on their own content changes', async () => {
-  const { emit } = listen()
-  const { container } = render(<CaptionOverlay />)
-  emit(caption('one', 'First sentence.', 1, '第一句。'))
-  await waitFor(() => expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toHaveTextContent('第一句。'))
-
-  emit(caption('two', 'Second sentence.', 1))
-  expect(container.querySelector('.overlay-track-source .overlay-track-in')).toHaveTextContent('Second sentence.')
-  expect(container.querySelector('.overlay-track-source .overlay-track-out')).toHaveTextContent('First sentence.')
-  expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toBeNull()
-  expect(container.querySelector('.overlay-track-translation .overlay-track-out')).toHaveTextContent('第一句。')
-
-  emit(caption('two', 'Second sentence.', 2, '第二句。'))
-  await waitFor(() => expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toHaveTextContent('第二句。'))
-  expect(container.querySelector('.overlay-track-translation .overlay-track-out')).toHaveTextContent('第一句。')
-})
-
-it('delays translation rollover even when a new caption includes both languages', async () => {
-  const { emit } = listen()
-  const { container } = render(<CaptionOverlay />)
-  emit(caption('one', 'First sentence.', 1, '第一句。'))
-  await waitFor(() => expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toHaveTextContent('第一句。'))
-  emit(caption('two', 'Second sentence.', 1, '第二句。'))
-  expect(container.querySelector('.overlay-track-source .overlay-track-in')).toHaveTextContent('Second sentence.')
-  expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toHaveTextContent('第一句。')
-  await waitFor(() => expect(container.querySelector('.overlay-track-translation .overlay-track-in')).toHaveTextContent('第二句。'))
-})
-
 it('applies separate typography and a fully transparent background', async () => {
   vi.spyOn(window.nolaTranslator!, 'getSettings').mockResolvedValue({
     ...DEFAULT_SETTINGS,
-    overlay: { ...DEFAULT_SETTINGS.overlay, backgroundOpacity: 0, maxLines: 2, translationMaxLines: 5, translationFontSize: 31 },
+    overlay: { ...DEFAULT_SETTINGS.overlay, backgroundOpacity: 0, translationFontSize: 31 },
   })
   const { container } = render(<CaptionOverlay />)
   await waitFor(() => expect(container.querySelector('.caption-console')).toHaveAttribute('data-transparent-background', 'true'))
   const style = (container.querySelector('.caption-console') as HTMLElement).style
-  expect(style.getPropertyValue('--overlay-max-lines')).toBe('2')
-  expect(style.getPropertyValue('--overlay-translation-max-lines')).toBe('5')
   expect(style.getPropertyValue('--overlay-translation-font-size')).toBe('31px')
 })

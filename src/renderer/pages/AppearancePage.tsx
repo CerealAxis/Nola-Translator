@@ -181,14 +181,12 @@ export function AppearancePage(): React.JSX.Element {
             <legend>{t('原文排版')}</legend>
             <label><span>{t('字号 · {size} px', { size: overlay.fontSize })}</span><input type="range" min="14" max="72" value={overlay.fontSize} {...rangeProps} onChange={(event) => scheduleOverlay({ fontSize: Number(event.target.value) })} /></label>
             <label><span>{t('字重 · {weight}', { weight: overlay.fontWeight })}</span><input type="range" min="300" max="800" step="100" value={overlay.fontWeight} {...rangeProps} onChange={(event) => scheduleOverlay({ fontWeight: Number(event.target.value) })} /></label>
-            <label><span>{t('最大行数 · {lines}', { lines: overlay.maxLines })}</span><input type="range" min="1" max="10" value={overlay.maxLines} {...rangeProps} onChange={(event) => scheduleOverlay({ maxLines: Number(event.target.value) })} /></label>
             <label><span>{t('行距 · {spacing}', { spacing: overlay.lineHeight.toFixed(2) })}</span><input type="range" min="1" max="2" step="0.05" value={overlay.lineHeight} {...rangeProps} onChange={(event) => scheduleOverlay({ lineHeight: Number(event.target.value) })} /></label>
           </fieldset>
           <fieldset className="subtitle-typography-group">
             <legend>{t('译文排版')}</legend>
             <label><span>{t('字号 · {size} px', { size: overlay.translationFontSize })}</span><input type="range" min="12" max="72" value={overlay.translationFontSize} {...rangeProps} onChange={(event) => scheduleOverlay({ translationFontSize: Number(event.target.value) })} /></label>
             <label><span>{t('字重 · {weight}', { weight: overlay.translationFontWeight })}</span><input type="range" min="300" max="800" step="100" value={overlay.translationFontWeight} {...rangeProps} onChange={(event) => scheduleOverlay({ translationFontWeight: Number(event.target.value) })} /></label>
-            <label><span>{t('最大行数 · {lines}', { lines: overlay.translationMaxLines })}</span><input type="range" min="1" max="10" value={overlay.translationMaxLines} {...rangeProps} onChange={(event) => scheduleOverlay({ translationMaxLines: Number(event.target.value) })} /></label>
             <label><span>{t('行距 · {spacing}', { spacing: overlay.translationLineHeight.toFixed(2) })}</span><input type="range" min="1" max="2" step="0.05" value={overlay.translationLineHeight} {...rangeProps} onChange={(event) => scheduleOverlay({ translationLineHeight: Number(event.target.value) })} /></label>
           </fieldset>
           <label><span>{t('背景不透明度 · {opacity}%', { opacity: Math.round(overlay.backgroundOpacity * 100) })}</span><input type="range" min="0" max="100" value={overlay.backgroundOpacity * 100} {...rangeProps} onChange={(event) => scheduleOverlay({ backgroundOpacity: Number(event.target.value) / 100 })} /></label>
@@ -200,7 +198,7 @@ export function AppearancePage(): React.JSX.Element {
           <label className="switch-label"><input checked={overlay.locked} onChange={(event) => void updateOverlay({ locked: event.target.checked })} type="checkbox" />{t('锁定位置和大小')}</label>
           <p className="setting-hint">{t('拖动字幕横条可移动浮层，拖动右下角可调整大小；悬停横条可关闭或锁定。')}</p>
         </section>
-        <CaptionPreview caption={{ segmentId: 'appearance-example', revision: 1, startedAtMs: 0, isFinal: true, sourceText: 'Take a moment to listen. Every word brings us closer.', translations: [{ targetLanguage: 'zh', state: 'complete', provider: 'example', text: '用心聆听，让每一句话拉近彼此。' }] }} overlay={overlay} sourceVisible={overlay.showSource} translationVisible={overlay.showTranslation} />
+        <CaptionPreview caption={{ segmentId: 'appearance-example', revision: 1, startedAtMs: 0, isFinal: true, sourceText: 'Take a moment to listen. Every word brings us closer.', translations: [{ targetLanguage: 'zh', state: 'complete', provider: 'example', text: '用心聆听，让每一句话拉近彼此。' }] }} overlay={overlay} sourceVisible={overlay.showSource} translationVisible={overlay.showTranslation} sourceLanguage={settings.recognition.sourceLanguage} targetLanguage={settings.translation.targetLanguage} />
       </div>
     </div>
   )

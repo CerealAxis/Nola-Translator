@@ -87,7 +87,7 @@ function AppContent(): React.JSX.Element {
     })
   }, [])
 
-  useEffect(() => window.nolaTranslator?.onOpenAppearance(() => setActivePage('appearance')), [])
+  useEffect(() => window.nolaTranslator?.onOpenAppearance((page) => setActivePage(page)), [])
 
   const stopActiveSession = async (): Promise<void> => {
     const api = window.nolaTranslator

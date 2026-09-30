@@ -12,12 +12,12 @@ export type OverlaySettings = {
   translationColor: string
   backgroundColor: string
   backgroundOpacity: number
-  maxLines: number
   lineHeight: number
-  translationMaxLines: number
   translationLineHeight: number
   showSource: boolean
   showTranslation: boolean
+  /** `rolling` keeps the source/translation streams scrolling up like 讯飞同传; `sentence` switches to per-segment line breaks. */
+  layout: 'rolling' | 'sentence'
 }
 
 export type AppSettings = {
@@ -36,6 +36,8 @@ export type RecognitionModelId = 'qwen3-asr-1.7b-hf' | 'qwen3-asr-0.6b-hf' | 'se
 export type RecognitionSettings = {
   modelId: RecognitionModelId
   sourceLanguage: string
+  /** `defaultOutput` or an audio device id; shared so the overlay can start a session with the same source. */
+  audioSource: string
 }
 
 export type TranslationProvider = 'hymt2' | 'm2m100' | 'microsoft' | 'openai' | 'ollama'
@@ -97,6 +99,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   recognition: {
     modelId: 'qwen3-asr-1.7b-hf',
     sourceLanguage: 'auto',
+    audioSource: 'defaultOutput',
   },
   overlay: {
     mode: 'bottom',
@@ -112,12 +115,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
     translationColor: '#D7DEE8',
     backgroundColor: '#0D0E10',
     backgroundOpacity: 0.96,
-    maxLines: 2,
     lineHeight: 1.3,
-    translationMaxLines: 2,
     translationLineHeight: 1.35,
     showSource: true,
     showTranslation: true,
+    layout: 'rolling',
   },
   translation: {
     provider: 'hymt2',

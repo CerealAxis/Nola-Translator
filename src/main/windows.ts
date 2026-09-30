@@ -44,13 +44,14 @@ export function computeOverlayBounds(
 }
 
 export function createOverlayWindowOptions(preload: string, workAreaWidth?: number): BrowserWindowConstructorOptions {
-  // The reference console is a compact bar near the lower center of the display.
+  // The reference console is a compact bar near the lower center of the display, tall enough for
+  // three source lines above three translation lines once the reserved control row is deducted.
   const width = workAreaWidth
     ? Math.min(940, Math.max(560, Math.round(workAreaWidth * 0.46)))
     : 820
   return {
     width,
-    height: 118,
+    height: 218,
     minWidth: 420,
     minHeight: 52,
     resizable: true,

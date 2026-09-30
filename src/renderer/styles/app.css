@@ -281,21 +281,24 @@ input[type="checkbox"] { accent-color: var(--accent); }
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 13%, transparent), transparent 58%), var(--navigation);
   overflow: hidden;
 }
-.caption-overlay { position: relative; display: flex; flex-direction: column; justify-content: space-between; width: min(760px, 94%); min-height: 118px; padding: 14px 20px 8px; border: 1px solid #292b2f; border-radius: 15px; text-align: left; background: color-mix(in srgb, var(--preview-background-color, #0d0e10) var(--preview-background-alpha, 96%), transparent); box-shadow: 0 9px 24px rgba(0, 0, 0, .34); }
+.caption-overlay { position: relative; display: flex; flex-direction: column; justify-content: flex-start; width: min(760px, 94%); min-height: 152px; padding: 22px 22px 38px; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; text-align: left; background: color-mix(in srgb, var(--preview-background-color, #0d0e10) var(--preview-background-alpha, 96%), transparent); box-shadow: 0 14px 34px rgba(0, 0, 0, .45); overflow: hidden; }
 .caption-overlay[data-transparent-background="true"] { background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none; }
-.caption-preview-text { min-width: 0; padding-right: 145px; }
-.caption-preview-actions { position: absolute; right: 12px; top: 10px; display: flex; align-items: center; gap: 5px; color: #c7c9cd; }
-.caption-preview-actions svg { width: 20px; height: 20px; padding: 3px; border-radius: 50%; background: #3b3d41; }
-.caption-preview-actions i { height: 15px; border-left: 1px solid #393b3f; }
-.caption-preview-controls { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 8px; color: #d4d5d8; font-size: 10px; font-weight: 600; }
-.caption-preview-mic, .caption-preview-pill { border-radius: 12px; background: #414348; }
-.caption-preview-mic { display: grid; place-items: center; width: 20px; height: 20px; margin-right: 8px; }
+.caption-preview-text { flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+.caption-preview-scrim { position: absolute; left: 0; right: 0; z-index: 1; pointer-events: none; }
+.caption-preview-scrim-top { top: 0; height: 46px; background: linear-gradient(to bottom, color-mix(in srgb, var(--preview-background-color, #0d0e10) 92%, transparent) 30%, transparent); }
+.caption-preview-scrim-bottom { bottom: 0; height: 40px; background: linear-gradient(to top, color-mix(in srgb, var(--preview-background-color, #0d0e10) 92%, transparent) 30%, transparent); }
+.caption-preview-actions { position: absolute; right: 10px; top: 10px; z-index: 2; display: flex; align-items: center; gap: 5px; color: #c7c9cd; }
+.caption-preview-actions svg { width: 20px; height: 20px; padding: 3px; border-radius: 50%; background: rgba(255,255,255,.12); }
+.caption-preview-actions i { height: 15px; border-left: 1px solid rgba(255,255,255,.16); }
+.caption-preview-controls { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 7px; height: 22px; color: rgba(255,255,255,.92); font-size: 11px; font-weight: 600; }
+.caption-preview-mic, .caption-preview-pill { border-radius: 13px; background: rgba(255,255,255,.13); }
+.caption-preview-mic { display: grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; }
 .caption-preview-mic svg { width: 12px; height: 12px; }
 .caption-preview-pill { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; }
 .caption-preview-pill svg { width: 11px; height: 11px; }
 .caption-source, .caption-translation { overflow-wrap: anywhere; white-space: pre-wrap; text-wrap: wrap; }
-.caption-source { margin-bottom: 3px; color: var(--preview-source-color, #f7f7f7); font-size: var(--preview-font-size, 17px); font-weight: var(--preview-font-weight, 500); line-height: var(--preview-line-height, 1.24); max-height: calc(var(--preview-max-lines, 2) * 1lh); overflow: hidden; }
-.caption-translation { margin-bottom: 0; color: var(--preview-translation-color, #bfc2c8); font-size: var(--preview-translation-font-size, 16px); font-weight: var(--preview-translation-font-weight, 400); line-height: var(--preview-translation-line-height, 1.28); max-height: calc(var(--preview-translation-max-lines, 2) * 1lh); overflow: hidden; }
+.caption-source { margin-bottom: 3px; color: var(--preview-source-color, #f7f7f7); font-size: var(--preview-font-size, 17px); font-weight: var(--preview-font-weight, 500); line-height: var(--preview-line-height, 1.3); }
+.caption-translation { margin-bottom: 0; color: var(--preview-translation-color, #eceff4); font-size: var(--preview-translation-font-size, 16px); font-weight: var(--preview-translation-font-weight, 400); line-height: var(--preview-translation-line-height, 1.35); }
 /* A failed translation must not read as an empty line, hence the error color. */
 .caption-translation-failed { color: #c42b1c; }
 
@@ -456,12 +459,13 @@ th { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
 }
 
 html[data-overlay="true"], html[data-overlay="true"] body, html[data-overlay="true"] #root { width: 100%; height: 100%; overflow: hidden; background: transparent; }
-.overlay-window { width: 100%; height: 100%; padding: 3px; background: transparent; }
+/* No outer padding: the Electron window is itself the card, so DWM cannot paint a frosted ring around it. */
+.overlay-window { width: 100%; height: 100%; padding: 0; background: transparent; }
 .caption-console {
-  position: relative; display: flex; flex-direction: column; width: 100%; height: 100%; min-width: 0; min-height: 0;
-  overflow: hidden; border: 1px solid #292b2f; border-radius: 15px;
+  position: relative; display: flex; flex-direction: column; width: 100%; height: 100%;
+  min-width: 0; min-height: 0; overflow: hidden; border: 0; border-radius: 16px;
   background: color-mix(in srgb, var(--overlay-background-color, #0d0e10) var(--overlay-background-alpha, 96%), transparent);
-  box-shadow: 0 9px 24px rgba(0,0,0,.34); color: #f5f5f5;
+  box-shadow: 0 12px 30px rgba(0,0,0,.45); color: #f5f5f5;
 }
 
 .startup-screen {
@@ -508,38 +512,118 @@ html[data-overlay="true"], html[data-overlay="true"] body, html[data-overlay="tr
 .session-loading > span:last-child { color: var(--text-secondary); }
 .caption-console[data-transparent-background="true"] { background: transparent; border-color: transparent; box-shadow: none; }
 .caption-console[data-locked="false"] { -webkit-app-region: drag; }
-.caption-console-stage { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px; flex: 1; min-height: 0; padding: 4px 22px; overflow: hidden; }
-.caption-console-translations { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.overlay-track { position: relative; flex: 0 1 auto; min-width: 0; min-height: 0; overflow: hidden; }
-.overlay-track-text { margin: 0; white-space: pre-line; overflow-wrap: anywhere; overflow: hidden; text-align: left; max-height: calc(var(--overlay-visible-lines, 1) * 1lh); }
-.overlay-source { color: var(--overlay-source-color, #f7f7f7); font-size: var(--overlay-font-size, 17px); font-weight: var(--overlay-font-weight, 500); line-height: var(--overlay-line-height, 1.24); }
-.overlay-translation { color: var(--overlay-translation-color, #d7dee8); font-size: var(--overlay-translation-font-size, 16px); font-weight: var(--overlay-translation-font-weight, 400); line-height: var(--overlay-translation-line-height, 1.28); }
-.overlay-track-in { animation: caption-track-in 280ms cubic-bezier(.2,.7,.2,1) both; }
-.overlay-track-out { position: absolute; inset: 0 0 auto; width: 100%; pointer-events: none; animation: caption-track-out 280ms cubic-bezier(.2,.7,.2,1) both; }
-@keyframes caption-track-in { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
-@keyframes caption-track-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-100%); } }
-.caption-console-actions { position: absolute; top: 13px; right: 14px; display: flex; align-items: center; gap: 7px; -webkit-app-region: no-drag; }
-.caption-console-actions button { display: grid; place-items: center; width: 25px; height: 25px; padding: 0; border: 0; border-radius: 50%; background: #3b3d41; color: #c7c9cd; cursor: pointer; }
-.caption-console-actions button:hover, .caption-console-actions button:focus-visible { background: #5b5e63; color: #fff; }
-.caption-console-actions button[data-active="true"] { color: #69a0fa; }
-.caption-console-actions svg { width: 17px; height: 17px; }
-.caption-action-divider { width: 1px; height: 18px; margin: 0 2px; background: #393b3f; }
-.caption-console-controls { display: flex; align-items: center; justify-content: center; gap: 11px; flex: 0 0 34px; padding: 0 16px 8px; -webkit-app-region: no-drag; }
-.caption-mic { display: grid; place-items: center; width: 24px; height: 24px; margin-right: 18px; border-radius: 50%; background: #3a3c40; color: #bdc0c6; }
-.caption-mic[data-active="true"] { color: #fff; }
+/* Top padding reserves space for the right-aligned action buttons; bottom padding reserves space for the centered control row. */
+.caption-console-stage { position: relative; display: flex; flex-direction: column; justify-content: flex-start; gap: 6px; flex: 1; min-height: 0; padding: 22px 22px 38px; overflow: hidden; }
+/* The rows keep their position whether or not the controls are showing; the scrims below cover whatever sits underneath. */
+.caption-console-scrim {
+  position: absolute; left: 0; right: 0; z-index: 1; pointer-events: none;
+  opacity: 0; transition: opacity 180ms ease;
+}
+/* The scrims fade the caption out from the card's own colour, so a custom background or opacity still reads correctly. */
+.caption-console-scrim-top { top: 0; height: 62px; background: linear-gradient(to bottom, color-mix(in srgb, var(--overlay-background-color, #0d0e10) 92%, transparent) 30%, transparent); }
+.caption-console-scrim-bottom { bottom: 0; height: 58px; background: linear-gradient(to top, color-mix(in srgb, var(--overlay-background-color, #0d0e10) 92%, transparent) 30%, transparent); }
+.caption-console[data-hover="true"] .caption-console-scrim,
+.caption-console:hover .caption-console-scrim { opacity: 1; }
+.caption-console[data-transparent-background="true"] .caption-console-scrim { opacity: 0; }
+.caption-console-translations { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.overlay-track { position: relative; flex: 0 0 auto; min-width: 0; overflow: hidden; }
+.overlay-track-source { height: calc(var(--overlay-visible-lines, 1) * 1lh); color: var(--overlay-source-color, #f7f7f7); font-size: var(--overlay-font-size, 17px); font-weight: var(--overlay-font-weight, 500); line-height: var(--overlay-line-height, 1.3); }
+.overlay-track-translation { height: calc(var(--overlay-visible-lines, 1) * 1lh); color: var(--overlay-translation-color, #eceff4); font-size: var(--overlay-translation-font-size, 16px); font-weight: var(--overlay-translation-font-weight, 400); line-height: var(--overlay-translation-line-height, 1.35); }
+/* One unbroken column: the block fills the track from the top and then rolls upward, so a full box loses its top line. */
+.overlay-track-flow { position: relative; height: 100%; overflow: hidden; }
+.overlay-track-content { transition: transform 320ms cubic-bezier(.22,.7,.2,1); will-change: transform; }
+/* No top fade here: the mask gradient turned every entry's top edge grey, and the rolling translate does not need it to feel "smooth". */
+/* Sentence layout: each entry is its own block, so the flow must clip overflow vertically instead of fading. */
+.overlay-track-sentence { height: auto; max-height: 100%; overflow: hidden auto; }
+.overlay-track-sentence .overlay-track-content { transform: none !important; }
+.overlay-track-sentence .overlay-track-entry { margin-bottom: 6px; }
+/* text-shadow kept off on opaque cards because the dark shadow over white reads as a gray halo. */
+/* `color: inherit` and `line-height: inherit` are mandatory: the global `p` rule pins every paragraph to the secondary text color and 1.55 line-height, which would otherwise hijack the track color and the rolling-offset math. */
+.overlay-track-entry { margin: 0; color: inherit; line-height: inherit; overflow-wrap: anywhere; text-align: left; animation: caption-entry-in 220ms cubic-bezier(.22,.7,.2,1) both; }
+@keyframes caption-entry-in {
+  from { opacity: 0; transform: translateY(28%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* When the card is dimmed (backgroundOpacity dropped) lift the entries with a small halo so they stay legible. */
+.caption-console[data-transparent-background="true"] .overlay-track-entry { text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+.caption-console-actions {
+  position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 6px;
+  -webkit-app-region: no-drag; opacity: 0; transform: translateY(-4px); pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+/* Mirror the actions row's inset from the top so the controls sit at the same distance from the bottom edge. */
+.caption-console-controls {
+  position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 2; display: flex; align-items: center; justify-content: center;
+  gap: 8px; height: 26px;
+  -webkit-app-region: no-drag; opacity: 0; transform: translateY(4px); pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.caption-console[data-hover="true"] .caption-console-actions, .caption-console[data-hover="true"] .caption-console-controls,
+.caption-console:hover .caption-console-actions, .caption-console:hover .caption-console-controls {
+  opacity: 1; transform: none; pointer-events: auto;
+}
+.caption-console-actions button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: rgba(255,255,255,.12); color: rgba(255,255,255,.78); cursor: pointer; }
+.caption-console-actions button:hover, .caption-console-actions button:focus-visible { background: rgba(255,255,255,.24); color: #fff; }
+.caption-console-actions button[data-active="true"] { color: #7fb0ff; }
+.caption-console-actions svg { width: 16px; height: 16px; }
+.caption-action-divider { width: 1px; height: 16px; margin: 0 2px; background: rgba(255,255,255,.16); }
+.caption-mic { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; margin-right: 14px; border: 0; border-radius: 50%; background: rgba(255,255,255,.12); color: rgba(255,255,255,.8); cursor: pointer; }
+.caption-mic:hover { background: rgba(255,255,255,.24); }
+.caption-mic[data-active="true"] { background: #fff; color: #17181a; }
+.caption-mic:disabled { opacity: .5; cursor: default; }
 .caption-mic svg { width: 15px; height: 15px; }
-.caption-control-pill { height: 24px; padding: 2px 12px; border: 0; border-radius: 14px; background: #414348; color: #d4d5d8; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.caption-control-pill { height: 26px; padding: 0 12px; border: 0; border-radius: 13px; background: rgba(255,255,255,.13); color: rgba(255,255,255,.92); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
 button.caption-control-pill { cursor: pointer; }
-button.caption-control-pill:hover { background: #56595e; }
-button.caption-control-pill[data-active="false"] { color: #8e9299; background: #292b2f; }
-.caption-mode-pill { display: inline-flex; align-items: center; gap: 6px; min-width: 93px; justify-content: center; }
-.caption-mode-pill svg { width: 12px; height: 12px; }
-.caption-mode-dot { width: 8px; height: 8px; border: 2px solid #e1e3e7; border-radius: 50%; }
-.caption-console-notice { position: absolute; left: 16px; bottom: 7px; max-width: 175px; font-size: 11px; color: #ffce86; pointer-events: none; }
-.caption-console[data-collapsed="true"] .caption-console-actions { top: 10px; }
+button.caption-control-pill:hover { background: rgba(255,255,255,.24); }
+.caption-control-icon { width: 30px; padding: 0; display: grid; place-items: center; }
+.caption-control-icon svg { width: 15px; height: 15px; }
+.caption-mode-pill { display: inline-flex; align-items: center; gap: 6px; min-width: 96px; justify-content: center; }
+.caption-mode-pill svg { width: 11px; height: 11px; }
+.caption-mode-dot { width: 9px; height: 9px; border: 2px solid currentColor; border-radius: 50%; }
+/* Layout popover: anchored to the icon button so it floats just above the controls row, mirroring the reference screenshot. */
+.caption-layout-popover { position: relative; display: inline-flex; }
+.caption-layout-menu {
+  position: absolute; right: 0; bottom: calc(100% + 12px); min-width: 220px; padding: 8px;
+  border-radius: 12px; background: #1f2024; color: #f3f4f6; box-shadow: 0 14px 32px rgba(0,0,0,.45);
+  display: flex; flex-direction: column; gap: 4px; z-index: 4;
+}
+.caption-layout-menu-title { display: block; padding: 4px 6px 6px; font-size: 11px; color: #b9bcc4; }
+.caption-layout-menu-item { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; text-align: left; }
+.caption-layout-menu-item:hover { background: rgba(255,255,255,.08); }
+.caption-layout-menu-item[data-active="true"] { background: rgba(96,205,255,.12); }
+.caption-layout-menu-thumb { position: relative; flex: 0 0 auto; width: 38px; height: 28px; border-radius: 4px; background: rgba(255,255,255,.16); overflow: hidden; }
+.caption-layout-menu-thumb i { position: absolute; left: 4px; right: 4px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.7); }
+.caption-layout-menu-thumb i:nth-child(1) { top: 5px; }
+.caption-layout-menu-thumb i:nth-child(2) { top: 12px; }
+.caption-layout-menu-thumb i:nth-child(3) { top: 19px; width: 60%; }
+.caption-layout-menu-thumb[data-layout="sentence"] i:nth-child(1) { top: 4px; }
+.caption-layout-menu-thumb[data-layout="sentence"] i:nth-child(2) { top: 12px; right: 12px; }
+.caption-layout-menu-thumb[data-layout="sentence"] i:nth-child(3) { top: 20px; }
+.caption-layout-menu-text { display: flex; flex-direction: column; gap: 2px; }
+.caption-layout-menu-label { font-size: 13px; font-weight: 600; }
+.caption-layout-menu-hint { font-size: 11px; color: #9ea2ab; }
+.caption-layout-menu-item[data-active="true"] .caption-layout-menu-label { color: #60cdff; }
+.caption-layout-menu-item[data-active="true"] .caption-layout-menu-thumb { background: rgba(96,205,255,.2); }
+.caption-layout-menu-item[data-active="true"] .caption-layout-menu-thumb i { background: #60cdff; }
+.caption-console-notice { position: absolute; right: 22px; bottom: 40px; z-index: 3; max-width: 45%; font-size: 11px; color: #ffce86; text-align: right; pointer-events: none; }
+.caption-console[data-collapsed="true"] .caption-console-actions { top: 8px; }
 .caption-console[data-collapsed="true"] .caption-console-stage { padding: 0; }
-.caption-console[data-color-scheme="light"] { border-color: #c8cbd0; color: #26282b; }
-.caption-console[data-color-scheme="light"] .caption-console-actions button, .caption-console[data-color-scheme="light"] .caption-control-pill, .caption-console[data-color-scheme="light"] .caption-mic { background: #e0e2e5; color: #33363b; }
+/* Only the light palette needs a hairline to separate the card from a bright desktop. */
+.caption-console[data-color-scheme="light"] { color: #26282b; }
+/* The hairline and the shadow are excluded from the fully-transparent case: this rule sits later in
+   the file than `[data-transparent-background="true"]` at equal specificity, so the `border` shorthand
+   would otherwise reset that rule's transparent `border-color` and restore the shadow, drawing a dark
+   outline around a card that has no background at all. */
+.caption-console[data-color-scheme="light"]:not([data-transparent-background="true"]) {
+  border: 1px solid rgba(0,0,0,.08); box-shadow: 0 16px 40px rgba(0,0,0,.28);
+}
+.caption-console[data-color-scheme="light"] .caption-console-actions button,
+.caption-console[data-color-scheme="light"] .caption-control-pill,
+.caption-console[data-color-scheme="light"] .caption-mic { background: rgba(0,0,0,.08); color: #33363b; }
+.caption-console[data-color-scheme="light"] .caption-console-actions button:hover,
+.caption-console[data-color-scheme="light"] .caption-control-pill:hover,
+.caption-console[data-color-scheme="light"] .caption-mic:hover { background: rgba(0,0,0,.16); }
+.caption-console[data-color-scheme="light"] .caption-mic[data-active="true"] { background: #1b1b1b; color: #fff; }
 
 .page-heading, .card-heading-row, .section-heading-row, .session-footer { flex-wrap: wrap; }
 .page-heading > div, .card-heading-row > div, .section-heading-row > div,
@@ -564,6 +648,6 @@ button.caption-control-pill[data-active="false"] { color: #8e9299; background: #
 }
 .model-storage-settings { padding: 20px; margin-top: 16px; margin-bottom: 24px; }
 .model-storage-settings p { margin-bottom: 10px; }
-.overlay-resize-grip { position: absolute; right: 0; bottom: 0; width: 20px; height: 20px; cursor: nwse-resize; -webkit-app-region: no-drag; opacity: .15; }
-.overlay-resize-grip::after { content: ''; position: absolute; right: 5px; bottom: 5px; width: 8px; height: 8px; border-right: 2px solid #c7c9cd; border-bottom: 2px solid #c7c9cd; }
-.caption-console:hover .overlay-resize-grip { opacity: .8; }
+.overlay-resize-grip { position: absolute; right: 4px; bottom: 4px; width: 14px; height: 14px; z-index: 3; cursor: nwse-resize; -webkit-app-region: no-drag; opacity: 0; transition: opacity 180ms ease; }
+.overlay-resize-grip::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 6px; height: 6px; border-right: 2px solid rgba(255,255,255,.55); border-bottom: 2px solid rgba(255,255,255,.55); }
+.caption-console[data-hover="true"] .overlay-resize-grip, .caption-console:hover .overlay-resize-grip { opacity: .8; }

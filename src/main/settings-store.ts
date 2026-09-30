@@ -115,6 +115,16 @@ export class SettingsStore {
         if (raw.overlay.sourceColor === '#FFFFFF') overlay.sourceColor = DEFAULT_SETTINGS.overlay.sourceColor
         if (raw.overlay.translationColor === '#FFFFFF') overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
       }
+      // The earliest bar was a #202020 slab left translucent, which over any bright window reads as a
+      // washed-out grey card with white text barely separating from it. Only the untouched legacy
+      // colours move; a card the user actually re-tinted keeps its background and its opacity.
+      if (raw.overlay?.backgroundColor === '#202020' && (raw.overlay.sourceColor ?? '').toUpperCase() === '#FFFFFF') {
+        overlay.backgroundColor = DEFAULT_SETTINGS.overlay.backgroundColor
+        overlay.backgroundOpacity = DEFAULT_SETTINGS.overlay.backgroundOpacity
+        if ((raw.overlay.translationColor ?? '').toUpperCase() === '#FFFFFF') {
+          overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
+        }
+      }
     } catch {
       this.settings = structuredClone(DEFAULT_SETTINGS)
     }

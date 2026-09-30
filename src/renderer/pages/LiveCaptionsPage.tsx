@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { ClosedCaptionRegular, PlayRegular, StopRegular } from '@fluentui/react-icons'
 
-import type { AudioDevice, EngineEvent, SessionConfig } from '../../shared/contracts'
+import type { AudioDevice, EngineEvent } from '../../shared/contracts'
 import { DEFAULT_SETTINGS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, type OverlaySettings, type RecognitionModelId, type TranslationSettings } from '../../shared/settings'
 import { EMPTY_CAPTION, receiveCaption } from '../components/caption-state'
 import { CaptionPreview } from '../components/CaptionPreview'
 import { useI18n, type TranslationValues } from '../i18n'
+import { buildSessionConfig, findMissingResource } from '../session'
 
 type SessionState = 'idle' | 'starting' | 'listening' | 'stopping' | 'error'
 
@@ -28,7 +29,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
   const [state, setState] = useState<SessionState>('idle')
   const [settingsReady, setSettingsReady] = useState(false)
   const [devices, setDevices] = useState<AudioDevice[]>([])
-  const [audioSource, setAudioSource] = useState('defaultOutput')
+  const [audioSource, setAudioSource] = useState(DEFAULT_SETTINGS.recognition.audioSource)
   const [sourceLanguage, setSourceLanguage] = useState('auto')
   const [targetLanguage, setTargetLanguage] = useState<string>('zh')
   const [translationSettings, setTranslationSettings] = useState<TranslationSettings>(DEFAULT_SETTINGS.translation)
@@ -58,6 +59,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
         setOverlaySettings(settings.overlay)
         setRecognitionModelId(settings.recognition.modelId)
         setSourceLanguage(settings.recognition.sourceLanguage)
+        setAudioSource(settings.recognition.audioSource)
         setTargetLanguage(settings.translation.targetLanguage)
         setSettingsReady(true)
         setNotice((current) => current === '正在连接本地引擎…' ? '准备就绪' : current)
@@ -74,6 +76,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
       setOverlaySettings(settings.overlay)
       setRecognitionModelId(settings.recognition.modelId)
       setSourceLanguage(settings.recognition.sourceLanguage)
+      setAudioSource(settings.recognition.audioSource)
       setTargetLanguage(settings.translation.targetLanguage)
     })
     const unsubscribe = api.onEngineEvent((event: EngineEvent) => {
@@ -122,44 +125,19 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
     setModelProgress(null)
     setMissingResource(false)
     setNotice('正在启动本地字幕引擎…')
-    const effectiveTargets = translationVisible ? [targetLanguage] : []
-    const config: SessionConfig = {
-      audioSource: selectedDevice
-        ? { kind: selectedDevice.kind, deviceId: selectedDevice.deviceId }
-        : { kind: 'defaultOutput' },
-      recognitionMode: 'realtime',
-      recognitionModelId: recognitionModelId,
-      sourceLanguage,
-      targetLanguages: effectiveTargets,
-      allowIntermediateTranslation: translationSettings.translateIntermediate,
-      translationProvider: translationSettings.provider,
-      translationModelId: translationSettings.hymt2ModelId,
-      translationOptions: translationSettings.provider === 'microsoft'
-        ? { endpoint: translationSettings.microsoftEndpoint, region: translationSettings.microsoftRegion }
-        : translationSettings.provider === 'openai'
-          ? { endpoint: translationSettings.openaiEndpoint, model: translationSettings.openaiModel }
-          : translationSettings.provider === 'ollama'
-            ? { endpoint: translationSettings.ollamaEndpoint, model: translationSettings.ollamaModel }
-            : undefined,
-    }
+    // The dropdowns update local state immediately, so they win over the not-yet-broadcast settings.
+    const config = buildSessionConfig({ ...DEFAULT_SETTINGS, recognition: { modelId: recognitionModelId, sourceLanguage, audioSource }, translation: { ...translationSettings, targetLanguage }, overlay: overlaySettings },
+      selectedDevice ? { kind: selectedDevice.kind, deviceId: selectedDevice.deviceId } : { kind: 'defaultOutput' })
     try {
-      const snapshot = await api.listResources()
-      const translationResourceId = effectiveTargets.length > 0
-        ? translationSettings.provider === 'hymt2' ? translationSettings.hymt2ModelId
-          : translationSettings.provider === 'm2m100' ? 'm2m100-418m' : null
-        : null
-      const requiredIds = [recognitionModelId, ...(translationResourceId ? [translationResourceId] : [])]
-      const missing = requiredIds
-        .map((id) => snapshot.resources.find((item) => item.resourceId === id))
-        .find((item) => !item?.installed)
-      if (missing || requiredIds.some((id) => !snapshot.resources.some((item) => item.resourceId === id))) {
+      const missing = findMissingResource(await api.listResources(), config)
+      if (missing) {
         setState('error')
         setMissingResource(true)
         setNotice('{name}模型尚未安装，请先到“模型与资源”页面安装。')
-        setNoticeValues({ name: missing?.name ?? '所选识别' })
+        setNoticeValues({ name: missing.name })
         return
       }
-      setNotice(effectiveTargets.length > 0 ? '正在加载识别和翻译模型…' : '正在加载所选识别模型…')
+      setNotice(config.targetLanguages.length > 0 ? '正在加载识别和翻译模型…' : '正在加载所选识别模型…')
       const result = await api.startSession(config)
       onSessionStarted(result.sessionId)
       setState('listening')
@@ -231,7 +209,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
 
           <div className="form-grid">
             <label><span>{t('音频来源')}</span>
-              <select aria-label={t('音频来源')} value={audioSource} onChange={(event) => setAudioSource(event.target.value)}>
+              <select aria-label={t('音频来源')} value={audioSource} onChange={(event) => { setAudioSource(event.target.value); void saveSettings({ recognition: { audioSource: event.target.value } }) }}>
                 <option value="defaultOutput">{t('系统声音（Windows 默认输出）')}</option>
                 {devices.map((device) => <option key={device.deviceId} value={device.deviceId}>{device.name}{device.isDefault ? t('（默认）') : ''}</option>)}
               </select>
@@ -273,7 +251,7 @@ export function LiveCaptionsPage({ activeSessionId, onSessionStarted, onStopSess
           </footer>
         </section>
 
-        <CaptionPreview caption={caption} listening={listening} modelProgress={modelProgress} overlay={overlaySettings} sourceVisible={sourceVisible} translationVisible={translationVisible} />
+        <CaptionPreview caption={caption} listening={listening} modelProgress={modelProgress} overlay={overlaySettings} sourceVisible={sourceVisible} translationVisible={translationVisible} sourceLanguage={sourceLanguage} targetLanguage={targetLanguage} />
       </div>
     </div>
   )

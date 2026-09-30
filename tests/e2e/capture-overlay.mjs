@@ -5,14 +5,22 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 const root = process.cwd()
 const output = resolve(root, 'artifacts/ui/overlay-console.png')
 const settings = {
+  version: 1, theme: 'system', uiLanguage: 'zh-CN', modelStoragePath: '', historyEnabled: false,
+  recognition: { modelId: 'qwen3-asr-1.7b-hf', sourceLanguage: 'en', audioSource: 'defaultOutput' },
   overlay: {
     mode: 'bottom', colorScheme: 'dark', locked: false, alwaysOnTop: true,
     fontFamily: 'Segoe UI Variable', fontSize: 17, fontWeight: 500,
     translationFontSize: 16, translationFontWeight: 400,
     sourceColor: '#F7F7F7', translationColor: '#D7DEE8',
     backgroundColor: '#0D0E10', backgroundOpacity: 0.96,
-    maxLines: 2, lineHeight: 1.24, translationMaxLines: 2, translationLineHeight: 1.28,
+    maxLines: 3, lineHeight: 1.3, translationMaxLines: 3, translationLineHeight: 1.35,
     showSource: true, showTranslation: true,
+  },
+  translation: {
+    provider: 'hymt2', hymt2ModelId: 'hy-mt2-1.8b-q3-k-m', targetLanguage: 'zh',
+    microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '',
+    openaiEndpoint: 'https://api.openai.com/v1', openaiModel: 'gpt-4.1-mini',
+    ollamaEndpoint: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b', translateIntermediate: false,
   },
 }
 
@@ -22,7 +30,7 @@ void app.whenReady().then(async () => {
   ipcMain.handle('app:update-settings', () => settings)
   ipcMain.handle('overlay:hide', () => undefined)
   const window = new BrowserWindow({
-    width: 900, height: 118, show: false, frame: false, transparent: true,
+    width: 900, height: 218, show: false, frame: false, transparent: true,
     webPreferences: { preload: resolve(root, 'out/preload/index.cjs'), contextIsolation: true, sandbox: true },
   })
   await window.loadFile(resolve(root, 'out/renderer/index.html'), { query: { overlay: '1' } })
@@ -68,8 +76,6 @@ void app.whenReady().then(async () => {
   settings.overlay.showTranslation = true
   settings.overlay.fontSize = 28
   settings.overlay.translationFontSize = 22
-  settings.overlay.maxLines = 3
-  settings.overlay.translationMaxLines = 3
   window.webContents.send('settings:changed', settings)
   const englishTranslation = 'In addition, several models have prices before and after the national subsidy limits being very similar.'
   window.webContents.send('engine:event', {
@@ -81,25 +87,35 @@ void app.whenReady().then(async () => {
     },
   })
   await new Promise((done) => setTimeout(done, 500))
-  const narrowLayout = await window.webContents.executeJavaScript(`(() => ({
-    text: document.querySelector('.overlay-track-translation .overlay-track-in')?.textContent,
-    lines: document.querySelector('.overlay-track-translation')?.style.getPropertyValue('--overlay-visible-lines')
-  }))()`)
-  if (narrowLayout.lines !== '1' || !narrowLayout.text?.startsWith('In addition') || narrowLayout.text === englishTranslation) {
-    throw new Error(`Compact English subtitle should roll one line: ${JSON.stringify(narrowLayout)}`)
+  // A one-line track keeps the whole sentence in the block and rolls the tail out of view.
+  const narrowLayout = await window.webContents.executeJavaScript(`(() => {
+    const track = document.querySelector('.overlay-track-translation')
+    return {
+      text: track?.textContent?.replace(/\\s+/g, ' '), entries: track?.querySelectorAll('.overlay-track-entry').length ?? 0,
+      lines: track?.style.getPropertyValue('--overlay-visible-lines'), rolling: track?.dataset.rolling,
+    }
+  })()`)
+  if (!narrowLayout.lines || Number(narrowLayout.lines) < 1 || narrowLayout.entries !== 1
+    || narrowLayout.text !== englishTranslation || narrowLayout.rolling !== 'true') {
+    throw new Error(`Compact English subtitle should roll at least one line: ${JSON.stringify(narrowLayout)}`)
   }
-  window.setSize(900, 148)
+  window.setSize(900, 230)
   await new Promise((done) => setTimeout(done, 500))
   const englishLayout = await window.webContents.executeJavaScript(`(() => {
-    const source = document.querySelector('.overlay-track-source .overlay-track-in')
-    const translation = document.querySelector('.overlay-track-translation .overlay-track-in')
-    return { text: translation?.textContent, lines: translation?.parentElement?.style.getPropertyValue('--overlay-visible-lines'),
+    const source = document.querySelector('.overlay-track-source')
+    const translation = document.querySelector('.overlay-track-translation')
+    const flow = translation?.querySelector('.overlay-track-flow')
+    return {
+      text: translation?.textContent?.replace(/\\s+/g, ' '),
+      lines: translation?.style.getPropertyValue('--overlay-visible-lines'),
       sourceBottom: source?.getBoundingClientRect().bottom,
       translationTop: translation?.getBoundingClientRect().top,
-      translationHeight: translation?.clientHeight, translationScrollHeight: translation?.scrollHeight,
-      clipped: translation ? translation.scrollHeight > translation.clientHeight + 2 : true }
+      translationHeight: translation?.clientHeight,
+      clipped: flow instanceof HTMLElement && flow.scrollHeight > flow.clientHeight + 2,
+    }
   })()`)
-  if (englishLayout.text?.replace(/\s+/g, ' ') !== englishTranslation || englishLayout.lines !== '2' || englishLayout.clipped || englishLayout.sourceBottom > englishLayout.translationTop) {
+  if (englishLayout.text !== englishTranslation || !englishLayout.lines || Number(englishLayout.lines) < 1 || !englishLayout.clipped
+    || englishLayout.sourceBottom > englishLayout.translationTop) {
     throw new Error(`English subtitle layout failed: ${JSON.stringify(englishLayout)}`)
   }
   await writeFile(resolve(root, 'artifacts/ui/overlay-english-translation.png'), (await window.webContents.capturePage()).toPNG())

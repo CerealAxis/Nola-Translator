@@ -2,7 +2,6 @@ import { writeFile } from 'node:fs/promises'
 import { normalize } from 'node:path'
 
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, screen } from 'electron'
-import { z } from 'zod'
 
 import { exportSrt, exportText, exportWebVtt, type HistoryStore } from './history-store'
 import type { EngineProcess } from './engine-process'
@@ -12,6 +11,7 @@ import { computeOverlayBounds, getOverlayInteractionPolicy } from './windows'
 import type { AppSettings, AppSettingsPatch } from '../shared/settings'
 import { RECOGNITION_MODEL_LABELS } from '../shared/settings'
 import { modelStorageEnvironment, readEngineStatus, validateModelStorageDirectory } from './model-storage'
+import { settingsPatchSchema } from './settings-schema'
 
 const channels = {
   getSettings: 'app:get-settings', updateSettings: 'app:update-settings',
@@ -24,35 +24,8 @@ const channels = {
 
 export const APP_IPC_CHANNELS = channels
 
-const settingsPatchSchema = z.object({
-  theme: z.enum(['system', 'light', 'dark']).optional(),
-  uiLanguage: z.enum(['zh-CN', 'en']).optional(),
-  historyEnabled: z.boolean().optional(),
-  recognition: z.object({
-    modelId: z.enum(['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf', 'sensevoice-small']).optional(),
-    sourceLanguage: z.string().min(1).max(32).optional(),
-  }).partial().optional(),
-  overlay: z.object({
-    mode: z.enum(['free', 'top', 'bottom']).optional(), locked: z.boolean().optional(),
-    colorScheme: z.enum(['dark', 'light']).optional(),
-    alwaysOnTop: z.boolean().optional(), fontFamily: z.string().max(128).optional(),
-    fontSize: z.number().min(14).max(72).optional(), fontWeight: z.number().min(300).max(800).optional(),
-    translationFontSize: z.number().min(12).max(72).optional(), translationFontWeight: z.number().min(300).max(800).optional(),
-    sourceColor: z.string().max(32).optional(), translationColor: z.string().max(32).optional(), backgroundColor: z.string().max(32).optional(),
-    backgroundOpacity: z.number().min(0).max(1).optional(), maxLines: z.number().int().min(1).max(10).optional(),
-    lineHeight: z.number().min(1).max(2).optional(), translationMaxLines: z.number().int().min(1).max(10).optional(),
-    translationLineHeight: z.number().min(1).max(2).optional(), showSource: z.boolean().optional(), showTranslation: z.boolean().optional(),
-  }).partial().optional(),
-  translation: z.object({
-    provider: z.enum(['hymt2', 'm2m100', 'microsoft', 'openai', 'ollama']).optional(),
-    hymt2ModelId: z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m']).optional(),
-    microsoftEndpoint: z.string().min(1).max(2048).optional(), microsoftRegion: z.string().max(128).optional(),
-    openaiEndpoint: z.string().min(1).max(2048).optional(), openaiModel: z.string().min(1).max(256).optional(),
-    ollamaEndpoint: z.string().min(1).max(2048).optional(), ollamaModel: z.string().min(1).max(256).optional(),
-    translateIntermediate: z.boolean().optional(),
-    targetLanguage: z.string().min(1).max(32).optional(),
-  }).partial().optional(),
-}).strict()
+/** Pages the caption overlay is allowed to send the main window to. */
+const OVERLAY_PAGES = new Set(['appearance', 'captions', 'resources', 'translation'])
 
 async function diagnostics(engine: EngineProcess, settings: AppSettings): Promise<Record<string, string | number>> {
   const modelDir = modelStorageEnvironment(settings.modelStoragePath || app.getPath('userData')).NOLA_TRANSLATOR_MODEL_DIR
@@ -123,13 +96,14 @@ export function registerAppIpc(options: {
   applyTheme()
 
   ipcMain.handle(channels.getSettings, () => current)
-  ipcMain.handle(channels.openAppearance, () => {
+  ipcMain.handle(channels.openAppearance, (_event, page: unknown) => {
     const window = options.getMainWindow()
     if (!window) return
     if (window.isMinimized()) window.restore()
     window.show()
     window.focus()
-    window.webContents.send('app:appearance-requested')
+    window.webContents.send('app:appearance-requested',
+      typeof page === 'string' && OVERLAY_PAGES.has(page) ? page : 'appearance')
   })
   ipcMain.handle(channels.getModelStorage, () => storageInfo())
   ipcMain.handle(channels.chooseModelStorageDirectory, async () => {
@@ -149,6 +123,8 @@ export function registerAppIpc(options: {
     app.quit()
   })
   ipcMain.handle(channels.updateSettings, async (_event, raw: unknown) => {
+    // The cast trusts that the schema accepts every field `AppSettingsPatch` declares; that parity
+    // is what `settings-schema.test.ts` guards, and it is the one thing that can silently break it.
     const patch = settingsPatchSchema.parse(raw) as AppSettingsPatch
     current = await options.settings.update(patch)
     await options.history.setEnabled(current.historyEnabled)

@@ -8,9 +8,9 @@ const output = resolve('artifacts/layout')
 const pages = ['captions', 'recognition', 'resources', 'translation', 'appearance', 'history', 'diagnostics']
 const settings = {
   version: 1, theme: 'system', uiLanguage: 'zh-CN', modelStoragePath: '', historyEnabled: false,
-  recognition: { modelId: 'qwen3-asr-1.7b-hf', sourceLanguage: 'auto' },
-  overlay: { mode: 'bottom', colorScheme: 'dark', locked: true, alwaysOnTop: true, fontFamily: 'Segoe UI Variable', fontSize: 26, fontWeight: 600, translationFontSize: 22, translationFontWeight: 500, sourceColor: '#FFFFFF', translationColor: '#FFFFFF', backgroundColor: '#111111', backgroundOpacity: 0.84, maxLines: 2, lineHeight: 1.3, translationMaxLines: 2, translationLineHeight: 1.35, showSource: true, showTranslation: true },
-  translation: { provider: 'hymt2', microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '', openaiEndpoint: 'https://api.openai.com/v1', openaiModel: 'gpt-4.1-mini', ollamaEndpoint: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b', translateIntermediate: false, targetLanguage: 'zh' },
+  recognition: { modelId: 'qwen3-asr-1.7b-hf', sourceLanguage: 'auto', audioSource: 'defaultOutput' },
+  overlay: { mode: 'bottom', colorScheme: 'dark', locked: true, alwaysOnTop: true, fontFamily: 'Segoe UI Variable', fontSize: 26, fontWeight: 600, translationFontSize: 22, translationFontWeight: 500, sourceColor: '#FFFFFF', translationColor: '#FFFFFF', backgroundColor: '#111111', backgroundOpacity: 0.84, maxLines: 3, lineHeight: 1.3, translationMaxLines: 3, translationLineHeight: 1.35, showSource: true, showTranslation: true },
+  translation: { provider: 'hymt2', hymt2ModelId: 'hy-mt2-1.8b-q3-k-m', microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '', openaiEndpoint: 'https://api.openai.com/v1', openaiModel: 'gpt-4.1-mini', ollamaEndpoint: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b', translateIntermediate: false, targetLanguage: 'zh' },
 }
 const recognitionResource = { resourceId: 'qwen3-asr-1.7b-hf', kind: 'recognitionModel', provider: 'qwen3-asr', name: 'Qwen3-ASR 1.7B · 本地流式识别', description: '本地流式识别模型，加载时以 NF4 4-bit 量化运行。', languages: ['zh', 'en', 'ja'], installed: true, installedBytes: 4300000000, state: 'idle', cancellable: false }
 const recognitionSmallResource = { resourceId: 'qwen3-asr-0.6b-hf', kind: 'recognitionModel', provider: 'qwen3-asr', name: 'Qwen3-ASR 0.6B · 本地流式识别', description: '体积更小的同系列流式识别模型。', languages: ['zh', 'en', 'ja'], installed: false, installedBytes: 0, downloadBytes: 1880619678, state: 'idle', cancellable: false }
@@ -140,21 +140,32 @@ async function main() {
     }
   })()`)
   if (!overlayState.hasZh || !overlayState.hasJa || overlayState.overflow) failures.push({ language: 'overlay', page: 'multitarget', overlayState })
-  // Mid-frame of the roll transition: 110 ms in, the old line is still leaving and the new one is rolling in.
+  // The next sentence must extend the same block instead of replacing it: the finished sentences stay
+  // in the flow, the block rolls upward, and the translation keeps its own lag.
   const nextSegment = { ...segment, segmentId: 'after-roll', revision: 1, startedAtMs: 4000, sourceText: 'Rest is not a luxury; it is how people recover attention and keep making good decisions.', translations: segment.translations }
   await overlay.webContents.executeJavaScript(`window.layoutFixture.emit(${JSON.stringify({ protocolVersion: 1, type: 'caption', requestId: 'qa2', sessionId: 'layout', segment: nextSegment })})`)
   await new Promise((resolve) => setTimeout(resolve, 110))
-  const rolling = await overlay.webContents.executeJavaScript(`({
-    leaving: document.querySelectorAll('.overlay-track-source .overlay-track-out').length,
-    active: document.querySelectorAll('.overlay-track-source .overlay-track-in').length,
-    oldVisible: (document.querySelector('.overlay-track-source .overlay-track-out')?.textContent ?? '').includes('balanced life.'),
-    translationHeld: (document.querySelector('.overlay-track-translation .overlay-track-in')?.textContent ?? '').includes('平衡的生活十分重要'),
-  })`)
-  if (rolling.leaving !== 1 || rolling.active !== 1 || !rolling.oldVisible || !rolling.translationHeld) failures.push({ language: 'overlay', page: 'roll-transition', rolling })
+  const rolling = await overlay.webContents.executeJavaScript(`(() => {
+    const track = document.querySelector('.overlay-track-source')
+    const content = track?.querySelector('.overlay-track-content')
+    const flow = track?.querySelector('.overlay-track-flow')
+    return {
+      entries: track?.querySelectorAll('.overlay-track-entry').length ?? 0,
+      kept: (track?.textContent ?? '').includes('balanced life.'),
+      translationEntries: document.querySelectorAll('.overlay-track-translation .overlay-track-entry').length,
+      translationHeld: (document.querySelector('.caption-console-translations')?.textContent ?? '').includes('平衡的生活十分重要'),
+      shifted: content instanceof HTMLElement && flow instanceof HTMLElement
+        && content.getBoundingClientRect().top < flow.getBoundingClientRect().top,
+      rolling: track?.dataset.rolling,
+    }
+  })()`)
+  if (rolling.entries !== 2 || !rolling.kept || rolling.translationEntries !== 2 || !rolling.translationHeld) {
+    failures.push({ language: 'overlay', page: 'roll-up', rolling })
+  }
   await writeFile(resolve(output, 'overlay-roll-transition.png'), (await overlay.webContents.capturePage()).toPNG())
   await new Promise((resolve) => setTimeout(resolve, 300))
-  const settled = await overlay.webContents.executeJavaScript(`document.querySelectorAll('.overlay-track-source .overlay-track-in').length`)
-  if (settled !== 1) failures.push({ language: 'overlay', page: 'roll-settled', rows: settled })
+  const settled = await overlay.webContents.executeJavaScript(`document.querySelectorAll('.overlay-track-source .overlay-track-entry').length`)
+  if (settled !== 2) failures.push({ language: 'overlay', page: 'roll-settled', rows: settled })
   await writeFile(resolve(output, 'overlay-bilingual.png'), (await overlay.webContents.capturePage()).toPNG())
   await overlay.webContents.executeJavaScript(`window.nolaTranslator.updateSettings({overlay:{fontSize:72,translationFontSize:72,locked:false}})`)
   await settle(overlay)
