@@ -139,11 +139,18 @@ export function CaptionTrack({ line, kind, maxLines, layout }: {
   }
 
   return <div className={`overlay-track overlay-track-${kind}`} data-track={kind} data-layout="rolling" data-rolling={offset > 0}
-    style={{ '--overlay-visible-lines': maxLines } as React.CSSProperties} aria-live="polite">
-    <div className="overlay-track-flow" ref={viewport}>
+    style={{ '--overlay-visible-lines': maxLines } as React.CSSProperties}>
+    {/* The visible block holds the whole transcript, and a live region announces its full contents
+        rather than the delta, so every streaming revision would re-read the history from the first
+        word. The visible copy is silenced and this hidden region carries only the newest sentence,
+        which is what a live caption should announce. */}
+    <div className="overlay-track-flow" ref={viewport} aria-live="off">
       <div className="overlay-track-content" ref={content} style={{ transform: offset > 0 ? `translate3d(0, -${offset}px, 0)` : 'none' }}>
         <p className="overlay-track-entry">{joinStream(entries)}</p>
       </div>
     </div>
+    <span className="overlay-track-announce" aria-live="polite" aria-atomic="true">
+      {entries.length > 0 ? entries[entries.length - 1].text : ''}
+    </span>
   </div>
 }

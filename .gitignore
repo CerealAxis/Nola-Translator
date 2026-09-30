@@ -20,6 +20,7 @@ coverage/
 .DS_Store
 Thumbs.db
 .venv/
+/.codex/
 engine/build/
 engine/dist/
 release/
