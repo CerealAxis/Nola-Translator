@@ -13,6 +13,7 @@ import {
 import type { EngineEvent, ResourceRecord, ResourceSnapshot } from '../../shared/contracts'
 import { DEFAULT_SETTINGS, HYMT2_MODEL_IDS, type Hymt2ModelId, type RecognitionModelId } from '../../shared/settings'
 import { ModelStorageSettings } from '../components/ModelStorageSettings'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const phaseLabels: Record<NonNullable<ResourceRecord['phase']>, string> = {
   resolve: '正在查找下载资源',
@@ -94,6 +95,7 @@ export function ResourcesPage(): React.JSX.Element {
   const [notice, setNotice] = useState('')
   const [noticeValues, setNoticeValues] = useState<TranslationValues>({})
   const [loading, setLoading] = useState(true)
+  const [pendingDelete, setPendingDelete] = useState<ResourceRecord | null>(null)
   const resourceName = (name: string): string => name.split(' · ')[0].split(' → ').map((part) => t(part)).join(' → ')
   const api = window.nolaTranslator
 
@@ -149,14 +151,31 @@ export function ResourcesPage(): React.JSX.Element {
 
   const act = async (resource: ResourceRecord, action: 'install' | 'remove' | 'cancel'): Promise<void> => {
     if (!api) return
-    if (action === 'remove' && !window.confirm(t('确定删除“{name}”吗？之后需要重新下载才能使用。', { name: resourceName(resource.name) }))) return
+    if (action === 'remove') {
+      setPendingDelete(resource)
+      return
+    }
     try {
       const next = await api.manageResource(resource.resourceId, action)
       setSnapshot((current) => ({ ...current, resources: current.resources.map((item) => item.resourceId === next.resourceId ? next : item) }))
       setNoticeValues({ name: resource.name })
-      setNotice(action === 'install' ? '已开始安装 {name}。' : action === 'remove' ? '正在删除 {name}。' : '正在取消 {name} 的下载。')
+      setNotice(action === 'install' ? '已开始安装 {name}。' : '正在取消 {name} 的下载。')
     } catch {
       setNotice('资源操作失败')
+    }
+  }
+
+  const confirmRemove = async (): Promise<void> => {
+    if (!api || !pendingDelete) return
+    try {
+      const next = await api.manageResource(pendingDelete.resourceId, 'remove')
+      setSnapshot((current) => ({ ...current, resources: current.resources.map((item) => item.resourceId === next.resourceId ? next : item) }))
+      setNoticeValues({ name: pendingDelete.name })
+      setNotice('正在删除 {name}。')
+    } catch {
+      setNotice('资源操作失败')
+    } finally {
+      setPendingDelete(null)
     }
   }
 
@@ -246,6 +265,18 @@ export function ResourcesPage(): React.JSX.Element {
           ))}
         </div>
       </section>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title={t('删除资源')}
+          message={t('确定删除"{name}"吗？之后需要重新下载才能使用。', { name: resourceName(pendingDelete.name) })}
+          confirmLabel={t('删除')}
+          cancelLabel={t('取消')}
+          variant="danger"
+          onConfirm={() => void confirmRemove()}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   )
 }

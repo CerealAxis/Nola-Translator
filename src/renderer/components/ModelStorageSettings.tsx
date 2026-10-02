@@ -2,12 +2,14 @@ import { useI18n } from '../i18n'
 import { useEffect, useState } from 'react'
 import { FolderRegular } from '@fluentui/react-icons'
 import type { ModelStorageInfo } from '../../shared/bridge'
+import { ConfirmDialog } from './ConfirmDialog'
 
 export function ModelStorageSettings(): React.JSX.Element | null {
   const { t } = useI18n()
   const [storage, setStorage] = useState<ModelStorageInfo | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [showRestartConfirm, setShowRestartConfirm] = useState(false)
   const api = window.nolaTranslator
 
   useEffect(() => {
@@ -31,8 +33,8 @@ export function ModelStorageSettings(): React.JSX.Element | null {
 
   const restart = async (): Promise<void> => {
     if (!api || busy) return
-    if (!window.confirm(t('重启会停止当前字幕与下载。确定现在重启吗？'))) return
     setBusy(true)
+    setShowRestartConfirm(false)
     try { await api.restartApp() } catch { setError('无法重启，请手动关闭并重新打开应用。'); setBusy(false) }
   }
 
@@ -49,10 +51,22 @@ export function ModelStorageSettings(): React.JSX.Element | null {
           <p>{t("重启后使用：")}<span className="storage-path">{storage.configuredPath}</span></p>
           <p>{t("需要时复制原目录中的 models 文件夹。")}</p>
           <p>{t("重启前的下载仍写入当前目录。")}</p>
-          <button className="button primary-button" disabled={busy} onClick={() => void restart()} type="button">{t("重启并应用")}</button>
+          <button className="button primary-button" disabled={busy} onClick={() => setShowRestartConfirm(true)} type="button">{t("重启并应用")}</button>
         </div>}
       </>}
       {error && <p role="alert">{t(error)}</p>}
+
+      {showRestartConfirm && (
+        <ConfirmDialog
+          title={t('重启应用')}
+          message={t('重启会停止当前字幕与下载。确定现在重启吗？')}
+          confirmLabel={t('重启')}
+          cancelLabel={t('取消')}
+          variant="default"
+          onConfirm={() => void restart()}
+          onCancel={() => setShowRestartConfirm(false)}
+        />
+      )}
     </section>
   )
 }

@@ -4,7 +4,6 @@ import {
   ChevronLeftRegular,
   ChevronRightRegular,
   DeleteRegular,
-  DismissRegular,
   EyeRegular,
   SearchRegular,
 } from '@fluentui/react-icons'
@@ -12,6 +11,7 @@ import {
 import type { MeetingMeta } from '../../shared/contracts'
 import { useI18n } from '../i18n'
 import { isLive, meetingDurationLabel, meetingEndLabel, meetingTitleFor } from '../components/meeting-format'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const PAGE_SIZE = 10
 
@@ -223,15 +223,17 @@ export function MeetingsPage({ onOpenMeeting }: MeetingsPageProps): React.JSX.El
           </label>
         </div>
       </div>
-      {pendingDelete && <div className="modal-backdrop" role="presentation">
-        <div className="modal-card" role="alertdialog" aria-modal="true" aria-label={t('删除会议')}>
-          <p>{t('确定删除“{title}”吗？该会议的字幕与录音都会被移除。', { title: meetingTitleFor(pendingDelete, language) })}</p>
-          <div className="modal-actions">
-            <button type="button" className="button secondary-button" onClick={() => setPendingDelete(null)}>{t('取消')}</button>
-            <button type="button" className="button danger-button" onClick={() => void remove(pendingDelete)}><DismissRegular aria-hidden />{t('删除')}</button>
-          </div>
-        </div>
-      </div>}
+      {pendingDelete && (
+        <ConfirmDialog
+          title={t('删除会议')}
+          message={t('确定删除"{title}"吗？该会议的字幕与录音都会被移除。', { title: meetingTitleFor(pendingDelete, language) })}
+          confirmLabel={t('删除')}
+          cancelLabel={t('取消')}
+          variant="danger"
+          onConfirm={() => void remove(pendingDelete)}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </section>
   )
 }
