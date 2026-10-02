@@ -25,7 +25,6 @@ export type AppSettings = {
   theme: 'system' | 'light' | 'dark'
   uiLanguage: 'zh-CN' | 'en'
   modelStoragePath: string
-  historyEnabled: boolean
   recognition: RecognitionSettings
   overlay: OverlaySettings
   translation: TranslationSettings
@@ -95,7 +94,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   uiLanguage: 'zh-CN',
   modelStoragePath: '',
-  historyEnabled: false,
   recognition: {
     modelId: 'qwen3-asr-1.7b-hf',
     sourceLanguage: 'auto',

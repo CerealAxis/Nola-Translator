@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from nola_translator_engine import resources as resources_module
+from nola_translator_engine.audio.devices import AudioDeviceRecord
 from nola_translator_engine import runtime as runtime_module
 from nola_translator_engine.models.manager import FileEntry, ModelSpec
 from nola_translator_engine.protocol import parse_command_line
@@ -20,6 +21,17 @@ from nola_translator_engine.resources import (
     SENSEVOICE_RESOURCE_ID,
 )
 from nola_translator_engine.runtime import EngineRuntime
+
+
+_DEVICE = AudioDeviceRecord(
+    device_id="test-device",
+    backend_index=0,
+    name="Test Loopback",
+    kind="systemOutput",
+    is_default=True,
+    sample_rate=48000,
+    channels=2,
+)
 
 
 def _hymt2_command(request_id: str, model_id: str | None) -> str:
@@ -79,28 +91,29 @@ def test_session_gates_and_loads_the_selected_hymt2_quantization(
         runtime_module, "create_sensevoice_recognizer", lambda *_a, **_k: _Raising()
     )
 
-    installed: set[str] = {
-        SENSEVOICE_RESOURCE_ID, QWEN_RESOURCE_ID, QWEN_06B_RESOURCE_ID, expected
-    }
+    # The ASR and capture sides are stubbed too: without them the successful branch of
+    # this test would open whatever default output device the test machine happens to have.
+    monkeypatch.setattr(
+        runtime.service.device_registry, "resolve", lambda *_a, **_k: _DEVICE
+    )
+    monkeypatch.setattr(runtime_module, "PortAudioCapture", _FakeCapture)
+
+    # Only the ASR models are installed: the selected Hy-MT2 tier is still missing, and no
+    # other tier stands in for it.
+    installed: set[str] = {SENSEVOICE_RESOURCE_ID, QWEN_RESOURCE_ID, QWEN_06B_RESOURCE_ID}
     monkeypatch.setattr(runtime.resources, "is_installed", lambda rid: rid in installed)
     missing = asyncio.run(runtime.handle(command))
     assert missing[0].code == "resourceUnavailable"
     assert missing[0].details == {"missingResourceIds": [expected]}
 
-    # The other tier is then the missing one, which proves the gate follows the
-    # selection rather than always checking Q4_K_M.
-    if model_id is not None and model_id != HYMT2_RESOURCE_ID:
-        installed.discard(expected)
-        installed.add(HYMT2_RESOURCE_ID)
-        again = asyncio.run(runtime.handle(command))
-        assert again[0].details == {"missingResourceIds": [expected]}
-
     installed.add(expected)
+    # The unselected tiers stay absent, so a start that still succeeds is what proves the
+    # gate follows the selection rather than always checking Q4_K_M.
     started = asyncio.run(runtime.handle(command))
 
-    assert started[0].type == "sessionStarted"
+    assert started[0].type == "sessionStarted", started[0]
     assert llama.loaded, "应把所选档位的 GGUF 交给 llama-server"
-    assert llama.loaded[0].name.startswith("Hy-MT2-1.8B-")
+    assert llama.loaded[0].name.startswith("Hy-MT2-1.8B-"), llama.loaded
 
 
 class _Loaded:
@@ -119,6 +132,25 @@ class _Loaded:
 class _Raising:
     async def close(self) -> None:
         return None
+
+
+class _FakeCapture:
+    """Stands in for PortAudioCapture so a successful start never touches real audio."""
+
+    dropped_chunks = 0
+
+    def __init__(self, _device: object) -> None:
+        self.started = False
+
+    def start(self) -> None:
+        self.started = True
+
+    def stop(self) -> None:
+        return None
+
+    async def frames(self):
+        if False:
+            yield None
 
 
 def _start_command(request_id: str, mode: str) -> str:

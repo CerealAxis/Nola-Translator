@@ -3,7 +3,7 @@ import { normalize } from 'node:path'
 
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, screen } from 'electron'
 
-import { exportSrt, exportText, exportWebVtt, type HistoryStore } from './history-store'
+import { exportSrt, exportText, exportWebVtt, type MeetingStore } from './meeting-store'
 import type { EngineProcess } from './engine-process'
 import type { SettingsStore } from './settings-store'
 import type { SecureCredentialStore } from './secure-store'
@@ -17,7 +17,9 @@ const channels = {
   getSettings: 'app:get-settings', updateSettings: 'app:update-settings',
   openAppearance: 'app:open-appearance',
   getModelStorage: 'storage:get', chooseModelStorageDirectory: 'storage:choose', restartApp: 'app:restart',
-  listHistory: 'history:list', clearHistory: 'history:clear', exportHistory: 'history:export',
+  listMeetings: 'meeting:list', getMeeting: 'meeting:get', readMeeting: 'meeting:read',
+  renameMeeting: 'meeting:rename', deleteMeeting: 'meeting:delete', exportMeeting: 'meeting:export',
+  meetingAudioUrl: 'meeting:audio-url',
   getDiagnostics: 'diagnostics:get', copyDiagnostics: 'diagnostics:copy',
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
 } as const
@@ -50,7 +52,8 @@ async function diagnostics(engine: EngineProcess, settings: AppSettings): Promis
 export function registerAppIpc(options: {
   settings: SettingsStore
   initialSettings: AppSettings
-  history: HistoryStore
+  meetings: MeetingStore
+  audioProtocol: string
   credentials: SecureCredentialStore
   engine: EngineProcess
   getOverlayWindow: () => BrowserWindow | null
@@ -127,23 +130,50 @@ export function registerAppIpc(options: {
     // is what `settings-schema.test.ts` guards, and it is the one thing that can silently break it.
     const patch = settingsPatchSchema.parse(raw) as AppSettingsPatch
     current = await options.settings.update(patch)
-    await options.history.setEnabled(current.historyEnabled)
     applyOverlay(patch.overlay?.mode !== undefined)
     applyTheme()
     broadcastSettings()
     return current
   })
-  ipcMain.handle(channels.listHistory, () => options.history.list())
-  ipcMain.handle(channels.clearHistory, () => options.history.clear())
-  ipcMain.handle(channels.exportHistory, async (_event, format: unknown) => {
+  ipcMain.handle(channels.listMeetings, () => options.meetings.list())
+  ipcMain.handle(channels.getMeeting, (_event, meetingId: unknown) => {
+    if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
+    return options.meetings.get(meetingId)
+  })
+  ipcMain.handle(channels.readMeeting, async (_event, meetingId: unknown) => {
+    if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
+    if (!options.meetings.get(meetingId)) throw new Error('会议不存在')
+    return options.meetings.segments(meetingId)
+  })
+  ipcMain.handle(channels.meetingAudioUrl, (_event, meetingId: unknown) => {
+    if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
+    const meta = options.meetings.get(meetingId)
+    return meta?.audioFile ? `${options.audioProtocol}://local/${meetingId}/${meta.audioFile}` : null
+  })
+  ipcMain.handle(channels.renameMeeting, async (_event, meetingId: unknown, title: unknown) => {
+    if (typeof meetingId !== 'string' || typeof title !== 'string') throw new Error('会议名称无效')
+    const meta = await options.meetings.rename(meetingId, title)
+    if (!meta) throw new Error('会议不存在')
+    return meta
+  })
+  ipcMain.handle(channels.deleteMeeting, async (_event, meetingId: unknown) => {
+    if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
+    await options.meetings.remove(meetingId)
+    return true
+  })
+  ipcMain.handle(channels.exportMeeting, async (_event, meetingId: unknown, format: unknown) => {
+    if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
     if (!['txt', 'srt', 'vtt'].includes(String(format))) throw new Error('导出格式无效')
     const value = String(format) as 'txt' | 'srt' | 'vtt'
+    const meta = options.meetings.get(meetingId)
+    if (!meta) throw new Error('会议不存在')
     const result = await dialog.showSaveDialog({
-      title: current.uiLanguage === 'en' ? 'Export captions' : '导出字幕', defaultPath: `Nola Translator.${value === 'vtt' ? 'vtt' : value}`,
+      title: current.uiLanguage === 'en' ? 'Export captions' : '导出字幕',
+      defaultPath: `${(meta.title || meetingId).slice(0, 60)}.${value}`,
       filters: [{ name: value.toUpperCase(), extensions: [value] }],
     })
     if (result.canceled || !result.filePath) return null
-    const segments = options.history.list()
+    const segments = await options.meetings.segments(meetingId)
     const content = value === 'srt' ? exportSrt(segments) : value === 'vtt' ? exportWebVtt(segments) : exportText(segments)
     await writeFile(result.filePath, content, 'utf8')
     return result.filePath

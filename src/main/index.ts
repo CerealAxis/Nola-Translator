@@ -3,10 +3,11 @@ import { mkdir } from 'node:fs/promises'
 
 import { app, BrowserWindow, safeStorage, screen, shell } from 'electron'
 
+import { handleMeetingAudio, MEETING_AUDIO_SCHEME, registerMeetingAudioScheme } from './audio-protocol'
 import { registerAppIpc } from './app-ipc'
 import { createEngineLaunchSpec, EngineProcess } from './engine-process'
-import { HistoryStore } from './history-store'
 import { migrateLegacyUserData } from './legacy-migration'
+import { MeetingStore } from './meeting-store'
 import { modelStorageEnvironment } from './model-storage'
 import { registerEngineIpc } from './ipc'
 import { SettingsStore } from './settings-store'
@@ -63,6 +64,9 @@ function createOverlayWindow(): void {
   }
 }
 
+// Must run before the app is ready: privileged schemes are frozen afterwards.
+registerMeetingAudioScheme()
+
 const hasSingleInstanceLock = app.requestSingleInstanceLock()
 
 if (!hasSingleInstanceLock) {
@@ -82,10 +86,13 @@ if (!hasSingleInstanceLock) {
     await migrateLegacyUserData(app.getPath('appData'), userData)
     const settings = new SettingsStore(join(userData, 'settings.json'))
     const initialSettings = await settings.load()
-    const history = new HistoryStore(join(userData, 'history.jsonl'))
+    const meetings = new MeetingStore(join(userData, 'meetings'))
     const credentials = new SecureCredentialStore(join(userData, 'credentials.json'), safeStorage)
-    await history.setEnabled(initialSettings.historyEnabled)
-    await history.restore()
+    // A read-only userData must not take the window down with it; the store degrades to empty.
+    await meetings.initialize(join(userData, 'history.jsonl')).catch((error) =>
+      console.error('meeting storage is unavailable', error),
+    )
+    handleMeetingAudio(meetings)
     const resourceEnvironment = modelStorageEnvironment(userData, initialSettings.modelStoragePath)
     // A disconnected custom drive must not keep the settings UI from opening, and keeping the
     // configured path is what stops downloads from silently falling back to C:.
@@ -102,11 +109,17 @@ if (!hasSingleInstanceLock) {
     })
     createMainWindow()
     createOverlayWindow()
-    disposeIpc = registerEngineIpc(engine, () => overlayWindow, (provider) => credentials.get(provider))
+    disposeIpc = registerEngineIpc(
+      engine,
+      () => overlayWindow,
+      (provider) => credentials.get(provider),
+      meetings,
+    )
     disposeAppIpc = registerAppIpc({
       settings,
       initialSettings,
-      history,
+      meetings,
+      audioProtocol: `${MEETING_AUDIO_SCHEME}://`,
       credentials,
       engine,
       getOverlayWindow: () => overlayWindow,
@@ -114,7 +127,9 @@ if (!hasSingleInstanceLock) {
     })
     engine.on('event', (event) => {
       if (event.type === 'caption' && event.segment.isFinal) {
-        void history.add(event.segment).catch((error) => console.error('history write failed', error))
+        void meetings.append(event.sessionId, event.segment).catch((error) =>
+          console.error('meeting transcript write failed', error),
+        )
       }
     })
     void engine.start().catch((error) => console.error('engine start failed', error))

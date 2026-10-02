@@ -22,6 +22,8 @@ export type SessionConfig = {
     region?: string
     model?: string
   }
+  /** Absolute path the engine records this meeting's audio to. Omitted means no audio file. */
+  recordingPath?: string
 }
 
 export type Translation = {
@@ -30,6 +32,33 @@ export type Translation = {
   state: 'pending' | 'complete' | 'failed'
   provider: string
   errorCode?: string
+}
+
+/**
+ * One recorded meeting. Starting a caption session always opens one; there is no opt-in switch,
+ * because a transcript nobody asked to keep is worth nothing after the meeting ends.
+ *
+ * `title` is empty until the user renames the meeting — the list then renders a localized default
+ * from `startedAtMs` and `daySequence`, so switching the UI language relabels every meeting without
+ * touching disk.
+ */
+export type MeetingMeta = {
+  meetingId: string
+  title: string
+  titleIsCustom: boolean
+  /** Wall clock when the caption session started. */
+  startedAtMs: number
+  /** Wall clock when it stopped; undefined while the meeting is still open. */
+  endedAtMs?: number
+  durationMs: number
+  /** How many meetings already existed on the same local day, used for the `_记录_1` suffix. */
+  daySequence: number
+  segmentCount: number
+  sourceLanguage: string
+  targetLanguage: string
+  /** File name inside the meeting directory; undefined when no audio was recorded. */
+  audioFile?: string
+  audioDurationMs?: number
 }
 
 export type CaptionSegment = {

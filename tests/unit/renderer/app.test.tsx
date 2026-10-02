@@ -82,8 +82,10 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: '外观' }))
     expect(screen.getByRole('heading', { name: '字幕样式' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: '历史记录' }))
-    expect(screen.getByText('默认不保存任何字幕内容。')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '会议记录' }))
+    expect(await screen.findByRole('heading', { name: '会议记录', level: 1 })).toBeInTheDocument()
+    // Every caption session is recorded; there is no switch to turn that off anymore.
+    expect(screen.getAllByText('周会')).toHaveLength(1)
   })
 
   it('offers explicit controls to hide and adjust the subtitle overlay', async () => {

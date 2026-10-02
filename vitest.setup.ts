@@ -1,5 +1,28 @@
 import '@testing-library/jest-dom/vitest'
 
+import { DEFAULT_SETTINGS, type AppSettings, type AppSettingsPatch } from './src/shared/settings'
+
+/**
+ * The bridge mock derives from DEFAULT_SETTINGS on purpose: a hand-written literal here silently
+ * drifted from the real defaults in nine overlay fields, which made every renderer test assert
+ * against settings the app could never produce.
+ */
+function settingsWith(patch: AppSettingsPatch = {}): AppSettings {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...patch,
+    modelStoragePath: 'C:\\Nola Translator\\models',
+    recognition: { ...DEFAULT_SETTINGS.recognition, ...(patch.recognition ?? {}) },
+    overlay: { ...DEFAULT_SETTINGS.overlay, ...(patch.overlay ?? {}) },
+    translation: { ...DEFAULT_SETTINGS.translation, ...(patch.translation ?? {}) },
+  }
+}
+
+const meetings = [
+  { meetingId: '20260929-225000-aaaaaaaa', title: '', titleIsCustom: false, startedAtMs: Date.UTC(2026, 8, 29, 14, 50), endedAtMs: Date.UTC(2026, 8, 29, 14, 51), durationMs: 60_000, daySequence: 0, segmentCount: 2, sourceLanguage: 'auto', targetLanguage: 'zh' },
+  { meetingId: '20260929-225500-bbbbbbbb', title: '周会', titleIsCustom: true, startedAtMs: Date.UTC(2026, 8, 29, 14, 55), endedAtMs: Date.UTC(2026, 8, 29, 14, 56, 30), durationMs: 90_000, daySequence: 1, segmentCount: 1, sourceLanguage: 'auto', targetLanguage: 'zh' },
+]
+
 Object.defineProperty(window, 'nolaTranslator', {
   configurable: true,
   writable: true,
@@ -11,7 +34,7 @@ Object.defineProperty(window, 'nolaTranslator', {
       { resourceId: 'hy-mt2-1.8b-q3-k-m', kind: 'translationModel', provider: 'hy-mt2', name: 'Hy-MT2 1.8B Q3_K_M', description: '测试翻译模型', languages: ['zh', 'en'], installed: true, installedBytes: 1, state: 'idle', cancellable: false },
     ] }),
     manageResource: async () => { throw new Error('测试未配置资源操作') },
-    startSession: async () => ({ sessionId: 'test-session' }),
+    startSession: async () => ({ sessionId: 'test-session', meetingId: 'test-meeting' }),
     stopSession: async () => undefined,
     onEngineEvent: () => () => undefined,
     showOverlay: async () => undefined,
@@ -19,11 +42,25 @@ Object.defineProperty(window, 'nolaTranslator', {
     resizeOverlay: async () => undefined,
     openAppearance: async () => undefined,
     onOpenAppearance: () => () => undefined,
-    getSettings: async () => ({ version: 1, theme: 'system', uiLanguage: 'zh-CN', modelStoragePath: '', historyEnabled: false, recognition: { modelId: 'qwen3-asr-1.7b-hf', sourceLanguage: 'auto', audioSource: 'defaultOutput' }, overlay: { mode: 'bottom', colorScheme: 'dark', locked: true, alwaysOnTop: true, fontFamily: 'Segoe UI Variable', fontSize: 28, fontWeight: 600, translationFontSize: 22, translationFontWeight: 500, sourceColor: '#FFFFFF', translationColor: '#FFFFFF', backgroundColor: '#111111', backgroundOpacity: 0.84, lineHeight: 1.3, translationLineHeight: 1.35, showSource: true, showTranslation: true, layout: 'rolling' }, translation: { provider: 'hymt2', hymt2ModelId: 'hy-mt2-1.8b-q3-k-m', microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '', openaiEndpoint: 'https://api.openai.com/v1', openaiModel: 'gpt-4.1-mini', ollamaEndpoint: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b', translateIntermediate: false, targetLanguage: 'zh' } }),
-    updateSettings: async (patch: any) => ({ version: 1, theme: 'system', uiLanguage: patch.uiLanguage ?? 'zh-CN', modelStoragePath: '', historyEnabled: false, recognition: { modelId: 'qwen3-asr-1.7b-hf', sourceLanguage: 'auto', audioSource: 'defaultOutput', ...(patch.recognition ?? {}) }, overlay: { mode: 'bottom', colorScheme: 'dark', locked: true, alwaysOnTop: true, fontFamily: 'Segoe UI Variable', fontSize: 28, fontWeight: 600, translationFontSize: 22, translationFontWeight: 500, sourceColor: '#FFFFFF', translationColor: '#FFFFFF', backgroundColor: '#111111', backgroundOpacity: 0.84, lineHeight: 1.3, translationLineHeight: 1.35, showSource: true, showTranslation: true, layout: 'rolling', ...(patch.overlay ?? {}) }, translation: { provider: 'hymt2', hymt2ModelId: 'hy-mt2-1.8b-q3-k-m', microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '', openaiEndpoint: 'https://api.openai.com/v1', openaiModel: 'gpt-4.1-mini', ollamaEndpoint: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b', translateIntermediate: false, targetLanguage: 'zh', ...(patch.translation ?? {}) } }),
+    getSettings: async () => settingsWith(),
+    getModelStorage: async () => ({ activePath: 'C:\\Nola Translator\\models', configuredPath: 'C:\\Nola Translator\\models', restartRequired: false }),
+    chooseModelStorageDirectory: async () => null,
+    restartApp: async () => undefined,
+    updateSettings: async (patch: AppSettingsPatch) => settingsWith(patch),
     onSettingsChanged: () => () => undefined,
-    listHistory: async () => [], clearHistory: async () => undefined,
-    exportHistory: async () => null, getDiagnostics: async () => ({ 引擎状态: 'ready', 语音识别: 'Qwen3-ASR 1.7B（nf4）', 本地翻译: 'Hy-MT2 · llama.cpp（cuda）' }), copyDiagnostics: async () => undefined,
-    hasTranslationCredential: async () => false, setTranslationCredential: async () => undefined,
+    listMeetings: async () => meetings,
+    getMeeting: async (meetingId: string) => meetings.find((item) => item.meetingId === meetingId) ?? null,
+    readMeeting: async () => [
+      { segmentId: 's1', revision: 1, startedAtMs: 0, endedAtMs: 2000, sourceText: 'Good morning everyone.', isFinal: true, translations: [{ targetLanguage: 'zh', text: '大家早上好。', state: 'complete', provider: 'hymt2' }] },
+      { segmentId: 's2', revision: 1, startedAtMs: 2200, sourceText: 'Let us get started.', isFinal: true, translations: [{ targetLanguage: 'zh', text: '我们开始吧。', state: 'complete', provider: 'hymt2' }] },
+    ],
+    renameMeeting: async (meetingId: string, title: string) => ({ meetingId, title, titleIsCustom: true, startedAtMs: Date.UTC(2026, 8, 29, 14, 50), endedAtMs: Date.UTC(2026, 8, 29, 14, 51), durationMs: 60_000, daySequence: 0, segmentCount: 2, sourceLanguage: 'auto', targetLanguage: 'zh' }),
+    deleteMeeting: async () => true,
+    exportMeeting: async () => null,
+    getMeetingAudioUrl: async () => null,
+    getDiagnostics: async () => ({ 引擎状态: 'ready', 应用版本: '0.0.0-test', 语音识别: 'Qwen3-ASR 1.7B（nf4）', 本地翻译: 'Hy-MT2 · llama.cpp（cuda）' }),
+    copyDiagnostics: async () => undefined,
+    hasTranslationCredential: async () => false,
+    setTranslationCredential: async () => undefined,
   },
 })

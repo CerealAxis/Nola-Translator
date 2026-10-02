@@ -50,6 +50,8 @@ class SessionConfig(ProtocolModel):
     translationProvider: Literal["hymt2", "m2m100", "microsoft", "openai", "ollama"] = "hymt2"
     translationModelId: str | None = Field(default=None, min_length=1, max_length=256)
     translationOptions: TranslationOptions | None = None
+    """Absolute path the engine records the meeting audio to; omitted means no audio file."""
+    recordingPath: str | None = Field(default=None, min_length=1, max_length=4096)
 
 
 class HelloCommand(Envelope):

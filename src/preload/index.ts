@@ -18,7 +18,9 @@ const channels = {
   appearanceRequested: 'app:appearance-requested',
   getSettings: 'app:get-settings', updateSettings: 'app:update-settings', settingsChanged: 'settings:changed',
   getModelStorage: 'storage:get', chooseModelStorageDirectory: 'storage:choose', restartApp: 'app:restart',
-  listHistory: 'history:list', clearHistory: 'history:clear', exportHistory: 'history:export',
+  listMeetings: 'meeting:list', getMeeting: 'meeting:get', readMeeting: 'meeting:read',
+  renameMeeting: 'meeting:rename', deleteMeeting: 'meeting:delete', exportMeeting: 'meeting:export',
+  meetingAudioUrl: 'meeting:audio-url',
   getDiagnostics: 'diagnostics:get', copyDiagnostics: 'diagnostics:copy',
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
 } as const
@@ -63,9 +65,13 @@ const api: NolaTranslatorApi = {
     ipcRenderer.on(channels.settingsChanged, wrapped)
     return () => ipcRenderer.off(channels.settingsChanged, wrapped)
   },
-  listHistory: () => invoke(channels.listHistory),
-  clearHistory: () => invoke(channels.clearHistory),
-  exportHistory: (format) => invoke(channels.exportHistory, format),
+  listMeetings: () => invoke(channels.listMeetings),
+  getMeeting: (meetingId) => invoke(channels.getMeeting, meetingId),
+  readMeeting: (meetingId) => invoke(channels.readMeeting, meetingId),
+  renameMeeting: (meetingId, title) => invoke(channels.renameMeeting, meetingId, title),
+  deleteMeeting: (meetingId) => invoke(channels.deleteMeeting, meetingId),
+  exportMeeting: (meetingId, format) => invoke(channels.exportMeeting, meetingId, format),
+  getMeetingAudioUrl: (meetingId) => invoke(channels.meetingAudioUrl, meetingId),
   getDiagnostics: () => invoke(channels.getDiagnostics),
   copyDiagnostics: () => invoke(channels.copyDiagnostics),
   hasTranslationCredential: (provider) => invoke(channels.hasTranslationCredential, provider),

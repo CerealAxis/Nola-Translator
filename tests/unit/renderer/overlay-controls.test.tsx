@@ -253,7 +253,7 @@ it('cycles bilingual, source only and translation only from one pill', async () 
 
 it('starts and stops a session from the mic button', async () => {
   const api = window.nolaTranslator!
-  const start = vi.spyOn(api, 'startSession').mockResolvedValue({ sessionId: 'session-live' })
+  const start = vi.spyOn(api, 'startSession').mockResolvedValue({ sessionId: 'session-live', meetingId: null })
   const stop = vi.spyOn(api, 'stopSession').mockResolvedValue(undefined)
   const { container } = render(<CaptionOverlay />)
   const mic = container.querySelector('.caption-mic') as HTMLButtonElement

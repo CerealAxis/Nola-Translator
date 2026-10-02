@@ -21,6 +21,7 @@ coverage/
 Thumbs.db
 .venv/
 /.codex/
+/docs/compose/
 engine/build/
 engine/dist/
 release/

@@ -32,8 +32,8 @@ describe('设置存储', () => {
       await writeFile(path, '{broken', 'utf8')
       const store = new SettingsStore(path)
       expect((await store.load()).overlay.mode).toBe('bottom')
-      const updated = await store.update({ historyEnabled: true })
-      expect(updated.historyEnabled).toBe(true)
+      const updated = await store.update({ uiLanguage: 'en' })
+      expect(updated.uiLanguage).toBe('en')
       expect(JSON.parse(await readFile(path, 'utf8')).version).toBe(1)
     } finally {
       await rm(directory, { recursive: true, force: true })

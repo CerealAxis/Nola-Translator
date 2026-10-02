@@ -5,6 +5,7 @@ import { BrowserWindow, ipcMain, screen } from 'electron'
 import type { EngineEvent, SessionConfig } from '../shared/contracts'
 import { sessionConfigSchema } from '../shared/schemas'
 import type { EngineProcess } from './engine-process'
+import type { MeetingStore } from './meeting-store'
 import { computeOverlayBounds } from './windows'
 
 export const IPC_CHANNELS = {
@@ -22,7 +23,8 @@ export const IPC_CHANNELS = {
 export function registerEngineIpc(
   engine: EngineProcess,
   getOverlayWindow: () => BrowserWindow | null,
-  getTranslationCredential: (provider: 'microsoft' | 'openai') => Promise<string> = async () => ''
+  getTranslationCredential: (provider: 'microsoft' | 'openai') => Promise<string> = async () => '',
+  meetings: MeetingStore | null = null
 ): () => void {
   let activeSessionId: string | null = null
 
@@ -80,19 +82,37 @@ export function registerEngineIpc(
     const config: SessionConfig = apiKey
       ? { ...parsed, translationOptions: { ...parsed.translationOptions, apiKey } }
       : parsed
-    const response = await engine.request(
-      {
-        protocolVersion: 1,
-        type: 'startSession',
-        requestId: `start-${randomUUID()}`,
-        config,
-      },
-      'sessionStarted',
-      30 * 60 * 1000
-    )
+    // Starting captions opens a meeting: the directory has to exist before the engine is told
+    // where to put the audio, and a start that fails is thrown away a few lines below.
+    const meeting = meetings
+      ? await meetings.begin({
+        sourceLanguage: parsed.sourceLanguage,
+        targetLanguage: parsed.targetLanguages[0] ?? 'zh',
+        recordAudio: true,
+      })
+      : null
+    let response: { sessionId: string }
+    try {
+      response = await engine.request(
+        {
+          protocolVersion: 1,
+          type: 'startSession',
+          requestId: `start-${randomUUID()}`,
+          config: meeting
+            ? { ...config, recordingPath: meetings?.recordingPathFor(meeting.meetingId) }
+            : config,
+        },
+        'sessionStarted',
+        30 * 60 * 1000
+      )
+    } catch (error) {
+      if (meeting) await meetings?.abandon(meeting.meetingId).catch(() => undefined)
+      throw error
+    }
+    if (meeting) meetings?.attach(meeting.meetingId, response.sessionId)
     activeSessionId = response.sessionId
     getOverlayWindow()?.showInactive()
-    return { sessionId: response.sessionId }
+    return { sessionId: response.sessionId, meetingId: meeting?.meetingId ?? null }
   })
 
   ipcMain.handle(IPC_CHANNELS.stopSession, async (_event, sessionId: unknown) => {
@@ -100,16 +120,24 @@ export function registerEngineIpc(
       throw new Error('字幕会话 ID 无效')
     }
     await ensureReady()
-    await engine.request(
-      {
-        protocolVersion: 1,
-        type: 'stopSession',
-        requestId: `stop-${randomUUID()}`,
-        sessionId,
-      },
-      'sessionStopped'
-    )
-    activeSessionId = null
+    // Teardown unloads several GB of weights and can outlive the 10 s default; a timeout here used
+    // to leave activeSessionId set, which wedged the app into "a session is already running".
+    try {
+      await engine.request(
+        {
+          protocolVersion: 1,
+          type: 'stopSession',
+          requestId: `stop-${randomUUID()}`,
+          sessionId,
+        },
+        'sessionStopped',
+        60 * 1000
+      )
+    } finally {
+      activeSessionId = null
+      // finish() is keyed on the open set, so the sessionStopped event that usually arrives first wins.
+      void meetings?.finish(sessionId).catch((error) => console.error('meeting finalize failed', error))
+    }
     getOverlayWindow()?.hide()
   })
 
@@ -134,6 +162,7 @@ export function registerEngineIpc(
     if (event.type === 'sessionStopped') {
       activeSessionId = null
       getOverlayWindow()?.hide()
+      void meetings?.finish(event.sessionId).catch((error) => console.error('meeting finalize failed', error))
     }
   }
   engine.on('event', forwardEvent)

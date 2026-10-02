@@ -6,7 +6,8 @@ import nolaLogo from '../../../assets/brand/nola-logo.svg'
 import { Navigation, type PageId } from './Navigation'
 import { AppearancePage } from '../pages/AppearancePage'
 import { DiagnosticsPage } from '../pages/DiagnosticsPage'
-import { HistoryPage } from '../pages/HistoryPage'
+import { MeetingsPage } from '../pages/MeetingsPage'
+import { MeetingDetailPage } from '../pages/MeetingDetailPage'
 import { LiveCaptionsPage } from '../pages/LiveCaptionsPage'
 import { RecognitionPage } from '../pages/RecognitionPage'
 import { ResourcesPage } from '../pages/ResourcesPage'
@@ -65,6 +66,7 @@ function AppContent(): React.JSX.Element {
   const [activePage, setActivePage] = useState<PageId>('captions')
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [sessionStopping, setSessionStopping] = useState(false)
+  const [openMeetingId, setOpenMeetingId] = useState<string | null>(null)
 
   useEffect(() => {
     const api = window.nolaTranslator
@@ -109,7 +111,9 @@ function AppContent(): React.JSX.Element {
       case 'resources': return <ResourcesPage />
       case 'translation': return <TranslationPage onOpenResources={() => setActivePage('resources')} />
       case 'appearance': return <AppearancePage />
-      case 'history': return <HistoryPage />
+      case 'history': return openMeetingId
+        ? <MeetingDetailPage meetingId={openMeetingId} onBack={() => setOpenMeetingId(null)} />
+        : <MeetingsPage onOpenMeeting={setOpenMeetingId} />
       case 'diagnostics': return <DiagnosticsPage />
     }
   }

@@ -11,7 +11,6 @@ import { z } from 'zod'
 export const settingsPatchSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']).optional(),
   uiLanguage: z.enum(['zh-CN', 'en']).optional(),
-  historyEnabled: z.boolean().optional(),
   recognition: z.object({
     modelId: z.enum(['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf', 'sensevoice-small']).optional(),
     sourceLanguage: z.string().min(1).max(32).optional(),

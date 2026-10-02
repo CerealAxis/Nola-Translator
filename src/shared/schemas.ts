@@ -32,6 +32,7 @@ export const sessionConfigSchema = z
       region: z.string().max(128).optional(),
       model: z.string().max(256).optional(),
     }).strip().optional(),
+    recordingPath: z.string().min(1).max(4096).optional(),
   })
   .strip()
 

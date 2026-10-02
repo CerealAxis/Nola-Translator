@@ -3,7 +3,7 @@ import { writeFile, mkdir } from 'node:fs/promises'
 import { app, BrowserWindow } from 'electron'
 app.disableHardwareAcceleration()
 const out = resolve('artifacts/layout')
-const settings = { version:1, theme:'system', uiLanguage:'zh-CN', modelStoragePath:'', historyEnabled:false,
+const settings = { version:1, theme:'system', uiLanguage:'zh-CN', modelStoragePath:'',
   recognition:{modelId:'qwen3-asr-1.7b-hf',sourceLanguage:'auto'},
   overlay:{mode:'bottom',colorScheme:'dark',locked:true,alwaysOnTop:true,fontFamily:'Segoe UI Variable',fontSize:26,fontWeight:600,translationFontSize:22,translationFontWeight:500,sourceColor:'#FFFFFF',translationColor:'#FFFFFF',backgroundColor:'#111111',backgroundOpacity:0.84,lineHeight:1.3,translationLineHeight:1.35,showSource:true,showTranslation:true,layout:'rolling'},
   translation:{provider:'m2m100',microsoftEndpoint:'https://api.cognitive.microsofttranslator.com',microsoftRegion:'',openaiEndpoint:'https://api.openai.com/v1',openaiModel:'gpt-4.1-mini',ollamaEndpoint:'http://127.0.0.1:11434',ollamaModel:'qwen3:4b',translateIntermediate:false,targetLanguage:'zh'} }
@@ -20,9 +20,10 @@ contextBridge.exposeInMainWorld('nolaTranslator', {
   onSettingsChanged:f=>{sl.add(f);return()=>sl.delete(f)}, onEngineEvent:f=>{el.add(f);return()=>el.delete(f)},
   listDevices:async()=>[], listResources:async()=>({storagePath:'D:/Models/Nola Translator/models',resources:[${JSON.stringify(rec)},${JSON.stringify(rec2)},${JSON.stringify(tr)},${JSON.stringify(m2)}]}),
   getModelStorage:async()=>({activePath:'D:/Models/Nola Translator',configuredPath:'',restartRequired:false}),
-  chooseModelStorageDirectory:async()=>null, restartApp:async()=>{}, listHistory:async()=>[], clearHistory:async()=>{}, exportHistory:async()=>null,
+  chooseModelStorageDirectory:async()=>null, restartApp:async()=>{},
+  listMeetings:async()=>[], getMeeting:async()=>null, readMeeting:async()=>[], renameMeeting:async()=>null, deleteMeeting:async()=>true, exportMeeting:async()=>null, getMeetingAudioUrl:async()=>null,
   getDiagnostics:async()=>({}), copyDiagnostics:async()=>{}, hasTranslationCredential:async()=>false, setTranslationCredential:async()=>{},
-  showOverlay:async()=>{}, hideOverlay:async()=>{}, startSession:async()=>({sessionId:'x'}), stopSession:async()=>{}, resizeOverlay:async()=>{}, openAppearance:async()=>{}, onOpenAppearance:()=>()=>{}
+  showOverlay:async()=>{}, hideOverlay:async()=>{}, startSession:async()=>({sessionId:'x',meetingId:null}), stopSession:async()=>{}, resizeOverlay:async()=>{}, openAppearance:async()=>{}, onOpenAppearance:()=>()=>{}
 });`
 const settle = async (w) => { await w.webContents.executeJavaScript('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))'); await new Promise(r=>setTimeout(r,400)) }
 app.whenReady().then(async () => {

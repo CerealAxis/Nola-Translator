@@ -12,6 +12,7 @@ from time import monotonic
 from uuid import uuid4
 
 from .audio.capture import AudioDeviceDisconnectedError, PortAudioCapture
+from .audio.recorder import WavRecorder
 from .models.manager import ModelManager
 from .protocol import (
     CaptionEvent,
@@ -81,6 +82,7 @@ class EngineRuntime:
         self.emit = emit
         self.resources = ResourceManager(model_root, emit)
         self.capture: PortAudioCapture | None = None
+        self.recorder: WavRecorder | None = None
         self.recognizer: Recognizer | None = None
         self.session_task: asyncio.Task[None] | None = None
         self.session_request_id = ""
@@ -240,6 +242,7 @@ class EngineRuntime:
                 )
             ]
 
+        self.recorder = self._open_recorder(command.config.recordingPath)
         self.capture = capture
         self.recognizer = recognizer
         self.session_request_id = command.requestId
@@ -248,6 +251,25 @@ class EngineRuntime:
         self.session_task = asyncio.create_task(self._run_session())
         self._write_engine_status()
         return events
+
+    def _open_recorder(self, path: str | None) -> WavRecorder | None:
+        """Start recording the meeting audio, or stay silent when the host did not ask for one."""
+        if not path:
+            return None
+        try:
+            return WavRecorder(path)
+        except OSError:
+            # A full disk or a locked path must not cost the user their captions; the meeting
+            # still records its transcript, just without an audio file.
+            return None
+
+    def _close_recorder(self) -> int:
+        """Finalize the WAV header and return the recorded duration in ms (0 when never opened)."""
+        recorder, self.recorder = self.recorder, None
+        if recorder is None:
+            return 0
+        recorder.close()
+        return recorder.duration_ms
 
     def _configure_translation(self, command: StartSessionCommand) -> None:
         config = command.config
@@ -380,6 +402,8 @@ class EngineRuntime:
         try:
             async for frame in capture.frames():
                 last_ended_at = frame.started_at_ms + 20
+                if self.recorder is not None:
+                    self.recorder.write(frame.samples)
                 for update in await recognizer.accept(frame):
                     await self._emit_update(update)
             for update in await recognizer.flush(last_ended_at):
@@ -678,6 +702,7 @@ class EngineRuntime:
         self.latest_updates.clear()
         self.latest_translations.clear()
         self.caption_revisions.clear()
+        self._close_recorder()
         if self.capture is not None:
             self._dropped_chunks = self.capture.dropped_chunks
         self.capture = None

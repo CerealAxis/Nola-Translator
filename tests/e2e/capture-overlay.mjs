@@ -5,7 +5,7 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 const root = process.cwd()
 const output = resolve(root, 'artifacts/ui/overlay-console.png')
 const settings = {
-  version: 1, theme: 'system', uiLanguage: 'zh-CN', modelStoragePath: '', historyEnabled: false,
+  version: 1, theme: 'system', uiLanguage: 'zh-CN', modelStoragePath: '',
   recognition: { modelId: 'qwen3-asr-1.7b-hf', sourceLanguage: 'en', audioSource: 'defaultOutput' },
   overlay: {
     mode: 'bottom', colorScheme: 'dark', locked: false, alwaysOnTop: true,

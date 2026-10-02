@@ -41,7 +41,7 @@ const navigationItems: NavigationItem[] = [
   { id: 'resources', label: '模型与资源', icon: ArrowDownloadRegular },
   { id: 'translation', label: '翻译', icon: LocalLanguageRegular },
   { id: 'appearance', label: '外观', icon: ColorRegular },
-  { id: 'history', label: '历史记录', icon: HistoryRegular },
+  { id: 'history', label: '会议记录', icon: HistoryRegular },
   { id: 'diagnostics', label: '诊断', icon: PulseRegular }
 ]
 

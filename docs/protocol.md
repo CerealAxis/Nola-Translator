@@ -47,13 +47,16 @@ sequenceDiagram
   "sourceLanguage": "auto",
   "targetLanguages": ["zh", "ja"],
   "translationProvider": "hymt2",
-  "allowIntermediateTranslation": false
+  "allowIntermediateTranslation": false,
+  "recordingPath": "C:/Users/me/AppData/Roaming/NolaTranslator/meetings/20260929-225000-a1b2c3d4/audio.wav"
 }
 ```
 
 `recognitionModelId` 可选值为 `qwen3-asr-1.7b-hf`、`qwen3-asr-0.6b-hf` 或 `sensevoice-small`；旧客户端省略该字段时，Python 引擎按 `qwen3-asr-1.7b-hf` 处理。SenseVoiceSmall 只覆盖中英日韩粤五种语言，传入其余源语言时引擎回落到模型自判。`recognitionMode` 为消息结构兼容字段，不再决定识别模型。
 
 `translationProvider` 可为 `hymt2`（本地 llama.cpp + Hy-MT2）、`microsoft`、`openai` 或 `ollama`。联网 Provider 的地址、区域和模型放在 `translationOptions`；API 密钥由 Electron 主进程从 Windows 加密存储读取，只在发送 `startSession` 时注入，不暴露给渲染进程。`allowIntermediateTranslation` 默认 `false`——只翻译最终字幕；为 `true` 时对变化中的中间字幕限频提交翻译，最终字幕始终优先。`hymt2` 在 `startSession` 前校验目标语言，不支持的组合返回 `invalidConfiguration`。
+
+`recordingPath` 是可选字段，且只由 Electron 主进程下发。开启一次字幕会话就是开启一次会议记录，所以主进程会在发出请求之前就建好会议目录，并把该路径交给引擎。引擎在重采样之后、识别之前把每一帧 16 kHz 单声道音频追加写入该文件（16 bit PCM，约 32 KB/s，一小时约 115 MB）；字幕与录音共用同一个帧源，被背压丢弃的 chunk 两边都不出现，因此录音与字幕天然对齐。该路径打不开时（磁盘满、目录被锁、权限不足）引擎继续识别并照常发字幕，只是本次会议没有音频——`startSession` 不会因此失败。会话结束时引擎回写 WAV 头部的真实长度，因此即使进程被强杀，留下的文件仍是可播放的合法 RIFF，只是数据长度为 0。
 
 ## 资源管理
 

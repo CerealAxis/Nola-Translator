@@ -11,7 +11,7 @@ export const english: Record<string, string> = {
   '简体中文': 'Simplified Chinese', '日本語': 'Japanese', '한국어': 'Korean', 'Français': 'French', 'Deutsch': 'German', 'Español': 'Spanish', 'Русский': 'Russian', '粤语': 'Cantonese', 'العربية': 'Arabic', 'Português': 'Portuguese', 'Indonesia': 'Indonesian', 'Italiano': 'Italian', 'ไทย': 'Thai', 'Tiếng Việt': 'Vietnamese', 'Türkçe': 'Turkish', 'Melayu': 'Malay',
   '无法读取模型存储目录': 'Could not read the model storage directory.', '无法使用该目录，请选择可写入的本地文件夹。': 'Cannot use this directory. Choose a writable local folder.', '重启会停止当前字幕与下载。确定现在重启吗？': 'Restarting will stop captions and downloads. Restart now?', '无法重启，请手动关闭并重新打开应用。': 'Could not restart. Close and reopen the app manually.', '模型下载位置': 'Model download location', '识别模型、翻译模型及下载缓存可存放在其他磁盘。': 'Store recognition models, translation models, and download caches on another drive.', '更改目录': 'Change directory', '当前目录：': 'Current directory: ', '重启后使用：': 'Directory after restart: ', '需要时复制原目录中的 models 文件夹。': 'Copy the models folder from the old directory when needed.', '重启并应用': 'Restart and apply',
   '本地模式': 'Local mode', '界面语言': 'Interface language', '语言设置保存失败，请重试。': 'Could not save the language setting. Please try again.',
-  '实时字幕': 'Live captions', '语音识别': 'Speech recognition', '模型与资源': 'Models & Resources', '翻译': 'Translation', '外观': 'Appearance', '历史记录': 'History', '诊断': 'Diagnostics', '设置': 'Settings', '主导航': 'Main navigation',
+  '实时字幕': 'Live captions', '语音识别': 'Speech recognition', '模型与资源': 'Models & Resources', '翻译': 'Translation', '外观': 'Appearance', '诊断': 'Diagnostics', '设置': 'Settings', '主导航': 'Main navigation',
   '正在连接引擎': 'Connecting to engine', '引擎接口不可用': 'Engine interface unavailable', '引擎已就绪': 'Engine ready', '引擎启动失败': 'Engine failed to start', '引擎正在启动': 'Engine starting', '引擎正在识别': 'Engine listening', '引擎发生错误': 'Engine error', '正在停止字幕': 'Stopping captions', '停止字幕服务': 'Stop caption service',
   '根据内容类型，在延迟和准确率之间切换。': 'Choose the balance of latency and accuracy for your content.',
   '推荐': 'Recommended',
@@ -48,4 +48,19 @@ export const english: Record<string, string> = {
   '开始字幕后，原文会显示在这里。': 'The original text will appear here once you start captions.', '字幕浮层预览': 'Caption overlay preview', '仅显示原文与译文': 'Original text and translation only', '正在识别语音…': 'Recognizing speech…', '开始会话后，识别原文会显示在这里。': 'Recognized text will appear here after you start a session.',
   '字幕浮层控制': 'Caption overlay controls', '切换字幕位置': 'Switch caption position', '锁定位置': 'Lock position', '解锁位置': 'Unlock position', '打开字幕设置': 'Open caption settings', '展开浮层': 'Expand overlay', '收起浮层': 'Collapse overlay', '无法修改浮层设置': 'Could not change overlay settings.',
   '双语': 'Bilingual', '翻译模型': 'Translation model', '翻译模型 · {model}': 'Translation model · {model}', '源语言与目标语言': 'Source and target language', '切换源语言与目标语言': 'Switch source and target language', '切换双语、原文和译文': 'Switch between bilingual, source-only and translation-only',
+  '字幕排版': 'Caption layout', '仅在「双语」模式下生效': 'Only applies in bilingual mode',
+
+  // Meetings
+  '会议记录': 'Meetings', '会议名称': 'Meeting name', '会议结束时间': 'Meeting end time', '会议时长': 'Duration', '序号': 'No.', '操作': 'Actions', '查看': 'View',
+  '请输入会议名称': 'Search meetings', '共 {count} 条会议记录': '{count} meetings in total', '上一页': 'Previous page', '下一页': 'Next page', '跳至': 'Go to', '页': '', '跳至页码': 'Go to page',
+  '暂无会议记录': 'No meetings yet', '记录中': 'Recording', '双击可重命名': 'Double-click to rename',
+  '按会议结束时间排序': 'Sort by meeting end time', '无法读取会议记录，请重试。': 'Could not load meetings. Please try again.', '删除会议失败，请重试。': 'Could not delete the meeting. Please try again.', '重命名失败，请重试。': 'Could not rename the meeting. Please try again.',
+  '删除会议': 'Delete meeting', '确定删除“{title}”吗？该会议的字幕与录音都会被移除。': 'Delete “{title}”? Its transcript and audio will be removed as well.',
+  '{minutes}分钟': '{minutes} min', '{hours}小时': '{hours} h', '{hours}小时{minutes}分钟': '{hours} h {minutes} min',
+  '返回': 'Back', '字号': 'Font size', '增大字号': 'Larger text', '减小字号': 'Smaller text',
+  '内容自动保存': 'Saved automatically', '数据安全保护': 'Protected data',
+  '调整原文与译文的显示比例': 'Resize the original and translation panes',
+  '本次会议没有识别到语音内容。': 'No speech was recognized in this meeting.',
+  '导出': 'Export', '已导出到 {path}': 'Exported to {path}', '导出失败，请重试。': 'Export failed. Please try again.',
+  '播放': 'Play', '暂停': 'Pause', '播放进度': 'Playback position', '正在加载…': 'Loading…',
 }
