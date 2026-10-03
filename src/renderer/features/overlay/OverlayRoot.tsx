@@ -60,6 +60,9 @@ export function OverlayRoot() {
   const session = useStore(sessionStore, (state) => state)
   const [hovered, setHovered] = useState(false)
   const [closing, setClosing] = useState(false)
+  const [closePending, setClosePending] = useState(false)
+  const [closeFailed, setCloseFailed] = useState(false)
+  const closeRequest = useRef(false)
 
   /*
    * 「−」是真最小化到任务栏，「✕」是关闭并停掉这场同传。
@@ -75,22 +78,24 @@ export function OverlayRoot() {
    * 只有一行 `.hide()`，不碰 session），但那是「隐藏」按钮的语义；这里是「关闭」，
    * 用户说关闭时指的就是这场同传结束。留着服务在跑，用户会以为它还在收音。
    */
-  /*
-   * 关闭 = 停掉这一场同传 + 关掉这个窗。
-   *
-   * **顺序是「先停、后关」，不能反。** 反过来（先关窗）在浏览器预览里必然失效：
-   * 浮窗自己的渲染进程调 `window.close()` 之后，这个文档当场被销毁，
-   * 后面那句 `stopSession()` 连发出去的机会都没有 —— 主窗那边一直以为会话还在跑。
-   * 表现就是"点了没反应，窗还开着，麦克风也还在收音"。
-   *
-   * 至于"引擎卸载权重要几秒，这期间玻璃一直亮在别人画面上"：那是反过来的代价。
-   * 两害相权，**先停后关**更值：少一次点击立刻生效，比多亮几秒更符合直觉，
-   * 而且关窗那一刻识别已经真的停了，不会有"以为关了其实还在收音"的隐私问题。
-   */
-  const closeOverlay = (): void => {
-    setClosing(false)
-    if (session.sessionId) void actions.session.stopSession().catch(() => undefined)
-    void getBridge()?.overlay.close()
+  // The main process owns stop + hide. Sending stopSession as well races two teardown requests.
+  const closeOverlay = async (): Promise<void> => {
+    if (closeRequest.current) return
+    closeRequest.current = true
+    setClosePending(true)
+    setCloseFailed(false)
+    try {
+      const bridge = getBridge()
+      if (!bridge) throw new Error('Overlay bridge unavailable')
+      await bridge.overlay.close()
+      setClosing(false)
+    } catch (error) {
+      console.error('[overlay] close failed', error)
+      setCloseFailed(true)
+    } finally {
+      closeRequest.current = false
+      setClosePending(false)
+    }
   }
 
   const config = overlay ?? DEFAULT_SETTINGS.overlay
@@ -284,6 +289,7 @@ export function OverlayRoot() {
         data-slot="caption-surface"
         data-scheme={scheme}
         data-locked={config.locked ? 'true' : 'false'}
+        data-confirm-open={closing ? 'true' : 'false'}
         data-hover={hovered ? 'true' : 'false'}
         data-layout={config.layout}
         data-bilingual={config.showSource && config.showTranslation ? 'true' : 'false'}
@@ -386,7 +392,7 @@ export function OverlayRoot() {
            *（重新开一场要重新加载几个 GB 的权重）。在玻璃弹窗上直接一按就关，用户
            * 手快按错了得等引擎把模型卸载完才知道。
            */}
-          <GhostButton label={t('overlay.close')} onPress={() => setClosing(true)} color={palette.chrome}>
+          <GhostButton label={t('overlay.close')} onPress={() => { setCloseFailed(false); setClosing(true) }} color={palette.chrome}>
             <X aria-hidden="true" />
           </GhostButton>
         </div>
@@ -435,14 +441,15 @@ export function OverlayRoot() {
             <div className="nola-confirm-dialog">
               <p className="nola-confirm-title">{t('overlay.closeTitle')}</p>
               <p className="nola-confirm-text">{t('overlay.closeBody')}</p>
+              {closeFailed ? <p className="nola-confirm-text" role="alert">{t('overlay.closeFailed')}</p> : null}
               <div className="nola-confirm-actions">
-                <Button variant="secondary" size="sm" onPress={() => setClosing(false)}>
+                <Button variant="secondary" size="sm" isDisabled={closePending} onPress={() => setClosing(false)}>
                   {t('common.cancel')}
                 </Button>
                 {/* HeroUI v3 的危险按钮是 `variant="danger"`（`buttonVariants` 的 variant
                     槽位），没有 `color` prop —— 传 color 会被 TS 拦下。 */}
-                <Button variant="danger" size="sm" onPress={closeOverlay}>
-                  {t('overlay.closeConfirm')}
+                <Button variant="danger" size="sm" isPending={closePending} onPress={() => void closeOverlay()}>
+                  {t(closePending ? 'overlay.closing' : 'overlay.closeConfirm')}
                 </Button>
               </div>
             </div>

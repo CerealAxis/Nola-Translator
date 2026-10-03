@@ -138,6 +138,8 @@ export const en: Dictionary = {
     closeTitle: 'Close the floating caption window?',
     closeBody: 'This also stops the current session and the caption service stops listening. Saved meeting records are not affected.',
     closeConfirm: 'Close and stop',
+    closing: 'Stopping…',
+    closeFailed: 'Unable to close. Please retry.',
     style: 'Style',
     size: 'Font size',
   },

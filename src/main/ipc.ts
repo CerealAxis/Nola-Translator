@@ -37,6 +37,8 @@ export function registerEngineIpc(
   getSettings: () => AppSettings = () => DEFAULT_SETTINGS
 ): () => void {
   let activeSessionId: string | null = null
+  let stoppingSession: { sessionId: string; request: Promise<void> } | null = null
+  let closingOverlay: Promise<void> | null = null
 
   const ensureReady = async (): Promise<void> => {
     if (engine.currentState !== 'ready') await engine.start()
@@ -45,24 +47,32 @@ export function registerEngineIpc(
   // Shared by the explicit stopSession channel and the caption window's close button.
   // Teardown unloads several GB of weights and can outlive the 10 s default; a timeout here
   // used to leave activeSessionId set, which wedged the app into "a session is already running".
-  const stopActiveSession = async (sessionId: string): Promise<void> => {
-    await ensureReady()
-    try {
-      await engine.request(
-        {
-          protocolVersion: 1,
-          type: 'stopSession',
-          requestId: `stop-${randomUUID()}`,
-          sessionId,
-        },
-        'sessionStopped',
-        60 * 1000
-      )
-    } finally {
-      activeSessionId = null
-      // finish() is keyed on the open set, so the sessionStopped event that usually arrives first wins.
-      void meetings?.finish(sessionId).catch((error) => console.error('meeting finalize failed', error))
-    }
+  const stopActiveSession = (sessionId: string): Promise<void> => {
+    if (stoppingSession?.sessionId === sessionId) return stoppingSession.request
+    const request = (async () => {
+      try {
+        await ensureReady()
+        await engine.request(
+          {
+            protocolVersion: 1,
+            type: 'stopSession',
+            requestId: `stop-${randomUUID()}`,
+            sessionId,
+          },
+          'sessionStopped',
+          60 * 1000
+        )
+      } finally {
+        activeSessionId = null
+        // finish() is keyed on the open set, so the sessionStopped event that usually arrives first wins.
+        void meetings?.finish(sessionId).catch((error) => console.error('meeting finalize failed', error))
+      }
+    })()
+    stoppingSession = { sessionId, request }
+    void request.finally(() => {
+      if (stoppingSession?.request === request) stoppingSession = null
+    }).catch(() => undefined)
+    return request
   }
 
   ipcMain.handle(IPC_CHANNELS.listDevices, async () => {
@@ -290,9 +300,29 @@ export function registerEngineIpc(
   // Closing the caption window means "this session is over", not "stop showing it to me".
   // It therefore stops recognition first — otherwise recordAudio would keep writing a file
   // nobody can see. hideOverlay stays a pure hide for callers that only want it out of the way.
-  ipcMain.handle(IPC_CHANNELS.closeOverlay, async () => {
-    if (activeSessionId) await stopActiveSession(activeSessionId)
-    getOverlayWindow()?.hide()
+  ipcMain.handle(IPC_CHANNELS.closeOverlay, () => {
+    if (closingOverlay) return closingOverlay
+    const request = (async () => {
+      const sessionId = activeSessionId ?? stoppingSession?.sessionId
+      if (sessionId) {
+        try {
+          // A dead engine cannot own a live session; don't restart it just to stop a stale id.
+          if (engine.currentState !== 'ready') throw new Error('Engine is unavailable during overlay close')
+          await stopActiveSession(sessionId)
+        } catch (error) {
+          console.error('[overlay] session stop failed; stopping engine process', error)
+          // Release audio capture even if teardown or transport failed, then notify both windows.
+          await engine.stop()
+          forwardEvent({ protocolVersion: 1, type: 'sessionStopped', requestId: `close-${randomUUID()}`, sessionId })
+        }
+      }
+      getOverlayWindow()?.hide()
+    })()
+    closingOverlay = request
+    void request.finally(() => {
+      if (closingOverlay === request) closingOverlay = null
+    }).catch(() => undefined)
+    return request
   })
   ipcMain.handle(IPC_CHANNELS.minimizeOverlay, () => {
     const window = getOverlayWindow()

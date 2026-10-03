@@ -119,6 +119,11 @@ html.is-overlay body {
   -webkit-app-region: drag;
 }
 
+/* A confirmation must be clickable across the whole window, including unlocked drag regions. */
+.nola-caption-card[data-confirm-open='true'] {
+  -webkit-app-region: no-drag;
+}
+
 /* 底色透明度归零 = 纯文字浮在别人画面上：去掉底、去掉投影，文字自己加描边保证可读。 */
 .nola-caption-card[data-transparent='true'] {
   background: transparent;
@@ -606,12 +611,16 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   -webkit-app-region: no-drag;
   position: absolute;
   inset: 0;
-  z-index: var(--z-caption-actions);
+  z-index: var(--z-overlay);
   display: grid;
   place-items: center;
   /* 半透明白色薄雾：能压住下面的字幕让人专注看确认，但不把玻璃整个变成不透明块。 */
   background: rgb(9 10 12 / 0.72);
   border-radius: 16px;
+}
+
+.nola-confirm-layer button {
+  -webkit-app-region: no-drag;
 }
 
 .nola-confirm-dialog {

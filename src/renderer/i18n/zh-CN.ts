@@ -145,6 +145,8 @@ export const zhCN = {
     closeTitle: '关闭悬浮字幕窗？',
     closeBody: '会同时停止这场同传，字幕服务将不再收音。已保存的会议记录不受影响。',
     closeConfirm: '关闭并停止',
+    closing: '正在停止…',
+    closeFailed: '关闭失败，请重试。',
     style: '样式',
     size: '字号',
   },
