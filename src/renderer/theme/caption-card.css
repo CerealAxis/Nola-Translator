@@ -1,0 +1,1006 @@
+/**
+/* ── 窗体 ──────────────────────────────────────────────────────────────── */
+
+/*
+ * 浮窗文档**不许有根背景**。
+ *
+ * 字幕窗是 `transparent: true` 的物理窗口：只有页面自己完全不画，窗口四角才是
+ * 真空的。`src/renderer/index.css` 给 `body` 写了 `background: var(--background)`
+ * —— 那是主窗的主题底色，不透明的。字幕窗加载的是同一个 `index.html`，于是这层
+ * 底色在浮窗里照样生效，把整个窗口矩形填成一块实色。
+ *
+ * 症状（用户截图里"圆角之外浮着一个淡淡的矩形轮廓"）就是这么来的：卡片是 16px
+ * 圆角，可窗口矩形是方的，两者之间的四个三角区漏出 `body` 的实色底。屏幕上就
+ * 是一块**方**的浅色/深色板托着一张**圆**卡 —— 右边和下边那两条直线尤其显眼，
+ * 因为那正是"矩形边缘"该在的位置。
+ *
+ * 判定用像素做过（1.5× 缩放下 1 物理像素取样，四角圆角之外的三角区共 608 px）：
+ *   现状                      → 607/608 px 与桌面背景不一致（99.8% 被污染）
+ *   只加这一条 background     → 见下面 padding 那条，两者必须**一起**上
+ *
+ * `html` 自己本来就是透明的（实测 `rgba(0, 0, 0, 0)`），要清的只有 `body`。
+ * 作用域挂在 `html.is-overlay` 上：主窗有主题底色，字幕窗没有，两边不能互相牵连。
+ * `theme-boot.js` 在 `?overlay=1` 时给 `<html>` 打这个类，早于 `<body>` 解析。
+ */
+html.is-overlay body {
+  background: transparent;
+}
+
+/*
+ * 窗体是**卡片 + 菜单余量**的容器，卡片在里面占一头、另一头留空给弹层。
+ *
+ * 为什么要留这段空白：字幕窗是个 104px 高的**物理窗口**，不是网页。弹层是被
+ * react-aria 定位后画在这个窗口的渲染面里的，而 react-aria 会把弹层高度夹到
+ * "触发器上下可用空间之内"——104px 的窗口里，触发器上方只有约 78px，于是 17 项
+ * 语言菜单被压成 70px 高、只露得下 1 项。用户看到的"弹窗太矮、旁边有滚动条"
+ * 就是这个机制，不是 CSS 写错了。
+ *
+ * 所以：**有菜单打开时把窗口临时加高**（主进程做，见 electron/main.cjs 的
+ * `nola:overlay-menu-space`），卡片用 `justify-content` 贴在窗口的一头不动，
+ * 空白留在另一头给弹层。菜单关掉窗口立刻缩回原高度，那段时间空白区不存在，
+ * 也就不会有"隐形窗口挡住别人视频点击"的问题。
+ */
+.nola-overlay-window {
+  box-sizing: border-box;
+  /*
+   * 卡片四周 6px 让开窗口边。**不是为了好看，是为了让圆角不落在窗口边上。**
+   *
+   * 卡片原来是 `width/height: 100%`，正好等于窗口内容区：圆角贴着窗口的四角，
+   * 一像素余量都没有。两个后果：
+   *   1. 卡片那条 1px 的圆角抗锯齿边正好压在窗口边界上，被 DWM 硬切一刀，
+   *      在屏幕上就是"圆角边缘还有东西" —— 用户报的那四个角。
+   *   2. 卡片的 `box-shadow`（30px 模糊 + 12px 偏移）整圈落在窗口之外被裁光，
+   *      等于白写；而只要给它留出内缩，它又会从这块透明余量里漏回窗口四角，
+   *      把四角重新染脏（实测内缩 6px 配原来的 0 12px 30px：605/608 px 污染）。
+   *
+   * 6px 是实测下限之上留了余量的值（1.5× 缩放下 1 物理像素取样）：内缩 6px +
+   * 把投影收到 `0 1px 3px` 之后，四角圆角之外的三角区 608 px **全部**与桌面背景
+   * 逐像素一致（最大偏差 1/255）。内缩 0 时同一测量是 45~62 px 不一致，残留的
+   * 正是卡片自己那条抗锯齿边。
+   *
+   * 代价（`windows.ts` 的 `overlayMinimumHeight` 已同步 +12 DIP）：最小窗高
+   * 113 → 125、单行 85 → 97，卡片小一圈。窗口本身没缩小，是最小高度跟着长，
+   * 所以每条轨道照样拿得到 1 行。
+   *
+   * 顺带的影响：卡片整体从窗口边缩进来 6px，于是**投影终于能被看见**了
+   * （`0 1px 3px`，只够 1px 浮起感）。这里刻意不再用原来那条 30px 模糊的：
+   * 6px 余量装不下 30px 的模糊，那条投影一放进来四角立刻重新变脏。
+   */
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  /* 卡片贴哪一头：`bottom` 模式贴下（弹层向上开），其余贴上（弹层向下开）。 */
+  justify-content: var(--nola-card-anchor, flex-start);
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+/* ── 卡片本体 ──────────────────────────────────────────────────────────── */
+
+/*
+ * 投影写死 rgba(0,0,0,.45) 而不是 currentColor：玻璃卡压在任意画面上，
+ * 阴影的作用是把卡片从背景里"抬"出来，用底色去染它反而会让浅色桌面上的卡片
+ * 拖出一圈脏边。这条投影与主仓逐字一致。
+ *
+ * ⚠ **模糊半径是被 `.nola-overlay-window` 那条 6px 内缩限死的，不是随手调的。**
+ * 原来是 `0 12px 30px`：卡片满窗时它整圈落在窗口外被裁掉，等于没生效；卡片内缩 6px
+ * 之后它又会从余量里漏回窗口四角，把四角重新染脏（实测 605/608 px 污染）。要既让四角
+ * 干净又留着一点浮起感，模糊就得能整个塞进 6px 里：`1px 偏移 + 3px 模糊` = 4px。
+ * 这一档同样是逐像素量过的：四角圆角之外的三角区 608 px 与桌面背景全部一致。
+ *
+ * 真要一条大投影，内缩就得加到 30px 以上 —— 那是 218px 高的窗口里 60px 的高度，
+ * 换一条几乎看不见的影子，不划算。
+ */
+.nola-caption-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--overlay-background-color) var(--overlay-background-alpha), transparent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  color: #f5f5f5;
+}
+
+/* 菜单开着：窗口多了 `--nola-menu-headroom` 的一段空白，卡片让出它。 */
+.nola-overlay-window[data-menu-open='true'] .nola-caption-card {
+  height: calc(100% - var(--nola-menu-headroom, 272px));
+}
+
+/* 锁定时整条不再是拖拽区：锁的就是"别让我挪走"。 */
+.nola-caption-card[data-locked='false'] {
+  -webkit-app-region: drag;
+}
+
+/* 底色透明度归零 = 纯文字浮在别人画面上：去掉底、去掉投影，文字自己加描边保证可读。 */
+.nola-caption-card[data-transparent='true'] {
+  background: transparent;
+  box-shadow: none;
+}
+
+.nola-caption-card[data-transparent='true'] .nola-caption-entry {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* ── 字幕区 ────────────────────────────────────────────────────────────── */
+
+/*
+ * 上 padding 22px 留给右上角动作行，下 padding 38px 留给底部胶囊行。
+ * 这两行**绝对定位**（不占布局），所以字幕块的行位在它们出现与否之间完全一致——
+ * 鼠标扫过时字幕不会跳一下。
+ */
+.nola-caption-stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 0;
+  padding: 22px 22px 38px;
+  overflow: hidden;
+}
+
+/*
+ * 上下渐隐罩。**用卡片自己的底色**，所以用户把背景色/不透明度调了，字幕依然是从
+ * 他选的那个颜色淡出，而不是永远从 #0d0e10 淡出。
+ * 平时 opacity 0：没有交互时字幕读到底，不该被两条灰带压住。
+ */
+.nola-caption-scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: var(--z-caption-scrim);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.nola-caption-scrim[data-edge='top'] {
+  top: 0;
+  height: 62px;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--overlay-background-color) 92%, transparent) 30%,
+    transparent
+  );
+}
+
+.nola-caption-scrim[data-edge='bottom'] {
+  bottom: 0;
+  height: 58px;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--overlay-background-color) 92%, transparent) 30%,
+    transparent
+  );
+}
+
+.nola-caption-card[data-hover='true'] .nola-caption-scrim,
+.nola-caption-card:hover .nola-caption-scrim {
+  opacity: 1;
+}
+
+/* 纯文字浮层（无底色）不需要渐隐罩：没有底可以淡出，罩子只会糊住别人的画面。 */
+.nola-caption-card[data-transparent='true'] .nola-caption-scrim {
+  opacity: 0;
+}
+
+/* ── 双语上下分区 ──────────────────────────────────────────────────────── */
+
+/*
+ * 双语时原文与译文**上下排列、各占一半**。**这里故意一条 `data-bilingual` 专属规则
+ * 都没有**：上下堆叠本来就是 `.nola-caption-stage` 自己的 `flex-direction: column`，
+ * 不需要第二条规则去改它。
+ *
+ * 曾经这里是 `flex-direction: row` + `column-gap: 16px`（左右分栏），理由写的是
+ * "940×104 的窗里上下堆叠只露得下一行、几乎读不了"。**那个窗高是错的**：字幕窗默认
+ * 高 **218px**（`src/main/windows.ts` 的 `createOverlayWindowOptions`，那里的注释原话
+ * 就是"扣掉预留控制行之后够放三条原文加三条译文"）。扣掉 stage 的 22px 上 padding 和
+ * 38px 下 padding 还剩 158px，对半分每边 76px，出厂字号（原文 17/1.3、译文 16/1.35）
+ * 下两条各 3 行 —— 上下堆叠在这个窗里是够用的。
+ *
+ * 分栏还有两个更硬的代价：
+ *   1. `allocateCaptionLines` 里的"两条可见就对半分"永远不执行（当时两条轨道是分开
+ *      调的，每次只传一条进去；见 OverlayRoot 那次调用的注释），行数预算等于各按整高算。
+ *   2. 分栏里两条轨道是**并排**的，根本不存在"译文那半边"这个位置，于是"译文还没
+ *      翻出来时原文不许占据它"这条做不到。上下排列才谈得上各占一半、互不侵占。
+ */
+
+/*
+ * **两条轨道都不许 `flex: 1`。**
+ *
+ * `.nola-caption-track` 与包裹译文的 `.nola-caption-translations` 都保持
+ * `flex: 0 0 auto`，高度就是 `height: calc(var(--nola-overlay-visible-lines) * 1lh)`，
+ * 而那个行数是 `allocateCaptionLines` 算出来的。给它们上 `flex: 1 1 0` 会用
+ * `flex-basis: 0` 顶掉这个 `height`（flex 主轴上 flex-basis 优先于 height），
+ * 行数预算就整个失效了 —— 上下对半分也跟着失效。
+ *
+ * 尤其**不能**图省事只给译文那个包裹层加 `flex: 1` 去"帮它占住下半"：那会让它按
+ * stage 余高自适应，原文那半就被挤成内容高度，分区边界随译文长短一帧一帧地动。
+ */
+
+/* ── 轨道（原文 / 译文各一条） ────────────────────────────────────────── */
+
+.nola-caption-track {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/*
+ * 高度按可见行数算（`calc(var(--nola-overlay-visible-lines) * 1lh)`）：
+ * `1lh` 是当前行高，所以行数与实际排版永远同步——用户改字号，行高跟着变，
+ * 露出几行也跟着变，不会出现"设了 3 行结果只放得下 2 行"。
+ * 每个 var 都带主仓的兜底值：浮窗可能在 settings 读到之前先渲染一帧。
+ */
+.nola-caption-track[data-kind='source'] {
+  height: calc(var(--nola-overlay-visible-lines, 1) * 1lh);
+  color: var(--overlay-source-color, #f7f7f7);
+  font-size: var(--overlay-font-size, 17px);
+  font-weight: var(--overlay-font-weight, 500);
+  line-height: var(--overlay-line-height, 1.3);
+}
+
+.nola-caption-track[data-kind='translation'] {
+  height: calc(var(--nola-overlay-visible-lines, 1) * 1lh);
+  color: var(--overlay-translation-color, #eceff4);
+  font-size: var(--overlay-translation-font-size, 16px);
+  font-weight: var(--overlay-translation-font-weight, 400);
+  line-height: var(--overlay-translation-line-height, 1.35);
+}
+
+.nola-caption-translations {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/*
+ * 一条不断开的文本流，从顶部填满轨道，然后随着新句子追加继续向上滚。
+ * 只放得下一行的轨道，每来一次修订就把那一行滑出去；更高的轨道则自然丢掉顶部的行。
+ */
+.nola-caption-track-flow {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+/*
+ * 上滚动效的载体。320ms 配这条曲线是主仓的手感，别改快——快了会像被人一把拽走，
+ * 字幕是要"自己流上去"的。
+ */
+.nola-caption-track-content {
+  transition: transform 320ms cubic-bezier(0.22, 0.7, 0.2, 1);
+  will-change: transform;
+}
+
+/* 每句在整段里仍是自己那个节点，文本才会作为一个块换行、作为一个块上滚。 */
+.nola-caption-segment {
+  display: inline;
+}
+
+/*
+ * 逐句模式：每条各自成块，所以要让溢出按纵向裁掉，而不是像上下那样淡出。
+ * 高度交给内容自己撑，只封顶在轨道高度内。
+ */
+.nola-caption-track-sentence {
+  height: auto;
+  max-height: 100%;
+  overflow: hidden auto;
+}
+
+.nola-caption-track-sentence .nola-caption-track-content {
+  transform: none !important;
+}
+
+/*
+ * `color: inherit` 与 `line-height: inherit` 是必须的：全局的 `p` 规则会把所有段落
+ * 钉到次级文字色与 1.55 行高，不覆盖的话轨道颜色与高度分配算的 `1lh` 都会对不上
+ * （主仓 `.overlay-track-entry` 的注释里记了同一个坑）。
+ */
+.nola-caption-entry {
+  margin: 0;
+  color: inherit;
+  line-height: inherit;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+/*
+ * 逐句模式才播入场动画，rolling 不播。
+ * rolling 整段文字是一个不带 key 的块，动画只会在挂载时放一次、之后再也不重放，
+ * 而那里"向上滚"本身就是动画——再叠一个淡入只会打架。
+ */
+.nola-caption-track-sentence .nola-caption-entry {
+  margin-bottom: 6px;
+  animation: nola-caption-entry-in 220ms cubic-bezier(0.22, 0.7, 0.2, 1) both;
+}
+
+@keyframes nola-caption-entry-in {
+  from { opacity: 0; transform: translateY(28%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/*
+ * 减少动效走双通道（`@media` + `html` 属性），和 motion.css 的约定一致。
+ * 时长给 `0.01ms` 而不是 `0s`：退场回调会被 0 时长跳过，浮层会卡住。
+ */
+@media (prefers-reduced-motion: reduce) {
+  .nola-caption-track-content { transition-duration: 0.01ms; }
+  .nola-caption-track-sentence .nola-caption-entry { animation: none; }
+}
+
+html[data-reduce-motion='true'] .nola-caption-track-content {
+  transition-duration: 0.01ms;
+}
+
+html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry {
+  animation: none;
+}
+
+/* ── 右上角动作行 ─────────────────────────────────────────────────────── */
+
+/*
+ * 平时完全隐形（`pointer-events: none` 一起关掉，鼠标划过去不会点到看不见的按钮）。
+ * hover 才浮现并从上方 4px 落位——"它刚才一直在那儿，只是藏起来了"。
+ */
+.nola-caption-card .nola-caption-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: var(--z-caption-actions);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  -webkit-app-region: no-drag;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+/*
+ * 三条触发路径，缺一不可：
+ *   · :hover                鼠标在卡片上
+ *   · [data-hover=true]     OverlayRoot 用原始指针坐标算出来的（drag 区域 + 圆角会让
+ *                           合成 enter/leave 失效，见 OverlayRoot 的注释）
+ *   · :focus-within         键盘 Tab 进卡片里的任何一个控件
+ *
+ * 第三条不是可选项：整个卡片未锁定时是 `-webkit-app-region: drag`，Chromium 里
+ * 拖拽区上的元素收不到鼠标事件（TitleBar 踩过同一个坑）。只留 :hover 的话，
+ * 这张卡在真实 Electron 里可能永远显示不出动作行与控制条——而它们恰恰是这张卡
+ * 唯一的可交互入口。:focus-within 让键盘用户一定够得着。
+ */
+.nola-caption-card[data-hover='true'] .nola-caption-actions,
+.nola-caption-card:hover .nola-caption-actions,
+.nola-caption-card:focus-within .nola-caption-actions {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/*
+ * 动作按钮：26px 圆形 + `rgba(255,255,255,.12)` 半透底，图标 16px。
+ * 几何抄主仓 `.caption-console-actions button`。底色是半透明白而不是纯白，
+ * 这样它压在深色玻璃上是"一层薄雾"，压在浅色玻璃上是"一层白霜"，
+ * 两种底色下都还看得出这是一个按钮而不是一个洞。
+ */
+.nola-caption-card .nola-caption-action {
+  /* 同 `.nola-caption-pill`：GhostButton 是 HeroUI Button，变量必须一起改。 */
+  --button-fg: rgba(255, 255, 255, 0.78);
+  --button-bg: rgba(255, 255, 255, 0.12);
+  --button-bg-hover: rgba(255, 255, 255, 0.24);
+  --button-bg-pressed: rgba(255, 255, 255, 0.24);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nola-caption-card .nola-caption-action:hover,
+.nola-caption-card .nola-caption-action:focus-visible {
+  --button-fg: #fff;
+  --button-bg: rgba(255, 255, 255, 0.24);
+  --button-bg-hover: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+.nola-caption-card .nola-caption-action > svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 生效中的动作（置顶 / 锁定 / 位置）用亮蓝点一下，不用底色——底色已经占着"可点"的语义了。 */
+.nola-caption-card .nola-caption-action[data-active='true'] {
+  --button-fg: #7fb0ff;
+  --button-bg: rgba(255, 255, 255, 0.12);
+  color: #7fb0ff;
+}
+
+/*
+ * 动作行里的分隔线。一排同款圆按钮中间竖一根 1px 的线，"这两组是不同的事"一眼可辨。
+ * 抄自主仓 `.caption-action-divider`。
+ */
+.nola-caption-card .nola-caption-divider {
+  width: 1px;
+  height: 16px;
+  flex-shrink: 0;
+  margin: 0 2px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/*
+ * 麦克风：26px 圆形。录音时整颗反白（白底深字），一眼看出"现在是开着麦的"。
+ * 抄自主仓 `.caption-mic`。
+ */
+.nola-caption-card .nola-caption-mic {
+  /* 同 `.nola-caption-pill`：这是 HeroUI Button，得连变量一起改，见那里的说明。 */
+  --button-fg: rgba(255, 255, 255, 0.8);
+  --button-bg: rgba(255, 255, 255, 0.12);
+  --button-bg-hover: rgba(255, 255, 255, 0.24);
+  --button-bg-pressed: rgba(255, 255, 255, 0.24);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  padding: 0;
+  margin-right: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nola-caption-card .nola-caption-mic:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+/*
+ * 启动/停止失败的那一行说明。
+ *
+ * 它是 `.nola-caption-controls` 的**兄弟节点**而不是子节点：控制条是 opacity:0、
+ * hover 才浮现的，而故障恰恰发生在用户刚把手拿走的瞬间，塞进去等于没修。
+ * `bottom: 40px` 让开控制条占的 10~36px。
+ *
+ * 配色**不跟随浮窗调色板**，固定深底白字。这块玻璃压在别人的画面上，深浅两套方案都不
+ * 保证一行小字在任意背景上读得清；一颗写死的深色 chip 对两种方案都成立。故障提示本来
+ * 也不该假装自己是字幕。
+ */
+.nola-caption-card .nola-caption-notice {
+  position: absolute;
+  right: 10px;
+  bottom: 40px;
+  left: 10px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.nola-caption-card .nola-caption-notice__text {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+/*
+ * 引擎加载中：转圈。不反白 —— 反白是"正在收音"的信号，两件事不能共用一个视觉。
+ * 转圈本身就是"在等"，再叠一个禁用态就够了，所以透明度只降到 0.7 而不是 0.5。
+ */
+.nola-caption-card .nola-caption-mic[data-loading='true'] {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.nola-caption-card .nola-caption-mic[data-loading='true'] > svg {
+  width: 15px;
+  height: 15px;
+}
+
+.nola-caption-card .nola-caption-mic[data-active='true'] {
+  --button-fg: #17181a;
+  --button-bg: #fff;
+  --button-bg-hover: #fff;
+  --button-bg-pressed: #fff;
+  background: #fff;
+  color: #17181a;
+}
+
+.nola-caption-card .nola-caption-mic:disabled,
+.nola-caption-card .nola-caption-mic[data-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.nola-caption-card .nola-caption-mic > svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* 纯文字动作（未开始态那两个）不吃 26px 圆尺寸，走药丸。 */
+.nola-caption-card .nola-caption-action:not([data-icon-only]) {
+  border-radius: 13px;
+}
+
+/* ── 控制条胶囊 ───────────────────────────────────────────────────────── */
+
+/*
+ * ③ 隐藏滚动条但保留滚动。17 项语言超过一屏。
+ * `scrollbar-width: none` + `::-webkit-scrollbar { display: none }` 让它看起来是
+ * 一份干净的列表，滚轮/触控板/键盘方向键仍然能滚 —— 滚动能力不能一起去掉，
+ * 否则后面的语言用户根本够不着。
+ *
+ * **这里刻意不写 `max-height`。** 高度上限走 `Dropdown.Popover` 的 `maxHeight`
+ * prop（见 OverlayControls 的 MENU_MAX_HEIGHT）：react-aria 会把碰撞检测算出的
+ * 高度写成**行内样式**，而行内优先级高于样式表，这里写多少都会被顶掉 ——
+ * 上一版就是踩了这个坑，弹层被压到只剩一行、右侧还冒出滚动条。
+ * 那个值必须由 prop 提供，CSS 这条只负责"有滚动时别把滚动条画出来"。
+ *
+ * 无层（与本文件其余部分同一手法），否则压不过 HeroUI 自己的 `.dropdown__popover`。
+ */
+.nola-caption-menu {
+  min-width: 168px;
+  max-width: 260px;
+}
+
+.nola-caption-menu-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  padding: 4px;
+  border-radius: 12px;
+}
+
+.nola-caption-menu-list::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * 关闭确认层。**自己画，不用 `AlertDialog`。**
+ *
+ * `AlertDialog.Backdrop` 是 `position: fixed; inset: 0`，在这块 104px 高的透明玻璃上
+ * 会盖满整个视口，把「关闭」按钮压在下面 —— 按下去没反应，屏幕上只剩一层暗色。
+ * 这是之前那个 BUG 的确切原因，不是 z-index 或 pointer-events 的问题。
+ *
+ * 所以改成：绝对定位在 `.nola-caption-card` **内部**，只盖住卡片那一块。
+ * 好处是按钮一定在层内、一定点得到，而且字幕玻璃的样子不变，用户知道自己在哪。
+ *
+ * 配色不跟随应用主题（同本文件其它控件的理由）：它盖在一块深色玻璃上，
+ * 用主题变量会出现"浅色主题 + 深色玻璃 = 白底黑字"的翻转。
+ *
+ * ⚠ `no-drag` 不是可选项，别删。整张卡片未锁定时是 `-webkit-app-region: drag`
+ * （见上面 `[data-locked='false']`），而 **Chromium 里拖拽区上的元素收不到鼠标事件**
+ * ——动作条与控制条各自都写了 `no-drag`（见 `.nola-caption-toolbar` / `.nola-caption-controls`），
+ * 这一层当时漏了，结果是「关闭并停止」按下去毫无反应：确认框画得出来、点不动，
+ * 用户既关不掉浮窗、也停不掉这场同传，而引擎还在收音。**这正是 TitleBar 踩过的同一个坑。**
+ */
+.nola-confirm-layer {
+  -webkit-app-region: no-drag;
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-caption-actions);
+  display: grid;
+  place-items: center;
+  /* 半透明白色薄雾：能压住下面的字幕让人专注看确认，但不把玻璃整个变成不透明块。 */
+  background: rgb(9 10 12 / 0.72);
+  border-radius: 16px;
+}
+
+.nola-confirm-dialog {
+  display: flex;
+  width: min(300px, calc(100% - 32px));
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #17181a;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.5);
+}
+
+.nola-confirm-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f5f5f5;
+}
+
+.nola-confirm-text {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #b9bfc9;
+}
+
+.nola-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/*
+ * 26px 高、13px 圆角、12.5px 字重 600、半透明白底 —— 逐字抄主仓
+ * `.caption-control-pill`（`background: rgba(255,255,255,.13)`，hover 加深到 .24）。
+ *
+ * 下面这批选择器都多带一层 `.nola-caption-card`，而且**整个文件是无层的**。这两件事
+ * 都在解决同一个故障，根子值得写清楚：
+ *
+ * 底部控制条里混着两种零件 ——
+ *   · 模型胶囊、显示内容胶囊是 `Dropdown.Trigger`，渲染出 `dropdown__trigger`，**不带** `.button`
+ *   · 麦克风、语言对胶囊是 HeroUI 的 `Button`，渲染出 `class="button button--ghost nola-caption-pill"`
+ *
+ * HeroUI 的 `.button` 自带 `color / background-color / width / padding / border-radius`，
+ * 颜色走 `--button-fg` / `--button-bg`，尺寸修饰类还有 `.button--icon-only` 的 `w-9`。
+ * 症状就是：前两个胶囊正常，后两个在深色玻璃上写着深色字（取到了**应用主题**的
+ * `--default-foreground`），圆形按钮还被撑成 36px 的圆角方块。
+ *
+ * 为什么两轮改特异性都没用 —— 这里踩过两次，机制值得写清楚：
+ *
+ *   本文件原先被**套了两层** `@layer components`：
+ *     ① `theme/index.css` 里 `@import './caption-card.css' layer(components);`
+ *     ② 本文件自己开头又有一个 `@layer components { ... }`
+ *   于是下面这些规则实际落在**子层** `components.components`。而 CSS 层叠的判定
+ *   顺序是「层 → 特异性 → 源码顺序」，**子层排在其父层自身规则之后**。HeroUI 的
+ *   `.button` 在父层 `components`，所以：
+ *
+ *     components          ← .button / .button--ghost / .button--icon-only
+ *       └ components.components   ← 本文件 (0,2,0)
+ *
+ *   层这一关已经分出胜负，特异性根本没机会参与比较。于是：
+ *     · 第一轮「只写死 color」        → 被 .button 自己的 color 顶掉
+ *     · 第二轮「加 .nola-caption-card 前缀抬到 (0,2,0)」→ 依然不生效
+ *   两轮都在改一个**已经用不上的维度**。
+ *
+ * 现在两处包装都拆了：本文件无层，`theme/index.css` 也不再用 `layer(components)`
+ * 导入它。无层声明压过所有层，与 import 顺序、特异性、变量继承都无关。
+ *
+ * `--button-fg` / `--button-bg` 仍然要写：`.button` 那条 `color: var(--button-fg)`
+ * 是它自己的规则，改掉变量让它算出来的值就已经是对的，两条路一起走最稳。
+ */
+.nola-caption-card .nola-caption-pill {
+  --button-fg: rgba(255, 255, 255, 0.92);
+  --button-bg: rgba(255, 255, 255, 0.13);
+  --button-bg-hover: rgba(255, 255, 255, 0.24);
+  --button-bg-pressed: rgba(255, 255, 255, 0.24);
+  display: inline-flex;
+  height: 26px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.13);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: nowrap;
+  transition: background-color 140ms ease;
+}
+
+.nola-caption-card .nola-caption-pill:hover,
+.nola-caption-card .nola-caption-pill[data-hovered='true'] {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.nola-caption-card .nola-caption-pill > svg {
+  width: 11px;
+  height: 11px;
+}
+
+/*
+ * 模型胶囊要能容下不同长度的模型名，所以给一个下限宽度并居中——否则「Qwen3-ASR 0.6B」
+ * 和「Hy-MT2」会让控制条整排的呼吸感跟着模型名长度变。
+ * 抄自主仓 `.caption-mode-pill`。
+ */
+.nola-caption-card .nola-caption-pill--mode {
+  gap: 6px;
+  min-width: 96px;
+  justify-content: center;
+}
+
+/* 供应商圆点：2px 描边的空心圈，跟随 currentColor 所以跟着浮窗自己的配色走。 */
+.nola-caption-card .nola-caption-mode-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+/* ── 底部控制行 ───────────────────────────────────────────────────────── */
+
+/* 内缩与动作行对上，所以两行到卡片边缘的距离是同一个。 */
+.nola-caption-controls {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: var(--z-caption-actions);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 26px;
+  -webkit-app-region: no-drag;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.nola-caption-card[data-hover='true'] .nola-caption-controls,
+.nola-caption-card:hover .nola-caption-controls,
+.nola-caption-card:focus-within .nola-caption-controls {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* ── 预览卡（主仓 `.caption-overlay` + `.caption-preview-*`） ─────────────── */
+
+/*
+ * 「悬浮字幕」页面里那块预览。**逐条搬自主仓**
+ * `src/renderer/styles/app.css:284-303` 与 `src/renderer/components/CaptionPreview.tsx`。
+ *
+ * 主仓里预览与浮窗本体本来就是两个组件、两条样式（`.caption-overlay` vs
+ * `.caption-console`），但底色、圆角、内边距、渐隐罩、控件尺寸刻意保持一致 ——
+ * 预览必须长得像真窗，否则用户在这里调出来的效果到了浮窗上会变样。
+ *
+ * CSS 变量沿用主仓的 `--preview-*` 命名，没跟浮窗本体的 `--overlay-*` 合并：
+ * 两套变量各管各的组件，合并之后改预览会顺带改到真窗。
+ */
+
+.nola-caption-preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  width: min(760px, 94%);
+  min-height: 152px;
+  padding: 22px 22px 38px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  text-align: left;
+  background: color-mix(in srgb, var(--preview-background-color, #0d0e10) var(--preview-background-alpha, 96%), transparent);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.nola-caption-preview[data-transparent-background='true'] {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.nola-caption-preview__text {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.nola-caption-preview__scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: var(--z-caption-scrim);
+  pointer-events: none;
+}
+
+.nola-caption-preview__scrim[data-edge='top'] {
+  top: 0;
+  height: 46px;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--preview-background-color, #0d0e10) 92%, transparent) 30%, transparent);
+}
+
+.nola-caption-preview__scrim[data-edge='bottom'] {
+  bottom: 0;
+  height: 40px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--preview-background-color, #0d0e10) 92%, transparent) 30%, transparent);
+}
+
+.nola-caption-preview__actions {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: var(--z-caption-actions);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #c7c9cd;
+}
+
+.nola-caption-preview__actions svg {
+  width: 20px;
+  height: 20px;
+  padding: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.nola-caption-preview__actions i {
+  height: 15px;
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.nola-caption-preview__controls {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: var(--z-caption-actions);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 22px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.nola-caption-preview__mic,
+.nola-caption-preview__pill {
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.nola-caption-preview__mic {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 8px;
+}
+
+.nola-caption-preview__mic svg {
+  width: 12px;
+  height: 12px;
+}
+
+.nola-caption-preview__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 9px;
+}
+
+.nola-caption-preview__pill svg {
+  width: 11px;
+  height: 11px;
+}
+
+.nola-caption-preview__source,
+.nola-caption-preview__translation {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  text-wrap: wrap;
+}
+
+.nola-caption-preview__source {
+  margin-bottom: 3px;
+  color: var(--preview-source-color, #f7f7f7);
+  font-size: var(--preview-font-size, 17px);
+  font-weight: var(--preview-font-weight, 500);
+  line-height: var(--preview-line-height, 1.3);
+}
+
+.nola-caption-preview__translation {
+  margin-bottom: 0;
+  color: var(--preview-translation-color, #eceff4);
+  font-size: var(--preview-translation-font-size, 16px);
+  font-weight: var(--preview-translation-font-weight, 400);
+  line-height: var(--preview-translation-line-height, 1.35);
+}
+
+/*
+ * 主仓的 `.caption-overlay` **没有**浅色板变体：控件底色写死半透明白，浅色玻璃上
+ * 根本看不见。这里补一档，跟浮窗本体 `[data-scheme='light']` 的处理保持一致。
+ */
+.nola-caption-preview[data-color-scheme='light'] .nola-caption-preview__mic,
+.nola-caption-preview[data-color-scheme='light'] .nola-caption-preview__pill {
+  color: #33363b;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.nola-caption-preview[data-color-scheme='light'] .nola-caption-preview__actions {
+  color: #4a5160;
+}
+
+.nola-caption-preview[data-color-scheme='light'] .nola-caption-preview__actions svg {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* ── 轻色板：亮桌面上要一根发丝边，控件也要跟着换成深色底 ────────────── */
+
+.nola-caption-card[data-scheme='light'] {
+  color: #26282b;
+}
+
+/*
+ * 发丝边与**更重**的投影。深色玻璃靠一条小投影就能从画面里抬出来，浅色玻璃在亮桌面上
+ * 不行：真正把边缘从桌面里分出来的是这根 `1px rgba(0,0,0,.08)` 发丝边，投影只补浮起感。
+ * `:not([data-transparent])` 必须留着：底色归零时不要发丝边也不要投影，
+ * 否则一张完全没有底色的卡片周围会凭空多一圈深色描边。
+ *
+ * ⚠ 投影的模糊半径同样被 6px 内缩限死。原值 `0 16px 40px` 在卡片满窗时被窗口裁光、
+ * 看不见；卡片内缩 6px 之后它会从余量里漏回窗口四角，把四角染脏 —— 实测
+ * 560/608 px 被污染、最大偏差 18/255，是深色板（0/608）的全部来源。模糊必须整个
+ * 塞进 6px：这里给 5px（比深色板的 3px 更重，浅色板"要更重"的意图还留着），
+ * 偏移 1px，合计 6px，正好贴住内缩边缘。
+ */
+.nola-caption-card[data-scheme='light']:not([data-transparent='true']) {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.28);
+}
+
+/*
+ * 控件底色翻面：深色玻璃上是半透明白，浅色玻璃上就是半透明黑 —— 白底白字在亮桌面上
+ * 直接消失。抄自主仓的 `[data-color-scheme="light"]` 段。
+ */
+.nola-caption-card[data-scheme='light'] .nola-caption-action,
+.nola-caption-card[data-scheme='light'] .nola-caption-pill,
+.nola-caption-card[data-scheme='light'] .nola-caption-mic {
+  /* 浅色板同样要改变量，否则 HeroUI 自己的取色规则还会把深色字压回深色玻璃上。 */
+  --button-fg: #33363b;
+  --button-bg: rgba(0, 0, 0, 0.08);
+  --button-bg-hover: rgba(0, 0, 0, 0.16);
+  --button-bg-pressed: rgba(0, 0, 0, 0.16);
+  color: #33363b;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.nola-caption-card[data-scheme='light'] .nola-caption-action:hover,
+.nola-caption-card[data-scheme='light'] .nola-caption-pill:hover,
+.nola-caption-card[data-scheme='light'] .nola-caption-mic:hover {
+  --button-fg: #33363b;
+  --button-bg: rgba(0, 0, 0, 0.16);
+  --button-bg-hover: rgba(0, 0, 0, 0.16);
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.nola-caption-card[data-scheme='light'] .nola-caption-mic[data-active='true'] {
+  --button-fg: #fff;
+  --button-bg: #1b1b1b;
+  --button-bg-hover: #1b1b1b;
+  --button-bg-pressed: #1b1b1b;
+  color: #fff;
+  background: #1b1b1b;
+}
+
+/*
+ * 这里**故意偏离主仓**：主仓的选中色是亮蓝 `#7fb0ff`，那是给深色玻璃用的；同样的值
+ * 压在浅色玻璃上对比度只剩不到 2:1。所以浅色板换同一色相的深一档，而不是照抄。
+ */
+.nola-caption-card[data-scheme='light'] .nola-caption-action[data-active='true'] {
+  --button-fg: #1d5fa8;
+  color: #1d5fa8;
+}

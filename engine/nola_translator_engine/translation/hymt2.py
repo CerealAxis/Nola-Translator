@@ -4,50 +4,15 @@ from __future__ import annotations
 
 import asyncio
 
+from ..hub import HYMT2_LANGUAGES
 from .base import ProviderTranslation
 from .llama_server import LlamaServerManager
 
-# The language table from the official Hy-MT2 README (39 rows), code → full English name.
-SUPPORTED_LANGUAGES: dict[str, str] = {
-    "zh": "Chinese",
-    "en": "English",
-    "fr": "French",
-    "pt": "Portuguese",
-    "es": "Spanish",
-    "ja": "Japanese",
-    "tr": "Turkish",
-    "ru": "Russian",
-    "ar": "Arabic",
-    "ko": "Korean",
-    "th": "Thai",
-    "it": "Italian",
-    "de": "German",
-    "vi": "Vietnamese",
-    "ms": "Malay",
-    "id": "Indonesian",
-    "tl": "Filipino",
-    "hi": "Hindi",
-    "zh-Hant": "Traditional Chinese",
-    "pl": "Polish",
-    "cs": "Czech",
-    "nl": "Dutch",
-    "km": "Khmer",
-    "my": "Burmese",
-    "fa": "Persian",
-    "gu": "Gujarati",
-    "ur": "Urdu",
-    "te": "Telugu",
-    "mr": "Marathi",
-    "he": "Hebrew",
-    "bn": "Bengali",
-    "ta": "Tamil",
-    "uk": "Ukrainian",
-    "bo": "Tibetan",
-    "kk": "Kazakh",
-    "mn": "Mongolian",
-    "ug": "Uyghur",
-    "yue": "Cantonese",
-}
+# The language table from the official Hy-MT2 README (39 rows), code → full English name. It now
+# lives in hub.py next to the adapter that declares Hy-MT2's capabilities: the table describes the
+# *model*, not this prompt template, and a runtime adapter that cannot answer "which languages do
+# you cover" is just the hardcoded list wearing a different hat.
+SUPPORTED_LANGUAGES: dict[str, str] = HYMT2_LANGUAGES
 
 _CASEFOLD_INDEX = {code.casefold(): code for code in SUPPORTED_LANGUAGES}
 _TRADITIONAL_ZH_SUFFIXES = {"tw", "hk", "mo"}

@@ -6,9 +6,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from hashlib import sha256
+from hashlib import sha1, sha256
 import os
 from pathlib import Path
+import re
 import shutil
 import tempfile
 from urllib.request import Request, urlopen
@@ -18,18 +19,44 @@ ProgressCallback = Callable[[int, int], None]
 Fetcher = Callable[[str, Path, ProgressCallback], None]
 PhaseCallback = Callable[[str], None]
 
+#: Characters Windows refuses in a path component. A self-installed model's id is `hub:owner/name`
+#: — a perfectly good protocol identifier and an illegal folder name — so nothing derived from a
+#: model id may reach the filesystem unsanitised.
+_UNSAFE_PATH_CHARS = re.compile(r"[^A-Za-z0-9._-]+")
+_SAFE_PREFIX_LIMIT = 32
+
 
 class ModelIntegrityError(RuntimeError):
     pass
 
 
+class ModelStorageError(RuntimeError):
+    """A local filesystem failure while installing — not a bad file, and not a network problem.
+
+    Deliberately not an ``OSError``: the resource layer maps ``OSError`` onto "网络不可用", which
+    would send the user off to debug their router over a full disk or a directory name Windows
+    rejected.
+    """
+
+
 @dataclass(frozen=True, slots=True)
 class FileEntry:
-    """One file in a snapshot: relative path, byte size, sha256."""
+    """One file in a snapshot: relative path, byte size, and a content digest to verify it against.
+
+    ``sha256`` is the per-file sha256 HuggingFace publishes for LFS-tracked files. Small git
+    blobs expose no sha256 through the API — only the git blob id — so ``blob_sha1`` carries
+    that instead. It is a digest over the same bytes, published by the same party, so accepting
+    it keeps a self-installed model fully verified instead of merely size-checked; refusing it
+    instead would make every transformers repo uninstallable, since config.json and the
+    tokenizer files are exactly the ones HF stores as plain git blobs. At least one of the two
+    is always present on a spec the engine builds, and a spec carrying neither is rejected at
+    verification time rather than trusted.
+    """
 
     path: str
     size: int
-    sha256: str
+    sha256: str | None = None
+    blob_sha1: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,7 +127,17 @@ class ModelManager:
                 on_phase(name)
 
         self.model_root.mkdir(parents=True, exist_ok=True)
-        temp = Path(tempfile.mkdtemp(prefix=f".{spec.model_id}-", dir=self.model_root))
+        # Sanitised from `directory`, never from `model_id`: a self-installed model's id carries
+        # `hub:owner/name`, and `tempfile` would fail with a WinError on the `:` and `/`. The
+        # failure would also arrive as an OSError, which reads as "网络不可用" and sends the user
+        # to debug a network that is fine.
+        prefix = _UNSAFE_PATH_CHARS.sub("-", spec.directory)[:_SAFE_PREFIX_LIMIT] or "model"
+        try:
+            temp = Path(tempfile.mkdtemp(prefix=f".{prefix}-", dir=self.model_root))
+        except OSError as error:
+            raise ModelStorageError(
+                f"无法在模型目录 {self.model_root} 下创建临时目录：{error}"
+            ) from error
         total = spec.total_bytes
         done = 0
         try:
@@ -142,9 +179,37 @@ class ModelManager:
             raise ModelIntegrityError("模型文件缺失")
         if path.stat().st_size != entry.size:
             raise ModelIntegrityError("模型文件大小不匹配")
-        digest = sha256()
-        with path.open("rb") as source:
-            while chunk := source.read(1024 * 1024):
-                digest.update(chunk)
-        if digest.hexdigest().casefold() != entry.sha256.casefold():
+        # Exactly one digest is checked, and which one is fixed by what HuggingFace published for
+        # this file. Falling through to "size matched, assume it is fine" is the one outcome a
+        # supply chain must never produce, so a spec with no digest fails loudly instead.
+        if entry.sha256:
+            expected, actual = entry.sha256.casefold(), _file_sha256(path)
+        elif entry.blob_sha1:
+            expected, actual = entry.blob_sha1.casefold(), _git_blob_id(path)
+        else:
+            raise ModelIntegrityError(f"模型文件 {entry.path} 没有可校验的摘要")
+        if actual != expected:
             raise ModelIntegrityError("模型文件摘要不匹配")
+
+
+def _file_sha256(path: Path) -> str:
+    digest = sha256()
+    with path.open("rb") as source:
+        while chunk := source.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _git_blob_id(path: Path) -> str:
+    """Git's own object id for a file: sha1 over the ``blob <size>\\0`` header plus the content.
+
+    This is the id git stores in its tree, and the one HuggingFace echoes as ``blobId``. Hashing
+    it locally is what makes a non-LFS file checkable against the value the hub published.
+    """
+    size = path.stat().st_size
+    digest = sha1()
+    digest.update(f"blob {size}\0".encode("ascii"))
+    with path.open("rb") as source:
+        while chunk := source.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()

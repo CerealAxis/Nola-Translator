@@ -1,13 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
 import type { MeetingMeta } from '../../../src/shared/contracts'
+import { translate } from '../../../src/renderer/i18n'
 import {
   clockLabel,
   isLive,
   meetingDurationLabel,
   meetingEndLabel,
   meetingTitleFor,
-} from '../../../src/renderer/components/meeting-format'
+} from '../../../src/renderer/meeting-format'
+
+/*
+ * 被测对象从 `src/renderer/components/meeting-format.ts` 搬到了 `src/renderer/meeting-format.ts`
+ * （旧 UI 整体删除时那一份跟着删了，逻辑逐字搬过来）。断言本身不变。
+ */
 
 function meeting(patch: Partial<MeetingMeta> = {}): MeetingMeta {
   return {
@@ -24,9 +30,13 @@ function meeting(patch: Partial<MeetingMeta> = {}): MeetingMeta {
   }
 }
 
-/** Stands in for the i18n hook, which only interpolates {placeholders} in this scope. */
-const t = (message: string, values?: Record<string, string | number>) =>
-  message.replace(/\{(\w+)\}/g, (whole, key) => String(values?.[key] ?? whole))
+/**
+ * 站位 i18n 函数。**用真实的 `translate`**，不再自己插值 ——
+ * 时长文案现在是词典里的键（`homeRecordsUi.durationMinutes`），一个只会替换
+ * `{占位符}` 的假 `t` 会把键原样返回，断言全部落空。
+ */
+const t = (key: string, values?: Record<string, string | number>) =>
+  translate(key, 'zh-CN', values)
 
 describe('会议展示格式', () => {
   it('自动标题按界面语言渲染, 不读盘上的 title', () => {

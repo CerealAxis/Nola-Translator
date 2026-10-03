@@ -71,6 +71,8 @@ export class SettingsStore {
         uiLanguage: raw.uiLanguage === 'en' ? 'en' : 'zh-CN',
         modelStoragePath: typeof raw.modelStoragePath === 'string' && isAbsolute(raw.modelStoragePath) ? raw.modelStoragePath : '',
         recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}) },
+        recording: { ...DEFAULT_SETTINGS.recording, ...(raw.recording ?? {}) },
+        appearance: { ...DEFAULT_SETTINGS.appearance, ...(raw.appearance ?? {}) },
         overlay: { ...DEFAULT_SETTINGS.overlay, ...rawOverlay },
         translation: {
           ...DEFAULT_SETTINGS.translation,
@@ -154,6 +156,8 @@ export class SettingsStore {
       ...patch,
       version: 1,
       recognition: { ...this.settings.recognition, ...(patch.recognition ?? {}) },
+      recording: { ...this.settings.recording, ...(patch.recording ?? {}) },
+      appearance: { ...this.settings.appearance, ...(patch.appearance ?? {}) },
       overlay: { ...this.settings.overlay, ...(patch.overlay ?? {}) },
       translation: { ...this.settings.translation, ...(patch.translation ?? {}) },
     }

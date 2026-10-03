@@ -16,16 +16,42 @@ const audioSourceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('microphone'), deviceId: z.string().min(1).max(512) }).strip(),
 ])
 
+/**
+ * A model id is either one of the ids the app ships with, or a `hub:<owner>/<name>` id for a model
+ * the user installed from Hugging Face.
+ *
+ * Refined rather than widened to a bare `z.string()` on purpose: the closed union is what makes
+ * a stale id (`sherpa-zh-en-small`, a removed Argos-era model) fail loudly at the protocol
+ * boundary instead of travelling to the engine and being resolved against whatever happens to be
+ * in the resource table. Widening the type is fine; widening the *runtime check* to "any string"
+ * is not.
+ */
+const hubModelId = z
+  .string()
+  .min(1)
+  .max(256)
+  .refine((value) => value.startsWith('hub:'), '只有 hub: 前缀的自装模型 id 才被接受')
+
+const recognitionModelIdSchema = z.union([
+  z.enum(['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf', 'sensevoice-small']),
+  hubModelId,
+])
+
+const translationModelIdSchema = z.union([
+  z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m']),
+  hubModelId,
+])
+
 export const sessionConfigSchema = z
   .object({
     audioSource: audioSourceSchema,
     recognitionMode: z.enum(['realtime', 'accurate']),
-    recognitionModelId: z.enum(['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf', 'sensevoice-small']).optional(),
+    recognitionModelId: recognitionModelIdSchema.optional(),
     sourceLanguage: z.string().min(1).max(32),
     targetLanguages: z.array(z.string().min(1).max(32)).max(8),
     allowIntermediateTranslation: z.boolean().optional(),
     translationProvider: z.enum(['hymt2', 'm2m100', 'microsoft', 'openai', 'ollama']).optional(),
-    translationModelId: z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m']).optional(),
+    translationModelId: translationModelIdSchema.optional(),
     translationOptions: z.object({
       endpoint: z.string().min(1).max(2048).optional(),
       apiKey: z.string().max(4096).optional(),
@@ -71,7 +97,35 @@ export const engineCommandSchema = z.discriminatedUnion('type', [
   }).strip(),
   z.object({ ...envelope, type: z.literal('startSession'), config: sessionConfigSchema }).strip(),
   z.object({ ...envelope, type: z.literal('stopSession'), sessionId: z.string().min(1).max(128) }).strip(),
+  z
+    .object({
+      ...envelope,
+      type: z.literal('setSessionPaused'),
+      sessionId: z.string().min(1).max(128),
+      paused: z.boolean(),
+    })
+    .strip(),
   z.object({ ...envelope, type: z.literal('shutdown') }).strip(),
+  z
+    .object({
+      ...envelope,
+      type: z.literal('searchHubModels'),
+      // Empty is meaningful: the hub's list endpoint treats `search=` as "most downloaded",
+      // which is how the search tab browses when its box is empty.
+      query: z.string().max(256),
+      slot: z.enum(['recognition', 'translation']).optional(),
+      limit: z.number().int().min(1).max(50).optional(),
+    })
+    .strip(),
+  z.object({ ...envelope, type: z.literal('inspectHubRepo'), repo: z.string().min(3).max(256) }).strip(),
+  z
+    .object({
+      ...envelope,
+      type: z.literal('installHubRepo'),
+      repo: z.string().min(3).max(256),
+      slot: z.enum(['recognition', 'translation']).optional(),
+    })
+    .strip(),
 ])
 
 const audioDeviceSchema = z
@@ -103,7 +157,11 @@ const resourceSchema = z
   .object({
     resourceId: z.string().min(1).max(256),
     kind: z.enum(['recognitionModel', 'translationModel']),
-    provider: z.enum(['qwen3-asr', 'sensevoice', 'hymt2', 'm2m100']),
+    // The loader that will run this model, i.e. the runtime adapter id. A self-installed model
+    // can carry `llama.cpp` or any adapter added later, so this cannot stay a closed union —
+    // and a closed union here would reject the record and kill the engine, because an event that
+    // fails to parse is treated as protocol corruption.
+    provider: z.string().min(1).max(64),
     name: z.string().min(1).max(256),
     description: z.string().min(1).max(1024),
     languages: z.array(z.string().min(1).max(32)).max(16),
@@ -117,6 +175,40 @@ const resourceSchema = z
     progress: z.number().min(0).max(1).optional(),
     cancellable: z.boolean(),
     errorCode: z.string().min(1).max(128).optional(),
+  })
+  .strip()
+
+const hubCompatibilitySchema = z
+  .object({
+    compatible: z.boolean(),
+    reasonCode: z.string().min(1).max(64),
+    reason: z.string().min(1).max(1024),
+    slot: z.enum(['recognition', 'translation']).optional(),
+    loader: z.enum(['llama.cpp', 'transformers', 'funasr']).optional(),
+    adapterId: z.string().max(64).optional(),
+    languages: z.array(z.string().min(1).max(32)).max(128),
+    evidence: z.record(z.string(), z.string()),
+  })
+  .strip()
+
+const hubModelSummarySchema = z
+  .object({
+    repo: z.string().min(1).max(256),
+    resourceId: z.string().min(1).max(256),
+    revision: z.string().max(64).optional(),
+    formats: z.array(z.enum(['pytorch', 'gguf'])).max(2).optional(),
+    description: z.string().max(600).optional(),
+    author: z.string().max(256).optional(),
+    pipelineTag: z.string().max(64).optional(),
+    libraryName: z.string().max(64).optional(),
+    downloads: z.number().int().nonnegative().optional(),
+    lastModified: z.string().max(64).optional(),
+    hasGguf: z.boolean(),
+    ggufArchitecture: z.string().max(64).optional(),
+    fileCount: z.number().int().nonnegative(),
+    downloadBytes: z.number().int().nonnegative().optional(),
+    installed: z.boolean(),
+    compatibility: hubCompatibilitySchema.optional(),
   })
   .strip()
 
@@ -162,7 +254,7 @@ export const engineEventSchema = z.discriminatedUnion('type', [
     .object({
       ...envelope,
       type: z.literal('status'),
-      code: z.enum(['idle', 'starting', 'ready', 'listening', 'stopping']),
+      code: z.enum(['idle', 'starting', 'ready', 'listening', 'paused', 'stopping']),
       details: z.record(z.string(), z.unknown()).optional(),
     })
     .strip(),
@@ -176,6 +268,29 @@ export const engineEventSchema = z.discriminatedUnion('type', [
     })
     .strip(),
   z.object({ ...envelope, type: z.literal('shutdownComplete') }).strip(),
+  z
+    .object({
+      ...envelope,
+      type: z.literal('hubModels'),
+      // Mirrors the command side: a browse request echoes back an empty query, and a parse
+      // failure here would take the whole engine process down (engine-process kills on bad event).
+      query: z.string().max(256),
+      models: z.array(hubModelSummarySchema).max(20),
+      candidates: z.number().int().nonnegative(),
+      rateLimited: z.boolean(),
+    })
+    .strip(),
+  z
+    .object({
+      ...envelope,
+      type: z.literal('hubInspect'),
+      repo: z.string().min(1).max(256),
+      revision: z.string().max(64).optional(),
+      fileCount: z.number().int().nonnegative(),
+      downloadBytes: z.number().int().nonnegative().optional(),
+      compatibility: hubCompatibilitySchema,
+    })
+    .strip(),
 ])
 
 function parseLine(line: string): unknown {

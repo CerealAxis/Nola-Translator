@@ -13,6 +13,7 @@ import threading
 from typing import Literal
 from uuid import uuid4
 
+from .hub import adapter_by_id, classify_hub_error
 from .models.catalog import (
     HYMT2_1_8B_IQ2_M,
     HYMT2_1_8B_Q3_K_M,
@@ -23,6 +24,7 @@ from .models.catalog import (
     SENSEVOICE_SMALL,
 )
 from .models.manager import ModelManager, ModelSpec
+from .models.registry import CustomFile, CustomModelEntry, CustomModelRegistry
 from .protocol import ResourceChangedEvent, ResourceRecord
 
 
@@ -68,7 +70,11 @@ class ResourceOperationCancelled(RuntimeError):
 class ResourceDefinition:
     resource_id: str
     kind: Literal["recognitionModel", "translationModel"]
-    provider: Literal["qwen3-asr", "sensevoice", "hy-mt2", "m2m100"]
+    # The provider tag is free-form: it names a loader, and a loader set that grows with the
+    # runtime registry must not need this annotation widened by hand each time. (It also used to
+    # read Literal[..., "hy-mt2", ...] while the definitions below wrote "hymt2", so the
+    # annotation already disagreed with every value it claimed to allow.)
+    provider: str
     name: str
     description: str
     languages: tuple[str, ...]
@@ -92,7 +98,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             QWEN_RESOURCE_ID,
             "recognitionModel",
             "qwen3-asr",
-            "Qwen3-ASR 1.7B · 本地流式识别",
+            "Qwen3-ASR 1.7B",
             "下载约 4GB 的 BF16 原始权重，加载时以 NF4 4-bit 量化运行；支持多语言流式字幕。",
             (
                 "zh", "en", "yue", "ar", "de", "fr", "es", "pt",
@@ -104,7 +110,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             QWEN_06B_RESOURCE_ID,
             "recognitionModel",
             "qwen3-asr",
-            "Qwen3-ASR 0.6B · 本地流式识别",
+            "Qwen3-ASR 0.6B",
             "约 1.5GB 的 BF16 原始权重，加载时以 NF4 4-bit 量化运行；与 1.7B 同系列，体积更小。",
             (
                 "zh", "en", "yue", "ar", "de", "fr", "es", "pt",
@@ -116,7 +122,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             SENSEVOICE_RESOURCE_ID,
             "recognitionModel",
             "sensevoice",
-            "SenseVoiceSmall · 本地流式识别",
+            "SenseVoiceSmall",
             "约 936MB 的非自回归权重，由内置 funasr 在本机运行；支持中日韩粤英五种语言，"
             "其余源语言自动回落到模型自判。",
             ("zh", "en", "yue", "ja", "ko"),
@@ -126,7 +132,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             HYMT2_RESOURCE_ID,
             "translationModel",
             "hymt2",
-            "Hy-MT2 1.8B Q4_K_M · 本地翻译模型",
+            "Hy-MT2 1.8B Q4_K_M",
             "预量化 Q4_K_M 文件（约 1.13GB），由内置 llama.cpp 在本机运行；质量基准档。",
             (
                 "zh", "en", "fr", "pt", "es", "ja", "tr", "ru",
@@ -138,7 +144,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             HYMT2_Q3_RESOURCE_ID,
             "translationModel",
             "hymt2",
-            "Hy-MT2 1.8B Q3_K_M · 本地翻译模型",
+            "Hy-MT2 1.8B Q3_K_M",
             "约 951MB，比 Q4_K_M 更小；实测专有名词（品牌、型号）保持得最好。",
             (
                 "zh", "en", "fr", "pt", "es", "ja", "tr", "ru",
@@ -150,7 +156,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             HYMT2_IQ2_RESOURCE_ID,
             "translationModel",
             "hymt2",
-            "Hy-MT2 1.8B UD-IQ2_M · 本地翻译模型",
+            "Hy-MT2 1.8B UD-IQ2_M",
             "约 723MB，体积最小；位宽很低，专有名词可能被译成字面意思。",
             (
                 "zh", "en", "fr", "pt", "es", "ja", "tr", "ru",
@@ -162,7 +168,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             M2M100_RESOURCE_ID,
             "translationModel",
             "m2m100",
-            "M2M100 418M · 本地翻译模型",
+            "M2M100 418M",
             "约 1.9GB 的 pytorch_model.bin，由 transformers 在本机运行；支持 100 种语言互译。",
             (
                 "zh", "en", "fr", "pt", "es", "ja", "tr", "ru",
@@ -197,6 +203,10 @@ class ResourceManager:
         self.emit = emit
         self.operations: dict[str, Operation] = {}
         self.tasks: dict[str, asyncio.Task[None]] = {}
+        # Self-installed models live beside the built-in table, not inside it: the table is a
+        # hand-maintained list of models the app ships with, and a user's own download is not
+        # something it should have to learn about at build time.
+        self.registry = CustomModelRegistry(self.model_root)
 
     @property
     def qwen_path(self) -> Path:
@@ -208,16 +218,59 @@ class ResourceManager:
         entry = spec.files[0]
         return self.model_root / spec.directory / entry.path
 
+    def translation_gguf_path(self, resource_id: str) -> Path:
+        """Absolute path of the single GGUF a llama.cpp translation resource loads.
+
+        Generic over ``resource_id`` rather than over the Hy-MT2 tiers, because a GGUF the user
+        installed from the hub is served by the same llama-server and the only thing that differs
+        is which file sits in the snapshot.
+        """
+        spec = self._spec(resource_id)
+        ggufs = [entry for entry in spec.files if entry.path.casefold().endswith(".gguf")]
+        if not ggufs:
+            raise ResourceActionError("invalidConfiguration", {"reason": "翻译模型资源里没有 GGUF 权重"})
+        return self.model_root / spec.directory / ggufs[0].path
+
     def model_path(self, resource_id: str) -> Path:
         """Resource id → local model directory; unknown ids fail the definition lookup before reaching here."""
         return self.models.model_path(self._spec(resource_id))
 
+    def adapter_for(self, resource_id: str) -> str | None:
+        """The runtime adapter id a resource is loaded by, or ``None`` for a built-in id.
+
+        The loader used to be chosen by comparing the id against a hardcoded list, which cannot
+        see a model the user installed. Everything downstream now asks here instead, so a
+        self-installed repo is dispatched by the adapter its own metadata selected.
+        """
+        entry = self.registry.get(resource_id)
+        if entry is not None:
+            return entry.adapter_id
+        if resource_id == SENSEVOICE_RESOURCE_ID:
+            return "sensevoice"
+        if resource_id in (QWEN_RESOURCE_ID, QWEN_06B_RESOURCE_ID):
+            return "qwen3-asr"
+        if resource_id == M2M100_RESOURCE_ID:
+            return "m2m100"
+        if resource_id in HYMT2_RESOURCE_IDS:
+            return "llama.cpp"
+        return None
+
     def list(self) -> list[ResourceRecord]:
-        return [self.record(item.resource_id) for item in RESOURCE_DEFINITIONS]
+        return [self.record(item.resource_id) for item in RESOURCE_DEFINITIONS] + [
+            self.record(entry.resource_id) for entry in self.registry.all()
+        ]
 
     def is_installed(self, resource_id: str) -> bool:
         self._definition(resource_id)
         return self.models.is_installed(self._spec(resource_id))
+
+    def is_registered(self, resource_id: str) -> bool:
+        """Whether the id names a resource at all, without raising for one that does not.
+
+        Search needs this: a repo that is not installed yet has no entry in the resource table,
+        and asking whether its weights are on disk must answer "no", not fail the whole search.
+        """
+        return resource_id in RESOURCE_BY_ID or self.registry.get(resource_id) is not None
 
     def record(self, resource_id: str) -> ResourceRecord:
         definition = self._definition(resource_id)
@@ -356,6 +409,13 @@ class ResourceManager:
     async def _remove(self, resource_id: str) -> None:
         spec = self._spec(resource_id)
         await asyncio.to_thread(shutil.rmtree, self.models.model_path(spec), True)
+        # A self-installed model is also an identity, not just a directory: keeping the registry
+        # entry after the weights are gone would leave a row in the resource list that can never
+        # become installed again and that nothing can install. Removing the weights without
+        # removing the entry is the reverse mistake, so both happen together, and only for ids
+        # the registry actually owns.
+        if self.registry.get(resource_id) is not None:
+            self.registry.remove(resource_id)
 
     def _set_progress(self, resource_id: str, progress: float) -> None:
         operation = self.operations.get(resource_id)
@@ -383,14 +443,83 @@ class ResourceManager:
 
     def _definition(self, resource_id: str) -> ResourceDefinition:
         definition = RESOURCE_BY_ID.get(resource_id)
-        if definition is None:
-            raise ResourceActionError("resourceNotFound", {"resourceId": resource_id})
-        return definition
+        if definition is not None:
+            return definition
+        entry = self.registry.get(resource_id)
+        if entry is not None:
+            return self._custom_definition(entry)
+        raise ResourceActionError("resourceNotFound", {"resourceId": resource_id})
+
+    def _custom_definition(self, entry: CustomModelEntry) -> ResourceDefinition:
+        """A self-installed repo presented exactly like a built-in resource.
+
+        The provider is the adapter id, which is the same value the loader dispatch keys on, so a
+        record's ``provider`` and the runtime's actual choice cannot drift apart.
+        """
+        adapter = adapter_by_id(entry.adapter_id)
+        label = adapter.label if adapter is not None else entry.adapter_id
+        kind: Literal["recognitionModel", "translationModel"] = (
+            "recognitionModel" if entry.slot == "recognition" else "translationModel"
+        )
+        if entry.adapter_id == "llama.cpp":
+            # Spelled out rather than left implicit: the llama-server path in this engine is
+            # Hy-MT2's translation prompt and language table, and a user who installed their own
+            # GGUF deserves to know that is what will be talking to it.
+            description = (
+                f"自 Hugging Face 安装：{entry.repo}，由 {label} 运行。"
+                "注意：内置 llama-server 使用 Hy-MT2 的翻译提示词与语言表，"
+                "自装 GGUF 会走同一条通道，但提示词模板并非为它调校。"
+            )
+        else:
+            description = f"自 Hugging Face 安装：{entry.repo}，由 {label} 运行。"
+        return ResourceDefinition(
+            resource_id=entry.resource_id,
+            kind=kind,
+            provider=entry.adapter_id,
+            name=entry.name,
+            description=description,
+            # A resource record carries at most 16 language codes, and the adapter tables run
+            # longer (Hy-MT2 declares 39). The registry keeps the full list; the record shows a
+            # prefix of it. Session-time language validation still runs against the provider's
+            # own table, so a truncated display list never becomes a false rejection.
+            languages=entry.languages[:16],
+            download_bytes=entry.total_bytes,
+        )
+
+    def register_hub_model(
+        self, repo: str, revision: str, adapter_id: str, slot: str, name: str,
+        files: tuple[CustomFile, ...], languages: tuple[str, ...],
+    ) -> CustomModelEntry:
+        """Remember a judged repo as an addressable resource, before anything is downloaded.
+
+        Registering first is what lets the install reuse ``ModelManager.ensure`` unchanged: the
+        download is driven by a ``ModelSpec`` built from this entry, and the same spec is what
+        ``is_installed`` and ``model_path`` will consult afterwards. Nothing here downloads, so an
+        entry that was written and then failed to install is still removable and still listed.
+        """
+        if adapter_id not in ("qwen3-asr", "sensevoice", "m2m100", "llama.cpp"):
+            raise ResourceActionError(
+                "invalidConfiguration", {"reason": f"没有可运行的加载器：{adapter_id}"}
+            )
+        if slot not in ("recognition", "translation"):
+            raise ResourceActionError("invalidConfiguration", {"reason": f"未知模型槽位：{slot}"})
+        if not files:
+            raise ResourceActionError("invalidConfiguration", {"reason": "仓库没有可安装的文件"})
+        entry = CustomModelEntry(
+            repo=repo,
+            revision=revision,
+            adapter_id=adapter_id,
+            slot=slot,  # type: ignore[arg-type]
+            name=name,
+            files=files,
+            languages=languages,
+        )
+        return self.registry.put(entry)
 
     def _spec(self, resource_id: str) -> ModelSpec:
         self._definition(resource_id)
         # read from the module-level constants at call time so tests can swap the catalog spec.
-        return {
+        builtin = {
             QWEN_RESOURCE_ID: QWEN3_ASR_1_7B_HF,
             QWEN_06B_RESOURCE_ID: QWEN3_ASR_0_6B_HF,
             SENSEVOICE_RESOURCE_ID: SENSEVOICE_SMALL,
@@ -398,13 +527,24 @@ class ResourceManager:
             HYMT2_Q3_RESOURCE_ID: HYMT2_1_8B_Q3_K_M,
             HYMT2_IQ2_RESOURCE_ID: HYMT2_1_8B_IQ2_M,
             M2M100_RESOURCE_ID: M2M100_418M,
-        }[resource_id]
+        }.get(resource_id)
+        if builtin is not None:
+            return builtin
+        entry = self.registry.get(resource_id)
+        assert entry is not None  # _definition already proved the id resolves
+        return entry.spec()
 
     @staticmethod
     def _error_code(error: Exception) -> str:
-        name = type(error).__name__
-        if name in {"URLError", "HTTPError", "ConnectionError", "TimeoutError"}:
-            return "networkUnavailable"
-        if str(error) == "downloadIntegrityFailed" or "Integrity" in name:
+        """Install failure → protocol error code.
+
+        A bare ``HTTPError`` catch would report 401/403/404/429 as "网络不可用", which is how a
+        mistyped repo name or a gated model ends up being debugged as a network problem; hub.py
+        already maps the status codes onto the vocabulary, so reuse it.
+        """
+        if str(error) == "downloadIntegrityFailed" or "Integrity" in type(error).__name__:
             return "integrityCheckFailed"
+        hub_error = classify_hub_error(error)
+        if hub_error is not None:
+            return hub_error.code
         return "installFailed"

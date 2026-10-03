@@ -26,11 +26,31 @@ export type AppSettings = {
   uiLanguage: 'zh-CN' | 'en'
   modelStoragePath: string
   recognition: RecognitionSettings
+  recording: RecordingSettings
+  appearance: AppearancePrefs
   overlay: OverlaySettings
   translation: TranslationSettings
 }
 
-export type RecognitionModelId = 'qwen3-asr-1.7b-hf' | 'qwen3-asr-0.6b-hf' | 'sensevoice-small'
+/** `keepAudio: false` stops the engine from being handed a recording path, so no WAV is written. */
+export type RecordingSettings = {
+  keepAudio: boolean
+}
+
+export type AppearancePrefs = {
+  /** Honoured by the app shell; the caption overlay always animates, it is the system caption surface. */
+  reduceMotion: boolean
+}
+
+/**
+ * One of the recognition models the app ships with, or a `hub:<owner>/<name>` id for a model the
+ * user installed from Hugging Face.
+ *
+ * The trailing `string & {}` keeps editor autocomplete on the three known ids while still
+ * accepting a custom one; a plain `string` would silently accept any typo, and the union is what
+ * `settings-schema.ts` mirrors at runtime.
+ */
+export type RecognitionModelId = 'qwen3-asr-1.7b-hf' | 'qwen3-asr-0.6b-hf' | 'sensevoice-small' | (string & {})
 
 export type RecognitionSettings = {
   modelId: RecognitionModelId
@@ -41,8 +61,11 @@ export type RecognitionSettings = {
 
 export type TranslationProvider = 'hymt2' | 'm2m100' | 'microsoft' | 'openai' | 'ollama'
 
-/** The three local Hy-MT2 quantization tiers; only meaningful when provider=hymt2. */
-export type Hymt2ModelId = 'hy-mt2-1.8b-q4-k-m' | 'hy-mt2-1.8b-q3-k-m' | 'hy-mt2-1.8b-iq2-m'
+/**
+ * The three local Hy-MT2 quantization tiers, or a `hub:<owner>/<name>` id for a GGUF the user
+ * installed; only meaningful when provider=hymt2.
+ */
+export type Hymt2ModelId = 'hy-mt2-1.8b-q4-k-m' | 'hy-mt2-1.8b-q3-k-m' | 'hy-mt2-1.8b-iq2-m' | (string & {})
 
 export type TranslationSettings = {
   provider: TranslationProvider
@@ -58,8 +81,10 @@ export type TranslationSettings = {
   targetLanguage: string
 }
 
-export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'overlay' | 'translation' | 'modelStoragePath' | 'version'> & {
+export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recording' | 'appearance' | 'overlay' | 'translation' | 'modelStoragePath' | 'version'> & {
   recognition?: Partial<RecognitionSettings>
+  recording?: Partial<RecordingSettings>
+  appearance?: Partial<AppearancePrefs>
   overlay?: Partial<OverlaySettings>
   translation?: Partial<TranslationSettings>
 }
@@ -98,6 +123,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
     modelId: 'qwen3-asr-1.7b-hf',
     sourceLanguage: 'auto',
     audioSource: 'defaultOutput',
+  },
+  recording: {
+    keepAudio: true,
+  },
+  appearance: {
+    reduceMotion: false,
   },
   overlay: {
     mode: 'bottom',

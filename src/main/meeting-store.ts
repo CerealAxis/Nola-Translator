@@ -344,6 +344,20 @@ export class MeetingStore {
     })
   }
 
+  async setNotes(meetingId: string, notes: string): Promise<MeetingMeta | null> {
+    // A blank note is dropped instead of stored as "", so a meeting that never had notes keeps
+    // reading back the same shape it was written with.
+    const value = notes.trim() ? notes : undefined
+    return this.serialize(meetingId, async () => {
+      const meta = this.cache.get(meetingId)
+      if (!meta) return null
+      const next: MeetingMeta = { ...meta, notes: value }
+      await writeMeta(this.directory(meetingId), next)
+      this.cache.set(meetingId, next)
+      return next
+    })
+  }
+
   async remove(meetingId: string): Promise<void> {
     this.open.delete([...this.open.entries()].find(([, value]) => value === meetingId)?.[0] ?? '')
     await this.serialize(meetingId, async () => {

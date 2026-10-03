@@ -1,0 +1,159 @@
+/* Shared v3 geometry and HeroUI refinements. Feature styles build on these tokens. */
+@layer base {
+  :root {
+    --nola-titlebar-h: 64px;
+    --nola-sidebar-w: 200px;
+    --nola-content-max: 1600px;
+    --nola-page-padding: 24px;
+    --radius: .5rem;
+    --field-radius: .625rem;
+    --nola-r-lg: 16px;
+    --nola-text-display: 700 32px/1.25 var(--font-ui);
+    --nola-text-title: 650 20px/1.4 var(--font-ui);
+    --nola-text-subtitle: 600 14px/1.45 var(--font-ui);
+    --nola-text-caption: 400 13px/1.5 var(--font-ui);
+  }
+}
+@layer components {
+  .nola-app-shell {
+    display: flex; flex-direction: column; height: 100dvh; overflow: hidden;
+    background:
+      linear-gradient(139deg, transparent 0 32%, color-mix(in oklch, var(--accent) 2.5%, transparent) 32% 40%, transparent 40% 68%, color-mix(in oklch, var(--accent) 2%, transparent) 68% 77%, transparent 77%),
+      radial-gradient(ellipse at 40% 0%, color-mix(in oklch, var(--accent) 7%, transparent), transparent 70%), var(--background);
+  }
+  .nola-titlebar { display: flex; align-items: center; gap: 20px; height: var(--nola-titlebar-h); flex-shrink: 0; padding: 0 24px; }
+  .nola-brand { display: flex; align-items: center; gap: 14px; min-width: 0; font-size: 18px; font-weight: 650; white-space: nowrap; }
+  .nola-titlebar-tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .nola-titlebar-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--foreground); }
+  .nola-titlebar-icon svg { width: 20px; height: 20px; }
+  .nola-titlebar-icon:hover { background: color-mix(in oklch, var(--accent) 8%, transparent); }
+  .nola-native-controls { width: 138px; flex-shrink: 0; height: 100%; }
+  .nola-web-controls { display: flex; gap: 6px; }
+  .nola-web-controls .button { width: 42px; height: 40px; padding: 0; border-radius: 8px; }
+  .nola-app-body { display: flex; flex: 1; min-height: 0; min-width: 0; }
+  .nola-sidebar { flex: 0 0 var(--nola-sidebar-w); width: var(--nola-sidebar-w); border-right: 1px solid color-mix(in oklch, var(--border) 65%, transparent); }
+  .nola-sidebar-nav { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+  .nola-nav-button { display: flex; width: 100%; height: 56px; min-width: 0; justify-content: flex-start; gap: 16px; padding: 0 16px; font-size: 14px; font-weight: 550; border: 0; box-shadow: none; border-radius: 12px; color: var(--foreground); background: transparent; }
+  .nola-nav-button svg { width: 23px; height: 23px; flex-shrink: 0; }
+  .nola-nav-button[data-active="true"] { color: var(--accent-foreground); background: var(--nola-primary-gradient); box-shadow: 0 3px 12px color-mix(in oklch, var(--accent) 17%, transparent); }
+  .nola-nav-button:not([data-active="true"]):hover { background: color-mix(in oklch, var(--accent) 7%, transparent); }
+  .nola-nav-tooltip { display: none; }
+  .nola-main { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; overflow-x: hidden; }
+  .nola-route-content { display: flex; flex-direction: column; width: 100%; min-width: 0; max-width: var(--nola-content-max); margin: 0 auto; padding: var(--nola-page-padding); gap: 20px; }
+  .nola-route-content > * { min-width: 0; }
+  .nola-route-content[data-page="workspace"] { height: 100%; }
+  .nola-section-card { gap: 0; min-width: 0; border-radius: 16px; border: 1px solid var(--border); box-shadow: var(--surface-shadow); background: var(--surface); color: var(--foreground); }
+  .nola-setting-row { display: grid; grid-template-columns: minmax(120px, .85fr) minmax(0, 1fr); align-items: center; min-height: 48px; gap: 20px; padding: 9px 16px; }
+  .nola-setting-control { display: flex; justify-content: flex-end; align-items: center; min-width: 0; gap: 8px; }
+  .nola-setting-control > * { max-width: 100%; }
+  .nola-setting-control .select { width: 100%; min-width: 0; max-width: 280px; }
+  .nola-setting-control .select__trigger { width: 100%; }
+  .nola-page-intro { padding: 20px 24px; border-radius: 16px; background: var(--nola-hero-gradient); }
+  .nola-page-intro h1 { font-size: 32px; font-weight: 700; }
+  .nola-overlay-page { display: flex; flex-direction: column; gap: 20px; }
+  .nola-overlay-preview { padding: 20px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface); }
+  /*
+   * 预览卡的舞台。搬自主仓 `.preview-stage`：卡片贴**底**居中（`place-items: end center`），
+   * 不是垂直居中 —— 主仓的参考截图里浮窗就落在舞台下沿，中央上方留白是为了让页面标题
+   * 与卡片之间的关系读起来像"窗浮在桌面上"，而不是"一块卡片摆在框里"。
+   */
+  .nola-overlay-stage { min-height: 260px; display: grid; place-items: end center; padding: clamp(16px, 3vw, 30px); border: 1px solid var(--border); border-radius: 12px; background: linear-gradient(135deg, color-mix(in oklch, var(--accent) 13%, transparent), transparent 58%), var(--surface-secondary); overflow: hidden; }
+  .nola-overlay-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; }
+  .nola-overlay-field { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 12px; }
+  .nola-overlay-field .select, .nola-overlay-field .select__trigger { width: 100%; }
+  .nola-overlay-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--separator); }
+}
+@layer utilities {
+  .button--primary { background: var(--nola-primary-gradient); color: var(--accent-foreground); }
+  .card { border-radius: 16px; }
+  .modal__dialog, .alert-dialog__dialog { border-radius: 20px; }
+  .popover, .dropdown__popover, .select__popover { border-radius: 14px; box-shadow: var(--overlay-shadow); }
+  .input, .input-group, .textarea, .search-field__group, .select__trigger { border-color: var(--field-border); border-radius: 10px; }
+}
+@media (max-width: 1024px) {
+  :root { --nola-sidebar-w: 76px; --nola-page-padding: 20px; }
+  .nola-sidebar-nav { padding: 12px 10px; }
+  .nola-nav-button { justify-content: center; padding: 0; }
+  .nola-nav-label { display: none; }
+  .nola-nav-tooltip { display: block; }
+  .nola-overlay-fields { grid-template-columns: 1fr; }
+}
+@media (max-width: 800px) {
+  .nola-titlebar { gap: 8px; padding: 0 16px; }
+  .nola-brand { font-size: 16px; gap: 10px; }
+  .nola-titlebar-tools { gap: 2px; }
+  .nola-setting-row { gap: 12px; grid-template-columns: minmax(110px, .65fr) minmax(0, 1fr); }
+  .nola-page-intro { padding: 18px; }
+  .nola-overlay-stage { min-height: 280px; padding: 20px 16px; }
+}
+@media (max-height: 700px) {
+  :root { --nola-page-padding: 16px; }
+  .nola-overlay-stage { min-height: 240px; padding: 16px; }
+}
+
+/* ---------------------------------------------------------------------------
+   分段控件：HeroUI v3 Tabs 的视觉语言，用在 ToggleButtonGroup 上。
+
+   为什么不直接用 <Tabs>：这些控件选的是**设置值**，不切换面板，所以没有
+   Tabs.Panel 可挂；一个没有 tabpanel 的 tablist 是 ARIA 误用，屏幕阅读器会
+   报"标签页没有对应内容"。而且 workspace.test.tsx 断言的就是单选组里
+   ToggleButton 的 radio 角色，换成 Tabs（role=tab）那条断言会红。
+   DESIGN.md §2 的组件表也把"单选与分段"明确指派给 ToggleButtonGroup。
+
+   尺寸与配色逐条对齐 node_modules/@heroui/styles/dist/components/tabs.css：
+   轨道 bg-default + radius*2.5、列表 p-1、标签 h-8 + rounded-3xl、
+   指示块 bg-segment + shadow-surface、未选中文字 muted。
+
+   这一段刻意不包 @layer。HeroUI 的 toggle-button 规则住在 `@layer components`
+   （toggle-button.css 自己没有 @layer，是被 @heroui/styles 的 index.css:14 用
+   layer(components) 罩进去的），而本文件这批规则如果也进 components 层，就只能
+   比源码顺序，"改了个数字却不生效"取决于 @import 排列这种跟样式本身无关的偶然因素。
+   写成无层就压过所有层，与顺序和特异性都无关。
+   也不加 z-index，不需要。
+--------------------------------------------------------------------------- */
+.nola-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: calc(var(--radius) * 2.5);
+  background: var(--default);
+}
+.nola-segmented .toggle-button {
+  min-width: 0;
+  height: 32px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: none;
+  transition: background-color 150ms var(--ease-nola), color 150ms var(--ease-nola), box-shadow 150ms var(--ease-nola);
+}
+/* HeroUI 的 attached 模式给首尾单独上 rounded-s-3xl / rounded-e-3xl，
+   :first-child 是伪类（0,3,0），比上面那条（0,2,0）更specific，必须同等
+   精度再压一次，否则首尾两个按钮的圆角会跟轨道贴平。 */
+.nola-segmented .toggle-button:first-child,
+.nola-segmented .toggle-button:last-child { border-radius: 12px; }
+.nola-segmented .toggle-button:hover { background: color-mix(in oklch, var(--foreground) 7%, transparent); }
+.nola-segmented .toggle-button[data-selected="true"] {
+  color: var(--segment-foreground);
+  background: var(--segment);
+  box-shadow: var(--shadow-surface);
+}
+/* 选中项悬停时保住白底：上面那条通用 :hover 会把 7% foreground 混进去。 */
+.nola-segmented .toggle-button[data-selected="true"]:hover { background: var(--segment); }
+
+/* 字号组是 A- / A / A+ 三个图标按钮，标签更窄（从 workspace.css 搬过来，
+   那条在 @layer 内会被上面的无层声明压掉）。 */
+.nola-workspace-font-control .nola-segmented .toggle-button { padding: 0 8px; }
+
+/* 窄窗收窄标签，保留工作台工具栏原来 ≤760px 的行为。 */
+@media (max-width: 760px) {
+  .nola-workspace-view-controls .nola-segmented .toggle-button { padding-inline: 9px; font-size: 12px; }
+}

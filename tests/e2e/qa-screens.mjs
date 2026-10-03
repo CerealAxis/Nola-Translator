@@ -7,10 +7,10 @@ const settings = { version:1, theme:'system', uiLanguage:'zh-CN', modelStoragePa
   recognition:{modelId:'qwen3-asr-1.7b-hf',sourceLanguage:'auto'},
   overlay:{mode:'bottom',colorScheme:'dark',locked:true,alwaysOnTop:true,fontFamily:'Segoe UI Variable',fontSize:26,fontWeight:600,translationFontSize:22,translationFontWeight:500,sourceColor:'#FFFFFF',translationColor:'#FFFFFF',backgroundColor:'#111111',backgroundOpacity:0.84,lineHeight:1.3,translationLineHeight:1.35,showSource:true,showTranslation:true,layout:'rolling'},
   translation:{provider:'m2m100',microsoftEndpoint:'https://api.cognitive.microsofttranslator.com',microsoftRegion:'',openaiEndpoint:'https://api.openai.com/v1',openaiModel:'gpt-4.1-mini',ollamaEndpoint:'http://127.0.0.1:11434',ollamaModel:'qwen3:4b',translateIntermediate:false,targetLanguage:'zh'} }
-const rec = { resourceId:'qwen3-asr-1.7b-hf', kind:'recognitionModel', provider:'qwen3-asr', name:'Qwen3-ASR 1.7B · 本地流式识别', description:'x', languages:['zh'], installed:true, installedBytes:4300000000, state:'idle', cancellable:false }
-const rec2 = { resourceId:'qwen3-asr-0.6b-hf', kind:'recognitionModel', provider:'qwen3-asr', name:'Qwen3-ASR 0.6B · 本地流式识别', description:'x', languages:['zh'], installed:false, installedBytes:0, downloadBytes:1880619678, state:'idle', cancellable:false }
-const tr = { resourceId:'hy-mt2-1.8b-q4-k-m', kind:'translationModel', provider:'hy-mt2', name:'Hy-MT2 1.8B · 本地翻译模型', description:'x', languages:['zh'], installed:true, installedBytes:1130000000, state:'idle', cancellable:false }
-const m2 = { resourceId:'m2m100-418m', kind:'translationModel', provider:'m2m100', name:'M2M100 418M · 本地翻译模型', description:'x', languages:['zh'], installed:false, installedBytes:0, downloadBytes:1941936305, state:'idle', cancellable:false }
+const rec = { resourceId:'qwen3-asr-1.7b-hf', kind:'recognitionModel', provider:'qwen3-asr', name:'Qwen3-ASR 1.7B', description:'x', languages:['zh'], installed:true, installedBytes:4300000000, state:'idle', cancellable:false }
+const rec2 = { resourceId:'qwen3-asr-0.6b-hf', kind:'recognitionModel', provider:'qwen3-asr', name:'Qwen3-ASR 0.6B', description:'x', languages:['zh'], installed:false, installedBytes:0, downloadBytes:1880619678, state:'idle', cancellable:false }
+const tr = { resourceId:'hy-mt2-1.8b-q4-k-m', kind:'translationModel', provider:'hy-mt2', name:'Hy-MT2 1.8B Q4_K_M', description:'x', languages:['zh'], installed:true, installedBytes:1130000000, state:'idle', cancellable:false }
+const m2 = { resourceId:'m2m100-418m', kind:'translationModel', provider:'m2m100', name:'M2M100 418M', description:'x', languages:['zh'], installed:false, installedBytes:0, downloadBytes:1941936305, state:'idle', cancellable:false }
 const preload = `
 const {contextBridge} = require('electron');
 let settings = ${JSON.stringify(settings)};

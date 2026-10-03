@@ -1,0 +1,69 @@
+/* =============================================================================
+   Nola Translator — Z-index ladder
+   -----------------------------------------------------------------------------
+   Imported from ./index.css with `layer(utilities)`, Tailwind's highest layer,
+   so these classes win over component defaults. The explicit @layer utilities
+   below keeps the file safe to import standalone.
+
+   NOTE: `:root` above is *not* wrapped in the layer block on purpose — custom
+   property definitions are cascade-resolved like any other declaration, and
+   keeping them at the top of the file makes the ladder readable in one glance.
+
+   THE ONLY SOURCE OF TRUTH FOR STACKING. An arbitrary z-index literal written
+   straight into a component is a bug: it is untraceable and it will eventually
+   collide with a modal. Every stacking decision picks a rung from this ladder,
+   and new rungs must be added here with a reason, never inline.
+
+   The gaps between rungs are intentional — they leave room for a future nested
+   portal (a popover inside a popover) without renumbering anything.
+   ========================================================================== */
+
+:root {
+  --z-base: 0; /* normal content flow */
+  --z-sticky: 20; /* sticky toolbars, record table headers */
+  --z-caption-scrim: 10; /* overlay card's top/bottom fade scrims */
+  --z-caption-actions: 30; /* overlay card's hover action + control rows */
+  --z-dropdown: 40; /* Dropdown / Select / Popover / Combobox */
+  --z-overlay: 60; /* Modal / AlertDialog / Drawer */
+  --z-toast: 80; /* Toast */
+  --z-titlebar-drag: 100; /* Electron titlebar drag region */
+}
+
+@layer utilities {
+  .z-base {
+    z-index: var(--z-base);
+  }
+
+  .z-sticky {
+    z-index: var(--z-sticky);
+  }
+
+  /*
+   * The overlay window is its own top-level document, so its dropdowns (language
+   * pair, display mode) render in a portal at the window root. They still need a
+   * rung above the caption card, or the card's hover rows paint over them.
+   */
+  .z-caption-scrim {
+    z-index: var(--z-caption-scrim);
+  }
+
+  .z-caption-actions {
+    z-index: var(--z-caption-actions);
+  }
+
+  .z-dropdown {
+    z-index: var(--z-dropdown);
+  }
+
+  .z-overlay {
+    z-index: var(--z-overlay);
+  }
+
+  .z-toast {
+    z-index: var(--z-toast);
+  }
+
+  .z-titlebar-drag {
+    z-index: var(--z-titlebar-drag);
+  }
+}

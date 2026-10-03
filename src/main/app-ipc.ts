@@ -7,7 +7,7 @@ import { exportSrt, exportText, exportWebVtt, type MeetingStore } from './meetin
 import type { EngineProcess } from './engine-process'
 import type { SettingsStore } from './settings-store'
 import type { SecureCredentialStore } from './secure-store'
-import { computeOverlayBounds, getOverlayInteractionPolicy } from './windows'
+import { computeOverlayBounds, getOverlayInteractionPolicy, overlayMinimumHeight, OVERLAY_MIN_WIDTH } from './windows'
 import type { AppSettings, AppSettingsPatch } from '../shared/settings'
 import { RECOGNITION_MODEL_LABELS } from '../shared/settings'
 import { modelStorageEnvironment, readEngineStatus, validateModelStorageDirectory } from './model-storage'
@@ -18,7 +18,7 @@ const channels = {
   openAppearance: 'app:open-appearance',
   getModelStorage: 'storage:get', chooseModelStorageDirectory: 'storage:choose', restartApp: 'app:restart',
   listMeetings: 'meeting:list', getMeeting: 'meeting:get', readMeeting: 'meeting:read',
-  renameMeeting: 'meeting:rename', deleteMeeting: 'meeting:delete', exportMeeting: 'meeting:export',
+  renameMeeting: 'meeting:rename', setMeetingNotes: 'meeting:set-notes', deleteMeeting: 'meeting:delete', exportMeeting: 'meeting:export',
   meetingAudioUrl: 'meeting:audio-url',
   getDiagnostics: 'diagnostics:get', copyDiagnostics: 'diagnostics:copy',
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
@@ -74,9 +74,15 @@ export function registerAppIpc(options: {
     window.setFocusable(interaction.focusable)
     window.setMovable(interaction.movable)
     window.setResizable(interaction.resizable)
+    const display = screen.getDisplayMatching(window.getBounds())
+    // The minimum height is a function of the font sizes, so it is re-applied on every settings
+    // change rather than frozen at window creation — otherwise raising the font size would leave
+    // the bar draggable back down into the "no track gets a line" range we just removed.
+    // This is a constraint, not a resize: it never calls setBounds, never repositions, and never
+    // recomputes the height the user already chose.
+    window.setMinimumSize(OVERLAY_MIN_WIDTH, overlayMinimumHeight(current.overlay, display.workArea.height))
     // Only reposition when the mode itself changed; appearance sliders must not resize a bar the user already sized.
     if (reposition) {
-      const display = screen.getDisplayMatching(window.getBounds())
       window.setBounds(computeOverlayBounds(current.overlay.mode, display.workArea, window.getBounds()))
     }
     window.webContents.send('settings:changed', current)
@@ -87,11 +93,14 @@ export function registerAppIpc(options: {
     }
   }
   const applyTheme = (): void => {
-    // The main window always follows Windows; the caption theme setting only ever affects the overlay.
-    nativeTheme.themeSource = 'system'
+    // The app shell follows `settings.theme`, not Windows. nativeTheme stays on 'system' so that
+    // media queries (prefers-color-scheme) keep describing the *user's* system, but the title bar
+    // symbols must follow what is actually painted — following the system left dark-on-dark
+    // minimise/maximise/close glyphs on a dark title bar.
+    const dark = current.theme === 'dark' || (current.theme === 'system' && nativeTheme.shouldUseDarkColors)
     options.getMainWindow()?.setTitleBarOverlay({
       color: '#00000000',
-      symbolColor: nativeTheme.shouldUseDarkColors ? '#ffffff' : '#1f1f1f',
+      symbolColor: dark ? '#ffffff' : '#1f1f1f',
       height: 48,
     })
   }
@@ -153,6 +162,12 @@ export function registerAppIpc(options: {
   ipcMain.handle(channels.renameMeeting, async (_event, meetingId: unknown, title: unknown) => {
     if (typeof meetingId !== 'string' || typeof title !== 'string') throw new Error('会议名称无效')
     const meta = await options.meetings.rename(meetingId, title)
+    if (!meta) throw new Error('会议不存在')
+    return meta
+  })
+  ipcMain.handle(channels.setMeetingNotes, async (_event, meetingId: unknown, notes: unknown) => {
+    if (typeof meetingId !== 'string' || typeof notes !== 'string') throw new Error('笔记内容无效')
+    const meta = await options.meetings.setNotes(meetingId, notes)
     if (!meta) throw new Error('会议不存在')
     return meta
   })

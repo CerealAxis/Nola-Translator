@@ -1,0 +1,100 @@
+.nola-home, .nola-record-page, .nola-record-detail { min-width: 0; display: flex; flex-direction: column; gap: 20px; container-type: inline-size; }
+.nola-home { --entry-purple: var(--color-purple, oklch(.59 .22 291)); --entry-orange: var(--color-orange, oklch(.68 .17 53)); --entry-mint: var(--color-emerald, oklch(.7 .15 168)); }
+.nola-home-hero { position: relative; display: flex; flex-direction: row; align-items: center; min-height: 264px; padding: 32px 36px; overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(125deg, color-mix(in oklab, var(--accent) 13%, var(--surface)), color-mix(in oklab, var(--accent) 6%, var(--surface)) 57%, color-mix(in oklab, var(--accent) 20%, var(--surface))); box-shadow: none; }
+.nola-home-hero::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(139deg, transparent 0 210px, color-mix(in oklab, var(--surface) 28%, transparent) 210px 310px, transparent 310px 420px); pointer-events: none; }
+.nola-home-hero__copy { position: relative; width: 64%; padding: 0; min-width: 0; }
+.nola-home-hero__copy h1 { margin: 0; font-size: clamp(32px, 4cqi, 52px); line-height: 1.15; font-weight: 700; letter-spacing: -.035em; white-space: nowrap; color: var(--foreground); }
+.nola-home-hero__copy h1 span { color: var(--accent); }
+.nola-home-hero__copy > p { margin: 12px 0 24px; color: var(--muted); font-size: clamp(14px, 1.65cqi, 21px); line-height: 1.6; }
+.nola-home-hero__features { display: flex; flex-wrap: wrap; gap: 16px 22px; }
+.nola-home-hero__features > span { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 550; color: var(--foreground); }
+.nola-home-hero__features i { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: color-mix(in oklab, var(--surface) 85%, transparent); color: var(--accent); }
+.nola-home-hero__features svg { width: 22px; height: 22px; }
+.nola-home-hero__art { position: absolute; pointer-events: none; right: 1%; top: 2%; width: 41%; height: 96%; object-fit: contain; }
+.nola-home__entries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.nola-entry { --entry-tone: var(--accent); position: relative; min-width: 0; min-height: 238px; padding: 22px; gap: 14px; overflow: hidden; border: 1px solid color-mix(in oklab, var(--entry-tone) 21%, var(--border)); border-radius: 16px; background: linear-gradient(150deg, var(--surface), color-mix(in oklab, var(--entry-tone) 6%, var(--surface))); box-shadow: none; }
+.nola-entry--secondary { --entry-tone: var(--entry-purple); }
+.nola-entry--tertiary { --entry-tone: var(--entry-orange); }
+.nola-entry--quaternary { --entry-tone: var(--entry-mint); }
+.nola-entry__top { position: relative; display: flex; align-items: flex-start; justify-content: space-between; color: var(--entry-tone); }
+.nola-entry__icon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 16px; background: color-mix(in oklab, var(--entry-tone) 15%, var(--surface)); }
+.nola-entry__icon svg { width: 34px; height: 34px; stroke-width: 1.8; }
+.nola-entry .card__header { position: relative; gap: 6px; }
+.nola-entry .card__title { color: var(--foreground); font-size: 22px; line-height: 1.35; font-weight: 650; }
+.nola-entry .card__description { white-space: pre-line; color: var(--muted); line-height: 1.7; font-size: 14px; }
+.nola-entry .card__footer { margin-top: auto; position: relative; }
+.nola-entry__action { min-height: 40px; min-width: min(180px, 100%); max-width: 100%; border-radius: 999px; background: color-mix(in oklab, var(--entry-tone) 22%, var(--surface)); color: var(--foreground); gap: 10px; padding-inline: 18px; }
+.nola-entry--primary .nola-entry__action { background: linear-gradient(100deg, var(--accent), color-mix(in oklab, var(--accent) 85%, var(--surface))); color: var(--accent-foreground); }
+.nola-entry__decoration { position: absolute; pointer-events: none; right: -12px; bottom: 47px; transform: rotate(-10deg); opacity: .09; color: var(--entry-tone); }
+.nola-entry__decoration svg { width: 118px; height: 118px; stroke-width: 1; }
+.nola-record-card { padding: 20px; min-width: 0; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 4%, transparent); gap: 16px; }
+.nola-record-card > .card__content { min-width: 0; padding: 0; }
+.nola-home__recent-header { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+.nola-home__recent-header .card__title { font-size: 20px; font-weight: 650; }
+.nola-records-table { width: 100%; border: 0; border-radius: 0; background: transparent; box-shadow: none; padding: 0; min-width: 0; }
+.nola-records-table__container { overflow: visible; width: 100%; min-width: 0; }
+.nola-records-table .table__content { table-layout: fixed; width: 100%; min-width: 0; border-collapse: collapse; }
+.nola-records-table th { height: 40px; padding: 10px 12px; color: var(--muted); font-size: 12px; font-weight: 500; text-align: left; background: var(--surface-secondary); border-radius: 0; }
+.nola-records-table td { height: 58px; padding: 10px 12px; color: var(--muted); font-size: 13px; border-bottom: 1px solid var(--separator); font-variant-numeric: tabular-nums; }
+.nola-records-table tr:last-child td { border-bottom: 0; }
+.nola-records-table tbody tr:hover { background: color-mix(in oklab, var(--accent) 4%, var(--surface)); }
+.nola-records-table__name { width: 30%; }
+.nola-records-table__time { width: 18%; white-space: nowrap; }
+.nola-records-table__duration { width: 11%; white-space: nowrap; }
+.nola-records-table__language { width: 18%; }
+.nola-records-table__status { width: 12%; white-space: nowrap; }
+.nola-records-table__actions { width: 11%; }
+.nola-records-table__title { display: flex; align-items: center; min-width: 0; gap: 12px; color: var(--foreground); }
+.nola-records-table__title > svg { width: 22px; height: 22px; flex-shrink: 0; stroke-width: 1.8; }
+.nola-records-table__open { display: block; padding: 0; min-width: 0; min-height: 30px; height: auto; max-width: 100%; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 6px; color: var(--foreground); font-weight: 550; font-size: 14px; background: transparent; }
+.nola-records-table__action-group { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.nola-records-table__view { color: var(--accent); padding: 4px; font-size: 13px; min-width: 0; }
+.nola-record-status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.nola-record-status i { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+.nola-record-status--live { color: var(--accent); }
+.nola-record-status--live i { background: var(--accent); }
+.nola-record-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; min-height: 200px; padding: 24px; color: var(--muted); text-align: center; }
+.nola-record-empty h2 { font-size: 20px; color: var(--foreground); }
+.nola-record-loading { display: grid; gap: 12px; }
+.nola-record-page__header { display: flex; justify-content: space-between; align-items: center; gap: 20px; min-width: 0; padding: 12px 4px; }
+.nola-record-page__header h1 { margin: 0 0 6px; color: var(--foreground); font-size: 32px; font-weight: 700; line-height: 1.25; }
+.nola-record-page__header p { color: var(--muted); font-size: 16px; margin: 0; }
+.nola-record-page__start { flex-shrink: 0; border-radius: 12px; min-height: 44px; padding-inline: 20px; }
+.nola-record-page__search { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.nola-record-page__search > .search-field { width: min(380px, 100%); }
+.nola-record-page__search .search-field__group { border: 1px solid var(--border); border-radius: 12px; min-height: 44px; background: var(--surface); }
+.nola-record-page__search > span, .nola-record-page__footer > span { font-size: 13px; color: var(--muted); }
+.nola-record-page__footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--separator); padding-top: 16px; gap: 12px; }
+.nola-record-page__footer > span { white-space: nowrap; flex-shrink: 0; }
+.nola-record-page__footer > .pagination { width: auto; margin-left: auto; }
+.nola-record-page__privacy { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; margin: 8px 12px; }
+.nola-record-detail { flex: 1; min-height: 0; }
+.nola-record-detail .nola-display { font-size: 32px; }
+.nola-record-detail__reading { flex: 1; min-height: 340px; padding: 0; overflow: hidden; }
+.nola-record-detail__reading > .card__content { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.nola-record-detail__back { align-self: flex-start; }
+.nola-dual { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.nola-dual__headers { display: grid; grid-template-columns: var(--dual-split, 50%) minmax(0, 1fr); padding-bottom: 14px; border-bottom: 1px solid var(--separator); }
+.nola-dual__headers > div { font-size: 16px; font-weight: 650; padding-inline: 16px; color: var(--foreground); }
+.nola-dual__scroll { overflow-y: auto; min-height: 0; flex: 1; }
+.nola-dual__pair { display: grid; grid-template-columns: var(--dual-split, 50%) minmax(0, 1fr); border-bottom: 1px solid var(--separator); }
+.nola-dual__pair:last-child { border-bottom: 0; }
+.nola-dual__cell { position: relative; padding: 18px 16px; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+.nola-dual__cell + .nola-dual__cell { border-left: 1px solid var(--separator); }
+.nola-dual__cell[data-current='true'] { background: color-mix(in oklab, var(--accent) 6%, var(--surface)); }
+.nola-record-audio { display: flex; align-items: center; min-height: 68px; gap: 16px; padding: 12px 20px; flex-wrap: wrap; background: var(--surface-secondary); }
+.nola-record-audio .slider { min-width: 120px; }
+@container (min-width: 1000px) { .nola-home__entries { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@container (max-width: 999px) { .nola-home-hero { min-height: 238px; padding: 28px; } .nola-home-hero__features { gap: 12px; } .nola-records-table__time { display: none; } .nola-records-table__name { width: 34%; } .nola-records-table__language { width: 24%; } .nola-records-table__actions { width: 16%; } }
+@container (max-width: 680px) { .nola-home-hero { min-height: 240px; padding: 24px; } .nola-home-hero__copy { width: 100%; } .nola-home-hero__art { opacity: .13; width: 60%; } .nola-home-hero__copy h1 { font-size: 32px; } .nola-home-hero__features { max-width: 360px; gap: 10px; } .nola-home-hero__features > span { font-size: 12px; } .nola-home-hero__features i { width: 30px; height: 30px; } .nola-records-table__language { display: none; } .nola-records-table__name { width: 47%; } .nola-records-table__duration { width: 18%; } .nola-records-table__status { width: 21%; } .nola-records-table__actions { width: 14%; } .nola-records-table__view { display: none; } .nola-records-table th, .nola-records-table td { padding-inline: 8px; } .nola-records-table__title { gap: 8px; } .nola-record-page__header { flex-wrap: wrap; } .nola-record-page__header h1 { font-size: 28px; } .nola-home__recent-header { flex-wrap: wrap; } .nola-entry { padding: 20px; } .nola-dual__headers { grid-template-columns: 1fr 1fr; } .nola-dual__pair { grid-template-columns: 1fr; } .nola-dual__cell + .nola-dual__cell { border-left: none; padding-top: 0; } .nola-dual > [role='separator'] { display: none; } }
+@container (max-width: 420px) { .nola-home__entries { grid-template-columns: 1fr; } .nola-records-table__duration { display: none; } .nola-records-table__name { width: 60%; } .nola-record-card { padding: 16px; } .nola-entry { min-height: 222px; } }
+
+.nola-dual__split { width: 120px; margin: 12px 16px 0 auto; flex-shrink: 0; }
+.nola-dual__split .slider__track { height: 3px; }
+.nola-dual__split .slider__thumb { width: 12px; height: 12px; }
+.nola-record-detail__header > div > div:last-child { flex-wrap: wrap; max-width: 100%; }
+.nola-record-detail__reading .border-t { flex-shrink: 0; }
+@container (max-width: 680px) { .nola-dual__split { display: none; } .nola-record-detail .nola-display { font-size: 26px; } }
+.nola-records-table .table__column::after { display: none; }
+.nola-records-table .table__row:hover .table__cell { background: color-mix(in oklab, var(--accent) 4%, var(--surface)); }
+

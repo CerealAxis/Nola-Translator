@@ -109,7 +109,7 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     qwen, qwen_small, sensevoice, hymt2, hymt2_q3, hymt2_iq2, m2m100 = records
     assert qwen.kind == "recognitionModel"
     assert qwen.provider == "qwen3-asr"
-    assert qwen.name == "Qwen3-ASR 1.7B · 本地流式识别"
+    assert qwen.name == "Qwen3-ASR 1.7B"
     assert qwen.downloadBytes == 4_087_646_324
     assert 0 < len(qwen.languages) <= 16
     assert qwen.installed is False
@@ -117,20 +117,20 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
 
     assert qwen_small.kind == "recognitionModel"
     assert qwen_small.provider == "qwen3-asr"
-    assert qwen_small.name == "Qwen3-ASR 0.6B · 本地流式识别"
+    assert qwen_small.name == "Qwen3-ASR 0.6B"
     assert qwen_small.downloadBytes == 1_576_381_331
     assert qwen_small.installed is False
 
     assert sensevoice.kind == "recognitionModel"
     assert sensevoice.provider == "sensevoice"
-    assert sensevoice.name == "SenseVoiceSmall · 本地流式识别"
+    assert sensevoice.name == "SenseVoiceSmall"
     assert sensevoice.downloadBytes == 936_694_116
     assert sensevoice.languages == ["zh", "en", "yue", "ja", "ko"]
     assert sensevoice.installed is False
 
     assert hymt2.kind == "translationModel"
     assert hymt2.provider == "hymt2"
-    assert hymt2.name == "Hy-MT2 1.8B Q4_K_M · 本地翻译模型"
+    assert hymt2.name == "Hy-MT2 1.8B Q4_K_M"
     assert hymt2.downloadBytes == 1_133_080_448
     assert 0 < len(hymt2.languages) <= 16
     assert hymt2.installed is False
@@ -145,7 +145,7 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
 
     assert m2m100.kind == "translationModel"
     assert m2m100.provider == "m2m100"
-    assert m2m100.name == "M2M100 418M · 本地翻译模型"
+    assert m2m100.name == "M2M100 418M"
     assert m2m100.downloadBytes == 1_941_936_305
     assert m2m100.installed is False
 

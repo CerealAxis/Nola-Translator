@@ -1,0 +1,341 @@
+/* =============================================================================
+   Nola Translator — Motion
+   -----------------------------------------------------------------------------
+   Imported into @layer base.
+
+   ============================ HARD RULES ================================
+   1. Animate ONLY `transform` and `opacity`. Anything else forces layout or
+      paint on every frame and drops frames on a low-end laptop.
+   2. Never animate `width` / `height` / `top` / `left` / `margin` / `padding`.
+      The ONE sanctioned exception is the expand/collapse built into HeroUI's
+      Disclosure / Accordion, which owns its own height transition.
+   3. Exit is always faster than enter (--dur-exit < --dur-enter). A dismissal
+      that lingers makes the whole app feel sluggish.
+   4. `transform` and `opacity` only — no `filter`, no `box-shadow`, no `color`
+      in keyframes. Colour transitions belong in the 120ms --dur-micro bucket.
+   ========================================================================== */
+
+:root {
+  --dur-micro: 120ms; /* hover / press / colour / focus ring */
+  --dur-enter: 200ms; /* menu, modal, drawer, toast entering */
+  --dur-exit: 120ms; /* exiting — MUST stay below --dur-enter */
+  --dur-page: 160ms; /* route change */
+
+  /* Reuse HeroUI's fluid curve so our timing matches every built-in component.
+     The literal is the fallback in case this file loads without @heroui/styles. */
+  --ease-nola: var(--ease-out-fluid, cubic-bezier(0.32, 0.72, 0, 1));
+  --press-scale: 0.96;
+}
+
+/* ============================ Press feedback ============================== */
+
+.nola-press {
+  transition: transform 80ms var(--ease-nola);
+  will-change: transform;
+}
+
+.nola-press:active {
+  transform: scale(var(--press-scale));
+}
+
+.nola-press:disabled,
+.nola-press[aria-disabled='true'] {
+  transform: none;
+  transition: none;
+}
+
+/* ============================ Overlay timing ============================== */
+/* HeroUI marks overlay elements with data-entering / data-exiting while the
+   transition runs. These two rules retune the duration per phase. Written flat
+   rather than nested so no bundler nesting support is required.
+
+   The Tailwind-native equivalents, if you prefer them:
+     data-[entering]:duration-200 data-[exiting]:duration-120          */
+
+.nola-fade-enter {
+  transition:
+    opacity var(--dur-enter) var(--ease-nola),
+    transform var(--dur-enter) var(--ease-nola);
+}
+
+.nola-fade-enter[data-entering] {
+  transition-duration: var(--dur-enter);
+}
+
+.nola-fade-enter[data-exiting] {
+  transition-duration: var(--dur-exit);
+}
+
+/* ============================ Overlay enter / exit ======================== */
+/* Menu / popover / tooltip: rises from just above its anchor and grows a hair. */
+
+.nola-overlay-enter {
+  animation: nola-overlay-in var(--dur-enter) var(--ease-nola) both;
+}
+
+.nola-overlay-exit {
+  animation: nola-overlay-out var(--dur-exit) var(--ease-nola) both;
+}
+
+@keyframes nola-overlay-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes nola-overlay-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+/* Dialog: travels further and scales from further out — a modal is a bigger
+   object than a menu, so it earns a larger travel distance. */
+
+.nola-modal-enter {
+  animation: nola-modal-in var(--dur-enter) var(--ease-nola) both;
+}
+
+.nola-modal-exit {
+  animation: nola-modal-out var(--dur-exit) var(--ease-nola) both;
+}
+
+@keyframes nola-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes nola-modal-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+}
+
+/* ============================ Route transition ============================ */
+/* Desktop app: a sliding page reads as a cheap web transition. Fade only. */
+
+.nola-page-enter {
+  animation: nola-page-in var(--dur-page) var(--ease-nola) both;
+}
+
+@keyframes nola-page-in {
+  from {
+    opacity: 0.85;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.nola-route-view {
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* ============================ List row insert ============================= */
+/* Opacity only. The other rows must not move — a reflowing list while the
+   user is reading it is the classic desktop-app jank tell. */
+
+.nola-row-enter {
+  animation: nola-row-in var(--dur-enter) var(--ease-nola) both;
+}
+
+@keyframes nola-row-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* ============================ Caption insert ============================== */
+/* One new caption line nudges up 4px. This is the single most-repeated
+   animation in the app, so it stays under 5px and never bounces. */
+
+.nola-caption-enter {
+  animation: nola-caption-in var(--dur-enter) var(--ease-nola) both;
+}
+
+@keyframes nola-caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================ Looping indicators ========================== */
+/* Exactly two infinite animations are allowed in the whole app, and both are
+   state indicators rather than decoration. Both are pausable. */
+
+.nola-tick {
+  animation: nola-tick-breathe 400ms var(--ease-nola) infinite alternate;
+}
+
+@keyframes nola-tick-breathe {
+  from {
+    opacity: 0.85;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.nola-live-dot {
+  animation: nola-live-pulse 1600ms var(--ease-nola) infinite;
+}
+
+@keyframes nola-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.55;
+    transform: scale(1.15);
+  }
+}
+
+.nola-tick[data-paused='true'],
+.nola-live-dot[data-paused='true'] {
+  animation: none;
+}
+
+.nola-live-dot[data-paused='true'] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ============================ Menu item hover ============================= */
+/*
+ * 这里**不画左侧 2px accent 指示条**，只用底色表达"指向"。
+ *
+ * 为什么删掉：HeroUI v3 的 `.menu-item__indicator` 是 `position: absolute; inset-inline-start: 8px`
+ * —— 选中标记的槽位本来就在**左侧 8px**。我们自己再画一根 2px 的条挂在这个坐标上，
+ * 两者精确重叠，✓ 被压成一条 2px 竖线，屏幕上读起来就是"文字左边凭空多了一根不属于
+ * 任何东西的线"，而它表达的那件事（这一项是当前生效的）✓ 本来就在说。
+ *
+ * 一处状态一个标记：hover / 键盘焦点 = 底色；选中 = 底色 + accent 文字 + HeroUI 的 ✓。
+ * 再加一根条就是两套语义说同一件事。
+ *
+ * 选中态靠 `[data-selected]`：它由 react-aria 依据 `selectedKeys` 写，所以键盘导航时
+ * 高亮会跟着走。手搓一个 ✓ 会在用键盘选中时留在旧位置。
+ *
+ * `selectedKeys` 必须传 `Set`（不是字符串）这一点在 TitleBar.tsx 的注释里记着，
+ * 是实测出来的：传字符串 react-aria 不报错，但选中态静默失效。
+ */
+
+.nola-menu-item {
+  background-color: transparent;
+  transition: background-color var(--dur-micro) var(--ease-nola);
+}
+
+.nola-menu-item:hover,
+.nola-menu-item[data-hovered='true'],
+.nola-menu-item:focus-visible,
+.nola-menu-item[data-focus-visible='true'] {
+  background-color: var(--surface-tertiary);
+}
+
+/* 选中项：底色转 accent-soft + 文字转 accent（DESIGN 第 8 节"菜单选中项"）。
+ * HeroUI 自己在这一态会点亮左侧的 ✓，这里不重复表达。 */
+.nola-menu-item[data-selected='true'] {
+  background-color: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* =============================================================================
+   REDUCED MOTION — two independent channels, BOTH required:
+     1. @media (prefers-reduced-motion: reduce)  — the OS setting
+     2. html[data-reduce-motion='true']          — the in-app toggle
+   An in-app preference must work even when the OS says nothing, and vice versa.
+   Durations collapse to 0.01ms rather than 0s: a zero-duration transition can
+   skip its end callback, which would strand exit animations in their start
+   state and leave overlays stuck on screen.
+   ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-micro: 0.01ms;
+    --dur-enter: 0.01ms;
+    --dur-exit: 0.01ms;
+    --dur-page: 0.01ms;
+  }
+
+  .nola-tick,
+  .nola-live-dot {
+    animation: none;
+  }
+
+  .nola-live-dot {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+html[data-reduce-motion='true'] {
+  --dur-micro: 0.01ms;
+  --dur-enter: 0.01ms;
+  --dur-exit: 0.01ms;
+  --dur-page: 0.01ms;
+}
+
+html[data-reduce-motion='true'] .nola-tick,
+html[data-reduce-motion='true'] .nola-live-dot {
+  animation: none;
+}
+
+html[data-reduce-motion='true'] .nola-live-dot {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* =============================================================================
+   BANNED EFFECTS — if one of these is ever "just for polish", it is a bug:
+     - animated / cycling gradient backgrounds
+     - parallax scrolling
+     - spring overshoot on anything
+     - number roll-up counters
+     - purely decorative infinite loops (only the two state indicators above)
+     - card lift on hover (cards do not float in this app)
+     - gradient-filled text
+     - coloured outer glows
+   ============================================================================= */

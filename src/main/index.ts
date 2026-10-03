@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises'
 
 import { app, BrowserWindow, safeStorage, screen, shell } from 'electron'
 
+import type { AppSettings, OverlaySettings } from '../shared/settings'
 import { handleMeetingAudio, MEETING_AUDIO_SCHEME, registerMeetingAudioScheme } from './audio-protocol'
 import { registerAppIpc } from './app-ipc'
 import { createEngineLaunchSpec, EngineProcess } from './engine-process'
@@ -22,9 +23,9 @@ let disposeIpc: (() => void) | null = null
 let disposeAppIpc: (() => void) | null = null
 let quitting = false
 
-function createMainWindow(): void {
+function createMainWindow(theme: AppSettings['theme']): void {
   const preload = resolvePreloadPath(__dirname)
-  const window = new BrowserWindow(createMainWindowOptions(preload))
+  const window = new BrowserWindow(createMainWindowOptions(preload, theme))
   mainWindow = window
 
   window.once('ready-to-show', () => window.show())
@@ -39,16 +40,26 @@ function createMainWindow(): void {
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {
-    void window.loadURL(process.env.ELECTRON_RENDERER_URL)
+    const url = new URL(process.env.ELECTRON_RENDERER_URL)
+    url.searchParams.set('theme', theme)
+    void window.loadURL(url.toString())
   } else {
-    void window.loadFile(join(__dirname, '../renderer/index.html'))
+    // The theme rides in on the query string because that is the only channel the page's main
+    // world can read synchronously: with contextIsolation+sandbox there is no window.process, so
+    // the pre-paint boot script would silently fall back to prefers-color-scheme and flash white.
+    void window.loadFile(join(__dirname, '../renderer/index.html'), { query: { theme } })
   }
 }
 
-function createOverlayWindow(): void {
+function createOverlayWindow(theme: AppSettings['theme'], overlay: OverlaySettings): void {
   const preload = resolvePreloadPath(__dirname)
   const display = screen.getPrimaryDisplay()
-  const window = new BrowserWindow(createOverlayWindowOptions(preload, display.workArea.width))
+  // The overlay settings come in here, not just the theme: the minimum height is derived from the
+  // caption font sizes, so building the window with the stored settings is what keeps a previously
+  // saved large font from starting out in a window that is too short to render it.
+  const window = new BrowserWindow(
+    createOverlayWindowOptions(preload, display.workArea.width, overlay, display.workArea.height),
+  )
   overlayWindow = window
   window.setAlwaysOnTop(true, 'screen-saver')
   window.setBounds(computeOverlayBounds('bottom', display.workArea, window.getBounds()))
@@ -58,9 +69,10 @@ function createOverlayWindow(): void {
   if (process.env.ELECTRON_RENDERER_URL) {
     const url = new URL(process.env.ELECTRON_RENDERER_URL)
     url.searchParams.set('overlay', '1')
+    url.searchParams.set('theme', theme)
     void window.loadURL(url.toString())
   } else {
-    void window.loadFile(join(__dirname, '../renderer/index.html'), { query: { overlay: '1' } })
+    void window.loadFile(join(__dirname, '../renderer/index.html'), { query: { overlay: '1', theme } })
   }
 }
 
@@ -107,13 +119,14 @@ if (!hasSingleInstanceLock) {
         ...resourceEnvironment,
       },
     })
-    createMainWindow()
-    createOverlayWindow()
+    createMainWindow(initialSettings.theme)
+    createOverlayWindow(initialSettings.theme, initialSettings.overlay)
     disposeIpc = registerEngineIpc(
       engine,
       () => overlayWindow,
       (provider) => credentials.get(provider),
       meetings,
+      () => settings.current(),
     )
     disposeAppIpc = registerAppIpc({
       settings,
@@ -141,7 +154,7 @@ if (!hasSingleInstanceLock) {
     })
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+      if (BrowserWindow.getAllWindows().length === 0) createMainWindow(settings.current().theme)
     })
   })
 }

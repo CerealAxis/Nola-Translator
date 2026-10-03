@@ -21,6 +21,7 @@ from .protocol import (
     HelloCommand,
     ListDevicesCommand,
     ReadyEvent,
+    SearchHubModelsCommand,
     SessionStartedEvent,
     SessionStoppedEvent,
     ShutdownCommand,
@@ -52,7 +53,9 @@ class EngineService:
                     type="ready",
                     requestId=command.requestId,
                     engineVersion=__version__,
-                    capabilities=["devices", "captions", "translation", "resources"],
+                    capabilities=[
+                        "devices", "captions", "translation", "resources", "pause", "hubInspect",
+                    ],
                 )
             ]
 
@@ -136,6 +139,18 @@ class EngineService:
                     requestId=command.requestId,
                     code="idle",
                 ),
+            ]
+
+        if isinstance(command, SearchHubModelsCommand):
+            # The search half of the hub feature is not built yet, and saying so is the whole
+            # point of this module: an empty result list would read as "the hub has nothing",
+            # which is a different and much more misleading answer.
+            return [
+                self._error(
+                    command.requestId,
+                    "resourceUnavailable",
+                    {"reason": "hubSearchNotImplemented", "query": command.query},
+                )
             ]
 
         if isinstance(command, ShutdownCommand):

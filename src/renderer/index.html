@@ -2,13 +2,258 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--
+      CSP 以**主项目那份为基底**，只追加三条：
+        object-src 'none'    —— 禁掉 <object>/<embed>，插件向量
+        base-uri 'none'      —— 禁掉 <base> 改写相对路径
+        form-action 'none'   —— 禁掉表单外发
+
+      **不要**把 connect-src 从 localhost 改成 127.0.0.1：electron-vite dev 的 HMR
+      WebSocket 连的是 localhost，改了会直接断掉热更新（而且不报任何错，只是热更新静默失效）。
+    -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws://localhost:* http://localhost:*"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws://localhost:* http://localhost:*; object-src 'none'; base-uri 'none'; form-action 'none'"
     >
     <title>诺拉翻译</title>
+
+    <!--
+      主题预涂。**必须是外部脚本，不能写成内联 <script>**：
+      上面那条 CSP 是 `script-src 'self'`，内联脚本会被浏览器直接拦掉，控制台报
+      "Executing inline script violates ... 'script-src self'"。被拦掉之后深色模式
+      每次启动都会先闪一帧白底，而这个错误在构建与单测里都不会出现，只有真正跑起来才看得到。
+      放在 public/theme-boot.js 由同源加载，'self' 才放行。
+    -->
+    <script src="./theme-boot.js"></script>
+
+    <!--
+      ══════════════════════════════════════════════════════════════════════════
+      启动画面（Splash）
+      ══════════════════════════════════════════════════════════════════════════
+
+      为什么必须是静态 HTML + 纯 CSS，一行 JS 都不能有：
+
+      `<script type="module">` 默认是 deferred，**会阻塞 DOMContentLoaded**。所以
+      Electron 的 dom-ready 与 ready-to-show 两个信号，都在整张模块图编译完的那一刻
+      才一起到。早期版本把 splash 交给 React 渲染，结果是它和应用同一帧出现 ——
+      等待的几十秒里屏幕上一个像素都没有，等于白做。
+
+      利用浏览器的渐进渲染：HTML 落地只要 150ms（实测），浏览器会在模块图还在编译的
+      时候就把这段静态 DOM 画出来。配合主进程里提前 `show()`，窗口约 1s 可见，
+      Logo 从此一直在呼吸，直到 React 接管。
+
+      为什么样式内联在 <style> 而不是外链 .css：
+      外链要等 Vite 把 CSS 过一遍 Tailwind，那条路曾经要 22.9s，splash 不能排在它后面。
+      内联 style 由上面那条 CSP 的 `style-src 'unsafe-inline'` 放行
+      （`script-src 'self'` 拦的是脚本，不是样式）。
+
+      为什么这套 CSS 不写 var(--dur-enter) / var(--background)：
+      它渲染的时候 src/index.css 还没到，任何来自项目 token 的 var() 都会解析失败。
+      所以这里的时长、缓动、颜色全部自包含。
+
+      ── 下面这一行 `@layer` 必须在任何样式之前 ──
+      Tailwind v4 与 HeroUI 依赖预先注册层叠层（`@layer properties, theme, base,
+      components, utilities`）才能把各自的规则放进正确的层。如果 feature 样式先
+      创建了这些层，Tailwind 的注册就会变成"往已有层里追加"而不是"按声明顺序建层"，
+      基础层会被组件层盖掉 —— 表现为颜色与间距莫名其妙，不报任何错。
+    -->
+    <style>
+      /* Register layers before lazily loaded feature styles can create them. */
+      @layer properties, theme, base, components, utilities;
+      /* ── 容器 ──────────────────────────────────────────────────────────────
+         position: fixed + inset: 0：不依赖 #root 的布局，而 #root 的样式此刻
+         还没到。z-index 用 var 走不到（见上），这里写字面量是唯一合理的选择：
+         splash 是 body 里第一个定位元素，1 已经足够压住尚未加载的 #root。 */
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background: #f4f5fa; /* = theme/nola-light.css --background */
+        animation: nola-splash-in 240ms cubic-bezier(0.32, 0.72, 0, 1) both;
+      }
+
+      [data-theme='dark'] #splash {
+        background: #101114;
+      }
+
+      /* ── 退场 ──────────────────────────────────────────────────────────────
+         由 main.tsx 在 React 首次绘制之后加 data-exit。120ms 淡出后节点被移除。
+         退场必须快于进场：多停 120ms 用户就会开始怀疑界面卡住了。 */
+      #splash[data-exit] {
+        animation: nola-splash-out 120ms cubic-bezier(0.32, 0.72, 0, 1) both;
+        pointer-events: none;
+      }
+
+      @keyframes nola-splash-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes nola-splash-out {
+        from { opacity: 1; }
+        to { opacity: 0; }
+      }
+
+      /* ── 毛玻璃底 ──────────────────────────────────────────────────────────
+         参照"背后是一层被模糊的桌面"的观感。不依赖系统的 Mica/Acrylic：那个效果
+         在 transparent 窗口上有已知的合成问题，而且开发/构建/不同 Windows 版本
+         表现不一致。改成纯 CSS 造 —— 四层低透明径向渐变 + 一层噪点，
+         dev、build、任何系统上都是同一张图。 */
+      .nola-splash__field {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(46% 38% at 62% 22%, rgba(22, 139, 217, 0.16), transparent 70%),
+          radial-gradient(36% 32% at 22% 74%, rgba(34, 85, 199, 0.14), transparent 72%),
+          radial-gradient(30% 26% at 84% 80%, rgba(151, 240, 218, 0.22), transparent 70%),
+          radial-gradient(40% 34% at 12% 18%, rgba(255, 255, 255, 0.6), transparent 72%);
+      }
+
+      [data-theme='dark'] .nola-splash__field {
+        background:
+          radial-gradient(46% 38% at 62% 22%, rgba(22, 139, 217, 0.26), transparent 70%),
+          radial-gradient(36% 32% at 22% 74%, rgba(34, 85, 199, 0.22), transparent 72%),
+          radial-gradient(30% 26% at 84% 80%, rgba(151, 240, 218, 0.14), transparent 70%),
+          radial-gradient(40% 34% at 12% 18%, rgba(122, 138, 190, 0.12), transparent 72%);
+      }
+
+      /* 噪点是"毛玻璃"和"渐变"的分界线：没有它，四层渐变读起来就是一张平滑的
+         色块；有了它才像一块被打磨过的亚克力。feTurbulence 内联成 data URI，
+         一次网络请求都不发（CSP 的 img-src 'self' data: 放行 data:）。 */
+      .nola-splash__grain {
+        position: absolute;
+        inset: 0;
+        opacity: 0.035;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+
+      [data-theme='dark'] .nola-splash__grain {
+        opacity: 0.05;
+      }
+
+      /* ── Logo ──────────────────────────────────────────────────────────────
+         两层分工：__halo 只动 opacity（做"呼吸的光"），__mark 只动 scale。
+         合成器上 transform 和 opacity 都便宜，但同一个元素上不能同时有两个
+         动画争 transform —— 后写的那条赢，先写的那条静默失效。所以拆成两个元素，
+         而不是一条 keyframes 里写两个属性。 */
+      .nola-splash__halo {
+        position: absolute;
+        width: 340px;
+        height: 340px;
+        border-radius: 50%;
+        background: radial-gradient(closest-side, rgba(22, 139, 217, 0.24), transparent 72%);
+        animation: nola-splash-breathe 3400ms cubic-bezier(0.32, 0.72, 0, 1) infinite;
+      }
+
+      [data-theme='dark'] .nola-splash__halo {
+        background: radial-gradient(closest-side, rgba(22, 139, 217, 0.34), transparent 72%);
+      }
+
+      .nola-splash__mark {
+        position: relative;
+        width: 120px;
+        height: 120px;
+        animation: nola-splash-breathe 3400ms cubic-bezier(0.32, 0.72, 0, 1) infinite;
+      }
+
+      .nola-splash__mark svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      @keyframes nola-splash-breathe {
+        0%, 100% { opacity: 0.62; transform: scale(0.945); }
+        50%      { opacity: 1;    transform: scale(1.035); }
+      }
+
+      /* ── 让位给 vite 报错浮层 ──────────────────────────────────────────────
+         splash 是 fixed + z-index:1，会盖住 vite-error-overlay。改了一行代码导致
+         transform 失败时，用户看到的会是一片"Logo 一直在呼吸"，而不是真正的
+         报错 —— 这比没有启动画面糟糕得多。
+         vite 启动失败时它把 <vite-error-overlay> 追加到 body，这里用 :has() 让
+         splash 自动让位，零 JS。Chromium 105+ 支持 :has()，Electron 43 远超。 */
+      body:has(vite-error-overlay) #splash {
+        display: none;
+      }
+
+      /* ── 悬浮字幕文档不走启动画面 ──────────────────────────────────────────
+         浮层窗是窄条，上面摆一个 120px 的 Logo 只会莫名其妙；而且它本来就是
+         show:false + ready-to-show，加载路径短，没必要遮。
+         theme-boot.js 给 <html> 打上 is-overlay，这里纯 CSS 隐藏。 */
+      html.is-overlay #splash {
+        display: none;
+      }
+
+      /* ── 降低动效偏好 ──────────────────────────────────────────────────────
+         呼吸停掉、进场退场都不再动（退场直接 display:none，由 main.tsx 移除节点）。 */
+      @media (prefers-reduced-motion: reduce) {
+        #splash,
+        .nola-splash__mark,
+        .nola-splash__halo {
+          animation: none;
+        }
+        .nola-splash__mark {
+          opacity: 1;
+        }
+        #splash[data-exit] {
+          animation: none;
+          display: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <!--
+      splash 是 #root 的兄弟节点，不是它的子节点。e2e 脚本的断言全部锚在 #root
+      及其后代上（getElementById("root")、querySelectorAll("#root *")），
+      把 splash 塞进 #root 会直接推翻它们。
+    -->
+    <div id="splash" aria-hidden="true">
+      <div class="nola-splash__field"></div>
+      <div class="nola-splash__grain"></div>
+      <div class="nola-splash__halo"></div>
+      <div class="nola-splash__mark">
+        <!--
+          品牌标志，原样内联。选内联而不是 <img>：splash 的整个前提是
+          "零网络依赖、尽早画出"，一个可能 404 的外链会让启动画面在最需要它的
+          时候变成空白。内联只有 1.1KB。渐变 id 加了前缀，避免和将来任何 #blue 撞名。
+          原文件的 role/aria-labelledby 去掉了 —— 整个 splash 是 aria-hidden，
+          留着一份指向不存在的 title 反而是噪声。
+        -->
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="120"
+          height="120"
+          viewBox="0 0 512 512"
+          fill="none"
+          focusable="false"
+        >
+          <defs>
+            <linearGradient id="nola-splash-blue" x1="80" y1="56" x2="432" y2="416" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#168BD9" />
+              <stop offset="1" stop-color="#2255C7" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M144 48H368C421.019 48 464 90.981 464 144V304C464 357.019 421.019 400 368 400H226L143.2 462.1C136.607 467.045 127.2 462.341 127.2 454.1V398.53C82.221 390.6 48 351.344 48 304V144C48 90.981 90.981 48 144 48Z"
+            fill="url(#nola-splash-blue)"
+          />
+          <path
+            d="M168 304V144L344 304V144"
+            stroke="white"
+            stroke-width="40"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path d="M344 144V183" stroke="#97F0DA" stroke-width="40" stroke-linecap="round" />
+        </svg>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/main.tsx"></script>
   </body>

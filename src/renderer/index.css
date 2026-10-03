@@ -1,0 +1,76 @@
+﻿/* Nola Translator 渲染层入口样式。
+ *
+ * import 顺序是 load-bearing，不可调换：
+ *   1. tailwindcss     —— Tailwind v4 必须最先
+ *   2. @heroui/styles  —— HeroUI v3 依赖上面已注册的 tailwind 变量
+ *   3. ./theme/index.css —— 本产品的 token / 排版 / 动效 / 层级
+ *
+ * ── 为什么这个文件在 `src/renderer/` 根目录而不是 `src/renderer/styles/` ──
+ *
+ * `@source` 的路径是**相对这个 CSS 文件自身**解析的，不是相对 vite root，也不是相对 cwd。
+ * 原型把它放在 `src/index.css`（与 features/ 同级），所以 `'./'` 覆盖整个 src/。
+ * 搬进主仓时如果图省事放进 `src/renderer/styles/index.css`，`'./'` 就只扫 styles/ 一个目录，
+ * `features/**` 里的每一个类名全部扫不到 → **样式静默失效，不报任何错，构建照样成功**。
+ * 放在这里（与所有子目录同级）就不用改这一行。
+ *
+ * `source(none)` 关掉 Tailwind 的自动源码探测，改由下面显式声明 —— 这不是洁癖，
+ * 是启动时间。主仓的 cwd 是**仓库根**，自动探测从那里开始扫：
+ *   · out/ —— 我们自己上一轮 build 的产物，renderer 的 CSS/JS 全在里面，
+ *     等于让 Tailwind 把自己吐出来的东西再吃一遍
+ *   · node_modules/ —— 上万个子目录
+ *   · engine/dist/、vendor/ —— 引擎的构建产物
+ * 原型实测过这一项：关掉自动探测前 40.25s，挪走构建产物后 23.37s —— 单这一项占 42%。
+ *
+ * **不要删 `source(none)`。** 另外：往 src/renderer/ 以外加带 Tailwind 类名的文件时，
+ * 要在这里补一行 `@source`，否则那个文件的样式会静默失效（不报错，只是没样式）。
+ */
+@import 'tailwindcss' source(none);
+@source './';
+@import '@heroui/styles';
+@import './theme/index.css';
+@import './theme/app.css';
+
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+/* 桌面应用：整个窗口不滚动，只有内容区滚动。 */
+#root {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+}
+
+/* 焦点样式一律交给组件层，本文件**故意不写**全局 `:focus-visible { outline: ... }`。
+ *
+ * 无层声明在层叠里优先级高于所有 `@layer`（与选择器特异性无关），所以一条全局
+ * `:focus-visible` 会盖掉组件层的每一个 outline：重命名输入框聚焦时显示的
+ * 「外圈 2px 蓝环 + 2px 空隙 + 内侧 1px 蓝边」就是它造成的，不是 HeroUI 的 focus ring。
+ *
+ * 删掉之后焦点由两处表达，键盘可达性不受影响：
+ *   · 字段（Input/TextArea/SearchField/InputGroup/Select）—— 1px accent 描边，
+ *     规则见 theme/index.css 的 utilities 层。
+ *   · 其余 HeroUI 组件（Button/Checkbox/Switch/...）—— 组件层自带的
+ *     `status-focused` box-shadow 环，配合 `--ring-offset-width: 0px` 紧贴控件、没有空隙。
+ *
+ * 本项目没有裸 <button> / <a> / <select>，全部交互元素都是 HeroUI 组件，
+ * 而它们都自带 `outline-none`，所以删掉这条不会漏出 Chromium 的 UA 焦点环。 */

@@ -13,20 +13,39 @@ from uuid import uuid4
 
 from .audio.capture import AudioDeviceDisconnectedError, PortAudioCapture
 from .audio.recorder import WavRecorder
+from .hub import (
+    HubRepoInfo,
+    RuntimeVerdict,
+    classify_hub_error,
+    detect_runtime,
+    inspect_repo,
+    search_repos,
+    search_formats,
+)
 from .models.manager import ModelManager
+from .models.registry import CustomFile
 from .protocol import (
     CaptionEvent,
     CaptionSegment,
     EngineCommand,
     EngineEvent,
     ErrorEvent,
+    HubCompatibility,
+    HubInspectEvent,
+    HubModelSummary,
+    HubModelsEvent,
+    InspectHubRepoCommand,
+    InstallHubRepoCommand,
     ListResourcesCommand,
     ManageResourceCommand,
     ResourceActionResultEvent,
     ResourcesEvent,
+    SearchHubModelsCommand,
     ShutdownCommand,
     StartSessionCommand,
+    StatusEvent,
     StopSessionCommand,
+    SetSessionPausedCommand,
     SessionConfig,
     Translation,
 )
@@ -40,7 +59,6 @@ from .resources import (
     HYMT2_RESOURCE_IDS,
     M2M100_RESOURCE_ID,
     QWEN_RESOURCE_ID,
-    SENSEVOICE_RESOURCE_ID,
     ResourceActionError,
     ResourceManager,
 )
@@ -67,12 +85,67 @@ from .translation.scheduler import TranslationScheduler
 EventSink = Callable[[EngineEvent], None]
 
 
+class UnknownTranslationModel(ValueError):
+    """A session named a translation model the engine has no llama-server tier for.
+
+    Raised instead of falling back to the baseline quantization: a silent fallback loads a model
+    the user did not pick, and the discrepancy only surfaces as mysteriously worse output much
+    later, when nobody is looking at the config that caused it.
+    """
+
+    def __init__(self, model_id: str) -> None:
+        super().__init__(
+            f"未知的翻译模型 id：{model_id}。可用：{'、'.join(HYMT2_RESOURCE_IDS)}"
+        )
+        self.model_id = model_id
+
+
 @dataclass(frozen=True, slots=True)
 class TranslationRequest:
     update: RecognitionUpdate
     source: str
     targets: tuple[str, ...]
     allow_intermediate: bool
+
+
+def _compatibility(verdict: RuntimeVerdict, *, languages: bool = True) -> HubCompatibility:
+    """A runtime verdict as the protocol shape both the search and the inspect event carry."""
+    return HubCompatibility(
+        compatible=verdict.compatible,
+        reasonCode=verdict.reason_code,
+        reason=verdict.reason,
+        slot=verdict.slot,
+        loader=verdict.loader,
+        adapterId=verdict.adapter_id,
+        languages=list(verdict.languages) if languages else [],
+        evidence=verdict.evidence_map,
+    )
+
+
+def _custom_files(info: HubRepoInfo) -> tuple[CustomFile, ...]:
+    """The repo's file list as registry entries, carrying whichever digest HF published.
+
+    Every file is kept, not just the weights: a transformers repo is unusable without
+    config.json and the tokenizer files, and dropping them here would produce a model that
+    downloads successfully and then fails to load.
+    """
+    files: list[CustomFile] = []
+    for item in info.files:
+        if item.size is None:
+            continue
+        if item.sha256 is None and item.blob_sha1 is None:
+            # detect_runtime already refuses a repo with an undigested file, so reaching here
+            # means every file has one; skipping is belt-and-braces, not a silent acceptance.
+            continue
+        files.append(
+            CustomFile(
+                path=item.path,
+                size=item.size,
+                sha256=item.sha256,
+                blob_sha1=item.blob_sha1,
+            )
+        )
+    return tuple(files)
 
 
 class EngineRuntime:
@@ -87,6 +160,8 @@ class EngineRuntime:
         self.session_task: asyncio.Task[None] | None = None
         self.session_request_id = ""
         self.session_started_at_ms = 0.0
+        self.session_paused = False
+        self.paused_at_ms = 0.0
         self.active_config = None
         self.llama_manager = LlamaServerManager(gguf_path=self.resources.hymt2_gguf_path)
         self.translation_provider = HyMt2TranslationProvider(self.llama_manager)
@@ -138,6 +213,14 @@ class EngineRuntime:
             ]
         if isinstance(command, StartSessionCommand):
             return await self._start(command)
+        if isinstance(command, InspectHubRepoCommand):
+            return await self._inspect_hub_repo(command)
+        if isinstance(command, SearchHubModelsCommand):
+            return await self._search_hub_models(command)
+        if isinstance(command, InstallHubRepoCommand):
+            return await self._install_hub_repo(command)
+        if isinstance(command, SetSessionPausedCommand):
+            return self._set_paused(command)
         if isinstance(command, StopSessionCommand):
             return await self._stop(command)
         if isinstance(command, ShutdownCommand):
@@ -153,21 +236,239 @@ class EngineRuntime:
             return self.service.handle(command)
         return self.service.handle(command)
 
+    async def _inspect_hub_repo(self, command: InspectHubRepoCommand) -> list[EngineEvent]:
+        """Report what a Hugging Face repo declares about itself and whether the engine can run it.
+
+        Read-only: it fetches the model index and config.json and nothing else, so a repo can be
+        checked for installability long before anyone commits to downloading it. Failures keep
+        hub's own meaning — a 404 stays "not found" instead of becoming "网络不可用".
+        """
+        try:
+            info = await asyncio.to_thread(inspect_repo, command.repo)
+        except ValueError as error:
+            return [
+                self._resource_error(
+                    command.requestId,
+                    "invalidConfiguration",
+                    {"field": "repo", "reason": str(error)},
+                )
+            ]
+        except Exception as error:
+            mapped = classify_hub_error(error)
+            if mapped is None:
+                return [
+                    self._resource_error(
+                        command.requestId,
+                        "internalError",
+                        {"reason": type(error).__name__},
+                    )
+                ]
+            details: dict[str, object] = {
+                "repo": command.repo,
+                "reason": mapped.reason,
+            }
+            if mapped.status is not None:
+                details["status"] = mapped.status
+            return [self._resource_error(command.requestId, mapped.code, details)]
+
+        verdict = detect_runtime(info)
+        return [
+            HubInspectEvent(
+                protocolVersion=1,
+                type="hubInspect",
+                requestId=command.requestId,
+                repo=info.repo,
+                revision=info.revision,
+                fileCount=len(info.files),
+                downloadBytes=info.total_bytes,
+                compatibility=_compatibility(verdict),
+            )
+        ]
+
+    async def _search_hub_models(self, command: SearchHubModelsCommand) -> list[EngineEvent]:
+        """Search the hub and return rows that already carry an installability verdict.
+
+        Read-only, like the inspection: it reads the model list and each candidate's metadata and
+        downloads nothing. The verdict travels with each row so the UI never has to infer
+        installability from the repo name, which is the guess this whole module was written to
+        eliminate.
+        """
+        try:
+            result = await asyncio.to_thread(
+                search_repos,
+                command.query,
+                slot=command.slot,
+                limit=command.limit,
+            )
+        except ValueError as error:
+            return [
+                self._resource_error(
+                    command.requestId,
+                    "invalidConfiguration",
+                    {"field": "query", "reason": str(error)},
+                )
+            ]
+        except Exception as error:
+            return [self._hub_error_event(command.requestId, error, command.query)]
+
+        return [
+            HubModelsEvent(
+                protocolVersion=1,
+                type="hubModels",
+                requestId=command.requestId,
+                query=result.query,
+                models=[self._hub_summary(info) for info in result.repos],
+                candidates=result.candidates,
+                rateLimited=result.rate_limited,
+            )
+        ]
+
+    def _hub_summary(self, info: HubRepoInfo) -> HubModelSummary:
+        """A metadata search row. Runtime compatibility is checked when installing."""
+        resource_id = f"hub:{info.repo}"
+        return HubModelSummary(
+            repo=info.repo,
+            resourceId=resource_id,
+            revision=info.revision,
+            formats=list(search_formats(info)),
+            author=info.author,
+            pipelineTag=info.pipeline_tag,
+            libraryName=info.library_name,
+            downloads=info.downloads,
+            lastModified=info.last_modified,
+            hasGguf=bool(info.gguf_files),
+            ggufArchitecture=info.gguf_architecture,
+            fileCount=len(info.files),
+            downloadBytes=info.total_bytes,
+            installed=(
+                self.resources.is_installed(resource_id)
+                if self.resources.is_registered(resource_id)
+                else False
+            ),
+        )
+
+    async def _install_hub_repo(self, command: InstallHubRepoCommand) -> list[EngineEvent]:
+        """Judge a repo, remember it, and hand it to the same installer the catalog uses.
+
+        The verdict is taken *before* the download starts. A repo the engine cannot run is
+        refused with the reason the adapter registry produced, and nothing is written to disk —
+        the alternative is discovering the model is unloadable after moving several gigabytes.
+        """
+        try:
+            info = await asyncio.to_thread(inspect_repo, command.repo)
+        except ValueError as error:
+            return [
+                self._resource_error(
+                    command.requestId,
+                    "invalidConfiguration",
+                    {"field": "repo", "reason": str(error)},
+                )
+            ]
+        except Exception as error:
+            return [self._hub_error_event(command.requestId, error, command.repo)]
+
+        verdict = detect_runtime(info)
+        if not verdict.compatible:
+            return [
+                self._resource_error(
+                    command.requestId,
+                    "modelUnavailable",
+                    {
+                        "repo": info.repo,
+                        "reason": verdict.reason_code,
+                        "reasonText": verdict.reason,
+                        "evidence": verdict.evidence_map,
+                    },
+                )
+            ]
+        if command.slot is not None and verdict.slot is not None and command.slot != verdict.slot:
+            return [
+                self._resource_error(
+                    command.requestId,
+                    "invalidConfiguration",
+                    {
+                        "field": "slot",
+                        "repo": info.repo,
+                        "reason": f"repoSlotMismatch:{verdict.slot}",
+                        "reasonText": (
+                            f"这个仓库被判为{'识别' if verdict.slot == 'recognition' else '翻译'}模型，"
+                            f"与请求的{'识别' if command.slot == 'recognition' else '翻译'}类别不符。"
+                        ),
+                    },
+                )
+            ]
+
+        resource_id = f"hub:{info.repo}"
+        try:
+            self.resources.register_hub_model(
+                repo=info.repo,
+                revision=info.revision or "",
+                adapter_id=verdict.adapter_id or "",
+                slot=verdict.slot or "",
+                name=info.repo.split("/")[-1],
+                files=_custom_files(info),
+                languages=verdict.languages,
+            )
+        except ResourceActionError as error:
+            return [
+                self._resource_error(command.requestId, error.code, error.details)
+            ]
+
+        # From here the install is the built-in path: the same ModelManager.ensure, the same
+        # progress/cancel/phase events, the same resourceChanged broadcast.
+        return await self.handle(
+            ManageResourceCommand(
+                protocolVersion=1,
+                type="manageResource",
+                requestId=command.requestId,
+                resourceId=resource_id,
+                action="install",
+            )
+        )
+
+    def _hub_error_event(self, request_id: str, error: Exception, subject: str) -> ErrorEvent:
+        """A hub failure as an engine error, keeping 401/403/404/429 distinct from a dead network."""
+        mapped = classify_hub_error(error)
+        if mapped is None:
+            return self._resource_error(
+                request_id, "internalError", {"reason": type(error).__name__, "subject": subject}
+            )
+        details: dict[str, object] = {"subject": subject, "reason": mapped.reason}
+        if mapped.status is not None:
+            details["status"] = mapped.status
+        return self._resource_error(request_id, mapped.code, details)
+
     async def _start(self, command: StartSessionCommand) -> list[EngineEvent]:
         if self.service.session_id is not None:
             return self.service.handle(command)
 
-        model_id = self._model_id(command)
-        required_resources = [model_id]
-        if command.config.targetLanguages:
-            if command.config.translationProvider == "hymt2":
-                required_resources.append(self._translation_model_id(command.config))
-            elif command.config.translationProvider == "m2m100":
-                required_resources.append(M2M100_RESOURCE_ID)
-        missing_resources = [
-            resource_id for resource_id in required_resources
-            if not self.resources.is_installed(resource_id)
-        ]
+        try:
+            model_id = self._model_id(command)
+            required_resources = [model_id]
+            if command.config.targetLanguages:
+                if command.config.translationProvider == "hymt2":
+                    required_resources.append(self._translation_model_id(command.config))
+                elif command.config.translationProvider == "m2m100":
+                    # Resolved from the table rather than hardcoded, so a self-installed M2M100
+                    # repo is the thing that gets checked for and loaded.
+                    required_resources.append(self._m2m100_model_id(command.config))
+            missing_resources = [
+                resource_id for resource_id in required_resources
+                if not self.resources.is_installed(resource_id)
+            ]
+        except ResourceActionError as error:
+            # The model ids are free-form strings now, so an id the resource table has never heard
+            # of arrives here as a lookup failure. It is a configuration problem, not a crash, and
+            # the table is the only thing that knows which ids exist.
+            return [self._resource_error(command.requestId, error.code, error.details)]
+        except UnknownTranslationModel as error:
+            return [
+                self._resource_error(
+                    command.requestId,
+                    "invalidConfiguration",
+                    {"field": "translationModelId", "reason": str(error)},
+                )
+            ]
         if missing_resources:
             return [
                 self._resource_error(
@@ -247,6 +548,8 @@ class EngineRuntime:
         self.recognizer = recognizer
         self.session_request_id = command.requestId
         self.session_started_at_ms = monotonic() * 1000
+        self.session_paused = False
+        self.paused_at_ms = 0.0
         self.active_config = command.config
         self.session_task = asyncio.create_task(self._run_session())
         self._write_engine_status()
@@ -293,7 +596,7 @@ class EngineRuntime:
                 )
             # all three quantization tiers share one llama-server; load whichever the session picked.
             self.llama_manager.switch_gguf(
-                self.resources.hymt2_gguf_path(self._translation_model_id(config))
+                self.resources.translation_gguf_path(self._translation_model_id(config))
             )
             provider = HyMt2TranslationProvider(self.llama_manager)
         elif config.translationProvider == "m2m100":
@@ -310,7 +613,7 @@ class EngineRuntime:
                     + ", ".join(unsupported)
                 )
             provider = M2M100TranslationProvider(
-                self.resources.model_path(M2M100_RESOURCE_ID)
+                self.resources.model_path(self._m2m100_model_id(config))
             )
         elif config.translationProvider == "microsoft":
             provider = MicrosoftTranslatorProvider(
@@ -365,7 +668,11 @@ class EngineRuntime:
         model_id = self._model_id(command)
         self.active_model_id = model_id
         model_path = self.resources.model_path(model_id)
-        if model_id == SENSEVOICE_RESOURCE_ID:
+        # Dispatch on the adapter the model's own metadata selected, not on a comparison against
+        # the built-in ids. A self-installed Qwen3-ASR repo has to reach the same loader as the
+        # shipped one, and the recognition guard in qwen_runtime.py stays the thing that decides
+        # whether the checkpoint layout actually fits.
+        if self.resources.adapter_for(model_id) == "sensevoice":
             await asyncio.to_thread(get_sensevoice_runtime(model_path).load)
             recognizer = create_sensevoice_recognizer(model_path, source_language=language)
         else:
@@ -377,7 +684,7 @@ class EngineRuntime:
     def _recognition_runtime(self) -> QwenRuntime | SenseVoiceRuntime:
         """Runtime of the currently selected recognition model; both expose load/unload/loaded/describe."""
         model_path = self.resources.model_path(self.active_model_id)
-        if self.active_model_id == SENSEVOICE_RESOURCE_ID:
+        if self.resources.adapter_for(self.active_model_id) == "sensevoice":
             return get_sensevoice_runtime(model_path)
         return get_qwen_runtime(model_path)
 
@@ -385,13 +692,37 @@ class EngineRuntime:
     def _model_id(command: StartSessionCommand) -> str:
         return command.config.recognitionModelId or QWEN_RESOURCE_ID
 
-    @staticmethod
-    def _translation_model_id(config: SessionConfig) -> str:
-        """The Hy-MT2 quantization the session selected; a missing or invalid id falls back to the Q4_K_M baseline."""
+    def _translation_model_id(self, config: SessionConfig) -> str:
+        """The llama.cpp translation model the session selected; an unknown id is refused outright.
+
+        A missing field still means the Q4_K_M baseline — that is an older client, not a
+        mistake. A *present but unknown* id used to be treated the same way, so a self-installed
+        or hand-edited model id was silently replaced by the baseline and the session translated
+        with a model the user never chose. Raising keeps that visible at session start.
+
+        What counts as known is the resource table rather than a fixed tuple, so a GGUF the user
+        installed from the hub is accepted here and reaches llama-server like any other tier.
+        """
         requested = config.translationModelId
-        if requested in HYMT2_RESOURCE_IDS:
+        if requested is None:
+            return HYMT2_RESOURCE_ID
+        if self.resources.adapter_for(requested) == "llama.cpp":
             return requested
-        return HYMT2_RESOURCE_ID
+        raise UnknownTranslationModel(requested)
+
+    def _m2m100_model_id(self, config: SessionConfig) -> str:
+        """The transformers M2M100 resource the session selected.
+
+        Same rule as the llama.cpp path: an absent field is the built-in default, a present field
+        has to resolve in the resource table, and a GGUF id arriving here is refused rather than
+        quietly routed to a loader that cannot read it.
+        """
+        requested = config.translationModelId
+        if requested is None:
+            return M2M100_RESOURCE_ID
+        if self.resources.adapter_for(requested) == "m2m100":
+            return requested
+        raise UnknownTranslationModel(requested)
 
     async def _run_session(self) -> None:
         capture = self.capture
@@ -547,9 +878,15 @@ class EngineRuntime:
         target_errors: dict[str, str] = {}
         if provider_name == "hymt2":
             active = self.active_config
-            if not self.resources.is_installed(
-                self._translation_model_id(active) if active else HYMT2_RESOURCE_ID
-            ):
+            try:
+                model_id = self._translation_model_id(active) if active else HYMT2_RESOURCE_ID
+            except UnknownTranslationModel:
+                # _start refuses an unknown id before a session exists, so this is unreachable in
+                # practice. It is caught anyway: an exception here runs on a background task, and
+                # an unretrieved task exception would leave the caption waiting on a translation
+                # that is never coming.
+                model_id = ""
+            if not model_id or not self.resources.is_installed(model_id):
                 target_errors = dict.fromkeys(targets, "resourceUnavailable")
             elif not is_supported(request.source):
                 target_errors = dict.fromkeys(targets, "unsupportedLanguagePair")
@@ -671,6 +1008,61 @@ class EngineRuntime:
             return "zh"
         return "en"
 
+    def _set_paused(self, command: SetSessionPausedCommand) -> list[EngineEvent]:
+        """Pause or resume the live capture without tearing the session down.
+
+        Pausing stops the PortAudio stream itself, so the microphone is genuinely
+        released, nothing is written to the recorder, and the recognizer keeps the
+        in-flight sentence it was building. Resuming shifts ``session_started_at_ms``
+        forward by the paused duration: caption timestamps are derived as
+        ``frame.started_at_ms - session_started_at_ms`` (see ``_emit_update``), so
+        absorbing the gap here is what keeps the exported SRT timeline continuous
+        instead of leaving a hole the length of the pause.
+        """
+        if self.service.session_id is None or command.sessionId != self.service.session_id:
+            return [
+                ErrorEvent(
+                    protocolVersion=1,
+                    type="error",
+                    requestId=command.requestId,
+                    code="sessionNotRunning",
+                    recoverable=True,
+                )
+            ]
+        if self.capture is None:
+            return [
+                ErrorEvent(
+                    protocolVersion=1,
+                    type="error",
+                    requestId=command.requestId,
+                    code="internalError",
+                    recoverable=True,
+                    details={"reason": "captureUnavailable"},
+                )
+            ]
+        if command.paused == self.session_paused:
+            # Already in the requested state. Answer with the authoritative status so a
+            # double-tap cannot leave the UI believing the engine is somewhere else.
+            return [self._listening_status(command.requestId)]
+        if command.paused:
+            self.paused_at_ms = monotonic() * 1000
+            self.capture.pause()
+            self.session_paused = True
+        else:
+            self.capture.resume()
+            self.session_started_at_ms += monotonic() * 1000 - self.paused_at_ms
+            self.paused_at_ms = 0.0
+            self.session_paused = False
+        return [self._listening_status(command.requestId)]
+
+    def _listening_status(self, request_id: str) -> StatusEvent:
+        return StatusEvent(
+            protocolVersion=1,
+            type="status",
+            requestId=request_id,
+            code="paused" if self.session_paused else "listening",
+        )
+
     async def _stop(self, command: StopSessionCommand) -> list[EngineEvent]:
         if self.service.session_id is None:
             return self.service.handle(command)
@@ -709,6 +1101,8 @@ class EngineRuntime:
         self.recognizer = None
         self.session_task = None
         self.active_config = None
+        self.session_paused = False
+        self.paused_at_ms = 0.0
         self._write_engine_status()
         return self.service.handle(command)
 

@@ -13,6 +13,8 @@ function settingsWith(patch: AppSettingsPatch = {}): AppSettings {
     ...patch,
     modelStoragePath: 'C:\\Nola Translator\\models',
     recognition: { ...DEFAULT_SETTINGS.recognition, ...(patch.recognition ?? {}) },
+    recording: { ...DEFAULT_SETTINGS.recording, ...(patch.recording ?? {}) },
+    appearance: { ...DEFAULT_SETTINGS.appearance, ...(patch.appearance ?? {}) },
     overlay: { ...DEFAULT_SETTINGS.overlay, ...(patch.overlay ?? {}) },
     translation: { ...DEFAULT_SETTINGS.translation, ...(patch.translation ?? {}) },
   }
@@ -36,9 +38,12 @@ Object.defineProperty(window, 'nolaTranslator', {
     manageResource: async () => { throw new Error('测试未配置资源操作') },
     startSession: async () => ({ sessionId: 'test-session', meetingId: 'test-meeting' }),
     stopSession: async () => undefined,
+    setSessionPaused: async () => undefined,
     onEngineEvent: () => () => undefined,
     showOverlay: async () => undefined,
     hideOverlay: async () => undefined,
+    closeOverlay: async () => undefined,
+    minimizeOverlay: async () => undefined,
     resizeOverlay: async () => undefined,
     openAppearance: async () => undefined,
     onOpenAppearance: () => () => undefined,
@@ -55,6 +60,12 @@ Object.defineProperty(window, 'nolaTranslator', {
       { segmentId: 's2', revision: 1, startedAtMs: 2200, sourceText: 'Let us get started.', isFinal: true, translations: [{ targetLanguage: 'zh', text: '我们开始吧。', state: 'complete', provider: 'hymt2' }] },
     ],
     renameMeeting: async (meetingId: string, title: string) => ({ meetingId, title, titleIsCustom: true, startedAtMs: Date.UTC(2026, 8, 29, 14, 50), endedAtMs: Date.UTC(2026, 8, 29, 14, 51), durationMs: 60_000, daySequence: 0, segmentCount: 2, sourceLanguage: 'auto', targetLanguage: 'zh' }),
+    setMeetingNotes: async (meetingId: string, notes: string) => {
+      const meeting = meetings.find((item) => item.meetingId === meetingId)
+      if (!meeting) throw new Error('测试未配置会议')
+      // 复制而非改写共享 fixture, 否则笔记会漏给后面的用例.
+      return { ...meeting, notes }
+    },
     deleteMeeting: async () => true,
     exportMeeting: async () => null,
     getMeetingAudioUrl: async () => null,

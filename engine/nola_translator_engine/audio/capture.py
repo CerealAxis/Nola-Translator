@@ -84,6 +84,7 @@ class PortAudioCapture:
         self.backend: object | None = None
         self.stream: PortAudioStream | None = None
         self.running = False
+        self.paused = False
 
     @property
     def dropped_chunks(self) -> int:
@@ -120,7 +121,32 @@ class PortAudioCapture:
             self.backend = None
             raise
         self.running = True
+        self.paused = False
         self.stream.start_stream()
+
+    def pause(self) -> None:
+        """Stop the device stream but keep it open, so a resume costs nothing to set up.
+
+        Pausing at the PortAudio level (rather than discarding frames in the consumer)
+        is what makes pause honest: the microphone is genuinely released, nothing is
+        written to the recorder, and the recognizer keeps the in-flight sentence it was
+        building. The caller is responsible for shifting its own timeline so caption
+        timestamps stay continuous across the gap.
+        """
+        if not self.running or self.paused or self.stream is None:
+            return
+        try:
+            self.stream.stop_stream()
+        except OSError:
+            pass
+        self.paused = True
+
+    def resume(self) -> None:
+        """Restart a paused stream. A no-op when not paused, so resume is always safe."""
+        if not self.running or not self.paused or self.stream is None:
+            return
+        self.stream.start_stream()
+        self.paused = False
 
     async def frames(self) -> AsyncIterator[AudioFrame]:
         # silence lookback window: pad with zero frames only once a full frame length has
@@ -140,7 +166,10 @@ class PortAudioCapture:
                             yield frame
                         last_seen_ms = monotonic() * 1000
                     continue
-                if self.running and self.stream is not None and not self.stream.is_active():
+                if self.running and self.stream is not None and not self.stream.is_active() and not self.paused:
+                    # A paused stream is deliberately inactive, so it must not be mistaken
+                    # for a device that dropped out. While paused the loop just keeps
+                    # polling an empty queue until resume() puts the callback back.
                     raise AudioDeviceDisconnectedError(self.device.device_id)
                 continue
             last_seen_ms = monotonic() * 1000
@@ -150,6 +179,7 @@ class PortAudioCapture:
 
     def stop(self) -> None:
         self.running = False
+        self.paused = False
         if self.stream is not None:
             try:
                 self.stream.stop_stream()
