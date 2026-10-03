@@ -1,5 +1,5 @@
 /** Metadata search is independent of card loading and runtime installation checks. */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Card, Drawer, EmptyState, Label, SearchField, Tag, TagGroup, toast } from '@heroui/react'
 import type { HubModelSummary, HubSearchResult, ResourceRecord } from '@/bridge'
 import { actions, stores, useStore } from '@/store'
@@ -54,11 +54,17 @@ export function hubCardRecord(hit: HubHit): ResourceRecord {
   }
 }
 
-function search(query: string, kind: HubKind): Promise<HubSearchResult> {
-  const key = `${kind}:${query.trim()}`
+function searchKey(query: string, kind: HubKind, cursor?: string) {
+  return JSON.stringify([kind, query.trim(), cursor ?? ''])
+}
+
+function search(query: string, kind: HubKind, cursor?: string): Promise<HubSearchResult> {
+  const key = searchKey(query, kind, cursor)
   const saved = searchCache.get(key)
   if (saved && saved.expires > Date.now()) return saved.request
-  const request = actions.models.searchHub(query.trim(), kind)
+  const request = cursor
+    ? actions.models.searchHub(query.trim(), kind, cursor)
+    : actions.models.searchHub(query.trim(), kind)
   searchCache.set(key, { expires: Date.now() + 60_000, request })
   if (searchCache.size > 24) searchCache.delete(searchCache.keys().next().value!)
   request.catch(() => { if (searchCache.get(key)?.request === request) searchCache.delete(key) })
@@ -101,23 +107,73 @@ export function HubSearchTab() {
   const [detail, setDetail] = useState<HubHit | null>(null)
   const [awaiting, setAwaiting] = useState(true)
   const [failed, setFailed] = useState(false)
+  const [nextCursor, setNextCursor] = useState<string>()
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [moreFailed, setMoreFailed] = useState(false)
+  const bottom = useRef<HTMLDivElement>(null)
+  const generation = useRef(0)
+  const pagingRequest = useRef<number | null>(null)
   const resources = useStore(stores.models, (state) => state.resources)
   const busyIds = useStore(stores.models, (state) => state.busyIds)
   const kind: HubKind = filter === 'quant' ? 'quant' : filter
 
   useEffect(() => {
     let cancelled = false
+    generation.current += 1
+    pagingRequest.current = null
     setAwaiting(true)
     setFailed(false)
+    setNextCursor(undefined)
+    setLoadingMore(false)
+    setMoreFailed(false)
     const timer = setTimeout(() => {
       void search(query, kind).then((result) => {
-        if (!cancelled) setHits(mergeHubResults([{ kind, result }]).hits)
+        if (!cancelled) {
+          setHits(mergeHubResults([{ kind, result }]).hits)
+          setNextCursor(result.nextCursor)
+        }
       }).catch(() => {
         if (!cancelled) { setHits([]); setFailed(true) }
       }).finally(() => { if (!cancelled) setAwaiting(false) })
     }, SEARCH_DEBOUNCE_MS)
-    return () => { cancelled = true; clearTimeout(timer) }
+    return () => { cancelled = true; generation.current += 1; clearTimeout(timer) }
   }, [query, kind, refresh])
+
+  const loadMore = useCallback(() => {
+    if (awaiting || failed || !nextCursor || pagingRequest.current !== null) return
+    const currentGeneration = generation.current
+    pagingRequest.current = currentGeneration
+    setLoadingMore(true)
+    setMoreFailed(false)
+    void search(query, kind, nextCursor).then((result) => {
+      if (generation.current !== currentGeneration) return
+      setHits((previous) => {
+        const seen = new Set(previous.map((hit) => hit.summary.repo))
+        return [...previous, ...result.models.filter((summary) => {
+          if (seen.has(summary.repo)) return false
+          seen.add(summary.repo)
+          return true
+        }).map((summary) => ({ summary, kind }))]
+      })
+      setNextCursor(result.nextCursor === nextCursor ? undefined : result.nextCursor)
+    }).catch(() => {
+      if (generation.current === currentGeneration) setMoreFailed(true)
+    }).finally(() => {
+      if (generation.current !== currentGeneration) return
+      pagingRequest.current = null
+      setLoadingMore(false)
+    })
+  }, [awaiting, failed, query, kind, nextCursor])
+
+  useEffect(() => {
+    const element = bottom.current
+    if (!element || awaiting || loadingMore || moreFailed || !nextCursor) return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) loadMore()
+    }, { root: element.closest('.nola-main'), rootMargin: '0px 0px 400px 0px' })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [awaiting, loadingMore, moreFailed, nextCursor, loadMore])
 
   // Load introductions after cards are visible; old searches stop scheduling requests.
   useEffect(() => {
@@ -127,7 +183,7 @@ export function HubSearchTab() {
     const worker = async () => {
       while (!cancelled && cursor < hits.length) {
         const { summary } = hits[cursor++]
-        if (summary.description) continue
+        if (summary.description || descriptions[summary.repo] !== undefined) continue
         try {
           const description = await actions.models.loadHubModelCard(summary.repo, summary.revision)
           if (!cancelled) setDescriptions((previous) => ({ ...previous, [summary.repo]: description }))
@@ -178,14 +234,14 @@ export function HubSearchTab() {
     {failed && !awaiting ? <Card className="flex flex-row items-center gap-3 border border-border p-4">
       <p className="nola-caption text-muted">{t('errors.searchFailed')}</p>
       <Button variant="tertiary" size="sm" onPress={() => {
-        searchCache.delete(`${kind}:${query.trim()}`)
+        searchCache.delete(searchKey(query, kind))
         setRefresh((value) => value + 1)
       }}>
         {t('errors.searchFailedAction')}
       </Button>
     </Card> : null}
     {awaiting ? <SearchSkeletons /> : null}
-    {!awaiting && !failed && visible.length === 0 ? <EmptyState>
+    {!awaiting && !failed && !nextCursor && visible.length === 0 ? <EmptyState>
       <h3>{t('models.noResults')}</h3>
     </EmptyState> : null}
     {!awaiting && !failed && visible.length > 0 ? <div className="models-grid">
@@ -208,6 +264,12 @@ export function HubSearchTab() {
             {t('models.openDetails')}
           </Button>} />
       })}
+    </div> : null}
+    {!awaiting && !failed ? <div ref={bottom} className="models-search__pagination" aria-live="polite">
+      {moreFailed ? <p className="nola-caption text-muted">{t('models.loadMoreFailed')}</p> : null}
+      {nextCursor ? <Button variant="tertiary" isPending={loadingMore} onPress={loadMore}>
+        {loadingMore ? t('common.loading') : moreFailed ? t('models.retry') : t('models.loadMore')}
+      </Button> : visible.length > 0 ? <p className="nola-caption text-muted">{t('models.noMoreResults')}</p> : null}
     </div> : null}
     <DetailDrawer hit={detail} description={detail ? descriptionOf(detail.summary) : ''}
       onClose={() => setDetail(null)} onInstall={install} />

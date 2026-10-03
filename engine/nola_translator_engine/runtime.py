@@ -294,6 +294,7 @@ class EngineRuntime:
                 slot=command.slot,
                 limit=command.limit,
                 weight_format=command.weightFormat,
+                cursor=command.cursor,
             )
         except ValueError as error:
             return [
@@ -315,6 +316,7 @@ class EngineRuntime:
                 models=[self._hub_summary(info) for info in result.repos],
                 candidates=result.candidates,
                 rateLimited=result.rate_limited,
+                nextCursor=result.next_cursor,
             )
         ]
 

@@ -106,7 +106,7 @@ export function registerEngineIpc(
 
   ipcMain.handle(
     IPC_CHANNELS.searchHuggingFace,
-    async (_event, query: unknown, kind: unknown) => {
+    async (_event, query: unknown, kind: unknown, cursor: unknown) => {
       /*
        * 空关键词**不是**非法输入：`search=` 传空时 Hugging Face 返回的是按下载量排的热门榜，
        * 所以"什么都没输入"就是"浏览热门"，界面靠这一点给出默认内容。拦掉它等于逼用户
@@ -119,6 +119,9 @@ export function registerEngineIpc(
       }
       if (query.length > 256) {
         throw new Error('搜索关键词过长：超过 256 个字符')
+      }
+      if (cursor !== undefined && (typeof cursor !== 'string' || cursor.length < 1 || cursor.length > 2048)) {
+        throw new Error('分页游标无效')
       }
       // 'asr'/'mt' is the renderer's vocabulary; the engine keys on the slot. Kept as a mapping
       if (kind !== 'all' && kind !== 'asr' && kind !== 'mt' && kind !== 'quant') throw new Error('模型类别无效')
@@ -133,6 +136,7 @@ export function registerEngineIpc(
           query,
           ...(slot ? { slot } : {}),
           ...(kind === 'quant' ? { weightFormat: 'gguf' as const } : {}),
+          ...(typeof cursor === 'string' ? { cursor } : {}),
           limit: 20,
         },
         'hubModels',
@@ -144,6 +148,7 @@ export function registerEngineIpc(
         models: response.models,
         candidates: response.candidates,
         rateLimited: response.rateLimited,
+        nextCursor: response.nextCursor,
       }
     }
   )

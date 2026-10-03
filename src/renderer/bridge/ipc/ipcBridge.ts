@@ -201,8 +201,8 @@ export function createIpcBridge(): NolaBridge {
        * 三个 Hub 方法都真调 preload。判定（`compatibility`）在引擎里发生一次，
        * 这里是原样透传：适配器一旦替引擎"再解释"一遍，可安装性就会有两个来源。
        */
-      searchHuggingFace: (query, kind) =>
-        call('searchHuggingFace', (injected) => injected.searchHuggingFace(query, kind)),
+      searchHuggingFace: (query, kind, cursor) =>
+        call('searchHuggingFace', (injected) => injected.searchHuggingFace(query, kind, cursor)),
       inspectHuggingFace: (repo) => call('inspectHuggingFace', (injected) => injected.inspectHuggingFace(repo)),
       getHuggingFaceModelCard: (repo, revision) =>
         call('getHuggingFaceModelCard', (injected) => injected.getHuggingFaceModelCard(repo, revision)),

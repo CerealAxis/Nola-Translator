@@ -27,9 +27,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 import json
+import re
 from typing import Literal
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode
+from urllib.parse import parse_qs, quote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from .translation.m2m100 import FLORES_LANGUAGES
@@ -701,6 +702,21 @@ def _http_get(url: str) -> bytes:
         return response.read(MAX_INSPECTION_BYTES)
 
 
+def _http_get_search_page(url: str) -> tuple[bytes, str | None]:
+    """Read one search page and the opaque cursor in Hugging Face's next-page link."""
+    request = Request(url, headers={"User-Agent": USER_AGENT})
+    with urlopen(request, timeout=30) as response:
+        payload = response.read(MAX_INSPECTION_BYTES)
+        link = response.headers.get("Link", "")
+    match = re.search(r'<([^>]+)>\s*;\s*rel="?next"?', link)
+    if not match:
+        return payload, None
+    next_url = urlparse(match.group(1))
+    if next_url.scheme != "https" or next_url.netloc != "huggingface.co" or next_url.path != "/api/models":
+        return payload, None
+    return payload, parse_qs(next_url.query).get("cursor", [None])[0]
+
+
 def _parse_json(payload: bytes, what: str) -> dict[str, object]:
     try:
         value = json.loads(payload.decode("utf-8"))
@@ -864,8 +880,12 @@ class HubSearchResult:
     repos: tuple[HubRepoInfo, ...]
     candidates: int = 0
     rate_limited: bool = False
+    next_cursor: str | None = None
 
-def search_url(query: str, slot: Slot | None, limit: int, weight_format: str | None = None) -> str:
+def search_url(
+    query: str, slot: Slot | None, limit: int,
+    weight_format: str | None = None, cursor: str | None = None,
+) -> str:
     """The search endpoint URL for a query, as a single string.
 
     Built as one URL rather than as query-parameter pairs so the exact request is visible in a log
@@ -886,6 +906,8 @@ def search_url(query: str, slot: Slot | None, limit: int, weight_format: str | N
         parameters.append(("filter", SLOT_PIPELINE_TAGS[slot]))
     if weight_format == "gguf":
         parameters.append(("filter", "gguf"))
+    if cursor:
+        parameters.append(("cursor", cursor))
     return f"{HF_ROOT}/api/models?{urlencode(parameters, quote_via=quote)}"
 
 
@@ -926,16 +948,19 @@ def search_repos(
     *,
     slot: Slot | None = None,
     limit: int = 20,
-    fetch: HubFetcher = _http_get,
+    fetch: Callable[[str], bytes | tuple[bytes, str | None]] = _http_get_search_page,
     weight_format: str | None = None,
+    cursor: str | None = None,
 ) -> HubSearchResult:
     """Search supported weight formats using one metadata request.
 
-    Fetch extra candidates so CoreML/ONNX-only repos do not consume the displayed page.
+    Return the next-page cursor even when format filtering leaves this page empty.
     Runtime inspection remains on the install path, where it can check an exact revision.
     """
     limit = max(1, min(20, limit))
-    hits = _parse_list(fetch(search_url(query.strip(), slot, min(100, limit * 4), weight_format)), "搜索结果")
+    page = fetch(search_url(query.strip(), slot, limit, weight_format, cursor))
+    payload, next_cursor = page if isinstance(page, tuple) else (page, None)
+    hits = _parse_list(payload, "搜索结果")
     allowed = set(_search_hit_repos(hits, slot))
     repos: list[HubRepoInfo] = []
     seen: set[str] = set()
@@ -957,6 +982,7 @@ def search_repos(
         slot=slot,
         repos=tuple(repos),
         candidates=len(hits),
+        next_cursor=next_cursor,
     )
 
 

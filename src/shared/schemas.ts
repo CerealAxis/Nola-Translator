@@ -115,6 +115,7 @@ export const engineCommandSchema = z.discriminatedUnion('type', [
       query: z.string().max(256),
       slot: z.enum(['recognition', 'translation']).optional(),
       weightFormat: z.literal('gguf').optional(),
+      cursor: z.string().min(1).max(2048).optional(),
       limit: z.number().int().min(1).max(50).optional(),
     })
     .strip(),
@@ -279,6 +280,7 @@ export const engineEventSchema = z.discriminatedUnion('type', [
       models: z.array(hubModelSummarySchema).max(20),
       candidates: z.number().int().nonnegative(),
       rateLimited: z.boolean(),
+      nextCursor: z.string().min(1).max(2048).optional(),
     })
     .strip(),
   z

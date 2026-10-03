@@ -96,7 +96,7 @@ export type EngineCommand =
   | (Envelope<'stopSession'> & { sessionId: string })
   | (Envelope<'setSessionPaused'> & { sessionId: string; paused: boolean })
   | Envelope<'shutdown'>
-  | (Envelope<'searchHubModels'> & { query: string; slot?: 'recognition' | 'translation'; limit?: number; weightFormat?: 'gguf' })
+  | (Envelope<'searchHubModels'> & { query: string; slot?: 'recognition' | 'translation'; limit?: number; weightFormat?: 'gguf'; cursor?: string })
   | (Envelope<'inspectHubRepo'> & { repo: string })
   | (Envelope<'installHubRepo'> & { repo: string; slot?: 'recognition' | 'translation' })
 
@@ -179,6 +179,8 @@ export type HubSearchResult = {
   /** Metadata candidates fetched before format filtering and the displayed page limit. */
   candidates: number
   rateLimited: boolean
+  /** Opaque Hub cursor. Absent only when no further page is available. */
+  nextCursor?: string
 }
 
 export type HubInspectResult = {

@@ -105,6 +105,7 @@ class SearchHubModelsCommand(Envelope):
     query: str = Field(max_length=256)
     slot: Literal["recognition", "translation"] | None = None
     weightFormat: Literal["gguf"] | None = None
+    cursor: str | None = Field(default=None, min_length=1, max_length=2048)
     limit: int = Field(default=20, ge=1, le=50)
 
 
@@ -303,6 +304,7 @@ class HubModelsEvent(Envelope):
     #: Number of metadata candidates fetched before format filtering and the page limit.
     candidates: int = Field(default=0, ge=0)
     rateLimited: bool = False
+    nextCursor: str | None = Field(default=None, min_length=1, max_length=2048)
 
 
 class HubInspectEvent(Envelope):

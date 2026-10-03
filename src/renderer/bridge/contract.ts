@@ -102,7 +102,7 @@ export interface NolaBridge {
    * README 异步加载，运行时适配器检查在安装时执行。
    */
   models: {
-    searchHuggingFace(query: string, kind: 'all' | 'asr' | 'mt' | 'quant'): Promise<HubSearchResult>
+    searchHuggingFace(query: string, kind: 'all' | 'asr' | 'mt' | 'quant', cursor?: string): Promise<HubSearchResult>
     /** 单个仓库的运行时检查；与搜索列表独立。 */
     inspectHuggingFace(repo: string): Promise<HubInspectResult>
     getHuggingFaceModelCard(repo: string, revision?: string): Promise<string>

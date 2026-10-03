@@ -46,8 +46,8 @@ const api: NolaTranslatorApi = {
   listDevices: () => invoke(channels.listDevices),
   listResources: () => invoke(channels.listResources),
   manageResource: (resourceId, action) => invoke(channels.manageResource, resourceId, action),
-  searchHuggingFace: (query, kind): Promise<HubSearchResult> =>
-    invoke(channels.searchHuggingFace, query, kind),
+  searchHuggingFace: (query, kind, cursor): Promise<HubSearchResult> =>
+    invoke(channels.searchHuggingFace, query, kind, cursor),
   inspectHuggingFace: (repo): Promise<HubInspectResult> => invoke(channels.inspectHuggingFace, repo),
   getHuggingFaceModelCard: (repo, revision) => invoke(channels.getHuggingFaceModelCard, repo, revision),
   installHuggingFaceModel: (repo, slot): Promise<ResourceRecord> =>

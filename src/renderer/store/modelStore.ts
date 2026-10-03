@@ -163,12 +163,12 @@ export async function manageResource(
 /**
  * Hub 元数据搜索。只让最新请求更新共享状态，调用方仍能拿到自己的返回值。
  */
-export async function searchHub(query: string, kind: HubKind): Promise<HubSearchResult> {
+export async function searchHub(query: string, kind: HubKind, cursor?: string): Promise<HubSearchResult> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
   const generation = ++searchGeneration
   modelsStore.setState((state) => ({ hub: { ...state.hub, query, kind, loading: true, failed: false } }))
   try {
-    const result = await bridge.models.searchHuggingFace(query, kind)
+    const result = await bridge.models.searchHuggingFace(query, kind, cursor)
     if (generation === searchGeneration) modelsStore.setState((state) => ({
       hub: {
         ...state.hub,
