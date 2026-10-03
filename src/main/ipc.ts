@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { BrowserWindow, ipcMain, screen } from 'electron'
+import { BrowserWindow, ipcMain, net, screen } from 'electron'
 
 import type { EngineEvent, SessionConfig } from '../shared/contracts'
 import { sessionConfigSchema } from '../shared/schemas'
@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS, type AppSettings } from '../shared/settings'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
 import { computeOverlayBounds } from './windows'
+import { readHubModelCard } from './hub-model-card'
 
 export const IPC_CHANNELS = {
   listDevices: 'engine:list-devices',
@@ -15,6 +16,7 @@ export const IPC_CHANNELS = {
   manageResource: 'engine:manage-resource',
   searchHuggingFace: 'hub:search',
   inspectHuggingFace: 'hub:inspect',
+  getHuggingFaceModelCard: 'hub:model-card',
   installHuggingFaceModel: 'hub:install',
   startSession: 'engine:start-session',
   stopSession: 'engine:stop-session',
@@ -119,6 +121,7 @@ export function registerEngineIpc(
         throw new Error('搜索关键词过长：超过 256 个字符')
       }
       // 'asr'/'mt' is the renderer's vocabulary; the engine keys on the slot. Kept as a mapping
+      if (kind !== 'all' && kind !== 'asr' && kind !== 'mt' && kind !== 'quant') throw new Error('模型类别无效')
       // here so the protocol keeps naming loaders and the UI keeps naming categories.
       const slot = kind === 'asr' ? 'recognition' : kind === 'mt' ? 'translation' : undefined
       await ensureReady()
@@ -129,12 +132,12 @@ export function registerEngineIpc(
           requestId: `hub-search-${randomUUID()}`,
           query,
           ...(slot ? { slot } : {}),
+          ...(kind === 'quant' ? { weightFormat: 'gguf' as const } : {}),
           limit: 20,
         },
         'hubModels',
-        // A search deep-inspects up to ten candidates against the hub, each an HTTPS round trip.
-        // The 10 s default used by the other channels is shorter than a slow-but-working search.
-        60 * 1000
+        // Search reads metadata once; model cards and install checks use separate requests.
+        35 * 1000
       )
       return {
         query: response.query,
@@ -144,6 +147,9 @@ export function registerEngineIpc(
       }
     }
   )
+
+  ipcMain.handle(IPC_CHANNELS.getHuggingFaceModelCard, (_event, repo: unknown, revision: unknown) =>
+    readHubModelCard(repo, revision, net.fetch))
 
   ipcMain.handle(IPC_CHANNELS.inspectHuggingFace, async (_event, repo: unknown) => {
     if (typeof repo !== 'string' || repo.length < 3 || repo.length > 256) {
@@ -320,6 +326,7 @@ export function registerEngineIpc(
       IPC_CHANNELS.manageResource,
       IPC_CHANNELS.searchHuggingFace,
       IPC_CHANNELS.inspectHuggingFace,
+      IPC_CHANNELS.getHuggingFaceModelCard,
       IPC_CHANNELS.installHuggingFaceModel,
       IPC_CHANNELS.startSession,
       IPC_CHANNELS.stopSession,

@@ -286,19 +286,14 @@ class EngineRuntime:
         ]
 
     async def _search_hub_models(self, command: SearchHubModelsCommand) -> list[EngineEvent]:
-        """Search the hub and return rows that already carry an installability verdict.
-
-        Read-only, like the inspection: it reads the model list and each candidate's metadata and
-        downloads nothing. The verdict travels with each row so the UI never has to infer
-        installability from the repo name, which is the guess this whole module was written to
-        eliminate.
-        """
+        """Return format-filtered metadata without waiting for per-repo runtime checks."""
         try:
             result = await asyncio.to_thread(
                 search_repos,
                 command.query,
                 slot=command.slot,
                 limit=command.limit,
+                weight_format=command.weightFormat,
             )
         except ValueError as error:
             return [

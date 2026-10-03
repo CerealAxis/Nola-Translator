@@ -96,7 +96,7 @@ export type EngineCommand =
   | (Envelope<'stopSession'> & { sessionId: string })
   | (Envelope<'setSessionPaused'> & { sessionId: string; paused: boolean })
   | Envelope<'shutdown'>
-  | (Envelope<'searchHubModels'> & { query: string; slot?: 'recognition' | 'translation'; limit?: number })
+  | (Envelope<'searchHubModels'> & { query: string; slot?: 'recognition' | 'translation'; limit?: number; weightFormat?: 'gguf' })
   | (Envelope<'inspectHubRepo'> & { repo: string })
   | (Envelope<'installHubRepo'> & { repo: string; slot?: 'recognition' | 'translation' })
 
@@ -151,7 +151,7 @@ export type HubCompatibility = {
   evidence: Record<string, string>
 }
 
-/** One inspected Hugging Face hit. `compatibility` is the load-bearing field. */
+/** A Hugging Face metadata hit, available before README or runtime inspection finishes. */
 export type HubModelSummary = {
   repo: string
   /** `hub:<owner>/<name>` — the id this repo gets once installed, so the UI can name the action early. */
@@ -176,11 +176,7 @@ export type HubModelSummary = {
 export type HubSearchResult = {
   query: string
   models: HubModelSummary[]
-  /**
-   * How many candidates the hub listed in total. `models` can be shorter — the engine inspects a
-   * bounded number of hits to stay inside the hub's anonymous rate limit — so a truncated result
-   * set is reported rather than presented as exhaustive.
-   */
+  /** Metadata candidates fetched before format filtering and the displayed page limit. */
   candidates: number
   rateLimited: boolean
 }

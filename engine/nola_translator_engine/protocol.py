@@ -104,6 +104,7 @@ class SearchHubModelsCommand(Envelope):
     # downloaded", which is how the app browses popular models with an empty search box.
     query: str = Field(max_length=256)
     slot: Literal["recognition", "translation"] | None = None
+    weightFormat: Literal["gguf"] | None = None
     limit: int = Field(default=20, ge=1, le=50)
 
 
@@ -268,12 +269,7 @@ class HubCompatibility(ProtocolModel):
 
 
 class HubModelSummary(ProtocolModel):
-    """One inspected search hit, carrying the verdict the engine reached about it.
-
-    ``compatibility`` is the load-bearing field: the UI is expected to read it rather than
-    re-deriving installability from the repo name, which is how a UI ends up offering to install
-    a model the engine has already refused.
-    """
+    """One metadata search hit; runtime compatibility is optional and separate."""
 
     repo: str = Field(min_length=1, max_length=256)
     #: The id this repo would get once installed (``hub:owner/name``), so the UI can name the
@@ -304,8 +300,7 @@ class HubModelsEvent(Envelope):
     # Mirrors SearchHubModelsCommand: a browse request echoes an empty query back.
     query: str = Field(max_length=256)
     models: list[HubModelSummary] = Field(max_length=20)
-    #: Candidates the hub listed that were not inspected, so a truncated result set is visible
-    #: as one instead of being presented as exhaustive.
+    #: Number of metadata candidates fetched before format filtering and the page limit.
     candidates: int = Field(default=0, ge=0)
     rateLimited: bool = False
 

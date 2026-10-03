@@ -24,14 +24,14 @@ export type NolaTranslatorApi = {
   /**
    * Search Hugging Face for candidate models.
    *
-   * `kind` selects the slot rather than filtering the response afterwards: the engine maps it onto
-   * the hub's own `pipeline_tag` filter, so the two categories are separated by the hub and not by
-   * string matching on the renderer. Every returned model carries a `compatibility` verdict — read
-   * it instead of deriving installability from the repo name.
+   * Search filters published PyTorch/GGUF weights using metadata. Categories narrow the server
+   * query; README excerpts and runtime installation checks do not block the list response.
    */
-  searchHuggingFace(query: string, kind: 'asr' | 'mt'): Promise<HubSearchResult>
+  searchHuggingFace(query: string, kind: 'all' | 'asr' | 'mt' | 'quant'): Promise<HubSearchResult>
   /** What one repo declares about itself, and whether the engine can run it. Read-only. */
   inspectHuggingFace(repo: string): Promise<HubInspectResult>
+  /** A plain text excerpt from the repository's README, fetched separately from search. */
+  getHuggingFaceModelCard(repo: string, revision?: string): Promise<string>
   /**
    * Judge a repo, register it, and start its download.
    *

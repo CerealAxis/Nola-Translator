@@ -22,14 +22,14 @@ import type {
 } from '@/bridge'
 import { createStore, createWriteQueue } from './createStore'
 
-export type HubKind = 'asr' | 'mt'
+export type HubKind = 'all' | 'asr' | 'mt' | 'quant'
 
 export interface HubSearchState {
   query: string
   kind: HubKind
-  /** 引擎**逐个深检过**的条目。能不能装看每条的 `compatibility`，界面不再推导。 */
+  /** 已按 PyTorch/GGUF 格式筛选的仓库元数据。 */
   results: HubModelSummary[]
-  /** hub 列出的候选总数。`candidates > results.length` 就是被深检上限截断了。 */
+  /** 筛选和分页前拉取的候选数。 */
   candidates: number
   /** 深检途中被 429 打断。 */
   rateLimited: boolean
@@ -77,6 +77,7 @@ export const modelsStore = createStore<ModelsState>(initialState)
 let bridge: NolaBridge | null = null
 let unsubscribe: (() => void) | null = null
 let busy = new Set<string>()
+let searchGeneration = 0
 
 const enqueue = createWriteQueue()
 
@@ -160,15 +161,15 @@ export async function manageResource(
 }
 
 /**
- * Hub 搜索。判定在引擎侧发生一次，这里原样把 `HubSearchResult` 存下并交回，
- * 包括 `candidates` 与 `rateLimited` —— 界面要靠这两个字段说清"这不是全集"。
+ * Hub 元数据搜索。只让最新请求更新共享状态，调用方仍能拿到自己的返回值。
  */
 export async function searchHub(query: string, kind: HubKind): Promise<HubSearchResult> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
+  const generation = ++searchGeneration
   modelsStore.setState((state) => ({ hub: { ...state.hub, query, kind, loading: true, failed: false } }))
   try {
     const result = await bridge.models.searchHuggingFace(query, kind)
-    modelsStore.setState((state) => ({
+    if (generation === searchGeneration) modelsStore.setState((state) => ({
       hub: {
         ...state.hub,
         query,
@@ -183,7 +184,7 @@ export async function searchHub(query: string, kind: HubKind): Promise<HubSearch
   } catch (error) {
     // 只写 hub.failed，不写页面级的 error：那个字段是「资源安装/卸载失败」专用的，
     // 写进去会让 ModelsPage 把一次搜索失败显示成"模型下载中断"。
-    modelsStore.setState((state) => ({ hub: { ...state.hub, query, kind, loading: false, failed: true } }))
+    if (generation === searchGeneration) modelsStore.setState((state) => ({ hub: { ...state.hub, query, kind, loading: false, failed: true } }))
     throw error
   }
 }
@@ -229,7 +230,13 @@ export async function inspectHubModel(repo: string): Promise<HubInspectResult> {
   return bridge.models.inspectHuggingFace(repo)
 }
 
+export async function loadHubModelCard(repo: string, revision?: string): Promise<string> {
+  if (!bridge) throw new Error('initStores 还没注入 bridge')
+  return bridge.models.getHuggingFaceModelCard(repo, revision)
+}
+
 export function clearHubSearch(): void {
+  searchGeneration += 1
   modelsStore.setState({ hub: { ...initialState.hub } })
 }
 
@@ -285,6 +292,7 @@ export function attachModelsStore(next: NolaBridge): void {
 }
 
 export function detachModelsStore(): void {
+  searchGeneration += 1
   unsubscribe?.()
   unsubscribe = null
   bridge = null

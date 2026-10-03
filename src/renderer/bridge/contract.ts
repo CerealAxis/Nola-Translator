@@ -98,18 +98,14 @@ export interface NolaBridge {
     onOverlayRequest(cb: (route: RouteId, path: string) => void): () => void
   }
   /**
-   * Hugging Face 搜索。**能不能装由引擎判定一次，每条命中自带 `compatibility`** ——
-   * 界面读那个字段，不要按仓库名重新推导（`repoKey` 那种前缀匹配已经删掉了：
-   * 它把 `facebook/m2m100_418M` 判成可装只因为两边都去掉了下划线）。
-   *
-   * `models` 是整个列表的条数，`candidates` 是 hub 列出的总数，引擎为守住匿名速率限制
-   * 只深检了有限条（`rateLimited: true` 表示中途被 429 打断）。三者不等时界面必须说出来，
-   * 不能把截断后的结果当成全集。
+   * Hugging Face 元数据搜索，按 PyTorch/GGUF 格式筛选。
+   * README 异步加载，运行时适配器检查在安装时执行。
    */
   models: {
-    searchHuggingFace(query: string, kind: 'asr' | 'mt'): Promise<HubSearchResult>
-    /** 单个仓库的判定。搜索已经带判定，这里是给「详情里再确认一次」用的只读复查。 */
+    searchHuggingFace(query: string, kind: 'all' | 'asr' | 'mt' | 'quant'): Promise<HubSearchResult>
+    /** 单个仓库的运行时检查；与搜索列表独立。 */
     inspectHuggingFace(repo: string): Promise<HubInspectResult>
+    getHuggingFaceModelCard(repo: string, revision?: string): Promise<string>
     /**
      * 判定 + 注册 + 起下载。引擎在**传输任何字节之前**就会拒绝跑不了的仓库，
      * 所以这里抛错时给的是兼容性理由而不是半截下载。之后的进度、取消、卸载走
@@ -167,6 +163,7 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'events.onOverlayRequest': 'ipc',
   'models.searchHuggingFace': 'ipc',
   'models.inspectHuggingFace': 'ipc',
+  'models.getHuggingFaceModelCard': 'ipc',
   'models.installHuggingFaceModel': 'ipc',
   'feedback.submit': 'ipc-new',
 }

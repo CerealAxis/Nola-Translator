@@ -113,6 +113,10 @@ export interface ModelCardProps {
   onSetDefault: () => void
   /** 卡片整体的次级动作（HF 搜索的"查看详情"）。 */
   footer?: ReactNode
+  className?: string
+  metadata?: ReactNode
+  descriptionLoading?: boolean
+  descriptionFallback?: string
 }
 
 export function ModelCard({
@@ -126,13 +130,17 @@ export function ModelCard({
   onRemove,
   onSetDefault,
   footer,
+  className = '',
+  metadata,
+  descriptionLoading = false,
+  descriptionFallback = '',
 }: ModelCardProps) {
   const { t } = useI18n()
   const state: ResourceState = resourceStateOf(record)
   const inFlight = state === 'queued' || state === 'downloading' || state === 'verifying'
 
   return (
-    <Card className="models-card h-full">
+    <Card className={`models-card h-full ${className}`}>
       {/*
        * 状态胶囊单独占一行，不跟标题抢宽度。
        * 之前它们并排，标题被压到只剩 "Qwen3-ASR 1.7B · ..." 这种没法辨认的长度 ——
@@ -144,8 +152,11 @@ export function ModelCard({
         </span>
         <div className="models-card__identity">
           <Card.Title>{record.name}</Card.Title>
-          <Card.Description>{record.description}</Card.Description>
-          <span className="models-card__meta tabular">{factsOf(record).join(' · ')}</span>
+          {descriptionLoading ? <div className="models-card__description-loading" aria-hidden="true">
+            <Skeleton className="h-3 w-full rounded-[6px]" />
+            <Skeleton className="h-3 w-3/4 rounded-[6px]" />
+          </div> : <Card.Description>{record.description || descriptionFallback}</Card.Description>}
+          <span className="models-card__meta tabular">{metadata ?? factsOf(record).join(' · ')}</span>
         </div>
       </Card.Header>
       <Card.Content>
@@ -323,17 +334,23 @@ function Actions({
  * 骨架。形状必须与真实卡片一致（DESIGN 第 10.3 节），否则加载完成时布局会跳：
  * 图标方块 40px + 两行文字 + 一条按钮。
  */
-export function ModelCardSkeleton() {
+export function ModelCardSkeleton({ withDetails = false }: { withDetails?: boolean }) {
   return (
-    <Card className="models-card h-full">
+    <Card className={`models-card h-full ${withDetails ? 'models-card--hub' : ''}`}>
       <div className="flex items-start gap-3">
-        <Skeleton className="size-10 rounded-[10px]" />
+        <Skeleton className="size-14 shrink-0 rounded-[12px]" />
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <Skeleton className="h-4 w-3/4 rounded-[6px]" />
           <Skeleton className="h-3 w-1/2 rounded-[6px]" />
+          <Skeleton className="h-3 w-full rounded-[6px]" />
+          <Skeleton className="h-3 w-3/4 rounded-[6px]" />
         </div>
       </div>
-      <Skeleton className="h-8 w-24 rounded-[6px]" />
+      <Skeleton className="h-5 w-16 rounded-full" />
+      <div className="mt-auto flex flex-col gap-2">
+        <Skeleton className="h-10 w-full rounded-[10px]" />
+        {withDetails ? <Skeleton className="h-8 w-full rounded-[6px]" /> : null}
+      </div>
     </Card>
   )
 }

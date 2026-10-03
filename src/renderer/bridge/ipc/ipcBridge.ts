@@ -204,6 +204,8 @@ export function createIpcBridge(): NolaBridge {
       searchHuggingFace: (query, kind) =>
         call('searchHuggingFace', (injected) => injected.searchHuggingFace(query, kind)),
       inspectHuggingFace: (repo) => call('inspectHuggingFace', (injected) => injected.inspectHuggingFace(repo)),
+      getHuggingFaceModelCard: (repo, revision) =>
+        call('getHuggingFaceModelCard', (injected) => injected.getHuggingFaceModelCard(repo, revision)),
       installHuggingFaceModel: (repo, slot) =>
         call('installHuggingFaceModel', (injected) => injected.installHuggingFaceModel(repo, slot)),
     },

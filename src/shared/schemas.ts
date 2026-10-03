@@ -114,6 +114,7 @@ export const engineCommandSchema = z.discriminatedUnion('type', [
       // which is how the search tab browses when its box is empty.
       query: z.string().max(256),
       slot: z.enum(['recognition', 'translation']).optional(),
+      weightFormat: z.literal('gguf').optional(),
       limit: z.number().int().min(1).max(50).optional(),
     })
     .strip(),

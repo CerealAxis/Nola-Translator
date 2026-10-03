@@ -27,7 +27,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 import json
-import time
 from typing import Literal
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
@@ -856,29 +855,9 @@ SLOT_PIPELINE_TAGS: dict[Slot, str] = {
     "translation": "translation",
 }
 
-#: How many search hits get the full ``?blobs=true`` inspection.
-#:
-#: This is the quota knob, and it exists because the two endpoints answer different questions: the
-#: search list carries no file list, no ``gguf`` block and no ``sha``, so a hit cannot be judged
-#: from it. Ten deepened candidates is one list call plus roughly twenty detail reads, which stays
-#: well inside a normal anonymous rate limit, and anything past it is reported as uninspected
-#: rather than silently dropped.
-DEFAULT_DEEPEN_LIMIT = 10
-
-#: Pause between deepened inspections. A user typing in a search box is not a bulk crawler, and
-#: bursting ten detail calls is what earns a 429 from a shared anonymous budget.
-DEEPEN_PAUSE_SECONDS = 0.25
-
-
 @dataclass(frozen=True, slots=True)
 class HubSearchResult:
-    """What one search returned, and how much of it could actually be judged.
-
-    ``inspected`` repos each carry a verdict; ``candidates`` is how many the search listed in
-    total. The gap is reported instead of hidden, because "these ten are all I could check" and
-    "these ten are everything that exists" are different claims and the UI has to be able to
-    tell them apart.
-    """
+    """One metadata page after filtering published weight formats."""
 
     query: str
     slot: Slot | None
@@ -886,12 +865,7 @@ class HubSearchResult:
     candidates: int = 0
     rate_limited: bool = False
 
-    @property
-    def uninspected(self) -> int:
-        return max(0, self.candidates - len(self.repos))
-
-
-def search_url(query: str, slot: Slot | None, limit: int) -> str:
+def search_url(query: str, slot: Slot | None, limit: int, weight_format: str | None = None) -> str:
     """The search endpoint URL for a query, as a single string.
 
     Built as one URL rather than as query-parameter pairs so the exact request is visible in a log
@@ -910,6 +884,8 @@ def search_url(query: str, slot: Slot | None, limit: int) -> str:
     ))
     if slot is not None:
         parameters.append(("filter", SLOT_PIPELINE_TAGS[slot]))
+    if weight_format == "gguf":
+        parameters.append(("filter", "gguf"))
     return f"{HF_ROOT}/api/models?{urlencode(parameters, quote_via=quote)}"
 
 
@@ -939,7 +915,7 @@ def _search_hit_repos(
         model_id = hit.get("modelId") or hit.get("id")
         if not isinstance(model_id, str) or model_id.count("/") != 1:
             continue
-        if wanted is not None and hit.get("pipeline_tag") != wanted:
+        if wanted is not None and hit.get("pipeline_tag") != wanted and wanted not in (hit.get("tags") or []):
             continue
         repos.append(model_id)
     return repos
@@ -951,22 +927,26 @@ def search_repos(
     slot: Slot | None = None,
     limit: int = 20,
     fetch: HubFetcher = _http_get,
+    weight_format: str | None = None,
 ) -> HubSearchResult:
     """Search supported weight formats using one metadata request.
 
     Fetch extra candidates so CoreML/ONNX-only repos do not consume the displayed page.
     Runtime inspection remains on the install path, where it can check an exact revision.
     """
-    hits = _parse_list(fetch(search_url(query.strip(), slot, min(100, limit * 4))), "搜索结果")
+    limit = max(1, min(20, limit))
+    hits = _parse_list(fetch(search_url(query.strip(), slot, min(100, limit * 4), weight_format)), "搜索结果")
     allowed = set(_search_hit_repos(hits, slot))
     repos: list[HubRepoInfo] = []
     seen: set[str] = set()
     for hit in hits:
         repo = hit.get("modelId") or hit.get("id")
-        if repo not in allowed or repo in seen:
+        if not isinstance(repo, str) or repo not in allowed or repo in seen:
             continue
         info = _repo_info_from_api(repo, hit)
         if info.is_private or info.is_gated or not search_formats(info):
+            continue
+        if weight_format and weight_format not in search_formats(info):
             continue
         seen.add(repo)
         repos.append(info)
