@@ -25,17 +25,16 @@ jobs:
           if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$') { throw 'Release tag must be vMAJOR.MINOR.PATCH, optionally with prerelease/build suffixes' }
           npm version $env:RELEASE_TAG.Substring(1) --no-git-tag-version --ignore-scripts --allow-same-version
           if ($LASTEXITCODE -ne 0) { throw 'Setting release version failed' }
-      - uses: ./.github/actions/build-windows
-      - name: Keep build artifact
-        uses: actions/upload-artifact@v4
+      - id: package
+        uses: ./.github/actions/build-windows
+      - name: Upload downloads
+        uses: ./.github/actions/upload-distributions
         with:
-          name: Nola-Translator-${{ env.RELEASE_TAG }}-Windows-x64
-          path: |
-            release/*-Setup-x64.exe
-            release/*.blockmap
-            release/SHA256SUMS.txt
-          if-no-files-found: error
-          compression-level: 0
+          exe-x64: ${{ steps.package.outputs.exe-x64 }}
+          msi-x64: ${{ steps.package.outputs.msi-x64 }}
+          exe-arm64: ${{ steps.package.outputs.exe-arm64 }}
+          msi-arm64: ${{ steps.package.outputs.msi-arm64 }}
+          source: ${{ steps.package.outputs.source }}
           retention-days: 30
       - name: Publish release assets
         shell: pwsh
@@ -50,6 +49,6 @@ jobs:
             gh release create $env:RELEASE_TAG @options
             if ($LASTEXITCODE -ne 0) { throw 'Creating release failed' }
           }
-          $assets = @(Get-ChildItem -LiteralPath release -File | Where-Object { $_.Name -like '*-Setup-x64.exe' -or $_.Extension -eq '.blockmap' -or $_.Name -eq 'SHA256SUMS.txt' } | ForEach-Object FullName)
+          $assets = @(Get-ChildItem -LiteralPath release -File | Where-Object { $_.Name -like '*-Setup.exe' -or $_.Name -like '*-Setup.msi' -or $_.Name -like '*-Source.zip' } | ForEach-Object FullName)
           gh release upload $env:RELEASE_TAG @assets --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Uploading release assets failed' }

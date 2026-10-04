@@ -1,5 +1,21 @@
 name: Build Windows application
 description: Build the Electron installer with private CPU Python and llama.cpp runtimes
+outputs:
+  exe-x64:
+    description: Windows x64 EXE installer
+    value: ${{ steps.package.outputs.exe-x64 }}
+  msi-x64:
+    description: Windows x64 MSI installer
+    value: ${{ steps.package.outputs.msi-x64 }}
+  exe-arm64:
+    description: Windows ARM64 EXE installer
+    value: ${{ steps.package.outputs.exe-arm64 }}
+  msi-arm64:
+    description: Windows ARM64 MSI installer
+    value: ${{ steps.package.outputs.msi-arm64 }}
+  source:
+    description: Source ZIP
+    value: ${{ steps.package.outputs.source }}
 runs:
   using: composite
   steps:
@@ -14,7 +30,7 @@ runs:
         cache: pip
         cache-dependency-path: engine/pyproject.toml
     - name: Cache Python downloads and llama archive
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: vendor/llama-zips
         key: windows-llama-cpu-${{ hashFiles('scripts/fetch-llama-cpu.ps1') }}
@@ -24,6 +40,7 @@ runs:
         npm ci
         if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
     - name: Build installer
+      id: package
       shell: pwsh
       env:
         CSC_IDENTITY_AUTO_DISCOVERY: 'false'

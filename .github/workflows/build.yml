@@ -21,15 +21,14 @@ jobs:
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version.Split('-')[0].Split('+')[0]
           npm version "$version-dev.${{ github.run_number }}" --no-git-tag-version --ignore-scripts
           if ($LASTEXITCODE -ne 0) { throw 'Setting development version failed' }
-      - uses: ./.github/actions/build-windows
-      - name: Upload installer
-        uses: actions/upload-artifact@v4
+      - id: package
+        uses: ./.github/actions/build-windows
+      - name: Upload downloads
+        uses: ./.github/actions/upload-distributions
         with:
-          name: Nola-Translator-Windows-x64-${{ github.run_number }}-${{ github.sha }}
-          path: |
-            release/*-Setup-x64.exe
-            release/*.blockmap
-            release/SHA256SUMS.txt
-          if-no-files-found: error
-          compression-level: 0
+          exe-x64: ${{ steps.package.outputs.exe-x64 }}
+          msi-x64: ${{ steps.package.outputs.msi-x64 }}
+          exe-arm64: ${{ steps.package.outputs.exe-arm64 }}
+          msi-arm64: ${{ steps.package.outputs.msi-arm64 }}
+          source: ${{ steps.package.outputs.source }}
           retention-days: 14
