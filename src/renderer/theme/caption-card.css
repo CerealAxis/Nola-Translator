@@ -136,11 +136,7 @@ html.is-overlay body {
 
 /* ── 字幕区 ────────────────────────────────────────────────────────────── */
 
-/*
- * 上 padding 22px 留给右上角动作行，下 padding 38px 留给底部胶囊行。
- * 这两行**绝对定位**（不占布局），所以字幕块的行位在它们出现与否之间完全一致——
- * 鼠标扫过时字幕不会跳一下。
- */
+/* 控件浮在字幕上方，不为动作行或底部胶囊预留文字空间。 */
 .nola-caption-stage {
   position: relative;
   display: flex;
@@ -149,7 +145,7 @@ html.is-overlay body {
   justify-content: flex-start;
   gap: 6px;
   min-height: 0;
-  padding: 22px 22px 38px;
+  padding: 8px 22px;
   overflow: hidden;
 }
 
@@ -198,57 +194,22 @@ html.is-overlay body {
   opacity: 0;
 }
 
-/* ── 双语上下分区 ──────────────────────────────────────────────────────── */
-
-/*
- * 双语时原文与译文**上下排列、各占一半**。**这里故意一条 `data-bilingual` 专属规则
- * 都没有**：上下堆叠本来就是 `.nola-caption-stage` 自己的 `flex-direction: column`，
- * 不需要第二条规则去改它。
- *
- * 曾经这里是 `flex-direction: row` + `column-gap: 16px`（左右分栏），理由写的是
- * "940×104 的窗里上下堆叠只露得下一行、几乎读不了"。**那个窗高是错的**：字幕窗默认
- * 高 **218px**（`src/main/windows.ts` 的 `createOverlayWindowOptions`，那里的注释原话
- * 就是"扣掉预留控制行之后够放三条原文加三条译文"）。扣掉 stage 的 22px 上 padding 和
- * 38px 下 padding 还剩 158px，对半分每边 76px，出厂字号（原文 17/1.3、译文 16/1.35）
- * 下两条各 3 行 —— 上下堆叠在这个窗里是够用的。
- *
- * 分栏还有两个更硬的代价：
- *   1. `allocateCaptionLines` 里的"两条可见就对半分"永远不执行（当时两条轨道是分开
- *      调的，每次只传一条进去；见 OverlayRoot 那次调用的注释），行数预算等于各按整高算。
- *   2. 分栏里两条轨道是**并排**的，根本不存在"译文那半边"这个位置，于是"译文还没
- *      翻出来时原文不许占据它"这条做不到。上下排列才谈得上各占一半、互不侵占。
- */
-
-/*
- * **两条轨道都不许 `flex: 1`。**
- *
- * `.nola-caption-track` 与包裹译文的 `.nola-caption-translations` 都保持
- * `flex: 0 0 auto`，高度就是 `height: calc(var(--nola-overlay-visible-lines) * 1lh)`，
- * 而那个行数是 `allocateCaptionLines` 算出来的。给它们上 `flex: 1 1 0` 会用
- * `flex-basis: 0` 顶掉这个 `height`（flex 主轴上 flex-basis 优先于 height），
- * 行数预算就整个失效了 —— 上下对半分也跟着失效。
- *
- * 尤其**不能**图省事只给译文那个包裹层加 `flex: 1` 去"帮它占住下半"：那会让它按
- * stage 余高自适应，原文那半就被挤成内容高度，分区边界随译文长短一帧一帧地动。
+/* 双语上下分区：原文轨道和译文容器等分可用高度。
+ * 译文尚未返回时仍保留其分区；单语模式由唯一轨道填满。
  */
 
 /* ── 轨道（原文 / 译文各一条） ────────────────────────────────────────── */
 
 .nola-caption-track {
   position: relative;
-  flex: 0 0 auto;
+  flex: 1 1 0;
+  min-height: 0;
   min-width: 0;
   overflow: hidden;
 }
 
-/*
- * 高度按可见行数算（`calc(var(--nola-overlay-visible-lines) * 1lh)`）：
- * `1lh` 是当前行高，所以行数与实际排版永远同步——用户改字号，行高跟着变，
- * 露出几行也跟着变，不会出现"设了 3 行结果只放得下 2 行"。
- * 每个 var 都带主仓的兜底值：浮窗可能在 settings 读到之前先渲染一帧。
- */
+/* 轨道按可用高度等分，字号与行高只决定排版，不决定分区高度。 */
 .nola-caption-track[data-kind='source'] {
-  height: calc(var(--nola-overlay-visible-lines, 1) * 1lh);
   color: var(--overlay-source-color, #f7f7f7);
   font-size: var(--overlay-font-size, 17px);
   font-weight: var(--overlay-font-weight, 500);
@@ -256,7 +217,6 @@ html.is-overlay body {
 }
 
 .nola-caption-track[data-kind='translation'] {
-  height: calc(var(--nola-overlay-visible-lines, 1) * 1lh);
   color: var(--overlay-translation-color, #eceff4);
   font-size: var(--overlay-translation-font-size, 16px);
   font-weight: var(--overlay-translation-font-weight, 400);
@@ -264,6 +224,8 @@ html.is-overlay body {
 }
 
 .nola-caption-translations {
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -794,7 +756,7 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   justify-content: flex-start;
   width: min(760px, 94%);
   min-height: 152px;
-  padding: 22px 22px 38px;
+  padding: 8px 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   text-align: left;

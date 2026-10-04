@@ -10,14 +10,14 @@ type OverlaySize = { width: number; height: number; x?: number; y?: number }
 export const OVERLAY_MIN_WIDTH = 420
 
 /**
- * `.nola-caption-stage` vertical padding, 22px top + 38px bottom.
+ * `.nola-caption-stage` vertical padding, 8px top + 8px bottom.
  *
  * These two values are copied from `.nola-caption-stage` in
- * `src/renderer/theme/caption-card.css` (`padding: 22px 22px 38px`). **Changing the CSS means
+ * `src/renderer/theme/caption-card.css` (`padding: 8px 22px`). **Changing the CSS means
  * coming back here** — the main process cannot read a stylesheet, so this is a deliberate
  * duplicate of the layout constants rather than a value that can be derived.
  */
-const STAGE_VERTICAL_PADDING = 22 + 38
+const STAGE_VERTICAL_PADDING = 8 + 8
 
 /**
  * `.nola-caption-stage` row gap, copied from the same rule (`gap: 6px`). Same caveat as above:

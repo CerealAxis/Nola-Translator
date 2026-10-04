@@ -137,6 +137,7 @@ export function CaptionTrack({
     const block = content.current
     const observer = typeof ResizeObserver === 'undefined' || !block ? null : new ResizeObserver(measure)
     if (observer && block) observer.observe(block)
+    if (observer && viewport.current) observer.observe(viewport.current)
     return () => observer?.disconnect()
   }, [entries, maxLines, layout])
 
