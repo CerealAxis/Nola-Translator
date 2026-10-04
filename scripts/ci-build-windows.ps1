@@ -5,6 +5,13 @@ function Assert-NativeSuccess([string]$Task) {
     if ($LASTEXITCODE -ne 0) { throw "$Task failed (exit $LASTEXITCODE)" }
 }
 
+# npm lifecycle policy can skip Electron's postinstall on a clean runner. The
+# package's own installer also handles an already-installed matching version.
+& node node_modules/electron/install.js
+Assert-NativeSuccess 'Prepare Electron binary'
+& node -e 'const fs=require("node:fs"); const p=require("electron/package.json"); const v=fs.readFileSync("node_modules/electron/dist/version","utf8").trim().replace(/^v/,""); if(v!==p.version || !fs.existsSync("node_modules/electron/dist/electron.exe")) throw new Error("Electron Windows binary is missing or has the wrong version"); console.log("Electron binary ready: "+v);'
+Assert-NativeSuccess 'Check Electron binary'
+
 & npm run build
 Assert-NativeSuccess 'Application build'
 $basePython = (& python -c 'import sys; print(sys.executable)').Trim()

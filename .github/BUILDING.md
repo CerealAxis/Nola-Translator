@@ -16,5 +16,7 @@ Enable GitHub Actions in the repository. No personal access token is needed: rel
 
 Commit `package-lock.json`, `build/icon.ico`, the runtime catalogs, all referenced build scripts, and the engine sources before pushing. CPU dependency imports are checked during packaging. Pip and npm caches accelerate subsequent builds; generated Python environments are rebuilt for each checkout.
 
+The build script explicitly runs Electron's binary installer and checks its version before building. This supports clean runners where npm lifecycle policy does not run Electron's postinstall; a matching existing binary is reused.
+
 The reference project's tag-triggered Release workflow informed the trigger/publish split:
 https://github.com/Xavier-MC/XavierChatSync/blob/master/.github/workflows/release.yml
