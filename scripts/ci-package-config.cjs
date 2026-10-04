@@ -7,8 +7,8 @@ const config = {
   win: {
     ...build.win,
     target: [
-      { target: 'nsis', arch: ['x64', 'arm64'] },
-      { target: 'msi', arch: ['x64', 'arm64'] },
+      { target: 'nsis', arch: ['x64'] },
+      { target: 'msi', arch: ['x64'] },
     ],
     artifactName: 'Nola-Translator-${version}-Windows-${arch}-Setup.${ext}',
   },

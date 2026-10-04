@@ -1,5 +1,5 @@
 name: Upload application downloads
-description: Upload four installers and source ZIP as five separate files
+description: Upload two x64 installers and source ZIP as three separate files
 inputs:
   exe-x64:
     required: true
@@ -7,12 +7,6 @@ inputs:
   msi-x64:
     required: true
     description: msi-x64 file path
-  exe-arm64:
-    required: true
-    description: exe-arm64 file path
-  msi-arm64:
-    required: true
-    description: msi-arm64 file path
   source:
     required: true
     description: source file path
@@ -33,20 +27,6 @@ runs:
       uses: actions/upload-artifact@v7
       with:
         path: ${{ inputs.msi-x64 }}
-        archive: false
-        if-no-files-found: error
-        retention-days: ${{ inputs.retention-days }}
-    - name: Upload exe-arm64
-      uses: actions/upload-artifact@v7
-      with:
-        path: ${{ inputs.exe-arm64 }}
-        archive: false
-        if-no-files-found: error
-        retention-days: ${{ inputs.retention-days }}
-    - name: Upload msi-arm64
-      uses: actions/upload-artifact@v7
-      with:
-        path: ${{ inputs.msi-arm64 }}
         archive: false
         if-no-files-found: error
         retention-days: ${{ inputs.retention-days }}

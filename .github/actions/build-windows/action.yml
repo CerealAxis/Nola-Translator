@@ -7,12 +7,6 @@ outputs:
   msi-x64:
     description: Windows x64 MSI installer
     value: ${{ steps.package.outputs.msi-x64 }}
-  exe-arm64:
-    description: Windows ARM64 EXE installer
-    value: ${{ steps.package.outputs.exe-arm64 }}
-  msi-arm64:
-    description: Windows ARM64 MSI installer
-    value: ${{ steps.package.outputs.msi-arm64 }}
   source:
     description: Source ZIP
     value: ${{ steps.package.outputs.source }}

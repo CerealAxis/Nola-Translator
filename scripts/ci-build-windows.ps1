@@ -18,17 +18,16 @@ $basePython = (& python -c 'import sys; print(sys.executable)').Trim()
 Assert-NativeSuccess 'Locate Python'
 & "$PSScriptRoot/build-cpu-engine.ps1" -BasePython $basePython
 & "$PSScriptRoot/fetch-llama-cpu.ps1"
-# Use separate installers for each architecture. electron-builder obtains the matching
-# Electron runtime; a local x64 electronDist cannot be reused for ARM64.
+# Build separate x64 EXE and MSI installers.
 & node "$PSScriptRoot/ci-package-config.cjs"
 Assert-NativeSuccess 'Generate packaging configuration'
-& npx --no-install electron-builder --config artifacts/ci-builder.json --win nsis msi --x64 --arm64 --publish never
+& npx --no-install electron-builder --config artifacts/ci-builder.json --win nsis msi --x64 --publish never
 Assert-NativeSuccess 'Installer packaging'
 
 $buildVersion = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
 $distributionPrefix = "Nola-Translator-$buildVersion"
 $assets = @()
-foreach ($arch in @('x64', 'arm64')) {
+foreach ($arch in @('x64')) {
     foreach ($extension in @('exe', 'msi')) {
         $name = "$distributionPrefix-Windows-$arch-Setup.$extension"
         if (-not (Test-Path -LiteralPath "release/$name")) { throw "Missing installer: $name" }
@@ -48,8 +47,6 @@ if ($env:GITHUB_OUTPUT) {
     Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8 -Value @(
         "exe-x64=release/$distributionPrefix-Windows-x64-Setup.exe",
         "msi-x64=release/$distributionPrefix-Windows-x64-Setup.msi",
-        "exe-arm64=release/$distributionPrefix-Windows-arm64-Setup.exe",
-        "msi-arm64=release/$distributionPrefix-Windows-arm64-Setup.msi",
         "source=release/$sourceName"
     )
 }
