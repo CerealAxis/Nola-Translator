@@ -8,7 +8,7 @@ import type { EngineProcess } from './engine-process'
 import type { SettingsStore } from './settings-store'
 import type { SecureCredentialStore } from './secure-store'
 import { computeOverlayBounds, getOverlayInteractionPolicy, overlayMinimumHeight, OVERLAY_MIN_WIDTH } from './windows'
-import type { AppSettings, AppSettingsPatch } from '../shared/settings'
+import type { AppSettings, AppSettingsPatch, CredentialProvider } from '../shared/settings'
 import { RECOGNITION_MODEL_LABELS } from '../shared/settings'
 import { modelStorageEnvironment, readEngineStatus, validateModelStorageDirectory } from './model-storage'
 import { settingsPatchSchema } from './settings-schema'
@@ -28,6 +28,17 @@ export const APP_IPC_CHANNELS = channels
 
 /** Pages the caption overlay is allowed to send the main window to. */
 const OVERLAY_PAGES = new Set(['appearance', 'captions', 'resources', 'translation'])
+
+/**
+ * `credentials.json` 允许的顶层键。列表而不是 `provider === 'microsoft' || ...` 那种就地判断：
+ * 密钥位的改名（openai → cloud）已经证明过这种写法漏改过一次。
+ */
+const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'microsoft']
+
+function assertCredentialProvider(value: unknown): CredentialProvider {
+  if (!CREDENTIAL_PROVIDERS.includes(value as CredentialProvider)) throw new Error('凭据类型无效')
+  return value as CredentialProvider
+}
 
 async function diagnostics(engine: EngineProcess, settings: AppSettings): Promise<Record<string, string | number>> {
   const modelDir = modelStorageEnvironment(settings.modelStoragePath || app.getPath('userData')).NOLA_TRANSLATOR_MODEL_DIR
@@ -195,14 +206,12 @@ export function registerAppIpc(options: {
   })
   ipcMain.handle(channels.getDiagnostics, () => diagnostics(options.engine, current))
   ipcMain.handle(channels.copyDiagnostics, async () => clipboard.writeText(JSON.stringify(await diagnostics(options.engine, current), null, 2)))
-  ipcMain.handle(channels.hasTranslationCredential, (_event, provider: unknown) => {
-    if (provider !== 'microsoft' && provider !== 'openai') throw new Error('凭据类型无效')
-    return options.credentials.has(provider)
-  })
+  ipcMain.handle(channels.hasTranslationCredential, (_event, provider: unknown) =>
+    options.credentials.has(assertCredentialProvider(provider)))
   ipcMain.handle(channels.setTranslationCredential, (_event, provider: unknown, value: unknown) => {
-    if (provider !== 'microsoft' && provider !== 'openai') throw new Error('凭据类型无效')
+    const target = assertCredentialProvider(provider)
     if (typeof value !== 'string' || value.length > 4096) throw new Error('凭据内容无效')
-    return options.credentials.set(provider, value)
+    return options.credentials.set(target, value)
   })
 
   return () => Object.values(channels).forEach((channel) => ipcMain.removeHandler(channel))

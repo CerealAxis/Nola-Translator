@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { computeSettingsSchema, computeSnapshotSchema } from './compute'
 
 import type { EngineCommand, EngineEvent } from './contracts'
 
@@ -37,26 +38,47 @@ const recognitionModelIdSchema = z.union([
   hubModelId,
 ])
 
+/**
+ * 本地翻译模型 id。Hy-MT2 的三个量化档 + 合并进来的 M2M100，或 `hub:` 前缀的自装 id。
+ *
+ * 闭集是刻意的（见 `hubModelId` 的注释）：一个已经下线的 id 必须在协议边界就响，
+ * 而不是带着它走到引擎再被解析成别的东西。`m2m100-418m` 之所以在列，是本地 provider
+ * 合并了 Hy-MT2 与 M2M100 之后，唯一区分「装的是哪个模型」的就是这个值。
+ */
 const translationModelIdSchema = z.union([
-  z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m']),
+  z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m', 'm2m100-418m']),
   hubModelId,
 ])
 
 export const sessionConfigSchema = z
   .object({
     audioSource: audioSourceSchema,
+    compute: computeSettingsSchema.optional(),
     recognitionMode: z.enum(['realtime', 'accurate']),
     recognitionModelId: recognitionModelIdSchema.optional(),
     sourceLanguage: z.string().min(1).max(32),
     targetLanguages: z.array(z.string().min(1).max(32)).max(8),
     allowIntermediateTranslation: z.boolean().optional(),
-    translationProvider: z.enum(['hymt2', 'm2m100', 'microsoft', 'openai', 'ollama']).optional(),
+    translationProvider: z.enum(['local', 'cloud', 'microsoft']).optional(),
     translationModelId: translationModelIdSchema.optional(),
     translationOptions: z.object({
-      endpoint: z.string().min(1).max(2048).optional(),
+      // `.min(1)` 刻意不加（和 `main/settings-schema.ts` 的 `cloudEndpoint` 对齐）：空接口地址是
+      // 合法的「还没配」状态，用户清空输入框换 Ollama、或从头重打一遍 base URL 都该能存能发。
+      // 这里只守长度上限，缺地址的提示不在协议层出 —— `runtime.py` 的 `_configure_translation`
+      // 只在**整段** `translationOptions` 缺席时才补默认地址（`local` provider 就是这样，整个字段
+      // 是 `undefined` 而不是 `{}`）；传下来的空串会原样进 provider，由 `network.py` 里那句
+      // `if not endpoint: raise` 报「…接口的地址为空：请填写服务根地址」。请求不会发去默认地址。
+      endpoint: z.string().max(2048).optional(),
       apiKey: z.string().max(4096).optional(),
       region: z.string().max(128).optional(),
       model: z.string().max(256).optional(),
+      apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
+      // The ceiling the engine fits a request into: it reserves room for the reply and splits the
+      // source text when it does not fit. Nothing downstream clips this to a vendor-documented
+      // window, so the generous upper bound here is a fat-finger guard, not slack — the 10M is
+      // what `protocol.py` accepts on purpose.
+      contextWindow: z.number().int().min(256).max(10_000_000).optional(),
+      maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
     }).strip().optional(),
     recordingPath: z.string().min(1).max(4096).optional(),
   })
@@ -88,6 +110,7 @@ const captionSegmentSchema = z
 export const engineCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...envelope, type: z.literal('hello'), clientVersion: z.string().min(1).max(64) }).strip(),
   z.object({ ...envelope, type: z.literal('listDevices') }).strip(),
+  z.object({ ...envelope, type: z.literal('listComputeDevices') }).strip(),
   z.object({ ...envelope, type: z.literal('listResources') }).strip(),
   z.object({
     ...envelope,
@@ -215,6 +238,7 @@ const hubModelSummarySchema = z
   .strip()
 
 export const engineEventSchema = z.discriminatedUnion('type', [
+  z.object({ ...envelope, type: z.literal('computeDevices'), ...computeSnapshotSchema.shape }).strip(),
   z
     .object({
       ...envelope,

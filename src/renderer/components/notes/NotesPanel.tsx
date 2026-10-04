@@ -56,7 +56,6 @@ export function NotesPanel({ value, onChange, collapsed = false, onToggleCollaps
           if (marker) { event.preventDefault(); applyMarker(marker) }
         }} />
       </Card.Content>
-      <Card.Footer className="nola-workspace-notes-footnote">{t('workspaceUi.notesLocalHint')}</Card.Footer>
     </Card>
   )
 }

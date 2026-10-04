@@ -14,11 +14,12 @@ import torch
 from numpy.typing import NDArray
 
 from .base import ModelUnavailable
+from ..compute import cpu_threads, release_device_cache, resolve_dtype, resource_failure, release_failed_load
 
 SAMPLE_RATE = 16_000
 MAX_NEW_TOKENS = 512
 QUANT_ENV_VAR = "NOLA_TRANSLATOR_QWEN_QUANT"
-VALID_QUANTS = ("nf4", "8bit")
+VALID_QUANTS = ("nf4", "8bit", "none")
 
 # The 30 languages Qwen3-ASR supports, protocol code ↔ official name.
 CODE_TO_NAME: dict[str, str] = {
@@ -99,11 +100,16 @@ def _language_code(value: str | None) -> str | None:
 class QwenRuntime:
     """In-process Qwen3-ASR runtime: load once, fall back across quants, single-flight inference."""
 
-    def __init__(self, model_dir: Path, quant: str | None = None) -> None:
+    def __init__(self, model_dir: Path, quant: str | None = None, *, device: str | None = None,
+                 precision: str = "auto", threads: int = 0) -> None:
         if quant is not None and quant not in VALID_QUANTS:
             raise ValueError(f"quant 必须是 {'/'.join(VALID_QUANTS)} 之一：{quant!r}")
         self.model_dir = Path(model_dir)
         self._quant_param = quant
+        self.device = device or ("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.precision = precision
+        self.threads = threads
+        self._compute_dtype = torch.bfloat16
         self._load_lock = threading.Lock()
         self._inference_lock = threading.Lock()
         self._loaded = False
@@ -119,7 +125,7 @@ class QwenRuntime:
         return self._quant
 
     def describe(self) -> str:
-        return self._quant if self._loaded else "unloaded"
+        return f"{self.device} · {self._quant} · {self._compute_dtype}" if self._loaded else "unloaded"
 
     def load(self) -> None:
         """Thread-safe one-shot load: NF4 falls back to 8bit; both failing raises QwenModelUnavailable."""
@@ -127,7 +133,7 @@ class QwenRuntime:
             if self._loaded:
                 return
             requested = self._resolve_quant()
-            attempts = VALID_QUANTS if requested == "nf4" else ("8bit",)
+            attempts = ("nf4", "8bit") if requested == "nf4" else (requested,)
             errors: list[tuple[str, Exception]] = []
             for quant in attempts:
                 try:
@@ -136,6 +142,11 @@ class QwenRuntime:
                     # Quantization-independent: an 8bit retry fails the same way, so report unavailable now.
                     raise QwenModelUnavailable(str(error)) from error
                 except Exception as error:
+                    release_failed_load(error)
+                    gc.collect()
+                    release_device_cache(self.device)
+                    if resource_failure(error):
+                        raise QwenModelUnavailable(str(error)) from error
                     errors.append((quant, error))
                     continue
                 self._pipeline = pipeline
@@ -159,10 +170,13 @@ class QwenRuntime:
                 self._quant = None
             del pipeline
             gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            release_device_cache(self.device)
 
     def _resolve_quant(self) -> str:
+        if self.device == "cpu" or not self.device.startswith("cuda") or torch.version.hip:
+            if self._quant_param not in (None, "none"):
+                raise ValueError("当前设备的 Qwen 基线仅支持不量化，请选择自动或不量化")
+            return "none"
         # explicit arg > env var > nf4 default
         if self._quant_param is not None:
             return self._quant_param
@@ -179,15 +193,21 @@ class QwenRuntime:
             Qwen3ASRForConditionalGeneration,
         )
 
+        self._compute_dtype = resolve_dtype(self.device, self.precision)
+        torch.set_num_threads(cpu_threads(self.threads))
         if quant == "nf4":
-            bnb = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4")
-        else:
+            bnb = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
+                                    bnb_4bit_compute_dtype=self._compute_dtype)
+        elif quant == "8bit":
             bnb = BitsAndBytesConfig(load_in_8bit=True)
+        else:
+            bnb = None
         processor = AutoProcessor.from_pretrained(str(self.model_dir), local_files_only=True)
         model, loading_info = Qwen3ASRForConditionalGeneration.from_pretrained(
             str(self.model_dir),
             quantization_config=bnb,
-            device_map="cuda:0" if torch.cuda.is_available() else "cpu",
+            device_map=self.device,
+            dtype=self._compute_dtype,
             local_files_only=True,
             output_loading_info=True,
         )
@@ -263,8 +283,8 @@ class QwenRuntime:
                 text=[prompt], audio=[audio], return_tensors="pt", padding=True
             )
             # bnb flips model.dtype to float32 after the first generate() call, so inputs
-            # must stay bfloat16 — never use model.dtype.
-            inputs = inputs.to(pipeline.model.device, torch.bfloat16)
+            # generation may change model.dtype; keep the explicitly selected compute dtype.
+            inputs = inputs.to(pipeline.model.device, self._compute_dtype)
             output = pipeline.model.generate(**inputs, max_new_tokens=MAX_NEW_TOKENS)
 
         # transformers 5.17 may return a bare tensor or an object carrying .sequences
@@ -300,17 +320,17 @@ class QwenRuntime:
         return prompt
 
 
-_runtimes: dict[str, QwenRuntime] = {}
+_runtimes: dict[tuple, QwenRuntime] = {}
 _runtimes_lock = threading.Lock()
 
 
-def get_qwen_runtime(model_dir: Path) -> QwenRuntime:
-    """Process-wide singleton cached by resolved model_dir, so weights load once per session."""
+def get_qwen_runtime(model_dir: Path, **options) -> QwenRuntime:
+    """Cache by resolved model directory and compute options."""
     resolved = Path(model_dir).resolve()
-    key = os.path.normcase(str(resolved))
+    key = (os.path.normcase(str(resolved)), tuple(sorted(options.items())))
     with _runtimes_lock:
         runtime = _runtimes.get(key)
         if runtime is None:
-            runtime = QwenRuntime(resolved)
+            runtime = QwenRuntime(resolved, **options)
             _runtimes[key] = runtime
         return runtime

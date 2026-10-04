@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { Description, Label } from '@heroui/react'
+import { Button, Description, Label, Tooltip } from '@heroui/react'
+import { CircleHelp } from 'lucide-react'
 
 /**
  * 设置页那一屏专用的行布局。**不是** `@/components/primitives` 里那个 `SettingRow`。
@@ -14,17 +15,26 @@ import { Description, Label } from '@heroui/react'
  * 早期两份都叫 `SettingRow`，读代码时无从判断 import 到的是哪一个；这里把设置页这个
  * 改名成 `SettingsRow`，「通用件叫 SettingRow、专用的带前缀」这条规矩才好记。
  */
-export function SettingsRow({ label, desc, children, className = '' }: {
+export function SettingsRow({ label, desc, children, className = '', descriptionTooltip = false }: {
   label: ReactNode
   desc?: ReactNode
   children: ReactNode
   className?: string
+  descriptionTooltip?: boolean
 }) {
   return (
     <div className={`settings-row ${className}`}>
       <div className="settings-row__label">
-        <Label>{label}</Label>
-        {desc ? <Description>{desc}</Description> : null}
+        <div className="settings-row__title">
+          <Label>{label}</Label>
+          {desc && descriptionTooltip ? <Tooltip delay={300}>
+            <Button variant="ghost" size="sm" isIconOnly aria-label={typeof label === 'string' ? `${label} — Info` : 'Info'} className="settings-row__help">
+              <CircleHelp size={15} aria-hidden="true" />
+            </Button>
+            <Tooltip.Content className="settings-row__tooltip">{desc}</Tooltip.Content>
+          </Tooltip> : null}
+        </div>
+        {desc && !descriptionTooltip ? <Description>{desc}</Description> : null}
       </div>
       <div className="settings-row__control">{children}</div>
     </div>

@@ -11,13 +11,15 @@
  *   1. 关掉译文时 `targetLanguages` 必须是**空数组**，不能是单元素。
  *      传单元素会让引擎照样起翻译管线：装 Hy-MT2 要加载几个 GB 的权重，
  *      而界面上把译文关着。「不显示译文」是显示偏好，「不翻译」是配置 —— 这里必须分清。
- *   2. `translationOptions` 按 provider 给三种不同形状；`hymt2` / `m2m100` 是本地模型，
- *      **没有 options**，必须整个字段缺席。给本地 provider 塞一个 `{}` 就够引擎判成「配置非法」。
+ *   2. `translationOptions` 按 provider 给不同形状；`local` 是本地模型，**没有 options**，
+ *      必须整个字段缺席。给本地 provider 塞一个 `{}` 就够引擎判成「配置非法」。
+ *      （这里的 provider 已经从五个塌成 `local` / `cloud` / `microsoft` 三个：云端那档还要
+ *      多带 `apiFormat` 与两个 token 预算，因为引擎得知道这个 endpoint 收哪种请求体。）
  *   3. `translationProvider` / `translationModelId` / `allowIntermediateTranslation`
  *      一律取自设置。**新 UI 那版把 provider 写死成 `hymt2`、把量化档写死成
  *      `hy-mt2-1.8b-q3-k-m`，并且从不设 `translationOptions`** ——
- *      于是配了 Microsoft / OpenAI / Ollama / m2m100 的用户每开一场会话都被强按到
- *      本地 Hy-MT2 上：云端 key 根本不传，本地权重用户又可能压根没装（预检也拦不住，
+ *      于是配了 Microsoft / OpenAI / Ollama / m2m100（合并前的旧 provider id）的用户每开一场会话
+ *      都被强按到本地 Hy-MT2 上：云端 key 根本不传，本地权重用户又可能压根没装（预检也拦不住，
  *      因为预检算出来的 `translationModelId` 和真正发出去的是同一个写死值，看起来"已安装"）。
  *   4. `recognitionModelId` / `recognitionMode` 同样取自设置（见 `SessionSetupDialog`）。
  *
@@ -68,15 +70,23 @@ export function translationFieldsOf(
     allowIntermediateTranslation: translation.translateIntermediate,
     // 见文件头第 3 条：全部取自设置，不写死。
     translationProvider: translation.provider,
-    // 只在 provider=hymt2 下有意义；引擎会忽略其它 provider 下的这个值。
-    translationModelId: translation.hymt2ModelId,
+    /*
+     * 只有本地模型有"模型 id"这个概念：它决定引擎加载哪份权重。云端与 Microsoft 的模型名
+     * 走 `translationOptions.model`（云端还带上线路协议与两个 token 预算），那边的模型由
+     * 服务商托管，本机不需要它，所以这个字段整个缺席。
+     */
+    translationModelId: translation.provider === 'local' ? translation.localModelId : undefined,
     // 见文件头第 2 条：本地 provider 必须是 `undefined`，不是 `{}`。
-    translationOptions: translation.provider === 'microsoft'
-      ? { endpoint: translation.microsoftEndpoint, region: translation.microsoftRegion }
-      : translation.provider === 'openai'
-        ? { endpoint: translation.openaiEndpoint, model: translation.openaiModel }
-        : translation.provider === 'ollama'
-          ? { endpoint: translation.ollamaEndpoint, model: translation.ollamaModel }
-          : undefined,
+    translationOptions: translation.provider === 'cloud'
+      ? {
+          endpoint: translation.cloudEndpoint,
+          model: translation.cloudModel,
+          apiFormat: translation.cloudApiFormat,
+          contextWindow: translation.cloudContextWindow,
+          maxOutputTokens: translation.cloudMaxOutputTokens,
+        }
+      : translation.provider === 'microsoft'
+        ? { endpoint: translation.microsoftEndpoint, region: translation.microsoftRegion }
+        : undefined,
   }
 }

@@ -59,8 +59,8 @@ export function AudioTab({ settings }: SettingsPanelProps) {
   )
 
   const modelOptions = useMemo<PickerOption[]>(
-    () => RECOGNITION_MODEL_IDS.map((id) => ({ value: id, label: RECOGNITION_MODEL_LABELS[id] })),
-    [],
+    () => RECOGNITION_MODEL_IDS.map((id) => ({ value: id, label: RECOGNITION_MODEL_LABELS[id], isDisabled: settings.compute.recognitionEngine !== 'pytorch' })),
+    [settings.compute.recognitionEngine],
   )
 
   return (

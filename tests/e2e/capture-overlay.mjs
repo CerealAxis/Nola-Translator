@@ -32,10 +32,10 @@ const settings = {
     showSource: true, showTranslation: true, layout: 'rolling',
   },
   translation: {
-    provider: 'hymt2', hymt2ModelId: 'hy-mt2-1.8b-q3-k-m', targetLanguage: 'zh',
+    provider: 'local', localModelId: 'hy-mt2-1.8b-q3-k-m', targetLanguage: 'zh',
     microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '',
-    openaiEndpoint: 'https://api.openai.com/v1', openaiModel: 'gpt-4.1-mini',
-    ollamaEndpoint: 'http://127.0.0.1:11434', ollamaModel: 'qwen3:4b', translateIntermediate: false,
+    cloudEndpoint: 'https://api.openai.com/v1', cloudModel: 'gpt-4.1-mini', cloudApiFormat: 'chat-completions',
+    translateIntermediate: false,
   },
 }
 

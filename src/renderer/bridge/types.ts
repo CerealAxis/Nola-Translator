@@ -25,6 +25,7 @@ export type {
   EngineCommand,
   EngineErrorCode,
   EngineEvent,
+  EngineProcessState,
   MeetingMeta,
   ResourceRecord,
   ResourceSnapshot,
@@ -32,12 +33,13 @@ export type {
   Translation,
 } from '../../shared/contracts'
 
-export type { ModelStorageInfo, OverlayTargetPage, SessionStartResult } from '../../shared/bridge'
+export type { EngineChannelEvent, EngineLifecycleEvent, ModelStorageInfo, OverlayTargetPage, SessionStartResult } from '../../shared/bridge'
 
 export type {
   AppearancePrefs,
   AppSettings,
   AppSettingsPatch,
+  CloudApiFormat,
   Hymt2ModelId,
   OverlaySettings,
   RecognitionModelId,
@@ -47,7 +49,15 @@ export type {
   TranslationSettings,
 } from '../../shared/settings'
 
+/**
+ * 需要凭据的翻译服务商，即 `credentials.json` 的顶层键；已随 `cloud` 合并改名为
+ * `CredentialProvider`，从主仓 `src/shared/settings` 原样透出，本文件不再自己定义一份。
+ */
+export type { CredentialProvider } from '../../shared/settings'
+
 export {
+  CLOUD_API_FORMATS,
+  CLOUD_FORMAT_DEFAULTS,
   DEFAULT_SETTINGS,
   HYMT2_MODEL_IDS,
   HYMT2_MODEL_LABELS,
@@ -117,11 +127,7 @@ export type DiagnosticsPayload = Record<string, string | number>
 /** `meetings.export()` 接受的导出格式；与主仓的并集保持一致。 */
 export type ExportFormat = 'txt' | 'srt' | 'vtt'
 
-/** 需要凭据的翻译服务商，即那些要 key 而不是本地模型的服务商。 */
-export type CloudTranslationProvider = 'microsoft' | 'openai'
-
-/**
- * 声源选择器里的一项。`AudioDevice` 表达不了「系统默认输出」这个伪选项 ——
+/** 声源选择器里的一项。`AudioDevice` 表达不了「系统默认输出」这个伪选项 ——
  * 协议里它是 `SessionConfig.audioSource = { kind: 'defaultOutput' }`，根本不是一个设备 ——
  * 所以选择器需要这个并集，而不是裸的 `AudioDevice[]`。
  */

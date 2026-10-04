@@ -1,4 +1,32 @@
+import type { CloudApiFormat } from './settings'
+import type { ComputeSettings, ComputeSnapshot } from './compute'
+
 export const PROTOCOL_VERSION = 1 as const
+
+/**
+ * 引擎**子进程**的存活状态，主进程独占这份知识。
+ *
+ * 它和 `EngineEvent` 里那条 `status` 事件不是一回事，别合并：
+ *   · `status` 是引擎在 stdout 协议上自报的话，引擎可以只说会话层面的事；
+ *   · 这里说的是"这个进程还在不在、握没握手"。引擎还没跑起来时它**没有语言**，
+ *     所以这条状态只存在于主进程与界面之间，永远不进协议。
+ *
+ * 定义放在 `shared/` 而不是 `main/engine-process.ts` 是因为渲染进程也要读它
+ * （界面显示的状态与它一一映射）。主进程那边从 `engine-process.ts` 原样转出，
+ * 免得同一个联合类型有两份定义、两处漂移。
+ *
+ * `crash` 与 `fatalError` 两条 EventEmitter 事件**都**紧跟在一次 `setState('failed')`
+ * 之后（`engine-process.ts` 的 `handleTermination` 与 `connectWithRetries`），
+ * 所以只转发 `state` 就已经涵盖崩溃，不必单独转发那两条。
+ *
+ * **`recovering` 是"进程没了、但主进程还打算重试"，`failed` 是"重试已经不用指望了"。**
+ * 这两个结论只有 `EngineProcess` 能下：它手里有退避表（`restartDelaysMs`）与已用次数，
+ * 界面既数不了也猜不着（从时序上猜就是又一次推断，而推断在这里已经错过三次）。
+ * 所以它进这个联合类型，而不是界面临时加一个布尔量 —— 崩溃那一刻转发的
+ * `engineStateChanged` 与挂载时查回来的 `engine:get-state` 读的是同一个值，
+ * 渲染进程重载正好落在退避窗口里也不会读到过期的 `failed`。
+ */
+export type EngineProcessState = 'stopped' | 'starting' | 'ready' | 'stopping' | 'recovering' | 'failed'
 
 export type AudioSource =
   | { kind: 'defaultOutput' }
@@ -6,6 +34,7 @@ export type AudioSource =
   | { kind: 'microphone'; deviceId: string }
 
 export type SessionConfig = {
+  compute?: ComputeSettings
   audioSource: AudioSource
   recognitionMode: 'realtime' | 'accurate'
   /** Selects the recognition model; recognitionMode is kept only for compatibility with older protocol versions. */
@@ -13,18 +42,26 @@ export type SessionConfig = {
   sourceLanguage: string
   targetLanguages: string[]
   allowIntermediateTranslation?: boolean
-  translationProvider?: 'hymt2' | 'm2m100' | 'microsoft' | 'openai' | 'ollama'
+  translationProvider?: 'local' | 'cloud' | 'microsoft'
   /**
    * Local translation model id. Free-form because a model the user installed from Hugging Face
    * is addressed by the same table as the shipped ones; the engine refuses an id nothing in that
    * table can load, rather than substituting a default.
    */
   translationModelId?: string
+  /**
+   * The whole field must be ABSENT when provider is 'local' — an empty `{}` is rejected by the
+   * engine as an invalid configuration, so `undefined` (field not sent) and `{}` are not the
+   * same thing on this wire.
+   */
   translationOptions?: {
     endpoint?: string
-    apiKey?: string
     region?: string
     model?: string
+    apiFormat?: CloudApiFormat
+    contextWindow?: number
+    maxOutputTokens?: number
+    apiKey?: string
   }
   /** Absolute path the engine records this meeting's audio to. Omitted means no audio file. */
   recordingPath?: string
@@ -56,6 +93,14 @@ export type MeetingMeta = {
   startedAtMs: number
   /** Wall clock when it stopped; undefined while the meeting is still open. */
   endedAtMs?: number
+  /**
+   * Lifecycle marker. `endedAtMs` alone cannot say "started but never finished": a session killed
+   * with the app leaves a meta with no `endedAtMs`, and the UI read that as 进行中 forever.
+   * `interrupted` is exactly that case — started, never finalized, not running now.
+   * Optional so meetings recorded before this field need no migration; the main process fills it
+   * in on load (see MeetingStore.loadAll).
+   */
+  state?: 'running' | 'completed' | 'interrupted'
   durationMs: number
   /** How many meetings already existed on the same local day, used for the `_记录_1` suffix. */
   daySequence: number
@@ -87,6 +132,7 @@ type Envelope<TType extends string> = {
 export type EngineCommand =
   | (Envelope<'hello'> & { clientVersion: string })
   | Envelope<'listDevices'>
+  | Envelope<'listComputeDevices'>
   | Envelope<'listResources'>
   | (Envelope<'manageResource'> & {
       resourceId: string
@@ -214,6 +260,7 @@ export type EngineErrorCode =
 export type EngineEvent =
   | (Envelope<'ready'> & { engineVersion: string; capabilities: string[] })
   | (Envelope<'devices'> & { devices: AudioDevice[] })
+  | (Envelope<'computeDevices'> & ComputeSnapshot)
   | (Envelope<'resources'> & ResourceSnapshot)
   | (Envelope<'resourceActionResult'> & { resource: ResourceRecord })
   | (Envelope<'resourceChanged'> & { resource: ResourceRecord })

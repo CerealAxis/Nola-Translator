@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Alert, Card, Fieldset, ListBox, Spinner, Switch, Tabs } from '@heroui/react'
-import { Database, Languages, Mic, Monitor, Settings, SlidersHorizontal } from 'lucide-react'
+import { Cpu, Gauge, Database, Languages, Mic, Monitor, Settings, SlidersHorizontal } from 'lucide-react'
 
 import type { AppSettings } from '@/bridge'
 import { useI18n } from '@/i18n'
@@ -15,14 +15,16 @@ import { TranslationTab } from './tabs/TranslationTab'
 import { AppearanceTab } from './tabs/AppearanceTab'
 import { StorageTab } from './tabs/StorageTab'
 import { AdvancedTab } from './tabs/AdvancedTab'
+import { ComputeTab } from './tabs/ComputeTab'
+import { PerformanceTab } from './tabs/PerformanceTab'
 import './settings.css'
 
 export interface SettingsPanelProps { settings: AppSettings }
 
-const NAV_ICONS = { general: Settings, audio: Mic, translation: Languages, appearance: Monitor, storage: Database, advanced: SlidersHorizontal }
+const NAV_ICONS = { general: Settings, audio: Mic, translation: Languages, compute: Cpu, performance: Gauge, appearance: Monitor, storage: Database, advanced: SlidersHorizontal }
 
 export function SettingsPage() {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const { tab, navigate } = useRoute()
   const settings = useStore(stores.settings, (state) => state.settings)
   const error = useStore(stores.settings, (state) => state.error)
@@ -45,6 +47,8 @@ export function SettingsPage() {
   )
 
   const labels: Record<SettingsTab, string> = {
+    compute: language === 'en' ? 'Compute devices' : '计算设备',
+    performance: language === 'en' ? 'Performance & memory' : '性能与显存',
     general: t('modelsSettingsUi.general'), audio: t('modelsSettingsUi.audio'),
     translation: t('modelsSettingsUi.translation'), appearance: t('modelsSettingsUi.appearance'),
     storage: t('modelsSettingsUi.storage'), advanced: t('modelsSettingsUi.advanced'),
@@ -68,6 +72,8 @@ export function SettingsPage() {
           <Tabs.Panel id="general"><GeneralTab settings={settings} /></Tabs.Panel>
           <Tabs.Panel id="audio"><AudioTab settings={settings} /></Tabs.Panel>
           <Tabs.Panel id="translation"><TranslationTab settings={settings} /></Tabs.Panel>
+          <Tabs.Panel id="compute"><ComputeTab settings={settings} /></Tabs.Panel>
+          <Tabs.Panel id="performance"><PerformanceTab settings={settings} /></Tabs.Panel>
           <Tabs.Panel id="appearance"><AppearanceTab settings={settings} /></Tabs.Panel>
           <Tabs.Panel id="storage"><StorageTab settings={settings} /></Tabs.Panel>
           <Tabs.Panel id="advanced"><AdvancedTab settings={settings} /></Tabs.Panel>
@@ -89,7 +95,7 @@ export function SettingGroup({ legend, actions, children }: SettingGroupProps) {
   )
 }
 
-export interface PickerOption { value: string; label: string }
+export interface PickerOption { value: string; label: string; isDisabled?: boolean }
 export interface SettingSelectProps { value: string; options: readonly PickerOption[]; onChange: (value: string) => void; ariaLabel: string; className?: string; isDisabled?: boolean }
 
 export function SettingSelect({ value, options, onChange, ariaLabel, className, isDisabled }: SettingSelectProps) {
@@ -97,7 +103,7 @@ export function SettingSelect({ value, options, onChange, ariaLabel, className, 
     <SelectField value={value} onChange={(key) => { if (typeof key === 'string') onChange(key) }} aria-label={ariaLabel} className={className} isDisabled={isDisabled}>
       <SelectField.Trigger><SelectField.Value /><SelectField.Indicator /></SelectField.Trigger>
       <SelectField.Popover><ListBox>
-        {options.map((option) => <ListBox.Item key={option.value} id={option.value} textValue={option.label}>{option.label}<ListBox.ItemIndicator /></ListBox.Item>)}
+        {options.map((option) => <ListBox.Item key={option.value} id={option.value} textValue={option.label} isDisabled={option.isDisabled}>{option.label}<ListBox.ItemIndicator /></ListBox.Item>)}
       </ListBox></SelectField.Popover>
     </SelectField>
   )

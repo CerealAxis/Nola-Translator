@@ -28,7 +28,10 @@ export const en: Dictionary = {
 
   titleBar: {
     engineReady: 'Engine ready',
-    engineUnavailable: 'Engine offline',
+    engineIdle: 'Engine not started',
+    engineStarting: 'Engine starting',
+    engineRecovering: 'Engine reconnecting',
+    engineFailed: 'Engine failed to start',
     language: 'Interface language',
     themeLight: 'Light',
     themeDark: 'Dark',
@@ -79,6 +82,10 @@ export const en: Dictionary = {
     checkingDevices: 'Detecting audio input',
     checkingModels: 'Verifying models',
     deviceUnavailable: 'No usable audio input found',
+    // The device row when the engine never answered. Deliberately says nothing about devices:
+    // the probe also boots the engine, so a device verdict here would misreport an engine
+    // failure as a hardware one. `errors.engineNotReady` (ENG-001) carries the real cause.
+    deviceCheckBlocked: 'Audio input check could not complete',
     modelMissing: 'Missing model: {name}',
     installNow: 'Install now',
     later: 'Later',
@@ -111,9 +118,6 @@ export const en: Dictionary = {
     notes: 'Notes',
     nothingYet: 'No captions yet',
     nothingYetHint: 'Start a session and each recognised sentence lands here.',
-    statusAutosave: 'Captions are saved line by line',
-    statusDataSafe: 'Everything stays on this computer',
-    aiDisclosure: 'Translations are machine generated and may be wrong.',
     sourcePanel: 'Live Transcription',
     translationPanel: 'Translation',
   },
@@ -296,6 +300,40 @@ export const en: Dictionary = {
     saveKey: 'Save key',
     deleteKey: 'Delete key',
     testing: 'Testing connection',
+    /*
+     * "Local model" / "Cloud model" are UI concepts, not product names: Hy-MT2 and M2M100
+     * collapse into the former (the selected model id decides which one actually runs), and
+     * OpenAI and Ollama into the latter (Ollama is an API format from here on, not a provider).
+     * Only "Microsoft Translator" is a product name and stays put.
+     */
+    providerLocal: 'Local model',
+    providerCloud: 'Cloud model',
+    providerMicrosoft: 'Microsoft Translator',
+    groupLocalModel: 'Local model in use',
+    localModelEmpty: 'No local translation model is installed yet. Download one in Models first.',
+    /*
+     * The seven cloud fields. The API format decides how deep the endpoint has to go (Anthropic
+     * takes a bare origin, the rest stop at /v1), so each format carries its own hint — getting
+     * that depth wrong is the mistake you cannot read back out of an error message.
+     */
+    apiFormat: 'API format',
+    apiFormatChatCompletions: 'Chat Completions (/v1/chat/completions)',
+    apiFormatChatResponses: 'Chat Responses (/v1/responses)',
+    apiFormatAnthropic: 'Anthropic Messages (/v1/messages)',
+    apiFormatOllama: 'Ollama (/api/chat)',
+    endpointHintChatCompletions: 'Up to and including /v1, e.g. https://api.example.com/v1',
+    endpointHintChatResponses: 'Up to and including /v1; requests go to /v1/responses',
+    endpointHintAnthropic: 'Site origin only: no /v1 or /v1/messages, e.g. https://api.anthropic.com',
+    endpointHintOllama: 'Local Ollama address, e.g. http://127.0.0.1:11434',
+    apiName: 'Name',
+    apiNamePlaceholder: 'e.g. Zhipu GLM',
+    endpointPlaceholder: 'https://api.example.com/v1',
+    // The row reads "Model ID", not "Model": this field takes the vendor's model identifier
+    // (gpt-4.1-mini). Typing the vendor name here is the most common useless answer, so the
+    // label says which of the two this is before the user types.
+    modelId: 'Model ID',
+    contextWindow: 'Context window',
+    maxOutputTokens: 'Max output tokens',
     // 分组名已经是 "Layout"，行标签再说一次 "Layout" 就在同一屏里出现两个一样的词。
     // 行标签要说清它管的是哪一段排版：原文与译文怎么分区。
     captionLayout: 'Caption layout',
@@ -365,15 +403,21 @@ export const en: Dictionary = {
      */
     engineNotReady: 'The local engine is not running, so recognition cannot start. Code ENG-001',
     // 预检状态不是失败：用户还没动手，所以不给错误码，也不用"yet"以外的 scary 语气。
+    // **当前没有界面在用这一条**：冷启动不再报"引擎没运行"，引擎起不来走的是上面
+    // `engineNotReady`（带 ENG-001）。留着是为了不删掉 `i18n.test.ts` 的 `noCodeByDesign`
+    // 里点名的那一条；**别拿它把冷启动那条 Alert 加回来** —— 那正是它当初的错误用法。
     engineNotReadyPreflight: 'The local engine is not running, so recognition cannot start yet.',
     // 会话中途引擎掉了。不能说"无法开始"——这场已经在跑了，说的是"停了"。
     engineStopped: 'The local engine stopped, so recognition has stopped.',
+    // 进程没了：重连出来的是新进程，这场会回不来，出路是那条记录而不是"重试"。
+    engineLost: 'The local engine stopped during the session, which ended early. Captions captured so far are saved. Code ENG-002',
+    engineLostAction: 'Open the record',
     engineNotReadyAction: 'Retry start',
     deviceNotFound: 'No usable audio input device was found. Code AUD-002',
     deviceNotFoundAction: 'Check the system sound settings',
     modelMissing: 'The recognition model is not installed yet. Code MDL-003',
     modelMissingAction: 'Install the model',
-    startFailed: 'The session failed to start, the audio channel never opened. Code SES-004',
+    startFailed: 'The session could not start. Check the selected model, compute device and runtime. Code SES-004',
     startFailedAction: 'Start the session again',
     downloadFailed: 'The model download stopped, partial files were kept. Code NET-006',
     downloadFailedAction: 'Retry the download',

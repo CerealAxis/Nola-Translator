@@ -87,6 +87,7 @@ export function mergeSettings(base: AppSettings, patch: AppSettingsPatch): AppSe
     recognition: { ...base.recognition, ...patch.recognition },
     overlay: { ...base.overlay, ...patch.overlay },
     translation: { ...base.translation, ...patch.translation },
+    compute: { ...base.compute, ...patch.compute },
   }
 }
 
@@ -128,6 +129,7 @@ function mergePatches(a: AppSettingsPatch, b: AppSettingsPatch): AppSettingsPatc
       : {}),
     ...(a.overlay || b.overlay ? { overlay: { ...a.overlay, ...b.overlay } } : {}),
     ...(a.translation || b.translation ? { translation: { ...a.translation, ...b.translation } } : {}),
+    ...(a.compute || b.compute ? { compute: { ...a.compute, ...b.compute } } : {}),
   }
 }
 

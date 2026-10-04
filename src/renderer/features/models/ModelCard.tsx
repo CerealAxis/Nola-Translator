@@ -1,3 +1,4 @@
+import { modelEngines, type InferenceEngine } from '../../../shared/model-engines'
 /** Shared catalog card. Visuals follow DESIGN v3; state and actions follow the bridge record. */
 
 import type { ReactNode } from 'react'
@@ -5,7 +6,7 @@ import { Button, Card, Chip, ProgressBar, Skeleton } from '@heroui/react'
 import { Check, Download, Trash2, X } from 'lucide-react'
 import './models.css'
 
-import { HYMT2_MODEL_IDS, RECOGNITION_MODEL_IDS, resourceStateOf } from '@/bridge'
+import { RECOGNITION_MODEL_IDS, resourceStateOf } from '@/bridge'
 import type { AppSettings, AppSettingsPatch, ResourceRecord, ResourceState } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
 import { useI18n } from '@/i18n'
@@ -67,26 +68,30 @@ export function factsOf(record: ResourceRecord): string[] {
 /**
  * 这条记录能不能被设成默认，返回对应的 patch；不能就返回 null。
  *
- * 依据是设置结构本身：`recognition.modelId` 只认三个 id，`translation.hymt2ModelId`
- * 只认 Hy-MT2 的三档。m2m100 能装能跑，但设置里没有它的槽位，所以不给"设为默认"，
- * 给一个按下去会静默失败的按钮比不给按钮更糟。
+ * **翻译模型不再挑档位，任何已装的翻译模型都有槽位。** 以前这里拿
+ * `HYMT2_MODEL_IDS` 过滤，于是 M2M100 能装能跑却没有槽位，「设为默认」只能返回
+ * null（给一个按下去会静默失败的按钮比不给按钮更糟）。现在 `translation.localModelId`
+ * 是「已安装的本地翻译模型」的裸字符串指针，引擎按 id 路由到对应 loader，
+ * 三档 Hy-MT2、M2M100、从 Hub 装的 GGUF 走的是同一条路。
+ *
+ * 识别模型那边没有这个问题：`recognition.modelId` 的取值由引擎的资源表决定，
+ * 目录里认不出来的 id 设下去也加载不了，所以仍按 `RECOGNITION_MODEL_IDS` 过滤。
  */
 export function defaultTargetOf(record: ResourceRecord): AppSettingsPatch | null {
   const id = record.resourceId
-  if (record.kind === 'recognitionModel' && isOneOf(id, RECOGNITION_MODEL_IDS)) {
+  if (record.kind === 'recognitionModel') {
+    if (!isOneOf(id, RECOGNITION_MODEL_IDS)) return null
     return { recognition: { modelId: id as (typeof RECOGNITION_MODEL_IDS)[number] } }
   }
-  if (record.kind === 'translationModel' && isOneOf(id, HYMT2_MODEL_IDS)) {
-    return { translation: { hymt2ModelId: id as (typeof HYMT2_MODEL_IDS)[number] } }
-  }
-  return null
+  // 顺带把 provider 拨到 local：设默认的含义就是"这条就是本地在跑的那一个"。
+  return { translation: { localModelId: id, provider: 'local' } }
 }
 
 export function isDefaultOf(record: ResourceRecord, settings: AppSettings | null): boolean {
   if (!settings) return false
   return (
     settings.recognition.modelId === record.resourceId ||
-    (settings.translation.provider === 'hymt2' && settings.translation.hymt2ModelId === record.resourceId)
+    (settings.translation.provider === 'local' && settings.translation.localModelId === record.resourceId)
   )
 }
 
@@ -103,7 +108,7 @@ export interface ModelCardProps {
   busy: boolean
   /** 当前是否是识别或翻译的默认模型。是了就不给"设为默认"。 */
   isDefault: boolean
-  /** 这条记录能不能被设成默认。不能（例如 m2m100 没有设置项槽位）就不给那个按钮。 */
+  /** 这条记录能不能被设成默认。不能（例如识别模型认不出的 id）就不给那个按钮。 */
   canBeDefault: boolean;
   /** Hub 结果：能不能安装。false 时禁用安装按钮，并把记录自带的理由显示出来。 */
   installable?: boolean
@@ -117,6 +122,7 @@ export interface ModelCardProps {
   metadata?: ReactNode
   descriptionLoading?: boolean
   descriptionFallback?: string
+  supportedEngines?: InferenceEngine[]
 }
 
 export function ModelCard({
@@ -134,6 +140,7 @@ export function ModelCard({
   metadata,
   descriptionLoading = false,
   descriptionFallback = '',
+  supportedEngines,
 }: ModelCardProps) {
   const { t } = useI18n()
   const state: ResourceState = resourceStateOf(record)
@@ -163,6 +170,7 @@ export function ModelCard({
       <div className="models-card__status">
         {isDefault && record.installed ? <Chip size="sm" variant="soft" color="accent">{t('modelsSettingsUi.default')}</Chip> : null}
         <StatePill state={state} />
+        {(supportedEngines ?? modelEngines(record)).map(engine => <Chip key={engine} size="sm" variant="soft">{engine === 'pytorch' ? 'PyTorch' : 'llama.cpp'}</Chip>)}
       </div>
 
       {inFlight ? <ProgressLine record={record} state={state} /> : null}

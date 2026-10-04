@@ -81,7 +81,7 @@ export function SessionSetupDialog({
   /**
    * 翻译设置。**这一场会话用哪个服务商、用哪一档、要不要带云端凭据，全部由它决定** ——
    * 这个弹窗只让用户挑「翻不翻」与「翻成什么语言」，不重复设置页已经定好的那些。
-   * 拿不到设置时回落到 `DEFAULT_SETTINGS`（hymt2 + q3-k-m），宁可退回默认也不让会话开不起来。
+   * 拿不到设置时回落到 `DEFAULT_SETTINGS`（本地模型 + q3-k-m），宁可退回默认也不让会话开不起来。
    */
   const settings = useStore(stores.settings, (state) => state.settings) ?? DEFAULT_SETTINGS
   const translation = settings.translation
@@ -294,7 +294,7 @@ export function SessionSetupDialog({
                 <Select.Popover className="rounded-2xl">
                   <ListBox>
                     {RECOGNITION_MODEL_IDS.map((id) => (
-                      <ListBoxItem key={id} id={id} textValue={RECOGNITION_MODEL_LABELS[id]}>
+                      <ListBoxItem key={id} id={id} textValue={RECOGNITION_MODEL_LABELS[id]} isDisabled={settings.compute.recognitionEngine !== 'pytorch'}>
                         {RECOGNITION_MODEL_LABELS[id]}
                       </ListBoxItem>
                     ))}

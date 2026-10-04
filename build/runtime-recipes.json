@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "recipes": [
+    {
+      "id": "torch-cuda-cu126",
+      "name": "PyTorch CUDA 12.6",
+      "backend": "cuda",
+      "pythonAbi": "cp313-win_amd64",
+      "torchVersion": "2.13.0+cu126",
+      "minimumDriver": "560.76",
+      "wheel": {
+        "url": "https://download.pytorch.org/whl/cu126/torch-2.13.0%2Bcu126-cp313-cp313-win_amd64.whl",
+        "filename": "torch-2.13.0+cu126-cp313-cp313-win_amd64.whl",
+        "sha256": "cb91b2f91d053bb91e413459a13ec8b036ff348d03e411e9c29988cc6edb7b32",
+        "bytes": 2594592768
+      }
+    }
+  ]
+}

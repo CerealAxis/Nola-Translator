@@ -13,7 +13,7 @@
 import type { NolaBridge } from '@/bridge'
 import type {
   AudioDevice,
-  CloudTranslationProvider,
+  CredentialProvider,
   HubInspectResult,
   HubModelSummary,
   HubSearchResult,
@@ -55,7 +55,7 @@ export interface ModelsState {
   busyIds: readonly string[]
   /** 引擎握手信息，`ready` 事件到达后才有。 */
   engineVersion: string | null
-  credentials: Readonly<Record<CloudTranslationProvider, boolean>>
+  credentials: Readonly<Record<CredentialProvider, boolean>>
   hub: HubSearchState
 }
 
@@ -68,7 +68,7 @@ const initialState: ModelsState = {
   error: null,
   busyIds: [],
   engineVersion: null,
-  credentials: { microsoft: false, openai: false },
+  credentials: { cloud: false, microsoft: false },
   hub: { query: '', kind: 'asr', results: [], candidates: 0, rateLimited: false, loading: false, failed: false },
 }
 
@@ -129,12 +129,22 @@ export async function loadModels(): Promise<void> {
   }
 }
 
-async function loadCredentials(target: NolaBridge): Promise<Record<CloudTranslationProvider, boolean>> {
-  const providers: CloudTranslationProvider[] = ['microsoft', 'openai']
+/** 需要查询密钥的服务商，即 `credentials.json` 的顶层键。 */
+const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'microsoft']
+
+async function loadCredentials(target: NolaBridge): Promise<Record<CredentialProvider, boolean>> {
   const entries = await Promise.all(
-    providers.map(async (provider) => [provider, await target.translation.hasCredential(provider)] as const),
+    CREDENTIAL_PROVIDERS.map(async (provider) => [provider, await target.translation.hasCredential(provider)] as const),
   )
-  return { microsoft: entries[0][1], openai: entries[1][1] }
+  // 用 provider 自己的值建表，不走 `entries[0][1]` / `entries[1][1]` 那种下标：下标把数组
+  // 顺序变成了隐式契约，顺序一改两个 flag 就静默对调，而 `tsc` 完全查不出来。
+  return entries.reduce<Record<CredentialProvider, boolean>>(
+    (flags, [provider, present]) => {
+      flags[provider] = present
+      return flags
+    },
+    { cloud: false, microsoft: false },
+  )
 }
 
 export async function manageResource(
@@ -241,7 +251,7 @@ export function clearHubSearch(): void {
 }
 
 export async function setTranslationCredential(
-  provider: CloudTranslationProvider,
+  provider: CredentialProvider,
   value: string,
 ): Promise<void> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')

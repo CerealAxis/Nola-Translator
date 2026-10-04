@@ -9,13 +9,16 @@
  * `BRIDGE_TIERS` 是**方法**清单，通道数会随 preload 增减，以它为准，别在注释里写死数字。
  */
 
+import type { ComputeSnapshot, RuntimeSnapshot } from '../../shared/compute'
 import type {
   AppSettings,
   AppSettingsPatch,
   AudioDevice,
   CaptionSegment,
-  CloudTranslationProvider,
+  CredentialProvider,
+  EngineChannelEvent,
   EngineEvent,
+  EngineProcessState,
   ExportFormat,
   MeetingMeta,
   ModelStorageInfoWithTotal,
@@ -44,6 +47,7 @@ export type RouteId = 'home' | 'workspace' | 'overlay' | 'records' | 'record' | 
 
 export interface NolaBridge {
   engine: {
+    listComputeDevices(): Promise<ComputeSnapshot>
     listDevices(): Promise<AudioDevice[]>
     listResources(): Promise<ResourceSnapshotWithRate>
     manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel'): Promise<ResourceRecord>
@@ -54,6 +58,18 @@ export interface NolaBridge {
      * 引擎拒绝时照样会有 `error` 事件把状态打回 error，那条路径负责如实报错。
      */
     setPaused(sessionId: string, paused: boolean): void
+    /**
+     * 引擎子进程当前状态（`stopped | starting | ready | stopping | recovering | failed`）。
+     *
+     * `recovering` 与 `failed` 的区别是**主进程还打不打算重试**（它手里有退避表），
+     * 所以这一个取值就分开了"崩一下正在自愈"与"重试耗尽、不会自己好"；界面拿到的是
+     * 同一个值的观测，不是从时序里猜的。
+     *
+     * **只读，且不会启动引擎** —— 与 `events.onEngineEvent` 里那条生命周期事件配套：
+     * 那条通道只给变化，本方法给当前值。界面在挂订阅之后立刻调一次，
+     * 才既能对上「已经就绪」这种没有边沿可听的情况，又能继续听后续的崩溃。
+     */
+    getEngineState(): Promise<EngineProcessState>
   }
   /*
    * 字幕窗的窗口级动作。
@@ -73,6 +89,13 @@ export interface NolaBridge {
     resize(width: number, height: number): Promise<void>
   }
   settings: { get(): Promise<AppSettings>; update(patch: AppSettingsPatch): Promise<AppSettings> }
+  runtimes: {
+    list(): Promise<RuntimeSnapshot>
+    prepare(): Promise<RuntimeSnapshot>
+    install(id: string, repair?: boolean): Promise<void>
+    import(): Promise<boolean>
+    cancel(): Promise<void>
+  }
   storage: { get(): Promise<ModelStorageInfoWithTotal>; choose(): Promise<ModelStorageInfoWithTotal | null>; restartApp(): Promise<void> }
   meetings: {
     list(): Promise<MeetingMeta[]>
@@ -87,9 +110,17 @@ export interface NolaBridge {
     audioUrl(id: string): Promise<string | null>
   }
   diagnostics: { get(): Promise<Record<string, string | number>>; copy(): Promise<void> }
-  translation: { hasCredential(p: CloudTranslationProvider): Promise<boolean>; setCredential(p: CloudTranslationProvider, v: string): Promise<void> }
+  translation: { hasCredential(p: CredentialProvider): Promise<boolean>; setCredential(p: CredentialProvider, v: string): Promise<void> }
   events: {
-    onEngineEvent(cb: (e: EngineEvent) => void): () => void
+    /**
+     * 引擎事件。载荷是 `EngineChannelEvent` = **引擎协议事件 ∪ 主进程发的生命周期事件**
+     * （`engineStateChanged`）。多出来那一支不是引擎发来的：主进程把 `EngineProcess`
+     * 的 `state` 转发到了同一条通道上，为的是让界面能分清「从没启动过 / 起不来 /
+     * 刚崩掉而且正在重连 / 重试耗尽」—— 这几件事过去只能靠推断，推断错过。
+     * `switch (event.type)` 的读者要知道多了一个分支。状态机归 `sessionStore`
+     * （`ENGINE_PROCESS_STATE_TO_UI`），本方法只保证把事件原样送到。
+     */
+    onEngineEvent(cb: (e: EngineChannelEvent) => void): () => void
     onSettingsChanged(cb: (s: AppSettings) => void): () => void
     /**
      * 浮窗请求主窗跳转。**两个参数**：`route` 用来高亮导航项，
@@ -137,6 +168,7 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'engine.startSession': 'ipc',
   'engine.stopSession': 'ipc',
   'engine.setPaused': 'ipc',
+  'engine.getEngineState': 'ipc',
   'overlay.show': 'ipc',
   'overlay.hide': 'ipc',
   'overlay.close': 'ipc',
@@ -184,6 +216,9 @@ export const BRIDGE_MISSING_FIELDS: Record<string, string> = {
  */
 export const BRIDGE_ADAPTER_NOTES: Record<string, string> = {
   'engine.setPaused': 'preload: setSessionPaused(sessionId, paused) · engine:set-session-paused — bridge 上是同步 void，promise 的失败走 error 事件',
+  'engine.getEngineState': 'preload: getEngineState() · engine:get-state — 只读，名字与语义都与主进程一致，适配器不做任何翻译（主进程那条处理器刻意不调 ensureReady，否则「问引擎在不在」会变成「启动引擎」）',
+  'events.onEngineEvent':
+    'preload: onEngineEvent(listener) · engine:event — 载荷是 EngineChannelEvent（协议事件 ∪ 主进程发的 engineStateChanged）。适配器原样透传，**不做**类型筛除：把生命周期事件滤掉就等于把「引擎崩了」重新变回界面看不见，而它靠推断已经猜错过三次。状态机归 sessionStore（ENGINE_PROCESS_STATE_TO_UI）',
   'overlay.close': 'preload: closeOverlay() · overlay:close（连带停识别，与 hideOverlay 语义不同）',
   'overlay.minimize': 'preload: minimizeOverlay() · overlay:minimize（真最小化到任务栏）',
   'meetings.remove': 'preload: deleteMeeting(meetingId) · meeting:delete（bridge 上叫 remove：delete 是保留字）',

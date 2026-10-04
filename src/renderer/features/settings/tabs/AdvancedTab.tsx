@@ -23,29 +23,54 @@ import { Check } from 'lucide-react'
 
 import { DEFAULT_SETTINGS, PROTOCOL_VERSION } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
+import type { StatusPillTone } from '@/components/primitives'
 import { useI18n } from '@/i18n'
+import type { TranslationKey } from '@/i18n'
 import { getBridge, stores, updateSettings, useStore } from '@/store'
+import type { EngineStatus } from '@/store'
 import { SettingGroup } from '../SettingsPage'
 import type { SettingsPanelProps } from '../SettingsPage'
 
 /** 复制成功后 ✓ 停留多久。DESIGN 第 8 节规定 1.5s。 */
 const COPIED_HOLD_MS = 1500
 
+/**
+ * 引擎状态灯：**读完整的 `engineStatus`，不再读那个布尔值。**
+ *
+ * 以前这里是 `engineReady ? '引擎就绪' : '引擎未启动'`，而那个布尔值就是
+ * `engineStatus === 'ready'`。于是五种截然不同的局面塌成两种画法：引擎从没起过、
+ * 引擎正在启动、引擎崩溃后正在重连、引擎重试耗尽起不来 —— 全部显示「引擎未启动」，
+ * **崩溃被报成了一件没发生的事**。用户在设置页唯一能问引擎状态的地方，
+ * 恰恰是引擎真出事时给出答案最少的地方。
+ *
+ * 写成穷举的 `Record`（与 `sessionStore` 的 `ENGINE_PROCESS_STATE_TO_UI` 同一个用意）：
+ * 将来 `EngineStatus` 加一个取值，这里编译不过，逼着补一句话，而不是让新状态
+ * 悄悄掉进 `?? '引擎未启动'`。
+ *
+ * 颜色也分开：`idle` 不是故障，所以是中性灰而不是黄色；黄色留给"正在起来"，
+ * 红色留给"起不来"。用同一个 warning 画"没启动"与"起不来"，就是把两者说成同一件事。
+ */
+const ENGINE_STATUS_ROW: Record<EngineStatus, { label: TranslationKey; tone: StatusPillTone }> = {
+  idle: { label: 'titleBar.engineIdle', tone: 'neutral' },
+  booting: { label: 'titleBar.engineStarting', tone: 'warning' },
+  ready: { label: 'titleBar.engineReady', tone: 'success' },
+  recovering: { label: 'titleBar.engineRecovering', tone: 'warning' },
+  failed: { label: 'titleBar.engineFailed', tone: 'danger' },
+}
+
 export function AdvancedTab(_props: SettingsPanelProps) {
   const { t } = useI18n()
   const engineVersion = useStore(stores.models, (state) => state.engineVersion)
-  const engineReady = useStore(stores.session, (state) => state.engineReady)
+  const engineStatus = useStore(stores.session, (state) => state.engineStatus)
   const storage = useStore(stores.settings, (state) => state.storage)
   const pending = useStore(stores.settings, (state) => state.pending)
+  const engineRow = ENGINE_STATUS_ROW[engineStatus]
 
   return (
     <div className="settings-panel">
       <SettingGroup legend={t('settings.groupEngine')}>
         <SettingsRow label={t('settings.engineStatus')}>
-          <StatusPill
-            label={engineReady ? t('titleBar.engineReady') : t('titleBar.engineUnavailable')}
-            tone={engineReady ? 'success' : 'warning'}
-          />
+          <StatusPill label={t(engineRow.label)} tone={engineRow.tone} />
         </SettingsRow>
         <CodeRow label={t('settings.engineVersion')} value={engineVersion ?? '-'} />
         <CodeRow label={t('settings.enginePath')} value={storage?.activePath ?? '-'} />

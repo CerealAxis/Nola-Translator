@@ -2,15 +2,16 @@ import { randomUUID } from 'node:crypto'
 
 import { BrowserWindow, ipcMain, net, screen } from 'electron'
 
-import type { EngineEvent, SessionConfig } from '../shared/contracts'
+import type { EngineEvent, EngineProcessState, SessionConfig } from '../shared/contracts'
 import { sessionConfigSchema } from '../shared/schemas'
-import { DEFAULT_SETTINGS, type AppSettings } from '../shared/settings'
+import { DEFAULT_SETTINGS, type AppSettings, type CredentialProvider } from '../shared/settings'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
 import { computeOverlayBounds } from './windows'
 import { readHubModelCard } from './hub-model-card'
 
 export const IPC_CHANNELS = {
+  listComputeDevices: 'engine:list-compute-devices',
   listDevices: 'engine:list-devices',
   listResources: 'engine:list-resources',
   manageResource: 'engine:manage-resource',
@@ -22,6 +23,7 @@ export const IPC_CHANNELS = {
   stopSession: 'engine:stop-session',
   setSessionPaused: 'engine:set-session-paused',
   event: 'engine:event',
+  getEngineState: 'engine:get-state',
   showOverlay: 'overlay:show',
   hideOverlay: 'overlay:hide',
   closeOverlay: 'overlay:close',
@@ -32,15 +34,20 @@ export const IPC_CHANNELS = {
 export function registerEngineIpc(
   engine: EngineProcess,
   getOverlayWindow: () => BrowserWindow | null,
-  getTranslationCredential: (provider: 'microsoft' | 'openai') => Promise<string> = async () => '',
+  getTranslationCredential: (provider: CredentialProvider) => Promise<string> = async () => '',
   meetings: MeetingStore | null = null,
-  getSettings: () => AppSettings = () => DEFAULT_SETTINGS
+  getSettings: () => AppSettings = () => DEFAULT_SETTINGS,
+  prepareEnvironment: (config: SessionConfig) => Promise<void> = async () => {},
+  onStartingChanged: (starting: boolean) => void = () => {},
+  whenRuntimeReady: () => Promise<void> = async () => {}
 ): () => void {
   let activeSessionId: string | null = null
   let stoppingSession: { sessionId: string; request: Promise<void> } | null = null
   let closingOverlay: Promise<void> | null = null
+  let startingSession = false
 
   const ensureReady = async (): Promise<void> => {
+    await whenRuntimeReady()
     if (engine.currentState !== 'ready') await engine.start()
   }
 
@@ -75,6 +82,28 @@ export function registerEngineIpc(
     return request
   }
 
+  /*
+   * **引擎进程没了，而主进程还记着一个活跃会话：这一场到此为止。**
+   *
+   * 进程消失时不会有 `sessionStopped`（协议那一侧什么都没发生，进程就没了），
+   * 所以光靠 `forwardEvent` 那个分支收不了尾：`activeSessionId` 会一直留着。等引擎自愈之后
+   * 用户开新会话只会拿到「已有字幕会话正在运行」，而实际上什么都没在跑；那条会议记录也永远
+   * 停在进行中。这里收的是**主进程自己的账本**，与 `forwardEvent` 收到 `sessionStopped`
+   * 时做的三件事完全一致（释放 id、给会议落结束时间、关掉字幕窗），只是没有报文可等。
+   *
+   * **`recovering` 也要走这条路，不能只等 `failed`。** 引擎会自己重连，但重连出来的是一个
+   * **新进程**：没有这场会话、没有录音、也没有已加载的权重（权重每场结束就卸），
+   * 所以「引擎回来了」从来不等于「这场会回来了」。留着 id 等的是一个永远不会来的
+   * `sessionStopped`。
+   */
+  const releaseSessionOnEngineLoss = (): void => {
+    const sessionId = activeSessionId
+    if (sessionId === null) return
+    activeSessionId = null
+    void meetings?.finish(sessionId).catch((error) => console.error('meeting finalize failed', error))
+    getOverlayWindow()?.hide()
+  }
+
   ipcMain.handle(IPC_CHANNELS.listDevices, async () => {
     await ensureReady()
     const response = await engine.request(
@@ -82,6 +111,16 @@ export function registerEngineIpc(
       'devices'
     )
     return response.devices
+  })
+
+  ipcMain.handle(IPC_CHANNELS.listComputeDevices, async () => {
+    await ensureReady()
+    const response = await engine.request(
+      { protocolVersion: 1, type: 'listComputeDevices', requestId: `compute-${randomUUID()}` },
+      'computeDevices', 30_000,
+    )
+    const { protocolVersion: _version, type: _type, requestId: _request, ...snapshot } = response
+    return snapshot
   })
 
   ipcMain.handle(IPC_CHANNELS.listResources, async () => {
@@ -219,51 +258,70 @@ export function registerEngineIpc(
   )
 
   ipcMain.handle(IPC_CHANNELS.startSession, async (_event, rawConfig: unknown) => {
-    await ensureReady()
-    if (activeSessionId) throw new Error('已有字幕会话正在运行')
+    if (activeSessionId || startingSession) throw new Error('已有字幕会话正在运行或启动')
     const parsed = sessionConfigSchema.parse(rawConfig) as SessionConfig
-    const provider = parsed.translationProvider ?? 'hymt2'
-    const apiKey = provider === 'microsoft' || provider === 'openai'
-      ? await getTranslationCredential(provider)
-      : ''
-    const config: SessionConfig = apiKey
-      ? { ...parsed, translationOptions: { ...parsed.translationOptions, apiKey } }
-      : parsed
-    // Starting captions opens a meeting: the directory has to exist before the engine is told
-    // where to put the audio, and a start that fails is thrown away a few lines below.
-    // keepAudio is read here rather than hardcoded, otherwise the setting would only ever
-    // look saved while the engine kept writing audio nobody can play back.
-    const keepAudio = getSettings().recording.keepAudio
-    const meeting = meetings
-      ? await meetings.begin({
-        sourceLanguage: parsed.sourceLanguage,
-        targetLanguage: parsed.targetLanguages[0] ?? 'zh',
-        recordAudio: keepAudio,
-      })
-      : null
-    let response: { sessionId: string }
+    parsed.compute = { ...getSettings().compute }
+    startingSession = true
+    onStartingChanged(true)
     try {
-      response = await engine.request(
-        {
-          protocolVersion: 1,
-          type: 'startSession',
-          requestId: `start-${randomUUID()}`,
-          // No recordingPath means the engine opens no recorder, so no WAV is produced at all.
-          config: meeting && keepAudio
-            ? { ...config, recordingPath: meetings?.recordingPathFor(meeting.meetingId) }
-            : config,
-        },
-        'sessionStarted',
-        30 * 60 * 1000
-      )
-    } catch (error) {
-      if (meeting) await meetings?.abandon(meeting.meetingId).catch(() => undefined)
-      throw error
+      await prepareEnvironment(parsed)
+      await ensureReady()
+      const provider = parsed.translationProvider ?? 'local'
+      // 只有需要密钥的两个 provider 才去取。Ollama 现在也归在 `cloud` 下面，所以这里取到空串
+      // 是合法状态：引擎在 key 为空时不发 Authorization 头，而不是报错。
+      const apiKey = provider === 'cloud' || provider === 'microsoft'
+        ? await getTranslationCredential(provider)
+        : ''
+      // 硬规则：provider==='local' 时 `translationOptions` 必须整个键不存在。zod 解析出来的对象
+      // 里键可能带着 `undefined` 值，所以这里把字段解构掉，而不是留一个 `{}` 发出去 ——
+      // 引擎会把 `{}` 判成配置非法，而"`translationOptions: undefined`"与"不给它"在 JSON 上
+      // 才是同一件事。
+      const { translationOptions, ...withoutOptions } = parsed
+      const config: SessionConfig = provider === 'local'
+        ? withoutOptions
+        : apiKey
+          ? { ...parsed, translationOptions: { ...translationOptions, apiKey } }
+          : parsed
+      // Starting captions opens a meeting: the directory has to exist before the engine is told
+      // where to put the audio, and a start that fails is thrown away a few lines below.
+      // keepAudio is read here rather than hardcoded, otherwise the setting would only ever
+      // look saved while the engine kept writing audio nobody can play back.
+      const keepAudio = getSettings().recording.keepAudio
+      config.compute = parsed.compute
+      const meeting = meetings
+        ? await meetings.begin({
+          sourceLanguage: parsed.sourceLanguage,
+          targetLanguage: parsed.targetLanguages[0] ?? 'zh',
+          recordAudio: keepAudio,
+        })
+        : null
+      let response: { sessionId: string }
+      try {
+        response = await engine.request(
+          {
+            protocolVersion: 1,
+            type: 'startSession',
+            requestId: `start-${randomUUID()}`,
+            // No recordingPath means the engine opens no recorder, so no WAV is produced at all.
+            config: meeting && keepAudio
+              ? { ...config, recordingPath: meetings?.recordingPathFor(meeting.meetingId) }
+              : config,
+          },
+          'sessionStarted',
+          30 * 60 * 1000
+        )
+      } catch (error) {
+        if (meeting) await meetings?.abandon(meeting.meetingId).catch(() => undefined)
+        throw error
+      }
+      if (meeting) meetings?.attach(meeting.meetingId, response.sessionId)
+      activeSessionId = response.sessionId
+      getOverlayWindow()?.showInactive()
+      return { sessionId: response.sessionId, meetingId: meeting?.meetingId ?? null }
+    } finally {
+      startingSession = false
+      onStartingChanged(false)
     }
-    if (meeting) meetings?.attach(meeting.meetingId, response.sessionId)
-    activeSessionId = response.sessionId
-    getOverlayWindow()?.showInactive()
-    return { sessionId: response.sessionId, meetingId: meeting?.meetingId ?? null }
   })
 
   ipcMain.handle(IPC_CHANNELS.stopSession, async (_event, sessionId: unknown) => {
@@ -294,6 +352,18 @@ export function registerEngineIpc(
       30 * 1000
     )
   })
+
+  /*
+   * 引擎进程状态的**按需读取**，与下面 `forwardState` 的边沿转发是一对。
+   *
+   * **这里绝对不能调 `ensureReady()`。** 这个通道的全部意义就是回答「引擎现在怎么样」；
+   * 一旦它自己会启动引擎，界面就永远问不出「从没启动过」这个答案，冷启动与引擎起不来
+   * 又被叠回同一个取值 —— 正是 `EngineStatus` 这个类型当初被造出来要分开的那两件事。
+   *
+   * 只读，不排队、不重试、不抛错：引擎没起来时 `currentState` 就是 `stopped`，
+   * 那是一个合法答案，不是失败。
+   */
+  ipcMain.handle(IPC_CHANNELS.getEngineState, () => engine.currentState)
 
   ipcMain.handle(IPC_CHANNELS.showOverlay, () => getOverlayWindow()?.show())
   ipcMain.handle(IPC_CHANNELS.hideOverlay, () => getOverlayWindow()?.hide())
@@ -353,10 +423,47 @@ export function registerEngineIpc(
   }
   engine.on('event', forwardEvent)
 
+  /*
+   * 引擎子进程状态 → 渲染进程。**这是 `forwardEvent` 之外唯一一条进 `engine:event` 的消息，
+   * 而它的产生者不是引擎。**
+   *
+   * 代价是这条通道的载荷类型（`EngineChannelEvent`）名不副实：它名义上是「引擎协议事件」，
+   * 现在多了一支主进程自己写的 `engineStateChanged`。之所以接受这个代价而不另开一条通道：
+   * 生命周期事件与协议事件走同一条管道、同一个发送顺序，于是「引擎握手完成」与「引擎进程
+   * 就绪」在渲染进程看来仍然严格有序 —— 而 `startSession` 过去那套推断依赖的正是这个顺序。
+   * 另开一条通道会拿到更诚实的名字，代价是多一处 preload 转发、桥接签名与 dispose 清单；
+   * 当时的判断是本仓更偏好能自我解释的最小改动。**这是一个决定，不是忘了收尾。**
+   *
+   * 只转发 `state` 就够了，不必再转发 `crash` / `fatalError`：`engine-process.ts` 里
+   * `connectWithRetries`（重试耗尽）与 `handleTermination`（进程退出）都是**先**
+   * `setState('failed')`、**再** `emit('fatalError' / 'crash')`，所以崩溃在状态上已经可见。
+   *
+   * **这条边沿还带着"引擎打算重试"这件事**，因为定这件事的只有 `EngineProcess`
+   * （它手里有退避表）：`recovering` 表示进程没了但还有重试次数，`failed` 表示退避耗尽。
+   * 界面只做一对一映射（`sessionStore` 的 `ENGINE_PROCESS_STATE_TO_UI`），
+   * 不自己数重试、不从时序里猜 —— 那样每加一次重试就要在渲染层同步一份节奏。
+   *
+   * 顺带在这里收主进程的会话账本，见 `releaseSessionOnEngineLoss`：**先收账本再广播**，
+   * 界面收到这条边沿、开始说"这场会没了"时，主进程这边已经不再有活跃会话了。
+   *
+   * 与 `forwardEvent` 用同一个广播方式：主窗与浮窗都要知道自己这条会话的引擎还在不在。
+   */
+  const forwardState = (state: EngineProcessState): void => {
+    if (state === 'recovering' || state === 'failed') releaseSessionOnEngineLoss()
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(IPC_CHANNELS.event, { type: 'engineStateChanged', state })
+    }
+  }
+  engine.on('state', forwardState)
+
   return () => {
     engine.off('event', forwardEvent)
+    // 长驻的 EngineProcess 上留一个监听器就是一次真泄漏：dispose 之后每次状态变化
+    // 还会往一个已经拆掉 IPC 的窗口广播。on / off 必须成对，和上面那条同理。
+    engine.off('state', forwardState)
     for (const channel of [
       IPC_CHANNELS.listDevices,
+      IPC_CHANNELS.getEngineState,
       IPC_CHANNELS.listResources,
       IPC_CHANNELS.manageResource,
       IPC_CHANNELS.searchHuggingFace,

@@ -10,7 +10,7 @@ from .volume_gate import VolumeGateSegmenter
 
 
 def create_sensevoice_recognizer(
-    model_dir: Path, *, source_language: str | None = None
+    model_dir: Path, *, source_language: str | None = None, runtime=None
 ) -> StreamingRecognizer:
     """Build the SenseVoice streaming recognizer; the model loads lazily on the first job's thread.
 
@@ -20,7 +20,7 @@ def create_sensevoice_recognizer(
     Load failures (SenseVoiceModelUnavailable) surface from accept()/flush().
     """
     return StreamingRecognizer(
-        get_sensevoice_runtime(model_dir),
+        runtime or get_sensevoice_runtime(model_dir),
         source_language=source_language,
         segmenter=VolumeGateSegmenter(max_segment_ms=12000),
         block_ms=1200,

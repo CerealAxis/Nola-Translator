@@ -16,8 +16,6 @@ import type {
   AppSettingsPatch,
   AudioDevice,
   CaptionSegment,
-  CloudTranslationProvider,
-  EngineEvent,
   ExportFormat,
   MeetingMeta,
   ModelStorageInfoWithTotal,
@@ -120,7 +118,15 @@ function subscribe<T>(method: keyof NolaTranslatorApi, run: (injected: NolaTrans
 
 export function createIpcBridge(): NolaBridge {
   return {
+    runtimes: {
+      list: () => call('getRuntimes', (injected) => injected.getRuntimes()),
+      prepare: () => call('prepareRuntimes', (injected) => injected.prepareRuntimes()),
+      install: (id, repair) => call('installRuntime', (injected) => injected.installRuntime(id, repair)),
+      import: () => call('importRuntime', (injected) => injected.importRuntime()),
+      cancel: () => call('cancelRuntimeInstall', (injected) => injected.cancelRuntimeInstall()),
+    },
     engine: {
+      listComputeDevices: () => call('listComputeDevices', (injected) => injected.listComputeDevices()),
       listDevices: () => call('listDevices', (injected) => injected.listDevices()),
       listResources: () => call('listResources', (injected) => injected.listResources() as Promise<ResourceSnapshotWithRate>),
       manageResource: (resourceId, action) => call('manageResource', (injected) => injected.manageResource(resourceId, action)),
@@ -141,6 +147,12 @@ export function createIpcBridge(): NolaBridge {
         }
         void injected.setSessionPaused(sessionId, paused).catch(() => undefined)
       },
+      /*
+       * 只读当前状态，名字与语义都与 preload 一致，适配器不翻译任何东西。
+       * 缺桥时走 `call()` 的 `MissingIpcApiError`：调用方是 store 初始化，拿不到就得
+       * 让界面知道「这个状态没对上」，静默回一个假值等于重新引入一次推断。
+       */
+      getEngineState: () => call('getEngineState', (injected) => injected.getEngineState()),
     },
     overlay: {
       show: () => call('showOverlay', (injected) => injected.showOverlay()),

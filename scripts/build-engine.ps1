@@ -1,8 +1,11 @@
+param([string]$PythonPath, [string]$OutputDirectory)
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $projectRoot '.venv\Scripts\python.exe'
+if ($PythonPath) { $python = (Resolve-Path -LiteralPath $PythonPath).Path }
 $engineRoot = Join-Path $projectRoot 'engine'
+if (-not $OutputDirectory) { $OutputDirectory = Join-Path $engineRoot 'dist' }
 $systemDirectory = Join-Path $env:SystemRoot 'System32'
 
 if (-not (Test-Path $python)) {
@@ -14,7 +17,7 @@ if (-not (Test-Path $python)) {
     --clean `
     --onedir `
     --name NolaTranslatorEngine `
-    --distpath (Join-Path $engineRoot 'dist') `
+    --distpath $OutputDirectory `
     --workpath (Join-Path $engineRoot 'build') `
     --specpath (Join-Path $engineRoot 'build') `
     --paths $engineRoot `
@@ -40,3 +43,4 @@ if (-not (Test-Path $python)) {
     --hidden-import kaldi_native_fbank `
     --hidden-import pyaudiowpatch `
     (Join-Path $engineRoot 'engine_entry.py')
+if ($LASTEXITCODE -ne 0) { throw 'PyInstaller 引擎构建失败' }

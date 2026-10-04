@@ -32,7 +32,10 @@ export const zhCN = {
 
   titleBar: {
     engineReady: '引擎就绪',
-    engineUnavailable: '引擎未启动',
+    engineIdle: '引擎未启动',
+    engineStarting: '引擎启动中',
+    engineRecovering: '引擎重连中',
+    engineFailed: '引擎启动失败',
     language: '界面语言',
     themeLight: '浅色',
     themeDark: '深色',
@@ -83,6 +86,12 @@ export const zhCN = {
     checkingDevices: '正在检测音频输入',
     checkingModels: '正在校验模型',
     deviceUnavailable: '没有检测到可用的音频输入',
+    /**
+     * 设备行在"引擎没答上话"时的读法。**这一条故意不写任何设备相关的结论**：
+     * 探设备那一次调用同时兼着启动引擎，引擎起不来时它没能探成，报"没有检测到可用的音频
+     * 输入"就是把引擎故障说成硬件故障。真原因由 `errors.engineNotReady`（ENG-001）承担。
+     */
+    deviceCheckBlocked: '音频输入检测未能完成',
     modelMissing: '缺少模型：{name}',
     installNow: '现在安装',
     later: '稍后再说',
@@ -115,9 +124,6 @@ export const zhCN = {
     notes: '笔记',
     nothingYet: '还没有字幕',
     nothingYetHint: '开始同传后，识别到的语句会逐句出现在这里。',
-    statusAutosave: '字幕逐句自动保存',
-    statusDataSafe: '内容只存在这台电脑上',
-    aiDisclosure: '译文由模型生成，可能有误。',
     sourcePanel: '实时转写',
     translationPanel: '翻译结果',
   },
@@ -302,6 +308,38 @@ export const zhCN = {
     saveKey: '保存密钥',
     deleteKey: '删除密钥',
     testing: '正在测试连接',
+    /*
+     * 翻译服务商只剩三个。**「本地模型」「云端模型」是界面概念，不是产品名**：
+     * Hy-MT2 与 M2M100 合并成前者（真正跑哪个由选中的模型 id 决定），
+     * OpenAI 与 Ollama 合并成后者（Ollama 从此只是一种接口协议，不是服务商）。
+     * 所以这两行必须跟着界面语言走；产品名只剩 Microsoft Translator 一个。
+     */
+    providerLocal: '本地模型',
+    providerCloud: '云端模型',
+    providerMicrosoft: 'Microsoft Translator',
+    groupLocalModel: '选择使用的本地模型',
+    localModelEmpty: '尚未安装本地翻译模型，请先到「模型管理」下载。',
+    /*
+     * 云端那七项。**API 格式决定接口地址该填到哪一层**（Anthropic 只填站点根地址，
+     * 其余填到 /v1），所以每种格式各带一句提示 —— 层级填错最难从报错里看出来。
+     */
+    apiFormat: 'API 格式',
+    apiFormatChatCompletions: 'Chat Completions (/v1/chat/completions)',
+    apiFormatChatResponses: 'Chat Responses (/v1/responses)',
+    apiFormatAnthropic: 'Anthropic Messages (/v1/messages)',
+    apiFormatOllama: 'Ollama (/api/chat)',
+    endpointHintChatCompletions: '填到 /v1 为止，例如 https://api.example.com/v1',
+    endpointHintChatResponses: '填到 /v1 为止；请求会发往 /v1/responses',
+    endpointHintAnthropic: '只填站点根地址，不要带 /v1 或 /v1/messages，例如 https://api.anthropic.com',
+    endpointHintOllama: '本机 Ollama 地址，例如 http://127.0.0.1:11434',
+    apiName: '名称',
+    apiNamePlaceholder: '如：智谱 GLM',
+    endpointPlaceholder: 'https://api.example.com/v1',
+    // 行标签是「模型 ID」而不是「模型」：这一栏填的是服务商那边的模型标识（gpt-4.1-mini），
+    // 填厂商名（OpenAI）是最常见也最没意义的填法，标签要先把这件事说清楚。
+    modelId: '模型 ID',
+    contextWindow: '上下文窗口',
+    maxOutputTokens: '最大输出 Token',
     // 分组名已经是「布局」，行标签再说一次「布局」就在同一屏里出现两个一样的词。
     // 行标签要说清它管的是哪一段排版：原文与译文怎么分区。
     captionLayout: '字幕排版',
@@ -372,15 +410,27 @@ export const zhCN = {
      */
     engineNotReady: '本地引擎没有运行，识别无法开始。错误码 ENG-001',
     // 预检状态不是失败：用户还没动手，所以不给错误码。
+    // **当前没有界面在用这一条**：冷启动不再报「引擎没运行」（主进程在 app ready 时就启动
+    // 引擎，应用刚打开那几秒是 `booting`，什么都没坏，报故障等于报一件没发生的事）；
+    // 引擎真的起不来走的是上面 `engineNotReady`（带 ENG-001）+ `engineNotReadyAction`。
+    // 留着是因为 `i18n.test.ts` 的 `noCodeByDesign` 点名了这一条，删掉会让那条断言的注释悬空。
     engineNotReadyPreflight: '本地引擎没有运行，识别暂时无法开始。',
     // 会话中途引擎掉了。不能说"无法开始"——这场已经在跑了，说的是"停了"。
     engineStopped: '本地引擎已经停止，识别随之停止。',
+    /*
+     * 引擎进程在同传途中没了（`sessionStore` 的 `ENGINE_LOST`）。与上面 `engineStopped`
+     * 的区别是**引擎自己会不会回来**：那一条说的是会话级的停止，这一条说的是进程没了，
+     * 而重连出来的是新进程，这场会一定回不来 —— 所以出路是"去那条记录"，不是"重试"。
+     * 字幕逐句落盘（主进程 `meetings.append`），所以"已保存"这句话是实情。
+     */
+    engineLost: '本地引擎在同传中停止，这场同传已中断，已经识别到的字幕已保存。错误码 ENG-002',
+    engineLostAction: '查看这场记录',
     engineNotReadyAction: '重试启动',
     deviceNotFound: '没有找到可用的音频输入设备。错误码 AUD-002',
     deviceNotFoundAction: '检查系统声音设置',
     modelMissing: '识别模型还没有安装。错误码 MDL-003',
     modelMissingAction: '去安装模型',
-    startFailed: '同传启动失败，音频通道没有打开。错误码 SES-004',
+    startFailed: '同传未能启动，请检查所选模型、计算设备和运行环境。错误码 SES-004',
     startFailedAction: '重新开始同传',
     downloadFailed: '模型下载中断，已保留部分文件。错误码 NET-006',
     downloadFailedAction: '重试下载',

@@ -76,7 +76,7 @@ describe('JSONL 协议校验', () => {
         config: {
           audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime',
           sourceLanguage: 'auto', targetLanguages: ['en'],
-          translationProvider: 'hymt2', translationModelId: id,
+          translationProvider: 'local', translationModelId: id,
         }
       }))).toMatchObject({ type: 'startSession', config: { translationModelId: id } })
     }
@@ -85,7 +85,7 @@ describe('JSONL 协议校验', () => {
       config: {
         audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime',
         sourceLanguage: 'auto', targetLanguages: ['en'],
-        translationProvider: 'hymt2', translationModelId: 'hy-mt2-1.8b-1.25bit',
+        translationProvider: 'local', translationModelId: 'hy-mt2-1.8b-1.25bit',
       }
     }))).toThrow()
   })

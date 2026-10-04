@@ -6,12 +6,13 @@ import asyncio
 import json
 from collections import OrderedDict
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from pathlib import Path
 from time import monotonic
 from uuid import uuid4
 
 from .audio.capture import AudioDeviceDisconnectedError, PortAudioCapture
+from .compute import ComputeDevice, choose_devices, model_memory_mb, probe_devices, resource_failure, cpu_threads, release_failed_load
 from .audio.recorder import WavRecorder
 from .hub import (
     HubRepoInfo,
@@ -26,6 +27,8 @@ from .models.manager import ModelManager
 from .models.registry import CustomFile
 from .protocol import (
     CaptionEvent,
+    ComputeDevicesEvent,
+    ListComputeDevicesCommand,
     CaptionSegment,
     EngineCommand,
     EngineEvent,
@@ -63,21 +66,30 @@ from .resources import (
     ResourceManager,
 )
 from .service import EngineService
+from .translation.base import TranslationProvider
 from .translation.hymt2 import (
     HyMt2TranslationProvider,
     is_supported,
     validate_session_languages,
 )
-from .translation.llama_server import LlamaServerError, LlamaServerManager
+from .translation.llama_server import LlamaServerError, LlamaServerManager, resolve_llama_dir
 from .translation.m2m100 import (
     M2M100TranslationProvider,
     is_supported as m2m100_is_supported,
     validate_session_languages as validate_m2m100_languages,
 )
 from .translation.network import (
+    DEFAULT_ANTHROPIC_ENDPOINT,
+    DEFAULT_CONTEXT_WINDOW,
+    DEFAULT_MAX_OUTPUT_TOKENS,
+    DEFAULT_MICROSOFT_ENDPOINT,
+    DEFAULT_OLLAMA_ENDPOINT,
+    DEFAULT_OPENAI_ENDPOINT,
+    AnthropicMessagesProvider,
     MicrosoftTranslatorProvider,
     OllamaTranslationProvider,
     OpenAICompatibleProvider,
+    OpenAIResponsesProvider,
 )
 from .translation.scheduler import TranslationScheduler
 
@@ -95,7 +107,8 @@ class UnknownTranslationModel(ValueError):
 
     def __init__(self, model_id: str) -> None:
         super().__init__(
-            f"未知的翻译模型 id：{model_id}。可用：{'、'.join(HYMT2_RESOURCE_IDS)}"
+            f"未知的翻译模型 id：{model_id}。可用："
+            + "、".join((*HYMT2_RESOURCE_IDS, M2M100_RESOURCE_ID))
         )
         self.model_id = model_id
 
@@ -179,10 +192,24 @@ class EngineRuntime:
         self.translation_wake: dict[str, asyncio.Event] = {}
         self._status_cache: str | None = None
         self._dropped_chunks = 0
+        self._device_plan: dict[str, object] | None = None
+        self._recognition_device = ComputeDevice("cpu", "CPU", "cpu", "cpu", recognition=True, translation=True)
+        self._translation_device = self._recognition_device
+        self._active_recognition_runtime = None
+        self._torch_threads = cpu_threads()
+        self._llama_threads = cpu_threads()
         self._write_engine_status()
 
 
     async def handle(self, command: EngineCommand) -> list[EngineEvent]:
+        if isinstance(command, ListComputeDevicesCommand):
+            self._update_compute_plan()
+            devices, notes, version = await asyncio.to_thread(probe_devices, resolve_llama_dir())
+            return [ComputeDevicesEvent(
+                protocolVersion=1, type="computeDevices", requestId=command.requestId,
+                devices=[asdict(d) for d in devices], notes=notes, torchVersion=version,
+                activePlan=self._device_plan,
+            )]
         if isinstance(command, ListResourcesCommand):
             return [
                 ResourcesEvent(
@@ -443,12 +470,11 @@ class EngineRuntime:
             model_id = self._model_id(command)
             required_resources = [model_id]
             if command.config.targetLanguages:
-                if command.config.translationProvider == "hymt2":
-                    required_resources.append(self._translation_model_id(command.config))
-                elif command.config.translationProvider == "m2m100":
-                    # Resolved from the table rather than hardcoded, so a self-installed M2M100
-                    # repo is the thing that gets checked for and loaded.
-                    required_resources.append(self._m2m100_model_id(command.config))
+                if command.config.translationProvider == "local":
+                    # Resolved from the resource table rather than hardcoded, so a GGUF or a
+                    # transformers repo the user installed themselves is the thing that gets
+                    # checked for and loaded.
+                    required_resources.append(self._local_translation_model_id(command.config))
             missing_resources = [
                 resource_id for resource_id in required_resources
                 if not self.resources.is_installed(resource_id)
@@ -476,11 +502,13 @@ class EngineRuntime:
             ]
 
         try:
+            await self._configure_device_plan(command)
             if command.config.targetLanguages:
                 self._configure_translation(command)
             recognizer = await self._create_recognizer(command)
             if command.config.targetLanguages:
                 await self._ensure_translation_server(command)
+            self._update_compute_plan(self.llama_manager.fallback_reason)
         except ValueError as error:
             await self._unload_session_models()
             return [
@@ -502,7 +530,7 @@ class EngineRuntime:
                     requestId=command.requestId,
                     code="modelUnavailable",
                     recoverable=True,
-                    details={"reason": type(error).__name__},
+                    details={"reason": str(error)[:1024] or type(error).__name__},
                 )
             ]
 
@@ -571,90 +599,202 @@ class EngineRuntime:
         recorder.close()
         return recorder.duration_ms
 
+    async def _configure_device_plan(self, command: StartSessionCommand) -> None:
+        self._device_plan = None
+        config = command.config
+        devices, notes, _version = await asyncio.to_thread(probe_devices, resolve_llama_dir())
+        adapter = self.resources.adapter_for(self._model_id(command))
+        recognition_mb = model_memory_mb(self.resources.model_path(self._model_id(command)), adapter, config.compute)
+        translation_adapter = None
+        translation_mb = 0.0
+        if config.targetLanguages and config.translationProvider == "local":
+            model_id = self._local_translation_model_id(config)
+            translation_adapter = self.resources.adapter_for(model_id)
+            path = self.resources.translation_gguf_path(model_id) if translation_adapter == "llama.cpp" else self.resources.model_path(model_id)
+            translation_mb = model_memory_mb(path, translation_adapter, config.compute)
+        a, b, reasons = choose_devices(devices, config.compute, recognition_mb, translation_mb, translation_adapter)
+        self._recognition_device, self._translation_device = a, b
+        total_threads = cpu_threads(config.compute.cpuThreads)
+        # PyTorch shares one process-wide thread pool; llama is a separate CPU consumer.
+        share_cpu = translation_adapter == "llama.cpp"
+        self._torch_threads = max(1, total_threads // 2) if share_cpu else total_threads
+        self._llama_threads = max(1, total_threads - self._torch_threads) if share_cpu else total_threads
+        self._device_plan = {"recognition": asdict(a), "translation": asdict(b) if translation_adapter else None,
+            "recognitionEstimateMb": round(recognition_mb), "translationEstimateMb": round(translation_mb),
+            "reservedVramMb": config.compute.reservedVramMb, "reasons": reasons, "probeNotes": notes,
+            "recognitionActual": "unloaded", "translationActual": "unloaded"}
+
+    def _update_compute_plan(self, reason: str | None = None) -> None:
+        if self._device_plan is None:
+            return
+        self._device_plan["recognition"] = asdict(self._recognition_device)
+        self._device_plan["translation"] = asdict(self._translation_device) if self._device_plan.get("translation") else None
+        runtime = self._active_recognition_runtime
+        self._device_plan["recognitionActual"] = runtime.describe() if runtime else "unloaded"
+        if isinstance(self.translation_provider, M2M100TranslationProvider):
+            self._device_plan["translationActual"] = (self.translation_provider.runtime.device or "unknown") if self.translation_provider.runtime.loaded else "unloaded"
+        else:
+            self._device_plan["translationActual"] = self.llama_manager.device or "unloaded"
+            self._device_plan["offloadedLayers"] = self.llama_manager.offloaded_layers
+        if reason:
+            self._device_plan["reasons"].append(reason)
+        self._write_engine_status()
+
     def _configure_translation(self, command: StartSessionCommand) -> None:
         config = command.config
         options = config.translationOptions
-        endpoint = options.endpoint if options and options.endpoint else ""
-        api_key = options.apiKey if options and options.apiKey else ""
-        region = options.region if options and options.region else ""
-        model = options.model if options and options.model else ""
-        if config.translationProvider == "hymt2":
-            source = (
-                None
-                if config.sourceLanguage == "auto"
-                else self._language_code(config.sourceLanguage)
-            )
-            targets = [self._language_code(item) for item in config.targetLanguages]
-            unsupported = validate_session_languages(source, targets)
-            if unsupported:
-                raise ValueError(
-                    "unsupportedTranslationLanguage (hymt2): "
-                    + ", ".join(unsupported)
-                )
-            # all three quantization tiers share one llama-server; load whichever the session picked.
-            self.llama_manager.switch_gguf(
-                self.resources.translation_gguf_path(self._translation_model_id(config))
-            )
-            provider = HyMt2TranslationProvider(self.llama_manager)
-        elif config.translationProvider == "m2m100":
-            source = (
-                None
-                if config.sourceLanguage == "auto"
-                else self._language_code(config.sourceLanguage)
-            )
-            targets = [self._language_code(item) for item in config.targetLanguages]
-            unsupported = validate_m2m100_languages(source, targets)
-            if unsupported:
-                raise ValueError(
-                    "unsupportedTranslationLanguage (m2m100): "
-                    + ", ".join(unsupported)
-                )
-            provider = M2M100TranslationProvider(
-                self.resources.model_path(self._m2m100_model_id(config))
-            )
+        endpoint = options.endpoint if options else ""
+        api_key = options.apiKey if options else ""
+        region = options.region if options else ""
+        model = options.model if options else ""
+        # 「整个 translationOptions 缺席」和「用户把接口地址清空了」是两件事，只有前者配得上默认地址：
+        # 设置项的默认值本来非空（`DEFAULT_SETTINGS.translation.cloudEndpoint`），所以空串只可能是
+        # 用户刚清空输入框，不是「没配过」。这里曾经的 `or DEFAULT_*` 会把请求静默发去官方地址 ——
+        # 用户清空的是 DeepSeek／硅基流动的网关地址，得到的却是一个跟真正原因无关的鉴权失败。所以
+        # 下面 cloud 的四条分支把空串原样交给 provider，由 network.py 里已有的 `if not endpoint:
+        # raise` 报出那句本来就写给用户看的话；**不要**再在这里补 `or DEFAULT_*`。
+        def resolved(value: str, default: str) -> str:
+            """A default stands in for a session that sent no translationOptions at all."""
+
+            return value if options is not None else default
+
+        # The defaults mirror TranslationOptions, so a session that sends no translationOptions
+        # at all lands on the same wire format and the same limits as one that sends them empty.
+        api_format = options.apiFormat if options else "chat-completions"
+        context_window = options.contextWindow if options else DEFAULT_CONTEXT_WINDOW
+        max_output_tokens = options.maxOutputTokens if options else DEFAULT_MAX_OUTPUT_TOKENS
+        if config.translationProvider == "local":
+            provider = self._local_translation_provider(config)
         elif config.translationProvider == "microsoft":
+            # The endpoint guard lives in `MicrosoftTranslatorProvider`, like the other four:
+            # an empty address reaches the provider as an empty string and is refused there
+            # with the message written for the user to read. Don't re-check it here.
             provider = MicrosoftTranslatorProvider(
                 api_key,
-                endpoint=endpoint or "https://api.cognitive.microsofttranslator.com",
+                endpoint=resolved(endpoint, DEFAULT_MICROSOFT_ENDPOINT),
                 region=region,
             )
-        elif config.translationProvider == "openai":
-            provider = OpenAICompatibleProvider(
-                endpoint=endpoint or "https://api.openai.com/v1",
-                model=model or "gpt-4.1-mini",
-                api_key=api_key,
-            )
-        elif config.translationProvider == "ollama":
-            provider = OllamaTranslationProvider(
-                endpoint=endpoint or "http://127.0.0.1:11434",
-                model=model or "qwen3:4b",
-            )
+        elif config.translationProvider == "cloud":
+            limits = {
+                "context_window": context_window,
+                "max_output_tokens": max_output_tokens,
+                "api_key": api_key,
+            }
+            # `model` 同理：设置里的 `cloudModel` 默认非空，清空就是明确的操作，所以把它原样
+            # 传下去，由 provider 报「模型名为空（translationOptions.model）」，而不是偷偷换一个
+            # 模型名让用户以为自己配的模型在工作。
+            if api_format == "chat-completions":
+                provider = OpenAICompatibleProvider(
+                    endpoint=resolved(endpoint, DEFAULT_OPENAI_ENDPOINT),
+                    model=resolved(model, "gpt-4.1-mini"),
+                    **limits,
+                )
+            elif api_format == "chat-responses":
+                provider = OpenAIResponsesProvider(
+                    endpoint=resolved(endpoint, DEFAULT_OPENAI_ENDPOINT),
+                    model=resolved(model, "gpt-4.1-mini"),
+                    **limits,
+                )
+            elif api_format == "anthropic":
+                # Bare origin, not a versioned base: /v1/messages is appended by the provider.
+                provider = AnthropicMessagesProvider(
+                    endpoint=resolved(endpoint, DEFAULT_ANTHROPIC_ENDPOINT),
+                    model=resolved(model, "claude-haiku-4-5"),
+                    **limits,
+                )
+            elif api_format == "ollama":
+                provider = OllamaTranslationProvider(
+                    endpoint=resolved(endpoint, DEFAULT_OLLAMA_ENDPOINT),
+                    model=resolved(model, "qwen3:4b"),
+                    **limits,
+                )
+            else:
+                raise ValueError(
+                    f"未知的翻译接口格式 apiFormat：{api_format}。"
+                    "可选：chat-completions、chat-responses、anthropic、ollama"
+                )
         else:
-            raise ValueError(f"未知翻译 Provider: {config.translationProvider}")
+            raise ValueError(
+                f"未知翻译 Provider: {config.translationProvider}。可选：local、cloud、microsoft"
+            )
         self.translation_provider = provider
         self.translation_scheduler = TranslationScheduler(
             provider,
-            max_concurrency=1 if config.translationProvider in ("hymt2", "m2m100") else 3,
+            # One at a time for `local`: the model already owns the accelerator and its
+            # tokenizer state is not re-entrant. The network formats are free to fan out.
+            max_concurrency=1 if config.translationProvider == "local" else 3,
         )
 
+    def _local_translation_provider(self, config: SessionConfig) -> TranslationProvider:
+        """Build the local provider for whichever translation model the session selected.
+
+        The choice is the model's *adapter*, not its id and not a provider name. `local` no
+        longer tells llama.cpp apart from transformers, so the same resource table the
+        recognition path already asks decides which runtime gets the weights — which is what
+        keeps a GGUF installed from the hub on llama-server.
+        """
+        model_id = self._local_translation_model_id(config)
+        source = (
+            None
+            if config.sourceLanguage == "auto"
+            else self._language_code(config.sourceLanguage)
+        )
+        targets = [self._language_code(item) for item in config.targetLanguages]
+        adapter = self.resources.adapter_for(model_id)
+        if adapter == "m2m100":
+            unsupported = validate_m2m100_languages(source, targets)
+            if unsupported:
+                raise ValueError(
+                    "unsupportedTranslationLanguage (m2m100): " + ", ".join(unsupported)
+                )
+            return M2M100TranslationProvider(self.resources.model_path(model_id),
+                device=self._translation_device.torchDevice,
+                precision="auto" if self._translation_device.id == "cpu" and config.compute.translationDevice != "cpu" and config.compute.allowCpuFallback else config.compute.precision,
+                threads=self._torch_threads)
+        if adapter == "llama.cpp":
+            unsupported = validate_session_languages(source, targets)
+            if unsupported:
+                raise ValueError(
+                    "unsupportedTranslationLanguage (hymt2): " + ", ".join(unsupported)
+                )
+            # all three quantization tiers share one llama-server; load whichever the session picked.
+            self.llama_manager.switch_gguf(self.resources.translation_gguf_path(model_id))
+            self.llama_manager.configure_compute(self._translation_device,
+                config.compute.model_copy(update={"cpuThreads": self._llama_threads}))
+            return HyMt2TranslationProvider(self.llama_manager)
+        raise UnknownTranslationModel(model_id)
+
     async def _ensure_translation_server(self, command: StartSessionCommand) -> None:
-        """Bring up the Hy-MT2 llama-server at session start; a missing model or a failed
+        """Bring up the local translation runtime at session start; a missing model or a failed
         start never blocks recognition.
         """
-        if command.config.translationProvider == "m2m100":
+        if command.config.translationProvider != "local":
+            return
+        model_id = self._local_translation_model_id(command.config)
+        if self.resources.adapter_for(model_id) == "m2m100":
             if isinstance(self.translation_provider, M2M100TranslationProvider):
-                await asyncio.to_thread(self.translation_provider.runtime.load)
+                try:
+                    await asyncio.to_thread(self.translation_provider.runtime.load)
+                except Exception as error:
+                    if not (command.config.compute.allowCpuFallback and
+                            self._translation_device.id != "cpu" and resource_failure(error)):
+                        raise
+                    release_failed_load(error)
+                    await asyncio.to_thread(self.translation_provider.runtime.unload)
+                    self._translation_device = ComputeDevice("cpu", "CPU", "cpu", "cpu", translation=True)
+                    self.translation_provider = M2M100TranslationProvider(self.resources.model_path(model_id),
+                        device="cpu", precision="auto", threads=self._torch_threads)
+                    await asyncio.to_thread(self.translation_provider.runtime.load)
+                    self._update_compute_plan("翻译 GPU 加载失败，回退 CPU")
             return
-        if command.config.translationProvider != "hymt2":
-            return
-        if not self.resources.is_installed(self._translation_model_id(command.config)):
+        if not self.resources.is_installed(model_id):
             return
         try:
             await self.llama_manager.start()
-        except LlamaServerError:
+        except LlamaServerError as error:
             # the session continues when the server is unavailable; translations just
             # fail per target (llamaServerUnavailable).
-            pass
+            self._update_compute_plan(f"翻译运行时启动失败：{str(error)[:256]}")
 
     async def _create_recognizer(self, command: StartSessionCommand) -> Recognizer:
         language = (
@@ -669,17 +809,38 @@ class EngineRuntime:
         # the built-in ids. A self-installed Qwen3-ASR repo has to reach the same loader as the
         # shipped one, and the recognition guard in qwen_runtime.py stays the thing that decides
         # whether the checkpoint layout actually fits.
-        if self.resources.adapter_for(model_id) == "sensevoice":
-            await asyncio.to_thread(get_sensevoice_runtime(model_path).load)
-            recognizer = create_sensevoice_recognizer(model_path, source_language=language)
-        else:
-            await asyncio.to_thread(get_qwen_runtime(model_path).load)
-            recognizer = create_qwen_recognizer(model_path, source_language=language)
+        compute = command.config.compute
+        if self._recognition_device.id == "cpu" and compute.recognitionDevice != "cpu" and compute.allowCpuFallback:
+            compute = compute.model_copy(update={"precision": "auto", "quantization": "none"})
+        for attempt in range(2):
+            options = {"device": self._recognition_device.torchDevice, "threads": self._torch_threads}
+            if self.resources.adapter_for(model_id) == "sensevoice":
+                runtime = get_sensevoice_runtime(model_path, **options)
+                factory = create_sensevoice_recognizer
+            else:
+                quant = None if compute.quantization == "auto" else compute.quantization
+                runtime = get_qwen_runtime(model_path, **options, quant=quant, precision=compute.precision)
+                factory = create_qwen_recognizer
+            self._active_recognition_runtime = runtime
+            try:
+                await asyncio.to_thread(runtime.load)
+                recognizer = factory(model_path, source_language=language, runtime=runtime)
+                break
+            except Exception as error:
+                release_failed_load(error)
+                await asyncio.to_thread(runtime.unload)
+                if attempt or self._recognition_device.id == "cpu" or not compute.allowCpuFallback or not resource_failure(error):
+                    raise
+                self._recognition_device = ComputeDevice("cpu", "CPU", "cpu", "cpu", recognition=True)
+                compute = compute.model_copy(update={"precision": "auto", "quantization": "none"})
+                self._update_compute_plan("识别 GPU 加载失败，回退 CPU / FP32")
         recognizer.on_update = self._emit_update
         return recognizer
 
     def _recognition_runtime(self) -> QwenRuntime | SenseVoiceRuntime:
-        """Runtime of the currently selected recognition model; both expose load/unload/loaded/describe."""
+        """Runtime of the currently selected recognition model."""
+        if self._active_recognition_runtime is not None:
+            return self._active_recognition_runtime
         model_path = self.resources.model_path(self.active_model_id)
         if self.resources.adapter_for(self.active_model_id) == "sensevoice":
             return get_sensevoice_runtime(model_path)
@@ -689,35 +850,20 @@ class EngineRuntime:
     def _model_id(command: StartSessionCommand) -> str:
         return command.config.recognitionModelId or QWEN_RESOURCE_ID
 
-    def _translation_model_id(self, config: SessionConfig) -> str:
-        """The llama.cpp translation model the session selected; an unknown id is refused outright.
+    def _local_translation_model_id(self, config: SessionConfig) -> str:
+        """The local translation model the session selected, whichever loader owns it.
 
-        A missing field still means the Q4_K_M baseline — that is an older client, not a
-        mistake. A *present but unknown* id used to be treated the same way, so a self-installed
-        or hand-edited model id was silently replaced by the baseline and the session translated
-        with a model the user never chose. Raising keeps that visible at session start.
-
-        What counts as known is the resource table rather than a fixed tuple, so a GGUF the user
-        installed from the hub is accepted here and reaches llama-server like any other tier.
+        Replaces a pair of per-provider resolvers that could only each see their own tier.
+        An absent field is still the Hy-MT2 Q4_K_M baseline — that is an older client, not a
+        mistake — while a *present* field has to resolve in the resource table, so a GGUF or a
+        transformers repo the user installed from the hub is accepted here and reaches the
+        runtime its own metadata selected. An id that resolves to neither translation adapter
+        is refused outright rather than silently replaced by the baseline.
         """
         requested = config.translationModelId
         if requested is None:
             return HYMT2_RESOURCE_ID
-        if self.resources.adapter_for(requested) == "llama.cpp":
-            return requested
-        raise UnknownTranslationModel(requested)
-
-    def _m2m100_model_id(self, config: SessionConfig) -> str:
-        """The transformers M2M100 resource the session selected.
-
-        Same rule as the llama.cpp path: an absent field is the built-in default, a present field
-        has to resolve in the resource table, and a GGUF id arriving here is refused rather than
-        quietly routed to a loader that cannot read it.
-        """
-        requested = config.translationModelId
-        if requested is None:
-            return M2M100_RESOURCE_ID
-        if self.resources.adapter_for(requested) == "m2m100":
+        if self.resources.adapter_for(requested) in ("llama.cpp", "m2m100"):
             return requested
         raise UnknownTranslationModel(requested)
 
@@ -876,7 +1022,7 @@ class EngineRuntime:
         if provider_name == "hymt2":
             active = self.active_config
             try:
-                model_id = self._translation_model_id(active) if active else HYMT2_RESOURCE_ID
+                model_id = self._local_translation_model_id(active) if active else HYMT2_RESOURCE_ID
             except UnknownTranslationModel:
                 # _start refuses an unknown id before a session exists, so this is unreachable in
                 # practice. It is caught anyway: an exception here runs on a background task, and
@@ -1105,12 +1251,14 @@ class EngineRuntime:
 
     async def _unload_session_models(self) -> None:
         """Release the ASR and local translation weights once the session ends."""
+        await self.llama_manager.stop()
         runtimes = [self._recognition_runtime()]
         if isinstance(self.translation_provider, M2M100TranslationProvider):
             runtimes.append(self.translation_provider.runtime)
         for runtime in runtimes:
             if getattr(runtime, "loaded", False):
                 await asyncio.to_thread(runtime.unload)
+        self._update_compute_plan()
 
     async def close(self) -> None:
         if self.service.session_id is not None:
@@ -1134,6 +1282,7 @@ class EngineRuntime:
             else self._dropped_chunks
         )
         return {
+            "compute": self._device_plan,
             "recognition": {
                 "modelId": self.active_model_id,
                 "loaded": bool(recognition.loaded),
@@ -1142,6 +1291,8 @@ class EngineRuntime:
             "hymt2": {
                 "device": device or "unknown",
                 "ready": bool(self.llama_manager.ready),
+                "offloadedLayers": self.llama_manager.offloaded_layers,
+                "fallbackReason": self.llama_manager.fallback_reason,
             },
             "audio": {"droppedChunks": int(dropped)},
         }

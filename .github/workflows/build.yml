@@ -1,0 +1,35 @@
+name: Build application
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set development version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version.Split('-')[0].Split('+')[0]
+          npm version "$version-dev.${{ github.run_number }}" --no-git-tag-version --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { throw 'Setting development version failed' }
+      - uses: ./.github/actions/build-windows
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nola-Translator-Windows-x64-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            release/*-Setup-x64.exe
+            release/*.blockmap
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14

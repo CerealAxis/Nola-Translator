@@ -5,6 +5,7 @@ import { Eye, FileText, Mic, MoreHorizontal, Pencil, Download, Trash2 } from 'lu
 import { LANGUAGE_LABELS } from '@/bridge'
 import type { MeetingMeta } from '@/bridge'
 import { useI18n } from '@/i18n'
+import { meetingState } from '@/meeting-format'
 import { fallbackTitle, formatDateTime, formatClock } from './recordLogic'
 
 interface RecordsTableProps {
@@ -37,7 +38,16 @@ export function RecordsTable({ meetings, onOpen, onRename, onExport, onDelete, p
           </Table.Header>
           <Table.Body>
             {meetings.map((meeting) => {
-              const live = meeting.endedAtMs === undefined
+              // 三态：真在跑 / 跑完了 / 开过但没走完（应用被关掉、崩掉）。
+              // 判据是主进程落盘的 state，不是「有没有 endedAtMs」—— 后者分不出中断。
+              const state = meetingState(meeting)
+              const live = state === 'running'
+              // 绿点=已完成、蓝点=进行中，中断用警示色：给它挂绿点等于说这条录好了。
+              const statusClass = 'nola-record-status'
+                + (live ? ' nola-record-status--live' : state === 'interrupted' ? ' nola-record-status--interrupted' : '')
+              const statusLabel = live
+                ? t('status.running')
+                : state === 'interrupted' ? t('homeRecordsUi.interrupted') : t('homeRecordsUi.completed')
               const title = meeting.title || fallbackTitle(meeting)
               return (
                 <Table.Row key={meeting.meetingId} id={meeting.meetingId} textValue={title} data-testid={'recent-' + meeting.meetingId}>
@@ -45,7 +55,7 @@ export function RecordsTable({ meetings, onOpen, onRename, onExport, onDelete, p
                   <Table.Cell className="nola-records-table__time">{formatDateTime(meeting.endedAtMs ?? meeting.startedAtMs)}</Table.Cell>
                   <Table.Cell className="nola-records-table__duration">{formatClock(meeting.durationMs)}</Table.Cell>
                   <Table.Cell className="nola-records-table__language">{languageLabel(meeting.sourceLanguage)} → {languageLabel(meeting.targetLanguage)}</Table.Cell>
-                  <Table.Cell className="nola-records-table__status"><span className={'nola-record-status' + (live ? ' nola-record-status--live' : '')}><i aria-hidden="true" />{live ? t('status.running') : t('homeRecordsUi.completed')}</span></Table.Cell>
+                  <Table.Cell className="nola-records-table__status"><span className={statusClass}><i aria-hidden="true" />{statusLabel}</span></Table.Cell>
                   <Table.Cell className="nola-records-table__actions"><div className="nola-records-table__action-group">
                     {onRename ? <Button variant="ghost" size="sm" className="nola-records-table__view" onPress={() => onOpen(meeting.meetingId)}>{t('records.view')}</Button> : null}
                     <Dropdown>

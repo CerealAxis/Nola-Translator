@@ -10,21 +10,27 @@
   }
   .nola-workspace-heading { flex: none; padding: 4px 20px 0; }
   .nola-workspace-heading h1 { margin: 0 0 10px; color: var(--foreground); font-size: 32px; font-weight: 700; line-height: 1.2; }
-  .nola-workspace-session { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; min-width: 0; }
-  .nola-workspace-session-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 18px; font-weight: 600; }
-  .nola-workspace-heading-time { padding-inline-start: 18px; border-inline-start: 1px solid var(--border); font-size: 17px; font-variant-numeric: tabular-nums; }
-  .nola-workspace-status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .nola-workspace-toolbar.card { flex: none; min-width: 0; padding: 0; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: none; }
   .nola-workspace-toolbar-content { padding: 16px 20px; }
   .nola-workspace-config { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; padding-bottom: 16px; border-bottom: 1px solid var(--separator); }
   .nola-workspace-audio { display: flex; flex-direction: row; flex: 1 1 220px; align-items: center; gap: 12px; min-width: 0; text-align: left; }
   .nola-workspace-audio .label { white-space: nowrap; font-size: 13px; }
   .nola-workspace-audio .select__trigger { flex: 1; min-width: 0; height: 36px; border-radius: 10px; background: var(--surface-secondary); box-shadow: none; border: 1px solid var(--border); }
+  /* 工具栏这一行的三个控件取值统一居中：输入来源（`.select__value`）、识别模型与语言方向（`.nola-workspace-picker > span`）。
+     输入来源那边的开关**不是** `.nola-workspace-audio` 上那句 `text-align: left`：
+     HeroUI 的 `.select__value` 自带 `text-start`（@heroui/styles/dist/components/select.css），
+     那是**写在取值元素自己身上**的声明，继承永远赢不了它 —— 删掉 `text-align: left` 不会有任何变化。
+     `.select__value` 和 `.nola-workspace-picker > span` 一样是 `flex-1`，已经把剩下的宽度吃满，
+     所以 `text-align: center` 就够，不必动 `justify-content`；
+     `Select.Indicator` 是 `absolute`，不参与 flex，箭头位置不受影响。 */
+  .nola-workspace-audio .select__value { text-align: center; }
   .nola-workspace-audio svg, .nola-workspace-picker svg { flex: none; width: 18px; height: 18px; color: var(--accent); }
   .nola-workspace-field { display: flex; flex: 1 1 220px; gap: 12px; align-items: center; min-width: 0; }
   .nola-workspace-field > span { font-size: 13px; white-space: nowrap; }
   .nola-workspace-picker { display: flex; gap: 9px; align-items: center; justify-content: start; flex: 1; min-width: 0; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-secondary); font-size: 13px; }
-  .nola-workspace-picker > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 取值文字同样居中，保持这一行三个控件一致。声明写在取值元素自己身上，不依赖父级继承：
+     `.button` 与本文件同在 components 层，它将来若带上 `text-align`，父级上的声明会输给它。 */
+  .nola-workspace-picker > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
   .nola-workspace-picker:disabled { opacity: .65; }
   .nola-workspace-overlay { height: 36px; min-width: 0; border: 1px solid var(--accent); border-radius: 10px; color: var(--accent); font-size: 13px; }
   .nola-workspace-languages { display: flex; flex-direction: column; gap: 12px; width: 280px; max-width: 90vi; padding: 12px; }
@@ -56,7 +62,6 @@
   .nola-workspace-caption[data-paused="true"] [data-slot="caption-line"] { opacity: .8 !important; }
   .nola-workspace-caption .nola-caption-sentence { gap: 8px; padding: 16px 10px; border-bottom: 1px solid var(--separator); }
   .nola-workspace-empty { display: flex; height: 100%; min-height: 120px; justify-content: center; align-items: center; flex-direction: column; gap: 10px; text-align: center; }
-  .nola-workspace-declarations { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
   .nola-workspace-notes.card { display: flex; flex-direction: column; gap: 0; flex: 0 0 280px; min-width: 0; min-height: 0; padding: 18px 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: none; }
   .nola-workspace-notes-heading { display: flex; flex-direction: row; justify-content: space-between; align-items: center; gap: 10px; flex: none; text-align: left; }
   .nola-workspace-notes-heading .card__title { font-size: 18px; font-weight: 650; }
@@ -66,7 +71,6 @@
   .nola-workspace-notes-tools .button:first-child { color: var(--accent); }
   .nola-workspace-notes-content { display: flex; flex: 1; min-height: 0; padding: 16px 0 8px; }
   .nola-workspace-notes-area { flex: 1; width: 100%; min-width: 0; min-height: 0; padding: 0; resize: none; background: transparent; border: none; border-radius: 0; box-shadow: none; font-size: 14px; line-height: 1.7; }
-  .nola-workspace-notes-footnote { flex: none; padding: 0; font-size: 11px; color: var(--muted); }
   .nola-workspace-notes-handle { align-self: start; width: 36px; min-width: 36px; height: 36px; border-radius: 10px; color: var(--accent); }
   .nola-workspace-session-bar { display: flex; flex: none; flex-wrap: wrap; min-width: 0; min-height: 72px; gap: 14px; align-items: center; padding: 14px 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
   .nola-workspace-audio-status { display: flex; min-width: 0; align-items: center; gap: 10px; font-size: 13px; }
@@ -75,11 +79,9 @@
   .nola-workspace-wave { display: flex; flex: 1 1 90px; max-width: 290px; height: 42px; gap: 4px; align-items: center; justify-content: center; color: var(--accent); opacity: .5; }
   .nola-workspace-wave span { width: 3px; flex: 0 1 3px; border-radius: 3px; background: currentColor; }
   .nola-workspace-bar-spacer { flex: 1; }
-  .nola-workspace-record-hint { font-size: 12px; color: var(--muted); }
   @media (max-width: 1200px) {
     .nola-workspace-heading { padding-inline: 4px; }
     .nola-workspace-notes.card { flex-basis: 240px; padding: 16px; }
-    .nola-workspace-record-hint { display: none; }
   }
   @media (max-width: 999px) {
     .nola-workspace-body[data-notes-open="true"] { flex-wrap: wrap; overflow-y: auto; }
@@ -98,9 +100,6 @@
     .nola-workspace-caption .nola-baseline-pair[data-bilingual="true"] [data-kind="translation"] { border: none; color: var(--accent) !important; }
     .nola-workspace-caption [data-slot="caption-line"] { padding-inline: 0; }
     .nola-transcript-head .card__title { font-size: 15px; }
-    .nola-workspace-session { gap: 10px; }
-    .nola-workspace-session-name { font-size: 15px; }
-    .nola-workspace-heading-time { padding-inline-start: 10px; font-size: 14px; }
     .nola-workspace-config { gap: 10px; }
     .nola-workspace-audio, .nola-workspace-field { flex-basis: 100%; }
     .nola-workspace-view-controls { gap: 10px; }

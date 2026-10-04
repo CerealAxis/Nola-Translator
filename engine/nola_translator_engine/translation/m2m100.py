@@ -1,6 +1,7 @@
 """M2M100 418M local translation provider: in-process transformers inference and FLORES-101 language validation."""
 
 from __future__ import annotations
+from ..compute import cpu_threads, release_device_cache, resolve_dtype
 
 import asyncio
 import gc
@@ -94,12 +95,16 @@ class _Bundle:
 class M2M100Runtime:
     """In-process M2M100 runtime: load once, serialize access to the stateful tokenizer, single-flight inference."""
 
-    def __init__(self, model_dir: Path) -> None:
+    def __init__(self, model_dir: Path, *, device: str | None = None,
+                 precision: str = "auto", threads: int = 0) -> None:
         self.model_dir = Path(model_dir)
         self._lock = threading.Lock()
         self._inference_lock = threading.Lock()
         self._loaded = False
         self._bundle: _Bundle | None = None
+        self.device = device
+        self.precision = precision
+        self.threads = threads
 
     @property
     def loaded(self) -> bool:
@@ -128,20 +133,20 @@ class M2M100Runtime:
                 self._loaded = False
             del bundle
             gc.collect()
-            import torch
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            release_device_cache(self.device)
 
     def _load_bundle(self) -> _Bundle:
         """The real from_pretrained block, split into its own method so tests can stub it."""
         import torch
         from transformers import AutoTokenizer, M2M100ForConditionalGeneration
 
-        device = _resolve_device(torch)
+        device = self.device or _resolve_device(torch)
+        self.device = device
+        torch.set_num_threads(cpu_threads(self.threads))
         tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir), local_files_only=True)
         model = M2M100ForConditionalGeneration.from_pretrained(
             str(self.model_dir),
-            dtype=torch.float16 if device.startswith("cuda") else torch.float32,
+            dtype=resolve_dtype(device, self.precision),
             local_files_only=True,
         )
         model = model.to(device).eval()
@@ -174,18 +179,18 @@ class M2M100Runtime:
         return result.strip()
 
 
-_runtimes: dict[str, M2M100Runtime] = {}
+_runtimes: dict[tuple, M2M100Runtime] = {}
 _runtimes_lock = threading.Lock()
 
 
-def get_m2m100_runtime(model_dir: Path) -> M2M100Runtime:
-    """Process-wide singleton cached by resolved model_dir, so weights load once per session."""
+def get_m2m100_runtime(model_dir: Path, **options) -> M2M100Runtime:
+    """Cache by resolved model directory and compute options."""
     resolved = Path(model_dir).resolve()
-    key = os.path.normcase(str(resolved))
+    key = (os.path.normcase(str(resolved)), tuple(sorted(options.items())))
     with _runtimes_lock:
         runtime = _runtimes.get(key)
         if runtime is None:
-            runtime = M2M100Runtime(resolved)
+            runtime = M2M100Runtime(resolved, **options)
             _runtimes[key] = runtime
         return runtime
 
@@ -195,8 +200,8 @@ class M2M100TranslationProvider:
 
     name = "m2m100"
 
-    def __init__(self, model_dir: Path) -> None:
-        self.runtime = get_m2m100_runtime(model_dir)
+    def __init__(self, model_dir: Path, **options) -> None:
+        self.runtime = get_m2m100_runtime(model_dir, **options)
 
     async def translate(self, text: str, source: str, target: str) -> ProviderTranslation:
         source_code = _normalize_language_code(source)

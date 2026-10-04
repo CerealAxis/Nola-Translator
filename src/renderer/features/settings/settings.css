@@ -1,4 +1,8 @@
 .settings-page { display:flex; flex-direction:column; gap:20px; min-width:0; }
+.compute-hint { margin:0; color:var(--muted); font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
+.compute-device-info { font-size:13px; overflow-wrap:anywhere; text-align:end; }
+.compute-number { width:140px; max-width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:10px; color:var(--foreground); background:var(--surface); }
+.compute-number:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .settings-page__heading { padding:20px 24px; border-radius:16px; background:linear-gradient(120deg,var(--accent-soft),color-mix(in oklch,var(--surface) 65%,var(--accent-soft))); }
 .settings-page__heading h1 { font-size:32px; font-weight:700; line-height:1.2; margin:0 0 8px; }
 .settings-page__heading p { color:var(--muted); font-size:14px; margin:0; }
@@ -70,3 +74,7 @@
  .settings-row__control .switch { margin-left:auto; }
  .settings-nav .tabs__tab { flex-basis:100px; font-size:12px; }
 }
+
+.settings-row__title { display: flex; align-items: center; gap: 0.35rem; }
+.settings-row__help { min-width: 1.5rem; width: 1.5rem; height: 1.5rem; padding: 0; color: var(--muted); }
+.settings-row__tooltip { max-width: min(24rem, calc(100vw - 2rem)); white-space: normal; }

@@ -12,7 +12,9 @@
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
     "build:engine": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-engine.ps1",
-    "dist:win": "npm run build && npm run build:engine && electron-builder --win nsis --x64",
+    "build:engine:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-cpu-engine.ps1",
+    "prepare:llama:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-llama-cpu.ps1",
+    "dist:win": "npm run build && npm run build:engine:cpu && npm run prepare:llama:cpu && electron-builder --win nsis --x64",
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:ui": "electron tests/e2e/capture-ui.mjs",
@@ -76,12 +78,24 @@
     ],
     "extraResources": [
       {
-        "from": "engine/dist/NolaTranslatorEngine",
+        "from": "engine/dist/NolaPythonEngine",
         "to": "engine"
       },
       {
-        "from": "vendor/llama",
+        "from": "vendor/llama-cpu",
         "to": "llama"
+      },
+      {
+        "from": "build/runtime-catalog.json",
+        "to": "runtime-catalog.json"
+      },
+      {
+        "from": "build/runtime-recipes.json",
+        "to": "runtime-recipes.json"
+      },
+      {
+        "from": "scripts/extract-runtime.ps1",
+        "to": "runtime/extract-runtime.ps1"
       }
     ],
     "win": {

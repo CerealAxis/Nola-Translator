@@ -1,3 +1,5 @@
+import { supportsSelectedEngine } from '../../../shared/model-engines'
+import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 /** Model catalog and download manager. The router owns the page padding. */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -33,9 +35,31 @@ export function ModelsPage() {
   const installed = useMemo(() => resources.filter((item) => item.installed), [resources])
   const activeCount = useMemo(() => countActive(resources), [resources])
   const recognition = resources.find((item) => item.resourceId === settings?.recognition.modelId)
-  const translation = resources.find((item) => item.resourceId === (settings?.translation.provider === 'm2m100' ? 'm2m100-418m' : settings?.translation.hymt2ModelId))
-  const localTranslation = settings?.translation.provider === 'hymt2' || settings?.translation.provider === 'm2m100'
-  const providerNames = { hymt2: 'Hy-MT2', m2m100: 'M2M100', microsoft: 'Microsoft Translator', openai: 'OpenAI', ollama: 'Ollama' }
+  const translation = resources.find((item) => item.resourceId === settings?.translation.localModelId)
+  const localTranslation = settings?.translation.provider === 'local'
+  /*
+   * 服务商显示名跟着界面语言走：「本地模型 / 云端模型」是界面概念而非产品名
+   * （Hy-MT2 与 M2M100 合并成前者，OpenAI 与 Ollama 合并成后者）。
+   * 只有 Microsoft Translator 是产品名。
+   */
+  const providerNames = {
+    local: t('settings.providerLocal'),
+    cloud: t('settings.providerCloud'),
+    microsoft: t('settings.providerMicrosoft'),
+  }
+  /*
+   * 云端那一栏显示**模型 ID**，不是服务商名。服务商名在这一栏是废话：三家云端服务商
+   * 都只是"把请求发给某个 OpenAI 兼容 endpoint"，真正决定用的是哪个模型的是
+   * `cloudModel`。只显示 "OpenAI" 会让人以为选服务商就等于选好了模型 —— 实际配置的是
+   * 另一个服务商、模型却还是 OpenAI 的，那一栏就整个说错了。模型 id 为空（还没填）
+   * 才退回服务商名，总得显示点什么。
+   */
+  const cloudModel = settings?.translation.cloudModel?.trim() ?? ''
+  const currentTranslation = localTranslation
+    ? translation?.name ?? settings?.translation.localModelId ?? '—'
+    : settings?.translation.provider === 'cloud'
+      ? cloudModel || providerNames.cloud
+      : providerNames.microsoft
 
   // error 是诊断串，不进界面（store 约定）：只送 console，界面走 errors.* 的错误码文案。
   useEffect(() => {
@@ -48,13 +72,15 @@ export function ModelsPage() {
     })
   }
 
+  /*
+   * `defaultTargetOf` 已经把 `provider: 'local'` 一起写进 patch 了，所以这里不再补写。
+   * 以前这里硬按 `hymt2`：那会儿 m2m100 在设置里没有槽位，从模型页设默认只能强行把
+   * provider 改回 hymt2，于是"给 M2M100 设默认"这件事根本无法表达。
+   */
   const setDefault = (record: ResourceRecord) => {
     const patch = defaultTargetOf(record)
-    if (!patch) return
-    const activePatch = record.kind === 'translationModel'
-      ? { ...patch, translation: { ...patch.translation, provider:'hymt2' as const } }
-      : patch
-    void updateSettings(activePatch).catch(() => toast.danger(t('modelsSettingsUi.defaultSaveFailed')))
+    if (!patch || !supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)) return
+    void updateSettings(patch).catch(() => toast.danger(t('modelsSettingsUi.defaultSaveFailed')))
   }
 
   const card = (record: ResourceRecord, installable = true) => (
@@ -63,7 +89,7 @@ export function ModelsPage() {
       record={record}
       busy={busyIds.includes(record.resourceId)}
       isDefault={isDefaultOf(record, settings)}
-      canBeDefault={defaultTargetOf(record) !== null}
+      canBeDefault={defaultTargetOf(record) !== null && supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)}
       installable={installable}
       onInstall={run(record.resourceId, 'install')}
       onCancel={run(record.resourceId, 'cancel')}
@@ -81,7 +107,7 @@ export function ModelsPage() {
         </header>
         <div className="models-overview__summaries">
           <CurrentModel label={t('modelsSettingsUi.currentRecognition')} name={recognition?.name ?? settings?.recognition.modelId ?? '—'} record={recognition ?? null} installed={recognition?.installed ?? false} kind="recognitionModel" />
-          <CurrentModel label={t('modelsSettingsUi.currentTranslation')} name={localTranslation ? translation?.name ?? settings?.translation.hymt2ModelId ?? '—' : providerNames[settings?.translation.provider ?? 'hymt2']} record={localTranslation ? translation ?? null : null} installed={localTranslation ? translation?.installed ?? false : null} kind="translationModel" />
+          <CurrentModel label={t('modelsSettingsUi.currentTranslation')} name={currentTranslation} record={localTranslation ? translation ?? null : null} installed={localTranslation ? translation?.installed ?? false : null} kind="translationModel" />
         </div>
       </section>
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button, Card, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
-import { ArrowRight, ChevronDown, ExternalLink, Info, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Settings, Square, X } from 'lucide-react'
+import { ArrowRight, ChevronDown, ExternalLink, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Settings, Square, X } from 'lucide-react'
 import { DEFAULT_SETTINGS, LANGUAGE_LABELS } from '@/bridge'
 import type { AppSettingsPatch } from '@/bridge'
 import { useI18n } from '@/i18n'
@@ -57,16 +57,24 @@ export function OverlayPage() {
     '--preview-translation-line-height': config.translationLineHeight,
     fontFamily: config.fontFamily,
   } as CSSProperties
-  /** 底部第一个胶囊显示的是**翻译服务商**，跟主仓的 `translationProviderLabel` 同一口径。 */
-  const providerNames = { hymt2: 'Hy-MT2', m2m100: 'M2M100', microsoft: 'Microsoft Translator', openai: 'OpenAI', ollama: 'Ollama' } as const
+  /*
+   * 底部第一个胶囊显示的是**翻译服务商**，跟主仓的 `translationProviderLabel` 同一口径。
+   * 名字跟着界面语言走：五个 provider 塌成 `local` / `cloud` / `microsoft` 三个，
+   * 前两个是界面概念而非产品名（Hy-MT2 与 M2M100 合并进前者，OpenAI 与 Ollama
+   * 合并进后者），只有 Microsoft Translator 是产品名。
+   */
+  const providerNames = {
+    local: t('settings.providerLocal'),
+    cloud: t('settings.providerCloud'),
+    microsoft: t('settings.providerMicrosoft'),
+  } as const
   return (
     <div className="nola-overlay-page">
-      <PageHeader className="nola-page-intro" title={t('shellUi.overlay')} subtitle={t('shellUi.overlaySubtitle')}
+      <PageHeader className="nola-page-intro" title={t('shellUi.overlay')}
         actions={<Button onPress={() => void open()} isPending={opening}><ExternalLink aria-hidden="true" />{t('shellUi.openOverlay')}</Button>} />
       <Card className="nola-overlay-preview">
-        <Card.Header className="flex-row items-center justify-between gap-3">
+        <Card.Header>
           <Card.Title className="text-lg font-semibold">{t('shellUi.captionPreview')}</Card.Title>
-          <Card.Description>{t('shellUi.movable')}</Card.Description>
         </Card.Header>
         {/*
          * 预览卡的结构逐条照主仓 `src/renderer/components/CaptionPreview.tsx`：
@@ -137,7 +145,6 @@ export function OverlayPage() {
         </Card.Content>
         <Card.Footer className="nola-overlay-footer">
           <Button variant="ghost" onPress={() => navigate('#/settings/appearance')}><Settings aria-hidden="true" />{t('shellUi.appearance')}<ArrowRight aria-hidden="true" /></Button>
-          <p className="flex items-center gap-2 text-xs text-muted"><Info className="size-4 shrink-0" aria-hidden="true" />{t('shellUi.overlayHint')}</p>
         </Card.Footer>
       </Card>
     </div>

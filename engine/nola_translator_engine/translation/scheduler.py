@@ -14,6 +14,8 @@ class TranslationScheduler:
         self,
         provider: TranslationProvider,
         *,
+        # The flat budget for a provider that answers in one request, and the floor for a
+        # provider that asks for more; see `_budget_seconds`. Not a hard ceiling.
         timeout_seconds: float = 10,
         cache_size: int = 512,
         max_concurrency: int = 3,
@@ -86,6 +88,21 @@ class TranslationScheduler:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
 
+    def _budget_seconds(self, text: str, source: str, target: str) -> float:
+        """How long this one translation may take.
+
+        `timeout_seconds` is the flat budget for a provider that answers in a single
+        request. A provider that has to split the text into several sequential requests —
+        the cloud formats do, whenever contextWindow is smaller than the caption — states
+        what it needs with `timeout_for`, because one shared 10s budget across all of those
+        chunks produced a 「翻译超时」 that never named contextWindow as the cause. The hook is
+        optional, so every provider that does not need it keeps the flat default.
+        """
+        timeout_for = getattr(self.provider, "timeout_for", None)
+        if timeout_for is None:
+            return self.timeout_seconds
+        return max(self.timeout_seconds, timeout_for(text, source, target))
+
     async def _request(
         self, key: tuple[str, str, str, str], normalized: str, source: str, target: str
     ) -> ScheduledTranslation:
@@ -93,7 +110,7 @@ class TranslationScheduler:
             async with self.semaphore:
                 result = await asyncio.wait_for(
                     self.provider.translate(normalized, source, target),
-                    timeout=self.timeout_seconds,
+                    timeout=self._budget_seconds(normalized, source, target),
                 )
         except TimeoutError:
             return ScheduledTranslation(

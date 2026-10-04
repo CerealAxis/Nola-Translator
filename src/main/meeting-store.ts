@@ -158,6 +158,29 @@ export class MeetingStore {
     )
     this.cache.clear()
     for (const meta of metas) if (meta) this.cache.set(meta.meetingId, meta)
+    await this.reconcileInterrupted()
+  }
+
+  /**
+   * `loadAll` runs once per process, at startup, before any window or session can exist — so a meta
+   * that still reads as running belongs to a session the previous process died with. Left alone it
+   * keeps no `endedAtMs`, the list shows it as 进行中 forever, and no later `finish` can repair it
+   * because `open` is in-memory only and is never repopulated. Only running -> interrupted is
+   * written; completed is left on disk untouched, the renderer already infers it from `endedAtMs`.
+   */
+  private async reconcileInterrupted(): Promise<void> {
+    for (const meta of [...this.cache.values()]) {
+      const state = meta.state ?? (meta.endedAtMs === undefined ? 'running' : 'completed')
+      if (state !== 'running') continue
+      const next: MeetingMeta = { ...meta, state: 'interrupted' }
+      this.cache.set(meta.meetingId, next)
+      try {
+        await this.serialize(meta.meetingId, () => writeMeta(this.directory(meta.meetingId), next))
+      } catch (error) {
+        // The in-memory entry is already correct, so a read-only directory only costs a stale file.
+        console.error('meeting interrupted rewrite failed', error)
+      }
+    }
   }
 
   private async migrateLegacyHistory(legacyPath: string): Promise<void> {
@@ -230,6 +253,7 @@ export class MeetingStore {
       title: '',
       titleIsCustom: false,
       startedAtMs,
+      state: 'running',
       durationMs: 0,
       daySequence: this.nextDaySequence(startedAtMs),
       segmentCount: 0,
@@ -272,6 +296,7 @@ export class MeetingStore {
       const next: MeetingMeta = {
         ...meta,
         endedAtMs,
+        state: 'completed',
         durationMs: Math.max(0, endedAtMs - meta.startedAtMs),
         ...(await this.resolveAudio(meta)),
       }

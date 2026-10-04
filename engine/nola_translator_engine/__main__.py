@@ -123,6 +123,21 @@ async def _run() -> int:
 
 
 def main() -> int:
+    if os.environ.get("NOLA_TRANSLATOR_RUNTIME_PROBE") == "1":
+        protocol_out = _redirect_third_party_stdout()
+        try:
+            import torch
+            import transformers
+            import pyaudiowpatch
+            from . import runtime
+            xpu_compiled = getattr(getattr(torch, "xpu", None), "_is_compiled", lambda: False)()
+            backend = "rocm" if torch.version.hip else "cuda" if torch.version.cuda else "xpu" if xpu_compiled else "cpu"
+            print(json.dumps({"torch": torch.__version__, "transformers": transformers.__version__, "backend": backend,
+                              "cudaAvailable": torch.cuda.is_available()}), file=protocol_out, flush=True)
+            return 0
+        except Exception as error:
+            print(f"runtime import failed: {type(error).__name__}: {error}", file=sys.stderr, flush=True)
+            return 1
     if os.environ.get("NOLA_TRANSLATOR_SELF_TEST") == "1":
         checks: dict[str, object] = {}
         stage = "imports"

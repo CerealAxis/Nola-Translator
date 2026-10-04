@@ -22,12 +22,14 @@ import { EmptyState, Spinner } from '@heroui/react'
 import type { RouteId } from '@/bridge'
 import { useI18n } from '@/i18n'
 
-export type SettingsTab = 'general' | 'audio' | 'translation' | 'appearance' | 'storage' | 'advanced'
+export type SettingsTab = 'general' | 'audio' | 'translation' | 'compute' | 'performance' | 'appearance' | 'storage' | 'advanced'
 
 export const SETTINGS_TABS: readonly SettingsTab[] = [
   'general',
   'audio',
   'translation',
+  'compute',
+  'performance',
   'appearance',
   'storage',
   'advanced',

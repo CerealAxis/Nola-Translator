@@ -21,12 +21,14 @@ coverage/
 Thumbs.db
 .venv/
 /.codex/
-/docs/compose/
+/docs
 engine/build/
 engine/dist/
 release/
 /build/*
 !/build/icon.ico
+!/build/runtime-catalog.json
+!/build/runtime-recipes.json
 __pycache__/
 *.py[cod]
 *.egg-info/

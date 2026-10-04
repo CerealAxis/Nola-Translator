@@ -142,7 +142,6 @@ export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, showC
           </Tooltip>
         </div>
       ) : null}
-      <span className="nola-workspace-record-hint">{t('workspaceUi.localRecord')}</span>
     </footer>
   )
 }

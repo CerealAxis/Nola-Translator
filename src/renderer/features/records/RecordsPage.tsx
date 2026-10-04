@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AlertDialog, Button, Card, EmptyState, Pagination, SearchField, Skeleton } from '@heroui/react'
-import { Mic, ShieldCheck } from 'lucide-react'
+import { Mic } from 'lucide-react'
 import { ErrorBoundary } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import { pathOf, recordPath, useRoute } from '@/routes'
@@ -83,7 +83,6 @@ export function RecordsPage(): ReactNode {
             </Pagination.Content></Pagination>
           </Card.Footer> : null}
         </Card>
-        <p className="nola-record-page__privacy"><ShieldCheck aria-hidden="true" size={20} />{t('homeRecordsUi.localOnly')}</p>
       </div>
       <RenameDialog meetingId={renaming?.meetingId ?? null} initialTitle={renaming?.title ?? ''} onClose={() => setRenaming(null)} />
       <ExportDialog meetingId={exporting?.meetingId ?? null} isOpen={exporting !== null} onOpenChange={(open) => { if (!open) setExporting(null) }} />

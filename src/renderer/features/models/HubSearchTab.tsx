@@ -42,7 +42,7 @@ export function hubCardRecord(hit: HubHit): ResourceRecord {
   return {
     resourceId: summary.resourceId,
     kind: installSlotOf(hit) === 'translation' ? 'translationModel' : 'recognitionModel',
-    provider: summary.libraryName ?? 'huggingface',
+    provider: summary.compatibility?.adapterId ?? summary.libraryName ?? 'huggingface',
     name: repoName(summary.repo),
     description: summary.description ?? '',
     languages: summary.compatibility?.languages ?? [],
@@ -252,6 +252,8 @@ export function HubSearchTab() {
         const loadingDescription = !summary.description && descriptions[summary.repo] === undefined
         const liveId = live?.resourceId ?? summary.resourceId
         return <ModelCard key={summary.repo} record={record} className="models-card--hub"
+          supportedEngines={summary.compatibility?.compatible
+            ? [summary.compatibility.loader === 'llama.cpp' ? 'llama' : 'pytorch'] : undefined}
           descriptionLoading={loadingDescription}
           descriptionFallback={t('models.noDescription')}
           metadata={`${summary.author ?? summary.repo.split('/')[0]} · ${summary.formats?.includes('gguf') || summary.hasGguf ? 'GGUF' : 'PyTorch'}`}
@@ -281,9 +283,22 @@ function DetailDrawer({ hit, description, onClose, onInstall }: {
 }) {
   const { t } = useI18n()
   const summary = hit?.summary
+  /*
+   * 宽度只能落在 `Drawer.Dialog` 上，**不能**落在 `Drawer.Content`。
+   *
+   * `Drawer.Content` 是铺满视口的定位壳（HeroUI 的 `.drawer__content`：
+   * `fixed inset-0 w-full flex pointer-events-none`），它唯一的职责是靠
+   * `justify-start/end` 把面板顶到某一边；面板自己的宽度由
+   * `.drawer__dialog[data-placement]` 给（left/right 为 `w-80 sm:w-96`）。
+   * 一旦给 Content 加宽度，这层壳就塌成那个宽度，并且因为 `inset-0` 过约束
+   * （left/right 都是 0 而 width 非 auto）被钉死在 `left: 0` —— 面板于是悬在
+   * 屏幕左缘内侧，左边空出一条竖直的 backdrop。进出场动画的 `translate: ±100%`
+   * 是相对**面板自身宽度**算的，滑动距离并没有变，变的是起点：静止位置跑偏到
+   * 屏幕左缘内侧之后，面板就从页面中间某个位置滑入，而不是贴着屏幕左缘。
+   */
   return <Drawer isOpen={hit !== null} onOpenChange={(open) => !open && onClose()}>
-    <Drawer.Backdrop><Drawer.Content placement="right" className="w-[420px]">
-      <Drawer.Dialog className="flex h-full flex-col gap-4 p-4">
+    <Drawer.Backdrop><Drawer.Content placement="left">
+      <Drawer.Dialog className="w-[420px] gap-4 p-4">
         <Drawer.Header className="flex items-start justify-between gap-4">
           <Drawer.Heading>{summary ? repoName(summary.repo) : t('models.details')}</Drawer.Heading>
           <Drawer.CloseTrigger />

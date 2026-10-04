@@ -57,15 +57,20 @@ describe('事实格式化（只写事实，不写形容词）', () => {
 })
 
 describe('默认模型的可设范围', () => {
-  it('识别模型与 Hy-MT2 有设置槽位，m2m100 没有', () => {
+  it('识别模型只认资源表里的 id，翻译模型任何 id 都有槽位', () => {
     expect(defaultTargetOf(record({ resourceId: 'qwen3-asr-1.7b-hf' }))).toEqual({
       recognition: { modelId: 'qwen3-asr-1.7b-hf' },
     })
+    // 翻译模型统一写成 localModelId + provider:'local'：三档 Hy-MT2、M2M100、Hub 自装 GGUF 同理。
     expect(
       defaultTargetOf(record({ resourceId: 'hy-mt2-1.8b-q4-k-m', kind: 'translationModel' })),
-    ).toEqual({ translation: { hymt2ModelId: 'hy-mt2-1.8b-q4-k-m' } })
-    // m2m100 能装能跑，但设置里没有它的槽位：给一个按下去会静默失败的按钮比不给更糟。
-    expect(defaultTargetOf(record({ resourceId: 'm2m100-418m', kind: 'translationModel' }))).toBeNull()
+    ).toEqual({ translation: { localModelId: 'hy-mt2-1.8b-q4-k-m', provider: 'local' } })
+    // m2m100 以前没有槽位，「设为默认」只能返回 null；现在按 id 路由，它有槽位了。
+    expect(defaultTargetOf(record({ resourceId: 'm2m100-418m', kind: 'translationModel' }))).toEqual({
+      translation: { localModelId: 'm2m100-418m', provider: 'local' },
+    })
+    // 识别模型那边不变：引擎资源表认不出的 id 设下去也加载不了，仍然不给槽位。
+    expect(defaultTargetOf(record({ resourceId: 'hub:openai/whisper-large-v3' }))).toBeNull()
   })
 
   it('isDefaultOf 对两处槽位都成立', () => {

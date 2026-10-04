@@ -118,20 +118,25 @@ describe('设置存储', () => {
         }), 'utf8')
         const migrated = await new SettingsStore(path).load()
         expect(migrated.recognition.modelId).toBe('qwen3-asr-1.7b-hf')
-        expect(migrated.translation.provider).toBe('hymt2')
+        expect(migrated.translation.provider).toBe('local')
         expect(migrated.translation).not.toHaveProperty('allowIntermediate')
         expect(migrated.translation.translateIntermediate).toBe(true)
       }
 
-      for (const provider of ['microsoft', 'openai', 'ollama']) {
-        await writeFile(path, JSON.stringify({ version: 1, translation: { provider } }), 'utf8')
+      // 'microsoft' 前后同名；'openai' / 'ollama' 合并成 'cloud'（协议降级成 cloudApiFormat）。
+      for (const [legacy, expected] of [
+        ['microsoft', 'microsoft'],
+        ['openai', 'cloud'],
+        ['ollama', 'cloud'],
+      ] as const) {
+        await writeFile(path, JSON.stringify({ version: 1, translation: { provider: legacy } }), 'utf8')
         const preserved = await new SettingsStore(path).load()
-        expect(preserved.translation.provider).toBe(provider)
+        expect(preserved.translation.provider).toBe(expected)
       }
 
       await writeFile(path, JSON.stringify({ version: 1, translation: { provider: 'unknown-provider' } }), 'utf8')
       const unknown = await new SettingsStore(path).load()
-      expect(unknown.translation.provider).toBe('hymt2')
+      expect(unknown.translation.provider).toBe('local')
 
       await writeFile(path, JSON.stringify({ version: 1, translation: { allowIntermediate: true } }), 'utf8')
       const pivotDropped = await new SettingsStore(path).load()
@@ -142,8 +147,8 @@ describe('设置存储', () => {
       const defaults = await new SettingsStore(path).load()
       expect(defaults.recognition.modelId).toBe('qwen3-asr-1.7b-hf')
       expect(defaults.recognition.sourceLanguage).toBe('auto')
-      expect(defaults.translation.provider).toBe('hymt2')
-      expect(defaults.translation.hymt2ModelId).toBe('hy-mt2-1.8b-q3-k-m')
+      expect(defaults.translation.provider).toBe('local')
+      expect(defaults.translation.localModelId).toBe('hy-mt2-1.8b-q3-k-m')
       expect(defaults.translation.targetLanguage).toBe('zh')
       expect(defaults.translation.translateIntermediate).toBe(false)
     } finally {
@@ -203,22 +208,27 @@ describe('设置存储', () => {
     }
   })
 
-  it('Hy-MT2 量化档位写入后可重载，非法值回落默认档', async () => {
+  it('本地模型 id 写入后可重载，空值与非法类型回落默认档', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
     const path = join(directory, 'settings.json')
     try {
       const store = new SettingsStore(path)
-      await store.update({ translation: { hymt2ModelId: 'hy-mt2-1.8b-iq2-m' } })
-      expect((await new SettingsStore(path).load()).translation.hymt2ModelId).toBe('hy-mt2-1.8b-iq2-m')
+      await store.update({ translation: { localModelId: 'hy-mt2-1.8b-iq2-m' } })
+      expect((await new SettingsStore(path).load()).translation.localModelId).toBe('hy-mt2-1.8b-iq2-m')
 
-      for (const bad of ['hy-mt2-1.8b-1.25bit', '', null]) {
-        const written = await store.update({ translation: { hymt2ModelId: bad as never } })
-        expect(written.translation.hymt2ModelId).toBe('hy-mt2-1.8b-q3-k-m')
-        expect(JSON.parse(await readFile(path, 'utf8')).translation.hymt2ModelId).toBe('hy-mt2-1.8b-q3-k-m')
+      // 合并 M2M100 与自装模型之后，这个位是自由字符串：档位枚举由 settings-schema 那层
+      // 负责，店内存的不再按三档过滤，否则刚装好的自装模型会被挡回默认档。
+      const custom = await store.update({ translation: { localModelId: 'hub:someone/my-mt-model' } })
+      expect(custom.translation.localModelId).toBe('hub:someone/my-mt-model')
+
+      for (const bad of ['', null]) {
+        const written = await store.update({ translation: { localModelId: bad as never } })
+        expect(written.translation.localModelId).toBe('hy-mt2-1.8b-q3-k-m')
+        expect(JSON.parse(await readFile(path, 'utf8')).translation.localModelId).toBe('hy-mt2-1.8b-q3-k-m')
       }
 
       await writeFile(path, JSON.stringify({ version: 1, translation: { provider: 'hymt2' } }), 'utf8')
-      expect((await new SettingsStore(path).load()).translation.hymt2ModelId).toBe('hy-mt2-1.8b-q3-k-m')
+      expect((await new SettingsStore(path).load()).translation.localModelId).toBe('hy-mt2-1.8b-q3-k-m')
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

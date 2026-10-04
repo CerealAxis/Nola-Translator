@@ -7,6 +7,7 @@ audio event, ITN flag, in that order.
 """
 
 from __future__ import annotations
+from ..compute import cpu_threads, release_device_cache
 
 import gc
 import os
@@ -44,13 +45,15 @@ class SenseVoiceModelUnavailable(ModelUnavailable):
 class SenseVoiceRuntime:
     """In-process SenseVoiceSmall runtime: load once, single-flight inference."""
 
-    def __init__(self, model_dir: Path) -> None:
+    def __init__(self, model_dir: Path, *, device: str | None = None, threads: int = 0) -> None:
         self.model_dir = Path(model_dir)
         self._load_lock = threading.Lock()
         self._inference_lock = threading.Lock()
         self._loaded = False
         self._device: str | None = None
         self._model: Any = None
+        self._requested_device = device
+        self.threads = threads
 
     @property
     def loaded(self) -> bool:
@@ -74,9 +77,9 @@ class SenseVoiceRuntime:
                 raise SenseVoiceModelUnavailable(
                     f"无法导入 funasr：{type(error).__name__}: {error}"
                 ) from error
-            device = "cuda:0" if torch.cuda.is_available() else "cpu"
+            device = self._requested_device or ("cuda:0" if torch.cuda.is_available() else "cpu")
             # funasr preprocessing still burns CPU, and the default thread pool can take the cores video playback needs.
-            torch.set_num_threads(max(1, min(4, (os.cpu_count() or 2) // 2)))
+            torch.set_num_threads(cpu_threads(self.threads))
             try:
                 model = AutoModel(
                     model=str(self.model_dir), device=device, disable_update=True
@@ -95,13 +98,13 @@ class SenseVoiceRuntime:
         with self._inference_lock:
             with self._load_lock:
                 model = self._model
+                device = self._device or self._requested_device
                 self._model = None
                 self._loaded = False
                 self._device = None
             del model
             gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            release_device_cache(device)
 
     def transcribe(
         self,
@@ -151,17 +154,17 @@ def _parse_text(raw: str) -> tuple[str, str | None]:
     return body, detected if detected in SUPPORTED_LANGUAGES else None
 
 
-_runtimes: dict[str, SenseVoiceRuntime] = {}
+_runtimes: dict[tuple, SenseVoiceRuntime] = {}
 _runtimes_lock = threading.Lock()
 
 
-def get_sensevoice_runtime(model_dir: Path) -> SenseVoiceRuntime:
-    """Process-wide singleton cached by resolved model_dir, so weights load once per session."""
+def get_sensevoice_runtime(model_dir: Path, **options) -> SenseVoiceRuntime:
+    """Cache by resolved model directory and compute options."""
     resolved = Path(model_dir).resolve()
-    key = os.path.normcase(str(resolved))
+    key = (os.path.normcase(str(resolved)), tuple(sorted(options.items())))
     with _runtimes_lock:
         runtime = _runtimes.get(key)
         if runtime is None:
-            runtime = SenseVoiceRuntime(resolved)
+            runtime = SenseVoiceRuntime(resolved, **options)
             _runtimes[key] = runtime
         return runtime

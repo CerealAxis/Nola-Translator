@@ -16,6 +16,7 @@ from nola_translator_engine.resources import (
     HYMT2_IQ2_RESOURCE_ID,
     HYMT2_Q3_RESOURCE_ID,
     HYMT2_RESOURCE_ID,
+    M2M100_RESOURCE_ID,
     QWEN_06B_RESOURCE_ID,
     QWEN_RESOURCE_ID,
     SENSEVOICE_RESOURCE_ID,
@@ -41,7 +42,7 @@ def _hymt2_command(request_id: str, model_id: str | None) -> str:
         '{"protocolVersion":1,"type":"startSession","requestId":"'
         + request_id
         + '","config":{"audioSource":{"kind":"defaultOutput"},"recognitionMode":"realtime",'
-        + f'"sourceLanguage":"auto","targetLanguages":["en"],"translationProvider":"hymt2",'
+        + f'"sourceLanguage":"auto","targetLanguages":["en"],"translationProvider":"local",'
         + tail
         + '"recognitionModelId":"'
         + SENSEVOICE_RESOURCE_ID
@@ -187,7 +188,7 @@ def test_start_session_reports_missing_translation_model(tmp_path, monkeypatch) 
     command = parse_command_line(
         '{"protocolVersion":1,"type":"startSession","requestId":"missing-translation",'
         '"config":{"audioSource":{"kind":"defaultOutput"},"recognitionMode":"realtime",'
-        '"sourceLanguage":"en","targetLanguages":["zh"],"translationProvider":"hymt2"}}'
+        '"sourceLanguage":"en","targetLanguages":["zh"],"translationProvider":"local"}}'
     )
     events = asyncio.run(runtime.handle(command))
     assert events[0].code == "resourceUnavailable"
@@ -240,7 +241,7 @@ def test_start_session_rejects_unsupported_translation_language(tmp_path, monkey
         '{"protocolVersion":1,"type":"startSession","requestId":"start-bad-lang",'
         '"config":{"audioSource":{"kind":"defaultOutput"},"recognitionMode":"realtime",'
         '"sourceLanguage":"auto","targetLanguages":["tlh"],'
-        '"translationProvider":"hymt2"}}'
+        '"translationProvider":"local"}}'
     )
 
     events = asyncio.run(runtime.handle(command))
@@ -257,7 +258,7 @@ def test_start_session_rejects_unsupported_m2m100_language(tmp_path, monkeypatch
         '{"protocolVersion":1,"type":"startSession","requestId":"start-bad-m2m",'
         '"config":{"audioSource":{"kind":"defaultOutput"},"recognitionMode":"realtime",'
         '"sourceLanguage":"auto","targetLanguages":["tlh"],'
-        '"translationProvider":"m2m100"}}'
+        f'"translationProvider":"local","translationModelId":"{M2M100_RESOURCE_ID}"}}}}'
     )
 
     events = asyncio.run(runtime.handle(command))
@@ -398,7 +399,7 @@ def test_m2m100_is_ready_before_session_starts(tmp_path, monkeypatch) -> None:
             '{"protocolVersion":1,"type":"startSession","requestId":"warm",'
             '"config":{"audioSource":{"kind":"defaultOutput"},"recognitionMode":"realtime",'
             '"sourceLanguage":"auto","targetLanguages":["zh"],'
-            '"translationProvider":"m2m100"}}'
+            f'"translationProvider":"local","translationModelId":"{M2M100_RESOURCE_ID}"}}}}'
         )
         runtime._configure_translation(command)
         runtime.translation_provider = provider

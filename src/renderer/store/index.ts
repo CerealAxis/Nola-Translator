@@ -126,8 +126,8 @@ export { meetingsStore } from './meetingStore'
 export type { MeetingsState, MeetingDetail } from './meetingStore'
 export { modelsStore } from './modelStore'
 export type { ModelsState, HubSearchState, HubKind } from './modelStore'
-export { sessionStore, findMissingResource, MAX_FINALIZED_SEGMENTS } from './sessionStore'
-export type { SessionState, MissingResource } from './sessionStore'
+export { sessionStore, findMissingResource, MAX_FINALIZED_SEGMENTS, ENGINE_LOST_CODE } from './sessionStore'
+export type { SessionState, EngineStatus, MissingResource } from './sessionStore'
 
 export {
   loadSettings,

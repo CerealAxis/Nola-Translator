@@ -22,14 +22,14 @@ def _prefix_builder(runtime: QwenRuntime):
 
 
 def create_qwen_recognizer(
-    model_dir: Path, *, source_language: str | None = None
+    model_dir: Path, *, source_language: str | None = None, runtime: QwenRuntime | None = None
 ) -> StreamingRecognizer:
     """Build the Qwen streaming recognizer; the model loads lazily on the first job's thread.
 
     Load failures (ModelUnavailable) surface from accept()/flush(), where runtime.py maps
     them to a modelUnavailable error event.
     """
-    runtime = get_qwen_runtime(model_dir)
+    runtime = runtime or get_qwen_runtime(model_dir)
     if Path(model_dir).name == "qwen3-asr-0.6b-hf":
         return StreamingRecognizer(
             runtime,

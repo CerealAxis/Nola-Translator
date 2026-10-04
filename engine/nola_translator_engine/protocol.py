@@ -1,6 +1,7 @@
 """The versioned JSONL protocol between Electron and the local engine."""
 
 from __future__ import annotations
+from .compute import ComputeOptions
 
 import json
 from typing import Annotated, Literal, Union
@@ -34,13 +35,35 @@ AudioSource = Annotated[Union[DefaultOutputSource, DeviceSource], Field(discrimi
 
 
 class TranslationOptions(ProtocolModel):
-    endpoint: str | None = Field(default=None, min_length=1, max_length=2048)
-    apiKey: str | None = Field(default=None, max_length=4096)
-    region: str | None = Field(default=None, max_length=128)
-    model: str | None = Field(default=None, max_length=256)
+    #: The wire protocol is a separate field from the provider name, so one `cloud` provider
+    #: covers OpenAI Chat Completions, OpenAI Responses, Anthropic Messages and Ollama. What
+    #: `endpoint` means depends on it: the three OpenAI-shaped formats take a versioned base
+    #: (`https://api.openai.com/v1`) and get their path appended, while `anthropic` takes a bare
+    #: origin and gets `/v1/messages` appended.
+    #: No `min_length`: an empty endpoint is the legitimate "not configured yet" state the
+    #: settings layer can persist, and the missing endpoint is reported by the provider as a
+    #: usable message rather than as a schema error here.
+    endpoint: str = Field(default="", max_length=2048)
+    region: str = Field(default="", max_length=128)
+    model: str = Field(default="", max_length=256)
+    apiFormat: Literal["chat-completions", "chat-responses", "anthropic", "ollama"] = "chat-completions"
+    #: Ceiling the engine fits a request into, reserving room for the reply and splitting the
+    #: source text when it does not fit. Nothing downstream clips this to what a vendor
+    #: documents, so the upper bound is a fat-finger guard only, and it is set at the same
+    #: 10M the TypeScript schema allows rather than at a real model's window — a ceiling the
+    #: settings UI rejects but the engine accepts is the disagreement worth avoiding.
+    contextWindow: int = Field(default=128000, ge=256, le=10_000_000)
+    #: Sent as each API's own output-limit field (`max_tokens`, `max_output_tokens`,
+    #: `options.num_predict`). Unlike the window this value goes onto the wire unedited, which
+    #: makes the ceiling the only thing between a pasted 1e9 and a request the user pays for.
+    maxOutputTokens: int = Field(default=4096, ge=1, le=10_000_000)
+    #: 4096 is far above any issued key — real ones run a few hundred bytes — but self-hosted
+    #: gateways mint signed tokens well past 1 KiB, and the TS schema agrees on the same number.
+    apiKey: str = Field(default="", max_length=4096)
 
 
 class SessionConfig(ProtocolModel):
+    compute: ComputeOptions = Field(default_factory=ComputeOptions)
     audioSource: AudioSource
     recognitionMode: Literal["realtime", "accurate"]
     # A free-form id rather than a fixed union: a session may name any model the engine has a
@@ -50,7 +73,11 @@ class SessionConfig(ProtocolModel):
     sourceLanguage: str = Field(min_length=1, max_length=32)
     targetLanguages: list[str] = Field(max_length=8)
     allowIntermediateTranslation: bool = False
-    translationProvider: Literal["hymt2", "m2m100", "microsoft", "openai", "ollama"] = "hymt2"
+    # `local` and `cloud` are provider names, not wire formats. `local` dispatches on the
+    # adapter the selected translation model's own metadata resolved to, so a GGUF installed
+    # from the hub and the bundled transformers model are both "local"; `cloud` dispatches on
+    # `translationOptions.apiFormat` instead.
+    translationProvider: Literal["local", "cloud", "microsoft"] = "local"
     translationModelId: str | None = Field(default=None, min_length=1, max_length=256)
     translationOptions: TranslationOptions | None = None
     """Absolute path the engine records the meeting audio to; omitted means no audio file."""
@@ -64,6 +91,10 @@ class HelloCommand(Envelope):
 
 class ListDevicesCommand(Envelope):
     type: Literal["listDevices"]
+
+
+class ListComputeDevicesCommand(Envelope):
+    type: Literal["listComputeDevices"]
 
 
 class StartSessionCommand(Envelope):
@@ -142,6 +173,7 @@ EngineCommand = Annotated[
         SetSessionPausedCommand,
         ShutdownCommand,
         ListResourcesCommand,
+        ListComputeDevicesCommand,
         ManageResourceCommand,
         SearchHubModelsCommand,
         InspectHubRepoCommand,
@@ -324,6 +356,14 @@ class StatusEvent(Envelope):
     details: dict[str, object] | None = None
 
 
+class ComputeDevicesEvent(Envelope):
+    type: Literal["computeDevices"]
+    devices: list[dict[str, object]] = Field(max_length=64)
+    notes: list[str] = Field(max_length=32)
+    torchVersion: str = Field(max_length=64)
+    activePlan: dict[str, object] | None = None
+
+
 ErrorCode = Literal[
     "invalidMessage",
     "unsupportedProtocol",
@@ -356,6 +396,7 @@ EngineEvent = Annotated[
     Union[
         ReadyEvent,
         DevicesEvent,
+        ComputeDevicesEvent,
         SessionStartedEvent,
         SessionStoppedEvent,
         CaptionEvent,

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { computeSettingsPatchSchema } from '../shared/compute'
 
 /**
  * The runtime half of the settings contract.
@@ -28,12 +29,19 @@ const recognitionModelIdSchema = z.union([
   hubModelId,
 ])
 
-const hymt2ModelIdSchema = z.union([
-  z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m']),
+/**
+ * 本地翻译模型 id：Hy-MT2 的三个量化档 + 合并进来的 M2M100，或 `hub:` 前缀的自装 id。
+ *
+ * 闭集而不是裸字符串，和 `recognitionModelIdSchema` 同理 —— 一个已经卸载的 id 在这里就响，
+ * 错误消息说的是设置项本身，而不是几分钟后引擎报的一句「模型不可用」。
+ */
+const localModelIdSchema = z.union([
+  z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m', 'm2m100-418m']),
   hubModelId,
 ])
 
 export const settingsPatchSchema = z.object({
+  compute: computeSettingsPatchSchema.optional(),
   theme: z.enum(['system', 'light', 'dark']).optional(),
   uiLanguage: z.enum(['zh-CN', 'en']).optional(),
   recognition: z.object({
@@ -60,11 +68,21 @@ export const settingsPatchSchema = z.object({
     layout: z.enum(['rolling', 'sentence']).optional(),
   }).partial().optional(),
   translation: z.object({
-    provider: z.enum(['hymt2', 'm2m100', 'microsoft', 'openai', 'ollama']).optional(),
-    hymt2ModelId: hymt2ModelIdSchema.optional(),
+    provider: z.enum(['local', 'cloud', 'microsoft']).optional(),
+    localModelId: localModelIdSchema.optional(),
     microsoftEndpoint: z.string().min(1).max(2048).optional(), microsoftRegion: z.string().max(128).optional(),
-    openaiEndpoint: z.string().min(1).max(2048).optional(), openaiModel: z.string().min(1).max(256).optional(),
-    ollamaEndpoint: z.string().min(1).max(2048).optional(), ollamaModel: z.string().min(1).max(256).optional(),
+    // `.min(1)` is deliberately dropped on the two cloud fields. With it, a user who clears the
+    // box (to switch to Ollama, or to re-type a base URL from scratch) gets a write that throws
+    // and bubbles up as a failed save — the setting then looks like it refuses to be cleared.
+    // An empty endpoint/model is a legitimate state here: the request is rejected at the engine
+    // with a message about the missing endpoint, which is more accurate than a schema error.
+    cloudEndpoint: z.string().max(2048).optional(), cloudModel: z.string().max(256).optional(),
+    cloudApiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
+    cloudName: z.string().max(64).optional(),
+    // Bounds are what keeps a typo'd 0 (or a pasted 1e9) from turning into a divide-by-zero or a
+    // runaway request body; the defaults sit comfortably inside them.
+    cloudContextWindow: z.number().int().min(256).max(10_000_000).optional(),
+    cloudMaxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
     translateIntermediate: z.boolean().optional(),
     targetLanguage: z.string().min(1).max(32).optional(),
   }).partial().optional(),

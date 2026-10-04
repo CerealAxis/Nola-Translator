@@ -1,6 +1,10 @@
 """llama.cpp llama-server process lifecycle: start, readiness polling, device detection, OpenAI-compatible calls."""
 
 from __future__ import annotations
+from collections import deque
+import re
+import threading
+from ..compute import ComputeDevice, ComputeOptions, cpu_threads
 
 import asyncio
 import json
@@ -18,7 +22,6 @@ LLAMA_DIR_ENV = "NOLA_TRANSLATOR_LLAMA_DIR"
 DEFAULT_GGUF_RELATIVE = Path("hy-mt2-1.8b-q4-k-m") / "Hy-MT2-1.8B-Q4_K_M.gguf"
 _HOST = "127.0.0.1"
 _HEALTH_POLL_INTERVAL_S = 0.25
-_VRAM_THRESHOLD_BYTES = 400 * 1024 * 1024
 
 
 class LlamaServerError(RuntimeError):
@@ -81,19 +84,6 @@ def _post_chat(url: str, payload: object, timeout: float) -> Any:
         raise LlamaServerError("llama-server 响应不是有效 JSON") from error
 
 
-def _default_vram_used() -> float | None:
-    """VRAM bytes currently in use; None when torch/CUDA is unavailable."""
-    try:
-        import torch
-
-        if not torch.cuda.is_available():
-            return None
-        free, total = torch.cuda.mem_get_info()
-    except Exception:
-        return None
-    return float(total - free)
-
-
 def _pick_free_port() -> int:
     """Grab a free port on 127.0.0.1 (bound, then released immediately)."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
@@ -114,19 +104,50 @@ class LlamaServerManager:
         vram_delta_fn: Callable[[], float | None] | None = None,
         sleep: Callable[[float], Any] | None = None,
     ) -> None:
-        # injection points, all for tests: popen/health_get/vram_delta_fn/sleep
+        # vram_delta_fn is retained for older callers; placement now uses backend logs.
         self._llama_dir_explicit = llama_dir
         self._gguf_path_explicit = gguf_path
         self._popen = popen if popen is not None else subprocess.Popen
         self._health_get = health_get if health_get is not None else _default_health_get
-        # returns "VRAM currently in use" (None = unavailable); start() samples it once
-        # before launch and once after, and takes the difference.
-        self._vram_used = vram_delta_fn if vram_delta_fn is not None else _default_vram_used
         self._sleep = sleep if sleep is not None else asyncio.sleep
         self._process: Any | None = None
         self._port: int | None = None
         self._ready = False
         self._device: str | None = None
+        self._compute = ComputeOptions()
+        self._selected_device: ComputeDevice | None = None
+        self._logs: deque[str] = deque(maxlen=200)
+        self._log_thread: threading.Thread | None = None
+        self._offloaded_layers: int | None = None
+        self.fallback_reason: str | None = None
+
+    def configure_compute(self, device: ComputeDevice, options: ComputeOptions) -> None:
+        if self._selected_device != device or self._compute != options:
+            self._ready = False
+        self._selected_device = device
+        self._compute = options.model_copy(deep=True)
+
+    @property
+    def offloaded_layers(self) -> int | None:
+        return self._offloaded_layers
+
+    def _read_logs(self, process: Any) -> None:
+        stream = getattr(process, "stderr", None)
+        if stream is None:
+            return
+        try:
+            while raw := stream.readline():
+                if self._process is not process:
+                    return
+                line = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
+                self._logs.append(line[:1024])
+                match = re.search(r"offloaded\s+(\d+)(?:/\d+)?\s+layers", line)
+                if match:
+                    self._offloaded_layers = int(match.group(1))
+                    if self._ready:
+                        self._device = self._decide_device("auto", None)
+        except (OSError, ValueError):
+            pass
 
     @property
     def ready(self) -> bool:
@@ -151,6 +172,7 @@ class LlamaServerManager:
         self._ready = False
         self._device = None
         self._port = None
+        self._offloaded_layers = None
         process, self._process = self._process, None
         if process is not None:
             self._terminate(process)
@@ -165,7 +187,7 @@ class LlamaServerManager:
             and self._process.poll() is None
         ):
             return self._device
-        self._ready = False
+        await self.stop()
         llama_dir = self._llama_dir_explicit or resolve_llama_dir()
         if llama_dir is None:
             raise LlamaServerError(f"未找到 llama.cpp 运行目录（{LLAMA_DIR_ENV} 未设置且开发/打包目录不存在）")
@@ -175,11 +197,18 @@ class LlamaServerManager:
         gguf = self._gguf_path_explicit or default_gguf_path()
         if not gguf.is_file():
             raise LlamaServerError(f"未找到 GGUF 模型：{gguf}")
-        baseline = self._vram_used()
-        cpu_threads = max(1, min(4, (os.cpu_count() or 2) // 2))
+        self.fallback_reason = None
+        thread_count = cpu_threads(self._compute.cpuThreads)
         failures: list[str] = []
         # llama.cpp picks the GPU layer count from the available device and VRAM; a failed start falls back to CPU.
-        for ngl, attempt_timeout in (("auto", timeout_s), (0, timeout_s * 2)):
+        selected_cpu = self._selected_device is not None and self._selected_device.id == "cpu"
+        gpu_layers = "auto" if self._compute.gpuLayers == -1 else self._compute.gpuLayers
+        attempts = [(0 if selected_cpu else gpu_layers, timeout_s)]
+        if not selected_cpu and gpu_layers != 0 and self._compute.allowCpuFallback:
+            attempts.append((0, timeout_s * 2))
+        for ngl, attempt_timeout in attempts:
+            self._logs.clear()
+            self._offloaded_layers = None
             port = _pick_free_port()
             args = [
                 str(exe),
@@ -187,32 +216,56 @@ class LlamaServerManager:
                 "--host", _HOST,
                 "--port", str(port),
                 "-ngl", str(ngl),
-                "-c", "1024",
+                "-c", str(self._compute.contextSize),
                 "-np", "1",
                 "-b", "128",
                 "-ub", "128",
-                "-t", str(cpu_threads),
-                "-tb", str(cpu_threads),
+                "-t", str(thread_count),
+                "-tb", str(thread_count),
+                "--split-mode", "none",
+                "--device", "none" if ngl == 0 else (self._selected_device.llamaDevice if self._selected_device else "CUDA0"),
+                "--main-gpu", "0",
+                "--fit", "on",
+                "--fit-target", str(self._compute.reservedVramMb),
+                "--flash-attn", self._compute.flashAttention,
                 "--jinja",
             ]
             assert args[args.index("--host") + 1] == _HOST, "只能绑定 127.0.0.1"
-            process = self._popen(
-                args,
-                cwd=str(llama_dir),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            try:
+                process = self._popen(
+                    args,
+                    cwd=str(llama_dir),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+            except OSError as error:
+                raise LlamaServerError(f"无法启动 llama-server：{error}") from error
             self._process = process
+            self._log_thread = threading.Thread(target=self._read_logs, args=(process,), daemon=True)
+            self._log_thread.start()
             if await self._wait_ready(process, port, attempt_timeout):
                 self._port = port
                 self._ready = True
-                self._device = self._decide_device(ngl, baseline)
+                self._device = self._decide_device(ngl, None)
                 return self._device
             reason = "进程提前退出" if process.poll() is not None else "健康检查超时"
-            failures.append(f"ngl={ngl}: {reason}")
             self._terminate(process)
+            self._log_thread.join(timeout=1)
+            diagnostic = " ".join(list(self._logs)[-8:])[-1024:].strip()
+            failures.append(f"ngl={ngl}: {reason}" + (f"；{diagnostic}" if diagnostic else ""))
+            log_detail = "".join(self._logs).lower()
             if self._process is process:
                 self._process = None
+            if ngl != 0:
+                resource_error = any(marker in log_detail for marker in (
+                    "out of memory", "failed to allocate", "cuda error", "no cuda-capable device", "device lost",
+                ))
+                if not resource_error:
+                    break
+                if self._compute.allowCpuFallback:
+                    self.fallback_reason = "GPU 加载失败，已按设置回退 CPU"
+        self._offloaded_layers = None
         raise LlamaServerError(f"llama-server 启动失败（{exe}）：" + "；".join(failures))
 
     async def stop(self) -> None:
@@ -221,6 +274,7 @@ class LlamaServerManager:
         self._ready = False
         self._device = None
         self._port = None
+        self._offloaded_layers = None
         if process is None:
             return
         self._terminate(process)
@@ -266,14 +320,14 @@ class LlamaServerManager:
             await self._sleep(_HEALTH_POLL_INTERVAL_S)
 
     def _decide_device(self, ngl: str | int, baseline: float | None) -> str:
-        """Decide the device from the actual VRAM delta; without CUDA or a measurement, report CPU conservatively."""
+        """Report backend log evidence; missing evidence stays unknown."""
         if ngl == 0:
             return "cpu"
-        current = self._vram_used()
-        if current is None or baseline is None:
+        if self._offloaded_layers == 0:
             return "cpu"
-        delta = current - baseline
-        return "cuda" if delta >= _VRAM_THRESHOLD_BYTES else "cpu"
+        if self._offloaded_layers is None:
+            return "unknown"
+        return self._selected_device.name if self._selected_device else "cuda"
 
     def _terminate(self, process: Any) -> None:
         """Terminate the process: on Windows taskkill the whole child tree, otherwise terminate+wait."""

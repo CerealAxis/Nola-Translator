@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "packages": [
+    {
+      "id": "llama-cuda-b11211",
+      "name": "llama.cpp CUDA 12.4",
+      "kind": "llama",
+      "backend": "cuda",
+      "version": "b11211",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11211/llama-b11211-bin-win-cuda-12.4-x64.zip",
+      "sha256": "33c8475c137bdaf7d0c108b0e77cb02eddc26f53d193c3acf69f1e4237668081",
+      "bytes": 263078592,
+      "companions": [{
+        "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11211/cudart-llama-bin-win-cuda-12.4-x64.zip",
+        "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6",
+        "bytes": 391443627
+      }]
+    },
+    {
+      "id": "llama-vulkan-b11211",
+      "name": "llama.cpp Vulkan",
+      "kind": "llama",
+      "backend": "vulkan",
+      "version": "b11211",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11211/llama-b11211-bin-win-vulkan-x64.zip",
+      "sha256": "84205d373657d81e2ae272c2fefe72148e655d72684745aa8c137578d8e3a855",
+      "bytes": 33062372
+    }
+  ]
+}
