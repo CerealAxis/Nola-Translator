@@ -26,5 +26,7 @@ Commit `package-lock.json`, `build/icon.ico`, the runtime catalogs, all referenc
 
 The build script explicitly runs Electron's binary installer and checks its version before building. This supports clean runners where npm lifecycle policy does not run Electron's postinstall; a matching existing binary is reused.
 
+The private runtime flattens nested dependency license files inside each `.dist-info/licenses` directory to avoid WiX legacy path limits. All notice contents are preserved, `original-paths.json` maps filenames to original paths, and package `RECORD` entries are updated. Installed dependency environments are not modified.
+
 The reference project's tag-triggered Release workflow informed the trigger/publish split:
 https://github.com/Xavier-MC/XavierChatSync/blob/master/.github/workflows/release.yml

@@ -5,6 +5,7 @@ Run with the CPU build venv; runtime installation never needs system Python or p
 from __future__ import annotations
 
 import hashlib
+import csv
 import importlib.metadata
 import json
 import os
@@ -12,6 +13,45 @@ from pathlib import Path
 import shutil
 import sys
 import uuid
+
+
+def flatten_license_paths(site_packages: Path) -> None:
+    """Keep vendor notices while avoiding legacy installer path limits."""
+    for metadata in site_packages.glob("*.dist-info"):
+        licenses = metadata / "licenses"
+        if not licenses.is_dir():
+            continue
+        replacements = {}
+        index = {}
+        for source in sorted(licenses.rglob("*")):
+            if not source.is_file() or source.parent == licenses:
+                continue
+            original = source.relative_to(licenses).as_posix()
+            filename = hashlib.sha256(original.encode()).hexdigest() + ".txt"
+            target = licenses / filename
+            if target.exists():
+                raise RuntimeError(f"License destination collision: {target}")
+            old_record_path = source.relative_to(site_packages).as_posix()
+            source.rename(target)
+            replacements[old_record_path] = target.relative_to(site_packages).as_posix()
+            index[filename] = original
+        if not index:
+            continue
+        for directory in sorted(licenses.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+            if directory.is_dir():
+                directory.rmdir()
+        (licenses / "original-paths.json").write_text(
+            json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8")
+        record = metadata / "RECORD"
+        if record.is_file():
+            with record.open(newline="", encoding="utf-8") as stream:
+                rows = list(csv.reader(stream))
+            for row in rows:
+                if row and row[0] in replacements:
+                    row[0] = replacements[row[0]]
+            rows.append([(licenses / "original-paths.json").relative_to(site_packages).as_posix(), "", ""])
+            with record.open("w", newline="", encoding="utf-8") as stream:
+                csv.writer(stream).writerows(rows)
 
 
 def main() -> None:
@@ -50,6 +90,7 @@ def main() -> None:
                         ignore=shutil.ignore_patterns("site-packages", "__pycache__", "test", "tests"))
         shutil.copytree(dependencies, staging / "Lib" / "site-packages",
                         ignore=shutil.ignore_patterns("__pycache__", "__editable__*"))
+        flatten_license_paths(staging / "Lib" / "site-packages")
         engine = staging / "Lib" / "site-packages" / "nola_translator_engine"
         if engine.exists():
             shutil.rmtree(engine)  # Inside the new, uniquely named staging tree.
