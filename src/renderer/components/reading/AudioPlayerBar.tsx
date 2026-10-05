@@ -1,17 +1,9 @@
 /**
- * 播放条。记录详情页底部，64px 高。
+ * Transport bar under the record detail page.
  *
- * ============================ 为什么它是台账组件 ============================
- * DESIGN 第 11.2 节第 11 条：播放条要"可拖动进度（Slider）+ 倍速（ToggleButtonGroup）
- * + 跟随滚动"，这个组合 HeroUI 没有对应物。
- *
- * **进度条不使用 `ProgressBar`**：那是给"有进度值的等待"用的，不可拖动。
- * 可拖动的播放进度必须用 `Slider`（DESIGN 第 6.10 节）。
- *
- * **不用原生 audio 控件**：原生控件是浏览器外观，无法压进我们的表面色阶，
- * 且不可访问性差。这里用一个隐藏的 `<audio>` 只做播放引擎，界面全部自绘。
- *
- * 归属：记录详情页。工作台那一侧不共用这个组件（那边没有回放）。
+ * The scrubber is a `Slider`, not a `ProgressBar`, which is for waiting and cannot be
+ * dragged. The native `<audio>` element is the engine only — the controls are drawn
+ * here, since native chrome ignores our surface tokens.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -22,20 +14,20 @@ import { Pause, Play } from 'lucide-react'
 
 import { useI18n } from '@/i18n'
 
-/** 倍速档位。DESIGN 第 6.10 节：0.5x / 1x / 1.5x / 2x。 */
+/** Playback speed steps, in the order they appear. */
 const RATES = [0.5, 1, 1.5, 2] as const
 type Rate = (typeof RATES)[number]
 
 export interface AudioPlayerBarProps {
-  /** 引擎给的音频地址。null 表示这场没录音。 */
+  /** Audio URL from the engine; null means this meeting has no recording. */
   audioUrl: string | null
-  /** 已知总时长（ms）。没有也能用，等 `<audio>` 自己读出 metadata。 */
+  /** Known total length in ms. Optional: the element reads it from its own metadata. */
   durationMs?: number | null
-  /** 音频地址还在取。true 时播放键是 pending 且不可点。 */
+  /** The URL is still loading; the play button shows pending and is disabled. */
   isPending?: boolean
-  /** 没有录音时的替代文案，调用方传 `t(...)` 的结果。 */
+  /** Copy for the no-recording case; callers pass the result of `t(...)`. */
   unavailableLabel?: string
-  /** 进度变化回调，详情页用它把播放头同步给双栏。 */
+  /** Playback position, used by the detail page to drive the dual column's focus. */
   onTimeChange?: (ms: number) => void
   className?: string
 }
@@ -55,14 +47,14 @@ export function AudioPlayerBar({
   const [totalMs, setTotalMs] = useState(durationMs ?? 0)
   const [rate, setRate] = useState<Rate>(1)
 
-  // 地址换了就复位：否则上一场的进度会带到下一场。
+  // A new URL resets the bar, or the previous meeting's position carries over.
   useEffect(() => {
     setPlaying(false)
     setPositionMs(0)
     setTotalMs(durationMs ?? 0)
   }, [audioUrl, durationMs])
 
-  // 播放状态由元素事件驱动，界面只是它的投影。
+  // Playback state is driven by element events; the UI is only a projection of them.
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
@@ -92,7 +84,7 @@ export function AudioPlayerBar({
     if (audio.paused) {
       void audio.play().then(
         () => setPlaying(true),
-        // 自动播放策略可能拒绝：界面回到"暂停"态，不假装在放。
+        // Autoplay policy can refuse: the UI falls back to paused rather than pretending.
         () => setPlaying(false),
       )
     } else {
@@ -112,7 +104,7 @@ export function AudioPlayerBar({
     if (audioRef.current) audioRef.current.playbackRate = next
   }, [])
 
-  // 没录音：给一句说明，不画一个点了没反应的播放键。
+  // No recording: say so, rather than render a play button that does nothing.
   if (!audioUrl) {
     return (
       <div
@@ -129,7 +121,7 @@ export function AudioPlayerBar({
     <div
       className={['nola-record-audio', className ?? ''].filter(Boolean).join(' ')}
     >
-      {/* 播放引擎。display:none 会让部分浏览器暂停，这里用视觉隐藏而不是隐藏。 */}
+      {/* The playback engine itself; every control below is drawn here. */}
       <audio ref={audioRef} src={audioUrl} preload="metadata" className="hidden" />
 
       <Button
@@ -152,8 +144,8 @@ export function AudioPlayerBar({
         maxValue={Math.max(totalMs, 1)}
         step={100}
         isDisabled={isPending || totalMs === 0}
-        // react-aria 的 onChange 收 `number | number[]`：单值 Slider 传 number，
-        // 保险起见取第一个（多个值只会在 range Slider 上出现）。
+        // react-aria's onChange takes `number | number[]`; a single-value Slider sends a
+        // number, and taking the first entry also covers a range Slider.
         onChange={(next: number | number[]) => seek(Array.isArray(next) ? (next[0] ?? 0) : next)}
         aria-label={t('records.columnDuration')}
         className="min-w-0 flex-1"
@@ -170,7 +162,7 @@ export function AudioPlayerBar({
         selectionMode="single"
         disallowEmptySelection
         selectedKeys={[String(rate)]}
-        // react-aria 的分段控件用 onSelectionChange（收 Selection）而不是 onChange。
+        // A react-aria segmented control reports selection, not change.
         onSelectionChange={(keys: Selection) => {
           const first = keys === 'all' ? null : Array.from(keys)[0] ?? null
           if (first === null) return
@@ -184,7 +176,7 @@ export function AudioPlayerBar({
         {RATES.map((value) => (
           <ToggleButton
             key={value}
-            // 分段控件里 `id` 就是它在 selectedKeys 里的键。
+            // In a segmented control the `id` is the key it is selected by.
             id={String(value)}
             className="rounded-[10px] text-[12.5px] leading-[1.5] font-normal tabular-nums"
           >
@@ -197,8 +189,8 @@ export function AudioPlayerBar({
 }
 
 /**
- * `00:00:00` 形式。小时位不补零（DESIGN 第 13.C 节：补零会避免宽度跳变是反的，
- * 实际上定宽反而更稳，所以这里按播放条规格固定三段）。
+ * `HH:MM:SS` with every field zero-padded, so the width does not jump as the
+ * clock ticks.
  */
 export function formatClock(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) ms = 0

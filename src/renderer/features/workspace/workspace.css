@@ -16,26 +16,17 @@
   .nola-workspace-audio { display: flex; flex-direction: row; flex: 1 1 220px; align-items: center; gap: 12px; min-width: 0; text-align: left; }
   .nola-workspace-audio .label { white-space: nowrap; font-size: 13px; }
   .nola-workspace-audio .select__trigger { flex: 1; min-width: 0; height: 36px; border-radius: 10px; background: var(--surface-secondary); box-shadow: none; border: 1px solid var(--border); }
-  /* 工具栏这一行的三个控件取值统一居中：输入来源（`.select__value`）、识别模型与语言方向（`.nola-workspace-picker > span`）。
-     输入来源那边的开关**不是** `.nola-workspace-audio` 上那句 `text-align: left`：
-     HeroUI 的 `.select__value` 自带 `text-start`（@heroui/styles/dist/components/select.css），
-     那是**写在取值元素自己身上**的声明，继承永远赢不了它 —— 删掉 `text-align: left` 不会有任何变化。
-     `.select__value` 和 `.nola-workspace-picker > span` 一样是 `flex-1`，已经把剩下的宽度吃满，
-     所以 `text-align: center` 就够，不必动 `justify-content`；
-     `Select.Indicator` 是 `absolute`，不参与 flex，箭头位置不受影响。 */
   .nola-workspace-audio .select__value { text-align: center; }
   .nola-workspace-audio svg, .nola-workspace-picker svg { flex: none; width: 18px; height: 18px; color: var(--accent); }
   .nola-workspace-field { display: flex; flex: 1 1 220px; gap: 12px; align-items: center; min-width: 0; }
   .nola-workspace-field > span { font-size: 13px; white-space: nowrap; }
   .nola-workspace-picker { display: flex; gap: 9px; align-items: center; justify-content: start; flex: 1; min-width: 0; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-secondary); font-size: 13px; }
-  /* 取值文字同样居中，保持这一行三个控件一致。声明写在取值元素自己身上，不依赖父级继承：
-     `.button` 与本文件同在 components 层，它将来若带上 `text-align`，父级上的声明会输给它。 */
   .nola-workspace-picker > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
   .nola-workspace-picker:disabled { opacity: .65; }
   .nola-workspace-overlay { height: 36px; min-width: 0; border: 1px solid var(--accent); border-radius: 10px; color: var(--accent); font-size: 13px; }
   .nola-workspace-languages { display: flex; flex-direction: column; gap: 12px; width: 280px; max-width: 90vi; padding: 12px; }
   .nola-workspace-view-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 20px; padding-top: 14px; }
-  /* 轨道与选中态交给 .nola-segmented（theme/app.css 末尾），这里不再重复配色。 */
+  /* Track and selected state come from .nola-segmented in theme/app.css. */
   .nola-workspace-font-control { display: flex; align-items: center; gap: 12px; font-size: 13px; }
   .nola-workspace-font-control svg { width: 14px; height: 14px; }
   .nola-workspace-notes-switch { margin-inline-start: auto; }

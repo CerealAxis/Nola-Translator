@@ -14,7 +14,7 @@ const baseSchema = z.object({ fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
 type Download = (recipe: RuntimeRecipe['wheel'], path: string, signal: AbortSignal, progress: (bytes: number) => void) => Promise<void>
 type Verify = (path: string, signal: AbortSignal) => Promise<string>
 
-/** Mirrors the launcher's fixed install recipes + backend precheck, using an app-owned Python. */
+/** Mirrors the install recipes and backend precheck built by `scripts/build-python-runtime.py`. */
 export class PythonEnvironments {
   recipes: RuntimeRecipe[] = []
   operation: RuntimeSnapshot['operation'] = null

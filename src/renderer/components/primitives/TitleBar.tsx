@@ -26,24 +26,12 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
   const { resolved, setTheme } = useNolaTheme()
   const native = isElectronShell()
   const dark = resolved === 'dark'
-  // **只有两项，没有「跟随系统」。** 语言是 `AppSettings.uiLanguage`，主进程的 zod schema
-  // 是 `z.enum(['zh-CN','en'])`，多一个 `'system'` 会让设置写不进去。
-  // （原型那版有第三项，走的是 localStorage + navigator.language，与主仓的设置模型无关。）
   const options = [
     { id: 'zh-CN' as const, label: t('language.zhCN') },
     { id: 'en' as const, label: t('language.en') },
   ]
   const help = helpItems ?? [
     { key: 'settings', label: t('nav.settings'), onSelect: () => navigate('#/settings/general') },
-    /*
-     * 第二项写「高级」，**不要写「反馈问题」**。
-     *
-     * `app:feedback` 通道主进程没有（`bridge/contract.ts` 的 `BRIDGE_TIERS` 里
-     * `feedback.submit` 是 `ipc-new`，`ipcBridge` 对它显式 reject），原型那套反馈对话框
-     * 整个没迁过来：`help.feedback*` 三十来个键全是死键，设置页的「问题反馈」分组里只有
-     * 「复制诊断信息」与「恢复出厂设置」，没有任何能提交反馈的东西。菜单项承诺一个做不到的
-     * 动作，比不写更糟，所以这里就写它真正带你去的地方。
-     */
     { key: 'advanced', label: t('modelsSettingsUi.advanced'), onSelect: () => navigate('#/settings/advanced') },
   ]
   return (
@@ -63,9 +51,9 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
             </Dropdown.Menu>
           </Dropdown.Popover>
         </Dropdown>
-        {/* 主题是一个按钮而不是两个：图标表示**当前**主题，点了切到另一个。
-            两个并排按钮会让人以为要"选中"某一侧，而不是"翻到另一侧"，而且顶栏右侧
-            已经挤了语言和帮助，文案改成动作名（切换到深色）后不用猜按下会发生什么。 */}
+        {/*
+          * The icon already shows the current theme, so this is
+            a single toggle, not a pair of them. */}
         <Tooltip delay={800}>
           <Button isIconOnly variant="ghost" className="nola-titlebar-icon" aria-label={dark ? t('titleBar.themeToLight') : t('titleBar.themeToDark')} onPress={() => setTheme(dark ? 'light' : 'dark')}>{dark ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}</Button>
           <Tooltip.Content>{dark ? t('titleBar.themeToLight') : t('titleBar.themeToDark')}</Tooltip.Content>
@@ -93,13 +81,9 @@ export interface NolaThemeController {
 }
 
 /**
- * 这个文档跑在 Electron 主窗里吗？
- *
- * 原型写的是 `Boolean(window.nolaDesktop)` —— **主仓没有 `nolaDesktop` 这个全局**
- * （preload 只注入 `nolaTranslator`），所以那一行恒为 false，标题栏右侧会画出一排
- * 禁用的「最小化 / 全屏 / 关闭」假按钮，而真正的原生窗口控件区域留成空白。
- * 判据改成 preload 桥接在不在：它在就说明我们在 Electron 里，窗口是 frameless 的，
- * 系统控件占用标题栏右侧那块保留区。
+ * True inside the Electron shell, where the window is frameless and the OS
+ * controls own the reserved strip on the right. `nolaTranslator` is the only
+ * global the preload injects, so its presence is the test.
  */
 function isElectronShell(): boolean {
   return typeof window !== 'undefined' && Boolean(window.nolaTranslator)

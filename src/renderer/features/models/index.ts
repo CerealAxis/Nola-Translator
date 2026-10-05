@@ -1,8 +1,8 @@
 /**
- * 模型配置 feature 的公开出口。
+ * Public entry point of the models feature.
  *
- * 编排者（main.tsx）只需要 `ModelsPage` 这一个页面组件；`ModelCard` 是台账第 7 项，
- * 台账归属在 feature 层，所以从这里一并导出，方便别的 feature 复用。
+ * `ModelCard` is one of the feature-layer components DESIGN §11.2 keeps out of the primitives
+ * list, so it is re-exported here for the other features to reuse.
  */
 
 export { ModelsPage } from './ModelsPage'

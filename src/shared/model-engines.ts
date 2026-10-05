@@ -5,9 +5,8 @@ export type InferenceEngine = 'pytorch' | 'llama'
 /** Compatibility follows the installed format and implemented loader, not the family name. */
 export function modelEngines(model: Pick<ResourceRecord, 'provider'>): InferenceEngine[] {
   if (['qwen3-asr', 'sensevoice', 'm2m100', 'transformers', 'funasr'].includes(model.provider)) return ['pytorch']
-  // 两条路径的 provider 词汇不同：内置 Hy-MT2 由引擎报 `hymt2`（resources.py 的
-  // ResourceDefinition），Hub 自装的 GGUF 则透传适配器 id `llama.cpp`（hub.py 的 adapter_id）。
-  // 少写任何一个都不会报错，只会让这张表静默返回空集，把模型判成"哪个引擎都不支持"。
+  // `provider` arrives in two vocabularies: built-in Hy-MT2 reports `hymt2`, a hub GGUF passes
+  // through its adapter id `llama.cpp`. Missing either yields an empty set with no error.
   if (['hymt2', 'llama.cpp'].includes(model.provider)) return ['llama']
   return []
 }

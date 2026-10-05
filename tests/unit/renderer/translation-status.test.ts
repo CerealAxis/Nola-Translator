@@ -4,8 +4,6 @@ import type { CaptionSegment, Translation } from '../../../src/shared/contracts'
 import { failedTranslations, translationErrorLabel, translationErrorSummary } from '../../../src/renderer/translation-status'
 import { translate } from '../../../src/renderer/i18n'
 
-// 被测对象从 `src/renderer/components/translation-status.ts` 搬到了
-// `src/renderer/translation-status.ts`（旧 UI 整体删除时那一份跟着删了，逻辑逐字搬过来）。
 const t = (key: string, values?: Record<string, string | number>) => translate(key, 'zh-CN', values)
 
 const make = (overrides: Partial<Translation> = {}): Translation => ({
@@ -47,8 +45,9 @@ describe('译文失败提示', () => {
   })
 
   it('汇总多条失败原因，全部失败时才非空', () => {
-    // 多个目标语言可以同时失败，全列出来比只报第一条有用：
-    // 看到「网络不可达」就知道不是配置问题，看到「翻译模型未安装」就知道要去装模型。
+    // Several target languages can fail at once, and listing all of them beats reporting
+    // only the first: "network unreachable" rules out configuration, "model not installed"
+    // points at a different fix.
     const twoFailures = {
       segmentId: 's2', revision: 1, startedAtMs: 0, isFinal: true,
       sourceText: '你好',

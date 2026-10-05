@@ -1,7 +1,7 @@
 /**
- * Electron wraps anything thrown by an IPC handler as
- * `Error invoking remote method '<channel>': [ClassName: ]<message>`.
- * That framing is a transport detail and must not reach user-facing notices.
+ * Electron frames anything an IPC handler throws as
+ * `Error invoking remote method '<channel>': [ClassName: ]<message>`; that framing is a transport
+ * detail and must not reach user-facing notices.
  */
 export function stripIpcErrorMessage(message: string): string {
   return message.replace(

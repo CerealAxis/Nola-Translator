@@ -23,11 +23,8 @@ function record(partial: Partial<ResourceRecord> & Pick<ResourceRecord, 'resourc
 }
 
 /*
- * 迁移说明：原型那版在 render 前写 `localStorage[LANGUAGE_STORAGE_KEY] = 'zh-CN'` 把语言钉死
- * （因为原型从 localStorage 读语言，而 jsdom 的 navigator.language 是 en-US）。
- * 现在语言来自主进程的 `AppSettings.uiLanguage`，jsdom 里没有 preload，
- * `I18nProvider` 的 `getSettings()` 落空、停在初始的 `'zh-CN'` —— 正好是下面断言要的语言，
- * 所以不需要（也不能）再钉一次。
+ * No language needs pinning here: `I18nProvider` starts at `'zh-CN'` and jsdom has no preload,
+ * so its `getSettings()` never resolves a value and the assertions below stay in that language.
  */
 function renderWithI18n(node: ReactElement) {
   return render(<I18nProvider>{node}</I18nProvider>)
@@ -61,15 +58,14 @@ describe('默认模型的可设范围', () => {
     expect(defaultTargetOf(record({ resourceId: 'qwen3-asr-1.7b-hf' }))).toEqual({
       recognition: { modelId: 'qwen3-asr-1.7b-hf' },
     })
-    // 翻译模型统一写成 localModelId + provider:'local'：三档 Hy-MT2、M2M100、Hub 自装 GGUF 同理。
+    // Every translation model lands on localModelId + provider:'local', one route for all.
     expect(
       defaultTargetOf(record({ resourceId: 'hy-mt2-1.8b-q4-k-m', kind: 'translationModel' })),
     ).toEqual({ translation: { localModelId: 'hy-mt2-1.8b-q4-k-m', provider: 'local' } })
-    // m2m100 以前没有槽位，「设为默认」只能返回 null；现在按 id 路由，它有槽位了。
     expect(defaultTargetOf(record({ resourceId: 'm2m100-418m', kind: 'translationModel' }))).toEqual({
       translation: { localModelId: 'm2m100-418m', provider: 'local' },
     })
-    // 识别模型那边不变：引擎资源表认不出的 id 设下去也加载不了，仍然不给槽位。
+    // Recognition stays filtered: an id outside the engine's resource table would not load.
     expect(defaultTargetOf(record({ resourceId: 'hub:openai/whisper-large-v3' }))).toBeNull()
   })
 

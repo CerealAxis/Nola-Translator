@@ -1,27 +1,22 @@
 /**
- * 页面头部：标题 + 可选副标题 + 右侧动作插槽。24px 页面标题，24px 下边距。
- *
- * **副标题是可选项且默认为空。** copy 纪律里最容易违反的一条就是补一句复述标题的说明
- * （"存储与下载 / 管理你的存储与下载设置"）。所以这里不提供 `subtitle` 的默认值，
- * 传了就渲染，不传就一个 `<p>` 都不生成。
- *
- * 这不是 HeroUI `Header`：Header 不处理"标题 + 可选副标题 + 右侧动作"这一组合，
- * 也不管 24px 的页面标题字阶。
+ * Page header: title, optional subtitle, optional action slot. The subtitle has no
+ * default and renders no `<p>` unless passed — a line that restates the title is the
+ * easiest copy mistake to make here.
  */
 
 import type { ReactNode } from 'react'
 
 export interface PageHeaderProps {
-  /** 页面标题，24px / 600。唯一带负字距的档。 */
+  /** Page title. `.nola-display` is the only step carrying negative tracking. */
   title: ReactNode
-  /** 副标题，**默认不渲染**。只有能回答"这句话告诉用户了什么他不知道的事"时才传。 */
+  /** Subtitle, not rendered unless passed. Only worth text the user cannot infer. */
   subtitle?: ReactNode
-  /** 右侧动作区。一屏最多一个 `variant="primary"`。 */
+  /** Action slot. At most one `variant="primary"` per screen. */
   actions?: ReactNode
   className?: string
   /**
-   * 块内间距，单位 px，且**只接受 4 / 8 / 12** 这三档。
-   * 写不出 6px：间距只有 4px 基数这一条，没有 6px 那个位置。
+   * Gap in px. The union is the guard rail: the design uses these three steps and
+   * the scale has no 6px slot to fall back on.
    */
   gap?: 4 | 8 | 12
 }

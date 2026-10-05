@@ -1,24 +1,14 @@
 /*
- * 布局验收门禁（`npm run test:layout`）。对着构建产物跑，不需要引擎、麦克风、模型或联网。
+ * Layout acceptance gate (`npm run test:layout`). Runs the built renderer with a
+ * stubbed preload, so it needs no engine, microphone, model or network.
  *
- * 页面清单不是抄来的，是**从 `src/renderer/routes.tsx` 的路由表枚举出来的**：新 UI 是手写
- * hash 路由（六条路由 + 六个设置 tab + 一条带 id 的记录详情），没有侧边栏页面表可以遍历。
- * 新增一条路由时这个清单不会自己更新 —— 所以下面每条都断言 `data-page` 的实际值，
- * 路由改了而清单没改会直接 FAIL，而不是静默少测一个页面。
+ * The page list is maintained by hand. Each entry asserts the `data-page` the
+ * route root actually renders, so a route that moves fails here instead of
+ * quietly dropping out of the run.
  *
- * ---------------------------------------------------------------------------
- * ⚠️ 不要把"查到 0 个元素"当成"没问题"。这是本文件最重要的一条规则。
- * ---------------------------------------------------------------------------
- * 每一组「用来查找的容器」都必须真的查到东西（`min`），查不到就是 FAIL。
- *
- * 上一版就是栽在这里：溢出检测用 9 个旧类名 `querySelectorAll`，UI 换掉之后它们返回
- * **空数组**，`overflow.length` 恒为 0，于是**所有溢出检查永远"通过"**。一个查不到
- * 元素的测试比没有测试更危险 —— 它给的是绿灯。
- *
- * 保留 `min` 断言的规则（改动前请先读完这段）：
- *   1. 任何 `querySelectorAll` 的结果，用在断言里之前必须先过 `min` 数量检查。
- *   2. 数量检查失败记一条 failure，**不要**当成"该页没有这块内容，跳过"。
- *   3. 容器选择器改名时，同一处必须同步改 `min` 与分组，别把 `min` 调到 0 来"消除失败"。
+ * Every lookup container carries a `min`. A `querySelectorAll` that matches
+ * nothing leaves the overflow checks vacuously green, so an empty match is a
+ * failure rather than a skipped page section.
  */
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -28,11 +18,9 @@ app.disableHardwareAcceleration()
 const output = resolve('artifacts/layout')
 const delay = (ms) => new Promise((done) => setTimeout(done, ms))
 
-// -- 路由表（与 src/renderer/routes.tsx 的 SETTINGS_TABS 对齐）-----------------
-
 const SETTINGS_TABS = ['general', 'audio', 'translation', 'appearance', 'storage', 'advanced']
 
-/** `id` 对应 `routes.tsx` 写在路由根节点上的 `data-page`，是这个断言的锚。 */
+/** Each entry names the `data-page` its route root renders, which is what the run asserts; the settings tabs all collapse to `settings`. */
 const PAGES = [
   { name: 'home', hash: '#/' },
   { name: 'workspace', hash: '#/workspace' },
@@ -43,13 +31,11 @@ const PAGES = [
   { name: 'record-detail', hash: '#/records/m-finished', page: 'record' },
 ]
 
-/** 视口宽度：760 是窗口下限，900/901 跨过设置页 850px 的紧凑断点，1100 是默认宽。 */
+/** 760 is the window's minWidth; 900/901 straddle the settings page's 850px stack breakpoint, 1100 sits on its 1100px one. */
 const WIDTHS = [760, 900, 901, 1100]
 const HEIGHT = 780
 
-// -- 容器分组：每组都必须查到 min 个以上 ----------------------------------------
-
-/** 每页都在的壳子。`nola-nav-button` 必须正好 6 个（main.tsx 里的 navigation 数组）。 */
+/** The shell present on every route; one nav button per entry in main.tsx's navigation array. */
 const SHELL_GROUPS = [
   { name: 'app-shell', selector: '.nola-app-shell', min: 1 },
   { name: 'titlebar', selector: '.nola-titlebar', min: 1 },
@@ -59,7 +45,7 @@ const SHELL_GROUPS = [
   { name: 'route-content', selector: '.nola-main .nola-route-content', min: 1 },
 ]
 
-/** 壳子的横向溢出容器。宽度不够时最先炸的就是这几个。 */
+/** Shell containers that break sideways first when the window is too narrow. */
 const SHELL_OVERFLOW = [
   { name: 'main', selector: '.nola-main', min: 1 },
   { name: 'sidebar', selector: '.nola-sidebar', min: 1 },
@@ -69,7 +55,7 @@ const SHELL_OVERFLOW = [
   { name: 'route-content', selector: '.nola-route-content', min: 1 },
 ]
 
-/** 页面自己的内容容器。数量对不上 = 页面空了一块（壳子应用 / 渲染失败）。 */
+/** The page's own content; too few means a section failed to render. */
 const PAGE_GROUPS = {
   home: [
     { name: 'home', selector: '.nola-home', min: 1 },
@@ -98,7 +84,7 @@ const PAGE_GROUPS = {
     { name: 'record-page', selector: '.nola-record-page', min: 1 },
     { name: 'record-card', selector: '.nola-record-page .nola-record-card', min: 1 },
     { name: 'records-table', selector: '.nola-records-table', min: 1 },
-    // RecordsTable 给每行 `data-testid="recent-<meetingId>"`，正好等于夹具里的两条。
+    // RecordsTable stamps each row `data-testid="recent-<meetingId>"`, and the fixture holds two meetings.
     { name: 'record-row', selector: '[data-testid^="recent-m-"]', min: 2 },
     { name: 'open-meeting', selector: '.nola-records-table__open', min: 2 },
   ],
@@ -109,7 +95,7 @@ const PAGE_GROUPS = {
     { name: 'dual', selector: '.nola-dual', min: 1 },
     { name: 'dual-headers', selector: '.nola-dual__headers', min: 1 },
     { name: 'dual-scroll', selector: '.nola-dual__scroll', min: 1 },
-    // 一对 = 一个 segment，夹具里是两条。
+    // One pair per segment; the fixture's meeting has two.
     { name: 'dual-pair', selector: '.nola-dual__scroll .nola-dual__pair', min: 2 },
     { name: 'audio-player', selector: '.nola-record-audio', min: 1 },
   ],
@@ -126,14 +112,12 @@ const PAGE_GROUPS = {
     { name: 'settings-page', selector: '.settings-page', min: 1 },
     { name: 'settings-tabs', selector: '.settings-tabs', min: 1 },
     { name: 'settings-nav', selector: '.settings-nav', min: 1 },
-    // 六个 tab 常驻，所以不管当前是哪个 tab 都必须是 6 个。
+    // Every tab stays mounted, so the count is the same whichever one is active.
     { name: 'settings-tab', selector: '.settings-nav [role="tab"]', min: 6 },
     { name: 'settings-panels', selector: '.settings-panels', min: 1 },
     { name: 'settings-group', selector: '.settings-panels .settings-group', min: 1 },
   ],
 }
-
-// -- 夹具 -----------------------------------------------------------------------
 
 const MEETING_LONG_TITLE = '2026年09月29日_产品评审与跨部门对齐会议纪要以及下一阶段里程碑确认'
 const MEETINGS = [
@@ -155,9 +139,11 @@ const RESOURCES = {
 }
 
 /**
- * 夹具 preload：照着 `src/preload/index.ts` 暴露的那份 API 抄。
- * 少抄一个方法，新 UI 里用到它的那条路径会 reject —— 这正是"壳子应用"的成因之一，
- * 所以这份清单要跟 preload 一起维护。
+ * The stub `window.nolaTranslator` the pages under test read, plus
+ * `layoutFixture` so this script can inject the engine events a real main
+ * process would send. It covers the methods those pages call, not preload's
+ * full surface — the engine-state read, for one, is left out and the store
+ * swallows the failure.
  */
 const preloadSource = `
 const {contextBridge} = require('electron');
@@ -223,21 +209,19 @@ contextBridge.exposeInMainWorld('nolaTranslator', {
 contextBridge.exposeInMainWorld('layoutFixture', { emit });
 `
 
-// -- 窗口辅助 -------------------------------------------------------------------
-
-// 双 rAF 只覆盖绘制；夹具的异步调用（getSettings/listResources/listMeetings）还要时间。
+// Two rAFs only cover paint; the stub's async bridge calls need wall-clock time on top.
 async function settle(window) {
   await window.webContents.executeJavaScript('new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))')
   await delay(220)
 }
 
 /**
- * 改 hash 之后等 `data-page` 真的变成目标值，而不是"睡够了就当它切完了"。
+ * Sets the hash, then waits for `data-page` to actually reach the target
+ * instead of assuming a fixed delay covered the switch.
  *
- * 已经在目标 hash 上时**不要 reload**：reload 会重新执行 preload，夹具那份内存里的
- * settings 随之回到初始值（uiLanguage 变回 zh-CN），而主进程里真实的设置并不会这样。
- * 那是这套夹具的假象，不是应用行为，reload 换来的任何"重新加载后"的断言都不可信。
- * hash 已经对上了就直接往下走，`data-page` 对不上本来就应该由断言报出来。
+ * A reload is no substitute: it re-runs the stub preload, so the in-memory
+ * settings fall back to their initial `uiLanguage` — an artefact of the stub
+ * that the real main process would not reproduce.
  */
 async function goto(window, hash, page) {
   await window.webContents.executeJavaScript(`(() => {
@@ -257,7 +241,6 @@ async function goto(window, hash, page) {
   return reached
 }
 
-// 绝不用 destroy()：这个 Electron 版本之后任何窗口都加载不出来（ERR_FAILED）。永远 close() 并等。
 function closeWindow(window) {
   return new Promise((done) => {
     if (window.isDestroyed()) { done(); return }
@@ -266,7 +249,7 @@ function closeWindow(window) {
   })
 }
 
-/** 真实鼠标输入。DOM `.click()` 测不出标题栏拖拽区吞掉点击这种问题。 */
+/** Real input events: the title bar is an `-webkit-app-region: drag` strip, which swallows a DOM `.click()`. */
 async function clickAt(window, selector) {
   const point = await window.webContents.executeJavaScript(`(() => {
     const el = document.querySelector(${JSON.stringify(selector)})
@@ -282,8 +265,6 @@ async function clickAt(window, selector) {
   await settle(window)
   return true
 }
-
-// -- 主流程 ---------------------------------------------------------------------
 
 async function main() {
   await mkdir(output, { recursive: true })
@@ -301,8 +282,9 @@ async function main() {
   await window.loadFile(resolve('out/renderer/index.html'))
 
   /**
-   * 一组容器的数量 + 横向溢出。一次 executeJavaScript 拿全部数据。
-   * `found < min` 与 `overflows.length > 0` 是两条独立的 failure。
+   * Counts and sideways overflow for a group of containers, collected in one
+   * `executeJavaScript` round trip. Too few elements and an element that
+   * overflows are two independent failures.
    */
   const probeGroups = (groups) => window.webContents.executeJavaScript(`(() => {
     const groups = ${JSON.stringify(groups)}
@@ -336,7 +318,8 @@ async function main() {
           continue
         }
 
-        // 崩了就是崩了：ErrorBoundary 的兜底页是全应用唯一渲染 <pre> 的地方。
+        // The ErrorBoundary fallback holds the only <pre> in the app, so one appearing means a
+        // page crashed. It lands inside .nola-main only when a page-level boundary caught it.
         scenarios += 1
         const crashed = await window.webContents.executeJavaScript(`(() => {
           const pre = document.querySelector('.nola-main pre')
@@ -344,7 +327,7 @@ async function main() {
         })()`)
         if (crashed) fail(context, 'error boundary rendered (page crashed)', { crashed })
 
-        // 壳子 + 页面内容，一起数量检查（每组都带 min，见文件头）。
+        // Shell and page containers in one count pass, each with its own `min`.
         for (const group of await probeGroups([...SHELL_GROUPS, ...(PAGE_GROUPS[expected] ?? [])])) {
           scenarios += 1
           if (group.found < group.min) {
@@ -352,7 +335,7 @@ async function main() {
           }
         }
 
-        // 横向溢出。宽度不够时最先撑破的是壳子与卡片容器。
+        // Sideways overflow: the shell and card containers break first.
         for (const group of await probeGroups(SHELL_OVERFLOW)) {
           scenarios += 1
           if (group.found < group.min) {
@@ -361,7 +344,8 @@ async function main() {
           if (group.overflows.length > 0) fail(context, `horizontal overflow in ${group.name}`, { overflows: group.overflows })
         }
 
-        // 整页不该出现横向滚动条。这条不依赖任何类名，类名全错了它照样有效。
+        // The page as a whole must not scroll sideways. No class names involved, so it still
+        // holds when every selector above has gone stale.
         scenarios += 1
         const pageOverflow = await window.webContents.executeJavaScript(`({
           docScroll: document.documentElement.scrollWidth,
@@ -381,7 +365,8 @@ async function main() {
         }
       }
 
-      // 记录详情是记录列表的子页：长会议名、双栏、分隔线、播放器都要放得下。
+      // A record detail is a child of the list: long title, dual columns, separators and the
+      // player all have to fit.
       scenarios += 1
       const reached = await goto(window, '#/records/m-finished', 'record')
       if (!reached) {
@@ -406,13 +391,13 @@ async function main() {
           }
         })()`)
         /*
-         * 横向溢出看不见"换行成两行"：两列 grid 抱着三个孩子会把译文挤到第二行，
-         * 而每个容器宽度都还是对的。所以要比几何，不能只比 scrollWidth。
+         * Sideways overflow cannot see "wrapped onto a second row": a two-column
+         * grid holding three children pushes the translation down while every
+         * container width still measures correct, so this compares geometry.
          *
-         * 断点是**有意的**：home-records.css 里 `@container (max-width: 680px)` 把
-         * `.nola-dual__pair` 变成单列 —— 窄窗下上下堆叠。所以两种形态都要接受，
-         * 但每种形态都得真的落到位：宽的时候必须左右分栏，窄的时候必须上下堆叠。
-         * 只写死一种，等于把这个断点本身的回归放过去。
+         * Both shapes are valid — `home-records.css` collapses
+         * `.nola-dual__pair` to one column at `@container (max-width: 680px)`, so a
+         * narrow window stacks — but each shape has to actually materialise.
          */
         const stacked = dualLayout.containerWidth <= 680
         const shapeOk = stacked
@@ -424,7 +409,7 @@ async function main() {
         if (width === 1100) await writeFile(resolve(output, `${language}-${width}-record-detail.png`), (await window.webContents.capturePage()).toPNG())
       }
 
-      // 返回键：详情页是列表的子页，退不回去会把后面整轮都困在这一页。
+      // The back button: without it the rest of the width sweep stays trapped on the detail page.
       scenarios += 1
       const wentBack = await clickAt(window, '.nola-record-detail__back')
       const backAtList = await window.webContents.executeJavaScript(`document.querySelector('[data-page]')?.getAttribute('data-page') === 'records'`)
@@ -432,7 +417,7 @@ async function main() {
     }
   }
 
-  // 真实鼠标点语言菜单：DOM .click() 测不出标题栏拖拽区把点击吞掉这种问题。
+  // Real input event: the dropdown lives in the title bar's drag region, where a DOM .click() proves nothing.
   window.setContentSize(1100, HEIGHT)
   await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings({ uiLanguage: 'zh-CN' })`)
   await goto(window, '#/', 'home')
@@ -448,11 +433,10 @@ async function main() {
       return { count: items.length, texts: items.map(el => el.textContent.trim()) }
     })()`)
     scenarios += 1
-    // 菜单项数量与文案：HeroUI v3 的 Dropdown.Menu 每一项都是 [data-slot="menu-item"]。
+    // Every HeroUI v3 Dropdown.Menu item carries [data-slot="menu-item"], so match on text rather than order.
     if (menu.count < 2 || !menu.texts.includes('English') || !menu.texts.includes('简体中文')) {
       fail({ language: 'zh-CN', width: 1100, page: 'language-menu' }, 'language menu items missing', { menu })
     } else {
-      // HeroUI v3 的 Dropdown 每一项都是 [data-slot="menu-item"]，按文案点而不是按下标。
       scenarios += 1
       const picked = await window.webContents.executeJavaScript(`(() => {
         const item = [...document.querySelectorAll('[data-slot="menu-item"]')].find(el => el.textContent.trim() === 'English')
@@ -468,7 +452,7 @@ async function main() {
       if (!picked || switched.lang !== 'en' || !switched.firstNav.includes('Home')) {
         fail({ language: 'en', width: 1100, page: 'language-menu' }, 'switching to English via the menu failed', { picked, switched })
       }
-      // 再切回中文，证明这条链路两个方向都通。
+      // Back to Chinese, so the language path is covered in both directions.
       await clickAt(window, LANG_TRIGGER('en'))
       const restored = await window.webContents.executeJavaScript(`(() => {
         const item = [...document.querySelectorAll('[data-slot="menu-item"]')].find(el => el.textContent.trim() === '简体中文')
@@ -486,14 +470,14 @@ async function main() {
 
   await closeWindow(window)
 
-  // -- 浮窗：?overlay=1 是独立文档分支，这条分流依然有效，保留 --------------------
+  // `?overlay=1` renders OverlayRoot instead of the shell (main.tsx), so the overlay needs its own window.
   const overlay = new BrowserWindow({ width: 880, height: 260, show: false, transparent: true, frame: false, webPreferences: { preload, contextIsolation: true, sandbox: true } })
   await overlay.loadFile(resolve('out/renderer/index.html'), { query: { overlay: '1' } })
   /*
-   * 必须真的显示这个窗。`caption-card.css` 给 `.nola-caption-track-content` 加了 320ms 的
-   * transform 过渡，而**隐藏窗口的 rAF 与合成被 Chromium 节流**：动画不推进，
-   * `getComputedStyle` 与 `getBoundingClientRect` 都停在起点（identity）。上滚断言会读到
-   * 一个假的 0，然后去"修"一个其实没坏的组件。
+   * The window has to be shown. `caption-card.css` gives
+   * `.nola-caption-track-content` a 320ms transform transition, and Chromium
+   * throttles rAF and compositing in a hidden window, so the animation never
+   * advances and the computed transform stays at identity.
    */
   overlay.showInactive()
   await settle(overlay)
@@ -505,7 +489,7 @@ async function main() {
       { targetLanguage: 'ja', text: '何もしないことも問題ではないし、健康でバランスの取れた生活に重要だと気づくかもしれません。', state: 'complete', provider: 'hymt2' },
     ],
   }
-  // 浮窗自己不开会话，sessionId 只能从 sessionStarted 事件里认领（见 sessionStore 文件头第 4 条）。
+  // The overlay document starts no session, so the store only learns a sessionId from this event.
   const emit = (type, extra) => overlay.webContents.executeJavaScript(
     `window.layoutFixture.emit(${JSON.stringify({ protocolVersion: 1, type, requestId: 'layout', sessionId: 'layout', ...extra })})`,
   )
@@ -521,7 +505,7 @@ async function main() {
     { name: 'translation-track', selector: '.nola-caption-track[data-kind="translation"]', min: 1 },
     { name: 'translation-wrap', selector: '.nola-caption-translations', min: 1 },
     { name: 'actions', selector: '.nola-caption-actions', min: 1 },
-    // 位置 · 锁定 · 置顶 │ 样式 · 最小化 · 关闭 = 6 颗（OverlayRoot 的动作行）。
+    // Position · lock · pin │ appearance · minimize · close — OverlayRoot's action row.
     { name: 'action-button', selector: '.nola-caption-actions .nola-caption-action', min: 6 },
     { name: 'controls', selector: '[data-slot="overlay-controls"]', min: 1 },
   ]
@@ -551,9 +535,10 @@ async function main() {
     fail({ language: 'overlay', page: 'multitarget' }, 'overlay lost the configured target language or overflowed', { bilingual })
   }
 
-  // 下一句要接在同一块文字流上，而不是换掉它：已完成的句子留在流里、块向上滚、译文慢一步。
-  // 第二句必须带**不同的**译文文案：文案一样时 CaptionTrack 的 mergeLine 会判成"同句修订"
-  // 就地替换（这是有意的去重），译文轨道就永远是 1 条，测不到"累积"。
+  // The next sentence has to join the same text flow rather than replace it: the finished
+  // sentence stays in the stream, the block scrolls up, the translation trails a step behind.
+  // Its translation text must differ — identical text is folded as a revision by
+  // `CaptionTrack`'s `mergeLine`, so the translation track would never reach two segments.
   await emit('caption', { segment: {
     ...segment,
     segmentId: 'after-roll',
@@ -584,13 +569,13 @@ async function main() {
   }
 
   /*
-   * 断言"上滚"这一步必须等 320ms 的 transform 过渡跑完（caption-card.css 的
-   * `.nola-caption-track-content`）—— 过渡途中读计算值拿到的是起点矩阵，
-   * 拿中途值断言只会得到一个假的 0。
+   * The 320ms transform transition on `.nola-caption-track-content` has to finish
+   * first; read mid-transition and the computed matrix is still the start value.
    *
-   * 而且不比"移了多少"，比**该移多少**：位移必须正好等于内容块超出 flow 的那部分高度
-   * （`CaptionTrack.measure()` 里的 `content.offsetHeight - flow.clientHeight`）。
-   * 只断言 shiftY < 0 的话，一个写死 `translateY(-4px)` 的回归照样能过。
+   * The assertion is on how far it *should* move, not that it moved: the shift
+   * must equal the block's own overflow of the flow
+   * (`content.offsetHeight - flow.clientHeight`, which is what `CaptionTrack`
+   * measures). A hardcoded `translateY(-4px)` would pass a `shiftY < 0` check.
    */
   await delay(420)
   scenarios += 1
@@ -616,7 +601,7 @@ async function main() {
   if (settledSegments !== 2) fail({ language: 'overlay', page: 'roll-settled' }, `source stream settled to ${settledSegments} segments, expected 2`)
   await writeFile(resolve(output, 'overlay-bilingual.png'), (await overlay.webContents.capturePage()).toPNG())
 
-  // 大字号下字幕区不能撑破玻璃。
+  // The caption must not break the glass at a large font size.
   await overlay.webContents.executeJavaScript(`window.nolaTranslator.updateSettings({ overlay: { fontSize: 72, translationFontSize: 72, locked: false } })`)
   await settle(overlay)
   scenarios += 1
@@ -636,7 +621,7 @@ async function main() {
   await writeFile(resolve(output, 'overlay-large-adjusting.png'), (await overlay.webContents.capturePage()).toPNG())
   await closeWindow(overlay)
 
-  // 边跑边计数：写死的总数会悄悄不再描述"到底验了什么"。
+  // Counted as it runs: a hardcoded total stops describing what was actually checked.
   await writeFile(resolve(output, 'results.json'), JSON.stringify({ scenarios, failures }, null, 2))
   console.log(JSON.stringify({ scenarios, failures }, null, 2))
   app.exit(failures.length ? 1 : 0)

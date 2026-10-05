@@ -1,11 +1,8 @@
 /**
- * 设置域。乐观更新 + 失败回滚 + 180ms 防抖 + 单写队列。
- *
- * 三条硬规则：
- * 1. 组件永远不直接调 `bridge.settings`，只调这里的 `updateSettings`。
- * 2. 乐观更新的回滚基准是"引擎确认过的快照 + 仍在飞的 patch"，不是"点击那一刻的快照"。
- *    后者在并发写下是错的：先发的写失败回滚时会把后发的那次改动一起抹掉。
- * 3. 滑块与颜色类字段会连续产生几十次 onChange，逐次打盘没意义，合并成一次。
+ * Settings domain: optimistic update + rollback + 180ms debounce + write queue.
+ * A rollback returns to "the snapshot the engine confirmed + the patches still
+ * in flight", not to the snapshot from the click, which would let an earlier
+ * failed write erase a later one. Slider changes collapse into one write.
  */
 
 import type { NolaBridge } from '@/bridge'
@@ -16,7 +13,7 @@ export interface SettingsState {
   settings: AppSettings | null
   loaded: boolean
   loading: boolean
-  /** 至少有一个写在飞。按钮的 pending 态读它。 */
+  /** At least one write in flight; buttons read it for their pending state. */
   pending: boolean
   error: string | null
   storage: ModelStorageInfo | null
@@ -35,7 +32,7 @@ const initialState: SettingsState = {
 
 export const settingsStore = createStore<SettingsState>(initialState)
 
-/** 连续拖动会打出的字段。180ms 内的连续改动合并成一次写。 */
+/** Fields a drag emits. Changes within 180ms collapse into one write. */
 const DEBOUNCE_MS = 180
 const DEBOUNCED_PATHS: ReadonlySet<string> = new Set([
   'overlay.fontSize',
@@ -50,17 +47,14 @@ const DEBOUNCED_PATHS: ReadonlySet<string> = new Set([
   'overlay.backgroundColor',
 ])
 
-// -- 注入的运行时依赖 ---------------------------------------------------------
-// bridge 是运行时注入的：模块顶层不允许碰它，否则单测和 Electron 的启动顺序都会炸。
-
 let bridge: NolaBridge | null = null
 let unsubscribe: (() => void) | null = null
 
-/** 引擎最后一次确认的完整快照。回滚的基准。 */
+/** The last full snapshot the engine confirmed. The rollback baseline. */
 let confirmed: AppSettings | null = null
-/** 乐观但还没被引擎确认的 patch，按提交顺序排队。 */
+/** Optimistic but unconfirmed patches, in submission order. */
 let inFlight: PendingWrite[] = []
-/** 尚未 flush 的防抖 patch 合并成一个。 */
+/** Debounced patches not yet flushed, merged into one. */
 let debouncePatch: AppSettingsPatch | null = null
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let debounceWaiters: Array<{ resolve: () => void; reject: (error: unknown) => void }> = []
@@ -70,14 +64,11 @@ interface PendingWrite {
   debounced: boolean
 }
 
-// -- 纯函数 -------------------------------------------------------------------
-
 /**
- * 与主进程 `settings-store` 的合并规则逐字段对齐。这里自己实现而不复用别处的那份，
- * 是因为 bridge 的 `update()` 返回的是合并后的完整快照，合并规则属于 UI 乐观渲染的责任。
- *
- * 刻意不处理 `modelStoragePath`：`AppSettingsPatch` 把它排除了，它只能由
- * `storage.choose()` 改动（主进程的 zod schema 也会直接拒收带它的 patch）。
+ * Field-by-field with the main process's `settings-store` merge rules, done here
+ * because the bridge's `update()` returns the merged snapshot and the merge is
+ * the UI's optimistic-rendering job. `modelStoragePath` is left out:
+ * `AppSettingsPatch` excludes it and the strict patch schema would reject it.
  */
 export function mergeSettings(base: AppSettings, patch: AppSettingsPatch): AppSettings {
   return {
@@ -95,16 +86,14 @@ function mergeAll(base: AppSettings, patches: AppSettingsPatch[]): AppSettings {
   return patches.reduce<AppSettings>((acc, patch) => mergeSettings(acc, patch), base)
 }
 
-/** 把一个 patch 摊成点号路径，用来判断它是不是"纯滑块/颜色"改动。 */
+/** Flattens a patch into dotted paths, to tell a pure slider/colour change from anything else. */
 function patchPaths(patch: AppSettingsPatch): string[] {
   const paths: string[] = []
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue
     if (typeof value === 'object' && value !== null) {
       for (const [leaf, leafValue] of Object.entries(value)) {
-        // 显式写成 undefined 的键等于"不改这个字段"，不能算进路径里。
-        // 漏掉这一步，一个本来只动 fontSize 的 patch 会因为带了个 undefined 兄弟键
-        // 被判成"非滑块改动"，于是绕开防抖立刻落盘，拖动时每一下都打一次盘。
+        // An explicit undefined means "leave alone" and is not a path, or a fontSize patch would miss the debounce.
         if (leafValue === undefined) continue
         paths.push(`${key}.${leaf}`)
       }
@@ -137,21 +126,18 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-// -- 写队列 -------------------------------------------------------------------
-
 const enqueue = createWriteQueue()
 
-/** 队列里还有多少个未落地的写。`pending` 由此推导，UI 不需要自己数。 */
+/** Writes still waiting to land. `pending` is derived from this, so the UI need not count. */
 function pendingCount(): number {
   return inFlight.length + (debouncePatch ? 1 : 0)
 }
 
 /**
- * 把"已确认快照 + 所有尚未落地的乐观 patch"重新合成 UI 该看到的值。
- *
- * 防抖窗口里的那个 patch **也必须算进来**。它还没进 `inFlight`，早先的版本漏了它，
- * 于是外部来一条 `onSettingsChanged`（另一个窗口改了设置）就会把用户正在拖的滑块
- * 重置回旧值——用户手还在滑，数字却跳回去了。
+ * Recomposes "the confirmed snapshot + every optimistic patch not yet written"
+ * into what the UI should see. The debounced patch counts too: it is not in
+ * `inFlight` yet, and leaving it out lets an external `onSettingsChanged` reset
+ * the slider the user is still dragging.
  */
 function publish(base: AppSettings | null): void {
   if (!base) return
@@ -181,9 +167,7 @@ async function bridgeWrite(patch: AppSettingsPatch): Promise<AppSettings> {
   return bridge.settings.update(patch)
 }
 
-// -- 公开动作 -----------------------------------------------------------------
-
-/** 首次加载 + 外部改动（onSettingsChanged）的入口。 */
+/** First load, and the entry point for external changes (onSettingsChanged). */
 export async function loadSettings(): Promise<void> {
   if (!bridge) return
   if (settingsStore.getState().loaded && !settingsStore.getState().error) return
@@ -200,8 +184,10 @@ export async function loadSettings(): Promise<void> {
 }
 
 /**
- * 乐观更新。成功则收敛到引擎返回的快照，失败则回滚到"已确认快照 + 其余仍在飞的 patch"，
- * 记录 error 并**把原始错误抛给调用方**（吞掉错误等于"点了没反应"）。
+ * Optimistic update. Success converges on the snapshot the engine returns,
+ * failure rolls back to "the confirmed snapshot + the patches still in flight",
+ * records the error and **rethrows the original error** — swallowing it reads as
+ * "nothing happened".
  */
 export async function updateSettings(patch: AppSettingsPatch): Promise<void> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
@@ -210,10 +196,7 @@ export async function updateSettings(patch: AppSettingsPatch): Promise<void> {
 
   if (isDebounceable(patch)) return enqueueDebounced(patch)
 
-  // 写必须严格按用户操作的先后顺序出去。所以在做一次立即写之前，先把还挂在防抖窗口里的
-  // 那次写排干：否则「拖滑块（防抖）→ 立刻切开关（立即）」之后，迟到的防抖 flush 会带着
-  // 滑块的旧值落到开关后面，把用户后做的那次改动盖掉。
-  // flush 自己的失败由它自己的等待者负责，这里不吞掉它要报的错。
+  // Drain the debounce window first, or a late flush lands behind a later write and undoes it.
   if (debouncePatch) await flushDebounced().catch(() => undefined)
 
   const record: PendingWrite = { patch, debounced: false }
@@ -228,10 +211,10 @@ export async function updateSettings(patch: AppSettingsPatch): Promise<void> {
   }
 }
 
-/** 滑块 / 颜色：本地立刻生效（拖动必须跟手），落盘合并到 180ms 之后。 */
+/** Sliders and colours: applied locally at once (a drag must track the hand), written 180ms later. */
 function enqueueDebounced(patch: AppSettingsPatch): Promise<void> {
   debouncePatch = debouncePatch ? mergePatches(debouncePatch, patch) : patch
-  // 立即把新值渲染出去，但不写引擎。publish 会把 debouncePatch 一起叠上去。
+  // Render the new value now without writing it; publish folds debouncePatch in.
   settingsStore.setState({ error: null })
   publish(confirmed)
 
@@ -266,7 +249,7 @@ async function flushDebounced(): Promise<void> {
   }
 }
 
-/** 防抖窗口内被卸载时，立刻把没落地的值写出去，避免用户改完就关窗丢掉。 */
+/** Unload inside the debounce window: write what has not landed, so a change made just before closing is not lost. */
 export async function flushPendingSettings(): Promise<void> {
   if (debounceTimer !== null) {
     clearTimeout(debounceTimer)
@@ -276,12 +259,10 @@ export async function flushPendingSettings(): Promise<void> {
 }
 
 /**
- * 后台重读一次磁盘占用。「存储」tab 打开时调它：可用空间与占用大小只有装完/删掉模型之后才变，
- * 而 `loadSettings` 只在启动时取过一次，不重读就会一直显示旧数字。
- *
- * 刻意不碰 `storageBusy` / `loaded` / `loading`：这是打开 tab 时的静默刷新，不是首屏加载，
- * 不该在界面上表现成一次新的加载。失败只写 `error`，并**保留上一次的 `storage`** ——
- * 过期数字好过空行。
+ * Re-reads disk usage in the background when the storage tab opens: those
+ * numbers only change once models are installed or removed, and `loadSettings`
+ * read them once at startup. Touches neither `storageBusy` nor `loaded`, and a
+ * failure keeps the previous `storage` — stale numbers beat an empty row.
  */
 export async function refreshStorage(): Promise<void> {
   if (!bridge) return
@@ -298,7 +279,7 @@ export async function chooseStorageDirectory(): Promise<ModelStorageInfo | null>
   settingsStore.setState({ storageBusy: true, error: null })
   try {
     const chosen = await bridge.storage.choose()
-    // 用户在系统对话框里点了取消：bridge 返回 null，这不是错误，静默保持原状。
+    // Cancelled in the system dialog: null is not an error, so leave the state as it was.
     if (!chosen) return null
     const storage = await bridge.storage.get()
     settingsStore.setState({ storage, storageBusy: false })
@@ -326,14 +307,11 @@ export function clearSettingsError(): void {
   settingsStore.setState({ error: null })
 }
 
-// -- 注入 ---------------------------------------------------------------------
-
 export function attachSettingsStore(next: NolaBridge): void {
   bridge = next
   unsubscribe?.()
   unsubscribe = next.events.onSettingsChanged((settings) => {
-    // 外部改动（另一个窗口改了设置）也要收敛，但不能覆盖本窗口仍在飞的乐观值：
-    // 确认快照前移，在飞的 patch 重新叠上去。
+    // An external change converges by advancing the confirmed snapshot, patches still in flight stay on top.
     confirmed = settings
     publish(confirmed)
   })

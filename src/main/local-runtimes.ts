@@ -10,7 +10,7 @@ export function missingLocalRuntime(path = '', source: LocalRuntime['source'] = 
   return { path, source, status: 'missing', backend: '', version: '', gpuAvailable: false, reason: '没有找到本地运行环境' }
 }
 
-/** Inspect existing runtimes read-only. Never install packages into someone else's environment. */
+/** Inspect existing runtimes read-only. */
 export async function probeLocalEngine(launch: EngineLaunchSpec, source: LocalRuntime['source']): Promise<LocalRuntime> {
   const result = missingLocalRuntime(launch.command, source)
   if (!await access(launch.command).then(() => true, () => false)) return result
@@ -37,6 +37,8 @@ export async function probeLocalLlama(directory: string, source: LocalRuntime['s
     const [version, help, devices] = await Promise.all([run(executable, ['--version'], options),
       run(executable, ['--help'], options), run(executable, ['--list-devices'], options)])
     const supported = help.stdout + help.stderr
+    // The app's launch args depend on these five flags, so a llama build
+    // missing any of them cannot be driven by this client.
     for (const flag of ['--device', '--split-mode', '--fit-target', '--flash-attn', '--jinja']) {
       if (!supported.includes(flag)) throw new Error(`本地 llama 缺少所需参数 ${flag}，请选择兼容版本`)
     }

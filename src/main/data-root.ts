@@ -4,16 +4,8 @@ import { dirname, isAbsolute, join, normalize } from 'node:path'
 import { app } from 'electron'
 
 /**
- * The app's own data — settings, credentials, meetings, models, runtimes — lives in ONE root, so
- * "where does this app store things" has a single answer and moving everything to another drive is
- * one setting instead of five.
- *
- * **Why this is deliberately not `app.setPath('userData', ...)`.** `userData` also holds everything
- * Chromium owns: `Cache`, `GPUCache`, `Code Cache`, `Local Storage`, `Preferences`, `Network`. All
- * of it is disposable, so relocating it would drag thousands of throwaway files into the install
- * directory and blur the line between "app data" and "browser state" — the very line the migration
- * has to reason about. Chromium state therefore stays in AppData and starts fresh; the data root
- * is a separate location that only this app's own stores resolve from.
+ * All app-owned data — settings, credentials, meetings, models, runtimes — lives in ONE root, so
+ * "where does this app store things" has a single answer and relocating it is one setting.
  */
 
 /** Pointer file, written next to the executable and only when the user overrides the root. */
@@ -23,31 +15,19 @@ const POINTER_FILE = 'data-location.json'
 const POINTER_VERSION = 1
 
 /**
- * The install directory, i.e. the parent of the `resources` directory. Two layouts, one rule,
- * discriminated on `app.isPackaged` — the flag this repo already uses for every other packaged/dev
- * path split (see `index.ts`):
- *
- *  - Packaged (`asar: true` in package.json): `<install>\Nola Translator.exe` sits next to
- *    `<install>\resources\app.asar`, so `dirname(app.getPath('exe'))` IS the install directory.
- *    `app.getAppPath()` alone is wrong here: it is `<install>\resources\app.asar`, which would put
- *    user data inside `resources` next to the bundled engine and llama binaries.
- *  - Dev: electron-vite runs `electron .` from the repo root, so `app.getAppPath()` is the repo
- *    root (it holds `package.json` and `out/`). The exe is
- *    `node_modules\electron\dist\electron.exe`, so `dirname(exe)` is the Electron *binary* folder,
- *    not the project.
- *
- * Sniffing for a sibling `resources` directory instead of branching on `isPackaged` looks
- * layout-agnostic but is not: `node_modules\electron\dist\resources` exists in dev too, so that
- * rule would resolve a dev run into the Electron binary folder.
+ * The install directory: the parent of `resources`, split on `app.isPackaged` as `index.ts` does
+ * everywhere else. Packaged, `dirname(app.getPath('exe'))` IS it; `getAppPath()` would be
+ * `<install>\resources\app.asar`. In dev the exe is the Electron binary, so `dirname(exe)` is its
+ * folder and only `getAppPath()` is right — sniffing for a sibling `resources` is no fix, since
+ * `node_modules\electron\dist\resources` exists in dev too.
  */
 export function defaultDataRoot(): string {
   if (app.isPackaged) {
     try {
       return dirname(app.getPath('exe'))
     } catch (error) {
-      // A path lookup must never take startup down. Falling through to `getAppPath()` is wrong for
-      // a packaged build (`<install>\resources\app.asar`), but it is absolute and writable, and a
-      // visible warning is better than a launch that never opens.
+      // A path lookup must never take startup down; `getAppPath()` is absolute and writable even
+      // though it is the wrong directory for a packaged build, and a warning beats a dead launch.
       console.warn('the exe path is unavailable; falling back to the app path for the data root', error)
     }
   }
@@ -59,18 +39,14 @@ function dataLocationFile(): string {
 }
 
 /**
- * The user-chosen data root, or `null` when there is no usable pointer.
- *
- * **A corrupt pointer falls back to the default; it never throws.** This runs during startup,
- * before a window exists, so an unreadable or hand-edited file has to degrade to "the default
- * install" and still open the app. A missing or relative `dataRoot` must especially not slip
- * through: `join(undefined, 'models')` hands the Python engine the literal path `undefined\models`,
- * and a relative path would resolve against whatever the process cwd happens to be.
+ * The user-chosen data root, or `null` when there is no usable pointer. An unreadable or
+ * hand-edited pointer degrades to the default instead of throwing: this runs before a window
+ * exists and the app still has to open. A relative `dataRoot` is rejected for the same reason — it
+ * would resolve against whatever the process cwd happens to be.
  */
 export function readDataRootPointer(): string | null {
   const file = dataLocationFile()
-  // Absent is the normal state, not a fault: the pointer is only written when the user overrides
-  // the root, so a default install carries no extra file at all.
+  // Absent is the normal state, not a fault: the pointer is written only when the user overrides the root.
   if (!existsSync(file)) return null
   let parsed: unknown
   try {
@@ -84,27 +60,14 @@ export function readDataRootPointer(): string | null {
     console.warn(`the data root pointer ${file} has no absolute "dataRoot"; using the default data root`)
     return null
   }
-  // `version` is deliberately not enforced here: an unversioned (or newer) file still yields its
-  // path, so a downgrade cannot strand the data behind a version check that fails.
   return normalize(candidate)
 }
 
 /**
- * The root an **existing** install already keeps its data in, or `null` when this is a fresh
- * install with nothing to keep.
+ * The root an existing install already keeps its data in, or `null` for a fresh install.
  *
- * Before this module existed, every byte of app data lived in Electron's `userData`
- * (`settings.json`, `credentials.json`, `meetings/`, and — through `modelStoragePath`'s empty
- * default — `models/`, `cache/`, `runtimes/`). Switching the stores over to the data root without
- * this check would make every current user's meetings, settings and API keys vanish on upgrade:
- * the new root would be empty and the app would silently start over. Silently moving gigabytes of
- * their recordings at first launch is no better — an unattended copy that is interrupted halfway
- * leaves two half-populated roots and no way to tell which is authoritative.
- *
- * So an install that already holds data **keeps it where it is**. The install directory only becomes
- * the default for an install that has nothing yet. A user who wants the data elsewhere moves it
- * deliberately from the settings page, where they are watching, rather than having it happen to
- * them on a version bump.
+ * An install that already holds data keeps it where it is; the install directory becomes the
+ * default only for one that has nothing yet.
  */
 function existingUserDataRoot(): string | null {
   const userData = app.getPath('userData')
@@ -115,15 +78,10 @@ function existingUserDataRoot(): string | null {
 }
 
 /**
- * What the app resolves to when there is no pointer file — the second and third tiers of
- * `resolveDataRoot()` below.
+ * The root when there is no pointer file — the second and third tiers of `resolveDataRoot()`.
  *
- * Exported because that answer is needed on its own, not only inside the resolve. When a migration
- * is cancelled for want of space, the entire point is to send the next launch back to the directory
- * that still holds the data, and whether that means *deleting* the pointer or *writing it back*
- * turns on this value alone (`index.ts`). Spelling the two tiers out a second time over there would
- * be a second copy of a rule that decides whether a user's settings and API keys are still
- * reachable, so the tiers live here and the resolve reads them.
+ * Exported because the cancellation branch in `index.ts` needs this answer on its own: whether it
+ * deletes the pointer or writes it back turns on this value alone.
  */
 export function fallbackDataRoot(): string {
   return existingUserDataRoot() ?? defaultDataRoot()
@@ -140,18 +98,10 @@ export function resolveDataRoot(): string {
 }
 
 /**
- * Points the app at another data root. Throws on a relative path: that is a programming error
- * rather than a runtime condition, and the caller (a settings flow over a directory the user just
- * picked) has to hear about it instead of silently writing a pointer that `readDataRootPointer`
- * would reject on the next launch.
- *
- * `version` earns its place because the file lives next to an installed executable and outlives
- * both app upgrades and reinstalls: a future layout change needs to tell "written by an older
- * build" from "written by a newer one" rather than inferring it from which keys happen to be
- * present.
- *
- * Sync `node:fs` on purpose — this must be callable before `app.whenReady()`, where there is no
- * ready loop to await on, and a half-written pointer is worse than a failed one.
+ * Points the app at another data root. Throws on a relative path: that is a programming error, and
+ * a pointer `readDataRootPointer` would reject next launch hides it. `version` earns its place
+ * because the file outlives upgrades and reinstalls. Sync `node:fs`: this has to be callable
+ * before `app.whenReady()`, where there is no loop to await on.
  */
 export function writeDataRootPointer(root: string): void {
   if (!isAbsolute(root)) throw new Error('The data root must be an absolute path')
@@ -160,62 +110,46 @@ export function writeDataRootPointer(root: string): void {
   writeFileSync(file, `${JSON.stringify({ version: POINTER_VERSION, dataRoot: normalize(root) }, null, 2)}\n`, 'utf8')
 }
 
-/*
- * ── 待迁移标记 ────────────────────────────────────────────────────────
- *
- * 换数据根**不在用户点「浏览」的那一瞬间搬数据**，只写指针 + 标记，然后要求重启；
- * 真正的搬运发生在下一次启动、任何 store 打开句柄之前。
- *
- * 理由是句柄：那一刻会议库正持有录音文件，密钥库正持有 credentials.json，而一次搬迁
- * 要动几个 GB（`build/runtime-catalog.json` 声明运行时合计约 687 MB）。在运行中的进程里
- * 搬自己的文件，是把"迁移失败"和"边搬边被写入"绑在一起。启动时则没有任何句柄，而且
- * 中途断电只需要下次启动重跑一遍——`data-migration.ts` 的暂存+rename 拷贝设计正是为
- * 重复执行准备的。
- *
- * 标记放在**旧根**旁边、也就是指针旁边，而不是新根里：新根可能还不存在。
- */
-
 const PENDING_MIGRATION_FILE = 'data-migration-pending.json'
 
 /**
- * 标记读回来的样子：旧根 + 必须一起搬走的遗留目录。
- *
- * 是结构而不是一个字符串，因为启动时的迁移缺一不可：旧根决定"从哪儿搬、删谁的原件"，
- * 遗留目录（旧版 `modelStoragePath` 指的那个文件夹）决定"还有什么在正常遍历之外"。
+ * A marker as read back: the old root, plus the legacy directories that must move with it. Both
+ * parts are needed — the old root says where to copy from, the legacy directories name what sits
+ * outside the root's normal walk.
  */
 export type PendingDataMigration = {
-  /** 旧数据根。 */
   from: string
-  /** 落在数据根之外、也要一起搬走的遗留目录；没有就是空数组。 */
+  /** Legacy directories outside the root that must move with it; absent means none. */
   extra: string[]
 }
 
 /**
- * 记下"下次启动要把 `from` 搬到当前数据根"，`extraSources` 是数据根之外、必须跟着走的遗留目录。
- *
- * 相对路径直接拒绝，同 `writeDataRootPointer`：`normalize` 和 `join` 都不会把相对路径变成绝对
- * 路径，而迁移的每一处都拿它去 `join`、去 `lstat`，一个按进程 cwd 解析的源目录只会把数据
- * 写进一个没人找得到的地方。
+ * Records "move `from` to the current data root at the next startup", where `extraSources` are
+ * legacy directories outside the root that must come along. The settings handler writes a pointer
+ * and this marker and moves nothing: the move runs at the next startup, before any store opens a
+ * handle, the one moment nothing is open. Relative paths are rejected as in
+ * `writeDataRootPointer` — `normalize` and `join` never make one absolute.
  */
 export function writePendingDataMigration(from: string, extraSources: readonly string[] = []): void {
   if (!isAbsolute(from)) throw new Error('The migration source must be an absolute path')
   for (const extra of extraSources) {
     if (!isAbsolute(extra)) throw new Error('A legacy migration source must be an absolute path')
   }
+  // The marker goes beside the pointer, under `defaultDataRoot()`, which ignores the pointer itself:
+  // that is the one path still found after the pointer has been overwritten, and the new root may
+  // not exist yet.
   const file = join(defaultDataRoot(), PENDING_MIGRATION_FILE)
   mkdirSync(dirname(file), { recursive: true })
-  // `extra` 无条件写出，哪怕它是空的：缺键和空数组在读侧同义（老标记没有这个键），
-  // 写全了才能让"这是一次完整的记录"和"文件写了一半"在内容上就长得不一样。
+  // `extra` is always written, even when empty, so a missing key reads as `[]`.
   const marker = { version: POINTER_VERSION, from: normalize(from), extra: extraSources.map((extra) => normalize(extra)) }
   writeFileSync(file, `${JSON.stringify(marker, null, 2)}\n`, 'utf8')
 }
 
 /**
- * 读出待迁移的旧根和遗留目录；没有标记、或标记坏了，都返回 `null` —— 坏标记绝不能挡住启动。
- *
- * **老标记没有 `extra` 键，读回来是 `[]` 而不是失败。** 这个字段是后来才加的，那之前的
- * 标记文件此刻正躺在用户的安装目录里，把它判成损坏等于让一次升级把这些人永久卡在"标记
- * 损坏、下次启动不搬"上，而旧根本身是完全好的。
+ * The pending old root and its legacy directories, or `null` when there is no marker or the marker
+ * is bad — a bad marker must never block startup. A marker written before `extra` existed must
+ * read as `[]` rather than corruption, or an upgrade strands users whose old root is perfectly
+ * good.
  */
 export function readPendingDataMigration(): PendingDataMigration | null {
   const file = join(defaultDataRoot(), PENDING_MIGRATION_FILE)
@@ -233,8 +167,7 @@ export function readPendingDataMigration(): PendingDataMigration | null {
     console.warn(`the pending data migration marker ${file} has no absolute "from"; skipping the move`)
     return null
   }
-  // 一个手改坏的 `extra` 条目只该让那个遗留文件夹不跟着走，不该连一个完好的 `from` 一起作废：
-  // 逐条判定、逐条告警，而不是让整个标记失败。
+  // One hand-edited `extra` entry drops that legacy folder, not the whole marker: a good `from` stays usable.
   const raw = Array.isArray(record.extra) ? record.extra : []
   const extra = raw.filter((value): value is string => {
     if (typeof value !== 'string' || !isAbsolute(value)) {
@@ -247,28 +180,16 @@ export function readPendingDataMigration(): PendingDataMigration | null {
 }
 
 /**
- * 迁移成功后清掉标记。
- *
- * **只在迁移确实成功时调用。** 标记留着只是下次启动再搬一遍（幂等），标记被清掉而数据还
- * 留在旧根，则用户永远不会再有人来搬它——所以失败路径绝不能走到这里。
+ * Clears the marker. Call only after a successful move: a leftover marker just runs the copy
+ * again, while a cleared one leaves the old root with nothing ever coming back for it.
  */
 export function clearPendingDataMigration(): void {
   rmSync(join(defaultDataRoot(), PENDING_MIGRATION_FILE), { force: true })
 }
 
 /**
- * 撤销一次换根：删掉指针，让下一次启动回到默认/既有根。
- *
- * **存在的理由只有一个：目标盘装不下时的回退。** 迁移到一半撞上 ENOSPC 才是最坏的结果 ——
- * 旧根已经被删掉一部分，新根只搬进去一部分，而标记会让它每次启动再试一次，永远停在中间态。
- * 启动时的空间预检发现装不下，就该**整件事撤销**：删指针、清标记，应用照旧在旧根上启动，
- * 数据一根汗毛没动，用户腾出空间后重新选一次目录即可。
- *
- * `force: true`，指针不存在（本来就是默认安装）时不报错。
- *
- * **只在"没有指针时本来就会解析到旧根"时才删。** 旧根有三种来历，其中一种是用户之前就用指针
- * 选过的目录：那种情况下删掉指针就再没有任何东西指向那个装着会议记录和 API key 的文件夹了。
- * 判定交给 `fallbackDataRoot()`，见 `index.ts` 的取消分支。
+ * Undoes a data-root change so the next launch falls back. Exists for the ENOSPC case only: the
+ * sole call site is inside the `required > available` branch in `index.ts`.
  */
 export function clearDataRootPointer(): void {
   rmSync(dataLocationFile(), { force: true })

@@ -99,10 +99,6 @@ EventSink = Callable[[EngineEvent], None]
 
 class UnknownTranslationModel(ValueError):
     """A session named a translation model the engine has no llama-server tier for.
-
-    Raised instead of falling back to the baseline quantization: a silent fallback loads a model
-    the user did not pick, and the discrepancy only surfaces as mysteriously worse output much
-    later, when nobody is looking at the config that caused it.
     """
 
     def __init__(self, model_id: str) -> None:
@@ -137,10 +133,6 @@ def _compatibility(verdict: RuntimeVerdict, *, languages: bool = True) -> HubCom
 
 def _custom_files(info: HubRepoInfo) -> tuple[CustomFile, ...]:
     """The repo's file list as registry entries, carrying whichever digest HF published.
-
-    Every file is kept, not just the weights: a transformers repo is unusable without
-    config.json and the tokenizer files, and dropping them here would produce a model that
-    downloads successfully and then fails to load.
     """
     files: list[CustomFile] = []
     for item in info.files:
@@ -375,8 +367,7 @@ class EngineRuntime:
         """Judge a repo, remember it, and hand it to the same installer the catalog uses.
 
         The verdict is taken *before* the download starts. A repo the engine cannot run is
-        refused with the reason the adapter registry produced, and nothing is written to disk —
-        the alternative is discovering the model is unloadable after moving several gigabytes.
+        refused with the reason the adapter registry produced, and nothing is written to disk.
         """
         try:
             info = await asyncio.to_thread(inspect_repo, command.repo)
@@ -471,7 +462,7 @@ class EngineRuntime:
             required_resources = [model_id]
             if command.config.targetLanguages:
                 if command.config.translationProvider == "local":
-                    # Resolved from the resource table rather than hardcoded, so a GGUF or a
+                    # Resolved from the resource table, so a GGUF or a
                     # transformers repo the user installed themselves is the thing that gets
                     # checked for and loaded.
                     required_resources.append(self._local_translation_model_id(command.config))
@@ -647,12 +638,9 @@ class EngineRuntime:
         api_key = options.apiKey if options else ""
         region = options.region if options else ""
         model = options.model if options else ""
-        # 「整个 translationOptions 缺席」和「用户把接口地址清空了」是两件事，只有前者配得上默认地址：
-        # 设置项的默认值本来非空（`DEFAULT_SETTINGS.translation.cloudEndpoint`），所以空串只可能是
-        # 用户刚清空输入框，不是「没配过」。这里曾经的 `or DEFAULT_*` 会把请求静默发去官方地址 ——
-        # 用户清空的是 DeepSeek／硅基流动的网关地址，得到的却是一个跟真正原因无关的鉴权失败。所以
-        # 下面 cloud 的四条分支把空串原样交给 provider，由 network.py 里已有的 `if not endpoint:
-        # raise` 报出那句本来就写给用户看的话；**不要**再在这里补 `or DEFAULT_*`。
+        # A missing `translationOptions` and an emptied field are different states, and only the
+        # former earns a default: the settings default is non-empty, so "" can only mean the user
+        # cleared the box. Empty passes through so the provider refuses it by naming the field.
         def resolved(value: str, default: str) -> str:
             """A default stands in for a session that sent no translationOptions at all."""
 
@@ -668,7 +656,7 @@ class EngineRuntime:
         elif config.translationProvider == "microsoft":
             # The endpoint guard lives in `MicrosoftTranslatorProvider`, like the other four:
             # an empty address reaches the provider as an empty string and is refused there
-            # with the message written for the user to read. Don't re-check it here.
+            # with the message written for the user to read.
             provider = MicrosoftTranslatorProvider(
                 api_key,
                 endpoint=resolved(endpoint, DEFAULT_MICROSOFT_ENDPOINT),
@@ -680,9 +668,8 @@ class EngineRuntime:
                 "max_output_tokens": max_output_tokens,
                 "api_key": api_key,
             }
-            # `model` 同理：设置里的 `cloudModel` 默认非空，清空就是明确的操作，所以把它原样
-            # 传下去，由 provider 报「模型名为空（translationOptions.model）」，而不是偷偷换一个
-            # 模型名让用户以为自己配的模型在工作。
+            # Same for `model`: the settings default is non-empty, so an empty value reaches the
+            # provider, which refuses it by naming the field instead of substituting a model.
             if api_format == "chat-completions":
                 provider = OpenAICompatibleProvider(
                     endpoint=resolved(endpoint, DEFAULT_OPENAI_ENDPOINT),
@@ -727,11 +714,6 @@ class EngineRuntime:
 
     def _local_translation_provider(self, config: SessionConfig) -> TranslationProvider:
         """Build the local provider for whichever translation model the session selected.
-
-        The choice is the model's *adapter*, not its id and not a provider name. `local` no
-        longer tells llama.cpp apart from transformers, so the same resource table the
-        recognition path already asks decides which runtime gets the weights — which is what
-        keeps a GGUF installed from the hub on llama-server.
         """
         model_id = self._local_translation_model_id(config)
         source = (
@@ -805,8 +787,8 @@ class EngineRuntime:
         model_id = self._model_id(command)
         self.active_model_id = model_id
         model_path = self.resources.model_path(model_id)
-        # Dispatch on the adapter the model's own metadata selected, not on a comparison against
-        # the built-in ids. A self-installed Qwen3-ASR repo has to reach the same loader as the
+        # Dispatch on the adapter the model's own metadata selected.
+        # A self-installed Qwen3-ASR repo has to reach the same loader as the
         # shipped one, and the recognition guard in qwen_runtime.py stays the thing that decides
         # whether the checkpoint layout actually fits.
         compute = command.config.compute
@@ -853,7 +835,6 @@ class EngineRuntime:
     def _local_translation_model_id(self, config: SessionConfig) -> str:
         """The local translation model the session selected, whichever loader owns it.
 
-        Replaces a pair of per-provider resolvers that could only each see their own tier.
         An absent field is still the Hy-MT2 Q4_K_M baseline — that is an older client, not a
         mistake — while a *present* field has to resolve in the resource table, so a GGUF or a
         transformers repo the user installed from the hub is accepted here and reaches the

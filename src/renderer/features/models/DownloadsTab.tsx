@@ -1,14 +1,13 @@
 /**
- * 下载任务。`Table` 一行一个任务，进度列用 `ProgressBar`（有进度值的等待），
- * 空闲时 `EmptyState`。
+ * Download tasks: one `Table` row each, a `ProgressBar` where a task is in flight, and an
+ * `EmptyState` when idle.
  *
- * **没有速度列。** `ResourceRecord` 与 `EngineEvent` 都不带速率字段（只有 `progress` 与
- * `downloadBytes`），写一列永远空着的"速度"，或者编一个 MB/s 出来，都是在骗人。
- * 进度列因此给的是真实的两件事：百分比，以及已落盘字节 / 总量。
- * 需要速度的话是 `bridge/types.ts` 的缺口（那是 A2 的文件），见交付报告。
+ * There is no speed column because no rate field exists to fill one — `ResourceRecord` carries
+ * only `progress` and `downloadBytes`. The progress column therefore reports the two facts it
+ * actually has: the percentage, and written bytes over total.
  *
- * 失败的任务**留在表里**而不是弹走：弹走了用户就找不到"重试"在哪。失败行内给 `Alert`
- * 与重试按钮，错误文案走 `errors.*`，`state.error` 那个诊断串只进 console。
+ * The row carries an `Alert` and a retry button, the message comes from `errors.*`, and
+ * the `state.error` diagnostic string stays in the console.
  */
 
 import { Alert, Button, Card, EmptyState, ProgressBar, Table } from '@heroui/react'
@@ -52,10 +51,7 @@ export function DownloadsTab() {
         </Alert>
       ) : null}
 
-      {/*
-        `Table` 本身只是个带样式的 div，真正的 RAC `Table` 是 `Table.Content`，
-        外层还要套 `ScrollContainer`（HeroUI 陷阱 9：这几个包装层不能换成 div）。
-      */}
+      {/* `Table` is only the root; the semantic table is `Table.Content`, inside a `ScrollContainer`. */}
       <Card className="models-downloads"><Card.Content><Table>
         <Table.ScrollContainer>
           <Table.Content aria-label={t('models.tabDownloads')}>

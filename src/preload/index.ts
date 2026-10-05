@@ -67,17 +67,16 @@ const api: NolaTranslatorApi = {
   setSessionPaused: (sessionId: string, paused: boolean) =>
     invoke(channels.setSessionPaused, sessionId, paused),
   /*
-   * 载荷是 `EngineChannelEvent` 而不是 `EngineEvent`：这条通道上还多一支主进程自己发的
-   * `engineStateChanged`（引擎生命周期）。刻意**不**在这里拆成两个监听器 ——
-   * 那会让界面自己把两条流按时间拼回去，而拼错一次的代价就是「以为引擎好好的」。
-   * 合流之后送达顺序由 IPC 管道保证，这里原样透传即可。
+   * The payload is `EngineChannelEvent`, not `EngineEvent`: this one channel also carries
+   * `engineStateChanged` from the main process. Deliberately not split into two listeners —
+   * merged, the IPC pipe guarantees delivery order; split, the UI would have to interleave two
+   * streams itself and could conclude the engine is healthy when it is not.
    */
   onEngineEvent: (listener: (event: EngineChannelEvent) => void) => {
     const wrapped = (_event: Electron.IpcRendererEvent, value: EngineChannelEvent): void => listener(value)
     ipcRenderer.on(channels.event, wrapped)
     return () => ipcRenderer.off(channels.event, wrapped)
   },
-  // 只读当前状态。通道名与方法名对得上，语义也一致，界面不需要在这里做解释。
   getEngineState: () => invoke<EngineProcessState>(channels.getEngineState),
   showOverlay: () => invoke(channels.showOverlay),
   hideOverlay: () => invoke(channels.hideOverlay),

@@ -53,8 +53,8 @@ describe('字幕浮层位置', () => {
   })
 
   it('默认宽度接近录屏中的紧凑控制条', () => {
-    // 218px leaves room for three source lines above three translation lines once the
-    // window padding and the reserved hover control row are deducted.
+    // At 218 the card leaves 190 of stage content after the card and stage padding; the two
+    // tracks split that evenly, so four lines fit each at the default type scale.
     expect(createOverlayWindowOptions('C:\\app\\preload.cjs', 1920)).toMatchObject({ width: 883, height: 218 })
     expect(createOverlayWindowOptions('C:\\app\\preload.cjs', 2560)).toMatchObject({ width: 940, height: 218 })
   })

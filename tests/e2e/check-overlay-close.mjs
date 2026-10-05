@@ -75,7 +75,7 @@ app.whenReady().then(async () => {
   }
   await win.loadFile(resolve('out/renderer/index.html'),{query:{overlay:'1'}})
   await until(()=>evaluate(`Boolean(document.querySelector('.nola-caption-actions'))`))
-  await close() // Matches the user's idle screenshot, without needing an engine startup.
+  await close() // Idle first: no session is running, so the engine is never asked to stop.
   assert.equal(engine.stops,0)
   await start()
   await close()

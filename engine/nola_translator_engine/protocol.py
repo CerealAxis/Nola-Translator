@@ -35,27 +35,24 @@ AudioSource = Annotated[Union[DefaultOutputSource, DeviceSource], Field(discrimi
 
 
 class TranslationOptions(ProtocolModel):
-    #: The wire protocol is a separate field from the provider name, so one `cloud` provider
-    #: covers OpenAI Chat Completions, OpenAI Responses, Anthropic Messages and Ollama. What
-    #: `endpoint` means depends on it: the three OpenAI-shaped formats take a versioned base
-    #: (`https://api.openai.com/v1`) and get their path appended, while `anthropic` takes a bare
-    #: origin and gets `/v1/messages` appended.
-    #: No `min_length`: an empty endpoint is the legitimate "not configured yet" state the
-    #: settings layer can persist, and the missing endpoint is reported by the provider as a
-    #: usable message rather than as a schema error here.
+    #: A field of its own, separate from the provider name, so one `cloud` provider covers all
+    #: four wire shapes. `endpoint` means something different per format: the two OpenAI
+    #: formats take a versioned base (`https://api.openai.com/v1`), while `anthropic` and
+    #: `ollama` take a bare origin, and the provider appends the path its format needs.
+    #: No `min_length`: an empty endpoint is the legitimate "not configured yet" state, and a
+    #: missing one is reported by the provider as a usable message, not as a schema error.
     endpoint: str = Field(default="", max_length=2048)
     region: str = Field(default="", max_length=128)
     model: str = Field(default="", max_length=256)
     apiFormat: Literal["chat-completions", "chat-responses", "anthropic", "ollama"] = "chat-completions"
     #: Ceiling the engine fits a request into, reserving room for the reply and splitting the
     #: source text when it does not fit. Nothing downstream clips this to what a vendor
-    #: documents, so the upper bound is a fat-finger guard only, and it is set at the same
-    #: 10M the TypeScript schema allows rather than at a real model's window — a ceiling the
-    #: settings UI rejects but the engine accepts is the disagreement worth avoiding.
+    #: documents, so 10M is a fat-finger guard rather than a real model's window, and it
+    #: matches the TypeScript bound so the settings UI cannot accept what the engine refuses.
     contextWindow: int = Field(default=128000, ge=256, le=10_000_000)
     #: Sent as each API's own output-limit field (`max_tokens`, `max_output_tokens`,
-    #: `options.num_predict`). Unlike the window this value goes onto the wire unedited, which
-    #: makes the ceiling the only thing between a pasted 1e9 and a request the user pays for.
+    #: `options.num_predict`). The window never leaves the engine, so this ceiling is the only
+    #: thing between a pasted 1e9 and a reply the user pays for.
     maxOutputTokens: int = Field(default=4096, ge=1, le=10_000_000)
     #: 4096 is far above any issued key — real ones run a few hundred bytes — but self-hosted
     #: gateways mint signed tokens well past 1 KiB, and the TS schema agrees on the same number.
@@ -66,17 +63,15 @@ class SessionConfig(ProtocolModel):
     compute: ComputeOptions = Field(default_factory=ComputeOptions)
     audioSource: AudioSource
     recognitionMode: Literal["realtime", "accurate"]
-    # A free-form id rather than a fixed union: a session may name any model the engine has a
-    # loader for, and the resource table is where "is this id real" is decided. Narrowing it here
-    # only made an unknown id fail as an opaque protocol error instead of a useful one.
+    # A session may name any model the engine has a loader for, and the resource table is
+    # where "is this id real" is decided.
     recognitionModelId: str | None = Field(default=None, min_length=1, max_length=256)
     sourceLanguage: str = Field(min_length=1, max_length=32)
     targetLanguages: list[str] = Field(max_length=8)
     allowIntermediateTranslation: bool = False
-    # `local` and `cloud` are provider names, not wire formats. `local` dispatches on the
-    # adapter the selected translation model's own metadata resolved to, so a GGUF installed
-    # from the hub and the bundled transformers model are both "local"; `cloud` dispatches on
-    # `translationOptions.apiFormat` instead.
+    # `local` and `cloud` are provider names, not wire formats. `local` dispatches on the adapter
+    # the selected model's own metadata resolved to, so a hub GGUF and the bundled transformers
+    # model are both "local"; `cloud` dispatches on `translationOptions.apiFormat`.
     translationProvider: Literal["local", "cloud", "microsoft"] = "local"
     translationModelId: str | None = Field(default=None, min_length=1, max_length=256)
     translationOptions: TranslationOptions | None = None
@@ -131,8 +126,8 @@ class SearchHubModelsCommand(Envelope):
     """Find candidate repos on Hugging Face. Read-only, and it installs nothing."""
 
     type: Literal["searchHubModels"]
-    # Empty is meaningful, not invalid: the hub's list endpoint reads `search=` as "most
-    # downloaded", which is how the app browses popular models with an empty search box.
+    # Empty is meaningful, not invalid: `search_url` always sends `search=`, and paired with
+    # `sort=downloads` that is how an empty box browses the most popular models.
     query: str = Field(max_length=256)
     slot: Literal["recognition", "translation"] | None = None
     weightFormat: Literal["gguf"] | None = None
@@ -149,12 +144,6 @@ class InspectHubRepoCommand(Envelope):
 
 class InstallHubRepoCommand(Envelope):
     """Judge a repo, remember it, and start its download.
-
-    Separate from ``manageResource`` on purpose. A repo that is not installed yet has no
-    ``resourceId`` in the engine's table, so ``manageResource`` cannot name it, and the
-    compatibility verdict has to be produced *before* anything is downloaded — refusing a model
-    the engine cannot run only after committing the user to a multi-gigabyte transfer is the
-    failure this command exists to prevent.
     """
 
     type: Literal["installHubRepo"]
@@ -247,8 +236,7 @@ class ModelProgressEvent(Envelope):
 class ResourceRecord(ProtocolModel):
     resourceId: str = Field(min_length=1, max_length=256)
     kind: Literal["recognitionModel", "translationModel"]
-    # Names a loader rather than a fixed enum, so a new runtime adapter does not require a
-    # protocol bump on both sides just to be listed.
+    # See `resources.py` for the values.
     provider: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=256)
     description: str = Field(min_length=1, max_length=1024)
@@ -282,12 +270,7 @@ class ResourceChangedEvent(Envelope):
 
 
 class HubCompatibility(ProtocolModel):
-    """Whether a repo can be installed, and the model-derived facts the call was made on.
-
-    ``reason`` is written for the user and always explains a refusal in terms of what the repo
-    actually declares (``modelType``, ``ggufArchitecture``); ``evidence`` carries the raw values
-    so a support conversation never has to go back to the network to explain a verdict.
-    """
+    """Whether a repo can be installed, and the model-derived facts the call was made on."""
 
     compatible: bool
     reasonCode: str = Field(min_length=1, max_length=64)
@@ -295,8 +278,8 @@ class HubCompatibility(ProtocolModel):
     slot: Literal["recognition", "translation"] | None = None
     loader: Literal["llama.cpp", "transformers", "funasr"] | None = None
     adapterId: str | None = Field(default=None, max_length=64)
-    # Empty when the loader declares no static table, not when the model supports nothing: the
-    # evidence map says which, and conflating the two would read as "no languages supported".
+    # Empty whenever no table was enumerated for this verdict - an adapter that declares none,
+    # or a rejection - so it must never be read as "this model supports no languages".
     languages: list[str] = Field(default_factory=list, max_length=128)
     evidence: dict[str, str] = Field(default_factory=dict)
 
@@ -323,9 +306,6 @@ class HubModelSummary(ProtocolModel):
     #: Already present in the engine's resource table, so the UI can show it as installed.
     installed: bool = False
     compatibility: HubCompatibility | None = None
-    """``languages`` is left empty in search results on purpose: the full table is up to 39 codes
-    per model, and a 20-row comparison list would spend most of the 32 KiB protocol line on
-    language codes the user is not choosing between. ``inspectHubRepo`` carries the full table."""
 
 
 class HubModelsEvent(Envelope):
@@ -376,6 +356,12 @@ ErrorCode = Literal[
     "resourceNotFound",
     "resourceBusy",
     "resourceInUse",
+  # Hub and install failures. classify_hub_error() raises these from a genuine
+  # transport failure or an install that could not complete; they never come from
+  # session handling.
+  "networkUnavailable",
+  "integrityCheckFailed",
+  "installFailed",
     "lineTooLarge",
     "internalError",
 ]

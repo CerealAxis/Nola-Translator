@@ -1,14 +1,13 @@
 import { SettingsRow } from '../SettingsRow'
 /**
- * 高级诊断。引擎状态、版本与路径、复制诊断信息、恢复出厂设置。
+ * Advanced diagnostics: engine state, versions and paths, copy diagnostics, factory reset.
  *
- * **复制诊断信息用 `bridge.diagnostics.copy()`。** 它把整份 `DiagnosticsPayload` 写进
- * 剪贴板（主仓的 `copyDiagnostics` 是同一个通道）。按钮图标换成 ✓ 保持 1.5s 再复原：
- * 用户点复制时眼睛盯着的是按钮，不是屏幕角落，所以这里用按钮原地的反馈而不是 toast
- * （DESIGN 第 8 节"复制按钮"）。
+ * Copying writes the whole `DiagnosticsPayload` to the clipboard and then holds the checkmark
+ * in place on the button itself: the user's eyes are on the button they just pressed, so the
+ * confirmation belongs there rather than in a corner toast.
  *
- * **恢复出厂设置走 `AlertDialog`。** 破坏性操作必须有二次确认，`window.confirm`
- * 在 Electron 里会被系统拦掉而且样式不可控（DESIGN 第 11.3 节）。
+ * Factory reset confirms through `AlertDialog`, which is the only destructive path in the app
+ * that is not a single click.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -31,24 +30,13 @@ import type { EngineStatus } from '@/store'
 import { SettingGroup } from '../SettingsPage'
 import type { SettingsPanelProps } from '../SettingsPage'
 
-/** 复制成功后 ✓ 停留多久。DESIGN 第 8 节规定 1.5s。 */
+/** How long the copied checkmark stays up. */
 const COPIED_HOLD_MS = 1500
 
 /**
- * 引擎状态灯：**读完整的 `engineStatus`，不再读那个布尔值。**
- *
- * 以前这里是 `engineReady ? '引擎就绪' : '引擎未启动'`，而那个布尔值就是
- * `engineStatus === 'ready'`。于是五种截然不同的局面塌成两种画法：引擎从没起过、
- * 引擎正在启动、引擎崩溃后正在重连、引擎重试耗尽起不来 —— 全部显示「引擎未启动」，
- * **崩溃被报成了一件没发生的事**。用户在设置页唯一能问引擎状态的地方，
- * 恰恰是引擎真出事时给出答案最少的地方。
- *
- * 写成穷举的 `Record`（与 `sessionStore` 的 `ENGINE_PROCESS_STATE_TO_UI` 同一个用意）：
- * 将来 `EngineStatus` 加一个取值，这里编译不过，逼着补一句话，而不是让新状态
- * 悄悄掉进 `?? '引擎未启动'`。
- *
- * 颜色也分开：`idle` 不是故障，所以是中性灰而不是黄色；黄色留给"正在起来"，
- * 红色留给"起不来"。用同一个 warning 画"没启动"与"起不来"，就是把两者说成同一件事。
+ * Engine state, keyed exhaustively: a new `EngineStatus` fails to compile here instead of
+ * falling through to a catch-all label. Same intent as `sessionStore`'s
+ * `ENGINE_PROCESS_STATE_TO_UI`.
  */
 const ENGINE_STATUS_ROW: Record<EngineStatus, { label: TranslationKey; tone: StatusPillTone }> = {
   idle: { label: 'titleBar.engineIdle', tone: 'neutral' },
@@ -87,11 +75,10 @@ export function AdvancedTab(_props: SettingsPanelProps) {
       </SettingGroup>
 
       {/*
-        诊断明细。
-        旧前端的 `DiagnosticsPage` 是一整页，只有一项能力是本页没有的：**把
-        `getDiagnostics()` 的返回逐条列出来**。只有「一键复制」的话，用户能复制但看不到 ——
-        复制出来那段 JSON 还要自己找个地方打开才看得到，而出问题时用户要的正是「现在就说给我听」。
-        载荷拉取失败时只显示一行原因，不空转：空表格会被当成「一切正常」。
+        The individual diagnostics rows. Copying alone hands the user JSON they have to open
+        somewhere else to read, while what they need during a failure is to be told now.
+        A failed load states the reason instead of showing an empty list, which would read
+        as "everything is fine".
       */}
       <SettingGroup legend={t('settings.groupDiagnostics')}>
         <DiagnosticsReport />
@@ -101,12 +88,12 @@ export function AdvancedTab(_props: SettingsPanelProps) {
 }
 
 /**
- * `getDiagnostics()` 的只读列表。
+ * Read-only list of what `getDiagnostics()` returns.
  *
- * **键是中文**（`应用版本` / `引擎状态` / `语音识别` / `本地翻译` / `数据目录` …）——
- * 那是主进程 `app-ipc.ts` 里写死的字面量，不经过 i18n。这里原样显示，
- * 不做翻译：翻译一份诊断键会让用户拿到的中文界面和复制出去的诊断对不上号，
- * 报 bug 时两边对不上的字段等于没有。
+ * The keys are Chinese literals hardcoded in the main process (`app-ipc.ts`) and never go
+ * through i18n, so they are shown as they arrive: translating a diagnostics key would make
+ * the on-screen Chinese and the copied report disagree, and a field that does not match is
+ * useless in a bug report.
  */
 function DiagnosticsReport() {
   const { t } = useI18n()
@@ -194,8 +181,9 @@ function ResetAll({ pending }: { pending: boolean }) {
 
   const reset = useCallback(async () => {
     setState('pending')
-    // version 与 modelStoragePath 不在 AppSettingsPatch 里：前者是结构版本，
-    // 后者只能由 storage.choose() 改。恢复出厂设置不应该动模型目录。
+    // `version` and `modelStoragePath` are not part of `AppSettingsPatch`: the first is the
+    // schema version and the second is only written by `storage.choose()`, so a reset must
+    // leave the model directory alone.
     const { version, modelStoragePath, ...patch } = DEFAULT_SETTINGS
     void version
     void modelStoragePath

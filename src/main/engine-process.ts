@@ -8,11 +8,7 @@ import { createInterface, type Interface as ReadlineInterface } from 'node:readl
 import type { EngineCommand, EngineEvent, EngineProcessState } from '../shared/contracts'
 import { engineCommandSchema, parseEventLine } from '../shared/schemas'
 
-/**
- * 状态联合类型现在住在 `shared/contracts.ts`（界面也要读它），这里原样转出，
- * 免得 `import ... from './engine-process'` 的调用点为了拿一个类型而依赖主进程模块。
- * 类型是唯一的定义，**不要**在这里再抄一份。
- */
+/** Re-exported so a caller can read the state union without importing a main-process module. */
 export type { EngineProcessState }
 
 export type EngineLaunchSpec = {
@@ -204,7 +200,7 @@ export class EngineProcess extends EventEmitter {
           2_000
         )
       } catch {
-        // The exit path below still falls back to killing the process.
+        // Falls through to the kill below.
       }
     }
 
@@ -331,28 +327,15 @@ export class EngineProcess extends EventEmitter {
       this.setState('stopped')
       return
     }
-    /*
-     * **崩溃那一刻要报的是"还在重试"还是"没救了"，而只有这里答得出来。**
-     *
-     * 这一行原来无条件 `setState('failed')`，紧接着 `ensureConnection()` 又把状态置成
-     * `starting`：一次 250ms 就能自愈的崩溃，在界面上先闪过一条红色 ENG-001，再自己好了。
-     * 退避表（`restartDelaysMs`）和已用次数都在本类里，所以**重试意图在这里宣布**，
-     * 界面照着显示"正在恢复"；退避耗尽时 `connectWithRetries` 自己置 `failed`
-     * （上面那条），那才是真的要报障、也真的不会自己好。
-     *
-     * 握手途中崩掉（`state !== 'ready'`）也走同一个判据：那次 `hello` 已经被
-     * `rejectPending` 拒掉，`connectWithRetries` 的循环还活着，所以"还有没有下一次尝试"
-     * 问的仍然是同一件事。界面不需要、也不该知道这些分支。
-     */
+    // Only this class can answer "recovering or given up": the backoff table and the used count
+    // live here. A crash during the handshake uses the same test, because `rejectPending` has
+    // already rejected that `hello` while `connectWithRetries` is still looping.
     this.setState(this.hasRetryLeft() ? 'recovering' : 'failed')
     this.emit('crash', error)
     if (shouldReconnect) void this.ensureConnection().catch(() => undefined)
   }
 
-  /**
-   * 退避表还剩几次。**定义只有这一处**，界面与 `ipc.ts` 都不得自己数 ——
-   * 数错了就会出现"引擎已经放弃而界面还在说正在恢复"。
-   */
+  /** Remaining backoff attempts. Defined here only, so a second count can never disagree. */
   private hasRetryLeft(): boolean {
     return this.restarts < this.options.restartDelaysMs.length
   }

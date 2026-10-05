@@ -1,20 +1,20 @@
 import { statfsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
-/** Depth of the `ENOENT` walk-up in `freeBytesForDirectory`. Capped so it always terminates. */
+/** Depth of the `ENOENT` walk-up in `freeBytesForDirectory`. Bounds the number of ancestor probes. */
 const MAX_ANCESTOR_PROBES = 4
 
 /**
  * Free space of the volume that would hold `directory`, or `undefined` when it cannot be read.
  *
- * `bavail * bsize`, not `bfree * bsize`: the difference is the blocks reserved for the system,
- * and a number the user cannot actually write into is the wrong thing to draw a "disk is full"
- * warning from.
+ * `bavail * bsize`, not `bfree * bsize`: the difference is blocks reserved for the system, and a
+ * number the user cannot actually write into is the wrong thing to draw a "disk is full" warning
+ * from.
  *
- * The directory usually does not exist yet — it is where models are *going* to be installed, and
- * on a fresh install nothing has been created. `statfsSync` throws `ENOENT` for a missing path, so
- * walk up to the nearest existing ancestor: a volume on Windows is flat, so every directory on
- * that drive reports the same `statfs` answer and an ancestor is a valid proxy for the child.
+ * The directory usually does not exist yet — it is where models are *going* to be installed. So
+ * `statfsSync` throws `ENOENT` and the walk climbs to the nearest existing ancestor. A sibling
+ * directory on the same volume reports the same `statfs`, so an ancestor is a valid proxy — unless
+ * the path crosses a junction or mount point, which can land on a different volume.
  */
 export function freeBytesForDirectory(directory: string): number | undefined {
   let candidate = resolve(directory)
@@ -23,7 +23,7 @@ export function freeBytesForDirectory(directory: string): number | undefined {
       const stats = statfsSync(candidate)
       return stats.bavail * stats.bsize
     } catch {
-      // Fall through to the parent; only the return value below reports failure.
+      // Retry the parent; an exhausted walk returns undefined.
     }
     const parent = dirname(candidate)
     if (parent === candidate) return undefined

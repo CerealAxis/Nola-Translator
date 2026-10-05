@@ -4,12 +4,9 @@
    Imported into @layer base.
 
    FONTS
-   System fonts only, no @font-face, therefore no webfont download and no
-   FOIT/FOUT window at all — the `font-display: swap` consideration is moot.
-   If a webfont is ever added, it MUST be declared with `font-display: swap` so
-   text paints immediately in the fallback and never shows an invisible-text
-   block. The first entry (Segoe UI Variable Text) is the Windows 11 system UI
-   face; Microsoft YaHei UI covers CJK on Windows, PingFang SC covers macOS.
+   System fonts only, no @font-face, so there is no webfont download and no
+   FOIT/FOUT window. The first entry is the Windows 11
+   system UI face; Microsoft YaHei UI covers CJK on Windows, PingFang SC on macOS.
    ========================================================================== */
 
 :root {
@@ -18,16 +15,8 @@
   --font-mono: 'Cascadia Mono', 'SF Mono', Consolas, ui-monospace, monospace;
 
   /* --- Type scale ----------------------------------------------------------
-     Every entry is a complete `font` shorthand, font-family included, so it can
-     be applied with a single `font: var(--nola-text-*)` without the shorthand
-     resetting the family back to the browser default.
-
-     This scale is FIXED. Do not invent sizes outside these 8 steps — a new
-     step means the scale is wrong, not that a 10th step is needed.
-
-     --nola-text-body is 14px/1.65 on purpose: CJK glyphs need >= 1.6 leading
-     or the ideographic em-boxes collide vertically and dense subtitle text
-     becomes unreadable. 1.47 is a Latin-only number and is wrong here. */
+     Every entry is a complete `font` shorthand, family included, so it applies
+     without the shorthand resetting the family to the browser default. */
   --nola-text-display: 600 32px/1.25 var(--font-ui); /* page title */
   --nola-text-title: 600 15px/1.4 var(--font-ui); /* section / dialog title */
   --nola-text-subtitle: 600 14px/1.45 var(--font-ui); /* card title, table head */
@@ -107,12 +96,11 @@
 
 /* --- CJK letter-spacing guard -----------------------------------------------
    Negative tracking is tuned for Latin sidebearings. Chinese glyphs already sit
-   edge-to-edge inside a full-width em box, so -0.01em closes the gaps between
+   edge-to-edge in a full-width em box, so -0.01em closes the gaps between
    characters and visibly damages the glyph face. Rule: negative letter-spacing
-   is Latin-only; CJK-dominant text uses `normal` at EVERY size.
-
-   Apply .nola-cjk directly, or rely on the :lang(zh) rule below when the DOM
-   carries a lang attribute (the i18n layer is expected to set it). */
+   is Latin-only; CJK-dominant text uses `normal` at EVERY size. Apply .nola-cjk
+   directly, or rely on the :lang() rules when the DOM carries a lang attribute
+   (the i18n layer is expected to set it). */
 .nola-cjk,
 :lang(zh),
 :lang(zh-Hans),
@@ -122,9 +110,8 @@
 
 /* --- Mixed CJK / Latin spacing ----------------------------------------------
    `text-autospace` inserts a 1/4 em gap at every CJK <-> Latin boundary, which
-   is what makes "3 个模型" read as two words instead of one run-on block.
-   It is progressive enhancement: browsers without support simply render with
-   no extra gap, i.e. today's behaviour, so there is nothing to polyfill. */
+   is what makes "3 个模型" read as two words. Progressive enhancement: browsers
+   without support render with no gap, i.e. today's behaviour. */
 @supports (text-autospace: normal) {
   .nola-mix,
   .nola-body,

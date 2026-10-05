@@ -28,17 +28,18 @@
 .nola-entry__decoration { position: absolute; pointer-events: none; right: -12px; bottom: 47px; transform: rotate(-10deg); opacity: .09; color: var(--entry-tone); }
 .nola-entry__decoration svg { width: 118px; height: 118px; stroke-width: 1; }
 /*
- * 记录屏吃掉剩余高度，让卡片下沿和内容区下沿对齐。少了这几条，卡片高度就只由行数决定：
- * 满 10 行时看着像到底了（那是巧合），只剩 1 条时就缩成一条半行高、分页紧贴表格、下面空一大片。
- * 链条是：app.css 里 `.nola-route-content[data-page="records"]` 的 min-height:100% 先拿到确定高度
- * → 这里 flex:1 吃掉 header/search 之外的空间 → 卡片 `1 0 auto` 只涨不缩，
- * 行多到超过一屏时宁可让 `.nola-main` 整页滚动，也不压扁表格。
- * `Card.Footer`（分页）不用单独处理：HeroUI 的 `.card__content` 本身就是 `flex:1`，
- * 卡片一高，多出来的高度落在表格与分页之间，分页自然落到底部。
+ * The records page soaks up the remaining height, aligning the card's lower edge
+ * with the content area's. Without these the card's height is decided by its row
+ * count alone, so a single record leaves pagination hugging the table with a large
+ * void beneath it. The chain is: `min-height: 100%` on
+ * `.nola-route-content[data-page="records"]` in app.css fixes a height,
+ * `flex: 1` here takes what the header and search leave, and the card's
+ * `1 0 auto` only grows — a table taller than one screen scrolls `.nola-main`
+ * rather than compressing the rows.
  *
- * 撑满是列表页独有的意图，所以下面这条用 `.nola-record-page` 限定、不直接改 `.nola-record-card`：
- * 那个类名三处共用（首页「最近会议」卡、详情页的阅读卡与笔记卡），现在看不出变化只是因为
- * 首页/详情页外层没有确定高度、没有可分配的剩余空间。详情页阅读卡那条 `flex: 1` 更不能只靠源码顺序压过。
+ * `Card.Footer` needs no rule of its own: `.card__content` is already `flex: 1`,
+ * so the surplus height falls between the table and the pagination and the
+ * pagination lands at the bottom on its own.
  */
 .nola-record-page { flex: 1; }
 .nola-record-card { padding: 20px; min-width: 0; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 4%, transparent); gap: 16px; }
@@ -70,7 +71,9 @@
 .nola-record-status--live i { background: var(--accent); }
 .nola-record-status--interrupted { color: var(--muted); }
 .nola-record-status--interrupted i { background: var(--warning); }
-/* 列表页卡片撑满后空状态跟着撑满，`justify-content: center` 才真的居中（否则「暂无记录」吊在卡片顶部、下面空一大片）。类名也被首页「最近会议」复用，所以同样限定在列表页里。 */
+/* Once the card is stretched, the empty state stretches with it and
+   `justify-content: center` genuinely centres; otherwise "no records" hangs at
+   the top of a tall card. */
 .nola-record-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; min-height: 200px; padding: 24px; color: var(--muted); text-align: center; }
 .nola-record-page .nola-record-empty { flex: 1; }
 .nola-record-empty h2 { font-size: 20px; color: var(--foreground); }

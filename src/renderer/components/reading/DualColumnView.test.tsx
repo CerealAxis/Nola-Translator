@@ -1,14 +1,11 @@
 /**
- * `DualColumnView` 与焦点衰减的测试。
+ * `DualColumnView` and the focus ramp.
  *
- * 断言 DESIGN 里可验证的几条硬约束：
- * - 焦点**连续**衰减，不分档硬切（第 6.6.2 节）
- * - 焦点衰减有下限 0.42，不会无限淡下去
- * - 分隔拉手夹在 15% 到 85% 之间
- * - 方向键可调分隔位置（键盘可达，不是只能拖）
- * - 渲染结构是**成对输出**（一句原文紧跟一句译文），不是两栏各渲染一个句子列表
+ * Asserts the checkable constraints: the ramp is continuous rather than stepped, it
+ * stops at the 0.42 floor, the divider clamps between 15% and 85%, arrow keys move it,
+ * and the output is paired per sentence instead of two independent lists.
  *
- * 组件本身只用相对导入，所以这组测试不受 `@/` 别名缺失的影响。
+ * The component uses relative imports only, so these tests do not depend on `@/`.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -36,11 +33,11 @@ describe('lineOpacity 连续衰减', () => {
   })
 
   it('有下限 0.42，不会无限淡下去', () => {
-    // DESIGN 第 6.6.2 节的表格在距离 5 那一行写的是 0.42，但同页给的公式是
-    // `max(0.42, 1 - 0.11 * distance)`，代入 5 得 0.45。**公式与表格不一致**。
-    // 这里按公式断言（公式是规范，表格是说明），差异写进交付报告请编排者裁决。
+    // The formula gives 0.45 at distance 5, still above the 0.42 floor; the floor only
+    // starts to bind at distance 6. Asserting the formula, which is what the code
+    // implements.
     expect(lineOpacity(5)).toBeCloseTo(0.45, 5)
-    // 距离 6 起才真正触到下限。
+    // Past distance 6 the floor is what holds the opacity up.
     expect(lineOpacity(6)).toBe(0.42)
     expect(lineOpacity(50)).toBe(0.42)
     expect(lineOpacity(1000)).toBe(0.42)
@@ -84,11 +81,11 @@ describe('DualColumnView 渲染结构', () => {
       />,
     )
 
-    // 当前句（索引 1）在原文栏与译文栏各有一根 accent 指示条。
+    // The current line (index 1) carries an accent marker in both columns.
     expect(container.querySelectorAll('[data-current="true"]')).toHaveLength(2)
     expect(container.querySelector('[data-current="true"] .bg-accent')).toBeInTheDocument()
 
-    // 索引 0 距离当前 1，opacity 0.89；索引 2 距离 -1，也是 0.89。
+    // Index 0 sits one row below current and index 2 one row above, so both are 0.89.
     const cells = Array.from(container.querySelectorAll<HTMLElement>('[data-current], [style*="opacity"]'))
     const opacities = cells
       .map((cell) => Number(cell.style.opacity))
@@ -118,7 +115,7 @@ describe('DualColumnView 渲染结构', () => {
     )
     const interim = container.querySelector<HTMLElement>('[data-interim="true"]')
     expect(interim).toBeInTheDocument()
-    // interim 走静态的"更淡"，不是闪烁：没有 animation / animate-* 类。
+    // Interim dims statically rather than blinking: no animation class.
     expect(interim?.className).not.toMatch(/animate-|nola-caption-enter/)
   })
 })
@@ -151,7 +148,7 @@ describe('DualColumnView 分隔拉手', () => {
     const separator = screen.getByRole('slider')
     expect(separator).toHaveAttribute('value', '50')
 
-    // 用 focus 而不是 click：click 会走 pointerdown，进入拖动态。
+    // focus, not click: a click goes through pointerdown and starts a drag.
     separator.focus()
     await user.keyboard('{ArrowRight}')
     expect(separator).toHaveAttribute('value', '55')
@@ -178,11 +175,11 @@ describe('DualColumnView 分隔拉手', () => {
     const separator = screen.getByRole('slider')
     separator.focus()
 
-    // 从 50 连按 12 次左（理论值 -10，低于下限）：夹在 15。
+    // 12 presses left from 50 would reach -10; it clamps to 15.
     for (let i = 0; i < 12; i += 1) await user.keyboard('{ArrowLeft}')
     expect(separator).toHaveAttribute('value', '15')
 
-    // 从 15 连按 20 次右（理论值 115，高于上限）：夹在 85。
+    // 20 presses right from 15 would reach 115; it clamps to 85.
     for (let i = 0; i < 20; i += 1) await user.keyboard('{ArrowRight}')
     expect(separator).toHaveAttribute('value', '85')
   })

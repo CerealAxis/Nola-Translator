@@ -38,6 +38,8 @@ export async function probeHardware(): Promise<HardwareInventory> {
   } else result.notes.push('系统显卡信息暂时不可用；CPU 环境仍可使用')
   if (reads[1].status === 'fulfilled') {
     const versions = reads[1].value.stdout.trim().split(/\r?\n/).filter(v => /^\d+\.\d+$/.test(v))
+    // Lowest driver across all GPUs, so auto-selection is gated by the
+    // weakest card in the machine rather than the strongest.
     result.nvidiaDriver = versions.sort(compareDriverVersions)[0] ?? null
   }
   return result

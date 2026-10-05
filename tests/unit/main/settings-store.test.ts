@@ -123,7 +123,7 @@ describe('设置存储', () => {
         expect(migrated.translation.translateIntermediate).toBe(true)
       }
 
-      // 'microsoft' 前后同名；'openai' / 'ollama' 合并成 'cloud'（协议降级成 cloudApiFormat）。
+      // 'microsoft' keeps its name; 'openai' and 'ollama' collapse into 'cloud' as an apiFormat.
       for (const [legacy, expected] of [
         ['microsoft', 'microsoft'],
         ['openai', 'cloud'],
@@ -216,8 +216,9 @@ describe('设置存储', () => {
       await store.update({ translation: { localModelId: 'hy-mt2-1.8b-iq2-m' } })
       expect((await new SettingsStore(path).load()).translation.localModelId).toBe('hy-mt2-1.8b-iq2-m')
 
-      // 合并 M2M100 与自装模型之后，这个位是自由字符串：档位枚举由 settings-schema 那层
-      // 负责，店内存的不再按三档过滤，否则刚装好的自装模型会被挡回默认档。
+      // A free string, because M2M100 and hub models share this field. The tier enum is
+      // settings-schema's job; filtering by the three Hy-MT2 tiers here would bounce a
+      // freshly installed hub model back to the default.
       const custom = await store.update({ translation: { localModelId: 'hub:someone/my-mt-model' } })
       expect(custom.translation.localModelId).toBe('hub:someone/my-mt-model')
 

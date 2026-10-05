@@ -40,7 +40,6 @@ export function exportText(segments: CaptionSegment[]): string {
   return segments.map((segment) => lines(segment).join('\n')).join('\n\n')
 }
 
-/** Timelines are per meeting, so cues start at 00:00:00 instead of inheriting the previous session's clock. */
 export function exportSrt(segments: CaptionSegment[]): string {
   return segments.map((segment, index) => [
     index + 1,
@@ -61,7 +60,6 @@ function pad(value: number): string {
   return value.toString().padStart(2, '0')
 }
 
-/** Sortable and human-readable: the list falls back to this order when two meetings share a second. */
 function meetingIdFor(at: Date): string {
   const stamp = `${at.getFullYear()}${pad(at.getMonth() + 1)}${pad(at.getDate())}-${pad(at.getHours())}${pad(at.getMinutes())}${pad(at.getSeconds())}`
   return `${stamp}-${randomUUID().slice(0, 8)}`
@@ -162,11 +160,10 @@ export class MeetingStore {
   }
 
   /**
-   * `loadAll` runs once per process, at startup, before any window or session can exist — so a meta
-   * that still reads as running belongs to a session the previous process died with. Left alone it
-   * keeps no `endedAtMs`, the list shows it as 进行中 forever, and no later `finish` can repair it
-   * because `open` is in-memory only and is never repopulated. Only running -> interrupted is
-   * written; completed is left on disk untouched, the renderer already infers it from `endedAtMs`.
+   * `loadAll` runs once per process at startup, so a meta still reading `running` belongs to a
+   * session the previous process died with: left alone it keeps no `endedAtMs` and the list shows
+   * it in progress forever, and `open` is in-memory only, so no later `finish` can repair it.
+   * Only running -> interrupted is written; completed records stay untouched on disk.
    */
   private async reconcileInterrupted(): Promise<void> {
     for (const meta of [...this.cache.values()]) {
@@ -190,7 +187,7 @@ export class MeetingStore {
       await stat(marker)
       return
     } catch {
-      // No marker yet; fall through and look for the old flat history file.
+      // No marker yet, so the flat legacy history may still be waiting to be imported.
     }
     let raw: string
     try {
@@ -213,7 +210,7 @@ export class MeetingStore {
       titleIsCustom: false,
       startedAtMs,
       endedAtMs: startedAtMs + contentEndedAtMs,
-      // 与新写入的记录同一口径：**内容跨度**，不是墙钟。
+      // Same measure as a live recording: content span, not wall-clock.
       durationMs: Math.max(0, contentEndedAtMs - contentStartedAtMs),
       daySequence: 0,
       segmentCount: segments.length,
@@ -229,13 +226,11 @@ export class MeetingStore {
     this.cache.set(meetingId, meta)
   }
 
-  /** The first meeting of a local day carries no suffix; later ones get `_1`, `_2`, ... */
   private nextDaySequence(at: number): number {
     const day = localDayKey(at)
     return [...this.cache.values()].filter((meta) => localDayKey(meta.startedAtMs) === day).length
   }
 
-  /** The absolute path the engine should record audio to, or undefined when audio is off. */
   recordingPathFor(meetingId: string): string {
     return join(this.directory(meetingId), AUDIO_FILE)
   }
@@ -291,9 +286,9 @@ export class MeetingStore {
     const meta = this.cache.get(meetingId)
     if (meta) {
       /*
-       * 内容区间只记**确认句段**，和写进 `segments.jsonl` 的是同一批，所以时长和字幕
-       * 永远说的是同一段时间。录音的 t=0 是采集真正吐出第一帧的时刻，播放器要靠
-       * `contentStartedAtMs` 把字幕对齐过去。
+       * The content interval covers confirmed segments only, the same batch written to
+       * `segments.jsonl`, so duration and captions describe one span. Audio t=0 is when capture
+       * produced its first frame; the player aligns captions through `contentStartedAtMs`.
        */
       const end = segment.endedAtMs ?? segment.startedAtMs
       this.cache.set(meetingId, {
@@ -318,15 +313,13 @@ export class MeetingStore {
       if (!meta) return null
       const audio = await this.resolveAudio(meta)
       /*
-       * 结束时刻取**内容结束**，不是 finalize 的墙钟。`finish()` 跑在引擎卸完几个 GB 权重、
-       * 发出 `sessionStopped` 之后，用 `Date.now()` 会把收尾那几十秒算成会议的一部分。
+       * Both the end instant and the duration come from the content span, never from the wall
+       * clock at finalize time. Pausing stops the capture and shifts the engine's caption clock
+       * forward, so neither the audio nor the content span contains the paused time: four minutes
+       * paused and then ninety minutes of speech is a ninety-minute meeting.
        *
-       * 时长是**内容跨度**（首条到最后一条），不是 `endedAtMs - startedAtMs` —— 录音本来
-       * 就不含暂停与前导静音（见引擎 `setSessionPaused`），开头空四分钟、之后说了九十分钟的
-       * 一场，录音是 90 分钟，时长也该是 90 分钟。
-       *
-       * 一条字幕都没有的退化情形：有音频就用音频长度，再没有就用墙钟。宁可给一个偏大的
-       * 数字，也不要在列表里显示 00:00 让用户以为记录坏了。
+       * With no segments at all: the audio length if there is audio, the wall clock otherwise —
+       * a slightly long number beats showing 00:00 as if the recording were broken.
        */
       const started = meta.contentStartedAtMs
       const ended = meta.contentEndedAtMs
@@ -347,7 +340,7 @@ export class MeetingStore {
     })
   }
 
-  /** Drop a meeting whose session never actually started, so the list stays free of empty rows. */
+  /** Called when the engine never started the session: `begin()` already wrote the meeting, so remove it rather than list an empty one. */
   async abandon(meetingId: string): Promise<void> {
     for (const [sessionId, value] of [...this.open]) if (value === meetingId) this.open.delete(sessionId)
     await this.serialize(meetingId, async () => {
@@ -356,7 +349,7 @@ export class MeetingStore {
     })
   }
 
-  /** Trust the WAV header rather than the file size: a killed engine leaves a zero-length data chunk. */
+  /** Trust the WAV header, not the file size: the engine writes zero lengths up front and patches them only on close, so a killed engine leaves a data chunk of length 0. */
   private async resolveAudio(
     meta: MeetingMeta,
   ): Promise<{ audioFile?: string; audioDurationMs?: number }> {
@@ -411,8 +404,6 @@ export class MeetingStore {
   }
 
   async setNotes(meetingId: string, notes: string): Promise<MeetingMeta | null> {
-    // A blank note is dropped instead of stored as "", so a meeting that never had notes keeps
-    // reading back the same shape it was written with.
     const value = notes.trim() ? notes : undefined
     return this.serialize(meetingId, async () => {
       const meta = this.cache.get(meetingId)

@@ -1,33 +1,26 @@
 /**
- * 悬浮字幕窗的根。`main.tsx` 在 `?overlay=1` 时渲染它，**不在 `AppShell` 里**：
- * 这个窗口是一块压在别人画面上的玻璃，不是应用的一个页面。
+ * Root of the caption window. `main.tsx` renders it for `?overlay=1`, outside
+ * `AppShell`: this window is glass over someone else's screen, not a page of
+ * the app.
  *
- * 卡片与字幕的样式**来自主仓的 `.caption-console` 段**，落在
- * `src/theme/caption-card.css`（文件头写了来源与搬的是哪几样）；字幕怎么排、
- * 怎么滚，则整块搬自主仓的 `src/renderer/overlay/CaptionTrack.tsx`（见本文件）。
- * 这里只提供语义与状态：`data-scheme` / `data-locked` / `data-hover` /
- * `data-transparent`，几何全在 CSS 里。高度分配用 `lineBudget.ts`，也是主仓那份。
+ * This file supplies semantics and state (`data-scheme`, `data-locked`,
+ * `data-hover`, `data-transparent`); all geometry is in `caption-card.css`.
  *
- * 四条不可让的原则：
- * 1. **配色不跟随应用主题。** 它压在视频、会议软件、浏览器上，必须自证对比：
- *    `dark` 方案 `#0d0e10` 底 / 原文 `#f7f7f7` / 译文 `#d7dee8`；
- *    `light` 方案 `#f7f7f7` 底 / 原文 `#1a1c22` / 译文 `#4a5160`。
- *    用户在工作台切深色主题，这个窗**不变**。由 `settings.overlay.colorScheme` 选。
- * 2. **滚动容器一律原生 `overflow-y: auto`。** 带 `mask-image` 的滚动容器会让根元素成为
- *    `position: fixed` 后代的包含块，浮层与菜单整体跑偏（DESIGN 第 11.4 节第 4 条）。
- *    渐隐罩是独立的绝对定位兄弟节点，不是滚动容器自己的 mask。
- * 3. **hover 状态用原始指针坐标判定**，不用 enter/leave：卡片未锁定时是拖拽区，
- *    它的圆角会让指针落到 wrapper 上，两个原因都会吞掉合成事件（主仓踩过，
- *    `CaptionOverlay.tsx` 里那段注释）。
- * 4. **字幕是一条连续文本流，不是"一句一个节点"。** 引擎会对同一句连着修订多次，
- *    每句一个节点的话字幕会在自己后面一遍遍重复自己；而且句子一多，固定高度的
- *    轨道会被直接撑破。折叠与上滚都由 `CaptionTrack` 负责。
- *
- * 已知缺口：bridge 上只有 `overlay.show / hide / close / minimize / resize` 通道，
- * **没有「重新显示」的对称入口之外的东西**。所以右上角是「字幕外观」（跳设置页）·
- * 「最小化」（真最小化到任务栏）· 「关闭」（带确认，连带停掉这场同传）。
- * 「最小化」要求字幕窗 `skipTaskbar: false`，否则它最小化之后没有任何入口能点回来，
- * 见 `electron/main.cjs` 的 `createOverlay`。
+ * Four rules that cannot be traded away:
+ * 1. **Colour does not follow the app theme.** This window sits over video and
+ *    meeting software, so it has to prove its own contrast. Switching the
+ *    workspace to dark must not move it.
+ * 2. **Scroll containers are always native `overflow-y: auto`.** A scroll
+ *    container with `mask-image` becomes the containing block for
+ *    `position: fixed` descendants, which displaces the popovers and menus.
+ *    The fade scrims are absolutely positioned siblings instead of a mask.
+ * 3. **Hover is tested with raw pointer coordinates**, not enter/leave: an
+ *    unlocked card is a drag region, and its rounded corners let the pointer
+ *    land on the wrapper, so both drop the synthetic events.
+ * 4. **Captions are one continuous text stream, not a node per sentence.** The
+ *    engine revises the same sentence repeatedly, so per-sentence nodes make the
+ *    caption repeat itself, and enough of them overflow a fixed-height track.
+ *    `CaptionTrack` owns collapsing and scrollback.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -46,7 +39,6 @@ import type { TrackLine } from './CaptionTrack'
 import { OverlayControls } from './OverlayControls'
 import { allocateCaptionLines } from './lineBudget'
 
-/** 两套固定配色。数值来自 DESIGN 第 2.6 节，不跟随应用主题，也不参与浅深色切换。 */
 export const CAPTION_SCHEMES = {
   dark: { bg: '#0d0e10', source: '#f7f7f7', target: '#d7dee8', border: 'rgba(255,255,255,0.10)', chrome: '#d7dee8' },
   light: { bg: '#f7f7f7', source: '#1a1c22', target: '#4a5160', border: 'rgba(0,0,0,0.08)', chrome: '#4a5160' },
@@ -65,18 +57,16 @@ export function OverlayRoot() {
   const closeRequest = useRef(false)
 
   /*
-   * 「−」是真最小化到任务栏，「✕」是关闭并停掉这场同传。
+   * 「−」 really minimizes to the taskbar, 「✕」 closes and ends the session.
    *
-   * **原先这里是「收起」** —— 调 `overlay.resize` 把窗口压到 56px 细条、再点一次展开。
-   * 换掉的理由：收起把「窗口还在、字幕还在跑、但你看不见内容」表达成了「收起」，
-   * 用户按「−」时想说的却是「先让它到旁边去，别挡我视频」。后者没有这个歧义。
+   * Real minimizing has a hard prerequisite: the caption window must be
+   * `skipTaskbar: false`, or a minimized window has no taskbar entry to bring
+   * it back.
    *
-   * 真最小化有一个硬前提：主进程那边字幕窗是 `skipTaskbar: false`。为 true 时
-   * 窗口最小化后任务栏上没有任何入口，用户再也点不回来（见 electron/main.cjs）。
-   *
-   * **关闭要连带停识别。** 主仓的 `hideOverlay` 是纯隐藏（`src/main/ipc.ts:145`
-   * 只有一行 `.hide()`，不碰 session），但那是「隐藏」按钮的语义；这里是「关闭」，
-   * 用户说关闭时指的就是这场同传结束。留着服务在跑，用户会以为它还在收音。
+   * Closing ends recognition. `hideOverlay` is a pure hide for a caller that
+   * only wants the window out of the way; here the user means the session is
+   * over, and leaving the engine running would have them believe it is still
+   * recording.
    */
   // The main process owns stop + hide. Sending stopSession as well races two teardown requests.
   const closeOverlay = async (): Promise<void> => {
@@ -104,15 +94,9 @@ export function OverlayRoot() {
   const opacity = clamp(config.backgroundOpacity, 0, 1)
 
   /*
-   * 「字幕外观」是**发给主窗**的一条请求，不是本地跳转。
-   *
-   * 原型那版写的是 `window.nolaDesktop?.openPage('appearance')`，而**主仓没有
-   * `nolaDesktop` 这个全局**（preload 只注入 `nolaTranslator`）。`?.` 可选链让这行
-   * 永远求值成 `undefined`，不抛错、不打日志 —— 按钮「点了静默无反应」。
-   *
-   * 主仓既有 `openAppearance(page)`（渲染层 → 主进程，主进程再 `openAppearance` 回自己
-   * 的 `onOpenAppearance` 推送）这条现成的路：浮窗调它，主窗的路由监听收到就改 hash。
-   * 见 `main.tsx` 里 `bridge.events.onOverlayRequest` 的订阅。
+   * Appearance is a request to the main window, not a local navigation: this
+   * window owns no settings page, so the main window's route listener receives
+   * the push and changes its own hash.
    */
   const openAppearanceSettings = (): void => {
     void window.nolaTranslator?.openAppearance('appearance').catch(() => undefined)
@@ -122,12 +106,13 @@ export function OverlayRoot() {
   const hasCaption = session.segments.length > 0 || session.interim !== null
 
   /*
-   * 轨道只吃**当前这一句**，之前的句子由 `CaptionTrack` 自己折叠累积 —— 这是主仓的
-   * 做法，也正是它和"每句渲染一个节点"的分水岭：折叠之后轨道是一条不断的文本流，
-   * 装得下就往下长、装不下就往上滚。
+   * Tracks render only the current sentence; `CaptionTrack` folds earlier ones
+   * into a running stream.
    *
-   * 未确认句段优先，它是引擎正在改写的最新版本。它没有译文时译文轨道保持不动，
-   * 不清空 —— 译文是慢一步的，清空会让刚翻好的一句整条消失。
+   * The unconfirmed segment wins, being the engine's latest revision. When it
+   * has no translation the translation track keeps its last line rather than
+   * clearing: translation lags by a step, and clearing would make a sentence
+   * that just finished translating vanish.
    */
   const current = session.interim ?? session.segments[session.segments.length - 1] ?? null
   const sourceLine: TrackLine | null = current?.sourceText
@@ -139,14 +124,13 @@ export function OverlayRoot() {
     : null
 
   /*
-   * 翻译失败**必须显示原因**。
+   * A translation failure must show its reason. Drawing only `complete`
+   * translations makes "offline / expired key / model not ready" look exactly
+   * like "still translating", and the user can act on neither.
    *
-   * 旧浮窗只画 `state === 'complete'` 的译文，于是「断网 / key 过期 / 模型没就绪」
-   * 与「还在翻译」长得一模一样 —— 两种情况译文轨道都是空的，用户什么也做不了。
-   * 这里把失败原因作为译文轨道的文字画出来（`translationErrorSummary` 汇总所有失败项）。
-   *
-   * **只在确实没有可用译文时占位**：这一句正在翻译（`pending`）时**不**显示失败文案 ——
-   * 翻译慢一步是常态，一直闪「翻译失败」比空白更吵。
+   * Shown only when there is genuinely no usable translation: a `pending`
+   * segment gets no failure copy, because translation lagging is normal and a
+   * flashing error is noisier than an empty line.
    */
   const failureLine: TrackLine | null = current && !translated?.text
     ? (() => {
@@ -157,9 +141,9 @@ export function OverlayRoot() {
   const effectiveTranslationLine = translationLine ?? failureLine
 
   /*
-   * hover 用原始坐标判定，而不是 onMouseEnter/onMouseLeave：卡片未锁定时是
-   * `-webkit-app-region: drag`，圆角处指针会落到 wrapper 上，两个原因都会让合成的
-   * enter/leave 事件丢失（主仓 CaptionOverlay 里踩过这个坑）。
+   * Hover from raw coordinates rather than onMouseEnter/onMouseLeave: an
+   * unlocked card is a `-webkit-app-region: drag`, and its rounded corners let
+   * the pointer land on the wrapper, so both drop the synthetic events.
    */
   const cardRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -185,10 +169,7 @@ export function OverlayRoot() {
   }, [])
 
   /*
-   * 每条轨道能露几行，取决于 stage 实测高度。
-   *
-   * 哪条轨道"占位"由用户的显示模式决定，不由"有没有字"决定：按有没有字来分会让
-   * 原文独占整个 stage，译文一落地就把舞台对半分，两行在每个句段上都跳一下。
+   * How many lines each track may show depends on the measured stage height.
    */
   const stageRef = useRef<HTMLDivElement>(null)
   const [stageBox, setStageBox] = useState({ height: 0, gap: 0 })
@@ -200,11 +181,11 @@ export function OverlayRoot() {
       const padding = Number.parseFloat(style.paddingTop || '0') + Number.parseFloat(style.paddingBottom || '0')
       const height = Math.max(0, stage.clientHeight - padding)
       /*
-       * 两条轨道之间的实际间距。**从 computed style 读，不在这里写死 `6`**：
-       * `gap` 的值住在 `caption-card.css` 的 `.nola-caption-stage` 上，写死一份就会
-       * 和 CSS 各改各的，而对半分是 `share = (height - gap * (轨数 - 1)) / 轨数` ——
-       * gap 对不上，总高就偏，行数会多算一行，把下一条轨道整个挤出可视区。这种错不报错。
-       * `rowGap` 解析不出数字时（`normal` / 空值）兜成 0，宁可少扣一点也不算出 NaN。
+       * The real gap, read from computed style instead of hardcoding `6`: the
+       * value lives on `.nola-caption-stage` in `caption-card.css`, and an even
+       * split is `share = (height - gap * (tracks - 1)) / tracks`, so a stale gap
+       * miscounts a line and pushes a track out of view without any error.
+       * Unparseable `rowGap` (`normal`, empty) falls back to 0 rather than NaN.
        */
       const gap = Number.parseFloat(style.rowGap || '0') || 0
       setStageBox(previous => previous.height === height && previous.gap === gap ? previous : { height, gap })
@@ -217,20 +198,14 @@ export function OverlayRoot() {
   }, [hasCaption, config.showSource, config.showTranslation, config.fontSize, config.translationFontSize, config.lineHeight, config.translationLineHeight])
 
   /*
-   * 双语时两条轨道**上下对半分**，单语时那一条占满整个 stage。
+   * Bilingual splits the stage in half; monolingual gives the one track all of
+   * it.
    *
-   * **必须一次把两条轨道都传进去。** `allocateCaptionLines` 的"两条可见就对半分"这一步
-   * 靠的是同一次调用里数出 `visibleCount === 2`；分开各调一次的话每次只数到 1，永远走
-   * "单轨占满"分支，每条都按整个 stage 算行数。叠在上下布局上，原文就会一路长到把
-   * 译文那条整个顶出可视区 —— 而这正是分栏版 CSS 掩盖掉的那个 bug。
-   *
-   * **`visible` 是设置值，不是"这一刻有没有字"**（`config.showSource` /
-   * `config.showTranslation` 来自 settings store，见上面 `config` 的定义）。这是"译文
-   * 那半边先占住"的地基：用户开着译文，哪怕这一刻译文一个字都还没翻出来，译文轨道照样
-   * 分到一半并把高度占住，原文只能在另一半里活动。反过来按有没有字来分，译文一落地
-   * 舞台就对半分，两行在每个句段上都跳一下；译文超时/失败时原文又会突然长高。
-   *
-   * 单语时只有一条 visible，`visibleCount === 1`，算法自己会让那条占满，不需要额外分支。
+   * `visible` is the setting, not whether text happens to exist right now. That
+   * is what reserves the translation half up front: with translation on, the
+   * track claims its half before the first word arrives. Splitting on the text
+   * instead would make both tracks jump on every segment, and the source track
+   * would grow abruptly when a translation times out or fails.
    */
   const [sourceLines, translationLines] = allocateCaptionLines(
     stageBox.height,
@@ -246,28 +221,8 @@ export function OverlayRoot() {
   }, [])
 
   /**
-   * CSS 自定义属性。整块玻璃的配色与字号都从这里进 `caption-card.css`。
-   *
-   * 这里**没有** `backdrop-filter`：主仓的 `.caption-console` 也没有。默认底色不透明度
-   * 就是 96%，玻璃本来就近乎不透明，那点模糊几乎看不出来，却要在一个常置顶的透明
-   * 窗口上每帧重新合成一遍背景。想要玻璃感就去设置里把不透明度调低。
-   */
-  /*
-   * 卡片高度与锚点，两个都必须显式给。
-   *
-   * **`--nola-card-anchor` 之前从来没有被赋值过** —— CSS 里写着
-   * `var(--nola-card-anchor, flex-start)`，但全项目没有任何地方设置它，所以一直是
-   * 贴顶。之所以没暴露问题，是因为卡片同时又是 `height: 100%`：卡片等于整个窗口，
-   * 贴哪一头都一样。现在卡片高度要跟窗口解耦（菜单展开时窗口会临时加高），锚点就必须
-   * 真的给出来：
-   *   窗口贴屏幕下沿（bottom）→ 卡片贴**下**沿，把上方空出来给向上的弹层
-   *   窗口贴屏幕上沿（top）    → 卡片贴**上**沿，把下方空出来给向下的弹层
-   *   自由拖动                  → 贴下沿（弹层向上开更常用，且字幕习惯压在底部）
-   *
-   * `--nola-card-height` 必须是**基准高度**，不能直接写 `window.innerHeight`：
-   * 菜单展开时窗口被加高到 360，`innerHeight` 跟着变成 360，卡片就会跟着长高、
-   * 字幕区重排 —— 正好是这里要避免的。所以只在**菜单关闭时**（那时窗口没被加高）
-   * 采样一次，作为基准。
+   * CSS custom properties. The glass's whole palette and typography enters
+   * `caption-card.css` from here.
    */
   const cardStyle = {
     '--overlay-background-color': palette.bg,
@@ -301,8 +256,8 @@ export function OverlayRoot() {
           {hasCaption ? (
             <>
               {/*
-               * 轨道按 sessionId 上 key：换一场同传就换一条空轨道，上一场折好的文本流
-               * 不会渗进这一场（主仓 `CaptionOverlay` 用的是同一个 key 策略）。
+               * Keyed on sessionId: a new session mounts a fresh track, so the
+               * previous session's folded stream cannot bleed into it.
                */}
               {config.showSource ? (
                 <CaptionTrack
@@ -327,25 +282,16 @@ export function OverlayRoot() {
               ) : null}
             </>
           ) : (
-            /* 未开始态**就是两条真轨道**，不是浮在卡片上的一个绝对定位层，所以它和
-               * 有字幕时占的是同一块地方：`config.showSource` / `config.showTranslation`
-               * 怎么分，stage 就怎么分，两半都是 `flex: 1 1 0`。原先这里是一层写死
-               * `top-[22px]` 的绝对定位层，两行都塌在卡片顶端、字号写死成 12.5px / 11px，
-               * 于是分区对照的用户第一眼看到的是一个完全不像分栏的版面，真字幕一落地
-               * 版面就当场变形。
-               *
-               * 字号/字重/行高/颜色**全部由 `data-kind` + `--overlay-*` 给**
-               * （`caption-card.css` 的 `.nola-caption-track[data-kind=…]`），所以这里一个
-               * 内联样式、一条字号工具类都不写：用户在「字幕外观」里调过的字号对空态一样
-               * 生效，写死就等于把同一套设置做成两套。`pointer-events-none` 保留 ——
-               * 空态不该抢卡片的拖拽区与点击。
-               *
-               * 只给两行说明，**不给按钮**。「立即开始」已经由底部控制条的麦克风按钮承担，
-               * 「字幕外观」在右上角那颗滑杆按钮里，在这里再摆一对同名按钮就是同一个动作
-               * 有两个入口——用户会点错，然后以为是应用有毛病。
-               *
-               * 第二行是**译文轨道的位置**，所以那一句放英文：中文提示语出现在译文那一侧
-               * 会让人以为翻译失败。也不加 `aria-live` —— 活区域归真轨道，空态不是字幕事件。 */
+            /* The idle state is two real tracks, not an absolutely positioned
+             * layer, so it occupies the same place captions do and the display
+             * settings split the stage the same way. Typography comes entirely
+             * from `data-kind` plus the `--overlay-*` variables, so a font size
+             * chosen in appearance settings applies here too.
+     *
+     * The second line sits in the translation track, so it is English — Chinese
+             * prompt copy there reads as a translation failure. No `aria-live`:
+             * the live region belongs to the real tracks, and this is not a
+             * caption event. */
             <>
               {config.showSource ? (
                 <div className="nola-caption-track pointer-events-none" data-kind="source" data-layout={config.layout}>
@@ -368,25 +314,14 @@ export function OverlayRoot() {
           )}
         </div>
 
-        {/* 渐隐罩是 stage 的兄弟节点，不是滚动容器的 mask（见文件头第 2 条）。 */}
+        {/* Fade scrims: siblings of the stage, not a mask on the scroll container. */}
         <div className="nola-caption-scrim" data-edge="top" aria-hidden="true" />
         <div className="nola-caption-scrim" data-edge="bottom" aria-hidden="true" />
 
         {/*
-         * 动作行：位置 · 锁定 · 置顶 │ 字幕外观 · 最小化 · 关闭。
-         *
-         * 分隔线把"改窗口"（前三项）和"关窗口"（后三项）分成两组 —— 位置/锁定/置顶
-         * 改的是窗口本身怎么摆，最小化/关闭改的是它还在不在。
-         *
-         * **「字幕外观」不再是下拉菜单，是一个直接跳转的按钮。** 原来这里挂着
-         * `Dropdown` 壳，菜单里只有「字幕样式」一项，弹出一个改不了东西的
-         * `OverlaySettingsDialog`（字号滑杆那些在真实交互里点不动）。用户要的是
-         * 「跳到软件里改」—— 主仓的 `CaptionOverlay.tsx:251-252` 现在也是这么干的
-         * （调 `openAppearance('appearance')`）。demo 没有主进程，直接改 hash。
-         *
-         * 顺带修掉了那个"三点没在圆心"的观感问题：它原来是 `Dropdown.Trigger`
-         * 而不是 `Button`，两者的内部 padding / line-height 不同，三点被顶到了
-         * 偏上。现在和其它四个一样是 `GhostButton`，几何完全一致。
+         * Position · lock · pin │ appearance · minimize · close. The divider
+         * splits changing how the window sits from changing whether it is
+         * there at all.
          */}
         <div className="nola-caption-actions" aria-label={t('overlay.title')}>
           <GhostButton
@@ -431,9 +366,8 @@ export function OverlayRoot() {
             <Minus aria-hidden="true" />
           </GhostButton>
           {/*
-           * 关闭走 AlertDialog 二次确认：这颗「✕」会连带停掉识别服务，是不可撤销的
-           *（重新开一场要重新加载几个 GB 的权重）。在玻璃弹窗上直接一按就关，用户
-           * 手快按错了得等引擎把模型卸载完才知道。
+           * Closing confirms first: it also stops recognition and is not
+           * reversible, since restarting reloads several GB of weights.
            */}
           <GhostButton label={t('overlay.close')} onPress={() => { setCloseFailed(false); setClosing(true) }} color={palette.chrome}>
             <X aria-hidden="true" />
@@ -443,19 +377,14 @@ export function OverlayRoot() {
         <OverlayControls active={active} locked={config.locked} />
 
         {/*
-         * 关闭确认。**不用 `AlertDialog`** —— 它的 `Backdrop` 是
-         * `position: fixed; inset: 0`（见 `@heroui/styles` 的 `.alert-dialog__backdrop`），
-         * 在这块只有 104px 高的透明玻璃上会盖满整个视口，于是「关闭」按钮自己被盖在下面，
-         * 按下去没反应、屏幕上只剩一层暗色。所以这里自己画一个窗内的确认层。
+         * Not `AlertDialog`: its backdrop is `position: fixed; inset: 0`, which
+         * covers the whole viewport of this short transparent window and buries
+         * the confirm button under itself. Drawn in-window instead.
          *
-         * 放在 `<section>` **内部**是有意的：这样 `position: absolute; inset: 0` 相对的是
-         * 卡片（`.nola-caption-card` 有 `position: relative`），确认层刚好盖住这张玻璃，
-         * 不会溢出到玻璃之外 —— 而外层 `main` 是撑满窗口的，盖它就等于盖满视口，
-         * 正是原来那个 BUG。
-         *
-         * 「取消」按钮一定在层内、一定点得到。
-         * 不用 `window.confirm`：原生弹窗在 frameless + transparent 的窗里样式全丢，
-         * 而且守卫脚本也禁了它。
+         * Inside `<section>` on purpose, so `position: absolute; inset: 0` resolves
+         * against the card (`position: relative`) and covers the glass without
+         * spilling past it. The outer `main` fills the window, so covering that
+         * would cover the viewport.
          */}
         {closing ? (
           <div className="nola-confirm-layer" role="dialog" aria-modal="true" aria-label={t('overlay.closeTitle')}>
@@ -467,8 +396,8 @@ export function OverlayRoot() {
                 <Button variant="secondary" size="sm" isDisabled={closePending} onPress={() => setClosing(false)}>
                   {t('common.cancel')}
                 </Button>
-                {/* HeroUI v3 的危险按钮是 `variant="danger"`（`buttonVariants` 的 variant
-                    槽位），没有 `color` prop —— 传 color 会被 TS 拦下。 */}
+                {/* HeroUI v3 styles the danger button with a `variant`,
+                    There is no `color` prop on this button. */}
                 <Button variant="danger" size="sm" isPending={closePending} onPress={() => void closeOverlay()}>
                   {t(closePending ? 'overlay.closing' : 'overlay.closeConfirm')}
                 </Button>
@@ -487,12 +416,12 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * 固定配色 + 不透明度 → `rgba()`。
+ * Fixed palette plus opacity -> `rgba()`.
  *
- * 用 `rgba()` 而不是 `color-mix(in srgb, #hex 96%, transparent)`：两者视觉等价，
- * 但 `color-mix` 的序列化在 jsdom 里会被改写成丢百分比的 `rgb()`，测试就断言不到不透明度了。
- * 而且这里根本不需要混色 —— 底色本来就是固定的，缺的只是一个 alpha 通道。
- * **纯函数，独立可测。**
+ * `rgba()` rather than `color-mix`: they look the same, but jsdom reserialises
+ * `color-mix` as an `rgb()` that drops the percentage, so a test cannot assert
+ * the opacity. No blending is needed here anyway — only an alpha channel is
+ * missing from a colour that is already fixed.
  */
 export function withAlpha(hex: string, alpha: number): string {
   const value = hex.replace('#', '')
@@ -503,11 +432,11 @@ export function withAlpha(hex: string, alpha: number): string {
 }
 
 /**
- * 浮窗动作行里的图标按钮。
+ * Icon button in the overlay action row. Geometry lives in `caption-card.css`.
  *
- * 26px 见方 + 圆形 + 半透明白底，几何抄主仓 `.caption-console-actions button`。
- * 颜色走浮窗自己的调色板而不是 `--foreground`：这个窗不参与应用主题，
- * 用主题色会让按钮在深色玻璃上变成黑底黑字。
+ * The colour is the window's own palette rather than `--foreground`: this
+ * window does not follow the app theme, and a theme colour would give black on
+ * black against the dark glass.
  */
 function GhostButton({
   label,
@@ -520,15 +449,15 @@ function GhostButton({
   label: string
   onPress: () => void
   color: string
-  /** 不传 children 时按钮就是一个纯文字动作（未开始态那两个）。 */
+  /** No children makes this a text-only action. */
   children?: ReactNode
   className?: string
-  /** 生效中的动作点亮成强调色，见 `caption-card.css` 的 `[data-active]` 规则。 */
+  /** An active action lights up in the accent colour; see `[data-active]` in `caption-card.css`. */
   active?: boolean
 }) {
   /*
-   * `active` 时**不写** inline color：行内样式的优先级高于任何样式表规则，一写就
-   * 把 `[data-active]` 的强调色盖掉了。所以生效态交回 CSS 决定颜色。
+   * No inline colour when active: an inline style outranks any stylesheet rule
+   * and would override the accent colour from `[data-active]`.
    */
   return (
     <Button

@@ -1,17 +1,9 @@
 /**
- * 导出弹窗。记录详情页的"导出"主按钮打开它。
+ * Export dialog, opened by the primary action on the record detail page.
  *
- * **只开放 TXT / SRT / VTT 三种**，不做音频导出、不做"导出原文/译文/笔记"的勾选组合：
- * 引擎的 `meetings.export(id, format)` 只收一个格式参数（见 `src/bridge/contract.ts`），
- * 一次调用产出一个文件。给用户三个复选框再拼一个文件名，是把引擎没有的能力画到界面上。
- *
- * 导出成功或失败都要有说法：
- * - 落盘成功：按钮回到 idle，弹窗关闭（路径由引擎的系统保存对话框负责，界面上重复一遍没有信息增量）
- * - 引擎判定没有可导出内容：留在弹窗内，说明发生了什么并给一个能点的下一步
- * - 通道抛错：留在弹窗内，走 `t('errors.exportFailed')`（带 EXP-009 错误码）
- *
- * **错误三要素**：发生了什么（导出失败）/ 用户能做什么（换个目录再试）/ 可复制错误码。
- * `state.error` 是诊断串，**不渲染**，只给 console。
+ * Every outcome says something — success closes and leaves the path to the engine's
+ * save dialog, while a thrown channel stays in the dialog on `t('errors.exportFailed')`,
+ * which carries EXP-009.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -23,14 +15,14 @@ import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
 import type { ExportFormat } from '@/bridge'
 
-/** 只开放这三种。顺序即界面上的顺序。 */
+/** The only formats offered, in display order. */
 const FORMATS: readonly ExportFormat[] = ['txt', 'srt', 'vtt']
 
 export interface ExportDialogProps {
   meetingId: string | null
   isOpen: boolean
   onOpenChange: (open: boolean) => void
-  /** 导出成功（引擎返回了落盘路径）。 */
+  /** Export finished; the engine returned the path it wrote. */
   onExported?: (format: ExportFormat) => void
 }
 
@@ -46,7 +38,7 @@ export function ExportDialog({
 
   const [format, setFormat] = useState<ExportFormat>('txt')
 
-  // 打开时回到默认格式并清掉上一次的错误：上一条会议的失败不该挂在这一条上。
+  // Opening resets the format and clears the last error, which belonged to another meeting.
   useEffect(() => {
     if (isOpen) {
       setFormat('txt')
@@ -59,13 +51,13 @@ export function ExportDialog({
     void actions.meetings
       .exportMeeting(meetingId, format)
       .then((path) => {
-        // path 为 null 表示用户取消了系统保存对话框，不是失败：安静收尾即可。
+        // A null path means the user dismissed the save dialog, not a failure: end quietly.
         if (path === null) return
         onExported?.(format)
         onOpenChange(false)
       })
       .catch(() => {
-        // 错误已写进 store.error，界面用 errorCode 查表显示。
+        // The error is already in store.error; the UI looks it up by errorCode.
       })
   }, [meetingId, format, onExported, onOpenChange])
 
@@ -112,12 +104,12 @@ export function ExportDialog({
                 </ToggleButtonGroup>
 
                 {/*
-                  导出的是模型生成的译文。AI 声明必须跟着文件走，
-                  所以它在弹窗里也写一遍（`legal.aiGeneratedExport`）。
+                 * The file holds model-generated translation, so the AI notice has to
+                 * travel with the file and is repeated here.
                 */}
                 <p className="nola-caption text-muted">{t('legal.aiGeneratedExport')}</p>
 
-                {/* state.error 只用来判断"要不要显示错误条"，不把它的内容渲染出去。 */}
+                {/* state.error only decides whether to show the bar; its text is never rendered. */}
                 {error !== null ? (
                   <Alert role="alert" status="danger" className="rounded-[8px]">
                     <Alert.Indicator />

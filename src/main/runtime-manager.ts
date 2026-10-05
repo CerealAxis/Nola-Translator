@@ -16,7 +16,7 @@ import type { EngineLaunchSpec } from './engine-process'
 const run = promisify(execFile)
 const catalogSchema = z.object({ version: z.literal(1), packages: z.array(runtimePackageSchema).max(32) })
 
-/** Versioned, hash-verified sidecars. Installation never edits a running environment. */
+/** Hash-verified sidecars under a versioned catalog. Installation never edits a running environment. */
 export class RuntimeManager {
   private packages: RuntimePackage[] = []
   private operation: RuntimeSnapshot['operation'] = null

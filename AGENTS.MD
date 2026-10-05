@@ -1,17 +1,15 @@
 # AGENTS.md
 
 > 写给 AI 编程助手的项目规范。视觉规范见 [DESIGN.MD](./DESIGN.MD)。
-> 改项目结构的那一刀必须同步改本文件，否则 AI 拿着过时结构硬套比没有这份文件更糟。
+> 改项目结构的那一刀必须同步改本文件。
 
 ## 1. 技术栈
 
-- Electron 43.1.1 + React 19.2.7 + TypeScript 7.0.2，`electron-vite` 5 构建，`"type": "module"`
-- 包管理器 npm 11.17.0（**不是 yarn/pnpm**），Node `>=24 <25`
-- 样式：Tailwind v4（`@tailwindcss/vite`）+ CSS 自定义属性 token，**无 CSS Modules、无 Less/Sass**
-- UI 库：HeroUI React v3.2.6 + `@heroui/styles`，图标 `lucide-react`
-- 运行时校验：zod 4.4.3，**只存在于主进程侧**（`src/main` / `src/shared`）
-- 引擎：Python 包 `engine/nola_translator_engine`，经 stdio JSON-lines 与主进程通信
-- 测试：vitest 4 + @testing-library/react，jsdom 环境
+- 桌面应用：Electron + React + TypeScript
+- 引擎：Python
+- UI：Tailwind CSS + HeroUI
+- 构建：electron-vite
+- 测试：Vitest + Testing Library
 
 ## 2. 目录结构
 
@@ -64,7 +62,41 @@ scripts/                        # PowerShell 构建脚本
 - 字阶压 HeroUI 原子组件时用 utilities 层任意值类（`text-[11px]`），`.nola-*` 在 base 层会被 components 层覆盖
 - z-index 只用 `.z-*` 类（见 DESIGN.MD 第 8 节），**禁 `z-50` 字面量**
 
-## 4. 构建命令
+## 4. 注释规范
+
+1. 基本原则
+- 统一使用英文注释
+- 注释说明“为什么”，代码本身说明“做什么”。
+- 优先写清楚的代码，避免重复描述代码行为。
+- 注释应准确、简洁，并与代码保持同步。
+
+2. 行内注释
+- 放在相关代码上方，说明特殊原因、限制或不明显的逻辑。
+- 不为简单语句添加注释。
+- 避免在行尾堆叠注释。
+
+3. 函数与组件注释
+- 对用途不明显、规则复杂或有副作用的函数添加说明。
+- 说明重要参数、返回值、副作用和调用限制。
+- 简单函数不必重复写注释。
+
+4. 类型与常量注释
+- 为不明显的类型约束、枚举含义和常量来源补充说明。
+- 注明单位、范围或特殊取值规则。
+- 不重复类型名称或变量名称已经表达的信息。
+
+5. TODO 与 FIXME
+- TODO：尚未完成的工作。
+- FIXME：已知问题或需要修复的行为。
+- 简要说明原因或后续方向；处理完成后删除注释。
+
+6. 禁止事项
+- 不保留过时、错误或与代码矛盾的注释。
+- 不用注释大段复述实现过程。
+- 不用注释代替变量名、函数名或必要的文档。
+- 不添加无明确用途的作者、日期或变更历史。
+
+## 5. 构建命令
 
 ```
 npm run dev            # 开发（electron-vite）
@@ -74,58 +106,6 @@ npm run build          # typecheck && electron-vite build
 npm run dist:win       # 完整发布：build → build:engine:cpu → prepare:llama:cpu → electron-builder
 ```
 
-## 5. Never 规则
-
-### 契约与枚举（本仓最大的缺陷来源）
-
-- **Never 只改枚举的一部分声明。** 同一枚举在 TS/zod/Python 间手工同步、无生成器：
-  - 翻译 provider：`shared/settings.ts:73,149`、`shared/schemas.ts:62`、`main/settings-schema.ts:71`、`engine/.../protocol.py:80`
-  - 云端 API 格式：`shared/settings.ts:82,151`、`shared/schemas.ts:75`、`main/settings-schema.ts:80`、`engine/.../protocol.py:49`
-  - 错误码（13 个）：`shared/contracts.ts:271`、`shared/schemas.ts:165-179`、`engine/.../protocol.py:367-381`
-  - 识别/翻译模型 id：`shared/settings.ts`、`shared/schemas.ts`、`main/settings-schema.ts`、`engine/.../models/catalog.py`
-  - compute 枚举：`shared/compute.ts:4-15` vs `engine/.../compute.py:16-27`（字段数还不一致）
-  - loader（`llama.cpp`/`transformers`/`funasr`）：`shared/contracts.ts:220`、`shared/schemas.ts:212`、`engine/.../hub.py:40`
-- **Never 只改一张 IPC channel 表。** 4 处：preload `index.ts:7-37`、main `ipc.ts:13-32`、
-  `app-ipc.ts:19-28`、`runtime-ipc.ts:7`（该处是**位置索引数组**，重排即静默改错通道）
-- **Never 给 `ResourceRecord.provider` 收窄成闭合联合。** 自装模型会带 `llama.cpp` 等适配器 id；
-  收窄会让记录解析失败，而**事件解析失败 = 协议损坏 = 直接杀掉引擎进程**（`shared/schemas.ts:186-188`）
-- **Never 在 `getEngineState` 里调 `ensureReady()`。** 该通道的全部意义就是回答「引擎现在怎么样」，
-  自己会启动引擎就永远问不出「从没启动过」（`main/ipc.ts:356-365`）
-- **Never 给 `AppSettingsPatch` 加字段却不同步 `main/settings-schema.ts`。** 注释已写明：
-  两者之间没有任何机制强制一致，漏改则**静默丢弃**，设置永远不落盘（`settings-schema.ts:4-11`）
-- **Never 发送 `translationOptions: {}`。** `provider === 'local'` 时该字段必须**整个缺席**，
-  空对象会被引擎判为非法配置（`shared/contracts.ts:52-56`、`main/ipc.ts:275-284`）
-
-### 进程边界
-
-- **Never 在 `ipcBridge.ts` 之外触碰 `window.nolaTranslator`。** 该全局只允许在 `ipcBridge.ts:51-55` 读一次
-  （现存越界：`OverlayRoot.tsx:118`、`TitleBar.tsx:105`、`i18n.tsx:94,127`）
-- **Never 在组件里直接调 `bridge.*`**，走 store action
-- **Never 把 API key 写进 `SecureCredentialStore`（`safeStorage` 加密 → `credentials.json`）以外的地方**
-- **Never 假设 `engine:event` 只带引擎事件**，它也带主进程自己的 `engineStateChanged`
-
-### 生成物与依赖
-
-- **Never 手改 `engine/dist/`、`vendor/`、`out/`、`release/`、`build/runtime-*.json`**（均在 .gitignore）
-- **Never 顺手改 `package-lock.json`**
-
-### UI
-
-- **Never 直接渲染 `state.error`。** 它是引擎抛的诊断原文（可能是中文），不走 i18n；
-  界面必须用 `errorCode` / `errors.*` 去 `t()` 查（`store/index.ts:18-21`）
-- **Never 加第 9 个 primitive。** `components/primitives/` 封闭 8 个，理由见 DESIGN.MD 第 11 节
-- **Never 移动 `src/renderer/index.css` 或删掉 `source(none)`。** `@source` 路径相对 CSS 文件，
-  挪走会让所有 `features/**` 的类**静默失效**且不报错（`index.css:8-25`）
-- **Never 往 `index.html` 加内联 `<script>`。** CSP 是 `script-src 'self'`，
-  需提前执行的脚本放 `public/theme-boot.js`（`index.html:21-28`）
-- **Never 把 `renderer/index.css` 的导入顺序改乱**：`source(none)` → `@source` → `@heroui/styles` → `theme/index.css` → `theme/app.css`（`index.css:27-31`）
-- **Never 加第二个渲染进程入口**，浮窗靠 `main.tsx:33` 的 `?overlay=1` 分支
-
-### 协作
-
-- **Never `git stash`、Never 切分支、Never commit 别人改过的文件**（多 Agent 并发时，stash 会吞掉对方的改动）
-- **Never 未经用户确认就 commit。** 提交前先把提交信息发给用户确认，且**提交信息用英文**
-
 ## 6. 约定与协作
 
 **Commit 规范**
@@ -134,8 +114,7 @@ npm run dist:win       # 完整发布：build → build:engine:cpu → prepare:l
 - 类型：`feat` / `fix` / `docs` / `style` / `refactor` / `perf` / `test` / `build` / `ci` / `chore`
 - 破坏性变更：前缀加 `!`
 - 描述用**英文**、祈使语气、小写开头、不加句号
-- 提交前先主动发给用户确认，**提交信息请使用英文**
-- 正文留空
+- 提交前先主动发给用户确认写好的提交信息（写在一个代码块中），**提交信息请使用英文**
 
 **多 Agent 并发**
 
@@ -145,5 +124,4 @@ npm run dist:win       # 完整发布：build → build:engine:cpu → prepare:l
 
 **维护本文件**
 
-- 每踩一个坑就往第 5 节加一条 Never 规则，并写清原因
 - 项目结构变更必须同步更新第 1、2、4 节

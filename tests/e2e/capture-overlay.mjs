@@ -1,13 +1,12 @@
 /*
- * 悬浮字幕窗的截图 + 版式门禁。
+ * Screenshot and layout gate for the caption overlay window.
  *
- * 走的是**真实 preload**（`out/preload/index.cjs`）而不是夹具：这扇窗的很多行为
- * 就在桥接的另一头（关窗、停会话、真最小化），夹具 preload 测不到。引擎事件用
- * `webContents.send('engine:event', ...)` 灌进来，等价于引擎在说话。
+ * Runs the real preload (`out/preload/index.cjs`), not a fixture: closing the window,
+ * session control and minimise all cross the bridge. Engine events are injected the way
+ * the main process broadcasts them, with `webContents.send('engine:event', ...)`.
  *
- * ⚠️ 与 check-layout.mjs 同一条纪律：每一个"用来查找的容器列表"都必须先断言数量 > 0。
- * 查不到就是 FAIL，不能当成"这一版没有这块内容，跳过"。旧版就是用旧类名
- * querySelectorAll 拿到空数组，然后把"没查到"当成"没问题"报了绿灯。
+ * Every container list below is counted before it is used: zero is a failure, not
+ * "this build has no such content".
  */
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -41,7 +40,7 @@ const settings = {
 
 let failures = 0
 let checks = 0
-/** 查不到就算失败。`label` 会进错误信息。 */
+/** A miss counts as a failure; `label` appears in the error message. */
 function expectFound(label, found, min = 1) {
   checks += 1
   if (found < min) {
@@ -66,8 +65,8 @@ let windowRef = null
 
 app.disableHardwareAcceleration()
 void app.whenReady().then(async () => {
-  // 只有设置这一条通道是这扇窗真正要用的；其余 invoke 会 reject 并落进 store.error，
-  // 浮窗不读 meetings / models，所以不影响这里的断言。
+  // Settings are the only channel this script drives. Close, minimise and session control
+  // only fire from user actions, so their handlers stay unregistered.
   ipcMain.handle('app:get-settings', () => settings)
   ipcMain.handle('app:update-settings', () => settings)
   const window = new BrowserWindow({
@@ -76,12 +75,12 @@ void app.whenReady().then(async () => {
   })
   windowRef = window
   await window.loadFile(resolve(root, 'out/renderer/index.html'), { query: { overlay: '1' } })
-  // 必须显示：`.nola-caption-track-content` 有 320ms 的 transform 过渡，隐藏窗的 rAF
-  // 被节流，动画不推进，上滚断言会读到一个假的 0。
+  // Must be shown: a hidden window throttles its animation timeline, so the 320ms
+  // transform on `.nola-caption-track-content` never advances and the roll reads a false 0.
   window.showInactive()
   await delay(500)
 
-  // -- 1. 空态：结构必须真的在 -----------------------------------------------------
+  // -- 1. Empty state: the structure must actually be in the DOM ---------------------
   let structure = await window.webContents.executeJavaScript(`(() => ({
     window: document.querySelectorAll('.nola-overlay-window').length,
     card: document.querySelectorAll('.nola-caption-card').length,
@@ -107,7 +106,7 @@ void app.whenReady().then(async () => {
   expectFound('caption-scrim', structure.scrims, 2)
   expectTrue('card state flags', structure.bilingual === 'true' && structure.locked === 'false' && structure.scheme === 'dark', structure)
 
-  // -- 2. 第一句：两条轨道都有内容，且都不是空的 ------------------------------------
+  // -- 2. First sentence: both tracks carry it and neither is empty ------------------
   await emit(window, 'sessionStarted')
   await caption({
     segmentId: 'preview-segment',
@@ -127,19 +126,19 @@ void app.whenReady().then(async () => {
   expectFound('first target segment', first.targetSegments)
   expectTrue('first sentence rendered on both tracks',
     first.source.includes('society makes us feel bad') && first.target.includes('让我们为休息而感到难过'), first)
-  // 行预算：两条轨道都必须至少分到 1 行，否则字幕根本没地方显示。
+  // A track budgeted zero lines has nowhere to render, so both must get at least one.
   expectTrue('line budget', Number.parseInt(first.sourceLines, 10) >= 1 && Number.parseInt(first.targetLines, 10) >= 1,
     { sourceLines: first.sourceLines, targetLines: first.targetLines })
   await writeFile(resolve(out, 'overlay-console.png'), (await window.webContents.capturePage()).toPNG())
 
-  // -- 3. 第二句：修订（未确认）不应把整块换掉 ------------------------------------
+  // -- 3. A second final segment, shot twice while the 320ms scroll is still running --
   await emit(window, 'caption', { segment: { segmentId: 'preview-next', revision: 1, startedAtMs: 2000, isFinal: true, sourceText: 'Taking a break is important for a healthy, balanced life.', translations: [{ targetLanguage: 'zh', state: 'complete', provider: 'example', text: '休息对健康而平衡的生活很重要。' }] } })
   await delay(70)
   await writeFile(resolve(out, 'overlay-source-transition.png'), (await window.webContents.capturePage()).toPNG())
   await delay(110)
   await writeFile(resolve(out, 'overlay-translation-transition.png'), (await window.webContents.capturePage()).toPNG())
 
-  // -- 4. 只显示原文：译文轨道必须真的消失，而不是"变空" ---------------------------
+  // -- 4. Source only: the translation track must disappear, not just empty out ------
   settings.overlay.showTranslation = false
   window.webContents.send('settings:changed', settings)
   await delay(400)
@@ -156,9 +155,9 @@ void app.whenReady().then(async () => {
   window.webContents.send('settings:changed', settings)
   await delay(300)
 
-  // -- 5. 未确认句段：原文继续上滚，且位移正好等于超出高度 --------------------------
-  // 先把字号推到 40/34：这块玻璃只有 218px 高，17px 的正文才两三行，**装得下就不滚**，
-  // "没滚"和"滚坏了"在断言里长得一模一样。必须先造出一个真的装不下的局面。
+  // -- 5. Unconfirmed revision: the source scrolls on by exactly its own overflow -----
+  // Text that fits never scrolls, and a scroller that failed looks the same as none, so
+  // the fonts are pushed to 40/34 first to force an overflow that has to be handled.
   settings.overlay.fontSize = 40
   settings.overlay.translationFontSize = 34
   window.webContents.send('settings:changed', settings)
@@ -166,7 +165,8 @@ void app.whenReady().then(async () => {
   await emit(window, 'caption', { segment: { segmentId: 'preview-next', revision: 2, startedAtMs: 2000, isFinal: false, sourceText: 'Taking a break is important for a healthy, balanced life. We can return to our work with a clearer mind and more energy than before.', translations: [{ targetLanguage: 'zh', state: 'pending', provider: 'example' }] } })
   await delay(70)
   await writeFile(resolve(out, 'overlay-line-roll.png'), (await window.webContents.capturePage()).toPNG())
-  // 320ms 过渡跑完再量（见文件头：过渡途中读计算值拿到的是起点矩阵）。
+  // Measure only once the 320ms transition has settled; mid-transition the computed
+  // matrix is an interpolation rather than the settled one.
   await delay(400)
   const roll = await window.webContents.executeJavaScript(`(() => {
     const track = document.querySelector('.nola-caption-track[data-kind="source"]')
@@ -188,34 +188,24 @@ void app.whenReady().then(async () => {
   expectTrue('caption block rolled up by exactly its own overflow',
     roll.overflow > 0 && roll.rolling === 'true' && Math.abs(roll.shiftY + roll.overflow) <= 1, roll)
 
-  // -- 6. 大字号 + 只放得下一行的轨道：尾巴必须滚出视野，而不是把卡片撑高 -----------
+  // -- 6. Big type in a squeezed bar: the tail must roll out of view, not stretch it -
   settings.overlay.fontSize = 28
   settings.overlay.translationFontSize = 22
   window.webContents.send('settings:changed', settings)
-  // 把玻璃压矮，行预算才会掉到 1 行。**装得下就不滚**，所以"没滚"和"滚坏了"在断言里
-  // 长得一模一样 —— 这一步必须先造出一个真的装不下的局面，否则断言是空的。
-  //
-  // 160 是 28/22 号字下**合法**的下限再加一点余量：`overlayMinimumHeight` 算出 153
-  // （= 2 × max(36.4, 29.7) + 6 gap + 60 上下 padding + 12 卡片内缩 + 2 slack）。
-  // 原来这里写的是 130 —— 那时公式还没算卡片那 6px 内缩，130 刚好还在线下一点点，
-  // 译文轨道能分到 1 行；内缩一加，130 就掉到 0 行了。真窗走的是 `setMinimumSize`，
-  // 用户根本进不了 130，所以这个数当时就是个只存在于测试里的非法高度。
+  // The bar is squeezed until the text genuinely overflows; 160 DIP is above the 109 that
+  // `overlayMinimumHeight` returns at 28/22, so the real bar can reach this height too.
   window.setSize(900, 160)
   await delay(400)
   /*
-   * 上一幕留了一条**未确认**句段，而 OverlayRoot 是 `session.interim ?? segments.at(-1)`：
-   * interim 优先，不先把它确认掉，后面那条英文 final 永远轮不到当"当前句"。
-   * 同 segmentId 的 final 到达时 `appendFinal` 才会清掉 interim —— 走别的 id 清不掉。
+   * The previous step left an unconfirmed segment, and `OverlayRoot` renders the interim
+   * ahead of the last final one. Only a final carrying the same segmentId clears it, so
+   * this step must reuse `preview-next` before the English segment can become current.
    */
   await emit(window, 'caption', { segment: { segmentId: 'preview-next', revision: 3, startedAtMs: 2000, isFinal: true, sourceText: 'Taking a break is important for a healthy, balanced life.', translations: [{ targetLanguage: 'zh', state: 'complete', provider: 'example', text: '休息对健康而平衡的生活很重要。' }] } })
   await delay(200)
   const englishTranslation = 'In addition, several models have prices before and after the national subsidy limits being very similar.'
   await emit(window, 'caption', { segment: { segmentId: 'preview-english', revision: 1, startedAtMs: 3000, isFinal: true, sourceText: '另外还有几台机型，国补前后的价格非常接近。', translations: [{ targetLanguage: 'en', state: 'complete', provider: 'example', text: englishTranslation }] } })
   await delay(500)
-  /*
-   * 一行高的轨道要装下整句，并把尾巴滚出视野。所以"只放得下一行"仍然必须成立：
-   * 可见行数 >= 1、这条译文仍在流里、且 data-rolling 标成 true。
-   */
   const narrow = await window.webContents.executeJavaScript(`(() => {
     const track = document.querySelector('.nola-caption-track[data-kind="translation"]')
     const flow = track?.querySelector('.nola-caption-track-flow')
@@ -235,15 +225,9 @@ void app.whenReady().then(async () => {
   window.setSize(900, 230)
   await delay(500)
   /*
-   * 双语**上下堆叠**：`.nola-caption-stage` 就是 `flex-direction: column`，原文在上、译文在下。
-   * `caption-card.css` 里那段注释写得很清楚 —— 左右分栏曾经存在，因为"940×104 的窗高"
-   * 是个错的数字而删掉了；字幕窗默认 218px，扣掉 stage 的 22/38px padding 还剩 158px，
-   * 上下堆叠够读。
-   *
-   * ⚠️ `OverlayRoot.tsx` 的文件头注释还写着"双语模式下两条轨道左右分栏"，**那一句已经过时**，
-   * 与 CSS 相反。以 CSS 为准。
-   * （判据别照着 OverlayRoot 的注释写 —— 我第一版就是照它写的左右分栏，然后稳定地红。
-   *   实测：stage 901×230，stageDir=column，原文 top22/bottom95、译文 top101/bottom160。）
+   * Bilingual is stacked, not side by side: `.nola-caption-stage` is
+   * `flex-direction: column`, so the source sits above the translation. Both rects are
+   * measured rather than the direction assumed, because a wrong guess fails silently.
    */
   const english = await window.webContents.executeJavaScript(`(() => {
     const source = document.querySelector('.nola-caption-track[data-kind="source"]')
@@ -270,7 +254,7 @@ void app.whenReady().then(async () => {
     && !english.cardOverflowX, english)
   await writeFile(resolve(out, 'overlay-english-translation.png'), (await window.webContents.capturePage()).toPNG())
 
-  // -- 7. 零不透明度：背景必须真的透明，而不是"看起来很淡" -------------------------
+  // -- 7. Zero opacity: the background must be truly transparent, not merely pale ---
   settings.overlay.backgroundOpacity = 0
   window.webContents.send('settings:changed', settings)
   await delay(300)

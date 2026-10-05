@@ -1,12 +1,11 @@
 /**
- * 同传记录详情。原文 / 译文双栏 + 底部播放条。
+ * Record detail: the two languages side by side, with a transport bar underneath.
  *
- * 这是"阅读优先"原则最完整的一屏：页面上唯一的主 CTA 是"导出"，
- * 正文占据绝大部分面积，字号可调（A+ / A-，0.7 到 2.0），
- * 顶栏三枚常驻声明胶囊交代数据的来源与去向。
- *
- * `Routes` 已经承担了页面框，本页不再套 max-w 或外层 padding。
- * 本页要撑满可用高度，所以用 `flex-1` + `min-h-0` 让双栏自己吃掉剩余空间。
+ * The reading-first screen — export is the only primary action, the transcript takes
+ * the area, the type scales from 0.7 to 2.0, and three standing pills say where the
+ * data came from and who wrote the translation. The route already supplies the page
+ * frame, so this adds no max-width or padding; `flex-1` and `min-h-0` let the two
+ * columns eat the remaining height.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -25,11 +24,11 @@ import { RenameDialog } from './RenameDialog'
 import { formatDateTime, formatClock } from './recordLogic'
 import '../home/home-records.css'
 
-/** 字号缩放区间。0.7 到 2.0：0.7 仍可读，2.0 适合投屏与视力不佳的场景。 */
+/** Type-scale bounds: 0.7 is still readable, 2.0 suits projection and low vision. */
 const SCALE_MIN = 0.7
 const SCALE_MAX = 2
 const SCALE_STEP = 0.1
-/** 骨架行数。DESIGN 第 10.2 节记录详情是 8 对句段，本页取 4 对（两栏各 4 行）。 */
+/** Skeleton rows per column. */
 const SKELETON_PAIRS = 4
 
 export function RecordDetailPage(): ReactNode {
@@ -47,11 +46,11 @@ export function RecordDetailPage(): ReactNode {
   useEffect(() => {
     if (!id) return
     void actions.meetings.loadMeetingDetail(id).catch(() => {
-      // 失败写进 store.error，界面按 errorCode 显示，不在这里渲染诊断串。
+        // The failure lands in store.error; the UI shows it by errorCode, not as a diagnostic dump.
     })
   }, [id])
 
-  // 换一条记录时字号与播放头回到默认：上一条的阅读位置不该继承过来。
+  // Switching records resets the type scale and the playhead: a reading position should not carry over.
   useEffect(() => {
     setFontScale(1)
     setCurrentIndex(undefined)
@@ -60,12 +59,12 @@ export function RecordDetailPage(): ReactNode {
   const changeScale = useCallback((delta: number) => {
     setFontScale((previous) => {
       const next = previous + delta
-      // 夹到区间并保留一位小数，避免 1.2000000000000002 这种值进 DOM。
+      // Clamp to the range and keep one decimal, so 1.2000000000000002 never reaches the DOM.
       return Math.round(Math.min(SCALE_MAX, Math.max(SCALE_MIN, next)) * 100) / 100
     })
   }, [])
 
-  // 段 -> 双栏的句段。译文取目标语言那一条；引擎可能返回多条翻译，按目标语言优先。
+  // Transcript rows for the dual column. The engine can return several translations, so prefer the target language.
   const segments = useMemo<DualColumnSegment[]>(() => {
     if (!detail) return []
     return detail.segments.map((segment) => {
@@ -86,9 +85,9 @@ export function RecordDetailPage(): ReactNode {
 
   const title = detail?.meta.title || t('records.title')
 
-  // 笔记正文。写入侧是 WorkspacePage 的防抖 `setMeetingNotes`（落盘到 meeting.json 的
-  // `notes`），读取侧就是这一屏。trim 一下是因为 setMeetingNotes 只会把纯空白存成
-  // undefined，但历史文件不一定都经过那条路径。
+  // The notes body. WorkspacePage debounces writes into `notes` in meeting.json and
+  // this screen reads them back. Trimmed because setMeetingNotes stores a whitespace-only
+  // value as undefined, but older files need not have gone through that path.
   const notes = detail?.meta.notes?.trim() ?? ''
 
   return (
@@ -131,7 +130,7 @@ export function RecordDetailPage(): ReactNode {
               >
                 {t('records.rename')}
               </Button>
-              {/* 详情页唯一的主 CTA。 */}
+              {/* The only primary action on this screen. */}
               <Button
                 variant="primary"
                 size="md"
@@ -147,11 +146,9 @@ export function RecordDetailPage(): ReactNode {
         />
 
         {/*
-          * 三枚常驻声明：数据怎么来的、存在哪、译文是谁写的。走 legal.*。
-          *
-          * 之前这里抄了 workspace.* 的那两条，是错的：`workspace.statusAutosave`
-          * 说的是"字幕逐句自动保存"，那描述的是**正在进行的**同传；这一页是一条**已经结束**
-          * 的记录，没有任何东西在存，用 `legal.statusAutosave`（"记录自动保存"）才对。
+         * Three standing declarations: where the data came from, where it is kept, and
+         * who wrote the translation. They use `legal.*` because this record has already
+         * finished, so nothing is being written.
           */}
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill label={t('legal.statusAutosave')} tone="neutral" size="sm" dot={false} />
@@ -177,7 +174,6 @@ export function RecordDetailPage(): ReactNode {
               targetLabel={t('records.detailTranslation')}
               fontScale={fontScale}
               currentIndex={currentIndex}
-              // 播放头同步给双栏做焦点衰减。关掉时双栏就是静态阅读。
               onSplitChange={undefined}
               className="min-h-0 flex-1 p-5"
             />
@@ -191,7 +187,7 @@ export function RecordDetailPage(): ReactNode {
               unavailableLabel={t('records.audioUnavailable')}
               onTimeChange={(ms) => {
                 if (!detail) return
-                // 播放头落在哪一句：取最后一条 startedAtMs <= 当前时间的句段。
+                // Which sentence the playhead is on: the last one starting at or before now.
                 let index = 0
                 for (let i = 0; i < detail.segments.length; i += 1) {
                   if (detail.segments[i].startedAtMs <= ms) index = i
@@ -204,16 +200,13 @@ export function RecordDetailPage(): ReactNode {
         </Card.Content></Card>
 
         {/*
-         * 笔记。会议结束前写的东西在这里找回来 —— `workspaceUi.notesLocalHint`
-         * ("停止后可在记录详情里继续看") 承诺的就是这个位置，缺了它那句话就是假的。
+         * The notes written before the meeting ended, which is what
+         * `workspaceUi.notesLocalHint` promises when it says they stay readable here.
          *
-         * 只读不回写：这一屏是"读"的地方，要改笔记回快速同传那一屏。
-         * `**加粗**` 这类快捷标记按纯文本原样显示，仓库里没有 Markdown 渲染器，
-         * 引入一个只为装饰笔记的依赖不划算（NotesPanel 也是按"纯文本 + 快捷标记"设计的）。
-         *
-         * 只在真的有笔记时占位：没写过笔记的记录不塞一个空块进来，
-         * 双栏才是这一屏的主体（见文件头的"阅读优先"）。高度封顶 + 内部滚动，
-         * 长笔记不会把双栏挤没。
+         * Read-only: editing happens on the quick-session screen. Markdown markers show as
+         * the plain text they are — there is no renderer in the repo, and the panel that
+         * writes them is plain text by design. The block only takes space when there are
+         * notes, and its height is capped so a long one cannot squeeze out the columns.
          */}
         {notes ? (
           <Card className="nola-record-card">
@@ -247,14 +240,13 @@ type TFn = (
   vars?: Record<string, string | number>,
 ) => string
 
-/** 双栏骨架：两栏各 4 行。行高贴近真实行（1.65 行高的文字条）。 */
+/** Two-column skeleton, four rows a side, each row close to a real line box. */
 function DualSkeleton({ t }: { t: TFn }): ReactNode {
   return (
     <div
       data-testid="dual-skeleton"
-      // 骨架照抄 `DualColumnView` 的三列几何与栏头留白（`pr-3` / `pl-3`）。
-      // 否则加载完成的瞬间栏头会横向跳一下：骨架原本是两栏 + 24px gap，
-      // 真视图是三栏 + 1px 分隔线，两侧的留白对不上。
+      // The skeleton mirrors the real view's column split, so the headers do not jump
+      // sideways at the moment the data lands.
       style={{ gridTemplateColumns: 'var(--dual-split, 50%) 1px minmax(0, 1fr)' }}
       className="grid min-h-0 flex-1 p-4"
     >

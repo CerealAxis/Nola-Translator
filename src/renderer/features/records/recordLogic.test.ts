@@ -1,8 +1,6 @@
 /**
- * 记录屏纯逻辑测试：搜索、排序、分页、时间与时长格式化。
- *
- * 这些函数是 `recordLogic.ts` 的纯导出，不经过 JSX、store 与 bridge，
- * 所以断言的是逻辑本身，而不是接线。
+ * The pure exports of `recordLogic.ts`, asserted without JSX, a store or the bridge,
+ * so a failure points at the logic rather than at the wiring.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -46,7 +44,7 @@ const NEWER = meeting({
   startedAtMs: new Date(2026, 9, 1, 10, 0, 0).getTime(),
   endedAtMs: new Date(2026, 9, 1, 11, 0, 0).getTime(),
 })
-/** 进行中：没有 endedAtMs。 */
+/** Running: no endedAtMs. */
 const LIVE = meeting({
   meetingId: 'live',
   title: '正在开的会',
@@ -89,7 +87,7 @@ describe('排序 sortByEndTime', () => {
   it('进行中的会议没有 endedAtMs，回落到 startedAtMs 再排', () => {
     expect(endedAt(LIVE)).toBe(LIVE.startedAtMs)
     const sorted = sortByEndTime([OLDER, LIVE], false)
-    // LIVE 开始于 10-02，比 OLDER 新，所以排前面。
+    // LIVE starts on 10-02, later than OLDER, so it sorts first.
     expect(sorted.map((m) => m.meetingId)).toEqual(['live', 'older'])
   })
 })
@@ -119,7 +117,7 @@ describe('分页 pageNumbers', () => {
 
 describe('分页夹取 clampPage', () => {
   it('当前页超过范围时夹回最后一页', () => {
-    // 12 条、每页 10 条 -> 共 2 页，停在第 9 页要夹到第 2 页。
+    // 12 records at 10 per page is 2 pages, so page 9 clamps to 2.
     expect(clampPage(9, 12, 10)).toBe(2)
   })
 

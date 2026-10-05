@@ -38,11 +38,10 @@ export function RecordsTable({ meetings, onOpen, onRename, onExport, onDelete, p
           </Table.Header>
           <Table.Body>
             {meetings.map((meeting) => {
-              // 三态：真在跑 / 跑完了 / 开过但没走完（应用被关掉、崩掉）。
-              // 判据是主进程落盘的 state，不是「有没有 endedAtMs」—— 后者分不出中断。
+              // Three states: running now, finished, or started and never finished.
               const state = meetingState(meeting)
               const live = state === 'running'
-              // 绿点=已完成、蓝点=进行中，中断用警示色：给它挂绿点等于说这条录好了。
+              // Green dot = done, blue = running, and interrupted takes the warning colour:
               const statusClass = 'nola-record-status'
                 + (live ? ' nola-record-status--live' : state === 'interrupted' ? ' nola-record-status--interrupted' : '')
               const statusLabel = live

@@ -1,4 +1,4 @@
-/** 快速同传工作台：由会话 store 驱动，布局受主内容区约束。 */
+/** The quick-speak workspace: driven by the session store. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -22,10 +22,10 @@ import type { SetupDraft } from './SessionSetupDialog'
 import { WorkspaceToolbar } from './WorkspaceToolbar'
 import './workspace.css'
 
-/** 工作台默认阅读字号16px，允许缩小或放大一档。 */
+/** Default reading size, one step smaller or larger. */
 const FONT_STEPS = [14, 16, 18] as const
 
-/** 笔记区在窗口 < 1000px 时折叠为拉手（DESIGN 第 14.2 节）。 */
+/** Below this the notes panel collapses to a handle (DESIGN section 3). */
 const NOTES_COLLAPSE_PX = 1000
 
 export function WorkspacePage() {
@@ -38,7 +38,7 @@ export function WorkspacePage() {
   const resources = useStore(stores.models, (state) => state.resources)
   const meetings = useStore(stores.meetings, (state) => state.meetings)
 
-  // -- 会话配置：草稿态只在弹窗打开期间存在，关掉就丢 --------------------------------
+  // -- Session config: the draft exists only while the dialog is open ------
   const [draft, setDraft] = useState<SetupDraft | null>(null)
   const [pendingConfig, setPendingConfig] = useState<Parameters<typeof actions.session.startSession>[0] | null>(null)
   const [setupOpen, setSetupOpen] = useState(false)
@@ -46,7 +46,8 @@ export function WorkspacePage() {
   const [stopConfirmOpen, setStopConfirmOpen] = useState(false)
   const [notes, setNotes] = useState('')
   const [notesCollapsed, setNotesCollapsed] = useState(false)
-  // -- 视图偏好：显示模式走设置（悬浮窗要跟着一起变），版式与字号是工作台自己的 ---------
+  // -- View preferences: display mode is a setting (the overlay follows it),
+  //    while layout and size belong to the workspace alone ----------------
   const overlay = settings?.overlay
   const displayMode: CaptionDisplayMode = useMemo(() => {
     const source = overlay?.showSource ?? true
@@ -60,14 +61,17 @@ export function WorkspacePage() {
 
   const status = session.status
   /**
-   * `starting` **不算** active：引擎还在握手，主区继续显示引导块，那颗主 CTA 因此留在原地
-   * 转成 pending（`workspace.starting`）。如果这一态切到字幕区，用户点了开始之后按钮就消失了，
-   * 只剩一个空舞台，"点了没反应"和"在连引擎"看起来一模一样。
-   * `stopping` 算 active：字幕区保持最后一眼，结束是一个不能被打断的过程。
+   * `starting` is not active: the engine is still handshaking, so the guide
+   * block stays and its CTA becomes pending. Switching to the transcript here
+   * would make the button vanish on press, leaving an empty stage where "no
+   * reaction" and "connecting" look identical.
+   *
+   * `stopping` is active: the transcript holds the last view, and stopping is
+   * not interruptible.
    */
   const active = status === 'running' || status === 'paused' || status === 'stopping'
 
-  // -- 窗口宽度：笔记区在窄窗折叠 ---------------------------------------------------
+  // -- Window width: the notes panel collapses in a narrow window ---------
   useEffect(() => {
     if (typeof window === 'undefined') return
     const query = window.matchMedia(`(max-width: ${NOTES_COLLAPSE_PX - 1}px)`)
@@ -77,19 +81,22 @@ export function WorkspacePage() {
     return () => query.removeEventListener('change', sync)
   }, [])
 
-  // -- 笔记：跟着会议走，800ms 防抖自动保存 -----------------------------------------
+  // -- Notes: follow the meeting, auto-saved with an 800ms debounce --------
   //
-  // 防抖是必需的，不是优化：setNotes 在主进程是「读整份 meeting.json → 改一个字段 → 原子重写」，
-  // 逐字调用会在一场两小时的会议里制造持续的小文件 IO 抖动。800ms 让人眼察觉不到，
-  // 又短到「切走页面之前基本已经落盘」。
+  // The debounce is required, not an optimisation: in the main process a notes
+  // write reads the whole meeting.json, changes one field and rewrites it, so
+  // per-keystroke calls mean continuous small-file IO for a two-hour meeting.
+  // 800ms is imperceptible and short enough to land before the user navigates
+  // away.
   const meetingId = session.meetingId
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedNotes = useRef('')
-  // 挂起中的写入：卸载时用来补一次落盘，不必等 800ms 走完。
+  // A write still in flight, so unmount can land it without waiting out the 800ms.
   const pendingNotes = useRef<string | null>(null)
   const pendingMeetingId = useRef<string | null>(null)
 
-  // 换一场会议先把已挂起的写入冲掉，否则它会落到下一场会议头上。
+  // Flush a pending write first when the meeting changes, or it lands on
+  // the next meeting.
   useEffect(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = null
@@ -116,14 +123,16 @@ export function WorkspacePage() {
         pendingMeetingId.current = null
         if (value === savedNotes.current) return
         savedNotes.current = value
-        // 失败不打扰用户：笔记是辅助信息，丢一段不该比一次红色报错更让人记住这场会。
+        // A failed save is not worth interrupting for: losing a passage of notes
+        // should not outlast a red error in memory.
         void actions.meetings.setMeetingNotes(meetingId, value).catch(() => undefined)
       }, 800)
     },
     [meetingId],
   )
 
-  // 卸载时把挂起的写入立刻落盘，否则"刚打完最后一个字就关窗"会丢掉这一段。
+  // Land a pending write on unmount, or closing the window right after typing
+  // the last character loses it.
   useEffect(
     () => () => {
       if (saveTimer.current) clearTimeout(saveTimer.current)
@@ -137,7 +146,7 @@ export function WorkspacePage() {
     [],
   )
 
-  // -- 打开设置弹窗：用当前设置做初值，而不是另一份草稿 -------------------------------
+  // -- Open the dialog seeded from current settings, not a separate draft ---
   const openSetup = useCallback(() => {
     setDraft({
       title: '',
@@ -160,15 +169,15 @@ export function WorkspacePage() {
 
   const missing: MissingResource | null = useMemo(() => {
     if (!pendingConfig) return null
-    // 传**整个** `pendingConfig`，不是只挑两个模型 id。
-    // `findMissingResource` 还需要 `targetLanguages` 与 `translationProvider` 才能算出
-    // 「这次要不要本地翻译模型」—— 云端模型的 id 不在本机，不进预检。
-    // `pendingConfig` 本来就是完整的 SessionConfig（`SessionSetupDialog` 的 onSubmit
-    // 传的就是它），不需要拼。
+    // The whole `pendingConfig`, not just the two model ids: `findMissingResource`
+    // also needs `targetLanguages` and `translationProvider` to decide whether a
+    // local translation model is required. A cloud provider's model id is not on
+    // this machine and stays out of preflight. `pendingConfig` is already a
+    // complete SessionConfig, since that is what `onSubmit` passes.
     return findMissingResource({ storagePath: '', resources }, pendingConfig)
   }, [pendingConfig, resources])
 
-  // -- 开始 / 暂停 / 继续 / 结束 --------------------------------------------------------
+  // -- Start / pause / resume / end ----------------------------------------
   const configRef = useRef(pendingConfig)
   configRef.current = pendingConfig
 
@@ -178,10 +187,11 @@ export function WorkspacePage() {
     setPreflightOpen(false)
     if (draft) {
       /*
-       * 录音开关落的是**全局偏好**，不是这场会话的配置：它写进 `settings.recording.keepAudio`，
-       * 主进程 `ipc.ts` 据此决定要不要给引擎注入 `recordingPath`（不给就不产生任何 WAV）。
-       * 所以在弹窗里拨一次会同时改掉以后每场的默认值 —— 这是"偏好"该有的样子，不是 bug。
-       * 顺带一句：录音早就是真的了，记录详情页放的是真实 WAV，界面文案别再写"演示"。
+       * The recording toggle is a global preference rather than part of this
+       * session: it writes `settings.recording.keepAudio`, and the main process
+       * uses that to decide whether to hand the engine a `recordingPath`. No path
+       * means no WAV at all, so toggling it also changes the default for later
+       * sessions.
        */
       try {
         await actions.settings.updateSettings({ recording: { keepAudio: draft.keepAudio } })
@@ -203,13 +213,13 @@ export function WorkspacePage() {
         }
       }
     } catch {
-      // 错误已经落在 store 的 errorCode 上，由下面的 AlertDialog 统一呈现。
-      // 这里**不**再弹一次 toast：同一个错误说两遍只会让人以为是两个问题。
+      // The error is already on the store as an errorCode, and the dialog
+      //      // below reports it. No second toast: saying it twice reads as two problems.
     }
   }, [draft, t])
 
   const stop = useCallback(async () => {
-    // meetingId 必须在 stop 之前取：store 的 finally 会无条件清掉它（见 sessionStore 文件头第 1 条）。
+    // Read before stopping: the store's `finally` clears it unconditionally.
     const meetingId = sessionStore.getState().meetingId
     setStopConfirmOpen(false)
     try {
@@ -218,8 +228,9 @@ export function WorkspacePage() {
     } catch (error) {
       toast.danger(describeError(t, errorCodeOfSession(sessionStore.getState())))
     } finally {
-      // 无论成败都回到 idle 入口：store 在 stop 的 finally 里已经清了 sessionId，
-      // 界面上再留一个"进行中"的壳子只会让用户以为还能继续录。
+      // Back to the idle entry either way: the store cleared the session id in
+      // its `finally`, and leaving a "running" shell here would suggest the
+      // session can still be recorded.
       setPendingConfig(null)
     }
   }, [navigate, t])
@@ -238,29 +249,27 @@ export function WorkspacePage() {
   }, [])
 
   /*
-   * 本窗**最近一次持有过**的会议 id。
+   * The most recent meeting id this window held.
    *
-   * 引擎在同传途中没了时，`sessionStore` 的 `abandonSessionOnEngineLoss` 会照
-   * `sessionStopped` 的做法把 `meetingId` 一起清掉（会话确实结束了，不留着冒充"还在跑"）。
-   * 但那场会的记录在磁盘上、也已经由主进程落了结束时间，**用户的下一站是那条记录**而不是
-   * 一个空工作台 —— 所以 id 在被清掉之前先在这里留一份。
+   * When the engine dies mid-session, `abandonSessionOnEngineLoss` clears the
+   * `meetingId` along with the session. The record is on disk and the main
+   * process has already stamped its end time, so the user's next stop is that
+   * record rather than an empty workspace. Keep the id before it is cleared.
    *
-   * 用 ref 而不是 state：它只在点击那一刻被读，不需要触发重渲染；`stop()` 取 meetingId
-   * 也是同一个理由（store 的 finally 会清掉它）。
+   * A ref, not state: it is read at the moment of a click and never needs to
+   * re-render, which is also why `stop()` reads the id the same way.
    */
   const lastMeetingIdRef = useRef<string | null>(null)
   if (session.meetingId !== null) lastMeetingIdRef.current = session.meetingId
 
   const viewRecord = useCallback(() => {
     const meetingId = lastMeetingIdRef.current
-    // 先复位再跳转：不清掉的话，用户从记录页回到工作台会被同一个对话框重新弹一次
-    // （`status` 仍是 `error`），而这一屏此时既没有会话也没有引擎可说。
+    // Reset before navigating: without it, returning here from the record page
+    // reopens the same dialog (`status` is still `error`) on a screen with no
+    // session and no engine to report.
     actions.session.resetSessionError()
     if (meetingId) navigate(recordPath(meetingId))
   }, [navigate])
-
-  // 会话开着的时候不允许直接把窗口换成别的路由：那里没有底栏，用户会以为同传停了。
-  // 结束之后跳到记录详情是刻意的，那是这场同传的下一站。
 
   const sourceLanguage = pendingConfig?.sourceLanguage ?? settings?.recognition.sourceLanguage ?? 'auto'
   const targetLanguage = pendingConfig?.targetLanguages[0] ?? settings?.translation.targetLanguage ?? 'zh'
@@ -305,7 +314,8 @@ export function WorkspacePage() {
         onFontSizeChange={(size) => setFontStep(Math.max(0, FONT_STEPS.indexOf(size as (typeof FONT_STEPS)[number])))}
         notesOpen={notesOpen}
         onToggleNotes={() => setNotesOpen((open) => !open)}
-        // 模型在 startSession 那一刻就被引擎握定了，starting 之后改设置对这一场没有影响。
+        // The engine fixes the model when the session starts, so a later change
+        // to settings does not affect the running session.
         sessionLocked={status !== 'idle' && status !== 'error'}
         language={language}
       />
@@ -342,8 +352,9 @@ export function WorkspacePage() {
             </>
           ) : (
             <IdleGuide
-              // 这里读 session.status 而不是上面那个被 !active 收窄过的 status：
-              // idle 才是 idle，starting 时这个分支不会渲染，但按钮的 pending 态仍然要接得上。
+              // `session.status`, not the narrowed `status` above: this branch
+              // does not render while starting, but the button's pending state
+              // still has to line up.
               starting={session.status === 'starting'}
               engineStatus={session.engineStatus}
               onStart={openSetup}
@@ -377,7 +388,6 @@ export function WorkspacePage() {
         onStart={() => void start()}
       />
 
-      {/* 结束同传：破坏性确认走 AlertDialog，不是 Modal（DESIGN 第 10.1 节）。 */}
       <AlertDialog isOpen={stopConfirmOpen} onOpenChange={setStopConfirmOpen}>
         <AlertDialog.Backdrop className="z-overlay">
           <AlertDialog.Container>
@@ -403,7 +413,7 @@ export function WorkspacePage() {
         </AlertDialog.Backdrop>
       </AlertDialog>
 
-      {/* 会话异常：文案由 errorCode 查表得到，state.error 那串诊断原文**不进界面**。 */}
+      {/* Session failure: copy comes from the errorCode table; the `state.error` diagnostic string never reaches the UI. */}
       <SessionErrorDialog state={session} onCopyDiagnostics={() => void copyDiagnostics()} onReset={resetError} onViewRecord={viewRecord} />
     </div>
   )
@@ -421,12 +431,11 @@ const EMPTY_DRAFT: SetupDraft = {
 }
 
 /**
- * 未开始态的居中引导块。
+ * The centred idle guide, and the only primary CTA on this screen.
  *
- * 只在 idle 出现，也是这一屏唯一的主 CTA（`rounded-full`，第 17 节检查清单第一条）。
- * 引擎**起不来**时，原因写在下面那条 Alert 里并给出「重试启动」；引擎只是**还没起**
- * （刚打开应用的那几秒）时这里什么都不写；引擎刚崩、正在重连时只给一行灰字 ——
- * 三种情况的区别见下面那段注释。
+ * A dead engine reports the reason in the Alert below; an engine that has not
+ * come up yet says nothing, and one that is reconnecting gets a single grey
+ * line. See below for why the three differ.
  */
 function IdleGuide({
   starting,
@@ -447,29 +456,32 @@ function IdleGuide({
         <h2 className="nola-display text-foreground">{t('workspaceUi.idleTitle')}</h2>
         <p className="nola-body text-muted">{t('workspace.nothingYetHint')}</p>
         {/*
-         * **红色 Alert 只给"起不来"这一种。**
+         * The red Alert is only for an engine that cannot start.
          *
-         * `engineStatus` 是**主进程观测**出来的（`engine-process.ts` 的 `state` 事件经
-         * `src/main/ipc.ts` 的 `forwardState` 转发，`sessionStore` 一对一映射），不是这里推的。
-         * 主进程在 `app.whenReady()` 里就 `engine.start()` 了（`src/main/index.ts`），
-         * 所以引擎**不是**懒启动：应用刚打开的那几秒是 `booting`，再往后是 `ready`，
-         * 而 `startSession` 处理器第一句的 `ensureReady()` 只是兜底（引擎真的掉过时才起作用），
-         * 不是"按下开始同传才会有人 spawn 它"。这里曾经按 `!engineReady` 报
-         * 「本地引擎没有运行，识别暂时无法开始」**并且禁用按钮**，等于当着一个还没坏的
-         * 东西报故障，同时禁掉唯一能解掉它所报状况的那个动作。
+         * `engineStatus` is observed in the main process (`engine-process.ts`
+         * emits `state`, `src/main/ipc.ts` forwards it as `engineStateChanged`,
+         * `sessionStore` maps it one to one). The main process starts the engine
+         * in `app.whenReady()`, so this window is not the thing that spawns it:
+         * `booting` is the first seconds after launch, and the `ensureReady()` in
+         * the `startSession` handler is a fallback for an engine that has actually
+         * gone away.
          *
-         * 三个非就绪的取值给出三种画法，因为它们的用户出路不同：
-         *   · `idle` / `booting` 什么都不写：什么都没坏，主 CTA 照常可点。
-         *   · `recovering` 一行灰字：进程刚崩、但主进程还有重试次数（退避 250ms / 1s / 4s），
-         *     引擎自己会好。报红色等于报一个正在被处理的状况，还附赠一个用户不需要按的
-         *     「重试启动」。
-         *   · `failed` 才是真的坏了：主进程退避耗尽（`connectWithRetries` 置 `failed`），
-         *     它不会自己变好。文案复用现成的失败文案对（`engineNotReady` 带错误码 ENG-001 +
-         *     `engineNotReadyAction`），不另造一句说法相近的句子。
+         * Three non-ready values, three renderings, because the user's way out
+         * differs:
+         *   · `idle` / `booting` say nothing: nothing is broken, and the primary
+         *     CTA stays clickable. Reporting a fault here would also disable the
+         *     only action that could resolve it.
+         *   · `recovering` gets one grey line: the process just crashed but the
+         *     main process still has retries (250ms / 1s / 4s) and the engine will
+         *     return by itself. A red alert would also offer a "retry" the user
+         *     does not need.
+         *   · `failed` is the real fault: the main process exhausted its retries
+         *     and it will not heal. Reuses the existing copy pair
+         *     (`engineNotReady` carries ENG-001, plus `engineNotReadyAction`).
          *
-         * 按钮只在 `starting` 时禁用：那时 `startSession` 已经在飞，而它**第一句**就是
-         * `ensureReady()`，所以 `starting` 已经把引擎握手的那几秒一起盖住了（store 在
-         * 任何 await 之前就置 `status: 'starting'`）。
+         * The button is disabled only while `starting`: `startSession` is already
+         * in flight, and the store sets `status: 'starting'` before any await,
+         * so that covers the engine handshake too.
          */}
         {engineStatus === 'failed' ? (
           <Alert status="danger">
@@ -489,11 +501,6 @@ function IdleGuide({
             </Alert.Content>
           </Alert>
         ) : null}
-        {/*
-         * 正在重连：只给一行灰字。主进程还剩重试次数时引擎会自己回来，
-         * 这不是故障，也不该在它旁边摆「重试启动」—— 摆出来等于教用户去按一个
-         * 系统正在自己做的动作。`Alert` 那一支（红色）留给退避耗尽的 `failed`。
-         */}
         {engineStatus === 'recovering' ? (
           <p className="nola-caption flex items-center gap-2 text-muted">
             <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden="true" />
@@ -516,21 +523,27 @@ function IdleGuide({
 }
 
 /**
- * 会话异常对话框。
+ * Session failure dialog.
  *
- * 动作按"这一场会还剩什么"分三种，因为它们的用户出路完全不同：
- * - `errorCode === ENGINE_LOST`：**引擎进程没了**，这一场已经结束（`sessionStore` 的
- *   `abandonSessionOnEngineLoss` 清掉了 `sessionId`）。出路是**那条记录**：字幕逐句落盘，
- *   主进程也已经给会议落了结束时间，用户要的是"半场的会议怎么拿到"，不是重试。
- * - `sessionId === null`：会话没开起来（引擎没起 / 设备没了 / 模型没装）。出路是重试或去装模型。
- * - `sessionId !== null`：会话还开着，只是中途报错。出路是结束这场同传（能存下已经有的字幕）。
+ * The three actions follow what is left of the session, because the ways out
+ * differ:
+ * - `ENGINE_LOST`: the engine process is gone and the session is over
+ *   (`abandonSessionOnEngineLoss` cleared the `sessionId`). The way out is the
+ *   record: captions are on disk per line and the main process has stamped the
+ *   end time, so the user wants "how do I get the half-finished meeting", not a
+ *   retry.
+ * - `sessionId === null`: the session never started. Retry, or install the model.
+ * - `sessionId !== null`: still running, just erroring. End the session, which
+ *   saves the captions so far.
  *
- * 前两种都落在 `errorCopyOf(code, 'start')` 那一支上，这是有意的：查表按
- * `errorCode` 走，而只有 `ENGINE_LOST` 会在表里命中 `errors.engineLost`，
- * 于是主按钮自然变成「查看这场记录」。**行为上的例外只有这一个**，所以单独判一次码，
- * 不去改 `errorCopyOf` 的签名 —— 浮窗那份 `StartFailureNotice` 也调它（见 `OverlayControls`）。
+ * The first two go through `errorCopyOf(code, 'start')`. Only `ENGINE_LOST`
+ * matches a table row, so the primary button becomes "view this record". That
+ * is the only behavioural exception, so it tests the code once here rather than
+ * changing the `errorCopyOf` signature, which the overlay's `StartFailureNotice`
+ * also calls.
  *
- * `state.error` 是诊断串，只给 console 与"复制诊断信息"，**不渲染**。
+ * `state.error` is a diagnostic string for the console and "copy diagnostics",
+ * never rendered.
  */
 function SessionErrorDialog({
   state,
@@ -554,8 +567,9 @@ function SessionErrorDialog({
     <AlertDialog
       isOpen={isOpen}
       onOpenChange={(open) => {
-        // ESC 与遮罩点击都会走到这里：这一屏的错误没有"稍后再说"的选项，
-        // 不复位就会一直挡着字幕区，所以关掉即复位。
+        // Reached by ESC and by a backdrop click. This failure has no "later"
+        // option, and without a reset it would keep covering the transcript, so
+        // closing resets.
         if (!open) onReset()
       }}
     >
@@ -596,36 +610,39 @@ function SessionErrorDialog({
   )
 }
 
-// -- 错误码到文案 ------------------------------------------------------------------
+// -- Error code to copy ------------------------------------------------------------
 
 export interface ErrorCopy {
   message: TranslationKey
   /**
-   * 可选的第二行。**默认是 null**：`errors.*` 的 message 本身已经是一句完整的话
-   * （发生了什么 + 错误码），原来的 detail 直接填了按钮那一条，于是对话框正文和
-   * 主按钮会显示同一句"重试启动"。真要补第二行时，它必须和 action 不是同一句。
+   * Optional second line, null by default: an `errors.*` message is already a
+   * complete sentence, so a detail repeating the action would show the same
+   * "retry" text in the body and on the primary button.
    */
   detail: TranslationKey | null
-  /** 主按钮。 */
+  /** The primary button. */
   action: TranslationKey
 }
 
 /**
- * `errorCode` 到 `errors.*` 的映射。
+ * `errorCode` to `errors.*` copy.
  *
- * `sessionStore.errorCodeOf()` 把引擎抛出的 `FOO: ...` 取前缀并大写，引擎事件则直接
- * `toUpperCase()`，所以同一个故障可能有三种写法（`MODEL_MISSING` /
- * `MODELUNAVAILABLE` / `MODEL_UNAVAILABLE`）。这里先归一化（大写 + 去分隔符）再查表，
- * 查不到就落到**上下文兜底**——宁可文案不够精确，也不能让界面显示 `missing:errors.xxx`
- * （i18n 层对缺 key 的处理就是这样）。
+ * `sessionStore.errorCodeOf()` takes the prefix of a thrown `FOO: ...` and
+ * uppercases it, while engine events are uppercased directly, so one fault can
+ * arrive three ways (`MODEL_MISSING` / `MODELUNAVAILABLE` / `MODEL_UNAVAILABLE`).
+ * Normalise before lookup, and fall back on context: an imprecise message beats
+ * the UI rendering `missing:errors.xxx`, which is what the i18n layer does with
+ * an unknown key.
  *
- * `context` 决定两件事：兜底文案，以及**主按钮**。会话还活着的时候（`stop`）主按钮一律是
- * 「结束同传」：错误发生后，引擎还握着的这场同传能做的唯一有价值的事就是把已经有的字幕存下来；
- * 把「重试」摆在那里只会让用户对着一个已经死掉的会话反复点。
+ * `context` decides the fallback copy and the primary button. A live session
+ * always gets "end session": once an error has happened, saving the captions
+ * already captured is the only useful thing left to do, and a "retry" there
+ * invites clicking a dead session.
  *
- * 查表命中的条目按 `errorCode` 走，与 `context` 无关，所以「引擎没了这场会」（`ENGINELOST`）
- * 落进哪个 context 都取到它自己那一行 —— 引擎把这场会带走时 `sessionId` 已经被清掉了，
- * 于是它落在 `start` 那一支上，而那支只做兜底、不改写表里命中的东西，正好合适。
+ * A matched row is chosen by `errorCode` alone, so `ENGINELOST` resolves to its
+ * own row in either context. The engine takes the session with it and clears
+ * the `sessionId`, so it lands in the `start` branch, which only supplies a
+ * fallback and leaves a matched row alone.
  */
 const ERROR_TABLE: Record<string, ErrorCopy> = {
   MODELMISSING: { message: 'errors.modelMissing', detail: null, action: 'errors.modelMissingAction' },
@@ -635,8 +652,8 @@ const ERROR_TABLE: Record<string, ErrorCopy> = {
   ENGINENOTREADY: { message: 'errors.engineNotReady', detail: null, action: 'errors.engineNotReadyAction' },
   ENGINENOTRUNNING: { message: 'errors.engineNotReady', detail: null, action: 'errors.engineNotReadyAction' },
   INTERNALERROR: { message: 'errors.engineNotReady', detail: null, action: 'errors.engineNotReadyAction' },
-  // 键是 `ENGINE_LOST` 归一化之后的样子（大写 + 去分隔符），与
-  // `sessionStore.ENGINE_LOST_CODE` 是同一个码的两个写法，别当成两个码。
+  // The normalised form of `ENGINE_LOST` (uppercase, separators removed) —
+  // the same code as `sessionStore.ENGINE_LOST_CODE`, not a second code.
   ENGINELOST: { message: 'errors.engineLost', detail: null, action: 'errors.engineLostAction' },
   AUDIODEVICEUNAVAILABLE: { message: 'errors.deviceNotFound', detail: null, action: 'errors.deviceNotFoundAction' },
   DEVICENOTFOUND: { message: 'errors.deviceNotFound', detail: null, action: 'errors.deviceNotFoundAction' },
@@ -645,32 +662,32 @@ const ERROR_TABLE: Record<string, ErrorCopy> = {
 
 const FALLBACK: Record<'start' | 'stop', ErrorCopy> = {
   start: { message: 'errors.startFailed', detail: null, action: 'errors.startFailedAction' },
-  // 会话中途崩掉且码认不出来：最接近的说法是"引擎没了"。这里不能用 engineNotReady ——
-  // 那句说的是"识别无法开始"，可这场明明已经在跑了，说的是"停了"。
-  // 也正因为码认不出来，这里不带错误码。
+  // A session that died mid-run with an unrecognised code is closest to
+  // "the engine stopped". `engineNotReady` says recognition cannot start,
+  // which is the opposite of what happened here. The code stays off because it
+  // could not be read.
   stop: { message: 'errors.engineStopped', detail: null, action: 'workspace.end' },
 }
 
 /**
- * 主语是「开始识别」的文案。会话**已经跑起来**之后照抄这些就是说反了。
- *
- * 这一族以前只有兜底路径（`FALLBACK.stop`）躲开了，查表命中的路径没有躲：引擎报
- * `internalError` 时 `errorCopyOf(code, 'stop')` 会照 `ERROR_TABLE` 取出
- * `errors.engineNotReady`（「本地引擎没有运行，识别无法开始。错误码 ENG-001」）——
- * 可这场会明明正在跑，用户读到的是"没法开始"，而实际发生的是"中途停了"。
- * 同一个文件里两处兜底口径不一致，所以在这里统一。
+ * Copy whose subject is "starting recognition", so it reads backwards once a
+ * session is already running. `errorCopyOf(code, 'stop')` would otherwise take
+ * `errors.engineNotReady` ("local engine not running, recognition cannot
+ * start") from the table for an `internalError` raised mid-session, telling the
+ * user it could not start when it actually stopped.
  */
 const START_ONLY_MESSAGES: ReadonlySet<TranslationKey> = new Set<TranslationKey>([
   'errors.engineNotReady',
   'errors.startFailed',
 ])
 
-/** 归一化 + 查表 + 按上下文选主按钮。**纯函数，独立可测。** */
+/** Normalise, look up, and pick the primary button by context. */
 export function errorCopyOf(code: string | null, context: 'start' | 'stop'): ErrorCopy {
   const normalized = code === null ? '' : code.toUpperCase().replace(/[^A-Z0-9]/g, '')
   const base = (normalized.length > 0 ? ERROR_TABLE[normalized] : undefined) ?? FALLBACK[context]
-  // 会话还活着的时候，主按钮一律是「结束同传」：这场同传能做的唯一有价值的事就是把已经
-  // 识别到的字幕存下来。把「重试」摆在那里只会让用户对着一个引擎已经掉线的会话反复点。
+  // A live session always gets "end session": saving the captions already
+  // recognised is the only useful thing left, and a "retry" would invite
+  // clicking a session whose engine is already gone.
   if (context !== 'stop') return base
   return {
     ...base,
@@ -679,12 +696,12 @@ export function errorCopyOf(code: string | null, context: 'start' | 'stop'): Err
   }
 }
 
-/** 从 store 快照里取 errorCode（`stop` 的 catch 分支要读终态）。 */
+/** The errorCode from a store snapshot, read after the fact by `stop`'s catch. */
 export function errorCodeOfSession(state: SessionState): string | null {
   return state.errorCode
 }
 
-/** toast 需要一句现成的话，复用同一张表。 */
+/** A ready-made line for a toast, from the same table. */
 function describeError(t: ReturnType<typeof useI18n>['t'], code: string | null): string {
   const copy = errorCopyOf(code, 'stop')
   return `${t(copy.message)} ${t(copy.action)}`

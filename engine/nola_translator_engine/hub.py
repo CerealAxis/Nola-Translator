@@ -53,11 +53,6 @@ MAX_INSPECTION_BYTES = 8 * 1024 * 1024
 
 @dataclass(frozen=True, slots=True)
 class HubError:
-    """A hub failure already mapped onto the protocol's error vocabulary.
-
-    ``code`` is one of ``ErrorCode``; ``reason`` is the machine-readable detail that goes into the
-    event's ``details``, so the reason survives even where the code has to stay coarse.
-    """
 
     code: str
     reason: str
@@ -207,10 +202,6 @@ class RuntimeAdapter:
     the runtime module (it pulls torch in, and this registry must stay importable without it)."""
 
 
-# The Hy-MT2 language table moves here from translation/hymt2.py: it is a property of the model,
-# not of the prompt template, and a registry that cannot answer "which languages does this loader
-# cover" is the same hardcoded table with a different location. hymt2.py re-exports it, so the
-# provider's own prompt construction keeps reading one single source of truth.
 HYMT2_LANGUAGES: dict[str, str] = {
     "zh": "Chinese",
     "en": "English",
@@ -254,10 +245,7 @@ HYMT2_LANGUAGES: dict[str, str] = {
 
 
 # llama.cpp's `general.architecture` names, the same strings HuggingFace echoes in
-# `gguf.architecture`. This is an allow-list on purpose: the only way to be sure a GGUF loads is to
-# load it, and finding that out after a multi-gigabyte download is the failure mode this module
-# exists to prevent. A name missing here is refused, and phase 2 grows the list as each GGUF is
-# validated against the shipped llama-server.
+# `gguf.architecture`.
 LLAMA_CPP_ARCHITECTURES: frozenset[str] = frozenset(
     {
         "hunyuan-dense",
@@ -352,10 +340,7 @@ M2M100_ADAPTER = RuntimeAdapter(
     slot="translation",
     label="transformers · M2M100ForConditionalGeneration",
     # `m2m_100` with the underscore, because that is what the model's own config.json declares
-    # (verified against facebook/m2m100_418M). Spelled from the repo name instead it would read
-    # `m2m100`, never match, and leave the whole adapter keyed on the weaker architectures check
-    # — the exact class of "keyed on the name rather than the declaration" mistake this registry
-    # exists to avoid.
+    # (verified against facebook/m2m100_418M).
     model_types=frozenset({"m2m_100"}),
     architectures=frozenset({"M2M100ForConditionalGeneration"}),
     required_files=("config.json", "tokenizer_config.json", "vocab.json"),
@@ -649,7 +634,6 @@ def detect_runtime(info: HubRepoInfo) -> RuntimeVerdict:
     languages = adapter.languages
     extra = {"matchedBy": matched_by}
     if languages is None:
-        # The adapter deliberately does not restate a table that lives in a torch-gated module.
         extra["languages"] = "见该加载器运行时的语言表"
     return RuntimeVerdict(
         compatible=True,

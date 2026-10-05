@@ -1,15 +1,10 @@
 /**
- * 页面崩溃兜底。React 类组件边界，HeroUI 没有对应物。
+ * Page crash fallback, implemented as a React class boundary.
  *
- * 落在 `EmptyState` + 标题 + 说明 + 原始错误 + 两个可点的按钮。文案遵守错误信息三要素：
- * 发生了什么（哪一步崩了）/ 用户能做什么（两个按钮）/ 可复制的错误码
- * （`errors.pageCrashed` 自带 UIP-010，页面渲染出来的原始错误也一并给出，方便直接贴进反馈）。
- *
- * `resetKey` 是调用方唯一需要关心的东西：**路由变了就清错**。没有它，一次崩溃会把整窗
- * 钉死在兜底页上，用户只能杀进程重开。
- *
- * 复制诊断走 `bridge.diagnostics.copy()`；没有注入 bridge 或通道失败时退回复制页面文本，
- * 不让"复制诊断"变成一个点了没反应的按钮。
+ * `resetKey` is the only thing callers supply; without it a crash pins the window
+ * to this fallback. Copy follows the three parts of an error message — what broke,
+ * what the user can do, a copyable code — and the copy button falls back to the
+ * page text when the diagnostics channel is missing or throws.
  */
 
 import { Component, useEffect, useRef, useState } from 'react'
@@ -20,12 +15,12 @@ import { Check, Copy } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { getBridge } from '@/store'
 
-/** 复制成功后按钮原地变对勾的时长。DESIGN 第 8 节：复制按钮不用 toast。 */
+/** How long the button shows a checkmark. The feedback is inline, not a toast. */
 const COPIED_FEEDBACK_MS = 1500
 
 export interface ErrorBoundaryProps {
   children: ReactNode
-  /** 变了就清掉错误状态。传路由的 `path` 或任意能标识"换了一个页面"的字符串。 */
+  /** Clears the error when it changes. Pass the route path or any page identity. */
   resetKey?: string
 }
 
@@ -41,7 +36,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
-    // 渲染栈进 console 是给开发者的；界面上只给用户能复制的三要素。
+    // The render stack goes to the console for developers; the UI gets the three parts.
     console.error('[nola] page crashed', error, info.componentStack)
   }
 
@@ -54,12 +49,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   override render(): ReactNode {
     const { error } = this.state
     if (error === null) return this.props.children
-    // 兜底内容必须能用 hook 取文案，所以委托给函数组件而不是写在 render 里。
+    // The fallback needs hooks for its copy, so it lives in a function component, not inline.
     return <CrashFallback error={error} />
   }
 }
 
-/** 单独拆成函数组件：类组件里不能调 hook，而文案必须走 `useI18n().t()`。 */
+/** Separate component: a class cannot call hooks, and the copy must go through `useI18n`. */
 function CrashFallback({ error }: { error: Error }): ReactNode {
   const { t } = useI18n()
 
@@ -73,7 +68,7 @@ function CrashFallback({ error }: { error: Error }): ReactNode {
       </pre>
 
       <div className="flex flex-wrap items-center gap-2">
-        {/* 文案是"重新载入界面"，主按钮就真的重载窗口，不做一个名不副实的 reset。 */}
+        {/* The copy says "reload the window", so the primary action really reloads it. */}
         <Button
           variant="primary"
           size="md"
@@ -112,7 +107,7 @@ function CopyDiagnosticsButton(): ReactNode {
           setCopied(true)
           return
         } catch {
-          // 通道失败不静默：退回复制页面文本，至少让用户拿得到东西。
+        // A failed channel falls back to copying the page text rather than failing silently.
         }
       }
       try {

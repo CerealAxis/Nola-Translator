@@ -13,16 +13,13 @@ export function resolvePreloadPath(mainDirectory: string): string {
 }
 
 /**
- * `electron-vite` bundles the main process to `out/main/index.js`, so the main directory handed in
- * here is `<root>/out/main` and the project root — the one that actually holds `build/icon.ico` — is
- * two levels up, not one: `resolvePreloadPath` and the renderer `loadFile` call in
- * `src/main/index.ts` both confirm the `out/` prefix.
+ * `electron-vite` bundles the main process to `out/main/index.js`, so the project root that
+ * holds `build/icon.ico` is two levels up from the directory handed in here.
  *
- * A packaged build has no `build/` directory to point at. The `build.files` list in `package.json`
- * ships only the bundled `out` tree and `package.json` itself, so the icon never lands inside the
- * asar, and the executable keeps the one electron-builder already stamps in. Probing for the file is
- * what keeps that production case from handing Electron a path that does not exist — a deliberate
- * branch here rather than a caught exception — so the caller gets `undefined` and omits the option.
+ * A packaged build has no `build/` directory: `package.json` ships only the bundled `out` tree
+ * and `package.json` itself, and electron-builder stamps the icon into the executable. Probing
+ * for the file — rather than catching an exception — is what lets the caller get `undefined` and
+ * omit the option entirely.
  */
 export function resolveWindowIconPath(mainDirectory: string): string | undefined {
   const icon = join(mainDirectory, '..', '..', 'build', 'icon.ico')
@@ -32,11 +29,9 @@ export function resolveWindowIconPath(mainDirectory: string): string | undefined
 export function createMainWindowOptions(
   preload: string,
   theme: AppSettings['theme'] = 'system',
-  // The main directory is passed in rather than read from `__dirname` here on purpose: only
-  // `src/main/index.ts` runs as the real CommonJS bundle, and under the unit tests this module is
-  // loaded through Vite, which substitutes a `__dirname` of its own. Resolving at the call site keeps
-  // the icon path tied to the genuine bundle location and leaves the option unset when there is no
-  // main directory to resolve against.
+  // Passed in rather than read from `__dirname`: only `src/main/index.ts` runs as the real
+  // CommonJS bundle, and the unit tests load this module through Vite, which substitutes its own
+  // `__dirname`.
   mainDirectory?: string
 ): BrowserWindowConstructorOptions {
   const icon = mainDirectory ? resolveWindowIconPath(mainDirectory) : undefined

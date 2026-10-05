@@ -51,9 +51,9 @@ export function registerEngineIpc(
     if (engine.currentState !== 'ready') await engine.start()
   }
 
-  // Shared by the explicit stopSession channel and the caption window's close button.
-  // Teardown unloads several GB of weights and can outlive the 10 s default; a timeout here
-  // used to leave activeSessionId set, which wedged the app into "a session is already running".
+  // Shared by the explicit stopSession channel and the caption window's close button, so a
+  // teardown already in flight is joined instead of repeated. Unloading several GB of weights
+  // can outlast the engine's 10 s default request timeout, hence the wider deadline.
   const stopActiveSession = (sessionId: string): Promise<void> => {
     if (stoppingSession?.sessionId === sessionId) return stoppingSession.request
     const request = (async () => {
@@ -83,18 +83,13 @@ export function registerEngineIpc(
   }
 
   /*
-   * **引擎进程没了，而主进程还记着一个活跃会话：这一场到此为止。**
+   * A dead engine sends no `sessionStopped`, so `forwardEvent` never gets its chance to close
+   * the session out: the id stays set and the meeting record stays in progress. Settle the main
+   * process's own ledger here instead.
    *
-   * 进程消失时不会有 `sessionStopped`（协议那一侧什么都没发生，进程就没了），
-   * 所以光靠 `forwardEvent` 那个分支收不了尾：`activeSessionId` 会一直留着。等引擎自愈之后
-   * 用户开新会话只会拿到「已有字幕会话正在运行」，而实际上什么都没在跑；那条会议记录也永远
-   * 停在进行中。这里收的是**主进程自己的账本**，与 `forwardEvent` 收到 `sessionStopped`
-   * 时做的三件事完全一致（释放 id、给会议落结束时间、关掉字幕窗），只是没有报文可等。
-   *
-   * **`recovering` 也要走这条路，不能只等 `failed`。** 引擎会自己重连，但重连出来的是一个
-   * **新进程**：没有这场会话、没有录音、也没有已加载的权重（权重每场结束就卸），
-   * 所以「引擎回来了」从来不等于「这场会回来了」。留着 id 等的是一个永远不会来的
-   * `sessionStopped`。
+   * `recovering` counts too. A reconnect is a new process — no session, no recording, and the
+   * weights are unloaded after every session — so the engine coming back never means this
+   * session came back with it.
    */
   const releaseSessionOnEngineLoss = (): void => {
     const sessionId = activeSessionId
@@ -157,11 +152,9 @@ export function registerEngineIpc(
     IPC_CHANNELS.searchHuggingFace,
     async (_event, query: unknown, kind: unknown, cursor: unknown) => {
       /*
-       * 空关键词**不是**非法输入：`search=` 传空时 Hugging Face 返回的是按下载量排的热门榜，
-       * 所以"什么都没输入"就是"浏览热门"，界面靠这一点给出默认内容。拦掉它等于逼用户
-       * 先编一个关键词才能看到 hub 上有什么。
-       * 超长仍然是错，但那是一条不同的诊断（粘贴了整段文本 / 脚本误调），不能和
-       * "类型不对"混成同一句，否则排查时分不清是哪一种。
+       * An empty query is legal: `search=` returns Hugging Face's most-downloaded list, so
+       * "nothing typed" is "browse the hub". Overlength is a different fault — pasted text, a
+       * scripted call — and keeps its own message so the two are not diagnosed as one.
        */
       if (typeof query !== 'string') {
         throw new Error('搜索关键词无效')
@@ -172,9 +165,9 @@ export function registerEngineIpc(
       if (cursor !== undefined && (typeof cursor !== 'string' || cursor.length < 1 || cursor.length > 2048)) {
         throw new Error('分页游标无效')
       }
-      // 'asr'/'mt' is the renderer's vocabulary; the engine keys on the slot. Kept as a mapping
+      // 'asr'/'mt' are the renderer's category names; the engine keys on a slot instead, and
+      // 'quant' is the same filter expressed as a weight format.
       if (kind !== 'all' && kind !== 'asr' && kind !== 'mt' && kind !== 'quant') throw new Error('模型类别无效')
-      // here so the protocol keeps naming loaders and the UI keeps naming categories.
       const slot = kind === 'asr' ? 'recognition' : kind === 'mt' ? 'translation' : undefined
       await ensureReady()
       const response = await engine.request(
@@ -234,14 +227,12 @@ export function registerEngineIpc(
         throw new Error('模型类别无效')
       }
       if (slot !== undefined && activeSessionId) {
-        // A model install rewrites files a running session has already loaded, and unloading
-        // several GB mid-meeting to install a different model is not a decision this channel
-        // makes for the user.
+        // An install rewrites files a live session has already loaded, and forcing a
+        // mid-meeting weight unload to swap models is not this channel's call to make.
         throw new Error('字幕会话运行中，不能更换模型')
       }
       await ensureReady()
-      // Returns as soon as the download is under way; progress and completion arrive as
-      // `resourceChanged` events, exactly as they do for a built-in model.
+      // Returns once the download is under way; progress arrives as `resourceChanged` events.
       const response = await engine.request(
         {
           protocolVersion: 1,
@@ -267,25 +258,25 @@ export function registerEngineIpc(
       await prepareEnvironment(parsed)
       await ensureReady()
       const provider = parsed.translationProvider ?? 'local'
-      // 只有需要密钥的两个 provider 才去取。Ollama 现在也归在 `cloud` 下面，所以这里取到空串
-      // 是合法状态：引擎在 key 为空时不发 Authorization 头，而不是报错。
+      // Only the two keyed providers fetch a credential. Ollama sits under `cloud`, so an empty
+      // key is a legitimate state for the OpenAI-shaped and ollama endpoints, which omit the
+      // header; the anthropic and microsoft shapes require one and raise without it.
       const apiKey = provider === 'cloud' || provider === 'microsoft'
         ? await getTranslationCredential(provider)
         : ''
-      // 硬规则：provider==='local' 时 `translationOptions` 必须整个键不存在。zod 解析出来的对象
-      // 里键可能带着 `undefined` 值，所以这里把字段解构掉，而不是留一个 `{}` 发出去 ——
-      // 引擎会把 `{}` 判成配置非法，而"`translationOptions: undefined`"与"不给它"在 JSON 上
-      // 才是同一件事。
+      // The engine's `local` branch never reads `translationOptions`, so the field is dropped
+      // there. Destructuring also keeps it absent rather than `{}`: the engine's `resolved()`
+      // substitutes defaults only when the field is missing outright.
       const { translationOptions, ...withoutOptions } = parsed
       const config: SessionConfig = provider === 'local'
         ? withoutOptions
         : apiKey
           ? { ...parsed, translationOptions: { ...translationOptions, apiKey } }
           : parsed
-      // Starting captions opens a meeting: the directory has to exist before the engine is told
-      // where to put the audio, and a start that fails is thrown away a few lines below.
-      // keepAudio is read here rather than hardcoded, otherwise the setting would only ever
-      // look saved while the engine kept writing audio nobody can play back.
+      // The meeting is opened before the engine is told where to write audio, so the directory
+      // exists first; a start that fails is abandoned a few lines below. `keepAudio` is read
+      // from settings rather than assumed, or the setting would look saved while the engine
+      // wrote audio nobody can play back.
       const keepAudio = getSettings().recording.keepAudio
       config.compute = parsed.compute
       const meeting = meetings
@@ -302,7 +293,6 @@ export function registerEngineIpc(
             protocolVersion: 1,
             type: 'startSession',
             requestId: `start-${randomUUID()}`,
-            // No recordingPath means the engine opens no recorder, so no WAV is produced at all.
             config: meeting && keepAudio
               ? { ...config, recordingPath: meetings?.recordingPathFor(meeting.meetingId) }
               : config,
@@ -338,8 +328,8 @@ export function registerEngineIpc(
     }
     if (typeof paused !== 'boolean') throw new Error('暂停参数无效')
     await ensureReady()
-    // The engine shifts its own caption timeline across the pause, so the SRT timeline stays
-    // continuous; here we only relay. A 30 s ceiling keeps a wedged engine from freezing the UI.
+    // The engine shifts its own caption timeline across the pause, so the SRT stays
+    // continuous; the 30 s ceiling keeps a wedged engine from freezing the UI.
     await engine.request(
       {
         protocolVersion: 1,
@@ -353,23 +343,13 @@ export function registerEngineIpc(
     )
   })
 
-  /*
-   * 引擎进程状态的**按需读取**，与下面 `forwardState` 的边沿转发是一对。
-   *
-   * **这里绝对不能调 `ensureReady()`。** 这个通道的全部意义就是回答「引擎现在怎么样」；
-   * 一旦它自己会启动引擎，界面就永远问不出「从没启动过」这个答案，冷启动与引擎起不来
-   * 又被叠回同一个取值 —— 正是 `EngineStatus` 这个类型当初被造出来要分开的那两件事。
-   *
-   * 只读，不排队、不重试、不抛错：引擎没起来时 `currentState` 就是 `stopped`，
-   * 那是一个合法答案，不是失败。
-   */
   ipcMain.handle(IPC_CHANNELS.getEngineState, () => engine.currentState)
 
   ipcMain.handle(IPC_CHANNELS.showOverlay, () => getOverlayWindow()?.show())
   ipcMain.handle(IPC_CHANNELS.hideOverlay, () => getOverlayWindow()?.hide())
-  // Closing the caption window means "this session is over", not "stop showing it to me".
-  // It therefore stops recognition first — otherwise recordAudio would keep writing a file
-  // nobody can see. hideOverlay stays a pure hide for callers that only want it out of the way.
+  // Closing the caption window ends the session, so recognition stops first and recordAudio
+  // stops writing a file nobody can see. hideOverlay stays a pure hide for a caller that only
+  // wants it out of the way.
   ipcMain.handle(IPC_CHANNELS.closeOverlay, () => {
     if (closingOverlay) return closingOverlay
     const request = (async () => {
@@ -417,19 +397,8 @@ export function registerEngineIpc(
     }
   }
 
-  /*
-   * **先收账本，再广播。** 与下面 `forwardState` 里的 `releaseSessionOnEngineLoss` 同一条纪律。
-   *
-   * 原来这里是反过来的：先把 `sessionStopped` 发给所有窗口，再去 `meetings.finish()`。
-   * 而渲染进程的 `meetingStore` 收到这条事件的处理就是立刻重拉列表（"一场同传结束时引擎才
-   * 补齐 endedAtMs / durationMs，这是列表唯一需要重拉的时刻"）—— 于是它读到的是
-   * **还没收尾的** `begin()` 写的那份：`state: 'running'`、`durationMs: 0`。列表把这份
-   * 快照存下来，而 `finish()` 之后不会再发任何事件，于是这条记录就一直挂在"进行中"，
-   * 时长永远是 00:00:00，直到应用重启。
-   *
-   * 主进程自己的账本已经写好（`finish()` 落盘并更新 cache）才广播，界面收到的那条边沿
-   * 才是真的"这场会已经收尾了"。收尾只读写一个 meta 文件，代价是几毫秒。
-   */
+  // Settle the ledger before broadcasting. The renderer re-reads the meeting list on this edge,
+  // and would otherwise cache the record as still in progress with a 00:00:00 duration.
   const forwardEvent = (event: EngineEvent): void => {
     if (event.type !== 'sessionStopped') {
       broadcast(event)
@@ -437,11 +406,8 @@ export function registerEngineIpc(
     }
     activeSessionId = null
     getOverlayWindow()?.hide()
-    /*
-     * `meetings` 为 null 时必须走 `Promise.resolve()`，不能写成
-     * `void meetings?.finish(x).finally(broadcast)`：可选链会把整条链短路成 `undefined`，
-     * `.finally` 跟着不执行，于是**广播永远不会发生**，界面就再也不知道这场会话结束了。
-     */
+    // `Promise.resolve()`, not `meetings?.finish(x).finally(broadcast)`: the optional chain
+    // short-circuits to `undefined`, so the broadcast would never happen at all.
     const finalized = meetings
       ? meetings.finish(event.sessionId).catch((error) => console.error('meeting finalize failed', error))
       : Promise.resolve()
@@ -450,29 +416,13 @@ export function registerEngineIpc(
   engine.on('event', forwardEvent)
 
   /*
-   * 引擎子进程状态 → 渲染进程。**这是 `forwardEvent` 之外唯一一条进 `engine:event` 的消息，
-   * 而它的产生者不是引擎。**
+   * The engine's state rides the same `engine:event` channel as protocol events, which is what
+   * keeps "handshake done" and "process ready" strictly ordered in the renderer.
    *
-   * 代价是这条通道的载荷类型（`EngineChannelEvent`）名不副实：它名义上是「引擎协议事件」，
-   * 现在多了一支主进程自己写的 `engineStateChanged`。之所以接受这个代价而不另开一条通道：
-   * 生命周期事件与协议事件走同一条管道、同一个发送顺序，于是「引擎握手完成」与「引擎进程
-   * 就绪」在渲染进程看来仍然严格有序 —— 而 `startSession` 过去那套推断依赖的正是这个顺序。
-   * 另开一条通道会拿到更诚实的名字，代价是多一处 preload 转发、桥接签名与 dispose 清单；
-   * 当时的判断是本仓更偏好能自我解释的最小改动。**这是一个决定，不是忘了收尾。**
-   *
-   * 只转发 `state` 就够了，不必再转发 `crash` / `fatalError`：`engine-process.ts` 里
-   * `connectWithRetries`（重试耗尽）与 `handleTermination`（进程退出）都是**先**
-   * `setState('failed')`、**再** `emit('fatalError' / 'crash')`，所以崩溃在状态上已经可见。
-   *
-   * **这条边沿还带着"引擎打算重试"这件事**，因为定这件事的只有 `EngineProcess`
-   * （它手里有退避表）：`recovering` 表示进程没了但还有重试次数，`failed` 表示退避耗尽。
-   * 界面只做一对一映射（`sessionStore` 的 `ENGINE_PROCESS_STATE_TO_UI`），
-   * 不自己数重试、不从时序里猜 —— 那样每加一次重试就要在渲染层同步一份节奏。
-   *
-   * 顺带在这里收主进程的会话账本，见 `releaseSessionOnEngineLoss`：**先收账本再广播**，
-   * 界面收到这条边沿、开始说"这场会没了"时，主进程这边已经不再有活跃会话了。
-   *
-   * 与 `forwardEvent` 用同一个广播方式：主窗与浮窗都要知道自己这条会话的引擎还在不在。
+   * `recovering` vs `failed` is `EngineProcess`'s to decide alone, since only it holds the
+   * backoff table, and the renderer maps it one-to-one rather than counting retries. Forwarding
+   * `state` alone still covers a crash: both `connectWithRetries` and `handleTermination`
+   * `setState` before emitting `fatalError` / `crash`.
    */
   const forwardState = (state: EngineProcessState): void => {
     if (state === 'recovering' || state === 'failed') releaseSessionOnEngineLoss()
@@ -484,8 +434,8 @@ export function registerEngineIpc(
 
   return () => {
     engine.off('event', forwardEvent)
-    // 长驻的 EngineProcess 上留一个监听器就是一次真泄漏：dispose 之后每次状态变化
-    // 还会往一个已经拆掉 IPC 的窗口广播。on / off 必须成对，和上面那条同理。
+    // A listener left on the long-lived EngineProcess is a real leak: every later state change
+    // would still broadcast into windows whose IPC has already been torn down.
     engine.off('state', forwardState)
     for (const channel of [
       IPC_CHANNELS.listDevices,

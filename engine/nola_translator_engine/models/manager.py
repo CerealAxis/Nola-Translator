@@ -32,10 +32,6 @@ class ModelIntegrityError(RuntimeError):
 
 class ModelStorageError(RuntimeError):
     """A local filesystem failure while installing — not a bad file, and not a network problem.
-
-    Deliberately not an ``OSError``: the resource layer maps ``OSError`` onto "网络不可用", which
-    would send the user off to debug their router over a full disk or a directory name Windows
-    rejected.
     """
 
 
@@ -45,10 +41,8 @@ class FileEntry:
 
     ``sha256`` is the per-file sha256 HuggingFace publishes for LFS-tracked files. Small git
     blobs expose no sha256 through the API — only the git blob id — so ``blob_sha1`` carries
-    that instead. It is a digest over the same bytes, published by the same party, so accepting
-    it keeps a self-installed model fully verified instead of merely size-checked; refusing it
-    instead would make every transformers repo uninstallable, since config.json and the
-    tokenizer files are exactly the ones HF stores as plain git blobs. At least one of the two
+    that instead.
+    At least one of the two
     is always present on a spec the engine builds, and a spec carrying neither is rejected at
     verification time rather than trusted.
     """
@@ -127,10 +121,9 @@ class ModelManager:
                 on_phase(name)
 
         self.model_root.mkdir(parents=True, exist_ok=True)
-        # Sanitised from `directory`, never from `model_id`: a self-installed model's id carries
-        # `hub:owner/name`, and `tempfile` would fail with a WinError on the `:` and `/`. The
-        # failure would also arrive as an OSError, which reads as "网络不可用" and sends the user
-        # to debug a network that is fine.
+        # Sanitised from `directory`, never from `model_id`: a custom model's id carries
+        # `hub:owner/name` and `tempfile` fails on the `:` and `/`, and the resulting OSError
+        # classifies as `networkUnavailable` — a working network sent off to be debugged.
         prefix = _UNSAFE_PATH_CHARS.sub("-", spec.directory)[:_SAFE_PREFIX_LIMIT] or "model"
         try:
             temp = Path(tempfile.mkdtemp(prefix=f".{prefix}-", dir=self.model_root))

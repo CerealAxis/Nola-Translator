@@ -1,14 +1,12 @@
 /**
- * 音频与识别。声源、源语言、识别模型、音频留存。
+ * Audio and recognition: source device, source language, recognition model, audio retention.
  *
- * **声源那一行做了一处映射。** `recognition.audioSource` 的初值是协议里的哨兵
- * `'defaultOutput'`，它不是一个设备；而 `AudioDevice.isDefault` 已经标出了系统默认设备。
- * 两者指的是同一个东西，所以读的时候把 `'defaultOutput'` 映射到那个默认设备，
- * 写的时候写真实 deviceId。少一个永远选不回去的空选项。
+ * `recognition.audioSource` ships as the protocol sentinel `'defaultOutput'`, which is not a
+ * device. `AudioDevice.isDefault` already names the system default, so the sentinel is mapped
+ * onto that device when reading and the real device id is written back.
  *
- * **没有电平表。** bridge 契约里没有任何"起一路监听读音量"的通道，画一个会跳动的
- * `Meter` 只能是编数据，所以这里只显示设备事实。见交付报告 Known Gaps。
- * "测试音频"是真实的检查：重新 `listDevices()` 并确认当前选中的设备还在。
+ * There is no level meter: the bridge exposes no channel that starts a capture and reports
+ * volume, so a moving `Meter` could only invent its numbers.
  */
 
 import { useCallback, useMemo, useState } from 'react'
@@ -26,10 +24,9 @@ const DEFAULT_OUTPUT = 'defaultOutput'
 export function AudioTab({ settings }: SettingsPanelProps) {
   const { t, language } = useI18n()
   const devices = useStore(stores.models, (state) => state.devices)
-  // 音频留存默认开着：关掉之后没法回放也没法导出，误操作代价很高（见 keepAudioHint）。
-  // `settings.recording.keepAudio` **已经是设置结构里的一等字段**（`src/shared/settings.ts`
-  // 的 `RecordingSettings`），主进程据此决定要不要给引擎注入 `recordingPath`。
-  // 别再按「tier: ipc-new 槽位」处理它。
+  // Retention is on by default: with it off nothing can be replayed or exported, and
+  // `ipc.ts` reads the flag to decide both `recordAudio` and the `recordingPath` it injects,
+  // so a toggle that only looked saved would leave audio nobody can play back.
   const keepAudio = settings.recording?.keepAudio ?? true
 
   const onKeepAudio = useCallback((next: boolean) => {
@@ -125,7 +122,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
   )
 }
 
-/** 真实检查：重新列一次设备，确认当前选中的那个还在。 */
+/** A real check: re-list the devices and confirm the selected one is still there. */
 function DeviceTest({ expect }: { expect: string }) {
   const { t } = useI18n()
   const [state, setState] = useState<'idle' | 'pending' | 'failed'>('idle')

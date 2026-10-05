@@ -15,8 +15,7 @@ from .base import ProviderTranslation
 
 JsonRequester = Callable[[str, object, dict[str, str]], object]
 
-#: Default base URLs, defined once. The runtime dispatch used to repeat these literals, so
-#: changing a default meant editing two files and silently keeping the other one.
+#: Default base URLs, defined in one place so the runtime dispatch cannot disagree with them.
 DEFAULT_MICROSOFT_ENDPOINT = "https://api.cognitive.microsofttranslator.com"
 #: Versioned base: the user types the address *including* the version, and the fixed suffix
 #: (`/chat/completions`, `/responses`, `/api/chat`) is appended to it.
@@ -36,16 +35,9 @@ DEFAULT_MAX_OUTPUT_TOKENS = 4_096
 #: is an approximation, not tokenisation: no tokenizer is loaded, and the real ratio is
 #: roughly 1.5 chars/token for CJK and roughly 4 for English prose, varying with model.
 #:
-#: The single 3 that used to sit here was arithmetically backwards. Only this guard stands
-#: between a caption and an HTTP 400, so the estimate has to be an UPPER bound on the real
-#: token count — under-counting is what blows the window, and 3 is *twice* the CJK ratio, so
-#: it counted Chinese at half its real weight and sent a 2x-oversized request. Measured on a
-#: ctx=4096 window: 5853 Chinese chars went out as one request of ~3902 real tokens against a
-#: 2048 budget.
-#:
-#: Both constants are therefore set BELOW the measured ratios, which makes the estimate
-#: over-count and the request under-fill. CJK is the direction that matters: it is this
-#: application's primary input language. Do not "tidy" these towards the measured 1.5/4.
+#: Both values sit BELOW those measured ratios, so the estimate over-counts and a request
+#: under-fills. That is the safe direction to err in: this guard is all that stands between
+#: a caption and an HTTP 400, and an under-count is what blows the window. CJK binds.
 CJK_CHARS_PER_TOKEN = 1.2
 LATIN_CHARS_PER_TOKEN = 3
 #: Floor for the per-request allowance. Without it a small contextWindow would compute a
@@ -60,8 +52,7 @@ MAX_CHUNKS = 8
 
 
 #: Seconds a single HTTP request may take. The scheduler's whole-translation deadline is
-#: derived from this (see `_BudgetedChatProvider.timeout_for`), so the two numbers cannot
-#: drift apart into "the HTTP layer allows 20s but the scheduler gave up at 10s" again.
+#: derived from this (see `_BudgetedChatProvider.timeout_for`).
 HTTP_REQUEST_TIMEOUT_SECONDS = 20
 
 
@@ -104,10 +95,7 @@ def _is_cjk(char: str) -> bool:
 def _is_dense(char: str) -> bool:
     """Whether a character belongs to a script that tokenizes at roughly one per token.
 
-    Deliberately wider than `_is_cjk`, which matches kana/ideograph/hangul blocks only: CJK
-    punctuation (、。，) lives outside those blocks yet tokenizes just as densely, and a
-    Chinese caption is full of it — classifying those as Latin would drag the blended ratio
-    back above the density it exists to guard. Only the token estimate asks this;
+    Only the token estimate asks this;
     `_join_chunks` keeps asking `_is_cjk`, where a fullwidth comma is no reason to drop the
     space between two English words.
     """
@@ -255,7 +243,8 @@ class _BudgetedChatProvider:
     #: Unique across providers: the scheduler keys its LRU cache on this, and the caption
     #: event reports it as the translation's `provider`.
     name = ""
-    #: Used to make the ValueError for a missing model name name the right setting.
+    #: Names the provider in every error message, so the message points at the setting the
+    #: user has to change.
     label = ""
 
     def __init__(
@@ -336,10 +325,8 @@ class _BudgetedChatProvider:
 
         One translation is not one request here: `translate` splits the text and then walks
         the chunks sequentially, so a small contextWindow turns a single caption into several
-        round trips. A flat per-translation budget shared across all of them cannot work —
-        the scheduler used to give the whole thing 10s, which no individual chunk of a few
-        thousand Chinese characters can finish, and the user saw 「翻译超时」 with nothing
-        pointing at contextWindow. The deadline therefore scales with the real chunk count.
+        round trips. A flat budget shared across all of them cannot work, so the deadline
+        scales with the real chunk count.
 
         Clamped at MAX_CHUNKS because `translate` refuses anything longer before it makes a
         single request, so an unbounded paste cannot buy itself an unbounded deadline.
@@ -358,7 +345,7 @@ class _BudgetedChatProvider:
             )
         parts: list[str] = []
         for chunk in chunks:
-            # Sequential on purpose: the chunks are one utterance and the scheduler already
+            # the chunks are one utterance and the scheduler already
             # runs the per-target requests concurrently, which is the concurrency that pays.
             result = await asyncio.to_thread(
                 self.requester, self._url(), self._payload(chunk, system), self._headers()
@@ -507,18 +494,6 @@ class AnthropicMessagesProvider(_BudgetedChatProvider):
     Two more differences from the OpenAI shape, both from Anthropic's own Messages reference:
     `max_tokens` is a *required* body field, and the system prompt is the top-level `system`
     parameter rather than a message with role "system".
-
-    `temperature` is deliberately not sent — but not because the API lacks it. It IS a
-    documented body parameter (https://platform.claude.com/docs/en/api/messages), just a
-    deprecated one: that page states "Models released after Claude Opus 4.6 do not support
-    setting temperature. A value of 1.0 will be accepted for backwards compatibility, all
-    other values will be rejected with a 400 error." `top_k` and `top_p` carry the same
-    deprecation, and none of the three appear in the official anthropic-sdk-python
-    `MessageCreateParamsBase`. So pinning sampling the way the other three formats do would
-    400 on every current model, including the `claude-haiku-4-5` this provider defaults to.
-    Anthropic is therefore intentionally the one format here with unpinned sampling. (The
-    same page notes even `temperature: 0.0` is not fully deterministic, so repeating prompts
-    are the lever for this format, not the sampler.)
     """
 
     name = "anthropic"
@@ -654,10 +629,7 @@ def _has_version_suffix(endpoint: str) -> bool:
 
     Both spellings count, because both are what a user actually pastes. `/v1` is the half-
     remembered base; `/v1/messages` is the complete endpoint printed in Anthropic's own docs
-    and SDK examples, so it is the more likely paste. Checking only the last segment for
-    `v1` let `/v1/messages` through and produced `/v1/messages/v1/messages` — a guaranteed
-    404 that reached the user as a bare 「接口返回错误」 minutes later, with nothing naming
-    the address as the cause.
+    and SDK examples, so it is the more likely paste.
 
     The path is compared as a whole, trailing slash included, so `/v1beta` and `/v10` are
     left alone.

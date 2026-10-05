@@ -1,4 +1,4 @@
-/** Metadata search is independent of card loading and runtime installation checks. */
+/** Hub metadata hits arrive before the README card or any runtime inspection finishes. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Card, Drawer, EmptyState, Label, SearchField, Tag, TagGroup, toast } from '@heroui/react'
 import type { HubModelSummary, HubSearchResult, ResourceRecord } from '@/bridge'
@@ -283,19 +283,6 @@ function DetailDrawer({ hit, description, onClose, onInstall }: {
 }) {
   const { t } = useI18n()
   const summary = hit?.summary
-  /*
-   * 宽度只能落在 `Drawer.Dialog` 上，**不能**落在 `Drawer.Content`。
-   *
-   * `Drawer.Content` 是铺满视口的定位壳（HeroUI 的 `.drawer__content`：
-   * `fixed inset-0 w-full flex pointer-events-none`），它唯一的职责是靠
-   * `justify-start/end` 把面板顶到某一边；面板自己的宽度由
-   * `.drawer__dialog[data-placement]` 给（left/right 为 `w-80 sm:w-96`）。
-   * 一旦给 Content 加宽度，这层壳就塌成那个宽度，并且因为 `inset-0` 过约束
-   * （left/right 都是 0 而 width 非 auto）被钉死在 `left: 0` —— 面板于是悬在
-   * 屏幕左缘内侧，左边空出一条竖直的 backdrop。进出场动画的 `translate: ±100%`
-   * 是相对**面板自身宽度**算的，滑动距离并没有变，变的是起点：静止位置跑偏到
-   * 屏幕左缘内侧之后，面板就从页面中间某个位置滑入，而不是贴着屏幕左缘。
-   */
   return <Drawer isOpen={hit !== null} onOpenChange={(open) => !open && onClose()}>
     <Drawer.Backdrop><Drawer.Content placement="left">
       <Drawer.Dialog className="w-[420px] gap-4 p-4">

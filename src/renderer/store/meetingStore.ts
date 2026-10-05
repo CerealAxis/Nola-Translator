@@ -1,11 +1,7 @@
 /**
- * 同传记录域。列表 + 单条详情 + 改名 / 删除 / 导出。
- *
- * 引擎没有"记录变了"的通道，所以增量更新只挂在一个真正会改变列表的事件上：
- * `sessionStopped`。一场同传结束时引擎才把 meeting 落盘并补上 endedAtMs / durationMs，
- * 那是列表唯一需要重新拉的时刻。在那之前列表是稳定的，没有理由让每个页面各自去拉一次。
- *
- * 改名与删除都做乐观更新：列表行是用户正在看的东西，让它等一次磁盘往返再变会显得卡。
+ * Meeting record domain: list + one detail + rename / delete / export. The engine
+ * has no "records changed" channel, so refresh rides `sessionStopped`, where the
+ * main process fills in endedAtMs / durationMs. Rename and delete are optimistic.
  */
 
 import type { NolaBridge } from '@/bridge'
@@ -23,12 +19,12 @@ export interface MeetingsState {
   loaded: boolean
   loading: boolean
   error: string | null
-  /** 正在进行乐观改写的记录 id。行内的 spinner 读它。 */
+  /** Records under an optimistic rewrite; the row's spinner reads it. */
   pendingIds: readonly string[]
   detail: MeetingDetail | null
   detailLoading: boolean
   exporting: boolean
-  /** 导出返回的文件路径；null 表示用户取消了系统对话框。 */
+  /** Path written by the last export; null means the save dialog was cancelled. */
   exportedPath: string | null
 }
 
@@ -48,9 +44,9 @@ export const meetingsStore = createStore<MeetingsState>(initialState)
 
 let bridge: NolaBridge | null = null
 let unsubscribe: (() => void) | null = null
-/** 引擎确认过的列表快照，回滚基准。 */
+/** The list snapshot the engine confirmed. The rollback baseline. */
 let confirmed: MeetingMeta[] = []
-/** 乐观但未确认的改动，按顺序排队。 */
+/** Optimistic but unconfirmed changes, in order. */
 let inFlight: Array<{ id: string; patch: MeetingMeta | null }> = []
 
 const enqueue = createWriteQueue()
@@ -75,8 +71,6 @@ function publish(): void {
   })
 }
 
-// -- 公开动作 -----------------------------------------------------------------
-
 export async function loadMeetings(): Promise<void> {
   if (!bridge) return
   const state = meetingsStore.getState()
@@ -93,7 +87,7 @@ export async function loadMeetings(): Promise<void> {
   }
 }
 
-/** 记录详情。字幕与音频地址一次取回，页面的 loading 态只依赖这一个 promise。 */
+/** Detail. Captions and audio URL are fetched together, so the page's loading state hangs off one promise. */
 export async function loadMeetingDetail(id: string): Promise<MeetingDetail | null> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
   meetingsStore.setState({ detailLoading: true, detail: null, error: null })
@@ -116,7 +110,7 @@ export async function loadMeetingDetail(id: string): Promise<MeetingDetail | nul
   }
 }
 
-/** 乐观改名。失败回滚到引擎确认过的标题。 */
+/** Optimistic rename. A failure rolls back to the title the engine confirmed. */
 export async function renameMeeting(id: string, title: string): Promise<MeetingMeta> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
   const current = confirmed.find((meeting) => meeting.meetingId === id)
@@ -141,11 +135,8 @@ export async function renameMeeting(id: string, title: string): Promise<MeetingM
 }
 
 /**
- * 乐观保存笔记。
- *
- * 与 rename 同样的乐观模式，但**不排进 enqueue 串行队列**：笔记是高频写入（见 WorkspacePage 的
- * 防抖），排在写标题的队列后面会互相拖慢；而 MeetingStore.setNotes 自己是原子的（读-改-写 +
- * 与 append/finish 共用同一条写队列），重复写同一个值也是安全的。
+ * The main process's `setNotes` is atomic on its own side, so a repeated value
+ * is safe.
  */
 export async function setMeetingNotes(id: string, notes: string): Promise<MeetingMeta> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
@@ -167,7 +158,7 @@ export async function setMeetingNotes(id: string, notes: string): Promise<Meetin
   }
 }
 
-/** 乐观删除。行先消失，失败再放回来。 */
+/** Optimistic delete. The row goes first and comes back if the write fails. */
 export async function removeMeeting(id: string): Promise<boolean> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
   const record = { id, patch: null }
@@ -182,7 +173,7 @@ export async function removeMeeting(id: string): Promise<boolean> {
         ? confirmed.filter((meeting) => meeting.meetingId !== id)
         : confirmed
       if (removed) {
-        // 详情页展示的正是被删掉的那条，别让用户停在一个已经不存在的东西上。
+        // The detail view is showing the record just deleted; do not strand the user on it.
         if (meetingsStore.getState().detail?.meta.meetingId === id) {
           meetingsStore.setState({ detail: null })
         }
@@ -198,7 +189,7 @@ export async function removeMeeting(id: string): Promise<boolean> {
   })
 }
 
-/** 导出。返回落盘路径，null 表示引擎判定这条记录没有可导出的内容。 */
+/** Export. Returns the written path; null means the user cancelled the save dialog. */
 export async function exportMeeting(id: string, format: ExportFormat): Promise<string | null> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
   meetingsStore.setState({ exporting: true, error: null, exportedPath: null })
@@ -216,16 +207,14 @@ export function clearMeetingsError(): void {
   meetingsStore.setState({ error: null, exportedPath: null })
 }
 
-// -- 注入 ---------------------------------------------------------------------
-
 export function attachMeetingsStore(next: NolaBridge): void {
   bridge = next
   unsubscribe?.()
   unsubscribe = next.events.onEngineEvent((event) => {
-    // 一场同传结束时引擎才补齐 endedAtMs / durationMs，这是列表唯一需要重拉的时刻。
+    // The engine fills in endedAtMs / durationMs only at session end, so this is the one moment to reload.
     if (event.type !== 'sessionStopped') return
     void loadMeetings().catch(() => {
-      // 已经在 state.error 里了，事件回调里再抛一次只会变成 unhandled rejection。
+      // Already in state.error; rethrowing from an event callback is an unhandled rejection.
     })
   })
 }

@@ -1,5 +1,4 @@
 import { modelEngines, type InferenceEngine } from '../../../shared/model-engines'
-/** Shared catalog card. Visuals follow DESIGN v3; state and actions follow the bridge record. */
 
 import type { ReactNode } from 'react'
 import { Button, Card, Chip, ProgressBar, Skeleton } from '@heroui/react'
@@ -12,13 +11,11 @@ import { StatusPill } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import { ModelMark } from './modelBrand'
 
-// -- 纯函数：事实格式化 --------------------------------------------------------
-
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
 
 /**
- * 字节数给人读。数字带单位是 copy 纪律第 7 条：`43 秒` 不是 `43s`，`1.13 GB` 不写 `1.13GB`。
- * 这串是数据不是文案，所以不经过 i18n（i18n 层存的是带中文的句子）。
+ * Byte counts for humans. A space between number and unit keeps the two readable as
+ * separate tokens.
  */
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return `0 ${BYTE_UNITS[0]}`
@@ -32,9 +29,11 @@ export function formatBytes(bytes: number): string {
 }
 
 /**
- * 参数量，从模型标识里读。不是所有模型都有（SenseVoice 这种就没有），读不到就返回 null。
+ * Parameter count read off the model identifier, `null` when the name states none. SenseVoice
+ * states no count, so it is answered with `Small` rather than left blank.
  *
- * 数字前面必须是非字母边界，否则 "M2M100" 会在 "2M" 上就匹配上，报出 2M 而不是 418M。
+ * The digits need a non-alphanumeric boundary before them: without it `M2M100` matches at `2M`
+ * and reports 2M instead of 418M.
  */
 export function paramsOf(record: ResourceRecord): string | null {
   const match = /(?:^|[^0-9A-Za-z])(\d+(?:\.\d+)?)\s?([BM])(?![A-Za-z])/i.exec(record.name) ?? /(\d+(?:\.\d+)?)([bm])/.exec(record.resourceId)
@@ -42,7 +41,7 @@ export function paramsOf(record: ResourceRecord): string | null {
   return `${match[1]}${match[2].toUpperCase()}`
 }
 
-/** 量化档，从模型标识里读。Hy-MT2 三档与 Qwen 的 NF4 都有，m2m100 没有。 */
+/** Quantisation tier read off the model identifier: the three Hy-MT2 tiers, Qwen's NF4. */
 export function quantizationOf(record: ResourceRecord): string | null {
   const id = record.resourceId.toLowerCase()
   if (id.includes('q4-k-m')) return 'Q4_K_M'
@@ -53,7 +52,7 @@ export function quantizationOf(record: ResourceRecord): string | null {
   return null
 }
 
-/** 详情抽屉里用的全部事实。抽成纯函数是为了能单独测。 */
+/** The card's meta line: size first, then parameters and quantisation when the id states them. */
 export function factsOf(record: ResourceRecord): string[] {
   const facts: string[] = [formatBytes(record.downloadBytes ?? record.installedBytes)]
   const params = paramsOf(record)
@@ -63,19 +62,12 @@ export function factsOf(record: ResourceRecord): string[] {
   return facts
 }
 
-// -- 默认模型 -----------------------------------------------------------------
-
 /**
- * 这条记录能不能被设成默认，返回对应的 patch；不能就返回 null。
+ * The settings patch that makes this record the default, or `null` when it cannot be one.
  *
- * **翻译模型不再挑档位，任何已装的翻译模型都有槽位。** 以前这里拿
- * `HYMT2_MODEL_IDS` 过滤，于是 M2M100 能装能跑却没有槽位，「设为默认」只能返回
- * null（给一个按下去会静默失败的按钮比不给按钮更糟）。现在 `translation.localModelId`
- * 是「已安装的本地翻译模型」的裸字符串指针，引擎按 id 路由到对应 loader，
- * 三档 Hy-MT2、M2M100、从 Hub 装的 GGUF 走的是同一条路。
- *
- * 识别模型那边没有这个问题：`recognition.modelId` 的取值由引擎的资源表决定，
- * 目录里认不出来的 id 设下去也加载不了，所以仍按 `RECOGNITION_MODEL_IDS` 过滤。
+ * Any installed translation model qualifies: `translation.localModelId` is a free-form id the
+ * engine routes by id, so the Hy-MT2 tiers, M2M100 and a hub GGUF share one path. Recognition
+ * ids come from the engine's resource table, so one it cannot resolve is rejected here.
  */
 export function defaultTargetOf(record: ResourceRecord): AppSettingsPatch | null {
   const id = record.resourceId
@@ -83,7 +75,7 @@ export function defaultTargetOf(record: ResourceRecord): AppSettingsPatch | null
     if (!isOneOf(id, RECOGNITION_MODEL_IDS)) return null
     return { recognition: { modelId: id as (typeof RECOGNITION_MODEL_IDS)[number] } }
   }
-  // 顺带把 provider 拨到 local：设默认的含义就是"这条就是本地在跑的那一个"。
+  // Also pin provider to 'local': becoming the default means this is the one running locally.
   return { translation: { localModelId: id, provider: 'local' } }
 }
 
@@ -99,24 +91,22 @@ function isOneOf(value: string, allowed: readonly string[]): boolean {
   return allowed.some((item) => item === value)
 }
 
-// -- 组件 ---------------------------------------------------------------------
-
-/** Hub 搜索的结果没有"能不能装"这个字段，所以由上层算好后传进来。 */
+/** Shared catalog card. A `ResourceRecord` carries no verdict field, so installability is the caller's call. */
 export interface ModelCardProps {
   record: ResourceRecord
-  /** 引擎正在 install / remove / cancel 这条记录。 */
+  /** The engine is installing, removing or cancelling this record. */
   busy: boolean
-  /** 当前是否是识别或翻译的默认模型。是了就不给"设为默认"。 */
+  /** Already the default for recognition or translation, which is why no "set default" is offered. */
   isDefault: boolean
-  /** 这条记录能不能被设成默认。不能（例如识别模型认不出的 id）就不给那个按钮。 */
+  /** Whether this record can become the default; when not, that button is left out entirely. */
   canBeDefault: boolean;
-  /** Hub 结果：能不能安装。false 时禁用安装按钮，并把记录自带的理由显示出来。 */
+  /** Hub result: whether it can be installed. False disables the install button. */
   installable?: boolean
   onInstall: () => void
   onCancel: () => void
   onRemove: () => void
   onSetDefault: () => void
-  /** 卡片整体的次级动作（HF 搜索的"查看详情"）。 */
+  /** Secondary action for the whole card (the hub result's "view details"). */
   footer?: ReactNode
   className?: string
   metadata?: ReactNode
@@ -149,9 +139,8 @@ export function ModelCard({
   return (
     <Card className={`models-card h-full ${className}`}>
       {/*
-       * 状态胶囊单独占一行，不跟标题抢宽度。
-       * 之前它们并排，标题被压到只剩 "Qwen3-ASR 1.7B · ..." 这种没法辨认的长度 ——
-       * 卡片上最先要读的就是"这是哪个模型"，状态反而是次要信息。
+       * The status pills get a row of their own rather than sharing the title's width: the model
+       * name is the first thing on the card to be read, and state is the secondary fact.
        */}
       <Card.Header>
         <span className={`models-card__icon models-card__icon--${record.kind === 'recognitionModel' ? 'recognition' : 'translation'}`}>
@@ -206,8 +195,8 @@ function StatePill({ state }: { state: ResourceState }) {
 }
 
 /**
- * 进度条 + 百分比。`phase` 决定百分比按什么算：
- * 排队时引擎还没有进度可言，按 0 呈现；其余按 `progress`。
+ * Progress bar plus percentage. A queued task has no progress to report yet and renders as 0;
+ * everything else uses `progress`, which may arrive as a fraction or already as a percentage.
  */
 function ProgressLine({ record, state }: { record: ResourceRecord; state: ResourceState }) {
   const { t } = useI18n()
@@ -305,8 +294,8 @@ function Actions({
           </Button>
         ) : null}
         {/*
-          移除是 ghost + hover 才浮现 danger 色。整屏红会让"看一眼列表"变成一件紧张的事，
-          而不可逆的那一下用户已经知道是哪一下了（DESIGN 第 8 节 danger 按钮）。
+          Removal stays ghost and only turns danger-coloured on hover: a screen of red buttons
+          makes scanning the list tense, and the irreversible click is already unambiguous.
         */}
         <Button
           variant="ghost"
@@ -339,8 +328,8 @@ function Actions({
 }
 
 /**
- * 骨架。形状必须与真实卡片一致（DESIGN 第 10.3 节），否则加载完成时布局会跳：
- * 图标方块 40px + 两行文字 + 一条按钮。
+ * Skeleton. Its geometry has to match the real card or the layout jumps when data lands: a 56px
+ * icon block, four text lines, then a full-width button.
  */
 export function ModelCardSkeleton({ withDetails = false }: { withDetails?: boolean }) {
   return (

@@ -13,7 +13,8 @@ export function modelStorageEnvironment(dataRoot: string, configuredPath = ''): 
     TMP: join(root, 'cache', 'tmp'),
     TEMP: join(root, 'cache', 'tmp'),
     TMPDIR: join(root, 'cache', 'tmp'),
-    // Models arrive through the app's own download manager, so loading is forced offline and must never fall back to the network.
+    // Belt-and-braces with the engine's `local_files_only=True`: a model that
+    // is not on disk must fail rather than silently pull from the network.
     HF_HUB_OFFLINE: '1',
     TRANSFORMERS_OFFLINE: '1',
   }

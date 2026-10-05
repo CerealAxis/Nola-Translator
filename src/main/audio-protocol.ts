@@ -8,22 +8,18 @@ import type { MeetingStore } from './meeting-store'
 
 export const MEETING_AUDIO_SCHEME = 'nola-audio'
 /**
- * 地址形状是 `nola-audio://local/<meetingId>/audio.wav`：**`local` 是 host，不在 pathname 里。**
+ * URL shape is `nola-audio://local/<meetingId>/audio.wav` — `local` is the HOST, not part of
+ * the pathname. The scheme is registered `standard: true`, so the WHATWG parser splits the
+ * authority by http rules and the host must be compared separately.
  *
- * 这个 scheme 注册成了 `standard: true`，所以 Chromium / WHATWG 解析器会照 http 那套拆
- * authority：`new URL('nola-audio://local/abc/audio.wav').host === 'local'`、
- * `.pathname === '/abc/audio.wav'`。原来那条正则去 pathname 里找 `/local/`，**永远匹配不上**，
- * 于是每个请求都落到 404 分支。host 必须单独比。
- *
- * **这条正则不是路径穿越的防线，防线在 `MeetingStore.audioPathFor`。** WHATWG 解析器会先
- * 归一化 `..`：`nola-audio://local/../../secrets/audio.wav` 到这里已经变成
- * `/secrets/audio.wav`，正则是能匹配的。真正拦住它的是 `audioPathFor` 只认 `cache` 里
- * 真实存在的会议 id（不是拿不可信输入去 join 路径）。这两处是纵深，不是二选一。
+ * This regex is not the path-traversal defence; `MeetingStore.audioPathFor` is. The parser
+ * normalises `..` away before the regex ever sees the path, so the defence is that only a
+ * meeting id actually present in the cache resolves to a file.
  */
 const MEETING_AUDIO_HOST = 'local'
 const MEETING_AUDIO_PATH = /^\/([0-9A-Za-z-]{1,64})\/audio\.wav$/
 
-/** 从请求 URL 里取出会议 id。任何形状不对都返回 null。 */
+/** Extracts the meeting id from a request URL. Any unexpected shape yields null. */
 function meetingIdOf(requestUrl: string): string | null {
   let url: URL
   try {
@@ -36,9 +32,9 @@ function meetingIdOf(requestUrl: string): string | null {
   return match ? match[1] : null
 }
 
-// The detail page needs an <audio src>, and a file:// URL would be blocked by the renderer's
-// context isolation. The scheme has to be declared before the app is ready to become standard,
-// otherwise Chromium treats it as an opaque origin and refuses to seek.
+// The detail page needs an <audio src>. The scheme must be declared before the app is
+// ready to become standard, otherwise Chromium treats it as an opaque origin and
+// refuses to seek.
 export function registerMeetingAudioScheme(): void {
   protocol.registerSchemesAsPrivileged([
     {

@@ -10,10 +10,6 @@ import {
   meetingTitleFor,
 } from '../../../src/renderer/meeting-format'
 
-/*
- * 被测对象从 `src/renderer/components/meeting-format.ts` 搬到了 `src/renderer/meeting-format.ts`
- * （旧 UI 整体删除时那一份跟着删了，逻辑逐字搬过来）。断言本身不变。
- */
 
 function meeting(patch: Partial<MeetingMeta> = {}): MeetingMeta {
   return {
@@ -31,9 +27,9 @@ function meeting(patch: Partial<MeetingMeta> = {}): MeetingMeta {
 }
 
 /**
- * 站位 i18n 函数。**用真实的 `translate`**，不再自己插值 ——
- * 时长文案现在是词典里的键（`homeRecordsUi.durationMinutes`），一个只会替换
- * `{占位符}` 的假 `t` 会把键原样返回，断言全部落空。
+ * The real `translate`, not a local stub: the duration text is a dictionary key
+ * (`homeRecordsUi.durationMinutes`), and a `t` that only substitutes `{placeholders}`
+ * would return the key verbatim and make every assertion below vacuous.
  */
 const t = (key: string, values?: Record<string, string | number>) =>
   translate(key, 'zh-CN', values)
@@ -62,11 +58,12 @@ describe('会议展示格式', () => {
   })
 
   /*
-   * 时长读的是 `durationMs`（主进程算好的**内容跨度**），不再用 `endedAtMs - startedAtMs`
-   * 重算一遍 —— 那条式子把引擎卸载权重的收尾时间也算进去了，每场虚高 16 秒到 5 分钟。
+   * A finished meeting reads `durationMs`, the main process's content span; recomputing
+   * `endedAtMs - startedAtMs` folds in unloading the weights, measured at 25-60s per
+   * meeting.
    *
-   * 这里刻意让两个值**不一致**（`endedAtMs` 多给 30 秒），断言才真的锁住新口径：
-   * 哪天有人改回重算，这几个断言会立刻红，而不是又悄悄显示一个偏大的数字。
+   * The fixture makes the two disagree by 30s on purpose, so an assertion that recomputes
+   * turns red instead of quietly showing a longer number.
    */
   it('会议时长按分钟/小时折算, 不足一分钟按一分钟', () => {
     const base = new Date(2026, 8, 29, 22, 0, 0).getTime()

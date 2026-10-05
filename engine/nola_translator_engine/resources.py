@@ -70,10 +70,9 @@ class ResourceOperationCancelled(RuntimeError):
 class ResourceDefinition:
     resource_id: str
     kind: Literal["recognitionModel", "translationModel"]
-    # The provider tag is free-form: it names a loader, and a loader set that grows with the
-    # runtime registry must not need this annotation widened by hand each time. (It also used to
-    # read Literal[..., "hy-mt2", ...] while the definitions below wrote "hymt2", so the
-    # annotation already disagreed with every value it claimed to allow.)
+    # Free-form, because a hub-installed model passes its adapter id straight through: the
+    # built-ins below write `qwen3-asr`/`sensevoice`/`hymt2`/`m2m100`, and `llama.cpp` joins them
+    # for a GGUF installed from the hub.
     provider: str
     name: str
     description: str
@@ -220,10 +219,6 @@ class ResourceManager:
 
     def translation_gguf_path(self, resource_id: str) -> Path:
         """Absolute path of the single GGUF a llama.cpp translation resource loads.
-
-        Generic over ``resource_id`` rather than over the Hy-MT2 tiers, because a GGUF the user
-        installed from the hub is served by the same llama-server and the only thing that differs
-        is which file sits in the snapshot.
         """
         spec = self._spec(resource_id)
         ggufs = [entry for entry in spec.files if entry.path.casefold().endswith(".gguf")]
@@ -238,8 +233,7 @@ class ResourceManager:
     def adapter_for(self, resource_id: str) -> str | None:
         """The runtime adapter id a resource is loaded by, or ``None`` for a built-in id.
 
-        The loader used to be chosen by comparing the id against a hardcoded list, which cannot
-        see a model the user installed. Everything downstream now asks here instead, so a
+        Everything downstream now asks here instead, so a
         self-installed repo is dispatched by the adapter its own metadata selected.
         """
         entry = self.registry.get(resource_id)
@@ -462,9 +456,6 @@ class ResourceManager:
             "recognitionModel" if entry.slot == "recognition" else "translationModel"
         )
         if entry.adapter_id == "llama.cpp":
-            # Spelled out rather than left implicit: the llama-server path in this engine is
-            # Hy-MT2's translation prompt and language table, and a user who installed their own
-            # GGUF deserves to know that is what will be talking to it.
             description = (
                 f"自 Hugging Face 安装：{entry.repo}，由 {label} 运行。"
                 "注意：内置 llama-server 使用 Hy-MT2 的翻译提示词与语言表，"
@@ -479,7 +470,7 @@ class ResourceManager:
             name=entry.name,
             description=description,
             # A resource record carries at most 16 language codes, and the adapter tables run
-            # longer (Hy-MT2 declares 39). The registry keeps the full list; the record shows a
+            # longer (Hy-MT2 declares 38). The registry keeps the full list; the record shows a
             # prefix of it. Session-time language validation still runs against the provider's
             # own table, so a truncated display list never becomes a false rejection.
             languages=entry.languages[:16],

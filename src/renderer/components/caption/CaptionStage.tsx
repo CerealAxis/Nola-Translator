@@ -1,17 +1,10 @@
 /**
- * 字幕区。同传进行中的主视图，**DESIGN 第 13 节原创方向 A（阅读优先）与 B（焦点跟随）的落点**。
- *
- * 为什么不用记录详情那套 `DualColumnView`：那一屏的两栏**各自独立滚动**（读者在回看历史，
- * 需要自己控制位置）；工作台的字幕区必须**实时焦点跟随**（眼睛钉在屏幕中下部，新句自己滚进来）。
- * 两种滚动行为放在一个组件里会互相打架，所以工作台有自己的 `CaptionStage`。
- *
- * 两种版式：
- * - `split` 分区对照：每句一段，两栏并排，共用 `.nola-baseline-pair` 的共享基线网格，
- *   跨中间那条 1px 分隔线逐行对齐（DESIGN 第 13.A 节，本项目与参考实现最主要的差异）。
- * - `sentence` 逐句对照：一句一块，原文在上译文在下，行宽由 `.nola-measure` 锁在 34em。
- *
- * 滚动行为：只在用户还贴在底部时自动跟随。用户往上翻看历史时**不抢滚动位置**，
- * 他滚回底部才恢复跟随（`stickToBottom`）。抢位置是实时字幕界面最招人烦的行为。
+ * Live caption area for an in-progress session. Not the record detail's
+ * `DualColumnView`: that screen scrolls each column independently so the reader can
+ * revisit history, while this one follows the newest line. `split` pairs the
+ * languages on a shared baseline grid so the divider lands between matching lines;
+ * `sentence` stacks each pair at a 34em measure. Auto-scroll follows only while the
+ * reader is at the bottom, and never while paused.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -28,47 +21,43 @@ export type CaptionDisplayMode = 'both' | 'source' | 'translation'
 
 export interface CaptionStageProps {
   segments: readonly CaptionSegment[]
-  /** 当前未确认句段。引擎总是先改写最后一句，所以同一时刻最多一条。 */
+  /** Unconfirmed segment. The engine always revises the last one, so there is at most one. */
   interim: CaptionSegment | null
   layout?: CaptionLayout
   displayMode?: CaptionDisplayMode
   fontSize?: number
-  /** 暂停态：整块降对比度，且不再跟随滚动。 */
+  /** Paused: the whole block dims and stops following the scroll. */
   paused?: boolean
-  /** 空态内容（工作台与悬浮窗给的文案不同）。 */
+  /** Empty-state content; the workspace and the overlay pass different copy. */
   emptyState?: ReactNode
   className?: string
-  /** 工作台带时间列；独立浮窗继续使用紧凑字幕。 */
+  /** The workspace shows timestamps; the floating window keeps the compact caption. */
   showTimestamps?: boolean
 }
 
-/** 距底部多少像素以内算"还贴着底部"。32px 是一行正文的高度量级。 */
+/** Pixels from the bottom that still count as "at the bottom", about one line of body text. */
 export const STICK_SLACK_PX = 32
 
 /**
- * 是否仍贴在底部。**纯函数，独立可测。**
- *
- * 真实浏览器里 `scrollHeight - clientHeight` 才是可滚动距离；jsdom 不做布局，三个值都是 0，
- * 所以这个函数是测试里唯一能确定地断言的滚动决策点。
+ * Whether the view is still at the bottom. Pure, and therefore directly testable: jsdom
+ * does no layout and reports all three values as 0, which makes this the only scroll
+ * decision a test can assert deterministically.
  */
 export function isStuckToBottom(scrollTop: number, scrollHeight: number, clientHeight: number, slack = STICK_SLACK_PX): boolean {
   const distance = scrollHeight - clientHeight - scrollTop
   return distance <= slack
 }
 
-/** 已确认句段里第一条 completed 的译文。pending / failed 都返回空串：宁可这一栏空着，也不显示占位符。 */
+/** First completed translation; pending and failed return empty rather than a placeholder. */
 export function translationOf(segment: CaptionSegment): string {
   return segment.translations.find((item) => item.state === 'complete')?.text ?? ''
 }
 
 /**
- * 这一栏该显示的译文：**先要真译文，没有才显示失败原因**。
+ * The translation column: a real translation when there is one, the failure reason
+ * otherwise.
  *
- * 旧工作台与旧浮窗都只画 `complete`，于是「翻译模型没装 / key 过期 / 断网」与
- * 「还在翻译」在屏幕上完全一样 —— 都是空白。空白不给用户任何可行动的信息。
- * 这里把失败原因当成译文栏的文字画出来，用户一眼就知道是配置问题还是网络问题。
- *
- * **纯函数，不碰 i18n**（传入的 `translate` 决定语言），所以独立可测。
+ * Pure and i18n-free: the caller's `translate` decides the language.
  */
 export function translationTextOf(
   segment: CaptionSegment,
@@ -91,7 +80,7 @@ export function CaptionStage({
   const { t } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickRef = useRef(true)
-  /** 已经播过入场动效的最后一个句段 id。用 ref 而不是 state 是为了 StrictMode 双跑时不重复播。 */
+  /** Last segment to have played its entrance; a ref so StrictMode's double run cannot replay it. */
   const enteredRef = useRef<string | null>(null)
   const [enteringId, setEnteringId] = useState<string | null>(null)
 
@@ -105,7 +94,7 @@ export function CaptionStage({
     setEnteringId(lastId)
   }, [lastId])
 
-  // 焦点跟随：新句到了就滚到底部。暂停时不滚（表停了，眼也别被拽着走）。
+  // Follow the newest line. Paused means the table stopped, so the eye should not be dragged along.
   useEffect(() => {
     if (paused) return
     const element = scrollRef.current
@@ -119,8 +108,8 @@ export function CaptionStage({
     stickRef.current = isStuckToBottom(element.scrollTop, element.scrollHeight, element.clientHeight)
   }
 
-  // 句段数组加上未确认句段，就是"视线应该落在哪"的完整序列：
-  // interim 在最后，因此 distance 为 0，但它走 interim 那一套静态表达，不挂指示条。
+  // These rows are where the eye belongs: the segments plus the interim one. Interim sits
+  // last, so its distance is 0, but it renders statically and gets no indicator bar.
   const rows: Array<{ segment: CaptionSegment; distance: number; interim: boolean }> = []
   segments.forEach((segment, index) => {
     rows.push({ segment, distance: segments.length - 1 - index + (interim ? 1 : 0), interim: false })
@@ -128,9 +117,9 @@ export function CaptionStage({
   if (interim) rows.push({ segment: interim, distance: 0, interim: true })
 
   const hasRows = rows.length > 0
-  // 共享基线：--nola-baseline 必须跟随字号，否则 A+ 之后两栏的基线网格会与实际行高脱节。
+  // The shared baseline must follow the type size, or the grid desyncs from the line height above A+.
   const baselineStyle = { '--nola-baseline': `${(fontSize * 1.65).toFixed(2)}px` } as CSSProperties
-  /** 译文失败原因（多条失败用「；」连接）。没有失败时返回空串，译文栏就保持空白。 */
+  /** Failure reasons joined with ";"; empty when there are none, which leaves the column blank. */
   const failureText = (segment: CaptionSegment): string => translationErrorSummary(t, segment)
 
   return (
@@ -171,10 +160,9 @@ export function CaptionStage({
 }
 
 /**
- * 一个句段在当前版式下的排布。
- *
- * 分区对照时它就是 `.nola-baseline-pair` 本身（两个单元格 + 中间那条分隔线）；
- * 逐句对照时是一个上下堆叠的块，原文与译文共享同一个 `distance`，所以整句一起衰减。
+ * One segment under the current layout: the baseline pair itself in `split`, and a
+ * stacked block in `sentence`, where source and translation share a distance so the
+ * sentence dims as a unit.
  */
 function Block({
   segment,

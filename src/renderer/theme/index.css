@@ -1,28 +1,13 @@
 /* =============================================================================
-   Nola Translator — Theme layer
-   -----------------------------------------------------------------------------
-   This is the ONLY stylesheet components import. Integration point, consumed by
-   the orchestrator's src/index.css as the third import:
+   The only stylesheet features import. Consumed as the third import of
+   `src/renderer/index.css`, after `tailwindcss` and `@heroui/styles`.
 
-       @import "tailwindcss";
-       @import "@heroui/styles";
-       @import "./theme/index.css";
-
-   The first two imports are load-bearing in that order and are NOT ours to
-   write: @heroui/styles layers itself into `base`, and Tailwind's preflight
-   must land first.
-
-   ============================ WHY `base`, NOT `theme` ======================
-   Tailwind v4's layer order is  theme < base < components < utilities,
-   and a later layer always beats an earlier one regardless of specificity.
-   HeroUI declares its colour primitives (`--accent`, `--radius`, ...) inside
-   `@layer base`. If we imported our colour overrides into `theme`, they would
-   sit BELOW HeroUI's `base` layer and every one of them would be silently
-   dropped. So the colour themes, the global tokens and typography all go in
-   `base` — same layer as HeroUI but later in source order, which is what makes
-   our values win. Semantic component classes go in `components` and the
-   stacking classes go in `utilities`, so Tailwind utilities can always
-   override them.
+   Everything here goes in `@layer base`, not `theme`: HeroUI declares its own
+   colour primitives (`--accent`, `--radius`, ...) inside `base`, so values of
+   ours imported into `theme` would sit below them and be silently dropped. The
+   same layer plus a later source position is what makes ours win. Semantic
+   component classes go in `components` and the stacking classes in `utilities`,
+   so Tailwind utilities can still override them.
    ========================================================================== */
 
 @layer theme, base, components, utilities;
@@ -31,31 +16,23 @@
 @import './nola-dark.css' layer(base);
 @import './typography.css' layer(base);
 @import './motion.css' layer(base);
-/*
- * 浮窗玻璃壳**刻意不带 layer**。它是压在别人画面上的独立窗口，控件又大量使用
- * HeroUI 组件（`Button` / `Dropdown.Trigger`），而 HeroUI 的 `.button` 自带
- * color / background / width / border-radius。一旦这条也进 `@layer components`，
- * 双方就只能比源码顺序，"改了个数字却不生效"会完全取决于 @import 排列。
- * 无层声明压过所有层，这条才稳得住。
- */
 @import './caption-card.css';
 @import './z-index.css' layer(utilities);
 
 /* =============================================================================
    GLOBAL NON-COLOUR TOKENS — shared by both themes.
-   Anything that differs between light and dark lives in nola-light/nola-dark
-   and must NOT be duplicated here.
+   Anything that differs between light and dark lives in nola-light/nola-dark.
    ========================================================================== */
 
 @layer base {
   :root {
     /* --- Font families -------------------------------------------------------
-       按 DESIGN.md 第 2.1 节定义。必须先定义字体族变量，后续字阶才能引用。 */
+       Per DESIGN.md §8.2. Defined before the scale below, which references them. */
     --font-ui: "Segoe UI Variable Text", "Microsoft YaHei UI", "PingFang SC", system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-mono: "Cascadia Mono", "SF Mono", Consolas, ui-monospace, monospace;
 
     /* --- Typography scale ----------------------------------------------------
-       按 DESIGN.md 第 2.2 节字阶表定义。8 档，display 到 label。
+       Per DESIGN.md §8.2. 8 steps, display to label.
        CSS shorthand: font-weight size/line-height family */
     --font-display: 600 48px/1.2 var(--font-ui);
     --font-h1: 600 32px/1.25 var(--font-ui);
@@ -67,7 +44,7 @@
     --font-label: 500 12px/1.4 var(--font-ui);
 
     /* --- Spacing scale -------------------------------------------------------
-       按 DESIGN.md 第 3 节定义。8 档间距，基数 8px。 */
+       Per DESIGN.md §8.3. 8 steps on an 8px base. */
     --space-1: 8px;
     --space-2: 16px;
     --space-3: 24px;
@@ -78,7 +55,7 @@
     --space-8: 80px;
 
     /* --- Radius scale --------------------------------------------------------
-       按 DESIGN.md 第 4 节定义。6 档圆角。 */
+       Per DESIGN.md §8.3. */
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
@@ -87,15 +64,15 @@
     --radius-full: 9999px;
 
     /* --- Shadow scale --------------------------------------------------------
-       按 DESIGN.md 第 5 节定义。3 档投影，浅色模式用 slate-900 (15, 23, 42) 作基准。
-       深色模式投影透明度减半，定义在 .dark 规则块里。 */
+       Per DESIGN.md §8.3. Light mode is based on slate-900 (15, 23, 42). */
     --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.1), 0 2px 4px -1px rgba(15, 23, 42, 0.06);
     --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -2px rgba(15, 23, 42, 0.05);
 
-    /* HeroUI radius and v3 shell geometry have one definition in app.css. */
+    /* HeroUI radius and the v3 shell geometry are defined in app.css, which is
+       imported after this file. */
 
-    /* 保留旧 token 名称以兼容现有组件，但映射到新间距系统 */
+    /* Legacy spacing names, kept as aliases of the scale above. */
     --nola-space-1: var(--space-1);
     --nola-space-2: var(--space-2);
     --nola-space-3: var(--space-3);
@@ -105,14 +82,14 @@
     --nola-space-7: var(--space-7);
     --nola-space-8: var(--space-8);
 
-    /* 保留旧圆角 token 名称 */
+    /* Legacy radius names. Nothing in the renderer reads them. */
     --nola-r-sm: var(--radius-sm);
     --nola-r-md: var(--radius-md);
     --nola-r-lg: var(--radius-lg);
     --nola-r-pill: var(--radius-full);
   }
 
-  /* 深色模式投影：透明度减半 */
+  /* Dark mode halves the shadow alpha and keeps the geometry. */
   .dark,
   [data-theme='dark'] {
     --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.025);
@@ -130,9 +107,6 @@
    ========================================================================== */
 
 @layer components {
-  /* --- Containers ----------------------------------------------------------
-     Cards use a restrained tinted shadow and a 1px semantic border. */
-
   .nola-card {
     background-color: var(--surface);
     color: var(--surface-foreground);
@@ -149,10 +123,8 @@
     box-shadow: var(--surface-shadow);
   }
 
-  /* --- List ----------------------------------------------------------------
-     ONE container, hairline dividers between rows. Wrapping every row in its
-     own card is the anti-pattern this class exists to prevent: N cards means N
-     borders and a wall of boxes instead of one readable record set. */
+  /* One container with hairline dividers between rows. Giving every row its own
+     card means N borders and a wall of boxes instead of a readable set. */
 
   .nola-list {
     background-color: var(--surface);
@@ -166,9 +138,8 @@
     border-top: 1px solid var(--separator);
   }
 
-  /* --- Scrollbar -----------------------------------------------------------
-     Fallback for Tailwind's scrollbar-thin. Uses standard scrollbar-color plus
-     the WebKit pseudo-elements, so it is honoured in Electron on both paths. */
+  /* Fallback for Tailwind's scrollbar-thin: the standard scrollbar-color plus the
+     WebKit pseudo-elements, so Electron honours both paths. */
 
   .nola-scrollbar {
     scrollbar-width: thin;
@@ -196,35 +167,30 @@
     background-color: color-mix(in oklch, var(--foreground) 34%, transparent);
   }
 
-  /* --- Electron frameless window ------------------------------------------- */
-
   .nola-drag {
     -webkit-app-region: drag;
   }
 
-  /* Any interactive child of a drag region MUST opt back out, otherwise the
-     button inside the titlebar becomes undraggable and unclickable. */
+  /* An interactive child of a drag region must opt back out, or the drag region
+     swallows it and the control cannot be clicked. */
   .nola-no-drag {
     -webkit-app-region: no-drag;
   }
 
-  /* --- Measure -------------------------------------------------------------
-     Caption line length. 34em at 14px is ~32-42 Han characters per line, the
-     comfortable reading window for CJK. Long transcription lines MUST use this
-     or they run the full window width and become unreadable. */
+  /* Reading measure for transcript lines. 34em at 14px is ~32-42 Han characters
+     per line, the comfortable reading window for CJK; without it a long
+     transcription line runs the full window width. */
 
   .nola-measure {
     max-width: 34em;
   }
 
-  /* --- Shared baseline pair ------------------------------------------------
-     The two-column transcript (source | translation). The whole point of this
-     class is that the two columns share ONE baseline grid so row N of the left
-     column lines up with row N of the right column across the divider.
-     It works by forcing an identical, unitless-free line box on both sides and
-     pinning each row to a whole multiple of that line box. */
+  /* The two-column transcript (source | translation). Row N of the left column
+     has to line up with row N of the right one across the divider, so both sides
+     are forced onto one identical line box and each row is pinned to a whole
+     multiple of it. */
   .nola-baseline-pair {
-    --nola-baseline: 23.1px; /* 14px x 1.65 — keep in sync with typography.css */
+    --nola-baseline: 23.1px;
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-items: stretch;
@@ -247,60 +213,37 @@
 }
 
 @layer utilities {
-  /* --- HeroUI 覆写：dropdown 触发器必须是 flex ---------------------------------
-   *
-   * HeroUI 把 `.dropdown__trigger` 定成 `display: inline-block`。这对纯文字触发器
-   * 没问题，但触发器里一旦放了「图标 + 文字 + 箭头」这种多子元素的组合：
-   *
-   *   1. 子元素是行内盒，`max-w-*` 完全不生效（max-width 不作用于 inline）；
-   *   2. `truncate` 同样失效（它需要 overflow:hidden + 非 inline）；
-   *   3. 文字不被截断，胶囊撑破容器，图标和箭头被挤到别的行上。
-   *
-   * 改成 inline-flex 后三件事一起解决：子元素排成一行、max-width 生效、
-   * truncate 生效。纯文字触发器在 inline-flex 下渲染结果不变，所以这个覆写是安全的。
-   *
-   * 放在 utilities 层是因为 Tailwind v4 的层序是 theme < base < components < utilities，
-   * 后写的层赢。B1 记录过同一个坑：`.nola-*` 字阶类在 base 层，压不住 components 层的
-   * `.button`，所以在 HeroUI 原子上压样式一律用 utilities 的任意值工具类。 */
+  /* HeroUI types `.dropdown__trigger` as `display: inline-block`, which is fine
+     until the trigger holds more than text: a multi-child trigger then lays out
+     as inline boxes, where `max-w-*` does not apply and `truncate` cannot work, so
+     the capsule overflows its container and pushes the icon and arrow onto other
+     lines. `inline-flex` fixes all three at once and leaves a text-only trigger
+     rendering identically. */
   .dropdown__trigger {
     display: inline-flex;
   }
 
-  /* --- 表单字段：1px 描边 + 单圈焦点 -----------------------------------------
+  /*
+   * Every field box gets `border-width: var(--border-width-field)`, and HeroUI
+   * resolves that to `--field-border-width`, whose default is 0px — so the
+   * hairline has to be stated explicitly rather than inherited.
    *
-   * ① 描边宽度钉死 1px。HeroUI 每个字段盒都写 `border-width: var(--border-width-field)`，
-   *    而它自己把该变量定义为 `--border-width-field: var(--field-border-width, var(--border-width))`，
-   *    `--field-border-width` 的默认值是 **0px**。所以这条声明是**合法的**，计算值就是 0：
-   *    HeroUI 字段默认无描边，靠底色和 focus ring 表达边界。本项目要的是 1px 发丝线，
-   *    所以这里显式写一次，把 0 覆盖成 1。
+   * `.search-field__group`, not `.search-field`, is the bordered box: the root is
+   * only the `flex flex-col` shell, and `SearchField.Group` has to be written out
+   * or the icon and the input land in the shell and wrap.
    *
-   * ② SearchField 的选择器是 `.__group`，不是根节点。根 `.search-field` 只是
-   *    `flex flex-col` 的外壳（label / group / description 竖排），真正那个有边框、
-   *    有底色、`h-9` 的盒子是 `.search-field__group`（`inline-flex items-center`）。
-   *    `SearchField.Group` 组件**必须显式写**，HeroUI 不会自动生成——漏掉它，
-   *    SearchIcon 和 Input 就直接落进 `flex-col` 外壳里，图标一行、输入框换行。
+   * Focus is the 1px border alone. HeroUI also applies `status-focused-field`, a
+   * 2px box-shadow ring, so that is cleared; its offset is zeroed by
+   * `--ring-offset-width` and the border colour comes from
+   * `--field-border-focus`, both set in nola-light/nola-dark.css.
    *
-   * ③ 聚焦态只留一圈 1px 描边，`box-shadow` 与 `outline` 全部清掉。
-   *    HeroUI 的字段盒在聚焦时同时做两件事：`border-color: var(--field-border-focus)`
-   *    （我们要的那圈 1px）和 `box-shadow` 画一圈 2px 的 `status-focused-field` 环。
-   *    焦点只由 1px 描边表达，所以用 `box-shadow: none` 去掉环。环的偏移由主题 token
-   *    `--ring-offset-width: 0px` 归零、描边色由 `--field-border-focus: var(--accent)`
-   *    提供，两者都在 nola-light/nola-dark.css。`outline: none` 是兜底：HeroUI 组件层
-   *    已写 `outline-none`，这里保证漏网的 UA 焦点环也不会出现。
+   * `:not([data-invalid='true'])` is load-bearing: HeroUI's `invalid-field-ring`
+   * is an `outline-1 outline-danger` when unfocused and a `ring-2` box-shadow
+   * when focused, and clearing both would leave an invalid field with no
+   * indication at all.
    *
-   *    ⚠️ 不要再走"在 utilities 层写 `outline: none` 去压 `:focus-visible`"这条路。
-   *    **无层声明的优先级高于所有 `@layer`**（与特异性无关），src/index.css 里那条
-   *    全局 `:focus-visible` 因此压得住这里、也压得住 HeroUI 组件层，怎么在本层加
-   *    特异性都赢不了。真正的修复是删掉那条无层规则，不是加选择器。
-   *
-   * ④ `:not([data-invalid='true'])` 不是可选的：HeroUI 的 `invalid-field-ring`
-   *    聚焦时靠 `ring-2 ring-danger` 画红框，ring 就是 box-shadow；未聚焦时靠
-   *    `outline-1 outline-danger`。一起干掉的话，**错误字段会彻底没有任何提示**。
-   *
-   * 覆盖的是本项目真正在用的那五个字段类：Input / TextArea / SearchField.Group /
-   * InputGroup / Select。放在 utilities 层是因为 Tailwind v4 层序
-   * theme < base < components < utilities，后写的层赢 —— 同 .dropdown__trigger，
-   * 在 HeroUI 原子上压样式一律走这一层。 */
+   * Covers the five field classes actually in use: Input / TextArea /
+   * SearchField.Group / InputGroup / Select. */
   .input,
   .textarea,
   .search-field__group,

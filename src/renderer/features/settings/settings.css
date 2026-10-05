@@ -31,7 +31,7 @@
 .settings-row__control > .select, .settings-row__control > .text-field, .settings-row__control > .input-group, .settings-row__control > .meter { width:100%; min-width:0; }
 .settings-row__control .select__trigger { width:100%; border-radius:10px; min-width:0; min-height:36px; }
 .settings-row__control .button { border-radius:10px; }
-/* 颜色、圆角、高度统一交给 .nola-segmented（theme/app.css 末尾），这里只管排版。 */
+/* Colour, radius and height come from .nola-segmented in theme/app.css; this only controls width. */
 .settings-row__control .nola-segmented { width:100%; }
 .settings-row__control .toggle-button { flex:1; }
 .settings-slider { display:flex; align-items:center; gap:12px; width:100%; min-width:0; }

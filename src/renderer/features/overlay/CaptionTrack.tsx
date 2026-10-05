@@ -1,18 +1,22 @@
 /**
- * 一条字幕轨道。**从主仓 `src/renderer/overlay/CaptionTrack.tsx` 逐字移植**（只改了
- * class 名与 CSS 变量名以对齐本项目的 `nola-` 约定，几何与动效一字未动）。
+ * One caption track.
  *
- * 两种排版模式：
- *   · `rolling`（主仓叫"分区对照"）——所有句子折成**一条连续文本流**，从顶部填满后
- *     继续向上滚。只放得下一行的轨道，每来一次修订就把那一行滑出去；更高的轨道则
- *     在文本块超出可视高度时自然丢掉顶部的行。
- *   · `sentence`（主仓叫"逐句对照"）——每句各自成块，新句把上一句往下推，轨道不滚。
+ * Two layout modes:
+ *   · `rolling` — every sentence folds into one continuous stream that fills
+ *     from the top and scrolls upward. A track one line high slides each
+ *     revision out; a taller one drops lines off the top once the block exceeds
+ *     the visible height.
+ *   · `sentence` — each sentence is its own block and pushes the previous one
+ *     down; the track does not scroll.
  *
- * 折叠逻辑（`mergeLine`）是这个组件的实质：引擎对同一句话会连续修订若干次，若每次
- * 都追加一段，字幕就会一遍遍重复自己。判定分三种：
- *   1. 同一个 segmentId → 就地替换（修订）
- *   2. 换了 id 但开头 16 字以上相同、长度差不超过一半 → 也是修订（引擎偶尔换 id 重发）
- *   3. 其余 → 下一句，只追加它**没有重复说**的那部分
+ * The folding in `mergeLine` is the substance of this component: the engine
+ * revises one sentence several times in a row, so appending each revision would
+ * make the captions repeat themselves. Three cases:
+ *   1. same segmentId → replace in place
+ *   2. different id but the first 16+ characters match and the lengths differ by
+ *      less than half → also a revision (the engine sometimes re-sends under a
+ *      new id)
+ *   3. otherwise → a new sentence; append only the part it has not said yet
  */
 
 import { useLayoutEffect, useRef, useState } from 'react'
@@ -20,21 +24,22 @@ import type { CSSProperties } from 'react'
 
 export type TrackLine = { key: string; text: string }
 
-/** 已经滚出视口很远、留着只会让 DOM 无限增长的句子，攒够就从头丢。 */
+/** Sentences that have scrolled far out of view; dropped in bulk so the DOM cannot grow without bound. */
 const MAX_ENTRIES = 40
 
 /*
- * CJK 与全角标点。用 `\uXXXX` 转义而不是直接写字符：`scripts/check-guardrails.mjs`
- * 的 `no-hardcoded-cjk` 判的是"组件里有没有中文字面量"，字面量写出来的字符类会
- * 被它当成界面文案报错。转义之后正则语义一模一样。
+ * CJK and full-width punctuation, written as \uXXXX escapes rather than literal
+ * characters: `scripts/check-guardrails.mjs` `no-hardcoded-cjk` flags CJK
+ * literals in components, and a character class written out would be read as UI
+ * copy. The escapes match the same set.
  */
 const CJK = /[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/
 
-/** 屏幕上那句话的修订，开头总是一样；下一句则不会。 */
+/** A revision of the on-screen sentence always starts alike; the next sentence does not. */
 const MIN_REVISION_PREFIX = 16
-/** 跨句的修订长度相近；真正的新句子没有这种牵连。 */
+/** A revision stays close in length to its predecessor; a genuinely new sentence does not. */
 const REVISION_LENGTH_RATIO = 0.5
-/** 相邻两句最多只共用这么长的一段接缝，所以搜索范围有界。 */
+/** Adjacent sentences share at most this much seam, so the search stays bounded. */
 const MAX_SEAM = 160
 
 function sharedPrefix(a: string, b: string): number {
@@ -52,9 +57,7 @@ function seamOverlap(previous: string, next: string): number {
   return 0
 }
 
-/**
- * 把一句折进文本流。详见文件头。
- */
+/** Folds a sentence into the stream. See the file header for the three cases. */
 function mergeLine(stream: TrackLine[], line: TrackLine): TrackLine[] {
   const last = stream[stream.length - 1]
   if (!last) return [line]
@@ -67,15 +70,16 @@ function mergeLine(stream: TrackLine[], line: TrackLine): TrackLine[] {
     return [...stream.slice(0, -1), { key: line.key, text: line.text }]
   }
   /*
-   * 切点落在接缝中间，所以剩下的部分通常以空白开头，而渲染层会在接缝处自己插一个
-   * 分隔符 —— 不去掉这个空白，每个句子的边界都会显示成两个空格。
+   * The cut lands inside the seam, so the remainder usually starts with
+   * whitespace while the renderer inserts its own separator at the seam —
+   * without this trim every boundary would render as two spaces.
    */
   const fresh = line.text.slice(seamOverlap(last.text, line.text)).trim()
   if (!fresh) return stream
   return [...stream, { key: line.key, text: fresh }].slice(-MAX_ENTRIES)
 }
 
-/** 句子连成一段；只有拉丁文字需要在接缝处补空格。 */
+/** Only Latin text needs a space inserted at the seam. */
 function seamNeedsSpace(previous: string, next: string): boolean {
   return !(CJK.test(previous.slice(-1)) && CJK.test(next.slice(0, 1)))
 }
@@ -104,12 +108,14 @@ export function CaptionTrack({
     setEntries(next)
   }
   /*
-   * `mergeLine` 不是幂等的 —— 它会把它去重后的切片挂在**传入那句**的 key 下，所以拿
-   * 同一份输入再折一次，会把那条读成"自己的修订"而把接缝刚去掉的那段又还原回来。
-   * 记住上一次折进去的输入，折叠就对 React 重复调用免疫。
+   * `mergeLine` is not idempotent: it files the deduplicated slice under the
+   * key of the sentence passed in, so folding the same input again reads it as
+   * its own revision and restores the part the seam just removed. Remembering
+   * the last input makes folding immune to React re-running it.
    */
   const folded = useRef<{ key: string; text: string } | null>(null)
-  // 在渲染期间就地调整：一串修订里 React 重跑多少次，中间态都不会被画出来。
+  // Adjusted in place during render: however often React re-runs this, no
+  // intermediate state is painted.
   if (key && text && (folded.current?.key !== key || folded.current.text !== text)) {
     folded.current = { key, text }
     const next = mergeLine(stream.current, { key, text })
@@ -117,15 +123,15 @@ export function CaptionTrack({
   }
 
   useLayoutEffect(() => {
-    // 从**未经变换**的文本块量：文本块一滚起来 scrollHeight 就跟着缩了。
+    // Measure the untransformed block: a scrolled block's scrollHeight shrinks with it.
     const measure = (): void => {
       const box = viewport.current
       if (!box) return
       if (layout === 'sentence') {
         /*
-         * 逐句模式每条一块装在 `overflow: auto` 的流里，CSS 又把它的 transform 钉成
-         * `none`，所以露出最新一句的唯一办法就是滚动。这里是程序化滚动，所以卡片
-         * 处于 `-webkit-app-region: drag` 区域时依然有效。
+         * Sentence mode puts one block per sentence in an `overflow: auto` flow, and CSS
+         * pins the content's transform to `none`, so scrolling is the only way to reach the
+         * newest sentence. The scroll is programmatic, so it works even in a drag region.
          */
         box.scrollTop = box.scrollHeight
         return
@@ -176,9 +182,9 @@ export function CaptionTrack({
           style={{ transform: offset > 0 ? `translate3d(0, -${offset}px, 0)` : 'none' }}
         >
           {/*
-           * 每句在整段文字里仍是自己那个节点，所以文本照样能换行、照样作为一个块上滚。
-           * `aria-atomic` 为 false 时，读屏只念发生变化的那个节点而不是整段，所以一次
-           * 修订只念正在被改的那一句，字幕也就没必要镜像到第二个节点里。
+           * Each sentence stays its own node inside the passage, so the text still wraps
+           * and still scrolls as one block. With `aria-atomic` false a screen reader announces
+           * only the node that changed, so no mirror node is needed for the captions.
            */}
           <p className="nola-caption-entry" aria-live="polite" aria-atomic="false">
             {entries.flatMap((entry, index) => [

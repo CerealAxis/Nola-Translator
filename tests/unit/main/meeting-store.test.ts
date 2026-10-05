@@ -89,7 +89,7 @@ describe('MeetingStore', () => {
     const reopened = new MeetingStore(join(root, 'meetings'))
     await reopened.initialize(join(root, 'history.jsonl'))
     expect((await reopened.segments(first.meetingId)).map((item) => item.sourceText)).toEqual(['kept'])
-    // 引擎崩溃后没有 sessionStopped, 未结束的会议依然存在, 音频仍可回放.
+    // A crashed engine sends no sessionStopped, so an unfinished meeting survives a restart.
     expect(reopened.get(second.meetingId)?.endedAtMs).toBeUndefined()
   })
 
@@ -179,7 +179,7 @@ describe('MeetingStore', () => {
     expect(meetings).toHaveLength(1)
     expect((await legacy.segments(meetings[0].meetingId)).map((item) => item.sourceText)).toEqual(['first', 'last'])
 
-    // 标记文件让第二次启动不再重复迁移.
+    // The marker the first import wrote keeps the second startup from re-importing.
     const again = new MeetingStore(join(root, 'legacy'))
     await again.initialize(join(root, 'history.jsonl'))
     expect(again.list()).toHaveLength(1)

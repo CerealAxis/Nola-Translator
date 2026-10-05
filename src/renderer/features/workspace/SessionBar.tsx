@@ -1,18 +1,12 @@
 /**
- * 会话底栏：计时器 + 暂停 / 继续 + 结束同传。
+ * The session bar: timer plus pause / resume and end.
  *
- * 计时器是 **DESIGN 第 13 节原创方向 C（时间即材料）** 的落点，三条决定都在这一个文件里：
+ * The timer needs monospaced digits (`.nola-mono .nola-num`): a per-second digit
+ * whose width changes makes the whole bar twitch. `<time dateTime>` keeps the
+ * reading a duration in the DOM, where export and screen readers can use it.
  *
- * 1. **等宽数位**（`.nola-mono .nola-num`）：每秒跳的数字宽度必须不变，否则整条底栏在左右抽动。
- *    标签用 `<time dateTime>`，让"这是一个时间量"留在 DOM 里，导出与朗读都拿得到。
- * 2. **极轻微的呼吸**：`.nola-tick` 是 400ms 的 `opacity 0.85 ↔ 1.0` 无限交替。
- *    不是缩放（缩放会让数字跳大小），不是颜色跳变（深色底上刺眼）。
- * 3. **暂停即信息**：暂停时数字转 `--muted` **并且停止呼吸**。CSS 里 `.nola-tick[data-paused='true']`
- *    是 `animation: none`，所以这里只要把 `data-paused` 写对，"它停了"这件事就同时被两处表达
- *    （颜色降一档 + 不再呼吸），用户不用读数字就知道表停了。
- *
- * 呼吸的周期是 400ms，而计时器每秒跳一次，所以呼吸与跳数并不同步：这是故意的。
- * 让呼吸周期等于 1s 会让"跳数"和"变淡"叠成一个周期运动，读起来像在闪。
+ * `.nola-tick` is a 400ms `opacity 0.85 <-> 1.0` alternate, not a scale (which
+ * would make the digits jump size) and not a colour change (harsh on a dark bar).
  */
 
 import { Button, Tooltip } from '@heroui/react'
@@ -22,10 +16,11 @@ import type { SessionStatus } from '@/bridge'
 import { useI18n } from '@/i18n'
 
 /**
- * 把毫秒格式化成计时器读数。**纯函数，独立可测。**
+ * Milliseconds to the timer reading.
  *
- * 小时位不补零（DESIGN 第 13.C 节）：`0:07:03` 与 `7:03` 的宽度差由外层的 `min-w-[10ch]`
- * 与等宽数位吸收，不靠补零去凑宽度。秒位永远两位，因为秒是跳得最勤的一位。
+ * Hours are not zero-padded: the width difference between `0:07:03` and `7:03`
+ * is absorbed by the outer `min-w-[10ch]` and the monospaced digits. Seconds
+ * are always two digits, being the one that changes most often.
  */
 export function formatElapsed(ms: number): string {
   const safe = Number.isFinite(ms) && ms > 0 ? Math.floor(ms) : 0
@@ -37,7 +32,7 @@ export function formatElapsed(ms: number): string {
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`
 }
 
-/** `dateTime` 属性用 ISO 8601 时长，语义比 `HH:MM:SS` 干净。 */
+/** `dateTime` takes an ISO 8601 duration, which is cleaner than `HH:MM:SS`. */
 export function isoDuration(ms: number): string {
   const safe = Number.isFinite(ms) && ms > 0 ? Math.floor(ms) : 0
   const totalSeconds = Math.floor(safe / 1000)
@@ -51,7 +46,7 @@ export interface SessionBarProps {
   onPause: () => void
   onResume: () => void
   onStop: () => void
-  /** 会话还没开（idle）：只留计时器，按钮不出现。 */
+  /** No session yet: the timer stays and the controls are hidden. */
   showControls?: boolean
   className?: string
   audioLabel?: string
@@ -77,10 +72,10 @@ export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, showC
       <time
         dateTime={isoDuration(elapsedMs)}
         data-slot="session-timer"
-        // 呼吸只在 running 时挂。其余状态一律写 data-paused="true"，CSS 的
-        // `.nola-tick[data-paused='true'] { animation: none }` 就会把动画摘掉：
-        // 表还没开始走（idle / starting）或正在收尾（stopping），动的数字没有含义。
-        // 暂停时同时把字色降为 --muted —— "停止本身就是信息"，用户不用读数字就知道表停了。
+        // Every state other than `running` gets data-paused, which the CSS turns
+        // into `animation: none`. A timer that has not started (idle, starting)
+        // or is winding down (stopping) has nothing to animate, and the dimmed
+        // colour says "stopped" without reading the digits.
         data-paused={running ? undefined : 'true'}
         className={[
           'nola-mono nola-num nola-tick min-w-[10ch] text-[14px] leading-none font-medium',

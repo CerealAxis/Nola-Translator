@@ -1,22 +1,13 @@
 /**
- * 数据访问层的类型出口。
- *
- * **本文件里所有"契约"类型都是从主仓 `src/shared/` 直接 import 的，不再自己抄一份。**
- * 早期版本在这里逐字复制了 `src/shared/contracts.ts`、`src/shared/settings.ts` 与
- * `src/shared/bridge.ts`，复制品迟早会和原件漂移：主会话刚给 preload 加了
- * `setSessionPaused` / `closeOverlay` / `minimizeOverlay` 三个方法，抄本就得跟着改一遍。
- * 现在只剩「UI 自己定义的类型」和「主仓还没有、需要主进程补的字段」两段。
- *
- * 相对路径是刻意的：`@` alias 指向 `src/renderer/`，而 `src/shared/` 在它外面，
- * 写成 `@/shared/contracts` 会解析到不存在的 `src/renderer/shared/contracts`。
+ * The type exit of the data-access layer. Every contract type here is imported
+ * from `src/shared/` rather than copied: a copy drifts the moment preload gains
+ * a method.
  */
 
 import type { NolaTranslatorApi } from '../../shared/bridge'
 import type { ResourceRecord, ResourceSnapshot } from '../../shared/contracts'
 
-// ---------------------------------------------------------------------------
-// 主仓契约 · 原样 re-export
-// ---------------------------------------------------------------------------
+// Re-exported verbatim from src/shared/.
 
 export type {
   AudioDevice,
@@ -50,8 +41,8 @@ export type {
 } from '../../shared/settings'
 
 /**
- * 需要凭据的翻译服务商，即 `credentials.json` 的顶层键；已随 `cloud` 合并改名为
- * `CredentialProvider`，从主仓 `src/shared/settings` 原样透出，本文件不再自己定义一份。
+ * Translation providers that need a credential, i.e. the top-level keys of
+ * `credentials.json`, re-exported from `src/shared/settings`.
  */
 export type { CredentialProvider } from '../../shared/settings'
 
@@ -72,14 +63,10 @@ export { PROTOCOL_VERSION } from '../../shared/contracts'
 
 export type { NolaTranslatorApi }
 
-// ---------------------------------------------------------------------------
-// 主仓还没有的字段（tier: 'ipc-new'）
-// ---------------------------------------------------------------------------
-
 /**
- * `ResourceRecord.bytesPerSecond`：主仓的 `ResourceRecord` 与 `modelProgress` 事件都不带速率。
- * 下载任务表的速度列需要它。**不要**用时间差反推一个假的速率出来 —— 缺这个字段时 UI 只显示
- * 「已落盘 / 总量」两个真值。主进程补上之后，把这个交叉类型换回裸 `ResourceSnapshot` 即可。
+ * `ResourceRecord.bytesPerSecond`: neither the main process's `ResourceRecord`
+ * nor its `modelProgress` event carries a rate, and the download table's speed
+ * column needs one.
  */
 export type ResourceRecordWithRate = ResourceRecord & {
   readonly bytesPerSecond?: number
@@ -89,37 +76,25 @@ export type ResourceSnapshotWithRate = Omit<ResourceSnapshot, 'resources'> & {
   readonly resources: readonly ResourceRecordWithRate[]
 }
 
-// ---------------------------------------------------------------------------
-// UI 自己的类型（不属于协议）
-// ---------------------------------------------------------------------------
-
-/**
- * UI 侧会话状态机。刻意**不是**引擎 `EngineEvent` 的 status 码
- * （`idle | starting | ready | listening | paused | stopping`）：界面还要说「出错」，
- * 而协议里没有这个词；反过来协议有 `'ready'`（引擎级握手）而界面不需要它。
- *
- * **映射在 `sessionStore` 里，不在 `ipcBridge`。** `ipcBridge` 原样透传 `EngineEvent`，
- * 它是数据通路、不含状态机；`sessionStore` 的 `ENGINE_STATUS_TO_UI` 是唯一做这件事的
- * 地方，引擎那条权威 `status` 事件也在那里被消费。
- */
 export type SessionStatus = 'idle' | 'starting' | 'running' | 'paused' | 'stopping' | 'error'
 
 /**
- * 下载生命周期，按模型列表的画法。引擎报的是更粗的
- * `state ('idle'|'running'|'cancelling'|'failed') + phase`；`resourceStateOf()` 在
- * `contract.ts` 里把两者压成这台扁平状态机，UI 就不必再压一次。
+ * Download lifecycle, shaped the way the model list draws it. The engine reports
+ * the coarser `state ('idle'|'running'|'cancelling'|'failed') + phase`, and
+ * `resourceStateOf()` in `contract.ts` flattens the two.
  */
 export type ResourceState = 'absent' | 'queued' | 'downloading' | 'verifying' | 'installed' | 'failed'
 
-/** 诊断负载形状；主仓的 `getDiagnostics()` 返回的就是这个类型。 */
+/** Diagnostics payload shape; this is what the main process's `getDiagnostics()` returns. */
 export type DiagnosticsPayload = Record<string, string | number>
 
-/** `meetings.export()` 接受的导出格式；与主仓的并集保持一致。 */
+/** Formats `meetings.export()` accepts. */
 export type ExportFormat = 'txt' | 'srt' | 'vtt'
 
-/** 声源选择器里的一项。`AudioDevice` 表达不了「系统默认输出」这个伪选项 ——
- * 协议里它是 `SessionConfig.audioSource = { kind: 'defaultOutput' }`，根本不是一个设备 ——
- * 所以选择器需要这个并集，而不是裸的 `AudioDevice[]`。
+/**
+ * One entry of the audio source picker. `AudioDevice` cannot express the
+ * pseudo-option "system default output" — in the protocol that is
+ * `SessionConfig.audioSource = { kind: 'defaultOutput' }`, not a device.
  */
 export type AudioSourceOption =
   | { value: 'defaultOutput'; kind: 'defaultOutput'; deviceId: null; name: string; isDefault: true }
@@ -131,12 +106,13 @@ export type AudioSourceOption =
       isDefault: boolean
     }
 
-/** 语言代码的双语标签。数据而非界面文案：i18n 层按 `code` 取值。 */
+/** Bilingual label for a language code. Data, not UI copy: the i18n layer looks it up by `code`. */
 export type LanguageLabel = { code: string; zh: string; en: string }
 
 /**
- * 语言名表。**数据不是 fixture** —— 语言名与界面语言无关，选哪种语言都得显示真名，
- * 所以它跟着 `SOURCE_LANGUAGE_OPTIONS` / `TARGET_LANGUAGE_OPTIONS` 走，不进 i18n 词典。
+ * Language names. Data, not a fixture: a language's name does not change with
+ * the UI language, so it follows `SOURCE_LANGUAGE_OPTIONS` /
+ * `TARGET_LANGUAGE_OPTIONS` instead of the i18n dictionary.
  */
 export const LANGUAGE_LABELS: Record<string, LanguageLabel> = {
   auto: { code: 'auto', zh: '自动检测', en: 'Auto detect' },
@@ -160,17 +136,18 @@ export const LANGUAGE_LABELS: Record<string, LanguageLabel> = {
 }
 
 /**
- * 「系统默认输出」这个伪声源。`listDevices()` 只回真设备，协议里的 `defaultOutput`
- * 没有对应设备，所以选择器的第一项由这里补出来。名称走 i18n（`audio.defaultOutput`），
- * 这里只给 `value` / `kind` / `deviceId` 三个协议字段。
+ * The "system default output" pseudo source. `listDevices()` returns real
+ * devices only, and the protocol's `defaultOutput` has no device behind it, so
+ * the picker takes its first entry from here. The name comes from i18n
+ * (`audio.defaultOutput`); only the three protocol fields live here.
  */
 export const DEFAULT_OUTPUT_VALUE = 'defaultOutput'
 
 /**
- * 失败原因，引擎报的 —— 大多是 `type(error).__name__`，另有几个固定语义码。
- *
- * 这是**兜底词表**，不是界面文案：界面走 i18n 词典（`shellUi.error.*`），
- * 这里只保证词典里没有的码还能显示出点什么，而不是一片空白。
+ * Fallback vocabulary for engine-reported failures, mostly
+ * `type(error).__name__` plus a few fixed semantic codes. Not UI copy: the UI
+ * goes through the i18n dictionary (`shellUi.error.*`), and this only keeps a
+ * code the dictionary has never heard of from rendering as a blank.
  */
 export const TRANSLATION_ERROR_LABELS: Record<string, string> = {
   URLError: '网络不可达',

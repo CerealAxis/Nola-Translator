@@ -4,16 +4,9 @@ import { dirname, join, resolve, sep } from 'node:path'
 /**
  * Every path the app owns inside a data root, in a stable order.
  *
- * This allowlist is the entire safety property of the delete step, so it is
- * spelled out rather than derived: when the data root is the default install
- * directory, `resources/**` (app.asar, the bundled Python engine, llama.cpp,
- * runtime-catalog.json, runtime-recipes.json, runtime/extract-runtime.ps1) and
- * the `*.exe` / `*.dll` / `Uninstall*.exe` / `Update.exe` sit right next to
- * these entries, and deleting the old root as a tree would uninstall the
- * running application. Nothing may be added here without proving it is app
- * data; Chromium's own state under Electron `userData` (`Cache`, `GPUCache`,
- * `Local Storage`, `Preferences`) is deliberately not in it because it belongs
- * to the Electron profile, not to us.
+ * The entire safety property of the delete step: the default data root is the install directory,
+ * where `resources/**` (app.asar, the bundled Python engine, llama.cpp) and the NSIS uninstaller
+ * sit beside these entries, so a tree delete would uninstall the app.
  */
 export const DATA_ROOT_ENTRIES: readonly string[] = [
   'settings.json',
@@ -25,21 +18,22 @@ export const DATA_ROOT_ENTRIES: readonly string[] = [
   'runtimes',
 ]
 
-/** The one allowlisted file that gets rewritten instead of copied, and the only field inside it that can point at the old root. */
+/**
+ * The one allowlisted file that is rewritten rather than byte-copied, and the only field in it that
+ * can point at the old root.
+ */
 const SETTINGS_ENTRY = 'settings.json'
 const MODEL_STORAGE_PATH_FIELD = 'modelStoragePath'
 
 /**
- * Staging suffix for every copy and for the settings rewrite.
+ * Staging suffix for every copy and for the settings rewrite, removed again on the failure path.
  *
- * Deterministic so a staging file left behind by a killed migration is easy to
- * find, and removed on the failure path so a clean run never accumulates them.
- * Staging must live beside the target: `rename` cannot cross a volume, and a
- * data root change can move between drives.
+ * Staging must live beside the target: `rename` cannot cross a volume, and a data root change can
+ * move between drives.
  */
 const STAGING_SUFFIX = '.nola-migration'
 
-/** Depth cap for the directory walk. A runtimes or `cache/tmp` tree is shallow; past this the entry fails instead of walking forever. */
+/** Depth cap for the directory walk; past it the entry fails rather than walking forever. */
 const MAX_WALK_DEPTH = 16
 
 export type DataRootMigrationReport = {
@@ -47,7 +41,7 @@ export type DataRootMigrationReport = {
   copied: string[]
   /** Absent at the source, or already identical at the destination. */
   skipped: string[]
-  /** Present at the source, but the copy threw. These are never deleted. */
+  /** Read, copy or removal failed, so the entry stays where it is and is never deleted. */
   failed: string[]
   /** Entries removed from the source afterwards. */
   removed: string[]
@@ -61,10 +55,10 @@ type WalkedFile = { relative: string; bytes: number }
 type EntryPlan = {
   name: string
   /**
-   * The root this entry is read from: the data root itself, or a legacy folder the pending marker
-   * named. The copy follows this field rather than the `from` argument, and so does the delete step —
-   * which is what makes "moved" mean the same thing for both: an entry lands at the destination and
-   * then leaves its origin, whichever origin that was.
+   * The root this entry is read from: the data root, or a legacy folder the pending marker named.
+   * Both the copy and the delete step follow this field rather than the `from` argument, so "moved"
+   * means the same thing for both: an entry lands at the destination and leaves its origin, whichever
+   * origin that was.
    */
   source: string
   files: WalkedFile[]
@@ -87,17 +81,9 @@ function errorCode(error: unknown): string | undefined {
 }
 
 /**
- * Whether `child` is `parent` or sits below it.
+ * Whether `child` is `parent` or sits below it. Exported so `app-ipc.ts` can ask the same question of a legacy `modelStoragePath` rather than hand-write a second containment check.
  *
- * Case-insensitive because this is a Windows-only build and the existing legacy
- * migration compares roots the same way (`legacy-migration.ts`); on a
- * case-sensitive volume this would only ever make the check *more* eager, which
- * fails towards refusing a migration rather than towards deleting one.
- *
- * Exported so `app-ipc.ts` can ask "is this legacy `modelStoragePath` inside the data root" by the
- * same rule. A second, hand-written copy of path containment is how one folder gets classified as
- * "somewhere else" by the code that records it and as "inside the data root" by the code that
- * moves it — and the entry is then copied twice over, or not at all.
+ * Case-insensitive, matching how `legacy-migration.ts` compares roots; on a case-sensitive volume that only makes the check more eager, so it fails towards refusing a migration rather than deleting one.
  */
 export function isSameOrInside(parent: string, child: string): boolean {
   const from = resolve(parent).toLowerCase()
@@ -107,31 +93,22 @@ export function isSameOrInside(parent: string, child: string): boolean {
 }
 
 /**
- * List every regular file below `root`, with its size.
- *
- * Throws on a symlink or junction rather than skipping it. A link is not
- * something this app writes, and `lstat` semantics mean a link inside
- * `runtimes/` or `cache/` would otherwise be invisible: `isFile()` and
- * `isDirectory()` are both false for one, so the copy would silently drop it
- * and — worse — the delete step would not know it is there. Refusing the whole
- * entry keeps the rule simple: an entry is either fully accounted for, or it
- * is left alone at the source.
+ * List every regular file below `root`, with its size. Throws on a link rather than skipping it: a
+ * junction is invisible to `isFile()` and `isDirectory()`, so the copy would drop it silently and the
+ * delete step would never know it is there. An entry is either fully accounted for or left alone.
  */
 async function walkFiles(root: string, prefix: string, depth: number): Promise<WalkedFile[]> {
   if (depth > MAX_WALK_DEPTH) throw new Error(`directory nesting exceeds ${MAX_WALK_DEPTH} levels`)
   const files: WalkedFile[] = []
   for (const entry of await readdir(root, { withFileTypes: true })) {
     const child = join(root, entry.name)
-    // lstat, not the dirent type: this walk decides what may later be deleted
-    // from the source, and on Windows a junction is the one reparse point that
-    // a copy would happily follow out of the root.
+    // lstat, not the dirent type: the delete step acts on this walk, and a junction is the one reparse
+    // point a copy would follow straight out of the root.
     const stats = await lstat(child)
     if (stats.isSymbolicLink()) throw new Error('symbolic link or junction is not app data')
     const relative = prefix ? join(prefix, entry.name) : entry.name
     if (stats.isDirectory()) files.push(...(await walkFiles(child, relative, depth + 1)))
-    // A file entry is reported by its own `lstat`, so the `isFile()` branch
-    // here only covers members of a directory. Sockets and FIFOs are neither
-    // app data nor something this app creates, and are ignored on purpose.
+    // A member of a directory only, so a socket or FIFO falls through on purpose: it is not app data.
     else if (stats.isFile()) files.push({ relative, bytes: stats.size })
   }
   return files
@@ -146,17 +123,9 @@ async function sameBytes(left: string, right: string): Promise<boolean> {
 /**
  * Whether the destination already holds this entry's content.
  *
- * A single file is compared byte for byte, never by size. `credentials.json` is
- * the reason: `secure-store.ts`'s `get()` deletes the ciphertext before it
- * throws when decryption fails, so a size-equal but different credentials file
- * is not a harmless miss — it is the user's API keys, gone for good. Proving
- * the bytes match is what makes deleting the source copy safe.
+ * A single file is compared byte for byte, never by size: `secure-store.ts`'s `get()` deletes the ciphertext before it throws, so a size-equal but different `credentials.json` is keys already lost, and only matching bytes make deleting the source copy safe.
  *
- * A directory is compared by member name and size. The residual is a member
- * that differs *and* has the same length, which needs corruption to line up;
- * the trade is deliberate because byte-comparing `models/` and `runtimes/`
- * would mean reading ~687 MB twice to save a case that a later run self-heals
- * (the entry is recopied, never deleted, until it matches).
+ * A directory is compared by member name and size; the residual is a member that differs and has the same length, and ruling that out byte-wise would mean reading `runtimes/` (roughly 687 MB) a second time to save a case a later run self-heals.
  */
 async function destinationHolds(source: string, destination: string, files: WalkedFile[], isSingleFile: boolean): Promise<boolean> {
   if (isSingleFile) return sameBytes(join(source, files[0]?.relative ?? ''), join(destination, files[0]?.relative ?? '')).catch(() => false)
@@ -176,10 +145,8 @@ type EntryRead =
 /**
  * `lstat` one entry root, and walk it when it is a directory.
  *
- * Split out so the data root and a legacy folder are read by identical rules. An entry that one
- * root refuses — a junction, a tree past the depth cap — has to be refused everywhere, or the move
- * would keep walking past the first refusal until some other root happened to answer, and the
- * result would depend on which folder the user happened to have pointed `modelStoragePath` at.
+ * Shared with the legacy-folder read so both are held to identical rules: an entry one root refuses has
+ * to be refused everywhere, or the move depends on which folder `modelStoragePath` happened to name.
  */
 async function readEntry(root: string): Promise<EntryRead> {
   try {
@@ -197,13 +164,7 @@ async function readEntry(root: string): Promise<EntryRead> {
 /**
  * The legacy folders this move may actually read from.
  *
- * Every direction of the module's existing overlap rule, applied to a third path: a legacy folder
- * that is the destination or sits inside it would be walked while it was being written to, and
- * **one that *contains* the destination** would make `survey` read the destination's own files back
- * out of an allowlisted entry and charge them to the precheck — the same "a root inside itself"
- * hazard the primary pair is refused for, in the other direction. A legacy folder that is the
- * primary source (or sits inside it) could only ever re-read bytes the data root already provides.
- * Everything else is left for `survey` to ask about one entry at a time.
+ * Every direction of the overlap rule, applied to a third path: one that is or contains the destination would make `survey` read the destination's own files back out of an allowlisted entry and charge them to the precheck; one that overlaps the primary source could only re-read bytes the data root already provides.
  */
 function usableExtraSources(from: string, to: string, extraSources: readonly string[]): string[] {
   return extraSources.filter((extra) => !isSameOrInside(to, extra) && !isSameOrInside(extra, to)
@@ -211,17 +172,9 @@ function usableExtraSources(from: string, to: string, extraSources: readonly str
 }
 
 /**
- * Measure every allowlisted entry without writing anything.
+ * Measure every allowlisted entry without writing anything. The total is the number the copy will move, so the caller's precheck and the copy cannot disagree.
  *
- * Shared by `planDataRootMigration` and `migrateDataRoot` so the byte total the
- * caller prechecks free space against is the same number the copy will move,
- * and so a single walk is not paid for twice.
- *
- * **The data root is the source of record for every entry.** A legacy folder from the
- * marker is consulted only for an entry the data root does not provide — absent, or
- * unreadable — and is never merged with the data root's own copy: two candidates for
- * one entry would leave "which of these is authoritative" unanswerable, and the data
- * root's is the one the app was actually running against.
+ * The data root is the source of record for every entry. A legacy folder is consulted only for an entry the data root does not provide, and never merged with it: two candidates for one entry leave "which of them is authoritative" unanswerable.
  */
 async function survey(source: string, to: string, extraSources: readonly string[]): Promise<Survey> {
   const report = emptyReport()
@@ -237,8 +190,7 @@ async function survey(source: string, to: string, extraSources: readonly string[
     let read = primary
     let entrySource = source
     if (primary.state !== 'ok') {
-      // First legacy folder that actually has this entry wins; the rest are not consulted, so two
-      // legacy folders can never be merged into the destination either.
+      // First legacy folder that has the entry wins; the rest are never consulted, so two legacy folders cannot merge into the destination either.
       for (const extra of extras) {
         const candidate = await readEntry(join(extra, name))
         if (candidate.state === 'ok') {
@@ -258,9 +210,7 @@ async function survey(source: string, to: string, extraSources: readonly string[
       continue
     }
     if (read.state === 'fault') {
-      // Reachable only when the data root itself is at fault: a legacy folder that is also at
-      // fault is logged above and does not turn the entry into a failure, because the entry is
-      // not going to be read from anywhere.
+      // Reachable only when the data root itself is at fault: a faulted legacy folder is logged above and ignored, because the entry will not be read from anywhere.
       report.failed.push(name)
       continue
     }
@@ -276,12 +226,7 @@ async function survey(source: string, to: string, extraSources: readonly string[
     const plan: EntryPlan = { name, files, identical, bytes, source: entrySource }
     plans.set(name, plan)
     if (identical) {
-      // An identical entry is not counted against the destination's free space — nothing is
-      // written for it — but it is still safe to delete afterwards. The exclusion has to happen
-      // here, where `identical` is known, and not at the accumulation point: charging the bytes
-      // anyway made a retried migration ask for the full size of `models/` and `runtimes/` again
-      // after they had already been moved, so the retry that only had a few MB left to transfer
-      // was cancelled for "not enough space" and the user could never finish the move.
+      // Not charged against the destination's free space, since nothing is written for it, but still safe to delete afterwards.
       report.skipped.push(name)
     } else {
       requiredBytes += bytes
@@ -293,18 +238,11 @@ async function survey(source: string, to: string, extraSources: readonly string[
 }
 
 /**
- * Write one file through a staging name.
+ * Write one file through a staging name, so the target path only ever appears complete: an interrupted
+ * copy would otherwise leave a truncated file where the app expects whole content.
  *
- * Interruption safety, which is the reason this is not `copyFile` straight to
- * the target: a file truncated by a half-finished copy *exists*, so an
- * exists-check would treat it as done and the app would go on running against
- * corrupt data. Staging and renaming means the target path is only ever
- * created complete — an interrupted migration leaves a `.nola-migration` file
- * beside it and the next run recopies from scratch. `copyFile` itself copies
- * raw bytes, which is what keeps `credentials.json` decryptable: it is never
- * parsed and re-serialised, because Electron's `safeStorage` on Windows is
- * DPAPI, bound to the logon credential rather than to the path, and
- * `secure-store.ts` permanently drops any ciphertext it fails to read.
+ * `copyFile` copies raw bytes, which is what keeps `credentials.json` decryptable — never parsed and
+ * re-serialised, because Windows `safeStorage` is DPAPI, bound to the logon credential, not the path.
  */
 async function copyThroughStaging(origin: string, target: string): Promise<void> {
   const staging = `${target}${STAGING_SUFFIX}`
@@ -319,15 +257,9 @@ async function copyThroughStaging(origin: string, target: string): Promise<void>
 }
 
 /**
- * Clear the absolute `modelStoragePath` in the destination's `settings.json`.
+ * Clear the absolute `modelStoragePath` in the destination's `settings.json`, the only field there that can point at the old root.
  *
- * Every other entry is a byte copy; this one field is not, because it is
- * absolute. Carried verbatim it keeps `models/` and `runtimes/` pinned to the
- * old root (`index.ts` builds the runtime directory from
- * `initialSettings.modelStoragePath || userData`), so the app would keep writing
- * to the directory it is being moved out of. Rewriting is atomic — staging file
- * plus `rename`, matching `SettingsStore.persist` — so an interrupted migration
- * cannot leave a half-written settings file that boots with no configuration.
+ * Carried verbatim it pins `models/` and `runtimes/` to the old root (`index.ts` derives the runtime directory from `initialSettings.modelStoragePath || dataRoot`). The rewrite is atomic, like `SettingsStore.persist`, so an interruption cannot leave a file that boots with no configuration.
  */
 async function clearModelStoragePath(settingsPath: string): Promise<void> {
   const parsed: unknown = JSON.parse(await readFile(settingsPath, 'utf8'))
@@ -350,9 +282,8 @@ async function clearModelStoragePath(settingsPath: string): Promise<void> {
 /**
  * Refuse roots that are the same directory or nested in each other.
  *
- * Copying a root into itself would walk into the copy, and moving one into its
- * own subdirectory would delete the tree it is walking. Neither is recoverable,
- * so the answer is a report the caller can show, not an exception.
+ * Copying a root into itself would walk into the copy, and moving one into its own subdirectory would
+ * delete the tree being walked. The answer is a report the caller can show, not an exception.
  */
 function refusedReport(from: string, to: string): DataRootMigrationReport {
   console.error('data root migration refused: the source and destination roots overlap', { from, to })
@@ -364,13 +295,7 @@ function refusedReport(from: string, to: string): DataRootMigrationReport {
 /**
  * Measure a root change without writing anything.
  *
- * The caller needs `requiredBytes` before committing: `build/runtime-catalog.json`
- * declares roughly 687 MB of downloadable runtimes, so the destination's free
- * space has to be checked against this number first.
- *
- * `extraSources` are the legacy folders the pending marker recorded (see `data-root.ts`).
- * They are measured on the same terms as the data root, so the precheck covers every
- * byte the copy will really write and not just the ones still living in the data root.
+ * The caller prechecks free space against `requiredBytes`, and `build/runtime-catalog.json` declares roughly 687 MB of downloadable runtimes, so a destination that cannot hold them is refused before anything is written. `extraSources` are the legacy folders the pending marker recorded (`data-root.ts`), measured on the same terms.
  */
 export async function planDataRootMigration(from: string, to: string, extraSources: readonly string[] = []): Promise<DataRootMigrationReport> {
   if (isSameOrInside(from, to) || isSameOrInside(to, from)) return refusedReport(from, to)
@@ -378,16 +303,10 @@ export async function planDataRootMigration(from: string, to: string, extraSourc
 }
 
 /**
- * Copy the allowlist to the new root, rewrite `settings.json`, then delete the
- * source entries.
+ * Copy the allowlist to the new root, rewrite `settings.json`, then delete the source entries.
  *
- * Per-entry failures are reported rather than thrown: one unreadable entry must
- * not cost the user the other six. The caller reads `failed` and `removed` to
- * tell the user what moved and what did not.
- *
- * `extraSources` are the legacy folders the pending marker recorded: an entry the data
- * root does not have is read from the first of them that does, and it leaves that folder
- * on the same terms as everything else — copied, then removed from wherever it was found.
+ * Per-entry failures are reported rather than thrown: one unreadable entry must not cost the user the
+ * other six, and the caller reads `failed` and `removed` to tell the user what moved and what did not.
  */
 export async function migrateDataRoot(from: string, to: string, extraSources: readonly string[] = []): Promise<DataRootMigrationReport> {
   if (isSameOrInside(from, to) || isSameOrInside(to, from)) return refusedReport(from, to)
@@ -404,37 +323,19 @@ export async function migrateDataRoot(from: string, to: string, extraSources: re
       }
       if (name === SETTINGS_ENTRY) await clearModelStoragePath(join(to, name))
     } catch (error) {
-      // Moved to `failed` from `copied` so the delete step below skips it, and
-      // a settings rewrite that could not be applied counts as a failure: the
-      // copy is in place but still points at the old root.
+      // Dropped from `copied` so the delete step skips it; a settings rewrite that could not be applied counts as a failure, because the copy in place still points at the old root.
       report.copied = report.copied.filter((entry) => entry !== name)
       report.failed.push(name)
       console.error('data root entry could not be copied, it stays at the source', join(plan.source, name), error)
     }
   }
 
-  // The delete rule, and the only part of this module that destroys anything:
-  // delete the allowlisted entries one by one, and only the ones that are now
-  // present at the destination — never the tree at `from`, and never an entry
-  // that failed. A blanket `rm(from, { recursive: true })` would be the one
-  // change that can delete `resources/app.asar`, the bundled engine, llama.cpp
-  // and the NSIS uninstaller, because the default data root *is* the install
-  // directory. An empty directory shell at a user-chosen old root is left in
-  // place on purpose: it may hold files that are not ours, and there is no way
-  // to tell, so the caller decides what to do with it.
-  //
-  // `copied` plus the entries the destination already held. An entry that was
-  // merely absent at the source is in neither set, so it is never reported as
-  // removed — nothing was there to remove.
-  //
-  // **每个条目都从它真正的来源删**（`plan.source`），数据根与旧 `modelStoragePath` 目录一视同仁：
-  // 搬完就删是这次搬家该有的语义——旧目录里剩下的那几个 GB 如果没人删，就等于这个功能只完成了一半，
-  // 而设置页还写着"设置、会议、模型和运行时都在这个文件夹里"。"搬完才删"的安全前提与主来源那条
-  // 完全相同：目标端已经完整落地（`copyFile` + `rename` 之后），且这一条目没有失败。
-  //
-  // 遗留目录能这样删，靠的是 `usableExtraSources` 已经把"等于或落在 `to` / `from` 里、以及**包含**
-  // `to` 或 `from`"的目录全部剔掉：剩下的任何一个来源，都不可能因为删掉白名单里的一个条目而碰到
-  // 这次搬运正在写入的那棵树。目录本身照旧只留空壳，不整棵删：里面可能有不是我们的文件。
+  // The only code here that destroys anything: allowlisted entries one by one, only those now present at
+  // the destination, never the tree at `from`, never a failed entry. Always from `plan.source`, so a legacy
+  // folder loses an entry exactly as the data root does — safe only because `usableExtraSources` already
+  // dropped every folder overlapping either root. The old root's shell stays behind: it may hold files that
+  // are not ours. An entry merely absent at the source is in neither `copied` nor identical, so it is never
+  // reported as removed.
   const settled = new Set<string>(report.copied)
   for (const [name, plan] of plans) if (plan.identical) settled.add(name)
   for (const name of DATA_ROOT_ENTRIES) {
@@ -444,17 +345,12 @@ export async function migrateDataRoot(from: string, to: string, extraSources: re
       await rm(join(plan.source, name), { recursive: true, force: true })
       report.removed.push(name)
     } catch (error) {
-      // A locked file (a runtime still mapped by a running engine) leaves a
-      // duplicate behind rather than losing data, so this is reported and not thrown.
+      // A locked file (a runtime still mapped by a running engine) leaves a duplicate behind rather than losing data, so this is reported, not thrown.
       report.failed.push(name)
       console.error('data root entry was copied but could not be removed from its old location', join(plan.source, name), error)
     }
   }
-  // There is no migration UI to say any of this: it runs before the window exists, and the storage
-  // page only learns the new root at the next launch. The console is the one place a user can find
-  // out that several GB came out of a folder the app no longer references, so name the entries, the
-  // folder they came from, and whether they are gone — that is the difference between "the old drive
-  // is free now" and "did this just eat my models".
+  // There is no migration UI: this runs before the window exists, so the console is the only place a user can learn that several GB left a folder the app no longer references.
   const fromLegacy = [...plans.values()].filter((plan) => plan.source !== from)
   if (fromLegacy.length > 0) {
     console.log(

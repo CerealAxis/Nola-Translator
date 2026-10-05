@@ -94,8 +94,8 @@ class TranslationScheduler:
         `timeout_seconds` is the flat budget for a provider that answers in a single
         request. A provider that has to split the text into several sequential requests —
         the cloud formats do, whenever contextWindow is smaller than the caption — states
-        what it needs with `timeout_for`, because one shared 10s budget across all of those
-        chunks produced a 「翻译超时」 that never named contextWindow as the cause. The hook is
+        what it needs with `timeout_for`, since one flat budget across all those chunks cannot fit
+        even one of them. The hook is optional, so every provider that does not need it keeps the flat default.
         optional, so every provider that does not need it keeps the flat default.
         """
         timeout_for = getattr(self.provider, "timeout_for", None)

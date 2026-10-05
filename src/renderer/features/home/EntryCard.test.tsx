@@ -1,15 +1,10 @@
 /**
- * 首页入口卡测试。
+ * Entry card tests, asserting the design's checkable constraints: the difference
+ * between the main and sub shapes, the absence of a subtitle, a disabled-but-visible
+ * entry that explains itself, literal pixel radii, and `.z-*` classes in place of
+ * `z-50`.
  *
- * 断言的是 DESIGN 里可验证的硬约束，不是快照：
- * - 主卡与次级卡的形态差别（accent 描边 + 药丸主按钮 vs 发丝线 + 整卡可点）
- * - 入口卡不带副标题（copy 纪律）
- * - 引擎未就绪时 isDisabled + Tooltip 说明原因，**不隐藏入口**
- * - 圆角写 6/8/10 的字面量，不写档位名（Tailwind 没有 `rounded-pill`）
- * - z-index 只用 `.z-*` 类，不写 `z-50`
- *
- * 组件内不出现中文字面量：可见文案全部由调用方传 `t(...)` 的结果，
- * 所以这里用 props 注入英文断言。
+ * Copy arrives as props from the caller's `t(...)`, so the assertions use English.
  */
 
 import { describe, expect, it, vi } from 'vitest'
@@ -27,7 +22,7 @@ describe('EntryCard 次级卡', () => {
     render(<EntryCard icon={ICON} title="Floating captions" onPress={onPress} testId="entry" />)
 
     const card = screen.getByTestId('entry')
-    // 整卡可点，所以它自己就是可聚焦的交互元素。
+    // The whole card is pressable, so it is itself the focusable control.
     expect(card.tagName).toBe('BUTTON')
 
     await user.click(card)
@@ -38,7 +33,7 @@ describe('EntryCard 次级卡', () => {
     render(
       <EntryCard icon={ICON} title="Records" onPress={() => {}} meta="2026-10-01" testId="entry" />,
     )
-    // 只有标题与传入的真实数据，没有第二行说明句。
+    // Only the title and the supplied data; no second line of copy.
     const card = screen.getByTestId('entry')
     expect(card.textContent).toBe('Records2026-10-01')
   })
@@ -53,9 +48,9 @@ describe('EntryCard 次级卡', () => {
   it('次级卡静止态用发丝线描边，accent 只出现在 hover/focus-visible 上', () => {
     render(<EntryCard icon={ICON} title="Records" onPress={() => {}} testId="entry" />)
     const className = screen.getByTestId('entry').className
-    // 静止态：border-border。
+    // The resting state uses the hairline border.
     expect(className).toContain('border-border')
-    // accent 只能挂在交互态前缀上，不能是静止态的 border-accent。
+    // Accent may only sit behind an interaction prefix, never as the resting border.
     expect(className).not.toMatch(/(^|\s)border-accent(\s|$)/)
     expect(className).toMatch(/hover:border-accent/)
   })
@@ -63,7 +58,7 @@ describe('EntryCard 次级卡', () => {
   it('hover 只改描边颜色，不抬升不加投影', () => {
     render(<EntryCard icon={ICON} title="Records" onPress={() => {}} testId="entry" />)
     const card = screen.getByTestId('entry')
-    // 没有 translate / scale / shadow：位移与投影属于悬浮层，页面上的东西没有。
+    // No translate, scale or shadow: those belong to overlays, not to a card on a page.
     expect(card.className).not.toMatch(/translate-|scale-\[|shadow-/)
   })
 })
@@ -81,7 +76,6 @@ describe('EntryCard 主卡', () => {
       />,
     )
     const main = screen.getByTestId('main')
-    // 套一个 Button 进来会得到嵌套 button，破坏 HTML 合法性与键盘顺序。
     expect(main.tagName).toBe('DIV')
     expect(main.className).toContain('border-accent')
 
@@ -103,7 +97,7 @@ describe('EntryCard 主卡', () => {
       />,
     )
     const cta = screen.getByRole('button', { name: 'Start' })
-    // WCAG 2.5.3：可见标签必须包含在无障碍名里。
+    // WCAG 2.5.3: the visible label has to be part of the accessible name.
     expect(cta.textContent).toBe('Start')
     expect(cta).not.toHaveAttribute('aria-label')
 
@@ -145,12 +139,12 @@ describe('EntryCard 引擎未就绪', () => {
       />,
     )
 
-    // 入口仍在 DOM 里：隐藏入口等于让用户以为这个功能不存在。
+    // The entry stays in the DOM: hiding it would suggest the feature does not exist.
     const card = screen.getByTestId('entry')
     expect(card).toBeInTheDocument()
     expect(card).toBeDisabled()
 
-    // 禁用时不派发动作。
+    // A disabled card dispatches no press.
     await userEvent.setup().click(card)
     expect(onPress).not.toHaveBeenCalled()
   })

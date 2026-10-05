@@ -1,8 +1,7 @@
 import type { ComputeDevice, HardwareInventory, RuntimeSnapshot } from './compute'
 
 export type DeviceIntent = { backend: 'cuda' | 'vulkan' | 'xpu' | 'directml'; hardwareId: string }
-// Windows may omit the model suffix which Vulkan reports (e.g. UHD Graphics / UHD Graphics 770).
-// Only accept this narrow alias; counts below still reject ambiguous physical adapters.
+// Vulkan may report "UHD Graphics" where the OS reports "UHD Graphics 770".
 function sameAdapterName(left: string, right: string): boolean {
   const a = left.trim().toLowerCase()
   const b = right.trim().toLowerCase()

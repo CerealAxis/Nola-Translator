@@ -1,13 +1,8 @@
 /**
- * 模型域。资源快照 + 音频设备 + Hub 搜索 + 云端密钥。
+ * Model domain: resource snapshot + audio devices + Hub search + credentials.
  *
- * 这里是最依赖 `onEngineEvent` 增量更新的一个域：下载进度每 200ms 一条事件，
- * 每次都重新 `listResources()` 会把整张列表重建一遍并把滚动位置抖掉。正确的做法是
- * `resourceChanged` 事件带回来的那条记录就地替换，其余记录一个都不碰。
- *
- * `tier: 'ipc-new'` 的那个通道（`feedback.submit`）在这里只用一次，
- * 不参与任何状态机，也不假设主仓已经有它。Hub 那三个方法（`models.*`）已经接上，
- * 搜索只往 `hub` 里写一次快照，安装则并入本域既有的 busyIds / patchResource 链路。
+ * Progress arrives every 200ms, and re-running `listResources()` each time
+ * jitters scroll — so a `resourceChanged` record replaces one entry in place.
  */
 
 import type { NolaBridge } from '@/bridge'
@@ -27,33 +22,33 @@ export type HubKind = 'all' | 'asr' | 'mt' | 'quant'
 export interface HubSearchState {
   query: string
   kind: HubKind
-  /** 已按 PyTorch/GGUF 格式筛选的仓库元数据。 */
+  /** Repo metadata already filtered down to PyTorch/GGUF formats. */
   results: HubModelSummary[]
-  /** 筛选和分页前拉取的候选数。 */
+  /** Candidates fetched before that filter and before pagination. */
   candidates: number
-  /** 深检途中被 429 打断。 */
+  /** The hub answered 429 partway through the deep check. */
   rateLimited: boolean
   loading: boolean
-  /** 搜索本身失败时为 true；结果为空但没有错误是"搜到 0 条"，不是失败。 */
+  /** The search itself failed. Zero results with no error means "found 0", not a failure. */
   failed: boolean
 }
 
 export interface ModelsState {
   storagePath: string
   /**
-   * `ResourceRecordWithRate` 而不是裸的 `ResourceRecord`：
-   * bridge 的 `listResources()` 返回 readonly 数组，元素是带可选 `bytesPerSecond`
-   * 的交叉类型（主仓的 `ResourceRecord` 还没有这个字段，见 bridge/types.ts）。
-   * store 只读不改，所以 readonly 数组是对的 —— 下面 upsert 那几处用展开造新数组。
+   * `ResourceRecordWithRate` rather than a bare `ResourceRecord`: the bridge's
+   * `listResources()` returns a readonly array of the intersection type with the
+   * optional `bytesPerSecond` (see bridge/types.ts). The store only reads, so
+   * readonly is right; the upserts below build new arrays.
    */
   resources: readonly ResourceRecordWithRate[]
   devices: AudioDevice[]
   loaded: boolean
   loading: boolean
   error: string | null
-  /** 正在被 install / remove / cancel 的资源 id。 */
+  /** Resource ids with an install, remove or cancel still in flight. */
   busyIds: readonly string[]
-  /** 引擎握手信息，`ready` 事件到达后才有。 */
+  /** Engine handshake, populated by the `ready` event. */
   engineVersion: string | null
   credentials: Readonly<Record<CredentialProvider, boolean>>
   hub: HubSearchState
@@ -90,7 +85,7 @@ function setBusy(ids: Iterable<string>): void {
   modelsStore.setState({ busyIds: [...busy] })
 }
 
-/** 就地替换一条记录，列表顺序与其它记录的引用都不变。 */
+/** Replaces one record in place, leaving list order and every other reference alone. */
 function patchResource(resource: ResourceRecord): void {
   modelsStore.setState((state) => {
     const index = state.resources.findIndex((item) => item.resourceId === resource.resourceId)
@@ -103,13 +98,12 @@ function patchResource(resource: ResourceRecord): void {
   })
 }
 
-// -- 公开动作 -----------------------------------------------------------------
-
 export async function loadModels(): Promise<void> {
   if (!bridge) return
   if (modelsStore.getState().loading) return
   modelsStore.setState({ loading: true, error: null })
   try {
+    // On a cold start these three start the engine and answer empty for seconds: a race window, not a state.
     const [snapshot, devices, credentials] = await Promise.all([
       bridge.engine.listResources(),
       bridge.engine.listDevices(),
@@ -129,15 +123,13 @@ export async function loadModels(): Promise<void> {
   }
 }
 
-/** 需要查询密钥的服务商，即 `credentials.json` 的顶层键。 */
+/** Providers that need a query, i.e. the top-level keys of `credentials.json`. */
 const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'microsoft']
 
 async function loadCredentials(target: NolaBridge): Promise<Record<CredentialProvider, boolean>> {
   const entries = await Promise.all(
     CREDENTIAL_PROVIDERS.map(async (provider) => [provider, await target.translation.hasCredential(provider)] as const),
   )
-  // 用 provider 自己的值建表，不走 `entries[0][1]` / `entries[1][1]` 那种下标：下标把数组
-  // 顺序变成了隐式契约，顺序一改两个 flag 就静默对调，而 `tsc` 完全查不出来。
   return entries.reduce<Record<CredentialProvider, boolean>>(
     (flags, [provider, present]) => {
       flags[provider] = present
@@ -171,7 +163,8 @@ export async function manageResource(
 }
 
 /**
- * Hub 元数据搜索。只让最新请求更新共享状态，调用方仍能拿到自己的返回值。
+ * Hub metadata search. Only the newest request may write the shared state, but
+ * every caller still gets its own return value.
  */
 export async function searchHub(query: string, kind: HubKind, cursor?: string): Promise<HubSearchResult> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
@@ -192,23 +185,16 @@ export async function searchHub(query: string, kind: HubKind, cursor?: string): 
     }))
     return result
   } catch (error) {
-    // 只写 hub.failed，不写页面级的 error：那个字段是「资源安装/卸载失败」专用的，
-    // 写进去会让 ModelsPage 把一次搜索失败显示成"模型下载中断"。
     if (generation === searchGeneration) modelsStore.setState((state) => ({ hub: { ...state.hub, query, kind, loading: false, failed: true } }))
     throw error
   }
 }
 
 /**
- * 自装模型：引擎判定、注册、起下载，之后的进度与取消都走 `resourceChanged` 事件。
- *
- * busy 的键是 **repo** 而不是 resourceId：请求发出时还不知道引擎会给出哪个 id
- * （`HubModelSummary.resourceId` 只是"装上之后会叫这个"），用 repo 键住请求本身，
- * 拿到 `ResourceRecord` 之后界面改用那条记录自己的 resourceId 走 cancel / remove。
- *
- * 失败**不写** `state.error`：那里是「资源安装/卸载失败」专用的页面级 Alert，
- * 而这条通道在传输之前就可能拒绝（例如字幕会话运行中），报成"下载中断"是错的。
- * 界面拿到的 reject 由调用方自己呈现。
+ * Self-installed model: the engine judges it, registers it and starts the
+ * download, after which progress travels on `resourceChanged`. The busy key is
+ * the **repo** — the engine's id is unknown until the call returns — and a
+ * failure does not write `state.error`, since this channel can refuse early.
  */
 export async function installHubModel(
   repo: string,
@@ -230,10 +216,9 @@ export async function installHubModel(
 }
 
 /**
- * 单个仓库的只读复查。搜索已经带判定，这条是给详情抽屉里"重新判定"用的：
- * 引擎会重新读一次 config 与文件清单，拿到的是当下的事实而不是搜索那一刻的快照。
- *
- * 不写任何 store 状态：它是只读的，判定结果由调用方（抽屉）自己持有。
+ * Read-only re-check of one repo, for the detail drawer's "judge again": the
+ * engine re-reads config and file list, so the answer is the fact as of now.
+ * Writes no store state — the caller holds the verdict.
  */
 export async function inspectHubModel(repo: string): Promise<HubInspectResult> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
@@ -270,15 +255,13 @@ export function clearModelsError(): void {
   modelsStore.setState({ error: null })
 }
 
-// -- 注入 ---------------------------------------------------------------------
-
 export function attachModelsStore(next: NolaBridge): void {
   bridge = next
   unsubscribe?.()
   unsubscribe = next.events.onEngineEvent((event) => {
     switch (event.type) {
       case 'resources':
-        // 整表快照：只在引擎主动广播时替换。下载过程中的 200ms 事件走下面两条。
+        // Whole-table snapshot; the 200ms download events take the branches below.
         modelsStore.setState({
           storagePath: event.storagePath,
           resources: event.resources,

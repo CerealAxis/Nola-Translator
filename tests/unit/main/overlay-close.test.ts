@@ -40,7 +40,7 @@ it('closes an idle overlay without starting the engine', async () => {
   expect(engine.request).not.toHaveBeenCalled()
 })
 
-/** 让出整个微任务队列：一次 `await Promise.resolve()` 只推进一格，不够。 */
+/** Drains the whole microtask queue; one `await Promise.resolve()` advances a single step. */
 const flushMicrotasks = () => new Promise<void>(resolve => { setTimeout(resolve, 0) })
 
 it('shares the stop request when closing and stopping concurrently', async () => {
@@ -51,15 +51,12 @@ it('shares the stop request when closing and stopping concurrently', async () =>
   const stop = invoke(IPC_CHANNELS.stopSession, 'session-1')
   const close = invoke(IPC_CHANNELS.closeOverlay)
   /*
-   * 这里**必须**把整个微任务队列排空，不能只 `await Promise.resolve()`。
+   * The whole microtask queue has to drain: `stopSession` runs through `ensureReady` to
+   * `await whenRuntimeReady()`, the runtime gate in `index.ts`, so a single microtask step
+   * would assert before `engine.request` is ever called.
    *
-   * `stopSession` → `stopActiveSession` → `ensureReady` → `await whenRuntimeReady()`
-   * 这条链上有好几个 await，而 `whenRuntimeReady` 是主进程那道运行时初始化闸门
-   * （`index.ts`：`await runtimeInitialization`）。一次微任务只能推进一格，于是断言会在
-   * `engine.request` 真正被调用**之前**执行，看到 0 次调用而失败。
-   *
-   * 去重本身不依赖等多久：`stoppingSession` 是在 `stopActiveSession` 里**同步**赋值的，
-   * 所以第二个调用方（关闭浮窗）拿到的必然是同一个 in-flight promise。
+   * Deduplication does not depend on how long this waits — `stoppingSession` is assigned
+   * synchronously in `stopActiveSession`, so the second caller joins the same in-flight promise.
    */
   await flushMicrotasks()
   expect(engine.request.mock.calls.filter(([command]) => command.type === 'stopSession')).toHaveLength(1)

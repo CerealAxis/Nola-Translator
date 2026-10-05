@@ -20,11 +20,6 @@ export function OverlayPage() {
   const [opening, setOpening] = useState(false)
   const config = settings.overlay
   const latest = session.interim ?? session.segments.at(-1)
-  /*
-   * 空会话时的占位走浮窗自己的 `overlay.notStarted*`，**不复用任何一份示例字幕**：
-   * 预览要复刻的是**浮窗**，浮窗空着的时候写的就是这两句，用户先看到的应该是
-   * "还没开麦"，而不是一段编出来的双语样例 —— 后者会让人以为字幕区已经就绪。
-   */
   const sourceText = latest?.sourceText || t('overlay.notStarted')
   const translationText = latest?.translations.find(item => item.state === 'complete')?.text || t('overlay.notStartedHint')
   const display = config.showSource && config.showTranslation ? 'both' : config.showSource ? 'source' : 'translation'
@@ -44,11 +39,6 @@ export function OverlayPage() {
   })
   const currentPair = `${settings.recognition.sourceLanguage}:${settings.translation.targetLanguage}`
   if (!languages.some(item => item.value === currentPair)) languages.push({ value: currentPair, label: `${label(settings.recognition.sourceLanguage)} → ${label(settings.translation.targetLanguage)}` })
-  /*
-   * 预览卡的 CSS 自定义属性。**变量名沿用主仓的 `--preview-*`**，没有跟浮窗本体的
-   * `--overlay-*` 合并：两边是两个组件，各改各的，合并之后改预览会顺带改到真窗。
-   * 数值全部原样传下去，不在这里做任何 clamp —— 主仓也没有 clamp。
-   */
   const previewStyle = {
     '--preview-background-color': config.backgroundColor,
     '--preview-background-alpha': `${Math.round(config.backgroundOpacity * 100)}%`,
@@ -71,10 +61,9 @@ export function OverlayPage() {
           <Card.Title className="text-lg font-semibold">{t('shellUi.captionPreview')}</Card.Title>
         </Card.Header>
         {/*
-         * 预览卡的结构逐条照主仓 `src/renderer/components/CaptionPreview.tsx`：
-         * 文字区 → 上下两条渐隐罩 → 右上角七个动作（含那根 1px 分隔线）→ 底部麦克风加
-         * 五个胶囊。胶囊内容与顺序以浮窗本体为准（见下方 `.nola-caption-preview__controls`
-         * 处的注释）。整块 `aria-hidden`，它只是外观预览，真控件都在这一页下面那张表单里。
+         * Text area, top and bottom scrims, the seven action glyphs, then the mic
+         * and pills below. Entirely `aria-hidden`: this is an appearance preview, and
+         * the real controls are in the form underneath.
          */}
         <Card.Content className="nola-overlay-stage">
           <div
@@ -95,12 +84,10 @@ export function OverlayPage() {
             </div>
             <div className="nola-caption-preview__controls">
               {/*
-               * 底部这一排逐条照浮窗本体 `OverlayControls.tsx:341-452` 的六项，顺序都不能换：
-               * 麦克风 → **识别模型** → 原文语言 → 译文语言 → 显示内容 → 对照方式。
-               * 之前这里第一个胶囊挂的是翻译服务商，而且把两种语言揉成一颗 `原文 → 译文`，
-               * 还把唯一的下拉箭头挂在了模型位上 —— 跟真窗三处都对不上，用户在浮窗里
-               * 看到的能力（换识别模型）反而在预览里看不见。
-               * 箭头只留在末尾两颗：它们才是真窗里带下拉的那两个维度。
+               * Mirrors the control bar's six items in order: mic, recognition
+               * model, source language, target language, display, layout. Only the
+               * last two carry a chevron, because only those two open menus in
+               * the real window.
                */}
               <span className="nola-caption-preview__mic">{sessionActive ? <Square /> : <Mic />}</span>
               <span className="nola-caption-preview__pill">{RECOGNITION_MODEL_LABELS[settings.recognition.modelId]}</span>

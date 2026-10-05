@@ -52,7 +52,7 @@ export type ComputeDevice = z.infer<typeof computeDeviceSchema>
 export const computeSnapshotSchema = z.object({
   devices: z.array(computeDeviceSchema).max(64), notes: z.array(z.string().max(1024)).max(32),
   torchVersion: z.string().max(64),
-  // Python's serializer omits None fields while no session is running.
+  // The engine serializes with `exclude_none=True`, so this is absent — not null — with no session.
   activePlan: z.record(z.string(), z.unknown()).nullable().default(null),
 })
 export type ComputeSnapshot = z.infer<typeof computeSnapshotSchema>

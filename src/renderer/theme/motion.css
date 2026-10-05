@@ -2,27 +2,15 @@
    Nola Translator — Motion
    -----------------------------------------------------------------------------
    Imported into @layer base.
-
-   ============================ HARD RULES ================================
-   1. Animate ONLY `transform` and `opacity`. Anything else forces layout or
-      paint on every frame and drops frames on a low-end laptop.
-   2. Never animate `width` / `height` / `top` / `left` / `margin` / `padding`.
-      The ONE sanctioned exception is the expand/collapse built into HeroUI's
-      Disclosure / Accordion, which owns its own height transition.
-   3. Exit is always faster than enter (--dur-exit < --dur-enter). A dismissal
-      that lingers makes the whole app feel sluggish.
-   4. `transform` and `opacity` only — no `filter`, no `box-shadow`, no `color`
-      in keyframes. Colour transitions belong in the 120ms --dur-micro bucket.
    ========================================================================== */
 
 :root {
   --dur-micro: 120ms; /* hover / press / colour / focus ring */
   --dur-enter: 200ms; /* menu, modal, drawer, toast entering */
-  --dur-exit: 120ms; /* exiting — MUST stay below --dur-enter */
+  --dur-exit: 120ms; /* exiting */
   --dur-page: 160ms; /* route change */
 
-  /* Reuse HeroUI's fluid curve so our timing matches every built-in component.
-     The literal is the fallback in case this file loads without @heroui/styles. */
+  /* Reuse HeroUI's fluid curve so our timing matches every built-in component. */
   --ease-nola: var(--ease-out-fluid, cubic-bezier(0.32, 0.72, 0, 1));
   --press-scale: 0.96;
 }
@@ -47,10 +35,7 @@
 /* ============================ Overlay timing ============================== */
 /* HeroUI marks overlay elements with data-entering / data-exiting while the
    transition runs. These two rules retune the duration per phase. Written flat
-   rather than nested so no bundler nesting support is required.
-
-   The Tailwind-native equivalents, if you prefer them:
-     data-[entering]:duration-200 data-[exiting]:duration-120          */
+   rather than nested so no bundler nesting support is required. */
 
 .nola-fade-enter {
   transition:
@@ -246,23 +231,14 @@
 
 /* ============================ Menu item hover ============================= */
 /*
- * 这里**不画左侧 2px accent 指示条**，只用底色表达"指向"。
+ * One marker per state — hover
+ * and keyboard focus use the background, selection uses background + accent
+ * text + HeroUI's own checkmark.
  *
- * 为什么删掉：HeroUI v3 的 `.menu-item__indicator` 是 `position: absolute; inset-inline-start: 8px`
- * —— 选中标记的槽位本来就在**左侧 8px**。我们自己再画一根 2px 的条挂在这个坐标上，
- * 两者精确重叠，✓ 被压成一条 2px 竖线，屏幕上读起来就是"文字左边凭空多了一根不属于
- * 任何东西的线"，而它表达的那件事（这一项是当前生效的）✓ 本来就在说。
- *
- * 一处状态一个标记：hover / 键盘焦点 = 底色；选中 = 底色 + accent 文字 + HeroUI 的 ✓。
- * 再加一根条就是两套语义说同一件事。
- *
- * 选中态靠 `[data-selected]`：它由 react-aria 依据 `selectedKeys` 写，所以键盘导航时
- * 高亮会跟着走。手搓一个 ✓ 会在用键盘选中时留在旧位置。
- *
- * `selectedKeys` 必须传 `Set`（不是字符串）这一点在 TitleBar.tsx 的注释里记着，
- * 是实测出来的：传字符串 react-aria 不报错，但选中态静默失效。
+ * Selection keys off `[data-selected]`, which react-aria writes from
+ * `selectedKeys` so the highlight follows keyboard navigation; a hand-rolled
+ * checkmark would stay behind on the old item.
  */
-
 .nola-menu-item {
   background-color: transparent;
   transition: background-color var(--dur-micro) var(--ease-nola);
@@ -275,8 +251,8 @@
   background-color: var(--surface-tertiary);
 }
 
-/* 选中项：底色转 accent-soft + 文字转 accent（DESIGN 第 8 节"菜单选中项"）。
- * HeroUI 自己在这一态会点亮左侧的 ✓，这里不重复表达。 */
+/* Selection: background to accent-soft, text to accent (DESIGN §8). HeroUI
+   lights its own left checkmark in this state, so nothing is repeated here. */
 .nola-menu-item[data-selected='true'] {
   background-color: var(--accent-soft);
   color: var(--accent);
@@ -327,15 +303,3 @@ html[data-reduce-motion='true'] .nola-live-dot {
   opacity: 1;
   transform: scale(1);
 }
-
-/* =============================================================================
-   BANNED EFFECTS — if one of these is ever "just for polish", it is a bug:
-     - animated / cycling gradient backgrounds
-     - parallax scrolling
-     - spring overshoot on anything
-     - number roll-up counters
-     - purely decorative infinite loops (only the two state indicators above)
-     - card lift on hover (cards do not float in this app)
-     - gradient-filled text
-     - coloured outer glows
-   ============================================================================= */
