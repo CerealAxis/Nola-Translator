@@ -108,7 +108,6 @@ npm run dist:win       # 完整发布：build → build:engine:cpu → prepare:l
 
 - **Never 手改 `engine/dist/`、`vendor/`、`out/`、`release/`、`build/runtime-*.json`**（均在 .gitignore）
 - **Never 顺手改 `package-lock.json`**
-- **Never 用 `scripts/build-engine.ps1` 产出发布包**（死代码，见第 4 节）
 
 ### UI
 

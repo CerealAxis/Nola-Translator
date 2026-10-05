@@ -11,7 +11,6 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
-    "build:engine": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-engine.ps1",
     "build:engine:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-cpu-engine.ps1",
     "prepare:llama:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-llama-cpu.ps1",
     "dist:win": "npm run build && npm run build:engine:cpu && npm run prepare:llama:cpu && electron-builder --win nsis --x64",
