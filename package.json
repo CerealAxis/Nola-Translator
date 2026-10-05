@@ -1,7 +1,7 @@
 {
   "name": "nola-translator",
   "productName": "Nola Translator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "license": "GPL-3.0-only",
   "description": "Real-time Captions and Translation",
   "author": "CerealAxis",
@@ -107,7 +107,7 @@
           ]
         }
       ],
-    "artifactName": "Nola-Translator-${version}-Setup-${arch}.${ext}"
+      "artifactName": "Nola-Translator-${version}-Setup-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
