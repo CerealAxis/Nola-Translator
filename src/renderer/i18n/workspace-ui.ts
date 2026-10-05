@@ -21,14 +21,17 @@ export const workspaceZh = {
    */
   engineRecovering: '引擎断开，正在重连',
   /**
-   * 录音开关下面那行小字。
+   * 录音偏好在开始会话时写失败了。
    *
-   * **不要写回「当前演示不生成真实录音」** —— 录音早就是真的了：主进程 `ipc.ts` 按
-   * `recording.keepAudio` 给引擎注入 `recordingPath`，`meeting-store.ts` 结束时按 WAV
-   * 字节数算出真实的 `audioDurationMs`，记录详情页的 `AudioPlayerBar` 放的就是那个文件。
-   * 留着「演示」两个字会让用户以为关掉也没损失，反而不去开。
+   * 原先这里还有一条 `recordingDemoHint`（「录音会随这场会议保存在本机…」），它挂在
+   * 会话弹窗的保存录音开关下面。说明文字改用 Tooltip 之后并进了 `session.keepAudioHint`，
+   * 这里就只剩失败提示。
+   *
+   * 那条小字曾经写过「当前演示不生成真实录音」，**别再写回去**：录音早就是真的了 ——
+   * 主进程 `ipc.ts` 按 `recording.keepAudio` 给引擎注入 `recordingPath`，`meeting-store.ts`
+   * 结束时按 WAV 字节数算出真实的 `audioDurationMs`，记录详情页的 `AudioPlayerBar` 放的就是
+   * 那个文件。留着「演示」两个字会让用户以为关掉也没损失，反而不去开。
    */
-  recordingDemoHint: '录音会随这场会议保存在本机，结束后可以在记录详情里回放。',
   recordingPreferenceFailed: '录音偏好未保存，请重新开始同传',
 } as const
 
@@ -46,6 +49,5 @@ export const workspaceEn: { [K in keyof typeof workspaceZh]: string } = {
   overlayFailed: 'Could not open floating captions. Try again',
   titleFailed: 'The session started, but its name was not saved. Rename it in records',
   engineRecovering: 'The engine connection dropped. Reconnecting',
-  recordingDemoHint: 'The recording is saved locally with this meeting and can be played back from its record afterwards.',
   recordingPreferenceFailed: 'The recording preference was not saved. Start the session again',
 }

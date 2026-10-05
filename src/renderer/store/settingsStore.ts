@@ -275,6 +275,24 @@ export async function flushPendingSettings(): Promise<void> {
   if (debouncePatch) await flushDebounced()
 }
 
+/**
+ * 后台重读一次磁盘占用。「存储」tab 打开时调它：可用空间与占用大小只有装完/删掉模型之后才变，
+ * 而 `loadSettings` 只在启动时取过一次，不重读就会一直显示旧数字。
+ *
+ * 刻意不碰 `storageBusy` / `loaded` / `loading`：这是打开 tab 时的静默刷新，不是首屏加载，
+ * 不该在界面上表现成一次新的加载。失败只写 `error`，并**保留上一次的 `storage`** ——
+ * 过期数字好过空行。
+ */
+export async function refreshStorage(): Promise<void> {
+  if (!bridge) return
+  try {
+    const storage = await bridge.storage.get()
+    settingsStore.setState({ storage, error: null })
+  } catch (error) {
+    settingsStore.setState({ error: errorMessage(error) })
+  }
+}
+
 export async function chooseStorageDirectory(): Promise<ModelStorageInfo | null> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
   settingsStore.setState({ storageBusy: true, error: null })

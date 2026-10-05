@@ -63,21 +63,20 @@ export const zhCN = {
   session: {
     title: '新建同传',
     name: '名称',
-    namePlaceholder: '例：2026-03-05 周会',
+    nameHelpAria: '名称说明',
+    nameHint: '这个框里显示的是系统会给你这场会起的名字（按开始时间和当天的场次算）。保持原样就用它；改写它就成为这场会的自定义名称。',
     audioSource: '音频来源',
-    audioSourceTest: '测试音频',
-    testingAudio: '正在检测音频输入',
     sourceLanguage: '原文语言',
     targetLanguage: '译文语言',
+    translation: '翻译',
+    translationLanguage: '翻译语言',
+    translationModel: '翻译模型',
     swapLanguages: '交换语言',
     recognitionModel: '识别模型',
-    translateEnabled: '翻译已开启',
-    translateDisabled: '翻译已关闭',
     keepAudio: '保存录音',
-    keepAudioHint: '关闭后不保存音频，无法回放与导出。',
+    keepAudioHint: '关闭后不保存音频，无法回放与导出。录音会随这场会议保存在本机，结束后可以在记录详情里回放。',
     cancel: '取消',
-    next: '下一步',
-    stepSetup: '设置',
+    start: '开始',
     stepPreflight: '检查',
   },
 
@@ -130,12 +129,13 @@ export const zhCN = {
 
   overlay: {
     title: '悬浮字幕',
-    notStarted: '悬浮窗还没有内容',
+    notStarted: '请点击下方的麦克风按钮开始字幕识别',
     /*
-     * 第二行是**译文轨道的位置**，所以这里放英文原文，不放中文提示语 ——
+     * 第二行落在**译文轨道的位置**上，所以这一行即使在中文界面下也保持英文
+     * （`Click the microphone button below to start captioning`），不放中文提示语 ——
      * 中文提示语出现在译文那一侧会让人误以为翻译失败。
      */
-    notStartedHint: 'Start a session to begin',
+    notStartedHint: 'Click the microphone button below to start captioning',
     micStart: '开始收音',
     micStop: '停止收音',
     micLoading: '正在准备识别引擎',

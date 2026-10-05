@@ -59,21 +59,20 @@ export const en: Dictionary = {
   session: {
     title: 'New session',
     name: 'Name',
-    namePlaceholder: 'e.g. Weekly sync 2026-03-05',
+    nameHelpAria: 'About the name',
+    nameHint: 'This box shows the name the system will give this session, derived from the start time and which meeting of the day it is. Leave it as it is to use it; editing it makes it a custom name for this session.',
     audioSource: 'Audio source',
-    audioSourceTest: 'Test audio',
-    testingAudio: 'Detecting audio input',
     sourceLanguage: 'Source language',
     targetLanguage: 'Target language',
+    translation: 'Translation',
+    translationLanguage: 'Translate into',
+    translationModel: 'Translation model',
     swapLanguages: 'Swap languages',
     recognitionModel: 'Recognition model',
-    translateEnabled: 'Translation on',
-    translateDisabled: 'Translation off',
     keepAudio: 'Keep audio',
-    keepAudioHint: 'Without audio you cannot replay or export the session.',
+    keepAudioHint: 'Without audio you cannot replay or export the session. Audio is kept on this machine and stays replayable from the record afterwards.',
     cancel: 'Cancel',
-    next: 'Next',
-    stepSetup: 'Setup',
+    start: 'Start',
     stepPreflight: 'Check',
   },
 
@@ -124,9 +123,9 @@ export const en: Dictionary = {
 
   overlay: {
     title: 'Floating captions',
-    notStarted: 'Nothing in the overlay yet',
-    // 译文轨道那一侧。中文界面下这里也显示英文：那一行的语义就是「译文」。
-    notStartedHint: 'Start a session to begin',
+    notStarted: 'Click the microphone button below to start captioning',
+    // 译文轨道那一侧。中文界面下这里也保持英文：那一行的语义就是「译文」，写成中文会让人以为翻译失败。
+    notStartedHint: 'Click the microphone button below to start captioning',
     micStart: 'Start mic',
     micStop: 'Stop mic',
     micLoading: 'Preparing the recognition engine',

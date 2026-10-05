@@ -33,3 +33,18 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .claude
+
+# 开发态写出的数据根（默认装在仓库根，见 src/main/data-root.ts）：指针文件本身，
+# 加上数据根里归应用所有的那些条目。必须整组忽略而不是只忽略指针 —— `credentials.json`
+# 装的是加密后的 API key，`meetings/` 里是录下来的 WAV，一次 `git add -A` 就能把它们提交进去。
+# 这份清单照抄 src/main/data-migration.ts 的 DATA_ROOT_ENTRIES，再加迁移标记文件
+# data-migration-pending.json（`models` 见上面已有一行 `/models/`），两边改动时对着改。
+# 全部锚在根上，仓库里同名的嵌套目录不受影响。
+/data-location.json
+/data-migration-pending.json
+/settings.json
+/credentials.json
+/history.jsonl
+/meetings/
+/cache/
+/runtimes/

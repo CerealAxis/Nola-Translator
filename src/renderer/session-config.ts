@@ -15,12 +15,17 @@
  *      必须整个字段缺席。给本地 provider 塞一个 `{}` 就够引擎判成「配置非法」。
  *      （这里的 provider 已经从五个塌成 `local` / `cloud` / `microsoft` 三个：云端那档还要
  *      多带 `apiFormat` 与两个 token 预算，因为引擎得知道这个 endpoint 收哪种请求体。）
- *   3. `translationProvider` / `translationModelId` / `allowIntermediateTranslation`
- *      一律取自设置。**新 UI 那版把 provider 写死成 `hymt2`、把量化档写死成
+ *   3. `translationProvider` / `allowIntermediateTranslation` 一律取自设置。
+ *      `translationModelId` 是唯一的例外：会话弹窗可以带一个**用户当场选的**本地模型覆盖它
+ *      （`options.modelId`），**缺席或空白**（空串、纯空格）就沿用设置里的 `localModelId`。
+ *      这一条必须认"空白"而不只是认 `undefined`：弹窗那侧的字段是必填 `string`，见第 3 条下面
+ *      `modelOverride` 处的注释 —— `''` 走到协议层的闭集上会直接让这一场开不起来。
+ *      **新 UI 原来那版把 provider 写死成 `hymt2`、把量化档写死成
  *      `hy-mt2-1.8b-q3-k-m`，并且从不设 `translationOptions`** ——
  *      于是配了 Microsoft / OpenAI / Ollama / m2m100（合并前的旧 provider id）的用户每开一场会话
  *      都被强按到本地 Hy-MT2 上：云端 key 根本不传，本地权重用户又可能压根没装（预检也拦不住，
  *      因为预检算出来的 `translationModelId` 和真正发出去的是同一个写死值，看起来"已安装"）。
+ *      区别在于：那是**代码替用户做的选择**，这里是用户自己点的 —— 两者不能相提并论。
  *   4. `recognitionModelId` / `recognitionMode` 同样取自设置（见 `SessionSetupDialog`）。
  *
  * 旧文件里还有三个标签助手（`shortLanguageLabel` / `translationProviderLabel` /
@@ -47,6 +52,17 @@ export interface TranslationFieldOptions {
    * 会话设置弹窗有自己的语言选择器，所以它会传进来。
    */
   targetLanguage?: string
+  /**
+   * 本次会话临时换用的**本地**模型 id。**缺席或空白时**用 `translation.localModelId`。
+   *
+   * 空白要算"没有覆盖"，不是"覆盖成空串"：`SetupDraft.translationModelId` 是必填 `string`，
+   * 设置 store 还没加载出来时弹窗那边只能填空串（见下面 `modelOverride` 的注释）。
+   *
+   * 只有 `provider === 'local'` 时才会被读（见下面的三元）：云端与 Microsoft 没有
+   * "本地模型 id"这个概念，所以弹窗在服务商不是本地时也不会给出这个选择器。
+   * 这是用户当场做的显式选择，与"写死一个默认值"是两回事 —— 下面第 3 条禁的是后者。
+   */
+  modelId?: string
 }
 
 /**
@@ -65,6 +81,18 @@ export function translationFieldsOf(
 
   const targetLanguages = [options.targetLanguage ?? translation.targetLanguage]
 
+  /*
+   * "没有覆盖"要同时认 `undefined` 与**空白**。`SessionSetupDialog` 那侧的
+   * `SetupDraft.translationModelId` 是必填 `string`，而 `WorkspacePage.openSetup` 在设置 store
+   * 还没加载完（`settings` 仍是 `null`）时只能填 `settings?.translation.localModelId ?? ''`。
+   * 那个 `''` 原样发出去会卡在协议边界上：`sessionConfigSchema` 的 `translationModelId` 是
+   * 四个字面量 id 加 `hub:` 前缀的**闭集**，`''` 不在里面，`startSession` 的 handler 直接抛错，
+   * 这一场根本开不起来 —— 而且预检查不出毛病（预检只在"字段缺失"时回落，字段在场）。
+   * `trim()` 之后判真，纯空格也一并挡掉；用 trim 后的值而不是原串，顺带把误粘的空格摘掉。
+   * 口径与 `store/sessionStore.ts` 的预检回落（`config.translationModelId?.trim() || …`）一致。
+   */
+  const modelOverride = options.modelId?.trim() || undefined
+
   return {
     targetLanguages,
     allowIntermediateTranslation: translation.translateIntermediate,
@@ -73,9 +101,10 @@ export function translationFieldsOf(
     /*
      * 只有本地模型有"模型 id"这个概念：它决定引擎加载哪份权重。云端与 Microsoft 的模型名
      * 走 `translationOptions.model`（云端还带上线路协议与两个 token 预算），那边的模型由
-     * 服务商托管，本机不需要它，所以这个字段整个缺席。
+     * 服务商托管，本机不需要它，所以这个字段整个缺席。取值与"缺席/空白"的区别见上面的
+     * `modelOverride`。
      */
-    translationModelId: translation.provider === 'local' ? translation.localModelId : undefined,
+    translationModelId: translation.provider === 'local' ? modelOverride ?? translation.localModelId : undefined,
     // 见文件头第 2 条：本地 provider 必须是 `undefined`，不是 `{}`。
     translationOptions: translation.provider === 'cloud'
       ? {

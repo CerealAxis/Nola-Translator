@@ -38,17 +38,48 @@ export function isLive(meta: MeetingMeta): boolean {
   return meetingState(meta) === 'running'
 }
 
-export function meetingTitleFor(meta: MeetingMeta, language: UiLanguage): string {
-  if (meta.titleIsCustom && meta.title) return meta.title
-  const at = new Date(meta.startedAtMs)
+/**
+ * 自动标题的**纯格式器**。
+ *
+ * `meetingTitleFor`（记录列表用）与会话弹窗里那个「名称」框的预览共用它。预览如果另写
+ * 一份格式，用户在弹窗里看到的名字就会和之后记录列表里的对不上 —— 而那两个名字指的是
+ * 同一件事。
+ */
+export function autoMeetingTitle(startedAtMs: number, daySequence: number, language: UiLanguage): string {
+  const at = new Date(startedAtMs)
   if (language === 'en') {
     const date = at.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    return meta.daySequence > 0
-      ? date.replace(/\//g, '-') + ' meeting ' + meta.daySequence
+    return daySequence > 0
+      ? date.replace(/\//g, '-') + ' meeting ' + daySequence
       : date.replace(/\//g, '-') + ' meeting'
   }
   const base = at.getFullYear() + '年' + pad(at.getMonth() + 1) + '月' + pad(at.getDate()) + '日_记录'
-  return meta.daySequence > 0 ? base + '_' + meta.daySequence : base
+  return daySequence > 0 ? base + '_' + daySequence : base
+}
+
+export function meetingTitleFor(meta: MeetingMeta, language: UiLanguage): string {
+  if (meta.titleIsCustom && meta.title) return meta.title
+  return autoMeetingTitle(meta.startedAtMs, meta.daySequence, language)
+}
+
+/**
+ * 本地日键。**口径必须与主进程 `MeetingStore.localDayKey` 一致** —— 两边都用本地时区
+ * （不是 UTC），否则跨零点的会议会被算到相邻的一天，序号也就错位了。
+ */
+function localDayKey(at: number): string {
+  const date = new Date(at)
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+}
+
+/**
+ * 下一场会将会拿到的 `daySequence`，即当天**已经存在**的会议数。
+ *
+ * 与主进程 `nextDaySequence` 同口径：`begin()` 是在把新记录放进 cache **之前**数的，
+ * 所以当天第一场拿到 0（不带 `_记录_N` 后缀），第二场 1，以此类推。
+ */
+export function nextDaySequence(meetings: readonly MeetingMeta[], at: number): number {
+  const day = localDayKey(at)
+  return meetings.filter((meta) => localDayKey(meta.startedAtMs) === day).length
 }
 
 export function meetingEndLabel(meta: MeetingMeta): string {
@@ -61,11 +92,16 @@ export function meetingDurationLabel(
   t: (key: TranslationKey, values?: Record<string, string | number>) => string,
 ): string {
   /*
-   * 只有真在跑的时候才用「现在」当终点。中断的会议没有 `endedAtMs`，
-   * 拿 `Date.now()` 去减会得到一个随时间一直变大的时长 —— 越晚打开页面越离谱。
+   * 结束后的时长**直接读 `durationMs`**，不再用 `endedAtMs - startedAtMs` 重算一遍。
+   * 那条式子把引擎卸载权重的收尾时间也算进去了（实测每场多 25~60 秒），而 `endedAtMs`
+   * 现在是"内容结束的时刻"、不是"按下停止的时刻"，两个数本来就不相等。
+   * `durationMs` 是主进程算好的内容跨度，是"时长"在这套代码里**唯一**的定义 ——
+   * 过去列表算一套、详情页读 `durationMs` 另一套，同一条记录两个地方能显示不同数字。
+   *
+   * 只有真在跑的时候才用「现在」当终点。中断的会议没有 `endedAtMs`，拿 `Date.now()`
+   * 去减会得到一个随时间一直变大的时长 —— 越晚打开页面越离谱。
    */
-  const end = meta.endedAtMs ?? (isLive(meta) ? Date.now() : meta.startedAtMs)
-  const ms = Math.max(0, end - meta.startedAtMs)
+  const ms = isLive(meta) ? Math.max(0, Date.now() - meta.startedAtMs) : Math.max(0, meta.durationMs)
   const minutes = Math.round(ms / 60_000)
   if (minutes < 1) return t('homeRecordsUi.durationMinutes', { minutes: 1 })
   if (minutes < 60) return t('homeRecordsUi.durationMinutes', { minutes })

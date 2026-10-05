@@ -3,8 +3,11 @@ import { isAbsolute, join, normalize } from 'node:path'
 
 import { RECOGNITION_MODEL_IDS, type RecognitionModelId } from '../shared/settings'
 
-export function modelStorageEnvironment(userData: string, configuredPath = ''): Record<string, string> {
-  const root = configuredPath && isAbsolute(configuredPath) ? normalize(configuredPath) : userData
+// `dataRoot` is the app's single data root, not `userData`: models and cache default next to the
+// rest of the app's data (see `data-root.ts`). A configured path still wins, but only when it is
+// absolute — a relative or empty setting must not resolve against the process cwd.
+export function modelStorageEnvironment(dataRoot: string, configuredPath = ''): Record<string, string> {
+  const root = configuredPath && isAbsolute(configuredPath) ? normalize(configuredPath) : dataRoot
   return {
     NOLA_TRANSLATOR_MODEL_DIR: join(root, 'models'),
     TMP: join(root, 'cache', 'tmp'),

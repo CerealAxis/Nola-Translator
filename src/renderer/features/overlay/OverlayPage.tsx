@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button, Card, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
 import { ArrowRight, ChevronDown, ExternalLink, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Settings, Square, X } from 'lucide-react'
-import { DEFAULT_SETTINGS, LANGUAGE_LABELS } from '@/bridge'
+import { DEFAULT_SETTINGS, LANGUAGE_LABELS, RECOGNITION_MODEL_LABELS } from '@/bridge'
 import type { AppSettingsPatch } from '@/bridge'
 import { useI18n } from '@/i18n'
 import { useRoute } from '@/routes'
@@ -20,8 +20,13 @@ export function OverlayPage() {
   const [opening, setOpening] = useState(false)
   const config = settings.overlay
   const latest = session.interim ?? session.segments.at(-1)
-  const sourceText = latest?.sourceText || t('shellUi.previewSource')
-  const translationText = latest?.translations.find(item => item.state === 'complete')?.text || t('shellUi.previewTarget')
+  /*
+   * 空会话时的占位走浮窗自己的 `overlay.notStarted*`，**不复用任何一份示例字幕**：
+   * 预览要复刻的是**浮窗**，浮窗空着的时候写的就是这两句，用户先看到的应该是
+   * "还没开麦"，而不是一段编出来的双语样例 —— 后者会让人以为字幕区已经就绪。
+   */
+  const sourceText = latest?.sourceText || t('overlay.notStarted')
+  const translationText = latest?.translations.find(item => item.state === 'complete')?.text || t('overlay.notStartedHint')
   const display = config.showSource && config.showTranslation ? 'both' : config.showSource ? 'source' : 'translation'
   const label = (code: string) => {
     const entry = LANGUAGE_LABELS[code]
@@ -57,17 +62,6 @@ export function OverlayPage() {
     '--preview-translation-line-height': config.translationLineHeight,
     fontFamily: config.fontFamily,
   } as CSSProperties
-  /*
-   * 底部第一个胶囊显示的是**翻译服务商**，跟主仓的 `translationProviderLabel` 同一口径。
-   * 名字跟着界面语言走：五个 provider 塌成 `local` / `cloud` / `microsoft` 三个，
-   * 前两个是界面概念而非产品名（Hy-MT2 与 M2M100 合并进前者，OpenAI 与 Ollama
-   * 合并进后者），只有 Microsoft Translator 是产品名。
-   */
-  const providerNames = {
-    local: t('settings.providerLocal'),
-    cloud: t('settings.providerCloud'),
-    microsoft: t('settings.providerMicrosoft'),
-  } as const
   return (
     <div className="nola-overlay-page">
       <PageHeader className="nola-page-intro" title={t('shellUi.overlay')}
@@ -79,7 +73,8 @@ export function OverlayPage() {
         {/*
          * 预览卡的结构逐条照主仓 `src/renderer/components/CaptionPreview.tsx`：
          * 文字区 → 上下两条渐隐罩 → 右上角七个动作（含那根 1px 分隔线）→ 底部麦克风加
-         * 三个胶囊。整块 `aria-hidden`，它只是外观预览，真控件都在这一页下面那张表单里。
+         * 五个胶囊。胶囊内容与顺序以浮窗本体为准（见下方 `.nola-caption-preview__controls`
+         * 处的注释）。整块 `aria-hidden`，它只是外观预览，真控件都在这一页下面那张表单里。
          */}
         <Card.Content className="nola-overlay-stage">
           <div
@@ -99,10 +94,20 @@ export function OverlayPage() {
               <Monitor /><Lock /><Pin /><i /><MoreHorizontal /><Minus /><X />
             </div>
             <div className="nola-caption-preview__controls">
+              {/*
+               * 底部这一排逐条照浮窗本体 `OverlayControls.tsx:341-452` 的六项，顺序都不能换：
+               * 麦克风 → **识别模型** → 原文语言 → 译文语言 → 显示内容 → 对照方式。
+               * 之前这里第一个胶囊挂的是翻译服务商，而且把两种语言揉成一颗 `原文 → 译文`，
+               * 还把唯一的下拉箭头挂在了模型位上 —— 跟真窗三处都对不上，用户在浮窗里
+               * 看到的能力（换识别模型）反而在预览里看不见。
+               * 箭头只留在末尾两颗：它们才是真窗里带下拉的那两个维度。
+               */}
               <span className="nola-caption-preview__mic">{sessionActive ? <Square /> : <Mic />}</span>
-              <span className="nola-caption-preview__pill">{providerNames[settings.translation.provider]}<ChevronDown /></span>
-              <span className="nola-caption-preview__pill">{label(settings.recognition.sourceLanguage)} → {label(settings.translation.targetLanguage)}</span>
-              <span className="nola-caption-preview__pill">{t(display === 'both' ? 'workspace.modeBoth' : display === 'source' ? 'workspace.modeSource' : 'workspace.modeTranslation')}</span>
+              <span className="nola-caption-preview__pill">{RECOGNITION_MODEL_LABELS[settings.recognition.modelId]}</span>
+              <span className="nola-caption-preview__pill">{label(settings.recognition.sourceLanguage)}</span>
+              <span className="nola-caption-preview__pill">{label(settings.translation.targetLanguage)}</span>
+              <span className="nola-caption-preview__pill">{t(display === 'both' ? 'workspace.modeBoth' : display === 'source' ? 'workspace.modeSource' : 'workspace.modeTranslation')}<ChevronDown /></span>
+              <span className="nola-caption-preview__pill">{t(config.layout === 'rolling' ? 'workspace.layoutSplit' : 'workspace.layoutSentence')}<ChevronDown /></span>
             </div>
           </div>
         </Card.Content>

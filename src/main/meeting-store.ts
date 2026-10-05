@@ -203,17 +203,24 @@ export class MeetingStore {
     if (segments.length === 0) return
     const startedAtMs = Date.now()
     const meetingId = `legacy-${meetingIdFor(new Date(startedAtMs))}`
+    const first = segments[0]
+    const last = segments[segments.length - 1]
+    const contentStartedAtMs = first.startedAtMs
+    const contentEndedAtMs = last.endedAtMs ?? last.startedAtMs
     const meta: MeetingMeta = {
       meetingId,
       title: '',
       titleIsCustom: false,
       startedAtMs,
-      endedAtMs: startedAtMs + (segments[segments.length - 1].startedAtMs || 0),
-      durationMs: segments[segments.length - 1].startedAtMs || 0,
+      endedAtMs: startedAtMs + contentEndedAtMs,
+      // 与新写入的记录同一口径：**内容跨度**，不是墙钟。
+      durationMs: Math.max(0, contentEndedAtMs - contentStartedAtMs),
       daySequence: 0,
       segmentCount: segments.length,
       sourceLanguage: segments.find((segment) => segment.sourceLanguage)?.sourceLanguage ?? 'auto',
       targetLanguage: segments[0].translations[0]?.targetLanguage ?? 'zh',
+      contentStartedAtMs,
+      contentEndedAtMs,
     }
     const directory = this.directory(meetingId)
     await mkdir(directory, { recursive: true })
@@ -282,7 +289,24 @@ export class MeetingStore {
       await appendFile(join(this.directory(meetingId), SEGMENTS_FILE), `${JSON.stringify(segment)}\n`, 'utf8')
     })
     const meta = this.cache.get(meetingId)
-    if (meta) this.cache.set(meetingId, { ...meta, segmentCount: meta.segmentCount + 1 })
+    if (meta) {
+      /*
+       * 内容区间只记**确认句段**，和写进 `segments.jsonl` 的是同一批，所以时长和字幕
+       * 永远说的是同一段时间。录音的 t=0 是采集真正吐出第一帧的时刻，播放器要靠
+       * `contentStartedAtMs` 把字幕对齐过去。
+       */
+      const end = segment.endedAtMs ?? segment.startedAtMs
+      this.cache.set(meetingId, {
+        ...meta,
+        segmentCount: meta.segmentCount + 1,
+        contentStartedAtMs: meta.contentStartedAtMs === undefined
+          ? segment.startedAtMs
+          : Math.min(meta.contentStartedAtMs, segment.startedAtMs),
+        contentEndedAtMs: meta.contentEndedAtMs === undefined
+          ? end
+          : Math.max(meta.contentEndedAtMs, end),
+      })
+    }
   }
 
   async finish(sessionId: string): Promise<MeetingMeta | null> {
@@ -292,13 +316,30 @@ export class MeetingStore {
     return this.serialize(meetingId, async () => {
       const meta = this.cache.get(meetingId)
       if (!meta) return null
-      const endedAtMs = Date.now()
+      const audio = await this.resolveAudio(meta)
+      /*
+       * 结束时刻取**内容结束**，不是 finalize 的墙钟。`finish()` 跑在引擎卸完几个 GB 权重、
+       * 发出 `sessionStopped` 之后，用 `Date.now()` 会把收尾那几十秒算成会议的一部分。
+       *
+       * 时长是**内容跨度**（首条到最后一条），不是 `endedAtMs - startedAtMs` —— 录音本来
+       * 就不含暂停与前导静音（见引擎 `setSessionPaused`），开头空四分钟、之后说了九十分钟的
+       * 一场，录音是 90 分钟，时长也该是 90 分钟。
+       *
+       * 一条字幕都没有的退化情形：有音频就用音频长度，再没有就用墙钟。宁可给一个偏大的
+       * 数字，也不要在列表里显示 00:00 让用户以为记录坏了。
+       */
+      const started = meta.contentStartedAtMs
+      const ended = meta.contentEndedAtMs
+      const endedAtMs = ended === undefined ? Date.now() : meta.startedAtMs + ended
+      const durationMs = started !== undefined && ended !== undefined
+        ? ended - started
+        : audio.audioDurationMs ?? Math.max(0, Date.now() - meta.startedAtMs)
       const next: MeetingMeta = {
         ...meta,
         endedAtMs,
         state: 'completed',
-        durationMs: Math.max(0, endedAtMs - meta.startedAtMs),
-        ...(await this.resolveAudio(meta)),
+        durationMs: Math.max(0, durationMs),
+        ...audio,
       }
       await writeMeta(this.directory(meetingId), next)
       this.cache.set(meetingId, next)

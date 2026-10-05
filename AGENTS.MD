@@ -1,205 +1,150 @@
-# 约定式提交 1.0.0
+# AGENTS.md
 
-## 概述
+> 写给 AI 编程助手的项目规范。视觉规范见 [DESIGN.MD](./DESIGN.MD)。
+> 改项目结构的那一刀必须同步改本文件，否则 AI 拿着过时结构硬套比没有这份文件更糟。
 
-约定式提交规范是一种基于提交信息的轻量级约定。
-它提供了一组简单规则来创建清晰的提交历史；
-这更有利于编写自动化工具。
-通过在提交信息中描述功能、修复和破坏性变更，
-使这种惯例与 [SemVer](http://semver.org/lang/zh-CN) 相互对应。
+## 1. 技术栈
 
-提交说明的结构如下所示：
+- Electron 43.1.1 + React 19.2.7 + TypeScript 7.0.2，`electron-vite` 5 构建，`"type": "module"`
+- 包管理器 npm 11.17.0（**不是 yarn/pnpm**），Node `>=24 <25`
+- 样式：Tailwind v4（`@tailwindcss/vite`）+ CSS 自定义属性 token，**无 CSS Modules、无 Less/Sass**
+- UI 库：HeroUI React v3.2.6 + `@heroui/styles`，图标 `lucide-react`
+- 运行时校验：zod 4.4.3，**只存在于主进程侧**（`src/main` / `src/shared`）
+- 引擎：Python 包 `engine/nola_translator_engine`，经 stdio JSON-lines 与主进程通信
+- 测试：vitest 4 + @testing-library/react，jsdom 环境
 
----
-
-原文：
-
-```
-<type>[optional scope]: <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-译文：
+## 2. 目录结构
 
 ```
-<类型>[可选 范围]: <描述>
-
-[可选 正文]
-
-[可选 脚注]
-```
----
-
-<br />
-提交说明包含了下面的结构化元素，以向类库使用者表明其意图：
-
-1. **fix:** _类型_ 为 `fix` 的提交表示在代码库中修复了一个 bug（这和语义化版本中的 [`PATCH`](https://semver.org/lang/zh-CN/#%E6%91%98%E8%A6%81) 相对应）。
-2. **feat:** _类型_ 为 `feat` 的提交表示在代码库中新增了一个功能（这和语义化版本中的 [`MINOR`](https://semver.org/lang/zh-CN/#%E6%91%98%E8%A6%81) 相对应）。
-3. **BREAKING CHANGE:** 在脚注中包含 `BREAKING CHANGE:` 或 <类型>(范围) 后面有一个 `!` 的提交，表示引入了破坏性 API 变更（这和语义化版本中的 [`MAJOR`](https://semver.org/lang/zh-CN/#%E6%91%98%E8%A6%81) 相对应）。
-破坏性变更可以是任意 _类型_ 提交的一部分。
-4. 除 `fix:` 和 `feat:` 之外，也可以使用其它提交 _类型_ ，例如 [@commitlint/config-conventional](https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional)（基于 [Angular 约定](https://github.com/angular/angular/blob/22b96b9/CONTRIBUTING.md#-commit-message-guidelines)）中推荐的 `build:`、`chore:`、
-  `ci:`、`docs:`、`style:`、`refactor:`、`perf:`、`test:`，等等。
-   - build: 用于修改项目构建系统，例如修改依赖库、外部接口或者升级 Node 版本等；
-   - chore: 用于对非业务性代码进行修改，例如修改构建流程或者工具配置等；
-   - ci: 用于修改持续集成流程，例如修改 Travis、Jenkins 等工作流配置；
-   - docs: 用于修改文档，例如修改 README 文件、API 文档等；
-   - style: 用于修改代码的样式，例如调整缩进、空格、空行等；
-   - refactor: 用于重构代码，例如修改代码结构、变量名、函数名等但不修改功能逻辑；
-   - perf: 用于优化性能，例如提升代码的性能、减少内存占用等；
-   - test: 用于修改测试用例，例如添加、删除、修改代码的测试用例等。
-1. 脚注中除了 `BREAKING CHANGE: <description>` ，其它条目应该采用类似
-  [git trailer format](https://git-scm.com/docs/git-interpret-trailers) 这样的惯例。
-
-其它提交类型在约定式提交规范中并没有强制限制，并且在语义化版本中没有隐式影响（除非它们包含 BREAKING CHANGE）。
-<br /><br />
-可以为提交类型添加一个围在圆括号内的范围，以为其提供额外的上下文信息。例如 `feat(parser): adds ability to parse arrays.`。
-
-## 示例
-
-### 包含了描述并且脚注中有破坏性变更的提交说明
-```
-feat: allow provided config object to extend other configs
-
-BREAKING CHANGE: `extends` key in config file is now used for extending other config files
+src/
+├── main/        # Electron 主进程：IPC 注册、窗口、设置/凭据持久化、引擎子进程
+├── preload/     # 单文件，contextBridge 暴露 window.nolaTranslator
+├── shared/      # 跨进程契约：类型 + zod + 默认值。**改枚举必看这里**
+└── renderer/    # React 应用
+    ├── bridge/  # 渲染进程唯一的数据出口（NolaBridge）
+    ├── store/   # 4 个域 store，自研 useSyncExternalStore 实现
+    ├── components/  # primitives/（封闭 8 个）+ caption/ home/ notes/ reading/
+    ├── features/    # home/ workspace/ overlay/ records/ models/ settings/
+    ├── i18n/         # zh-CN.ts 为 Dictionary 源，en.ts 受其类型约束
+    └── theme/        # 设计 token 唯一来源（CSS）
+engine/nola_translator_engine/  # Python 引擎，协议定义在 protocol.py
+scripts/                        # PowerShell 构建脚本
 ```
 
-### 包含了 `!` 字符以提醒注意破坏性变更的提交说明
-```
-feat!: send an email to the customer when a product is shipped
-```
+- 组件文件名 PascalCase，逻辑模块 camelCase，测试 `*.test.ts(x)` 与源文件同目录
+- 组件目录带 `index.ts` barrel，同时导出组件与 `export type { XProps }`
+- 路径别名 `@` / `@renderer` → `src/renderer`（**在 `electron.vite.config.ts` 与 `vitest.config.ts` 中各写一遍**）
 
-### 包含了范围和破坏性变更 `!` 的提交说明
-```
-feat(api)!: send an email to the customer when a product is shipped
-```
+## 3. 编码规范
 
-### 包含了 `!` 和 BREAKING CHANGE 脚注的提交说明
-```
-feat!: drop support for Node 6
+**事件名**
+- HeroUI v3 用 `onPress`，**全仓不用 `onClick`**（唯一例外是自建 `FeatureCard` 自己的 prop）
+- 图标加 `aria-hidden="true"`
 
-BREAKING CHANGE: use JavaScript features not available in Node 6.
-```
+**组件**
+- 只用具名导出，不用 default export
+- Props 对象用 `export interface XProps`；变体联合用 `export type`
+- 组件内不写用户可见字面量：`label: ReactNode` 由调用方传 `t(...)` 的结果
+- 多 className 拼接用 `[...].filter(Boolean).join(' ')`
 
-### 不包含正文的提交说明
-```
-docs: correct spelling of CHANGELOG
-```
+**状态**
+- 组件**只**调 store action，**不直接调 `bridge.*`**（`settingsStore.ts:4-5`）
+- store **不在模块顶层**触碰 bridge，bridge 由 `initStores()` 注入
+- 禁止 `any`（全仓 `src/renderer` 零命中）
+- 模块求值期**不得同步抛错**——顶层 throw 会连带 `createRoot` 失败；缺 IPC 时 reject 或降级为 no-op
 
-### 包含范围的提交说明
-```
-feat(lang): add polish language
-```
+**i18n**
+- 界面字符串走 `t()`，语言只有 `'zh-CN' | 'en'`
+- `en.ts` 声明为 `const en: Dictionary`，`t()` 收 `Leaves<Dictionary>`，写错 key 是**编译错误**
+- 新增 key 只改 `zh-CN.ts`，`en.ts` 会因类型不匹配而报错
 
-### 包含多行正文和多行脚注的提交说明
-```
-fix: prevent racing of requests
+**样式**
+- 颜色/间距/圆角/字号一律用 token（见 `renderer/theme/`），**不写字面值**
+- 圆角写数字任意值 `rounded-[8px]`，theme 里**没有** `rounded-pill` 这个档位
+- 字阶压 HeroUI 原子组件时用 utilities 层任意值类（`text-[11px]`），`.nola-*` 在 base 层会被 components 层覆盖
+- z-index 只用 `.z-*` 类（见 DESIGN.MD 第 8 节），**禁 `z-50` 字面量**
 
-Introduce a request id and a reference to latest request. Dismiss
-incoming responses other than from latest request.
-
-Remove timeouts which were used to mitigate the racing issue but are
-obsolete now.
-
-Reviewed-by: Z
-Refs: #123
-```
-
-## 约定式提交规范
-
-本文中的关键词 “必须（MUST）”、“禁止（MUST NOT）”、“必要（REQUIRED）”、“应当（SHALL）”、“不应当（SHALL NOT）”、“应该（SHOULD）”、“不应该（SHOULD NOT）”、“推荐（RECOMMENDED）”、“可以（MAY）” 和 “可选（OPTIONAL）” ，其相关解释参考 [RFC 2119](https://www.ietf.org/rfc/rfc2119.txt) 。
-
-1. 每个提交都**必须**使用类型字段前缀，它由一个名词构成，诸如 `feat` 或 `fix` ，
-  其后接**可选的**范围字段，**可选的** `!`，以及**必要的**冒号（英文半角）和空格。
-1. 当一个提交为应用或类库实现了新功能时，**必须**使用 `feat` 类型。
-1. 当一个提交为应用修复了 bug 时，**必须**使用 `fix` 类型。
-1. 范围字段**可以**跟随在类型字段后面。范围**必须**是一个描述某部分代码的名词，并用圆括号包围，例如： `fix(parser):`
-1. 描述字段**必须**直接跟在 <类型>(范围) 前缀的冒号和空格之后。
-  描述指的是对代码变更的简短总结，例如： _fix: array parsing issue when multiple spaces were contained in string_ 。
-1. 在简短描述之后，**可以**编写较长的提交正文，为代码变更提供额外的上下文信息。正文**必须**起始于描述字段结束的一个空行后。
-1. 提交的正文内容自由编写，并**可以**使用空行分隔不同段落。
-1. 在正文结束的一个空行之后，**可以**编写一行或多行脚注。每行脚注都**必须**包含
-  一个令牌（token），后面紧跟 `:<space>` 或 `<space>#` 作为分隔符，后面再紧跟令牌的值（受 
-  [git trailer convention](https://git-scm.com/docs/git-interpret-trailers) 启发）。
-1. 脚注的令牌**必须**使用 `-` 作为连字符，比如 `Acked-by` (这样有助于
-  区分脚注和多行正文)。有一种例外情况就是 `BREAKING CHANGE`，它**可以**被认为是一个令牌。
-1. 脚注的值**可以**包含空格和换行，值的解析过程**必须**直到下一个脚注的令牌/分隔符出现为止。
-1. 破坏性变更**必须**在提交信息中标记出来，要么在 <类型>(范围) 前缀中标记，要么作为脚注的一项。
-1. 包含在脚注中时，破坏性变更**必须**包含大写的文本 `BREAKING CHANGE`，后面紧跟着冒号、空格，然后是描述，例如：
-  _BREAKING CHANGE: environment variables now take precedence over config files_ 。
-1. 包含在 <类型>(范围) 前缀时，破坏性变更**必须**通过把 `!` 直接放在 `:` 前面标记出来。
-  如果使用了 `!`，那么脚注中**可以**不写 `BREAKING CHANGE:`，
-  同时提交信息的描述中**应该**用来描述破坏性变更。
-1. 在提交说明中，**可以**使用 `feat` 和 `fix` 之外的类型，比如：_docs: updated ref docs._ 。
-1. 工具的实现必须**不区分**大小写地解析构成约定式提交的信息单元，只有 `BREAKING CHANGE` **必须**是大写的。
-1. BREAKING-CHANGE 作为脚注的令牌时**必须**是 BREAKING CHANGE 的同义词。
-
-## 为什么使用约定式提交
-
-* 自动化生成 CHANGELOG。
-* 基于提交的类型，自动决定语义化的版本变更。
-* 向同事、公众与其他利益关系者传达变化的性质。
-* 触发构建和部署流程。
-* 让人们探索一个更加结构化的提交历史，以便降低对你的项目做出贡献的难度。
-
-## FAQ
-
-### 在初始开发阶段我该如何处理提交说明？
-
-我们建议你按照假设你已发布了产品那样来处理。因为通常总 *有人* 使用你的软件，即便那是你软件开发的同事们。他们会希望知道诸如修复了什么、哪里不兼容等信息。
-
-### 提交标题中的类型是大写还是小写?
-
-大小写都可以，但最好是一致的。
-
-### 如果提交符合多种类型我该如何操作？
-
-回退并尽可能创建多次提交。约定式提交的好处之一是能够促使我们做出更有组织的提交和 PR。
-
-### 这不会阻碍快速开发和迭代吗？
-
-它阻碍的是以杂乱无章的方式快速前进。它助你能在横跨多个项目以及和多个贡献者协作时长期地快速演进。
-
-### 约定式提交会让开发者受限于提交的类型吗（因为他们会想着已提供的类型）？
-
-约定式提交鼓励我们更多地使用某些类型的提交，比如 `fixes`。除此之外，约定式提交的灵活性也允许你的团队使用自己的类型，并随着时间的推移更改这些类型。
-
-### 这和 SemVer 有什么关联呢？
-
-`fix` 类型提交应当对应到 `PATCH` 版本。`feat` 类型提交应该对应到 `MINOR` 版本。带有 `BREAKING CHANGE` 的提交不管类型如何，都应该对应到 `MAJOR` 版本。
-
-### 我对约定式提交做了形如 `@jameswomack/conventional-commit-spec` 的扩展，该如何版本化管理这些扩展呢？
-
-我们推荐使用 SemVer 来发布你对于这个规范的扩展（并鼓励你创建这些扩展！）
-
-### 如果我不小心使用了错误的提交类型，该怎么办呢？
-
-#### 当你使用了在规范中但错误的类型时，例如将 `feat` 写成了 `fix`
-
-在合并或发布这个错误之前，我们建议使用 `git rebase -i` 来编辑提交历史。而在发布之后，根据你使用的工具和流程不同，会有不同的清理方案。
-
-#### 当使用了 *不在* 规范中的类型时，例如将 `feat` 写成了 `feet`
-
-在最坏的场景下，即便提交没有满足约定式提交的规范，也不会是世界末日。这只意味着这个提交会被基于规范的工具错过而已。
-
-### 所有的贡献者都需要使用约定式提交规范吗？
-
-并不！如果你使用基于 squash 的 Git 工作流，主管维护者可以在合并时清理提交信息——这不会对普通提交者产生额外的负担。
-有种常见的工作流是让 git 系统自动从 pull request 中 squash 出提交，并向主管维护者提供一份表单，用以在合并时输入合适的 git 提交信息。
-
-### 约定式提交规范中如何处理还原（revert）提交?
-
-还原提交（Reverting）会比较复杂：你还原的是多个提交吗？如果你还原了一个功能模块，下次发布的应该是补丁吗？
-
-约定式提交不能明确的定义还原行为。所以我们把这个问题留给工具开发者，
-基于 _类型_ 和 _脚注_ 的灵活性来开发他们自己的还原处理逻辑。
-
-一种建议是使用 `revert` 类型，和一个指向被还原提交摘要的脚注：
+## 4. 构建命令
 
 ```
-revert: let us never again speak of the noodle incident
-
-Refs: 676104e, a215868
+npm run dev            # 开发（electron-vite）
+npm run typecheck      # tsc --noEmit
+npm test               # vitest run
+npm run build          # typecheck && electron-vite build
+npm run dist:win       # 完整发布：build → build:engine:cpu → prepare:llama:cpu → electron-builder
 ```
+
+## 5. Never 规则
+
+### 契约与枚举（本仓最大的缺陷来源）
+
+- **Never 只改枚举的一部分声明。** 同一枚举在 TS/zod/Python 间手工同步、无生成器：
+  - 翻译 provider：`shared/settings.ts:73,149`、`shared/schemas.ts:62`、`main/settings-schema.ts:71`、`engine/.../protocol.py:80`
+  - 云端 API 格式：`shared/settings.ts:82,151`、`shared/schemas.ts:75`、`main/settings-schema.ts:80`、`engine/.../protocol.py:49`
+  - 错误码（13 个）：`shared/contracts.ts:271`、`shared/schemas.ts:165-179`、`engine/.../protocol.py:367-381`
+  - 识别/翻译模型 id：`shared/settings.ts`、`shared/schemas.ts`、`main/settings-schema.ts`、`engine/.../models/catalog.py`
+  - compute 枚举：`shared/compute.ts:4-15` vs `engine/.../compute.py:16-27`（字段数还不一致）
+  - loader（`llama.cpp`/`transformers`/`funasr`）：`shared/contracts.ts:220`、`shared/schemas.ts:212`、`engine/.../hub.py:40`
+- **Never 只改一张 IPC channel 表。** 4 处：preload `index.ts:7-37`、main `ipc.ts:13-32`、
+  `app-ipc.ts:19-28`、`runtime-ipc.ts:7`（该处是**位置索引数组**，重排即静默改错通道）
+- **Never 给 `ResourceRecord.provider` 收窄成闭合联合。** 自装模型会带 `llama.cpp` 等适配器 id；
+  收窄会让记录解析失败，而**事件解析失败 = 协议损坏 = 直接杀掉引擎进程**（`shared/schemas.ts:186-188`）
+- **Never 在 `getEngineState` 里调 `ensureReady()`。** 该通道的全部意义就是回答「引擎现在怎么样」，
+  自己会启动引擎就永远问不出「从没启动过」（`main/ipc.ts:356-365`）
+- **Never 给 `AppSettingsPatch` 加字段却不同步 `main/settings-schema.ts`。** 注释已写明：
+  两者之间没有任何机制强制一致，漏改则**静默丢弃**，设置永远不落盘（`settings-schema.ts:4-11`）
+- **Never 发送 `translationOptions: {}`。** `provider === 'local'` 时该字段必须**整个缺席**，
+  空对象会被引擎判为非法配置（`shared/contracts.ts:52-56`、`main/ipc.ts:275-284`）
+
+### 进程边界
+
+- **Never 在 `ipcBridge.ts` 之外触碰 `window.nolaTranslator`。** 该全局只允许在 `ipcBridge.ts:51-55` 读一次
+  （现存越界：`OverlayRoot.tsx:118`、`TitleBar.tsx:105`、`i18n.tsx:94,127`）
+- **Never 在组件里直接调 `bridge.*`**，走 store action
+- **Never 把 API key 写进 `SecureCredentialStore`（`safeStorage` 加密 → `credentials.json`）以外的地方**
+- **Never 假设 `engine:event` 只带引擎事件**，它也带主进程自己的 `engineStateChanged`
+
+### 生成物与依赖
+
+- **Never 手改 `engine/dist/`、`vendor/`、`out/`、`release/`、`build/runtime-*.json`**（均在 .gitignore）
+- **Never 顺手改 `package-lock.json`**
+- **Never 用 `scripts/build-engine.ps1` 产出发布包**（死代码，见第 4 节）
+
+### UI
+
+- **Never 直接渲染 `state.error`。** 它是引擎抛的诊断原文（可能是中文），不走 i18n；
+  界面必须用 `errorCode` / `errors.*` 去 `t()` 查（`store/index.ts:18-21`）
+- **Never 加第 9 个 primitive。** `components/primitives/` 封闭 8 个，理由见 DESIGN.MD 第 11 节
+- **Never 移动 `src/renderer/index.css` 或删掉 `source(none)`。** `@source` 路径相对 CSS 文件，
+  挪走会让所有 `features/**` 的类**静默失效**且不报错（`index.css:8-25`）
+- **Never 往 `index.html` 加内联 `<script>`。** CSP 是 `script-src 'self'`，
+  需提前执行的脚本放 `public/theme-boot.js`（`index.html:21-28`）
+- **Never 把 `renderer/index.css` 的导入顺序改乱**：`source(none)` → `@source` → `@heroui/styles` → `theme/index.css` → `theme/app.css`（`index.css:27-31`）
+- **Never 加第二个渲染进程入口**，浮窗靠 `main.tsx:33` 的 `?overlay=1` 分支
+
+### 协作
+
+- **Never `git stash`、Never 切分支、Never commit 别人改过的文件**（多 Agent 并发时，stash 会吞掉对方的改动）
+- **Never 未经用户确认就 commit。** 提交前先把提交信息发给用户确认，且**提交信息用英文**
+
+## 6. 约定与协作
+
+**Commit 规范**
+
+- 格式：`<type>[optional scope][!]: <description>`
+- 类型：`feat` / `fix` / `docs` / `style` / `refactor` / `perf` / `test` / `build` / `ci` / `chore`
+- 破坏性变更：前缀加 `!`
+- 描述用**英文**、祈使语气、小写开头、不加句号
+- 提交前先主动发给用户确认，**提交信息请使用英文**
+- 正文留空
+
+**多 Agent 并发**
+
+- 派活必须写清文件所有权边界，避免两个 worker 改同一个文件
+- 并行前先 `git status --porcelain -uall` 确认目标文件不存在
+- 审计与修复分开：Verifier 只出结论，修复派 Worker
+
+**维护本文件**
+
+- 每踩一个坑就往第 5 节加一条 Never 规则，并写清原因
+- 项目结构变更必须同步更新第 1、2、4 节

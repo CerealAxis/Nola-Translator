@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "license": "GPL-3.0-only",
   "description": "Real-time Captions and Translation",
-  "author": "Nola Translator Contributors",
+  "author": "CerealAxis",
   "private": true,
   "type": "module",
   "main": "out/main/index.js",

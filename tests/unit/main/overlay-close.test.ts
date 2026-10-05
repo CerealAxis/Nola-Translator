@@ -40,6 +40,9 @@ it('closes an idle overlay without starting the engine', async () => {
   expect(engine.request).not.toHaveBeenCalled()
 })
 
+/** 让出整个微任务队列：一次 `await Promise.resolve()` 只推进一格，不够。 */
+const flushMicrotasks = () => new Promise<void>(resolve => { setTimeout(resolve, 0) })
+
 it('shares the stop request when closing and stopping concurrently', async () => {
   const { engine, window, invoke, start } = setup()
   await start()
@@ -47,7 +50,18 @@ it('shares the stop request when closing and stopping concurrently', async () =>
   engine.request.mockImplementation(() => new Promise(resolve => { finish = resolve }))
   const stop = invoke(IPC_CHANNELS.stopSession, 'session-1')
   const close = invoke(IPC_CHANNELS.closeOverlay)
-  await Promise.resolve()
+  /*
+   * 这里**必须**把整个微任务队列排空，不能只 `await Promise.resolve()`。
+   *
+   * `stopSession` → `stopActiveSession` → `ensureReady` → `await whenRuntimeReady()`
+   * 这条链上有好几个 await，而 `whenRuntimeReady` 是主进程那道运行时初始化闸门
+   * （`index.ts`：`await runtimeInitialization`）。一次微任务只能推进一格，于是断言会在
+   * `engine.request` 真正被调用**之前**执行，看到 0 次调用而失败。
+   *
+   * 去重本身不依赖等多久：`stoppingSession` 是在 `stopActiveSession` 里**同步**赋值的，
+   * 所以第二个调用方（关闭浮窗）拿到的必然是同一个 in-flight promise。
+   */
+  await flushMicrotasks()
   expect(engine.request.mock.calls.filter(([command]) => command.type === 'stopSession')).toHaveLength(1)
   finish({ sessionId: 'session-1' })
   await Promise.all([stop, close])

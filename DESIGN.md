@@ -1,6 +1,9 @@
 # Nola Translator 设计系统
 
-更新：2026-10-02
+> 视觉规范。代码规范见 [AGENTS.MD](./AGENTS.MD)。
+> Token 事实源在 `src/renderer/theme/`
+> 两边不一致时以 CSS 为准，并回来改本文件。
+> 更新：2026-10-05
 
 ## 1. 视觉与功能基准
 
@@ -143,6 +146,136 @@ Electron 拖拽仅顶栏/浮窗壳，交互元素 no-drag。原生窗口控制�
 ## 7. 实施与验收
 
 先更新本规范，再分工实现。共享主题/main/routes/基础壳层/聚合i18n由主代理维护；页面代理只写分配模块与独立locale文件。
-完成后运行 typecheck、lint、相关已有测试、build，并检查三个窗口尺寸、深浅主题、各页与弹层。
+完成后运行 `npm run typecheck` 与 `npm test`（已有测试），并 `npm run build` 后检查三个窗口尺寸、深浅主题、各页与弹层。
+> 本仓**没有 lint 脚本**（`package.json` 无 `lint`），不要向 AI 承诺 lint 结果。
 验收：单Logo、导航从顶部连续排列、首页四卡合理折行、工具栏无遮挡、无横向滚动、控件不截断、所有操作可执行。
 生成PNG用于设计比对，不能作为整页交互背景。
+
+## 8. Design Token 台账
+
+> 组件只引用 token，不写字面值。台账来源：`src/renderer/theme/index.css`、
+> `nola-light.css`、`nola-dark.css`、`z-index.css`。
+
+### 8.1 颜色（语义 token，OKLCH）
+
+| token | 浅色 | 深色 | 用途 |
+| --- | --- | --- | --- |
+| `--background` | `oklch(97.8% 0.014 255)` | `oklch(21% 0.039 259)` | 页面底色 |
+| `--surface` | `oklch(99.6% 0.004 255)` | `oklch(27% 0.044 258)` | 卡片/面板 |
+| `--surface-secondary` | `oklch(97.4% 0.012 255)` | `oklch(31% 0.048 258)` | 次级面、字段 |
+| `--surface-tertiary` | `oklch(94.4% 0.024 255)` | — | 三级面、hover |
+| `--foreground` | `oklch(22.5% 0.047 261)` | `oklch(96% 0.014 255)` | 主文字 |
+| `--muted` | `oklch(57.5% 0.046 259)` | `oklch(74% 0.04 258)` | 次要文字 |
+| `--border` | `oklch(92.3% 0.026 255)` | `oklch(37% 0.05 258)` | 边框 |
+| `--separator` | `oklch(95.2% 0.013 255)` | `oklch(32% 0.044 258)` | 分隔线 |
+| `--accent` | `oklch(60% 0.22 257)` | `oklch(70% 0.16 257)` | 主色 |
+| `--success` | `oklch(71% 0.19 155)` | `oklch(76% 0.16 157)` | 成功 |
+| `--warning` | `oklch(73% 0.16 65)` | `oklch(80% 0.15 75)` | 警告 |
+| `--danger` | `oklch(64% 0.21 23)` | `oklch(72% 0.18 22)` | 危险 |
+
+四色入口：`--color-blue`（=accent）/ `--color-purple` / `--color-orange` / `--color-emerald`，
+**仅用于对应入口卡与装饰**，不得挪作语义色。柔色底用
+`--color-accent-soft: color-mix(in oklch, var(--accent) 12%, var(--surface))`。
+
+> 中性色与彩色背景混合用 `oklab`。用 `oklch` 会让橙色/薄荷绿的色相被插值混成紫蓝。
+
+### 8.2 字阶（`--font-*`）
+
+| token | 值 | 用途 |
+| --- | --- | --- |
+| `--font-display` | `600 48px/1.2` | Hero 标题 |
+| `--font-h1` | `600 32px/1.25` | 页面标题 |
+| `--font-h2` | `600 24px/1.3` | 小节标题 |
+| `--font-title` | `600 15px/1.4` | 卡片标题 |
+| `--font-body` | `400 14px/1.65` | 正文 |
+| `--font-body-strong` | `600 14px/1.45` | 强调正文 |
+| `--font-caption` | `400 13px/1.5` | 说明文字 |
+| `--font-label` | `500 12px/1.4` | 元信息 |
+
+字体族 `--font-ui`: Segoe UI Variable Text / Microsoft YaHei UI / PingFang SC / system-ui。
+`--font-mono`: Cascadia Mono / SF Mono / Consolas。
+
+> **压 HeroUI 原子组件的字阶必须用 utilities 层任意值类**（`text-[11px] leading-[1.45]`），
+> 不能靠 `.nola-*`——那些在 `@layer base`，而 `.chip`/`.button` 在 `@layer components`，
+> 层序是 `theme < base < components < utilities`，后写的 components 会赢。
+
+### 8.3 间距、圆角、投影
+
+- 间距 `--space-1…8`：8 / 16 / 24 / 32 / 40 / 48 / 64 / 80px
+- 圆角 `--radius-sm/md/lg/xl/2xl/full`：6 / 8 / 12 / 16 / 24 / 9999px
+  → 写数字任意值 `rounded-[8px]`。**theme 里没有 `--radius-pill`**，写 `rounded-pill` 不生成任何样式
+- 投影 `--shadow-sm/md/lg`，深色模式只降不透明度（`index.css:116-121`），几何不变
+
+### 8.4 Z-index 阶梯（唯一事实源）
+
+`--z-caption-scrim:10` → `--z-sticky:20` → `--z-caption-actions:30` → `--z-dropdown:40`
+→ `--z-overlay:60` → `--z-toast:80` → `--z-titlebar-drag:100`
+
+配套类：`.z-base` `.z-caption-scrim` `.z-sticky` `.z-caption-actions` `.z-dropdown`
+`.z-overlay` `.z-toast` `.z-titlebar-drag`
+
+> **禁止 `z-50` 这类字面量。** 新增层级必须先在 `z-index.css` 加 `--z-*` 并写明理由。
+> 档位之间的空隙是留给未来嵌套 portal 的，不要为了「排整齐」去重排。
+
+### 8.5 语义类（`@layer components`）
+
+`.nola-card` `.nola-panel` `.nola-list` `.nola-scrollbar` `.nola-drag` `.nola-no-drag`
+`.nola-measure` `.nola-baseline-pair` `.nola-baseline-row`
+
+`caption-card.css` **故意不进任何 layer**，靠无层声明压过 HeroUI 的 `.button`。
+
+### 8.6 Layer 顺序（改动即静默失效）
+
+`@layer theme, base, components, utilities` 在 `theme/index.css:28` 声明，
+并必须在 `index.html:63` **任何样式之前**重复注册一次，否则页面局部样式抢先注册
+`components` 会让全局 reset 反过来覆盖布局。
+
+- 颜色/字阶/动效 → `base`（必须与 HeroUI 同层且源码在后，否则 HeroUI 赢）
+- 语义类 → `components`
+- HeroUI 原子覆写、z-index → `utilities`
+
+## 9. Never 规则（视觉）
+
+- **Never 写字面色值**，用 8.1 的语义 token。（现存例外：字幕卡颜色为设置项数据、
+  启动页 `index.html` splash 自带一套、Logo 内 `#97F0DA` 为品牌锁定色）
+- **Never 写 `z-50` 类字面量**
+- **Never 在组件里写用户可见字面量**，由调用方传 `t(...)` 的结果
+- **Never 新增第 9 个 primitive**（见第 11 节）
+- **Never 给功能页用 `w-screen` / `100vw` / 负 margin / `fixed` 逃出主内容**
+- **Never 用内联 `style={{}}` 承载主题色**；动态计算值除外
+- **Never 用纯黑投影、逐行投影、卡片 hover 大幅抬升**
+- **Never 移除或改乱 `renderer/index.css` 的导入顺序与 `source(none)`**
+- **Never 往 `index.html` 加内联 `<script>`**（CSP `script-src 'self'`）
+
+## 10. 验收清单
+
+改完 UI 必须逐项确认：
+
+- 1440×960 / 1180×780 / 760×560 三个尺寸无横向滚动、无内容藏到侧栏后
+- 深浅两套主题下对比度可读，且几何尺寸不变
+- 三个窗口（主窗口 / 悬浮字幕 / 设置）各自独立滚动，不逃出壳层
+- 所有交互元素有可访问名称；图标 `aria-hidden`
+- `npm run typecheck` 与 `npm test` 通过
+
+## 11. 组件台账
+
+> 本节是 `src/renderer/components/primitives/index.ts:2,8` 引用的「DESIGN 第 11.1 / 11.2 节」，
+### 11.1 四步决策阶梯
+
+新建 UI 组件前必须依次尝试，任一步成功即停：
+
+1. HeroUI 有没有语义匹配的原子组件？
+2. 它的 `className` + `variant` 能不能达到？
+3. `extend xxxVariants` 能不能加出来？
+4. 都不行才自创
+
+### 11.2 自创组件封闭清单
+
+`AppShell` `TitleBar`(+`useNolaTheme`) `PageHeader` `StatusPill` `SectionCard`
+`SettingRow` `ErrorBoundary` `NolaLogo` `NavigationItem`
+
+- 以上每个都过了 11.1 的四步决策
+- 其余 5 个台账组件归 feature 层所有，不是「缺了」：
+  `ModelCard` `DualColumnView` `CaptionLine` `NotesPanel` `AudioPlayerBar`
+- 新增任何 UI 一律用 HeroUI 原子组合；确需新增自创件，先改本节再改代码
+

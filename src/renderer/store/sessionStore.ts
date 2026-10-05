@@ -1,7 +1,7 @@
 /**
  * 同传会话状态机：`idle | starting | running | paused | stopping | error`。
  *
- * 这个文件里有五条从主仓继承来的教训，写的时候不要"简化"掉：
+ * 这个文件里有六条从主仓继承来的教训，写的时候不要"简化"掉：
  *
  * 1. `stop()` 的 `finally` **必须**清掉 sessionId。停失败时如果把 id 留着，下一次
  *    `stopSession(id)` 会打在一个已经死掉的会话上，引擎会回 sessionNotRunning，然后
@@ -16,6 +16,9 @@
  *    `applyEngineState` 写。曾经反过来：界面自己先猜"要 booting 了"，再用
  *    这个猜测反过来判定"引擎起不来"—— 猜错一次就报一次假故障（这个 bug 类已经让三个
  *    界面 bug 各打了一个临时补丁）。手上没有权威信号时，正确做法是不知道，不是猜。
+ * 6. **结束一场同传要连字幕一起清。** `clearSessionTranscript` 以前写好了、导出了，
+ *    却**一个调用方都没有**，于是浮窗在引擎停了之后继续显示上一场的最后一句。
+ *    清字幕的三个点在下面各自注明了——少一个就漏一条路径。
  */
 
 import { DEFAULT_SETTINGS } from '@/bridge'
@@ -272,6 +275,8 @@ function abandonSessionOnEngineLoss(): void {
   stopTicker()
   pausedAtMs = null
   pausedTotalMs = 0
+  // 引擎都没了，字幕流不可能再更新，留着就是一段永远不会再变的死文本。见 `clearSessionTranscript`。
+  clearSessionTranscript()
   sessionStore.setState({
     status: 'error',
     // 诊断串：这一条是写死的，因为退出码与信号只存在于主进程（日志与 `diagnostics`），
@@ -516,6 +521,9 @@ export async function stopSession(): Promise<void> {
     stopTicker()
     pausedAtMs = null
     pausedTotalMs = 0
+    // 字幕同样无条件清：这场对界面来说已经结束了（id 都忘了），留着它只会让浮窗
+    // 在下一场开始前继续显示上一场的最后一句。见 `clearSessionTranscript`。
+    clearSessionTranscript()
     sessionStore.setState({ sessionId: null, meetingId: null, startedAtMs: null })
   }
 }
@@ -556,10 +564,24 @@ export function resetSessionError(): void {
   sessionStore.setState({ status: 'idle', error: null, errorCode: null })
 }
 
+/**
+ * 清空这一场的实时字幕。
+ *
+ * **每一场结束都要调它**，下面三个收尾点各调一次：`stopSession` 的 `finally`、协议事件
+ * `sessionStopped`、以及 `abandonSessionOnEngineLoss`。
+ *
+ * 为什么不能留着：字幕正文在这场进行期间就已经由主进程逐句写进会议记录了
+ * （`meeting-store` 的 `append`），所以清掉的是**副本**不是数据，记录详情页照旧看得到。
+ * 而留着它的后果不是"多了一屏字"，是浮窗在**下一场**开始前仍然显示上一场的最后一句 ——
+ * `OverlayRoot` 的 `CaptionTrack` 按 `session.sessionId ?? 'idle'` 上 key，会话结束、
+ * `sessionId` 变 null 时轨道会重新挂载，然后忠实地把 `segments` 的最后一条再画一次。
+ * 引擎明明已经停了，字幕却停不下来。
+ *
+ * 这个函数以前**没有任何调用方**：写好了、导出了，然后谁也没调。
+ */
 export function clearSessionTranscript(): void {
   sessionStore.setState({ segments: [], interim: null })
 }
-
 // -- 注入 ---------------------------------------------------------------------
 
 export function attachSessionStore(next: NolaBridge): void {
@@ -711,6 +733,9 @@ export function attachSessionStore(next: NolaBridge): void {
         // 引擎侧已经收尾了。把 UI 状态对齐，不去猜 meeting 的最终时长。
         if (sessionStore.getState().sessionId !== event.sessionId) return
         stopTicker()
+        // 这条边沿是**主进程**停会话时走的路径（浮窗的「关闭并停止」就是它），
+        // 本窗并没有调过 `stopSession`，所以字幕必须在这里单独清一次。
+        clearSessionTranscript()
         sessionStore.setState({ status: 'idle', sessionId: null, meetingId: null, startedAtMs: null })
         pausedAtMs = null
         pausedTotalMs = 0

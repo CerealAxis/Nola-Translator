@@ -11,7 +11,7 @@
  * 写成 `@/shared/contracts` 会解析到不存在的 `src/renderer/shared/contracts`。
  */
 
-import type { ModelStorageInfo, NolaTranslatorApi } from '../../shared/bridge'
+import type { NolaTranslatorApi } from '../../shared/bridge'
 import type { ResourceRecord, ResourceSnapshot } from '../../shared/contracts'
 
 // ---------------------------------------------------------------------------
@@ -83,16 +83,6 @@ export type { NolaTranslatorApi }
  */
 export type ResourceRecordWithRate = ResourceRecord & {
   readonly bytesPerSecond?: number
-}
-
-/**
- * `ModelStorageInfo.totalBytes`：设置页的「已用 / 总量」进度条需要分母。
- * 主仓的 `ModelStorageInfo` 只有 `activePath` / `configuredPath` / `restartRequired`，
- * 所以真实后端下这个分母恒为 `undefined`，进度条会退化成只显示「已用」。
- * 缺分母时与其画一个假的分母不如把百分比藏掉，见 `StorageTab`。
- */
-export type ModelStorageInfoWithTotal = ModelStorageInfo & {
-  readonly totalBytes?: number
 }
 
 export type ResourceSnapshotWithRate = Omit<ResourceSnapshot, 'resources'> & {

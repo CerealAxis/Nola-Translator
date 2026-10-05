@@ -42,6 +42,13 @@
   .nola-route-content { display: flex; flex-direction: column; width: 100%; min-width: 0; max-width: var(--nola-content-max); margin: 0 auto; padding: var(--nola-page-padding); gap: 20px; }
   .nola-route-content > * { min-width: 0; }
   .nola-route-content[data-page="workspace"] { height: 100%; }
+  /*
+   * 记录屏的表格卡片要贴到内容区底部（分页行常驻下沿），这层得先有确定高度，百分比才有得解析。
+   * `.nola-main` 是 `flex:1` 的滚动容器，高度由 `.nola-app-shell` 的 100dvh 推出来，所以 100% 有效。
+   * 用 min-height 而不是 height：行多到超过一屏时让这层长出去、交给 `.nola-main` 滚，
+   * 而不是被钉死在视口高度里让表格被裁。
+   */
+  .nola-route-content[data-page="records"] { min-height: 100%; }
   .nola-section-card { gap: 0; min-width: 0; border-radius: 16px; border: 1px solid var(--border); box-shadow: var(--surface-shadow); background: var(--surface); color: var(--foreground); }
   .nola-setting-row { display: grid; grid-template-columns: minmax(120px, .85fr) minmax(0, 1fr); align-items: center; min-height: 48px; gap: 20px; padding: 9px 16px; }
   .nola-setting-control { display: flex; justify-content: flex-end; align-items: center; min-width: 0; gap: 8px; }

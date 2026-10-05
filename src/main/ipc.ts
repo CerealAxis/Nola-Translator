@@ -411,15 +411,41 @@ export function registerEngineIpc(
     }))
   })
 
-  const forwardEvent = (event: EngineEvent): void => {
+  const broadcast = (event: EngineEvent): void => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(IPC_CHANNELS.event, event)
     }
-    if (event.type === 'sessionStopped') {
-      activeSessionId = null
-      getOverlayWindow()?.hide()
-      void meetings?.finish(event.sessionId).catch((error) => console.error('meeting finalize failed', error))
+  }
+
+  /*
+   * **先收账本，再广播。** 与下面 `forwardState` 里的 `releaseSessionOnEngineLoss` 同一条纪律。
+   *
+   * 原来这里是反过来的：先把 `sessionStopped` 发给所有窗口，再去 `meetings.finish()`。
+   * 而渲染进程的 `meetingStore` 收到这条事件的处理就是立刻重拉列表（"一场同传结束时引擎才
+   * 补齐 endedAtMs / durationMs，这是列表唯一需要重拉的时刻"）—— 于是它读到的是
+   * **还没收尾的** `begin()` 写的那份：`state: 'running'`、`durationMs: 0`。列表把这份
+   * 快照存下来，而 `finish()` 之后不会再发任何事件，于是这条记录就一直挂在"进行中"，
+   * 时长永远是 00:00:00，直到应用重启。
+   *
+   * 主进程自己的账本已经写好（`finish()` 落盘并更新 cache）才广播，界面收到的那条边沿
+   * 才是真的"这场会已经收尾了"。收尾只读写一个 meta 文件，代价是几毫秒。
+   */
+  const forwardEvent = (event: EngineEvent): void => {
+    if (event.type !== 'sessionStopped') {
+      broadcast(event)
+      return
     }
+    activeSessionId = null
+    getOverlayWindow()?.hide()
+    /*
+     * `meetings` 为 null 时必须走 `Promise.resolve()`，不能写成
+     * `void meetings?.finish(x).finally(broadcast)`：可选链会把整条链短路成 `undefined`，
+     * `.finally` 跟着不执行，于是**广播永远不会发生**，界面就再也不知道这场会话结束了。
+     */
+    const finalized = meetings
+      ? meetings.finish(event.sessionId).catch((error) => console.error('meeting finalize failed', error))
+      : Promise.resolve()
+    void finalized.finally(() => broadcast(event))
   }
   engine.on('event', forwardEvent)
 

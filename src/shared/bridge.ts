@@ -14,7 +14,30 @@ import type { AppSettings, AppSettingsPatch, CredentialProvider } from './settin
 import type { ComputeSnapshot, RuntimeSnapshot } from './compute'
 
 export type SessionStartResult = { sessionId: string; meetingId: string | null }
-export type ModelStorageInfo = { activePath: string; configuredPath: string; restartRequired: boolean }
+
+/**
+ * 模型保存位置的信息，外加一个**读盘**得到的数字。
+ *
+ * 这个字段以前不存在，存储页的「已用 / 总量」于是只能拿"目录里这些模型全装齐共需"
+ * 当分母 —— 那是配额，不是磁盘的真实读数，画出来的条是假的。现在补上的是真读数。
+ *
+ * **字段是可选的，测不到时缺席，而不是 0。** 0 会被界面读成"磁盘满了"，
+ * 编一个近似值比不给更糟：用户据此做的判断（换盘、清会议）都会建立在假数字上。
+ */
+export type ModelStorageInfo = {
+  activePath: string
+  configuredPath: string
+  restartRequired: boolean
+  /**
+   * `configuredPath` 所在卷的可用空间，来自 `fs.statfs` 的 `bavail * bsize`
+   * （**不是** `bfree` —— 那个含系统保留块，是普通用户写不进去的空间）。
+   *
+   * `configuredPath` 是模型**将要**装进去的目录，全新安装时还不存在，`statfs` 会抛
+   * `ENOENT`；主进程因此上溯到最近一个已存在的祖先再 stat（同一卷上答案相同）。
+   * 逐个候选都失败时本字段缺席。
+   */
+  freeBytes?: number
+}
 
 /**
  * **主进程自己发的**引擎生命周期事件，不是引擎发的话。

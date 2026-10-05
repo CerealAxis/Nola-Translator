@@ -146,6 +146,7 @@ export function WorkspacePage() {
       recognitionModelId: settings?.recognition.modelId ?? 'qwen3-asr-1.7b-hf',
       translate: true,
       targetLanguage: settings?.translation.targetLanguage ?? 'zh',
+      translationModelId: settings?.translation.localModelId ?? '',
       keepAudio: settings?.recording.keepAudio ?? true,
     })
     setSetupOpen(true)
@@ -176,6 +177,12 @@ export function WorkspacePage() {
     if (config === null) return
     setPreflightOpen(false)
     if (draft) {
+      /*
+       * 录音开关落的是**全局偏好**，不是这场会话的配置：它写进 `settings.recording.keepAudio`，
+       * 主进程 `ipc.ts` 据此决定要不要给引擎注入 `recordingPath`（不给就不产生任何 WAV）。
+       * 所以在弹窗里拨一次会同时改掉以后每场的默认值 —— 这是"偏好"该有的样子，不是 bug。
+       * 顺带一句：录音早就是真的了，记录详情页放的是真实 WAV，界面文案别再写"演示"。
+       */
       try {
         await actions.settings.updateSettings({ recording: { keepAudio: draft.keepAudio } })
       } catch {
@@ -409,6 +416,7 @@ const EMPTY_DRAFT: SetupDraft = {
   recognitionModelId: 'qwen3-asr-1.7b-hf',
   translate: true,
   targetLanguage: 'zh',
+  translationModelId: '',
   keepAudio: true,
 }
 

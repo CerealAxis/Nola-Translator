@@ -21,7 +21,7 @@ import type {
   EngineProcessState,
   ExportFormat,
   MeetingMeta,
-  ModelStorageInfoWithTotal,
+  ModelStorageInfo,
   ResourceRecord,
   ResourceSnapshotWithRate,
   ResourceState,
@@ -96,7 +96,7 @@ export interface NolaBridge {
     import(): Promise<boolean>
     cancel(): Promise<void>
   }
-  storage: { get(): Promise<ModelStorageInfoWithTotal>; choose(): Promise<ModelStorageInfoWithTotal | null>; restartApp(): Promise<void> }
+  storage: { get(): Promise<ModelStorageInfo>; choose(): Promise<ModelStorageInfo | null>; restartApp(): Promise<void> }
   meetings: {
     list(): Promise<MeetingMeta[]>
     get(id: string): Promise<MeetingMeta | null>
@@ -202,11 +202,10 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
 
 /**
  * tier: 'ipc-new' — 通道是 `'ipc'`（上面 BRIDGE_TIERS 已列），缺的是主仓**类型**里要补的字段。
- * 渲染层已经用交叉类型（`ResourceRecordWithRate` / `ModelStorageInfoWithTotal`）把它们接上了，
- * 主仓补完字段后把这两个交叉类型换回裸类型即可，UI 与 store 都不用动。
+ * 渲染层已经用交叉类型 `ResourceRecordWithRate` 把它接上了，
+ * 主仓补完 `bytesPerSecond` 后把这个交叉类型换回裸 `ResourceSnapshot` 即可，UI 与 store 都不用动。
  */
 export const BRIDGE_MISSING_FIELDS: Record<string, string> = {
-  'storage.get().totalBytes': 'ModelStorageInfo',
   'engine.listResources().bytesPerSecond': 'ResourceRecord',
 }
 

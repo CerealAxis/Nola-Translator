@@ -61,9 +61,16 @@ describe('会议展示格式', () => {
     expect(isLive(meeting({ endedAtMs: Date.now() }))).toBe(false)
   })
 
+  /*
+   * 时长读的是 `durationMs`（主进程算好的**内容跨度**），不再用 `endedAtMs - startedAtMs`
+   * 重算一遍 —— 那条式子把引擎卸载权重的收尾时间也算进去了，每场虚高 16 秒到 5 分钟。
+   *
+   * 这里刻意让两个值**不一致**（`endedAtMs` 多给 30 秒），断言才真的锁住新口径：
+   * 哪天有人改回重算，这几个断言会立刻红，而不是又悄悄显示一个偏大的数字。
+   */
   it('会议时长按分钟/小时折算, 不足一分钟按一分钟', () => {
     const base = new Date(2026, 8, 29, 22, 0, 0).getTime()
-    const at = (ms: number) => meeting({ startedAtMs: base, endedAtMs: base + ms })
+    const at = (ms: number) => meeting({ startedAtMs: base, endedAtMs: base + ms + 30_000, durationMs: ms })
     expect(meetingDurationLabel(at(20_000), t)).toBe('1分钟')
     expect(meetingDurationLabel(at(60_000), t)).toBe('1分钟')
     expect(meetingDurationLabel(at(5 * 60_000), t)).toBe('5分钟')

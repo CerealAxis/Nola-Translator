@@ -298,31 +298,74 @@ export function OverlayRoot() {
         style={cardStyle}
       >
         <div ref={stageRef} className="nola-caption-stage">
-          {/*
-           * 轨道按 sessionId 上 key：换一场同传就换一条空轨道，上一场折好的文本流
-           * 不会渗进这一场（主仓 `CaptionOverlay` 用的是同一个 key 策略）。
-           */}
-          {config.showSource ? (
-            <CaptionTrack
-              key={`source-${session.sessionId ?? 'idle'}`}
-              kind="source"
-              line={sourceLine}
-              maxLines={sourceLines}
-              layout={config.layout}
-            />
-          ) : null}
+          {hasCaption ? (
+            <>
+              {/*
+               * 轨道按 sessionId 上 key：换一场同传就换一条空轨道，上一场折好的文本流
+               * 不会渗进这一场（主仓 `CaptionOverlay` 用的是同一个 key 策略）。
+               */}
+              {config.showSource ? (
+                <CaptionTrack
+                  key={`source-${session.sessionId ?? 'idle'}`}
+                  kind="source"
+                  line={sourceLine}
+                  maxLines={sourceLines}
+                  layout={config.layout}
+                />
+              ) : null}
 
-          {config.showTranslation ? (
-            <div className="nola-caption-translations">
-              <CaptionTrack
-                key={`translation-${session.sessionId ?? 'idle'}`}
-                kind="translation"
-                line={effectiveTranslationLine}
-                maxLines={translationLines}
-                layout={config.layout}
-              />
-            </div>
-          ) : null}
+              {config.showTranslation ? (
+                <div className="nola-caption-translations">
+                  <CaptionTrack
+                    key={`translation-${session.sessionId ?? 'idle'}`}
+                    kind="translation"
+                    line={effectiveTranslationLine}
+                    maxLines={translationLines}
+                    layout={config.layout}
+                  />
+                </div>
+              ) : null}
+            </>
+          ) : (
+            /* 未开始态**就是两条真轨道**，不是浮在卡片上的一个绝对定位层，所以它和
+               * 有字幕时占的是同一块地方：`config.showSource` / `config.showTranslation`
+               * 怎么分，stage 就怎么分，两半都是 `flex: 1 1 0`。原先这里是一层写死
+               * `top-[22px]` 的绝对定位层，两行都塌在卡片顶端、字号写死成 12.5px / 11px，
+               * 于是分区对照的用户第一眼看到的是一个完全不像分栏的版面，真字幕一落地
+               * 版面就当场变形。
+               *
+               * 字号/字重/行高/颜色**全部由 `data-kind` + `--overlay-*` 给**
+               * （`caption-card.css` 的 `.nola-caption-track[data-kind=…]`），所以这里一个
+               * 内联样式、一条字号工具类都不写：用户在「字幕外观」里调过的字号对空态一样
+               * 生效，写死就等于把同一套设置做成两套。`pointer-events-none` 保留 ——
+               * 空态不该抢卡片的拖拽区与点击。
+               *
+               * 只给两行说明，**不给按钮**。「立即开始」已经由底部控制条的麦克风按钮承担，
+               * 「字幕外观」在右上角那颗滑杆按钮里，在这里再摆一对同名按钮就是同一个动作
+               * 有两个入口——用户会点错，然后以为是应用有毛病。
+               *
+               * 第二行是**译文轨道的位置**，所以那一句放英文：中文提示语出现在译文那一侧
+               * 会让人以为翻译失败。也不加 `aria-live` —— 活区域归真轨道，空态不是字幕事件。 */
+            <>
+              {config.showSource ? (
+                <div className="nola-caption-track pointer-events-none" data-kind="source" data-layout={config.layout}>
+                  <div className="nola-caption-track-flow">
+                    <p className="nola-caption-entry">{t('overlay.notStarted')}</p>
+                  </div>
+                </div>
+              ) : null}
+
+              {config.showTranslation ? (
+                <div className="nola-caption-translations">
+                  <div className="nola-caption-track pointer-events-none" data-kind="translation" data-layout={config.layout}>
+                    <div className="nola-caption-track-flow">
+                      <p className="nola-caption-entry">{t('overlay.notStartedHint')}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
 
         {/* 渐隐罩是 stage 的兄弟节点，不是滚动容器的 mask（见文件头第 2 条）。 */}
@@ -396,28 +439,6 @@ export function OverlayRoot() {
             <X aria-hidden="true" />
           </GhostButton>
         </div>
-
-        {/*
-          未开始态只给两行说明，**不给按钮**。
-          「立即开始」已经由底部控制条的麦克风按钮承担，「字幕外观」在右上角那颗
-          滑杆按钮里，在这里再摆一对同名按钮就是同一个动作有两个入口——用户会点错，
-          然后以为是应用有毛病。
-
-          第二行是**译文轨道的位置**，所以放英文 `Start a session to begin`：
-          中文提示语出现在译文那一侧会让人以为翻译失败。两行的字号/颜色都跟轨道
-          对齐（原文用 source 色、译文用 target 色），所以空态一出现，字幕区看着
-          就已经是双语分栏的样子，不用等真有字幕才知道版面长什么样。
-        */}
-        {hasCaption ? null : (
-          <div className="pointer-events-none absolute inset-x-0 top-[22px] flex flex-col items-start gap-1 px-[22px]">
-            <p className="text-[12.5px] leading-[1.5] font-normal" style={{ color: palette.source }}>
-              {t('overlay.notStarted')}
-            </p>
-            <p className="text-[11px] leading-[1.45] font-normal" style={{ color: palette.target }}>
-              {t('overlay.notStartedHint')}
-            </p>
-          </div>
-        )}
 
         <OverlayControls active={active} locked={config.locked} />
 

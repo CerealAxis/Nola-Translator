@@ -771,8 +771,19 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   box-shadow: none;
 }
 
+/*
+ * 文字区照浮窗本体的 `.nola-caption-stage` 抄：**上下两轨等高**，不是两行紧挨着。
+ * 原轨（原文 / 译文）各占可用高度的一半、各自从自己那一半的顶部开始排版，所以译文
+ * 出现在卡片竖直中线附近，而不是紧跟在原文下面一行。原来的预览是普通块容器，两个
+ * `<p>` 全塌到顶部、只隔 3px，于是「分区对照」在预览里看着像「两行连排」——
+ * 跟真窗对不上，用户没法拿这一页判断分区到底分在哪。
+ * `gap: 6px` 用的是浮窗舞台那个值，不是新拍的数。
+ */
 .nola-caption-preview__text {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: 6px;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
@@ -869,15 +880,23 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   height: 11px;
 }
 
+/*
+ * 两条轨各自等分文字区（`flex: 1 1 0`，同浮窗的 `.nola-caption-track` /
+ * `.nola-caption-translations`），字号行高只决定排版、不决定轨高。`flex-basis: 0` 也
+ * 顺带处理了单语：只渲染一条时它撑满整个文字区，跟浮窗里单轨填满舞台的行为一致。
+ * 轨间距交给父级的 `gap: 6px`，所以下面两条都不再留 `margin-bottom`。
+ */
 .nola-caption-preview__source,
 .nola-caption-preview__translation {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   text-wrap: wrap;
 }
 
 .nola-caption-preview__source {
-  margin-bottom: 3px;
   color: var(--preview-source-color, #f7f7f7);
   font-size: var(--preview-font-size, 17px);
   font-weight: var(--preview-font-weight, 500);
@@ -885,7 +904,6 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 }
 
 .nola-caption-preview__translation {
-  margin-bottom: 0;
   color: var(--preview-translation-color, #eceff4);
   font-size: var(--preview-translation-font-size, 16px);
   font-weight: var(--preview-translation-font-weight, 400);

@@ -18,7 +18,6 @@ import type {
   CaptionSegment,
   ExportFormat,
   MeetingMeta,
-  ModelStorageInfoWithTotal,
   OverlayTargetPage,
   ResourceRecord,
   ResourceSnapshotWithRate,
@@ -169,7 +168,7 @@ export function createIpcBridge(): NolaBridge {
       update: (patch) => call('updateSettings', (injected) => injected.updateSettings(patch)),
     },
     storage: {
-      get: () => call('getModelStorage', (injected) => injected.getModelStorage() as Promise<ModelStorageInfoWithTotal>),
+      get: () => call('getModelStorage', (injected) => injected.getModelStorage()),
       choose: () => call('chooseModelStorageDirectory', (injected) => injected.chooseModelStorageDirectory()),
       restartApp: () => call('restartApp', (injected) => injected.restartApp()),
     },

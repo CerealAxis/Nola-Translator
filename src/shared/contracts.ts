@@ -91,7 +91,14 @@ export type MeetingMeta = {
   notes?: string
   /** Wall clock when the caption session started. */
   startedAtMs: number
-  /** Wall clock when it stopped; undefined while the meeting is still open. */
+  /**
+   * Wall clock when the **content** ended — not when the user pressed stop.
+   *
+   * 它过去是 finalize 那一刻的 `Date.now()`，而 `finish()` 跑在引擎卸完几个 GB 权重、
+   * 发出 `sessionStopped` **之后**，所以它比最后一句话晚了 25~60 秒。现在由最后一条字幕
+   * 推出来。一条内容都没有的退化情形保留墙钟 —— 没有内容时刻可指。
+   * 会议仍在进行时为 undefined。
+   */
   endedAtMs?: number
   /**
    * Lifecycle marker. `endedAtMs` alone cannot say "started but never finished": a session killed
@@ -101,7 +108,26 @@ export type MeetingMeta = {
    * in on load (see MeetingStore.loadAll).
    */
   state?: 'running' | 'completed' | 'interrupted'
+  /**
+   * **内容有多长** = 最后一条内容结束 − 第一条内容开始。列表、详情页、导出都只看这一个数。
+   *
+   * 它**故意不等于** `endedAtMs - startedAtMs`：录音本身就不含暂停与前导静音（见引擎
+   * `setSessionPaused` 的说明），所以"开头空了四分钟、之后说了九十分钟"的一场，录音就是
+   * 90 分钟，时长也该是 90 分钟 —— 过去列表显示 398 秒。
+   *
+   * 老记录里这个值是旧的墙钟时长且**无法重算**（字幕文件还在，但要重扫全部历史记录不值得）。
+   * 它们的音频长度是更接近真相的替代，但统一改写历史数据不在这次改动范围内。
+   */
   durationMs: number
+  /**
+   * 首尾内容时刻，**会话相对**毫秒（与 `CaptionSegment.startedAtMs` 同一个时钟）。
+   * 这一场没有产出任何字幕时两个字段都缺席。
+   *
+   * 落盘是因为有两处都要用、而且事后都算不出来：录音的 t=0 是采集**真正吐出第一帧**的
+   * 时刻，播放器要靠这个量把字幕对齐；上面的时长就是这两者之差。
+   */
+  contentStartedAtMs?: number
+  contentEndedAtMs?: number
   /** How many meetings already existed on the same local day, used for the `_记录_1` suffix. */
   daySequence: number
   segmentCount: number
