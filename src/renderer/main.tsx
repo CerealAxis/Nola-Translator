@@ -8,7 +8,7 @@ import { createIpcBridge, isIpcBridgeAvailable } from './bridge/ipc/ipcBridge'
 import { I18nProvider, useI18n } from './i18n'
 import { AppShell, ErrorBoundary } from './components/primitives'
 import { Routes, useRoute } from './routes'
-import { disposeStores, initStores, isEngineConnected } from './store'
+import { disposeStores, initStores, isEngineConnected, stores, useStore } from './store'
 import { HomePage } from './features/home'
 import { RecordsPage, RecordDetailPage } from './features/records'
 import { WorkspacePage } from './features/workspace'
@@ -186,9 +186,29 @@ function dismissSplash() {
   window.setTimeout(() => splash.remove(), SPLASH_EXIT_MS)
 }
 
-function Root() {
+/**
+ * 启动画面盖到引擎结算为止。
+ *
+ * 冷启动要 `import torch`，实测 10 秒以上。splash 提前退场的话，用户看到的就是模型页
+ * 一直转骨架屏 —— 那是"在等数据"，而此刻真正在等的是引擎本身，等它这段时间里界面
+ * 本来就没有能显示的东西。
+ *
+ * `failed` 同样放行，不只有 `ready`：引擎失败是终态，而设置页里的运行时修复不依赖引擎，
+ * 一直把 splash 盖着等于把唯一的自救入口也关在门外。没有 preload 的场合压根没有引擎状态
+ * 可等，所以立刻退场，交给界面顶部那条横幅说话。
+ */
+function useSplashUntilEngineSettles(): void {
+  const engineStatus = useStore(stores.session, (state) => state.engineStatus)
+  const settled = !isIpcBridgeAvailable() || engineStatus === 'ready' || engineStatus === 'failed'
+
   useEffect(() => {
-    dismissSplash()
+    if (settled) dismissSplash()
+  }, [settled])
+}
+
+function Root() {
+  useSplashUntilEngineSettles()
+  useEffect(() => {
     const teardown = () => {
       void disposeStores()
     }

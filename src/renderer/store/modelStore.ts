@@ -103,7 +103,8 @@ export async function loadModels(): Promise<void> {
   if (modelsStore.getState().loading) return
   modelsStore.setState({ loading: true, error: null })
   try {
-    // On a cold start these three start the engine and answer empty for seconds: a race window, not a state.
+    // Both engine calls block until the handshake finishes, so on a cold start this
+    // resolves after the engine is up rather than answering empty.
     const [snapshot, devices, credentials] = await Promise.all([
       bridge.engine.listResources(),
       bridge.engine.listDevices(),

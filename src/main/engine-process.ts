@@ -20,6 +20,14 @@ export type EngineLaunchSpec = {
 
 export type EngineProcessOptions = EngineLaunchSpec & {
   resolveLaunchSpec?: () => EngineLaunchSpec
+  /**
+   * Ceiling on one `hello` handshake. The default leaves room for a cold `import torch`
+   * on a slow disk, which is the bulk of the wait.
+   *
+   * A wall clock is still the backstop, not the primary signal: a wedged child that never
+   * speaks and never exits is exactly the case this bound exists for. Normal startup is
+   * decided by the engine's own `ready`.
+   */
   startupTimeoutMs?: number
   restartDelaysMs?: number[]
 }
@@ -28,7 +36,9 @@ type PendingRequest = {
   expectedType: EngineEvent['type']
   resolve: (event: EngineEvent) => void
   reject: (error: Error) => void
-  timer: ReturnType<typeof setTimeout>
+  /** `null` when the request is bounded by child lifetime instead of a deadline. */
+  timer: ReturnType<typeof setTimeout> | null
+  clear(): void
 }
 
 export function createEngineLaunchSpec(options: {
@@ -105,6 +115,19 @@ export class CaptionEventCoalescer {
   }
 }
 
+/**
+ * Whether a later attempt could plausibly succeed.
+ *
+ * A missing or non-executable interpreter is the launch configuration itself being wrong, so
+ * every retry re-pays a full cold start to reach the same failure. Retrying it only delays the
+ * verdict the user needs to see, and the settings page is where they can fix it. A crash or a
+ * missed handshake is transient by nature, which is what the backoff table is for.
+ */
+function isRetryable(error: Error): boolean {
+  const code = (error as NodeJS.ErrnoException).code
+  return code !== 'ENOENT' && code !== 'EACCES' && code !== 'EPERM'
+}
+
 export class EngineProcess extends EventEmitter {
   private readonly options: Required<Pick<EngineProcessOptions, 'startupTimeoutMs' | 'restartDelaysMs'>> &
     EngineLaunchSpec & Pick<EngineProcessOptions, 'resolveLaunchSpec'>
@@ -124,7 +147,7 @@ export class EngineProcess extends EventEmitter {
     super()
     this.options = {
       ...options,
-      startupTimeoutMs: options.startupTimeoutMs ?? 10_000,
+      startupTimeoutMs: options.startupTimeoutMs ?? 60_000,
       restartDelaysMs: options.restartDelaysMs ?? [250, 1_000, 4_000],
     }
     this.coalescer = new CaptionEventCoalescer((event) => this.emit('event', event))
@@ -145,10 +168,15 @@ export class EngineProcess extends EventEmitter {
     await this.ensureConnection()
   }
 
+  /**
+   * `timeoutMs: null` binds the request to the child's lifetime: it settles when the engine
+   * answers, or fails when the process dies, and no wall clock can cut it off. Used for the
+   * handshake, where a slow cold start must not be mistaken for a dead engine.
+   */
   async request<TType extends EngineEvent['type']>(
     command: EngineCommand,
     expectedType: TType,
-    timeoutMs = 10_000
+    timeoutMs: number | null = 10_000
   ): Promise<Extract<EngineEvent, { type: TType }>> {
     const validated = engineCommandSchema.parse(command) as EngineCommand
     if (this.pending.has(validated.requestId)) {
@@ -156,11 +184,20 @@ export class EngineProcess extends EventEmitter {
     }
 
     const response = new Promise<EngineEvent>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(validated.requestId)
-        reject(new Error(`等待 ${expectedType} 超时`))
-      }, timeoutMs)
-      this.pending.set(validated.requestId, { expectedType, resolve, reject, timer })
+      const timer = timeoutMs === null
+        ? null
+        : setTimeout(() => {
+          this.pending.delete(validated.requestId)
+          reject(new Error(`等待 ${expectedType} 超时`))
+        }, timeoutMs)
+      const entry: PendingRequest = {
+        expectedType,
+        resolve,
+        reject,
+        timer,
+        clear: () => { if (timer !== null) clearTimeout(timer) },
+      }
+      this.pending.set(validated.requestId, entry)
     })
 
     try {
@@ -168,7 +205,7 @@ export class EngineProcess extends EventEmitter {
     } catch (error) {
       const pending = this.pending.get(validated.requestId)
       if (pending) {
-        clearTimeout(pending.timer)
+        pending.clear()
         this.pending.delete(validated.requestId)
         pending.reject(error instanceof Error ? error : new Error(String(error)))
       }
@@ -231,7 +268,7 @@ export class EngineProcess extends EventEmitter {
         lastError = error instanceof Error ? error : new Error(String(error))
         this.disposeCurrentChild()
         if (!this.desiredRunning) throw lastError
-        if (!this.hasRetryLeft()) {
+        if (!this.hasRetryLeft() || !isRetryable(lastError)) {
           this.setState('failed')
           this.emit('fatalError', lastError)
           throw lastError
@@ -265,6 +302,13 @@ export class EngineProcess extends EventEmitter {
       this.handleTermination(child, new Error(`引擎已退出（code=${code}, signal=${signal ?? 'none'}）`))
     )
 
+    /*
+     * Bounded by the child's lifetime rather than a wall clock: a cold `import torch`
+     * decides when the engine is ready, and a slow disk must not read as a dead engine.
+     * `startupTimeoutMs` still caps the one case a liveness signal cannot catch — a child
+     * that stays alive but never answers. `handleTermination` settles this request if the
+     * process dies first.
+     */
     await this.request(
       {
         protocolVersion: 1,
@@ -306,7 +350,7 @@ export class EngineProcess extends EventEmitter {
 
     const pending = this.pending.get(event.requestId)
     if (pending && (event.type === pending.expectedType || event.type === 'error')) {
-      clearTimeout(pending.timer)
+      pending.clear()
       this.pending.delete(event.requestId)
       if (event.type === 'error') {
         const reason = typeof event.details?.reason === 'string' ? `：${event.details.reason.slice(0, 512)}` : ''
@@ -356,7 +400,7 @@ export class EngineProcess extends EventEmitter {
 
   private rejectPending(error: Error): void {
     for (const pending of this.pending.values()) {
-      clearTimeout(pending.timer)
+      pending.clear()
       pending.reject(error)
     }
     this.pending.clear()
