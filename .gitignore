@@ -26,10 +26,13 @@ Thumbs.db
 engine/build/
 engine/dist/
 release/
+release-verify*/
+release-v[0-9]*/
 /build/*
 !/build/icon.ico
 !/build/runtime-catalog.json
 !/build/runtime-recipes.json
+!/build/installer.nsh
 __pycache__/
 *.py[cod]
 *.egg-info/

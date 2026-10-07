@@ -15,16 +15,16 @@ const POINTER_FILE = 'data-location.json'
 const POINTER_VERSION = 1
 
 /**
- * The install directory: the parent of `resources`, split on `app.isPackaged` as `index.ts` does
- * everywhere else. Packaged, `dirname(app.getPath('exe'))` IS it; `getAppPath()` would be
- * `<install>\resources\app.asar`. In dev the exe is the Electron binary, so `dirname(exe)` is its
- * folder and only `getAppPath()` is right — sniffing for a sibling `resources` is no fix, since
- * `node_modules\electron\dist\resources` exists in dev too.
+ * The install root: the folder holding `App\` (the program) and `Data\` (user data).
+ *
+ * Packaged, `dirname(app.getPath('exe'))` is `...\App`, so the root is one level up. In dev the exe
+ * is the Electron binary inside `node_modules\electron\dist`, where that parent is meaningless —
+ * there the app root is the repository and the two subfolders do not exist.
  */
 export function defaultDataRoot(): string {
   if (app.isPackaged) {
     try {
-      return dirname(app.getPath('exe'))
+      return join(dirname(app.getPath('exe')), '..', 'Data')
     } catch (error) {
       // A path lookup must never take startup down; `getAppPath()` is absolute and writable even
       // though it is the wrong directory for a packaged build, and a warning beats a dead launch.
@@ -66,12 +66,13 @@ export function readDataRootPointer(): string | null {
 /**
  * The root an existing install already keeps its data in, or `null` for a fresh install.
  *
- * An install that already holds data keeps it where it is; the install directory becomes the
- * default only for one that has nothing yet.
+ * An install that already holds data keeps it where it is; the default root is for one that has
+ * nothing yet. `models` and `runtimes` are markers alongside the settings files because a user who
+ * has only downloaded a model — never recorded a meeting — still owns data worth finding.
  */
 function existingUserDataRoot(): string | null {
   const userData = app.getPath('userData')
-  for (const marker of ['settings.json', 'credentials.json', 'meetings']) {
+  for (const marker of ['settings.json', 'credentials.json', 'meetings', 'models', 'runtimes']) {
     if (existsSync(join(userData, marker))) return userData
   }
   return null
