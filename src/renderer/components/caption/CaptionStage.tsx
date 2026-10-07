@@ -192,6 +192,8 @@ function Block({
   translate: (segment: CaptionSegment) => string
 }) {
   const translation = translationTextOf(segment, translate)
+  const untranslated = segment.translations.length === 0
+  if (untranslated && showTranslation) { showSource = true; showTranslation = false }
 
   if (layout === 'split') {
     return (

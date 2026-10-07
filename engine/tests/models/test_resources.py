@@ -111,7 +111,7 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     assert qwen.provider == "qwen3-asr"
     assert qwen.name == "Qwen3-ASR 1.7B"
     assert qwen.downloadBytes == 4_087_646_324
-    assert 0 < len(qwen.languages) <= 16
+    assert len(qwen.languages) == 30
     assert qwen.installed is False
     assert qwen.state == "idle"
 
@@ -132,7 +132,7 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     assert hymt2.provider == "hymt2"
     assert hymt2.name == "Hy-MT2 1.8B Q4_K_M"
     assert hymt2.downloadBytes == 1_133_080_448
-    assert 0 < len(hymt2.languages) <= 16
+    assert len(hymt2.languages) > 16
     assert hymt2.installed is False
 
     assert hymt2_q3.resourceId == HYMT2_Q3_RESOURCE_ID
@@ -150,7 +150,7 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     assert m2m100.installed is False
 
     for record in records:
-        assert 0 < len(record.languages) <= 16
+        assert 0 < len(record.languages) <= 128
         assert ResourceRecord.model_validate(record.model_dump()) == record
 
 

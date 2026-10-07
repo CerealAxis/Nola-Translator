@@ -189,6 +189,71 @@ export async function removeMeeting(id: string): Promise<boolean> {
   })
 }
 
+/** One delete outcome per requested id, so the caller can tell the user which rows survived. */
+export interface BatchRemoveResult {
+  removed: string[]
+  failed: Array<{ id: string; error: string }>
+}
+
+/**
+ * Batch delete. The whole batch leaves the list in a single publish, so the
+ * rows disappear together instead of flickering one after another.
+ *
+ * Unlike `removeMeeting` this resolves instead of rejecting: a partial failure
+ * is a normal outcome when several records are deleted at once, and the caller
+ * needs the per-record breakdown to report it — one exception would discard
+ * what did get deleted.
+ *
+ * Deletes run one at a time through the write queue. `confirmed` is a single
+ * snapshot that both the optimistic hide and the rollback read, so overlapping
+ * deletes would let one rollback undo another's result.
+ */
+export async function removeMeetings(ids: readonly string[]): Promise<BatchRemoveResult> {
+  if (!bridge) throw new Error('initStores 还没注入 bridge')
+  if (ids.length === 0) return { removed: [], failed: [] }
+
+  const records: Array<{ id: string; patch: MeetingMeta | null }> = ids.map((id) => ({ id, patch: null }))
+  const batch = new Set(records)
+  const requested = new Set(ids)
+  inFlight = [...inFlight, ...records]
+  publish()
+  meetingsStore.setState({ error: null })
+
+  return enqueue(async () => {
+    const removed: string[] = []
+    const failed: Array<{ id: string; error: string }> = []
+    try {
+      for (const record of records) {
+        try {
+          const deleted = await bridge!.meetings.remove(record.id)
+          if (deleted) {
+            confirmed = confirmed.filter((meeting) => meeting.meetingId !== record.id)
+            removed.push(record.id)
+          } else {
+            // The engine left the file in place, so the row must come back; dropping it silently would show a delete that never happened.
+            failed.push({ id: record.id, error: 'engine did not confirm the delete' })
+          }
+        } catch (error) {
+          // A rejected write only concerns its own record; the rest of the batch still gets its attempt.
+          failed.push({ id: record.id, error: errorMessage(error) })
+        }
+      }
+      const detailId = meetingsStore.getState().detail?.meta.meetingId
+      // The user can be sitting on a record this batch removed, and a detail page for a gone row offers actions on nothing.
+      if (detailId !== undefined && requested.has(detailId)) {
+        meetingsStore.setState({ detail: null })
+      }
+      if (failed.length > 0) {
+        meetingsStore.setState({ error: failed[0].error })
+      }
+      return { removed, failed }
+    } finally {
+      inFlight = inFlight.filter((item) => !batch.has(item))
+      publish()
+    }
+  })
+}
+
 /** Export. Returns the written path; null means the user cancelled the save dialog. */
 export async function exportMeeting(id: string, format: ExportFormat): Promise<string | null> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')

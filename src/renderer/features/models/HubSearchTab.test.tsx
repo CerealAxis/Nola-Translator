@@ -38,7 +38,7 @@ it('shows metadata before README loading finishes and ignores responses from old
   const search = vi.spyOn(actions.models, 'searchHub').mockImplementation((query) =>
     query === 'older' ? older.promise : query === 'newer' ? newer.promise : initial.promise)
   vi.spyOn(actions.models, 'loadHubModelCard').mockReturnValue(introduction.promise)
-  const { container } = render(<HubSearchTab />)
+  const { container } = render(<HubSearchTab onGoRecommended={vi.fn()} />)
   expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument()
   expect(container.querySelectorAll('.models-card--hub').length).toBeGreaterThan(4)
   await waitFor(() => expect(search).toHaveBeenCalledWith('', 'all'))

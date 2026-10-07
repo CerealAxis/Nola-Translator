@@ -1,3 +1,4 @@
+import { LANGUAGE_CODES } from './languages'
 import { DEFAULT_COMPUTE_SETTINGS, type ComputeSettings } from './compute'
 
 export type OverlaySettings = {
@@ -141,11 +142,10 @@ export const HYMT2_MODEL_LABELS: Record<Hymt2ModelId, string> = {
   'hy-mt2-1.8b-iq2-m': 'UD-IQ2_M · 723 MB · 体积最小',
 }
 
-/** Source language dropdown entries; `auto` leaves detection to the model. The codes are the union of the per-model language lists in the engine's resources.py. */
-export const SOURCE_LANGUAGE_OPTIONS = ['auto', 'zh', 'yue', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'pt', 'it', 'ru', 'ar', 'th', 'vi', 'tr', 'id'] as const
-
-/** Target language dropdown entries. The app passes exactly one; the engine protocol still accepts a list. */
-export const TARGET_LANGUAGE_OPTIONS = ['zh', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'ru', 'pt', 'it', 'tr', 'ar', 'th', 'vi', 'ms', 'id'] as const
+/** Catalog fallback for remote providers and persisted language validation. */
+export const SOURCE_LANGUAGE_OPTIONS: readonly string[] = ['auto', ...LANGUAGE_CODES]
+export const NO_TRANSLATION_LANGUAGE = 'none'
+export const TARGET_LANGUAGE_OPTIONS: readonly string[] = [NO_TRANSLATION_LANGUAGE, ...LANGUAGE_CODES]
 
 export const DEFAULT_SETTINGS: AppSettings = {
   compute: { ...DEFAULT_COMPUTE_SETTINGS },

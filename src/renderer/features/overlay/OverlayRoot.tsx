@@ -138,7 +138,8 @@ export function OverlayRoot() {
         return reason ? { key: `${current.segmentId}-error`, text: reason } : null
       })()
     : null
-  const effectiveTranslationLine = translationLine ?? failureLine
+  const originalOnly = !!current && current.translations.length === 0
+  const effectiveTranslationLine = originalOnly && !config.showSource ? sourceLine : translationLine ?? failureLine
 
   /*
    * Hover from raw coordinates rather than onMouseEnter/onMouseLeave: an

@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 
 PROTOCOL_VERSION = 1
-MAX_PROTOCOL_LINE_BYTES = 32 * 1024
+MAX_PROTOCOL_LINE_BYTES = 512 * 1024
 
 
 class ProtocolModel(BaseModel):
@@ -142,6 +142,27 @@ class InspectHubRepoCommand(Envelope):
     repo: str = Field(min_length=3, max_length=256)
 
 
+class TranslationPair(ProtocolModel):
+    source: str = Field(min_length=1, max_length=32)
+    target: str = Field(min_length=1, max_length=32)
+
+
+class ModelConfiguration(ProtocolModel):
+    slot: Literal["recognition", "translation"]
+    engine: Literal["pytorch", "llama"]
+    languages: list[str] = Field(max_length=128)
+    supportsAutoDetection: bool
+    sourceLanguages: list[str] = Field(max_length=128)
+    targetLanguages: list[str] = Field(max_length=128)
+    translationPairs: list[TranslationPair] | None = Field(default=None, max_length=512)
+
+
+class ConfigureModelCommand(Envelope):
+    type: Literal["configureModel"]
+    resourceId: str = Field(min_length=1, max_length=256)
+    configuration: ModelConfiguration
+
+
 class InstallHubRepoCommand(Envelope):
     """Judge a repo, remember it, and start its download.
     """
@@ -167,6 +188,7 @@ EngineCommand = Annotated[
         SearchHubModelsCommand,
         InspectHubRepoCommand,
         InstallHubRepoCommand,
+        ConfigureModelCommand,
     ],
     Field(discriminator="type"),
 ]
@@ -240,7 +262,8 @@ class ResourceRecord(ProtocolModel):
     provider: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=256)
     description: str = Field(min_length=1, max_length=1024)
-    languages: list[str] = Field(max_length=16)
+    languages: list[str] = Field(max_length=128)
+    configuration: ModelConfiguration | None = None
     sourceLanguage: str | None = Field(default=None, max_length=32)
     targetLanguage: str | None = Field(default=None, max_length=32)
     installed: bool
@@ -405,7 +428,7 @@ _EVENT_ADAPTER = TypeAdapter(EngineEvent)
 
 def _load_line(line: str) -> object:
     if len(line.encode("utf-8")) > MAX_PROTOCOL_LINE_BYTES:
-        raise ValueError("协议单行不能超过 32 KiB")
+        raise ValueError("协议单行不能超过 512 KiB")
     return json.loads(line)
 
 

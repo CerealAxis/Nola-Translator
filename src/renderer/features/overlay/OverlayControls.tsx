@@ -1,3 +1,4 @@
+import { useModelOptions } from '@/model-options'
 /**
  * Control bar at the bottom of the caption window.
  *
@@ -30,16 +31,12 @@ import { Mic, Square } from 'lucide-react'
 import {
   DEFAULT_SETTINGS,
   LANGUAGE_LABELS,
-  RECOGNITION_MODEL_IDS,
-  RECOGNITION_MODEL_LABELS,
-  SOURCE_LANGUAGE_OPTIONS,
-  TARGET_LANGUAGE_OPTIONS,
 } from '@/bridge'
 import type { AppSettings, AudioDevice, AudioSourceOption, RecognitionModelId, SessionConfig } from '@/bridge'
 import { audioSourceFrom } from '@/features/workspace/SessionSetupDialog'
 import { errorCopyOf } from '@/features/workspace/WorkspacePage'
 import { actions, sessionStore, stores, useStore } from '@/store'
-import { translationFieldsOf } from '@/session-config'
+import { targetLanguagePatch, translationFieldsOf } from '@/session-config'
 import { useI18n } from '@/i18n'
 
 import { OverlayDisplayMenu, OverlayLayoutMenu } from './OverlayDisplayMenu'
@@ -93,6 +90,12 @@ export interface OverlayControlsProps {
  * whichever side has space, and it will not flip unless the overflow is worse
  * than the original side. Handing it the best of both sides leaves that choice
  * to react-aria.
+ *
+ * Every menu passes this to both its Popover and its Menu. The Popover needs it
+ * to choose a side; the Menu is the element that scrolls, and a cap that stops
+ * at the Popover leaves the Menu at its full content height — it then spills
+ * past the window edge with nothing to scroll. `Dropdown.Menu` has no
+ * `maxHeight` prop, so the second copy goes through `style`.
  */
 export function useMenuMaxHeight(): number {
   const [maxHeight, setMaxHeight] = useState<number>(fallbackMaxHeight)
@@ -195,6 +198,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
   const errorCode = useStore(sessionStore, (state) => state.errorCode)
   const missing = useStore(sessionStore, (state) => state.missing)
 
+  const modelOptions = useModelOptions()
   const modelId = settings.recognition.modelId
   const source = settings.recognition.sourceLanguage
   const target = settings.translation.targetLanguage
@@ -313,7 +317,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
           <Dropdown>
             <Dropdown.Trigger isDisabled={active || locked} className={`${CAPSULE} nola-caption-pill--mode`}>
               <span className="nola-caption-mode-dot" aria-hidden="true" />
-              <span>{RECOGNITION_MODEL_LABELS[modelId]}</span>
+              <span>{modelOptions.recognition?.name ?? modelId}</span>
             </Dropdown.Trigger>
             {/*
               Selection is computed by the Menu, not set per item: `Dropdown.Item`
@@ -329,21 +333,23 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
             <Dropdown.Popover className="nola-caption-menu" maxHeight={menuMaxHeight}>
               <Dropdown.Menu
                 className="nola-caption-menu-list"
+                style={{ maxHeight: menuMaxHeight }}
                 selectionMode="single"
                 selectedKeys={new Set([modelId])}
                 onSelectionChange={(key) => {
                   if (typeof key === 'string') patch({ recognition: { modelId: key as RecognitionModelId } })
                 }}
               >
-                {RECOGNITION_MODEL_IDS.map(id => (
+                {modelOptions.recognitionModels.map(model => (
                   <Dropdown.Item
-                    key={id}
-                    id={id}
+                    key={model.value}
+                    id={model.value}
+                    isDisabled={model.isDisabled}
                     className="nola-menu-item"
-                    textValue={RECOGNITION_MODEL_LABELS[id]}
-                    onAction={() => patch({ recognition: { modelId: id as RecognitionModelId } })}
+                    textValue={model.label}
+                    onAction={() => patch({ recognition: { modelId: model.value as RecognitionModelId } })}
                   >
-                    {RECOGNITION_MODEL_LABELS[id]}
+                    {model.label}
                     <Dropdown.ItemIndicator type="checkmark" />
                   </Dropdown.Item>
                 ))}
@@ -354,7 +360,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
           <LanguagePill
             caption={t('session.sourceLanguage')}
             value={source}
-            options={SOURCE_LANGUAGE_OPTIONS}
+            options={modelOptions.sourceLanguages}
             labelOf={label}
             isDisabled={active || locked}
             maxHeight={menuMaxHeight}
@@ -363,11 +369,11 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
           <LanguagePill
             caption={t('session.targetLanguage')}
             value={target}
-            options={TARGET_LANGUAGE_OPTIONS}
+            options={modelOptions.targetLanguages}
             labelOf={label}
             isDisabled={active || locked}
             maxHeight={menuMaxHeight}
-            onChange={next => patch({ translation: { targetLanguage: next } })}
+            onChange={next => patch(targetLanguagePatch(next, target))}
           />
 
           <OverlayDisplayMenu isDisabled={locked} />
@@ -442,6 +448,7 @@ function LanguagePill({
       <Dropdown.Popover className="nola-caption-menu" maxHeight={maxHeight}>
         <Dropdown.Menu
           className="nola-caption-menu-list"
+          style={{ maxHeight }}
           selectionMode="single"
           selectedKeys={new Set([value])}
           onSelectionChange={key => { if (typeof key === 'string') onChange(key) }}

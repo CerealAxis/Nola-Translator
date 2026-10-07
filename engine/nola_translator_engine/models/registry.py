@@ -30,6 +30,8 @@ import re
 from typing import Literal
 
 from .manager import FileEntry, ModelSpec
+from ..protocol import ModelConfiguration
+from ..model_capabilities import LANGUAGE_CODES, normalize, supports_translation
 
 
 CUSTOM_REGISTRY_FILENAME = ".custom-models.json"
@@ -134,6 +136,7 @@ class CustomModelEntry:
     files: tuple[CustomFile, ...]
     directory: str = ""
     languages: tuple[str, ...] = ()
+    configuration: ModelConfiguration | None = None
 
     @property
     def resource_id(self) -> str:
@@ -179,7 +182,20 @@ class CustomModelEntry:
             raise RegistryError(f"自定义模型 {repo} 没有文件清单")
         directory = raw.get("directory")
         languages = raw.get("languages")
+        configuration = None
+        # Incomplete capabilities must not make an otherwise manageable download disappear.
+        if raw.get("configuration"):
+            try:
+                candidate = ModelConfiguration.model_validate(raw["configuration"])
+                required = [candidate.languages] if slot == "recognition" else [candidate.sourceLanguages, candidate.targetLanguages]
+                codes = candidate.languages + candidate.sourceLanguages + candidate.targetLanguages
+                valid_pairs = candidate.translationPairs is None or bool(candidate.translationPairs) and all(supports_translation(candidate, pair.source, pair.target) for pair in candidate.translationPairs)
+                if candidate.slot == slot and candidate.engine == ("llama" if adapter_id == "llama.cpp" else "pytorch") and all(required) and all(normalize(code) in LANGUAGE_CODES for code in codes) and valid_pairs:
+                    configuration = candidate
+            except ValueError:
+                pass
         return cls(
+            configuration=configuration,
             repo=repo,
             revision=revision,
             adapter_id=adapter_id,
@@ -201,6 +217,7 @@ class CustomModelEntry:
             "adapterId": self.adapter_id,
             "slot": self.slot,
             "name": self.name,
+            "configuration": self.configuration.model_dump(exclude_none=True) if self.configuration else None,
             "languages": list(self.languages),
             "files": [item.to_json() for item in self.files],
         }

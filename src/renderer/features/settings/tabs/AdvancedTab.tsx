@@ -18,7 +18,7 @@ import {
   Surface,
   Typography,
 } from '@heroui/react'
-import { Check } from 'lucide-react'
+import { Check, ExternalLink } from 'lucide-react'
 
 import { DEFAULT_SETTINGS, PROTOCOL_VERSION } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
@@ -29,9 +29,13 @@ import { getBridge, stores, updateSettings, useStore } from '@/store'
 import type { EngineStatus } from '@/store'
 import { SettingGroup } from '../SettingsPage'
 import type { SettingsPanelProps } from '../SettingsPage'
+import { ThirdPartyNotices } from '../ThirdPartyNotices'
 
 /** How long the copied checkmark stays up. */
 const COPIED_HOLD_MS = 1500
+
+const ISSUES_URL = 'https://github.com/CerealAxis/Nola-Translator/issues'
+const QQ_GROUP = '701699932'
 
 /**
  * Engine state, keyed exhaustively: a new `EngineStatus` fails to compile here instead of
@@ -65,9 +69,28 @@ export function AdvancedTab(_props: SettingsPanelProps) {
         <CodeRow label={t('settings.protocolVersion')} value={String(PROTOCOL_VERSION)} />
       </SettingGroup>
 
+      <SettingGroup legend={t('settings.groupAbout')}>
+        <SettingsRow label={t('settings.thirdPartyNotices')} desc={t('settings.thirdPartyNoticesHint')} descriptionTooltip>
+          <ThirdPartyNotices />
+        </SettingsRow>
+      </SettingGroup>
+
       <SettingGroup legend={t('settings.groupReport')}>
         <SettingsRow label={t('settings.copyDiagnostics')}>
           <CopyDiagnostics />
+        </SettingsRow>
+        {/*
+          The main process `setWindowOpenHandler` hands `https:` targets to the shell and
+          denies the window, so this anchor leaves the app instead of navigating the renderer.
+        */}
+        <SettingsRow label={t('settings.githubIssue')} desc={t('settings.githubIssueHint')} descriptionTooltip>
+          <a className="inline-flex items-center gap-1 text-accent underline" href={ISSUES_URL} target="_blank" rel="noreferrer">
+            {t('settings.openInBrowser')}
+            <ExternalLink className="size-4" aria-hidden="true" />
+          </a>
+        </SettingsRow>
+        <SettingsRow label={t('settings.qqGroup')}>
+          <CodeValue value={QQ_GROUP} />
         </SettingsRow>
         <SettingsRow label={t('settings.resetAll')}>
           <ResetAll pending={pending} />
@@ -135,12 +158,18 @@ function DiagnosticsReport() {
   )
 }
 
+function CodeValue({ value }: { value: string }) {
+  return (
+    <Surface className="settings-code rounded-[8px] border border-border px-3 py-1">
+      <Typography.Code className="settings-code nola-mono text-foreground">{value}</Typography.Code>
+    </Surface>
+  )
+}
+
 function CodeRow({ label, value }: { label: string; value: string }) {
   return (
     <SettingsRow label={label}>
-      <Surface className="settings-code rounded-[8px] border border-border px-3 py-1">
-        <Typography.Code className="settings-code nola-mono text-foreground">{value}</Typography.Code>
-      </Surface>
+      <CodeValue value={value} />
     </SettingsRow>
   )
 }
@@ -249,4 +278,3 @@ function ResetAll({ pending }: { pending: boolean }) {
     </>
   )
 }
-

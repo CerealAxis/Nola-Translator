@@ -28,10 +28,11 @@ class FakeManager:
 
 
 def test_supported_language_table_matches_official_readme() -> None:
-    # 38 data rows plus a header, which is the "39 lines" the table shows in markdown.
     assert len(SUPPORTED_LANGUAGES) == 38
     assert SUPPORTED_LANGUAGES["zh"] == "Chinese"
     assert SUPPORTED_LANGUAGES["zh-Hant"] == "Traditional Chinese"
+    assert SUPPORTED_LANGUAGES["bo"] == "Tibetan"
+    assert SUPPORTED_LANGUAGES["yue"] == "Cantonese"
 
 
 def test_is_supported_handles_codes_and_aliases() -> None:
@@ -51,11 +52,11 @@ async def test_translate_builds_official_prompt_with_full_names() -> None:
     assert provider.name == "hymt2"
     assert result.text == "今天天气很好。"
     assert result.path == ("en", "zh")
-    system, user = manager.calls[0]
-    assert system["role"] == "system"
-    assert "from English into Chinese." in system["content"]
-    assert "only output the translated result" in system["content"]
-    assert user == {"role": "user", "content": "The weather is nice today."}
+    assert manager.calls[0] == [{
+        "role": "user",
+        "content": "Translate the following text into Chinese. Note that you should only output "
+        "the translated result without any additional explanation:\nThe weather is nice today.",
+    }]
 
 
 async def test_translate_uses_traditional_chinese_name_for_zh_hant() -> None:
@@ -64,8 +65,7 @@ async def test_translate_uses_traditional_chinese_name_for_zh_hant() -> None:
 
     await provider.translate("Hello", "en", "zh-Hant")
 
-    system = manager.calls[0][0]
-    assert "into Traditional Chinese." in system["content"]
+    assert "into Traditional Chinese." in manager.calls[0][0]["content"]
 
 
 async def test_translate_accepts_language_aliases() -> None:
@@ -80,7 +80,21 @@ async def test_translate_accepts_language_aliases() -> None:
     assert "into Chinese." in contents[0]
     assert "into Traditional Chinese." in contents[1]
     assert "into Filipino." in contents[2]
-    assert manager.calls[0][1]["content"] == "Hello"
+    assert all(content.endswith("\nHello") for content in contents)
+
+
+@pytest.mark.parametrize(("target", "instruction"), [("bo", "into Tibetan."), ("yue", "翻译为粤语")])
+async def test_translate_keeps_tibetan_and_cantonese_target_names(target: str, instruction: str) -> None:
+    manager = FakeManager()
+    provider = HyMt2TranslationProvider(manager)  # type: ignore[arg-type]
+
+    await provider.translate("What would you like to eat today?", "en", target)
+
+    assert len(manager.calls[0]) == 1
+    assert manager.calls[0][0]["role"] == "user"
+    assert instruction in manager.calls[0][0]["content"]
+    assert "into Chinese." not in manager.calls[0][0]["content"]
+    assert manager.calls[0][0]["content"].endswith("\nWhat would you like to eat today?")
 
 
 async def test_translate_rejects_unsupported_target() -> None:

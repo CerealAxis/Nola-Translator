@@ -6,7 +6,7 @@
 ## 1. 技术栈
 
 - 桌面应用：Electron + React + TypeScript
-- 引擎：Python
+- 引擎：Python（模型能力持久化在自定义模型注册表，启动与逐句翻译必须校验配置）
 - UI：Tailwind CSS + HeroUI
 - 构建：electron-vite
 - 测试：Vitest + Testing Library
@@ -17,7 +17,7 @@
 src/
 ├── main/        # Electron 主进程：IPC 注册、窗口、设置/凭据持久化、引擎子进程
 ├── preload/     # 单文件，contextBridge 暴露 window.nolaTranslator
-├── shared/      # 跨进程契约：类型 + zod + 默认值。**改枚举必看这里**
+├── shared/      # 跨进程契约：类型 + zod + 默认值；languages.ts 为语言代码目录，model-capabilities.ts 为模型能力与推荐预设。**改枚举必看这里**
 └── renderer/    # React 应用
     ├── bridge/  # 渲染进程唯一的数据出口（NolaBridge）
     ├── store/   # 4 个域 store，自研 useSyncExternalStore 实现
@@ -25,7 +25,7 @@ src/
     ├── features/    # home/ workspace/ overlay/ records/ models/ settings/
     ├── i18n/         # zh-CN.ts 为 Dictionary 源，en.ts 受其类型约束
     └── theme/        # 设计 token 唯一来源（CSS）
-engine/nola_translator_engine/  # Python 引擎，协议定义在 protocol.py
+engine/nola_translator_engine/  # Python 引擎，协议定义在 protocol.py，model_capabilities.py 为引擎能力校验
 scripts/                        # PowerShell 构建脚本
 ```
 
@@ -63,6 +63,8 @@ scripts/                        # PowerShell 构建脚本
 - z-index 只用 `.z-*` 类（见 DESIGN.MD 第 8 节），**禁 `z-50` 字面量**
 
 ## 4. 注释规范
+
+- 模型语言目录、推荐能力与运行引擎限制的注释须注明来源或限制原因；用户配置不代表模型自动获得新能力。
 
 1. 基本原则
 - 统一使用英文注释

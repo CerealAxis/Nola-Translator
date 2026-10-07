@@ -1,3 +1,6 @@
+import { useModelOptions } from '@/model-options'
+import { configurationOf, isModelReady, recognitionLanguages, supportsTranslation } from '../../../shared/model-capabilities'
+import { TranslationCompatibilityDialog } from '../models/TranslationCompatibilityDialog'
 /**
  * The session setup dialog. Six fields: meeting name, input source,
  * recognition language, recognition model, translation (with its language
@@ -19,7 +22,8 @@
  */
 
 import { supportsSelectedEngine } from '../../../shared/model-engines'
-import { useCallback, useMemo } from 'react'
+import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
+import { useCallback, useMemo, useState } from 'react'
 
 import {
   Button,
@@ -38,10 +42,7 @@ import { CircleHelp } from 'lucide-react'
 import {
   DEFAULT_SETTINGS,
   LANGUAGE_LABELS,
-  RECOGNITION_MODEL_IDS,
-  RECOGNITION_MODEL_LABELS,
-  SOURCE_LANGUAGE_OPTIONS,
-  TARGET_LANGUAGE_OPTIONS,
+  NO_TRANSLATION_LANGUAGE,
 } from '@/bridge'
 import type { AudioDevice, AudioSourceOption, RecognitionModelId, SessionConfig } from '@/bridge'
 import { SettingRow } from '@/components/primitives'
@@ -95,6 +96,12 @@ export function SessionSetupDialog({
   const settings = useStore(stores.settings, (state) => state.settings) ?? DEFAULT_SETTINGS
   const translation = settings.translation
   const resources = useStore(stores.models, (state) => state.resources)
+  const modelOptions = useModelOptions(draft.recognitionModelId, draft.translationModelId || translation.localModelId, draft.sourceLanguage)
+  const [dismissedPair, setDismissedPair] = useState<string | null>(null)
+  const signature = `${draft.translationModelId}|${draft.sourceLanguage}|${draft.targetLanguage}`
+  const incompatible = draft.translate && translation.provider === 'local' && !!configurationOf(modelOptions.translation) && !supportsTranslation(modelOptions.translation, draft.sourceLanguage, draft.targetLanguage)
+  const recognitionValid = modelOptions.sourceLanguages.includes(draft.sourceLanguage)
+  const modelsConfigured = !!configurationOf(modelOptions.recognition) && (!draft.translate || translation.provider !== 'local' || !!configurationOf(modelOptions.translation))
   const meetings = useStore(stores.meetings, (state) => state.meetings)
 
   /**
@@ -170,7 +177,7 @@ export function SessionSetupDialog({
       .map((item) => ({
         value: item.resourceId,
         label: item.name,
-        isDisabled: !supportsSelectedEngine(item, settings.compute, item.resourceId),
+        isDisabled: !isModelReady(item) || !supportsSelectedEngine(item, settings.compute ?? DEFAULT_COMPUTE_SETTINGS, item.resourceId) || !supportsTranslation(item, draft.sourceLanguage, draft.targetLanguage),
       }))
     // The selected model stays listed even when not installed (just removed,
     // or settings synced from another machine): it is the current value, not
@@ -179,9 +186,11 @@ export function SessionSetupDialog({
       options.push({ value: draft.translationModelId, label: draft.translationModelId, isDisabled: true })
     }
     return options
-  }, [draft.translationModelId, resources, settings.compute])
+  }, [draft.translationModelId, draft.sourceLanguage, draft.targetLanguage, resources, settings.compute])
 
   const submit = useCallback(() => {
+    if (incompatible) { setDismissedPair(null); return }
+    if (!modelsConfigured || !recognitionValid) return
     // The name is optional: the engine generates one from the start time and
     // the day sequence, so there is no "cannot be empty" error here.
     const option = audioOptions.find((item) => item.value === draft.audioSource)
@@ -208,10 +217,14 @@ export function SessionSetupDialog({
         modelId: draft.translationModelId,
       }),
     })
-  }, [audioOptions, draft, onSubmit, translation])
+  }, [audioOptions, draft, onSubmit, translation, incompatible, modelsConfigured, recognitionValid])
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+    <>
+    <TranslationCompatibilityDialog key={signature} isOpen={isOpen && incompatible && dismissedPair !== signature} onClose={() => setDismissedPair(signature)} source={draft.sourceLanguage} target={draft.targetLanguage} recognition={modelOptions.recognition} translation={modelOptions.translation} resources={resources} compute={settings.compute ?? DEFAULT_COMPUTE_SETTINGS}
+      onChangeSource={sourceLanguage => patch({ sourceLanguage })} onChangeModel={translationModelId => patch({ translationModelId })}
+      onDisableTranslation={() => patch({ translate: false, targetLanguage: NO_TRANSLATION_LANGUAGE })} />
+    <Modal isOpen={isOpen && !(incompatible && dismissedPair !== signature)} onOpenChange={onOpenChange}>
       <Modal.Backdrop className="z-overlay">
         <Modal.Container size="lg" placement="center">
           <Modal.Dialog className="rounded-2xl border border-border">
@@ -293,7 +306,7 @@ export function SessionSetupDialog({
                 </Select.Trigger>
                 <Select.Popover className="rounded-2xl">
                   <ListBox>
-                    {SOURCE_LANGUAGE_OPTIONS.map((code) => (
+                    {modelOptions.sourceLanguages.map((code) => (
                       <ListBoxItem key={code} id={code} textValue={languageLabel(code)}>
                         {languageLabel(code)}
                       </ListBoxItem>
@@ -306,7 +319,10 @@ export function SessionSetupDialog({
               <Select
                 value={draft.recognitionModelId}
                 onChange={(key) => {
-                  if (typeof key === 'string') patch({ recognitionModelId: key as RecognitionModelId })
+                  if (typeof key === 'string') {
+                    const codes = recognitionLanguages(resources.find(model => model.resourceId === key))
+                    patch({ recognitionModelId: key as RecognitionModelId, sourceLanguage: codes.includes(draft.sourceLanguage) ? draft.sourceLanguage : codes[0] ?? draft.sourceLanguage })
+                  }
                 }}
               >
                 <Label className="text-[14px] leading-[1.45] font-semibold text-foreground">
@@ -318,9 +334,9 @@ export function SessionSetupDialog({
                 </Select.Trigger>
                 <Select.Popover className="rounded-2xl">
                   <ListBox>
-                    {RECOGNITION_MODEL_IDS.map((id) => (
-                      <ListBoxItem key={id} id={id} textValue={RECOGNITION_MODEL_LABELS[id]} isDisabled={settings.compute.recognitionEngine !== 'pytorch'}>
-                        {RECOGNITION_MODEL_LABELS[id]}
+                    {modelOptions.recognitionModels.map(model => (
+                      <ListBoxItem key={model.value} id={model.value} textValue={model.label} isDisabled={model.isDisabled}>
+                        {model.label}
                       </ListBoxItem>
                     ))}
                   </ListBox>
@@ -332,7 +348,7 @@ export function SessionSetupDialog({
                 <SettingRow label={t('session.translation')} className="hover:bg-transparent">
                   <Switch
                     isSelected={draft.translate}
-                    onChange={(next: boolean) => patch({ translate: next })}
+                    onChange={(next: boolean) => patch({ translate: next, ...(next && draft.targetLanguage === NO_TRANSLATION_LANGUAGE ? { targetLanguage: DEFAULT_SETTINGS.translation.targetLanguage } : {}) })}
                   ><Switch.Content aria-label={t('session.translation')}><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content></Switch>
                 </SettingRow>
 
@@ -341,7 +357,7 @@ export function SessionSetupDialog({
                     <Select
                       value={draft.targetLanguage}
                       onChange={(key) => {
-                        if (typeof key === 'string') patch({ targetLanguage: key })
+                        if (typeof key === 'string') patch({ targetLanguage: key, translate: key !== NO_TRANSLATION_LANGUAGE })
                       }}
                     >
                       <Label className="text-[14px] leading-[1.45] font-semibold text-foreground">
@@ -353,7 +369,7 @@ export function SessionSetupDialog({
                       </Select.Trigger>
                       <Select.Popover className="rounded-2xl">
                         <ListBox>
-                          {TARGET_LANGUAGE_OPTIONS.map((lang) => (
+                          {modelOptions.targetLanguages.map((lang) => (
                             <ListBoxItem key={lang} id={lang} textValue={languageLabel(lang)}>
                               {languageLabel(lang)}
                             </ListBoxItem>
@@ -412,11 +428,12 @@ export function SessionSetupDialog({
               </div>
             </Modal.Body>
 
+            {!modelsConfigured ? <p className="nola-caption text-warning">{t('modelConfig.needsConfiguration')}</p> : !recognitionValid ? <p className="nola-caption text-warning">{t('modelConfig.sourceUnsupported')}</p> : null}
             <Modal.Footer>
               <Button variant="tertiary" size="sm" className="rounded-xl" onPress={() => onOpenChange(false)}>
                 {t('session.cancel')}
               </Button>
-              <Button variant="primary" size="sm" className="rounded-full px-5" onPress={submit}>
+              <Button variant="primary" size="sm" className="rounded-full px-5" isDisabled={!modelsConfigured || !recognitionValid} onPress={submit}>
                 {t('session.start')}
               </Button>
             </Modal.Footer>
@@ -424,6 +441,7 @@ export function SessionSetupDialog({
         </Modal.Container>
       </Modal.Backdrop>
     </Modal>
+    </>
   )
 }
 

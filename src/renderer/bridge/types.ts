@@ -52,6 +52,7 @@ export {
   DEFAULT_SETTINGS,
   HYMT2_MODEL_IDS,
   HYMT2_MODEL_LABELS,
+  NO_TRANSLATION_LANGUAGE,
   RECOGNITION_MODEL_IDS,
   RECOGNITION_MODEL_LABELS,
   SOURCE_LANGUAGE_OPTIONS,
@@ -106,34 +107,9 @@ export type AudioSourceOption =
       isDefault: boolean
     }
 
-/** Bilingual label for a language code. Data, not UI copy: the i18n layer looks it up by `code`. */
-export type LanguageLabel = { code: string; zh: string; en: string }
-
-/**
- * Language names. Data, not a fixture: a language's name does not change with
- * the UI language, so it follows `SOURCE_LANGUAGE_OPTIONS` /
- * `TARGET_LANGUAGE_OPTIONS` instead of the i18n dictionary.
- */
-export const LANGUAGE_LABELS: Record<string, LanguageLabel> = {
-  auto: { code: 'auto', zh: '自动检测', en: 'Auto detect' },
-  zh: { code: 'zh', zh: '中文（简体）', en: 'Chinese (Simplified)' },
-  yue: { code: 'yue', zh: '粤语', en: 'Cantonese' },
-  en: { code: 'en', zh: '英语', en: 'English' },
-  ja: { code: 'ja', zh: '日语', en: 'Japanese' },
-  ko: { code: 'ko', zh: '韩语', en: 'Korean' },
-  fr: { code: 'fr', zh: '法语', en: 'French' },
-  de: { code: 'de', zh: '德语', en: 'German' },
-  es: { code: 'es', zh: '西班牙语', en: 'Spanish' },
-  pt: { code: 'pt', zh: '葡萄牙语', en: 'Portuguese' },
-  it: { code: 'it', zh: '意大利语', en: 'Italian' },
-  ru: { code: 'ru', zh: '俄语', en: 'Russian' },
-  ar: { code: 'ar', zh: '阿拉伯语', en: 'Arabic' },
-  th: { code: 'th', zh: '泰语', en: 'Thai' },
-  vi: { code: 'vi', zh: '越南语', en: 'Vietnamese' },
-  tr: { code: 'tr', zh: '土耳其语', en: 'Turkish' },
-  id: { code: 'id', zh: '印度尼西亚语', en: 'Indonesian' },
-  ms: { code: 'ms', zh: '马来语', en: 'Malay' },
-}
+export { LANGUAGE_LABELS } from '../../shared/languages'
+export type { LanguageLabel } from '../../shared/languages'
+export type { ModelConfiguration } from '../../shared/model-capabilities'
 
 /**
  * The "system default output" pseudo source. `listDevices()` returns real

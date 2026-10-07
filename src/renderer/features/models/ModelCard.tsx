@@ -1,3 +1,4 @@
+import { configurationOf } from '../../../shared/model-capabilities'
 import { modelEngines, type InferenceEngine } from '../../../shared/model-engines'
 
 import type { ReactNode } from 'react'
@@ -5,7 +6,7 @@ import { Button, Card, Chip, ProgressBar, Skeleton } from '@heroui/react'
 import { Check, Download, Trash2, X } from 'lucide-react'
 import './models.css'
 
-import { RECOGNITION_MODEL_IDS, resourceStateOf } from '@/bridge'
+import { resourceStateOf } from '@/bridge'
 import type { AppSettings, AppSettingsPatch, ResourceRecord, ResourceState } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
 import { useI18n } from '@/i18n'
@@ -65,22 +66,22 @@ export function factsOf(record: ResourceRecord): string[] {
 /**
  * The settings patch that makes this record the default, or `null` when it cannot be one.
  *
- * Any installed translation model qualifies: `translation.localModelId` is a free-form id the
- * engine routes by id, so the Hy-MT2 tiers, M2M100 and a hub GGUF share one path. Recognition
- * ids come from the engine's resource table, so one it cannot resolve is rejected here.
+ * Both tasks require saved capabilities. Installation and engine compatibility are checked
+ * by the caller before offering the default action.
  */
 export function defaultTargetOf(record: ResourceRecord): AppSettingsPatch | null {
   const id = record.resourceId
   if (record.kind === 'recognitionModel') {
-    if (!isOneOf(id, RECOGNITION_MODEL_IDS)) return null
-    return { recognition: { modelId: id as (typeof RECOGNITION_MODEL_IDS)[number] } }
+    if (!configurationOf(record)) return null
+    return { recognition: { modelId: id } }
   }
+  if (!configurationOf(record)) return null
   // Also pin provider to 'local': becoming the default means this is the one running locally.
   return { translation: { localModelId: id, provider: 'local' } }
 }
 
 export function isDefaultOf(record: ResourceRecord, settings: AppSettings | null): boolean {
-  if (!settings) return false
+  if (!settings || !configurationOf(record)) return false
   return (
     settings.recognition.modelId === record.resourceId ||
     (settings.translation.provider === 'local' && settings.translation.localModelId === record.resourceId)
@@ -158,7 +159,7 @@ export function ModelCard({
       <Card.Content>
       <div className="models-card__status">
         {isDefault && record.installed ? <Chip size="sm" variant="soft" color="accent">{t('modelsSettingsUi.default')}</Chip> : null}
-        <StatePill state={state} />
+        {record.installed && !configurationOf(record) ? <StatusPill label={t('modelConfig.pending')} tone="warning" /> : <StatePill state={state} />}
         {(supportedEngines ?? modelEngines(record)).map(engine => <Chip key={engine} size="sm" variant="soft">{engine === 'pytorch' ? 'PyTorch' : 'llama.cpp'}</Chip>)}
       </div>
 

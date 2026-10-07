@@ -1,3 +1,4 @@
+import type { ModelConfiguration } from '../../shared/model-capabilities'
 /**
  * The renderer's data-access interface: the method and type surface every
  * component reads through. The production implementation is `createIpcBridge()`,
@@ -119,6 +120,7 @@ export interface NolaBridge {
    * asynchronously; the runtime adapter check happens at install time.
    */
   models: {
+    configureModel(resourceId: string, configuration: ModelConfiguration): Promise<ResourceRecord>
     searchHuggingFace(query: string, kind: 'all' | 'asr' | 'mt' | 'quant', cursor?: string): Promise<HubSearchResult>
     /** Read-only re-check of one repo, independent of the search list. */
     inspectHuggingFace(repo: string): Promise<HubInspectResult>
@@ -174,6 +176,7 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'events.onSettingsChanged': 'ipc',
   'events.onOverlayRequest': 'ipc',
   'models.searchHuggingFace': 'ipc',
+  'models.configureModel': 'ipc',
   'models.inspectHuggingFace': 'ipc',
   'models.getHuggingFaceModelCard': 'ipc',
   'models.installHuggingFaceModel': 'ipc',
@@ -207,6 +210,7 @@ export const BRIDGE_ADAPTER_NOTES: Record<string, string> = {
     'preload: onOpenAppearance(listener) · app:appearance-requested — 载荷类型不同：主仓发 OverlayTargetPage，界面用 RouteId + 目标 hash；ipcBridge 负责映射',
   'models.searchHuggingFace':
     "preload: searchHuggingFace(query, kind) · hub:search — kind 是界面词汇，'asr'→slot recognition、'mt'→slot translation，映射在主进程；返回值是 HubSearchResult 而不是 ResourceRecord[]，因为能不能装是引擎判定的，不是一条本地记录",
+  'models.configureModel': 'preload: configureModel(resourceId, configuration)',
   'models.inspectHuggingFace': 'preload: inspectHuggingFace(repo) · hub:inspect（只读复查单个仓库，不注册不下载）',
   'models.installHuggingFaceModel':
     'preload: installHuggingFaceModel(repo, slot?) · hub:install（返回的是注册后的 ResourceRecord，之后的进度/取消/卸载与内置模型同一条路）',

@@ -1,9 +1,10 @@
+import { modelConfigurationSchema } from './model-capabilities'
 import { z } from 'zod'
 import { computeSettingsSchema, computeSnapshotSchema } from './compute'
 
 import type { EngineCommand, EngineEvent } from './contracts'
 
-export const MAX_PROTOCOL_LINE_BYTES = 32 * 1024
+export const MAX_PROTOCOL_LINE_BYTES = 512 * 1024
 
 const requestId = z.string().min(1).max(128)
 const envelope = {
@@ -94,6 +95,7 @@ export const engineCommandSchema = z.discriminatedUnion('type', [
     resourceId: z.string().min(1).max(256),
     action: z.enum(['install', 'remove', 'cancel']),
   }).strip(),
+  z.object({ ...envelope, type: z.literal('configureModel'), resourceId: z.string().min(1).max(256), configuration: modelConfigurationSchema }).strip(),
   z.object({ ...envelope, type: z.literal('startSession'), config: sessionConfigSchema }).strip(),
   z.object({ ...envelope, type: z.literal('stopSession'), sessionId: z.string().min(1).max(128) }).strip(),
   z
@@ -168,7 +170,8 @@ const resourceSchema = z
     provider: z.string().min(1).max(64),
     name: z.string().min(1).max(256),
     description: z.string().min(1).max(1024),
-    languages: z.array(z.string().min(1).max(32)).max(16),
+    languages: z.array(z.string().min(1).max(32)).max(128),
+    configuration: modelConfigurationSchema.optional(),
     sourceLanguage: z.string().max(32).optional(),
     targetLanguage: z.string().max(32).optional(),
     installed: z.boolean(),
@@ -299,7 +302,7 @@ export const engineEventSchema = z.discriminatedUnion('type', [
 
 function parseLine(line: string): unknown {
   if (new TextEncoder().encode(line).byteLength > MAX_PROTOCOL_LINE_BYTES) {
-    throw new Error('协议单行不能超过 32 KiB')
+    throw new Error('协议单行不能超过 512 KiB')
   }
   return JSON.parse(line) as unknown
 }

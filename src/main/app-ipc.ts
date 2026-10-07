@@ -4,7 +4,7 @@ import { isAbsolute, normalize } from 'node:path'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, screen } from 'electron'
 
 import { exportSrt, exportText, exportWebVtt, type MeetingStore } from './meeting-store'
-import { freeBytesForDirectory } from './disk-usage'
+import { usedBytesForDirectory } from './disk-usage'
 import type { EngineProcess } from './engine-process'
 import { resolveDataRoot, writeDataRootPointer, writePendingDataMigration } from './data-root'
 import { isSameOrInside } from './data-migration'
@@ -79,13 +79,13 @@ export function registerAppIpc(options: {
   // than self-cancelling.
   const activeStoragePath = normalize(current.modelStoragePath || resolveDataRoot())
   const configuredStoragePath = () => normalize(current.modelStoragePath || resolveDataRoot())
-  const storageInfo = (): ModelStorageInfo => {
+  const storageInfo = async (): Promise<ModelStorageInfo> => {
     const configuredPath = configuredStoragePath()
     return {
       activePath: activeStoragePath,
       configuredPath,
       restartRequired: activeStoragePath.toLowerCase() !== configuredPath.toLowerCase(),
-      freeBytes: freeBytesForDirectory(configuredPath),
+      usedBytes: await usedBytesForDirectory(configuredPath),
     }
   }
   const applyOverlay = (reposition = false): void => {

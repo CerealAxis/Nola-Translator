@@ -60,7 +60,7 @@ def test_rejects_lines_larger_than_32_kib() -> None:
             "clientVersion": "x" * MAX_PROTOCOL_LINE_BYTES,
         }
     )
-    with pytest.raises(ValueError, match="32 KiB"):
+    with pytest.raises(ValueError, match="512 KiB"):
         parse_command_line(oversized)
 
 

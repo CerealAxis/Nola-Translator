@@ -156,20 +156,20 @@ describe('设置存储', () => {
     }
   })
 
-  it('源语言与目标语言写入后重新加载不被重置回默认', async () => {
+  it.each(['fr', 'none'])('preserves the saved source and %s target language after reloading', async targetLanguage => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
     const path = join(directory, 'settings.json')
     try {
       const store = new SettingsStore(path)
       await store.update({
         recognition: { sourceLanguage: 'ja' },
-        translation: { targetLanguage: 'fr' },
+        translation: { targetLanguage },
       })
 
       const reloaded = await new SettingsStore(path).load()
 
       expect(reloaded.recognition.sourceLanguage).toBe('ja')
-      expect(reloaded.translation.targetLanguage).toBe('fr')
+      expect(reloaded.translation.targetLanguage).toBe(targetLanguage)
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

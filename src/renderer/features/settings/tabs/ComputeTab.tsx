@@ -117,7 +117,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
       <SettingsRow label={language === 'en' ? 'Local translation engine' : '本地翻译引擎'}><SettingSelect value={useTorch ? 'pytorch' : 'llama'} options={engineOptions} ariaLabel={c.translation} isDisabled={settings.translation.provider !== 'local'} onChange={value => save({ translationEngine: value as 'pytorch' | 'llama', translationDevice: 'auto' })} /></SettingsRow>
     </SettingGroup>
     <SettingGroup legend={c.hardware} actions={<Button variant="primary" size="sm" isPending={installing} isDisabled={installing || !!runtimes?.operation} onPress={() => void prepare()}>{c.prepareRecommended}</Button>}>
-      {runtimes?.hardware.adapters.map(d => <SettingsRow key={d.hardwareId} label={d.name} desc={`${d.vendor.toUpperCase()} · ${d.driver}`}><span>{d.vendor.toUpperCase()}</span></SettingsRow>)}
+      {runtimes?.hardware.adapters.map(d => <SettingsRow key={d.hardwareId} label={d.name} descriptionTooltip desc={`${d.vendor.toUpperCase()} · ${d.driver}`}><span>{d.vendor.toUpperCase()}</span></SettingsRow>)}
     </SettingGroup>
     <SettingGroup legend={c.devices} actions={<Button variant="secondary" size="sm" isDisabled={loading} onPress={() => void refresh()}>{loading ? <Spinner size="sm" /> : <RefreshCw size={16} />}{c.refresh}</Button>}>
       <SettingsRow label={c.recognition} descriptionTooltip desc={c.assignmentHint}><SettingSelect value={compute.recognitionDevice} options={options('recognition')} ariaLabel={c.recognition} onChange={recognitionDevice => save({ recognitionDevice })} /></SettingsRow>

@@ -1,3 +1,4 @@
+import type { ModelConfiguration } from '../../shared/model-capabilities'
 /**
  * Model domain: resource snapshot + audio devices + Hub search + credentials.
  *
@@ -197,6 +198,12 @@ export async function searchHub(query: string, kind: HubKind, cursor?: string): 
  * the **repo** — the engine's id is unknown until the call returns — and a
  * failure does not write `state.error`, since this channel can refuse early.
  */
+export async function configureModel(resourceId: string, configuration: ModelConfiguration): Promise<void> {
+  if (!bridge) throw new Error('Bridge unavailable')
+  const record = await bridge.models.configureModel(resourceId, configuration)
+  patchResource(record)
+}
+
 export async function installHubModel(
   repo: string,
   slot: 'recognition' | 'translation',

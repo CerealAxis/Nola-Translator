@@ -56,8 +56,7 @@
   .nola-setting-control > * { max-width: 100%; }
   .nola-setting-control .select { width: 100%; min-width: 0; max-width: 280px; }
   .nola-setting-control .select__trigger { width: 100%; }
-  .nola-page-intro { padding: 20px 24px; border-radius: 16px; background: var(--nola-hero-gradient); }
-  .nola-page-intro h1 { font-size: 32px; font-weight: 700; }
+  .nola-page-heading { padding: 12px 4px; }
   .nola-overlay-page { display: flex; flex-direction: column; gap: 20px; }
   .nola-overlay-preview { padding: 20px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface); }
   /*
@@ -69,6 +68,11 @@
   .nola-overlay-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; }
   .nola-overlay-field { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 12px; }
   .nola-overlay-field .select, .nola-overlay-field .select__trigger { width: 100%; }
+  .nola-overlay-language-trigger.button { display: flex; width: 100%; min-width: 0; height: var(--space-5); gap: var(--space-1); padding: 0 var(--space-2); border: 1px solid var(--field-border); border-radius: var(--field-radius); background: var(--surface-secondary); font: var(--font-body); }
+  .nola-overlay-language-trigger > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+  .nola-overlay-language-trigger svg { flex: none; width: var(--space-2); height: var(--space-2); color: var(--accent); }
+  .nola-overlay-languages { display: flex; flex-direction: column; width: calc(var(--space-8) * 4); max-width: calc(100vi - var(--space-4)); max-height: inherit; overflow-y: auto; gap: var(--space-2); padding: var(--space-2); }
+  .nola-language-options.list-box { max-height: min(calc(var(--space-8) * 4), 45dvh); overflow-y: auto; }
   .nola-overlay-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--separator); }
 }
 @layer utilities {
@@ -91,7 +95,6 @@
   .nola-brand { font-size: 16px; gap: 10px; }
   .nola-titlebar-tools { gap: 2px; }
   .nola-setting-row { gap: 12px; grid-template-columns: minmax(110px, .65fr) minmax(0, 1fr); }
-  .nola-page-intro { padding: 18px; }
   .nola-overlay-stage { min-height: 280px; padding: 20px 16px; }
 }
 @media (max-height: 700px) {

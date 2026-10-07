@@ -1,3 +1,4 @@
+import { ModelCapabilityNotices } from './features/models/ModelCapabilityNotices'
 import './index.css'
 import { StrictMode, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -220,6 +221,7 @@ function Root() {
     return (
       <ErrorBoundary>
         <OverlayRoot />
+        <ModelCapabilityNotices />
       </ErrorBoundary>
     )
   }
@@ -227,6 +229,7 @@ function Root() {
   return (
     <ErrorBoundary>
       <Shell />
+      <ModelCapabilityNotices />
     </ErrorBoundary>
   )
 }

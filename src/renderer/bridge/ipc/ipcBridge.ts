@@ -183,6 +183,7 @@ export function createIpcBridge(): NolaBridge {
       }),
     },
     models: {
+      configureModel: (resourceId, configuration) => call('configureModel', injected => injected.configureModel(resourceId, configuration)),
       /*
        * All three Hub methods call preload for real. The engine decides
        * `compatibility` once and the adapter forwards it untouched.

@@ -1,20 +1,8 @@
-/**
- * The overlay's two settings pills: what is shown, and how it is arranged.
- *
- * They are orthogonal dimensions, so one pill each rather than two groups in
- * one menu. Neither is a precondition for the other: display decides which
- * columns exist, layout decides whether the sentences run as one stream
- * that scrolls as a whole or stack as separate blocks. All four
- * combinations are meaningful.
- *
- * `rolling` and `sentence` both keep the earlier sentences. They differ in
- * continuity, scrolling and fade, not in how many are kept.
- */
-
 import { Dropdown } from '@heroui/react'
 import { ChevronDown } from 'lucide-react'
 
 import type { OverlaySettings } from '@/bridge'
+import { NO_TRANSLATION_LANGUAGE } from '@/bridge'
 
 import { useMenuMaxHeight } from './OverlayControls'
 import { actions, stores, useStore } from '@/store'
@@ -45,24 +33,28 @@ const DISPLAY_PATCH: Record<DisplayKey, Pick<OverlaySettings, 'showSource' | 'sh
 export function OverlayDisplayMenu({ isDisabled = false }: { isDisabled?: boolean }) {
   const { t } = useI18n()
   const overlay = useStore(stores.settings, (state) => state.settings?.overlay)
+  const translationDisabled = useStore(stores.settings, (state) => state.settings?.translation.targetLanguage === NO_TRANSLATION_LANGUAGE)
 
   const showSource = overlay?.showSource ?? true
   const showTranslation = overlay?.showTranslation ?? true
-  const display: DisplayKey = showSource && showTranslation ? 'both' : showSource ? 'source' : 'translation'
+  const display: DisplayKey = translationDisabled ? 'source' : showSource && showTranslation ? 'both' : showSource ? 'source' : 'translation'
 
   return (
     <OverlayPill label={t('overlay.displayMode')} value={t(DISPLAY_LABELS[display])} isDisabled={isDisabled} options={[
       { id: 'display:both', label: t('workspace.modeBoth'), active: display === 'both', patch: DISPLAY_PATCH.both },
       { id: 'display:source', label: t('workspace.modeSource'), active: display === 'source', patch: DISPLAY_PATCH.source },
       { id: 'display:translation', label: t('workspace.modeTranslation'), active: display === 'translation', patch: DISPLAY_PATCH.translation },
-    ]} />
+    ].filter(option => !translationDisabled || option.id === 'display:source')} />
   )
 }
 
 export function OverlayLayoutMenu({ isDisabled = false }: { isDisabled?: boolean }) {
   const { t } = useI18n()
   const overlay = useStore(stores.settings, (state) => state.settings?.overlay)
+  const translationDisabled = useStore(stores.settings, (state) => state.settings?.translation.targetLanguage === NO_TRANSLATION_LANGUAGE)
   const layout: LayoutKey = overlay?.layout === 'sentence' ? 'sentence' : 'rolling'
+
+  if (translationDisabled) return null
 
   return (
     <OverlayPill label={t('overlay.layout')} value={t(LAYOUT_LABELS[layout])} isDisabled={isDisabled} options={[
@@ -106,6 +98,7 @@ function OverlayPill({ label, value, options, isDisabled = false }: { label: str
       <Dropdown.Popover className="nola-caption-menu" maxHeight={maxHeight}>
         <Dropdown.Menu
           className="nola-caption-menu-list"
+          style={{ maxHeight }}
           selectionMode="single"
           selectedKeys={new Set(options.filter(option => option.active).map(option => option.id))}
         >

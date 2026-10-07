@@ -14,7 +14,7 @@ const channels = {
   searchHuggingFace: 'hub:search',
   inspectHuggingFace: 'hub:inspect',
   getHuggingFaceModelCard: 'hub:model-card',
-  installHuggingFaceModel: 'hub:install',
+  installHuggingFaceModel: 'hub:install', configureModel: 'model:configure',
   startSession: 'engine:start-session',
   stopSession: 'engine:stop-session',
   setSessionPaused: 'engine:set-session-paused',
@@ -62,6 +62,7 @@ const api: NolaTranslatorApi = {
   getHuggingFaceModelCard: (repo, revision) => invoke(channels.getHuggingFaceModelCard, repo, revision),
   installHuggingFaceModel: (repo, slot): Promise<ResourceRecord> =>
     invoke(channels.installHuggingFaceModel, repo, slot),
+  configureModel: (resourceId, configuration) => invoke(channels.configureModel, resourceId, configuration),
   startSession: (config: SessionConfig) => invoke(channels.startSession, config),
   stopSession: (sessionId: string) => invoke(channels.stopSession, sessionId),
   setSessionPaused: (sessionId: string, paused: boolean) =>

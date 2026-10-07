@@ -1,16 +1,14 @@
 /**
- * Storage and downloads: data folder, free space on its volume, restart prompt.
+ * Storage and downloads: data folder, how much of it is in use, restart prompt.
  *
  * The folder row is the whole data root — settings, credentials, meetings, models and the
  * runtime all live inside it. Picking a new one writes a pointer plus a pending-migration
  * marker and moves nothing; the move happens on the next launch, before any store opens a
  * handle, so the prompt says the data will move rather than "restart required".
  *
- * The free-space row reports a disk reading, not a quota: the main process probes
- * `configuredPath's volume with `statfs` and sends `freeBytes`.
- *
- * Free space must carry the volume letter (`G:`): without it "free" is ambiguous about which
- * disk is meant.
+ * The usage row is `usedBytes` from a recursive walk of that same folder, not a disk reading: free
+ * space on the volume is a property of the drive, and it says nothing about how much this app is
+ * holding.
  */
 
 import { useEffect } from 'react'
@@ -29,24 +27,20 @@ export function StorageTab(_props: SettingsPanelProps) {
   const busy = useStore(stores.settings, (state) => state.storageBusy)
 
   const path = storage?.configuredPath || storage?.activePath || ''
-  // A UNC path (`\\server\share`) and a bare relative path have no drive letter, so slicing a
-  // fixed prefix off them would leave mojibake; when none matches, no volume label is shown.
-  const volume = /^([a-zA-Z]:)/.exec(path)?.[1] ?? ''
 
   useEffect(() => {
     void actions.settings.refreshStorage().catch(() => {})
   }, [])
 
-  // An unmeasurable volume is undefined rather than 0, which would read as "disk full".
-  const freeBytes = storage?.freeBytes
-
-  const freeLabel = volume ? `${volume} ${t('modelsSettingsUi.storageFree')}` : t('modelsSettingsUi.storageFree')
+  // Undefined is "the folder could not be listed", which is a different statement from an empty
+  // folder; the main process keeps the two apart for exactly this reason.
+  const usedBytes = storage?.usedBytes
 
   return (
     <div className="settings-panel">
       <SettingGroup legend={t('settings.groupStorage')}>
-        <SettingsRow label={t('modelsSettingsUi.dataFolder')} desc={t('modelsSettingsUi.dataFolderDescription')}>
-          <InputGroup className="w-[200px]">
+        <SettingsRow label={t('modelsSettingsUi.dataFolder')} desc={t('modelsSettingsUi.dataFolderDescription')} descriptionTooltip>
+          <InputGroup className="settings-path-input">
             <InputGroup.Input readOnly value={path} aria-label={t('modelsSettingsUi.dataFolder')} />
           </InputGroup>
           <Button
@@ -68,15 +62,10 @@ export function StorageTab(_props: SettingsPanelProps) {
           </Button>
         </SettingsRow>
 
-        <SettingsRow label={t('modelsSettingsUi.storageUsage')} desc={t('modelsSettingsUi.storageUsageDescription')}>
-          <dl className="flex w-[200px] flex-col gap-1" aria-label={t('modelsSettingsUi.storageUsage')}>
-            <div className="flex items-baseline justify-between gap-3">
-              <dt className="nola-caption truncate text-muted">{freeLabel}</dt>
-              <dd className={`nola-body-strong tabular-nums ${freeBytes === undefined ? 'text-muted' : 'text-foreground'}`}>
-                {freeBytes === undefined ? t('modelsSettingsUi.storageValueUnavailable') : formatBytes(freeBytes)}
-              </dd>
-            </div>
-          </dl>
+        <SettingsRow label={t('modelsSettingsUi.storageUsage')}>
+          <p className={`nola-body-strong tabular-nums ${usedBytes === undefined ? 'text-muted' : 'text-foreground'}`}>
+            {usedBytes === undefined ? t('modelsSettingsUi.storageValueUnavailable') : formatBytes(usedBytes)}
+          </p>
         </SettingsRow>
       </SettingGroup>
 

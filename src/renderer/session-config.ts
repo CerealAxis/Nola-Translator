@@ -35,8 +35,43 @@
  * 不需要再拿 id 回头查一次 `listDevices()`。搬过来只会是没人调的死代码。
  */
 
-import type { SessionConfig } from '@/bridge'
+import { NO_TRANSLATION_LANGUAGE, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS } from '@/bridge'
+import type { AppSettings, AppSettingsPatch, ResourceRecord, SessionConfig } from '@/bridge'
+import { isModelReady, translationLanguages } from '../shared/model-capabilities'
+import { normalizeLanguage } from '../shared/languages'
+import { supportsSelectedEngine } from '../shared/model-engines'
+import { DEFAULT_COMPUTE_SETTINGS } from '../shared/compute'
 import type { TranslationSettings } from '@/bridge'
+
+/** Auto detection has no reverse translation target, so swapping resolves it to English. */
+export function swappedLanguagesOf(sourceLanguage: string, targetLanguage: string, sourceOptions: readonly string[] = SOURCE_LANGUAGE_OPTIONS, targetOptions: readonly string[] = TARGET_LANGUAGE_OPTIONS): { sourceLanguage: string; targetLanguage: string } | null {
+  const nextTarget = sourceLanguage === 'auto' ? 'en' : sourceLanguage
+  if (!sourceOptions.some(code => code === targetLanguage)
+    || !targetOptions.some(code => code === nextTarget)) return null
+  return { sourceLanguage: targetLanguage, targetLanguage: nextTarget }
+}
+
+/** Keep captions readable when disabling translation, and restore the translation track when re-enabling it. */
+export function targetLanguagePatch(targetLanguage: string, previousTargetLanguage: string): AppSettingsPatch {
+  return {
+    translation: { targetLanguage },
+    ...(targetLanguage === NO_TRANSLATION_LANGUAGE
+      ? { overlay: { showSource: true, showTranslation: false } }
+      : previousTargetLanguage === NO_TRANSLATION_LANGUAGE ? { overlay: { showTranslation: true } } : {}),
+  }
+}
+
+/** Selecting a model after disabling translation must also restore a usable target. */
+export function translationModelPatch(settings: AppSettings, model: ResourceRecord): AppSettingsPatch | null {
+  if (!isModelReady(model) || model.kind !== 'translationModel' || !supportsSelectedEngine(model, settings.compute ?? DEFAULT_COMPUTE_SETTINGS, model.resourceId)) return null
+  const targets = translationLanguages(model, settings.recognition.sourceLanguage)
+    .filter(code => code !== NO_TRANSLATION_LANGUAGE && code !== normalizeLanguage(settings.recognition.sourceLanguage))
+  const current = settings.translation.targetLanguage
+  const targetLanguage = targets.includes(current) ? current : targets.includes('zh') ? 'zh' : targets[0]
+  if (!targetLanguage) return null
+  const patch = targetLanguagePatch(targetLanguage, current)
+  return { ...patch, translation: { ...patch.translation, provider: 'local', localModelId: model.resourceId } }
+}
 
 /** `SessionConfig` 里由翻译设置决定的那几个字段。 */
 export type TranslationFields = Pick<
@@ -76,10 +111,11 @@ export function translationFieldsOf(
   translation: TranslationSettings,
   options: TranslationFieldOptions,
 ): TranslationFields {
-  // 见文件头第 1 条。
-  if (!options.enabled) return { targetLanguages: [] }
+  const targetLanguage = options.targetLanguage ?? translation.targetLanguage
+  // The sentinel is a user preference, never an engine language code.
+  if (!options.enabled || targetLanguage === NO_TRANSLATION_LANGUAGE) return { targetLanguages: [] }
 
-  const targetLanguages = [options.targetLanguage ?? translation.targetLanguage]
+  const targetLanguages = [targetLanguage]
 
   /*
    * "没有覆盖"要同时认 `undefined` 与**空白**。`SessionSetupDialog` 那侧的

@@ -20,6 +20,8 @@
     "test:layout": "electron tests/e2e/check-layout.mjs",
     "test:overlay": "electron tests/e2e/capture-overlay.mjs",
     "test:packaged-ui": "node scripts/check-packaged-ui.mjs",
+    "gen:notices": "node scripts/gen-third-party-notices.mjs",
+    "check:notices": "node scripts/gen-third-party-notices.mjs --check",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit"

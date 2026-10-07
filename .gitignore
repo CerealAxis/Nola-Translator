@@ -5,6 +5,7 @@ coverage/
 /playwright-report/
 /test-results/
 /artifacts/
+/.notices-tmp/
 /vendor/
 /models/
 .vite/

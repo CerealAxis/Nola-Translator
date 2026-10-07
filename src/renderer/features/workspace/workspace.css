@@ -8,7 +8,9 @@
     min-height: 0;
     height: calc(100dvh - var(--nola-titlebar-h, 64px) - 48px);
   }
-  .nola-workspace-heading { flex: none; padding: 4px 20px 0; }
+  /* No horizontal padding: the title lines up with the toolbar card's own edge, the
+     way `PageHeader` places every other page's title against the content area. */
+  .nola-workspace-heading { flex: none; padding: 4px 0 0; }
   .nola-workspace-heading h1 { margin: 0 0 10px; color: var(--foreground); font-size: 32px; font-weight: 700; line-height: 1.2; }
   .nola-workspace-toolbar.card { flex: none; min-width: 0; padding: 0; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: none; }
   .nola-workspace-toolbar-content { padding: 16px 20px; }
@@ -24,7 +26,7 @@
   .nola-workspace-picker > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
   .nola-workspace-picker:disabled { opacity: .65; }
   .nola-workspace-overlay { height: 36px; min-width: 0; border: 1px solid var(--accent); border-radius: 10px; color: var(--accent); font-size: 13px; }
-  .nola-workspace-languages { display: flex; flex-direction: column; gap: 12px; width: 280px; max-width: 90vi; padding: 12px; }
+  .nola-workspace-languages { display: flex; flex-direction: column; gap: 12px; width: 280px; max-width: 90vi; max-height: inherit; overflow-y: auto; padding: 12px; }
   .nola-workspace-view-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 20px; padding-top: 14px; }
   /* Track and selected state come from .nola-segmented in theme/app.css. */
   .nola-workspace-font-control { display: flex; align-items: center; gap: 12px; font-size: 13px; }
@@ -71,7 +73,7 @@
   .nola-workspace-wave span { width: 3px; flex: 0 1 3px; border-radius: 3px; background: currentColor; }
   .nola-workspace-bar-spacer { flex: 1; }
   @media (max-width: 1200px) {
-    .nola-workspace-heading { padding-inline: 4px; }
+    .nola-workspace-heading { padding-inline: 0; }
     .nola-workspace-notes.card { flex-basis: 240px; padding: 16px; }
   }
   @media (max-width: 999px) {

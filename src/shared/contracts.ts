@@ -1,3 +1,4 @@
+import type { ModelConfiguration } from './model-capabilities'
 import type { CloudApiFormat } from './settings'
 import type { ComputeSettings, ComputeSnapshot } from './compute'
 
@@ -133,6 +134,7 @@ export type EngineCommand =
   | (Envelope<'searchHubModels'> & { query: string; slot?: 'recognition' | 'translation'; limit?: number; weightFormat?: 'gguf'; cursor?: string })
   | (Envelope<'inspectHubRepo'> & { repo: string })
   | (Envelope<'installHubRepo'> & { repo: string; slot?: 'recognition' | 'translation' })
+  | (Envelope<'configureModel'> & { resourceId: string; configuration: ModelConfiguration })
 
 export type AudioDevice = {
   deviceId: string
@@ -153,6 +155,7 @@ export type ResourceRecord = {
   name: string
   description: string
   languages: string[]
+  configuration?: ModelConfiguration
   sourceLanguage?: string
   targetLanguage?: string
   installed: boolean

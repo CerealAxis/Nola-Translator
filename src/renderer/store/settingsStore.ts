@@ -1,3 +1,5 @@
+import { recognitionLanguages } from '../../shared/model-capabilities'
+import { modelsStore } from './modelStore'
 /**
  * Settings domain: optimistic update + rollback + 180ms debounce + write queue.
  * A rollback returns to "the snapshot the engine confirmed + the patches still
@@ -193,6 +195,12 @@ export async function updateSettings(patch: AppSettingsPatch): Promise<void> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
   const base = confirmed ?? settingsStore.getState().settings
   if (!base) throw new Error('设置还没有加载完成')
+  if (patch.recognition?.modelId) {
+    const model = modelsStore.getState().resources.find(item => item.resourceId === patch.recognition?.modelId)
+    const codes = recognitionLanguages(model)
+    const source = patch.recognition.sourceLanguage ?? settingsStore.getState().settings?.recognition.sourceLanguage ?? base.recognition.sourceLanguage
+    if (codes.length > 0 && !codes.includes(source)) patch = { ...patch, recognition: { ...patch.recognition, sourceLanguage: codes[0] } }
+  }
 
   if (isDebounceable(patch)) return enqueueDebounced(patch)
 

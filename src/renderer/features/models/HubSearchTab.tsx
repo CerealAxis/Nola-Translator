@@ -1,6 +1,8 @@
+import { configurationOf } from '../../../shared/model-capabilities'
+import { ModelConfigurationDialog } from './ModelConfigurationDialog'
 /** Hub metadata hits arrive before the README card or any runtime inspection finishes. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Card, Drawer, EmptyState, Label, SearchField, Tag, TagGroup, toast } from '@heroui/react'
+import { Alert, Button, Card, Drawer, EmptyState, SearchField, Tag, TagGroup, toast } from '@heroui/react'
 import type { HubModelSummary, HubSearchResult, ResourceRecord } from '@/bridge'
 import { actions, stores, useStore } from '@/store'
 import type { HubKind } from '@/store'
@@ -97,9 +99,14 @@ function SearchSkeletons() {
   </div>
 }
 
-export function HubSearchTab() {
+export interface HubSearchTabProps {
+  onGoRecommended: () => void
+}
+
+export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
   const { t } = useI18n()
   const [query, setQuery] = useState('')
+  const [configuring, setConfiguring] = useState<ResourceRecord | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [hits, setHits] = useState<HubHit[]>([])
   const [descriptions, setDescriptions] = useState<Record<string, string>>({})
@@ -215,13 +222,25 @@ export function HubSearchTab() {
     ?? descriptions[summary.repo] ?? ''
 
   return <div className="flex flex-col gap-4">
+    {configuring ? <ModelConfigurationDialog key={configuring.resourceId} record={configuring} onClose={() => setConfiguring(null)} /> : null}
     <SearchField value={query} onChange={setQuery} fullWidth aria-label={t('models.searchPlaceholder')}>
-      <Label className="models-search__label">{t('modelsSettingsUi.searchLabel')}</Label>
       <SearchField.Group>
         <SearchField.SearchIcon />
         <SearchField.Input placeholder={t('models.searchPlaceholder')} />
       </SearchField.Group>
     </SearchField>
+    <Alert status="warning">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title className="nola-body-strong">{t('models.experimentalNoticeTitle')}</Alert.Title>
+        <Alert.Description className="nola-caption">
+          {t('models.experimentalNoticeBody')}
+          <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={onGoRecommended}>
+            {t('models.experimentalNoticeAction')}
+          </Button>
+        </Alert.Description>
+      </Alert.Content>
+    </Alert>
     <TagGroup aria-label={t('modelsSettingsUi.filtersLabel')} selectionMode="single"
       selectedKeys={new Set([filter])} onSelectionChange={(keys) => {
         const next = [...keys][0]
@@ -262,9 +281,9 @@ export function HubSearchTab() {
           onCancel={() => { void actions.models.manageResource(liveId, 'cancel').catch(() => undefined) }}
           onRemove={() => { void actions.models.manageResource(liveId, 'remove').catch(() => undefined) }}
           onSetDefault={() => undefined}
-          footer={<Button variant="tertiary" size="sm" onPress={() => setDetail(hit)}>
+          footer={<div className="flex flex-wrap gap-[var(--space-1)]">{live?.installed ? <Button variant="secondary" onPress={() => setConfiguring(live)}>{t(configurationOf(live) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : null}<Button variant="tertiary" size="sm" onPress={() => setDetail(hit)}>
             {t('models.openDetails')}
-          </Button>} />
+          </Button></div>} />
       })}
     </div> : null}
     {!awaiting && !failed ? <div ref={bottom} className="models-search__pagination" aria-live="polite">

@@ -14,6 +14,8 @@ import { NotesPanel } from '@/components/notes'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 import { recordPath, useRoute } from '@/routes'
+import { NO_TRANSLATION_LANGUAGE } from '@/bridge'
+import { targetLanguagePatch, translationModelPatch } from '@/session-config'
 
 import { PreflightDialog } from './PreflightDialog'
 import { SessionBar } from './SessionBar'
@@ -50,11 +52,12 @@ export function WorkspacePage() {
   //    while layout and size belong to the workspace alone ----------------
   const overlay = settings?.overlay
   const displayMode: CaptionDisplayMode = useMemo(() => {
+    if (settings?.translation.targetLanguage === NO_TRANSLATION_LANGUAGE) return 'source'
     const source = overlay?.showSource ?? true
     const target = overlay?.showTranslation ?? true
     if (source && target) return 'both'
     return source ? 'source' : 'translation'
-  }, [overlay?.showSource, overlay?.showTranslation])
+  }, [overlay?.showSource, overlay?.showTranslation, settings?.translation.targetLanguage])
   const [layout, setLayout] = useState<CaptionLayout>('split')
   const [fontStep, setFontStep] = useState(1)
   const [notesOpen, setNotesOpen] = useState(true)
@@ -153,7 +156,7 @@ export function WorkspacePage() {
       audioSource: settings?.recognition.audioSource ?? 'defaultOutput',
       sourceLanguage: settings?.recognition.sourceLanguage ?? 'auto',
       recognitionModelId: settings?.recognition.modelId ?? 'qwen3-asr-1.7b-hf',
-      translate: true,
+      translate: settings?.translation.targetLanguage !== NO_TRANSLATION_LANGUAGE,
       targetLanguage: settings?.translation.targetLanguage ?? 'zh',
       translationModelId: settings?.translation.localModelId ?? '',
       keepAudio: settings?.recording.keepAudio ?? true,
@@ -271,9 +274,10 @@ export function WorkspacePage() {
     if (meetingId) navigate(recordPath(meetingId))
   }, [navigate])
 
-  const sourceLanguage = pendingConfig?.sourceLanguage ?? settings?.recognition.sourceLanguage ?? 'auto'
-  const targetLanguage = pendingConfig?.targetLanguages[0] ?? settings?.translation.targetLanguage ?? 'zh'
-  const audioSource = pendingConfig?.audioSource.kind === 'defaultOutput' ? 'defaultOutput' : pendingConfig?.audioSource.deviceId ?? settings?.recognition.audioSource ?? 'defaultOutput'
+  const currentConfig = !['idle', 'error'].includes(status) ? pendingConfig : null
+  const sourceLanguage = currentConfig?.sourceLanguage ?? settings?.recognition.sourceLanguage ?? 'auto'
+  const targetLanguage = currentConfig ? currentConfig.targetLanguages[0] ?? NO_TRANSLATION_LANGUAGE : settings?.translation.targetLanguage ?? 'zh'
+  const audioSource = currentConfig?.audioSource.kind === 'defaultOutput' ? 'defaultOutput' : currentConfig?.audioSource.deviceId ?? settings?.recognition.audioSource ?? 'defaultOutput'
   const audioLabel = audioSource === 'defaultOutput' ? t('workspaceUi.systemAudio') : devices.find((device) => device.deviceId === audioSource)?.name ?? audioSource
   const timer = <SessionBar status={status} elapsedMs={session.elapsedMs} audioLabel={audioLabel} showControls={active} onPause={() => actions.session.pauseSession()} onResume={() => actions.session.resumeSession()} onStop={() => setStopConfirmOpen(true)} />
 
@@ -290,6 +294,23 @@ export function WorkspacePage() {
         modelId={pendingConfig?.recognitionModelId ?? settings?.recognition.modelId ?? 'qwen3-asr-1.7b-hf'} onModelChange={(modelId) => {
           void actions.settings.updateSettings({ recognition: { modelId } }).catch(() => undefined)
         }}
+        translationModelId={currentConfig?.translationModelId ?? settings?.translation.localModelId ?? ''}
+        translationProvider={currentConfig?.translationProvider ?? settings?.translation.provider ?? 'local'}
+        translationProviderLabel={settings?.translation.provider === 'cloud' ? settings.translation.cloudModel || t('settings.providerCloud') : t('settings.providerMicrosoft')}
+        onTranslationModelChange={(value) => {
+          if (!settings) return
+          const previousTarget = settings.translation.targetLanguage
+          if (value === NO_TRANSLATION_LANGUAGE) {
+            void actions.settings.updateSettings(targetLanguagePatch(NO_TRANSLATION_LANGUAGE, previousTarget)).catch(() => undefined)
+          } else if (value === settings.translation.provider && value !== 'local') {
+            const target = previousTarget === NO_TRANSLATION_LANGUAGE ? settings.recognition.sourceLanguage === 'zh' ? 'en' : 'zh' : previousTarget
+            void actions.settings.updateSettings(targetLanguagePatch(target, previousTarget)).catch(() => undefined)
+          } else {
+            const model = resources.find(item => item.resourceId === value)
+            const patch = model && translationModelPatch(settings, model)
+            if (patch) void actions.settings.updateSettings(patch).catch(() => undefined)
+          }
+        }}
         audioSource={audioSource}
         devices={devices}
         onAudioSourceChange={(next) => { void actions.settings.updateSettings({ recognition: { audioSource: next } }).catch(() => undefined) }}
@@ -300,7 +321,10 @@ export function WorkspacePage() {
           void actions.settings.updateSettings({ recognition: { sourceLanguage } }).catch(() => undefined)
         }}
         onTargetLanguageChange={(targetLanguage) => {
-          void actions.settings.updateSettings({ translation: { targetLanguage } }).catch(() => undefined)
+          void actions.settings.updateSettings(targetLanguagePatch(targetLanguage, settings?.translation.targetLanguage ?? 'zh')).catch(() => undefined)
+        }}
+        onLanguagePairChange={(sourceLanguage, targetLanguage) => {
+          void actions.settings.updateSettings({ recognition: { sourceLanguage }, translation: { targetLanguage } }).catch(() => undefined)
         }}
         displayMode={displayMode}
         onDisplayModeChange={(mode) => {

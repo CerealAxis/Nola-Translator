@@ -1,5 +1,6 @@
+import { useModelOptions } from '@/model-options'
 /**
- * Audio and recognition: source device, source language, recognition model, audio retention.
+ * Audio and recognition: source device, recognition model, source language, audio retention.
  *
  * `recognition.audioSource` ships as the protocol sentinel `'defaultOutput'`, which is not a
  * device. `AudioDevice.isDefault` already names the system default, so the sentinel is mapped
@@ -12,7 +13,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Alert, Button, InputGroup, toast } from '@heroui/react'
 
-import { LANGUAGE_LABELS, RECOGNITION_MODEL_IDS, RECOGNITION_MODEL_LABELS, SOURCE_LANGUAGE_OPTIONS } from '@/bridge'
+import { LANGUAGE_LABELS } from '@/bridge'
 import { SettingsRow } from '../SettingsRow'
 import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
@@ -23,6 +24,7 @@ const DEFAULT_OUTPUT = 'defaultOutput'
 
 export function AudioTab({ settings }: SettingsPanelProps) {
   const { t, language } = useI18n()
+  const modelChoices = useModelOptions()
   const devices = useStore(stores.models, (state) => state.devices)
   // Retention is on by default: with it off nothing can be replayed or exported, and
   // `ipc.ts` reads the flag to decide both `recordAudio` and the `recordingPath` it injects,
@@ -48,16 +50,16 @@ export function AudioTab({ settings }: SettingsPanelProps) {
 
   const languageOptions = useMemo<PickerOption[]>(
     () =>
-      SOURCE_LANGUAGE_OPTIONS.map((code) => ({
+      modelChoices.sourceLanguages.map((code) => ({
         value: code,
         label: LANGUAGE_LABELS[code]?.[language === 'zh-CN' ? 'zh' : 'en'] ?? code,
       })),
-    [language],
+    [language, modelChoices.sourceLanguages],
   )
 
   const modelOptions = useMemo<PickerOption[]>(
-    () => RECOGNITION_MODEL_IDS.map((id) => ({ value: id, label: RECOGNITION_MODEL_LABELS[id], isDisabled: settings.compute.recognitionEngine !== 'pytorch' })),
-    [settings.compute.recognitionEngine],
+    () => modelChoices.recognitionModels,
+    [modelChoices.recognitionModels],
   )
 
   return (
@@ -79,12 +81,24 @@ export function AudioTab({ settings }: SettingsPanelProps) {
             />
           )}
         </SettingsRow>
-        <SettingsRow label={t('settings.testAudio')} desc={activeDevice ? activeDevice.name : undefined}>
+        <SettingsRow label={t('settings.testAudio')} descriptionTooltip desc={activeDevice ? activeDevice.name : undefined}>
           <DeviceTest expect={selectedDeviceId} />
         </SettingsRow>
       </SettingGroup>
 
       <SettingGroup legend={t('settings.groupRecognition')}>
+        <SettingsRow label={t('settings.recognitionModel')}>
+          <SettingSelect
+            value={settings.recognition.modelId}
+            options={modelOptions}
+            ariaLabel={t('settings.recognitionModel')}
+            onChange={(value) => {
+              void updateSettings({
+                recognition: { modelId: value },
+              }).catch(() => undefined)
+            }}
+          />
+        </SettingsRow>
         <SettingsRow label={t('settings.sourceLanguage')}>
           <SettingSelect
             value={settings.recognition.sourceLanguage}
@@ -95,22 +109,10 @@ export function AudioTab({ settings }: SettingsPanelProps) {
             }}
           />
         </SettingsRow>
-        <SettingsRow label={t('settings.recognitionModel')}>
-          <SettingSelect
-            value={settings.recognition.modelId}
-            options={modelOptions}
-            ariaLabel={t('settings.recognitionModel')}
-            onChange={(value) => {
-              void updateSettings({
-                recognition: { modelId: value as (typeof RECOGNITION_MODEL_IDS)[number] },
-              }).catch(() => undefined)
-            }}
-          />
-        </SettingsRow>
       </SettingGroup>
 
       <SettingGroup legend={t('settings.groupRecording')}>
-        <SettingsRow label={t('settings.keepAudio')} desc={t('settings.keepAudioHint')}>
+        <SettingsRow label={t('settings.keepAudio')} descriptionTooltip desc={t('settings.keepAudioHint')}>
           <SettingSwitch
             isSelected={keepAudio}
             ariaLabel={t('settings.keepAudio')}

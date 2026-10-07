@@ -300,15 +300,15 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 }
 
 /*
- * Three trigger paths, all required: `:hover` when the pointer is over the card,
- * `[data-hover='true']` computed in `OverlayRoot` by hit-testing raw pointer
- * coordinates, and `:focus-within` for keyboard Tab. The third is the only one
- * that survives an unlocked card, which is `-webkit-app-region: drag` and in
- * Chromium delivers no mouse events to anything inside it.
+ * Pointer hover reaches this row through CSS and the raw-coordinate state from
+ * `OverlayRoot`. Keyboard focus also reveals it, but only in keyboard modality:
+ * a mouse press leaves DOM focus on a pill after the pointer has gone, and plain
+ * `:focus-within` would strand the whole chrome on screen.
  */
 .nola-caption-card[data-hover='true'] .nola-caption-actions,
 .nola-caption-card:hover .nola-caption-actions,
-.nola-caption-card:focus-within .nola-caption-actions {
+.nola-caption-card:has(:focus-visible) .nola-caption-actions,
+.nola-caption-card:has([data-focus-visible='true']) .nola-caption-actions {
   opacity: 1;
   transform: none;
   pointer-events: auto;
@@ -469,25 +469,41 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 /* ── Control bar pill ──────────────────────────────────────────────────── */
 
 /*
- * Scrollbar hidden but scrolling kept: the language list does not fit one
- * screen, and `scrollbar-width: none` plus `::-webkit-scrollbar { display: none }`
- * reads as a clean list while the wheel, trackpad and arrow keys still work.
+ * The language list is longer than the caption window, so it scrolls — the Menu
+ * carries `maxHeight` and `.nola-caption-menu-list` is the element that acts on
+ * it. A hairline thumb is what communicates that: with the scrollbar hidden, a
+ * clipped list reads as a complete one, and the languages below the fold are
+ * reachable only by someone who already suspects the wheel works.
  */
 .nola-caption-menu {
+  /* The popover overlaps an unlocked card's drag region, so it must opt out
+     before Chromium can deliver its presses and wheel events to the menu. */
+  -webkit-app-region: no-drag;
   min-width: 168px;
   max-width: 260px;
 }
 
 .nola-caption-menu-list {
+  -webkit-app-region: no-drag;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.26) transparent;
   padding: 4px;
   border-radius: 12px;
 }
 
 .nola-caption-menu-list::-webkit-scrollbar {
-  display: none;
+  width: 6px;
+}
+
+.nola-caption-menu-list::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.nola-caption-menu-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /*
@@ -619,7 +635,8 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 
 .nola-caption-card[data-hover='true'] .nola-caption-controls,
 .nola-caption-card:hover .nola-caption-controls,
-.nola-caption-card:focus-within .nola-caption-controls {
+.nola-caption-card:has(:focus-visible) .nola-caption-controls,
+.nola-caption-card:has([data-focus-visible='true']) .nola-caption-controls {
   opacity: 1;
   transform: none;
   pointer-events: auto;
@@ -669,6 +686,17 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   right: 0;
   z-index: var(--z-caption-scrim);
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.nola-caption-preview:hover .nola-caption-preview__scrim {
+  opacity: 1;
+}
+
+/* With no fill to fade out of, a scrim would only haze whatever is behind. */
+.nola-caption-preview[data-transparent-background='true'] .nola-caption-preview__scrim {
+  opacity: 0;
 }
 
 .nola-caption-preview__scrim[data-edge='top'] {
@@ -683,6 +711,13 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   background: linear-gradient(to top, color-mix(in srgb, var(--preview-background-color, #0d0e10) 92%, transparent) 30%, transparent);
 }
 
+/*
+ * Both rows reveal on hover exactly as the real card's
+ * `.nola-caption-actions` / `.nola-caption-controls` do, so the preview shows
+ * the resting state a live window actually has: captions alone on the glass.
+ * The preview is neither a drag region nor focusable, so plain `:hover` is the
+ * whole trigger — no pointer hit-testing is needed here.
+ */
 .nola-caption-preview__actions {
   position: absolute;
   right: 10px;
@@ -692,6 +727,16 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   align-items: center;
   gap: 5px;
   color: #c7c9cd;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.nola-caption-preview:hover .nola-caption-preview__actions {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
 }
 
 .nola-caption-preview__actions svg {
@@ -721,6 +766,16 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   color: rgba(255, 255, 255, 0.92);
   font-size: 11px;
   font-weight: 600;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.nola-caption-preview:hover .nola-caption-preview__controls {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
 }
 
 .nola-caption-preview__mic,

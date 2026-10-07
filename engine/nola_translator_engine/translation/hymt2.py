@@ -8,10 +8,7 @@ from ..hub import HYMT2_LANGUAGES
 from .base import ProviderTranslation
 from .llama_server import LlamaServerManager
 
-# The language table from the official Hy-MT2 README (39 rows), code → full English name. It now
-# lives in hub.py next to the adapter that declares Hy-MT2's capabilities: the table describes the
-# *model*, not this prompt template, and a runtime adapter that cannot answer "which languages do
-# you cover" is just the hardcoded list wearing a different hat.
+# Keep prompt names aligned with the adapter's official model capability table.
 SUPPORTED_LANGUAGES: dict[str, str] = HYMT2_LANGUAGES
 
 _CASEFOLD_INDEX = {code.casefold(): code for code in SUPPORTED_LANGUAGES}
@@ -65,35 +62,33 @@ def validate_session_languages(source: str | None, targets: list[str]) -> list[s
     return list(dict.fromkeys(unsupported))
 
 
-def _system_prompt(source_key: str, target_key: str) -> str:
-    """Hy-MT2's official default translation prompt: full language names plus the
-    translate-only constraint, with the body carried by the user message.
-    """
-    source_name = SUPPORTED_LANGUAGES[source_key]
-    target_name = SUPPORTED_LANGUAGES[target_key]
-    return (
-        f"Translate the following text from {source_name} into {target_name}. "
-        "Note that you should **only output the translated result "
-        "without any additional explanation**:"
-    )
-
-
 class HyMt2TranslationProvider:
     """Local Hy-MT2 translation provider backed by llama-server."""
 
     name = "hymt2"
 
-    def __init__(self, manager: LlamaServerManager) -> None:
+    def __init__(self, manager: LlamaServerManager, *, languages: dict[str, str] | None = None) -> None:
         self.manager = manager
+        self.languages = languages if languages is not None else SUPPORTED_LANGUAGES
 
     async def translate(self, text: str, source: str, target: str) -> ProviderTranslation:
-        source_key = _normalize_language_code(source)
-        target_key = _normalize_language_code(target)
+        from ..model_capabilities import normalize
+        source_key = next((code for code in self.languages if normalize(code) == normalize(source)), None)
+        target_key = next((code for code in self.languages if normalize(code) == normalize(target)), None)
         if source_key is None or target_key is None:
             raise UnsupportedLanguagePair(source, target)
-        messages = [
-            {"role": "system", "content": _system_prompt(source_key, target_key)},
-            {"role": "user", "content": text},
-        ]
+        # Hy-MT2's official examples place the instruction and text in one user message.
+        # The official Chinese template keeps Cantonese distinct from Standard Written Chinese
+        # more reliably than the English template in local Q4_K_M inference checks.
+        prompt = (
+            f"将以下文本翻译为粤语，注意只需要输出翻译后的结果，不要额外解释：\n{text}"
+            if normalize(target_key) == "yue"
+            else (
+                f"Translate the following text into {self.languages[target_key]}. "
+                "Note that you should only output the translated result "
+                f"without any additional explanation:\n{text}"
+            )
+        )
+        messages = [{"role": "user", "content": prompt}]
         content = await asyncio.to_thread(self.manager.chat_sync, messages)
         return ProviderTranslation(content, (source, target))

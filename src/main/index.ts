@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs'
 import { app, BrowserWindow, safeStorage, screen, shell } from 'electron'
 
 import type { AppSettings, OverlaySettings } from '../shared/settings'
+import { NO_TRANSLATION_LANGUAGE } from '../shared/settings'
 import type { SessionConfig } from '../shared/contracts'
 import { randomUUID } from 'node:crypto'
 import { handleMeetingAudio, MEETING_AUDIO_SCHEME, registerMeetingAudioScheme } from './audio-protocol'
@@ -245,7 +246,7 @@ if (!hasSingleInstanceLock) {
         const translationSettings = settings.current().translation
         const provider = session ? session.translationProvider ?? 'local' : translationSettings.provider
         const modelId = session?.translationModelId ?? translationSettings.localModelId
-        let translation: 'torch' | 'llama' | 'none' = provider !== 'local' || (session && !session.targetLanguages.length)
+        let translation: 'torch' | 'llama' | 'none' = provider !== 'local' || (session ? !session.targetLanguages.length : translationSettings.targetLanguage === NO_TRANSLATION_LANGUAGE)
           ? 'none' : modelId === 'm2m100-418m' ? 'torch' : 'llama'
         if (translation !== 'none' && engine!.currentState === 'ready') {
           try {

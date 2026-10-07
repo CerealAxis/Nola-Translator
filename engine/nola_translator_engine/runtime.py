@@ -23,6 +23,7 @@ from .hub import (
     search_repos,
     search_formats,
 )
+from .model_capabilities import normalize, supports_translation
 from .models.manager import ModelManager
 from .models.registry import CustomFile
 from .protocol import (
@@ -39,6 +40,7 @@ from .protocol import (
     HubModelsEvent,
     InspectHubRepoCommand,
     InstallHubRepoCommand,
+    ConfigureModelCommand,
     ListResourcesCommand,
     ManageResourceCommand,
     ResourceActionResultEvent,
@@ -230,6 +232,14 @@ class EngineRuntime:
                     resource=resource,
                 )
             ]
+        if isinstance(command, ConfigureModelCommand):
+            if self.service.session_id is not None:
+                return [self._resource_error(command.requestId, "resourceInUse")]
+            try:
+                record = self.resources.configure(command.resourceId, command.configuration)
+                return [ResourceActionResultEvent(protocolVersion=1, type="resourceActionResult", requestId=command.requestId, resource=record)]
+            except ResourceActionError as error:
+                return [self._resource_error(command.requestId, error.code, error.details)]
         if isinstance(command, StartSessionCommand):
             return await self._start(command)
         if isinstance(command, InspectHubRepoCommand):
@@ -466,6 +476,18 @@ class EngineRuntime:
                     # transformers repo the user installed themselves is the thing that gets
                     # checked for and loaded.
                     required_resources.append(self._local_translation_model_id(command.config))
+            for resource_id in required_resources:
+                capability = self.resources.configuration(resource_id)
+                if capability is None:
+                    raise ResourceActionError("invalidConfiguration", {"resourceId": resource_id, "reason": "modelNeedsConfiguration"})
+            recognition = self.resources.configuration(model_id)
+            source = normalize(command.config.sourceLanguage)
+            if source == "auto" and not recognition.supportsAutoDetection or source != "auto" and source not in {normalize(code) for code in recognition.languages}:
+                raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedRecognitionLanguage", "language": source})
+            if command.config.translationProvider == "local" and command.config.targetLanguages:
+                capability = self.resources.configuration(self._local_translation_model_id(command.config))
+                if any(not supports_translation(capability, source, target) for target in command.config.targetLanguages):
+                    raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedTranslationLanguage", "language": source})
             missing_resources = [
                 resource_id for resource_id in required_resources
                 if not self.resources.is_installed(resource_id)
@@ -734,17 +756,20 @@ class EngineRuntime:
                 precision="auto" if self._translation_device.id == "cpu" and config.compute.translationDevice != "cpu" and config.compute.allowCpuFallback else config.compute.precision,
                 threads=self._torch_threads)
         if adapter == "llama.cpp":
-            unsupported = validate_session_languages(source, targets)
-            if unsupported:
-                raise ValueError(
-                    "unsupportedTranslationLanguage (hymt2): " + ", ".join(unsupported)
-                )
             # all three quantization tiers share one llama-server; load whichever the session picked.
             self.llama_manager.switch_gguf(self.resources.translation_gguf_path(model_id))
             self.llama_manager.configure_compute(self._translation_device,
                 config.compute.model_copy(update={"cpuThreads": self._llama_threads}))
-            return HyMt2TranslationProvider(self.llama_manager)
+            capability = self.resources.configuration(model_id)
+            languages = {code: self._language_name(code) for code in set(capability.sourceLanguages + capability.targetLanguages)}
+            return HyMt2TranslationProvider(self.llama_manager, languages=languages)
         raise UnknownTranslationModel(model_id)
+
+    @staticmethod
+    def _language_name(code: str) -> str:
+        from .hub import HYMT2_LANGUAGES
+        from .recognition.qwen_runtime import CODE_TO_NAME
+        return HYMT2_LANGUAGES.get(code) or CODE_TO_NAME.get(code) or CODE_TO_NAME.get("fil" if code == "tl" else code) or code
 
     async def _ensure_translation_server(self, command: StartSessionCommand) -> None:
         """Bring up the local translation runtime at session start; a missing model or a failed
@@ -784,6 +809,8 @@ class EngineRuntime:
             if command.config.sourceLanguage == "auto"
             else self._language_code(command.config.sourceLanguage)
         )
+        if language == "tl":
+            language = "fil"
         model_id = self._model_id(command)
         self.active_model_id = model_id
         model_path = self.resources.model_path(model_id)
@@ -913,9 +940,18 @@ class EngineRuntime:
         targets = [] if config is None else [self._language_code(item) for item in config.targetLanguages]
         source = self._language_code(update.language or self._detect_language(update.source_text))
         targets = list(dict.fromkeys(item for item in targets if item != source))
+        if config is not None and getattr(config, "translationProvider", None) == "local" and targets:
+            capability = self.resources.configuration(self._local_translation_model_id(config))
+            # Automatic language detection is allowed to retain untranslated speech silently.
+            targets = [target for target in targets if supports_translation(capability, source, target)]
         previous_update = self.latest_updates.get(update.segment_id)
         self.latest_updates[update.segment_id] = update
         if not targets:
+            self.translation_requests.pop(update.segment_id, None)
+            self.latest_translations.pop(update.segment_id, None)
+            task = self.translation_tasks.get(update.segment_id)
+            if task is not None:
+                task.cancel()
             self.emit(self._caption_event(update, []))
             self._retire_completed(update)
             return
@@ -1012,16 +1048,14 @@ class EngineRuntime:
                 model_id = ""
             if not model_id or not self.resources.is_installed(model_id):
                 target_errors = dict.fromkeys(targets, "resourceUnavailable")
-            elif not is_supported(request.source):
-                target_errors = dict.fromkeys(targets, "unsupportedLanguagePair")
             else:
-                for target in targets:
-                    if not is_supported(target):
-                        target_errors[target] = "unsupportedLanguagePair"
+                capability = self.resources.configuration(model_id)
+                target_errors = {target: "unsupportedLanguagePair" for target in targets if not supports_translation(capability, request.source, target)}
                 if not target_errors and not self.llama_manager.ready:
                     target_errors = dict.fromkeys(targets, "llamaServerUnavailable")
         elif provider_name == "m2m100":
-            if not self.resources.is_installed(M2M100_RESOURCE_ID):
+            model_id = self._local_translation_model_id(self.active_config) if self.active_config else M2M100_RESOURCE_ID
+            if not self.resources.is_installed(model_id):
                 target_errors = dict.fromkeys(targets, "resourceUnavailable")
             elif not m2m100_is_supported(request.source):
                 target_errors = dict.fromkeys(targets, "unsupportedLanguagePair")
@@ -1118,8 +1152,8 @@ class EngineRuntime:
 
     @staticmethod
     def _language_code(language: str) -> str:
-        aliases = {"zh-CN": "zh", "zh-Hans": "zh", "en-US": "en", "ja-JP": "ja", "auto": "en"}
-        return aliases.get(language, language.split("-")[0])
+        normalized = normalize(language)
+        return "en" if normalized == "auto" else normalized if normalized == "zh-Hant" else normalized.split("-")[0]
 
     @staticmethod
     def _detect_language(text: str) -> str:

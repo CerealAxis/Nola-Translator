@@ -494,7 +494,7 @@ def _verdict_gguf(info: HubRepoInfo) -> RuntimeVerdict:
         slot="translation",
         loader="llama.cpp",
         adapter_id="llama.cpp",
-        languages=tuple(sorted(HYMT2_LANGUAGES)),
+        languages=(),
         evidence=_evidence(info, {"ggufFiles": ",".join(item.path for item in info.gguf_files)}),
     )
 

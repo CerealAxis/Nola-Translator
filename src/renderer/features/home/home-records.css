@@ -78,9 +78,9 @@
 .nola-record-page .nola-record-empty { flex: 1; }
 .nola-record-empty h2 { font-size: 20px; color: var(--foreground); }
 .nola-record-loading { display: grid; gap: 12px; }
-.nola-record-page__header { display: flex; justify-content: space-between; align-items: center; gap: 20px; min-width: 0; padding: 12px 4px; }
+.nola-record-page__header { display: flex; justify-content: space-between; align-items: center; gap: 20px; min-width: 0; padding: 12px 0; }
 .nola-record-page__header h1 { margin: 0 0 6px; color: var(--foreground); font-size: 32px; font-weight: 700; line-height: 1.25; }
-.nola-record-page__header p { color: var(--muted); font-size: 16px; margin: 0; }
+.nola-record-page__header p { color: var(--muted); font-size: 14px; margin: 0; }
 .nola-record-page__start { flex-shrink: 0; border-radius: 12px; min-height: 44px; padding-inline: 20px; }
 .nola-record-page__search { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .nola-record-page__search > .search-field { width: min(380px, 100%); }
@@ -88,7 +88,11 @@
 .nola-record-page__search > span, .nola-record-page__footer > span { font-size: 13px; color: var(--muted); }
 .nola-record-page__footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--separator); padding-top: 16px; gap: 12px; }
 .nola-record-page__footer > span { white-space: nowrap; flex-shrink: 0; }
-.nola-record-page__footer > .pagination { width: auto; margin-left: auto; }
+.nola-record-page__paging { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.nola-record-page__paging > .pagination { width: auto; }
+.nola-record-page__per-page { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.nola-record-page__page-size { width: 84px; }
+.nola-record-page__page-size .select__trigger { min-height: 32px; }
 .nola-record-detail { flex: 1; min-height: 0; }
 .nola-record-detail .nola-display { font-size: 32px; }
 .nola-record-detail__reading { flex: 1; min-height: 340px; padding: 0; overflow: hidden; }
@@ -118,4 +122,19 @@
 @container (max-width: 680px) { .nola-dual__split { display: none; } .nola-record-detail .nola-display { font-size: 26px; } }
 .nola-records-table .table__column::after { display: none; }
 .nola-records-table .table__row:hover .table__cell { background: color-mix(in oklab, var(--accent) 4%, var(--surface)); }
+
+/* Fixed rather than a percentage: every other column already claims a share of
+   100%, so a percentage here would scale with the window instead of holding the
+   boxes in one column. */
+.nola-records-table__select { width: 44px; padding-inline: 12px 0; }
+
+/* Selection wins over hover because it is the state the user is acting on. */
+.nola-records-table .table__row[data-selected='true'] .table__cell { background: color-mix(in oklab, var(--accent) 9%, var(--surface)); }
+
+.nola-record-page__bulk { display: flex; align-items: center; gap: 8px; padding: 0 12px 14px; flex-wrap: wrap; }
+.nola-record-page__bulk > .button { flex-shrink: 0; }
+.nola-record-page__bulk-count { font-size: 13px; font-weight: 550; color: var(--foreground); white-space: nowrap; }
+/* Pushes the dismiss and delete pair to the far end, so "select all" stays next
+   to the count it widens. */
+.nola-record-page__bulk-dismiss { margin-left: auto; }
 

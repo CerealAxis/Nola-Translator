@@ -1,3 +1,4 @@
+import type { ModelConfiguration } from './model-capabilities'
 import type {
   AudioDevice,
   CaptionSegment,
@@ -16,21 +17,20 @@ import type { ComputeSnapshot, RuntimeSnapshot } from './compute'
 export type SessionStartResult = { sessionId: string; meetingId: string | null }
 
 /**
- * Where models are stored, plus one number read from the volume itself.
- * `freeBytes` is optional and absent when it cannot be measured — 0 would read as "the disk is
- * full", and an invented figure is worse than none. The volume is probed at the nearest existing
- * ancestor, since a fresh install has no directory to stat yet.
+ * Where models are stored, plus one number measured from that folder.
+ * `usedBytes` is optional and absent when the folder cannot be listed — 0 would read as "nothing is
+ * stored here", and an invented figure is worse than none.
  */
 export type ModelStorageInfo = {
   activePath: string
   configuredPath: string
   restartRequired: boolean
   /**
-   * Free space on the volume holding `configuredPath`: `bavail * bsize`, not `bfree`, which counts
-   * blocks reserved for the system that the user cannot write to. Absent when every ancestor probe
-   * failed.
+   * Bytes occupied by everything under `configuredPath`, walked recursively. Absent when the
+   * folder itself could not be listed; a subtree that could not be read is skipped, so the figure
+   * can sit slightly under the real total.
    */
-  freeBytes?: number
+  usedBytes?: number
 }
 
 /**
@@ -82,6 +82,7 @@ export type NolaTranslatorApi = {
     repo: string,
     slot?: 'recognition' | 'translation'
   ): Promise<ResourceRecord>
+  configureModel(resourceId: string, configuration: ModelConfiguration): Promise<ResourceRecord>
   startSession(config: SessionConfig): Promise<SessionStartResult>
   stopSession(sessionId: string): Promise<void>
   setSessionPaused(sessionId: string, paused: boolean): Promise<void>

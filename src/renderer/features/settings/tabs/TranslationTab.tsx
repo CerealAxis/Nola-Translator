@@ -1,4 +1,6 @@
+import { isModelReady, supportsTranslation } from '../../../../shared/model-capabilities'
 import { supportsSelectedEngine } from '../../../../shared/model-engines'
+import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
 /**
  * Translation: provider, intermediate translation, per-provider connection fields, API key.
  * Hy-MT2 and M2M100 are both `local` — `localModelId` picks one, routed by id in the engine.
@@ -59,7 +61,7 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
   const localModelOptions = useMemo<PickerOption[]>(() => {
     const installed = resources
       .filter((item) => item.kind === 'translationModel' && item.installed)
-      .map((item) => ({ value: item.resourceId, label: item.name, isDisabled: !supportsSelectedEngine(item, settings.compute, item.resourceId) }))
+      .map((item) => ({ value: item.resourceId, label: item.name, isDisabled: !isModelReady(item) || !supportsSelectedEngine(item, settings.compute ?? DEFAULT_COMPUTE_SETTINGS, item.resourceId) || !supportsTranslation(item, settings.recognition.sourceLanguage, translation.targetLanguage) }))
     /*
      * The current value is patched in even when it is not among the installed models (just
      * uninstalled, or settings synced from another machine): it is the current value rather
@@ -70,7 +72,7 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
       installed.push({ value: translation.localModelId, label: translation.localModelId, isDisabled: true })
     }
     return installed
-  }, [resources, translation.localModelId, settings.compute])
+  }, [resources, translation.localModelId, translation.targetLanguage, settings.recognition.sourceLanguage, settings.compute])
 
   /*
    * How deep the address goes depends on the format: Anthropic takes a bare origin and Ollama

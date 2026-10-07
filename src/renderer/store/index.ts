@@ -98,7 +98,7 @@ export type { Store, StoreListener, StorePatch, StoreUpdater } from './createSto
 export { settingsStore } from './settingsStore'
 export type { SettingsState } from './settingsStore'
 export { meetingsStore } from './meetingStore'
-export type { MeetingsState, MeetingDetail } from './meetingStore'
+export type { MeetingsState, MeetingDetail, BatchRemoveResult } from './meetingStore'
 export { modelsStore } from './modelStore'
 export type { ModelsState, HubSearchState, HubKind } from './modelStore'
 export { sessionStore, findMissingResource, MAX_FINALIZED_SEGMENTS, ENGINE_LOST_CODE } from './sessionStore'
@@ -117,6 +117,7 @@ export {
   renameMeeting,
   setMeetingNotes,
   removeMeeting,
+  removeMeetings,
   exportMeeting,
   clearMeetingsError,
 } from './meetingStore'

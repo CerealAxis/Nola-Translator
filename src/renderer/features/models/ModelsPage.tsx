@@ -1,3 +1,5 @@
+import { configurationOf, isModelReady } from '../../../shared/model-capabilities'
+import { ModelConfigurationDialog } from './ModelConfigurationDialog'
 import { supportsSelectedEngine } from '../../../shared/model-engines'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 /** Model catalog and download manager. The router owns the page padding. */
@@ -24,6 +26,7 @@ const GRID = 'models-grid'
 export function ModelsPage() {
   const { t } = useI18n()
   const [tab, setTab] = useState<ModelsTab>('recommended')
+  const [configuring, setConfiguring] = useState<ResourceRecord | null>(null)
 
   const resources = useStore(stores.models, (state) => state.resources)
   const loaded = useStore(stores.models, (state) => state.loaded)
@@ -79,7 +82,7 @@ export function ModelsPage() {
    */
   const setDefault = (record: ResourceRecord) => {
     const patch = defaultTargetOf(record)
-    if (!patch || !supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)) return
+    if (!isModelReady(record) || !patch || !supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)) return
     void updateSettings(patch).catch(() => toast.danger(t('modelsSettingsUi.defaultSaveFailed')))
   }
 
@@ -89,17 +92,19 @@ export function ModelsPage() {
       record={record}
       busy={busyIds.includes(record.resourceId)}
       isDefault={isDefaultOf(record, settings)}
-      canBeDefault={defaultTargetOf(record) !== null && supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)}
+      canBeDefault={isModelReady(record) && defaultTargetOf(record) !== null && supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)}
       installable={installable}
       onInstall={run(record.resourceId, 'install')}
       onCancel={run(record.resourceId, 'cancel')}
       onRemove={run(record.resourceId, 'remove')}
       onSetDefault={() => setDefault(record)}
+      footer={record.resourceId.startsWith('hub:') && record.installed ? <Button variant="secondary" onPress={() => setConfiguring(record)}>{t(configurationOf(record) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : undefined}
     />
   )
 
   return (
     <div className="models-page">
+      {configuring ? <ModelConfigurationDialog key={configuring.resourceId} record={configuring} onClose={() => setConfiguring(null)} /> : null}
       <section className="models-overview">
         <header className="models-overview__heading">
           <span className="models-overview__icon"><Box aria-hidden="true" /></span>
@@ -140,7 +145,7 @@ export function ModelsPage() {
 
         <Tabs.Panel id="recommended">
           <Catalog
-            records={resources}
+            records={resources.filter(record => !record.resourceId.startsWith('hub:'))}
             loading={loading && !loaded}
             card={card}
             emptyAction={
@@ -165,7 +170,7 @@ export function ModelsPage() {
         </Tabs.Panel>
 
         <Tabs.Panel id="search">
-          <HubSearchTab />
+          <HubSearchTab onGoRecommended={() => setTab('recommended')} />
         </Tabs.Panel>
 
         <Tabs.Panel id="downloads">
@@ -273,10 +278,11 @@ function Section({
 
 function CurrentModel({ label, name, record, installed, kind }: { label:string; name:string; record:ResourceRecord | null; installed:boolean | null; kind:'recognitionModel' | 'translationModel' }) {
   const { t } = useI18n()
+  const pending = installed && record && !configurationOf(record)
   return <Card className="models-current">
     <span className={`models-card__icon models-card__icon--${kind === 'recognitionModel' ? 'recognition' : 'translation'}`}><ModelMark record={record} kind={kind} /></span>
     <Card.Header><Card.Description>{label}</Card.Description><Card.Title>{name}</Card.Title></Card.Header>
-    {installed === null ? null : <Chip color={installed ? 'success' : 'warning'} variant="soft" size="sm">{installed ? t('modelsSettingsUi.active') : t('modelsSettingsUi.unavailable')}</Chip>}
+    {installed === null ? null : <Chip color={installed && !pending ? 'success' : 'warning'} variant="soft" size="sm">{pending ? t('modelConfig.pending') : installed ? t('modelsSettingsUi.active') : t('modelsSettingsUi.unavailable')}</Chip>}
   </Card>
 }
 

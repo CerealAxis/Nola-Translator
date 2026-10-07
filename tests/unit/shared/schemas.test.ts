@@ -31,14 +31,14 @@ describe('JSONL 协议校验', () => {
     expect(parseCommandLine(JSON.stringify(command))).not.toHaveProperty('futureOptionalField')
   })
 
-  it('拒绝超过 32 KiB 的单行', () => {
+  it('拒绝超过 512 KiB 的单行', () => {
     const oversized = JSON.stringify({
       protocolVersion: 1,
       type: 'hello',
       requestId: 'req-large',
       clientVersion: 'x'.repeat(MAX_PROTOCOL_LINE_BYTES)
     })
-    expect(() => parseCommandLine(oversized)).toThrow(/32 KiB/)
+    expect(() => parseCommandLine(oversized)).toThrow(/512 KiB/)
   })
 
   it('校验显式资源管理命令和状态事件', () => {

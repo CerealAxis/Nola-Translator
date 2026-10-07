@@ -47,5 +47,4 @@
   --color-emerald: oklch(80% 0.12 170);
   --color-accent-soft: color-mix(in oklch, var(--accent) 12%, var(--surface));
   --nola-primary-gradient: linear-gradient(105deg, oklch(70% 0.16 257), oklch(76% 0.12 257));
-  --nola-hero-gradient: linear-gradient(120deg, color-mix(in oklch, var(--accent) 14%, var(--background)), color-mix(in oklch, var(--accent) 8%, var(--background)));
 }

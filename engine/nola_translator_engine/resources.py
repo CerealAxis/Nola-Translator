@@ -5,7 +5,7 @@ caption startup touch the network.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import os
 from pathlib import Path
 import shutil
@@ -25,7 +25,10 @@ from .models.catalog import (
 )
 from .models.manager import ModelManager, ModelSpec
 from .models.registry import CustomFile, CustomModelEntry, CustomModelRegistry
-from .protocol import ResourceChangedEvent, ResourceRecord
+from .protocol import ResourceChangedEvent, ResourceRecord, ModelConfiguration
+from .model_capabilities import QWEN_LANGUAGES, normalize, recognition_configuration, translation_configuration, supports_translation
+from .hub import HYMT2_LANGUAGES
+from .translation.m2m100 import FLORES_LANGUAGES
 
 
 QWEN_RESOURCE_ID = QWEN3_ASR_1_7B_HF.model_id
@@ -99,10 +102,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "qwen3-asr",
             "Qwen3-ASR 1.7B",
             "下载约 4GB 的 BF16 原始权重，加载时以 NF4 4-bit 量化运行；支持多语言流式字幕。",
-            (
-                "zh", "en", "yue", "ar", "de", "fr", "es", "pt",
-                "id", "it", "ko", "ru", "th", "vi", "ja", "tr",
-            ),
+            tuple(normalize(code) for code in QWEN_LANGUAGES),
             4_087_646_324,
         ),
         ResourceDefinition(
@@ -111,10 +111,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "qwen3-asr",
             "Qwen3-ASR 0.6B",
             "约 1.5GB 的 BF16 原始权重，加载时以 NF4 4-bit 量化运行；与 1.7B 同系列，体积更小。",
-            (
-                "zh", "en", "yue", "ar", "de", "fr", "es", "pt",
-                "id", "it", "ko", "ru", "th", "vi", "ja", "tr",
-            ),
+            tuple(normalize(code) for code in QWEN_LANGUAGES),
             1_576_381_331,
         ),
         ResourceDefinition(
@@ -122,8 +119,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "recognitionModel",
             "sensevoice",
             "SenseVoiceSmall",
-            "约 936MB 的非自回归权重，由内置 funasr 在本机运行；支持中日韩粤英五种语言，"
-            "其余源语言自动回落到模型自判。",
+            "约 936MB 的非自回归权重，由内置 funasr 在本机运行；支持中日韩粤英五种语言及自动检测。",
             ("zh", "en", "yue", "ja", "ko"),
             936_694_116,
         ),
@@ -133,10 +129,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "hymt2",
             "Hy-MT2 1.8B Q4_K_M",
             "预量化 Q4_K_M 文件（约 1.13GB），由内置 llama.cpp 在本机运行；质量基准档。",
-            (
-                "zh", "en", "fr", "pt", "es", "ja", "tr", "ru",
-                "ar", "ko", "th", "it", "de", "vi", "ms", "id",
-            ),
+            tuple(HYMT2_LANGUAGES),
             1_133_080_448,
         ),
         ResourceDefinition(
@@ -145,10 +138,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "hymt2",
             "Hy-MT2 1.8B Q3_K_M",
             "约 951MB，比 Q4_K_M 更小；实测专有名词（品牌、型号）保持得最好。",
-            (
-                "zh", "en", "fr", "pt", "es", "ja", "tr", "ru",
-                "ar", "ko", "th", "it", "de", "vi", "ms", "id",
-            ),
+            tuple(HYMT2_LANGUAGES),
             951_022_560,
         ),
         ResourceDefinition(
@@ -157,10 +147,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "hymt2",
             "Hy-MT2 1.8B UD-IQ2_M",
             "约 723MB，体积最小；位宽很低，专有名词可能被译成字面意思。",
-            (
-                "zh", "en", "fr", "pt", "es", "ja", "tr", "ru",
-                "ar", "ko", "th", "it", "de", "vi", "ms", "id",
-            ),
+            tuple(HYMT2_LANGUAGES),
             722_666_176,
         ),
         ResourceDefinition(
@@ -169,10 +156,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "m2m100",
             "M2M100 418M",
             "约 1.9GB 的 pytorch_model.bin，由 transformers 在本机运行；支持 100 种语言互译。",
-            (
-                "zh", "en", "fr", "pt", "es", "ja", "tr", "ru",
-                "ar", "ko", "th", "it", "de", "vi", "ms", "id",
-            ),
+            tuple(sorted(FLORES_LANGUAGES)),
             1_941_936_305,
         ),
     )
@@ -280,6 +264,7 @@ class ResourceManager:
             name=definition.name,
             description=definition.description,
             languages=list(definition.languages),
+            configuration=self.configuration(resource_id),
             sourceLanguage=None,
             targetLanguage=None,
             installed=installed,
@@ -458,8 +443,7 @@ class ResourceManager:
         if entry.adapter_id == "llama.cpp":
             description = (
                 f"自 Hugging Face 安装：{entry.repo}，由 {label} 运行。"
-                "注意：内置 llama-server 使用 Hy-MT2 的翻译提示词与语言表，"
-                "自装 GGUF 会走同一条通道，但提示词模板并非为它调校。"
+                "翻译语言与方向以保存的模型配置为准。"
             )
         else:
             description = f"自 Hugging Face 安装：{entry.repo}，由 {label} 运行。"
@@ -469,13 +453,43 @@ class ResourceManager:
             provider=entry.adapter_id,
             name=entry.name,
             description=description,
-            # A resource record carries at most 16 language codes, and the adapter tables run
-            # longer (Hy-MT2 declares 38). The registry keeps the full list; the record shows a
-            # prefix of it. Session-time language validation still runs against the provider's
-            # own table, so a truncated display list never becomes a false rejection.
-            languages=entry.languages[:16],
+            languages=tuple(dict.fromkeys((entry.configuration.languages + entry.configuration.sourceLanguages + entry.configuration.targetLanguages) if entry.configuration else entry.languages)),
             download_bytes=entry.total_bytes,
         )
+
+    def configuration(self, resource_id: str) -> ModelConfiguration | None:
+        definition = RESOURCE_BY_ID.get(resource_id)
+        if definition is None:
+            entry = self.registry.get(resource_id)
+            return entry.configuration if entry else None
+        languages = list(definition.languages)
+        if definition.kind == "recognitionModel":
+            return recognition_configuration(languages)
+        return translation_configuration(languages, "pytorch" if definition.provider == "m2m100" else "llama")
+
+    def configure(self, resource_id: str, configuration: ModelConfiguration) -> ResourceRecord:
+        entry = self.registry.get(resource_id)
+        if entry is None:
+            raise ResourceActionError("invalidConfiguration", {"reason": "recommendedConfigurationIsFixed"})
+        expected_engine = "llama" if entry.adapter_id == "llama.cpp" else "pytorch"
+        if configuration.slot != entry.slot or configuration.engine != expected_engine:
+            raise ResourceActionError("invalidConfiguration", {"reason": "modelLoaderMismatch"})
+        required = [configuration.languages] if entry.slot == "recognition" else [configuration.sourceLanguages, configuration.targetLanguages]
+        from .model_capabilities import LANGUAGE_CODES
+        if any(normalize(code) not in LANGUAGE_CODES for codes in required for code in codes):
+            raise ResourceActionError("invalidConfiguration", {"reason": "unknownLanguage"})
+        if any(not codes for codes in required):
+            raise ResourceActionError("invalidConfiguration", {"reason": "missingLanguages"})
+        # Specialized tokenizers cannot accept language codes outside their vocabularies.
+        canonical = {normalize(code) for code in (QWEN_LANGUAGES if entry.adapter_id == "qwen3-asr" else ["zh", "en", "yue", "ja", "ko"] if entry.adapter_id == "sensevoice" else FLORES_LANGUAGES)}
+        if entry.adapter_id != "llama.cpp" and any(normalize(code) not in canonical for codes in required for code in codes):
+            raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedLanguage"})
+        if configuration.translationPairs is not None and (not configuration.translationPairs or any(not supports_translation(configuration, pair.source, pair.target) for pair in configuration.translationPairs)):
+            raise ResourceActionError("invalidConfiguration", {"reason": "invalidPair"})
+        self.registry.put(replace(entry, configuration=configuration))
+        record = self.record(resource_id)
+        self.emit(ResourceChangedEvent(protocolVersion=1, type="resourceChanged", requestId="configure", resource=record))
+        return record
 
     def register_hub_model(
         self, repo: str, revision: str, adapter_id: str, slot: str, name: str,
@@ -496,6 +510,8 @@ class ResourceManager:
             raise ResourceActionError("invalidConfiguration", {"reason": f"未知模型槽位：{slot}"})
         if not files:
             raise ResourceActionError("invalidConfiguration", {"reason": "仓库没有可安装的文件"})
+        previous = self.registry.get(f"hub:{repo}")
+        same_model = previous is not None and (previous.revision, previous.adapter_id, previous.slot, previous.files) == (revision, adapter_id, slot, files)
         entry = CustomModelEntry(
             repo=repo,
             revision=revision,
@@ -504,6 +520,7 @@ class ResourceManager:
             name=name,
             files=files,
             languages=languages,
+            configuration=previous.configuration if same_model else None,
         )
         return self.registry.put(entry)
 

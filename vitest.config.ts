@@ -20,7 +20,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
     // 渲染层自带的单测跟着新 UI 一起搬过来了，位置在 `src/renderer/**` 下。
-    include: ['tests/unit/**/*.test.{ts,tsx}', 'src/renderer/**/*.test.{ts,tsx}'],
+    include: ['tests/unit/**/*.test.{ts,tsx}', 'src/renderer/**/*.test.{ts,tsx}', 'src/shared/**/*.test.{ts,tsx}'],
     css: true
   }
 })

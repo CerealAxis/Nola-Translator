@@ -1,10 +1,11 @@
+import { modelConfigurationSchema } from '../shared/model-capabilities'
 import { randomUUID } from 'node:crypto'
 
 import { BrowserWindow, ipcMain, net, screen } from 'electron'
 
 import type { EngineEvent, EngineProcessState, SessionConfig } from '../shared/contracts'
 import { sessionConfigSchema } from '../shared/schemas'
-import { DEFAULT_SETTINGS, type AppSettings, type CredentialProvider } from '../shared/settings'
+import { DEFAULT_SETTINGS, NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider } from '../shared/settings'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
 import { computeOverlayBounds } from './windows'
@@ -18,7 +19,7 @@ export const IPC_CHANNELS = {
   searchHuggingFace: 'hub:search',
   inspectHuggingFace: 'hub:inspect',
   getHuggingFaceModelCard: 'hub:model-card',
-  installHuggingFaceModel: 'hub:install',
+  installHuggingFaceModel: 'hub:install', configureModel: 'model:configure',
   startSession: 'engine:start-session',
   stopSession: 'engine:stop-session',
   setSessionPaused: 'engine:set-session-paused',
@@ -198,6 +199,15 @@ export function registerEngineIpc(
   ipcMain.handle(IPC_CHANNELS.getHuggingFaceModelCard, (_event, repo: unknown, revision: unknown) =>
     readHubModelCard(repo, revision, net.fetch))
 
+  ipcMain.handle(IPC_CHANNELS.configureModel, async (_event, resourceId: unknown, configuration: unknown) => {
+    if (activeSessionId) throw new Error('字幕会话运行中，不能修改模型配置')
+    if (typeof resourceId !== 'string' || resourceId.length > 256) throw new Error('模型 ID 无效')
+    const validated = modelConfigurationSchema.parse(configuration)
+    await ensureReady()
+    const response = await engine.request({ protocolVersion: 1, type: 'configureModel', requestId: `configure-${randomUUID()}`, resourceId, configuration: validated }, 'resourceActionResult')
+    return response.resource
+  })
+
   ipcMain.handle(IPC_CHANNELS.inspectHuggingFace, async (_event, repo: unknown) => {
     if (typeof repo !== 'string' || repo.length < 3 || repo.length > 256) {
       throw new Error('仓库名无效')
@@ -282,7 +292,7 @@ export function registerEngineIpc(
       const meeting = meetings
         ? await meetings.begin({
           sourceLanguage: parsed.sourceLanguage,
-          targetLanguage: parsed.targetLanguages[0] ?? 'zh',
+          targetLanguage: parsed.targetLanguages[0] ?? NO_TRANSLATION_LANGUAGE,
           recordAudio: keepAudio,
         })
         : null
@@ -446,6 +456,7 @@ export function registerEngineIpc(
       IPC_CHANNELS.inspectHuggingFace,
       IPC_CHANNELS.getHuggingFaceModelCard,
       IPC_CHANNELS.installHuggingFaceModel,
+      IPC_CHANNELS.configureModel,
       IPC_CHANNELS.startSession,
       IPC_CHANNELS.stopSession,
       IPC_CHANNELS.setSessionPaused,
