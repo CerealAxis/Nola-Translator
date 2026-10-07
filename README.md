@@ -8,7 +8,7 @@
 </div>
 
 <p align="center">
-  <img src="docs/images/nola-ui-preview.svg" alt="Nola Translator interface concept" width="1000">
+  <img src="docs/images/nola-ui-en.png" alt="Nola Translator interface preview" width="1000">
 </p>
 
 ## Contents
