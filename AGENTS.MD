@@ -105,7 +105,7 @@ npm run dev            # 开发（electron-vite）
 npm run typecheck      # tsc --noEmit
 npm test               # vitest run
 npm run build          # typecheck && electron-vite build
-npm run dist:win       # 完整发布：build → build:engine:cpu → prepare:llama:cpu → electron-builder
+npm run dist:win       # 完整发布：build → build:engine:cpu → prepare:llama:cpu → electron-builder（EXE + MSI）
 ```
 
 ## 6. 约定与协作

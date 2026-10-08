@@ -13,7 +13,7 @@
     "build": "npm run typecheck && electron-vite build",
     "build:engine:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-cpu-engine.ps1",
     "prepare:llama:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-llama-cpu.ps1",
-    "dist:win": "npm run build && npm run build:engine:cpu && npm run prepare:llama:cpu && electron-builder --win nsis --x64",
+    "dist:win": "npm run build && npm run build:engine:cpu && npm run prepare:llama:cpu && electron-builder --win nsis msi --x64",
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:ui": "electron tests/e2e/capture-ui.mjs",
@@ -107,17 +107,31 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "msi",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "Nola-Translator-${version}-Setup-${arch}.${ext}"
     },
     "nsis": {
+      "useZip": true,
+      "differentialPackage": false,
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "include": "build/installer.nsh"
+    },
+    "msi": {
+      "oneClick": false,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   }
 }

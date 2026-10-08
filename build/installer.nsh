@@ -20,14 +20,15 @@ LangString nolaUninstallRemovingData 1033 "Removing the Data folder"
 ; fix has to hang off a Function that NSIS calls at run time. The directory page cannot supply its
 ; own: MUI_PAGE_CUSTOMFUNCTION_PRE is taken by instFilesPre, and its own PRE/LEAVE pair would be
 ; overwritten by whatever the next page declares.
+!ifndef BUILD_UNINSTALLER
 Function nolaFixInstallDir
   ; The directory page yields the install root; the program needs its own subfolder under it. This
   ; also runs on an update, where $INSTDIR already ends in \App because it came from the registry,
   ; so the append is conditional or the path would gain one \App per upgrade.
-  ; ${StdUtils.GetFNamePart} rather than StrContains: NsisTarget includes StdUtils.nsh in the
+  ; ${StdUtils.GetFileNamePart} rather than StrContains: NsisTarget includes StdUtils.nsh in the
   ; shared header, while StrContains.nsh only arrives later via assistedInstaller.nsh.
-  ${StdUtils.GetFNamePart} "$INSTDIR" $0
-  ${If} $0 != "\${NOLA_APP_DIR_NAME}"
+  ${StdUtils.GetFileNamePart} $0 "$INSTDIR"
+  ${If} $0 != "${NOLA_APP_DIR_NAME}"
     StrCpy $INSTDIR "$INSTDIR\${NOLA_APP_DIR_NAME}"
   ${EndIf}
 FunctionEnd
@@ -35,15 +36,25 @@ FunctionEnd
 !macro customPageAfterChangeDir
   Page custom nolaFixInstallDir
 !macroend
+!endif
 
 !macro customInstall
   ; $INSTDIR is already <root>\App at this point, so .. resolves to the install root.
   CreateDirectory "$INSTDIR\..\${NOLA_DATA_DIR_NAME}"
+  !ifdef ZIP_COMPRESSION
+    !ifndef APP_BUILD_DIR
+      ; Extraction has finished; release the embedded payload before the finish page.
+      ; NSIS removes the remaining plugin temporary directory when the installer exits.
+      Delete "$PLUGINSDIR\app-$packageArch.zip"
+    !endif
+  !endif
 !macroend
 
 ; Declared here rather than with LogicLib's ${Var}: the uninstaller build does not pull in the whole
 ; LogicLib rule set. A plain NSIS Var is what the surrounding templates use as well.
+!ifdef BUILD_UNINSTALLER
 Var /GLOBAL NolaDeleteData
+!endif
 
 !macro customUnInstall
   ; ${isUpdated} is how the uninstaller tells a newer installer's run apart from the user's own
