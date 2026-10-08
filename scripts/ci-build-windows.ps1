@@ -25,8 +25,10 @@ $hostEnvironment = Join-Path (Get-Location).Path 'artifacts/browser-host-environ
 Assert-NativeSuccess 'Create browser host build environment'
 $hostPython = Join-Path $hostEnvironment 'Scripts/python.exe'
 # Keep the host build tool aligned with the engine's declared development dependency.
-$pyInstallerRequirement = (& $basePython -c 'import tomllib; from pathlib import Path; deps = tomllib.loads(Path("engine/pyproject.toml").read_text())["project"]["optional-dependencies"]["dev"]; print(next(dep for dep in deps if dep.startswith("pyinstaller==")))').Trim()
+$pyInstallerOutput = & $basePython -c 'import tomllib; from pathlib import Path; deps = tomllib.loads(Path("engine/pyproject.toml").read_bytes().decode("utf-8"))["project"]["optional-dependencies"]["dev"]; print(next(dep for dep in deps if dep.startswith("pyinstaller==")))'
 Assert-NativeSuccess 'Locate PyInstaller requirement'
+$pyInstallerRequirement = ($pyInstallerOutput -join "`n").Trim()
+if (-not $pyInstallerRequirement) { throw 'PyInstaller requirement is missing' }
 & $hostPython -m pip install $pyInstallerRequirement
 Assert-NativeSuccess 'Install browser host build tool'
 & "$PSScriptRoot/build-browser-host.ps1" -Python $hostPython
