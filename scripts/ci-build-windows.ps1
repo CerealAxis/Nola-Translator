@@ -14,8 +14,22 @@ Assert-NativeSuccess 'Check Electron binary'
 
 & npm run build
 Assert-NativeSuccess 'Application build'
+& npm run build:browser
+Assert-NativeSuccess 'Browser extension build'
+& npm run package:browser
+Assert-NativeSuccess 'Browser extension archive'
 $basePython = (& python -c 'import sys; print(sys.executable)').Trim()
 Assert-NativeSuccess 'Locate Python'
+$hostEnvironment = Join-Path (Get-Location).Path 'artifacts/browser-host-environment'
+& $basePython -m venv $hostEnvironment
+Assert-NativeSuccess 'Create browser host build environment'
+$hostPython = Join-Path $hostEnvironment 'Scripts/python.exe'
+# Keep the host build tool aligned with the engine's declared development dependency.
+$pyInstallerRequirement = (& $basePython -c 'import tomllib; from pathlib import Path; deps = tomllib.loads(Path("engine/pyproject.toml").read_text())["project"]["optional-dependencies"]["dev"]; print(next(dep for dep in deps if dep.startswith("pyinstaller==")))').Trim()
+Assert-NativeSuccess 'Locate PyInstaller requirement'
+& $hostPython -m pip install $pyInstallerRequirement
+Assert-NativeSuccess 'Install browser host build tool'
+& "$PSScriptRoot/build-browser-host.ps1" -Python $hostPython
 & "$PSScriptRoot/build-cpu-engine.ps1" -BasePython $basePython
 & "$PSScriptRoot/fetch-llama-cpu.ps1"
 # Build separate x64 EXE and MSI installers.

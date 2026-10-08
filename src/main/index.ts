@@ -244,6 +244,8 @@ if (!hasSingleInstanceLock) {
       },
     })
     let sessionActive = false
+    engine.on('log', (message: string) => console.error('[engine]', message.trimEnd()))
+    engine.on('protocolError', (error: unknown) => console.error('engine protocol failed', error))
     let sessionStarting = false
     let preparation: Promise<void> | null = null
     const prepareEnvironment = (forStart = false, session?: SessionConfig, cancelled: () => boolean = () => false): Promise<void> => {

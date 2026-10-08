@@ -19,20 +19,6 @@ import css from './styles.css?inline'
  */
 const CAPTION_BOTTOM_CLEARANCE = 0.05
 
-/**
- * Share of the frame the `position` setting can lift the block over that clearance line. The setting is
- * a percent of the frame height at which the bottom edge rests, so it reads from the top down; mapped
- * onto this band it puts the desktop's default of 82 on the clearance line itself and leaves the lower
- * fifth of the travel for a deliberate move up the frame.
- */
-const CAPTION_POSITION_BAND = 0.25
-
-/**
- * Tallest control band the block will reserve, as a share of the frame. A control bar expands into a
- * tall panel on hover, and an anchor pushed clear of that reads as floating in the middle of the video.
- */
-const CONTROL_RESERVE_CEILING = 0.25
-
 type CaptionPhase = 'idle' | 'appearing' | 'shown' | 'fading'
 interface PendingCaption { key: string; lines: string[] }
 
@@ -78,11 +64,14 @@ function install(): void {
     caption.replaceChildren()
     overlay.host.hidden = true
   }
-  /** Paints one phrase and lets it fade in as a whole, so a revision never reveals itself character by character. */
-  const paintCaption = (key: string, lines: string[]): void => {
+  const updateCaptionLines = (lines: string[]): void => {
     const rows = document.createDocumentFragment()
     for (const line of lines) { const row = document.createElement('div'); row.textContent = line; rows.append(row) }
     caption.replaceChildren(rows)
+  }
+  /** Paints one phrase and lets it fade in as a whole, so a revision never reveals itself character by character. */
+  const paintCaption = (key: string, lines: string[]): void => {
+    updateCaptionLines(lines)
     captionKey = key
     pendingCaption = null
     captionPhase = 'appearing'
@@ -114,14 +103,12 @@ function install(): void {
     caption.style.height = 'auto'
     return caption.scrollHeight
   }
-  // The block's own animations sequence a phrase swap: the outgoing phrase is still on screen when the
-  // next one starts fading in, and a phrase with nothing after it leaves the block empty and hidden
-  // rather than painted.
+  // Finish the outgoing fade before painting the latest revision of the queued sentence.
   caption.addEventListener('animationend', event => {
     if (event.target !== caption || (captionPhase !== 'appearing' && captionPhase !== 'fading')) return
     const next = pendingCaption
     pendingCaption = null
-    if (next) { paintCaption(next.key, next.lines); return }
+    if (next && captionPhase === 'fading') { paintCaption(next.key, next.lines); return }
     if (captionPhase === 'appearing') { captionPhase = 'shown'; caption.dataset.phase = 'shown' }
     else dismissCaption()
   })
@@ -168,29 +155,32 @@ function install(): void {
     overlay.host.style.width = `${rect.width * 0.84}px`
     caption.style.fontSize = `${state.config.fontSize}px`
     const segment = state.captions[0]
-    const remaining = captionClock.update(segment ? `${state.epoch}:${segment.segmentId}:${segment.revision}` : '', performance.now(), state.playbackPaused, video.playbackRate)
+    const remaining = captionClock.update(segment ? `${state.epoch}:${segment.segmentId}:${segment.revision}` : '', performance.now(), state.playbackPaused || !segment?.isFinal, video.playbackRate)
     const lines = remaining > 0 ? captionLines(segment, state.config) : []
-    // Recognition and translation both arrive as whole phrase revisions, so each is one block that
-    // fades in; a phrase with nothing after it keeps the block up for the rest of its hold and then
-    // fades it away.
-    const key = lines.length ? `${state.epoch}:${segment?.segmentId}:${segment?.revision}:${lines.join('\n')}` : ''
+    // Segment identity survives streaming revisions and late translations of the same sentence.
+    const key = lines.length ? `${state.epoch}:${segment?.segmentId}` : ''
     if (state.status !== 'active' || fullscreen === video) dismissCaption()
-    else if (key && key !== captionKey) {
+    else if (key && key === captionKey) {
+      updateCaptionLines(lines)
+    } else if (key) {
       if (captionPhase === 'idle') paintCaption(key, lines)
-      else { pendingCaption = { key, lines }; if (captionPhase === 'shown') beginFade() }
-    } else if (!key && captionPhase !== 'idle') {
+      else {
+        pendingCaption = { key, lines }
+        if (captionPhase !== 'fading') beginFade()
+      }
+    } else if (captionPhase !== 'idle') {
       pendingCaption = null
-      beginFade()
+      if (captionPhase !== 'fading') beginFade()
     }
     // The control bar expands on hover and fades out again on its own, so the band it reserves is read
     // from the bar as it is right now. Holding the tallest bar ever seen is what left the block parked
     // high over the video for the rest of the session.
-    const reserve = Math.min(rect.height * CONTROL_RESERVE_CEILING, visibleControlReserve(adapter.controls, adapter.container, rect))
+    const reserve = visibleControlReserve(adapter.controlBar, adapter.container, rect)
     // The block hangs by its bottom edge, so the anchor is a line across the frame rather than the
     // block's own height: a phrase that grows from one line to two extends upward and leaves the
     // anchor where it was.
     const contentHeight = captionPhase === 'idle' ? 0 : captionContentHeight()
-    const clearance = Math.max(CAPTION_BOTTOM_CLEARANCE, CAPTION_POSITION_BAND * (1 - state.config.position / 100))
+    const clearance = CAPTION_BOTTOM_CLEARANCE
     const band = subtitleGeometry(rect.height, clearance, contentHeight, reserve)
     overlay.host.style.bottom = `${Math.max(0, innerHeight - rect.top - band.top)}px`
     if (contentHeight) caption.style.height = `${Math.min(band.maxHeight, contentHeight)}px`
@@ -233,10 +223,10 @@ function install(): void {
   // content, so its box only ever changes when render() has just changed it, and each of those
   // notifications would run another full-document video scan and another pair of React renders.
   const interval = setInterval(refresh, 1000)
-  for (const name of ['scroll', 'resize', 'fullscreenchange', 'enterpictureinpicture', 'leavepictureinpicture']) window.addEventListener(name, refresh, true)
+  for (const name of ['scroll', 'resize', 'pointermove', 'pointerleave', 'fullscreenchange', 'enterpictureinpicture', 'leavepictureinpicture']) window.addEventListener(name, refresh, true)
   const destroy = (): void => {
     mutation.disconnect(); resize.disconnect(); clearInterval(interval); nativeTrack.restore(); unsubscribe()
-    for (const name of ['scroll', 'resize', 'fullscreenchange', 'enterpictureinpicture', 'leavepictureinpicture']) window.removeEventListener(name, refresh, true)
+    for (const name of ['scroll', 'resize', 'pointermove', 'pointerleave', 'fullscreenchange', 'enterpictureinpicture', 'leavepictureinpicture']) window.removeEventListener(name, refresh, true)
     triggerRoot.unmount(); panelRoot.unmount(); hosts.forEach(host => host.remove()); delete document.documentElement.dataset.nolaInstalled; void store.destroy()
   }
   window.addEventListener('pagehide', destroy, { once: true })

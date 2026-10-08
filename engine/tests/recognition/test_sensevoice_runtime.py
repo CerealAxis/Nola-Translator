@@ -61,6 +61,20 @@ def audio(seconds: float = 0.5) -> np.ndarray:
     return np.zeros(int(16_000 * seconds), dtype=np.float32)
 
 
+def test_warmup_runs_once_and_does_not_emit_a_caption(monkeypatch) -> None:
+    fake = FakeAutoModel()
+    install_fake(monkeypatch, fake)
+    runtime = SenseVoiceRuntime("C:/models/sensevoice-small")
+    runtime.warmup()
+    runtime.warmup()
+    assert len(fake.calls) == 1
+    assert fake.calls[0]["samples"].size == 9600
+    assert runtime.loaded
+    runtime.unload()
+    runtime.warmup()
+    assert len(fake.calls) == 2
+
+
 def test_parse_text_splits_language_tag_from_body() -> None:
     assert _parse_text("<|zh|><|NEUTRAL|><|Speech|><|withitn|>开饭时间早上9点至下午5点。") == (
         "开饭时间早上9点至下午5点。",

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -29,6 +29,26 @@ function caption(revision: number, isFinal = false): Extract<EngineEvent, { type
 }
 
 describe('Python 引擎进程', () => {
+  it.each([false, true])('uses current app engine code with managed dependencies (packaged: %s)', async isPackaged => {
+    const root = await mkdtemp(join(tmpdir(), 'nola-launch-'))
+    try {
+      const managed = join(root, 'managed')
+      const resources = join(root, 'resources')
+      const source = isPackaged ? join(resources, 'engine', 'Lib', 'site-packages') : join(root, 'engine')
+      await mkdir(managed, { recursive: true })
+      await mkdir(join(source, 'nola_translator_engine'), { recursive: true })
+      await writeFile(join(managed, 'python.exe'), '')
+      await writeFile(join(source, 'nola_translator_engine', '__main__.py'), '')
+      const launch = createEngineLaunchSpec({ isPackaged, appPath: root, resourcesPath: resources, managedEngineDirectory: managed })
+      expect(launch.command).toBe(join(managed, 'python.exe'))
+      expect(launch.args.slice(0, 2)).toEqual(['-I', '-c'])
+      expect(launch.args[2]).toContain(`sys.path.insert(0, ${JSON.stringify(source)})`)
+      expect(launch.args[2]).toContain('runpy.run_module("nola_translator_engine", run_name="__main__")')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('开发态优先使用项目本地 Python，发布态使用打包后的 exe', () => {
     expect(
       createEngineLaunchSpec({ isPackaged: false, appPath: 'G:/app', resourcesPath: 'G:/resources' })

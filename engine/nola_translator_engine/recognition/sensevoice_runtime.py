@@ -50,6 +50,7 @@ class SenseVoiceRuntime:
         self._load_lock = threading.Lock()
         self._inference_lock = threading.Lock()
         self._loaded = False
+        self._warmed = False
         self._device: str | None = None
         self._model: Any = None
         self._requested_device = device
@@ -93,6 +94,14 @@ class SenseVoiceRuntime:
             self._device = device
             self._loaded = True
 
+    def warmup(self) -> None:
+        """Run the cold inference before live audio enters the bounded capture queue."""
+        with self._inference_lock:
+            if self._warmed:
+                return
+            self._transcribe_locked(np.zeros(int(SAMPLE_RATE * 0.6), dtype=np.float32), language=None)
+            self._warmed = True
+
     def unload(self) -> None:
         """Wait for in-flight inference to finish, then drop weights and clear the CUDA cache."""
         with self._inference_lock:
@@ -101,6 +110,7 @@ class SenseVoiceRuntime:
                 device = self._device or self._requested_device
                 self._model = None
                 self._loaded = False
+                self._warmed = False
                 self._device = None
             del model
             gc.collect()

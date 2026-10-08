@@ -110,6 +110,20 @@ describe('extension session lifecycle', () => {
     expect(fixture.requests.some(request => request.type === 'audio')).toBe(false)
     await fixture.store.destroy()
   })
+  it('shows late sentences and translations regardless of their video timestamp', async () => {
+    const fixture = setup(); await fixture.store.init(); fixture.store.pressStart()
+    await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('active'))
+    const emit = (segmentId: string, videoStartedAtMs: number, revision: number) => fixture.emit({ type: 'event', event: {
+      type: 'caption', protocolVersion: 1, requestId: 'event', sessionId: 'session', streamEpoch: 0, videoStartedAtMs,
+      segment: { segmentId, revision, startedAtMs: 0, sourceText: segmentId, translations: [], isFinal: true },
+    } })
+    emit('newer', 20000, 0)
+    emit('late', 10000, 0)
+    expect(fixture.store.getSnapshot().captions[0].segmentId).toBe('late')
+    emit('late', 10000, 1)
+    expect(fixture.store.getSnapshot().captions[0].revision).toBe(1)
+    await fixture.store.destroy()
+  })
   it('stops and releases capture at two seconds of unacknowledged audio', async () => {
     const fixture = setup({ deferredAudio: true }); await fixture.store.init(); fixture.store.pressStart(); await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('active'))
     for (let index = 0; index < 21; index++) fixture.chunk()

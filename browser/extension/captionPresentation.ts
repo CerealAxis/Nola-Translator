@@ -51,7 +51,7 @@ export function visibleControlReserve(controls: HTMLElement | null, container: H
   let opacity = 1
   for (let node: HTMLElement | null = controls; node; node = node.parentElement) {
     const style = getComputedStyle(node)
-    if (style.visibility === 'hidden' || style.visibility === 'collapse') return 0
+    if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return 0
     const value = Number.parseFloat(style.opacity)
     if (Number.isFinite(value)) opacity *= value
     if (node === container) break
@@ -60,16 +60,12 @@ export function visibleControlReserve(controls: HTMLElement | null, container: H
   return Math.max(0, frame.bottom - bar.top)
 }
 /**
- * The band a bottom-hung caption block may occupy: the frame above the player's own controls.
- * `preferredPosition` is a fraction of the frame height measured up from the bottom edge, because the
- * block is anchored there and a bilingual phrase extends upward out of that anchor. `top` is the
- * anchor line measured down from the top of the frame, clamped so a block taller than its band still
- * fits inside the frame.
+ * Bottom anchor measured down from the video top. Text grows upward within the available band,
+ * while the gap above visible controls remains a fraction of the full video height.
  */
-export function subtitleGeometry(videoHeight: number, preferredPosition: number, captionHeight: number, controlReserve: number): { top: number; maxHeight: number } {
+export function subtitleGeometry(videoHeight: number, preferredPosition: number, _captionHeight: number, controlReserve: number): { top: number; maxHeight: number } {
   const frame = Math.max(0, videoHeight)
-  const maxHeight = Math.max(0, frame - Math.min(frame, Math.max(0, controlReserve)))
-  const block = Math.min(maxHeight, Math.max(0, captionHeight))
-  const anchor = frame - Math.min(maxHeight, Math.max(0, frame * preferredPosition))
-  return { top: Math.max(0, Math.min(anchor, maxHeight - block)), maxHeight }
+  const reserve = Math.min(frame, Math.max(0, controlReserve))
+  const anchor = Math.max(0, frame - reserve - Math.max(0, frame * preferredPosition))
+  return { top: anchor, maxHeight: anchor }
 }

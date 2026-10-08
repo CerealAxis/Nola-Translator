@@ -56,6 +56,14 @@ export function createEngineLaunchSpec(options: {
   const pythonDirectory = options.managedEngineDirectory ?? (options.isPackaged
     ? join(options.resourcesPath, 'engine') : join(options.appPath, 'engine', 'dist', 'NolaPythonEngine'))
   if (existsSync(join(pythonDirectory, 'python.exe'))) {
+    const sourceDirectory = options.isPackaged
+      ? join(options.resourcesPath, 'engine', 'Lib', 'site-packages')
+      : join(options.appPath, 'engine')
+    if (options.managedEngineDirectory && existsSync(join(sourceDirectory, 'nola_translator_engine', '__main__.py'))) {
+      // Managed environments cache dependencies across app upgrades; their copied engine code may be older.
+      const bootstrap = `import runpy, sys; sys.path.insert(0, ${JSON.stringify(sourceDirectory)}); runpy.run_module("nola_translator_engine", run_name="__main__")`
+      return { command: join(pythonDirectory, 'python.exe'), args: ['-I', '-c', bootstrap], cwd: pythonDirectory }
+    }
     return { command: join(pythonDirectory, 'python.exe'), args: ['-I', '-m', 'nola_translator_engine'], cwd: pythonDirectory }
   }
   if (options.managedEngineDirectory) {

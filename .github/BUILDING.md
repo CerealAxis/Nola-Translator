@@ -2,6 +2,8 @@
 
 Two workflows build separate Windows x64 EXE (NSIS) and MSI installers, plus a source ZIP. End users do not need to install Python. GPU dependencies remain managed by the application. Model weights are not bundled.
 
+Both workflows rebuild the browser extension from the checked-out source, create `Nola-Browser-Extension.zip`, and build the Native Messaging host before packaging. EXE and MSI installations include these files; the settings download uses the bundled extension ZIP. The host uses a separate build environment and the PyInstaller version declared in `engine/pyproject.toml`.
+
 `npm run dist:win` also builds both EXE and MSI installers locally. The EXE embeds a ZIP payload and extracts it directly into the installation directory instead of extracting and copying a temporary application tree. It remains an offline NSIS installer; the ZIP is an internal build artifact, not a portable download. Differential NSIS packages are disabled to keep the payload format and extraction plugin consistent. After installation, the embedded temporary ZIP is deleted before the finish page, and NSIS cleans up the remaining plugin temporary directory when the installer exits. MSI continues to use Windows Installer packaging.
 
 - `build.yml`: every branch push, pull request, or manual run. Download the installer from the run's **Artifacts** section. Development versions use `package version-dev.run number`. Artifacts expire after 14 days; newer runs cancel older builds on the same branch/PR.

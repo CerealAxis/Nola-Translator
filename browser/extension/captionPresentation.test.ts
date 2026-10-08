@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CaptionClock, captionLines, deepFullscreenElement, fullscreenCueBounds, subtitleGeometry } from './captionPresentation'
+import { CaptionClock, captionLines, deepFullscreenElement, fullscreenCueBounds, subtitleGeometry, visibleControlReserve } from './captionPresentation'
 import type { Caption, CaptionConfig } from './store'
 
 const phrase: Caption = { segmentId: 'phrase', revision: 1, startedAtMs: 0, videoStartedAtMs: 12000, videoEndedAtMs: 13000, sourceText: 'Hello', translations: [], isFinal: true }
@@ -36,11 +36,32 @@ describe('live caption presentation', () => {
     expect(deepFullscreenElement(document)).toBe(video)
     Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null })
   })
+  it('releases the control reserve when the bar or its parent fades away', () => {
+    const container = document.createElement('div')
+    const wrapper = document.createElement('div')
+    const controls = document.createElement('div')
+    container.append(wrapper); wrapper.append(controls); document.body.append(container)
+    controls.getBoundingClientRect = () => ({ top: 340, bottom: 400, height: 60 }) as DOMRect
+    const frame = { top: 0, bottom: 400, height: 400 }
+    expect(visibleControlReserve(controls, container, frame)).toBe(60)
+    wrapper.style.opacity = '0'
+    expect(visibleControlReserve(controls, container, frame)).toBe(0)
+    wrapper.style.opacity = '1'
+    expect(visibleControlReserve(controls, container, frame)).toBe(60)
+    controls.style.display = 'none'
+    expect(visibleControlReserve(controls, container, frame)).toBe(0)
+    container.remove()
+  })
+  it('anchors the bottom five percent above the frame or visible controls regardless of text height', () => {
+    expect(subtitleGeometry(400, 0.05, 40, 0)).toEqual({ top: 380, maxHeight: 380 })
+    expect(subtitleGeometry(400, 0.05, 80, 60)).toEqual({ top: 320, maxHeight: 320 })
+    expect(subtitleGeometry(400, 0.05, 80, 0)).toEqual({ top: 380, maxHeight: 380 })
+  })
   it('keeps oversized bilingual phrases within a small video and reserves controls', () => {
-    expect(subtitleGeometry(90, 0.18, 180, 22.5)).toEqual({ top: 0, maxHeight: 67.5 })
+    expect(subtitleGeometry(90, 0.18, 180, 22.5)).toEqual({ top: 51.3, maxHeight: 51.3 })
     const layout = subtitleGeometry(360, 0.12, 72, 40)
-    expect(layout.top).toBe(248)
-    expect(layout.top + 72).toBeLessThanOrEqual(320)
+    expect(layout.top).toBe(276.8)
+    expect(layout.top).toBeLessThanOrEqual(320)
     expect(subtitleGeometry(0, 0.18, 72, 40)).toEqual({ top: 0, maxHeight: 0 })
   })
 })

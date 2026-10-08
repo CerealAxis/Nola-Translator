@@ -1005,6 +1005,8 @@ class EngineRuntime:
             self._active_recognition_runtime = runtime
             try:
                 await asyncio.to_thread(runtime.load)
+                if isinstance(runtime, SenseVoiceRuntime):
+                    await asyncio.to_thread(runtime.warmup)
                 recognizer = factory(model_path, source_language=language, runtime=runtime)
                 break
             except Exception as error:

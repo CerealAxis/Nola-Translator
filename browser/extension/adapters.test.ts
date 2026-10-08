@@ -28,10 +28,11 @@ describe('video adapters', () => {
     expect(detectVideos(document)).toEqual([large, shadowVideo])
   })
   it('uses platform controls without modifying other videos', () => {
-    document.body.innerHTML = '<div id="movie_player"><video></video><div class="ytp-right-controls"></div></div>'
+    document.body.innerHTML = '<div id="movie_player"><video></video><div class="ytp-chrome-bottom"><div class="ytp-right-controls"></div></div></div>'
     const video = document.querySelector('video')!
+    expect(playerAdapter(video).controlBar).toBe(document.querySelector('.ytp-chrome-bottom'))
     expect(playerAdapter(video).controls).toBe(document.querySelector('.ytp-right-controls'))
     document.body.innerHTML = '<main><video></video></main>'
-    expect(playerAdapter(document.querySelector('video')!)).toEqual({ container: document.querySelector('main'), controls: null })
+    expect(playerAdapter(document.querySelector('video')!)).toEqual({ container: document.querySelector('main'), controls: null, controlBar: null })
   })
 })

@@ -389,8 +389,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     if (event.type !== 'caption' || event.sessionId !== sessionId || event.streamEpoch !== state.epoch || typeof event.videoStartedAtMs !== 'number') return
     const previous = state.captions.find(caption => caption.segmentId === event.segment.segmentId)
     if (previous && previous.revision >= event.segment.revision) return
-    if (!previous && state.captions[0] && state.captions[0].videoStartedAtMs > event.videoStartedAtMs) return
-    // Keep only the currently visible phrase, never a history or persistent caption document.
+    // Show arriving sentences even when recognition or translation trails the video's timeline.
     set({ captions: [{ ...event.segment, videoStartedAtMs: event.videoStartedAtMs, videoEndedAtMs: event.videoEndedAtMs }] })
   }
   const unsubscribe = dependencies.bridge.subscribe(onResponse)

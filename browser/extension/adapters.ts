@@ -1,4 +1,4 @@
-export interface PlayerAdapter { container: HTMLElement; controls: HTMLElement | null }
+export interface PlayerAdapter { container: HTMLElement; controls: HTMLElement | null; controlBar: HTMLElement | null }
 /** Native control rows can have automatic heights and different text baselines. Match their painted icons. */
 export function alignPlayerTrigger(controls: HTMLElement, trigger: HTMLElement): void {
   const logo = trigger.shadowRoot?.querySelector('svg')
@@ -32,8 +32,8 @@ export function detectVideos(document: Document): HTMLVideoElement[] {
 }
 export function playerAdapter(video: HTMLVideoElement): PlayerAdapter {
   const youtube = video.closest<HTMLElement>('#movie_player')
-  if (youtube) return { container: youtube, controls: youtube.querySelector<HTMLElement>('.ytp-right-controls') }
+  if (youtube) return { container: youtube, controlBar: youtube.querySelector<HTMLElement>('.ytp-chrome-bottom'), controls: youtube.querySelector<HTMLElement>('.ytp-right-controls') }
   const bilibili = video.closest<HTMLElement>('.bpx-player-container, .bilibili-player')
-  if (bilibili) return { container: bilibili, controls: bilibili.querySelector<HTMLElement>('.bpx-player-control-bottom-right, .bilibili-player-video-control-bottom-right') }
-  return { container: video.parentElement ?? video, controls: null }
+  if (bilibili) return { container: bilibili, controlBar: bilibili.querySelector<HTMLElement>('.bpx-player-control-bottom, .bilibili-player-video-control'), controls: bilibili.querySelector<HTMLElement>('.bpx-player-control-bottom-right, .bilibili-player-video-control-bottom-right') }
+  return { container: video.parentElement ?? video, controls: null, controlBar: null }
 }
