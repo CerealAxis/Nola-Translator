@@ -443,6 +443,6 @@ def parse_event_line(line: str) -> EngineEvent:
 def serialize_event(event: EngineEvent) -> str:
     return json.dumps(
         _EVENT_ADAPTER.dump_python(event, mode="json", exclude_none=True),
-        ensure_ascii=False,
+        ensure_ascii=True,
         separators=(",", ":"),
     )

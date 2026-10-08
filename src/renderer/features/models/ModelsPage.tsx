@@ -86,14 +86,13 @@ export function ModelsPage() {
     void updateSettings(patch).catch(() => toast.danger(t('modelsSettingsUi.defaultSaveFailed')))
   }
 
-  const card = (record: ResourceRecord, installable = true) => (
+  const card = (record: ResourceRecord) => (
     <ModelCard
       key={record.resourceId}
       record={record}
       busy={busyIds.includes(record.resourceId)}
       isDefault={isDefaultOf(record, settings)}
       canBeDefault={isModelReady(record) && defaultTargetOf(record) !== null && supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)}
-      installable={installable}
       onInstall={run(record.resourceId, 'install')}
       onCancel={run(record.resourceId, 'cancel')}
       onRemove={run(record.resourceId, 'remove')}
