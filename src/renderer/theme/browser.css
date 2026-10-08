@@ -1,0 +1,11 @@
+@layer base {
+  :root {
+    --browser-panel-width: 350px;
+    --browser-caption-line-height: 1.4;
+    --browser-caption-background-mix: 78%;
+    /* Neutral black on purpose: the theme's own dark surface tokens carry a cool blue cast that
+       reads as tinted once it is composited over a video frame. */
+    --browser-caption-fill: oklch(0% 0 0);
+    --browser-field-border-width: 1px;
+  }
+}

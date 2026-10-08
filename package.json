@@ -13,7 +13,7 @@
     "build": "npm run typecheck && electron-vite build",
     "build:engine:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-cpu-engine.ps1",
     "prepare:llama:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-llama-cpu.ps1",
-    "dist:win": "npm run build && npm run build:engine:cpu && npm run prepare:llama:cpu && electron-builder --win nsis msi --x64",
+    "dist:win": "npm run build && npm run build:browser && npm run package:browser && npm run build:browser-host && npm run build:engine:cpu && npm run prepare:llama:cpu && electron-builder --win nsis msi --x64",
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:ui": "electron tests/e2e/capture-ui.mjs",
@@ -24,7 +24,10 @@
     "check:notices": "node scripts/gen-third-party-notices.mjs --check",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:browser": "node browser/extension/build.mjs",
+    "build:browser-host": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-browser-host.ps1",
+    "package:browser": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-browser-extension.ps1"
   },
   "dependencies": {
     "@heroui/react": "^3.2.6",
@@ -33,6 +36,7 @@
     "lucide-react": "^0.468.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
+    "react-stately": "3.50.0",
     "zod": "4.4.3"
   },
   "devDependencies": {
@@ -97,6 +101,14 @@
       {
         "from": "scripts/extract-runtime.ps1",
         "to": "runtime/extract-runtime.ps1"
+      },
+      {
+        "from": "artifacts/browser-host/NolaBrowserHost.exe",
+        "to": "browser/NolaBrowserHost.exe"
+      },
+      {
+        "from": "release/Nola-Browser-Extension.zip",
+        "to": "browser/Nola-Browser-Extension.zip"
       }
     ],
     "win": {
@@ -118,7 +130,10 @@
       "artifactName": "Nola-Translator-${version}-Setup-${arch}.${ext}"
     },
     "nsis": {
-      "installerLanguages": ["en_US", "zh_CN"],
+      "installerLanguages": [
+        "en_US",
+        "zh_CN"
+      ],
       "useZip": true,
       "differentialPackage": false,
       "oneClick": false,

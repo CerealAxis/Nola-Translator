@@ -23,6 +23,40 @@ export type OverlaySettings = {
   layout: 'rolling' | 'sentence'
 }
 
+/**
+ * The caption block drawn inside a browser video. A single-member `layout` union: the block always
+ * pairs each source segment with its translation, so there is no other arrangement to store.
+ */
+/**
+ * Where the browser extension's caption audio comes from. `tab` is the page's own playback,
+ * captured in the tab; `system` is captured by the desktop from an output device, which is why it
+ * also carries a device id. The extension reads this to fill `source` and `deviceId` on `start`.
+ */
+export type VideoCaptionAudioSource = 'tab' | 'system'
+
+export type VideoCaptionSettings = {
+  showSource: boolean
+  showTranslation: boolean
+  /** Per-segment bilingual pairing; the video overlay has no rolling mode. */
+  layout: 'sentence'
+  fontSize: number
+  /** Percent of the video height where the caption block's bottom edge sits, 0..100. */
+  position: number
+  /**
+   * `tab` alone, or `system` plus the device id in `audioDeviceId`. Same convention as
+   * `RecognitionSettings.audioSource`: the device is only meaningful for a desktop-side capture,
+   * so the two fields stay separate instead of overloading one string with a sentinel.
+   *
+   * Optional because the browser extension builds its own config object on this type and merges the
+   * desktop's copy field by field, across independently shipped versions — the desktop always writes
+   * a value (`DEFAULT_SETTINGS`, then sanitized on load and on write), the extension tolerates its
+   * absence. Required here would break every extension build on the field's introduction.
+   */
+  audioSource?: VideoCaptionAudioSource
+  /** The output device for `audioSource: 'system'`; absent or ignored when it is `tab`. */
+  audioDeviceId?: string
+}
+
 export type AppSettings = {
   version: 1
   theme: 'system' | 'light' | 'dark'
@@ -32,8 +66,10 @@ export type AppSettings = {
   recording: RecordingSettings
   appearance: AppearancePrefs
   overlay: OverlaySettings
+  videoCaptions: VideoCaptionSettings
   translation: TranslationSettings
   compute: ComputeSettings
+  browserConnection: { enabled: boolean }
 }
 
 /** `keepAudio: false` stops the engine from being handed a recording path, so no WAV is written. */
@@ -112,12 +148,13 @@ export type CloudFormatDefaults = {
   cloudModel: string
 }
 
-export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recording' | 'appearance' | 'overlay' | 'translation' | 'compute' | 'modelStoragePath' | 'version'> & {
+export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recording' | 'appearance' | 'overlay' | 'videoCaptions' | 'translation' | 'compute' | 'modelStoragePath' | 'version' | 'browserConnection'> & {
   compute?: Partial<ComputeSettings>
   recognition?: Partial<RecognitionSettings>
   recording?: Partial<RecordingSettings>
   appearance?: Partial<AppearancePrefs>
   overlay?: Partial<OverlaySettings>
+  videoCaptions?: Partial<VideoCaptionSettings>
   translation?: Partial<TranslationSettings>
 }
 
@@ -149,6 +186,7 @@ export const TARGET_LANGUAGE_OPTIONS: readonly string[] = [NO_TRANSLATION_LANGUA
 
 export const DEFAULT_SETTINGS: AppSettings = {
   compute: { ...DEFAULT_COMPUTE_SETTINGS },
+  browserConnection: { enabled: false },
   version: 1,
   theme: 'system',
   uiLanguage: 'zh-CN',
@@ -183,6 +221,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
     showSource: true,
     showTranslation: true,
     layout: 'rolling',
+  },
+  videoCaptions: {
+    showSource: true,
+    showTranslation: true,
+    layout: 'sentence',
+    fontSize: 24,
+    position: 82,
+    audioSource: 'tab',
   },
   translation: {
     provider: 'local',

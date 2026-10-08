@@ -18,6 +18,7 @@
 @import './motion.css' layer(base);
 @import './caption-card.css';
 @import './z-index.css' layer(utilities);
+@import './browser.css';
 
 /* =============================================================================
    GLOBAL NON-COLOUR TOKENS — shared by both themes.

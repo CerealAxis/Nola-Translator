@@ -13,7 +13,9 @@ import { homeRecordsZh } from './home-records-ui'
 import { workspaceZh } from './workspace-ui'
 import { modelsSettingsZh } from './models-settings-ui'
 
+import { browserZh } from './browser-ui'
 export const zhCN = {
+  browser: browserZh,
   modelConfig: {
     title: '配置模型', pending: '待配置', edit: '编辑配置', configure: '配置并启用',
     description: '确认模型用途、运行引擎及语言能力。保存完整配置后，才能在同传中选择这个模型。',
@@ -139,6 +141,35 @@ export const zhCN = {
     nothingYetHint: '开始同传后，识别到的语句会逐句出现在这里。',
     sourcePanel: '实时转写',
     translationPanel: '翻译结果',
+  },
+
+  videoCaptions: {
+    title: '视频字幕',
+    experimentalTitle: '实验性功能',
+    experimentalBody: '视频字幕功能正在开发中，如有问题可反馈至 Github issue。',
+    experimentalAction: '去反馈',
+    captionPreview: '字幕预览',
+    settings: '视频字幕设置',
+    openBrowser: '打开浏览器',
+    audioSource: '输入声源',
+    tabAudio: '标签页声音',
+    systemAudio: '系统音频',
+    browserAppearance: '浏览器字幕外观设置',
+    enableService: '开启字幕服务',
+    disableService: '关闭字幕服务',
+    serviceLoading: '正在加载模型',
+    serviceReady: '字幕服务已就绪',
+    // 按钮旁边的常驻指示，只在闸门开着时出现：开着但没有会话 = 已就绪，
+    // 开着且有会话 = 扩展正在用它（转圈）。关着的时候按钮本身就是唯一信号，不再加文字。
+    serviceRunning: '浏览器正在生成字幕',
+    serviceFailed: '字幕服务开启失败',
+    errorOpeningBrowser: '无法打开默认浏览器，请在系统里设置一个默认浏览器后重试。错误码 UIP-017',
+    /*
+     * 预览里的示例句：第一行原文、第二行译文，双语对照就长这样。
+     * 用一句真实语料而不是 lorem —— 占位文本看不出换行与字号对不对。
+     */
+    previewSource: '这是视频里正在播放的那句话。',
+    previewTranslation: 'This is the line playing in the video.',
   },
 
   overlay: {
@@ -477,12 +508,41 @@ export const zhCN = {
     translateFailedAction: '检查密钥与网络',
     storageChanged: '保存位置已失效，字幕暂时写不进磁盘。错误码 STO-008',
     storageChangedAction: '重新选择保存位置',
+    // 设置保存失败的真实原因。主进程只有被文件系统拒绝写入时才会失败，所以界面按 errno 分派；
+    // 认不出 errno 时只能说「没能保存」，不能像 `storageChanged` 那样断言保存位置已经失效。
+    // 编号接着全局序列往下排，全局最后一个是 `videoCaptions.errorOpeningBrowser` 的 UIP-017。
+    settingsWriteDenied: '没有写入设置的权限，这次改动没能保存。错误码 STO-018',
+    settingsFileLocked: '设置文件正被其他程序占用，这次改动没能保存。错误码 STO-019',
+    settingsDiskFull: '磁盘空间不足，这次改动没能保存。错误码 STO-020',
+    settingsSaveFailed: '这次改动没能保存，请重试。错误码 STO-021',
     exportFailed: '导出失败，没有生成文件。错误码 EXP-009',
     // preload 没注入 = 这个窗口压根没接到引擎。给 UIP 而不是 ENG：引擎本身没坏，坏的是接线。
     engineNotConnected: '没有连上本地引擎，设置、记录和模型都读不到。错误码 UIP-011',
     pageCrashed: '界面渲染中断，同传仍在后台运行。错误码 UIP-010',
     pageCrashedAction: '重新载入界面',
     copyDiagnosticsAction: '复制诊断信息',
+
+    /*
+     * 字幕服务闸门操作失败。域前缀用 UIP：这两条里引擎、模型、存储、网络和翻译都是好的，
+     * 坏的是桌面端自己那条开关 / 停会话的调用，所以和 `engineNotConnected`、`errorOpeningBrowser`
+     * 归在一起。编号接着全局序列往下排，全局最后一个是 `settingsSaveFailed` 的 STO-021。
+     */
+    captionServiceToggleFailed: '字幕服务的开关没有切换成功，请重试。错误码 UIP-022',
+    captionServiceStopFailed: '字幕服务已关闭，但有一场字幕会话没能结束，识别可能还在继续。错误码 UIP-023',
+
+    /*
+     * 预热被引擎拒绝的原因。每条都要说清现在该做什么：只写「加载失败」的话，
+     * 用户既不知道是模型没装、是模型不支持这组语言，还是有别的东西正占着模型。
+     * 编号接着全局序列往下排（005 空缺，011 是最后一个），域前缀用 MDL ——
+     * 这五条都是模型侧的拒绝，不是引擎进程本身的问题。
+     */
+    prewarm: {
+      modelUnavailable: '所需模型还没有下载，请先到模型管理里下载该模型。错误码 MDL-012',
+      resourceUnavailable: '模型文件不完整或读取失败，请到模型管理里重新下载。错误码 MDL-013',
+      invalidConfiguration: '当前的模型或语言设置无法用于字幕，请先到模型管理里完成模型配置。错误码 MDL-014',
+      resourceBusy: '模型正在卸载或切换，请稍候再开启字幕服务。错误码 MDL-015',
+      sessionAlreadyRunning: '已有一场字幕会话在运行，请先结束它再开启字幕服务。错误码 MDL-016',
+    },
   },
 
   legal: {

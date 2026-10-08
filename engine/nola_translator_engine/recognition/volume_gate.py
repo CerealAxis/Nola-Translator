@@ -90,6 +90,29 @@ class VolumeGateSegmenter:
         self._voiced_samples = 0
         self._silence_samples = 0
         self._gate_open = False
+        #: Counters behind the `gate.*` diagnostic lines. The gate is the last filter before an
+        #: inference job exists, so "no captions" and "the gate never opened" are otherwise
+        #: indistinguishable from the outside.
+        self.frames_in = 0
+        self.frames_voiced = 0
+        self.segments_started = 0
+        self.segments_emitted = 0
+        self.segments_dropped_short = 0
+        self.highest_frame_db = -120.0
+
+    def stats(self) -> dict[str, float | int]:
+        return {
+            "framesIn": self.frames_in,
+            "framesVoiced": self.frames_voiced,
+            "segmentsStarted": self.segments_started,
+            "segmentsEmitted": self.segments_emitted,
+            "segmentsDroppedShort": self.segments_dropped_short,
+            "noiseFloorDb": round(self._noise_floor_db, 2),
+            "onThresholdDb": round(self._on_threshold_db(), 2),
+            "highestFrameDb": round(self.highest_frame_db, 2),
+            "voicedMs": round(self._voiced_samples * 1000.0 / TARGET_SAMPLE_RATE, 1),
+            "activeMs": round(self._active_samples * 1000.0 / TARGET_SAMPLE_RATE, 1),
+        }
 
     @property
     def noise_floor_db(self) -> float:
@@ -98,6 +121,8 @@ class VolumeGateSegmenter:
     def accept(self, frame: AudioFrame) -> list[VolumeGateSegment]:
         db = self._rms_dbfs(frame.samples)
         completed: list[VolumeGateSegment] = []
+        self.frames_in += 1
+        self.highest_frame_db = max(self.highest_frame_db, db)
         if not self._active:
             self._update_noise_floor(db)
             if db > self._on_threshold_db():
@@ -113,6 +138,8 @@ class VolumeGateSegmenter:
         else:
             self._gate_open = db > on_db
         voiced = self._gate_open
+        if voiced:
+            self.frames_voiced += 1
 
         pushed = _Frame(frame.samples, frame.started_at_ms, voiced)
         self._push_pre_roll(pushed)
@@ -176,6 +203,7 @@ class VolumeGateSegmenter:
         self._voiced_samples = opener.samples.size
         self._silence_samples = 0
         self._gate_open = True
+        self.segments_started += 1
         self._push_pre_roll(opener)
 
     def _finalize_silence(self) -> VolumeGateSegment | None:
@@ -192,6 +220,9 @@ class VolumeGateSegmenter:
                 self._active[trim_index].start_ms,
                 np.concatenate([f.samples for f in kept]),
             )
+            self.segments_emitted += 1
+        elif kept:
+            self.segments_dropped_short += 1
         self._clear_active()
         return segment
 

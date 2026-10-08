@@ -20,6 +20,9 @@ import { migrateLegacyUserData } from './legacy-migration'
 import { MeetingStore } from './meeting-store'
 import { modelStorageEnvironment } from './model-storage'
 import { registerEngineIpc } from './ipc'
+import { SessionController } from './session-controller'
+import { BrowserConnection } from './browser-connection'
+import { BrowserIntegrations } from './browser-integrations'
 import { RuntimeManager } from './runtime-manager'
 import { registerRuntimeIpc } from './runtime-ipc'
 import { SettingsStore } from './settings-store'
@@ -34,6 +37,7 @@ let disposeIpc: (() => void) | null = null
 let disposeAppIpc: (() => void) | null = null
 let disposeRuntimeIpc: (() => void) | null = null
 let quitting = false
+let browserConnection: BrowserConnection | null = null
 
 function createMainWindow(theme: AppSettings['theme']): void {
   const preload = resolvePreloadPath(__dirname)
@@ -211,6 +215,7 @@ if (!hasSingleInstanceLock) {
       await runtimeInitialization
       if (quitting) throw new Error('应用正在退出')
     }
+    const pipelineDebugLog = join(dataRoot, 'pipeline-debug.jsonl')
     engine = new EngineProcess({
       resolveLaunchSpec: () => {
         const compute = launchCompute
@@ -221,6 +226,9 @@ if (!hasSingleInstanceLock) {
             managedEngineDirectory: engineDirectory }),
           env: { ...resourceEnvironment,
             NOLA_TRANSLATOR_LLAMA_DIR: llamaDirectory ?? bundledLlamaDirectory,
+            // Every layer of the caption pipeline appends to this one file, so a stall can be read
+            // end to end instead of inferred from three separate logs.
+            NOLA_TRANSLATOR_DEBUG_LOG: pipelineDebugLog,
           },
         }
       },
@@ -232,17 +240,21 @@ if (!hasSingleInstanceLock) {
       env: {
         ...resourceEnvironment,
         NOLA_TRANSLATOR_LLAMA_DIR: bundledLlamaDirectory,
+        NOLA_TRANSLATOR_DEBUG_LOG: pipelineDebugLog,
       },
     })
     let sessionActive = false
     let sessionStarting = false
     let preparation: Promise<void> | null = null
-    const prepareEnvironment = (forStart = false, session?: SessionConfig): Promise<void> => {
+    const prepareEnvironment = (forStart = false, session?: SessionConfig, cancelled: () => boolean = () => false): Promise<void> => {
+      const checkCancelled = () => { if (quitting || cancelled()) throw new Error('sessionStartCancelled') }
+      try { checkCancelled() } catch (error) { return Promise.reject(error) }
       if (sessionActive || (sessionStarting && !forStart)) return Promise.reject(new Error('请先停止同传，再应用计算环境'))
-      if (preparation) return preparation.then(() => prepareEnvironment(forStart, session))
+      if (preparation) return preparation.catch(() => undefined).then(() => prepareEnvironment(forStart, session, cancelled))
       const compute = { ...(session?.compute ?? settings.current().compute) }
       preparation = (async () => {
         await whenRuntimeReady()
+        checkCancelled()
         const translationSettings = settings.current().translation
         const provider = session ? session.translationProvider ?? 'local' : translationSettings.provider
         const modelId = session?.translationModelId ?? translationSettings.localModelId
@@ -264,11 +276,14 @@ if (!hasSingleInstanceLock) {
           }
         }
         await runtimes.prepare(compute, translation)
+        checkCancelled()
         const next = JSON.stringify(runtimes.selectedDirectories(compute))
         launchCompute = compute
         if (next !== currentDirectories) {
           await engine!.stop()
+          checkCancelled()
           await engine!.start()
+          checkCancelled()
           currentDirectories = next
         } else if (engine!.currentState !== 'ready') await engine!.start()
         if (session) {
@@ -283,6 +298,7 @@ if (!hasSingleInstanceLock) {
       return preparation
     }
     disposeRuntimeIpc = registerRuntimeIpc(runtimes, () => mainWindow, () => prepareEnvironment(), () => sessionActive || sessionStarting, whenRuntimeReady)
+    const sessions = new SessionController({ engine, meetings, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareEnvironment(true, config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => overlayWindow?.showInactive(), hideOverlay: () => overlayWindow?.hide() })
     disposeIpc = registerEngineIpc(
       engine,
       () => overlayWindow,
@@ -292,7 +308,13 @@ if (!hasSingleInstanceLock) {
       config => prepareEnvironment(true, config),
       starting => { sessionStarting = starting },
       whenRuntimeReady,
+      sessions,
     )
+    browserConnection = new BrowserConnection({ engine, sessions, integrations: new BrowserIntegrations({ localAppData: process.env.LOCALAPPDATA ?? app.getPath('userData'), userData: app.getPath('userData') }), getSettings: () => settings.current(), setEnabled: async enabled => {
+      const saved = await settings.update({ browserConnection: { enabled } })
+      for (const window of BrowserWindow.getAllWindows()) window.webContents.send('settings:changed', saved)
+    } })
+    void browserConnection.initialize(initialSettings.browserConnection.enabled).catch(error => console.error('browser connection initialization failed', error))
     disposeAppIpc = registerAppIpc({
       settings,
       initialSettings,
@@ -306,7 +328,7 @@ if (!hasSingleInstanceLock) {
     engine.on('event', (event) => {
       if (event.type === 'sessionStarted') sessionActive = true
       if (event.type === 'sessionStopped') sessionActive = false
-      if (event.type === 'caption' && event.segment.isFinal) {
+      if (event.type === 'caption' && event.segment.isFinal && !sessions.isBrowserEvent(event)) {
         void meetings.append(event.sessionId, event.segment).catch((error) =>
           console.error('meeting transcript write failed', error),
         )
@@ -339,5 +361,5 @@ app.on('before-quit', (event) => {
   disposeIpc?.()
   disposeAppIpc?.()
   disposeRuntimeIpc?.()
-  void engine.stop().finally(() => app.quit())
+  void (browserConnection?.dispose() ?? Promise.resolve()).catch(error => console.error('browser cleanup failed', error)).finally(() => engine!.stop().finally(() => app.quit()))
 })

@@ -4,7 +4,7 @@ import { StrictMode, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
 import { Alert, Button, Toast } from '@heroui/react'
-import { Home, Mic, Captions, Clock, SlidersHorizontal, Settings } from 'lucide-react'
+import { Home, Mic, Captions, Clock, SlidersHorizontal, Settings, Video } from 'lucide-react'
 import { createIpcBridge, isIpcBridgeAvailable } from './bridge/ipc/ipcBridge'
 import { I18nProvider, useI18n } from './i18n'
 import { AppShell, ErrorBoundary } from './components/primitives'
@@ -15,6 +15,7 @@ import { RecordsPage, RecordDetailPage } from './features/records'
 import { WorkspacePage } from './features/workspace'
 import { OverlayRoot } from './features/overlay'
 import { OverlayPage } from './features/overlay/OverlayPage'
+import { VideoCaptionsPage } from './features/video-captions/VideoCaptionsPage'
 import { ModelsPage } from './features/models'
 import { SettingsPage } from './features/settings'
 
@@ -40,6 +41,7 @@ const PAGES = {
   home: () => <HomePage />,
   workspace: () => <WorkspacePage />,
   overlay: () => <OverlayPage />,
+  'video-captions': () => <VideoCaptionsPage />,
   records: () => <RecordsPage />,
   record: () => <RecordDetailPage />,
   models: () => <ModelsPage />,
@@ -131,6 +133,14 @@ function Shell() {
       path: '#/overlay',
       active: route === 'overlay',
       onPress: () => navigate('#/overlay'),
+    },
+    {
+      id: 'video-captions',
+      label: t('videoCaptions.title'),
+      icon: Video,
+      path: '#/video-captions',
+      active: route === 'video-captions',
+      onPress: () => navigate('#/video-captions'),
     },
     {
       id: 'records',

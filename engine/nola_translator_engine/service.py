@@ -54,7 +54,8 @@ class EngineService:
                     requestId=command.requestId,
                     engineVersion=__version__,
                     capabilities=[
-                        "devices", "captions", "translation", "resources", "pause", "hubInspect",
+                        "devices", "captions", "translation", "resources", "pause", "hubInspect", "browserAudio",
+                        "prewarmModels",
                     ],
                 )
             ]
@@ -92,7 +93,9 @@ class EngineService:
                 return [self._error(command.requestId, "sessionAlreadyRunning")]
             source = command.config.audioSource
             try:
-                if source.kind == "defaultOutput":
+                if source.kind == "browserTab":
+                    self.active_device = None
+                elif source.kind == "defaultOutput":
                     self.active_device = self.device_registry.resolve("systemOutput")
                 else:
                     self.active_device = self.device_registry.resolve(source.kind, source.deviceId)

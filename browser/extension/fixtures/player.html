@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Nola browser caption fixture</title></head><body>
+<h1>Nola browser caption fixture</h1><p>Serve this page over HTTPS, enable this website in the extension popup, and press Play tone. The video is a generated canvas with an audible 440 Hz tone. Select this tab and its audio in the sharing picker. Use two players to test explicit video selection. No video or audio files are saved.</p>
+<video id="first" controls width="640" height="360"></video><video id="second" controls width="320" height="180"></video>
+<button id="tone">Play tone</button><button id="replace">Replace first player</button><button id="rate">Change playback rate</button>
+<script>
+document.getElementById('tone').addEventListener('click', async () => {
+  const context = new AudioContext(); const oscillator = context.createOscillator(); const output = context.createMediaStreamDestination(); const gain = context.createGain(); gain.gain.value = 0.08; oscillator.connect(gain); gain.connect(output); oscillator.start();
+  const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360; const drawing = canvas.getContext('2d');
+  function draw(time) { drawing.fillStyle = '#18253b'; drawing.fillRect(0, 0, 640, 360); drawing.fillStyle = 'white'; drawing.font = '24px system-ui'; drawing.fillText('Tone fixture: ' + (time / 1000).toFixed(1), 40, 160); requestAnimationFrame(draw); } requestAnimationFrame(draw);
+  const stream = canvas.captureStream(24); output.stream.getAudioTracks().forEach(track => stream.addTrack(track));
+  for (const video of document.querySelectorAll('video')) { video.srcObject = stream; await video.play(); }
+});
+document.getElementById('replace').addEventListener('click', () => { const old = document.querySelector('video'); const next = old.cloneNode(); next.srcObject = old.srcObject; old.replaceWith(next); next.play(); });
+document.getElementById('rate').addEventListener('click', () => { const video = document.querySelector('video'); video.playbackRate = video.playbackRate === 1 ? 1.5 : 1; });
+</script></body></html>

@@ -5,7 +5,7 @@ import { computeSettingsSchema, DEFAULT_COMPUTE_SETTINGS } from '../shared/compu
 import { DEFAULT_SETTINGS, RECOGNITION_MODEL_IDS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
 
 // Store-internal patches may also touch fields the IPC schema exposes only through their own channels.
-export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 1 }
+export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 1; browserConnection?: { enabled: boolean } }
 
 /** Must be a dropdown entry; anything else falls back to auto-detect. */
 function sanitizeSourceLanguage(value: unknown): string {
@@ -19,6 +19,20 @@ function sanitizeLocalModelId(value: unknown): string {
   return typeof value === 'string' && value.length > 0 && value.length <= 256
     ? value
     : DEFAULT_SETTINGS.translation.localModelId
+}
+
+/**
+ * A closed two-value union, so an unknown value cannot survive: the extension branches on it to
+ * decide between a tab capture and a desktop capture. Falls back the same way on both the load and
+ * the write path, so a hand-edited file cannot leave the dropdown showing a source that no longer exists.
+ */
+function sanitizeVideoCaptionAudioSource(value: unknown): 'tab' | 'system' {
+  return value === 'system' ? 'system' : 'tab'
+}
+
+/** A device id is a display-device string from `listDevices()`; anything else means "no device chosen". */
+function sanitizeVideoCaptionDeviceId(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 && value.length <= 512 ? value : undefined
 }
 
 /** A pre-migration `settings.json` `translation` block: old key names, every value unknown. */
@@ -135,8 +149,12 @@ export class SettingsStore {
         recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}) },
         recording: { ...DEFAULT_SETTINGS.recording, ...(raw.recording ?? {}) },
         appearance: { ...DEFAULT_SETTINGS.appearance, ...(raw.appearance ?? {}) },
+        browserConnection: { enabled: raw.browserConnection?.enabled === true },
         compute: computeSettingsSchema.safeParse(raw.compute ?? {}).data ?? { ...DEFAULT_COMPUTE_SETTINGS },
         overlay: { ...DEFAULT_SETTINGS.overlay, ...rawOverlay },
+        // Video caption settings are run-scoped, so a block an older build left here is ignored and
+        // every launch starts from the defaults. The write side keeps the same block in memory only.
+        videoCaptions: structuredClone(DEFAULT_SETTINGS.videoCaptions),
         translation: {
           ...DEFAULT_SETTINGS.translation,
           ...rawTranslation,
@@ -222,6 +240,7 @@ export class SettingsStore {
       recording: { ...this.settings.recording, ...(patch.recording ?? {}) },
       appearance: { ...this.settings.appearance, ...(patch.appearance ?? {}) },
       overlay: { ...this.settings.overlay, ...(patch.overlay ?? {}) },
+      videoCaptions: { ...this.settings.videoCaptions, ...(patch.videoCaptions ?? {}) },
       translation: { ...this.settings.translation, ...(patch.translation ?? {}) },
       compute: { ...this.settings.compute, ...(patch.compute ?? {}) },
     }
@@ -229,9 +248,21 @@ export class SettingsStore {
     next.recognition.sourceLanguage = sanitizeSourceLanguage(next.recognition.sourceLanguage)
     next.translation.targetLanguage = sanitizeTargetLanguage(next.translation.targetLanguage)
     next.translation.localModelId = sanitizeLocalModelId(next.translation.localModelId)
+    next.videoCaptions.audioSource = sanitizeVideoCaptionAudioSource(next.videoCaptions.audioSource)
+    next.videoCaptions.audioDeviceId = next.videoCaptions.audioSource === 'system'
+      ? sanitizeVideoCaptionDeviceId(next.videoCaptions.audioDeviceId)
+      : undefined
     await mkdir(dirname(this.path), { recursive: true })
     const temporary = `${this.path}.tmp`
-    await writeFile(temporary, JSON.stringify(next, null, 2), 'utf8')
+    /*
+     * A browser caption session creates no meeting and writes no file, so `videoCaptions` has no
+     * result to outlive and stays in memory for the running app only. The block is left out of the
+     * file rather than written with the defaults: an absent block can only read as "never
+     * persisted", while a defaulted block reads back as a remembered setting. `this.settings`
+     * still holds the live values, which is what `browserCaptionConfig()` reads.
+     */
+    const { videoCaptions: _runScoped, ...persisted } = next
+    await writeFile(temporary, JSON.stringify(persisted, null, 2), 'utf8')
     await rename(temporary, this.path)
     this.settings = next
     return structuredClone(this.settings)

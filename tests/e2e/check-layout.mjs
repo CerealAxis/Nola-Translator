@@ -18,7 +18,7 @@ app.disableHardwareAcceleration()
 const output = resolve('artifacts/layout')
 const delay = (ms) => new Promise((done) => setTimeout(done, ms))
 
-const SETTINGS_TABS = ['general', 'audio', 'translation', 'appearance', 'storage', 'advanced']
+const SETTINGS_TABS = ['general', 'audio', 'translation', 'appearance', 'storage', 'browser', 'advanced']
 
 /** Each entry names the `data-page` its route root renders, which is what the run asserts; the settings tabs all collapse to `settings`. */
 const PAGES = [
@@ -113,7 +113,7 @@ const PAGE_GROUPS = {
     { name: 'settings-tabs', selector: '.settings-tabs', min: 1 },
     { name: 'settings-nav', selector: '.settings-nav', min: 1 },
     // Every tab stays mounted, so the count is the same whichever one is active.
-    { name: 'settings-tab', selector: '.settings-nav [role="tab"]', min: 6 },
+    { name: 'settings-tab', selector: '.settings-nav [role="tab"]', min: 7 },
     { name: 'settings-panels', selector: '.settings-panels', min: 1 },
     { name: 'settings-group', selector: '.settings-panels .settings-group', min: 1 },
   ],

@@ -10,22 +10,28 @@
 - UI：Tailwind CSS + HeroUI
 - 构建：electron-vite
 - 测试：Vitest + Testing Library
+- 浏览器：Chrome／Edge Manifest V3 + React／TypeScript；Python 标准库 Native Messaging 连接程序由 PyInstaller 打包
 
 ## 2. 目录结构
 
 ```
 src/
-├── main/        # Electron 主进程：IPC 注册、窗口、设置/凭据持久化、引擎子进程
+├── main/        # Electron 主进程：IPC 注册、窗口、设置/凭据持久化、引擎子进程；browser-integrations.ts 只读检测浏览器扩展状态并打开管理页
 ├── preload/     # 单文件，contextBridge 暴露 window.nolaTranslator
 ├── shared/      # 跨进程契约：类型 + zod + 默认值；languages.ts 为语言代码目录，model-capabilities.ts 为模型能力与推荐预设。**改枚举必看这里**
 └── renderer/    # React 应用
     ├── bridge/  # 渲染进程唯一的数据出口（NolaBridge）
+    ├── assets/browsers/ # Chrome／Edge 图标，用于浏览器连接设置
     ├── store/   # 4 个域 store，自研 useSyncExternalStore 实现
     ├── components/  # primitives/（封闭 8 个）+ caption/ home/ notes/ reading/
     ├── features/    # home/ workspace/ overlay/ records/ models/ settings/
     ├── i18n/         # zh-CN.ts 为 Dictionary 源，en.ts 受其类型约束
     └── theme/        # 设计 token 唯一来源（CSS）
 engine/nola_translator_engine/  # Python 引擎，协议定义在 protocol.py，model_capabilities.py 为引擎能力校验
+browser/
+├── extension/                 # MV3 扩展、播放器适配、临时 store、Shadow DOM；build.mjs 独立构建到 dist/
+├── native_host/               # 标准库 stdio／当前用户命名管道连接程序及帧协议测试
+└── tests/                     # 隔离配置的浏览器冒烟测试（Playwright，可选开发依赖）
 scripts/                        # PowerShell 构建脚本
 ```
 
@@ -50,6 +56,8 @@ scripts/                        # PowerShell 构建脚本
 - store **不在模块顶层**触碰 bridge，bridge 由 `initStores()` 注入
 - 禁止 `any`（全仓 `src/renderer` 零命中）
 - 模块求值期**不得同步抛错**——顶层 throw 会连带 `createRoot` 失败；缺 IPC 时 reject 或降级为 no-op
+- `src/main/session-controller.ts` 是桌面与浏览器单会话的唯一控制入口。浏览器临时会话不得创建记录、传 recordingPath 或打开悬浮窗。
+- `src/shared/browser.ts` 定义受限的扩展契约、固定开发 ID 和 Native Messaging 名称；不得在该接口暴露凭据、文件或模型管理。
 
 **i18n**
 - 界面字符串走 `t()`，语言只有 `'zh-CN' | 'en'`
@@ -65,6 +73,10 @@ scripts/                        # PowerShell 构建脚本
 ## 4. 注释规范
 
 - 模型语言目录、推荐能力与运行引擎限制的注释须注明来源或限制原因；用户配置不代表模型自动获得新能力。
+- 浏览器采集限制注释须注明浏览器 API 原因；`getDisplayMedia` 必须在用户动作的原调用栈发起，Capture Handle 校验后仅处理音频。
+- 浏览器安装状态只读 Preferences／Secure Preferences 或以实际连接确认；不得修改浏览器受保护配置。每浏览器开关仅控制 Nola 连接权限，不能冒充浏览器扩展开关。
+- 浏览器音频块为单声道 PCM16、约 100 ms，输入与确认各限两秒；epoch／sequence／session 校验与 TS、zod、Python 协议同步维护。视频时间通过 browserTimeline 映射，禁止直接使用会话相对时间。
+- 重置保留加载的模型，隔离旧推理和翻译；停止回执不得等待不可取消的原生推理线程，后台卸载完成前锁定资源。自然结束用 finishStream 排空尾句。
 
 1. 基本原则
 - 统一使用英文注释
@@ -105,6 +117,9 @@ npm run dev            # 开发（electron-vite）
 npm run typecheck      # tsc --noEmit
 npm test               # vitest run
 npm run build          # typecheck && electron-vite build
+npm run build:browser  # 构建可手动加载的 MV3 扩展
+npm run package:browser # release/Nola-Browser-Extension.zip
+npm run build:browser-host # PyInstaller Native Messaging EXE
 npm run dist:win       # 完整发布：build → build:engine:cpu → prepare:llama:cpu → electron-builder（EXE + MSI）
 ```
 

@@ -64,6 +64,15 @@ export const settingsPatchSchema = z.object({
     translationLineHeight: z.number().min(1).max(2).optional(), showSource: z.boolean().optional(), showTranslation: z.boolean().optional(),
     layout: z.enum(['rolling', 'sentence']).optional(),
   }).partial().optional(),
+  videoCaptions: z.object({
+    showSource: z.boolean().optional(),
+    showTranslation: z.boolean().optional(),
+    layout: z.literal('sentence').optional(),
+    fontSize: z.number().int().min(12).max(72).optional(),
+    position: z.number().min(0).max(100).optional(),
+    audioSource: z.enum(['tab', 'system']).optional(),
+    audioDeviceId: z.string().min(1).max(512).optional(),
+  }).partial().optional(),
   translation: z.object({
     provider: z.enum(['local', 'cloud', 'microsoft']).optional(),
     localModelId: localModelIdSchema.optional(),

@@ -130,7 +130,7 @@ export function registerAppIpc(options: {
   applyOverlay(true)
   applyTheme()
 
-  ipcMain.handle(channels.getSettings, () => current)
+  ipcMain.handle(channels.getSettings, () => options.settings.current())
   ipcMain.handle(channels.openAppearance, (_event, page: unknown) => {
     const window = options.getMainWindow()
     if (!window) return

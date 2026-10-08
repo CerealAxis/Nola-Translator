@@ -9,7 +9,9 @@ import { modelsSettingsEn } from './models-settings-ui'
  * 不直译中文的啰嗦：中文那句是废话的，英文删掉或压缩。
  */
 
+import { browserEn } from './browser-ui'
 export const en: Dictionary = {
+  browser: browserEn,
   modelConfig: {
     title: 'Configure model', pending: 'Needs configuration', edit: 'Edit configuration', configure: 'Configure and enable',
     description: 'Confirm the model task, inference engine and language capabilities before using it in a session.',
@@ -133,6 +135,35 @@ export const en: Dictionary = {
     nothingYetHint: 'Start a session and each recognised sentence lands here.',
     sourcePanel: 'Live Transcription',
     translationPanel: 'Translation',
+  },
+
+  videoCaptions: {
+    title: 'Video captions',
+    experimentalTitle: 'Experimental feature',
+    experimentalBody: 'Video captions are still under development. If something goes wrong, please report it on GitHub.',
+    experimentalAction: 'Report an issue',
+    captionPreview: 'Caption preview',
+    settings: 'Video caption settings',
+    openBrowser: 'Open browser',
+    audioSource: 'Input source',
+    tabAudio: 'Tab audio',
+    systemAudio: 'System audio',
+    browserAppearance: 'Browser caption appearance',
+    enableService: 'Enable caption service',
+    disableService: 'Turn off caption service',
+    serviceLoading: 'Loading models',
+    serviceReady: 'Caption service ready',
+    // The standing indicator beside the button, shown only while the gate is open: open with
+    // no session is ready, open with a session is the extension using it (spinner). With the
+    // gate closed the button itself is the whole signal, so no text joins it.
+    serviceRunning: 'The browser is generating captions',
+    serviceFailed: 'Could not enable the caption service',
+    errorOpeningBrowser: 'Could not open the default browser. Set a default browser in system settings, then try again. Code UIP-017',
+    // A real bilingual pair rather than two near-identical English lines: the preview
+    // exists to show what a source line above a translation line looks like, and one
+    // language would not show that. Spanish is a supported target language.
+    previewSource: 'The video is playing this line right now.',
+    previewTranslation: 'El vídeo está reproduciendo esta línea ahora mismo.',
   },
 
   overlay: {
@@ -463,6 +494,13 @@ export const en: Dictionary = {
     translateFailedAction: 'Check the API key and your network',
     storageChanged: 'The save location is no longer valid, captions cannot reach disk. Code STO-008',
     storageChangedAction: 'Pick a new save location',
+    // Why a settings write failed. The main process only fails when the filesystem refuses, so
+    // the page dispatches on the errno; an unrecognised one only says the change was not saved
+    // rather than repeating the storage-location claim `storageChanged` makes.
+    settingsWriteDenied: 'The app is not allowed to write its settings, so this change was not saved. Code STO-018',
+    settingsFileLocked: 'Another program is holding the settings file, so this change was not saved. Code STO-019',
+    settingsDiskFull: 'The disk is full, so this change was not saved. Code STO-020',
+    settingsSaveFailed: 'This change was not saved. Try again. Code STO-021',
     exportFailed: 'Export failed, no file was written. Code EXP-009',
     // The preload never ran, so this window has no engine behind it. UIP rather than ENG:
     // the engine is fine, the wiring is not.
@@ -470,6 +508,27 @@ export const en: Dictionary = {
     pageCrashed: 'The interface stopped rendering, the session is still running. Code UIP-010',
     pageCrashedAction: 'Reload the window',
     copyDiagnosticsAction: 'Copy diagnostics',
+
+    /*
+     * A caption-service gate action that did not land. UIP because the engine, model,
+     * storage, network and translation are all fine — the desktop side's own toggle or
+     * stop call is what failed, which is the same family as `engineNotConnected`.
+     */
+    captionServiceToggleFailed: 'The caption service switch did not flip. Try again. Code UIP-022',
+    captionServiceStopFailed: 'The caption service is off, but a caption session did not end. Recognition may still be running. Code UIP-023',
+
+    /*
+     * Why the engine refused a prewarm. Each one says what to do next: "load failed"
+     * alone leaves the user unable to tell a missing model from one that cannot be
+     * used for these languages.
+     */
+    prewarm: {
+      modelUnavailable: 'The required model is not downloaded yet. Download it in Models first. Code MDL-012',
+      resourceUnavailable: 'The model files are incomplete or could not be read. Download the model again in Models. Code MDL-013',
+      invalidConfiguration: 'The current model or language settings cannot be used for captions. Finish the model setup in Models first. Code MDL-014',
+      resourceBusy: 'A model is unloading or switching. Wait a moment, then enable the caption service again. Code MDL-015',
+      sessionAlreadyRunning: 'A caption session is already running. End it before enabling the caption service. Code MDL-016',
+    },
   },
 
   legal: {

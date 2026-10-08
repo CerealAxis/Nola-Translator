@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 from collections import OrderedDict
 from collections.abc import Callable
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, replace
 from pathlib import Path
 from time import monotonic
 from uuid import uuid4
 
-from .audio.capture import AudioDeviceDisconnectedError, PortAudioCapture
+from .audio.capture import AudioDeviceDisconnectedError, BrowserAudioCapture, PortAudioCapture
+from . import debug_log
+from .debug_log import write as write_debug
 from .compute import ComputeDevice, choose_devices, model_memory_mb, probe_devices, resource_failure, cpu_threads, release_failed_load
 from .audio.recorder import WavRecorder
 from .hub import (
@@ -28,9 +31,18 @@ from .models.manager import ModelManager
 from .models.registry import CustomFile
 from .protocol import (
     CaptionEvent,
+    AudioAcceptedEvent,
+    BrowserTimeline,
+    PushAudioCommand,
+    ResetStreamCommand,
+    StreamResetEvent,
+    FinishStreamCommand,
+    StreamFinishedEvent,
     ComputeDevicesEvent,
     ListComputeDevicesCommand,
     CaptionSegment,
+    DebugLogCommand,
+    DebugLoggedEvent,
     EngineCommand,
     EngineEvent,
     ErrorEvent,
@@ -43,6 +55,9 @@ from .protocol import (
     ConfigureModelCommand,
     ListResourcesCommand,
     ManageResourceCommand,
+    ModelSelection,
+    ModelsPrewarmedEvent,
+    PrewarmModelsCommand,
     ResourceActionResultEvent,
     ResourcesEvent,
     SearchHubModelsCommand,
@@ -97,6 +112,10 @@ from .translation.scheduler import TranslationScheduler
 
 
 EventSink = Callable[[EngineEvent], None]
+
+#: Both commands name their models through a ``config`` and reach the same runtime resolution,
+#: so the load path is shared rather than typed twice.
+ModelSelectionCommand = StartSessionCommand | PrewarmModelsCommand
 
 
 class UnknownTranslationModel(ValueError):
@@ -161,7 +180,7 @@ class EngineRuntime:
         self.models = ModelManager(model_root)
         self.emit = emit
         self.resources = ResourceManager(model_root, emit)
-        self.capture: PortAudioCapture | None = None
+        self.capture: PortAudioCapture | BrowserAudioCapture | None = None
         self.recorder: WavRecorder | None = None
         self.recognizer: Recognizer | None = None
         self.session_task: asyncio.Task[None] | None = None
@@ -190,6 +209,26 @@ class EngineRuntime:
         self._recognition_device = ComputeDevice("cpu", "CPU", "cpu", "cpu", recognition=True, translation=True)
         self._translation_device = self._recognition_device
         self._active_recognition_runtime = None
+        self._stream_generation = 0
+        self._stream_epoch: int | None = None
+        self._timeline: BrowserTimeline | None = None
+        self._timeline_origin_ms = 0.0
+        self._last_audio_sequence = -1
+        self._last_audio_end_ms = 0.0
+        self._stream_anchored = False
+        self._epoch_initialized = False
+        self._pause_flush_task: asyncio.Task[None] | None = None
+        self._finish_stream_task: asyncio.Task[None] | None = None
+        self._stream_finishing = False
+        self._last_frame_end_ms = 0.0
+        self._model_cleanup_task: asyncio.Task[None] | None = None
+        self.model_cleanup_timeout = 2.0
+        #: Recognition runtimes a prewarm brought in, keyed by resource id. The engine holds the
+        #: cache entry, so nothing else would free it once a session that merely reused it ends.
+        self._prewarmed_runtimes: dict[str, list[QwenRuntime | SenseVoiceRuntime]] = {}
+        self._closing = False
+        self._last_heartbeat_at: float | None = None
+        self._heartbeat_task: asyncio.Task[None] | None = None
         self._torch_threads = cpu_threads()
         self._llama_threads = cpu_threads()
         self._write_engine_status()
@@ -215,11 +254,17 @@ class EngineRuntime:
                 )
             ]
         if isinstance(command, ManageResourceCommand):
-            if (
-                command.action == "remove"
-                and self.service.session_id is not None
-            ):
-                return [self._resource_error(command.requestId, "resourceInUse")]
+            if command.action == "remove":
+                # The weights are about to be deleted, so a warm copy of them is no longer the
+                # model the user is keeping; it stops being protected from the next unload.
+                self._prewarmed_runtimes.pop(command.resourceId, None)
+                if self._model_cleanup_pending():
+                    return [self._cleanup_busy_error(command.requestId)]
+                if (
+                    command.action == "remove"
+                    and self.service.session_id is not None
+                ):
+                    return [self._resource_error(command.requestId, "resourceInUse")]
             try:
                 resource = await self.resources.manage(command.resourceId, command.action)
             except ResourceActionError as error:
@@ -233,6 +278,8 @@ class EngineRuntime:
                 )
             ]
         if isinstance(command, ConfigureModelCommand):
+            if self._model_cleanup_pending():
+                return [self._cleanup_busy_error(command.requestId)]
             if self.service.session_id is not None:
                 return [self._resource_error(command.requestId, "resourceInUse")]
             try:
@@ -242,6 +289,8 @@ class EngineRuntime:
                 return [self._resource_error(command.requestId, error.code, error.details)]
         if isinstance(command, StartSessionCommand):
             return await self._start(command)
+        if isinstance(command, PrewarmModelsCommand):
+            return await self._prewarm(command)
         if isinstance(command, InspectHubRepoCommand):
             return await self._inspect_hub_repo(command)
         if isinstance(command, SearchHubModelsCommand):
@@ -249,7 +298,18 @@ class EngineRuntime:
         if isinstance(command, InstallHubRepoCommand):
             return await self._install_hub_repo(command)
         if isinstance(command, SetSessionPausedCommand):
+            if self._timeline is not None or isinstance(self.capture, BrowserAudioCapture):
+                return await self._set_browser_paused(command)
             return self._set_paused(command)
+        if isinstance(command, PushAudioCommand):
+            return self._push_audio(command)
+        if isinstance(command, ResetStreamCommand):
+            return await self._reset_stream(command)
+        if isinstance(command, FinishStreamCommand):
+            return await self._finish_stream(command)
+        if isinstance(command, DebugLogCommand):
+            debug_log.write(command.layer, command.event, command.data)
+            return [DebugLoggedEvent(protocolVersion=1, type="debugLogged", requestId=command.requestId)]
         if isinstance(command, StopSessionCommand):
             return await self._stop(command)
         if isinstance(command, ShutdownCommand):
@@ -464,34 +524,13 @@ class EngineRuntime:
         return self._resource_error(request_id, mapped.code, details)
 
     async def _start(self, command: StartSessionCommand) -> list[EngineEvent]:
+        if not await self._await_model_cleanup():
+            return [self._cleanup_busy_error(command.requestId)]
         if self.service.session_id is not None:
             return self.service.handle(command)
 
         try:
-            model_id = self._model_id(command)
-            required_resources = [model_id]
-            if command.config.targetLanguages:
-                if command.config.translationProvider == "local":
-                    # Resolved from the resource table, so a GGUF or a
-                    # transformers repo the user installed themselves is the thing that gets
-                    # checked for and loaded.
-                    required_resources.append(self._local_translation_model_id(command.config))
-            for resource_id in required_resources:
-                capability = self.resources.configuration(resource_id)
-                if capability is None:
-                    raise ResourceActionError("invalidConfiguration", {"resourceId": resource_id, "reason": "modelNeedsConfiguration"})
-            recognition = self.resources.configuration(model_id)
-            source = normalize(command.config.sourceLanguage)
-            if source == "auto" and not recognition.supportsAutoDetection or source != "auto" and source not in {normalize(code) for code in recognition.languages}:
-                raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedRecognitionLanguage", "language": source})
-            if command.config.translationProvider == "local" and command.config.targetLanguages:
-                capability = self.resources.configuration(self._local_translation_model_id(command.config))
-                if any(not supports_translation(capability, source, target) for target in command.config.targetLanguages):
-                    raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedTranslationLanguage", "language": source})
-            missing_resources = [
-                resource_id for resource_id in required_resources
-                if not self.resources.is_installed(resource_id)
-            ]
+            model_id, missing_resources = self._validate_model_selection(command.config)
         except ResourceActionError as error:
             # The model ids are free-form strings now, so an id the resource table has never heard
             # of arrives here as a lookup failure. It is a configuration problem, not a crash, and
@@ -552,9 +591,11 @@ class EngineRuntime:
             await recognizer.close()
             await self._unload_session_models()
             return events
-        assert self.service.active_device is not None
-
-        capture = PortAudioCapture(self.service.active_device)
+        if command.config.audioSource.kind == "browserTab":
+            capture = BrowserAudioCapture()
+        else:
+            assert self.service.active_device is not None
+            capture = PortAudioCapture(self.service.active_device)
         try:
             capture.start()
         except Exception as error:
@@ -581,7 +622,10 @@ class EngineRuntime:
                 )
             ]
 
-        self.recorder = self._open_recorder(command.config.recordingPath)
+        self.recorder = self._open_recorder(
+            None if command.config.browserTimeline is not None or isinstance(capture, BrowserAudioCapture)
+            else command.config.recordingPath
+        )
         self.capture = capture
         self.recognizer = recognizer
         self.session_request_id = command.requestId
@@ -589,9 +633,137 @@ class EngineRuntime:
         self.session_paused = False
         self.paused_at_ms = 0.0
         self.active_config = command.config
+        self._stream_generation += 1
+        self._timeline = command.config.browserTimeline
+        self._stream_epoch = self._timeline.epoch if self._timeline is not None else None
+        self._timeline_origin_ms = 0.0 if isinstance(capture, BrowserAudioCapture) else monotonic() * 1000
+        self._stream_anchored = False
+        self._epoch_initialized = False
+        self._stream_finishing = False
+        self._last_audio_sequence = -1
+        self._last_audio_end_ms = 0.0
+        self._bind_recognizer(recognizer)
         self.session_task = asyncio.create_task(self._run_session())
+        self._start_pipeline_heartbeat()
         self._write_engine_status()
         return events
+
+    def _validate_model_selection(self, config: ModelSelection) -> tuple[str, list[str]]:
+        """The recognition id a config names, and the required ids whose weights are absent.
+
+        A prewarm runs this before loading, so a config it accepted is one the session start
+        accepts, with the same error code and the same ``reason``.
+        """
+        model_id = config.recognitionModelId or QWEN_RESOURCE_ID
+        required_resources = [model_id]
+        if config.targetLanguages and config.translationProvider == "local":
+            # Resolved from the resource table, so a GGUF or a
+            # transformers repo the user installed themselves is the thing that gets
+            # checked for and loaded.
+            required_resources.append(self._local_translation_model_id(config))
+        for resource_id in required_resources:
+            if self.resources.configuration(resource_id) is None:
+                raise ResourceActionError("invalidConfiguration", {"resourceId": resource_id, "reason": "modelNeedsConfiguration"})
+        recognition = self.resources.configuration(model_id)
+        source = normalize(config.sourceLanguage)
+        if source == "auto" and not recognition.supportsAutoDetection or source != "auto" and source not in {normalize(code) for code in recognition.languages}:
+            raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedRecognitionLanguage", "language": source})
+        if config.translationProvider == "local" and config.targetLanguages:
+            capability = self.resources.configuration(self._local_translation_model_id(config))
+            if any(not supports_translation(capability, source, target) for target in config.targetLanguages):
+                raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedTranslationLanguage", "language": source})
+        return model_id, [
+            resource_id for resource_id in required_resources
+            if not self.resources.is_installed(resource_id)
+        ]
+
+    async def _prewarm(self, command: PrewarmModelsCommand) -> list[EngineEvent]:
+        """Load the recognition weights now, leaving the loaded runtime cached for the next start.
+
+        The placement and the runtime resolution are the session start's own calls, so the
+        warmed entry is the one a later ``startSession`` resolves and reuses instead of loading
+        a second copy. Nothing is captured, no session exists, and the translation side is only
+        resolved: bringing up the translation runtime means starting a separate llama-server
+        process, which is a resident resource in its own right rather than a warm cache entry.
+        """
+        if not await self._await_model_cleanup():
+            return [self._cleanup_busy_error(command.requestId)]
+        if self.service.session_id is not None:
+            return [self._resource_error(command.requestId, "sessionAlreadyRunning")]
+
+        config = command.config
+        try:
+            model_id, missing_resources = self._validate_model_selection(config)
+            translation_model_id = (
+                self._local_translation_model_id(config)
+                if config.targetLanguages and config.translationProvider == "local"
+                else None
+            )
+        except ResourceActionError as error:
+            return [self._resource_error(command.requestId, error.code, error.details)]
+        except UnknownTranslationModel as error:
+            return [
+                self._resource_error(
+                    command.requestId,
+                    "invalidConfiguration",
+                    {"field": "translationModelId", "reason": str(error)},
+                )
+            ]
+        if missing_resources:
+            return [
+                self._resource_error(
+                    command.requestId,
+                    "resourceUnavailable",
+                    {"missingResourceIds": missing_resources},
+                )
+            ]
+
+        self.emit(ModelsPrewarmedEvent(
+            protocolVersion=1, type="modelsPrewarmed", requestId=command.requestId,
+            state="loading", recognitionModelId=model_id, translationModelId=translation_model_id,
+        ))
+        started_at = monotonic()
+        try:
+            await self._configure_device_plan(command)
+            recognizer = await self._create_recognizer(command)
+            await recognizer.close()
+            self._pin_prewarmed(model_id, self._active_recognition_runtime)
+        except ValueError as error:
+            await self._unload_session_models()
+            return [
+                self._resource_error(
+                    command.requestId, "invalidConfiguration", {"reason": str(error)},
+                )
+            ]
+        except Exception as error:
+            await self._unload_session_models()
+            return [
+                self._resource_error(
+                    command.requestId, "modelUnavailable",
+                    {"reason": str(error)[:1024] or type(error).__name__},
+                )
+            ]
+        self._update_compute_plan()
+        return [ModelsPrewarmedEvent(
+            protocolVersion=1, type="modelsPrewarmed", requestId=command.requestId,
+            state="ready", recognitionModelId=model_id, translationModelId=translation_model_id,
+            elapsedMs=(monotonic() - started_at) * 1000,
+            device=self._recognition_device.torchDevice,
+            runtime=self._active_recognition_runtime.describe(),
+        )]
+
+    def _pin_prewarmed(self, model_id: str, runtime: QwenRuntime | SenseVoiceRuntime) -> None:
+        """Mark a runtime as held for a prewarm, so a session stop leaves it loaded."""
+        pinned = self._prewarmed_runtimes.setdefault(model_id, [])
+        if not any(item is runtime for item in pinned):
+            pinned.append(runtime)
+
+    def _is_prewarmed(self, runtime: object) -> bool:
+        return any(
+            item is runtime
+            for pinned in self._prewarmed_runtimes.values()
+            for item in pinned
+        )
 
     def _open_recorder(self, path: str | None) -> WavRecorder | None:
         """Start recording the meeting audio, or stay silent when the host did not ask for one."""
@@ -612,7 +784,7 @@ class EngineRuntime:
         recorder.close()
         return recorder.duration_ms
 
-    async def _configure_device_plan(self, command: StartSessionCommand) -> None:
+    async def _configure_device_plan(self, command: ModelSelectionCommand) -> None:
         self._device_plan = None
         config = command.config
         devices, notes, _version = await asyncio.to_thread(probe_devices, resolve_llama_dir())
@@ -803,7 +975,7 @@ class EngineRuntime:
             # fail per target (llamaServerUnavailable).
             self._update_compute_plan(f"翻译运行时启动失败：{str(error)[:256]}")
 
-    async def _create_recognizer(self, command: StartSessionCommand) -> Recognizer:
+    async def _create_recognizer(self, command: ModelSelectionCommand) -> Recognizer:
         language = (
             None
             if command.config.sourceLanguage == "auto"
@@ -856,10 +1028,10 @@ class EngineRuntime:
         return get_qwen_runtime(model_path)
 
     @staticmethod
-    def _model_id(command: StartSessionCommand) -> str:
+    def _model_id(command: ModelSelectionCommand) -> str:
         return command.config.recognitionModelId or QWEN_RESOURCE_ID
 
-    def _local_translation_model_id(self, config: SessionConfig) -> str:
+    def _local_translation_model_id(self, config: ModelSelection) -> str:
         """The local translation model the session selected, whichever loader owns it.
 
         An absent field is still the Hy-MT2 Q4_K_M baseline — that is an older client, not a
@@ -880,22 +1052,28 @@ class EngineRuntime:
         recognizer = self.recognizer
         if capture is None or recognizer is None:
             return
+        session_id = self.service.session_id
+        generation = self._stream_generation
         last_ended_at = self.session_started_at_ms
         try:
             async for frame in capture.frames():
+                if (self.session_paused or generation != self._stream_generation
+                        or self._timeline is not None and not self._stream_anchored):
+                    continue
                 last_ended_at = frame.started_at_ms + 20
+                self._last_frame_end_ms = last_ended_at
                 if self.recorder is not None:
                     self.recorder.write(frame.samples)
                 for update in await recognizer.accept(frame):
-                    await self._emit_update(update)
+                    await self._emit_stream_update(update, session_id, generation)
             for update in await recognizer.flush(last_ended_at):
-                await self._emit_update(update)
+                await self._emit_stream_update(update, session_id, generation)
         except AudioDeviceDisconnectedError:
             # a disconnected device still gets its captured tail flushed (best effort —
             # a failure here must not mask the disconnect).
             try:
                 for update in await recognizer.flush(last_ended_at):
-                    await self._emit_update(update)
+                    await self._emit_stream_update(update, session_id, generation)
             except Exception:
                 pass
             self.emit(
@@ -934,7 +1112,32 @@ class EngineRuntime:
                 )
             )
 
+    def _bind_recognizer(self, recognizer: Recognizer) -> None:
+        session_id, generation = self.service.session_id, self._stream_generation
+
+        async def on_update(update: RecognitionUpdate) -> None:
+            await self._emit_stream_update(update, session_id, generation)
+
+        recognizer.on_update = on_update
+
+    async def _emit_stream_update(
+        self, update: RecognitionUpdate, session_id: str | None, generation: int,
+    ) -> None:
+        if session_id != self.service.session_id or generation != self._stream_generation:
+            return
+        write_debug("engine", "engine.update", {
+            "segmentId": update.segment_id, "isFinal": update.is_final,
+            "startedAtMs": round(update.started_at_ms, 1),
+            "endedAtMs": round(update.ended_at_ms, 1) if update.ended_at_ms is not None else None,
+            "text": update.source_text[:120],
+        })
+        if self._stream_epoch is not None:
+            update = replace(update, segment_id=f"e{self._stream_epoch}-{update.segment_id}")
+        await self._emit_update(update)
+
     async def _emit_update(self, update: RecognitionUpdate) -> None:
+        if self.service.session_id is None:
+            return
         self._write_engine_status()
         config = self.active_config
         targets = [] if config is None else [self._language_code(item) for item in config.targetLanguages]
@@ -970,6 +1173,7 @@ class EngineRuntime:
             for target in targets
         ]
         self.emit(self._caption_event(update, visible))
+        self.latest_translations[update.segment_id] = visible
         self.translation_requests[update.segment_id] = TranslationRequest(
             update=update,
             source=source,
@@ -986,6 +1190,7 @@ class EngineRuntime:
             )
 
     async def _translation_worker(self, segment_id: str) -> None:
+        session_id, generation = self.service.session_id, self._stream_generation
         try:
             while segment_id in self.translation_requests:
                 request = self.translation_requests[segment_id]
@@ -1011,7 +1216,8 @@ class EngineRuntime:
                 if (
                     latest is None
                     or latest.revision != request.update.revision
-                    or self.service.session_id is None
+                    or self.service.session_id != session_id
+                    or self._stream_generation != generation
                 ):
                     continue
                 self.latest_translations[segment_id] = translations
@@ -1024,7 +1230,8 @@ class EngineRuntime:
             latest = self.latest_updates.get(segment_id)
             if latest is not None and latest.is_final:
                 self._retire_completed(latest)
-            if segment_id in self.translation_requests and self.service.session_id is not None:
+            if (segment_id in self.translation_requests and self.service.session_id == session_id
+                    and self._stream_generation == generation):
                 self.translation_tasks[segment_id] = asyncio.create_task(
                     self._translation_worker(segment_id)
                 )
@@ -1123,19 +1330,32 @@ class EngineRuntime:
         session_id = self.service.session_id
         if session_id is None:
             raise RuntimeError("字幕会话已经结束")
-        started = max(0.0, update.started_at_ms - self.session_started_at_ms)
+        origin = 0.0 if isinstance(self.capture, BrowserAudioCapture) else self.session_started_at_ms
+        started = max(0.0, update.started_at_ms - origin)
         ended = (
-            max(started, update.ended_at_ms - self.session_started_at_ms)
+            max(started, update.ended_at_ms - origin)
             if update.ended_at_ms is not None
             else None
         )
         revision = self.caption_revisions.get(update.segment_id, -1) + 1
         self.caption_revisions[update.segment_id] = revision
+        write_debug("engine", "engine.caption", {
+            "segmentId": update.segment_id, "revision": revision, "isFinal": update.is_final,
+            "videoStartedAtMs": self._timeline.videoTimeMs + (update.started_at_ms - self._timeline_origin_ms) * self._timeline.playbackRate if self._timeline is not None else None,
+            "text": update.source_text[:120],
+        })
         return CaptionEvent(
             protocolVersion=1,
             type="caption",
             requestId=f"caption-{uuid4()}",
             sessionId=session_id,
+            streamEpoch=self._stream_epoch,
+            videoStartedAtMs=(max(0.0, self._timeline.videoTimeMs +
+                (update.started_at_ms - self._timeline_origin_ms) * self._timeline.playbackRate)
+                if self._timeline is not None else None),
+            videoEndedAtMs=(max(0.0, self._timeline.videoTimeMs +
+                (update.ended_at_ms - self._timeline_origin_ms) * self._timeline.playbackRate)
+                if self._timeline is not None and update.ended_at_ms is not None else None),
             segment=CaptionSegment(
                 segmentId=update.segment_id,
                 revision=revision,
@@ -1165,6 +1385,189 @@ class EngineRuntime:
         if any("\u3400" <= character <= "\u9fff" for character in text):
             return "zh"
         return "en"
+
+    def _push_audio(self, command: PushAudioCommand) -> list[EngineEvent]:
+        if command.sessionId != self.service.session_id:
+            write_debug("engine", "engine.pushAudio.reject", {"reason": "sessionNotRunning"})
+            return [self._resource_error(command.requestId, "sessionNotRunning")]
+        config, capture = self.active_config, self.capture
+        if (config is None or config.audioSource.kind != "browserTab"
+                or not isinstance(capture, BrowserAudioCapture)):
+            write_debug("engine", "engine.pushAudio.reject", {"reason": "notBrowserAudio"})
+            return [self._resource_error(command.requestId, "invalidConfiguration", {"reason": "notBrowserAudio"})]
+        if (command.streamId != config.audioSource.streamId or command.epoch != self._stream_epoch
+                or not self._stream_anchored or self.session_paused or self._stream_finishing):
+            write_debug("engine", "engine.pushAudio.reject", {
+                "reason": "inactiveStream", "streamIdMatches": command.streamId == config.audioSource.streamId,
+                "epoch": command.epoch, "streamEpoch": self._stream_epoch,
+                "anchored": self._stream_anchored, "paused": self.session_paused,
+                "finishing": self._stream_finishing, "capturePaused": capture.paused,
+            })
+            return [self._resource_error(command.requestId, "invalidConfiguration", {"reason": "inactiveStream"})]
+        if (command.sequence <= self._last_audio_sequence
+                or self._last_audio_sequence >= 0 and command.sequence != self._last_audio_sequence + 1
+                or command.capturedAtMs + 2 < self._last_audio_end_ms):
+            write_debug("engine", "engine.pushAudio.reject", {
+                "reason": "audioOutOfOrder", "sequence": command.sequence,
+                "lastAudioSequence": self._last_audio_sequence, "capturedAtMs": command.capturedAtMs,
+                "lastAudioEndMs": self._last_audio_end_ms,
+            })
+            return [self._resource_error(command.requestId, "invalidMessage", {"reason": "audioOutOfOrder"})]
+        data = base64.b64decode(command.pcmBase64, validate=True)
+        if not capture.push(data, command.sampleRate, command.capturedAtMs):
+            write_debug("engine", "engine.pushAudio.reject", {
+                "reason": "pushRefused", "bytes": len(data), "sampleRate": command.sampleRate,
+                "bufferedMs": round(capture.buffered_ms, 1), "capturePaused": capture.paused,
+                "captureRunning": capture.running, "captureFinishing": capture._finishing,
+            })
+            return [self._resource_error(command.requestId, "audioBufferOverflow")]
+        self._last_audio_sequence = command.sequence
+        self._last_audio_end_ms = command.capturedAtMs + len(data) * 500 / command.sampleRate
+        return [AudioAcceptedEvent(protocolVersion=1, type="audioAccepted", requestId=command.requestId,
+            sessionId=command.sessionId, epoch=command.epoch, sequence=command.sequence)]
+
+    async def _cancel_stream_tasks(self) -> None:
+        tasks = [task for task in (self.session_task, self._pause_flush_task, self._finish_stream_task)
+                 if task is not None]
+        self.session_task = None
+        self._pause_flush_task = None
+        self._finish_stream_task = None
+        self.translation_requests.clear()
+        tasks.extend(self.translation_tasks.values())
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        await self.translation_scheduler.close()
+        self.translation_tasks.clear()
+        for mapping in (self.translation_last_started, self.translation_wake, self.completed_segments,
+                        self.latest_updates, self.latest_translations, self.caption_revisions):
+            mapping.clear()
+
+    def _fresh_recognizer(self) -> Recognizer:
+        config = self.active_config
+        assert config is not None
+        language = None if config.sourceLanguage == "auto" else self._language_code(config.sourceLanguage)
+        if language == "tl":
+            language = "fil"
+        model_path = self.resources.model_path(self.active_model_id)
+        factory = (create_sensevoice_recognizer if self.resources.adapter_for(self.active_model_id) == "sensevoice"
+                   else create_qwen_recognizer)
+        # Seek changes sentence state, not weights or the capability-validated model selection.
+        return factory(model_path, source_language=language, runtime=self._recognition_runtime())
+
+    async def _reset_stream(self, command: ResetStreamCommand) -> list[EngineEvent]:
+        if command.sessionId != self.service.session_id:
+            return [self._resource_error(command.requestId, "sessionNotRunning")]
+        config = self.active_config
+        if config is None or config.audioSource.kind != "browserTab" and self._timeline is None:
+            return [self._resource_error(command.requestId, "invalidConfiguration", {"reason": "notBrowserTimeline"})]
+        if self._stream_epoch is not None and (command.epoch < self._stream_epoch
+                or command.epoch == self._stream_epoch and self._epoch_initialized):
+            return [self._resource_error(command.requestId, "invalidMessage", {"reason": "staleEpoch"})]
+        self._stream_generation += 1
+        capture = self.capture
+        if capture is not None:
+            capture.pause()
+        await self._cancel_stream_tasks()
+        if self.recognizer is not None:
+            await self.recognizer.close()
+        if isinstance(capture, PortAudioCapture):
+            # Old callback packets carry pre-seek wall time and must never cross the anchor.
+            capture.reset_stream()
+        self._stream_epoch = command.epoch
+        self._timeline = BrowserTimeline(epoch=command.epoch, videoTimeMs=command.videoTimeMs,
+            playbackRate=command.playbackRate)
+        self._timeline_origin_ms = 0.0 if isinstance(capture, BrowserAudioCapture) else monotonic() * 1000
+        self._last_frame_end_ms = self._timeline_origin_ms
+        self._last_audio_sequence = -1
+        self._last_audio_end_ms = 0.0
+        self._stream_anchored = True
+        self._epoch_initialized = True
+        self._stream_finishing = False
+        self.recognizer = self._fresh_recognizer()
+        self._bind_recognizer(self.recognizer)
+        if capture is not None and not self.session_paused:
+            capture.resume()
+        self.session_task = asyncio.create_task(self._run_session())
+        return [StreamResetEvent(protocolVersion=1, type="streamReset", requestId=command.requestId,
+            sessionId=command.sessionId, epoch=command.epoch)]
+
+    async def _set_browser_paused(self, command: SetSessionPausedCommand) -> list[EngineEvent]:
+        if command.sessionId != self.service.session_id:
+            return [self._resource_error(command.requestId, "sessionNotRunning")]
+        if self._stream_finishing:
+            if not command.paused:
+                return [self._resource_error(command.requestId, "invalidConfiguration", {"reason": "streamFinishing"})]
+            # EOF already froze input; cancelling its consumer would also cancel the finish acknowledgement.
+            return [StatusEvent(protocolVersion=1, type="status", requestId=command.requestId, code="paused")]
+        if command.paused == self.session_paused:
+            return [self._listening_status(command.requestId)]
+        was_anchored = self._stream_anchored
+        self.session_paused = command.paused
+        self._stream_anchored = False
+        if command.paused:
+            if self.capture is not None:
+                self.capture.pause()
+            if self.session_task is not None:
+                self.session_task.cancel()
+                await asyncio.gather(self.session_task, return_exceptions=True)
+                self.session_task = None
+            recognizer = self.recognizer
+            session_id, generation = self.service.session_id, self._stream_generation
+
+            async def flush_sentence() -> None:
+                if recognizer is not None:
+                    try:
+                        for update in await recognizer.flush(self._last_frame_end_ms):
+                            await self._emit_stream_update(update, session_id, generation)
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as error:
+                        if generation == self._stream_generation and session_id == self.service.session_id:
+                            self.emit(self._resource_error(command.requestId, "modelUnavailable",
+                                {"reason": type(error).__name__}))
+
+            # Final inference may take seconds; seek/reset remains available while it runs.
+            if self._pause_flush_task is None or self._pause_flush_task.done():
+                self._pause_flush_task = asyncio.create_task(flush_sentence())
+        elif was_anchored and self._timeline is not None:
+            # The mirror of the branch above: pausing stops the capture and its consumer, so
+            # resuming has to start both again. Re-anchoring reopens the input gate that pausing
+            # closed, and the consumer is what drains the queue into the recognizer at all.
+            if self.capture is not None:
+                self.capture.resume()
+            self._stream_anchored = True
+            self.session_task = asyncio.create_task(self._run_session())
+        return [self._listening_status(command.requestId)]
+
+    async def _finish_stream(self, command: FinishStreamCommand) -> list[EngineEvent]:
+        if command.sessionId != self.service.session_id:
+            return [self._resource_error(command.requestId, "sessionNotRunning")]
+        if self._timeline is None or command.epoch != self._stream_epoch or not self._epoch_initialized:
+            return [self._resource_error(command.requestId, "invalidConfiguration", {"reason": "inactiveStream"})]
+        if self._finish_stream_task is not None and not self._finish_stream_task.done():
+            return [self._resource_error(command.requestId, "resourceBusy", {"reason": "streamFinishing"})]
+        self._stream_finishing = True
+        if self.capture is not None and not self.session_paused:
+            self.capture.finish()
+        drain_task = self._pause_flush_task if self.session_paused else self.session_task
+        generation = self._stream_generation
+
+        async def finish() -> None:
+            if drain_task is not None:
+                await drain_task
+            translations = list(self.translation_tasks.values())
+            if translations:
+                await asyncio.gather(*translations, return_exceptions=True)
+            if generation == self._stream_generation and command.sessionId == self.service.session_id:
+                self.session_paused = True
+                self.emit(StreamFinishedEvent(protocolVersion=1, type="streamFinished", requestId=command.requestId,
+                    sessionId=command.sessionId, epoch=command.epoch))
+
+        # End-of-video draining can take model latency; the command loop must stay available.
+        self._finish_stream_task = asyncio.create_task(finish())
+        return []
 
     def _set_paused(self, command: SetSessionPausedCommand) -> list[EngineEvent]:
         """Pause or resume the live capture without tearing the session down.
@@ -1222,8 +1625,13 @@ class EngineRuntime:
         )
 
     async def _stop(self, command: StopSessionCommand) -> list[EngineEvent]:
-        if self.service.session_id is None:
+        if self.service.session_id is None or command.sessionId != self.service.session_id:
             return self.service.handle(command)
+        browser_session = self._timeline is not None or isinstance(self.capture, BrowserAudioCapture)
+        if browser_session:
+            self._finalize_browser_partials()
+            self._stream_generation += 1
+            await self._cancel_stream_tasks()
         if self.capture is not None:
             self.capture.stop()
         if self.session_task is not None:
@@ -1243,8 +1651,13 @@ class EngineRuntime:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         await self.translation_scheduler.close()
-        await self.llama_manager.stop()
-        await self._unload_session_models()
+        if browser_session:
+            # Cancelling a to_thread ASR job cannot release its native inference lock.
+            # Reserve its models until deferred unloading finishes, without delaying stop.
+            self._model_cleanup_task = asyncio.create_task(self._cleanup_browser_models(command.requestId))
+        else:
+            await self.llama_manager.stop()
+            await self._unload_session_models()
         self.translation_tasks.clear()
         self.translation_last_started.clear()
         self.translation_wake.clear()
@@ -1261,21 +1674,81 @@ class EngineRuntime:
         self.active_config = None
         self.session_paused = False
         self.paused_at_ms = 0.0
+        self._timeline = None
+        self._stream_epoch = None
+        self._stream_anchored = False
+        self._epoch_initialized = False
+        self._stream_finishing = False
+        self._stop_pipeline_heartbeat()
         self._write_engine_status()
         return self.service.handle(command)
 
+    def _finalize_browser_partials(self) -> None:
+        """Retain already recognized stop tails without waiting for uninterruptible inference."""
+        for update in list(self.latest_updates.values()):
+            if update.is_final:
+                continue
+            final = replace(update, is_final=True,
+                ended_at_ms=max(update.started_at_ms, self._last_frame_end_ms))
+            translations = [
+                item.model_copy(update={"state": "failed", "errorCode": "translationCancelled"})
+                if item.state == "pending" else item
+                for item in self.latest_translations.get(update.segment_id, [])
+            ]
+            self.emit(self._caption_event(final, translations))
+
+    async def _await_model_cleanup(self) -> bool:
+        """Wait out a detached browser unload so an immediate restart is not refused.
+
+        The deferral exists because the unload can be stuck behind native inference that cannot
+        be cancelled, so the wait is bounded and the caller reports the reservation when it
+        expires. The bound is the one ``close()`` already applies to this same task: a start
+        tolerates a stuck unload exactly as long as a shutdown does, and an unload that is not
+        stuck — the common case, since the lock is usually free — finishes inside it.
+        """
+        task = self._model_cleanup_task
+        if task is None or task.done():
+            return True
+        # asyncio.wait leaves the task running when the timeout expires, which is what the
+        # reservation requires: the native thread still holds the lock either way.
+        done, _pending = await asyncio.wait({task}, timeout=self.model_cleanup_timeout)
+        return task in done and not task.cancelled()
+
+    def _model_cleanup_pending(self) -> bool:
+        return self._model_cleanup_task is not None and not self._model_cleanup_task.done()
+
+    def _cleanup_busy_error(self, request_id: str) -> ErrorEvent:
+        return self._resource_error(request_id, "resourceBusy", {"reason": "modelCleanupPending"})
+
+    async def _cleanup_browser_models(self, request_id: str) -> None:
+        try:
+            await self._unload_session_models()
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            if not self._closing:
+                self.emit(self._resource_error(request_id, "internalError",
+                    {"reason": "modelCleanupFailed", "error": type(error).__name__}))
+
     async def _unload_session_models(self) -> None:
-        """Release the ASR and local translation weights once the session ends."""
+        """Release the ASR and local translation weights once the session ends.
+
+        A runtime a prewarm brought in stays loaded: the warm service outlives the session that
+        used it, and the engine holds the only cache entry that can release those weights.
+        """
         await self.llama_manager.stop()
         runtimes = [self._recognition_runtime()]
         if isinstance(self.translation_provider, M2M100TranslationProvider):
             runtimes.append(self.translation_provider.runtime)
         for runtime in runtimes:
+            if self._is_prewarmed(runtime):
+                continue
             if getattr(runtime, "loaded", False):
                 await asyncio.to_thread(runtime.unload)
         self._update_compute_plan()
 
     async def close(self) -> None:
+        self._closing = True
         if self.service.session_id is not None:
             await self._stop(
                 StopSessionCommand(
@@ -1285,8 +1758,91 @@ class EngineRuntime:
                     sessionId=self.service.session_id,
                 )
             )
-        await self.llama_manager.stop()
+        if self._model_cleanup_pending():
+            # Keep the reservation alive after a timeout; native work still owns its lock.
+            try:
+                await asyncio.wait_for(asyncio.shield(self._model_cleanup_task), self.model_cleanup_timeout)
+            except TimeoutError:
+                pass
+        else:
+            await self.llama_manager.stop()
         self._remove_engine_status()
+
+    def _write_pipeline_heartbeat(self) -> None:
+        """One `engine.pipeline` line per second, holding every counter the chain exposes.
+
+        Driven by its own task rather than by the status writer: the failing case this exists to
+        diagnose recognizes nothing at all, and a heartbeat that only ran on a recognition update
+        would stay silent exactly when it is needed. The numbers are cumulative per capture and
+        recognizer, so consecutive lines read as deltas.
+        """
+        if debug_log.resolve_path() is None:
+            return
+        now = monotonic()
+        if self._last_heartbeat_at is not None and now - self._last_heartbeat_at < 1.0:
+            return
+        self._last_heartbeat_at = now
+        capture = self.capture
+        recognizer = self.recognizer
+        data: dict[str, object] = {
+            "sessionId": self.service.session_id,
+            "sessionPaused": self.session_paused,
+            "streamAnchored": self._stream_anchored,
+            "streamEpoch": self._stream_epoch,
+            "epochInitialized": self._epoch_initialized,
+            "streamFinishing": self._stream_finishing,
+            "sessionTaskAlive": self.session_task is not None and not self.session_task.done(),
+            "lastAudioSequence": self._last_audio_sequence,
+            "lastAudioEndMs": round(self._last_audio_end_ms, 1),
+            "timelineOriginMs": round(self._timeline_origin_ms, 1),
+        }
+        if isinstance(capture, BrowserAudioCapture):
+            data["capture"] = {
+                "kind": "browserTab",
+                "pushedChunks": capture.pushed_chunks,
+                "pushedSamples": capture.pushed_samples,
+                "framesOut": capture.frames_out,
+                "framesOutSamples": capture.frames_out_samples,
+                "bufferedMs": round(capture.buffered_ms, 1),
+                "queued": len(capture._queue),
+                "pushRejects": capture.push_rejects,
+                "paused": capture.paused,
+                "running": capture.running,
+                "finishing": capture._finishing,
+                "lastSampleRate": capture.last_sample_rate,
+                "peakDbfs": round(capture.peak_dbfs, 2),
+                "rmsDbfs": round(capture.rms_dbfs, 2),
+            }
+        if hasattr(recognizer, "stats"):
+            try:
+                data["asr"] = recognizer.stats()
+            except Exception as error:  # a stats call must never break a session
+                data["asr"] = {"error": type(error).__name__}
+        debug_log.write("engine", "engine.pipeline", data)
+
+    def _start_pipeline_heartbeat(self) -> None:
+        """Run the heartbeat on its own task for as long as a session lasts."""
+        if debug_log.resolve_path() is None or self._heartbeat_task is not None:
+            return
+        self._last_heartbeat_at = None
+
+        async def beat() -> None:
+            try:
+                while True:
+                    await asyncio.sleep(1.0)
+                    self._write_pipeline_heartbeat()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                return
+
+        self._heartbeat_task = asyncio.create_task(beat())
+
+    def _stop_pipeline_heartbeat(self) -> None:
+        task = self._heartbeat_task
+        self._heartbeat_task = None
+        if task is not None and not task.done():
+            task.cancel()
 
     def _engine_status_payload(self) -> dict[str, object]:
         recognition = self._recognition_runtime()
@@ -1296,6 +1852,7 @@ class EngineRuntime:
             if self.capture is not None
             else self._dropped_chunks
         )
+        self._write_pipeline_heartbeat()
         return {
             "compute": self._device_plan,
             "recognition": {
@@ -1316,6 +1873,8 @@ class EngineRuntime:
         """Maintain the .runtime/engine-status.json diagnostic file atomically; a write
         failure never affects the session.
         """
+        if self._closing:
+            return
         try:
             text = json.dumps(
                 self._engine_status_payload(),

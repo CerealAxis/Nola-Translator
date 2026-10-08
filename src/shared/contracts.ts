@@ -18,6 +18,7 @@ export type AudioSource =
   | { kind: 'defaultOutput' }
   | { kind: 'systemOutput'; deviceId: string }
   | { kind: 'microphone'; deviceId: string }
+  | { kind: 'browserTab'; streamId: string }
 
 export type SessionConfig = {
   compute?: ComputeSettings
@@ -50,6 +51,46 @@ export type SessionConfig = {
   }
   /** Absolute path the engine records this meeting's audio to. Omitted means no audio file. */
   recordingPath?: string
+  browserTimeline?: { epoch: number; videoTimeMs: number; playbackRate: number }
+}
+
+/**
+ * The weights a prewarm loads, without opening a session.
+ *
+ * `compute` is required and must be the same object the following `startSession` would carry: the
+ * engine keys its loaded-runtime cache on the model path plus the sorted compute options, so a
+ * prewarm run against different device or quantization settings leaves a second copy of the same
+ * weights in memory and the session that follows misses the cache — the load was paid for twice.
+ * The translation fields are `SessionConfig`'s own, minus the credential: a cloud provider keeps
+ * no local weights, so there is nothing to prewarm and no reason to hand over an API key.
+ */
+export type PrewarmConfig = {
+  compute: ComputeSettings
+  recognitionModelId: string
+  sourceLanguage: string
+  targetLanguages: string[]
+  allowIntermediateTranslation?: boolean
+  translationProvider?: 'local' | 'cloud' | 'microsoft'
+  translationModelId?: string
+  translationOptions?: SessionConfig['translationOptions']
+}
+
+/**
+ * The codes the engine's prewarm branch refuses with, kept narrow so the UI can name the cause
+ * instead of collapsing every failure into one message.
+ *
+ * A language the model does not cover is deliberately **not** a code of its own: it arrives as
+ * `invalidConfiguration` carrying a per-language `details.reason` (`unsupportedRecognitionLanguage`
+ * or `unsupportedTranslationLanguage` on the prewarm path).
+ */
+export const PREWARM_ERROR_CODES = ['resourceBusy', 'sessionAlreadyRunning', 'invalidConfiguration', 'resourceUnavailable', 'modelUnavailable'] as const
+export type PrewarmErrorCode = (typeof PREWARM_ERROR_CODES)[number]
+
+/** The settled answer of a prewarm; the `loading` state stays on the event channel. */
+export type PrewarmResult = {
+  state: 'ready' | 'failed'
+  code?: PrewarmErrorCode
+  message?: string
 }
 
 export type Translation = {
@@ -128,8 +169,14 @@ export type EngineCommand =
       action: 'install' | 'remove' | 'cancel'
     })
   | (Envelope<'startSession'> & { config: SessionConfig })
+  | (Envelope<'prewarmModels'> & { config: PrewarmConfig })
   | (Envelope<'stopSession'> & { sessionId: string })
   | (Envelope<'setSessionPaused'> & { sessionId: string; paused: boolean })
+  | (Envelope<'pushAudio'> & { sessionId: string; streamId: string; epoch: number; sequence: number; sampleRate: number; capturedAtMs: number; pcmBase64: string })
+  | (Envelope<'resetStream'> & { sessionId: string; epoch: number; videoTimeMs: number; playbackRate: number })
+  | (Envelope<'finishStream'> & { sessionId: string; epoch: number })
+  /** One diagnostic line for the shared pipeline log; the engine writes it and answers with `debugLogged`. */
+  | (Envelope<'debugLog'> & { layer: string; event: string; data: Record<string, unknown> })
   | Envelope<'shutdown'>
   | (Envelope<'searchHubModels'> & { query: string; slot?: 'recognition' | 'translation'; limit?: number; weightFormat?: 'gguf'; cursor?: string })
   | (Envelope<'inspectHubRepo'> & { repo: string })
@@ -237,6 +284,7 @@ export type EngineErrorCode =
   | 'sessionNotRunning'
   | 'sessionAlreadyRunning'
   | 'audioDeviceUnavailable'
+  | 'audioBufferOverflow'
   | 'modelUnavailable'
   | 'resourceUnavailable'
   | 'resourceNotFound'
@@ -256,8 +304,26 @@ export type EngineEvent =
   | (Envelope<'resourceActionResult'> & { resource: ResourceRecord })
   | (Envelope<'resourceChanged'> & { resource: ResourceRecord })
   | (Envelope<'sessionStarted'> & { sessionId: string })
+  | (Envelope<'modelsPrewarmed'> & {
+      /**
+       * How far the prewarm got. `loading` is written before the weights are read, because a cold
+       * load is long enough that a client waiting on the terminal event has nothing to show; a
+       * refusal arrives as an `error` event instead of a third state.
+       */
+      state: 'loading' | 'ready'
+      recognitionModelId: string
+      /** The translation model the request resolved and validated. Its weights are not loaded by a prewarm, so this reports intent rather than residency. */
+      translationModelId?: string
+      elapsedMs: number
+      device?: string
+      runtime?: string
+    })
   | (Envelope<'sessionStopped'> & { sessionId: string })
-  | (Envelope<'caption'> & { sessionId: string; segment: CaptionSegment })
+  | (Envelope<'caption'> & { sessionId: string; segment: CaptionSegment; streamEpoch?: number; videoStartedAtMs?: number; videoEndedAtMs?: number })
+  | (Envelope<'audioAccepted'> & { sessionId: string; epoch: number; sequence: number })
+  | (Envelope<'streamReset'> & { sessionId: string; epoch: number })
+  | (Envelope<'streamFinished'> & { sessionId: string; epoch: number })
+  | Envelope<'debugLogged'>
   | (Envelope<'modelProgress'> & {
       modelId: string
       operation: 'download' | 'install' | 'remove'

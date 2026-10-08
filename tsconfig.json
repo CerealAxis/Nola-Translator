@@ -28,6 +28,8 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "tests/**/*.ts",
-    "tests/**/*.tsx"
+    "tests/**/*.tsx",
+    "browser/extension/**/*.ts",
+    "browser/extension/**/*.tsx"
   ]
 }

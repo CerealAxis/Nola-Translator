@@ -109,3 +109,13 @@ class StreamingAudioNormalizer:
                 )
             )
         return frames
+
+    def finish(self) -> list[AudioFrame]:
+        """Pad only the last incomplete frame so natural EOF cannot drop recognized audio."""
+        if self.origin_ms is None or not self.pending.size:
+            return []
+        samples = np.pad(self.pending, (0, FRAME_SAMPLES - self.pending.size)).astype(np.float32)
+        started_at_ms = self.origin_ms + self.delivered_samples * 1000 / TARGET_SAMPLE_RATE
+        self.pending = np.empty(0, dtype=np.float32)
+        self.delivered_samples += FRAME_SAMPLES
+        return [AudioFrame(samples=samples, started_at_ms=started_at_ms)]

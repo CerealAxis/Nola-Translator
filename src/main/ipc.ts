@@ -3,13 +3,14 @@ import { randomUUID } from 'node:crypto'
 
 import { BrowserWindow, ipcMain, net, screen } from 'electron'
 
-import type { EngineEvent, EngineProcessState, SessionConfig } from '../shared/contracts'
-import { sessionConfigSchema } from '../shared/schemas'
+import type { EngineEvent, EngineProcessState, PrewarmConfig, SessionConfig } from '../shared/contracts'
 import { DEFAULT_SETTINGS, NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider } from '../shared/settings'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
 import { computeOverlayBounds } from './windows'
 import { readHubModelCard } from './hub-model-card'
+import { SessionController } from './session-controller'
+import { openDefaultBrowser as launchDefaultBrowser } from './open-default-browser'
 
 export const IPC_CHANNELS = {
   listComputeDevices: 'engine:list-compute-devices',
@@ -21,6 +22,8 @@ export const IPC_CHANNELS = {
   getHuggingFaceModelCard: 'hub:model-card',
   installHuggingFaceModel: 'hub:install', configureModel: 'model:configure',
   startSession: 'engine:start-session',
+  prewarmModels: 'engine:prewarm-models',
+  ensureEngineReady: 'engine:ensure-ready',
   stopSession: 'engine:stop-session',
   setSessionPaused: 'engine:set-session-paused',
   event: 'engine:event',
@@ -30,7 +33,30 @@ export const IPC_CHANNELS = {
   closeOverlay: 'overlay:close',
   minimizeOverlay: 'overlay:minimize',
   resizeOverlay: 'overlay:resize',
+  openDefaultBrowser: 'app:open-default-browser',
 } as const
+
+/**
+ * The prewarm payload, read from settings rather than taken from the caller. `compute` is the
+ * whole point: the engine's loaded-runtime cache is keyed on it, and `SessionController.start`
+ * overwrites a session's `compute` from the same settings, so both sides of a prewarm-then-start
+ * sequence read one source. The credential is left out — a cloud provider keeps no local weights,
+ * so there is nothing to load and no key to hand over.
+ */
+function prewarmConfigFrom(settings: AppSettings): PrewarmConfig {
+  const translation = settings.translation
+  return {
+    compute: { ...settings.compute },
+    recognitionModelId: settings.recognition.modelId,
+    sourceLanguage: settings.recognition.sourceLanguage,
+    targetLanguages: translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? [] : [translation.targetLanguage],
+    allowIntermediateTranslation: translation.translateIntermediate,
+    translationProvider: translation.provider,
+    translationModelId: translation.localModelId,
+    ...(translation.provider === 'cloud' ? { translationOptions: { endpoint: translation.cloudEndpoint, model: translation.cloudModel, apiFormat: translation.cloudApiFormat, contextWindow: translation.cloudContextWindow, maxOutputTokens: translation.cloudMaxOutputTokens } } : {}),
+    ...(translation.provider === 'microsoft' ? { translationOptions: { endpoint: translation.microsoftEndpoint, region: translation.microsoftRegion } } : {}),
+  }
+}
 
 export function registerEngineIpc(
   engine: EngineProcess,
@@ -40,66 +66,14 @@ export function registerEngineIpc(
   getSettings: () => AppSettings = () => DEFAULT_SETTINGS,
   prepareEnvironment: (config: SessionConfig) => Promise<void> = async () => {},
   onStartingChanged: (starting: boolean) => void = () => {},
-  whenRuntimeReady: () => Promise<void> = async () => {}
+  whenRuntimeReady: () => Promise<void> = async () => {},
+  sharedController?: SessionController
 ): () => void {
-  let activeSessionId: string | null = null
-  let stoppingSession: { sessionId: string; request: Promise<void> } | null = null
+  const controller = sharedController ?? new SessionController({ engine, meetings, getSettings, getCredential: getTranslationCredential, prepare: prepareEnvironment, whenReady: whenRuntimeReady, startingChanged: onStartingChanged, showOverlay: () => getOverlayWindow()?.showInactive(), hideOverlay: () => getOverlayWindow()?.hide() })
   let closingOverlay: Promise<void> | null = null
-  let startingSession = false
-
-  const ensureReady = async (): Promise<void> => {
-    await whenRuntimeReady()
-    if (engine.currentState !== 'ready') await engine.start()
-  }
-
-  // Shared by the explicit stopSession channel and the caption window's close button, so a
-  // teardown already in flight is joined instead of repeated. Unloading several GB of weights
-  // can outlast the engine's 10 s default request timeout, hence the wider deadline.
-  const stopActiveSession = (sessionId: string): Promise<void> => {
-    if (stoppingSession?.sessionId === sessionId) return stoppingSession.request
-    const request = (async () => {
-      try {
-        await ensureReady()
-        await engine.request(
-          {
-            protocolVersion: 1,
-            type: 'stopSession',
-            requestId: `stop-${randomUUID()}`,
-            sessionId,
-          },
-          'sessionStopped',
-          60 * 1000
-        )
-      } finally {
-        activeSessionId = null
-        // finish() is keyed on the open set, so the sessionStopped event that usually arrives first wins.
-        void meetings?.finish(sessionId).catch((error) => console.error('meeting finalize failed', error))
-      }
-    })()
-    stoppingSession = { sessionId, request }
-    void request.finally(() => {
-      if (stoppingSession?.request === request) stoppingSession = null
-    }).catch(() => undefined)
-    return request
-  }
-
-  /*
-   * A dead engine sends no `sessionStopped`, so `forwardEvent` never gets its chance to close
-   * the session out: the id stays set and the meeting record stays in progress. Settle the main
-   * process's own ledger here instead.
-   *
-   * `recovering` counts too. A reconnect is a new process — no session, no recording, and the
-   * weights are unloaded after every session — so the engine coming back never means this
-   * session came back with it.
-   */
-  const releaseSessionOnEngineLoss = (): void => {
-    const sessionId = activeSessionId
-    if (sessionId === null) return
-    activeSessionId = null
-    void meetings?.finish(sessionId).catch((error) => console.error('meeting finalize failed', error))
-    getOverlayWindow()?.hide()
-  }
-
+  const ensureReady = () => controller.ensureReady()
+  const stopActiveSession = (id: string) => controller.stop(id)
+  const releaseSessionOnEngineLoss = () => controller.releaseOnLoss()
   ipcMain.handle(IPC_CHANNELS.listDevices, async () => {
     await ensureReady()
     const response = await engine.request(
@@ -200,7 +174,7 @@ export function registerEngineIpc(
     readHubModelCard(repo, revision, net.fetch))
 
   ipcMain.handle(IPC_CHANNELS.configureModel, async (_event, resourceId: unknown, configuration: unknown) => {
-    if (activeSessionId) throw new Error('字幕会话运行中，不能修改模型配置')
+    if (controller.busy) throw new Error('字幕会话运行中，不能修改模型配置')
     if (typeof resourceId !== 'string' || resourceId.length > 256) throw new Error('模型 ID 无效')
     const validated = modelConfigurationSchema.parse(configuration)
     await ensureReady()
@@ -236,7 +210,7 @@ export function registerEngineIpc(
       if (slot !== undefined && slot !== 'recognition' && slot !== 'translation') {
         throw new Error('模型类别无效')
       }
-      if (slot !== undefined && activeSessionId) {
+      if (slot !== undefined && controller.busy) {
         // An install rewrites files a live session has already loaded, and forcing a
         // mid-meeting weight unload to swap models is not this channel's call to make.
         throw new Error('字幕会话运行中，不能更换模型')
@@ -258,102 +232,33 @@ export function registerEngineIpc(
     }
   )
 
-  ipcMain.handle(IPC_CHANNELS.startSession, async (_event, rawConfig: unknown) => {
-    if (activeSessionId || startingSession) throw new Error('已有字幕会话正在运行或启动')
-    const parsed = sessionConfigSchema.parse(rawConfig) as SessionConfig
-    parsed.compute = { ...getSettings().compute }
-    startingSession = true
-    onStartingChanged(true)
-    try {
-      await prepareEnvironment(parsed)
-      await ensureReady()
-      const provider = parsed.translationProvider ?? 'local'
-      // Only the two keyed providers fetch a credential. Ollama sits under `cloud`, so an empty
-      // key is a legitimate state for the OpenAI-shaped and ollama endpoints, which omit the
-      // header; the anthropic and microsoft shapes require one and raise without it.
-      const apiKey = provider === 'cloud' || provider === 'microsoft'
-        ? await getTranslationCredential(provider)
-        : ''
-      // The engine's `local` branch never reads `translationOptions`, so the field is dropped
-      // there. Destructuring also keeps it absent rather than `{}`: the engine's `resolved()`
-      // substitutes defaults only when the field is missing outright.
-      const { translationOptions, ...withoutOptions } = parsed
-      const config: SessionConfig = provider === 'local'
-        ? withoutOptions
-        : apiKey
-          ? { ...parsed, translationOptions: { ...translationOptions, apiKey } }
-          : parsed
-      // The meeting is opened before the engine is told where to write audio, so the directory
-      // exists first; a start that fails is abandoned a few lines below. `keepAudio` is read
-      // from settings rather than assumed, or the setting would look saved while the engine
-      // wrote audio nobody can play back.
-      const keepAudio = getSettings().recording.keepAudio
-      config.compute = parsed.compute
-      const meeting = meetings
-        ? await meetings.begin({
-          sourceLanguage: parsed.sourceLanguage,
-          targetLanguage: parsed.targetLanguages[0] ?? NO_TRANSLATION_LANGUAGE,
-          recordAudio: keepAudio,
-        })
-        : null
-      let response: { sessionId: string }
-      try {
-        response = await engine.request(
-          {
-            protocolVersion: 1,
-            type: 'startSession',
-            requestId: `start-${randomUUID()}`,
-            config: meeting && keepAudio
-              ? { ...config, recordingPath: meetings?.recordingPathFor(meeting.meetingId) }
-              : config,
-          },
-          'sessionStarted',
-          30 * 60 * 1000
-        )
-      } catch (error) {
-        if (meeting) await meetings?.abandon(meeting.meetingId).catch(() => undefined)
-        throw error
-      }
-      if (meeting) meetings?.attach(meeting.meetingId, response.sessionId)
-      activeSessionId = response.sessionId
-      getOverlayWindow()?.showInactive()
-      return { sessionId: response.sessionId, meetingId: meeting?.meetingId ?? null }
-    } finally {
-      startingSession = false
-      onStartingChanged(false)
-    }
-  })
-
+  ipcMain.handle(IPC_CHANNELS.startSession, (_event, config: unknown) => controller.start(config, 'desktop'))
   ipcMain.handle(IPC_CHANNELS.stopSession, async (_event, sessionId: unknown) => {
-    if (typeof sessionId !== 'string' || sessionId !== activeSessionId) {
-      throw new Error('字幕会话 ID 无效')
-    }
-    await stopActiveSession(sessionId)
+    if (typeof sessionId !== 'string') throw new Error('字幕会话 ID 无效')
+    controller.assertOwner(sessionId, 'desktop')
+    await controller.stop(sessionId)
     getOverlayWindow()?.hide()
   })
-
   ipcMain.handle(IPC_CHANNELS.setSessionPaused, async (_event, sessionId: unknown, paused: unknown) => {
-    if (typeof sessionId !== 'string' || sessionId !== activeSessionId) {
-      throw new Error('字幕会话 ID 无效')
-    }
-    if (typeof paused !== 'boolean') throw new Error('暂停参数无效')
+    if (typeof sessionId !== 'string' || typeof paused !== 'boolean') throw new Error('暂停参数无效')
+    controller.assertOwner(sessionId, 'desktop')
+    await controller.pause(sessionId, paused)
+  })
+  ipcMain.handle(IPC_CHANNELS.getEngineState, () => engine.currentState)
+
+  // Starting the engine process is not loading weights: it is here for a caller that needs the
+  // pipe and the device list, and it takes no session reservation.
+  ipcMain.handle(IPC_CHANNELS.ensureEngineReady, async () => {
     await ensureReady()
-    // The engine shifts its own caption timeline across the pause, so the SRT stays
-    // continuous; the 30 s ceiling keeps a wedged engine from freezing the UI.
-    await engine.request(
-      {
-        protocolVersion: 1,
-        type: 'setSessionPaused',
-        requestId: `pause-${randomUUID()}`,
-        sessionId,
-        paused,
-      },
-      'status',
-      30 * 1000
-    )
+    return engine.currentState
   })
 
-  ipcMain.handle(IPC_CHANNELS.getEngineState, () => engine.currentState)
+  // What "enable captions" means: the models are resident, so the browser side starts a session
+  // against weights that are already in memory.
+  ipcMain.handle(IPC_CHANNELS.prewarmModels, async () => {
+    await ensureReady()
+    return engine.prewarmModels(prewarmConfigFrom(getSettings()))
+  })
 
   ipcMain.handle(IPC_CHANNELS.showOverlay, () => getOverlayWindow()?.show())
   ipcMain.handle(IPC_CHANNELS.hideOverlay, () => getOverlayWindow()?.hide())
@@ -363,7 +268,7 @@ export function registerEngineIpc(
   ipcMain.handle(IPC_CHANNELS.closeOverlay, () => {
     if (closingOverlay) return closingOverlay
     const request = (async () => {
-      const sessionId = activeSessionId ?? stoppingSession?.sessionId
+      const sessionId = controller.browserActive ? null : controller.activeSessionId
       if (sessionId) {
         try {
           // A dead engine cannot own a live session; don't restart it just to stop a stale id.
@@ -400,6 +305,9 @@ export function registerEngineIpc(
       height: Math.min(workArea.height, Math.max(52, Math.round(height as number))),
     }))
   })
+  // "Open the browser", with no URL. `shell.openExternal` cannot express it, so the main process
+  // resolves the user's own handler instead; see open-default-browser.ts for why.
+  ipcMain.handle(IPC_CHANNELS.openDefaultBrowser, () => launchDefaultBrowser())
 
   const broadcast = (event: EngineEvent): void => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -410,11 +318,13 @@ export function registerEngineIpc(
   // Settle the ledger before broadcasting. The renderer re-reads the meeting list on this edge,
   // and would otherwise cache the record as still in progress with a 00:00:00 duration.
   const forwardEvent = (event: EngineEvent): void => {
+    const browser = controller.isBrowserEvent(event)
+    controller.handleEvent(event)
+    if (browser) return
     if (event.type !== 'sessionStopped') {
       broadcast(event)
       return
     }
-    activeSessionId = null
     getOverlayWindow()?.hide()
     // `Promise.resolve()`, not `meetings?.finish(x).finally(broadcast)`: the optional chain
     // short-circuits to `undefined`, so the broadcast would never happen at all.
@@ -458,6 +368,8 @@ export function registerEngineIpc(
       IPC_CHANNELS.installHuggingFaceModel,
       IPC_CHANNELS.configureModel,
       IPC_CHANNELS.startSession,
+      IPC_CHANNELS.prewarmModels,
+      IPC_CHANNELS.ensureEngineReady,
       IPC_CHANNELS.stopSession,
       IPC_CHANNELS.setSessionPaused,
       IPC_CHANNELS.showOverlay,
@@ -465,6 +377,7 @@ export function registerEngineIpc(
       IPC_CHANNELS.closeOverlay,
       IPC_CHANNELS.minimizeOverlay,
       IPC_CHANNELS.resizeOverlay,
+      IPC_CHANNELS.openDefaultBrowser,
     ]) {
       ipcMain.removeHandler(channel)
     }

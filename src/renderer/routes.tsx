@@ -22,7 +22,7 @@ import { EmptyState, Spinner } from '@heroui/react'
 import type { RouteId } from '@/bridge'
 import { useI18n } from '@/i18n'
 
-export type SettingsTab = 'general' | 'audio' | 'translation' | 'compute' | 'performance' | 'appearance' | 'storage' | 'advanced'
+export type SettingsTab = 'general' | 'audio' | 'translation' | 'compute' | 'performance' | 'appearance' | 'storage' | 'advanced' | 'browser'
 
 export const SETTINGS_TABS: readonly SettingsTab[] = [
   'general',
@@ -33,6 +33,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   'appearance',
   'storage',
   'advanced',
+  'browser',
 ]
 
 /** 未在表内的 tab 一律回落到 general，不进 404：设置页是横向切换，不该有"页面不存在"。 */
@@ -66,6 +67,8 @@ export function pathOf(route: RouteId, options?: { tab?: SettingsTab; id?: strin
       return '#/workspace'
     case 'overlay':
       return '#/overlay'
+    case 'video-captions':
+      return '#/video-captions'
     case 'records':
       return '#/records'
     case 'record':
@@ -92,6 +95,7 @@ const PARENT_ROUTES: Record<RouteId, RouteId | null> = {
   home: null,
   workspace: 'home',
   overlay: 'home',
+  'video-captions': 'home',
   records: 'home',
   record: 'records',
   models: 'home',
@@ -121,6 +125,8 @@ export function parseRoute(hash: string): Route {
       return { route: 'workspace', path: '#/workspace' }
     case 'overlay':
       return { route: 'overlay', path: '#/overlay' }
+    case 'video-captions':
+      return { route: 'video-captions', path: '#/video-captions' }
     case 'records': {
       const id = segments[1]
       if (id === undefined) return { route: 'records', path: '#/records' }
@@ -214,10 +220,11 @@ export function useRoute(): UseRoute {
 // -- 渲染 ---------------------------------------------------------------------
 
 /** 路由 id 到页面标题。文案是页面自己的名字，不是"占位"两个字。 */
-const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay'> = {
+const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay' | 'videoCaptions.title'> = {
   home: 'nav.home',
   workspace: 'nav.workspace',
   overlay: 'shellUi.overlay',
+  'video-captions': 'videoCaptions.title',
   records: 'nav.records',
   record: 'nav.records',
   models: 'nav.models',

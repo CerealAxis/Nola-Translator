@@ -1,0 +1,61 @@
+/*
+ * The preview stage imitates a video frame rather than an app surface: the picture is
+ * dark in both themes and the captions sit inside it, so the caption colours come from
+ * the video-caption settings instead of the theme's foreground/background pair. A
+ * light-mode card would misrepresent how the captions actually read over a video.
+ */
+.nola-video-stage {
+  position: relative;
+  min-height: 320px;
+  padding: clamp(16px, 3vw, 30px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(ellipse at 30% 20%, color-mix(in oklch, var(--accent) 16%, transparent), transparent 62%),
+    linear-gradient(160deg, color-mix(in oklch, var(--accent) 8%, transparent), transparent 55%),
+    oklch(16% 0.012 258);
+}
+
+/*
+ * `position` is the line on the frame that the caption block's **bottom** edge sits on, as a
+ * percentage of the video height. `translate(-50%, -100%)` hangs the block by that edge, so the
+ * block grows upwards as lines are added and can never be cut off by the stage's `overflow: hidden`.
+ * The extension anchors the same edge the same way.
+ */
+.nola-video-frame {
+  position: absolute;
+  left: 50%;
+  top: var(--video-caption-top, 82%);
+  transform: translate(-50%, -100%);
+  display: grid;
+  gap: calc(var(--space-1) / 2);
+  justify-items: center;
+  max-width: 90%;
+  text-align: center;
+  color: var(--accent-foreground);
+  font-family: var(--font-ui);
+  font-size: var(--video-caption-font-size, 24px);
+  line-height: 1.35;
+  padding: calc(var(--space-1) / 2) var(--space-2);
+  border-radius: var(--radius-md);
+  /* Same recipe as the extension's caption block: white glyphs over a translucent black fill, which
+   holds its contrast over a bright frame and over a dark one alike. */
+  background: color-mix(in oklab, var(--browser-caption-fill) var(--browser-caption-background-mix), transparent);
+}
+
+.nola-video-caption-line {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.nola-video-caption-line[data-role='translation'] {
+  opacity: 0.92;
+}
+
+.nola-video-service {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}

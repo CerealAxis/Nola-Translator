@@ -169,6 +169,7 @@ try {
     { path: '#/records', page: 'records', selector: '.nola-records-page, .nola-record-page', min: 1 },
     { path: '#/models', page: 'models', selector: '.models-page', min: 1 },
     { path: '#/settings/general', page: 'settings', selector: '.settings-page', min: 1 },
+    { path: '#/settings/browser', page: 'settings', selector: '.settings-panel', min: 1 },
   ]
   const routeProbes = []
   for (const route of routes) {
@@ -185,6 +186,31 @@ try {
       activeNav: document.querySelectorAll('.nola-sidebar-nav .nola-nav-button[aria-current="page"]').length,
     }))()`)
     routeProbes.push({ ...probe, arrived, path: route.path, expectedPage: route.page, min: route.min })
+    if (route.path === '#/settings/browser') {
+      await pageWait(target, `document.querySelectorAll('.browser-settings__browser').length === 2`)
+      const browserProbe = await evaluate(target, `(() => ({ rows: document.querySelectorAll('.browser-settings__browser').length, icons: [...document.querySelectorAll('.browser-settings__icon')].filter(image => image.complete && image.naturalWidth > 0).length, downloads: document.querySelectorAll('.browser-settings__row-actions button').length, horizontalOverflow: document.documentElement.scrollWidth > innerWidth, text: document.querySelector('.browser-settings')?.innerText ?? '' }))()`)
+      if (browserProbe.rows !== 2 || browserProbe.icons !== 2 || browserProbe.downloads < 2 || browserProbe.horizontalOverflow || /加载已解压|Load unpacked|开发者模式|Developer mode/.test(browserProbe.text)) throw new Error(`Browser settings check failed: ${JSON.stringify(browserProbe)}`)
+      const originalTheme = await evaluate(target, `(async () => (await window.nolaTranslator.getSettings()).theme)()`)
+      try {
+        for (const theme of ['light', 'dark']) {
+          await evaluate(target, `window.nolaTranslator.updateSettings({ theme: ${JSON.stringify(theme)} })`)
+          for (const [width, height] of [[1440, 960], [1180, 780], [760, 560]]) {
+            await sendCommand(target, 'Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
+            await delay(120)
+            const layout = await evaluate(target, `(() => ({ overflow: document.documentElement.scrollWidth > innerWidth, hiddenActions: [...document.querySelectorAll('.browser-settings button')].filter(button => { const r = button.getBoundingClientRect(); return r.width === 0 || r.left < 0 || r.right > innerWidth + 1 }).length }))()`)
+            if (layout.overflow || layout.hiddenActions) throw new Error(`Browser layout ${theme} ${width}: ${JSON.stringify(layout)}`)
+          }
+        }
+      } finally {
+        await sendCommand(target, 'Emulation.clearDeviceMetricsOverride')
+        await evaluate(target, `window.nolaTranslator.updateSettings({ theme: ${JSON.stringify(originalTheme)} })`)
+        await delay(120)
+      }
+      if (process.env.NOLA_BROWSER_SETTINGS_SCREENSHOT) {
+        const screenshot = await sendCommand(target, 'Page.captureScreenshot', { format: 'png' })
+        writeFileSync(process.env.NOLA_BROWSER_SETTINGS_SCREENSHOT, Buffer.from(screenshot.data, 'base64'))
+      }
+    }
   }
 
   // -- 主窗：设置页与翻译开关（沿用旧版的实质检查，换成新选择器） -------------------
@@ -377,6 +403,7 @@ try {
 
   const failed = CHECKS.filter(([, ok]) => !ok)
   console.log(JSON.stringify({ total: CHECKS.length, failed: failed.length, checks: Object.fromEntries(CHECKS) }, null, 2))
+  if (failed.length) console.log(JSON.stringify({ failureEvidence: Object.fromEntries(failed.map(([name, , evidence]) => [name, evidence])) }, null, 2))
   console.log(failed.length ? 'PACKAGED_UI_REPRO=FAIL' : 'PACKAGED_UI_REPRO=PASS')
   if (process.env.NOLA_TRANSLATOR_SCREENSHOT) {
     const screenshot = await sendCommand(target, 'Page.captureScreenshot', { format: 'png' })

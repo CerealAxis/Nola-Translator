@@ -8,8 +8,16 @@ import { modelsStore } from './modelStore'
  */
 
 import type { NolaBridge } from '@/bridge'
-import type { AppSettings, AppSettingsPatch, ModelStorageInfo } from '@/bridge'
+import type { AppSettings, AppSettingsPatch, ModelStorageInfo, PrewarmErrorCode, PrewarmResult } from '@/bridge'
+import type { BrowserConnectionAction, BrowserConnectionStatus, BrowserKind } from '../../shared/browser'
 import { createStore, createWriteQueue } from './createStore'
+
+/**
+ * What the caption service is doing, as the engine reports it. `loading` rides the
+ * event channel because reading several GB off disk takes long enough that a button
+ * left in its idle state looks dead.
+ */
+export type CaptionServiceState = 'idle' | 'loading' | 'ready' | 'failed'
 
 export interface SettingsState {
   settings: AppSettings | null
@@ -20,6 +28,13 @@ export interface SettingsState {
   error: string | null
   storage: ModelStorageInfo | null
   storageBusy: boolean
+  browser: BrowserConnectionStatus | null
+  browserBusy: boolean
+  browserError: string | null
+  captionService: CaptionServiceState
+  /** The engine's own refusal reason, so the page can explain which model or language is at fault. */
+  captionServiceCode: PrewarmErrorCode | null
+  captionServiceBusy: boolean
 }
 
 const initialState: SettingsState = {
@@ -30,6 +45,12 @@ const initialState: SettingsState = {
   error: null,
   storage: null,
   storageBusy: false,
+  browser: null,
+  browserBusy: false,
+  browserError: null,
+  captionService: 'idle',
+  captionServiceCode: null,
+  captionServiceBusy: false,
 }
 
 export const settingsStore = createStore<SettingsState>(initialState)
@@ -47,10 +68,13 @@ const DEBOUNCED_PATHS: ReadonlySet<string> = new Set([
   'overlay.sourceColor',
   'overlay.translationColor',
   'overlay.backgroundColor',
+  'videoCaptions.fontSize',
+  'videoCaptions.position',
 ])
 
 let bridge: NolaBridge | null = null
 let unsubscribe: (() => void) | null = null
+let unsubscribeCaptionService: (() => void) | null = null
 
 /** The last full snapshot the engine confirmed. The rollback baseline. */
 let confirmed: AppSettings | null = null
@@ -79,6 +103,7 @@ export function mergeSettings(base: AppSettings, patch: AppSettingsPatch): AppSe
     ...(patch.uiLanguage !== undefined ? { uiLanguage: patch.uiLanguage } : {}),
     recognition: { ...base.recognition, ...patch.recognition },
     overlay: { ...base.overlay, ...patch.overlay },
+    videoCaptions: { ...base.videoCaptions, ...patch.videoCaptions },
     translation: { ...base.translation, ...patch.translation },
     compute: { ...base.compute, ...patch.compute },
   }
@@ -119,6 +144,7 @@ function mergePatches(a: AppSettingsPatch, b: AppSettingsPatch): AppSettingsPatc
       ? { recognition: { ...a.recognition, ...b.recognition } }
       : {}),
     ...(a.overlay || b.overlay ? { overlay: { ...a.overlay, ...b.overlay } } : {}),
+    ...(a.videoCaptions || b.videoCaptions ? { videoCaptions: { ...a.videoCaptions, ...b.videoCaptions } } : {}),
     ...(a.translation || b.translation ? { translation: { ...a.translation, ...b.translation } } : {}),
     ...(a.compute || b.compute ? { compute: { ...a.compute, ...b.compute } } : {}),
   }
@@ -315,6 +341,78 @@ export function clearSettingsError(): void {
   settingsStore.setState({ error: null })
 }
 
+/**
+ * Loads the configured recognition and translation weights, which is what "enable
+ * captions" means: a browser session opened afterwards starts against memory that is
+ * already warm.
+ *
+ * A refusal is a `state: 'failed'` answer carrying the engine's reason, not an
+ * exception, so a missing model and a transport failure stay distinguishable. Only
+ * the transport itself throws.
+ */
+export async function enableCaptionService(): Promise<PrewarmResult> {
+  if (!bridge) throw new Error('initStores 还没注入 bridge')
+  settingsStore.setState({ captionService: 'loading', captionServiceCode: null, captionServiceBusy: true })
+  try {
+    const result = await bridge.engine.prewarmModels()
+    settingsStore.setState({
+      captionService: result.state,
+      captionServiceCode: result.state === 'failed' ? result.code ?? null : null,
+    })
+    return result
+  } finally {
+    settingsStore.setState({ captionServiceBusy: false })
+  }
+}
+
+/** Back to "not enabled" once the engine is gone, so the button cannot claim a service that stopped. */
+export function resetCaptionService(): void {
+  settingsStore.setState({ captionService: 'idle', captionServiceCode: null, captionServiceBusy: false })
+}
+
+/**
+ * Opens or closes the gate browser captions pass through. The answer is the whole
+ * connection status rather than a boolean, so the store paints the value actually in
+ * force: another window may have moved the gate since this one last read it.
+ */
+export async function setCaptionServiceActive(active: boolean): Promise<BrowserConnectionStatus> {
+  if (!bridge) throw new Error('initStores 还没注入 bridge')
+  settingsStore.setState({ captionServiceBusy: true, error: null })
+  try {
+    const status = await bridge.settings.setCaptionService(active)
+    settingsStore.setState({ browser: status })
+    return status
+  } finally {
+    settingsStore.setState({ captionServiceBusy: false })
+  }
+}
+
+/**
+ * Ends one browser session by its id. The gate only decides whether a session may *start*,
+ * so a session already running keeps the engine recording until it is stopped here.
+ */
+export async function stopCaptionSession(sessionId: string): Promise<void> {
+  if (!bridge) throw new Error('initStores 还没注入 bridge')
+  try {
+    await bridge.engine.stopSession(sessionId)
+  } catch (error) {
+    settingsStore.setState({ error: errorMessage(error) })
+    throw error
+  }
+}
+
+export async function browserConnectionAction(action: BrowserConnectionAction, enabled?: boolean, browser?: BrowserKind): Promise<void> {
+  if (action === 'status' && settingsStore.getState().browserBusy) return
+  if (action !== 'status') settingsStore.setState({ browserBusy: true, browserError: null })
+  try {
+    if (!bridge?.settings.browserConnection) throw new Error('Browser connection is unavailable')
+    const status = await bridge.settings.browserConnection(action, enabled, browser)
+    settingsStore.setState({ browser: status, ...(action !== 'status' ? { browserError: null } : {}) })
+  } catch (error) {
+    settingsStore.setState({ browserError: errorMessage(error) })
+  } finally { if (action !== 'status') settingsStore.setState({ browserBusy: false }) }
+}
+
 export function attachSettingsStore(next: NolaBridge): void {
   bridge = next
   unsubscribe?.()
@@ -323,11 +421,21 @@ export function attachSettingsStore(next: NolaBridge): void {
     confirmed = settings
     publish(confirmed)
   })
+  unsubscribeCaptionService?.()
+  unsubscribeCaptionService = next.events.onEngineEvent((event) => {
+    // `loading` is the only reason this subscription exists: the answer settles the
+    // request, and a multi-gigabyte read leaves the button idle for the whole wait.
+    // The event carries no failure state — a refusal comes back on the request itself.
+    if (event.type !== 'modelsPrewarmed') return
+    settingsStore.setState({ captionService: event.state, captionServiceCode: null })
+  })
 }
 
 export function detachSettingsStore(): void {
   unsubscribe?.()
   unsubscribe = null
+  unsubscribeCaptionService?.()
+  unsubscribeCaptionService = null
   bridge = null
   confirmed = null
   inFlight = []

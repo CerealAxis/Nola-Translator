@@ -12,6 +12,7 @@ import { getBridge, sessionStore, stores, updateSettings, useStore } from '@/sto
 import { swappedLanguagesOf, targetLanguagePatch } from '@/session-config'
 import { PageHeader } from '@/components/primitives'
 import { SettingSelect } from '../settings/SettingsPage'
+import { SETTINGS_WRITE_FAILURE_KEYS, settingsWriteFailure } from '../settings/settingsWriteError'
 
 export function OverlayPage() {
   const { t, language } = useI18n()
@@ -33,7 +34,7 @@ export function OverlayPage() {
     const entry = LANGUAGE_LABELS[code]
     return entry ? language === 'zh-CN' ? entry.zh : entry.en : code
   }
-  const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch(() => toast.danger(t('errors.storageChangedAction'))) }
+  const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch((error: unknown) => toast.danger(t(SETTINGS_WRITE_FAILURE_KEYS[settingsWriteFailure(error)]))) }
   const open = async () => {
     setOpening(true)
     try { await getBridge()?.overlay.show() } catch { toast.danger(t('shellUi.errorOpening')) }

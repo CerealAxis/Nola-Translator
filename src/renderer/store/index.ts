@@ -96,7 +96,7 @@ export { createStore, useStore } from './createStore'
 export type { Store, StoreListener, StorePatch, StoreUpdater } from './createStore'
 
 export { settingsStore } from './settingsStore'
-export type { SettingsState } from './settingsStore'
+export type { CaptionServiceState, SettingsState } from './settingsStore'
 export { meetingsStore } from './meetingStore'
 export type { MeetingsState, MeetingDetail, BatchRemoveResult } from './meetingStore'
 export { modelsStore } from './modelStore'
@@ -110,6 +110,9 @@ export {
   chooseStorageDirectory,
   restartAppForStorage,
   clearSettingsError,
+  enableCaptionService,
+  resetCaptionService,
+  browserConnectionAction,
 } from './settingsStore'
 export {
   loadMeetings,

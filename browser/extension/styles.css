@@ -1,0 +1,82 @@
+@import 'tailwindcss' source(none);
+@source './';
+@import '@heroui/styles';
+@import '../../src/renderer/theme/index.css';
+
+@layer components {
+  :host { all: initial; font: var(--font-body); color: var(--foreground); color-scheme: light; }
+  :host(.z-overlay) { z-index: var(--z-overlay); }
+  :host([hidden]) { display: none !important; }
+  .nola-extension { font: var(--font-body); color: var(--foreground); }
+  .nola-extension, .nola-extension * { box-sizing: border-box; }
+  /* The anchor moves when the player's own controls come and go, and the block rides it instead of
+     jumping to the new line. */
+  :host([data-nola-extension='overlay']) { transition: bottom var(--dur-enter) var(--ease-nola); }
+  /* Fill explicit-height rows; the adapter corrects automatic-height rows against native icons. */
+  :host([data-nola-extension='trigger'][data-docked='true']) { height: 100%; align-self: center; vertical-align: top; }
+  .nola-trigger { display: flex; align-items: center; justify-content: center; height: 100%; pointer-events: auto; }
+  .nola-panel { width: min(var(--browser-panel-width), calc(100vw - var(--space-3))); padding: var(--space-2); display: grid; gap: var(--space-1); max-height: calc(100vh - var(--space-4)); overflow: auto; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+  .nola-heading { font: var(--font-title); margin: 0; }
+  .nola-row { display: grid; grid-template-columns: 1fr 1.1fr; gap: var(--space-1); align-items: center; }
+  .nola-choice { min-width: 0; }
+  .nola-row .button { width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* Keep an invisible hit area while leaving only the brand mark painted in every pointer state. */
+  .nola-trigger .button { --button-bg: transparent; --button-bg-hover: transparent; --button-bg-pressed: transparent; width: var(--space-4); min-width: var(--space-4); height: var(--space-4); padding: 0; background: transparent; }
+  .nola-value { color: var(--muted); text-align: end; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nola-status { font: var(--font-caption); margin: 0; color: var(--muted); }
+  .nola-status[data-state='ready'] { color: var(--accent); }
+  .nola-status[data-state='recognizing'] { color: var(--foreground); }
+  .nola-status[data-state='unavailable'] { color: var(--danger); }
+  .nola-options { max-height: calc(var(--space-8) * 3); overflow: auto; background: var(--surface-secondary); margin-top: var(--space-1); border: var(--browser-field-border-width) solid var(--border); border-radius: var(--radius-md); }
+  .nola-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); }
+  .nola-toggle { display: inline-flex; align-items: center; gap: var(--space-1); }
+  .nola-error { font: var(--font-caption); color: var(--danger); margin: 0; }
+  .nola-muted { font: var(--font-caption); color: var(--muted); margin: 0; }
+  /* The block hangs from the bottom edge the renderer anchors it to, so a bilingual phrase growing
+     from one line to two extends upward and leaves the anchor where it was. Its height is pinned to
+     its own text by the renderer, since a transition cannot interpolate to `auto`. White glyphs over a
+     translucent black fill keep their contrast whatever the frame underneath is doing, so the block
+     needs no stroke to stay legible. */
+  .nola-caption { position: absolute; left: 0; bottom: 0; display: grid; gap: calc(var(--space-1) / 2); width: 100%; overflow: hidden; text-align: center; color: var(--accent-foreground); font-family: var(--font-ui); line-height: var(--browser-caption-line-height); padding: var(--space-1) var(--space-2); border-radius: var(--radius-md); background: color-mix(in oklab, var(--browser-caption-fill) var(--browser-caption-background-mix), transparent); pointer-events: auto; transition: height var(--dur-enter) var(--ease-nola); }
+  /* One phrase is one animation: the block settles in from half a space-1, and a phrase that replaces
+     another fades out first, so text is never revealed a character at a time. */
+  .nola-caption[data-phase='appearing'] { animation: nola-caption-block-in var(--dur-enter) var(--ease-nola) both; }
+  .nola-caption[data-phase='fading'] { animation: nola-caption-block-out var(--dur-enter) var(--ease-nola) both; }
+  .nola-popup { width: var(--browser-panel-width); padding: var(--space-2); display: grid; gap: var(--space-2); background: var(--background); font: var(--font-body); color: var(--foreground); }
+}
+
+@layer utilities {
+  /* HeroUI's responsive icon rules have higher component specificity. */
+  .nola-trigger .button > svg { width: var(--space-3); height: var(--space-3); margin: 0; }
+}
+
+@keyframes nola-caption-block-in {
+  from { opacity: 0; transform: translateY(calc(var(--space-1) / 2)); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes nola-caption-block-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(calc(var(--space-1) / 2)); }
+}
+
+@keyframes nola-caption-block-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes nola-caption-block-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Reduced motion through both channels, as in motion.css: the fade is what tells one phrase from the
+   next, so it stays and only the travel goes. The animations still run and still end, which is how the
+   renderer learns a phase is over; the theme collapses --dur-enter on both channels as well. */
+@media (prefers-reduced-motion: reduce) {
+  .nola-caption[data-phase='appearing'] { animation-name: nola-caption-block-fade-in; }
+  .nola-caption[data-phase='fading'] { animation-name: nola-caption-block-fade-out; }
+}
+
+:host([data-reduce-motion='true']) .nola-caption[data-phase='appearing'] { animation-name: nola-caption-block-fade-in; }
+:host([data-reduce-motion='true']) .nola-caption[data-phase='fading'] { animation-name: nola-caption-block-fade-out; }

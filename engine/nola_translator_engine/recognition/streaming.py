@@ -100,11 +100,36 @@ class StreamingRecognizer:
         self._idle = asyncio.Event()
         self._idle.set()
         self._pending_error: Exception | None = None
+        #: Dispatch and delivery counters behind the `asr.*` diagnostic lines. A recognizer that
+        #: never dispatches a job and one whose jobs all return empty text are the same silence
+        #: from the outside, so both sides are counted.
+        self.blocks_dispatched = 0
+        self.updates_produced = 0
+        self.empty_updates = 0
+
+    def stats(self) -> dict[str, int]:
+        stats: dict[str, int] = {
+            "blocksDispatched": self.blocks_dispatched,
+            "updatesProduced": self.updates_produced,
+            "emptyUpdates": self.empty_updates,
+        }
+        segmenter = self.segmenter
+        if hasattr(segmenter, "stats"):
+            stats.update(segmenter.stats())
+        return stats
 
     async def accept(self, frame: AudioFrame) -> list[RecognitionUpdate]:
         """Feed one frame: enqueue inference jobs and collect finished results, never blocking on inference."""
         if self._pending_error is not None:
             raise self._pending_error
+        updates = self._feed(frame)
+        for update in updates:
+            self.updates_produced += 1
+            if not update.source_text.strip():
+                self.empty_updates += 1
+        return updates
+
+    def _feed(self, frame: AudioFrame) -> list[RecognitionUpdate]:
 
         for segment in self.segmenter.accept(frame):
             state = self._current if self._current is not None else self._new_state(segment.start_ms)
@@ -196,6 +221,7 @@ class StreamingRecognizer:
         generation = state.next_generation
         state.next_generation += 1
         state.blocks_dispatched += 1
+        self.blocks_dispatched += 1
         return generation, prefix
 
     def _dispatch_intermediate(

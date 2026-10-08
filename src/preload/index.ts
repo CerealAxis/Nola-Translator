@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 import type { NolaTranslatorApi, EngineChannelEvent, OverlayTargetPage } from '../shared/bridge'
-import type { EngineProcessState, HubInspectResult, HubSearchResult, ResourceRecord, SessionConfig } from '../shared/contracts'
+import type { EngineProcessState, HubInspectResult, HubSearchResult, PrewarmResult, ResourceRecord, SessionConfig } from '../shared/contracts'
 import { stripIpcErrorMessage } from '../shared/ipc-error'
 
 const channels = {
@@ -16,6 +16,8 @@ const channels = {
   getHuggingFaceModelCard: 'hub:model-card',
   installHuggingFaceModel: 'hub:install', configureModel: 'model:configure',
   startSession: 'engine:start-session',
+  prewarmModels: 'engine:prewarm-models',
+  ensureEngineReady: 'engine:ensure-ready',
   stopSession: 'engine:stop-session',
   setSessionPaused: 'engine:set-session-paused',
   event: 'engine:event',
@@ -34,6 +36,8 @@ const channels = {
   meetingAudioUrl: 'meeting:audio-url',
   getDiagnostics: 'diagnostics:get', copyDiagnostics: 'diagnostics:copy',
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
+  setCaptionService: 'browser:caption-service',
+  openDefaultBrowser: 'app:open-default-browser',
 } as const
 
 // Unwraps the channel prefix Electron adds to handler errors; see stripIpcErrorMessage.
@@ -47,6 +51,7 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 }
 
 const api: NolaTranslatorApi = {
+  browserConnection: (action, enabled, browser) => invoke('browser:connection', action, enabled, browser),
   listComputeDevices: () => invoke(channels.listComputeDevices),
   getRuntimes: () => invoke(channels.getRuntimes),
   prepareRuntimes: () => invoke(channels.prepareRuntimes),
@@ -64,6 +69,8 @@ const api: NolaTranslatorApi = {
     invoke(channels.installHuggingFaceModel, repo, slot),
   configureModel: (resourceId, configuration) => invoke(channels.configureModel, resourceId, configuration),
   startSession: (config: SessionConfig) => invoke(channels.startSession, config),
+  prewarmModels: (): Promise<PrewarmResult> => invoke(channels.prewarmModels),
+  ensureEngineReady: () => invoke<EngineProcessState>(channels.ensureEngineReady),
   stopSession: (sessionId: string) => invoke(channels.stopSession, sessionId),
   setSessionPaused: (sessionId: string, paused: boolean) =>
     invoke(channels.setSessionPaused, sessionId, paused),
@@ -112,6 +119,8 @@ const api: NolaTranslatorApi = {
   copyDiagnostics: () => invoke(channels.copyDiagnostics),
   hasTranslationCredential: (provider) => invoke(channels.hasTranslationCredential, provider),
   setTranslationCredential: (provider, value) => invoke(channels.setTranslationCredential, provider, value),
+  setCaptionService: (active) => invoke(channels.setCaptionService, active),
+  openDefaultBrowser: () => invoke(channels.openDefaultBrowser),
 }
 
 contextBridge.exposeInMainWorld('nolaTranslator', api)

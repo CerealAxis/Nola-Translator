@@ -108,6 +108,13 @@ export function createIpcBridge(): NolaBridge {
       listResources: () => call('listResources', (injected) => injected.listResources() as Promise<ResourceSnapshotWithRate>),
       manageResource: (resourceId, action) => call('manageResource', (injected) => injected.manageResource(resourceId, action)),
       startSession: (config) => call('startSession', (injected) => injected.startSession(config)) as Promise<SessionStartResult>,
+      /*
+       * No payload crosses this call: the main process builds the prewarm config from
+       * settings, because the engine caches loaded weights under the compute options and
+       * a second copy of those options would miss that cache.
+       */
+      prewarmModels: () => call('prewarmModels', (injected) => injected.prewarmModels()),
+      ensureEngineReady: () => call('ensureEngineReady', (injected) => injected.ensureEngineReady()),
       stopSession: (sessionId) => call('stopSession', (injected) => injected.stopSession(sessionId)),
       /**
        * Pause/resume goes through preload's `setSessionPaused` and returns a
@@ -138,6 +145,13 @@ export function createIpcBridge(): NolaBridge {
       resize: (width, height) => call('resizeOverlay', (injected) => injected.resizeOverlay(width, height)),
     },
     settings: {
+      browserConnection: (action, enabled, browser) => call('browserConnection', api => api.browserConnection ? api.browserConnection(action, enabled, browser) : Promise.reject(new MissingIpcApiError('browserConnection'))),
+      /*
+       * The gate, forwarded with its argument untouched and its answer forwarded whole:
+       * `BrowserConnectionStatus` is where both the gate and the live session id live, so a
+       * separate boolean would be a second source of truth to drift from it.
+       */
+      setCaptionService: (active) => call('setCaptionService', (injected) => injected.setCaptionService(active)),
       get: () => call('getSettings', (injected) => injected.getSettings()),
       update: (patch) => call('updateSettings', (injected) => injected.updateSettings(patch)),
     },
@@ -163,6 +177,11 @@ export function createIpcBridge(): NolaBridge {
     diagnostics: {
       get: () => call('getDiagnostics', (injected) => injected.getDiagnostics()),
       copy: () => call('copyDiagnostics', (injected) => injected.copyDiagnostics()),
+    },
+    app: {
+      // No payload and no translation: the main process resolves the user's default browser
+      // itself, so nothing about *which* browser crosses this boundary.
+      openDefaultBrowser: () => call('openDefaultBrowser', (injected) => injected.openDefaultBrowser()),
     },
     translation: {
       hasCredential: (provider) => call('hasTranslationCredential', (injected) => injected.hasTranslationCredential(provider)),

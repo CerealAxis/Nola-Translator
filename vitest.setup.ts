@@ -18,6 +18,7 @@ function settingsWith(patch: AppSettingsPatch = {}): AppSettings {
     overlay: { ...DEFAULT_SETTINGS.overlay, ...(patch.overlay ?? {}) },
     translation: { ...DEFAULT_SETTINGS.translation, ...(patch.translation ?? {}) },
     compute: { ...DEFAULT_SETTINGS.compute, ...(patch.compute ?? {}) },
+    videoCaptions: { ...DEFAULT_SETTINGS.videoCaptions, ...(patch.videoCaptions ?? {}) },
   }
 }
 

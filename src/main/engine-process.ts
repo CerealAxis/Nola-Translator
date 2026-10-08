@@ -5,7 +5,8 @@ import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { createInterface, type Interface as ReadlineInterface } from 'node:readline'
 
-import type { EngineCommand, EngineEvent, EngineProcessState } from '../shared/contracts'
+import { PREWARM_ERROR_CODES } from '../shared/contracts'
+import type { EngineCommand, EngineEvent, EngineProcessState, PrewarmConfig, PrewarmErrorCode, PrewarmResult } from '../shared/contracts'
 import { engineCommandSchema, parseEventLine } from '../shared/schemas'
 
 /** Re-exported so a caller can read the state union without importing a main-process module. */
@@ -34,6 +35,8 @@ export type EngineProcessOptions = EngineLaunchSpec & {
 
 type PendingRequest = {
   expectedType: EngineEvent['type']
+  /** Whether a matching event is the answer, or progress the caller merely streams onward. */
+  isFinal: (event: EngineEvent) => boolean
   resolve: (event: EngineEvent) => void
   reject: (error: Error) => void
   /** `null` when the request is bounded by child lifetime instead of a deadline. */
@@ -142,6 +145,9 @@ export class EngineProcess extends EventEmitter {
   private readonly coalescer: CaptionEventCoalescer
   private state: EngineProcessState = 'stopped'
   private restarts = 0
+  private capabilities: readonly string[] = []
+
+  supports(capability: string): boolean { return this.capabilities.includes(capability) }
 
   constructor(options: EngineProcessOptions) {
     super()
@@ -176,7 +182,8 @@ export class EngineProcess extends EventEmitter {
   async request<TType extends EngineEvent['type']>(
     command: EngineCommand,
     expectedType: TType,
-    timeoutMs: number | null = 10_000
+    timeoutMs: number | null = 10_000,
+    isFinal: (event: Extract<EngineEvent, { type: TType }>) => boolean = () => true
   ): Promise<Extract<EngineEvent, { type: TType }>> {
     const validated = engineCommandSchema.parse(command) as EngineCommand
     if (this.pending.has(validated.requestId)) {
@@ -192,6 +199,7 @@ export class EngineProcess extends EventEmitter {
         }, timeoutMs)
       const entry: PendingRequest = {
         expectedType,
+        isFinal: event => isFinal(event as Extract<EngineEvent, { type: TType }>),
         resolve,
         reject,
         timer,
@@ -211,6 +219,35 @@ export class EngineProcess extends EventEmitter {
       }
     }
     return (await response) as Extract<EngineEvent, { type: TType }>
+  }
+
+  /**
+   * Loads the weights named by `config` without opening a session, and answers when they are
+   * resident. `timeoutMs: null` for the handshake's reason — reading a model off disk is slow and
+   * varies with the disk, and a wall clock here would report a healthy engine as a dead one.
+   *
+   * A refusal arrives as an `error` event rather than as a third state, so it reaches this method
+   * as a rejection and is turned back into a result: the UI branches on `code`, not on a thrown
+   * error. `state: 'loading'` reaches `onEngineEvent` and deliberately does not settle this call.
+   */
+  async prewarmModels(config: PrewarmConfig): Promise<PrewarmResult> {
+    try {
+      const event = await this.request(
+        { protocolVersion: 1, type: 'prewarmModels', requestId: `prewarm-${randomUUID()}`, config },
+        'modelsPrewarmed',
+        null,
+        answer => answer.state !== 'loading'
+      )
+      if (event.state !== 'ready') throw new Error(`引擎预热进度异常：${event.state}`)
+      return { state: 'ready' }
+    } catch (error) {
+      const code = (error as { engineCode?: unknown }).engineCode
+      return {
+        state: 'failed',
+        ...(typeof code === 'string' && (PREWARM_ERROR_CODES as readonly string[]).includes(code) ? { code: code as PrewarmErrorCode } : {}),
+        message: error instanceof Error ? error.message : String(error),
+      }
+    }
   }
 
   async stop(): Promise<void> {
@@ -309,7 +346,7 @@ export class EngineProcess extends EventEmitter {
      * that stays alive but never answers. `handleTermination` settles this request if the
      * process dies first.
      */
-    await this.request(
+    const handshake = await this.request(
       {
         protocolVersion: 1,
         type: 'hello',
@@ -319,6 +356,7 @@ export class EngineProcess extends EventEmitter {
       'ready',
       this.options.startupTimeoutMs
     )
+    this.capabilities = handshake.capabilities
     if (this.child !== child) throw new Error('引擎在握手期间退出')
     this.setState('ready')
   }
@@ -349,12 +387,14 @@ export class EngineProcess extends EventEmitter {
     }
 
     const pending = this.pending.get(event.requestId)
-    if (pending && (event.type === pending.expectedType || event.type === 'error')) {
+    if (pending && (event.type === 'error' || (event.type === pending.expectedType && pending.isFinal(event)))) {
       pending.clear()
       this.pending.delete(event.requestId)
       if (event.type === 'error') {
         const reason = typeof event.details?.reason === 'string' ? `：${event.details.reason.slice(0, 512)}` : ''
-        pending.reject(new Error(`引擎错误：${event.code}${reason}`))
+        // The code rides along as a property so a caller that branches on it does not have to take
+        // a localized message apart to find it. The message itself is unchanged.
+        pending.reject(Object.assign(new Error(`引擎错误：${event.code}${reason}`), { engineCode: event.code }))
       } else {
         pending.resolve(event)
       }

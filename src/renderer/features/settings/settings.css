@@ -6,7 +6,9 @@
 .settings-page__heading { padding:12px 0; }
 .settings-page__heading h1 { font-size:32px; font-weight:700; line-height:1.25; margin:0 0 6px; }
 .settings-page__heading p { color:var(--muted); font-size:14px; margin:0; }
-.settings-page .settings-tabs { display:grid; grid-template-columns:208px minmax(0,1fr); gap:16px; align-items:start; }
+/* The nav column tracks the widest tab label, so a longer translation stays on one line instead of
+   wrapping into a two-line tab. 208px is the floor that the short labels settle at. */
+.settings-page .settings-tabs { display:grid; grid-template-columns:minmax(208px,max-content) minmax(0,1fr); gap:16px; align-items:start; }
 .settings-nav { padding:12px; border:1px solid var(--border); border-radius:16px; background:var(--surface); min-width:0; }
 .settings-nav .tabs__list { display:flex; flex-direction:column; gap:8px; background:transparent; padding:0; width:100%; }
 .settings-nav .tabs__tab { justify-content:flex-start; height:52px; border-radius:12px; padding:0 16px; font-size:14px; gap:14px; opacity:1; color:var(--foreground); white-space:normal; }
@@ -60,7 +62,7 @@
 .settings-save__state[data-error="true"] { color:var(--danger); }
 .settings-code { max-width:100%; overflow-wrap:anywhere; white-space:normal; }
 @media (max-width:1100px) {
- .settings-page .settings-tabs { grid-template-columns:170px minmax(0,1fr); }
+ .settings-page .settings-tabs { grid-template-columns:minmax(170px,max-content) minmax(0,1fr); }
  .settings-nav { padding:8px; }
  .settings-nav .tabs__tab { padding:0 12px; gap:10px; }
  .settings-row { grid-template-columns:minmax(110px,0.8fr) minmax(0,1.2fr); }
@@ -69,7 +71,8 @@
 @media (max-width:850px) {
  .settings-page .settings-tabs { grid-template-columns:minmax(0,1fr); }
  .settings-nav .tabs__list { flex-direction:row; flex-wrap:wrap; gap:4px; }
- .settings-nav .tabs__tab { flex:1 1 120px; min-height:44px; height:auto; padding:10px; gap:8px; }
+ /* Chips wrap onto rows by label width, so a label keeps its own line rather than breaking across two. */
+ .settings-nav .tabs__tab { flex:1 1 120px; min-height:44px; height:auto; padding:10px; gap:8px; white-space:nowrap; }
  .settings-group.card { padding:16px; }
 }
 @media (max-width:540px) {

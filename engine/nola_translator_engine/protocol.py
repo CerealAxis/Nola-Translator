@@ -3,10 +3,12 @@
 from __future__ import annotations
 from .compute import ComputeOptions
 
+import base64
+import binascii
 import json
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
 
 PROTOCOL_VERSION = 1
@@ -31,7 +33,18 @@ class DeviceSource(ProtocolModel):
     deviceId: str = Field(min_length=1, max_length=512)
 
 
-AudioSource = Annotated[Union[DefaultOutputSource, DeviceSource], Field(discriminator="kind")]
+class BrowserTabSource(ProtocolModel):
+    kind: Literal["browserTab"]
+    streamId: str = Field(min_length=1, max_length=128)
+
+
+AudioSource = Annotated[Union[DefaultOutputSource, DeviceSource, BrowserTabSource], Field(discriminator="kind")]
+
+
+class BrowserTimeline(ProtocolModel):
+    epoch: int = Field(ge=0, le=9_007_199_254_740_991, strict=True)
+    videoTimeMs: float = Field(ge=0, allow_inf_nan=False)
+    playbackRate: float = Field(gt=0, le=16, allow_inf_nan=False)
 
 
 class TranslationOptions(ProtocolModel):
@@ -59,11 +72,16 @@ class TranslationOptions(ProtocolModel):
     apiKey: str = Field(default="", max_length=4096)
 
 
-class SessionConfig(ProtocolModel):
+class ModelSelection(ProtocolModel):
+    """Which models a request needs and how it wants them placed.
+
+    A prewarm loads exactly what a session would load, so the two commands derive from one
+    field set rather than keeping parallel copies that could drift apart and make the warmed
+    runtime a different cache entry than the one the session asks for.
+    """
+
     compute: ComputeOptions = Field(default_factory=ComputeOptions)
-    audioSource: AudioSource
-    recognitionMode: Literal["realtime", "accurate"]
-    # A session may name any model the engine has a loader for, and the resource table is
+    # A request may name any model the engine has a loader for, and the resource table is
     # where "is this id real" is decided.
     recognitionModelId: str | None = Field(default=None, min_length=1, max_length=256)
     sourceLanguage: str = Field(min_length=1, max_length=32)
@@ -75,8 +93,28 @@ class SessionConfig(ProtocolModel):
     translationProvider: Literal["local", "cloud", "microsoft"] = "local"
     translationModelId: str | None = Field(default=None, min_length=1, max_length=256)
     translationOptions: TranslationOptions | None = None
+
+
+class SessionConfig(ModelSelection):
+    audioSource: AudioSource
+    recognitionMode: Literal["realtime", "accurate"]
     """Absolute path the engine records the meeting audio to; omitted means no audio file."""
     recordingPath: str | None = Field(default=None, min_length=1, max_length=4096)
+    browserTimeline: BrowserTimeline | None = None
+
+    @model_validator(mode="after")
+    def validate_browser_timeline(self) -> SessionConfig:
+        if self.browserTimeline is not None and self.audioSource.kind == "microphone":
+            raise ValueError("browserTimeline requires a browser tab or system output")
+        return self
+
+
+class PrewarmConfig(ModelSelection):
+    """The model half of a session with the audio half left out.
+
+    Warming the service resolves and loads weights without capturing anything, so it names no
+    audio source and writes no recording.
+    """
 
 
 class HelloCommand(Envelope):
@@ -97,6 +135,17 @@ class StartSessionCommand(Envelope):
     config: SessionConfig
 
 
+class PrewarmModelsCommand(Envelope):
+    """Load the recognition weights now so the next session starts without the model load.
+
+    No audio source travels with it: nothing is captured, nothing is recorded, and the result
+    outlives the session that later uses it.
+    """
+
+    type: Literal["prewarmModels"]
+    config: PrewarmConfig
+
+
 class StopSessionCommand(Envelope):
     type: Literal["stopSession"]
     sessionId: str = Field(min_length=1, max_length=128)
@@ -106,6 +155,44 @@ class SetSessionPausedCommand(Envelope):
     type: Literal["setSessionPaused"]
     sessionId: str = Field(min_length=1, max_length=128)
     paused: bool
+
+
+class PushAudioCommand(Envelope):
+    type: Literal["pushAudio"]
+    sessionId: str = Field(min_length=1, max_length=128)
+    streamId: str = Field(min_length=1, max_length=128)
+    epoch: int = Field(ge=0, le=9_007_199_254_740_991, strict=True)
+    sequence: int = Field(ge=0, le=9_007_199_254_740_991, strict=True)
+    sampleRate: int = Field(ge=8_000, le=192_000, strict=True)
+    capturedAtMs: float = Field(ge=0, allow_inf_nan=False)
+    # The 200 ms ceiling bounds decoding allocations before the duration-bounded queue.
+    pcmBase64: str = Field(min_length=4, max_length=102_400)
+
+    @model_validator(mode="after")
+    def validate_pcm(self) -> PushAudioCommand:
+        try:
+            data = base64.b64decode(self.pcmBase64, validate=True)
+        except (ValueError, binascii.Error) as error:
+            raise ValueError("pcmBase64 must be valid base64") from error
+        if not data or len(data) % 2:
+            raise ValueError("PCM16 mono requires complete samples")
+        if len(data) > self.sampleRate * 2 // 5:
+            raise ValueError("PCM chunk cannot exceed 200 ms")
+        return self
+
+
+class ResetStreamCommand(Envelope):
+    type: Literal["resetStream"]
+    sessionId: str = Field(min_length=1, max_length=128)
+    epoch: int = Field(ge=0, le=9_007_199_254_740_991, strict=True)
+    videoTimeMs: float = Field(ge=0, allow_inf_nan=False)
+    playbackRate: float = Field(gt=0, le=16, allow_inf_nan=False)
+
+
+class FinishStreamCommand(Envelope):
+    type: Literal["finishStream"]
+    sessionId: str = Field(min_length=1, max_length=128)
+    epoch: int = Field(ge=0, le=9_007_199_254_740_991, strict=True)
 
 
 class ShutdownCommand(Envelope):
@@ -174,6 +261,23 @@ class InstallHubRepoCommand(Envelope):
     slot: Literal["recognition", "translation"] | None = None
 
 
+class DebugLogCommand(Envelope):
+    """One diagnostic line, appended to the file named by ``NOLA_TRANSLATOR_DEBUG_LOG``.
+
+    The desktop relays the lines the browser extension produced, so every layer of a caption
+    session lands in one file in the order it happened.
+    """
+
+    type: Literal["debugLog"]
+    layer: str = Field(min_length=1, max_length=32)
+    event: str = Field(min_length=1, max_length=64)
+    data: dict[str, object] | None = None
+
+
+class DebugLoggedEvent(Envelope):
+    type: Literal["debugLogged"]
+
+
 EngineCommand = Annotated[
     Union[
         HelloCommand,
@@ -181,6 +285,10 @@ EngineCommand = Annotated[
         StartSessionCommand,
         StopSessionCommand,
         SetSessionPausedCommand,
+        PrewarmModelsCommand,
+        PushAudioCommand,
+        ResetStreamCommand,
+        FinishStreamCommand,
         ShutdownCommand,
         ListResourcesCommand,
         ListComputeDevicesCommand,
@@ -189,6 +297,7 @@ EngineCommand = Annotated[
         InspectHubRepoCommand,
         InstallHubRepoCommand,
         ConfigureModelCommand,
+        DebugLogCommand,
     ],
     Field(discriminator="type"),
 ]
@@ -241,10 +350,48 @@ class SessionStoppedEvent(Envelope):
     sessionId: str = Field(min_length=1, max_length=128)
 
 
+class ModelsPrewarmedEvent(Envelope):
+    """How far a prewarm got. A refusal arrives as an `error` event instead."""
+
+    type: Literal["modelsPrewarmed"]
+    # `loading` is written before the weight load starts, because a cold load takes long enough
+    # that a client waiting on the terminal event alone has nothing to show.
+    state: Literal["loading", "ready"]
+    recognitionModelId: str = Field(min_length=1, max_length=256)
+    # The translation model the request resolved and validated. Its weights are not loaded by a
+    # prewarm, so this reports intent rather than residency.
+    translationModelId: str | None = Field(default=None, min_length=1, max_length=256)
+    elapsedMs: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    device: str | None = Field(default=None, max_length=128)
+    runtime: str | None = Field(default=None, max_length=256)
+
+
+class AudioAcceptedEvent(Envelope):
+    type: Literal["audioAccepted"]
+    sessionId: str = Field(min_length=1, max_length=128)
+    epoch: int = Field(ge=0, le=9_007_199_254_740_991)
+    sequence: int = Field(ge=0, le=9_007_199_254_740_991)
+
+
+class StreamResetEvent(Envelope):
+    type: Literal["streamReset"]
+    sessionId: str = Field(min_length=1, max_length=128)
+    epoch: int = Field(ge=0, le=9_007_199_254_740_991)
+
+
+class StreamFinishedEvent(Envelope):
+    type: Literal["streamFinished"]
+    sessionId: str = Field(min_length=1, max_length=128)
+    epoch: int = Field(ge=0, le=9_007_199_254_740_991)
+
+
 class CaptionEvent(Envelope):
     type: Literal["caption"]
     sessionId: str = Field(min_length=1, max_length=128)
     segment: CaptionSegment
+    streamEpoch: int | None = Field(default=None, ge=0, le=9_007_199_254_740_991)
+    videoStartedAtMs: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    videoEndedAtMs: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
 
 class ModelProgressEvent(Envelope):
@@ -374,6 +521,7 @@ ErrorCode = Literal[
     "sessionNotRunning",
     "sessionAlreadyRunning",
     "audioDeviceUnavailable",
+    "audioBufferOverflow",
     "modelUnavailable",
     "resourceUnavailable",
     "resourceNotFound",
@@ -408,6 +556,10 @@ EngineEvent = Annotated[
         ComputeDevicesEvent,
         SessionStartedEvent,
         SessionStoppedEvent,
+        ModelsPrewarmedEvent,
+        AudioAcceptedEvent,
+        StreamResetEvent,
+        StreamFinishedEvent,
         CaptionEvent,
         ModelProgressEvent,
         ResourcesEvent,
@@ -418,6 +570,7 @@ EngineEvent = Annotated[
         StatusEvent,
         ErrorEvent,
         ShutdownCompleteEvent,
+        DebugLoggedEvent,
     ],
     Field(discriminator="type"),
 ]

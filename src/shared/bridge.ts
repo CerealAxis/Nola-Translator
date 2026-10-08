@@ -7,12 +7,14 @@ import type {
   HubInspectResult,
   HubSearchResult,
   MeetingMeta,
+  PrewarmResult,
   ResourceRecord,
   ResourceSnapshot,
   SessionConfig,
 } from './contracts'
 import type { AppSettings, AppSettingsPatch, CredentialProvider } from './settings'
 import type { ComputeSnapshot, RuntimeSnapshot } from './compute'
+import type { BrowserConnectionAction, BrowserConnectionStatus, BrowserKind } from './browser'
 
 export type SessionStartResult = { sessionId: string; meetingId: string | null }
 
@@ -55,6 +57,7 @@ export type EngineChannelEvent = EngineEvent | EngineLifecycleEvent
 export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'translation'
 
 export type NolaTranslatorApi = {
+  browserConnection?(action: BrowserConnectionAction, enabled?: boolean, browser?: BrowserKind): Promise<BrowserConnectionStatus>
   listDevices(): Promise<AudioDevice[]>
   listComputeDevices(): Promise<ComputeSnapshot>
   getRuntimes(): Promise<RuntimeSnapshot>
@@ -84,6 +87,19 @@ export type NolaTranslatorApi = {
   ): Promise<ResourceRecord>
   configureModel(resourceId: string, configuration: ModelConfiguration): Promise<ResourceRecord>
   startSession(config: SessionConfig): Promise<SessionStartResult>
+  /**
+   * Loads the configured recognition and translation weights and answers when they are resident,
+   * which is what "enable captions" means. It takes no session slot: `ensureEngineReady` only
+   * starts the engine process, and a browser session opened afterwards reuses these weights.
+   * A refusal arrives as `state: 'failed'` with the engine's own `code`, never as a thrown error,
+   * so the UI can tell a missing model from a language the model does not cover.
+   */
+  prewarmModels(): Promise<PrewarmResult>
+  /**
+   * Starts the engine process and completes the handshake. Weights are *not* loaded — the process
+   * is up and its devices can be listed. Distinct from `getEngineState`, which starts nothing.
+   */
+  ensureEngineReady(): Promise<EngineProcessState>
   stopSession(sessionId: string): Promise<void>
   setSessionPaused(sessionId: string, paused: boolean): Promise<void>
   onEngineEvent(listener: (event: EngineChannelEvent) => void): () => void
@@ -121,4 +137,16 @@ export type NolaTranslatorApi = {
   copyDiagnostics(): Promise<void>
   hasTranslationCredential(provider: CredentialProvider): Promise<boolean>
   setTranslationCredential(provider: CredentialProvider, value: string): Promise<void>
+  /**
+   * Opens or closes the desktop's caption-service gate, and answers with the connection
+   * status as it stands afterwards. The status is the return value rather than a bare
+   * boolean so a caller paints the value that is actually in force — another window may
+   * have moved it since this page mounted.
+   */
+  setCaptionService(active: boolean): Promise<BrowserConnectionStatus>
+  /**
+   * Opens the user's default browser with no URL. `shell.openExternal` needs a protocol URL, so the
+   * main process resolves the registered handler itself; see `open-default-browser.ts`.
+   */
+  openDefaultBrowser(): Promise<void>
 }

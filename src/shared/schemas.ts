@@ -16,6 +16,7 @@ const audioSourceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('defaultOutput') }).strip(),
   z.object({ kind: z.literal('systemOutput'), deviceId: z.string().min(1).max(512) }).strip(),
   z.object({ kind: z.literal('microphone'), deviceId: z.string().min(1).max(512) }).strip(),
+  z.object({ kind: z.literal('browserTab'), streamId: z.string().min(1).max(128) }).strip(),
 ])
 
 const hubModelId = z
@@ -58,8 +59,33 @@ export const sessionConfigSchema = z
       maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
     }).strip().optional(),
     recordingPath: z.string().min(1).max(4096).optional(),
+    browserTimeline: z.object({ epoch: z.number().int().nonnegative(), videoTimeMs: z.number().nonnegative().finite(), playbackRate: z.number().positive().max(16) }).strip().optional(),
   })
   .strip()
+
+/**
+ * The prewarm payload mirrors `SessionConfig`'s model half; `compute` is mandatory here where the
+ * session treats it as optional, because the engine's loaded-runtime cache is keyed on it and a
+ * defaulted copy is a different key from the one the session will ask for.
+ */
+const prewarmConfigSchema = z.object({
+  compute: computeSettingsSchema,
+  recognitionModelId: z.string().min(1).max(256).optional(),
+  sourceLanguage: z.string().min(1).max(32),
+  targetLanguages: z.array(z.string().min(1).max(32)).max(8),
+  allowIntermediateTranslation: z.boolean().optional(),
+  translationProvider: z.enum(['local', 'cloud', 'microsoft']).optional(),
+  translationModelId: translationModelIdSchema.optional(),
+  translationOptions: z.object({
+    endpoint: z.string().max(2048).optional(),
+    apiKey: z.string().max(4096).optional(),
+    region: z.string().max(128).optional(),
+    model: z.string().max(256).optional(),
+    apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
+    contextWindow: z.number().int().min(256).max(10_000_000).optional(),
+    maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
+  }).strip().optional(),
+}).strip()
 
 const translationSchema = z
   .object({
@@ -84,6 +110,15 @@ const captionSegmentSchema = z
   })
   .strip()
 
+/** Diagnostic payloads are capped so one oversized line cannot stall the log file. */
+const MAX_DEBUG_DATA_CHARS = 4096
+function boundDebugData(data: Record<string, unknown>): Record<string, unknown> {
+  let serialized: string
+  try { serialized = JSON.stringify(data) } catch { return { dropped: 'unserializable' } }
+  if (serialized === undefined) return {}
+  return serialized.length <= MAX_DEBUG_DATA_CHARS ? data : { truncatedChars: serialized.length }
+}
+
 export const engineCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...envelope, type: z.literal('hello'), clientVersion: z.string().min(1).max(64) }).strip(),
   z.object({ ...envelope, type: z.literal('listDevices') }).strip(),
@@ -97,7 +132,17 @@ export const engineCommandSchema = z.discriminatedUnion('type', [
   }).strip(),
   z.object({ ...envelope, type: z.literal('configureModel'), resourceId: z.string().min(1).max(256), configuration: modelConfigurationSchema }).strip(),
   z.object({ ...envelope, type: z.literal('startSession'), config: sessionConfigSchema }).strip(),
+  z.object({ ...envelope, type: z.literal('prewarmModels'), config: prewarmConfigSchema }).strip(),
   z.object({ ...envelope, type: z.literal('stopSession'), sessionId: z.string().min(1).max(128) }).strip(),
+  z.object({ ...envelope, type: z.literal('pushAudio'), sessionId: z.string().min(1).max(128), streamId: z.string().min(1).max(128), epoch: z.number().int().nonnegative(), sequence: z.number().int().nonnegative(), sampleRate: z.number().int().min(8000).max(192000), capturedAtMs: z.number().nonnegative().finite(), pcmBase64: z.string().min(4).max(102400).regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/) }).strip(),
+  z.object({ ...envelope, type: z.literal('resetStream'), sessionId: z.string().min(1).max(128), epoch: z.number().int().nonnegative(), videoTimeMs: z.number().nonnegative().finite(), playbackRate: z.number().positive().max(16) }).strip(),
+  z.object({ ...envelope, type: z.literal('finishStream'), sessionId: z.string().min(1).max(128), epoch: z.number().int().nonnegative() }).strip(),
+  /*
+   * Diagnostic traffic, not a caption command: an unparseable payload here is dropped by the
+   * clamp rather than killing the engine, because an event the engine cannot read is treated as
+   * protocol corruption and takes the whole child process with it.
+   */
+  z.object({ ...envelope, type: z.literal('debugLog'), layer: z.string().min(1).max(32), event: z.string().min(1).max(64), data: z.record(z.string(), z.unknown()).transform(boundDebugData) }).strip(),
   z
     .object({
       ...envelope,
@@ -147,6 +192,7 @@ const errorCodes = [
   'sessionNotRunning',
   'sessionAlreadyRunning',
   'audioDeviceUnavailable',
+  'audioBufferOverflow',
   'modelUnavailable',
   'resourceUnavailable',
   'resourceNotFound',
@@ -239,6 +285,16 @@ export const engineEventSchema = z.discriminatedUnion('type', [
   z.object({ ...envelope, type: z.literal('resourceActionResult'), resource: resourceSchema }).strip(),
   z.object({ ...envelope, type: z.literal('resourceChanged'), resource: resourceSchema }).strip(),
   z.object({ ...envelope, type: z.literal('sessionStarted'), sessionId: z.string().min(1).max(128) }).strip(),
+  z.object({
+    ...envelope,
+    type: z.literal('modelsPrewarmed'),
+    state: z.enum(['loading', 'ready']),
+    recognitionModelId: z.string().min(1).max(256),
+    translationModelId: z.string().min(1).max(256).optional(),
+    elapsedMs: z.number().nonnegative().finite(),
+    device: z.string().max(128).optional(),
+    runtime: z.string().max(256).optional(),
+  }).strip(),
   z.object({ ...envelope, type: z.literal('sessionStopped'), sessionId: z.string().min(1).max(128) }).strip(),
   z
     .object({
@@ -246,8 +302,15 @@ export const engineEventSchema = z.discriminatedUnion('type', [
       type: z.literal('caption'),
       sessionId: z.string().min(1).max(128),
       segment: captionSegmentSchema,
+      streamEpoch: z.number().int().nonnegative().optional(),
+      videoStartedAtMs: z.number().nonnegative().optional(),
+      videoEndedAtMs: z.number().nonnegative().optional(),
     })
     .strip(),
+  z.object({ ...envelope, type: z.literal('audioAccepted'), sessionId: z.string().min(1).max(128), epoch: z.number().int().nonnegative(), sequence: z.number().int().nonnegative() }).strip(),
+  z.object({ ...envelope, type: z.literal('streamReset'), sessionId: z.string().min(1).max(128), epoch: z.number().int().nonnegative() }).strip(),
+  z.object({ ...envelope, type: z.literal('streamFinished'), sessionId: z.string().min(1).max(128), epoch: z.number().int().nonnegative() }).strip(),
+  z.object({ ...envelope, type: z.literal('debugLogged') }).strip(),
   z
     .object({
       ...envelope,

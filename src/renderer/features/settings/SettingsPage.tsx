@@ -17,11 +17,12 @@ import { StorageTab } from './tabs/StorageTab'
 import { AdvancedTab } from './tabs/AdvancedTab'
 import { ComputeTab } from './tabs/ComputeTab'
 import { PerformanceTab } from './tabs/PerformanceTab'
+import { BrowserTab } from './tabs/BrowserTab'
 import './settings.css'
 
 export interface SettingsPanelProps { settings: AppSettings }
 
-const NAV_ICONS = { general: Settings, audio: Mic, translation: Languages, compute: Cpu, performance: Gauge, appearance: Monitor, storage: Database, advanced: SlidersHorizontal }
+const NAV_ICONS = { browser: Monitor, general: Settings, audio: Mic, translation: Languages, compute: Cpu, performance: Gauge, appearance: Monitor, storage: Database, advanced: SlidersHorizontal }
 
 export function SettingsPage() {
   const { t, language } = useI18n()
@@ -47,6 +48,7 @@ export function SettingsPage() {
   )
 
   const labels: Record<SettingsTab, string> = {
+    browser: t('browser.title'),
     compute: language === 'en' ? 'Compute devices' : '计算设备',
     performance: language === 'en' ? 'Performance & memory' : '性能与显存',
     general: t('modelsSettingsUi.general'), audio: t('modelsSettingsUi.audio'),
@@ -77,6 +79,7 @@ export function SettingsPage() {
           <Tabs.Panel id="appearance"><AppearanceTab settings={settings} /></Tabs.Panel>
           <Tabs.Panel id="storage"><StorageTab settings={settings} /></Tabs.Panel>
           <Tabs.Panel id="advanced"><AdvancedTab settings={settings} /></Tabs.Panel>
+          <Tabs.Panel id="browser"><BrowserTab /></Tabs.Panel>
         </div>
       </Tabs>
     </div>
