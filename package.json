@@ -118,6 +118,7 @@
       "artifactName": "Nola-Translator-${version}-Setup-${arch}.${ext}"
     },
     "nsis": {
+      "installerLanguages": ["en_US", "zh_CN"],
       "useZip": true,
       "differentialPackage": false,
       "oneClick": false,

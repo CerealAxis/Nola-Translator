@@ -8,26 +8,30 @@
 !define NOLA_APP_DIR_NAME "App"
 !define NOLA_DATA_DIR_NAME "Data"
 
-; Uninstaller prompt wording, as LangString with the LCID numbers electron-builder emits for its own
-; message files (nsisLang.js). package.json sets no nsis.installerLanguages, so the build compiles
-; the English entry alone; MUI2.nsh arrives later than this header, so bare numbers stand in for
-; the ${LANG_*} constants it defines.
+; Keep these entries aligned with nsis.installerLanguages in package.json. electron-builder
+; otherwise enables all bundled languages, and missing LangStrings fail compilation with -WX.
+; LCIDs match electron-builder's nsisLang.js; MUI2.nsh and its LANG_* constants arrive later.
 LangString nolaUninstallDeleteData 1033 "Also delete the Data folder? It holds your meetings, models and settings.$\r$\n$\r$\nChoose No to keep it."
 LangString nolaUninstallKeepingData 1033 "Keeping the Data folder"
 LangString nolaUninstallRemovingData 1033 "Removing the Data folder"
+LangString nolaUninstallDeleteData 2052 "是否同时删除 Data 文件夹？其中包含你的会议记录、模型和设置。$\r$\n$\r$\n选择“否”可保留这些数据。"
+LangString nolaUninstallKeepingData 2052 "正在保留 Data 文件夹"
+LangString nolaUninstallRemovingData 2052 "正在删除 Data 文件夹"
 
 ; A macro expanded into the page list contributes page declarations, not runnable code, so the path
 ; fix has to hang off a Function that NSIS calls at run time. The directory page cannot supply its
 ; own: MUI_PAGE_CUSTOMFUNCTION_PRE is taken by instFilesPre, and its own PRE/LEAVE pair would be
 ; overwritten by whatever the next page declares.
 !ifndef BUILD_UNINSTALLER
+!include "FileFunc.nsh"
+!include "LogicLib.nsh"
+
 Function nolaFixInstallDir
   ; The directory page yields the install root; the program needs its own subfolder under it. This
   ; also runs on an update, where $INSTDIR already ends in \App because it came from the registry,
   ; so the append is conditional or the path would gain one \App per upgrade.
-  ; ${StdUtils.GetFileNamePart} rather than StrContains: NsisTarget includes StdUtils.nsh in the
-  ; shared header, while StrContains.nsh only arrives later via assistedInstaller.nsh.
-  ${StdUtils.GetFileNamePart} $0 "$INSTDIR"
+  ; Use the built-in helper: electron-builder may register plugin directories after this include.
+  ${GetFileName} "$INSTDIR" $0
   ${If} $0 != "${NOLA_APP_DIR_NAME}"
     StrCpy $INSTDIR "$INSTDIR\${NOLA_APP_DIR_NAME}"
   ${EndIf}
