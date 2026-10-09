@@ -71,8 +71,9 @@ class ModelSpec:
     def total_bytes(self) -> int:
         return sum(entry.size for entry in self.files)
 
-    def url_for(self, entry: FileEntry) -> str:
-        return f"https://huggingface.co/{self.repo}/resolve/{self.revision}/{entry.path}"
+    def url_for(self, entry: FileEntry, use_mirror: bool = False) -> str:
+        endpoint = "https://hf-mirror.com" if use_mirror else "https://huggingface.co"
+        return f"{endpoint}/{self.repo}/resolve/{self.revision}/{entry.path}"
 
 
 def _download(url: str, destination: Path, progress: ProgressCallback) -> None:
@@ -107,6 +108,7 @@ class ModelManager:
         spec: ModelSpec,
         progress: ProgressCallback = lambda _current, _total: None,
         on_phase: PhaseCallback | None = None,
+        use_mirror: bool = False,
     ) -> Path:
         """Download file by file into a temp dir, then switch to the target atomically once verification passes.
 
@@ -145,7 +147,7 @@ class ModelManager:
                 def file_progress(current: int, _file_total: int, base: int = base) -> None:
                     progress(base + current, total)
 
-                self.fetcher(spec.url_for(entry), part, file_progress)
+                self.fetcher(spec.url_for(entry, use_mirror), part, file_progress)
                 done += entry.size
 
             phase("verify")

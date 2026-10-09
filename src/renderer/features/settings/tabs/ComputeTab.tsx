@@ -4,7 +4,7 @@ import { Alert, Button, Spinner } from '@heroui/react'
 import { RefreshCw } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { getBridge, stores, updateSettings, useStore } from '@/store'
-import type { ComputeDevice, ComputeSnapshot, RuntimeSnapshot } from '../../../../shared/compute'
+import type { ComputeDevice, ComputeSnapshot, LocalRuntime, RuntimeSnapshot } from '../../../../shared/compute'
 import { deviceCandidates } from '../../../../shared/device-selection'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
 import { SettingsRow } from '../SettingsRow'
@@ -15,6 +15,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
   const { language } = useI18n()
   const c = language === 'en' ? computeUi.en : computeUi.zh
   const [snapshot, setSnapshot] = useState<ComputeSnapshot | null>(null)
+  const [deviceCheck, setDeviceCheck] = useState<'loading' | 'ready' | 'failed'>('loading')
   const [runtimes, setRuntimes] = useState<RuntimeSnapshot | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -28,11 +29,12 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
 
   const refresh = useCallback(async () => {
     const bridge = getBridge()
-    if (!bridge) { setError('IPC bridge unavailable'); return }
+    if (!bridge) { setDeviceCheck('failed'); setError('IPC bridge unavailable'); return }
     setLoading(true)
     const results = await Promise.allSettled([bridge.engine.listComputeDevices(), bridge.runtimes.list()])
     const [devices, packages] = results
     if (devices.status === 'fulfilled') setSnapshot(devices.value)
+    setDeviceCheck(devices.status === 'fulfilled' ? 'ready' : 'failed')
     if (packages.status === 'fulfilled') setRuntimes(packages.value)
     setError(results.filter(r => r.status === 'rejected').map(r => String(r.reason)).join('\n'))
     setLoading(false)
@@ -71,7 +73,12 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
         if (selected === d.id) choices[existing] = { value: d.id, label }
       } else choices.push({ value: d.id, label })
     }
-    if (!choices.some(d => d.value === selected)) choices.push({ value: selected, label: `${c.unavailable} · ${selected}` })
+    if (!choices.some(d => d.value === selected)) {
+      const label = deviceCheck === 'loading' ? c.checkingDevices
+        : deviceCheck === 'failed' ? c.deviceCheckFailed
+          : `${c.unavailable} · ${selected}`
+      choices.push({ value: selected, label })
+    }
     return choices
   }
   function runtimeOptions(kind: 'engine' | 'llama') {
@@ -109,6 +116,11 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
   }
   const plan = snapshot?.activePlan
   const actual = (value: unknown) => value === 'unknown' ? c.planUnknown : value === 'unloaded' ? c.unloaded : String(value ?? c.noSession)
+  // Keep runtime details in the tooltip so long probe errors do not expand the settings page.
+  const localRuntimeRow = (label: string, local: LocalRuntime) => <SettingsRow label={label} descriptionTooltip={local.status === 'ready' || !!local.reason}
+    desc={local.status === 'ready' ? `${local.backend.toUpperCase()} · ${local.version}` : local.reason || undefined}>
+    <span>{local.status === 'ready' ? c.available : local.status === 'missing' ? c.notFound : c.notReady}</span>
+  </SettingsRow>
   return <div className="settings-panel">
     {error ? <Alert status="danger"><Alert.Content><Alert.Description>{error}</Alert.Description></Alert.Content></Alert> : null}
     <p className="compute-hint">{c.nextSession}</p>
@@ -134,38 +146,35 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
       <SettingsRow label={c.translationActual}><span>{actual(plan?.translationActual)}</span></SettingsRow>
       {Array.isArray(plan?.reasons) ? plan.reasons.map((reason, i) => <p className="compute-hint" key={i}>{String(reason)}</p>) : null}
     </SettingGroup>
-    <details><summary className="compute-hint">{language === 'en' ? 'Environment maintenance' : '环境维护（高级）'}</summary>
     <SettingGroup legend={c.environments} actions={<>
       <Button variant="secondary" size="sm" isDisabled={installing || !!runtimes?.operation} onPress={() => void prepare()}>{c.restart}</Button>
       <Button variant="secondary" size="sm" isDisabled={installing || !!runtimes?.operation || !runtimes?.packages.length} onPress={() => void install()}>{c.import}</Button>
       {installing || runtimes?.operation ? <Button variant="secondary" size="sm" onPress={() => void getBridge()?.runtimes.cancel().catch(e => setError(String(e)))}>{c.cancel}</Button> : null}
     </>}>
-      <p className="compute-hint">{c.environmentHint}</p>
       {runtimes ? <>
-        {[['engine', c.localPython], ['llama', c.localLlama]].map(([kind, label]) => {
-          const local = runtimes.local[kind as 'engine' | 'llama']
-          return <SettingsRow key={kind} label={label} desc={<>{local.path ? <code className="settings-code">{local.path}</code> : null}{local.reason ? <p role="status">{local.reason}</p> : null}</>}>
-            <span>{local.status === 'ready' ? `${c.available} · ${local.backend.toUpperCase()} · ${local.version}` : c.notReady}</span>
-          </SettingsRow>
-        })}
+        <SettingsRow label={c.localPython} descriptionTooltip desc={runtimes.local.engine.path ? <code className="settings-code">{runtimes.local.engine.path}</code> : undefined}>
+          <span>{runtimes.local.engine.status === 'missing' ? c.notFound : c.found}</span>
+        </SettingsRow>
+        {localRuntimeRow(c.localTorch, runtimes.local.engine)}
+        {localRuntimeRow(c.localLlama, runtimes.local.llama)}
       </> : null}
       {runtimes ? <SettingsRow label={c.environmentStorage} descriptionTooltip desc={c.environmentStorageHint}><code className="settings-code">{runtimes.directory}</code></SettingsRow> : null}
       <SettingsRow label={c.engineEnvironment}><SettingSelect value={compute.runtimeId} options={runtimeOptions('engine')} ariaLabel={c.engineEnvironment} onChange={runtimeId => save({ runtimeId })} /></SettingsRow>
       <SettingsRow label={c.llamaEnvironment}><SettingSelect value={compute.llamaRuntimeId} options={runtimeOptions('llama')} ariaLabel={c.llamaEnvironment} onChange={llamaRuntimeId => save({ llamaRuntimeId })} /></SettingsRow>
-      <details><summary className="compute-hint">{c.optionalEnvironments}</summary>
       {runtimes?.recipes.map(p => {
         const localReady = runtimes.local.engine.status === 'ready' && runtimes.local.engine.gpuAvailable && runtimes.local.engine.backend === p.backend && runtimes.local.engine.version === p.torchVersion
-        return <SettingsRow key={p.id} label={p.name} desc={localReady ? c.available : p.reason || `${p.torchVersion} · ${Math.round(p.wheel.bytes / 2 ** 20)} MiB`}>
+        const blocked = !localReady && !!p.reason
+        const detail = `${localReady ? `${c.available} · ` : ''}${p.torchVersion} · ${Math.round(p.wheel.bytes / 2 ** 20)} MiB`
+        return <SettingsRow key={p.id} label={p.name} descriptionTooltip={!blocked} desc={blocked ? p.reason : detail}>
           <Button variant="secondary" size="sm" isDisabled={localReady || !p.available || installing || !!runtimes.operation} onPress={() => void install(p.id, p.installed)}>{localReady ? c.available : p.installed ? c.repair : c.install}</Button>
         </SettingsRow>
       })}
-      {!runtimes?.packages.length ? <p className="compute-hint">{c.noPackages}</p> : runtimes.packages.map(p => <SettingsRow key={p.id} label={p.name} desc={`${p.kind === 'llama' && runtimes.local.llama.status === 'ready' && runtimes.local.llama.backend === p.backend ? `${c.available} · ` : ''}${p.backend.toUpperCase()} · ${Math.round((p.bytes + (p.companions?.reduce((n, c) => n + c.bytes, 0) ?? 0)) / 2 ** 20)} MiB`}>
+      {!runtimes?.packages.length ? <p className="compute-hint">{c.noPackages}</p> : runtimes.packages.map(p => <SettingsRow key={p.id} label={p.name} descriptionTooltip
+        desc={`${p.kind === 'llama' && runtimes.local.llama.status === 'ready' && runtimes.local.llama.backend === p.backend ? `${c.available} · ` : ''}${p.backend.toUpperCase()} · ${Math.round((p.bytes + (p.companions?.reduce((n, extra) => n + extra.bytes, 0) ?? 0)) / 2 ** 20)} MiB`}>
         <Button variant="secondary" size="sm" isDisabled={installing || !!runtimes.operation} onPress={() => void install(p.id, p.installed)}>{p.installed ? c.repair : c.install}</Button>
       </SettingsRow>)}
-      </details>
       {runtimes?.operation ? <p role="status">{c[runtimes.operation.phase]}{runtimes.operation.phase === 'download' ? ` · ${Math.round(runtimes.operation.bytes / runtimes.operation.totalBytes * 100)}%` : ''}</p> : null}
       {runtimes?.lastError && !error ? <p role="alert">{runtimes.lastError}</p> : null}
     </SettingGroup>
-    </details>
   </div>
 }

@@ -101,7 +101,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "recognitionModel",
             "qwen3-asr",
             "Qwen3-ASR 1.7B",
-            "下载约 4GB 的 BF16 原始权重，加载时以 NF4 4-bit 量化运行；支持多语言流式字幕。",
+            "支持中文、英语、粤语等 30 种语言及 22 种中文方言语音识别。",
             tuple(normalize(code) for code in QWEN_LANGUAGES),
             4_087_646_324,
         ),
@@ -110,7 +110,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "recognitionModel",
             "qwen3-asr",
             "Qwen3-ASR 0.6B",
-            "约 1.5GB 的 BF16 原始权重，加载时以 NF4 4-bit 量化运行；与 1.7B 同系列，体积更小。",
+            "支持中文、英语、粤语等 30 种语言及 22 种中文方言语音识别。",
             tuple(normalize(code) for code in QWEN_LANGUAGES),
             1_576_381_331,
         ),
@@ -119,7 +119,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "recognitionModel",
             "sensevoice",
             "SenseVoiceSmall",
-            "约 936MB 的非自回归权重，由内置 funasr 在本机运行；支持中日韩粤英五种语言及自动检测。",
+            "支持普通话、粤语、英语、日语和韩语语音识别与语言检测。",
             ("zh", "en", "yue", "ja", "ko"),
             936_694_116,
         ),
@@ -128,7 +128,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "translationModel",
             "hymt2",
             "Hy-MT2 1.8B Q4_K_M",
-            "预量化 Q4_K_M 文件（约 1.13GB），由内置 llama.cpp 在本机运行；质量基准档。",
+            "Q4_K_M 量化版本；支持 33 种语言互译，另含藏语、哈萨克语、蒙古语、维吾尔语和粤语。",
             tuple(HYMT2_LANGUAGES),
             1_133_080_448,
         ),
@@ -137,7 +137,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "translationModel",
             "hymt2",
             "Hy-MT2 1.8B Q3_K_M",
-            "约 951MB，比 Q4_K_M 更小；实测专有名词（品牌、型号）保持得最好。",
+            "Q3_K_M 量化版本；支持 33 种语言互译，另含藏语、哈萨克语、蒙古语、维吾尔语和粤语。",
             tuple(HYMT2_LANGUAGES),
             951_022_560,
         ),
@@ -146,7 +146,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "translationModel",
             "hymt2",
             "Hy-MT2 1.8B UD-IQ2_M",
-            "约 723MB，体积最小；位宽很低，专有名词可能被译成字面意思。",
+            "UD-IQ2_M 量化版本；支持 33 种语言互译，另含藏语、哈萨克语、蒙古语、维吾尔语和粤语。",
             tuple(HYMT2_LANGUAGES),
             722_666_176,
         ),
@@ -155,7 +155,7 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
             "translationModel",
             "m2m100",
             "M2M100 418M",
-            "约 1.9GB 的 pytorch_model.bin，由 transformers 在本机运行；支持 100 种语言互译。",
+            "支持中文、英语等 100 种语言互译。",
             tuple(sorted(FLORES_LANGUAGES)),
             1_941_936_305,
         ),
@@ -278,7 +278,7 @@ class ResourceManager:
         )
 
     async def manage(
-        self, resource_id: str, action: Literal["install", "remove", "cancel"]
+        self, resource_id: str, action: Literal["install", "remove", "cancel"], use_mirror: bool = False
     ) -> ResourceRecord:
         self._definition(resource_id)
         if action == "cancel":
@@ -307,7 +307,7 @@ class ResourceManager:
             cancel_event=threading.Event() if cancellable else None,
         )
         self.operations[resource_id] = operation
-        task = asyncio.create_task(self._run(resource_id, action, operation))
+        task = asyncio.create_task(self._run(resource_id, action, operation, use_mirror))
         self.tasks[resource_id] = task
         self._emit_changed(resource_id)
         return self.record(resource_id)
@@ -317,10 +317,11 @@ class ResourceManager:
         resource_id: str,
         action: Literal["install", "remove"],
         operation: Operation,
+        use_mirror: bool,
     ) -> None:
         try:
             if action == "install":
-                await self._install(resource_id, operation)
+                await self._install(resource_id, operation, use_mirror)
             else:
                 await self._remove(resource_id)
         except ResourceOperationCancelled:
@@ -335,7 +336,7 @@ class ResourceManager:
             self.tasks.pop(resource_id, None)
             self._emit_changed(resource_id)
 
-    async def _install(self, resource_id: str, operation: Operation) -> None:
+    async def _install(self, resource_id: str, operation: Operation, use_mirror: bool) -> None:
         spec = self._spec(resource_id)
         loop = asyncio.get_running_loop()
 
@@ -352,7 +353,7 @@ class ResourceManager:
                 return
             loop.call_soon_threadsafe(self._set_phase, resource_id, phase)
 
-        await asyncio.to_thread(self.models.ensure, spec, progress, on_phase)
+        await asyncio.to_thread(self.models.ensure, spec, progress, on_phase, use_mirror)
         # clean up legacy resources once the install succeeds; a cleanup failure doesn't change the result.
         await asyncio.to_thread(self._cleanup_after_install, resource_id)
 

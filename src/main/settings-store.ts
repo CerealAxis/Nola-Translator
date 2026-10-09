@@ -146,6 +146,9 @@ export class SettingsStore {
         version: 1,
         uiLanguage: raw.uiLanguage === 'en' ? 'en' : 'zh-CN',
         modelStoragePath: typeof raw.modelStoragePath === 'string' && isAbsolute(raw.modelStoragePath) ? raw.modelStoragePath : '',
+        useHuggingFaceMirror: typeof raw.useHuggingFaceMirror === 'boolean'
+          ? raw.useHuggingFaceMirror
+          : DEFAULT_SETTINGS.useHuggingFaceMirror,
         recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}) },
         recording: { ...DEFAULT_SETTINGS.recording, ...(raw.recording ?? {}) },
         appearance: { ...DEFAULT_SETTINGS.appearance, ...(raw.appearance ?? {}) },

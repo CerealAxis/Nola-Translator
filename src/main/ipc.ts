@@ -116,6 +116,7 @@ export function registerEngineIpc(
           requestId: `resource-action-${randomUUID()}`,
           resourceId,
           action: action as 'install' | 'remove' | 'cancel',
+          useHuggingFaceMirror: getSettings().useHuggingFaceMirror,
         },
         'resourceActionResult'
       )
@@ -224,6 +225,7 @@ export function registerEngineIpc(
           requestId: `hub-install-${randomUUID()}`,
           repo,
           ...(slot ? { slot } : {}),
+          useHuggingFaceMirror: getSettings().useHuggingFaceMirror,
         },
         'resourceActionResult',
         60 * 1000

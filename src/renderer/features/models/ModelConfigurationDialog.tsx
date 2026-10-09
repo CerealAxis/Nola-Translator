@@ -44,7 +44,7 @@ export function ModelConfigurationDialog({ record, onClose }: ModelConfiguration
     slot: record.kind === 'recognitionModel' ? 'recognition' : 'translation',
     engine: engines[0] ?? 'pytorch',
     languages: record.kind === 'recognitionModel' ? record.languages.map(normalizeLanguage) : [],
-    supportsAutoDetection: false,
+    supportsAutoDetection: record.kind === 'recognitionModel',
     sourceLanguages: record.kind === 'translationModel' ? record.languages.map(normalizeLanguage) : [],
     targetLanguages: record.kind === 'translationModel' ? record.languages.map(normalizeLanguage) : [],
   })

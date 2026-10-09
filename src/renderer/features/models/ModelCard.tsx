@@ -10,9 +10,20 @@ import { resourceStateOf } from '@/bridge'
 import type { AppSettings, AppSettingsPatch, ResourceRecord, ResourceState } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
 import { useI18n } from '@/i18n'
+import type { TranslationKey } from '@/i18n'
 import { ModelMark } from './modelBrand'
 
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
+
+const BUILTIN_DESCRIPTION_KEYS: Readonly<Record<string, TranslationKey>> = {
+  'qwen3-asr-1.7b-hf': 'models.descriptions.qwenAsr17',
+  'qwen3-asr-0.6b-hf': 'models.descriptions.qwenAsr06',
+  'sensevoice-small': 'models.descriptions.senseVoice',
+  'hy-mt2-1.8b-q4-k-m': 'models.descriptions.hyMt2Q4',
+  'hy-mt2-1.8b-q3-k-m': 'models.descriptions.hyMt2Q3',
+  'hy-mt2-1.8b-iq2-m': 'models.descriptions.hyMt2Iq2',
+  'm2m100-418m': 'models.descriptions.m2m100',
+}
 
 /**
  * Byte counts for humans. A space between number and unit keeps the two readable as
@@ -136,6 +147,8 @@ export function ModelCard({
   const { t } = useI18n()
   const state: ResourceState = resourceStateOf(record)
   const inFlight = state === 'queued' || state === 'downloading' || state === 'verifying'
+  const descriptionKey = BUILTIN_DESCRIPTION_KEYS[record.resourceId]
+  const description = descriptionKey ? t(descriptionKey) : record.description || descriptionFallback
 
   return (
     <Card className={`models-card h-full ${className}`}>
@@ -152,7 +165,7 @@ export function ModelCard({
           {descriptionLoading ? <div className="models-card__description-loading" aria-hidden="true">
             <Skeleton className="h-3 w-full rounded-[6px]" />
             <Skeleton className="h-3 w-3/4 rounded-[6px]" />
-          </div> : <Card.Description>{record.description || descriptionFallback}</Card.Description>}
+          </div> : <Card.Description>{description}</Card.Description>}
           <span className="models-card__meta tabular">{metadata ?? factsOf(record).join(' · ')}</span>
         </div>
       </Card.Header>

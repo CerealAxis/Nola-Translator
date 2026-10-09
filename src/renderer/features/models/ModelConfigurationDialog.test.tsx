@@ -15,7 +15,7 @@ it('keeps a downloaded model gated until the user saves its configuration', asyn
   render(<ModelConfigurationDialog record={pending} onClose={close} />)
   expect(save).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: '保存配置' }))
-  await waitFor(() => expect(save).toHaveBeenCalledWith(pending.resourceId, expect.objectContaining({ slot: 'recognition', engine: 'pytorch', languages: ['en', 'ja'], supportsAutoDetection: false })))
+  await waitFor(() => expect(save).toHaveBeenCalledWith(pending.resourceId, expect.objectContaining({ slot: 'recognition', engine: 'pytorch', languages: ['en', 'ja'], supportsAutoDetection: true })))
   expect(close).toHaveBeenCalledOnce()
 })
 

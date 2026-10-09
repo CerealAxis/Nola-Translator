@@ -62,6 +62,8 @@ export type AppSettings = {
   theme: 'system' | 'light' | 'dark'
   uiLanguage: 'zh-CN' | 'en'
   modelStoragePath: string
+  /** Download Hugging Face model files through hf-mirror.com when enabled. */
+  useHuggingFaceMirror: boolean
   recognition: RecognitionSettings
   recording: RecordingSettings
   appearance: AppearancePrefs
@@ -191,6 +193,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   uiLanguage: 'zh-CN',
   modelStoragePath: '',
+  useHuggingFaceMirror: true,
   recognition: {
     modelId: 'qwen3-asr-1.7b-hf',
     sourceLanguage: 'auto',

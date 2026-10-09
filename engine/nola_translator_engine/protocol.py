@@ -207,6 +207,7 @@ class ManageResourceCommand(Envelope):
     type: Literal["manageResource"]
     resourceId: str = Field(min_length=1, max_length=256)
     action: Literal["install", "remove", "cancel"]
+    useHuggingFaceMirror: bool = True
 
 
 class SearchHubModelsCommand(Envelope):
@@ -259,6 +260,7 @@ class InstallHubRepoCommand(Envelope):
     #: The slot the caller expects. Mismatched against the repo's own verdict so a click on the
     #: wrong filter cannot install a translation model into the recognition list.
     slot: Literal["recognition", "translation"] | None = None
+    useHuggingFaceMirror: bool = True
 
 
 class DebugLogCommand(Envelope):

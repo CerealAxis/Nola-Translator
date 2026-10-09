@@ -129,6 +129,7 @@ export const engineCommandSchema = z.discriminatedUnion('type', [
     type: z.literal('manageResource'),
     resourceId: z.string().min(1).max(256),
     action: z.enum(['install', 'remove', 'cancel']),
+    useHuggingFaceMirror: z.boolean().optional(),
   }).strip(),
   z.object({ ...envelope, type: z.literal('configureModel'), resourceId: z.string().min(1).max(256), configuration: modelConfigurationSchema }).strip(),
   z.object({ ...envelope, type: z.literal('startSession'), config: sessionConfigSchema }).strip(),
@@ -172,6 +173,7 @@ export const engineCommandSchema = z.discriminatedUnion('type', [
       type: z.literal('installHubRepo'),
       repo: z.string().min(3).max(256),
       slot: z.enum(['recognition', 'translation']).optional(),
+      useHuggingFaceMirror: z.boolean().optional(),
     })
     .strip(),
 ])

@@ -167,6 +167,7 @@ export type EngineCommand =
   | (Envelope<'manageResource'> & {
       resourceId: string
       action: 'install' | 'remove' | 'cancel'
+      useHuggingFaceMirror?: boolean
     })
   | (Envelope<'startSession'> & { config: SessionConfig })
   | (Envelope<'prewarmModels'> & { config: PrewarmConfig })
@@ -180,7 +181,7 @@ export type EngineCommand =
   | Envelope<'shutdown'>
   | (Envelope<'searchHubModels'> & { query: string; slot?: 'recognition' | 'translation'; limit?: number; weightFormat?: 'gguf'; cursor?: string })
   | (Envelope<'inspectHubRepo'> & { repo: string })
-  | (Envelope<'installHubRepo'> & { repo: string; slot?: 'recognition' | 'translation' })
+  | (Envelope<'installHubRepo'> & { repo: string; slot?: 'recognition' | 'translation'; useHuggingFaceMirror?: boolean })
   | (Envelope<'configureModel'> & { resourceId: string; configuration: ModelConfiguration })
 
 export type AudioDevice = {

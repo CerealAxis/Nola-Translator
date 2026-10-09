@@ -41,6 +41,7 @@ export const settingsPatchSchema = z.object({
   compute: computeSettingsPatchSchema.optional(),
   theme: z.enum(['system', 'light', 'dark']).optional(),
   uiLanguage: z.enum(['zh-CN', 'en']).optional(),
+  useHuggingFaceMirror: z.boolean().optional(),
   recognition: z.object({
     modelId: recognitionModelIdSchema.optional(),
     sourceLanguage: z.string().min(1).max(32).optional(),

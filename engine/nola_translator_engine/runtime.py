@@ -266,7 +266,9 @@ class EngineRuntime:
                 ):
                     return [self._resource_error(command.requestId, "resourceInUse")]
             try:
-                resource = await self.resources.manage(command.resourceId, command.action)
+                resource = await self.resources.manage(
+                    command.resourceId, command.action, command.useHuggingFaceMirror
+                )
             except ResourceActionError as error:
                 return [self._resource_error(command.requestId, error.code, error.details)]
             return [
@@ -508,6 +510,7 @@ class EngineRuntime:
                 requestId=command.requestId,
                 resourceId=resource_id,
                 action="install",
+                useHuggingFaceMirror=command.useHuggingFaceMirror,
             )
         )
 

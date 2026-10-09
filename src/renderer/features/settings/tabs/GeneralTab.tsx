@@ -68,6 +68,18 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
           />
         </SettingsRow>
       </SettingGroup>
+
+      <SettingGroup legend={t('settings.groupDownloads')}>
+        <SettingsRow label={t('settings.huggingFaceMirror')} desc={t('settings.huggingFaceMirrorHint')} descriptionTooltip>
+          <SettingSwitch
+            isSelected={settings.useHuggingFaceMirror}
+            ariaLabel={t('settings.huggingFaceMirror')}
+            onChange={(useHuggingFaceMirror) => {
+              void updateSettings({ useHuggingFaceMirror }).catch(() => undefined)
+            }}
+          />
+        </SettingsRow>
+      </SettingGroup>
     </div>
   )
 }
@@ -105,4 +117,3 @@ function ThemeRow() {
     </SettingsRow>
   )
 }
-
