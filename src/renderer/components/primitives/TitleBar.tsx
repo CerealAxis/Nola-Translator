@@ -6,7 +6,7 @@ import { CircleHelp, Languages, Moon, Sun, Minus, Square, X } from 'lucide-react
 import { useI18n } from '@/i18n'
 import { useRoute } from '@/routes'
 import { settingsStore, updateSettings, useStore } from '@/store'
-import { NolaLogo } from './NolaLogo'
+import nolaLogoUrl from '../../../../assets/brand/nola-logo.svg'
 
 export type TitleBarVariant = 'brand' | 'session'
 export interface TitleBarHelpItem { key: string; label: ReactNode; onSelect: () => void }
@@ -37,8 +37,7 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
   return (
     <header className={`nola-titlebar nola-drag z-titlebar-drag ${className}`}>
       <div className="nola-brand">
-        <NolaLogo size={36} title={null} />
-        <span>{t('app.name')}</span>
+        <img className="nola-brand__mark" src={nolaLogoUrl} alt={t('app.name')} />
       </div>
       {variant === 'session' ? <div className="nola-no-drag flex min-w-0 items-center gap-3">{leading}{sessionTitle}{status}{timer}</div> : null}
       <div className="nola-titlebar-tools nola-no-drag">

@@ -25,8 +25,5 @@ export type { SettingRowProps } from './SettingRow'
 export { ErrorBoundary } from './ErrorBoundary'
 export type { ErrorBoundaryProps } from './ErrorBoundary'
 
-export { NolaLogo } from './NolaLogo'
-export type { NolaLogoProps } from './NolaLogo'
-
 export { NavigationItem } from './NavigationItem'
 export type { NavigationItemProps } from './NavigationItem'

@@ -4,6 +4,7 @@
 > Token 事实源在 `src/renderer/theme/`
 > 两边不一致时以 CSS 为准，并回来改本文件。
 > 更新：2026-10-05
+> 项目 logo：`assets/brand/nola-logo.svg`
 
 ## 1. 视觉与功能基准
 
@@ -281,7 +282,7 @@ Electron 拖拽仅顶栏/浮窗壳，交互元素 no-drag。原生窗口控制�
 ### 11.2 自创组件封闭清单
 
 `AppShell` `TitleBar`(+`useNolaTheme`) `PageHeader` `StatusPill` `SectionCard`
-`SettingRow` `ErrorBoundary` `NolaLogo` `NavigationItem`
+`SettingRow` `ErrorBoundary` `NavigationItem`
 
 - 以上每个都过了 11.1 的四步决策
 - 其余 5 个台账组件归 feature 层所有，不是「缺了」：

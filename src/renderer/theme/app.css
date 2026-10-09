@@ -22,7 +22,9 @@
       radial-gradient(ellipse at 40% 0%, color-mix(in oklch, var(--accent) 7%, transparent), transparent 70%), var(--background);
   }
   .nola-titlebar { display: flex; align-items: center; gap: 20px; height: var(--nola-titlebar-h); flex-shrink: 0; padding: 0 24px; }
-  .nola-brand { display: flex; align-items: center; gap: 14px; min-width: 0; font-size: 18px; font-weight: 650; white-space: nowrap; }
+  .nola-brand { display: flex; align-items: center; }
+  /* The brand SVG pads its 512 canvas by 48 units, so the artwork fills 416/512; 25px renders a ~20px mark. */
+  .nola-brand__mark { width: 25px; height: 25px; flex-shrink: 0; }
   .nola-titlebar-tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
   .nola-titlebar-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--foreground); }
   .nola-titlebar-icon svg { width: 20px; height: 20px; }
@@ -92,7 +94,6 @@
 }
 @media (max-width: 800px) {
   .nola-titlebar { gap: 8px; padding: 0 16px; }
-  .nola-brand { font-size: 16px; gap: 10px; }
   .nola-titlebar-tools { gap: 2px; }
   .nola-setting-row { gap: 12px; grid-template-columns: minmax(110px, .65fr) minmax(0, 1fr); }
   .nola-overlay-stage { min-height: 280px; padding: 20px 16px; }
