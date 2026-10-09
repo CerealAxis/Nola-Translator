@@ -123,7 +123,6 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
   </SettingsRow>
   return <div className="settings-panel">
     {error ? <Alert status="danger"><Alert.Content><Alert.Description>{error}</Alert.Description></Alert.Content></Alert> : null}
-    <p className="compute-hint">{c.nextSession}</p>
     <SettingGroup legend={language === 'en' ? 'Inference engines' : '推理引擎'}>
       <SettingsRow label={language === 'en' ? 'Speech recognition engine' : '语音识别引擎'}><SettingSelect value={compute.recognitionEngine} options={engineOptions} ariaLabel={c.recognition} onChange={value => save({ recognitionEngine: value as 'pytorch' | 'llama', recognitionDevice: 'auto' })} /></SettingsRow>
       <SettingsRow label={language === 'en' ? 'Local translation engine' : '本地翻译引擎'}><SettingSelect value={useTorch ? 'pytorch' : 'llama'} options={engineOptions} ariaLabel={c.translation} isDisabled={settings.translation.provider !== 'local'} onChange={value => save({ translationEngine: value as 'pytorch' | 'llama', translationDevice: 'auto' })} /></SettingsRow>

@@ -27,7 +27,6 @@ export function PerformanceTab({ settings }: SettingsPanelProps) {
     <SettingsRow descriptionTooltip label={label} desc={desc}><NumberSetting value={compute[field]} min={min} max={max} label={label} onSave={value => save({ [field]: value })} /></SettingsRow>
   return <div className="settings-panel">
     {error ? <Alert status="danger"><Alert.Content><Alert.Description>{error}</Alert.Description></Alert.Content></Alert> : null}
-    <p className="compute-hint">{c.nextSession}</p>
     {usesTorch ? <SettingGroup legend="PyTorch">
       <SettingsRow descriptionTooltip label={c.precision} desc={c.precisionHint}><SettingSelect ariaLabel={c.precision} value={compute.precision} options={[{ value: 'auto', label: c.automatic }, ...['fp32', 'fp16', 'bf16'].map(value => ({ value, label: value.toUpperCase() }))]} onChange={value => save({ precision: value as ComputeSettings['precision'] })} /></SettingsRow>
       <SettingsRow descriptionTooltip label={c.quantization} desc={c.quantHint}><SettingSelect ariaLabel={c.quantization} value={compute.quantization} options={[{ value: 'auto', label: c.automatic }, { value: 'none', label: c.none }, { value: 'nf4', label: 'NF4' }, { value: '8bit', label: '8bit' }]} onChange={value => save({ quantization: value as ComputeSettings['quantization'] })} /></SettingsRow>

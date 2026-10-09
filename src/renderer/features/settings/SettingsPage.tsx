@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Alert, Card, Fieldset, ListBox, Spinner, Switch, Tabs } from '@heroui/react'
-import { Cpu, Gauge, Database, Languages, Mic, Monitor, Settings, SlidersHorizontal } from 'lucide-react'
+import { Alert, Card, Fieldset, ListBox, Spinner, Switch, Tabs, Tooltip } from '@heroui/react'
+import { Cpu, CircleHelp, Gauge, Database, Languages, Mic, Monitor, Settings, SlidersHorizontal } from 'lucide-react'
 
 import type { AppSettings } from '@/bridge'
 import { useI18n } from '@/i18n'
@@ -18,6 +18,7 @@ import { AdvancedTab } from './tabs/AdvancedTab'
 import { ComputeTab } from './tabs/ComputeTab'
 import { PerformanceTab } from './tabs/PerformanceTab'
 import { BrowserTab } from './tabs/BrowserTab'
+import { computeUi } from './compute-ui'
 import './settings.css'
 
 export interface SettingsPanelProps { settings: AppSettings }
@@ -56,6 +57,11 @@ export function SettingsPage() {
     storage: t('modelsSettingsUi.storage'), advanced: t('modelsSettingsUi.advanced'),
   }
 
+  const computeCopy = language === 'en' ? computeUi.en : computeUi.zh
+  const NAV_HINTS: Partial<Record<SettingsTab, string>> = {
+    compute: computeCopy.nextSession, performance: computeCopy.nextSession,
+  }
+
   return (
     <div className="settings-page">
       <header className="settings-page__heading"><h1>{t('settings.title')}</h1><p>{t('modelsSettingsUi.settingsSubtitle')}</p></header>
@@ -66,7 +72,11 @@ export function SettingsPage() {
           <Tabs.List aria-label={t('modelsSettingsUi.settingsTabs')}>
             {SETTINGS_TABS.map((item) => {
               const Icon = NAV_ICONS[item]
-              return <Tabs.Tab key={item} id={item}><Icon aria-hidden="true" />{labels[item]}<Tabs.Indicator /></Tabs.Tab>
+              const hint = NAV_HINTS[item]
+              const content = <><Icon aria-hidden="true" />{labels[item]}{hint ? <span className="tabs__hint" aria-hidden="true"><CircleHelp aria-hidden="true" /></span> : null}<Tabs.Indicator /></>
+              return hint
+                ? <Tooltip key={item} delay={300}><Tabs.Tab id={item}>{content}</Tabs.Tab><Tooltip.Content className="settings-nav__tooltip">{hint}</Tooltip.Content></Tooltip>
+                : <Tabs.Tab key={item} id={item}>{content}</Tabs.Tab>
             })}
           </Tabs.List>
         </div>

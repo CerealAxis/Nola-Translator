@@ -13,6 +13,9 @@
 .settings-nav .tabs__list { display:flex; flex-direction:column; gap:8px; background:transparent; padding:0; width:100%; }
 .settings-nav .tabs__tab { justify-content:flex-start; height:52px; border-radius:12px; padding:0 16px; font-size:14px; gap:14px; opacity:1; color:var(--foreground); white-space:normal; }
 .settings-nav .tabs__tab svg { width:22px; height:22px; flex-shrink:0; }
+.settings-nav .tabs__tab .tabs__hint { display:flex; align-items:center; margin-left:auto; color:var(--muted); flex-shrink:0; }
+.settings-nav .tabs__tab .tabs__hint svg { width:15px; height:15px; }
+.settings-nav__tooltip { max-width: min(24rem, calc(100vw - 2rem)); white-space: normal; }
 .settings-nav .tabs__tab[data-selected="true"] { color:var(--accent); font-weight:600; }
 .settings-nav .tabs__indicator { background:var(--accent-soft); border-radius:12px; box-shadow:none; }
 .settings-panels { min-width:0; }
