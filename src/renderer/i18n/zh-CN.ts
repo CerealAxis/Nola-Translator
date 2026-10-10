@@ -473,6 +473,8 @@ export const zhCN = {
     enginePath: '安装路径',
     protocolVersion: '通信协议',
     copyDiagnostics: '复制诊断信息',
+    openLogs: '打开日志目录',
+    openLogsHint: '每次启动记录运行过程；复现问题后发送本次日志。日志统一使用英文，单份约 4 MB 时自动续写，保留最近 20 份。日志可能包含设备名称和本地路径。',
     copied: '已复制',
     githubIssue: 'GitHub issue',
     githubIssueHint: '在这里提交问题与需求',

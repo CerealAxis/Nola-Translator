@@ -180,6 +180,7 @@ export function createIpcBridge(): NolaBridge {
     diagnostics: {
       get: () => call('getDiagnostics', (injected) => injected.getDiagnostics()),
       copy: () => call('copyDiagnostics', (injected) => injected.copyDiagnostics()),
+      openLogs: () => call('openLogs', (injected) => injected.openLogs()),
     },
     app: {
       // No payload and no translation: the main process resolves the user's default browser

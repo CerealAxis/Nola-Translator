@@ -1,10 +1,11 @@
 import { translationEngine } from '../shared/model-engines'
+import { captureMainConsole, initializeSessionLog, logActivityTotals, logDiagnostic } from './session-log'
 import { resolveDeviceIntent } from '../shared/device-selection'
 import { join } from 'node:path'
 import { mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 
-import { app, BrowserWindow, safeStorage, screen, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, safeStorage, screen, shell } from 'electron'
 
 import type { AppSettings, OverlaySettings } from '../shared/settings'
 import { NO_TRANSLATION_LANGUAGE } from '../shared/settings'
@@ -110,12 +111,46 @@ if (!hasSingleInstanceLock) {
   })
 
   void app.whenReady().then(async () => {
+    initializeSessionLog(join(app.getPath('userData'), 'logs'), {
+      version: app.getVersion(), electron: process.versions.electron, node: process.versions.node,
+      platform: process.platform, architecture: process.arch, systemVersion: process.getSystemVersion(), packaged: app.isPackaged,
+    })
+    captureMainConsole()
+    app.on('web-contents-created', (_event, contents) => {
+      contents.on('did-finish-load', () => logDiagnostic('ui.window.loaded', { windowId: contents.id }))
+      contents.on('destroyed', () => logDiagnostic('ui.window.closed'))
+      contents.on('console-message', details => {
+        if (details.level !== 'error' && details.level !== 'warning') return
+        logDiagnostic('renderer.console', { level: details.level, message: details.message, source: details.sourceId, line: details.lineNumber })
+      })
+      contents.on('did-fail-load', (_event, code, description, _url, isMainFrame) => {
+        if (isMainFrame) logDiagnostic('renderer.load-failed', { code, description })
+      })
+    })
+    app.on('child-process-gone', (_event, details) => logDiagnostic('app.child-process-gone', details))
+    app.on('render-process-gone', (_event, contents, details) => logDiagnostic('app.renderer-gone', { id: contents.id, ...details }))
+    ipcMain.on('diagnostics:ui-activity', (event, activity: unknown) => {
+      if (!BrowserWindow.fromWebContents(event.sender) || !activity || typeof activity !== 'object') return
+      const item = activity as Record<string, unknown>
+      if (item.type !== 'navigation' && item.type !== 'interaction') return
+      logDiagnostic(`ui.${item.type}`, { windowId: event.sender.id,
+        route: typeof item.route === 'string' ? item.route.slice(0, 120) : '',
+        element: typeof item.element === 'string' ? item.element.slice(0, 64) : '' })
+    })
+    app.on('will-quit', () => { logActivityTotals(); logDiagnostic('app.quit') })
+    const healthTimer = setInterval(() => logDiagnostic('app.health', {
+      uptimeSeconds: Math.round(process.uptime()), memory: process.memoryUsage(), cpu: process.getCPUUsage(),
+      engineState: engine?.currentState ?? 'not-created', windows: BrowserWindow.getAllWindows().length,
+    }), 30_000)
+    healthTimer.unref()
+    app.once('will-quit', () => clearInterval(healthTimer))
     // The app's own stores resolve from the single data root, not from `userData`, which is
     // left as Chromium's disposable state; it is still read here as the destination of the
     // FluentCaptions -> Nola rename migration. See `data-root.ts` for why the two stay apart.
     const userData = app.getPath('userData')
     await migrateLegacyUserData(app.getPath('appData'), userData)
     const dataRoot = resolveDataRoot()
+    logDiagnostic('app.data-root', { dataRoot })
     // A data-root change runs here, before any store is constructed: this is the one moment the
     // tree has no open handles — the meeting store has not mapped an audio file and
     // `credentials.json` is untouched. The settings handler wrote the marker and moved nothing.
@@ -214,7 +249,6 @@ if (!hasSingleInstanceLock) {
       await runtimeInitialization
       if (quitting) throw new Error('应用正在退出')
     }
-    const pipelineDebugLog = join(dataRoot, 'pipeline-debug.jsonl')
     engine = new EngineProcess({
       resolveLaunchSpec: () => {
         const compute = launchCompute
@@ -224,9 +258,9 @@ if (!hasSingleInstanceLock) {
             managedEngineDirectory: engineDirectory }),
           env: { ...resourceEnvironment,
             NOLA_TRANSLATOR_LLAMA_DIR: llamaDirectory ?? '',
-            // Every layer of the caption pipeline appends to this one file, so a stall can be read
-            // end to end instead of inferred from three separate logs.
-            NOLA_TRANSLATOR_DEBUG_LOG: pipelineDebugLog,
+            // The main logger receives structured pipeline diagnostics on stderr, keeping one
+            // ordered trace without giving multiple processes ownership of file rotation.
+            NOLA_TRANSLATOR_RUN_LOG_STDERR: '1',
           },
         }
       },
@@ -238,12 +272,14 @@ if (!hasSingleInstanceLock) {
       env: {
         ...resourceEnvironment,
         NOLA_TRANSLATOR_LLAMA_DIR: bundledLlamaDirectory,
-        NOLA_TRANSLATOR_DEBUG_LOG: pipelineDebugLog,
+        NOLA_TRANSLATOR_RUN_LOG_STDERR: '1',
       },
     })
     let sessionActive = false
     engine.on('log', (message: string) => console.error('[engine]', message.trimEnd()))
     engine.on('protocolError', (error: unknown) => console.error('engine protocol failed', error))
+    engine.on('state', state => logDiagnostic('engine.state', { state }))
+    engine.on('crash', error => logDiagnostic('engine.crash', error))
     let componentInstalling = false
     let sessionStarting = false
     let preparation: Promise<void> | null = null
@@ -365,7 +401,7 @@ if (!hasSingleInstanceLock) {
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createMainWindow(settings.current().theme)
     })
-  })
+  }).catch(error => { console.error('application startup failed', error); app.quit() })
 }
 
 app.on('window-all-closed', () => app.quit())

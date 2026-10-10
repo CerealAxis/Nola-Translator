@@ -113,6 +113,7 @@ export type { SessionState, EngineStatus, MissingResource } from './sessionStore
 
 export {
   loadSettings,
+  openLogs,
   updateSettings,
   chooseStorageDirectory,
   restartAppForStorage,

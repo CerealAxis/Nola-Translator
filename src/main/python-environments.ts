@@ -1,4 +1,5 @@
 import { cleanupRuntimeArtifacts, removeRuntimeArtifact, renameRuntimeDirectory } from './runtime-files'
+import { logDiagnostic, processFailure } from './session-log'
 import { randomUUID } from 'node:crypto'
 import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { createWriteStream } from 'node:fs'
@@ -119,6 +120,7 @@ export class PythonEnvironments {
       this.installedIds.add(id)
       if (movedOld) await rm(backup, { recursive: true, force: true }).catch(() => undefined)
     } catch (error) {
+      logDiagnostic('runtime.python-install.failed', { id, phase: this.operation?.phase, cancelled: controller.signal.aborted, ...processFailure(error) })
       this.lastError = controller.signal.aborted ? '安装已取消' : String(error)
       throw new Error(this.lastError)
     } finally {
@@ -160,6 +162,7 @@ export class PythonEnvironments {
           stream?.pipe(log, { end: false })
           stream?.setEncoding('utf8')
           stream?.on('data', (chunk: string) => {
+            logDiagnostic('runtime.pip-output', { id: state.id, output: chunk })
             const line = chunk.split(/[\r\n]+/).map(value => value.trim()).filter(Boolean).at(-1)
             if (line && this.operation) this.operation.detail = line.slice(0, 512)
           })

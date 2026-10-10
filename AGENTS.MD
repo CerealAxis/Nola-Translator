@@ -10,13 +10,14 @@
 - UI：Tailwind CSS + HeroUI
 - 构建：electron-vite
 - 测试：Vitest + Testing Library
+- 诊断：主进程使用 Node 文件 API 保存每次启动的独立日志，自动脱敏并限制保留数量和文件大小。
 - 浏览器：Chrome／Edge Manifest V3 + React／TypeScript；Python 标准库 Native Messaging 连接程序由 PyInstaller 打包
 
 ## 2. 目录结构
 
 ```
 src/
-├── main/        # Electron 主进程：IPC 注册、窗口、设置/凭据持久化、引擎子进程；runtime-manager.ts／python-environments.ts 管理组件，python-runtime-paths.ts 统一 Python 导入与 DLL 路径，runtime-files.ts 处理 Windows 目录切换；browser-integrations.ts 只读检测浏览器扩展状态并打开管理页
+├── main/        # Electron 主进程：IPC 注册、窗口、设置/凭据持久化、引擎子进程；session-log.ts 保存每次启动的诊断日志；runtime-manager.ts／python-environments.ts 管理组件，python-runtime-paths.ts 统一 Python 导入与 DLL 路径，runtime-files.ts 处理 Windows 目录切换；browser-integrations.ts 只读检测浏览器扩展状态并打开管理页
 ├── preload/     # 单文件，contextBridge 暴露 window.nolaTranslator
 ├── shared/      # 跨进程契约：类型 + zod + 默认值；languages.ts 为语言代码目录，model-capabilities.ts 为模型能力与推荐预设。**改枚举必看这里**
 └── renderer/    # React 应用
@@ -75,6 +76,7 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 - Runtime catalogs record official wheel ABI, SHA-256 and backend combinations. Checks use built-in Python 3.12 without installing; repair ownership requires an app installation record.
 - Cloud translation uses a session-scoped HTTP pool and streams Chat Completions / Anthropic text; final captions supersede obsolete network intermediates, while native inference retains its reservation. Timing diagnostics distinguish queue, first text, and request duration.
 - Meeting transcripts persist confirmed speech and settled translation changes, not streamed token revisions; segment counts count unique confirmed segments.
+- `src/main/session-log.ts` records application activity in English JSONL under Electron userData/logs. `logged-ipc.ts` correlates every IPC operation; engine commands/events and UI/browser activity share the launch trace. Files rotate at 4 MB and retain the latest 20 files. Credential/audio/caption contents are omitted; localized native diagnostics remain recoverable as UTF-8 base64. Pipeline diagnostics travel over stderr to the main logger, which alone owns rotation. The settings feedback area reveals the current log through IPC and a store action.
 - Installation caches and staging files are temporary on success, failure, and cancellation; startup cleanup uses known artifact names, skips junctions, and recovers backups before deleting leftovers. Pip does not retain an additional user cache.
 - Component DLL paths must match in probes and engine startup; keep Windows DLL-directory handles alive for inference. Older Torch uses MKL in the component's `Library/bin`, and the Python base bundles the VC++ OpenMP runtime.
 

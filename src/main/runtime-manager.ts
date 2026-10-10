@@ -1,4 +1,5 @@
 import { cleanupRuntimeArtifacts, removeRuntimeArtifact, renameRuntimeDirectory } from './runtime-files'
+import { logDiagnostic, processFailure } from './session-log'
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { access, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
@@ -46,6 +47,7 @@ export class RuntimeManager {
 
   async initialize(): Promise<void> {
     this.hardware = await probeHardware()
+    logDiagnostic('runtime.hardware', this.hardware)
     this.packages = catalogSchema.parse(JSON.parse((await readFile(this.catalogPath, 'utf8')).replace(/^\uFEFF/, ''))).packages
     this.python = new PythonEnvironments(this.directory, this.options.baseDirectory, this.options.recipesPath,
       (item, path, signal, progress) => this.download(item, path, signal, progress), (path, signal) => this.digest(path, signal),
@@ -87,6 +89,7 @@ export class RuntimeManager {
       this.pythonState = { path: python, version: result.stdout.trim(), ready: true, reason: '' }
     } catch (error) {
       this.pythonState = { path: python, version: '', ready: false, reason: String(error) }
+      logDiagnostic('runtime.python-base.failed', { python, ...processFailure(error) })
     }
     const candidates = await localCandidates(this.options.baseDirectory, this.directory, this.options.localLlamaDirectory)
     const inspect = async (kind: 'engine' | 'llama', paths: string[]): Promise<LocalRuntime> => {
@@ -167,6 +170,7 @@ export class RuntimeManager {
   }
   cancel(): void { this.cancellation?.abort(); this.python?.cancel() }
   async install(id: string, repair = false): Promise<void> {
+    logDiagnostic('runtime.install.request', { id, repair })
     if (this.operation || this.python?.operation || this.checking) throw new Error('已有组件检查或安装任务')
     if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('这些组合仅支持 Windows x64')
     if (!this.pythonState.ready) throw new Error(this.pythonState.reason || '内置 Python 3.12 无法运行')
@@ -187,6 +191,7 @@ export class RuntimeManager {
     if (actual.status !== 'ready') throw new Error(actual.reason)
     this.local[kind] = { ...actual, id, managed: true }
     await this.saveSelection()
+    logDiagnostic('runtime.install.complete', { id, actual })
   }
   async importArchive(_path: string): Promise<void> { throw new Error('请在设置页选择组合安装') }
   private async digest(path: string, signal?: AbortSignal): Promise<string> {
@@ -207,6 +212,7 @@ export class RuntimeManager {
       await mkdir(this.directory, { recursive: true })
       let completed = 0
       for (const [index, part] of parts.entries()) {
+        logDiagnostic('runtime.llama-install.download', { id: item.id, part: index, bytes: part.bytes })
         const archive = this.inside(`${item.id}-${index}.zip.partial`)
         this.operation.phase = 'download'
         await this.download(part, archive, controller.signal, bytes => { if (this.operation) this.operation.bytes = completed + bytes })
@@ -216,6 +222,7 @@ export class RuntimeManager {
           throw new Error('运行组件下载校验失败，请重试')
         }
         this.operation.phase = 'extract'
+        logDiagnostic('runtime.llama-install.extract', { id: item.id, part: index })
         const extracted = index === 0 ? staging : this.inside(`staging-${item.id}-dll-${randomUUID()}`)
         try {
           await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', this.extractScript, '-Archive', archive, '-Destination', extracted],
@@ -253,6 +260,7 @@ export class RuntimeManager {
       catch (error) { if (movedOld) await renameRuntimeDirectory(backup, destination); throw error }
       if (movedOld) await rm(backup, { recursive: true, force: true }).catch(() => undefined)
     } catch (error) {
+      logDiagnostic('runtime.llama-install.failed', { id: item.id, phase: this.operation?.phase, cancelled: controller.signal.aborted, ...processFailure(error) })
       this.lastError = controller.signal.aborted ? '安装已取消' : String(error)
       throw new Error(this.lastError)
     } finally {

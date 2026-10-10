@@ -1,7 +1,8 @@
+import { loggedHandle } from './logged-ipc'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { createServer, type Server, type Socket } from 'node:net'
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
-import { appendFileSync } from 'node:fs'
+import { logActivity, logDiagnostic } from './session-log'
 import { mkdir, writeFile, access, rm, copyFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
@@ -90,7 +91,6 @@ export class BrowserConnection {
   private readonly cleanup = new Set<Promise<void>>()
   private error: string | undefined
   private devices: AudioDevice[] = []
-  private debugLogPath: string | null = null
   constructor(private readonly options: BrowserConnectionOptions) {
     options.engine.on('event', this.onEvent)
     options.engine.on('state', this.onState)
@@ -101,12 +101,12 @@ export class BrowserConnection {
      * page paints. It returns the status instead of a bare boolean so the caller reads the
      * value that is now in force, not the one it asked for.
      */
-    ipcMain.handle(CAPTION_SERVICE_CHANNEL, (_event, active: unknown) => {
+    loggedHandle(CAPTION_SERVICE_CHANNEL, (_event, active: unknown) => {
       if (typeof active !== 'boolean') throw new Error('invalidConfiguration')
       this.setCaptionServiceActive(active)
       return this.status()
     })
-    ipcMain.handle(CHANNEL, async (_event, action: unknown, enabled?: unknown, browser?: unknown) => {
+    loggedHandle(CHANNEL, async (_event, action: unknown, enabled?: unknown, browser?: unknown) => {
       if (action === 'status') { await options.integrations?.inspect(); return this.status() }
       if (action === 'download' || action === 'manage' || action === 'browserEnable') {
         if (browser !== 'chrome' && browser !== 'edge') throw new Error('invalidConfiguration')
@@ -147,17 +147,12 @@ export class BrowserConnection {
   }
   private extensionZip(): string { return app.isPackaged ? join(process.resourcesPath, 'browser', 'Nola-Browser-Extension.zip') : resolve('release/Nola-Browser-Extension.zip') }
   /**
-   * One JSON line per observation, appended to the same file the engine writes, so the whole
-   * pipeline can be read in order. A line that cannot be written is dropped: the log exists to
-   * explain a failure and must never become one.
+   * Route browser lifecycle and pipeline activity into the shared launch trace. Only
+   * high-frequency successful audio observations are sampled; failures remain individual.
    */
   private debugLog(event: string, data?: Record<string, unknown>): void {
-    try {
-      this.debugLogPath ??= join(resolveDataRoot(), 'pipeline-debug.jsonl')
-      appendFileSync(this.debugLogPath, `${JSON.stringify({ atMs: Date.now(), layer: 'main', event, ...data })}\n`)
-    } catch (error) {
-      console.warn('the pipeline debug log could not be appended to', error)
-    }
+    if (/audio|ext\.forward/.test(event) && !/Failed|Rejected/.test(event)) logActivity(`browser.${event}`, data)
+    else logDiagnostic(`browser.${event}`, data)
   }
   /** Read-only: reading this never starts the engine, so it is safe to ask before a warm-up. */
   engineState(): EngineProcessState { return this.options.engine.currentState }

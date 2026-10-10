@@ -25,7 +25,7 @@ import { StatusPill } from '@/components/primitives'
 import type { StatusPillTone } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
-import { getBridge, stores, updateSettings, useStore } from '@/store'
+import { getBridge, openLogs, stores, updateSettings, useStore } from '@/store'
 import type { EngineStatus } from '@/store'
 import { SettingGroup } from '../SettingsPage'
 import type { SettingsPanelProps } from '../SettingsPage'
@@ -78,6 +78,9 @@ export function AdvancedTab(_props: SettingsPanelProps) {
       <SettingGroup legend={t('settings.groupReport')}>
         <SettingsRow label={t('settings.copyDiagnostics')}>
           <CopyDiagnostics />
+        </SettingsRow>
+        <SettingsRow label={t('settings.openLogs')} desc={t('settings.openLogsHint')} descriptionTooltip>
+          <Button variant="secondary" onPress={() => { void openLogs() }}>{t('settings.openLogs')}</Button>
         </SettingsRow>
         {/*
           The main process `setWindowOpenHandler` hands `https:` targets to the shell and

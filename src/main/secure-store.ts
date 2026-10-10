@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { registerLogSecret } from './session-log'
 
 export type EncryptionAdapter = {
   isEncryptionAvailable(): boolean
@@ -65,7 +66,9 @@ export class SecureCredentialStore {
     if (!stored) return ''
     if (!this.encryption.isEncryptionAvailable()) throw new Error('Windows 凭据加密当前不可用')
     try {
-      return this.encryption.decryptString(Buffer.from(stored, 'base64'))
+      const value = this.encryption.decryptString(Buffer.from(stored, 'base64'))
+      registerLogSecret(value)
+      return value
     } catch {
       // The ciphertext is unrecoverable, so it is deleted rather than left to fail every read.
       await this.remove(key)
@@ -74,6 +77,7 @@ export class SecureCredentialStore {
   }
 
   async set(key: string, value: string): Promise<void> {
+    registerLogSecret(value)
     if (!this.encryption.isEncryptionAvailable()) throw new Error('Windows 凭据加密当前不可用')
     const values = await this.read()
     if (value) values[key] = this.encryption.encryptString(value).toString('base64')

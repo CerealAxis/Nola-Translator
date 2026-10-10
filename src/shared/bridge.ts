@@ -137,6 +137,7 @@ export type NolaTranslatorApi = {
   getMeetingAudioUrl(meetingId: string): Promise<string | null>
   getDiagnostics(): Promise<Record<string, string | number>>
   copyDiagnostics(): Promise<void>
+  openLogs(): Promise<void>
   hasTranslationCredential(provider: CredentialProvider): Promise<boolean>
   setTranslationCredential(provider: CredentialProvider, value: string): Promise<void>
   /**

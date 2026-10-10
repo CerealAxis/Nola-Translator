@@ -1,3 +1,4 @@
+import { loggedHandle } from './logged-ipc'
 import { modelConfigurationSchema } from '../shared/model-capabilities'
 import { randomUUID } from 'node:crypto'
 
@@ -74,7 +75,7 @@ export function registerEngineIpc(
   const ensureReady = () => controller.ensureReady()
   const stopActiveSession = (id: string) => controller.stop(id)
   const releaseSessionOnEngineLoss = () => controller.releaseOnLoss()
-  ipcMain.handle(IPC_CHANNELS.listDevices, async () => {
+  loggedHandle(IPC_CHANNELS.listDevices, async () => {
     await ensureReady()
     const response = await engine.request(
       { protocolVersion: 1, type: 'listDevices', requestId: `devices-${randomUUID()}` },
@@ -83,7 +84,7 @@ export function registerEngineIpc(
     return response.devices
   })
 
-  ipcMain.handle(IPC_CHANNELS.listComputeDevices, async () => {
+  loggedHandle(IPC_CHANNELS.listComputeDevices, async () => {
     await ensureReady()
     const response = await engine.request(
       { protocolVersion: 1, type: 'listComputeDevices', requestId: `compute-${randomUUID()}` },
@@ -93,7 +94,7 @@ export function registerEngineIpc(
     return snapshot
   })
 
-  ipcMain.handle(IPC_CHANNELS.listResources, async () => {
+  loggedHandle(IPC_CHANNELS.listResources, async () => {
     await ensureReady()
     const response = await engine.request(
       { protocolVersion: 1, type: 'listResources', requestId: `resources-${randomUUID()}` },
@@ -102,7 +103,7 @@ export function registerEngineIpc(
     return { storagePath: response.storagePath, resources: response.resources }
   })
 
-  ipcMain.handle(
+  loggedHandle(
     IPC_CHANNELS.manageResource,
     async (_event, resourceId: unknown, action: unknown) => {
       if (typeof resourceId !== 'string' || !['install', 'remove', 'cancel'].includes(String(action))) {
@@ -124,7 +125,7 @@ export function registerEngineIpc(
     }
   )
 
-  ipcMain.handle(
+  loggedHandle(
     IPC_CHANNELS.searchHuggingFace,
     async (_event, query: unknown, kind: unknown, cursor: unknown) => {
       /*
@@ -172,10 +173,10 @@ export function registerEngineIpc(
     }
   )
 
-  ipcMain.handle(IPC_CHANNELS.getHuggingFaceModelCard, (_event, repo: unknown, revision: unknown) =>
+  loggedHandle(IPC_CHANNELS.getHuggingFaceModelCard, (_event, repo: unknown, revision: unknown) =>
     readHubModelCard(repo, revision, net.fetch, () => getSettings().network))
 
-  ipcMain.handle(IPC_CHANNELS.configureModel, async (_event, resourceId: unknown, configuration: unknown) => {
+  loggedHandle(IPC_CHANNELS.configureModel, async (_event, resourceId: unknown, configuration: unknown) => {
     if (controller.busy) throw new Error('字幕会话运行中，不能修改模型配置')
     if (typeof resourceId !== 'string' || resourceId.length > 256) throw new Error('模型 ID 无效')
     const validated = modelConfigurationSchema.parse(configuration)
@@ -184,7 +185,7 @@ export function registerEngineIpc(
     return response.resource
   })
 
-  ipcMain.handle(IPC_CHANNELS.inspectHuggingFace, async (_event, repo: unknown) => {
+  loggedHandle(IPC_CHANNELS.inspectHuggingFace, async (_event, repo: unknown) => {
     if (typeof repo !== 'string' || repo.length < 3 || repo.length > 256) {
       throw new Error('仓库名无效')
     }
@@ -203,7 +204,7 @@ export function registerEngineIpc(
     }
   })
 
-  ipcMain.handle(
+  loggedHandle(
     IPC_CHANNELS.installHuggingFaceModel,
     async (_event, repo: unknown, slot: unknown) => {
       if (typeof repo !== 'string' || repo.length < 3 || repo.length > 256) {
@@ -235,30 +236,30 @@ export function registerEngineIpc(
     }
   )
 
-  ipcMain.handle(IPC_CHANNELS.startSession, (_event, config: unknown) => controller.start(config, 'desktop'))
-  ipcMain.handle(IPC_CHANNELS.stopSession, async (_event, sessionId: unknown) => {
+  loggedHandle(IPC_CHANNELS.startSession, (_event, config: unknown) => controller.start(config, 'desktop'))
+  loggedHandle(IPC_CHANNELS.stopSession, async (_event, sessionId: unknown) => {
     if (typeof sessionId !== 'string') throw new Error('字幕会话 ID 无效')
     controller.assertOwner(sessionId, 'desktop')
     await controller.stop(sessionId)
     getOverlayWindow()?.hide()
   })
-  ipcMain.handle(IPC_CHANNELS.setSessionPaused, async (_event, sessionId: unknown, paused: unknown) => {
+  loggedHandle(IPC_CHANNELS.setSessionPaused, async (_event, sessionId: unknown, paused: unknown) => {
     if (typeof sessionId !== 'string' || typeof paused !== 'boolean') throw new Error('暂停参数无效')
     controller.assertOwner(sessionId, 'desktop')
     await controller.pause(sessionId, paused)
   })
-  ipcMain.handle(IPC_CHANNELS.getEngineState, () => engine.currentState)
+  loggedHandle(IPC_CHANNELS.getEngineState, () => engine.currentState)
 
   // Starting the engine process is not loading weights: it is here for a caller that needs the
   // pipe and the device list, and it takes no session reservation.
-  ipcMain.handle(IPC_CHANNELS.ensureEngineReady, async () => {
+  loggedHandle(IPC_CHANNELS.ensureEngineReady, async () => {
     await ensureReady()
     return engine.currentState
   })
 
   // What "enable captions" means: the models are resident, so the browser side starts a session
   // against weights that are already in memory.
-  ipcMain.handle(IPC_CHANNELS.prewarmModels, async () => {
+  loggedHandle(IPC_CHANNELS.prewarmModels, async () => {
     const config = prewarmConfigFrom(getSettings())
     const session = { ...config, audioSource: { kind: 'defaultOutput' as const }, recognitionMode: 'realtime' as const }
     await prepareEnvironment(session)
@@ -267,12 +268,12 @@ export function registerEngineIpc(
     return engine.prewarmModels(config)
   })
 
-  ipcMain.handle(IPC_CHANNELS.showOverlay, () => getOverlayWindow()?.show())
-  ipcMain.handle(IPC_CHANNELS.hideOverlay, () => getOverlayWindow()?.hide())
+  loggedHandle(IPC_CHANNELS.showOverlay, () => getOverlayWindow()?.show())
+  loggedHandle(IPC_CHANNELS.hideOverlay, () => getOverlayWindow()?.hide())
   // Closing the caption window ends the session, so recognition stops first and recordAudio
   // stops writing a file nobody can see. hideOverlay stays a pure hide for a caller that only
   // wants it out of the way.
-  ipcMain.handle(IPC_CHANNELS.closeOverlay, () => {
+  loggedHandle(IPC_CHANNELS.closeOverlay, () => {
     if (closingOverlay) return closingOverlay
     const request = (async () => {
       const sessionId = controller.browserActive ? null : controller.activeSessionId
@@ -296,12 +297,12 @@ export function registerEngineIpc(
     }).catch(() => undefined)
     return request
   })
-  ipcMain.handle(IPC_CHANNELS.minimizeOverlay, () => {
+  loggedHandle(IPC_CHANNELS.minimizeOverlay, () => {
     const window = getOverlayWindow()
     // skipTaskbar must be false for this to be recoverable; see windows.ts.
     if (window && !window.isDestroyed()) window.minimize()
   })
-  ipcMain.handle(IPC_CHANNELS.resizeOverlay, (event, width: unknown, height: unknown) => {
+  loggedHandle(IPC_CHANNELS.resizeOverlay, (event, width: unknown, height: unknown) => {
     const window = getOverlayWindow()
     if (!window || event.sender !== window.webContents) return
     if (!Number.isFinite(width) || !Number.isFinite(height)) return
@@ -314,7 +315,7 @@ export function registerEngineIpc(
   })
   // "Open the browser", with no URL. `shell.openExternal` cannot express it, so the main process
   // resolves the user's own handler instead; see open-default-browser.ts for why.
-  ipcMain.handle(IPC_CHANNELS.openDefaultBrowser, () => launchDefaultBrowser())
+  loggedHandle(IPC_CHANNELS.openDefaultBrowser, () => launchDefaultBrowser())
 
   const broadcast = (event: EngineEvent): void => {
     for (const window of BrowserWindow.getAllWindows()) {

@@ -8,6 +8,7 @@ import { PREWARM_ERROR_CODES } from '../shared/contracts'
 import type { EngineCommand, EngineEvent, EngineProcessState, PrewarmConfig, PrewarmErrorCode, PrewarmResult } from '../shared/contracts'
 import { engineCommandSchema, parseEventLine } from '../shared/schemas'
 import { pythonRuntimePaths } from './python-runtime-paths'
+import { logActivity, logDiagnostic } from './session-log'
 
 /** Re-exported so a caller can read the state union without importing a main-process module. */
 export type { EngineProcessState }
@@ -181,6 +182,7 @@ export class EngineProcess extends EventEmitter {
         ? null
         : setTimeout(() => {
           this.pending.delete(validated.requestId)
+          logDiagnostic('engine.request.timeout', { requestId: validated.requestId, command: validated.type, expectedType, timeoutMs })
           reject(new Error(`等待 ${expectedType} 超时`))
         }, timeoutMs)
       const entry: PendingRequest = {
@@ -315,15 +317,38 @@ export class EngineProcess extends EventEmitter {
       windowsHide: true,
     })
     this.child = child
+    logDiagnostic('engine.process.started', { pid: child.pid, executable: launch.command, cwd: launch.cwd })
     this.lines = createInterface({ input: child.stdout, crlfDelay: Infinity })
     this.lines.on('line', (line) => {
       if (this.child === child) this.handleLine(line)
     })
-    child.stderr.on('data', (chunk: Buffer) => this.emit('log', chunk.toString('utf8')))
+    let stderrPending = ''
+    const recordStderr = (line: string): void => {
+      if (!line) return
+      if (line.startsWith('NOLA_DIAGNOSTIC ')) {
+        try {
+          const observation = JSON.parse(line.slice('NOLA_DIAGNOSTIC '.length)) as Record<string, unknown>
+          const category = [observation.layer, observation.event].filter(value => typeof value === 'string').join('.').replace(/[^a-zA-Z0-9_.-]/g, '_')
+          if (/timing|fail|error/.test(category)) logDiagnostic(`pipeline.${category}`, observation)
+          else logActivity(`pipeline.${category}`, observation)
+          return
+        } catch { /* Unparseable diagnostics remain visible as ordinary stderr. */ }
+      }
+      this.emit('log', line)
+    }
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderrPending += chunk.toString('utf8')
+      const lines = stderrPending.split(/\r?\n/)
+      stderrPending = lines.pop() ?? ''
+      for (const line of lines) recordStderr(line)
+      if (stderrPending.length > 32000) { recordStderr(stderrPending); stderrPending = '' }
+    })
+    child.stderr.once('end', () => recordStderr(stderrPending))
     child.once('error', (error) => this.handleTermination(child, error))
-    child.once('exit', (code, signal) =>
-      this.handleTermination(child, new Error(`引擎已退出（code=${code}, signal=${signal ?? 'none'}）`))
-    )
+    child.once('exit', (code, signal) => {
+      logDiagnostic(code ? 'engine.process.failed' : 'engine.process.exited', { pid: child.pid, code, signal })
+      this.handleTermination(child, Object.assign(new Error(`引擎已退出（code=${code}, signal=${signal ?? 'none'}）`), { code, signal }))
+    })
 
     /*
      * Bounded by the child's lifetime rather than a wall clock: a cold `import torch`
@@ -348,6 +373,8 @@ export class EngineProcess extends EventEmitter {
   }
 
   private enqueueWrite(command: EngineCommand): Promise<void> {
+    if (command.type === 'pushAudio' || command.type === 'debugLog') logActivity(`engine.command.${command.type}`, command)
+    else logDiagnostic('engine.command', command)
     const line = `${JSON.stringify(command)}\n`
     const write = async (): Promise<void> => {
       const child = this.child
@@ -373,6 +400,8 @@ export class EngineProcess extends EventEmitter {
     }
 
     const pending = this.pending.get(event.requestId)
+    if (event.type === 'caption' || event.type === 'audioAccepted' || event.type === 'modelProgress') logActivity(`engine.event.${event.type}`, event)
+    else logDiagnostic(`engine.event.${event.type}`, event)
     if (pending && (event.type === 'error' || (event.type === pending.expectedType && pending.isFinal(event)))) {
       pending.clear()
       this.pending.delete(event.requestId)

@@ -544,6 +544,13 @@ export function attachSettingsStore(next: NolaBridge, watchComputeChanges = true
   })
 }
 
+export async function openLogs(): Promise<void> {
+  try {
+    if (!bridge?.diagnostics.openLogs) throw new Error('diagnosticsUnavailable')
+    await bridge.diagnostics.openLogs()
+  } catch (error) { settingsStore.setState({ error: errorMessage(error) }) }
+}
+
 export function detachSettingsStore(): void {
   unsubscribe?.()
   unsubscribe = null

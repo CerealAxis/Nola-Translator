@@ -4,6 +4,17 @@ import type { NolaTranslatorApi, EngineChannelEvent, OverlayTargetPage } from '.
 import type { EngineProcessState, HubInspectResult, HubSearchResult, PrewarmResult, ResourceRecord, SessionConfig } from '../shared/contracts'
 import { stripIpcErrorMessage } from '../shared/ipc-error'
 
+// Observe structural UI activity in the isolated world; never read labels or form values.
+window.addEventListener('DOMContentLoaded', () => {
+  const navigation = () => ipcRenderer.send('diagnostics:ui-activity', { type: 'navigation', route: location.hash })
+  navigation()
+  window.addEventListener('hashchange', navigation)
+  document.addEventListener('click', event => {
+    const target = event.target instanceof Element ? event.target.closest('button,a,[role="button"]') : null
+    if (target) ipcRenderer.send('diagnostics:ui-activity', { type: 'interaction', route: location.hash, element: target.tagName.toLowerCase() })
+  }, true)
+})
+
 const channels = {
   listComputeDevices: 'engine:list-compute-devices',
   getRuntimes: 'runtime:list', installRuntime: 'runtime:install', importRuntime: 'runtime:import', cancelRuntimeInstall: 'runtime:cancel',
@@ -35,7 +46,7 @@ const channels = {
   listMeetings: 'meeting:list', getMeeting: 'meeting:get', readMeeting: 'meeting:read',
   renameMeeting: 'meeting:rename', setMeetingNotes: 'meeting:set-notes', deleteMeeting: 'meeting:delete', exportMeeting: 'meeting:export',
   meetingAudioUrl: 'meeting:audio-url',
-  getDiagnostics: 'diagnostics:get', copyDiagnostics: 'diagnostics:copy',
+  getDiagnostics: 'diagnostics:get', copyDiagnostics: 'diagnostics:copy', openLogs: 'diagnostics:open-logs',
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
   setCaptionService: 'browser:caption-service',
   openDefaultBrowser: 'app:open-default-browser',
@@ -120,6 +131,7 @@ const api: NolaTranslatorApi = {
   getMeetingAudioUrl: (meetingId) => invoke(channels.meetingAudioUrl, meetingId),
   getDiagnostics: () => invoke(channels.getDiagnostics),
   copyDiagnostics: () => invoke(channels.copyDiagnostics),
+  openLogs: () => invoke(channels.openLogs),
   hasTranslationCredential: (provider) => invoke(channels.hasTranslationCredential, provider),
   setTranslationCredential: (provider, value) => invoke(channels.setTranslationCredential, provider, value),
   setCaptionService: (active) => invoke(channels.setCaptionService, active),

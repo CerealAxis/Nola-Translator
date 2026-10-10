@@ -125,7 +125,7 @@ export interface NolaBridge {
     export(id: string, format: ExportFormat): Promise<string | null>
     audioUrl(id: string): Promise<string | null>
   }
-  diagnostics: { get(): Promise<Record<string, string | number>>; copy(): Promise<void> }
+  diagnostics: { get(): Promise<Record<string, string | number>>; copy(): Promise<void>; openLogs?(): Promise<void> }
   /**
    * Opens the user's default browser with **no URL** — the video-captions page's "open browser"
    * button, which must not invent a start page to satisfy `shell.openExternal`.
@@ -210,6 +210,7 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'meetings.audioUrl': 'ipc',
   'diagnostics.get': 'ipc',
   'diagnostics.copy': 'ipc',
+  'diagnostics.openLogs': 'ipc',
   'app.openDefaultBrowser': 'ipc',
   'app.checkLatestRelease': 'ipc',
   'app.openReleasePage': 'ipc',

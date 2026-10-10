@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { logDiagnostic } from './session-log'
 import type { EngineEvent, SessionConfig } from '../shared/contracts'
 import { sessionConfigSchema } from '../shared/schemas'
 import { NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider } from '../shared/settings'
@@ -40,6 +41,7 @@ export class SessionController {
     return this.browserActive && (event.type === 'status' || event.type === 'error')
   }
   async start(raw: unknown, owner: SessionOwner): Promise<{ sessionId: string; meetingId: string | null }> {
+    logDiagnostic('session.start.requested', { owner })
     if (this.busy) throw new Error('sessionAlreadyRunning')
     const parsed = sessionConfigSchema.parse(raw) as SessionConfig
     if (owner === 'desktop' && (parsed.audioSource.kind === 'browserTab' || parsed.browserTimeline)) throw new Error('invalidConfiguration')
@@ -77,8 +79,10 @@ export class SessionController {
       if (owner === 'browser') this.rememberBrowser(response.sessionId)
       if (meetingId) this.options.meetings?.attach(meetingId, response.sessionId)
       if (owner === 'desktop') this.options.showOverlay()
+      logDiagnostic('session.started', { owner, sessionId: response.sessionId, meetingId })
       return { sessionId: response.sessionId, meetingId }
     } catch (error) {
+      logDiagnostic('session.start.failed', { owner, error })
       if (meetingId) await this.options.meetings?.abandon(meetingId).catch(() => undefined)
       if (operation === this.operation) this.owner = null
       throw error
@@ -105,6 +109,7 @@ export class SessionController {
     return task
   }
   stop(id: string): Promise<void> {
+    logDiagnostic('session.stop.requested', { sessionId: id, owner: this.owner })
     if (this.stopping?.id === id) return this.stopping.task
     if (id !== this.activeSessionId) return Promise.resolve()
     const browser = this.browserSessions.has(id)
@@ -126,6 +131,7 @@ export class SessionController {
     return task
   }
   async pause(id: string, paused: boolean): Promise<void> {
+    logDiagnostic('session.pause.requested', { sessionId: id, paused })
     await this.ensureReady()
     await this.options.engine.request({ protocolVersion: 1, type: 'setSessionPaused', requestId: `pause-${randomUUID()}`, sessionId: id, paused }, 'status', 30_000)
   }

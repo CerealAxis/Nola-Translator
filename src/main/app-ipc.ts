@@ -1,4 +1,6 @@
+import { loggedHandle } from './logged-ipc'
 import { writeFile } from 'node:fs/promises'
+import { sessionLogPath } from './session-log'
 import { isAbsolute, join, normalize } from 'node:path'
 
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, screen, shell } from 'electron'
@@ -26,7 +28,7 @@ const channels = {
   listMeetings: 'meeting:list', getMeeting: 'meeting:get', readMeeting: 'meeting:read',
   renameMeeting: 'meeting:rename', setMeetingNotes: 'meeting:set-notes', deleteMeeting: 'meeting:delete', exportMeeting: 'meeting:export',
   meetingAudioUrl: 'meeting:audio-url',
-  getDiagnostics: 'diagnostics:get', copyDiagnostics: 'diagnostics:copy',
+  getDiagnostics: 'diagnostics:get', copyDiagnostics: 'diagnostics:copy', openLogs: 'diagnostics:open-logs',
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
 } as const
 
@@ -60,6 +62,7 @@ async function diagnostics(engine: EngineProcess, settings: AppSettings): Promis
       ? `Hy-MT2 · llama.cpp（${hymt2.device}）`
       : '未运行',
     数据目录: resolveDataRoot(),
+    本次日志: sessionLogPath() || '日志不可用',
   }
 }
 
@@ -132,14 +135,14 @@ export function registerAppIpc(options: {
   applyOverlay(true)
   applyTheme()
 
-  ipcMain.handle(channels.getSettings, () => options.settings.current())
-  ipcMain.handle(channels.checkLatestRelease, (_event, force: unknown) =>
+  loggedHandle(channels.getSettings, () => options.settings.current())
+  loggedHandle(channels.checkLatestRelease, (_event, force: unknown) =>
     checkLatestRelease(app.getVersion(), join(resolveDataRoot(), '.cache', 'github-release.json'), force === true))
-  ipcMain.handle(channels.openReleasePage, (_event, url: unknown) => {
+  loggedHandle(channels.openReleasePage, (_event, url: unknown) => {
     if (!isTrustedReleaseUrl(url)) throw new Error('Release 页面地址无效')
     return shell.openExternal(url)
   })
-  ipcMain.handle(channels.openAppearance, (_event, page: unknown) => {
+  loggedHandle(channels.openAppearance, (_event, page: unknown) => {
     const window = options.getMainWindow()
     if (!window) return
     if (window.isMinimized()) window.restore()
@@ -148,8 +151,8 @@ export function registerAppIpc(options: {
     window.webContents.send('app:appearance-requested',
       typeof page === 'string' && OVERLAY_PAGES.has(page) ? page : 'appearance')
   })
-  ipcMain.handle(channels.getModelStorage, () => storageInfo())
-  ipcMain.handle(channels.chooseModelStorageDirectory, async () => {
+  loggedHandle(channels.getModelStorage, () => storageInfo())
+  loggedHandle(channels.chooseModelStorageDirectory, async () => {
     const result = await dialog.showOpenDialog({
       title: current.uiLanguage === 'en' ? 'Choose data folder' : '选择数据文件夹',
       defaultPath: configuredStoragePath(),
@@ -179,11 +182,11 @@ export function registerAppIpc(options: {
     broadcastSettings()
     return storageInfo()
   })
-  ipcMain.handle(channels.restartApp, () => {
+  loggedHandle(channels.restartApp, () => {
     app.relaunch()
     app.quit()
   })
-  ipcMain.handle(channels.updateSettings, async (_event, raw: unknown) => {
+  loggedHandle(channels.updateSettings, async (_event, raw: unknown) => {
     // The cast trusts that the schema accepts every field `AppSettingsPatch` declares; that parity
     // is the one thing that can silently break it.
     const patch = settingsPatchSchema.parse(raw) as AppSettingsPatch
@@ -193,17 +196,17 @@ export function registerAppIpc(options: {
     broadcastSettings()
     return current
   })
-  ipcMain.handle(channels.listMeetings, () => options.meetings.list())
-  ipcMain.handle(channels.getMeeting, (_event, meetingId: unknown) => {
+  loggedHandle(channels.listMeetings, () => options.meetings.list())
+  loggedHandle(channels.getMeeting, (_event, meetingId: unknown) => {
     if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
     return options.meetings.get(meetingId)
   })
-  ipcMain.handle(channels.readMeeting, async (_event, meetingId: unknown) => {
+  loggedHandle(channels.readMeeting, async (_event, meetingId: unknown) => {
     if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
     if (!options.meetings.get(meetingId)) throw new Error('会议不存在')
     return options.meetings.segments(meetingId)
   })
-  ipcMain.handle(channels.meetingAudioUrl, (_event, meetingId: unknown) => {
+  loggedHandle(channels.meetingAudioUrl, (_event, meetingId: unknown) => {
     if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
     const meta = options.meetings.get(meetingId)
     /*
@@ -215,24 +218,24 @@ export function registerAppIpc(options: {
      */
     return meta?.audioFile ? `${options.audioProtocol}local/${meetingId}/${meta.audioFile}` : null
   })
-  ipcMain.handle(channels.renameMeeting, async (_event, meetingId: unknown, title: unknown) => {
+  loggedHandle(channels.renameMeeting, async (_event, meetingId: unknown, title: unknown) => {
     if (typeof meetingId !== 'string' || typeof title !== 'string') throw new Error('会议名称无效')
     const meta = await options.meetings.rename(meetingId, title)
     if (!meta) throw new Error('会议不存在')
     return meta
   })
-  ipcMain.handle(channels.setMeetingNotes, async (_event, meetingId: unknown, notes: unknown) => {
+  loggedHandle(channels.setMeetingNotes, async (_event, meetingId: unknown, notes: unknown) => {
     if (typeof meetingId !== 'string' || typeof notes !== 'string') throw new Error('笔记内容无效')
     const meta = await options.meetings.setNotes(meetingId, notes)
     if (!meta) throw new Error('会议不存在')
     return meta
   })
-  ipcMain.handle(channels.deleteMeeting, async (_event, meetingId: unknown) => {
+  loggedHandle(channels.deleteMeeting, async (_event, meetingId: unknown) => {
     if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
     await options.meetings.remove(meetingId)
     return true
   })
-  ipcMain.handle(channels.exportMeeting, async (_event, meetingId: unknown, format: unknown) => {
+  loggedHandle(channels.exportMeeting, async (_event, meetingId: unknown, format: unknown) => {
     if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
     if (!['txt', 'srt', 'vtt'].includes(String(format))) throw new Error('导出格式无效')
     const value = String(format) as 'txt' | 'srt' | 'vtt'
@@ -249,11 +252,16 @@ export function registerAppIpc(options: {
     await writeFile(result.filePath, content, 'utf8')
     return result.filePath
   })
-  ipcMain.handle(channels.getDiagnostics, () => diagnostics(options.engine, current))
-  ipcMain.handle(channels.copyDiagnostics, async () => clipboard.writeText(JSON.stringify(await diagnostics(options.engine, current), null, 2)))
-  ipcMain.handle(channels.hasTranslationCredential, (_event, provider: unknown) =>
+  loggedHandle(channels.getDiagnostics, () => diagnostics(options.engine, current))
+  loggedHandle(channels.openLogs, async () => {
+    const path = sessionLogPath()
+    if (!path) throw new Error('日志目录不可用')
+    shell.showItemInFolder(path)
+  })
+  loggedHandle(channels.copyDiagnostics, async () => clipboard.writeText(JSON.stringify(await diagnostics(options.engine, current), null, 2)))
+  loggedHandle(channels.hasTranslationCredential, (_event, provider: unknown) =>
     options.credentials.has(assertCredentialProvider(provider)))
-  ipcMain.handle(channels.setTranslationCredential, (_event, provider: unknown, value: unknown) => {
+  loggedHandle(channels.setTranslationCredential, (_event, provider: unknown, value: unknown) => {
     const target = assertCredentialProvider(provider)
     if (typeof value !== 'string' || value.length > 4096) throw new Error('凭据内容无效')
     return options.credentials.set(target, value)

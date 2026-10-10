@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type { LocalRuntime } from '../shared/compute'
 import { pythonRuntimePaths } from './python-runtime-paths'
+import { logDiagnostic, processFailure } from './session-log'
 
 const run = promisify(execFile)
 export function missingLocalRuntime(path = ''): LocalRuntime {
@@ -26,6 +27,7 @@ export async function probeLocalEngine(python: string, directory: string): Promi
     return { ...result, path: actual.path, status: 'ready', backend: actual.backend, version: actual.torch,
       gpuAvailable: actual.backend !== 'cpu', xformersVersion: actual.xformersVersion }
   } catch (error) {
+    logDiagnostic('runtime.python-probe.failed', { directory, ...processFailure(error) })
     const failure = error as Error & { stderr?: string }
     const reason = (failure.stderr?.trim() || failure.message).slice(-2048)
     const incompatible = /python3(?!12)\d*\.dll|cp31[013]|Python version|not a valid Win32/i.test(reason)
@@ -38,8 +40,10 @@ export async function probeLocalLlama(directory: string): Promise<LocalRuntime> 
   const result = missingLocalRuntime(directory)
   if (!await access(executable).then(() => true, () => false)) return result
   try {
+    logDiagnostic('runtime.llama-probe.start', { executable })
     const version = await run(executable, ['--version'], { cwd: directory, windowsHide: true, timeout: 15_000, maxBuffer: 1024 * 1024 })
     const files = (await readdir(directory)).join(' ').toLowerCase()
+    logDiagnostic('runtime.llama-probe.ready', { directory, files, stdout: version.stdout, stderr: version.stderr })
     const backend = ['cuda', 'vulkan', 'sycl', 'openvino', 'hip', 'rocm'].find(b => files.includes(`ggml-${b}`)) ?? 'cpu'
     const output = version.stdout + version.stderr
     const cudaVersion = /cudart64_13\.dll/.test(files) ? '13.4' : /cudart64_12\.dll/.test(files) ? '12.4' : undefined
@@ -47,6 +51,7 @@ export async function probeLocalLlama(directory: string): Promise<LocalRuntime> 
     return { ...result, status: 'ready', cudaVersion, backend: backend === 'hip' ? 'rocm' : backend, gpuAvailable: backend !== 'cpu',
       version: build ? `b${build}` : /version:\s*([^\r\n]+)/i.exec(output)?.[1]?.slice(0, 128) ?? output.trim().slice(0, 128) }
   } catch (error) {
+    logDiagnostic('runtime.llama-probe.failed', { executable, files: await readdir(directory).catch(() => []), ...processFailure(error) })
     const failure = error as Error & { stderr?: string }
     return { ...result, status: 'failed', reason: (failure.stderr?.trim() || failure.message).slice(-2048) }
   }

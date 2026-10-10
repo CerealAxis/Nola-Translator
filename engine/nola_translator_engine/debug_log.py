@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,7 +40,8 @@ def resolve_path() -> Path | None:
 def write(layer: str, event: str, data: dict[str, Any] | None = None) -> None:
     """Append one line. Never raises and never blocks the caller for longer than the disk takes."""
     target = resolve_path()
-    if target is None:
+    forward = os.environ.get("NOLA_TRANSLATOR_RUN_LOG_STDERR") == "1"
+    if target is None and not forward:
         return
     try:
         payload: dict[str, Any] = {
@@ -53,6 +55,10 @@ def write(layer: str, event: str, data: dict[str, Any] | None = None) -> None:
         if len(line) > MAX_DATA_CHARS + 512:
             line = json.dumps({**payload, "data": {"truncated": True}}, ensure_ascii=False, default=str)
         with _lock:
+            if forward:
+                print("NOLA_DIAGNOSTIC " + line, file=sys.stderr, flush=True)
+                return
+            assert target is not None
             target.parent.mkdir(parents=True, exist_ok=True)
             with target.open("a", encoding="utf-8") as handle:
                 handle.write(line + "\n")

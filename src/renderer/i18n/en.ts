@@ -461,6 +461,8 @@ export const en: Dictionary = {
     enginePath: 'Install path',
     protocolVersion: 'Protocol',
     copyDiagnostics: 'Copy diagnostics',
+    openLogs: 'Open log folder',
+    openLogsHint: 'Each launch records application activity in English. Reproduce the issue and send the current log. Files roll over at about 4 MB; keeps the latest 20 files. Logs may include device names and local paths.',
     copied: 'Copied',
     githubIssue: 'GitHub issue',
     githubIssueHint: 'Report bugs and request features here',
