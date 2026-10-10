@@ -19,6 +19,7 @@ import { VideoCaptionsPage } from './features/video-captions/VideoCaptionsPage'
 import { ModelsPage } from './features/models'
 import { SettingsPage } from './features/settings'
 import { RuntimeNotice } from './features/settings/RuntimeNotice'
+import { AppUpdateNotice } from './features/settings/AppUpdateNotice'
 
 /*
  * 桥接的唯一挂载点。
@@ -232,6 +233,7 @@ function Root() {
       <Shell />
       <ModelCapabilityNotices />
       <RuntimeNotice />
+      <AppUpdateNotice />
     </ErrorBoundary>
   )
 }

@@ -8,7 +8,7 @@ import { modelsStore } from './modelStore'
  */
 
 import type { NolaBridge } from '@/bridge'
-import type { AppSettings, AppSettingsPatch, ModelStorageInfo, PrewarmErrorCode, PrewarmResult } from '@/bridge'
+import type { AppSettings, AppSettingsPatch, AppUpdateCheckResult, ModelStorageInfo, PrewarmErrorCode, PrewarmResult } from '@/bridge'
 import type { BrowserConnectionAction, BrowserConnectionStatus, BrowserKind } from '../../shared/browser'
 import { createStore, createWriteQueue } from './createStore'
 import type { ComputeSnapshot, RuntimeSnapshot } from '../../shared/compute'
@@ -44,6 +44,9 @@ export interface SettingsState {
   runtimeChecking: boolean
   runtimeError: string | null
   runtimeNoticeDismissed: boolean
+  appUpdate: AppUpdateCheckResult | null
+  appUpdateChecking: boolean
+  appUpdateError: boolean
 }
 
 const initialState: SettingsState = {
@@ -62,6 +65,7 @@ const initialState: SettingsState = {
   captionServiceBusy: false,
   runtimes: null, computeSnapshot: null, computeChecking: false, computeError: null,
   runtimeBusy: false, runtimeChecking: false, runtimeError: null, runtimeNoticeDismissed: false,
+  appUpdate: null, appUpdateChecking: false, appUpdateError: false,
 }
 
 export const settingsStore = createStore<SettingsState>(initialState)
@@ -146,6 +150,7 @@ const DEBOUNCED_PATHS: ReadonlySet<string> = new Set([
 ])
 
 let bridge: NolaBridge | null = null
+let appUpdateCheck: Promise<AppUpdateCheckResult | null> | null = null
 let unsubscribe: (() => void) | null = null
 let unsubscribeCaptionService: (() => void) | null = null
 
@@ -157,6 +162,30 @@ let inFlight: PendingWrite[] = []
 let debouncePatch: AppSettingsPatch | null = null
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let debounceWaiters: Array<{ resolve: () => void; reject: (error: unknown) => void }> = []
+
+/** Shares the one background release lookup across StrictMode mounts and window remounts. */
+export function checkForAppUpdate(force = false): Promise<AppUpdateCheckResult | null> {
+  if (!bridge) return Promise.resolve(null)
+  if (appUpdateCheck && settingsStore.getState().appUpdateChecking) return appUpdateCheck
+  if (appUpdateCheck && !force) return appUpdateCheck
+  const source = bridge
+  settingsStore.setState({ appUpdateChecking: true, appUpdateError: false })
+  const task = source.app.checkLatestRelease(force).then((result) => {
+    if (bridge === source) settingsStore.setState({ appUpdate: result, appUpdateError: result.latestVersion === null })
+    return result
+  }).catch(() => {
+    if (bridge === source) settingsStore.setState({ appUpdate: null, appUpdateError: true })
+    return null
+  }).finally(() => {
+    if (bridge === source) settingsStore.setState({ appUpdateChecking: false })
+  })
+  appUpdateCheck = task
+  return appUpdateCheck
+}
+
+export async function openAppReleasePage(url: string): Promise<void> {
+  await bridge?.app.openReleasePage(url)
+}
 
 interface PendingWrite {
   patch: AppSettingsPatch
@@ -521,6 +550,7 @@ export function detachSettingsStore(): void {
   unsubscribeCaptionService?.()
   unsubscribeCaptionService = null
   bridge = null
+  appUpdateCheck = null
   computeRefresh = null
   confirmed = null
   inFlight = []

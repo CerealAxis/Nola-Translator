@@ -12,18 +12,21 @@ import { SettingsRow } from '../SettingsRow'
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { Input, TextField, ToggleButton, ToggleButtonGroup } from '@heroui/react'
+import { Button, Input, TextField, ToggleButton, ToggleButtonGroup } from '@heroui/react'
 
 import { useNolaTheme } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import type { UiLanguage } from '@/i18n'
-import { updateSettings } from '@/store'
+import { actions, stores, updateSettings, useStore } from '@/store'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 
 export function GeneralTab({ settings }: SettingsPanelProps) {
   const { t, language, setLanguage } = useI18n()
   const reduceMotion = settings.appearance?.reduceMotion ?? false
+  const appUpdate = useStore(stores.settings, (state) => state.appUpdate)
+  const appUpdateChecking = useStore(stores.settings, (state) => state.appUpdateChecking)
+  const appUpdateError = useStore(stores.settings, (state) => state.appUpdateError)
 
   useEffect(() => {
     document.documentElement.dataset.reduceMotion = reduceMotion ? 'true' : 'false'
@@ -67,6 +70,31 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
             }}
           />
         </SettingsRow>
+      </SettingGroup>
+
+      <SettingGroup legend={t('appUpdate.group')}>
+        <SettingsRow label={t('appUpdate.versionCheck')} desc={t('appUpdate.versionCheckHint')}>
+          <Button
+            variant="tertiary"
+            size="sm"
+            isPending={appUpdateChecking}
+            onPress={() => { void actions.settings.checkForAppUpdate(true) }}
+          >
+            {t('appUpdate.checkNow')}
+          </Button>
+        </SettingsRow>
+        {appUpdate ? <SettingsRow label={t('appUpdate.currentVersion', { version: appUpdate.currentVersion })}>
+          <span className="nola-caption text-muted">
+            {appUpdate.latestVersion === null
+              ? t('appUpdate.checkFailed')
+              : appUpdate.updateAvailable
+                ? t('appUpdate.availableStatus', { version: appUpdate.latestVersion })
+                : t('appUpdate.upToDateStatus', { version: appUpdate.latestVersion })}
+          </span>
+        </SettingsRow> : null}
+        {appUpdateError && !appUpdate ? <SettingsRow label={t('appUpdate.versionCheck')}>
+          <span className="nola-caption text-danger">{t('appUpdate.checkFailed')}</span>
+        </SettingsRow> : null}
       </SettingGroup>
 
       <NetworkGroup settings={settings} />

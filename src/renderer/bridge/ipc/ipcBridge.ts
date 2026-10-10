@@ -185,6 +185,8 @@ export function createIpcBridge(): NolaBridge {
       // No payload and no translation: the main process resolves the user's default browser
       // itself, so nothing about *which* browser crosses this boundary.
       openDefaultBrowser: () => call('openDefaultBrowser', (injected) => injected.openDefaultBrowser()),
+      checkLatestRelease: (force) => call('checkLatestRelease', (injected) => injected.checkLatestRelease(force)),
+      openReleasePage: (url) => call('openReleasePage', (injected) => injected.openReleasePage(url)),
     },
     translation: {
       hasCredential: (provider) => call('hasTranslationCredential', (injected) => injected.hasTranslationCredential(provider)),

@@ -22,9 +22,9 @@ import { EmptyState, Spinner } from '@heroui/react'
 import type { RouteId } from '@/bridge'
 import { useI18n } from '@/i18n'
 
-export type SettingsTab = 'general' | 'audio' | 'translation' | 'compute' | 'performance' | 'appearance' | 'storage' | 'advanced' | 'browser'
+export type SettingsTab = 'general' | 'audio' | 'translation' | 'compute' | 'performance' | 'appearance' | 'storage' | 'advanced' | 'browser' | 'developer'
 
-export const SETTINGS_TABS: readonly SettingsTab[] = [
+const ALL_SETTINGS_TABS: readonly SettingsTab[] = [
   'general',
   'audio',
   'translation',
@@ -34,7 +34,18 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   'storage',
   'advanced',
   'browser',
+  'developer',
 ]
+
+/**
+ * The developer tab has nothing to offer a user of a release build, so it is filtered out of the
+ * exported list entirely. `import.meta.env.DEV` is written as a bare literal because Vite can only
+ * statically replace that form: with the flag folded in at build time the whole branch tree-shakes
+ * away instead of shipping a runtime check to users.
+ */
+export const SETTINGS_TABS: readonly SettingsTab[] = import.meta.env.DEV
+  ? ALL_SETTINGS_TABS
+  : ALL_SETTINGS_TABS.filter((tab) => tab !== 'developer')
 
 /** 未在表内的 tab 一律回落到 general，不进 404：设置页是横向切换，不该有"页面不存在"。 */
 export const DEFAULT_SETTINGS_TAB: SettingsTab = 'general'

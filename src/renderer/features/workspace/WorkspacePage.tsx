@@ -2,17 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { Alert, AlertDialog, Button, Card, EmptyState, toast } from '@heroui/react'
+import { Alert, Button, Card, EmptyState, toast } from '@heroui/react'
 import { Captions } from 'lucide-react'
 
 import { findMissingResource } from '@/store'
 import type { MissingResource, SessionState } from '@/store'
-import { ENGINE_LOST_CODE, actions, getBridge, sessionStore, stores, useStore } from '@/store'
+import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { CaptionStage } from '@/components/caption'
 import type { CaptionDisplayMode, CaptionLayout } from '@/components/caption'
 import { NotesPanel } from '@/components/notes'
 import { useI18n } from '@/i18n'
-import type { TranslationKey } from '@/i18n'
 import { recordPath, useRoute } from '@/routes'
 import { NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import { targetLanguagePatch, translationModelPatch } from '@/session-config'
@@ -21,8 +20,12 @@ import { PreflightDialog } from './PreflightDialog'
 import { SessionBar } from './SessionBar'
 import { SessionSetupDialog } from './SessionSetupDialog'
 import type { SetupDraft } from './SessionSetupDialog'
+import { errorCodeOfSession, errorCopyOf } from './error-copy'
+import { SessionErrorDialog, StopSessionDialog } from './WorkspaceDialogs'
 import { WorkspaceToolbar } from './WorkspaceToolbar'
 import './workspace.css'
+
+export { errorCopyOf } from './error-copy'
 
 /** Default reading size, one step smaller or larger. */
 const FONT_STEPS = [14, 16, 18] as const
@@ -412,30 +415,7 @@ export function WorkspacePage() {
         onStart={() => void start()}
       />
 
-      <AlertDialog isOpen={stopConfirmOpen} onOpenChange={setStopConfirmOpen}>
-        <AlertDialog.Backdrop className="z-overlay">
-          <AlertDialog.Container>
-            <AlertDialog.Dialog className="rounded-2xl border border-border">
-              <AlertDialog.Header>
-                <AlertDialog.Heading className="nola-title text-foreground">
-                  {t('workspace.endConfirmTitle')}
-                </AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>
-                <p className="nola-body text-muted">{t('workspace.endConfirmBody')}</p>
-              </AlertDialog.Body>
-              <AlertDialog.Footer>
-                <Button variant="tertiary" size="sm" className="rounded-xl" onPress={() => setStopConfirmOpen(false)}>
-                  {t('workspace.keepGoing')}
-                </Button>
-                <Button variant="danger" size="sm" className="rounded-xl" onPress={() => void stop()}>
-                  {t('workspace.end')}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+      <StopSessionDialog isOpen={stopConfirmOpen} onOpenChange={setStopConfirmOpen} onEnd={() => void stop()} />
 
       {/* Session failure: copy comes from the errorCode table; the diagnostic reason remains visible alongside the translated action. */}
       <SessionErrorDialog state={session} onCopyDiagnostics={() => void copyDiagnostics()} onReset={resetError} onViewRecord={viewRecord} />
@@ -544,191 +524,6 @@ function IdleGuide({
       </div>
     </div>
   )
-}
-
-/**
- * Session failure dialog.
- *
- * The three actions follow what is left of the session, because the ways out
- * differ:
- * - `ENGINE_LOST`: the engine process is gone and the session is over
- *   (`abandonSessionOnEngineLoss` cleared the `sessionId`). The way out is the
- *   record: captions are on disk per line and the main process has stamped the
- *   end time, so the user wants "how do I get the half-finished meeting", not a
- *   retry.
- * - `sessionId === null`: the session never started. Retry, or install the model.
- * - `sessionId !== null`: still running, just erroring. End the session, which
- *   saves the captions so far.
- *
- * The first two go through `errorCopyOf(code, 'start')`. Only `ENGINE_LOST`
- * matches a table row, so the primary button becomes "view this record". That
- * is the only behavioural exception, so it tests the code once here rather than
- * changing the `errorCopyOf` signature, which the overlay's `StartFailureNotice`
- * also calls.
- *
- * `state.error` is a diagnostic string for the console and "copy diagnostics",
- * never rendered.
- */
-function SessionErrorDialog({
-  state,
-  onCopyDiagnostics,
-  onReset,
-  onViewRecord,
-}: {
-  state: SessionState
-  onCopyDiagnostics: () => void
-  onReset: () => void
-  onViewRecord: () => void
-}) {
-  const { t } = useI18n()
-  const isOpen = state.status === 'error'
-  const alive = state.sessionId !== null
-  const engineLost = state.errorCode === ENGINE_LOST_CODE
-  const runtimeComponent = state.errorCode === 'RUNTIME_TORCH' ? 'engine' : state.errorCode === 'RUNTIME_LLAMA' ? 'llama' : null
-
-  const handle = useMemo(() => errorCopyOf(state.errorCode, alive ? 'stop' : 'start'), [state.errorCode, alive])
-
-  return (
-    <AlertDialog
-      isOpen={isOpen}
-      onOpenChange={(open) => {
-        // Reached by ESC and by a backdrop click. This failure has no "later"
-        // option, and without a reset it would keep covering the transcript, so
-        // closing resets.
-        if (!open) onReset()
-      }}
-    >
-      <AlertDialog.Backdrop className="z-overlay">
-        <AlertDialog.Container>
-          <AlertDialog.Dialog className="rounded-2xl border border-border">
-            <AlertDialog.Header>
-              <AlertDialog.Heading className="nola-title text-foreground">
-                {t(handle.message)}
-              </AlertDialog.Heading>
-            </AlertDialog.Header>
-            {state.error || handle.detail ? (
-              <AlertDialog.Body>
-                <p className="nola-body text-muted">{state.error || (handle.detail ? t(handle.detail) : null)}</p>
-              </AlertDialog.Body>
-            ) : null}
-            <AlertDialog.Footer>
-              <Button variant="tertiary" size="sm" className="rounded-xl" onPress={onCopyDiagnostics}>
-                {t('errors.copyDiagnosticsAction')}
-              </Button>
-              <Button
-                variant={alive ? 'danger' : 'primary'}
-                size="sm"
-                className="rounded-xl"
-                onPress={() => {
-                  if (runtimeComponent) {
-                    onReset()
-                    void actions.settings.openRuntimeSettings(runtimeComponent)
-                  } else if (engineLost) onViewRecord()
-                  else if (alive) void actions.session.stopSession().catch(() => onReset())
-                  else onReset()
-                }}
-              >
-                {t(handle.action)}
-              </Button>
-            </AlertDialog.Footer>
-          </AlertDialog.Dialog>
-        </AlertDialog.Container>
-      </AlertDialog.Backdrop>
-    </AlertDialog>
-  )
-}
-
-// -- Error code to copy ------------------------------------------------------------
-
-export interface ErrorCopy {
-  message: TranslationKey
-  /**
-   * Optional second line, null by default: an `errors.*` message is already a
-   * complete sentence, so a detail repeating the action would show the same
-   * "retry" text in the body and on the primary button.
-   */
-  detail: TranslationKey | null
-  /** The primary button. */
-  action: TranslationKey
-}
-
-/**
- * `errorCode` to `errors.*` copy.
- *
- * `sessionStore.errorCodeOf()` takes the prefix of a thrown `FOO: ...` and
- * uppercases it, while engine events are uppercased directly, so one fault can
- * arrive three ways (`MODEL_MISSING` / `MODELUNAVAILABLE` / `MODEL_UNAVAILABLE`).
- * Normalise before lookup, and fall back on context: an imprecise message beats
- * the UI rendering `missing:errors.xxx`, which is what the i18n layer does with
- * an unknown key.
- *
- * `context` decides the fallback copy and the primary button. A live session
- * always gets "end session": once an error has happened, saving the captions
- * already captured is the only useful thing left to do, and a "retry" there
- * invites clicking a dead session.
- *
- * A matched row is chosen by `errorCode` alone, so `ENGINELOST` resolves to its
- * own row in either context. The engine takes the session with it and clears
- * the `sessionId`, so it lands in the `start` branch, which only supplies a
- * fallback and leaves a matched row alone.
- */
-const ERROR_TABLE: Record<string, ErrorCopy> = {
-  RUNTIMETORCH: { message: 'runtime.noticeTitle', detail: null, action: 'runtime.goTorch' },
-  RUNTIMELLAMA: { message: 'runtime.noticeTitle', detail: null, action: 'runtime.goLlama' },
-  MODELMISSING: { message: 'errors.modelMissing', detail: null, action: 'errors.modelMissingAction' },
-  MODELUNAVAILABLE: { message: 'errors.modelMissing', detail: null, action: 'errors.modelMissingAction' },
-  RESOURCEUNAVAILABLE: { message: 'errors.modelMissing', detail: null, action: 'errors.modelMissingAction' },
-  RESOURCEUNFOUND: { message: 'errors.modelMissing', detail: null, action: 'errors.modelMissingAction' },
-  ENGINENOTREADY: { message: 'errors.engineNotReady', detail: null, action: 'errors.engineNotReadyAction' },
-  ENGINENOTRUNNING: { message: 'errors.engineNotReady', detail: null, action: 'errors.engineNotReadyAction' },
-  INTERNALERROR: { message: 'errors.engineNotReady', detail: null, action: 'errors.engineNotReadyAction' },
-  // The normalised form of `ENGINE_LOST` (uppercase, separators removed) —
-  // the same code as `sessionStore.ENGINE_LOST_CODE`, not a second code.
-  ENGINELOST: { message: 'errors.engineLost', detail: null, action: 'errors.engineLostAction' },
-  AUDIODEVICEUNAVAILABLE: { message: 'errors.deviceNotFound', detail: null, action: 'errors.deviceNotFoundAction' },
-  DEVICENOTFOUND: { message: 'errors.deviceNotFound', detail: null, action: 'errors.deviceNotFoundAction' },
-  TRANSLATIONUNAVAILABLE: { message: 'errors.translateFailed', detail: null, action: 'errors.translateFailedAction' },
-}
-
-const FALLBACK: Record<'start' | 'stop', ErrorCopy> = {
-  start: { message: 'errors.startFailed', detail: null, action: 'errors.startFailedAction' },
-  // A session that died mid-run with an unrecognised code is closest to
-  // "the engine stopped". `engineNotReady` says recognition cannot start,
-  // which is the opposite of what happened here. The code stays off because it
-  // could not be read.
-  stop: { message: 'errors.engineStopped', detail: null, action: 'workspace.end' },
-}
-
-/**
- * Copy whose subject is "starting recognition", so it reads backwards once a
- * session is already running. `errorCopyOf(code, 'stop')` would otherwise take
- * `errors.engineNotReady` ("local engine not running, recognition cannot
- * start") from the table for an `internalError` raised mid-session, telling the
- * user it could not start when it actually stopped.
- */
-const START_ONLY_MESSAGES: ReadonlySet<TranslationKey> = new Set<TranslationKey>([
-  'errors.engineNotReady',
-  'errors.startFailed',
-])
-
-/** Normalise, look up, and pick the primary button by context. */
-export function errorCopyOf(code: string | null, context: 'start' | 'stop'): ErrorCopy {
-  const normalized = code === null ? '' : code.toUpperCase().replace(/[^A-Z0-9]/g, '')
-  const base = (normalized.length > 0 ? ERROR_TABLE[normalized] : undefined) ?? FALLBACK[context]
-  // A live session always gets "end session": saving the captions already
-  // recognised is the only useful thing left, and a "retry" would invite
-  // clicking a session whose engine is already gone.
-  if (context !== 'stop') return base
-  return {
-    ...base,
-    message: START_ONLY_MESSAGES.has(base.message) ? 'errors.engineStopped' : base.message,
-    action: 'workspace.end',
-  }
-}
-
-/** The errorCode from a store snapshot, read after the fact by `stop`'s catch. */
-export function errorCodeOfSession(state: SessionState): string | null {
-  return state.errorCode
 }
 
 /** A ready-made line for a toast, from the same table. */

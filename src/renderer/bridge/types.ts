@@ -25,6 +25,7 @@ export type {
 } from '../../shared/contracts'
 
 export type { EngineChannelEvent, EngineLifecycleEvent, ModelStorageInfo, OverlayTargetPage, SessionStartResult } from '../../shared/bridge'
+export type { AppUpdateCheckResult } from '../../shared/app-updates'
 
 export type {
   AppearancePrefs,

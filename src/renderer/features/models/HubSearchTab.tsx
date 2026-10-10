@@ -297,7 +297,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
   </div>
 }
 
-function DetailDrawer({ hit, description, onClose, onInstall }: {
+export function DetailDrawer({ hit, description, onClose, onInstall }: {
   hit: HubHit | null; description: string; onClose: () => void; onInstall: (hit: HubHit) => void
 }) {
   const { t } = useI18n()

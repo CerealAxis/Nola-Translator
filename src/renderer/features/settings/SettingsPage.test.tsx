@@ -1,9 +1,10 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { detachSettingsStore, settingsStore } from '@/store/settingsStore'
 import * as settingsActions from '@/store/settingsStore'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import { ComputeTab } from './tabs/ComputeTab'
+import { GeneralTab } from './tabs/GeneralTab'
 import { SettingsPage } from './SettingsPage'
 
 beforeEach(() => {
@@ -28,4 +29,17 @@ it('shows a retry action instead of a spinner when saved settings cannot be read
   render(<SettingsPage />)
   expect(screen.queryByText('加载中')).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument()
+})
+
+it('starts a forced version check from General settings', () => {
+  const check = vi.spyOn(settingsActions, 'checkForAppUpdate').mockResolvedValue({
+    currentVersion: '1.0.3', latestVersion: '1.1.0', updateAvailable: true,
+    releaseName: 'Release 1.1.0', releaseNotes: '',
+    releaseUrl: 'https://github.com/CerealAxis/Nola-Translator/releases/tag/v1.1.0',
+  })
+
+  render(<GeneralTab settings={DEFAULT_SETTINGS} />)
+  fireEvent.click(screen.getByRole('button', { name: '检查更新' }))
+
+  expect(check).toHaveBeenCalledWith(true)
 })

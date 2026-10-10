@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { createIpcBridge } from '@/bridge/ipc/ipcBridge'
 import { disposeStores, initStores } from './index'
-import { attachSettingsStore, detachSettingsStore, loadSettings, refreshComputeDevices, settingsStore } from './settingsStore'
+import { attachSettingsStore, checkForAppUpdate, detachSettingsStore, loadSettings, refreshComputeDevices, settingsStore } from './settingsStore'
 import { DEFAULT_SETTINGS } from '../../shared/settings'
 import type { ComputeSnapshot } from '../../shared/compute'
 
@@ -70,4 +70,20 @@ it('shares concurrent device refreshes and retains the last result on failure', 
   list.mockRejectedValueOnce(new Error('device probe failed'))
   await expect(refreshComputeDevices()).rejects.toThrow('device probe failed')
   expect(settingsStore.getState().computeSnapshot).toEqual(snapshot)
+})
+
+it('forces a fresh GitHub version check from settings and publishes the result', async () => {
+  const bridge = createIpcBridge()
+  const release = {
+    currentVersion: '1.0.3', latestVersion: '1.1.0', updateAvailable: true,
+    releaseName: 'Release 1.1.0', releaseNotes: 'New features',
+    releaseUrl: 'https://github.com/CerealAxis/Nola-Translator/releases/tag/v1.1.0',
+  }
+  const check = vi.spyOn(bridge.app, 'checkLatestRelease').mockResolvedValue(release)
+  attachSettingsStore(bridge, false)
+
+  await expect(checkForAppUpdate(true)).resolves.toEqual(release)
+
+  expect(check).toHaveBeenCalledWith(true)
+  expect(settingsStore.getState()).toMatchObject({ appUpdate: release, appUpdateChecking: false, appUpdateError: false })
 })

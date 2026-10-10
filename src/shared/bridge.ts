@@ -15,6 +15,7 @@ import type {
 import type { AppSettings, AppSettingsPatch, CredentialProvider } from './settings'
 import type { ComputeSnapshot, RuntimeSnapshot } from './compute'
 import type { BrowserConnectionAction, BrowserConnectionStatus, BrowserKind } from './browser'
+import type { AppUpdateCheckResult } from './app-updates'
 
 export type SessionStartResult = { sessionId: string; meetingId: string | null }
 
@@ -150,4 +151,6 @@ export type NolaTranslatorApi = {
    * main process resolves the registered handler itself; see `open-default-browser.ts`.
    */
   openDefaultBrowser(): Promise<void>
+  checkLatestRelease(force?: boolean): Promise<AppUpdateCheckResult>
+  openReleasePage(url: string): Promise<void>
 }

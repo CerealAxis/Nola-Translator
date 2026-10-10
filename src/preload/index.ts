@@ -39,6 +39,7 @@ const channels = {
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
   setCaptionService: 'browser:caption-service',
   openDefaultBrowser: 'app:open-default-browser',
+  checkLatestRelease: 'app:check-latest-release', openReleasePage: 'app:open-release-page',
 } as const
 
 // Unwraps the channel prefix Electron adds to handler errors; see stripIpcErrorMessage.
@@ -123,6 +124,8 @@ const api: NolaTranslatorApi = {
   setTranslationCredential: (provider, value) => invoke(channels.setTranslationCredential, provider, value),
   setCaptionService: (active) => invoke(channels.setCaptionService, active),
   openDefaultBrowser: () => invoke(channels.openDefaultBrowser),
+  checkLatestRelease: (force?: boolean) => invoke(channels.checkLatestRelease, force),
+  openReleasePage: (url: string) => invoke(channels.openReleasePage, url),
 }
 
 contextBridge.exposeInMainWorld('nolaTranslator', api)

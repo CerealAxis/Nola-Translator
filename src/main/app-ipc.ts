@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises'
-import { isAbsolute, normalize } from 'node:path'
+import { isAbsolute, join, normalize } from 'node:path'
 
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, screen } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, screen, shell } from 'electron'
 
 import { exportSrt, exportText, exportWebVtt, type MeetingStore } from './meeting-store'
 import { usedBytesForDirectory } from './disk-usage'
@@ -16,10 +16,12 @@ import { RECOGNITION_MODEL_LABELS } from '../shared/settings'
 import type { ModelStorageInfo } from '../shared/bridge'
 import { modelStorageEnvironment, readEngineStatus, validateModelStorageDirectory } from './model-storage'
 import { settingsPatchSchema } from './settings-schema'
+import { checkLatestRelease, isTrustedReleaseUrl } from './github-updates'
 
 const channels = {
   getSettings: 'app:get-settings', updateSettings: 'app:update-settings',
   openAppearance: 'app:open-appearance',
+  checkLatestRelease: 'app:check-latest-release', openReleasePage: 'app:open-release-page',
   getModelStorage: 'storage:get', chooseModelStorageDirectory: 'storage:choose', restartApp: 'app:restart',
   listMeetings: 'meeting:list', getMeeting: 'meeting:get', readMeeting: 'meeting:read',
   renameMeeting: 'meeting:rename', setMeetingNotes: 'meeting:set-notes', deleteMeeting: 'meeting:delete', exportMeeting: 'meeting:export',
@@ -131,6 +133,12 @@ export function registerAppIpc(options: {
   applyTheme()
 
   ipcMain.handle(channels.getSettings, () => options.settings.current())
+  ipcMain.handle(channels.checkLatestRelease, (_event, force: unknown) =>
+    checkLatestRelease(app.getVersion(), join(resolveDataRoot(), '.cache', 'github-release.json'), force === true))
+  ipcMain.handle(channels.openReleasePage, (_event, url: unknown) => {
+    if (!isTrustedReleaseUrl(url)) throw new Error('Release 页面地址无效')
+    return shell.openExternal(url)
+  })
   ipcMain.handle(channels.openAppearance, (_event, page: unknown) => {
     const window = options.getMainWindow()
     if (!window) return

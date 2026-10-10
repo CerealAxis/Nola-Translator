@@ -153,3 +153,52 @@
 .runtime-progress-copy { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); overflow-wrap: anywhere; }
 .runtime-progress-copy small { font: var(--nola-text-caption); color: var(--muted); }
 .runtime-panel-body .select { min-width: 0; max-width: 100%; }
+
+/* ============================ Developer tab ================================== */
+/* Preview strips live in the row's control column, which is right-aligned and wraps; the
+   `width:100%` below is what makes each strip take a whole line of that column instead of
+   squeezing itself beside the label. */
+
+.dev-strip { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); width: 100%; justify-content: flex-end; }
+.dev-stack { display: flex; flex-direction: column; gap: var(--space-1); width: 100%; }
+.dev-empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); padding: var(--space-2) 0; }
+.dev-skeleton-line { height: var(--space-1); border-radius: var(--radius-sm); }
+.dev-skeleton-line--short { width: 60%; }
+.dev-progress { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+
+.dev-gallery { display: flex; flex-wrap: wrap; gap: var(--space-1); width: 100%; }
+.dev-token { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; width: 9rem; }
+.dev-token__caption { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.dev-token__chip { height: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.dev-token__radius { height: var(--space-2); border: 1px solid var(--accent); background: var(--accent-soft); }
+.dev-token__space { height: var(--space-1); border-radius: var(--radius-sm); background: var(--accent); }
+.dev-token__sample { color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Two independent motion channels, same reasoning as theme/motion.css: the preview must animate
+   under the app's own reduced-motion setting and under the OS preference, which is exactly what
+   makes it a useful check. `data-reduce-motion` collapses the duration the same way the global
+   rule does, so the loop still runs instead of leaving an element parked mid-transform. */
+
+.dev-motion-box { width: var(--space-2); height: var(--space-2); border-radius: var(--radius-sm); background: var(--accent); }
+.dev-motion-box[data-running='true'] { animation: dev-motion-pulse calc(var(--dur-enter) * 2) var(--ease-nola) infinite alternate; }
+.dev-motion-track { position: relative; display: inline-block; width: calc(var(--space-8) * 1.5); height: var(--space-2); border-radius: var(--radius-full); background: var(--surface-tertiary); overflow: hidden; }
+.dev-motion-dot { position: absolute; inset-block: 0; left: 0; width: var(--space-2); border-radius: var(--radius-full); background: var(--accent); }
+.dev-motion-dot[data-running='true'] { animation: dev-motion-slide calc(var(--dur-enter) * 3) var(--ease-nola) infinite alternate; }
+
+@keyframes dev-motion-pulse {
+  from { opacity: 0.5; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1.15); }
+}
+
+@keyframes dev-motion-slide {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(var(--space-8) * 1.5 - var(--space-2))); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dev-motion-box[data-running='true'],
+  .dev-motion-dot[data-running='true'] { animation: none; }
+}
+
+html[data-reduce-motion='true'] .dev-motion-box[data-running='true'],
+html[data-reduce-motion='true'] .dev-motion-dot[data-running='true'] { animation: none; }

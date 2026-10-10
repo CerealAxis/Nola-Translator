@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Alert, Button, Card, Fieldset, ListBox, Spinner, Switch, Tabs, Tooltip } from '@heroui/react'
-import { Cpu, CircleHelp, Gauge, Database, Languages, Mic, Monitor, Settings, SlidersHorizontal } from 'lucide-react'
+import { Cpu, CircleHelp, Gauge, Database, FlaskConical, Languages, Mic, Monitor, Settings, SlidersHorizontal } from 'lucide-react'
 
 import type { AppSettings } from '@/bridge'
 import { useI18n } from '@/i18n'
@@ -18,12 +18,13 @@ import { AdvancedTab } from './tabs/AdvancedTab'
 import { ComputeTab } from './tabs/ComputeTab'
 import { PerformanceTab } from './tabs/PerformanceTab'
 import { BrowserTab } from './tabs/BrowserTab'
+import { DeveloperTab } from './tabs/DeveloperTab'
 import { computeUi } from './compute-ui'
 import './settings.css'
 
 export interface SettingsPanelProps { settings: AppSettings }
 
-const NAV_ICONS = { browser: Monitor, general: Settings, audio: Mic, translation: Languages, compute: Cpu, performance: Gauge, appearance: Monitor, storage: Database, advanced: SlidersHorizontal }
+const NAV_ICONS = { browser: Monitor, general: Settings, audio: Mic, translation: Languages, compute: Cpu, performance: Gauge, appearance: Monitor, storage: Database, advanced: SlidersHorizontal, developer: FlaskConical }
 
 export function SettingsPage() {
   const { t, language } = useI18n()
@@ -66,6 +67,7 @@ export function SettingsPage() {
     general: t('modelsSettingsUi.general'), audio: t('modelsSettingsUi.audio'),
     translation: t('modelsSettingsUi.translation'), appearance: t('modelsSettingsUi.appearance'),
     storage: t('modelsSettingsUi.storage'), advanced: t('modelsSettingsUi.advanced'),
+    developer: t('dev.tabLabel'),
   }
 
   const computeCopy = language === 'en' ? computeUi.en : computeUi.zh
@@ -101,6 +103,7 @@ export function SettingsPage() {
           <Tabs.Panel id="storage"><StorageTab settings={settings} /></Tabs.Panel>
           <Tabs.Panel id="advanced"><AdvancedTab settings={settings} /></Tabs.Panel>
           <Tabs.Panel id="browser"><BrowserTab /></Tabs.Panel>
+          <Tabs.Panel id="developer"><DeveloperTab /></Tabs.Panel>
         </div>
       </Tabs>
     </div>

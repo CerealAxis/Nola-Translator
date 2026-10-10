@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AlertDialog, Button, Card, EmptyState, ListBox, ListBoxItem, Pagination, SearchField, Select, Skeleton, toast } from '@heroui/react'
+import { Button, Card, EmptyState, ListBox, ListBoxItem, Pagination, SearchField, Select, Skeleton, toast } from '@heroui/react'
 import type { Selection } from '@react-types/shared'
 import { Mic } from 'lucide-react'
 import { ErrorBoundary } from '@/components/primitives'
@@ -11,6 +11,7 @@ import { LANGUAGE_LABELS } from '@/bridge'
 import type { MeetingMeta } from '@/bridge'
 import { RenameDialog } from './RenameDialog'
 import { ExportDialog } from './ExportDialog'
+import { RecordDeleteDialog } from './RecordDeleteDialog'
 import { RecordsTable } from './RecordsTable'
 import { clampPage, matches, pageNumbers, sortByEndTime } from './recordLogic'
 import '../home/home-records.css'
@@ -144,13 +145,14 @@ export function RecordsPage(): ReactNode {
       </div>
       <RenameDialog meetingId={renaming?.meetingId ?? null} initialTitle={renaming?.title ?? ''} onClose={() => setRenaming(null)} />
       <ExportDialog meetingId={exporting?.meetingId ?? null} isOpen={exporting !== null} onOpenChange={(open) => { if (!open) setExporting(null) }} />
-      <AlertDialog isOpen={pendingDelete !== null} onOpenChange={(open) => { if (!open && !deletePending) setPendingDelete(null) }}>
-        <AlertDialog.Backdrop><AlertDialog.Container><AlertDialog.Dialog>
-          <AlertDialog.Header><AlertDialog.Icon /><AlertDialog.Heading>{bulk ? t('records.deleteManyTitle', { count: selectedCount }) : t('records.deleteTitle')}</AlertDialog.Heading></AlertDialog.Header>
-          <AlertDialog.Body><p>{bulk ? t('records.deleteManyBody') : t('records.deleteBody')}</p></AlertDialog.Body>
-          <AlertDialog.Footer><Button variant="tertiary" isDisabled={deletePending} onPress={() => setPendingDelete(null)}>{t('common.cancel')}</Button><Button variant="danger" isPending={deletePending} onPress={confirmDelete}>{bulk ? t('records.deleteSelected', { count: selectedCount }) : t('records.delete')}</Button></AlertDialog.Footer>
-        </AlertDialog.Dialog></AlertDialog.Container></AlertDialog.Backdrop>
-      </AlertDialog>
+      <RecordDeleteDialog
+        isOpen={pendingDelete !== null}
+        onOpenChange={(open) => { if (!open && !deletePending) setPendingDelete(null) }}
+        bulk={bulk}
+        selectedCount={selectedCount}
+        isPending={deletePending}
+        onConfirm={confirmDelete}
+      />
     </ErrorBoundary>
   )
 }

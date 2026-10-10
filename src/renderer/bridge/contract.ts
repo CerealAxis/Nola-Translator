@@ -1,5 +1,6 @@
 import type { ModelConfiguration } from '../../shared/model-capabilities'
 import type { BrowserConnectionAction, BrowserConnectionStatus, BrowserKind } from '../../shared/browser'
+import type { AppUpdateCheckResult } from '../../shared/app-updates'
 /**
  * The renderer's data-access interface: the method and type surface every
  * component reads through. The production implementation is `createIpcBridge()`,
@@ -129,7 +130,11 @@ export interface NolaBridge {
    * Opens the user's default browser with **no URL** — the video-captions page's "open browser"
    * button, which must not invent a start page to satisfy `shell.openExternal`.
    */
-  app: { openDefaultBrowser(): Promise<void> }
+  app: {
+    openDefaultBrowser(): Promise<void>
+    checkLatestRelease(force?: boolean): Promise<AppUpdateCheckResult>
+    openReleasePage(url: string): Promise<void>
+  }
   translation: { hasCredential(p: CredentialProvider): Promise<boolean>; setCredential(p: CredentialProvider, v: string): Promise<void> }
   events: {
     /**
@@ -206,6 +211,8 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'diagnostics.get': 'ipc',
   'diagnostics.copy': 'ipc',
   'app.openDefaultBrowser': 'ipc',
+  'app.checkLatestRelease': 'ipc',
+  'app.openReleasePage': 'ipc',
   'translation.hasCredential': 'ipc',
   'translation.setCredential': 'ipc',
   'events.onEngineEvent': 'ipc',
