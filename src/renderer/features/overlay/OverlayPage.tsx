@@ -27,7 +27,7 @@ export function OverlayPage() {
   const latest = session.interim ?? session.segments.at(-1)
   const sourceText = latest?.sourceText || t('overlay.notStarted')
   const originalOnly = latest?.translations.length === 0
-  const translationText = latest?.translations.find(item => item.state === 'complete')?.text || t('overlay.notStartedHint')
+  const translationText = latest?.translations.find(item => item.state !== 'failed' && item.text)?.text || t('overlay.notStartedHint')
   const translationDisabled = settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE
   const display = translationDisabled ? 'source' : config.showSource && config.showTranslation ? 'both' : config.showSource ? 'source' : 'translation'
   const label = (code: string) => {

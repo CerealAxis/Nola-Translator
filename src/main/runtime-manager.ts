@@ -1,4 +1,4 @@
-import { renameRuntimeDirectory } from './runtime-files'
+import { cleanupRuntimeArtifacts, removeRuntimeArtifact, renameRuntimeDirectory } from './runtime-files'
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { access, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
@@ -65,6 +65,7 @@ export class RuntimeManager {
         } catch { /* Unrecognized directories never grant permission to replace files. */ }
       }
     }
+    await cleanupRuntimeArtifacts(this.directory, this.packages.map(item => item.id))
     try {
       const saved = JSON.parse(await readFile(join(this.directory, 'current-components.json'), 'utf8')) as RuntimeSnapshot['local']
       for (const kind of ['engine', 'llama'] as const) if (typeof saved[kind]?.path === 'string') this.local[kind] = { ...missingLocalRuntime(saved[kind].path), id: saved[kind].id }
@@ -252,10 +253,14 @@ export class RuntimeManager {
       catch (error) { if (movedOld) await renameRuntimeDirectory(backup, destination); throw error }
       if (movedOld) await rm(backup, { recursive: true, force: true }).catch(() => undefined)
     } catch (error) {
-      this.lastError = controller.signal.aborted ? '安装已取消；下载缓存已保留' : String(error)
+      this.lastError = controller.signal.aborted ? '安装已取消' : String(error)
       throw new Error(this.lastError)
     } finally {
-      await rm(staging, { recursive: true, force: true }).catch(() => undefined)
+      for (const artifact of [staging, ...parts.map((_part, index) => this.inside(`${item.id}-${index}.zip.partial`))]) {
+        await removeRuntimeArtifact(this.directory, artifact).catch(error => {
+          this.lastError = `${this.lastError ? `${this.lastError}；` : ''}安装临时文件清理失败：${String(error)}`
+        })
+      }
       this.operation = null
       this.cancellation = null
     }

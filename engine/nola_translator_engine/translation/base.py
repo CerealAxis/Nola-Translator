@@ -13,7 +13,7 @@ class ProviderTranslation:
 @dataclass(frozen=True, slots=True)
 class ScheduledTranslation:
     target_language: str
-    state: Literal["complete", "failed"]
+    state: Literal["pending", "complete", "failed"]
     provider: str
     text: str | None = None
     error_code: str | None = None

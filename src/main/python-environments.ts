@@ -1,4 +1,4 @@
-import { renameRuntimeDirectory } from './runtime-files'
+import { cleanupRuntimeArtifacts, removeRuntimeArtifact, renameRuntimeDirectory } from './runtime-files'
 import { randomUUID } from 'node:crypto'
 import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { createWriteStream } from 'node:fs'
@@ -53,6 +53,7 @@ export class PythonEnvironments {
         if (marker.id === recipe.id && marker.kind === 'python') this.installedIds.add(recipe.id)
       } catch { /* Installation records, rather than folder names, grant repair ownership. */ }
     }
+    await cleanupRuntimeArtifacts(this.directory, this.recipes.map(recipe => recipe.id), true)
   }
   states(): RuntimeRecipeState[] {
     return this.recipes.map(recipe => ({ ...recipe, installed: this.installedIds.has(recipe.id), available: true, reason: '' }))
@@ -118,10 +119,14 @@ export class PythonEnvironments {
       this.installedIds.add(id)
       if (movedOld) await rm(backup, { recursive: true, force: true }).catch(() => undefined)
     } catch (error) {
-      this.lastError = controller.signal.aborted ? '安装已取消；下载缓存已保留' : String(error)
+      this.lastError = controller.signal.aborted ? '安装已取消' : String(error)
       throw new Error(this.lastError)
     } finally {
-      await rm(staging, { recursive: true, force: true }).catch(() => undefined)
+      for (const artifact of [staging, cache, this.inside('pip-temp')]) {
+        await removeRuntimeArtifact(this.directory, artifact).catch(error => {
+          this.lastError = `${this.lastError ? `${this.lastError}；` : ''}安装临时文件清理失败：${String(error)}`
+        })
+      }
       this.operation = null
       this.controller = null
     }
@@ -137,18 +142,20 @@ export class PythonEnvironments {
     const network = this.network?.()
     const index = network?.usePypiMirror ? PYPI_MIRROR : PYPI_INDEX
     const proxy = network?.proxyForPip ? network.proxyUrl.trim() : ''
+    let childClosed: Promise<void> | undefined
     try {
       await new Promise<void>((resolveInstall, reject) => {
         // Same-volume temporary files avoid copying the whole CUDA package a second time.
         // Compile only imported modules at runtime, rather than every dependency during installation.
         const child = execFile(join(this.baseDirectory, 'python.exe'), ['-I', '-u', '-m', 'pip', '--isolated', 'install',
-          '--disable-pip-version-check', '--no-warn-script-location', '--no-compile', '--progress-bar', 'off', '--target', staging,
+          '--disable-pip-version-check', '--no-warn-script-location', '--no-cache-dir', '--no-compile', '--progress-bar', 'off', '--target', staging,
           '--index-url', index, '--extra-index-url', state.indexUrl,
           ...(proxy ? ['--proxy', proxy] : []),
           ...paths, ...state.requirements], {
           cwd: this.baseDirectory, windowsHide: true, signal, timeout: 30 * 60_000, maxBuffer: 4 * 1024 * 1024,
           env: { ...process.env, PYTHONUTF8: '1', PIP_CONFIG_FILE: 'nul', TEMP: temporary, TMP: temporary },
         }, error => error ? reject(error) : resolveInstall())
+        childClosed = new Promise<void>(resolveClosed => { child.once('close', () => resolveClosed()) })
         for (const stream of [child.stdout, child.stderr]) {
           stream?.pipe(log, { end: false })
           stream?.setEncoding('utf8')
@@ -159,6 +166,8 @@ export class PythonEnvironments {
         }
       })
     } finally {
+      // Abort callbacks can run before close; cleanup must wait until pip releases its files.
+      if (signal.aborted) await childClosed
       log.end()
       const error = await logDone
       if (error instanceof Error) throw error

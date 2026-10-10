@@ -140,7 +140,37 @@ class ModelManager:
         return partial(_download, opener=http_opener(network))
 
     def model_path(self, spec: ModelSpec) -> Path:
-        return self.model_root / spec.directory
+        target = self.model_root / spec.directory
+        if target.parent.resolve() != self.model_root or target.name in ('', '.', '..'):
+            raise ModelStorageError('模型目录必须位于模型存储目录内')
+        return target
+
+    def _owned_directory(self, path: Path) -> bool:
+        return (path.parent.resolve() == self.model_root and path.is_dir()
+                and not path.is_symlink() and not path.is_junction())
+
+    def cleanup_stale(self, specs: list[ModelSpec]) -> None:
+        """Recover interrupted swaps before removing known tempfile names; never follow junctions."""
+        if not self.model_root.exists():
+            return
+        names = list(self.model_root.iterdir())
+        for spec in specs:
+            target = self.model_path(spec)
+            prefix = _UNSAFE_PATH_CHARS.sub('-', spec.directory)[:_SAFE_PREFIX_LIMIT] or 'model'
+            pattern = re.compile(rf'^\.{re.escape(prefix)}-[a-z0-9_]{{8}}$')
+            for path in names:
+                if pattern.fullmatch(path.name) and self._owned_directory(path):
+                    shutil.rmtree(path, ignore_errors=True)
+            backup = self.model_root / f'.{spec.directory}.corrupt'
+            if not self._owned_directory(backup):
+                continue
+            if not target.exists():
+                try:
+                    os.replace(backup, target)
+                except OSError:
+                    pass
+            elif self._owned_directory(target) and self.is_installed(spec):
+                shutil.rmtree(backup, ignore_errors=True)
 
     def is_installed(self, spec: ModelSpec) -> bool:
         target = self.model_path(spec)
@@ -201,23 +231,36 @@ class ModelManager:
             phase("verify")
             for entry in spec.files:
                 part = temp / f".{entry.path}.part"
-                self._verify_file(part, entry)
+                self._verify_file(part, entry, lambda: progress(done, total))
                 os.replace(part, temp / entry.path)
 
             phase("install")
             target = self.model_path(spec)
+            corrupt = self.model_root / f".{spec.directory}.corrupt"
+            moved_old = False
             if target.exists():
-                corrupt = self.model_root / f".{spec.directory}.corrupt"
+                if not self._owned_directory(target):
+                    raise ModelStorageError('不能覆盖外部链接模型目录')
                 if corrupt.exists():
-                    shutil.rmtree(corrupt, ignore_errors=True)
+                    if not self._owned_directory(corrupt):
+                        raise ModelStorageError('模型备份目录不是本地目录')
+                    shutil.rmtree(corrupt)
                 os.replace(target, corrupt)
-            os.replace(temp, target)
+                moved_old = True
+            try:
+                os.replace(temp, target)
+            except OSError:
+                if moved_old:
+                    os.replace(corrupt, target)
+                raise
+            if moved_old:
+                shutil.rmtree(corrupt, ignore_errors=True)
             return target
         finally:
             shutil.rmtree(temp, ignore_errors=True)
 
     @staticmethod
-    def _verify_file(path: Path, entry: FileEntry) -> None:
+    def _verify_file(path: Path, entry: FileEntry, checkpoint: Callable[[], None] = lambda: None) -> None:
         if not path.is_file():
             raise ModelIntegrityError("模型文件缺失")
         if path.stat().st_size != entry.size:
@@ -226,24 +269,25 @@ class ModelManager:
         # this file. Falling through to "size matched, assume it is fine" is the one outcome a
         # supply chain must never produce, so a spec with no digest fails loudly instead.
         if entry.sha256:
-            expected, actual = entry.sha256.casefold(), _file_sha256(path)
+            expected, actual = entry.sha256.casefold(), _file_sha256(path, checkpoint)
         elif entry.blob_sha1:
-            expected, actual = entry.blob_sha1.casefold(), _git_blob_id(path)
+            expected, actual = entry.blob_sha1.casefold(), _git_blob_id(path, checkpoint)
         else:
             raise ModelIntegrityError(f"模型文件 {entry.path} 没有可校验的摘要")
         if actual != expected:
             raise ModelIntegrityError("模型文件摘要不匹配")
 
 
-def _file_sha256(path: Path) -> str:
+def _file_sha256(path: Path, checkpoint: Callable[[], None] = lambda: None) -> str:
     digest = sha256()
     with path.open("rb") as source:
         while chunk := source.read(1024 * 1024):
+            checkpoint()
             digest.update(chunk)
     return digest.hexdigest()
 
 
-def _git_blob_id(path: Path) -> str:
+def _git_blob_id(path: Path, checkpoint: Callable[[], None] = lambda: None) -> str:
     """Git's own object id for a file: sha1 over the ``blob <size>\\0`` header plus the content.
 
     This is the id git stores in its tree, and the one HuggingFace echoes as ``blobId``. Hashing
@@ -254,5 +298,6 @@ def _git_blob_id(path: Path) -> str:
     digest.update(f"blob {size}\0".encode("ascii"))
     with path.open("rb") as source:
         while chunk := source.read(1024 * 1024):
+            checkpoint()
             digest.update(chunk)
     return digest.hexdigest()

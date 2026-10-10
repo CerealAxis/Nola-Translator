@@ -1,7 +1,7 @@
 import type { Dirent } from 'node:fs'
 import { appendFile, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 
 import type { CaptionSegment, MeetingMeta } from '../shared/contracts'
 
@@ -113,6 +113,7 @@ export class MeetingStore {
   private readonly queues = new Map<string, Promise<unknown>>()
   /** sessionId -> meetingId, for meetings still recording. */
   private readonly open = new Map<string, string>()
+  private readonly recorded = new Map<string, Map<string, { revision: number; signature: string }>>()
 
   constructor(private readonly root: string) {}
 
@@ -281,10 +282,23 @@ export class MeetingStore {
     const meetingId = this.open.get(sessionId)
     if (!meetingId) return
     await this.serialize(meetingId, async () => {
-      await appendFile(join(this.directory(meetingId), SEGMENTS_FILE), `${JSON.stringify(segment)}\n`, 'utf8')
-    })
-    const meta = this.cache.get(meetingId)
-    if (meta) {
+      const ledger = this.recorded.get(meetingId) ?? new Map<string, { revision: number; signature: string }>()
+      this.recorded.set(meetingId, ledger)
+      const previous = ledger.get(segment.segmentId)
+      if (previous && previous.revision > segment.revision) return
+      // Preserve confirmed speech immediately, but keep token-by-token updates out of the transcript log.
+      const stored: CaptionSegment = { ...segment, translations: segment.translations.map(item =>
+        item.state === 'pending' ? { ...item, text: undefined } : item,
+      ) }
+      const signature = createHash('sha256').update(JSON.stringify({ ...stored, revision: 0 })).digest('hex')
+      if (previous?.signature === signature) {
+        ledger.set(segment.segmentId, { revision: segment.revision, signature })
+        return
+      }
+      await appendFile(join(this.directory(meetingId), SEGMENTS_FILE), `${JSON.stringify(stored)}\n`, 'utf8')
+      ledger.set(segment.segmentId, { revision: segment.revision, signature })
+      const meta = this.cache.get(meetingId)
+      if (!meta) return
       /*
        * The content interval covers confirmed segments only, the same batch written to
        * `segments.jsonl`, so duration and captions describe one span. Audio t=0 is when capture
@@ -293,7 +307,7 @@ export class MeetingStore {
       const end = segment.endedAtMs ?? segment.startedAtMs
       this.cache.set(meetingId, {
         ...meta,
-        segmentCount: meta.segmentCount + 1,
+        segmentCount: meta.segmentCount + (previous ? 0 : 1),
         contentStartedAtMs: meta.contentStartedAtMs === undefined
           ? segment.startedAtMs
           : Math.min(meta.contentStartedAtMs, segment.startedAtMs),
@@ -301,7 +315,7 @@ export class MeetingStore {
           ? end
           : Math.max(meta.contentEndedAtMs, end),
       })
-    }
+    })
   }
 
   async finish(sessionId: string): Promise<MeetingMeta | null> {
@@ -336,6 +350,7 @@ export class MeetingStore {
       }
       await writeMeta(this.directory(meetingId), next)
       this.cache.set(meetingId, next)
+      this.recorded.delete(meetingId)
       return next
     })
   }
@@ -345,6 +360,7 @@ export class MeetingStore {
     for (const [sessionId, value] of [...this.open]) if (value === meetingId) this.open.delete(sessionId)
     await this.serialize(meetingId, async () => {
       this.cache.delete(meetingId)
+      this.recorded.delete(meetingId)
       await rm(this.directory(meetingId), { recursive: true, force: true })
     })
   }

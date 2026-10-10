@@ -31,6 +31,106 @@ class ControlledProvider:
 
 
 @pytest.mark.asyncio
+async def test_fast_target_is_visible_while_slow_target_is_pending(tmp_path):
+    release = asyncio.Event()
+    emitted = []
+
+    class Provider(ImmediateProvider):
+        async def translate(self, text, source, target):
+            if target == 'ja':
+                await release.wait()
+            return await super().translate(text, source, target)
+
+    runtime = EngineRuntime(tmp_path / 'models', emitted.append)
+    runtime.service.session_id = 'session'
+    runtime.active_config = SimpleNamespace(targetLanguages=['zh', 'ja'], allowIntermediateTranslation=False)
+    runtime.translation_scheduler = TranslationScheduler(Provider())
+    await runtime._emit_update(RecognitionUpdate('segment', 1, 0, 10, 'hello', 'en', True))
+    worker = next(iter(runtime.translation_tasks.values()))
+    try:
+        for _ in range(30):
+            await asyncio.sleep(0)
+        latest = emitted[-1].segment.translations
+        assert latest[0].text == 'zh:hello'
+        assert latest[1].state == 'pending'
+        assert not worker.done()
+    finally:
+        release.set()
+        await worker
+
+
+@pytest.mark.asyncio
+async def test_final_caption_preempts_obsolete_network_intermediate(tmp_path):
+    started = asyncio.Event()
+    final_started = asyncio.Event()
+    cancelled = asyncio.Event()
+    release = asyncio.Event()
+
+    class Provider:
+        name = 'cloud-test'
+        async def translate(self, text, source, target):
+            if text == 'old':
+                started.set()
+                try:
+                    await release.wait()
+                except asyncio.CancelledError:
+                    cancelled.set()
+                    raise
+            else:
+                final_started.set()
+            return ProviderTranslation(text, (source, target))
+
+    runtime = EngineRuntime(tmp_path / 'models', lambda _: None)
+    runtime.service.session_id = 'session'
+    runtime.active_config = SimpleNamespace(targetLanguages=['zh'], allowIntermediateTranslation=True, translationProvider='cloud')
+    runtime.translation_scheduler = TranslationScheduler(Provider(), max_concurrency=1)
+    await runtime._emit_update(RecognitionUpdate('segment', 0, 0, None, 'old', 'en', False))
+    await started.wait()
+    await runtime._emit_update(RecognitionUpdate('segment', 1, 0, 10, 'final', 'en', True))
+    try:
+        for _ in range(50):
+            await asyncio.sleep(0)
+        assert final_started.is_set(), 'Final text must not wait for obsolete intermediate HTTP work'
+        assert cancelled.is_set()
+    finally:
+        release.set()
+        await asyncio.gather(*runtime.translation_tasks.values())
+        await runtime.translation_scheduler.close()
+
+
+@pytest.mark.asyncio
+async def test_streamed_text_is_published_before_completion_and_stale_updates_are_ignored(tmp_path):
+    started, release = asyncio.Event(), asyncio.Event()
+    emitted = []
+    callbacks = []
+    class Provider:
+        name = 'stream-test'
+        async def translate_stream(self, text, source, target, on_text):
+            callbacks.append(on_text)
+            on_text('partial translation')
+            started.set()
+            await release.wait()
+            return ProviderTranslation('complete translation', (source, target))
+    runtime = EngineRuntime(tmp_path / 'models', emitted.append)
+    runtime.service.session_id = 'session'
+    runtime.active_config = SimpleNamespace(targetLanguages=['zh'], allowIntermediateTranslation=False)
+    runtime.translation_scheduler = TranslationScheduler(Provider())
+    await runtime._emit_update(RecognitionUpdate('segment', 0, 0, 10, 'hello', 'en', True))
+    await started.wait()
+    try:
+        assert emitted[-1].segment.translations[0].text == 'partial translation'
+        assert emitted[-1].segment.translations[0].state == 'pending'
+        runtime._stream_generation += 1
+        count = len(emitted)
+        callbacks[0]('stale partial')
+        assert len(emitted) == count
+    finally:
+        release.set()
+        await asyncio.gather(*runtime.translation_tasks.values())
+        await runtime.translation_scheduler.close()
+
+
+@pytest.mark.asyncio
 async def test_changed_source_does_not_pair_with_previous_revision_translation(tmp_path) -> None:
     emitted = []
     runtime = EngineRuntime(tmp_path / "models", emitted.append)

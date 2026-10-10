@@ -23,6 +23,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   HTTPError: 'shellUi.error.HTTPError',
   TimeoutError: 'shellUi.error.TimeoutError',
   translationTimeout: 'shellUi.error.translationTimeout',
+  translationRateLimited: 'shellUi.error.translationRateLimited',
   resourceUnavailable: 'shellUi.error.resourceUnavailable',
   llamaServerUnavailable: 'shellUi.error.llamaServerUnavailable',
   unsupportedLanguagePair: 'shellUi.error.unsupportedLanguagePair',

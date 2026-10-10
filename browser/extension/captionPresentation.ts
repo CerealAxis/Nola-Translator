@@ -12,7 +12,7 @@ export function captionLines(caption: Caption | undefined, config: CaptionConfig
   if (!caption) return []
   const source = config.showSource && caption.sourceText ? [caption.sourceText] : []
   if (config.targetLanguage === 'none' || !config.showTranslation) return source
-  const translation = caption.translations.find(item => item.targetLanguage === config.targetLanguage && item.state === 'complete')?.text
+  const translation = caption.translations.find(item => item.targetLanguage === config.targetLanguage && item.state !== 'failed' && item.text)?.text
   // Translation latency or failure must not hide speech that recognition already produced.
   return translation ? [...source, translation] : source
 }

@@ -69,6 +69,24 @@ describe('MeetingStore', () => {
     expect(stored.map((item) => item.sourceText)).toEqual(['hello', 'world'])
   })
 
+  it('persists source and completed translation without storing every streamed revision', async () => {
+    const meeting = await store.begin({ sourceLanguage: 'en', targetLanguage: 'zh', recordAudio: false })
+    store.attach(meeting.meetingId, 'stream-session')
+    const base = segment('stream', 0, 'hello')
+    const updates = Array.from({ length: 20 }, (_, index): CaptionSegment => ({ ...base, revision: index + 1,
+      translations: [{ targetLanguage: 'zh', state: 'pending', provider: 'cloud', text: `partial-${index}` }],
+    }))
+    await Promise.all(updates.map(update => store.append('stream-session', update)))
+    await store.append('stream-session', { ...base, revision: 21 })
+    await store.append('stream-session', { ...updates[0], revision: 2 })
+    expect(store.get(meeting.meetingId)?.segmentCount).toBe(1)
+    const rows = (await readFile(join(root, 'meetings', meeting.meetingId, MEETING_SEGMENTS_FILE), 'utf8')).trim().split('\n')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).not.toContain('partial-')
+    expect((await store.segments(meeting.meetingId))[0].translations[0].text).toBe('hello-译')
+    await store.finish('stream-session')
+  })
+
   it('中间结果不落盘, 未 attach 的会话写入被丢弃', async () => {
     const meeting = await store.begin({ sourceLanguage: 'auto', targetLanguage: 'zh', recordAudio: true })
     await store.append('session-x', segment('a', 0, 'orphan'))

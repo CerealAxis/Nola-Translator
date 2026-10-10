@@ -118,7 +118,7 @@ export function OverlayRoot() {
   const sourceLine: TrackLine | null = current?.sourceText
     ? { key: current.segmentId, text: current.sourceText }
     : null
-  const translated = current?.translations.find((entry) => entry.state === 'complete' && entry.text)
+  const translated = current?.translations.find((entry) => entry.state !== 'failed' && entry.text)
   const translationLine: TrackLine | null = current && translated?.text
     ? { key: current.segmentId, text: translated.text }
     : null

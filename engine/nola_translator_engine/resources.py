@@ -190,6 +190,9 @@ class ResourceManager:
         # hand-maintained list of models the app ships with, and a user's own download is not
         # something it should have to learn about at build time.
         self.registry = CustomModelRegistry(self.model_root)
+        specs = [self._spec(item.resource_id) for item in RESOURCE_DEFINITIONS]
+        specs.extend(entry.spec() for entry in self.registry.all())
+        self.models.cleanup_stale(specs)
 
     @property
     def qwen_path(self) -> Path:

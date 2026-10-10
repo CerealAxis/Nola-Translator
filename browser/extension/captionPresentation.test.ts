@@ -16,6 +16,8 @@ describe('live caption presentation', () => {
     expect(captionLines(translated, config())).toEqual(['Hello'])
     expect(captionLines(translated, config({ showTranslation: true }))).toEqual(['Hello', '你好'])
     expect(captionLines(translated, config({ showSource: false, showTranslation: true }))).toEqual(['你好'])
+    const streaming = { ...phrase, translations: [{ targetLanguage: 'zh', text: '你好', state: 'pending' as const, provider: 'test' }] }
+    expect(captionLines(streaming, config({ showTranslation: true }))).toEqual(['Hello', '你好'])
   })
   it('expires a phrase once and freezes its remaining lifetime while paused', () => {
     const clock = new CaptionClock()

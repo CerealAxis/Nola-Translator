@@ -83,7 +83,7 @@ from .resources import (
     ResourceManager,
 )
 from .service import EngineService
-from .translation.base import TranslationProvider
+from .translation.base import ScheduledTranslation, TranslationProvider
 from .translation.hymt2 import (
     HyMt2TranslationProvider,
     is_supported,
@@ -1217,7 +1217,32 @@ class EngineRuntime:
                     continue
                 self.translation_requests.pop(segment_id)
                 self.translation_last_started[segment_id] = monotonic()
-                translations = await self._translate_request(request)
+                work = asyncio.create_task(self._translate_request(request))
+                wake = self.translation_wake[segment_id]
+                try:
+                    while not work.done():
+                        wake.clear()
+                        changed = asyncio.create_task(wake.wait())
+                        try:
+                            await asyncio.wait((work, changed), return_when=asyncio.FIRST_COMPLETED)
+                        finally:
+                            changed.cancel()
+                            await asyncio.gather(changed, return_exceptions=True)
+                        newer = self.translation_requests.get(segment_id)
+                        if (newer is not None and newer.update.is_final
+                                and newer.update.source_text != request.update.source_text
+                                and getattr(self.active_config, 'translationProvider', None) in ('cloud', 'microsoft')):
+                            # Network IO is cancellable; local native inference must keep its reservation.
+                            work.cancel()
+                            await asyncio.gather(work, return_exceptions=True)
+                            break
+                    if work.cancelled():
+                        continue
+                    translations = await work
+                finally:
+                    if not work.done():
+                        work.cancel()
+                        await asyncio.gather(work, return_exceptions=True)
                 latest = self.latest_updates.get(segment_id)
                 if (
                     latest is None
@@ -1226,8 +1251,9 @@ class EngineRuntime:
                     or self._stream_generation != generation
                 ):
                     continue
-                self.latest_translations[segment_id] = translations
-                self.emit(self._caption_event(latest, translations))
+                if self.latest_translations.get(segment_id) != translations:
+                    self.latest_translations[segment_id] = translations
+                    self.emit(self._caption_event(latest, translations))
                 self._retire_completed(latest)
         except asyncio.CancelledError:
             raise
@@ -1247,6 +1273,18 @@ class EngineRuntime:
     ) -> list[Translation]:
         targets = list(request.targets)
         provider_name = self.translation_scheduler.provider.name
+        session_id, generation = self.service.session_id, self._stream_generation
+        def publish(result: ScheduledTranslation) -> None:
+            latest = self.latest_updates.get(request.update.segment_id)
+            if (latest is None or latest.revision != request.update.revision
+                    or self.service.session_id != session_id or self._stream_generation != generation):
+                return
+            replacement = Translation(targetLanguage=result.target_language, state=result.state,
+                                      provider=result.provider, text=result.text, errorCode=result.error_code)
+            visible = [replacement if item.targetLanguage == result.target_language else item
+                       for item in self.latest_translations.get(request.update.segment_id, [])]
+            self.latest_translations[request.update.segment_id] = visible
+            self.emit(self._caption_event(latest, visible))
 
         target_errors: dict[str, str] = {}
         if provider_name == "hymt2":
@@ -1285,6 +1323,7 @@ class EngineRuntime:
                 request.update.source_text,
                 request.source,
                 available_targets,
+                on_result=publish,
             )
             if available_targets
             else []

@@ -5,10 +5,14 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import re
+import ssl
+from time import monotonic
+import httpx
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlencode, urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request, getproxies, proxy_bypass, urlopen
 
 from .base import ProviderTranslation
 
@@ -170,7 +174,36 @@ def _split_text(text: str, limit: int) -> list[str]:
     return pieces
 
 
-class MicrosoftTranslatorProvider:
+class _NetworkTransport:
+    requester: JsonRequester
+    endpoint: str
+    _http: httpx.AsyncClient | None = None
+
+    def _client(self) -> httpx.AsyncClient:
+        if self._http is None:
+            # A session-scoped pool avoids a new TCP/TLS handshake for every caption.
+            # Keep urllib's Windows proxy bypass rules and system certificate trust when switching transport.
+            endpoint = urlsplit(self.endpoint)
+            proxy = None if proxy_bypass(endpoint.netloc) else getproxies().get(endpoint.scheme)
+            self._http = httpx.AsyncClient(timeout=HTTP_REQUEST_TIMEOUT_SECONDS, follow_redirects=True,
+                                          proxy=proxy, trust_env=False, verify=ssl.create_default_context(),
+                                          limits=httpx.Limits(max_connections=3, max_keepalive_connections=3))
+        return self._http
+
+    async def _request_json(self, url: str, payload: object, headers: dict[str, str]) -> object:
+        if self.requester is not _post_json:
+            return await asyncio.to_thread(self.requester, url, payload, headers)
+        response = await self._client().post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+    async def aclose(self) -> None:
+        if self._http is not None:
+            client, self._http = self._http, None
+            await client.aclose()
+
+
+class MicrosoftTranslatorProvider(_NetworkTransport):
     name = "microsoft"
 
     def __init__(
@@ -204,8 +237,7 @@ class MicrosoftTranslatorProvider:
         headers = {"Ocp-Apim-Subscription-Key": self.api_key}
         if self.region:
             headers["Ocp-Apim-Subscription-Region"] = self.region
-        result = await asyncio.to_thread(
-            self.requester,
+        result = await self._request_json(
             f"{self.endpoint}/translate?{query}",
             [{"Text": text}],
             headers,
@@ -231,7 +263,7 @@ def _translation_messages(text: str, source: str, target: str) -> list[dict[str,
     ]
 
 
-class _BudgetedChatProvider:
+class _BudgetedChatProvider(_NetworkTransport):
     """Shared limit handling and context-window chunking for the four chat-shaped formats.
 
     A subclass only describes its wire format: the URL, the headers, the body, and which JSON
@@ -246,6 +278,7 @@ class _BudgetedChatProvider:
     #: Names the provider in every error message, so the message points at the setting the
     #: user has to change.
     label = ""
+    supports_streaming = False
 
     def __init__(
         self,
@@ -347,10 +380,74 @@ class _BudgetedChatProvider:
         for chunk in chunks:
             # the chunks are one utterance and the scheduler already
             # runs the per-target requests concurrently, which is the concurrency that pays.
-            result = await asyncio.to_thread(
-                self.requester, self._url(), self._payload(chunk, system), self._headers()
-            )
+            result = await self._request_json(self._url(), self._payload(chunk, system), self._headers())
             parts.append(self._extract(result))
+        return ProviderTranslation(_join_chunks(parts), (source, target))
+
+    def _stream_delta(self, event: dict[str, Any]) -> tuple[str, bool]:
+        raise NotImplementedError
+
+    async def translate_stream(self, text: str, source: str, target: str,
+                               on_text: Callable[[str], None]) -> ProviderTranslation:
+        if not self.supports_streaming or self.requester is not _post_json:
+            return await self.translate(text, source, target)
+        system = _system_prompt(source, target)
+        chunks = self._plan_chunks(text, system)
+        if len(chunks) > MAX_CHUNKS:
+            raise RuntimeError(f"{self.label}的原文过长，超过上限 {MAX_CHUNKS} 段")
+        parts: list[str] = []
+        last_sent = 0.0
+        last_text = ""
+        for chunk in chunks:
+            payload = {**self._payload(chunk, system), "stream": True}
+            buffer = ""
+            finished = False
+            async with self._client().stream('POST', self._url(), json=payload, headers=self._headers()) as response:
+                response.raise_for_status()
+                if 'text/event-stream' not in response.headers.get('content-type', ''):
+                    # Some compatible gateways ignore stream and return their ordinary JSON reply.
+                    await response.aread()
+                    parts.append(self._extract(response.json()))
+                    continue
+                data: list[str] = []
+
+                def consume() -> None:
+                    nonlocal buffer, finished, last_sent, last_text
+                    raw = '\n'.join(data)
+                    data.clear()
+                    if not raw:
+                        return
+                    if raw == '[DONE]':
+                        finished = True
+                        return
+                    event = json.loads(raw)
+                    if not isinstance(event, dict) or event.get('error') or event.get('type') == 'error':
+                        raise RuntimeError(f"{self.label}的流式响应错误")
+                    delta, done = self._stream_delta(event)
+                    finished = finished or done
+                    buffer += delta
+                    # Some compatible chat APIs put reasoning inside content instead of a separate field.
+                    visible = re.sub(r'<think>.*?(?:</think>|$)', '', buffer, flags=re.DOTALL)
+                    if '<' in visible and visible[visible.rfind('<'):] in ('<', '<t', '<th', '<thi', '<thin', '<think'):
+                        visible = visible[:visible.rfind('<')]
+                    partial = _join_chunks([*parts, visible])
+                    now = monotonic()
+                    if partial and partial != last_text and (not last_text or now - last_sent >= 0.1):
+                        on_text(partial)
+                        last_text, last_sent = partial, now
+
+                async for line in response.aiter_lines():
+                    if line.startswith('data:'):
+                        data.append(line[5:].lstrip(' '))
+                    elif not line:
+                        consume()
+                consume()
+                if not finished:
+                    raise RuntimeError(f"{self.label}的流式响应中断")
+                visible = re.sub(r'<think>.*?(?:</think>|$)', '', buffer, flags=re.DOTALL).strip()
+                if not visible:
+                    raise RuntimeError(f"{self.label}没有返回译文")
+                parts.append(visible)
         return ProviderTranslation(_join_chunks(parts), (source, target))
 
 
@@ -363,6 +460,7 @@ class OpenAICompatibleProvider(_BudgetedChatProvider):
 
     name = "openai"
     label = "OpenAI 兼容接口"
+    supports_streaming = True
 
     def __init__(
         self,
@@ -396,7 +494,7 @@ class OpenAICompatibleProvider(_BudgetedChatProvider):
         return {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
 
     def _payload(self, text: str, system: str) -> dict[str, Any]:
-        return {
+        payload = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system},
@@ -407,15 +505,41 @@ class OpenAICompatibleProvider(_BudgetedChatProvider):
             "temperature": 0,
             "max_tokens": self._output_token_limit(text, system),
         }
+        # MiniMax's documented reasoning_split changes output format, not reasoning latency.
+        # https://platform.minimax.io/docs/api-reference/text-openai-api
+        if urlsplit(self.endpoint).hostname in ('api.minimax.io', 'api.minimax.cn', 'api.minimax.chat'):
+            payload.update(temperature=1, reasoning_split=True)
+        return payload
+
+    def _stream_delta(self, event: dict[str, Any]) -> tuple[str, bool]:
+        choices = event.get('choices', [])
+        if not choices:
+            return '', False
+        choice = choices[0]
+        reason = choice.get('finish_reason')
+        if reason and reason != 'stop':
+            raise RuntimeError('OpenAI 兼容接口译文被截断或阻止')
+        content = choice.get('delta', {}).get('content') or ''
+        if not isinstance(content, str):
+            raise RuntimeError('OpenAI 兼容接口流式文本格式无效')
+        return content, reason == 'stop'
 
     def _extract(self, result: object) -> str:
         try:
-            translated = result["choices"][0]["message"]["content"]  # type: ignore[index]
+            choice = result["choices"][0]  # type: ignore[index]
+            if choice.get('finish_reason') not in (None, 'stop'):
+                raise RuntimeError('OpenAI 兼容接口译文被截断或阻止')
+            translated = choice["message"]["content"]
         except (KeyError, IndexError, TypeError) as error:
             raise RuntimeError(
                 "OpenAI 兼容接口响应格式无效（缺少 choices[0].message.content）"
             ) from error
-        return str(translated).strip()
+        if not isinstance(translated, str):
+            raise RuntimeError('OpenAI 兼容接口没有返回译文')
+        translated = re.sub(r'<think>.*?(?:</think>|$)', '', translated, flags=re.DOTALL).strip()
+        if not translated:
+            raise RuntimeError('OpenAI 兼容接口没有返回译文')
+        return translated
 
 
 class OpenAIResponsesProvider(_BudgetedChatProvider):
@@ -498,6 +622,7 @@ class AnthropicMessagesProvider(_BudgetedChatProvider):
 
     name = "anthropic"
     label = "Anthropic Messages 接口"
+    supports_streaming = True
 
     def __init__(
         self,
@@ -553,6 +678,8 @@ class AnthropicMessagesProvider(_BudgetedChatProvider):
 
     def _extract(self, result: object) -> str:
         try:
+            if result.get('stop_reason') not in (None, 'end_turn', 'stop_sequence'):  # type: ignore[union-attr]
+                raise RuntimeError('Anthropic Messages 译文被截断或阻止')
             blocks = result["content"]  # type: ignore[index]
             for block in blocks:
                 if block.get("type") == "text" and block.get("text"):
@@ -560,6 +687,16 @@ class AnthropicMessagesProvider(_BudgetedChatProvider):
         except (AttributeError, IndexError, KeyError, TypeError) as error:
             raise RuntimeError("Anthropic Messages 响应格式无效（缺少 content 数组）") from error
         raise RuntimeError("Anthropic Messages 响应里没有文本内容块")
+
+    def _stream_delta(self, event: dict[str, Any]) -> tuple[str, bool]:
+        if event.get('type') == 'message_delta':
+            reason = event.get('delta', {}).get('stop_reason')
+            if reason not in (None, 'end_turn', 'stop_sequence'):
+                raise RuntimeError('Anthropic Messages 译文被截断或阻止')
+        delta = event.get('delta', {})
+        if event.get('type') == 'content_block_delta' and delta.get('type') == 'text_delta':
+            return delta.get('text', ''), False
+        return '', event.get('type') == 'message_stop'
 
 
 class OllamaTranslationProvider(_BudgetedChatProvider):

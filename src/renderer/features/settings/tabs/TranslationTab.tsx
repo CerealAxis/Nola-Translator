@@ -121,7 +121,7 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
             onChange={setProvider}
           />
         </SettingsRow>
-        <SettingsRow label={t('settings.translateIntermediate')}>
+        <SettingsRow label={t('settings.translateIntermediate')} desc={t('settings.translateIntermediateHint')} descriptionTooltip>
           <SettingSwitch
             isSelected={translation.translateIntermediate}
             ariaLabel={t('settings.translateIntermediate')}

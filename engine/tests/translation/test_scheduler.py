@@ -109,3 +109,47 @@ async def test_default_concurrency_limit_is_three() -> None:
     results = await asyncio.gather(*tasks)
     assert all(result[0].state == 'complete' for result in results)
     assert provider.peak == 3
+
+
+@pytest.mark.asyncio
+async def test_cancelling_one_subscriber_keeps_shared_request_for_other_subscriber():
+    started, release, cancelled = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    class Provider:
+        name = 'shared'
+        async def translate(self, text, source, target):
+            started.set()
+            try:
+                await release.wait()
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+            return ProviderTranslation(text, (source, target))
+    scheduler = TranslationScheduler(Provider())
+    first = asyncio.create_task(scheduler.translate('a', 1, 'same', 'en', ['zh']))
+    second = asyncio.create_task(scheduler.translate('b', 1, 'same', 'en', ['zh']))
+    await started.wait()
+    first.cancel()
+    await asyncio.gather(first, return_exceptions=True)
+    assert not cancelled.is_set()
+    release.set()
+    assert (await second)[0].text == 'same'
+    assert not scheduler.listeners
+    await scheduler.close()
+
+
+@pytest.mark.asyncio
+async def test_provider_rate_limit_is_reported_without_retrying():
+    import httpx
+    class Provider:
+        name = 'limited'
+        calls = 0
+        async def translate(self, text, source, target):
+            self.calls += 1
+            response = httpx.Response(429, request=httpx.Request('POST', 'https://example.test/v1'))
+            response.raise_for_status()
+    provider = Provider()
+    scheduler = TranslationScheduler(provider)
+    result = await scheduler.translate('segment', 1, 'hello', 'en', ['zh'])
+    assert result[0].state == 'failed'
+    assert result[0].error_code == 'translationRateLimited'
+    assert provider.calls == 1

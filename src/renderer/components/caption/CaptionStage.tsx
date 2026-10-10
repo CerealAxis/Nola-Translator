@@ -48,9 +48,9 @@ export function isStuckToBottom(scrollTop: number, scrollHeight: number, clientH
   return distance <= slack
 }
 
-/** First completed translation; pending and failed return empty rather than a placeholder. */
+/** Streamed text is usable before completion; failed requests never expose partial output. */
 export function translationOf(segment: CaptionSegment): string {
-  return segment.translations.find((item) => item.state === 'complete')?.text ?? ''
+  return segment.translations.find((item) => item.state !== 'failed' && item.text)?.text ?? ''
 }
 
 /**

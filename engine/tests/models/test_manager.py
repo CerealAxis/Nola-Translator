@@ -202,7 +202,7 @@ def test_sha256_mismatch_rejected_without_target(tmp_path: Path) -> None:
     assert _leftovers(tmp_path / "models") == []
 
 
-def test_atomic_replace_quarantines_existing_target(tmp_path: Path) -> None:
+def test_atomic_replace_removes_old_target_after_success(tmp_path: Path) -> None:
     spec, payloads = _snapshot_spec()
     models = tmp_path / "models"
     target = models / spec.directory
@@ -219,8 +219,43 @@ def test_atomic_replace_quarantines_existing_target(tmp_path: Path) -> None:
     assert manager.is_installed(spec) is True
     assert not (target / "stale.bin").exists()
     assert (target / "config.json").is_file()
-    assert (corrupt / "stale.bin").read_bytes() == b"stale"
-    assert not (corrupt / "old-marker").exists()
+    assert not corrupt.exists()
+
+
+def test_failed_atomic_swap_restores_existing_target(tmp_path, monkeypatch):
+    import os
+    spec, payloads = _snapshot_spec()
+    models = tmp_path / 'models'
+    target = models / spec.directory
+    target.mkdir(parents=True)
+    (target / 'stale.bin').write_bytes(b'original')
+    replace = os.replace
+    def fail_install(source, destination):
+        if Path(destination) == target and Path(source).name != f'.{spec.directory}.corrupt':
+            raise OSError('swap failed')
+        return replace(source, destination)
+    monkeypatch.setattr(os, 'replace', fail_install)
+    with pytest.raises(OSError, match='swap failed'):
+        ModelManager(models, fetcher=_fetcher(payloads)).ensure(spec)
+    assert (target / 'stale.bin').read_bytes() == b'original'
+    assert list(models.iterdir()) == [target]
+
+
+def test_startup_cleanup_removes_only_known_model_temps_and_recovers_backup(tmp_path):
+    spec, _ = _snapshot_spec()
+    models = tmp_path / 'models'
+    models.mkdir()
+    stale = models / f'.{spec.directory}-abcdefgh'
+    stale.mkdir(); (stale / 'partial.bin').write_bytes(b'partial')
+    unknown = models / '.user-private-abcdefgh'
+    unknown.mkdir(); (unknown / 'keep.bin').write_bytes(b'user')
+    backup = models / f'.{spec.directory}.corrupt'
+    backup.mkdir(); (backup / 'original.bin').write_bytes(b'original')
+    manager = ModelManager(models)
+    manager.cleanup_stale([spec])
+    assert not stale.exists()
+    assert (unknown / 'keep.bin').read_bytes() == b'user'
+    assert (models / spec.directory / 'original.bin').read_bytes() == b'original'
 
 
 def test_cancel_mid_download_cleans_temp(tmp_path: Path) -> None:
@@ -238,6 +273,21 @@ def test_cancel_mid_download_cleans_temp(tmp_path: Path) -> None:
 
     assert manager.is_installed(spec) is False
     assert _leftovers(tmp_path / "models") == []
+
+
+def test_cancel_during_verification_cleans_download_without_replacing_model(tmp_path):
+    spec, payloads = _snapshot_spec()
+    phase = ''
+    def on_phase(value):
+        nonlocal phase
+        phase = value
+    def progress(current, total):
+        if phase == 'verify':
+            raise _Cancelled()
+    models = tmp_path / 'models'
+    with pytest.raises(_Cancelled):
+        ModelManager(models, fetcher=_fetcher(payloads)).ensure(spec, progress, on_phase)
+    assert _leftovers(models) == []
 
 
 def test_single_file_gguf_install_success(tmp_path: Path) -> None:
