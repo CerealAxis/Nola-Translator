@@ -15,6 +15,9 @@ def supports_translation(configuration: ModelConfiguration | None, source: str, 
     source, target = normalize(source), normalize(target)
     if target not in {normalize(code) for code in configuration.targetLanguages}: return False
     if source != "auto" and source not in {normalize(code) for code in configuration.sourceLanguages}: return False
+    # A primary-language match can still hide code-switching, so let the selected
+    # translator inspect same-language captions instead of silently dropping them.
+    if source == target: return True
     pairs = configuration.translationPairs
     return pairs is None or any(normalize(pair.target) == target and (source == "auto" or normalize(pair.source) == source) for pair in pairs)
 

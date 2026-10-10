@@ -101,9 +101,18 @@ export class BrowserConnection {
      * page paints. It returns the status instead of a bare boolean so the caller reads the
      * value that is now in force, not the one it asked for.
      */
-    loggedHandle(CAPTION_SERVICE_CHANNEL, (_event, active: unknown) => {
+    loggedHandle(CAPTION_SERVICE_CHANNEL, async (_event, active: unknown) => {
       if (typeof active !== 'boolean') throw new Error('invalidConfiguration')
       this.setCaptionServiceActive(active)
+      if (!active) {
+        await options.sessions.cancelBrowserStart()
+        const sessionId = options.sessions.browserActive ? options.sessions.activeSessionId : null
+        if (sessionId) await options.sessions.stop(sessionId)
+        // Closing the browser service must not release a desktop session's models.
+        if (!options.sessions.busy && options.engine.currentState === 'ready') {
+          await options.engine.request({ protocolVersion: 1, type: 'releaseModels', requestId: `release-${randomUUID()}` }, 'modelsReleased', 60_000)
+        }
+      }
       return this.status()
     })
     loggedHandle(CHANNEL, async (_event, action: unknown, enabled?: unknown, browser?: unknown) => {

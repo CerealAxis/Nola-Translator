@@ -5,11 +5,14 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import importlib
+import os
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, asdict, replace
 from pathlib import Path
 from time import monotonic
+from typing import TypeVar
 from uuid import uuid4
 
 from .audio.capture import AudioDeviceDisconnectedError, BrowserAudioCapture, PortAudioCapture
@@ -57,7 +60,10 @@ from .protocol import (
     ManageResourceCommand,
     ModelSelection,
     ModelsPrewarmedEvent,
+    ModelsReleasedEvent,
     PrewarmModelsCommand,
+    ReleaseModelsCommand,
+    HelloCommand,
     ResourceActionResultEvent,
     ResourcesEvent,
     SearchHubModelsCommand,
@@ -116,6 +122,7 @@ EventSink = Callable[[EngineEvent], None]
 #: Both commands name their models through a ``config`` and reach the same runtime resolution,
 #: so the load path is shared rather than typed twice.
 ModelSelectionCommand = StartSessionCommand | PrewarmModelsCommand
+LoadResult = TypeVar('LoadResult')
 
 
 class UnknownTranslationModel(ValueError):
@@ -136,6 +143,7 @@ class TranslationRequest:
     source: str
     targets: tuple[str, ...]
     allow_intermediate: bool
+    previous_context: tuple[str, str] | None = None
 
 
 def _compatibility(verdict: RuntimeVerdict, *, languages: bool = True) -> HubCompatibility:
@@ -194,6 +202,8 @@ class EngineRuntime:
         self.translation_scheduler = TranslationScheduler(self.translation_provider)
         self.active_model_id = QWEN_RESOURCE_ID
         self.translation_tasks: dict[str, asyncio.Task[None]] = {}
+        self.translation_jobs: dict[str, set[asyncio.Task[list[Translation]]]] = {}
+        self.translation_display_revision: dict[tuple[str, str], int] = {}
         self.translation_requests: dict[str, TranslationRequest] = {}
         self.latest_updates: dict[str, RecognitionUpdate] = {}
         self.latest_translations: dict[str, list[Translation]] = {}
@@ -223,9 +233,12 @@ class EngineRuntime:
         self._last_frame_end_ms = 0.0
         self._model_cleanup_task: asyncio.Task[None] | None = None
         self.model_cleanup_timeout = 2.0
-        #: Recognition runtimes a prewarm brought in, keyed by resource id. The engine holds the
-        #: cache entry, so nothing else would free it once a session that merely reused it ends.
-        self._prewarmed_runtimes: dict[str, list[QwenRuntime | SenseVoiceRuntime]] = {}
+        self._loaded_model_key: tuple[str, str | None, str] | None = None
+        self._loaded_translation_model_id: str | None = None
+        self._retain_models = False
+        self._compute_inventory: tuple[list[ComputeDevice], list[str], str] | None = None
+        self._compute_inventory_at = 0.0
+        self._dependency_task: asyncio.Task[None] | None = None
         self._closing = False
         self._last_heartbeat_at: float | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
@@ -235,9 +248,16 @@ class EngineRuntime:
 
 
     async def handle(self, command: EngineCommand) -> list[EngineEvent]:
+        if isinstance(command, HelloCommand):
+            # FunASR discovers many adapters on its first import. Do that once after the
+            # handshake, while the UI is usable, without loading weights or running inference.
+            model_id = os.environ.get('NOLA_TRANSLATOR_RECOGNITION_MODEL_ID')
+            if model_id and self._dependency_task is None:
+                self._dependency_task = asyncio.create_task(self._import_recognition_dependencies(model_id))
+            return self.service.handle(command)
         if isinstance(command, ListComputeDevicesCommand):
             self._update_compute_plan()
-            devices, notes, version = await asyncio.to_thread(probe_devices, resolve_llama_dir())
+            devices, notes, version = await self._probe_compute_inventory(refresh=True)
             return [ComputeDevicesEvent(
                 protocolVersion=1, type="computeDevices", requestId=command.requestId,
                 devices=[asdict(d) for d in devices], notes=notes, torchVersion=version,
@@ -255,9 +275,6 @@ class EngineRuntime:
             ]
         if isinstance(command, ManageResourceCommand):
             if command.action == "remove":
-                # The weights are about to be deleted, so a warm copy of them is no longer the
-                # model the user is keeping; it stops being protected from the next unload.
-                self._prewarmed_runtimes.pop(command.resourceId, None)
                 if self._model_cleanup_pending():
                     return [self._cleanup_busy_error(command.requestId)]
                 if (
@@ -265,6 +282,8 @@ class EngineRuntime:
                     and self.service.session_id is not None
                 ):
                     return [self._resource_error(command.requestId, "resourceInUse")]
+                if command.resourceId in (self.active_model_id, self._loaded_translation_model_id):
+                    await self._unload_session_models()
             try:
                 resource = await self.resources.manage(
                     command.resourceId, command.action, command.network
@@ -293,6 +312,14 @@ class EngineRuntime:
             return await self._start(command)
         if isinstance(command, PrewarmModelsCommand):
             return await self._prewarm(command)
+        if isinstance(command, ReleaseModelsCommand):
+            if self.service.session_id is not None:
+                return [self._resource_error(command.requestId, 'resourceInUse')]
+            self._retain_models = False
+            deferred = self._model_cleanup_pending()
+            if not deferred:
+                await self._unload_session_models()
+            return [ModelsReleasedEvent(protocolVersion=1, type='modelsReleased', requestId=command.requestId, deferred=deferred)]
         if isinstance(command, InspectHubRepoCommand):
             return await self._inspect_hub_repo(command)
         if isinstance(command, SearchHubModelsCommand):
@@ -326,6 +353,26 @@ class EngineRuntime:
                 )
             return self.service.handle(command)
         return self.service.handle(command)
+
+    async def _import_recognition_dependencies(self, model_id: str) -> None:
+        started_at = monotonic()
+        try:
+            adapter = self.resources.adapter_for(model_id)
+            module = 'funasr' if adapter == 'sensevoice' else 'transformers' if adapter == 'qwen3-asr' else None
+            if module:
+                await asyncio.to_thread(importlib.import_module, module)
+                write_debug('engine', 'recognition.dependencies.timing', {'adapter': adapter, 'elapsedMs': round((monotonic() - started_at) * 1000)})
+        except Exception as error:
+            # The actual loader remains the authority for errors and device fallback.
+            write_debug('engine', 'recognition.dependencies.failed', {'error': type(error).__name__})
+
+    async def _probe_compute_inventory(self, *, refresh: bool = False) -> tuple[list[ComputeDevice], list[str], str]:
+        # Main-process device-intent resolution and model placement run back to back. Reuse
+        # that inventory briefly; an explicit list request still refreshes live free memory.
+        if refresh or self._compute_inventory is None or monotonic() - self._compute_inventory_at > 5:
+            self._compute_inventory = await asyncio.to_thread(probe_devices, resolve_llama_dir())
+            self._compute_inventory_at = monotonic()
+        return self._compute_inventory
 
     async def _inspect_hub_repo(self, command: InspectHubRepoCommand) -> list[EngineEvent]:
         """Report what a Hugging Face repo declares about itself and whether the engine can run it.
@@ -558,12 +605,7 @@ class EngineRuntime:
             ]
 
         try:
-            await self._configure_device_plan(command)
-            if command.config.targetLanguages:
-                self._configure_translation(command)
-            recognizer = await self._create_recognizer(command)
-            if command.config.targetLanguages:
-                await self._ensure_translation_server(command)
+            recognizer = await self._prepare_models(command)
             self._update_compute_plan(self.llama_manager.fallback_reason)
         except ValueError as error:
             await self._unload_session_models()
@@ -682,14 +724,7 @@ class EngineRuntime:
         ]
 
     async def _prewarm(self, command: PrewarmModelsCommand) -> list[EngineEvent]:
-        """Load the recognition weights now, leaving the loaded runtime cached for the next start.
-
-        The placement and the runtime resolution are the session start's own calls, so the
-        warmed entry is the one a later ``startSession`` resolves and reuses instead of loading
-        a second copy. Nothing is captured, no session exists, and the translation side is only
-        resolved: bringing up the translation runtime means starting a separate llama-server
-        process, which is a resident resource in its own right rather than a warm cache entry.
-        """
+        """Keep the wire name for compatibility; load both local models without inference."""
         if not await self._await_model_cleanup():
             return [self._cleanup_busy_error(command.requestId)]
         if self.service.session_id is not None:
@@ -728,10 +763,8 @@ class EngineRuntime:
         ))
         started_at = monotonic()
         try:
-            await self._configure_device_plan(command)
-            recognizer = await self._create_recognizer(command)
+            recognizer = await self._prepare_models(command)
             await recognizer.close()
-            self._pin_prewarmed(model_id, self._active_recognition_runtime)
         except ValueError as error:
             await self._unload_session_models()
             return [
@@ -756,18 +789,50 @@ class EngineRuntime:
             runtime=self._active_recognition_runtime.describe(),
         )]
 
-    def _pin_prewarmed(self, model_id: str, runtime: QwenRuntime | SenseVoiceRuntime) -> None:
-        """Mark a runtime as held for a prewarm, so a session stop leaves it loaded."""
-        pinned = self._prewarmed_runtimes.setdefault(model_id, [])
-        if not any(item is runtime for item in pinned):
-            pinned.append(runtime)
-
-    def _is_prewarmed(self, runtime: object) -> bool:
-        return any(
-            item is runtime
-            for pinned in self._prewarmed_runtimes.values()
-            for item in pinned
+    async def _prepare_models(self, command: ModelSelectionCommand) -> Recognizer:
+        config = command.config
+        local_translation = bool(config.targetLanguages and config.translationProvider == 'local')
+        translation_id = self._local_translation_model_id(config) if local_translation else None
+        key = (self._model_id(command), translation_id, json.dumps(config.compute.model_dump(), sort_keys=True))
+        reuse = key == self._loaded_model_key
+        if reuse:
+            devices, _notes, _version = await self._probe_compute_inventory()
+            available = {device.id for device in devices}
+            reuse = self._recognition_device.id in available and (not local_translation or self._translation_device.id in available)
+        if not reuse:
+            if self._loaded_model_key is not None:
+                await self._unload_session_models()
+            await self._configure_device_plan(command)
+        # Free VRAM already excludes resident models; keep their placement instead of
+        # charging the same weights against the remaining budget a second time.
+        if config.targetLanguages and (local_translation or isinstance(command, StartSessionCommand)):
+            self._configure_translation(command)
+        results = await asyncio.gather(
+            self._timed_model_load('recognition', self._create_recognizer(command)),
+            self._timed_model_load('translation', self._ensure_translation_server(command)),
+            return_exceptions=True,
         )
+        # Native loader threads cannot be cancelled safely. Join both loads before cleanup
+        # so a failed translator cannot leave ASR allocating behind the error reply.
+        errors = [result for result in results if isinstance(result, BaseException)]
+        if errors:
+            if not isinstance(results[0], BaseException):
+                await results[0].close()
+            raise errors[0]
+        self._loaded_model_key = key
+        self._loaded_translation_model_id = translation_id
+        self._retain_models = True
+        return results[0]
+
+    async def _timed_model_load(self, task: str, work: Awaitable[LoadResult]) -> LoadResult:
+        started_at = monotonic()
+        outcome = 'failed'
+        try:
+            result = await work
+            outcome = 'ready'
+            return result
+        finally:
+            write_debug('engine', 'model.load.timing', {'task': task, 'outcome': outcome, 'elapsedMs': round((monotonic() - started_at) * 1000)})
 
     def _open_recorder(self, path: str | None) -> WavRecorder | None:
         """Start recording the meeting audio, or stay silent when the host did not ask for one."""
@@ -791,7 +856,7 @@ class EngineRuntime:
     async def _configure_device_plan(self, command: ModelSelectionCommand) -> None:
         self._device_plan = None
         config = command.config
-        devices, notes, _version = await asyncio.to_thread(probe_devices, resolve_llama_dir())
+        devices, notes, _version = await self._probe_compute_inventory()
         adapter = self.resources.adapter_for(self._model_id(command))
         recognition_mb = model_memory_mb(self.resources.model_path(self._model_id(command)), adapter, config.compute)
         translation_adapter = None
@@ -829,7 +894,7 @@ class EngineRuntime:
             self._device_plan["reasons"].append(reason)
         self._write_engine_status()
 
-    def _configure_translation(self, command: StartSessionCommand) -> None:
+    def _configure_translation(self, command: ModelSelectionCommand) -> None:
         config = command.config
         options = config.translationOptions
         endpoint = options.endpoint if options else ""
@@ -910,7 +975,7 @@ class EngineRuntime:
             max_concurrency=1 if config.translationProvider == "local" else 3,
         )
 
-    def _local_translation_provider(self, config: SessionConfig) -> TranslationProvider:
+    def _local_translation_provider(self, config: ModelSelection) -> TranslationProvider:
         """Build the local provider for whichever translation model the session selected.
         """
         model_id = self._local_translation_model_id(config)
@@ -934,8 +999,15 @@ class EngineRuntime:
         if adapter == "llama.cpp":
             # all three quantization tiers share one llama-server; load whichever the session picked.
             self.llama_manager.switch_gguf(self.resources.translation_gguf_path(model_id))
+            reserved_mb = config.compute.reservedVramMb
+            if (self._recognition_device.id != 'cpu' and
+                    (self._recognition_device.id == self._translation_device.id or
+                     self._recognition_device.name == self._translation_device.name)):
+                # Concurrent loading requires llama's automatic fitting to leave ASR room
+                # even before the recognition loader has allocated its own weights.
+                reserved_mb = min(65536, reserved_mb + int(self._device_plan['recognitionEstimateMb']))
             self.llama_manager.configure_compute(self._translation_device,
-                config.compute.model_copy(update={"cpuThreads": self._llama_threads}))
+                config.compute.model_copy(update={"cpuThreads": self._llama_threads, "reservedVramMb": reserved_mb}))
             capability = self.resources.configuration(model_id)
             languages = {code: self._language_name(code) for code in set(capability.sourceLanguages + capability.targetLanguages)}
             return HyMt2TranslationProvider(self.llama_manager, languages=languages)
@@ -947,13 +1019,13 @@ class EngineRuntime:
         from .recognition.qwen_runtime import CODE_TO_NAME
         return HYMT2_LANGUAGES.get(code) or CODE_TO_NAME.get(code) or CODE_TO_NAME.get("fil" if code == "tl" else code) or code
 
-    async def _ensure_translation_server(self, command: StartSessionCommand) -> None:
-        """Bring up the local translation runtime at session start; a missing model or a failed
-        start never blocks recognition.
-        """
-        if command.config.translationProvider != "local":
+    async def _ensure_translation_server(self, command: ModelSelectionCommand) -> None:
+        """A selected local translator must load successfully before reporting readiness."""
+        if not command.config.targetLanguages or command.config.translationProvider != "local":
             return
         model_id = self._local_translation_model_id(command.config)
+        if not self.resources.is_installed(model_id):
+            raise ModelUnavailable(f"翻译模型不可用：{model_id}")
         if self.resources.adapter_for(model_id) == "m2m100":
             if isinstance(self.translation_provider, M2M100TranslationProvider):
                 try:
@@ -970,14 +1042,11 @@ class EngineRuntime:
                     await asyncio.to_thread(self.translation_provider.runtime.load)
                     self._update_compute_plan("翻译 GPU 加载失败，回退 CPU")
             return
-        if not self.resources.is_installed(model_id):
-            return
         try:
             await self.llama_manager.start()
         except LlamaServerError as error:
-            # the session continues when the server is unavailable; translations just
-            # fail per target (llamaServerUnavailable).
             self._update_compute_plan(f"翻译运行时启动失败：{str(error)[:256]}")
+            raise
 
     async def _create_recognizer(self, command: ModelSelectionCommand) -> Recognizer:
         language = (
@@ -1009,8 +1078,6 @@ class EngineRuntime:
             self._active_recognition_runtime = runtime
             try:
                 await asyncio.to_thread(runtime.load)
-                if isinstance(runtime, SenseVoiceRuntime):
-                    await asyncio.to_thread(runtime.warmup)
                 recognizer = factory(model_path, source_language=language, runtime=runtime)
                 break
             except Exception as error:
@@ -1148,7 +1215,10 @@ class EngineRuntime:
         config = self.active_config
         targets = [] if config is None else [self._language_code(item) for item in config.targetLanguages]
         source = self._language_code(update.language or self._detect_language(update.source_text))
-        targets = list(dict.fromkeys(item for item in targets if item != source))
+        provider = getattr(config, "translationProvider", None)
+        # Cloud transcripts can switch languages mid-sentence, so the recognizer's single
+        # language label must not suppress translation when it happens to match the target.
+        targets = list(dict.fromkeys(targets))
         if config is not None and getattr(config, "translationProvider", None) == "local" and targets:
             capability = self.resources.configuration(self._local_translation_model_id(config))
             # Automatic language detection is allowed to retain untranslated speech silently.
@@ -1169,8 +1239,17 @@ class EngineRuntime:
             item.targetLanguage: item
             for item in self.latest_translations.get(update.segment_id, [])
         }
+        previous_context = None
+        if (provider == "cloud" and len(targets) == 1 and previous_update is not None
+                and previous_update.source_text
+                and update.source_text.startswith(previous_update.source_text)):
+            draft = previous.get(targets[0])
+            if (draft is not None and draft.state == "complete" and draft.text
+                    and len(previous_update.source_text) <= 1200 and len(draft.text) <= 1200):
+                previous_context = (previous_update.source_text, draft.text)
         visible = [
-            (previous.get(target) if previous_update and previous_update.source_text == update.source_text else None)
+            (previous.get(target) if previous.get(target) is not None
+             and previous[target].text else None)
             or Translation(
                 targetLanguage=target,
                 state="pending",
@@ -1187,6 +1266,7 @@ class EngineRuntime:
             allow_intermediate=bool(
                 getattr(config, "allowIntermediateTranslation", False)
             ),
+            previous_context=previous_context,
         )
         self.translation_wake.setdefault(update.segment_id, asyncio.Event()).set()
         task = self.translation_tasks.get(update.segment_id)
@@ -1204,6 +1284,16 @@ class EngineRuntime:
                     # only final captions get translated by default; intermediates need the user to opt in.
                     self.translation_requests.pop(segment_id, None)
                     continue
+                jobs = self.translation_jobs.get(segment_id, set())
+                if (not request.update.is_final
+                        and len(jobs) >= self.translation_scheduler.max_concurrency):
+                    wake = self.translation_wake[segment_id]
+                    wake.clear()
+                    try:
+                        await wake.wait()
+                    except asyncio.CancelledError:
+                        raise
+                    continue
                 delay = self.partial_translation_interval - (
                     monotonic() - self.translation_last_started.get(segment_id, 0)
                 )
@@ -1217,44 +1307,12 @@ class EngineRuntime:
                     continue
                 self.translation_requests.pop(segment_id)
                 self.translation_last_started[segment_id] = monotonic()
-                work = asyncio.create_task(self._translate_request(request))
-                wake = self.translation_wake[segment_id]
-                try:
-                    while not work.done():
-                        wake.clear()
-                        changed = asyncio.create_task(wake.wait())
-                        try:
-                            await asyncio.wait((work, changed), return_when=asyncio.FIRST_COMPLETED)
-                        finally:
-                            changed.cancel()
-                            await asyncio.gather(changed, return_exceptions=True)
-                        newer = self.translation_requests.get(segment_id)
-                        if (newer is not None and newer.update.is_final
-                                and newer.update.source_text != request.update.source_text
-                                and getattr(self.active_config, 'translationProvider', None) in ('cloud', 'microsoft')):
-                            # Network IO is cancellable; local native inference must keep its reservation.
-                            work.cancel()
-                            await asyncio.gather(work, return_exceptions=True)
-                            break
-                    if work.cancelled():
-                        continue
-                    translations = await work
-                finally:
-                    if not work.done():
-                        work.cancel()
-                        await asyncio.gather(work, return_exceptions=True)
-                latest = self.latest_updates.get(segment_id)
-                if (
-                    latest is None
-                    or latest.revision != request.update.revision
-                    or self.service.session_id != session_id
-                    or self._stream_generation != generation
-                ):
-                    continue
-                if self.latest_translations.get(segment_id) != translations:
-                    self.latest_translations[segment_id] = translations
-                    self.emit(self._caption_event(latest, translations))
-                self._retire_completed(latest)
+                work = asyncio.create_task(
+                    self._run_translation_job(request, session_id, generation)
+                )
+                jobs = self.translation_jobs.setdefault(segment_id, set())
+                jobs.add(work)
+                work.add_done_callback(lambda done, sid=segment_id: self._translation_job_done(sid, done))
         except asyncio.CancelledError:
             raise
         finally:
@@ -1268,23 +1326,84 @@ class EngineRuntime:
                     self._translation_worker(segment_id)
                 )
 
+    async def _run_translation_job(
+        self, request: TranslationRequest, session_id: str | None, generation: int,
+    ) -> None:
+        translations = await self._translate_request(request)
+        for item in translations:
+            self._publish_translation_result(
+                request,
+                ScheduledTranslation(
+                    item.targetLanguage, item.state, item.provider, text=item.text,
+                    error_code=item.errorCode,
+                ),
+                session_id,
+                generation,
+            )
+        latest = self.latest_updates.get(request.update.segment_id)
+        if (latest is not None and self.service.session_id == session_id
+                and self._stream_generation == generation):
+            self._retire_completed(latest)
+
+    def _translation_job_done(
+        self, segment_id: str, task: asyncio.Task[list[Translation]],
+    ) -> None:
+        if not task.cancelled():
+            task.exception()
+        jobs = self.translation_jobs.get(segment_id)
+        if jobs is not None:
+            jobs.discard(task)
+            if not jobs:
+                self.translation_jobs.pop(segment_id, None)
+        latest = self.latest_updates.get(segment_id)
+        if latest is not None:
+            self._retire_completed(latest)
+        wake = self.translation_wake.get(segment_id)
+        if wake is not None:
+            wake.set()
+
+    def _publish_translation_result(
+        self, request: TranslationRequest, result: ScheduledTranslation,
+        session_id: str | None, generation: int,
+    ) -> None:
+        latest = self.latest_updates.get(request.update.segment_id)
+        if (latest is None or self.service.session_id != session_id
+                or self._stream_generation != generation):
+            return
+        display_key = (request.update.segment_id, result.target_language)
+        displayed_revision = self.translation_display_revision.get(display_key, -1)
+        if request.update.revision < displayed_revision:
+            return
+        if result.state != "pending" or result.text:
+            self.translation_display_revision[display_key] = request.update.revision
+        replacement = Translation(
+            targetLanguage=result.target_language, state=result.state,
+            provider=result.provider, text=result.text, errorCode=result.error_code,
+        )
+        visible = [
+            replacement if item.targetLanguage == result.target_language else item
+            for item in self.latest_translations.get(request.update.segment_id, [])
+        ]
+        self.latest_translations[request.update.segment_id] = visible
+        self.emit(self._caption_event(latest, visible))
+
     async def _translate_request(
         self, request: TranslationRequest
     ) -> list[Translation]:
         targets = list(request.targets)
         provider_name = self.translation_scheduler.provider.name
+        text = request.update.source_text
+        cloud_providers = {"openai", "openai-responses", "anthropic", "ollama"}
+        if provider_name in cloud_providers and request.previous_context:
+            previous_source, previous_translation = request.previous_context
+            text = json.dumps({
+                "previousSource": previous_source,
+                "previousTranslation": previous_translation,
+                "currentSource": text,
+            }, ensure_ascii=False)
         session_id, generation = self.service.session_id, self._stream_generation
         def publish(result: ScheduledTranslation) -> None:
-            latest = self.latest_updates.get(request.update.segment_id)
-            if (latest is None or latest.revision != request.update.revision
-                    or self.service.session_id != session_id or self._stream_generation != generation):
-                return
-            replacement = Translation(targetLanguage=result.target_language, state=result.state,
-                                      provider=result.provider, text=result.text, errorCode=result.error_code)
-            visible = [replacement if item.targetLanguage == result.target_language else item
-                       for item in self.latest_translations.get(request.update.segment_id, [])]
-            self.latest_translations[request.update.segment_id] = visible
-            self.emit(self._caption_event(latest, visible))
+            self._publish_translation_result(request, result, session_id, generation)
 
         target_errors: dict[str, str] = {}
         if provider_name == "hymt2":
@@ -1320,7 +1439,7 @@ class EngineRuntime:
             await self.translation_scheduler.translate(
                 request.update.segment_id,
                 request.update.revision,
-                request.update.source_text,
+                text,
                 request.source,
                 available_targets,
                 on_result=publish,
@@ -1360,12 +1479,15 @@ class EngineRuntime:
         for segment_id in list(self.completed_segments):
             if len(self.completed_segments) <= self.completed_segment_limit:
                 break
-            if segment_id in self.translation_tasks or segment_id in self.translation_requests:
+            if (segment_id in self.translation_tasks or segment_id in self.translation_requests
+                    or segment_id in self.translation_jobs):
                 continue
             self.completed_segments.pop(segment_id, None)
             for mapping in (self.latest_updates, self.latest_translations, self.caption_revisions,
                             self.translation_last_started, self.translation_wake):
                 mapping.pop(segment_id, None)
+            for key in [key for key in self.translation_display_revision if key[0] == segment_id]:
+                self.translation_display_revision.pop(key, None)
 
     def _caption_event(
         self,
@@ -1479,13 +1601,17 @@ class EngineRuntime:
         self._finish_stream_task = None
         self.translation_requests.clear()
         tasks.extend(self.translation_tasks.values())
+        tasks.extend(task for jobs in self.translation_jobs.values() for task in jobs)
         for task in tasks:
             task.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         await self.translation_scheduler.close()
         self.translation_tasks.clear()
-        for mapping in (self.translation_last_started, self.translation_wake, self.completed_segments,
+        self.translation_jobs.clear()
+        self.translation_display_revision.clear()
+        for mapping in (self.translation_last_started, self.translation_wake,
+                        self.completed_segments,
                         self.latest_updates, self.latest_translations, self.caption_revisions):
             mapping.clear()
 
@@ -1602,9 +1728,12 @@ class EngineRuntime:
         async def finish() -> None:
             if drain_task is not None:
                 await drain_task
-            translations = list(self.translation_tasks.values())
-            if translations:
-                await asyncio.gather(*translations, return_exceptions=True)
+            dispatchers = list(self.translation_tasks.values())
+            if dispatchers:
+                await asyncio.gather(*dispatchers, return_exceptions=True)
+            jobs = [task for segment_jobs in self.translation_jobs.values() for task in segment_jobs]
+            if jobs:
+                await asyncio.gather(*jobs, return_exceptions=True)
             if generation == self._stream_generation and command.sessionId == self.service.session_id:
                 self.session_paused = True
                 self.emit(StreamFinishedEvent(protocolVersion=1, type="streamFinished", requestId=command.requestId,
@@ -1691,6 +1820,7 @@ class EngineRuntime:
             await self.recognizer.close()
         self.translation_requests.clear()
         tasks = list(self.translation_tasks.values())
+        tasks.extend(task for jobs in self.translation_jobs.values() for task in jobs)
         for task in tasks:
             task.cancel()
         if tasks:
@@ -1698,12 +1828,13 @@ class EngineRuntime:
         await self.translation_scheduler.close()
         if browser_session:
             # Cancelling a to_thread ASR job cannot release its native inference lock.
-            # Reserve its models until deferred unloading finishes, without delaying stop.
+            # Retain its reservation until native work finishes, without delaying stop.
             self._model_cleanup_task = asyncio.create_task(self._cleanup_browser_models(command.requestId))
         else:
-            await self.llama_manager.stop()
-            await self._unload_session_models()
+            await self._settle_session_models()
         self.translation_tasks.clear()
+        self.translation_jobs.clear()
+        self.translation_display_revision.clear()
         self.translation_last_started.clear()
         self.translation_wake.clear()
         self.completed_segments.clear()
@@ -1767,7 +1898,7 @@ class EngineRuntime:
 
     async def _cleanup_browser_models(self, request_id: str) -> None:
         try:
-            await self._unload_session_models()
+            await self._settle_session_models()
         except asyncio.CancelledError:
             raise
         except Exception as error:
@@ -1775,25 +1906,35 @@ class EngineRuntime:
                 self.emit(self._resource_error(request_id, "internalError",
                     {"reason": "modelCleanupFailed", "error": type(error).__name__}))
 
-    async def _unload_session_models(self) -> None:
-        """Release the ASR and local translation weights once the session ends.
+    async def _settle_session_models(self) -> None:
+        runtimes = [self._recognition_runtime(), self.llama_manager]
+        if isinstance(self.translation_provider, M2M100TranslationProvider):
+            runtimes.append(self.translation_provider.runtime)
+        waits = [asyncio.to_thread(runtime.wait_idle) for runtime in runtimes if hasattr(runtime, 'wait_idle')]
+        if waits:
+            await asyncio.gather(*waits)
+        if not self._retain_models or self._closing:
+            await self._unload_session_models()
 
-        A runtime a prewarm brought in stays loaded: the warm service outlives the session that
-        used it, and the engine holds the only cache entry that can release those weights.
-        """
+    async def _unload_session_models(self) -> None:
+        """Release the selected models on service close, failure, removal or configuration change."""
+        self._retain_models = False
+        self._loaded_model_key = None
+        self._loaded_translation_model_id = None
         await self.llama_manager.stop()
         runtimes = [self._recognition_runtime()]
         if isinstance(self.translation_provider, M2M100TranslationProvider):
             runtimes.append(self.translation_provider.runtime)
         for runtime in runtimes:
-            if self._is_prewarmed(runtime):
-                continue
             if getattr(runtime, "loaded", False):
                 await asyncio.to_thread(runtime.unload)
         self._update_compute_plan()
 
     async def close(self) -> None:
         self._closing = True
+        self._retain_models = False
+        if self._dependency_task is not None:
+            self._dependency_task.cancel()
         if self.service.session_id is not None:
             await self._stop(
                 StopSessionCommand(
@@ -1810,7 +1951,7 @@ class EngineRuntime:
             except TimeoutError:
                 pass
         else:
-            await self.llama_manager.stop()
+            await self._unload_session_models()
         self._remove_engine_status()
 
     def _write_pipeline_heartbeat(self) -> None:

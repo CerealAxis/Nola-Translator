@@ -1,8 +1,8 @@
 /** A single brand header; native Windows controls own their reserved region. */
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button, Dropdown, Tooltip, useTheme } from '@heroui/react'
-import { CircleHelp, Languages, Moon, Sun, Minus, Square, X } from 'lucide-react'
+import { CircleHelp, Languages, Moon, Sun, Minus, Square, Copy, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { useRoute } from '@/routes'
 import { settingsStore, updateSettings, useStore } from '@/store'
@@ -25,7 +25,19 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
   const { navigate } = useRoute()
   const { resolved, setTheme } = useNolaTheme()
   const native = isElectronShell()
+  const windowsShell = native && window.nolaTranslator?.isWindows === true
+  const [maximized, setMaximized] = useState(false)
   const dark = resolved === 'dark'
+  useEffect(() => {
+    const bridge = window.nolaTranslator
+    if (!bridge?.isWindows) return
+    const unsubscribe = bridge.onMainWindowMaximizedChanged(setMaximized)
+    void bridge.isMainWindowMaximized().then(setMaximized).catch(() => undefined)
+    return unsubscribe
+  }, [])
+  const toggleMaximize = () => {
+    void window.nolaTranslator?.toggleMainWindowMaximize().then(setMaximized).catch(() => undefined)
+  }
   const options = [
     { id: 'zh-CN' as const, label: t('language.zhCN') },
     { id: 'en' as const, label: t('language.en') },
@@ -35,12 +47,14 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
     { key: 'advanced', label: t('modelsSettingsUi.advanced'), onSelect: () => navigate('#/settings/advanced') },
   ]
   return (
-    <header className={`nola-titlebar nola-drag z-titlebar-drag ${className}`}>
+    <header className={`nola-titlebar nola-drag z-titlebar-drag ${className}`} onDoubleClick={event => {
+      if (windowsShell && !(event.target instanceof Element && event.target.closest('.nola-no-drag'))) toggleMaximize()
+    }}>
       <div className="nola-brand">
         <img className="nola-brand__mark" src={nolaLogoUrl} alt={t('app.name')} />
       </div>
       {variant === 'session' ? <div className="nola-no-drag flex min-w-0 items-center gap-3">{leading}{sessionTitle}{status}{timer}</div> : null}
-      <div className="nola-titlebar-tools nola-no-drag">
+      <div className={`nola-titlebar-tools nola-no-drag${windowsShell ? ' nola-titlebar-tools--windows' : ''}`}>
         {actions}
         <Dropdown>
           <Dropdown.Trigger className="nola-titlebar-icon" aria-label={t('titleBar.language')}><Languages aria-hidden="true" /></Dropdown.Trigger>
@@ -62,7 +76,11 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
           <Dropdown.Popover><Dropdown.Menu>{help.map(item => <Dropdown.Item key={item.key} id={item.key} onAction={item.onSelect}>{item.label}</Dropdown.Item>)}</Dropdown.Menu></Dropdown.Popover>
         </Dropdown>
       </div>
-      {native ? <div className="nola-native-controls" aria-hidden="true" /> : (
+      {windowsShell ? <div className="nola-window-controls nola-no-drag">
+        <Button variant="ghost" isIconOnly className="nola-window-control" aria-label={t('titleBar.minimizeWindow')} title={t('titleBar.minimizeWindow')} onPress={() => { void window.nolaTranslator?.minimizeMainWindow() }}><Minus aria-hidden="true" /></Button>
+        <Button variant="ghost" isIconOnly className="nola-window-control" aria-label={maximized ? t('titleBar.restoreWindow') : t('titleBar.maximizeWindow')} title={maximized ? t('titleBar.restoreWindow') : t('titleBar.maximizeWindow')} onPress={toggleMaximize}>{maximized ? <Copy aria-hidden="true" /> : <Square aria-hidden="true" />}</Button>
+        <Button variant="ghost" isIconOnly className="nola-window-control nola-window-control--close" aria-label={t('titleBar.closeWindow')} title={t('titleBar.closeWindow')} onPress={() => { void window.nolaTranslator?.closeMainWindow() }}><X aria-hidden="true" /></Button>
+      </div> : native ? <div className="nola-native-controls" aria-hidden="true" /> : (
         <div className="nola-web-controls nola-no-drag">
           <Button variant="ghost" isIconOnly isDisabled aria-label={t('shellUi.minimize')}><Minus aria-hidden="true" /></Button>
           <Button variant="ghost" isIconOnly aria-label={t('shellUi.fullscreen')} onPress={() => { if(document.fullscreenElement) void document.exitFullscreen(); else void document.documentElement.requestFullscreen?.() }}><Square aria-hidden="true" /></Button>

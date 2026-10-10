@@ -30,6 +30,8 @@
   .nola-titlebar-icon svg { width: 20px; height: 20px; }
   .nola-titlebar-icon:hover { background: color-mix(in oklch, var(--accent) 8%, transparent); }
   .nola-native-controls { width: 138px; flex-shrink: 0; height: 100%; }
+  .nola-titlebar-tools--windows { gap: 10px; margin-right: -24px; }
+  .nola-window-controls { display: flex; flex-shrink: 0; gap: 6px; }
   .nola-web-controls { display: flex; gap: 6px; }
   .nola-web-controls .button { width: 42px; height: 40px; padding: 0; border-radius: 8px; }
   .nola-app-body { display: flex; flex: 1; min-height: 0; min-width: 0; }
@@ -78,6 +80,10 @@
   .nola-overlay-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--separator); }
 }
 @layer utilities {
+  .nola-window-control.button { width: 40px; height: 48px; flex-shrink: 0; padding: 0; border: 0; border-radius: 0; color: var(--foreground); }
+  .nola-window-control.button svg { width: 16px; height: 16px; stroke-width: 1.8; }
+  .nola-window-control.button:hover { background: color-mix(in oklch, var(--accent) 9%, transparent); }
+  .nola-window-control--close.button:hover { color: var(--danger-foreground); background: var(--danger); }
   .button--primary { background: var(--nola-primary-gradient); color: var(--accent-foreground); }
   .card { border-radius: 16px; }
   .modal__dialog, .alert-dialog__dialog { border-radius: 20px; }

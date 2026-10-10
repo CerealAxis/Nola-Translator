@@ -52,6 +52,8 @@ export function supportsTranslation(model: ResourceRecord | undefined, source: s
   if (!config.targetLanguages.map(normalizeLanguage).includes(to)) return false
   if (from === 'auto') return !config.translationPairs || config.translationPairs.some(pair => normalizeLanguage(pair.target) === to)
   if (!config.sourceLanguages.map(normalizeLanguage).includes(from)) return false
+  // A primary-language match can still hide code-switching, so allow the model to inspect it.
+  if (from === to) return true
   return !config.translationPairs || config.translationPairs.some(pair => normalizeLanguage(pair.source) === from && normalizeLanguage(pair.target) === to)
 }
 export function translationLanguages(model: ResourceRecord | undefined, source: string): string[] {

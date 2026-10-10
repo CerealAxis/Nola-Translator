@@ -22,6 +22,9 @@ import { checkLatestRelease, isTrustedReleaseUrl } from './github-updates'
 
 const channels = {
   getSettings: 'app:get-settings', updateSettings: 'app:update-settings',
+  minimizeMainWindow: 'app:window:minimize', toggleMainWindowMaximize: 'app:window:toggle-maximize',
+  getMainWindowMaximized: 'app:window:is-maximized', mainWindowMaximizedChanged: 'app:window:maximized-changed',
+  closeMainWindow: 'app:window:close',
   openAppearance: 'app:open-appearance',
   checkLatestRelease: 'app:check-latest-release', openReleasePage: 'app:open-release-page',
   getModelStorage: 'storage:get', chooseModelStorageDirectory: 'storage:choose', restartApp: 'app:restart',
@@ -78,6 +81,14 @@ export function registerAppIpc(options: {
   getMainWindow: () => BrowserWindow | null
 }): () => void {
   let current = options.initialSettings
+  const mainWindow = options.getMainWindow()
+  const publishMaximizedState = (): void => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channels.mainWindowMaximizedChanged, mainWindow.isMaximized())
+  }
+  const onMaximize = (): void => publishMaximizedState()
+  const onUnmaximize = (): void => publishMaximizedState()
+  mainWindow?.on('maximize', onMaximize)
+  mainWindow?.on('unmaximize', onUnmaximize)
   // Single funnel for "where does the app store things when the user has not chosen": the data
   // root, not `userData` (see `data-root.ts`). `activeStoragePath` stays a snapshot of what this
   // process started with, which is what makes the `restartRequired` comparison below true rather
@@ -122,10 +133,10 @@ export function registerAppIpc(options: {
   }
   const applyTheme = (): void => {
     // The app shell follows `settings.theme`, not Windows. nativeTheme stays on 'system' so that
-    // media queries (prefers-color-scheme) keep describing the *user's* system, but the title bar
-    // symbols must follow what is actually painted — following the system left dark-on-dark
-    // minimise/maximise/close glyphs on a dark title bar.
+    // media queries (prefers-color-scheme) keep describing the *user's* system. Other platforms
+    // still use native overlay symbols and need their colour to follow the painted title bar.
     const dark = current.theme === 'dark' || (current.theme === 'system' && nativeTheme.shouldUseDarkColors)
+    if (process.platform === 'win32') return
     options.getMainWindow()?.setTitleBarOverlay({
       color: '#00000000',
       symbolColor: dark ? '#ffffff' : '#1f1f1f',
@@ -185,6 +196,25 @@ export function registerAppIpc(options: {
   loggedHandle(channels.restartApp, () => {
     app.relaunch()
     app.quit()
+  })
+  loggedHandle(channels.minimizeMainWindow, (event) => {
+    const window = options.getMainWindow()
+    if (window && !window.isDestroyed() && event.sender === window.webContents) window.minimize()
+  })
+  loggedHandle(channels.toggleMainWindowMaximize, (event) => {
+    const window = options.getMainWindow()
+    if (!window || window.isDestroyed() || event.sender !== window.webContents) return false
+    if (window.isMaximized()) window.unmaximize()
+    else window.maximize()
+    return window.isMaximized()
+  })
+  loggedHandle(channels.getMainWindowMaximized, (event) => {
+    const window = options.getMainWindow()
+    return Boolean(window && !window.isDestroyed() && event.sender === window.webContents && window.isMaximized())
+  })
+  loggedHandle(channels.closeMainWindow, (event) => {
+    const window = options.getMainWindow()
+    if (window && !window.isDestroyed() && event.sender === window.webContents) window.close()
   })
   loggedHandle(channels.updateSettings, async (_event, raw: unknown) => {
     // The cast trusts that the schema accepts every field `AppSettingsPatch` declares; that parity
@@ -267,5 +297,9 @@ export function registerAppIpc(options: {
     return options.credentials.set(target, value)
   })
 
-  return () => Object.values(channels).forEach((channel) => ipcMain.removeHandler(channel))
+  return () => {
+    mainWindow?.off('maximize', onMaximize)
+    mainWindow?.off('unmaximize', onUnmaximize)
+    Object.values(channels).forEach((channel) => ipcMain.removeHandler(channel))
+  }
 }

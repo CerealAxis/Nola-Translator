@@ -105,23 +105,29 @@ export function OverlayRoot() {
   const active = session.status === 'running' || session.status === 'paused' || session.status === 'starting'
   const hasCaption = session.segments.length > 0 || session.interim !== null
 
-  /*
-   * Tracks render only the current sentence; `CaptionTrack` folds earlier ones
-   * into a running stream.
-   *
-   * The unconfirmed segment wins, being the engine's latest revision. When it
-   * has no translation the translation track keeps its last line rather than
-   * clearing: translation lags by a step, and clearing would make a sentence
-   * that just finished translating vanish.
-   */
+  /* Source and translation tracks advance independently and retain per-segment revisions. */
   const current = session.interim ?? session.segments[session.segments.length - 1] ?? null
-  const sourceLine: TrackLine | null = current?.sourceText
-    ? { key: current.segmentId, text: current.sourceText }
-    : null
-  const translated = current?.translations.find((entry) => entry.state !== 'failed' && entry.text)
-  const translationLine: TrackLine | null = current && translated?.text
-    ? { key: current.segmentId, text: translated.text }
-    : null
+  const orderedSegments = [
+    ...session.segments,
+    ...(session.interim ? [session.interim] : []),
+  ]
+    .sort((left, right) => left.startedAtMs - right.startedAtMs)
+  const translationCurrent = [...orderedSegments]
+    .reverse()
+    .find((segment) => segment.translations.some((entry) => entry.state !== 'failed' && Boolean(entry.text))
+      || (segment.translations.length > 0 && segment.translations.every((entry) => entry.state === 'failed')))
+  const translated = translationCurrent?.translations.find((entry) => entry.state !== 'failed' && entry.text)
+  const sourceTrackLines = orderedSegments.flatMap((segment): TrackLine[] =>
+    segment.sourceText ? [{ key: segment.segmentId, text: segment.sourceText }] : [])
+  const translatedTrackLines = orderedSegments.map((segment): TrackLine => {
+    const entry = segment.translations.find((item) => item.state !== 'failed' && item.text)
+    if (entry?.text) return { key: segment.segmentId, text: entry.text }
+    if (segment.segmentId === translationCurrent?.segmentId && !translated?.text) {
+      const reason = translationErrorSummary(t, segment)
+      return { key: segment.segmentId, text: reason ?? '' }
+    }
+    return { key: segment.segmentId, text: '' }
+  })
 
   /*
    * A translation failure must show its reason. Drawing only `complete`
@@ -132,14 +138,8 @@ export function OverlayRoot() {
    * segment gets no failure copy, because translation lagging is normal and a
    * flashing error is noisier than an empty line.
    */
-  const failureLine: TrackLine | null = current && !translated?.text
-    ? (() => {
-        const reason = translationErrorSummary(t, current)
-        return reason ? { key: `${current.segmentId}-error`, text: reason } : null
-      })()
-    : null
   const originalOnly = !!current && current.translations.length === 0
-  const effectiveTranslationLine = originalOnly && !config.showSource ? sourceLine : translationLine ?? failureLine
+  const effectiveTranslationTrackLines = originalOnly && !config.showSource ? sourceTrackLines : translatedTrackLines
 
   /*
    * Hover from raw coordinates rather than onMouseEnter/onMouseLeave: an
@@ -264,7 +264,7 @@ export function OverlayRoot() {
                 <CaptionTrack
                   key={`source-${session.sessionId ?? 'idle'}`}
                   kind="source"
-                  line={sourceLine}
+                  lines={sourceTrackLines}
                   maxLines={sourceLines}
                   layout={config.layout}
                 />
@@ -275,7 +275,7 @@ export function OverlayRoot() {
                   <CaptionTrack
                     key={`translation-${session.sessionId ?? 'idle'}`}
                     kind="translation"
-                    line={effectiveTranslationLine}
+                    lines={effectiveTranslationTrackLines}
                     maxLines={translationLines}
                     layout={config.layout}
                   />

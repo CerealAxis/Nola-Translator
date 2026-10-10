@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Slider, ToggleButton, ToggleButtonGroup, Typography } from '@heroui/react'
+import { Button, Slider, ToggleButton, ToggleButtonGroup, Typography, toast } from '@heroui/react'
 import type { Selection } from '@react-types/shared'
 import { Pause, Play } from 'lucide-react'
 
@@ -42,17 +42,31 @@ export function AudioPlayerBar({
 }: AudioPlayerBarProps): ReactNode {
   const { t } = useI18n()
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const playbackErrorReportedRef = useRef(false)
   const [playing, setPlaying] = useState(false)
   const [positionMs, setPositionMs] = useState(0)
   const [totalMs, setTotalMs] = useState(durationMs ?? 0)
   const [rate, setRate] = useState<Rate>(1)
+
+  const reportPlaybackError = useCallback(() => {
+    if (playbackErrorReportedRef.current) return
+    playbackErrorReportedRef.current = true
+    toast.danger(t('records.playerError'))
+  }, [t])
 
   // A new URL resets the bar, or the previous meeting's position carries over.
   useEffect(() => {
     setPlaying(false)
     setPositionMs(0)
     setTotalMs(durationMs ?? 0)
+    playbackErrorReportedRef.current = false
+    const audio = audioRef.current
+    audio?.load()
   }, [audioUrl, durationMs])
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.playbackRate = rate
+  }, [rate, audioUrl])
 
   // Playback state is driven by element events; the UI is only a projection of them.
   useEffect(() => {
@@ -67,16 +81,22 @@ export function AudioPlayerBar({
       if (Number.isFinite(audio.duration)) setTotalMs(audio.duration * 1000)
     }
     const onEnd = (): void => setPlaying(false)
+    const onError = (): void => {
+      setPlaying(false)
+      reportPlaybackError()
+    }
 
     audio.addEventListener('timeupdate', onTime)
     audio.addEventListener('loadedmetadata', onMeta)
     audio.addEventListener('ended', onEnd)
+    audio.addEventListener('error', onError)
     return () => {
       audio.removeEventListener('timeupdate', onTime)
       audio.removeEventListener('loadedmetadata', onMeta)
       audio.removeEventListener('ended', onEnd)
+      audio.removeEventListener('error', onError)
     }
-  }, [onTimeChange])
+  }, [onTimeChange, reportPlaybackError])
 
   const toggle = useCallback(() => {
     const audio = audioRef.current
@@ -84,14 +104,16 @@ export function AudioPlayerBar({
     if (audio.paused) {
       void audio.play().then(
         () => setPlaying(true),
-        // Autoplay policy can refuse: the UI falls back to paused rather than pretending.
-        () => setPlaying(false),
+        () => {
+          setPlaying(false)
+          reportPlaybackError()
+        },
       )
     } else {
       audio.pause()
       setPlaying(false)
     }
-  }, [audioUrl])
+  }, [audioUrl, reportPlaybackError])
 
   const seek = useCallback((nextMs: number) => {
     const audio = audioRef.current
@@ -161,7 +183,7 @@ export function AudioPlayerBar({
       <ToggleButtonGroup
         selectionMode="single"
         disallowEmptySelection
-        selectedKeys={[String(rate)]}
+        selectedKeys={new Set([String(rate)])}
         // A react-aria segmented control reports selection, not change.
         onSelectionChange={(keys: Selection) => {
           const first = keys === 'all' ? null : Array.from(keys)[0] ?? null
@@ -171,14 +193,14 @@ export function AudioPlayerBar({
         }}
         size="sm"
         aria-label={t('homeRecordsUi.playbackRate')}
-        className="shrink-0"
+        className="nola-segmented shrink-0"
       >
         {RATES.map((value) => (
           <ToggleButton
             key={value}
             // In a segmented control the `id` is the key it is selected by.
             id={String(value)}
-            className="rounded-[10px] text-[12.5px] leading-[1.5] font-normal tabular-nums"
+            className="tabular-nums"
           >
             {value}x
           </ToggleButton>

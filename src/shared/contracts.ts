@@ -173,6 +173,7 @@ export type EngineCommand =
     })
   | (Envelope<'startSession'> & { config: SessionConfig })
   | (Envelope<'prewarmModels'> & { config: PrewarmConfig })
+  | Envelope<'releaseModels'>
   | (Envelope<'stopSession'> & { sessionId: string })
   | (Envelope<'setSessionPaused'> & { sessionId: string; paused: boolean })
   | (Envelope<'pushAudio'> & { sessionId: string; streamId: string; epoch: number; sequence: number; sampleRate: number; capturedAtMs: number; pcmBase64: string })
@@ -315,12 +316,13 @@ export type EngineEvent =
        */
       state: 'loading' | 'ready'
       recognitionModelId: string
-      /** The translation model the request resolved and validated. Its weights are not loaded by a prewarm, so this reports intent rather than residency. */
+      /** A local translation model is resident when this event reaches `ready`. */
       translationModelId?: string
       elapsedMs: number
       device?: string
       runtime?: string
     })
+  | (Envelope<'modelsReleased'> & { deferred: boolean })
   | (Envelope<'sessionStopped'> & { sessionId: string })
   | (Envelope<'caption'> & { sessionId: string; segment: CaptionSegment; streamEpoch?: number; videoStartedAtMs?: number; videoEndedAtMs?: number })
   | (Envelope<'audioAccepted'> & { sessionId: string; epoch: number; sequence: number })

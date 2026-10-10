@@ -162,6 +162,11 @@ class QwenRuntime:
                 f"无法从 {self.model_dir} 加载 Qwen3-ASR 模型（{detail}）"
             ) from errors[-1][1]
 
+    def wait_idle(self) -> None:
+        """A cancelled worker still owns its native inference lock until it returns."""
+        with self._inference_lock:
+            pass
+
     def unload(self) -> None:
         """Wait for in-flight inference to finish, then drop weights and clear the CUDA cache."""
         with self._inference_lock:

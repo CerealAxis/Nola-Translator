@@ -8,7 +8,7 @@ import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
  * `AppSettings`, so the check button can only ask whether a key is stored: no endpoint probe.
  */
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button, Input, TextField, toast } from '@heroui/react'
 
@@ -166,6 +166,7 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
           <TextRow
             label={t('settings.endpoint')}
             desc={endpointHint}
+            descriptionTooltip
             placeholder={t('settings.endpointPlaceholder')}
             value={translation.cloudEndpoint}
             onCommit={(value) => {
@@ -233,12 +234,14 @@ function TextRow({
   label,
   desc,
   placeholder,
+  descriptionTooltip,
   value,
   onCommit,
 }: {
   label: string
   desc?: ReactNode
   placeholder?: string
+  descriptionTooltip?: boolean
   value: string
   onCommit: (value: string) => void
 }) {
@@ -254,13 +257,13 @@ function TextRow({
   }, [draft, value, onCommit])
 
   return (
-    <SettingsRow label={label} desc={desc}>
+    <SettingsRow label={label} desc={desc} descriptionTooltip>
       <TextField
         value={shown}
         onChange={setDraft}
         onFocus={() => { setDraft(value); setFocused(true) }}
         onBlur={commit}
-        className="w-[200px]"
+        className="settings-control-field"
       >
         <Input className="rounded-[8px]" aria-label={label} placeholder={placeholder} />
       </TextField>
@@ -305,7 +308,7 @@ function NumberRow({
         onChange={setDraft}
         onFocus={() => { setDraft(String(value)); setFocused(true) }}
         onBlur={commit}
-        className="w-[200px]"
+        className="settings-control-field"
       >
         <Input type="number" min={1} step={1} className="rounded-[8px]" aria-label={label} />
       </TextField>
@@ -316,23 +319,36 @@ function NumberRow({
 function ApiKeyRow({ provider, stored }: { provider: CredentialProvider; stored: boolean }) {
   const { t } = useI18n()
   const [draft, setDraft] = useState('')
-  const [state, setState] = useState<'idle' | 'pending' | 'testing'>('idle')
+  const [editing, setEditing] = useState(false)
+  const [state, setState] = useState<'idle' | 'pending' | 'testing' | 'deleting'>('idle')
+  const saveTask = useRef<Promise<boolean> | null>(null)
+  const masked = stored && !editing && draft === ''
 
-  const save = useCallback(async () => {
-    if (draft.trim() === '') return
+  const save = useCallback((nextDraft: string): Promise<boolean> => {
+    if (saveTask.current) return saveTask.current
+    const key = nextDraft.trim()
+    if (key === '') return Promise.resolve(true)
     setState('pending')
-    try {
-      await actions.models.setTranslationCredential(provider, draft.trim())
-      setDraft('')
-      toast.success(t('common.saved'))
-    } catch {
-      toast.danger(t('errors.translateFailed'))
-    } finally {
-      setState('idle')
-    }
-  }, [draft, provider, t])
+    const task = actions.models.setTranslationCredential(provider, key)
+      .then(() => {
+        setDraft('')
+        toast.success(t('common.saved'))
+        return true
+      })
+      .catch(() => {
+        toast.danger(t('errors.translateFailed'))
+        return false
+      })
+      .finally(() => {
+        saveTask.current = null
+        setState('idle')
+      })
+    saveTask.current = task
+    return task
+  }, [provider, t])
 
   const verify = useCallback(async () => {
+    if (draft.trim() !== '' && !(await save(draft))) return
     setState('testing')
     try {
       const bridge = getBridge()
@@ -344,41 +360,46 @@ function ApiKeyRow({ provider, stored }: { provider: CredentialProvider; stored:
     } finally {
       setState('idle')
     }
+  }, [draft, provider, save, t])
+
+  const deleteKey = useCallback(async () => {
+    await saveTask.current
+    setState('deleting')
+    try {
+      await actions.models.setTranslationCredential(provider, '')
+      setDraft('')
+      toast.success(t('common.done'))
+    } catch {
+      toast.danger(t('errors.translateFailed'))
+    } finally {
+      setState('idle')
+    }
   }, [provider, t])
 
   return (
-    <SettingsRow label={t('settings.apiKey')} desc={t('modelsSettingsUi.credentialCheckHint')}>
-      <TextField value={draft} onChange={setDraft} className="w-[200px]">
+    <SettingsRow label={t('settings.apiKey')} desc={t('settings.apiKeyHint')} descriptionTooltip>
+      <TextField value={masked ? `sk-${'*'.repeat(80)}` : draft} onChange={setDraft}
+        onFocus={() => setEditing(true)} onBlur={() => { setEditing(false); void save(draft) }} className="settings-control-field">
         {/*
           `type` and the placeholder belong on `Input`: the `TextField` root takes only value
-          and onChange, so the native change event is `Input`'s to handle. The key input is a
-          password: a screen share must not expose it.
+          and onChange, so the native change event is `Input`'s to handle. The saved credential
+          is represented by a mask; actual replacement input stays a password field.
         */}
         <Input
-          type="password"
+          type={masked ? 'text' : 'password'}
+          readOnly={masked}
           className="rounded-[8px]"
           aria-label={t('settings.apiKey')}
-          placeholder={t('settings.apiKeyPlaceholder')}
+          placeholder={stored ? '' : t('settings.apiKeyPlaceholder')}
+          disabled={state === 'pending' || state === 'deleting'}
         />
       </TextField>
       <Button
         variant="tertiary"
         size="sm"
         className="rounded-[6px]"
-        isDisabled={draft.trim() === ''}
-        isPending={state === 'pending'}
-        onPress={() => {
-          void save()
-        }}
-      >
-        {t('settings.saveKey')}
-      </Button>
-      <Button
-        variant="tertiary"
-        size="sm"
-        className="rounded-[6px]"
         isPending={state === 'testing'}
-        isDisabled={!stored}
+        isDisabled={!stored || state === 'deleting'}
         onPress={() => {
           void verify()
         }}
@@ -386,15 +407,13 @@ function ApiKeyRow({ provider, stored }: { provider: CredentialProvider; stored:
         {state === 'testing' ? t('settings.testing') : t('modelsSettingsUi.credentialCheck')}
       </Button>
       <Button
-        variant="ghost"
+        variant="danger"
         size="sm"
-        className="rounded-[6px] text-muted hover:bg-danger-soft hover:text-danger-soft-foreground"
-        isDisabled={!stored}
+        className="rounded-[6px]"
+        isPending={state === 'deleting'}
+        isDisabled={!stored || state === 'testing' || state === 'deleting'}
         onPress={() => {
-          void actions.models
-            .setTranslationCredential(provider, '')
-            .then(() => toast.success(t('common.done')))
-            .catch(() => toast.danger(t('errors.translateFailed')))
+          void deleteKey()
         }}
       >
         {t('settings.deleteKey')}

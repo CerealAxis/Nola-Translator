@@ -13,6 +13,7 @@ import gc
 import os
 import re
 import threading
+from time import monotonic
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .base import ModelUnavailable
+from ..debug_log import write as write_debug
 
 SAMPLE_RATE = 16_000
 # Per-transcribe dynamic-batch duration cap in seconds, matching the official demo.
@@ -49,7 +51,6 @@ class SenseVoiceRuntime:
         self._load_lock = threading.Lock()
         self._inference_lock = threading.Lock()
         self._loaded = False
-        self._warmed = False
         self._device: str | None = None
         self._model: Any = None
         self._requested_device = device
@@ -73,7 +74,9 @@ class SenseVoiceRuntime:
             if self._loaded:
                 return
             try:
+                started_at = monotonic()
                 from funasr import AutoModel
+                write_debug('engine', 'model.import.timing', {'adapter': 'sensevoice', 'elapsedMs': round((monotonic() - started_at) * 1000)})
             except Exception as error:
                 raise SenseVoiceModelUnavailable(
                     f"无法导入 funasr：{type(error).__name__}: {error}"
@@ -82,9 +85,12 @@ class SenseVoiceRuntime:
             # funasr preprocessing still burns CPU, and the default thread pool can take the cores video playback needs.
             torch.set_num_threads(cpu_threads(self.threads))
             try:
+                started_at = monotonic()
                 model = AutoModel(
-                    model=str(self.model_dir), device=device, disable_update=True
+                    model=str(self.model_dir), device=device, disable_update=True,
+                    ncpu=cpu_threads(self.threads),
                 )
+                write_debug('engine', 'model.weights.timing', {'adapter': 'sensevoice', 'elapsedMs': round((monotonic() - started_at) * 1000)})
             except Exception as error:
                 raise SenseVoiceModelUnavailable(
                     f"无法从 {self.model_dir} 加载 SenseVoiceSmall 模型"
@@ -94,13 +100,10 @@ class SenseVoiceRuntime:
             self._device = device
             self._loaded = True
 
-    def warmup(self) -> None:
-        """Run the cold inference before live audio enters the bounded capture queue."""
+    def wait_idle(self) -> None:
+        """Keep cancelled native inference reserved without unloading reusable weights."""
         with self._inference_lock:
-            if self._warmed:
-                return
-            self._transcribe_locked(np.zeros(int(SAMPLE_RATE * 0.6), dtype=np.float32), language=None)
-            self._warmed = True
+            pass
 
     def unload(self) -> None:
         """Wait for in-flight inference to finish, then drop weights and clear the CUDA cache."""
@@ -110,7 +113,6 @@ class SenseVoiceRuntime:
                 device = self._device or self._requested_device
                 self._model = None
                 self._loaded = False
-                self._warmed = False
                 self._device = None
             del model
             gc.collect()

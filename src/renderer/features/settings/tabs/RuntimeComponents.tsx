@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Accordion, Alert, Button, Checkbox, Label } from '@heroui/react'
+import { Accordion, Alert, Button, Checkbox, Label, Tooltip } from '@heroui/react'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
 import type { LocalRuntime } from '../../../../shared/compute'
@@ -13,7 +13,7 @@ export function RuntimeComponents() {
   const runtimes = state.runtimes
   const operation = runtimes?.operation
   const [now, setNow] = useState(Date.now)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(['engine']))
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(['engine', 'llama']))
   const [selected, setSelected] = useState({ engine: '', llama: '' })
   const [force, setForce] = useState({ engine: false, llama: false })
   const [repairs, setRepairs] = useState({ engine: false, llama: false })
@@ -62,7 +62,7 @@ export function RuntimeComponents() {
       onPress={() => void actions.settings.loadRuntimeComponents(true).then(() => actions.settings.refreshComputeDevices()).catch(() => undefined)}>{t('runtime.recheck')}</Button>}>
       <SettingsRow label={t('runtime.python')} desc={runtimes?.python?.reason || undefined}><span>{t('runtime.builtInPython')}</span></SettingsRow>
       {local ? (['engine', 'llama'] as const).map(kind => <SettingsRow key={kind} label={kind === 'engine' ? 'PyTorch' : 'llama.cpp'} desc={local[kind].reason || undefined}>
-        <span className="runtime-component-status">{description(kind, local[kind])}{local[kind].status === 'ready' ? <small>{t('runtime.installed')}</small> : null}</span>
+        <span className="runtime-component-status">{description(kind, local[kind])}</span>
       </SettingsRow>) : null}
     </SettingGroup>
     {state.runtimeError ? <Alert status="danger"><Alert.Content><Alert.Description>{state.runtimeError}</Alert.Description></Alert.Content></Alert> : null}
@@ -77,7 +77,7 @@ export function RuntimeComponents() {
         const owned = selected[kind] !== 'current' && (kind === 'engine' ? runtimes?.recipes : runtimes?.packages)?.some(p => p.id === selected[kind] && p.installed)
         return <Accordion.Item key={kind} id={kind} className="runtime-panel">
           <Accordion.Heading><Accordion.Trigger id={`runtime-${kind}`} className="runtime-panel-heading">
-            <span><strong>{t(kind === 'engine' ? 'runtime.installTorch' : 'runtime.installLlama')}</strong><small>{t(kind === 'engine' ? 'runtime.torchDescription' : 'runtime.llamaDescription')}</small></span><Accordion.Indicator />
+            <Tooltip delay={300}><Tooltip.Trigger className="runtime-panel-heading__title"><strong>{t(kind === 'engine' ? 'runtime.installTorch' : 'runtime.installLlama')}</strong></Tooltip.Trigger><Tooltip.Content className="settings-row__tooltip">{t(kind === 'engine' ? 'runtime.torchDescription' : 'runtime.llamaDescription')}</Tooltip.Content></Tooltip><Accordion.Indicator />
           </Accordion.Trigger></Accordion.Heading>
           <Accordion.Panel><Accordion.Body className="runtime-panel-body">
             <SettingsRow label={t('runtime.current')}><span className="runtime-component-status">{component ? description(kind, component) : t('runtime.missing')}</span></SettingsRow>

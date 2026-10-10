@@ -71,6 +71,11 @@ def test_session_gates_and_loads_the_selected_hymt2_quantization(
     class FakeLlamaManager:
         device = "cuda"
         ready = True
+        offloaded_layers = 20
+        fallback_reason = None
+
+        def configure_compute(self, _device, _options):
+            pass
 
         def __init__(self) -> None:
             self.loaded: list[Path] = []
@@ -87,7 +92,7 @@ def test_session_gates_and_loads_the_selected_hymt2_quantization(
 
     llama = FakeLlamaManager()
     monkeypatch.setattr(runtime, "llama_manager", llama)
-    monkeypatch.setattr(runtime_module, "get_sensevoice_runtime", lambda _p: _Loaded())
+    monkeypatch.setattr(runtime_module, "get_sensevoice_runtime", lambda _p, **_options: _Loaded())
     monkeypatch.setattr(
         runtime_module, "create_sensevoice_recognizer", lambda *_a, **_k: _Raising()
     )
@@ -285,13 +290,13 @@ def test_selected_recognition_model_gates_and_loads_that_directory(
     monkeypatch.setattr(runtime.resources, "is_installed", lambda _rid: True)
     seen: list[Path] = []
 
-    class LoadedRuntime:
+    class LoadedRuntime(_Loaded):
         def load(self) -> None:
             seen.append(tmp_path / "models" / QWEN_06B_RESOURCE_ID)
 
-    monkeypatch.setattr(runtime_module, "get_qwen_runtime", lambda _path: LoadedRuntime())
+    monkeypatch.setattr(runtime_module, "get_qwen_runtime", lambda _path, **_options: LoadedRuntime())
 
-    def fake_create(model_dir, *, source_language=None):
+    def fake_create(model_dir, *, source_language=None, runtime=None):
         seen.append(Path(model_dir))
         raise RuntimeError("stop here")
 
@@ -314,18 +319,18 @@ def test_sensevoice_selection_loads_its_own_runtime(tmp_path, monkeypatch) -> No
     monkeypatch.setattr(runtime.resources, "is_installed", lambda _rid: True)
     seen: list[Path] = []
 
-    class LoadedRuntime:
+    class LoadedRuntime(_Loaded):
         def load(self) -> None:
             seen.append(tmp_path / "models" / SENSEVOICE_RESOURCE_ID)
 
-    monkeypatch.setattr(runtime_module, "get_sensevoice_runtime", lambda _path: LoadedRuntime())
+    monkeypatch.setattr(runtime_module, "get_sensevoice_runtime", lambda _path, **_options: LoadedRuntime())
     monkeypatch.setattr(
         runtime_module,
         "get_qwen_runtime",
         lambda _path: pytest.fail("选择 SenseVoice 时不应加载 Qwen 运行时"),
     )
 
-    def fake_create(model_dir, *, source_language=None):
+    def fake_create(model_dir, *, source_language=None, runtime=None):
         seen.append(Path(model_dir))
         raise RuntimeError("stop here")
 
@@ -368,7 +373,7 @@ def test_engine_status_file_lifecycle(tmp_path) -> None:
         "loaded": False,
         "runtime": "unloaded",
     }
-    assert data["hymt2"] == {"device": "unknown", "ready": False}
+    assert data["hymt2"] == {"device": "unknown", "ready": False, "offloadedLayers": None, "fallbackReason": None}
 
     asyncio.run(runtime.close())
     assert not status_path.exists()

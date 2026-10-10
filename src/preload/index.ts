@@ -42,6 +42,9 @@ const channels = {
   openAppearance: 'app:open-appearance',
   appearanceRequested: 'app:appearance-requested',
   getSettings: 'app:get-settings', updateSettings: 'app:update-settings', settingsChanged: 'settings:changed',
+  minimizeMainWindow: 'app:window:minimize', toggleMainWindowMaximize: 'app:window:toggle-maximize',
+  getMainWindowMaximized: 'app:window:is-maximized', mainWindowMaximizedChanged: 'app:window:maximized-changed',
+  closeMainWindow: 'app:window:close',
   getModelStorage: 'storage:get', chooseModelStorageDirectory: 'storage:choose', restartApp: 'app:restart',
   listMeetings: 'meeting:list', getMeeting: 'meeting:get', readMeeting: 'meeting:read',
   renameMeeting: 'meeting:rename', setMeetingNotes: 'meeting:set-notes', deleteMeeting: 'meeting:delete', exportMeeting: 'meeting:export',
@@ -64,6 +67,16 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 }
 
 const api: NolaTranslatorApi = {
+  isWindows: process.platform === 'win32',
+  minimizeMainWindow: () => invoke<void>(channels.minimizeMainWindow),
+  toggleMainWindowMaximize: () => invoke<boolean>(channels.toggleMainWindowMaximize),
+  isMainWindowMaximized: () => invoke<boolean>(channels.getMainWindowMaximized),
+  closeMainWindow: () => invoke<void>(channels.closeMainWindow),
+  onMainWindowMaximizedChanged: (listener) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, maximized: boolean): void => listener(maximized)
+    ipcRenderer.on(channels.mainWindowMaximizedChanged, wrapped)
+    return () => ipcRenderer.off(channels.mainWindowMaximizedChanged, wrapped)
+  },
   browserConnection: (action, enabled, browser) => invoke('browser:connection', action, enabled, browser),
   listComputeDevices: () => invoke(channels.listComputeDevices),
   getRuntimes: () => invoke(channels.getRuntimes),

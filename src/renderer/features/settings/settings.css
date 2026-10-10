@@ -1,4 +1,4 @@
-.settings-page { display:flex; flex-direction:column; gap:20px; min-width:0; }
+.settings-page { --settings-control-width:500px; display:flex; flex-direction:column; gap:20px; min-width:0; }
 .compute-hint { margin:0; color:var(--muted); font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
 .compute-device-info { font-size:13px; overflow-wrap:anywhere; text-align:end; }
 .compute-number { width:140px; max-width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:10px; color:var(--foreground); background:var(--surface); }
@@ -8,7 +8,7 @@
 .settings-page__heading p { color:var(--muted); font-size:14px; margin:0; }
 /* The nav column tracks the widest tab label, so a longer translation stays on one line instead of
    wrapping into a two-line tab. 208px is the floor that the short labels settle at. */
-.settings-page .settings-tabs { display:grid; grid-template-columns:minmax(208px,max-content) minmax(0,1fr); gap:16px; align-items:start; }
+.settings-page .settings-tabs { display:grid; width:100%; grid-template-columns:minmax(208px,max-content) minmax(0,1fr); gap:16px; align-items:start; }
 .settings-nav { padding:12px; border:1px solid var(--border); border-radius:16px; background:var(--surface); min-width:0; }
 .settings-nav .tabs__list { display:flex; flex-direction:column; gap:8px; background:transparent; padding:0; width:100%; }
 .settings-nav .tabs__tab { justify-content:flex-start; height:52px; border-radius:12px; padding:0 16px; font-size:14px; gap:14px; opacity:1; color:var(--foreground); white-space:normal; }
@@ -18,10 +18,10 @@
 .settings-nav__tooltip { max-width: min(24rem, calc(100vw - 2rem)); white-space: normal; }
 .settings-nav .tabs__tab[data-selected="true"] { color:var(--accent); font-weight:600; }
 .settings-nav .tabs__indicator { background:var(--accent-soft); border-radius:12px; box-shadow:none; }
-.settings-panels { min-width:0; }
-.settings-panels .tabs__panel { padding:0; margin:0; }
-.settings-panel { display:flex; flex-direction:column; gap:16px; min-width:0; }
-.settings-group.card { padding:20px; border:1px solid var(--border); border-radius:16px; gap:8px; background:var(--surface); box-shadow:0 2px 10px color-mix(in oklch,var(--accent) 4%,transparent); min-width:0; }
+.settings-panels { width:100%; min-width:0; }
+.settings-panels .tabs__panel { width:100%; padding:0; margin:0; }
+.settings-panel { display:flex; flex-direction:column; gap:16px; width:100%; min-width:0; }
+.settings-group.card { width:100%; padding:20px; border:1px solid var(--border); border-radius:16px; gap:8px; background:var(--surface); box-shadow:0 2px 10px color-mix(in oklch,var(--accent) 4%,transparent); min-width:0; }
 .settings-group .card__header { padding:0; }
 .settings-group .card__title { font-size:20px; font-weight:650; line-height:1.4; }
 .settings-group .card__content { padding:0; min-width:0; }
@@ -33,13 +33,15 @@
 .settings-row__label .label { font-size:14px; font-weight:500; color:var(--foreground); }
 .settings-row__label .description { font-size:12px; color:var(--muted); }
 .settings-row__control { display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px; min-width:0; }
-.settings-row__control > .select, .settings-row__control > .text-field, .settings-row__control > .input-group, .settings-row__control > .meter { width:100%; min-width:0; }
+.settings-row__control > .settings-control-field, .settings-row__control > .number-field { width:var(--settings-control-width); min-width:0; max-width:none; flex:0 0 var(--settings-control-width); }
+.settings-row__control > .meter { width:100%; min-width:0; }
 /* The data-folder path is a fixed path, not a field to type into, so it takes only as much room as
    the longest path needs to look complete. Matching the selector above keeps the `width:100%` from
    pushing the browse button onto its own line, and `:has()` keeps that row from wrapping at all. */
-.settings-row__control > .settings-path-input { width: 320px; flex: none; }
+.settings-row__control > .settings-path-input { width:var(--settings-control-width); flex:0 0 var(--settings-control-width); }
 .settings-row__control:has(.settings-path-input) { flex-wrap: nowrap; }
 .settings-row__control .select__trigger { width:100%; border-radius:10px; min-width:0; min-height:36px; }
+.select__popover.settings-select-popover { max-height:250px !important; overflow-y:auto !important; }
 .settings-row__control .button { border-radius:10px; }
 /* Colour, radius and height come from .nola-segmented in theme/app.css; this only controls width. */
 .settings-row__control .nola-segmented { width:100%; }
@@ -142,12 +144,10 @@
 .runtime-panels { display: flex; flex-direction: column; gap: var(--space-2); }
 .runtime-panel { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); }
 .runtime-panel-heading { padding: var(--space-2) var(--space-3); width: 100%; scroll-margin-top: var(--space-3); }
-.runtime-panel-heading > span { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); text-align: left; }
+.runtime-panel-heading__title { display: flex; min-width: 0; text-align: left; }
 .runtime-panel-heading strong { font: var(--nola-text-title); }
-.runtime-panel-heading small { font: var(--nola-text-caption); color: var(--muted); }
 .runtime-panel-body { padding: var(--space-2) var(--space-3); border-top: 1px solid var(--separator); display: flex; flex-direction: column; gap: var(--space-2); }
 .runtime-component-status { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; overflow-wrap: anywhere; text-align: right; }
-.runtime-component-status small { color: var(--success); }
 .runtime-actions, .runtime-progress { display: flex; justify-content: flex-end; align-items: center; gap: var(--space-2); }
 .runtime-progress { justify-content: space-between; }
 .runtime-progress-copy { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); overflow-wrap: anywhere; }

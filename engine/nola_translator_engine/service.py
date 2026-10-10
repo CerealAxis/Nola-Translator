@@ -56,6 +56,7 @@ class EngineService:
                     capabilities=[
                         "devices", "captions", "translation", "resources", "pause", "hubInspect", "browserAudio",
                         "prewarmModels",
+                        "releaseModels",
                     ],
                 )
             ]

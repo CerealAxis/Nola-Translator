@@ -58,6 +58,12 @@ export type EngineChannelEvent = EngineEvent | EngineLifecycleEvent
 export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'translation' | 'torch' | 'llama'
 
 export type NolaTranslatorApi = {
+  isWindows: boolean
+  minimizeMainWindow(): Promise<void>
+  toggleMainWindowMaximize(): Promise<boolean>
+  isMainWindowMaximized(): Promise<boolean>
+  closeMainWindow(): Promise<void>
+  onMainWindowMaximizedChanged(listener: (maximized: boolean) => void): () => void
   openRuntimeSettings(component: 'engine' | 'llama'): Promise<void>
   browserConnection?(action: BrowserConnectionAction, enabled?: boolean, browser?: BrowserKind): Promise<BrowserConnectionStatus>
   listDevices(): Promise<AudioDevice[]>
@@ -91,8 +97,8 @@ export type NolaTranslatorApi = {
   startSession(config: SessionConfig): Promise<SessionStartResult>
   /**
    * Loads the configured recognition and translation weights and answers when they are resident,
-   * which is what "enable captions" means. It takes no session slot: `ensureEngineReady` only
-   * starts the engine process, and a browser session opened afterwards reuses these weights.
+   * which is what "enable captions" means. Preparation reserves the models without opening
+   * an audio session; a browser session opened afterwards reuses these weights.
    * A refusal arrives as `state: 'failed'` with the engine's own `code`, never as a thrown error,
    * so the UI can tell a missing model from a language the model does not cover.
    */

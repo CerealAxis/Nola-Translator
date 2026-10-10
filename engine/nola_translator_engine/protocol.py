@@ -81,7 +81,9 @@ class NetworkSettings(ProtocolModel):
 
     useHuggingFaceMirror: bool = True
     #: pip's default index only; the PyTorch ``--extra-index-url`` is never mirrored.
-    usePypiMirror: bool = False
+    usePypiMirror: bool = True
+    #: Whether ``githubAccelerateUrl`` is applied to GitHub asset URLs at all.
+    useGithubAccelerate: bool = True
     #: Prefixed onto a GitHub release asset URL as ``prefix + url``; empty leaves the URL alone.
     githubAccelerateUrl: str = Field(default="", max_length=2048)
     #: Empty means no proxy, whatever the three scope switches below say.
@@ -155,7 +157,7 @@ class StartSessionCommand(Envelope):
 
 
 class PrewarmModelsCommand(Envelope):
-    """Load the recognition weights now so the next session starts without the model load.
+    """Load all selected local models without running inference or capturing audio.
 
     No audio source travels with it: nothing is captured, nothing is recorded, and the result
     outlives the session that later uses it.
@@ -163,6 +165,10 @@ class PrewarmModelsCommand(Envelope):
 
     type: Literal["prewarmModels"]
     config: PrewarmConfig
+
+
+class ReleaseModelsCommand(Envelope):
+    type: Literal["releaseModels"]
 
 
 class StopSessionCommand(Envelope):
@@ -309,6 +315,7 @@ EngineCommand = Annotated[
         StopSessionCommand,
         SetSessionPausedCommand,
         PrewarmModelsCommand,
+        ReleaseModelsCommand,
         PushAudioCommand,
         ResetStreamCommand,
         FinishStreamCommand,
@@ -381,12 +388,17 @@ class ModelsPrewarmedEvent(Envelope):
     # that a client waiting on the terminal event alone has nothing to show.
     state: Literal["loading", "ready"]
     recognitionModelId: str = Field(min_length=1, max_length=256)
-    # The translation model the request resolved and validated. Its weights are not loaded by a
-    # prewarm, so this reports intent rather than residency.
+    # A selected local translation model is also resident when the service reports ready.
     translationModelId: str | None = Field(default=None, min_length=1, max_length=256)
     elapsedMs: float = Field(default=0.0, ge=0, allow_inf_nan=False)
     device: str | None = Field(default=None, max_length=128)
     runtime: str | None = Field(default=None, max_length=256)
+
+
+class ModelsReleasedEvent(Envelope):
+    type: Literal["modelsReleased"]
+    # A cancelled native job keeps the reservation until its background cleanup finishes.
+    deferred: bool = False
 
 
 class AudioAcceptedEvent(Envelope):
@@ -580,6 +592,7 @@ EngineEvent = Annotated[
         SessionStartedEvent,
         SessionStoppedEvent,
         ModelsPrewarmedEvent,
+        ModelsReleasedEvent,
         AudioAcceptedEvent,
         StreamResetEvent,
         StreamFinishedEvent,

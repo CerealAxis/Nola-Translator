@@ -11,22 +11,21 @@ import { SettingsRow } from '../SettingsRow'
  * attribute as well as persisting the flag.
  */
 
-import { useCallback, useEffect, useState } from 'react'
-import { Button, Input, TextField, ToggleButton, ToggleButtonGroup } from '@heroui/react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Button, Input, TextField, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
 
 import { useNolaTheme } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import type { UiLanguage } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
+import { GITHUB_PROXY_AUTO, GITHUB_PROXY_NODES, findGithubProxyNode } from '../../../../shared/github-proxies'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 
 export function GeneralTab({ settings }: SettingsPanelProps) {
   const { t, language, setLanguage } = useI18n()
   const reduceMotion = settings.appearance?.reduceMotion ?? false
-  const appUpdate = useStore(stores.settings, (state) => state.appUpdate)
   const appUpdateChecking = useStore(stores.settings, (state) => state.appUpdateChecking)
-  const appUpdateError = useStore(stores.settings, (state) => state.appUpdateError)
 
   useEffect(() => {
     document.documentElement.dataset.reduceMotion = reduceMotion ? 'true' : 'false'
@@ -73,28 +72,26 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
       </SettingGroup>
 
       <SettingGroup legend={t('appUpdate.group')}>
-        <SettingsRow label={t('appUpdate.versionCheck')} desc={t('appUpdate.versionCheckHint')}>
+        <SettingsRow label={t('appUpdate.versionCheck')}>
           <Button
             variant="tertiary"
             size="sm"
             isPending={appUpdateChecking}
-            onPress={() => { void actions.settings.checkForAppUpdate(true) }}
+            onPress={() => {
+              void actions.settings.checkForAppUpdate(true).then((result) => {
+                if (!result || result.latestVersion === null) {
+                  toast.danger(t('appUpdate.checkFailed'))
+                  return
+                }
+                toast.success(t(result.updateAvailable ? 'appUpdate.availableStatus' : 'appUpdate.upToDateStatus', {
+                  version: result.latestVersion,
+                }))
+              })
+            }}
           >
             {t('appUpdate.checkNow')}
           </Button>
         </SettingsRow>
-        {appUpdate ? <SettingsRow label={t('appUpdate.currentVersion', { version: appUpdate.currentVersion })}>
-          <span className="nola-caption text-muted">
-            {appUpdate.latestVersion === null
-              ? t('appUpdate.checkFailed')
-              : appUpdate.updateAvailable
-                ? t('appUpdate.availableStatus', { version: appUpdate.latestVersion })
-                : t('appUpdate.upToDateStatus', { version: appUpdate.latestVersion })}
-          </span>
-        </SettingsRow> : null}
-        {appUpdateError && !appUpdate ? <SettingsRow label={t('appUpdate.versionCheck')}>
-          <span className="nola-caption text-danger">{t('appUpdate.checkFailed')}</span>
-        </SettingsRow> : null}
       </SettingGroup>
 
       <NetworkGroup settings={settings} />
@@ -146,6 +143,11 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
   const { t } = useI18n()
   const network = settings.network
   const proxyConfigured = network.proxyUrl.trim() !== ''
+
+  const nodeOptions = useMemo<PickerOption[]>(() => [
+    { value: GITHUB_PROXY_AUTO, label: t('settings.githubAccelerateAuto') },
+    ...GITHUB_PROXY_NODES.map((node) => ({ value: node, label: githubNodeLabel(node) })),
+  ], [t])
 
   return (
     <SettingGroup legend={t('settings.groupNetwork')}>
@@ -205,16 +207,47 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
           }}
         />
       </SettingsRow>
-      <NetworkTextRow
-        label={t('settings.githubAccelerate')}
-        desc={t('settings.githubAccelerateHint')}
-        value={network.githubAccelerateUrl}
-        onCommit={(githubAccelerateUrl) => {
-          void updateSettings({ network: { githubAccelerateUrl } }).catch(() => undefined)
-        }}
-      />
+      <SettingsRow label={t('settings.githubAccelerate')} desc={t('settings.githubAccelerateHint')} descriptionTooltip>
+        <SettingSwitch
+          isSelected={network.useGithubAccelerate}
+          ariaLabel={t('settings.githubAccelerate')}
+          onChange={(useGithubAccelerate) => {
+            // An address left empty by a settings file predating the toggle means the accelerator is on
+            // while the download path has no prefix to apply, so turning it on is where it gets seeded.
+            // Turning it off writes the flag alone, which leaves a node chosen earlier in place.
+            void updateSettings({
+              network: {
+                useGithubAccelerate,
+                ...(useGithubAccelerate && network.githubAccelerateUrl.trim() === ''
+                  ? { githubAccelerateUrl: GITHUB_PROXY_AUTO }
+                  : {}),
+              },
+            }).catch(() => undefined)
+          }}
+        />
+      </SettingsRow>
+      <SettingsRow label={t('settings.githubAccelerateNode')} desc={t('settings.githubAccelerateNodeHint')} descriptionTooltip>
+        <SettingSelect
+          value={findGithubProxyNode(network.githubAccelerateUrl) ?? GITHUB_PROXY_AUTO}
+          options={nodeOptions}
+          isDisabled={!network.useGithubAccelerate}
+          ariaLabel={t('settings.githubAccelerateNode')}
+          onChange={(githubAccelerateUrl) => {
+            void updateSettings({ network: { githubAccelerateUrl, useGithubAccelerate: true } }).catch(() => undefined)
+          }}
+        />
+      </SettingsRow>
     </SettingGroup>
   )
+}
+
+/**
+ * A node is stored as the URL that gets concatenated onto an asset URL, but 115 rows sharing one
+ * `https://` prefix are unreadable, so the picker shows the host alone. An entry the strip cannot
+ * reduce falls back to the full URL, which is still a row the user can pick from and recognise.
+ */
+function githubNodeLabel(node: string): string {
+  return node.replace(/^https?:\/\//, '').replace(/\/+$/, '') || node
 }
 
 /**
@@ -242,7 +275,7 @@ function NetworkTextRow({ label, desc, value, onCommit }: {
         onChange={setDraft}
         onFocus={() => { setDraft(value); setFocused(true) }}
         onBlur={commit}
-        className="w-[200px]"
+        className="settings-control-field"
       >
         <Input className="rounded-[8px]" aria-label={label} />
       </TextField>

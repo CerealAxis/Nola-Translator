@@ -115,6 +115,7 @@ async def test_start_gpu_becomes_ready_with_cuda_device(tmp_path) -> None:
     assert args[args.index("--host") + 1] == "127.0.0.1"
     assert args[args.index("-ngl") + 1] == "auto"
     assert "--jinja" in args
+    assert "--no-warmup" in args
     assert args[args.index("-c") + 1] == "2048"
     assert args[args.index("-np") + 1] == "1"
     assert args[args.index("-b") + 1] == "128"
@@ -337,6 +338,20 @@ async def test_missing_exe_raises_with_path_context(tmp_path) -> None:
     assert "llama-server.exe" in str(info.value)
     assert str(llama_dir) in str(info.value)
     assert popen.calls == []
+
+
+async def test_inventory_memory_changes_do_not_restart_resident_server(tmp_path) -> None:
+    from dataclasses import replace
+    from nola_translator_engine.compute import ComputeDevice, ComputeOptions
+
+    popen = FakePopen()
+    manager, _, _ = make_manager(tmp_path, popen, health=scripted_health([200]))
+    device = ComputeDevice('gpu', 'GPU', 'cuda', llamaDevice='CUDA0', freeMemoryMb=8000)
+    manager.configure_compute(device, ComputeOptions())
+    await manager.start()
+    manager.configure_compute(replace(device, freeMemoryMb=3000, score=500), ComputeOptions())
+    await manager.start()
+    assert len(popen.calls) == 1
 
 
 async def _noop_sleep(seconds: float) -> None:

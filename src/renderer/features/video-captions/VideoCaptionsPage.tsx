@@ -155,7 +155,7 @@ export function VideoCaptionsPage() {
     <div className="nola-overlay-page">
       <PageHeader className="nola-page-heading" title={t('videoCaptions.title')}
         actions={<Button onPress={() => void openBrowser()} isPending={opening}><AppWindow aria-hidden="true" />{t('videoCaptions.openBrowser')}</Button>} />
-      <Alert status="warning" className="mb-5">
+      <Alert status="warning">
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Title className="nola-body-strong">{t('videoCaptions.experimentalTitle')}</Alert.Title>
@@ -173,12 +173,11 @@ export function VideoCaptionsPage() {
           <Card.Title className="text-lg font-semibold">{t('videoCaptions.captionPreview')}</Card.Title>
         </Card.Header>
         {/*
-         * A video frame rather than a caption window: dark ground, the block sitting
-         * near the bottom edge the way an in-player overlay does, and the font size the
-         * extension would actually paint. Sample text stands in for a live segment
-         * because this page never holds a session.
+         * A compact, theme-matched stage with the configured caption block anchored
+         * at its saved position. Sample text stands in for a live segment because
+         * this page never holds a session.
          */}
-        <Card.Content className="nola-video-stage">
+        <Card.Content className="nola-overlay-stage nola-video-stage">
           <div className="nola-video-frame" style={frameStyle} aria-hidden="true">
             {showSource ? <p className="nola-video-caption-line">{t('videoCaptions.previewSource')}</p> : null}
             {showTranslation ? <p className="nola-video-caption-line" data-role="translation">{t('videoCaptions.previewTranslation')}</p> : null}
@@ -268,7 +267,7 @@ export function VideoCaptionsPage() {
           </div>
         </Card.Content>
         <Card.Footer className="nola-overlay-footer">
-          <Button variant="ghost" onPress={() => navigate(settingsPath('browser'))}><Settings aria-hidden="true" />{t('videoCaptions.browserAppearance')}<ArrowRight aria-hidden="true" /></Button>
+          <Button variant="ghost" onPress={() => navigate(settingsPath('browser'))}><Settings aria-hidden="true" />{t('videoCaptions.browserSettings')}<ArrowRight aria-hidden="true" /></Button>
         </Card.Footer>
       </Card>
       <div className="nola-video-service">

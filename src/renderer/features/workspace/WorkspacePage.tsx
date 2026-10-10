@@ -282,7 +282,7 @@ export function WorkspacePage() {
   const targetLanguage = currentConfig ? currentConfig.targetLanguages[0] ?? NO_TRANSLATION_LANGUAGE : settings?.translation.targetLanguage ?? 'zh'
   const audioSource = currentConfig?.audioSource.kind === 'defaultOutput' ? 'defaultOutput' : currentConfig && 'deviceId' in currentConfig.audioSource ? currentConfig.audioSource.deviceId : settings?.recognition.audioSource ?? 'defaultOutput'
   const audioLabel = audioSource === 'defaultOutput' ? t('workspaceUi.systemAudio') : devices.find((device) => device.deviceId === audioSource)?.name ?? audioSource
-  const timer = <SessionBar status={status} elapsedMs={session.elapsedMs} audioLabel={audioLabel} showControls={active} onPause={() => actions.session.pauseSession()} onResume={() => actions.session.resumeSession()} onStop={() => setStopConfirmOpen(true)} />
+  const timer = <SessionBar status={status} elapsedMs={session.elapsedMs} audioLabel={audioLabel} onPause={() => actions.session.pauseSession()} onResume={() => actions.session.resumeSession()} onStop={() => setStopConfirmOpen(true)} />
 
   return (
     <div
@@ -397,7 +397,7 @@ export function WorkspacePage() {
         ) : null}
       </div>
 
-      {timer}
+      {active ? timer : null}
 
       <SessionSetupDialog
         isOpen={setupOpen && draft !== null}

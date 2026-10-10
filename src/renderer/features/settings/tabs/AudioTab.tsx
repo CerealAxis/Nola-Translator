@@ -67,7 +67,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
       <SettingGroup legend={t('settings.groupInput')}>
         <SettingsRow label={t('settings.audioSource')}>
           {deviceOptions.length === 0 ? (
-            <InputGroup className="w-[200px]">
+            <InputGroup className="settings-control-field">
               <InputGroup.Input readOnly value={t('errors.deviceNotFound')} aria-label={t('settings.audioSource')} />
             </InputGroup>
           ) : (

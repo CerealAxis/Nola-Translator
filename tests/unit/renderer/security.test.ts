@@ -21,6 +21,10 @@ describe('renderer content security policy', () => {
     expect(html).toContain("form-action 'none'")
   })
 
+  it('allows playback from the isolated meeting audio scheme', () => {
+    expect(html).toContain("media-src 'self' nola-audio:")
+  })
+
   it('keeps dev HMR reachable on localhost', () => {
     // electron-vite's dev HMR socket connects to `localhost`, not `127.0.0.1`, and a CSP
     // that misses it kills hot reload silently: no error, no red screen, just no refresh.

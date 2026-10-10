@@ -52,11 +52,13 @@ export function createMainWindowOptions(
     backgroundColor: theme === 'light' || theme === 'dark' ? SURFACE[theme] : '#00000000',
     backgroundMaterial: 'mica',
     titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#00000000',
-      symbolColor: '#1f1f1f',
-      height: 48
-    },
+    ...(process.platform === 'win32' ? {} : {
+      titleBarOverlay: {
+        color: '#00000000',
+        symbolColor: '#1f1f1f',
+        height: 48
+      }
+    }),
     webPreferences: {
       preload,
       contextIsolation: true,

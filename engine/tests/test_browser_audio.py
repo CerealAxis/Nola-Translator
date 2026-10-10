@@ -14,6 +14,7 @@ from nola_translator_engine.audio.capture import BrowserAudioCapture
 from nola_translator_engine.protocol import (
     BrowserTimeline, PushAudioCommand, ResetStreamCommand, SessionConfig,
     ManageResourceCommand,
+    ReleaseModelsCommand,
     FinishStreamCommand,
     SetSessionPausedCommand, StartSessionCommand, StopSessionCommand,
     parse_command_line, parse_event_line, serialize_event,
@@ -296,6 +297,7 @@ class ThreadLockedModel:
         self.started = threading.Event()
         self.release = threading.Event()
         self.unload_started = threading.Event()
+        self.idle_started = threading.Event()
 
     def describe(self):
         return "loaded" if self.loaded else "unloaded"
@@ -310,6 +312,11 @@ class ThreadLockedModel:
         self.unload_started.set()
         with self.lock:
             self.loaded = False
+
+    def wait_idle(self):
+        self.idle_started.set()
+        with self.lock:
+            pass
 
 
 async def locked_runtime(tmp_path, monkeypatch):
@@ -344,7 +351,7 @@ async def test_stop_replies_while_real_streaming_inference_lock_is_held(tmp_path
         assert runtime.capture is None and runtime.recognizer is None
         assert runtime.service.session_id is None
         assert model.loaded and not model.release.is_set()
-        assert await asyncio.to_thread(model.unload_started.wait, 1)
+        assert await asyncio.to_thread(model.idle_started.wait, 1)
         busy = (await runtime.handle(start))[0]
         assert busy.code == "resourceBusy" and busy.details["reason"] == "modelCleanupPending"
         remove = ManageResourceCommand(protocolVersion=1, type="manageResource", requestId="remove",
@@ -352,9 +359,25 @@ async def test_stop_replies_while_real_streaming_inference_lock_is_held(tmp_path
         assert (await runtime.handle(remove))[0].code == "resourceBusy"
         model.release.set()
         await asyncio.wait_for(runtime._model_cleanup_task, 1)
-        assert not model.loaded
+        assert model.loaded and not model.unload_started.is_set()
         assert not [event for event in emitted if event.type == "caption"]
         assert (await runtime.handle(start))[0].type == "sessionStarted"
+    finally:
+        model.release.set()
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_release_models_defers_unload_until_cancelled_native_job_finishes(tmp_path, monkeypatch):
+    runtime, _, model, session_id, _ = await locked_runtime(tmp_path, monkeypatch)
+    try:
+        await runtime.handle(StopSessionCommand(protocolVersion=1, type='stopSession', requestId='stop', sessionId=session_id))
+        result = await runtime.handle(ReleaseModelsCommand(protocolVersion=1, type='releaseModels', requestId='release'))
+        assert result[0].type == 'modelsReleased' and result[0].deferred
+        assert model.loaded and runtime._model_cleanup_pending()
+        model.release.set()
+        await asyncio.wait_for(runtime._model_cleanup_task, 1)
+        assert not model.loaded
     finally:
         model.release.set()
         await runtime.close()

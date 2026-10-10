@@ -46,13 +46,11 @@ export interface SessionBarProps {
   onPause: () => void
   onResume: () => void
   onStop: () => void
-  /** No session yet: the timer stays and the controls are hidden. */
-  showControls?: boolean
   className?: string
   audioLabel?: string
 }
 
-export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, showControls = true, className, audioLabel }: SessionBarProps) {
+export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, className, audioLabel }: SessionBarProps) {
   const { t } = useI18n()
   const running = status === 'running'
   const paused = status === 'paused'
@@ -89,54 +87,52 @@ export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, showC
 
       <div className="nola-workspace-bar-spacer" />
 
-      {showControls ? (
-        <div className="flex shrink-0 items-center gap-2">
-          {paused ? (
-            <Tooltip delay={1500}>
-              <Button variant="outline" size="sm" className="rounded-xl" onPress={onResume} isDisabled={busy}>
-                <Play aria-hidden="true" />
-                {t('workspace.resume')}
-              </Button>
-              <Tooltip.Content>
-                <p className="nola-caption">{t('workspace.resume')}</p>
-              </Tooltip.Content>
-            </Tooltip>
-          ) : (
-            <Tooltip delay={1500}>
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-xl"
-                onPress={onPause}
-                isDisabled={!running || busy}
-              >
-                <Pause aria-hidden="true" />
-                {t('workspace.pause')}
-              </Button>
-              <Tooltip.Content>
-                <p className="nola-caption">{t('workspace.pause')}</p>
-              </Tooltip.Content>
-            </Tooltip>
-          )}
-
+      <div className="flex shrink-0 items-center gap-2">
+        {paused ? (
           <Tooltip delay={1500}>
-            <Button
-              variant="danger-soft"
-              size="sm"
-              className="rounded-xl"
-              onPress={onStop}
-              isDisabled={busy}
-              isPending={status === 'stopping'}
-            >
-              <CircleStop aria-hidden="true" />
-              {status === 'stopping' ? t('workspace.stopping') : t('workspace.stop')}
+            <Button variant="outline" size="sm" className="rounded-xl" onPress={onResume} isDisabled={busy}>
+              <Play aria-hidden="true" />
+              {t('workspace.resume')}
             </Button>
             <Tooltip.Content>
-              <p className="nola-caption">{t('workspace.endConfirm')}</p>
+              <p className="nola-caption">{t('workspace.resume')}</p>
             </Tooltip.Content>
           </Tooltip>
-        </div>
-      ) : null}
+        ) : (
+          <Tooltip delay={1500}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              onPress={onPause}
+              isDisabled={!running || busy}
+            >
+              <Pause aria-hidden="true" />
+              {t('workspace.pause')}
+            </Button>
+            <Tooltip.Content>
+              <p className="nola-caption">{t('workspace.pause')}</p>
+            </Tooltip.Content>
+          </Tooltip>
+        )}
+
+        <Tooltip delay={1500}>
+          <Button
+            variant="danger-soft"
+            size="sm"
+            className="rounded-xl"
+            onPress={onStop}
+            isDisabled={busy}
+            isPending={status === 'stopping'}
+          >
+            <CircleStop aria-hidden="true" />
+            {status === 'stopping' ? t('workspace.stopping') : t('workspace.stop')}
+          </Button>
+          <Tooltip.Content>
+            <p className="nola-caption">{t('workspace.endConfirm')}</p>
+          </Tooltip.Content>
+        </Tooltip>
+      </div>
     </footer>
   )
 }

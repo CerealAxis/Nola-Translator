@@ -1,4 +1,4 @@
-"""Multi-target translation, revision invalidation, timeouts, and a session-scoped LRU cache."""
+"""Multi-target translation, bounded concurrency, timeouts, and a session-scoped LRU cache."""
 
 from __future__ import annotations
 
@@ -30,7 +30,8 @@ class TranslationScheduler:
         self.cache: OrderedDict[tuple[str, str, str, str], ProviderTranslation] = OrderedDict()
         self.current_revision: OrderedDict[str, int] = OrderedDict()
         self.active_segments: dict[str, int] = {}
-        self.semaphore = asyncio.Semaphore(max(1, max_concurrency))
+        self.max_concurrency = max(1, max_concurrency)
+        self.semaphore = asyncio.Semaphore(self.max_concurrency)
         self.inflight: dict[tuple[str, str, str, str], asyncio.Task[ScheduledTranslation]] = {}
         self.listeners: dict[tuple[str, str, str, str], set[Callable[[ScheduledTranslation], None]]] = {}
 
@@ -44,20 +45,17 @@ class TranslationScheduler:
         on_result: Callable[[ScheduledTranslation], None] | None = None,
     ) -> list[ScheduledTranslation]:
         current = self.current_revision.get(segment_id, -1)
-        if revision < current:
-            return []
-        self.current_revision[segment_id] = revision
+        self.current_revision[segment_id] = max(current, revision)
         self.current_revision.move_to_end(segment_id)
         self.active_segments[segment_id] = self.active_segments.get(segment_id, 0) + 1
         def notify(result: ScheduledTranslation) -> None:
-            if on_result is not None and self.current_revision.get(segment_id) == revision:
+            # Runtime owns per-target revision arbitration so concurrent snapshots can stream.
+            if on_result is not None:
                 on_result(result)
         try:
             results = await asyncio.gather(
                 *(self._translate_one(text, source, target, notify) for target in targets)
             )
-            if self.current_revision.get(segment_id) != revision:
-                return []
             return list(results)
         finally:
             self.active_segments[segment_id] -= 1

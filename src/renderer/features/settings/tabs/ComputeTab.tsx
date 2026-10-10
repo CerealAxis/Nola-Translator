@@ -71,14 +71,14 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
     {error || computeError ? <Alert status="danger"><Alert.Content><Alert.Description>{error || computeError}</Alert.Description></Alert.Content></Alert> : null}
     <SettingGroup legend={t('runtime.engines')}>
       <SettingsRow label={t('runtime.recognitionEngine')}><SettingSelect value={compute.recognitionEngine} options={engineOptions} ariaLabel={t('compute.recognition')} onChange={value => save({ recognitionEngine: value as 'pytorch' | 'llama', recognitionDevice: 'auto' })} /></SettingsRow>
-      <SettingsRow label={t('runtime.translationEngine')}><SettingSelect value={useTorch ? 'pytorch' : 'llama'} options={engineOptions} ariaLabel={t('compute.translation')} isDisabled={settings.translation.provider !== 'local'} onChange={value => save({ translationEngine: value as 'pytorch' | 'llama', translationDevice: 'auto' })} /></SettingsRow>
+      <SettingsRow label={t('runtime.translationEngine')}><SettingSelect value={useTorch ? 'pytorch' : 'llama'} options={engineOptions} ariaLabel={t('compute.translation')} onChange={value => save({ translationEngine: value as 'pytorch' | 'llama', translationDevice: 'auto' })} /></SettingsRow>
     </SettingGroup>
     <SettingGroup legend={t('compute.hardware')} >
       {runtimes?.hardware.adapters.map(d => <SettingsRow key={d.hardwareId} label={d.name} descriptionTooltip desc={`${d.vendor.toUpperCase()} · ${d.driver}`}><span>{d.vendor.toUpperCase()}</span></SettingsRow>)}
     </SettingGroup>
     <SettingGroup legend={t('compute.devices')} actions={<Button variant="secondary" size="sm" isDisabled={loading} onPress={() => void refresh()}>{loading ? <Spinner size="sm" /> : <RefreshCw size={16} aria-hidden="true" />}{t('compute.refresh')}</Button>}>
       <SettingsRow label={t('compute.recognition')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={compute.recognitionDevice} options={options('recognition')} ariaLabel={t('compute.recognition')} onChange={recognitionDevice => save({ recognitionDevice })} /></SettingsRow>
-      <SettingsRow label={t('compute.translation')} descriptionTooltip desc={settings.translation.provider === 'local' ? t('compute.assignmentHint') : t('compute.network')}><SettingSelect value={compute.translationDevice} options={options('translation')} ariaLabel={t('compute.translation')} isDisabled={settings.translation.provider !== 'local'} onChange={translationDevice => save({ translationDevice })} /></SettingsRow>
+      <SettingsRow label={t('compute.translation')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={compute.translationDevice} options={options('translation')} ariaLabel={t('compute.translation')} onChange={translationDevice => save({ translationDevice })} /></SettingsRow>
       <SettingsRow label={t('compute.fallback')} descriptionTooltip desc={t('compute.fallbackHint')}><SettingSwitch isSelected={compute.allowCpuFallback} ariaLabel={t('compute.fallback')} onChange={allowCpuFallback => save({ allowCpuFallback })} /></SettingsRow>
     </SettingGroup>
     <SettingGroup legend={t('compute.detected')}>

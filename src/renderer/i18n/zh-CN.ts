@@ -42,7 +42,7 @@ export const zhCN = {
     name: 'Nola Translator',
   },
   appUpdate: {
-    group: '软件更新', versionCheck: '版本检查', versionCheckHint: '从 GitHub 获取当前版本和最新稳定版信息。',
+    group: '软件更新', versionCheck: '版本检查',
     checkNow: '检查更新', availableStatus: '发现新版本 {version}', upToDateStatus: '已是最新版本 {version}',
     checkFailed: '暂时无法从 GitHub 获取版本信息，请稍后重试。',
     title: '发现新版本', version: '最新版本 {version}', currentVersion: '当前版本 {version}',
@@ -71,6 +71,10 @@ export const zhCN = {
     themeToLight: '切换到浅色',
     themeToDark: '切换到深色',
     helpMenu: '帮助菜单',
+    minimizeWindow: '最小化窗口',
+    maximizeWindow: '最大化窗口',
+    restoreWindow: '还原窗口',
+    closeWindow: '关闭窗口',
   },
 
   language: {
@@ -166,7 +170,7 @@ export const zhCN = {
     audioSource: '输入声源',
     tabAudio: '标签页声音',
     systemAudio: '系统音频',
-    browserAppearance: '浏览器字幕外观设置',
+    browserSettings: '浏览器拓展设置',
     enableService: '开启字幕服务',
     disableService: '关闭字幕服务',
     serviceLoading: '正在加载模型',
@@ -260,6 +264,7 @@ export const zhCN = {
     audioUnavailable: '这场同传的录音没有保存',
     playerPlay: '播放',
     playerPause: '暂停',
+    playerError: '录音无法播放，请检查录音文件后重试。',
   },
 
   notes: {
@@ -367,8 +372,8 @@ export const zhCN = {
     groupLanguage: '语言',
     /*
      * 网络这一组按「谁负责加速哪一段下载」拆开：代理是一次性的通道，两个镜像各管一个上游，
-     * GitHub 前缀只补镜像覆盖不到的组件下载。地址与前缀留空都等于关闭，所以下面三条代理开关
-     * 在地址为空时是禁用状态。
+     * GitHub 节点只补镜像覆盖不到的组件下载。代理地址留空等于关闭，所以下面三条代理开关在地址
+     * 为空时是禁用状态；GitHub 加速有自己的开关，节点是否为空不再表示开关状态。
      */
     groupNetwork: '网络设置',
     proxyUrl: '代理服务器地址',
@@ -381,7 +386,10 @@ export const zhCN = {
     huggingFaceMirror: 'Huggingface 国内镜像',
     huggingFaceMirrorHint: '通过国内镜像下载 Huggingface 模型',
     githubAccelerate: 'GitHub 加速',
-    githubAccelerateHint: '未镜像的组件下载加速；留空表示不加速，填写后拼在下载地址前，例如 https://ghfast.top',
+    githubAccelerateHint: '给镜像覆盖不到的组件下载换一个中转地址，主要是 GitHub 上的 PyTorch 与 llama.cpp 安装包',
+    githubAccelerateNode: '加速节点',
+    githubAccelerateNodeHint: '自动选择会先测速，再用响应最快的节点；某条线路不通或自动选的不够快时，换一条或切回自动选择',
+    githubAccelerateAuto: '自动选择',
     theme: '主题',
     reduceMotion: '减少动效',
     uiLanguage: '界面语言',
@@ -403,8 +411,8 @@ export const zhCN = {
     region: '区域',
     model: '模型',
     apiKey: 'API 密钥',
-    apiKeyPlaceholder: 'sk-...',
-    saveKey: '保存密钥',
+    apiKeyPlaceholder: '请输入 API KEY',
+    apiKeyHint: '直接输入密钥，离开输入框后自动保存。',
     deleteKey: '删除密钥',
     testing: '正在测试连接',
     /*
@@ -427,10 +435,10 @@ export const zhCN = {
     apiFormatChatResponses: 'Chat Responses (/v1/responses)',
     apiFormatAnthropic: 'Anthropic Messages (/v1/messages)',
     apiFormatOllama: 'Ollama (/api/chat)',
-    endpointHintChatCompletions: '填到 /v1 为止，例如 https://api.example.com/v1',
-    endpointHintChatResponses: '填到 /v1 为止；请求会发往 /v1/responses',
-    endpointHintAnthropic: '只填站点根地址，不要带 /v1 或 /v1/messages，例如 https://api.anthropic.com',
-    endpointHintOllama: '本机 Ollama 地址，例如 http://127.0.0.1:11434',
+    endpointHintChatCompletions: '包含 /v1，例如 https://api.example.com/v1',
+    endpointHintChatResponses: '包含 /v1；请求发往 /v1/responses',
+    endpointHintAnthropic: '只填站点根地址，例如 https://api.anthropic.com',
+    endpointHintOllama: '例如 http://127.0.0.1:11434',
     apiName: '名称',
     apiNamePlaceholder: '如：智谱 GLM',
     endpointPlaceholder: 'https://api.example.com/v1',

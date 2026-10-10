@@ -260,12 +260,7 @@ export function registerEngineIpc(
   // What "enable captions" means: the models are resident, so the browser side starts a session
   // against weights that are already in memory.
   loggedHandle(IPC_CHANNELS.prewarmModels, async () => {
-    const config = prewarmConfigFrom(getSettings())
-    const session = { ...config, audioSource: { kind: 'defaultOutput' as const }, recognitionMode: 'realtime' as const }
-    await prepareEnvironment(session)
-    config.compute = session.compute
-    await ensureReady()
-    return engine.prewarmModels(config)
+    return controller.prewarm(prewarmConfigFrom(getSettings()))
   })
 
   loggedHandle(IPC_CHANNELS.showOverlay, () => getOverlayWindow()?.show())

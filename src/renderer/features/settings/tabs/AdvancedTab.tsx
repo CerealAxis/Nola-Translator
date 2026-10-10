@@ -80,7 +80,7 @@ export function AdvancedTab(_props: SettingsPanelProps) {
           <CopyDiagnostics />
         </SettingsRow>
         <SettingsRow label={t('settings.openLogs')} desc={t('settings.openLogsHint')} descriptionTooltip>
-          <Button variant="secondary" onPress={() => { void openLogs() }}>{t('settings.openLogs')}</Button>
+          <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={() => { void openLogs() }}>{t('settings.openLogs')}</Button>
         </SettingsRow>
         {/*
           The main process `setWindowOpenHandler` hands `https:` targets to the shell and

@@ -3,6 +3,7 @@ import { dirname, isAbsolute } from 'node:path'
 import { computeSettingsSchema, DEFAULT_COMPUTE_SETTINGS } from '../shared/compute'
 
 import { DEFAULT_SETTINGS, RECOGNITION_MODEL_IDS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
+import { findGithubProxyNode, GITHUB_PROXY_AUTO } from '../shared/github-proxies'
 
 // Store-internal patches may also touch fields the IPC schema exposes only through their own channels.
 export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 1; browserConnection?: { enabled: boolean } }
@@ -107,6 +108,33 @@ function sanitizeTargetLanguage(value: unknown): string {
   return match ?? DEFAULT_SETTINGS.translation.targetLanguage
 }
 
+/**
+ * Moves the GitHub accelerator off the old free-text box, where a filled address meant acceleration
+ * was on and an empty one meant it was off, onto a node picker that has no room for a custom address.
+ * A value outside the catalog therefore has no entry to land on and becomes `auto`, which measures the
+ * catalog instead.
+ *
+ * An empty value stays the empty string rather than being rewritten to `auto`, because the next load
+ * reads an empty field as "off" again: filling it in would switch a user's disabled accelerator back
+ * on one launch later, so the migration has to leave it exactly as it found it.
+ *
+ * A file that already carries the toggle is not one of these older files, and its boolean is the
+ * newer answer: deriving the switch from the address alone would turn a user back on who had turned
+ * acceleration off while leaving a node selected.
+ */
+function migrateGithubAccelerate(raw: Partial<AppSettings['network']> | undefined): Partial<Pick<AppSettings['network'], 'useGithubAccelerate' | 'githubAccelerateUrl'>> {
+  const value = raw?.githubAccelerateUrl
+  if (typeof value !== 'string') return {}
+  const trimmed = value.trim()
+  // Normalizing here as well as in the older branch below keeps the stored address and the node the
+  // picker highlights the same one: the picker resolves anything outside the catalog to `auto`, so a
+  // value left unnormalized would sit behind a row that is not the address actually in use.
+  const node = trimmed ? findGithubProxyNode(trimmed) ?? GITHUB_PROXY_AUTO : ''
+  if (typeof raw?.useGithubAccelerate === 'boolean') return { githubAccelerateUrl: node }
+  if (!trimmed) return { useGithubAccelerate: false, githubAccelerateUrl: '' }
+  return { useGithubAccelerate: true, githubAccelerateUrl: node }
+}
+
 export class SettingsStore {
   private settings: AppSettings = structuredClone(DEFAULT_SETTINGS)
   private writeQueue: Promise<unknown> = Promise.resolve()
@@ -157,6 +185,9 @@ export class SettingsStore {
           ...(typeof raw.useHuggingFaceMirror === 'boolean' && typeof raw.network?.useHuggingFaceMirror !== 'boolean'
             ? { useHuggingFaceMirror: raw.useHuggingFaceMirror }
             : {}),
+          // A file that never carried the field leaves the spread above to the current default,
+          // which is on with `auto`; only a stored value decides the outcome for one that did.
+          ...migrateGithubAccelerate(raw.network),
         },
         recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}) },
         recording: { ...DEFAULT_SETTINGS.recording, ...(raw.recording ?? {}) },

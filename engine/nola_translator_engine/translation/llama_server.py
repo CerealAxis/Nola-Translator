@@ -113,6 +113,7 @@ class LlamaServerManager:
         self._process: Any | None = None
         self._port: int | None = None
         self._ready = False
+        self._inference_lock = threading.Lock()
         self._device: str | None = None
         self._compute = ComputeOptions()
         self._selected_device: ComputeDevice | None = None
@@ -122,7 +123,10 @@ class LlamaServerManager:
         self.fallback_reason: str | None = None
 
     def configure_compute(self, device: ComputeDevice, options: ComputeOptions) -> None:
-        if self._selected_device != device or self._compute != options:
+        # Free VRAM and probe scores change while weights are resident; only launch arguments
+        # can invalidate the server, not a fresh inventory of the same physical device.
+        identity = lambda item: None if item is None else (item.id, item.backend, item.llamaDevice, item.llamaDeviceNative)
+        if identity(self._selected_device) != identity(device) or self._compute != options:
             self._ready = False
         self._selected_device = device
         self._compute = options.model_copy(deep=True)
@@ -229,6 +233,8 @@ class LlamaServerManager:
                 "--fit-target", str(self._compute.reservedVramMb),
                 "--flash-attn", self._compute.flashAttention,
                 "--jinja",
+                # llama.cpp server README: skip its default empty inference run.
+                "--no-warmup",
             ]
             child_env = dict(os.environ)
             if ngl != 0 and self._selected_device and self._selected_device.backend == "openvino":
@@ -292,6 +298,15 @@ class LlamaServerManager:
         self, messages: list[dict], *, timeout_s: float = 10.0
     ) -> str:
         """POST /v1/chat/completions (temperature=0), returns the stripped translation."""
+        with self._inference_lock:
+            return self._chat_locked(messages, timeout_s=timeout_s)
+
+    def wait_idle(self) -> None:
+        """A cancelled HTTP worker can still be using the resident native server."""
+        with self._inference_lock:
+            pass
+
+    def _chat_locked(self, messages: list[dict], *, timeout_s: float) -> str:
         port = self._port
         if (
             not self._ready

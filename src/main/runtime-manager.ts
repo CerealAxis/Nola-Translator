@@ -14,6 +14,7 @@ import { probeHardware } from './hardware-inventory'
 import { PythonEnvironments } from './python-environments'
 import { localCandidates, missingLocalRuntime, probeLocalEngine, probeLocalLlama } from './local-runtimes'
 import { decodeDeviceIntent } from '../shared/device-selection'
+import { resolveGithubProxyNode } from './github-proxy-probe'
 
 const run = promisify(execFile)
 const catalogSchema = z.object({ version: z.literal(1), packages: z.array(runtimePackageSchema).max(32) })
@@ -138,6 +139,14 @@ export class RuntimeManager {
   }
   async prepare(compute: ComputeSettings, translation: 'torch' | 'llama' | 'none' = 'llama'): Promise<void> {
     if (this.operation || this.python?.operation) throw new Error('组件安装中，请等待完成')
+    if (this.checking) await this.checking
+    // Initialization and explicit rechecks validate the ABI; each caption start only verifies
+    // that those components still exist, avoiding another cold Python/Torch import.
+    const files = [this.pythonState.path, join(this.local.engine.path, 'torch', '__init__.py'),
+      ...(translation === 'llama' ? [join(this.local.llama.path, 'llama-server.exe')] : [])]
+    if (!(await Promise.all(files.map(path => path ? access(path).then(() => true, () => false) : false))).every(Boolean)) {
+      await this.recheck()
+    }
     for (const kind of ['engine', ...(translation === 'llama' ? ['llama'] as const : [])] as const) {
       const component = this.local[kind]
       if (component.status !== 'ready') throw new Error(`RUNTIME_${kind === 'engine' ? 'TORCH' : 'LLAMA'}: ${component.reason || (kind === 'engine' ? '尚未安装 PyTorch' : '尚未安装 llama.cpp')}；请前往设置 → 计算设备选择组合${component.managed ? '重新安装／修复' : '安装'}`)
@@ -280,7 +289,7 @@ export class RuntimeManager {
     await withSessionProxy(this.runtimeProxy(), () => this.transfer(item, path, offset, signal, progress))
   }
   private async transfer(item: Pick<RuntimePackage, 'url' | 'bytes'>, path: string, offset: number, signal: AbortSignal, progress: (bytes: number) => void): Promise<void> {
-    const response = await net.fetch(this.accelerated(item.url), { headers: offset ? { Range: `bytes=${offset}-` } : {}, signal })
+    const response = await net.fetch(await this.accelerated(item.url), { headers: offset ? { Range: `bytes=${offset}-` } : {}, signal })
     if (!response.ok || !response.body) throw new Error(`下载失败：HTTP ${response.status}`)
     if (response.status === 206) {
       const range = response.headers.get('content-range')
@@ -310,12 +319,19 @@ export class RuntimeManager {
     const network = this.options.network?.()
     return network?.proxyForRuntimeDownload ? network.proxyUrl.trim() : ''
   }
-  private accelerated(url: string): string {
-    const prefix = this.options.network?.().githubAccelerateUrl.trim() ?? ''
-    if (!prefix) return url
+  private async accelerated(url: string): Promise<string> {
     let host: string
     try { host = new URL(url).hostname.toLowerCase() } catch { return url }
     // An accelerator fronts GitHub only; download.pytorch.org wheels and the pip mirror keep their own address.
-    return GITHUB_ASSET_HOSTS.has(host) ? prefix + url : url
+    // The host decides before the node is resolved, so a wheel download never waits on a probe whose
+    // result would be discarded on the next line.
+    if (!GITHUB_ASSET_HOSTS.has(host)) return url
+    // Read per request so a node picked in settings, or a probe that measured a different one, reaches
+    // the next download without a restart.
+    const network = this.options.network?.()
+    if (!network?.useGithubAccelerate) return url
+    const prefix = await resolveGithubProxyNode(network.githubAccelerateUrl)
+    if (!prefix) return url
+    return prefix + url
   }
 }

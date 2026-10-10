@@ -43,6 +43,7 @@ const translationModelIdSchema = z.union([
 const networkSettingsSchema = z.object({
   useHuggingFaceMirror: z.boolean().optional(),
   usePypiMirror: z.boolean().optional(),
+  useGithubAccelerate: z.boolean().optional(),
   githubAccelerateUrl: z.string().max(2048).optional(),
   proxyUrl: z.string().max(2048).optional(),
   proxyForPip: z.boolean().optional(),
@@ -149,6 +150,7 @@ export const engineCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...envelope, type: z.literal('configureModel'), resourceId: z.string().min(1).max(256), configuration: modelConfigurationSchema }).strip(),
   z.object({ ...envelope, type: z.literal('startSession'), config: sessionConfigSchema }).strip(),
   z.object({ ...envelope, type: z.literal('prewarmModels'), config: prewarmConfigSchema }).strip(),
+  z.object({ ...envelope, type: z.literal('releaseModels') }).strip(),
   z.object({ ...envelope, type: z.literal('stopSession'), sessionId: z.string().min(1).max(128) }).strip(),
   z.object({ ...envelope, type: z.literal('pushAudio'), sessionId: z.string().min(1).max(128), streamId: z.string().min(1).max(128), epoch: z.number().int().nonnegative(), sequence: z.number().int().nonnegative(), sampleRate: z.number().int().min(8000).max(192000), capturedAtMs: z.number().nonnegative().finite(), pcmBase64: z.string().min(4).max(102400).regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/) }).strip(),
   z.object({ ...envelope, type: z.literal('resetStream'), sessionId: z.string().min(1).max(128), epoch: z.number().int().nonnegative(), videoTimeMs: z.number().nonnegative().finite(), playbackRate: z.number().positive().max(16) }).strip(),
@@ -314,6 +316,7 @@ export const engineEventSchema = z.discriminatedUnion('type', [
     runtime: z.string().max(256).optional(),
   }).strip(),
   z.object({ ...envelope, type: z.literal('sessionStopped'), sessionId: z.string().min(1).max(128) }).strip(),
+  z.object({ ...envelope, type: z.literal('modelsReleased'), deferred: z.boolean() }).strip(),
   z
     .object({
       ...envelope,

@@ -124,8 +124,13 @@ class M2M100Runtime:
             self._bundle = bundle
             self._loaded = True
 
+    def wait_idle(self) -> None:
+        """Wait out cancelled native translations before a session reuses the tokenizer."""
+        with self._inference_lock:
+            pass
+
     def unload(self) -> None:
-        """Wait for translation threads, then release the model instead of keeping it for the next session."""
+        """Wait for translation threads before releasing weights on a model switch or service close."""
         with self._inference_lock:
             with self._lock:
                 bundle = self._bundle

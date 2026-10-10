@@ -1,5 +1,6 @@
 import { LANGUAGE_CODES } from './languages'
 import { DEFAULT_COMPUTE_SETTINGS, type ComputeSettings } from './compute'
+import { GITHUB_PROXY_AUTO } from './github-proxies'
 
 export type OverlaySettings = {
   mode: 'free' | 'top' | 'bottom'
@@ -63,7 +64,12 @@ export type NetworkSettings = {
   useHuggingFaceMirror: boolean
   /** pip's default index only; the PyTorch `--extra-index-url` is never mirrored. */
   usePypiMirror: boolean
-  /** Prefixed onto a GitHub release asset URL (`prefix + url`); empty disables the rewrite. */
+  /** Whether `githubAccelerateUrl` is applied to GitHub asset URLs at all. */
+  useGithubAccelerate: boolean
+  /**
+   * Prefixed onto a GitHub release asset URL (`prefix + url`). Holds a `GITHUB_PROXY_NODES` entry or
+   * `GITHUB_PROXY_AUTO`, which probes the catalog and uses whichever node answers first.
+   */
   githubAccelerateUrl: string
   /** Empty disables proxying whatever the three scope switches below say. */
   proxyUrl: string
@@ -210,8 +216,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   modelStoragePath: '',
   network: {
     useHuggingFaceMirror: true,
-    usePypiMirror: false,
-    githubAccelerateUrl: '',
+    usePypiMirror: true,
+    useGithubAccelerate: true,
+    githubAccelerateUrl: GITHUB_PROXY_AUTO,
     proxyUrl: '',
     proxyForPip: false,
     proxyForModelDownload: false,

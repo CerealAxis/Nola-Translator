@@ -44,8 +44,9 @@ export const settingsPatchSchema = z.object({
   network: z.object({
     useHuggingFaceMirror: z.boolean().optional(),
     usePypiMirror: z.boolean().optional(),
-    // Free-typed origins, bounded like the endpoint fields above and in `protocol.py`, where an
-    // over-long value would ride along on every engine request.
+    useGithubAccelerate: z.boolean().optional(),
+    // A node from the picker catalog or its `auto` sentinel; the catalog is not enforced here, so the
+    // bound is what keeps a hand-built request from riding an oversized value onto every engine call.
     githubAccelerateUrl: z.string().max(2048).optional(),
     proxyUrl: z.string().max(2048).optional(),
     proxyForPip: z.boolean().optional(),

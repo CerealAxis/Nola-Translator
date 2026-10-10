@@ -155,8 +155,13 @@ export class MeetingStore {
           }
         }),
     )
+    const validatedMetas = await Promise.all(metas.map(async (meta) => {
+      if (!meta) return null
+      const audio = await this.resolveAudio(meta)
+      return { ...meta, ...audio }
+    }))
     this.cache.clear()
-    for (const meta of metas) if (meta) this.cache.set(meta.meetingId, meta)
+    for (const meta of validatedMetas) if (meta) this.cache.set(meta.meetingId, meta)
     await this.reconcileInterrupted()
   }
 
@@ -369,18 +374,32 @@ export class MeetingStore {
   private async resolveAudio(
     meta: MeetingMeta,
   ): Promise<{ audioFile?: string; audioDurationMs?: number }> {
-    if (!meta.audioFile) return { audioFile: undefined, audioDurationMs: undefined }
+    if (meta.audioFile !== AUDIO_FILE) return { audioFile: undefined, audioDurationMs: undefined }
     const path = join(this.directory(meta.meetingId), meta.audioFile)
     try {
       const handle = await open(path, 'r')
       try {
         const header = Buffer.alloc(WAV_HEADER_BYTES)
-        await handle.read(header, 0, WAV_HEADER_BYTES, 0)
-        if (header.toString('ascii', 0, 4) !== 'RIFF' || header.toString('ascii', 8, 12) !== 'WAVE') {
+        const { bytesRead } = await handle.read(header, 0, WAV_HEADER_BYTES, 0)
+        if (bytesRead !== WAV_HEADER_BYTES
+          || header.toString('ascii', 0, 4) !== 'RIFF'
+          || header.toString('ascii', 8, 12) !== 'WAVE'
+          || header.toString('ascii', 12, 16) !== 'fmt '
+          || header.readUInt32LE(16) !== 16
+          || header.readUInt16LE(20) !== 1
+          || header.readUInt16LE(22) !== 1
+          || header.readUInt32LE(24) !== 16_000
+          || header.readUInt32LE(28) !== WAV_BYTES_PER_SECOND
+          || header.readUInt16LE(32) !== 2
+          || header.readUInt16LE(34) !== 16
+          || header.toString('ascii', 36, 40) !== 'data') {
           return { audioFile: undefined, audioDurationMs: undefined }
         }
         const dataBytes = header.readUInt32LE(40)
-        if (dataBytes === 0) return { audioFile: undefined, audioDurationMs: undefined }
+        const file = await handle.stat()
+        if (dataBytes === 0 || dataBytes % 2 !== 0 || file.size < WAV_HEADER_BYTES + dataBytes) {
+          return { audioFile: undefined, audioDurationMs: undefined }
+        }
         return { audioFile: meta.audioFile, audioDurationMs: Math.round((dataBytes / WAV_BYTES_PER_SECOND) * 1000) }
       } finally {
         await handle.close()

@@ -34,7 +34,6 @@ export const modelsSettingsZh = {
   storageValueUnavailable: '读不到',
   dataFolderWillMove: '数据会在重启应用后搬到新文件夹',
   credentialCheck: '检查密钥',
-  credentialCheckHint: '仅检查已保存的密钥是否存在，不验证远端服务连接。',
 }
 
 export const modelsSettingsEn: Record<keyof typeof modelsSettingsZh, string> = {
@@ -73,5 +72,4 @@ export const modelsSettingsEn: Record<keyof typeof modelsSettingsZh, string> = {
   storageValueUnavailable: 'Unavailable',
   dataFolderWillMove: 'Your data will move to the new folder on the next restart',
   credentialCheck: 'Check credential',
-  credentialCheckHint: 'Checks whether a saved credential exists; does not test the remote connection.',
 }

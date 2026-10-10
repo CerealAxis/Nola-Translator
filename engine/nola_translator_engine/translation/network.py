@@ -251,8 +251,15 @@ class MicrosoftTranslatorProvider(_NetworkTransport):
 
 def _system_prompt(source: str, target: str) -> str:
     return (
-        "You are a translation engine. Translate the user's text "
-        f"from {source} to {target}. Return only the translation."
+        "You are a translation engine. Translate the complete transcript into "
+        f"{target}. The recognizer labels the main source language as {source}, but the text may "
+        "switch between languages within a sentence. Translate every non-target-language part; "
+        "preserve wording that is already in the target language, and keep names and technical "
+        "terms when translating them would be misleading. For a JSON input containing "
+        "previousSource, previousTranslation, and currentSource, treat the previous fields as "
+        "context and translate currentSource only. Return the complete current translation, "
+        "keeping the previous wording where the meaning is unchanged and adding or revising only "
+        "what the updated source requires. Return only translated text."
     )
 
 

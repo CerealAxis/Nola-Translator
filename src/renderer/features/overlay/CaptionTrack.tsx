@@ -85,12 +85,12 @@ function seamNeedsSpace(previous: string, next: string): boolean {
 }
 
 export function CaptionTrack({
-  line,
+  lines,
   kind,
   maxLines,
   layout,
 }: {
-  line: TrackLine | null
+  lines: readonly TrackLine[]
   kind: 'source' | 'translation'
   maxLines: number
   layout: 'rolling' | 'sentence'
@@ -98,28 +98,34 @@ export function CaptionTrack({
   const [entries, setEntries] = useState<TrackLine[]>([])
   const [offset, setOffset] = useState(0)
   const stream = useRef<TrackLine[]>([])
+  const knownLines = useRef(new Map<string, string>())
   const viewport = useRef<HTMLDivElement | null>(null)
   const content = useRef<HTMLDivElement | null>(null)
 
-  const key = line?.key ?? null
-  const text = line?.text ?? null
   const commit = (next: TrackLine[]): void => {
     stream.current = next
     setEntries(next)
   }
+
   /*
-   * `mergeLine` is not idempotent: it files the deduplicated slice under the
-   * key of the sentence passed in, so folding the same input again reads it as
-   * its own revision and restores the part the seam just removed. Remembering
-   * the last input makes folding immune to React re-running it.
+   * Keep the latest snapshot for every segment. A translation can arrive after
+   * later segments, and its final revision must replace its own earlier text.
    */
-  const folded = useRef<{ key: string; text: string } | null>(null)
-  // Adjusted in place during render: however often React re-runs this, no
-  // intermediate state is painted.
-  if (key && text && (folded.current?.key !== key || folded.current.text !== text)) {
-    folded.current = { key, text }
-    const next = mergeLine(stream.current, { key, text })
-    if (next !== stream.current) commit(next)
+  for (const line of lines) {
+    if (!knownLines.current.has(line.key) || line.text) knownLines.current.set(line.key, line.text)
+  }
+  const lineOrder = [...new Set(lines.map((line) => line.key))].slice(-MAX_ENTRIES)
+  const visibleKeys = new Set(lineOrder)
+  for (const key of knownLines.current.keys()) {
+    if (!visibleKeys.has(key)) knownLines.current.delete(key)
+  }
+  const next = lineOrder.reduce<TrackLine[]>((folded, key) => {
+    const text = knownLines.current.get(key)
+    return text ? mergeLine(folded, { key, text }) : folded
+  }, [])
+  if (next.length !== stream.current.length || next.some((line, index) =>
+    line.key !== stream.current[index]?.key || line.text !== stream.current[index]?.text)) {
+    commit(next)
   }
 
   useLayoutEffect(() => {

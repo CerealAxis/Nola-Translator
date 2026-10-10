@@ -261,6 +261,7 @@ if (!hasSingleInstanceLock) {
             // The main logger receives structured pipeline diagnostics on stderr, keeping one
             // ordered trace without giving multiple processes ownership of file rotation.
             NOLA_TRANSLATOR_RUN_LOG_STDERR: '1',
+            NOLA_TRANSLATOR_RECOGNITION_MODEL_ID: settings.current().recognition.modelId,
           },
         }
       },
@@ -291,6 +292,7 @@ if (!hasSingleInstanceLock) {
       if (preparation) return preparation.catch(() => undefined).then(() => prepareEnvironment(forStart, session, cancelled))
       const compute = { ...(session?.compute ?? settings.current().compute) }
       preparation = (async () => {
+        const startedAt = performance.now()
         await whenRuntimeReady()
         checkCancelled()
         const translationSettings = settings.current().translation
@@ -313,7 +315,6 @@ if (!hasSingleInstanceLock) {
             if (selected !== expected) throw new Error('所选翻译模型与推理引擎不兼容，请重新选择模型或引擎')
           }
         }
-        await runtimes.recheck()
         await runtimes.prepare(compute, translation)
         checkCancelled()
         const next = JSON.stringify(runtimes.selectedDirectories(compute))
@@ -333,6 +334,7 @@ if (!hasSingleInstanceLock) {
             translationDevice: translation === 'none' ? 'auto' : resolveDeviceIntent(compute.translationDevice, hardware, response.devices, translation),
           }
         }
+        logDiagnostic('runtime.prepare.complete', { durationMs: Math.round(performance.now() - startedAt), translation })
       })().finally(() => { preparation = null })
       return preparation
     }

@@ -69,6 +69,32 @@ function send(socket: Socket, value: unknown) { socket.write(`${JSON.stringify(v
 const start = { id: 'start', type: 'start', source: 'tab', streamId: 'stream', sourceLanguage: 'auto', targetLanguage: 'en', epoch: 0, videoTimeMs: 0, playbackRate: 1 }
 
 describe('native pipe boundary', () => {
+  it('releases resident models when the idle browser caption service is closed', async () => {
+    const f = await fixture()
+    const handler = vi.mocked(ipcMain.handle).mock.calls.filter(([channel]) => channel === 'browser:caption-service').at(-1)![1]
+    await handler({} as Electron.IpcMainInvokeEvent, false)
+    expect(f.connection.status().captionServiceActive).toBe(false)
+    expect(f.engine.request).toHaveBeenCalledWith(expect.objectContaining({ type: 'releaseModels' }), 'modelsReleased', 60_000)
+  })
+  it('keeps the desktop session models when the browser caption gate closes', async () => {
+    const f = await fixture()
+    await f.sessions.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'en', targetLanguages: [] }, 'desktop')
+    f.engine.request.mockClear()
+    const handler = vi.mocked(ipcMain.handle).mock.calls.filter(([channel]) => channel === 'browser:caption-service').at(-1)![1]
+    await handler({} as Electron.IpcMainInvokeEvent, false)
+    expect(f.sessions.activeSessionId).toBe('session')
+    expect(f.engine.request).not.toHaveBeenCalled()
+  })
+  it('stops browser capture before releasing models when its service closes', async () => {
+    const f = await fixture()
+    await f.sessions.start({ audioSource: { kind: 'browserTab', streamId: 'tab' }, browserTimeline: { epoch: 0, videoTimeMs: 0, playbackRate: 1 },
+      recognitionMode: 'realtime', sourceLanguage: 'en', targetLanguages: [] }, 'browser')
+    f.engine.request.mockClear()
+    const handler = vi.mocked(ipcMain.handle).mock.calls.filter(([channel]) => channel === 'browser:caption-service').at(-1)![1]
+    await handler({} as Electron.IpcMainInvokeEvent, false)
+    expect(f.sessions.busy).toBe(false)
+    expect(f.engine.request.mock.calls.map(([command]) => command.type)).toEqual(['stopSession', 'releaseModels'])
+  })
   it('answers repeated browser summaries without enumerating hardware devices', async () => {
     const f = await fixture()
     f.engine.emit('event', { protocolVersion: 1, type: 'devices', requestId: 'desktop-devices', devices: [{ kind: 'microphone', name: 'mic', deviceId: 'mic', isDefault: true }, { kind: 'systemOutput', name: 'speaker', deviceId: 'speaker', isDefault: true }] })

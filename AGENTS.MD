@@ -79,12 +79,13 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 - `src/main/session-log.ts` records application activity in English JSONL under Electron userData/logs. `logged-ipc.ts` correlates every IPC operation; engine commands/events and UI/browser activity share the launch trace. Files rotate at 4 MB and retain the latest 20 files. Credential/audio/caption contents are omitted; localized native diagnostics remain recoverable as UTF-8 base64. Pipeline diagnostics travel over stderr to the main logger, which alone owns rotation. The settings feedback area reveals the current log through IPC and a store action.
 - Installation caches and staging files are temporary on success, failure, and cancellation; startup cleanup uses known artifact names, skips junctions, and recovers backups before deleting leftovers. Pip does not retain an additional user cache.
 - Component DLL paths must match in probes and engine startup; keep Windows DLL-directory handles alive for inference. Older Torch uses MKL in the component's `Library/bin`, and the Python base bundles the VC++ OpenMP runtime.
+- Caption startup reuses validated components and one recent device inventory. Recognition and enabled local translation models load concurrently without trial inference; only the selected configuration stays resident across stops. Native jobs retain their reservation until idle. Service close, model changes and shutdown release weights; dependency imports run in the background after the engine handshake and stage timings reach the launch log.
 
 - 模型语言目录、推荐能力与运行引擎限制的注释须注明来源或限制原因；用户配置不代表模型自动获得新能力。
 - 浏览器采集限制注释须注明浏览器 API 原因；`getDisplayMedia` 必须在用户动作的原调用栈发起，Capture Handle 校验后仅处理音频。
 - 浏览器安装状态只读 Preferences／Secure Preferences 或以实际连接确认；不得修改浏览器受保护配置。每浏览器开关仅控制 Nola 连接权限，不能冒充浏览器扩展开关。
 - 浏览器音频块为单声道 PCM16、约 100 ms，输入与确认各限两秒；epoch／sequence／session 校验与 TS、zod、Python 协议同步维护。视频时间通过 browserTimeline 映射，禁止直接使用会话相对时间。
-- 重置保留加载的模型，隔离旧推理和翻译；停止回执不得等待不可取消的原生推理线程，后台卸载完成前锁定资源。自然结束用 finishStream 排空尾句。
+- 重置保留加载的模型，隔离旧推理和翻译；停止回执不得等待不可取消的原生推理线程，后台原生任务结束前锁定资源。自然结束用 finishStream 排空尾句。
 
 1. 基本原则
 - 统一使用英文注释

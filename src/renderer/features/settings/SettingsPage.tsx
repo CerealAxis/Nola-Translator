@@ -127,9 +127,9 @@ export interface SettingSelectProps { value: string; options: readonly PickerOpt
 
 export function SettingSelect({ value, options, onChange, ariaLabel, className, isDisabled }: SettingSelectProps) {
   return (
-    <SelectField value={value} onChange={(key) => { if (typeof key === 'string') onChange(key) }} aria-label={ariaLabel} className={className} isDisabled={isDisabled}>
+    <SelectField value={value} onChange={(key) => { if (typeof key === 'string') onChange(key) }} aria-label={ariaLabel} className={['settings-control-field', className].filter(Boolean).join(' ')} isDisabled={isDisabled}>
       <SelectField.Trigger><SelectField.Value /><SelectField.Indicator /></SelectField.Trigger>
-      <SelectField.Popover><ListBox>
+      <SelectField.Popover className="settings-select-popover"><ListBox>
         {options.map((option) => <ListBox.Item key={option.value} id={option.value} textValue={option.label} isDisabled={option.isDisabled}>{option.label}<ListBox.ItemIndicator /></ListBox.Item>)}
       </ListBox></SelectField.Popover>
     </SelectField>

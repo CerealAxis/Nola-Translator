@@ -1,20 +1,5 @@
-/*
- * The preview stage imitates a video frame rather than an app surface: the picture is
- * dark in both themes and the captions sit inside it, so the caption colours come from
- * the video-caption settings instead of the theme's foreground/background pair. A
- * light-mode card would misrepresent how the captions actually read over a video.
- */
 .nola-video-stage {
   position: relative;
-  min-height: 320px;
-  padding: clamp(16px, 3vw, 30px);
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background:
-    radial-gradient(ellipse at 30% 20%, color-mix(in oklch, var(--accent) 16%, transparent), transparent 62%),
-    linear-gradient(160deg, color-mix(in oklch, var(--accent) 8%, transparent), transparent 55%),
-    oklch(16% 0.012 258);
 }
 
 /*
@@ -39,8 +24,7 @@
   line-height: 1.35;
   padding: calc(var(--space-1) / 2) var(--space-2);
   border-radius: var(--radius-md);
-  /* Same recipe as the extension's caption block: white glyphs over a translucent black fill, which
-   holds its contrast over a bright frame and over a dark one alike. */
+  /* Keep the extension's configured caption fill and white glyphs unchanged across theme surfaces. */
   background: color-mix(in oklab, var(--browser-caption-fill) var(--browser-caption-background-mix), transparent);
 }
 

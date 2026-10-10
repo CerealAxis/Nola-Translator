@@ -493,8 +493,8 @@ export async function setCaptionServiceActive(active: boolean): Promise<BrowserC
 }
 
 /**
- * Ends one browser session by its id. The gate only decides whether a session may *start*,
- * so a session already running keeps the engine recording until it is stopped here.
+ * Ends one browser session while keeping the enabled service's models resident.
+ * Closing the service also stops its browser session and releases those models.
  */
 export async function stopCaptionSession(sessionId: string): Promise<void> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
@@ -531,6 +531,10 @@ export function attachSettingsStore(next: NolaBridge, watchComputeChanges = true
     if (event.type === 'computeDevices') {
       const { devices, notes, torchVersion, activePlan } = event
       settingsStore.setState({ computeSnapshot: { devices, notes, torchVersion, activePlan } })
+      return
+    }
+    if (event.type === 'modelsReleased') {
+      resetCaptionService()
       return
     }
     // Session changes affect residency and free memory, so refresh when they happen rather than on navigation.

@@ -10,8 +10,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Card, EmptyState, Skeleton } from '@heroui/react'
-import { ArrowLeft, Download, Minus, Plus } from 'lucide-react'
+import { Breadcrumbs, Button, Card, EmptyState, Skeleton } from '@heroui/react'
+import { Download, Minus, Plus } from 'lucide-react'
 
 import { AudioPlayerBar, DualColumnView } from '@/components/reading'
 import type { DualColumnSegment } from '@/components/reading'
@@ -28,6 +28,7 @@ import '../home/home-records.css'
 const SCALE_MIN = 0.7
 const SCALE_MAX = 2
 const SCALE_STEP = 0.1
+const HEADER_ACTION_CLASS = 'w-24 justify-center rounded-[10px]'
 /** Skeleton rows per column. */
 const SKELETON_PAIRS = 4
 
@@ -93,7 +94,10 @@ export function RecordDetailPage(): ReactNode {
   return (
     <ErrorBoundary resetKey={path}>
       <div className="nola-record-detail">
-        <Button variant="ghost" className="nola-record-detail__back" onPress={back}><ArrowLeft size={18} aria-hidden="true" />{t('homeRecordsUi.back')}</Button>
+        <Breadcrumbs className="self-start" aria-label={t('nav.records')}>
+          <Breadcrumbs.Item href={pathOf('records')}>{t('nav.records')}</Breadcrumbs.Item>
+          <Breadcrumbs.Item>{title}</Breadcrumbs.Item>
+        </Breadcrumbs>
         <PageHeader
           title={title}
           className="nola-record-detail__header"
@@ -125,7 +129,7 @@ export function RecordDetailPage(): ReactNode {
               <Button
                 variant="tertiary"
                 size="sm"
-                className="rounded-[10px]"
+                className={HEADER_ACTION_CLASS}
                 onPress={() => setRenameOpen(true)}
               >
                 {t('records.rename')}
@@ -133,8 +137,8 @@ export function RecordDetailPage(): ReactNode {
               {/* The only primary action on this screen. */}
               <Button
                 variant="primary"
-                size="md"
-                className="rounded-full px-5"
+                size="sm"
+                className={HEADER_ACTION_CLASS}
                 onPress={() => setExportOpen(true)}
                 isDisabled={!detail}
               >
@@ -163,7 +167,7 @@ export function RecordDetailPage(): ReactNode {
             <EmptyState className="flex flex-col items-start gap-4 p-6">
               <h2 className="nola-body-strong text-foreground">{t('workspace.nothingYet')}</h2>
               <p className="nola-caption text-muted">{t('workspace.nothingYetHint')}</p>
-              <Button variant="primary" size="md" className="rounded-full px-5" onPress={back}>
+              <Button variant="primary" size="sm" className="rounded-[10px]" onPress={back}>
                 {t('nav.records')}
               </Button>
             </EmptyState>
