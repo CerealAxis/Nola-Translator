@@ -77,9 +77,9 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
         </Dropdown>
       </div>
       {windowsShell ? <div className="nola-window-controls nola-no-drag">
-        <Button variant="ghost" isIconOnly className="nola-window-control" aria-label={t('titleBar.minimizeWindow')} title={t('titleBar.minimizeWindow')} onPress={() => { void window.nolaTranslator?.minimizeMainWindow() }}><Minus aria-hidden="true" /></Button>
-        <Button variant="ghost" isIconOnly className="nola-window-control" aria-label={maximized ? t('titleBar.restoreWindow') : t('titleBar.maximizeWindow')} title={maximized ? t('titleBar.restoreWindow') : t('titleBar.maximizeWindow')} onPress={toggleMaximize}>{maximized ? <Copy aria-hidden="true" /> : <Square aria-hidden="true" />}</Button>
-        <Button variant="ghost" isIconOnly className="nola-window-control nola-window-control--close" aria-label={t('titleBar.closeWindow')} title={t('titleBar.closeWindow')} onPress={() => { void window.nolaTranslator?.closeMainWindow() }}><X aria-hidden="true" /></Button>
+        <Button variant="ghost" isIconOnly className="nola-window-control" aria-label={t('titleBar.minimizeWindow')} onPress={() => { void window.nolaTranslator?.minimizeMainWindow() }}><Minus aria-hidden="true" /></Button>
+        <Button variant="ghost" isIconOnly className="nola-window-control" aria-label={maximized ? t('titleBar.restoreWindow') : t('titleBar.maximizeWindow')} onPress={toggleMaximize}>{maximized ? <Copy aria-hidden="true" /> : <Square aria-hidden="true" />}</Button>
+        <Button variant="ghost" isIconOnly className="nola-window-control nola-window-control--close" aria-label={t('titleBar.closeWindow')} onPress={() => { void window.nolaTranslator?.closeMainWindow() }}><X aria-hidden="true" /></Button>
       </div> : native ? <div className="nola-native-controls" aria-hidden="true" /> : (
         <div className="nola-web-controls nola-no-drag">
           <Button variant="ghost" isIconOnly isDisabled aria-label={t('shellUi.minimize')}><Minus aria-hidden="true" /></Button>
