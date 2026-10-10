@@ -55,7 +55,7 @@ Nola Translator captures system audio or microphone input, transcribes speech, a
 
 - Windows 11 x64
 - Node.js 24 and npm 11
-- Python 3.13
+- Python 3.12
 
 ### Install and run
 

@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import torch
 from numpy.typing import NDArray
 
 from .base import ModelUnavailable
@@ -69,6 +68,7 @@ class SenseVoiceRuntime:
 
     def load(self) -> None:
         """Thread-safe one-shot load; failure raises SenseVoiceModelUnavailable."""
+        import torch
         with self._load_lock:
             if self._loaded:
                 return

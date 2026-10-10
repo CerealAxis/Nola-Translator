@@ -1,50 +1,39 @@
-import { createHash, randomUUID } from 'node:crypto'
-import { access, cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { isAbsolute, join, relative, resolve, basename } from 'node:path'
+import { renameRuntimeDirectory } from './runtime-files'
+import { randomUUID } from 'node:crypto'
+import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { createWriteStream } from 'node:fs'
+import { finished } from 'node:stream/promises'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import { z } from 'zod'
-import { runtimeRecipeSchema, type HardwareInventory, type RuntimeRecipe, type RuntimeRecipeState, type RuntimeSnapshot } from '../shared/compute'
-import { compareDriverVersions } from './hardware-inventory'
+import { runtimeRecipeSchema, type RuntimeRecipe, type RuntimeRecipeState, type RuntimeSnapshot } from '../shared/compute'
+import type { NetworkSettings } from '../shared/settings'
+import { probeLocalEngine } from './local-runtimes'
 
-const run = promisify(execFile)
-const recipesSchema = z.object({ version: z.literal(1), recipes: z.array(runtimeRecipeSchema).max(16) })
-const baseSchema = z.object({ fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
-  pythonAbi: z.literal('cp313-win_amd64'), torchVersion: z.string() })
-type Download = (recipe: RuntimeRecipe['wheel'], path: string, signal: AbortSignal, progress: (bytes: number) => void) => Promise<void>
+const PYPI_INDEX = 'https://pypi.org/simple'
+const PYPI_MIRROR = 'https://pypi.tuna.tsinghua.edu.cn/simple'
+const recipesSchema = z.object({ version: z.literal(1), recipes: z.array(runtimeRecipeSchema).max(256) })
+type Download = (wheel: RuntimeRecipe['wheel'], path: string, signal: AbortSignal, progress: (bytes: number) => void) => Promise<void>
 type Verify = (path: string, signal: AbortSignal) => Promise<string>
 
-/** Mirrors the install recipes and backend precheck built by `scripts/build-python-runtime.py`. */
+/** Install only libraries; every combination shares the app's Python 3.12 interpreter. */
 export class PythonEnvironments {
   recipes: RuntimeRecipe[] = []
   operation: RuntimeSnapshot['operation'] = null
   lastError: string | null = null
-  private base: z.infer<typeof baseSchema> | null = null
   private installedIds = new Set<string>()
   private controller: AbortController | null = null
-
   constructor(private readonly directory: string, private readonly baseDirectory: string,
-    private readonly recipesPath: string, readonly hardware: HardwareInventory,
-    private readonly download: Download, private readonly digest: Verify) {}
-
+    private readonly recipesPath: string, private readonly download: Download, private readonly digest: Verify,
+    private readonly network?: () => NetworkSettings) {}
   private inside(name: string): string {
     const target = resolve(this.directory, name)
     const path = relative(resolve(this.directory), target)
-    if (!path || path.startsWith('..') || isAbsolute(path)) throw new Error('推理环境路径无效')
+    if (!path || path.startsWith('..') || isAbsolute(path)) throw new Error('组件路径无效')
     return target
   }
-
   async initialize(): Promise<void> {
-    try {
-      this.recipes = recipesSchema.parse(JSON.parse((await readFile(this.recipesPath, 'utf8')).replace(/^\uFEFF/, ''))).recipes
-      if (new Set(this.recipes.map(r => r.id)).size !== this.recipes.length) throw new Error('依赖配方 ID 重复')
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') this.lastError = `依赖配方无法读取：${String(error)}`
-    }
-    try {
-      this.base = baseSchema.parse(JSON.parse(await readFile(join(this.baseDirectory, 'runtime-base.json'), 'utf8')))
-      await access(join(this.baseDirectory, 'python.exe'))
-    } catch { this.base = null }
+    this.recipes = recipesSchema.parse(JSON.parse((await readFile(this.recipesPath, 'utf8')).replace(/^\uFEFF/, ''))).recipes
     const names = await readdir(this.directory).catch(() => [] as string[])
     for (const recipe of this.recipes) {
       const destination = this.inside(recipe.id)
@@ -53,154 +42,126 @@ export class PythonEnvironments {
           try {
             const backup = this.inside(name)
             const marker = JSON.parse(await readFile(join(backup, 'runtime-installed.json'), 'utf8'))
-            if (marker.id !== recipe.id || marker.fingerprint !== this.fingerprint(recipe)) continue
-            await rename(backup, destination)
+            if (marker.id !== recipe.id || marker.kind !== 'python') continue
+            await renameRuntimeDirectory(backup, destination)
             break
-          } catch { /* Preserve directories that cannot be identified. */ }
+          } catch { /* Leave unrecognized legacy installations untouched. */ }
         }
       }
       try {
-        const root = this.inside(recipe.id)
-        const marker = JSON.parse(await readFile(join(root, 'runtime-installed.json'), 'utf8'))
-        if (marker.id !== recipe.id || marker.fingerprint !== this.fingerprint(recipe)) continue
-        await access(join(root, 'python.exe'))
-        this.installedIds.add(recipe.id)
-      } catch { /* Partial/old environments are not selected. */ }
+        const marker = JSON.parse(await readFile(join(destination, 'runtime-installed.json'), 'utf8'))
+        if (marker.id === recipe.id && marker.kind === 'python') this.installedIds.add(recipe.id)
+      } catch { /* Installation records, rather than folder names, grant repair ownership. */ }
     }
   }
-
-  private fingerprint(recipe: RuntimeRecipe): string {
-    return createHash('sha256').update(JSON.stringify({ recipe: runtimeRecipeSchema.parse(recipe), base: this.base?.fingerprint })).digest('hex')
-  }
-
   states(): RuntimeRecipeState[] {
-    return this.recipes.map(recipe => {
-      let reason = ''
-      if (!this.base) reason = '当前应用未包含可管理的 Python 基础环境'
-      else if (this.base.torchVersion.split('+')[0] !== recipe.torchVersion.split('+')[0]) reason = '依赖配方与当前模型环境版本不匹配'
-      else if (!this.hardware.nvidiaDriver) reason = '未检测到可用的 NVIDIA 驱动'
-      else if (compareDriverVersions(this.hardware.nvidiaDriver, recipe.minimumDriver) < 0) reason = `本配方要求 NVIDIA 驱动 ${recipe.minimumDriver} 或更新版本`
-      return { ...recipe, installed: this.installedIds.has(recipe.id), available: !reason, reason }
-    })
+    return this.recipes.map(recipe => ({ ...recipe, installed: this.installedIds.has(recipe.id), available: true, reason: '' }))
   }
-
-  recommendedId(): string | null { return this.states().find(r => r.available)?.id ?? null }
   has(id: string): boolean { return this.recipes.some(r => r.id === id) }
-  directoryFor(id: string): string {
-    if (!this.installedIds.has(id)) throw new Error('所选 Python 环境尚未准备，请先准备计算环境')
-    return this.inside(id)
-  }
-  automaticDirectory(): string | undefined {
-    const id = this.recommendedId()
-    return id && this.installedIds.has(id) ? this.directoryFor(id) : undefined
-  }
+  directoryFor(id: string): string { return this.inside(id) }
   cancel(): void { this.controller?.abort() }
-
-  async importWheel(path: string, isActive: (path: string) => boolean): Promise<void> {
-    if (this.operation) throw new Error('已有环境准备任务')
-    const controller = new AbortController()
-    this.controller = controller
-    this.lastError = null
-    this.operation = { id: 'offline-wheel', phase: 'verify', bytes: 0, totalBytes: 0 }
-    let recipe: RuntimeRecipe | undefined
-    try {
-      const size = (await stat(path)).size
-      this.operation.bytes = size
-      this.operation.totalBytes = size
-      const candidates = this.recipes.filter(r => r.wheel.bytes === size)
-      if (!candidates.length) throw new Error('此 wheel 不属于当前版本的依赖配方')
-      const hash = await this.digest(path, controller.signal)
-      recipe = candidates.find(r => r.wheel.sha256 === hash)
-      if (!recipe) throw new Error('离线 wheel 校验失败')
-      const cache = this.inside('wheel-cache')
-      await mkdir(cache, { recursive: true })
-      const target = join(cache, recipe.wheel.filename)
-      if (resolve(path).toLowerCase() !== target.toLowerCase()) {
-        await cp(path, target, { filter: () => { controller.signal.throwIfAborted(); return true } })
-      }
-      controller.signal.throwIfAborted()
-    } catch (error) {
-      this.lastError = controller.signal.aborted ? '导入已取消' : String(error)
-      throw new Error(this.lastError)
-    } finally {
-      this.operation = null
-      this.controller = null
-    }
-    await this.install(recipe.id, false, isActive)
-  }
-
-  async install(id: string, repair: boolean, isActive: (path: string) => boolean): Promise<void> {
-    if (this.operation) throw new Error('已有环境准备任务')
+  async install(id: string, repair: boolean): Promise<void> {
+    if (this.operation) throw new Error('已有组件安装任务')
     const state = this.states().find(r => r.id === id)
-    if (!state) throw new Error('依赖配方不存在')
-    if (!state.available) throw new Error(state.reason)
+    if (!state) throw new Error('安装组合不存在')
     if (state.installed && !repair) return
     const destination = this.inside(id)
-    if (isActive(destination)) throw new Error('该环境正在使用，请先选择随包环境并应用后再修复')
     const controller = new AbortController()
     this.controller = controller
     this.lastError = null
-    this.operation = { id, phase: 'download', bytes: 0, totalBytes: state.wheel.bytes }
+    const wheels = [state.wheel, ...state.companions]
+    this.operation = { id, phase: 'download', bytes: 0, totalBytes: wheels.reduce((n, w) => n + w.bytes, 0), startedAt: Date.now() }
     const cache = this.inside('wheel-cache')
-    const wheel = join(cache, state.wheel.filename)
     const staging = this.inside(`staging-${id}-${randomUUID()}`)
     const backup = this.inside(`backup-${id}-${randomUUID()}`)
     let movedOld = false
     try {
       await mkdir(cache, { recursive: true })
-      await this.download(state.wheel, wheel, controller.signal, bytes => { if (this.operation) this.operation.bytes = bytes })
-      this.operation.phase = 'verify'
-      if (await this.digest(wheel, controller.signal) !== state.wheel.sha256) {
-        await rm(wheel, { force: true })
-        throw new Error('PyTorch 下载校验失败，请重新准备')
+      const paths: string[] = []
+      let completed = 0
+      for (const item of wheels) {
+        // Different CUDA builds of xFormers may share a filename; their hashes identify the cache.
+        const folder = join(cache, item.sha256)
+        await mkdir(folder, { recursive: true })
+        const wheel = join(folder, item.filename)
+        await this.download(item, wheel, controller.signal, bytes => { if (this.operation) this.operation.bytes = completed + bytes })
+        this.operation.phase = 'verify'
+        if (await this.digest(wheel, controller.signal) !== item.sha256) {
+          await rm(wheel, { force: true })
+          throw new Error('组件下载校验失败，请重试安装')
+        }
+        paths.push(wheel)
+        completed += item.bytes
+        this.operation.phase = 'download'
       }
+      await mkdir(staging, { recursive: true })
       this.operation.phase = 'prepare'
-      // Copy common, pinned dependencies; torch itself comes from the selected backend wheel.
-      await cp(this.baseDirectory, staging, { recursive: true, dereference: false,
-        filter: async source => {
-          controller.signal.throwIfAborted()
-          const name = basename(source)
-          return !/^(torch|torchgen|functorch)$|^torch-[^\\/]+\.dist-info$|^__editable__/i.test(name)
-        } })
-      controller.signal.throwIfAborted()
-      const python = join(staging, 'python.exe')
-      await run(python, ['-I', '-m', 'pip', '--isolated', 'install', '--quiet', '--no-index', '--no-deps',
-        '--disable-pip-version-check', '--no-warn-script-location', wheel], {
-        cwd: staging, windowsHide: true, signal: controller.signal, timeout: 30 * 60_000, maxBuffer: 2 * 1024 * 1024,
-        env: { ...process.env, PYTHONUTF8: '1' },
-      })
+      await this.installLibraries(state, paths, staging, controller.signal)
       this.operation.phase = 'check'
-      const probe = await run(python, ['-I', '-m', 'nola_translator_engine'], {
-        cwd: staging, windowsHide: true, signal: controller.signal, timeout: 60_000, maxBuffer: 1024 * 1024,
-        env: { ...process.env, PYTHONUTF8: '1', NOLA_TRANSLATOR_RUNTIME_PROBE: '1' },
-      })
-      const actual = JSON.parse(probe.stdout.trim()) as { backend?: string; torch?: string; cudaAvailable?: boolean }
-      if (actual.backend !== state.backend || actual.torch !== state.torchVersion || !actual.cudaAvailable) {
-        throw new Error('安装后的 PyTorch 版本、后端或驱动检查未通过；请检查显卡驱动')
+      const actual = await probeLocalEngine(join(this.baseDirectory, 'python.exe'), staging)
+      if (actual.status !== 'ready' || actual.backend !== state.backend || actual.version.split('+')[0] !== state.torchVersion ||
+        (state.xformersVersion && actual.xformersVersion !== state.xformersVersion)) {
+        throw new Error(actual.reason || '安装后的组件版本或后端与所选组合不一致')
       }
-      await writeFile(join(staging, 'runtime-installed.json'), JSON.stringify({
-        id, kind: 'python', fingerprint: this.fingerprint(state), torch: actual.torch, backend: actual.backend,
-      }), 'utf8')
       controller.signal.throwIfAborted()
-      if (isActive(destination)) throw new Error('环境仍在使用，无法切换')
+      await writeFile(join(staging, 'runtime-installed.json'), JSON.stringify({ id, kind: 'python', backend: state.backend,
+        torch: actual.version, xformersVersion: actual.xformersVersion, pythonAbi: state.pythonAbi }), 'utf8')
       try {
         await access(destination)
-        const previous = JSON.parse(await readFile(join(destination, 'runtime-installed.json'), 'utf8'))
-        if (previous.id !== id) throw new Error('目标目录不属于本应用，拒绝替换')
-        await rename(destination, backup)
+        const marker = JSON.parse(await readFile(join(destination, 'runtime-installed.json'), 'utf8'))
+        if (marker.id !== id || marker.kind !== 'python') throw new Error('目标目录不属于软件安装的组件，不能覆盖')
+        await renameRuntimeDirectory(destination, backup)
         movedOld = true
       } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
-      try { await rename(staging, destination) }
-      catch (error) { if (movedOld) await rename(backup, destination); throw error }
+      try { await renameRuntimeDirectory(staging, destination) }
+      catch (error) { if (movedOld) await renameRuntimeDirectory(backup, destination); throw error }
       this.installedIds.add(id)
       if (movedOld) await rm(backup, { recursive: true, force: true }).catch(() => undefined)
     } catch (error) {
-      this.lastError = controller.signal.aborted ? '环境准备已取消；下载缓存已保留' : String(error)
+      this.lastError = controller.signal.aborted ? '安装已取消；下载缓存已保留' : String(error)
       throw new Error(this.lastError)
     } finally {
       await rm(staging, { recursive: true, force: true }).catch(() => undefined)
       this.operation = null
       this.controller = null
+    }
+  }
+
+  private async installLibraries(state: RuntimeRecipe, paths: string[], staging: string, signal: AbortSignal): Promise<void> {
+    const temporary = this.inside('pip-temp')
+    await mkdir(temporary, { recursive: true })
+    const log = createWriteStream(this.inside(`install-${state.id}.log`))
+    const logDone = finished(log).catch((error: unknown) => error)
+    // `--isolated` together with PIP_CONFIG_FILE=nul discards whatever pip.conf the machine
+    // carries, so the flag below is the only route a configured proxy can take into pip.
+    const network = this.network?.()
+    const index = network?.usePypiMirror ? PYPI_MIRROR : PYPI_INDEX
+    const proxy = network?.proxyForPip ? network.proxyUrl.trim() : ''
+    try {
+      await new Promise<void>((resolveInstall, reject) => {
+        // Same-volume temporary files avoid copying the whole CUDA package a second time.
+        // Compile only imported modules at runtime, rather than every dependency during installation.
+        const child = execFile(join(this.baseDirectory, 'python.exe'), ['-I', '-u', '-m', 'pip', '--isolated', 'install',
+          '--disable-pip-version-check', '--no-warn-script-location', '--no-compile', '--progress-bar', 'off', '--target', staging,
+          '--index-url', index, '--extra-index-url', state.indexUrl,
+          ...(proxy ? ['--proxy', proxy] : []),
+          ...paths, ...state.requirements], {
+          cwd: this.baseDirectory, windowsHide: true, signal, timeout: 30 * 60_000, maxBuffer: 4 * 1024 * 1024,
+          env: { ...process.env, PYTHONUTF8: '1', PIP_CONFIG_FILE: 'nul', TEMP: temporary, TMP: temporary },
+        }, error => error ? reject(error) : resolveInstall())
+        for (const stream of [child.stdout, child.stderr]) {
+          stream?.pipe(log, { end: false })
+          stream?.setEncoding('utf8')
+          stream?.on('data', (chunk: string) => {
+            const line = chunk.split(/[\r\n]+/).map(value => value.trim()).filter(Boolean).at(-1)
+            if (line && this.operation) this.operation.detail = line.slice(0, 512)
+          })
+        }
+      })
+    } finally {
+      log.end()
+      const error = await logDone
+      if (error instanceof Error) throw error
     }
   }
 }

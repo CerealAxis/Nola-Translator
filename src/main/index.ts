@@ -197,8 +197,7 @@ if (!hasSingleInstanceLock) {
       app.isPackaged ? join(process.resourcesPath, 'runtime', 'extract-runtime.ps1') : join(app.getAppPath(), 'scripts', 'extract-runtime.ps1'),
       { baseDirectory: pythonBaseDirectory, recipesPath: app.isPackaged ? join(process.resourcesPath, 'runtime-recipes.json')
         : join(app.getAppPath(), 'build', 'runtime-recipes.json'),
-      localEngine: { ...createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath }), env: resourceEnvironment },
-      localLlamaDirectory: bundledLlamaDirectory, source: app.isPackaged ? 'bundled' : 'project' })
+      localLlamaDirectory: bundledLlamaDirectory, network: () => settings.current().network })
     let launchCompute = { ...initialSettings.compute }
     let currentDirectories = ''
     // The runtime init body is deferred into a microtask so it never blocks window creation;
@@ -220,12 +219,11 @@ if (!hasSingleInstanceLock) {
       resolveLaunchSpec: () => {
         const compute = launchCompute
         const { engine: engineDirectory, llama: llamaDirectory } = runtimes.selectedDirectories(compute)
-        runtimes.setActiveDirectories([engineDirectory, llamaDirectory].filter((directory): directory is string => !!directory))
         return {
           ...createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
             managedEngineDirectory: engineDirectory }),
           env: { ...resourceEnvironment,
-            NOLA_TRANSLATOR_LLAMA_DIR: llamaDirectory ?? bundledLlamaDirectory,
+            NOLA_TRANSLATOR_LLAMA_DIR: llamaDirectory ?? '',
             // Every layer of the caption pipeline appends to this one file, so a stall can be read
             // end to end instead of inferred from three separate logs.
             NOLA_TRANSLATOR_DEBUG_LOG: pipelineDebugLog,
@@ -246,11 +244,13 @@ if (!hasSingleInstanceLock) {
     let sessionActive = false
     engine.on('log', (message: string) => console.error('[engine]', message.trimEnd()))
     engine.on('protocolError', (error: unknown) => console.error('engine protocol failed', error))
+    let componentInstalling = false
     let sessionStarting = false
     let preparation: Promise<void> | null = null
     const prepareEnvironment = (forStart = false, session?: SessionConfig, cancelled: () => boolean = () => false): Promise<void> => {
       const checkCancelled = () => { if (quitting || cancelled()) throw new Error('sessionStartCancelled') }
       try { checkCancelled() } catch (error) { return Promise.reject(error) }
+      if (componentInstalling) return Promise.reject(new Error('组件安装中，请等待完成'))
       if (sessionActive || (sessionStarting && !forStart)) return Promise.reject(new Error('请先停止同传，再应用计算环境'))
       if (preparation) return preparation.catch(() => undefined).then(() => prepareEnvironment(forStart, session, cancelled))
       const compute = { ...(session?.compute ?? settings.current().compute) }
@@ -277,6 +277,7 @@ if (!hasSingleInstanceLock) {
             if (selected !== expected) throw new Error('所选翻译模型与推理引擎不兼容，请重新选择模型或引擎')
           }
         }
+        await runtimes.recheck()
         await runtimes.prepare(compute, translation)
         checkCancelled()
         const next = JSON.stringify(runtimes.selectedDirectories(compute))
@@ -299,7 +300,19 @@ if (!hasSingleInstanceLock) {
       })().finally(() => { preparation = null })
       return preparation
     }
-    disposeRuntimeIpc = registerRuntimeIpc(runtimes, () => mainWindow, () => prepareEnvironment(), () => sessionActive || sessionStarting, whenRuntimeReady)
+    disposeRuntimeIpc = registerRuntimeIpc(runtimes, () => mainWindow, () => runtimes.recheck(),
+      () => sessionActive || sessionStarting || componentInstalling, whenRuntimeReady, async (id, repair) => {
+        componentInstalling = true
+        try {
+          await engine!.stop()
+          await runtimes.install(id, repair)
+        } finally {
+          currentDirectories = JSON.stringify(runtimes.selectedDirectories())
+          try { await engine!.start() }
+          catch (error) { console.error('engine restart after component install failed', error) }
+          finally { componentInstalling = false }
+        }
+      })
     const sessions = new SessionController({ engine, meetings, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareEnvironment(true, config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => overlayWindow?.showInactive(), hideOverlay: () => overlayWindow?.hide() })
     disposeIpc = registerEngineIpc(
       engine,

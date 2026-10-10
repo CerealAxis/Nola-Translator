@@ -41,7 +41,17 @@ export const settingsPatchSchema = z.object({
   compute: computeSettingsPatchSchema.optional(),
   theme: z.enum(['system', 'light', 'dark']).optional(),
   uiLanguage: z.enum(['zh-CN', 'en']).optional(),
-  useHuggingFaceMirror: z.boolean().optional(),
+  network: z.object({
+    useHuggingFaceMirror: z.boolean().optional(),
+    usePypiMirror: z.boolean().optional(),
+    // Free-typed origins, bounded like the endpoint fields above and in `protocol.py`, where an
+    // over-long value would ride along on every engine request.
+    githubAccelerateUrl: z.string().max(2048).optional(),
+    proxyUrl: z.string().max(2048).optional(),
+    proxyForPip: z.boolean().optional(),
+    proxyForModelDownload: z.boolean().optional(),
+    proxyForRuntimeDownload: z.boolean().optional(),
+  }).partial().optional(),
   recognition: z.object({
     modelId: recognitionModelIdSchema.optional(),
     sourceLanguage: z.string().min(1).max(32).optional(),

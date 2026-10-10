@@ -12,6 +12,7 @@ function settingsWith(patch: AppSettingsPatch = {}): AppSettings {
     ...DEFAULT_SETTINGS,
     ...patch,
     modelStoragePath: 'C:\\Nola Translator\\models',
+    network: { ...DEFAULT_SETTINGS.network, ...(patch.network ?? {}) },
     recognition: { ...DEFAULT_SETTINGS.recognition, ...(patch.recognition ?? {}) },
     recording: { ...DEFAULT_SETTINGS.recording, ...(patch.recording ?? {}) },
     appearance: { ...DEFAULT_SETTINGS.appearance, ...(patch.appearance ?? {}) },

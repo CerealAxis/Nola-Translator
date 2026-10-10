@@ -196,6 +196,8 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
   const devices = useStore(stores.models, (state) => state.devices)
   const status = useStore(sessionStore, (state) => state.status)
   const errorCode = useStore(sessionStore, (state) => state.errorCode)
+  const diagnostic = useStore(sessionStore, (state) => state.error)
+  const runtimeComponent = errorCode === 'RUNTIME_TORCH' ? 'engine' : errorCode === 'RUNTIME_LLAMA' ? 'llama' : null
   const missing = useStore(sessionStore, (state) => state.missing)
 
   const modelOptions = useModelOptions()
@@ -239,7 +241,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
       ? null
       : missing
         ? t('preflight.modelMissing', { name: missing.name })
-        : t(errorCopyOf(errorCode, lastIntent).message)
+        : runtimeComponent || errorCode === 'SESSION_ERROR' ? diagnostic : t(errorCopyOf(errorCode, lastIntent).message)
 
   /**
    * The mic is the single on/off control for a session: `idle` / `error` start,
@@ -381,7 +383,8 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
         </div>
       </div>
 
-      <StartFailureNotice message={failureMessage} />
+      <StartFailureNotice message={failureMessage} action={runtimeComponent ? t(runtimeComponent === 'engine' ? 'runtime.goTorch' : 'runtime.goLlama') : undefined}
+        onAction={runtimeComponent ? () => void actions.settings.openRuntimeSettings(runtimeComponent) : undefined} />
     </>
   )
 }
@@ -395,7 +398,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
  * (`caption-card.css`), and a failure lands exactly when the pointer has
  * just left the mic, so the notice would fade out with it.
  */
-function StartFailureNotice({ message }: { message: string | null }) {
+function StartFailureNotice({ message, action, onAction }: { message: string | null; action?: string; onAction?: () => void }) {
   if (message === null) return null
   return (
     <div
@@ -405,6 +408,7 @@ function StartFailureNotice({ message }: { message: string | null }) {
       className="nola-caption-notice"
     >
       <p className="nola-caption-notice__text">{message}</p>
+      {action ? <Button size="sm" variant="secondary" onPress={onAction}>{action}</Button> : null}
     </div>
   )
 }

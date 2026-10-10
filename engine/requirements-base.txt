@@ -1,0 +1,7 @@
+# The engine can manage models and settings without importing inference libraries.
+numpy==1.26.4
+pydantic==2.13.4
+PyAudioWPatch==0.2.12.8
+scipy==1.15.3
+kaldi-native-fbank==1.22.3
+pip

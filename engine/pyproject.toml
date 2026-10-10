@@ -3,18 +3,17 @@ name = "nola-translator-engine"
 version = "0.1.0"
 description = "Nola Translator 本地音频、识别与翻译引擎"
 license = "GPL-3.0-only"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.12,<3.13"
 dependencies = [
   "accelerate==1.15.0",
   "bitsandbytes==0.50.2",
   "funasr==1.4.16",
   "kaldi-native-fbank==1.22.3",
-  "numpy==2.5.1",
+  "numpy==1.26.4",
   "pydantic==2.13.4",
   "PyAudioWPatch==0.2.12.8",
-  "scipy==1.18.0",
+  "scipy==1.15.3",
   "sentencepiece==0.2.1",
-  "torch==2.13.0",
   "transformers==5.17.0"
 ]
 

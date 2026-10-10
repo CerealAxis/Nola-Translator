@@ -267,7 +267,7 @@ class EngineRuntime:
                     return [self._resource_error(command.requestId, "resourceInUse")]
             try:
                 resource = await self.resources.manage(
-                    command.resourceId, command.action, command.useHuggingFaceMirror
+                    command.resourceId, command.action, command.network
                 )
             except ResourceActionError as error:
                 return [self._resource_error(command.requestId, error.code, error.details)]
@@ -335,7 +335,7 @@ class EngineRuntime:
         hub's own meaning — a 404 stays "not found" instead of becoming "网络不可用".
         """
         try:
-            info = await asyncio.to_thread(inspect_repo, command.repo)
+            info = await asyncio.to_thread(inspect_repo, command.repo, network=command.network)
         except ValueError as error:
             return [
                 self._resource_error(
@@ -384,6 +384,7 @@ class EngineRuntime:
                 command.query,
                 slot=command.slot,
                 limit=command.limit,
+                network=command.network,
                 weight_format=command.weightFormat,
                 cursor=command.cursor,
             )
@@ -442,7 +443,7 @@ class EngineRuntime:
         refused with the reason the adapter registry produced, and nothing is written to disk.
         """
         try:
-            info = await asyncio.to_thread(inspect_repo, command.repo)
+            info = await asyncio.to_thread(inspect_repo, command.repo, network=command.network)
         except ValueError as error:
             return [
                 self._resource_error(
@@ -510,7 +511,7 @@ class EngineRuntime:
                 requestId=command.requestId,
                 resourceId=resource_id,
                 action="install",
-                useHuggingFaceMirror=command.useHuggingFaceMirror,
+                network=command.network,
             )
         )
 

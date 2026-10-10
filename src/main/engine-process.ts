@@ -1,8 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
-import { existsSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { createInterface, type Interface as ReadlineInterface } from 'node:readline'
 
 import { PREWARM_ERROR_CODES } from '../shared/contracts'
@@ -50,35 +49,13 @@ export function createEngineLaunchSpec(options: {
   resourcesPath: string
   managedEngineDirectory?: string
 }): EngineLaunchSpec {
-  if (!options.isPackaged && !options.managedEngineDirectory && existsSync(join(options.appPath, '.venv', 'Scripts', 'python.exe'))) {
-    return { command: join(options.appPath, '.venv', 'Scripts', 'python.exe'), args: ['-m', 'nola_translator_engine'], cwd: join(options.appPath, 'engine') }
-  }
-  const pythonDirectory = options.managedEngineDirectory ?? (options.isPackaged
-    ? join(options.resourcesPath, 'engine') : join(options.appPath, 'engine', 'dist', 'NolaPythonEngine'))
-  if (existsSync(join(pythonDirectory, 'python.exe'))) {
-    const sourceDirectory = options.isPackaged
-      ? join(options.resourcesPath, 'engine', 'Lib', 'site-packages')
-      : join(options.appPath, 'engine')
-    if (options.managedEngineDirectory && existsSync(join(sourceDirectory, 'nola_translator_engine', '__main__.py'))) {
-      // Managed environments cache dependencies across app upgrades; their copied engine code may be older.
-      const bootstrap = `import runpy, sys; sys.path.insert(0, ${JSON.stringify(sourceDirectory)}); runpy.run_module("nola_translator_engine", run_name="__main__")`
-      return { command: join(pythonDirectory, 'python.exe'), args: ['-I', '-c', bootstrap], cwd: pythonDirectory }
-    }
-    return { command: join(pythonDirectory, 'python.exe'), args: ['-I', '-m', 'nola_translator_engine'], cwd: pythonDirectory }
-  }
-  if (options.managedEngineDirectory) {
-    const command = join(options.managedEngineDirectory, 'NolaTranslatorEngine.exe')
-    return { command, args: [], cwd: dirname(command) }
-  }
-  if (options.isPackaged) {
-    const command = join(options.resourcesPath, 'engine', 'NolaTranslatorEngine.exe')
-    return { command, args: [], cwd: dirname(command) }
-  }
-  return {
-    command: join(options.appPath, '.venv', 'Scripts', 'python.exe'),
-    args: ['-m', 'nola_translator_engine'],
-    cwd: join(options.appPath, 'engine'),
-  }
+  const pythonDirectory = options.isPackaged ? join(options.resourcesPath, 'engine')
+    : join(options.appPath, 'engine', 'dist', 'NolaPythonEngine')
+  const sourceDirectory = options.isPackaged ? join(pythonDirectory, 'Lib', 'site-packages') : join(options.appPath, 'engine')
+  const paths = options.managedEngineDirectory ? [sourceDirectory, options.managedEngineDirectory] : [sourceDirectory]
+  // Python is fixed; only component search paths change. App code always comes from this release.
+  const bootstrap = `import runpy, sys; assert sys.version_info[:2] == (3,12), "Python 3.12 required"; sys.path[:0] = ${JSON.stringify(paths)}; runpy.run_module("nola_translator_engine", run_name="__main__")`
+  return { command: join(pythonDirectory, 'python.exe'), args: ['-I', '-c', bootstrap], cwd: pythonDirectory }
 }
 
 export class CaptionEventCoalescer {

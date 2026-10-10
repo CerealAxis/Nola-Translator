@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import io
+import os
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -25,6 +27,7 @@ class FakeProcess:
         self.pid = pid
         self.terminated = False
         self.waited = 0
+        self.stderr = io.StringIO("offloaded 20/20 layers\n")
 
     def poll(self) -> int | None:
         return self.returncode
@@ -63,6 +66,7 @@ def scripted_health(values, log: list[str] | None = None):
     def health(url: str, timeout: float) -> int:
         if log is not None:
             log.append(url)
+        threading.Event().wait(0.01)
         return next(iterator, 0)
 
     return health
@@ -111,10 +115,10 @@ async def test_start_gpu_becomes_ready_with_cuda_device(tmp_path) -> None:
     assert args[args.index("--host") + 1] == "127.0.0.1"
     assert args[args.index("-ngl") + 1] == "auto"
     assert "--jinja" in args
-    assert args[args.index("-c") + 1] == "1024"
+    assert args[args.index("-c") + 1] == "2048"
     assert args[args.index("-np") + 1] == "1"
     assert args[args.index("-b") + 1] == "128"
-    assert 1 <= int(args[args.index("-t") + 1]) <= 4
+    assert 1 <= int(args[args.index("-t") + 1]) <= (os.cpu_count() or 2)
     assert popen.calls[0]["kwargs"]["cwd"] == str(llama_dir)
     assert health_log and all(url.startswith("http://127.0.0.1:") for url in health_log)
     assert sleeps == [0.25, 0.25]
@@ -125,6 +129,8 @@ async def test_gpu_early_exit_retries_with_cpu(tmp_path) -> None:
 
     def factory(_args):
         process = FakeProcess(alive=bool(processes))  # The first process is already dead; the retry stays alive.
+        if not processes:
+            process.stderr = io.StringIO("CUDA error: failed to allocate\n")
         processes.append(process)
         return process
 
@@ -159,15 +165,17 @@ async def test_gpu_health_timeout_then_cpu_failure_raises(tmp_path) -> None:
         await manager.start(timeout_s=0)
 
     message = str(info.value)
-    assert "ngl=auto" in message and "ngl=0" in message
-    assert len(popen.calls) == 2
+    assert "ngl=auto" in message and "健康检查超时" in message
+    assert len(popen.calls) == 1
     assert all(process.terminated for process in processes)
     assert manager.ready is False and manager.device is None
-    assert len(health_log) == 2
+    assert len(health_log) == 1
 
 
 async def test_silent_cpu_fallback_reports_cpu_device(tmp_path) -> None:
-    popen = FakePopen()
+    process = FakeProcess()
+    process.stderr = io.StringIO("offloaded 0/20 layers\n")
+    popen = FakePopen(lambda _args: process)
     manager, _llama_dir, _sleeps = make_manager(
         tmp_path,
         popen,
@@ -183,12 +191,14 @@ async def test_silent_cpu_fallback_reports_cpu_device(tmp_path) -> None:
 
 
 async def test_auto_layers_work_without_cuda(tmp_path) -> None:
-    popen = FakePopen()
+    process = FakeProcess()
+    process.stderr = io.StringIO()
+    popen = FakePopen(lambda _args: process)
     manager, _llama_dir, _sleeps = make_manager(
         tmp_path, popen, health=scripted_health([200]), vram=lambda: None
     )
 
-    assert await manager.start(timeout_s=5) == "cpu"
+    assert await manager.start(timeout_s=5) == "unknown"
     assert popen.calls[0]["args"][popen.calls[0]["args"].index("-ngl") + 1] == "auto"
 
 
@@ -356,3 +366,12 @@ def test_resolve_llama_dir_packaged(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "executable", str(exe))
     assert resolve_llama_dir() == resources / "llama"
+
+async def test_openvino_passes_native_device_to_child(tmp_path):
+    from nola_translator_engine.compute import ComputeDevice, ComputeOptions
+    popen = FakePopen()
+    manager, _, _ = make_manager(tmp_path, popen, health=scripted_health([200]))
+    manager.configure_compute(ComputeDevice("ov", "Intel GPU", "openvino", llamaDevice="OPENVINO1", llamaDeviceNative="GPU.0"), ComputeOptions())
+    assert await manager.start(timeout_s=5) == "Intel GPU"
+    assert popen.calls[0]["kwargs"]["env"]["GGML_OPENVINO_DEVICE"] == "GPU.0"
+    assert popen.calls[0]["args"][popen.calls[0]["args"].index("--device") + 1] == "OPENVINO1"

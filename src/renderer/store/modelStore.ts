@@ -99,6 +99,13 @@ function patchResource(resource: ResourceRecord): void {
   })
 }
 
+export async function probeAudioDevices(): Promise<AudioDevice[]> {
+  if (!bridge) throw new Error('IPC bridge unavailable')
+  const devices = await bridge.engine.listDevices()
+  modelsStore.setState({ devices })
+  return devices
+}
+
 export async function loadModels(): Promise<void> {
   if (!bridge) return
   if (modelsStore.getState().loading) return

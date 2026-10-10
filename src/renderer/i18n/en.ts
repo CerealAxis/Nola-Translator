@@ -10,8 +10,12 @@ import { modelsSettingsEn } from './models-settings-ui'
  */
 
 import { browserEn } from './browser-ui'
+import { runtimeEn } from './runtime-ui'
+import { computeUi } from '../features/settings/compute-ui'
 export const en: Dictionary = {
   browser: browserEn,
+  runtime: runtimeEn,
+  compute: computeUi.en,
   modelConfig: {
     title: 'Configure model', pending: 'Needs configuration', edit: 'Edit configuration', configure: 'Configure and enable',
     description: 'Confirm the model task, inference engine and language capabilities before using it in a session.',
@@ -340,12 +344,22 @@ export const en: Dictionary = {
   },
 
   settings: {
+    loadFailed: 'Unable to read settings',
     title: 'Settings',
     groupAppearance: 'Appearance',
     groupLanguage: 'Language',
-    groupDownloads: 'Model downloads',
-    huggingFaceMirror: 'Use a Hugging Face mirror',
-    huggingFaceMirrorHint: 'Download model weights from hf-mirror.com. Search and repository details still use the official Hugging Face API.',
+    groupNetwork: 'Network',
+    proxyUrl: 'Proxy server address',
+    proxyUrlHint: 'Leave empty to use no proxy. The three switches below apply once an address is set, e.g. http://127.0.0.1:7890',
+    proxyForPip: 'Apply proxy to Pip',
+    proxyForModelDownload: 'Apply proxy to model downloads',
+    proxyForRuntimeDownload: 'Apply proxy to component downloads',
+    pypiMirror: 'PyPI mirror',
+    pypiMirrorHint: 'Download Python packages from a domestic mirror',
+    huggingFaceMirror: 'Huggingface mirror',
+    huggingFaceMirrorHint: 'Download Huggingface models from a domestic mirror',
+    githubAccelerate: 'GitHub acceleration',
+    githubAccelerateHint: 'Accelerate downloads for components without a mirror. Leave empty to disable; the prefix is prepended to the download URL, e.g. https://ghfast.top',
     theme: 'Theme',
     reduceMotion: 'Reduce motion',
     uiLanguage: 'Interface language',

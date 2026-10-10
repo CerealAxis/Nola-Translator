@@ -6,18 +6,55 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from hashlib import sha1, sha256
 import os
 from pathlib import Path
 import re
 import shutil
 import tempfile
-from urllib.request import Request, urlopen
+from urllib.error import URLError
+from urllib.parse import urlparse
+from urllib.request import OpenerDirector, ProxyHandler, Request, build_opener
+
+from ..protocol import NetworkSettings
 
 
 ProgressCallback = Callable[[int, int], None]
 Fetcher = Callable[[str, Path, ProgressCallback], None]
 PhaseCallback = Callable[[str], None]
+
+#: The official hub and the community mirror, which serves the same resolve and API routes. The
+#: choice is a user setting, so it is resolved per operation instead of frozen at import time.
+HF_ENDPOINT = "https://huggingface.co"
+HF_MIRROR_ENDPOINT = "https://hf-mirror.com"
+
+
+def hf_endpoint(network: NetworkSettings | None) -> str:
+    """The Hugging Face host one operation talks to; absent settings mean the official host."""
+    if network is not None and network.useHuggingFaceMirror:
+        return HF_MIRROR_ENDPOINT
+    return HF_ENDPOINT
+
+
+def http_opener(network: NetworkSettings | None) -> OpenerDirector:
+    """An opener carrying one operation's proxy policy.
+
+    Built once per operation rather than per read: ``build_opener`` assembles the handler stack
+    and reads the environment, and the weight download loop would otherwise pay that on every
+    1 MB chunk.
+    """
+    proxy = network.proxyUrl.strip() if network is not None and network.proxyForModelDownload else ""
+    if not proxy:
+        return build_opener()
+    parsed = urlparse(proxy)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        # A malformed proxy otherwise reaches http.client, which raises InvalidURL — neither an
+        # HTTP status nor an OSError, so it escapes classify_hub_error and surfaces as an
+        # unexplained internal error. URLError is the transport failure callers already speak.
+        raise URLError(f"代理地址无效：{proxy}")
+    return build_opener(ProxyHandler({"http": proxy, "https": proxy}))
+
 
 #: Characters Windows refuses in a path component. A self-installed model's id is `hub:owner/name`
 #: — a perfectly good protocol identifier and an illegal folder name — so nothing derived from a
@@ -71,14 +108,16 @@ class ModelSpec:
     def total_bytes(self) -> int:
         return sum(entry.size for entry in self.files)
 
-    def url_for(self, entry: FileEntry, use_mirror: bool = False) -> str:
-        endpoint = "https://hf-mirror.com" if use_mirror else "https://huggingface.co"
+    def url_for(self, entry: FileEntry, network: NetworkSettings | None = None) -> str:
+        endpoint = hf_endpoint(network)
         return f"{endpoint}/{self.repo}/resolve/{self.revision}/{entry.path}"
 
 
-def _download(url: str, destination: Path, progress: ProgressCallback) -> None:
+def _download(
+    url: str, destination: Path, progress: ProgressCallback, opener: OpenerDirector
+) -> None:
     request = Request(url, headers={"User-Agent": "Nola Translator/0.1"})
-    with urlopen(request, timeout=30) as response, destination.open("wb") as output:
+    with opener.open(request, timeout=30) as response, destination.open("wb") as output:
         total = int(response.headers.get("Content-Length", 0))
         current = 0
         while chunk := response.read(1024 * 1024):
@@ -88,9 +127,17 @@ def _download(url: str, destination: Path, progress: ProgressCallback) -> None:
 
 
 class ModelManager:
-    def __init__(self, model_root: Path, fetcher: Fetcher = _download) -> None:
+    def __init__(self, model_root: Path, fetcher: Fetcher | None = None) -> None:
         self.model_root = model_root.resolve()
+        # `None` selects the engine's own downloader, the only transport that carries network
+        # settings; an injected fetcher arrives with its own.
         self.fetcher = fetcher
+
+    def _fetcher_for(self, network: NetworkSettings | None) -> Fetcher:
+        """The downloader for one install, with the proxy bound once for every file it fetches."""
+        if self.fetcher is not None:
+            return self.fetcher
+        return partial(_download, opener=http_opener(network))
 
     def model_path(self, spec: ModelSpec) -> Path:
         return self.model_root / spec.directory
@@ -108,7 +155,7 @@ class ModelManager:
         spec: ModelSpec,
         progress: ProgressCallback = lambda _current, _total: None,
         on_phase: PhaseCallback | None = None,
-        use_mirror: bool = False,
+        network: NetworkSettings | None = None,
     ) -> Path:
         """Download file by file into a temp dir, then switch to the target atomically once verification passes.
 
@@ -137,6 +184,7 @@ class ModelManager:
         done = 0
         try:
             phase("download")
+            fetcher = self._fetcher_for(network)
             for entry in spec.files:
                 part = temp / f".{entry.path}.part"
                 part.parent.mkdir(parents=True, exist_ok=True)
@@ -147,7 +195,7 @@ class ModelManager:
                 def file_progress(current: int, _file_total: int, base: int = base) -> None:
                     progress(base + current, total)
 
-                self.fetcher(spec.url_for(entry, use_mirror), part, file_progress)
+                fetcher(spec.url_for(entry, network), part, file_progress)
                 done += entry.size
 
             phase("verify")

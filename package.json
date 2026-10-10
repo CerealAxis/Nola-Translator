@@ -11,9 +11,8 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
-    "build:engine:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-cpu-engine.ps1",
-    "prepare:llama:cpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-llama-cpu.ps1",
-    "dist:win": "npm run build && npm run build:browser && npm run package:browser && npm run build:browser-host && npm run build:engine:cpu && npm run prepare:llama:cpu && electron-builder --win nsis msi --x64",
+    "build:python": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-python-base.ps1",
+    "dist:win": "npm run build && npm run build:browser && npm run package:browser && npm run build:browser-host && npm run build:python && electron-builder --win nsis msi --x64",
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:ui": "electron tests/e2e/capture-ui.mjs",
@@ -85,10 +84,6 @@
       {
         "from": "engine/dist/NolaPythonEngine",
         "to": "engine"
-      },
-      {
-        "from": "vendor/llama-cpu",
-        "to": "llama"
       },
       {
         "from": "build/runtime-catalog.json",

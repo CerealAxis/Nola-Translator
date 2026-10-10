@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import torch
 from numpy.typing import NDArray
 
 from .base import ModelUnavailable
@@ -106,10 +105,11 @@ class QwenRuntime:
             raise ValueError(f"quant 必须是 {'/'.join(VALID_QUANTS)} 之一：{quant!r}")
         self.model_dir = Path(model_dir)
         self._quant_param = quant
-        self.device = device or ("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = device or "cpu"
+        self._auto_device = device is None
         self.precision = precision
         self.threads = threads
-        self._compute_dtype = torch.bfloat16
+        self._compute_dtype = None
         self._load_lock = threading.Lock()
         self._inference_lock = threading.Lock()
         self._loaded = False
@@ -132,6 +132,8 @@ class QwenRuntime:
         with self._load_lock:
             if self._loaded:
                 return
+            import torch
+            self._compute_dtype = torch.bfloat16
             requested = self._resolve_quant()
             attempts = ("nf4", "8bit") if requested == "nf4" else (requested,)
             errors: list[tuple[str, Exception]] = []
@@ -173,6 +175,9 @@ class QwenRuntime:
             release_device_cache(self.device)
 
     def _resolve_quant(self) -> str:
+        import torch
+        if self._auto_device:
+            self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         if self.device == "cpu" or not self.device.startswith("cuda") or torch.version.hip:
             if self._quant_param not in (None, "none"):
                 raise ValueError("当前设备的 Qwen 基线仅支持不量化，请选择自动或不量化")
@@ -187,6 +192,10 @@ class QwenRuntime:
 
     def _load_pipeline(self, quant: str) -> _Pipeline:
         """The real from_pretrained block, split into its own method so tests can stub it."""
+        import torch
+        import transformers
+        if not hasattr(transformers, "Qwen3ASRForConditionalGeneration"):
+            raise ValueError(f"当前 Torch {torch.__version__} / Transformers {transformers.__version__} 不支持 Qwen3-ASR；请选择较新 Torch 组合或 SenseVoice 模型")
         from transformers import (
             AutoProcessor,
             BitsAndBytesConfig,
@@ -206,11 +215,13 @@ class QwenRuntime:
         model, loading_info = Qwen3ASRForConditionalGeneration.from_pretrained(
             str(self.model_dir),
             quantization_config=bnb,
-            device_map=self.device,
+            device_map=None if self.device.startswith("privateuseone") else self.device,
             dtype=self._compute_dtype,
             local_files_only=True,
             output_loading_info=True,
         )
+        if self.device.startswith("privateuseone"):
+            model = model.to(self.device)
         # On a weight-key layout mismatch (e.g. the thinker-layout Qwen/Qwen3-ASR-0.6B),
         # from_pretrained random-initializes every parameter and returns normally — it
         # only falls apart at inference time.
@@ -264,6 +275,7 @@ class QwenRuntime:
         """Transcribe 16 kHz mono float32 audio; prefix continues through the chat
         template (official streaming prefix, not a hotword list).
         """
+        import torch
         audio = np.asarray(samples, dtype=np.float32).reshape(-1)
         if audio.size == 0:
             return "", None

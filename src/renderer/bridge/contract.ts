@@ -104,6 +104,7 @@ export interface NolaBridge {
     setCaptionService(active: boolean): Promise<BrowserConnectionStatus>
   }
   runtimes: {
+    openSettings(component: 'engine' | 'llama'): Promise<void>
     list(): Promise<RuntimeSnapshot>
     prepare(): Promise<RuntimeSnapshot>
     install(id: string, repair?: boolean): Promise<void>

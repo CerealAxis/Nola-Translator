@@ -437,7 +437,7 @@ export function WorkspacePage() {
         </AlertDialog.Backdrop>
       </AlertDialog>
 
-      {/* Session failure: copy comes from the errorCode table; the `state.error` diagnostic string never reaches the UI. */}
+      {/* Session failure: copy comes from the errorCode table; the diagnostic reason remains visible alongside the translated action. */}
       <SessionErrorDialog state={session} onCopyDiagnostics={() => void copyDiagnostics()} onReset={resetError} onViewRecord={viewRecord} />
     </div>
   )
@@ -584,6 +584,7 @@ function SessionErrorDialog({
   const isOpen = state.status === 'error'
   const alive = state.sessionId !== null
   const engineLost = state.errorCode === ENGINE_LOST_CODE
+  const runtimeComponent = state.errorCode === 'RUNTIME_TORCH' ? 'engine' : state.errorCode === 'RUNTIME_LLAMA' ? 'llama' : null
 
   const handle = useMemo(() => errorCopyOf(state.errorCode, alive ? 'stop' : 'start'), [state.errorCode, alive])
 
@@ -605,9 +606,9 @@ function SessionErrorDialog({
                 {t(handle.message)}
               </AlertDialog.Heading>
             </AlertDialog.Header>
-            {handle.detail ? (
+            {state.error || handle.detail ? (
               <AlertDialog.Body>
-                <p className="nola-body text-muted">{t(handle.detail)}</p>
+                <p className="nola-body text-muted">{state.error || (handle.detail ? t(handle.detail) : null)}</p>
               </AlertDialog.Body>
             ) : null}
             <AlertDialog.Footer>
@@ -619,7 +620,10 @@ function SessionErrorDialog({
                 size="sm"
                 className="rounded-xl"
                 onPress={() => {
-                  if (engineLost) onViewRecord()
+                  if (runtimeComponent) {
+                    onReset()
+                    void actions.settings.openRuntimeSettings(runtimeComponent)
+                  } else if (engineLost) onViewRecord()
                   else if (alive) void actions.session.stopSession().catch(() => onReset())
                   else onReset()
                 }}
@@ -669,6 +673,8 @@ export interface ErrorCopy {
  * fallback and leaves a matched row alone.
  */
 const ERROR_TABLE: Record<string, ErrorCopy> = {
+  RUNTIMETORCH: { message: 'runtime.noticeTitle', detail: null, action: 'runtime.goTorch' },
+  RUNTIMELLAMA: { message: 'runtime.noticeTitle', detail: null, action: 'runtime.goLlama' },
   MODELMISSING: { message: 'errors.modelMissing', detail: null, action: 'errors.modelMissingAction' },
   MODELUNAVAILABLE: { message: 'errors.modelMissing', detail: null, action: 'errors.modelMissingAction' },
   RESOURCEUNAVAILABLE: { message: 'errors.modelMissing', detail: null, action: 'errors.modelMissingAction' },

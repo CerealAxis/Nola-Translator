@@ -54,9 +54,10 @@ export type EngineLifecycleEvent = {
 export type EngineChannelEvent = EngineEvent | EngineLifecycleEvent
 
 /** Pages the caption overlay can send the main window to. */
-export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'translation'
+export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'translation' | 'torch' | 'llama'
 
 export type NolaTranslatorApi = {
+  openRuntimeSettings(component: 'engine' | 'llama'): Promise<void>
   browserConnection?(action: BrowserConnectionAction, enabled?: boolean, browser?: BrowserKind): Promise<BrowserConnectionStatus>
   listDevices(): Promise<AudioDevice[]>
   listComputeDevices(): Promise<ComputeSnapshot>

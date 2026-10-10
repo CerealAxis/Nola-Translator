@@ -1,7 +1,7 @@
 /**
  * The app's stores and the single injection point for the bridge. Each domain's
  * `state.error` is a diagnostic string (the engine's own text, possibly Chinese)
- * and does not go through i18n, so the UI shows `errorCode` via `t('errors.*')`.
+ * remains available as a concrete reason alongside translated error actions.
  */
 
 import type { NolaBridge } from '@/bridge'
@@ -44,6 +44,8 @@ export interface InitStoresOptions {
    * `true`: a test's fake bridge has no engine behind it and is not degraded.
    */
   engineConnected?: boolean
+  /** Only the main window needs settings diagnostics; the caption overlay reuses engine events. */
+  backgroundChecks?: boolean
 }
 
 /**
@@ -57,12 +59,17 @@ export function initStores(bridge: NolaBridge, options: InitStoresOptions = {}):
   engineConnected = options.engineConnected ?? true
   if (!engineConnected) return
 
-  attachSettingsStore(bridge)
+  attachSettingsStore(bridge, options.backgroundChecks ?? true)
   attachMeetingsStore(bridge)
   attachModelsStore(bridge)
   attachSessionStore(bridge)
 
   void actions.settings.loadSettings().catch(() => undefined)
+  if (options.backgroundChecks !== false) {
+    void actions.settings.loadRuntimeComponents().catch(() => undefined)
+    void actions.settings.refreshComputeDevices().catch(() => undefined)
+    void actions.settings.refreshStorage().catch(() => undefined)
+  }
   void actions.meetings.loadMeetings().catch(() => undefined)
   void actions.models.loadModels().catch(() => undefined)
 }

@@ -116,7 +116,7 @@ export function registerEngineIpc(
           requestId: `resource-action-${randomUUID()}`,
           resourceId,
           action: action as 'install' | 'remove' | 'cancel',
-          useHuggingFaceMirror: getSettings().useHuggingFaceMirror,
+          network: getSettings().network,
         },
         'resourceActionResult'
       )
@@ -156,6 +156,7 @@ export function registerEngineIpc(
           ...(kind === 'quant' ? { weightFormat: 'gguf' as const } : {}),
           ...(typeof cursor === 'string' ? { cursor } : {}),
           limit: 20,
+          network: getSettings().network,
         },
         'hubModels',
         // Search reads metadata once; model cards and install checks use separate requests.
@@ -172,7 +173,7 @@ export function registerEngineIpc(
   )
 
   ipcMain.handle(IPC_CHANNELS.getHuggingFaceModelCard, (_event, repo: unknown, revision: unknown) =>
-    readHubModelCard(repo, revision, net.fetch))
+    readHubModelCard(repo, revision, net.fetch, () => getSettings().network))
 
   ipcMain.handle(IPC_CHANNELS.configureModel, async (_event, resourceId: unknown, configuration: unknown) => {
     if (controller.busy) throw new Error('字幕会话运行中，不能修改模型配置')
@@ -189,7 +190,7 @@ export function registerEngineIpc(
     }
     await ensureReady()
     const response = await engine.request(
-      { protocolVersion: 1, type: 'inspectHubRepo', requestId: `hub-inspect-${randomUUID()}`, repo },
+      { protocolVersion: 1, type: 'inspectHubRepo', requestId: `hub-inspect-${randomUUID()}`, repo, network: getSettings().network },
       'hubInspect',
       30 * 1000
     )
@@ -225,7 +226,7 @@ export function registerEngineIpc(
           requestId: `hub-install-${randomUUID()}`,
           repo,
           ...(slot ? { slot } : {}),
-          useHuggingFaceMirror: getSettings().useHuggingFaceMirror,
+          network: getSettings().network,
         },
         'resourceActionResult',
         60 * 1000
@@ -258,8 +259,12 @@ export function registerEngineIpc(
   // What "enable captions" means: the models are resident, so the browser side starts a session
   // against weights that are already in memory.
   ipcMain.handle(IPC_CHANNELS.prewarmModels, async () => {
+    const config = prewarmConfigFrom(getSettings())
+    const session = { ...config, audioSource: { kind: 'defaultOutput' as const }, recognitionMode: 'realtime' as const }
+    await prepareEnvironment(session)
+    config.compute = session.compute
     await ensureReady()
-    return engine.prewarmModels(prewarmConfigFrom(getSettings()))
+    return engine.prewarmModels(config)
   })
 
   ipcMain.handle(IPC_CHANNELS.showOverlay, () => getOverlayWindow()?.show())

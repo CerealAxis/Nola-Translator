@@ -8,7 +8,7 @@ import { useModelOptions } from '@/model-options'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 import { settingsPath, useRoute } from '@/routes'
-import { enableCaptionService, stores, updateSettings, useStore } from '@/store'
+import { actions, enableCaptionService, stores, updateSettings, useStore } from '@/store'
 import { browserConnectionAction, setCaptionServiceActive, stopCaptionSession } from '@/store/settingsStore'
 import { swappedLanguagesOf, targetLanguagePatch } from '@/session-config'
 import { translationLanguages } from '../../../shared/model-capabilities'
@@ -106,7 +106,14 @@ export function VideoCaptionsPage() {
     try {
       const result = await enableCaptionService()
       if (result.state === 'failed') { toast.danger(prewarmFailure(result.code)); return }
-    } catch { toast.danger(t('videoCaptions.serviceFailed')); return }
+    } catch (error) {
+      const message = String(error)
+      if (/RUNTIME_(TORCH|LLAMA)/.test(message)) {
+        toast.danger(message)
+        await actions.settings.openRuntimeSettings(message.includes('RUNTIME_TORCH') ? 'engine' : 'llama')
+      } else toast.danger(t('videoCaptions.serviceFailed'))
+      return
+    }
     try { await setCaptionServiceActive(true) } catch { toast.danger(t('errors.captionServiceToggleFailed')) }
   }
   /*

@@ -35,6 +35,21 @@ const translationModelIdSchema = z.union([
   hubModelId,
 ])
 
+/**
+ * The runtime check on `NetworkSettings`. Every field is optional because the engine's own model
+ * carries the same defaults: a request naming only one of them still parses, and a payload the
+ * engine could not read would take the whole child process down with it.
+ */
+const networkSettingsSchema = z.object({
+  useHuggingFaceMirror: z.boolean().optional(),
+  usePypiMirror: z.boolean().optional(),
+  githubAccelerateUrl: z.string().max(2048).optional(),
+  proxyUrl: z.string().max(2048).optional(),
+  proxyForPip: z.boolean().optional(),
+  proxyForModelDownload: z.boolean().optional(),
+  proxyForRuntimeDownload: z.boolean().optional(),
+}).strip()
+
 export const sessionConfigSchema = z
   .object({
     audioSource: audioSourceSchema,
@@ -129,7 +144,7 @@ export const engineCommandSchema = z.discriminatedUnion('type', [
     type: z.literal('manageResource'),
     resourceId: z.string().min(1).max(256),
     action: z.enum(['install', 'remove', 'cancel']),
-    useHuggingFaceMirror: z.boolean().optional(),
+    network: networkSettingsSchema.optional(),
   }).strip(),
   z.object({ ...envelope, type: z.literal('configureModel'), resourceId: z.string().min(1).max(256), configuration: modelConfigurationSchema }).strip(),
   z.object({ ...envelope, type: z.literal('startSession'), config: sessionConfigSchema }).strip(),
@@ -164,16 +179,17 @@ export const engineCommandSchema = z.discriminatedUnion('type', [
       weightFormat: z.literal('gguf').optional(),
       cursor: z.string().min(1).max(2048).optional(),
       limit: z.number().int().min(1).max(50).optional(),
+      network: networkSettingsSchema.optional(),
     })
     .strip(),
-  z.object({ ...envelope, type: z.literal('inspectHubRepo'), repo: z.string().min(3).max(256) }).strip(),
+  z.object({ ...envelope, type: z.literal('inspectHubRepo'), repo: z.string().min(3).max(256), network: networkSettingsSchema.optional() }).strip(),
   z
     .object({
       ...envelope,
       type: z.literal('installHubRepo'),
       repo: z.string().min(3).max(256),
       slot: z.enum(['recognition', 'translation']).optional(),
-      useHuggingFaceMirror: z.boolean().optional(),
+      network: networkSettingsSchema.optional(),
     })
     .strip(),
 ])

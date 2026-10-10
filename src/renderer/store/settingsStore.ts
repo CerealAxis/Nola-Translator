@@ -11,6 +11,7 @@ import type { NolaBridge } from '@/bridge'
 import type { AppSettings, AppSettingsPatch, ModelStorageInfo, PrewarmErrorCode, PrewarmResult } from '@/bridge'
 import type { BrowserConnectionAction, BrowserConnectionStatus, BrowserKind } from '../../shared/browser'
 import { createStore, createWriteQueue } from './createStore'
+import type { ComputeSnapshot, RuntimeSnapshot } from '../../shared/compute'
 
 /**
  * What the caption service is doing, as the engine reports it. `loading` rides the
@@ -35,6 +36,14 @@ export interface SettingsState {
   /** The engine's own refusal reason, so the page can explain which model or language is at fault. */
   captionServiceCode: PrewarmErrorCode | null
   captionServiceBusy: boolean
+  runtimes: RuntimeSnapshot | null
+  computeSnapshot: ComputeSnapshot | null
+  computeChecking: boolean
+  computeError: string | null
+  runtimeBusy: boolean
+  runtimeChecking: boolean
+  runtimeError: string | null
+  runtimeNoticeDismissed: boolean
 }
 
 const initialState: SettingsState = {
@@ -51,9 +60,73 @@ const initialState: SettingsState = {
   captionService: 'idle',
   captionServiceCode: null,
   captionServiceBusy: false,
+  runtimes: null, computeSnapshot: null, computeChecking: false, computeError: null,
+  runtimeBusy: false, runtimeChecking: false, runtimeError: null, runtimeNoticeDismissed: false,
 }
 
 export const settingsStore = createStore<SettingsState>(initialState)
+
+export async function loadRuntimeComponents(recheck = false): Promise<RuntimeSnapshot> {
+  if (!bridge) throw new Error('IPC bridge unavailable')
+  if (recheck) settingsStore.setState({ runtimeChecking: true, runtimeError: null })
+  try {
+    const runtimes = await (recheck ? bridge.runtimes.prepare() : bridge.runtimes.list())
+    settingsStore.setState({ runtimes })
+    return runtimes
+  } catch (error) {
+    settingsStore.setState({ runtimeError: errorMessage(error) })
+    throw error
+  } finally { if (recheck) settingsStore.setState({ runtimeChecking: false }) }
+}
+
+let computeRefresh: Promise<void> | null = null
+
+export function refreshComputeDevices(): Promise<void> {
+  if (!bridge) return Promise.reject(new Error('IPC bridge unavailable'))
+  if (computeRefresh) return computeRefresh
+  const source = bridge
+  settingsStore.setState({ computeChecking: true, computeError: null })
+  const task = (async () => {
+    try {
+      const computeSnapshot = await source.engine.listComputeDevices()
+      if (bridge === source) settingsStore.setState({ computeSnapshot })
+    } catch (error) {
+      if (bridge === source) settingsStore.setState({ computeError: errorMessage(error) })
+      throw error
+    }
+  })().finally(() => {
+    if (computeRefresh !== task) return
+    computeRefresh = null
+    if (bridge === source) settingsStore.setState({ computeChecking: false })
+  })
+  computeRefresh = task
+  return task
+}
+
+export async function installRuntimeComponent(id: string, reinstall = false): Promise<void> {
+  if (!bridge) throw new Error('IPC bridge unavailable')
+  if (settingsStore.getState().runtimeBusy) return
+  settingsStore.setState({ runtimeBusy: true, runtimeError: null })
+  const poll = setInterval(() => { void loadRuntimeComponents().catch(() => undefined) }, 1000)
+  try {
+    await bridge.runtimes.install(id, reinstall)
+    await loadRuntimeComponents()
+    await refreshComputeDevices()
+  } catch (error) {
+    settingsStore.setState({ runtimeError: errorMessage(error) })
+  } finally {
+    clearInterval(poll)
+    settingsStore.setState({ runtimeBusy: false })
+    await loadRuntimeComponents().catch(() => undefined)
+  }
+}
+
+export async function cancelRuntimeInstallation(): Promise<void> { await bridge?.runtimes.cancel() }
+export function dismissRuntimeNotice(): void { settingsStore.setState({ runtimeNoticeDismissed: true }) }
+export async function openRuntimeSettings(component: 'engine' | 'llama'): Promise<void> {
+  settingsStore.setState({ runtimeNoticeDismissed: true })
+  await bridge?.runtimes.openSettings(component)
+}
 
 /** Fields a drag emits. Changes within 180ms collapse into one write. */
 const DEBOUNCE_MS = 180
@@ -106,6 +179,7 @@ export function mergeSettings(base: AppSettings, patch: AppSettingsPatch): AppSe
     videoCaptions: { ...base.videoCaptions, ...patch.videoCaptions },
     translation: { ...base.translation, ...patch.translation },
     compute: { ...base.compute, ...patch.compute },
+    network: { ...base.network, ...patch.network },
   }
 }
 
@@ -147,6 +221,7 @@ function mergePatches(a: AppSettingsPatch, b: AppSettingsPatch): AppSettingsPatc
     ...(a.videoCaptions || b.videoCaptions ? { videoCaptions: { ...a.videoCaptions, ...b.videoCaptions } } : {}),
     ...(a.translation || b.translation ? { translation: { ...a.translation, ...b.translation } } : {}),
     ...(a.compute || b.compute ? { compute: { ...a.compute, ...b.compute } } : {}),
+    ...(a.network || b.network ? { network: { ...a.network, ...b.network } } : {}),
   }
 }
 
@@ -201,10 +276,9 @@ export async function loadSettings(): Promise<void> {
   if (settingsStore.getState().loaded && !settingsStore.getState().error) return
   settingsStore.setState({ loading: true, error: null })
   try {
-    const [settings, storage] = await Promise.all([bridge.settings.get(), bridge.storage.get()])
-    confirmed = settings
+    confirmed = await bridge.settings.get()
     publish(confirmed)
-    settingsStore.setState({ loaded: true, loading: false, storage })
+    settingsStore.setState({ loaded: true, loading: false })
   } catch (error) {
     settingsStore.setState({ loading: false, error: errorMessage(error) })
     throw error
@@ -293,10 +367,9 @@ export async function flushPendingSettings(): Promise<void> {
 }
 
 /**
- * Re-reads disk usage in the background when the storage tab opens: those
- * numbers only change once models are installed or removed, and `loadSettings`
- * read them once at startup. Touches neither `storageBusy` nor `loaded`, and a
- * failure keeps the previous `storage` — stale numbers beat an empty row.
+ * Re-reads disk usage in the background: those numbers only change once models are installed or
+ * removed, and the storage tab re-reads them again when it opens. Touches neither `storageBusy` nor
+ * `loaded`, and a failure keeps the previous `storage` — stale numbers beat an empty row.
  */
 export async function refreshStorage(): Promise<void> {
   if (!bridge) return
@@ -360,6 +433,9 @@ export async function enableCaptionService(): Promise<PrewarmResult> {
       captionServiceCode: result.state === 'failed' ? result.code ?? null : null,
     })
     return result
+  } catch (error) {
+    settingsStore.setState({ captionService: 'failed', runtimeError: errorMessage(error) })
+    throw error
   } finally {
     settingsStore.setState({ captionServiceBusy: false })
   }
@@ -413,7 +489,7 @@ export async function browserConnectionAction(action: BrowserConnectionAction, e
   } finally { if (action !== 'status') settingsStore.setState({ browserBusy: false }) }
 }
 
-export function attachSettingsStore(next: NolaBridge): void {
+export function attachSettingsStore(next: NolaBridge, watchComputeChanges = true): void {
   bridge = next
   unsubscribe?.()
   unsubscribe = next.events.onSettingsChanged((settings) => {
@@ -423,9 +499,17 @@ export function attachSettingsStore(next: NolaBridge): void {
   })
   unsubscribeCaptionService?.()
   unsubscribeCaptionService = next.events.onEngineEvent((event) => {
-    // `loading` is the only reason this subscription exists: the answer settles the
-    // request, and a multi-gigabyte read leaves the button idle for the whole wait.
-    // The event carries no failure state — a refusal comes back on the request itself.
+    if (event.type === 'computeDevices') {
+      const { devices, notes, torchVersion, activePlan } = event
+      settingsStore.setState({ computeSnapshot: { devices, notes, torchVersion, activePlan } })
+      return
+    }
+    // Session changes affect residency and free memory, so refresh when they happen rather than on navigation.
+    if (watchComputeChanges && (event.type === 'sessionStarted' || event.type === 'sessionStopped'
+      || event.type === 'engineStateChanged' && event.state === 'ready'
+      || event.type === 'modelsPrewarmed' && event.state === 'ready')) {
+      void refreshComputeDevices().catch(() => undefined)
+    }
     if (event.type !== 'modelsPrewarmed') return
     settingsStore.setState({ captionService: event.state, captionServiceCode: null })
   })
@@ -437,6 +521,7 @@ export function detachSettingsStore(): void {
   unsubscribeCaptionService?.()
   unsubscribeCaptionService = null
   bridge = null
+  computeRefresh = null
   confirmed = null
   inFlight = []
   debouncePatch = null

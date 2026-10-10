@@ -13,8 +13,6 @@ export const computeSettingsSchema = z.object({
   gpuLayers: z.number().int().min(-1).max(1000).default(-1),
   contextSize: z.number().int().min(512).max(32768).default(2048),
   flashAttention: z.enum(['auto', 'on', 'off']).default('auto'),
-  runtimeId: z.string().regex(/^(bundled|[a-z0-9][a-z0-9-]{0,79})$/).default('auto'),
-  llamaRuntimeId: z.string().regex(/^(bundled|[a-z0-9][a-z0-9-]{0,79})$/).default('auto'),
 })
 
 export type ComputeSettings = z.infer<typeof computeSettingsSchema>
@@ -35,14 +33,13 @@ export const computeSettingsPatchSchema = z.object({
   gpuLayers: computeFields.gpuLayers.removeDefault(),
   contextSize: computeFields.contextSize.removeDefault(),
   flashAttention: computeFields.flashAttention.removeDefault(),
-  runtimeId: computeFields.runtimeId.removeDefault(),
-  llamaRuntimeId: computeFields.llamaRuntimeId.removeDefault(),
 }).partial()
 
 export const computeDeviceSchema = z.object({
   id: z.string().min(1).max(512), name: z.string().max(256),
   backend: z.string().max(32), torchDevice: z.string().max(64).nullable(),
   llamaDevice: z.string().max(64).nullable(),
+  llamaDeviceNative: z.string().max(64).nullable().optional(),
   totalMemoryMb: z.number().nonnegative(), freeMemoryMb: z.number().nonnegative(),
   integrated: z.boolean(), stableId: z.boolean(),
   recognition: z.boolean(), translation: z.boolean(),
@@ -59,7 +56,8 @@ export type ComputeSnapshot = z.infer<typeof computeSnapshotSchema>
 
 export const runtimePackageSchema = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,79}$/), name: z.string().min(1).max(256),
-  kind: z.enum(['engine', 'llama']), backend: z.enum(['cpu', 'cuda', 'xpu', 'rocm', 'vulkan']),
+  kind: z.enum(['engine', 'llama']), backend: z.enum(['cpu', 'cuda', 'xpu', 'rocm', 'vulkan', 'sycl', 'openvino']),
+  architecture: z.literal('x64').default('x64'),
   version: z.string().min(1).max(64), url: z.string().url().startsWith('https://'),
   sha256: z.string().regex(/^[a-f0-9]{64}$/), bytes: z.number().int().positive(),
   companions: z.array(z.object({ url: z.string().url().startsWith('https://'),
@@ -67,16 +65,18 @@ export const runtimePackageSchema = z.object({
 })
 export type RuntimePackage = z.infer<typeof runtimePackageSchema>
 export type RuntimePackageState = RuntimePackage & { installed: boolean }
+const runtimeWheelSchema = z.object({
+  url: z.string().url().startsWith('https://'), filename: z.string().regex(/^[a-zA-Z0-9+_.-]+\.whl$/),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/), bytes: z.number().int().positive(),
+})
 export const runtimeRecipeSchema = z.object({
   id: z.string().regex(/^(?!auto$|bundled$)[a-z0-9][a-z0-9-]{0,79}$/),
-  name: z.string().min(1).max(256), backend: z.literal('cuda'),
-  pythonAbi: z.literal('cp313-win_amd64'), torchVersion: z.string().regex(/^\d+\.\d+\.\d+\+cu\d+$/),
-  minimumDriver: z.string().regex(/^\d+\.\d+$/),
-  wheel: z.object({
-    url: z.string().url().startsWith('https://download.pytorch.org/whl/'),
-    filename: z.string().regex(/^torch-[a-zA-Z0-9+_.-]+\.whl$/),
-    sha256: z.string().regex(/^[a-f0-9]{64}$/), bytes: z.number().int().positive(),
-  }),
+  name: z.string().min(1).max(256), backend: z.enum(['cuda', 'cpu', 'xpu', 'directml']),
+  pythonAbi: z.literal('cp312-win_amd64'), torchVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
+  indexUrl: z.string().url().startsWith('https://download.pytorch.org/whl/'),
+  xformersVersion: z.string().optional(), directmlVersion: z.string().optional(),
+  wheel: runtimeWheelSchema, companions: z.array(runtimeWheelSchema).default([]),
+  requirements: z.array(z.string().min(1).max(128)),
 })
 export type RuntimeRecipe = z.infer<typeof runtimeRecipeSchema>
 export type RuntimeRecipeState = RuntimeRecipe & { installed: boolean; available: boolean; reason: string }
@@ -88,12 +88,15 @@ export type HardwareInventory = {
 export type RuntimeRecommendation = { engineId: string | null; llamaId: string | null; reasons: string[] }
 export type LocalRuntime = {
   path: string
-  source: 'project' | 'bundled'
-  status: 'ready' | 'missing' | 'failed'
+  status: 'ready' | 'missing' | 'failed' | 'incompatible'
   backend: string
   version: string
   gpuAvailable: boolean
   reason: string
+  id?: string
+  managed?: boolean
+  xformersVersion?: string
+  cudaVersion?: string
 }
 export type RuntimeSnapshot = {
   packages: RuntimePackageState[]
@@ -101,7 +104,8 @@ export type RuntimeSnapshot = {
   hardware: HardwareInventory
   recommendation: RuntimeRecommendation
   local: { engine: LocalRuntime; llama: LocalRuntime }
-  operation: { id: string; phase: 'download' | 'verify' | 'extract' | 'prepare' | 'check'; bytes: number; totalBytes: number } | null
+  python?: { path: string; version: string; ready: boolean; reason: string }
+  operation: { id: string; phase: 'download' | 'verify' | 'extract' | 'prepare' | 'check'; bytes: number; totalBytes: number; startedAt?: number; detail?: string } | null
   lastError: string | null
   directory: string
 }

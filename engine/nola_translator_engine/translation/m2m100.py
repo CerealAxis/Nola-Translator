@@ -146,7 +146,7 @@ class M2M100Runtime:
         tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir), local_files_only=True)
         model = M2M100ForConditionalGeneration.from_pretrained(
             str(self.model_dir),
-            dtype=resolve_dtype(device, self.precision),
+            torch_dtype=resolve_dtype(device, self.precision),
             local_files_only=True,
         )
         model = model.to(device).eval()

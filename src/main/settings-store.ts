@@ -130,6 +130,8 @@ export class SettingsStore {
           maxLines?: unknown
           translationMaxLines?: unknown
         }
+        /** The pre-`network` top-level mirror toggle; migrated into `network` on load. */
+        useHuggingFaceMirror?: unknown
       }
       // The legacy Argos relay toggle meant something else, so drop it rather than mapping it onto translateIntermediate.
       const rawTranslation = migrateTranslation({ ...(raw.translation ?? {}) })
@@ -146,9 +148,16 @@ export class SettingsStore {
         version: 1,
         uiLanguage: raw.uiLanguage === 'en' ? 'en' : 'zh-CN',
         modelStoragePath: typeof raw.modelStoragePath === 'string' && isAbsolute(raw.modelStoragePath) ? raw.modelStoragePath : '',
-        useHuggingFaceMirror: typeof raw.useHuggingFaceMirror === 'boolean'
-          ? raw.useHuggingFaceMirror
-          : DEFAULT_SETTINGS.useHuggingFaceMirror,
+        network: {
+          ...DEFAULT_SETTINGS.network,
+          ...(raw.network ?? {}),
+          // A build from before the group kept the mirror toggle at the top level; reading it here
+          // is the one place that value is honoured, so a user who turned it off does not get it
+          // back from the default above.
+          ...(typeof raw.useHuggingFaceMirror === 'boolean' && typeof raw.network?.useHuggingFaceMirror !== 'boolean'
+            ? { useHuggingFaceMirror: raw.useHuggingFaceMirror }
+            : {}),
+        },
         recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}) },
         recording: { ...DEFAULT_SETTINGS.recording, ...(raw.recording ?? {}) },
         appearance: { ...DEFAULT_SETTINGS.appearance, ...(raw.appearance ?? {}) },
@@ -246,6 +255,7 @@ export class SettingsStore {
       videoCaptions: { ...this.settings.videoCaptions, ...(patch.videoCaptions ?? {}) },
       translation: { ...this.settings.translation, ...(patch.translation ?? {}) },
       compute: { ...this.settings.compute, ...(patch.compute ?? {}) },
+      network: { ...this.settings.network, ...(patch.network ?? {}) },
     }
     // Writes share the load-time allowlist so no write path can persist an invalid language code.
     next.recognition.sourceLanguage = sanitizeSourceLanguage(next.recognition.sourceLanguage)

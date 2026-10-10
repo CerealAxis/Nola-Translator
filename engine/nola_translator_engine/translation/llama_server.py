@@ -230,11 +230,20 @@ class LlamaServerManager:
                 "--flash-attn", self._compute.flashAttention,
                 "--jinja",
             ]
+            child_env = dict(os.environ)
+            if ngl != 0 and self._selected_device and self._selected_device.backend == "openvino":
+                # b11532 chooses its native OpenVINO device via this variable, not --device.
+                # Source: ggml/src/ggml-openvino/ggml-openvino.cpp device descriptions.
+                native = self._selected_device.llamaDeviceNative
+                if not native:
+                    raise LlamaServerError("OpenVINO 设备缺少原生标识，请重新检查计算设备")
+                child_env["GGML_OPENVINO_DEVICE"] = native
             assert args[args.index("--host") + 1] == _HOST, "只能绑定 127.0.0.1"
             try:
                 process = self._popen(
                     args,
                     cwd=str(llama_dir),
+                    env=child_env,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.PIPE,
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),

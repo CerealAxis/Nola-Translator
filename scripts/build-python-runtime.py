@@ -1,6 +1,6 @@
-"""Build a relocatable private CPython + CPU model environment for the installer.
+"""Build the relocatable CPython base without optional inference components.
 
-Run with the CPU build venv; runtime installation never needs system Python or pip.
+Run with the Python 3.12 base build venv; runtime installation never needs system Python or pip.
 """
 from __future__ import annotations
 
@@ -55,12 +55,11 @@ def flatten_license_paths(site_packages: Path) -> None:
 
 
 def main() -> None:
-    if sys.platform != "win32" or sys.version_info[:2] != (3, 13):
-        raise RuntimeError("The release runtime requires Windows x64 CPython 3.13")
+    if sys.platform != "win32" or sys.version_info[:2] != (3, 12):
+        raise RuntimeError("The release runtime requires Windows x64 CPython 3.12")
     import struct
-    import torch
-    if struct.calcsize("P") != 8 or torch.version.cuda or torch.version.hip:
-        raise RuntimeError("Build from the x64 CPU environment")
+    if struct.calcsize("P") != 8:
+        raise RuntimeError("Build from an x64 environment")
     root = Path(__file__).resolve().parents[1]
     output = (root / "engine" / "dist").resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -83,13 +82,14 @@ def main() -> None:
             for source in base.glob(pattern):
                 if source.is_file():
                     shutil.copy2(source, staging / source.name)
-        if not (staging / "python.exe").exists() or not (staging / "python313.dll").exists():
+        if not (staging / "python.exe").exists() or not (staging / "python312.dll").exists():
             raise RuntimeError("The base Python installation is incomplete")
         shutil.copytree(base / "DLLs", staging / "DLLs", ignore=shutil.ignore_patterns("__pycache__"))
         shutil.copytree(base / "Lib", staging / "Lib",
                         ignore=shutil.ignore_patterns("site-packages", "__pycache__", "test", "tests"))
         shutil.copytree(dependencies, staging / "Lib" / "site-packages",
-                        ignore=shutil.ignore_patterns("__pycache__", "__editable__*"))
+                        ignore=shutil.ignore_patterns("__pycache__", "__editable__*", "torch", "torchgen", "functorch",
+                                                     "torch-*.dist-info", "torch_directml*", "xformers*", "torchaudio*", "torchvision*"))
         flatten_license_paths(staging / "Lib" / "site-packages")
         engine = staging / "Lib" / "site-packages" / "nola_translator_engine"
         if engine.exists():
@@ -109,8 +109,8 @@ def main() -> None:
             digest.update(source.relative_to(engine).as_posix().encode())
             digest.update(source.read_bytes())
         (staging / "runtime-base.json").write_text(json.dumps({
-            "fingerprint": digest.hexdigest(), "pythonAbi": "cp313-win_amd64",
-            "torchVersion": torch.__version__, "dependencies": versions,
+            "fingerprint": digest.hexdigest(), "pythonAbi": "cp312-win_amd64",
+            "dependencies": versions,
         }, indent=2), encoding="utf-8")
         if destination.exists():
             if not (destination / "runtime-base.json").is_file():
@@ -125,7 +125,7 @@ def main() -> None:
             raise
         if moved_old:
             remove_owned(backup)
-        print(f"Private CPU Python runtime: {destination}")
+        print(f"Python 3.12 base runtime: {destination}")
     finally:
         remove_owned(staging)
 

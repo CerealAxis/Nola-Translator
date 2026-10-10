@@ -1,6 +1,6 @@
 import { SettingsRow } from '../SettingsRow'
 /**
- * General: theme, reduced motion, UI language.
+ * General: theme, reduced motion, UI language, network.
  *
  * The theme goes through `useNolaTheme()` so this tab and the title bar share one controller:
  * it applies the theme first and persists it with `updateSettings({ theme })`, rolling back to
@@ -11,8 +11,8 @@ import { SettingsRow } from '../SettingsRow'
  * attribute as well as persisting the flag.
  */
 
-import { useCallback, useEffect } from 'react'
-import { ToggleButton, ToggleButtonGroup } from '@heroui/react'
+import { useCallback, useEffect, useState } from 'react'
+import { Input, TextField, ToggleButton, ToggleButtonGroup } from '@heroui/react'
 
 import { useNolaTheme } from '@/components/primitives'
 import { useI18n } from '@/i18n'
@@ -69,17 +69,7 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
         </SettingsRow>
       </SettingGroup>
 
-      <SettingGroup legend={t('settings.groupDownloads')}>
-        <SettingsRow label={t('settings.huggingFaceMirror')} desc={t('settings.huggingFaceMirrorHint')} descriptionTooltip>
-          <SettingSwitch
-            isSelected={settings.useHuggingFaceMirror}
-            ariaLabel={t('settings.huggingFaceMirror')}
-            onChange={(useHuggingFaceMirror) => {
-              void updateSettings({ useHuggingFaceMirror }).catch(() => undefined)
-            }}
-          />
-        </SettingsRow>
-      </SettingGroup>
+      <NetworkGroup settings={settings} />
     </div>
   )
 }
@@ -114,6 +104,120 @@ function ThemeRow() {
           </ToggleButton>
         ))}
       </ToggleButtonGroup>
+    </SettingsRow>
+  )
+}
+
+/**
+ * Mirror sources and proxying for every outbound download.
+ *
+ * The three proxy switches stay disabled while the address is empty: a switch reading "on" while
+ * every download path still ignores the proxy is the most misleading state this group could show.
+ */
+function NetworkGroup({ settings }: SettingsPanelProps) {
+  const { t } = useI18n()
+  const network = settings.network
+  const proxyConfigured = network.proxyUrl.trim() !== ''
+
+  return (
+    <SettingGroup legend={t('settings.groupNetwork')}>
+      <NetworkTextRow
+        label={t('settings.proxyUrl')}
+        desc={t('settings.proxyUrlHint')}
+        value={network.proxyUrl}
+        onCommit={(proxyUrl) => {
+          void updateSettings({ network: { proxyUrl } }).catch(() => undefined)
+        }}
+      />
+      <SettingsRow label={t('settings.proxyForPip')}>
+        <SettingSwitch
+          isSelected={network.proxyForPip}
+          isDisabled={!proxyConfigured}
+          ariaLabel={t('settings.proxyForPip')}
+          onChange={(proxyForPip) => {
+            void updateSettings({ network: { proxyForPip } }).catch(() => undefined)
+          }}
+        />
+      </SettingsRow>
+      <SettingsRow label={t('settings.proxyForModelDownload')}>
+        <SettingSwitch
+          isSelected={network.proxyForModelDownload}
+          isDisabled={!proxyConfigured}
+          ariaLabel={t('settings.proxyForModelDownload')}
+          onChange={(proxyForModelDownload) => {
+            void updateSettings({ network: { proxyForModelDownload } }).catch(() => undefined)
+          }}
+        />
+      </SettingsRow>
+      <SettingsRow label={t('settings.proxyForRuntimeDownload')}>
+        <SettingSwitch
+          isSelected={network.proxyForRuntimeDownload}
+          isDisabled={!proxyConfigured}
+          ariaLabel={t('settings.proxyForRuntimeDownload')}
+          onChange={(proxyForRuntimeDownload) => {
+            void updateSettings({ network: { proxyForRuntimeDownload } }).catch(() => undefined)
+          }}
+        />
+      </SettingsRow>
+      <SettingsRow label={t('settings.pypiMirror')} desc={t('settings.pypiMirrorHint')} descriptionTooltip>
+        <SettingSwitch
+          isSelected={network.usePypiMirror}
+          ariaLabel={t('settings.pypiMirror')}
+          onChange={(usePypiMirror) => {
+            void updateSettings({ network: { usePypiMirror } }).catch(() => undefined)
+          }}
+        />
+      </SettingsRow>
+      <SettingsRow label={t('settings.huggingFaceMirror')} desc={t('settings.huggingFaceMirrorHint')} descriptionTooltip>
+        <SettingSwitch
+          isSelected={network.useHuggingFaceMirror}
+          ariaLabel={t('settings.huggingFaceMirror')}
+          onChange={(useHuggingFaceMirror) => {
+            void updateSettings({ network: { useHuggingFaceMirror } }).catch(() => undefined)
+          }}
+        />
+      </SettingsRow>
+      <NetworkTextRow
+        label={t('settings.githubAccelerate')}
+        desc={t('settings.githubAccelerateHint')}
+        value={network.githubAccelerateUrl}
+        onCommit={(githubAccelerateUrl) => {
+          void updateSettings({ network: { githubAccelerateUrl } }).catch(() => undefined)
+        }}
+      />
+    </SettingGroup>
+  )
+}
+
+/**
+ * The stored value wins again once the field is left, so an edit from another window cannot cut a
+ * keystroke in half; the draft is only read while this field owns the focus.
+ */
+function NetworkTextRow({ label, desc, value, onCommit }: {
+  label: string
+  desc: string
+  value: string
+  onCommit: (value: string) => void
+}) {
+  const [draft, setDraft] = useState(value)
+  const [focused, setFocused] = useState(false)
+  const shown = focused ? draft : value
+  const commit = useCallback(() => {
+    setFocused(false)
+    if (draft !== value) onCommit(draft)
+  }, [draft, value, onCommit])
+
+  return (
+    <SettingsRow label={label} desc={desc} descriptionTooltip>
+      <TextField
+        value={shown}
+        onChange={setDraft}
+        onFocus={() => { setDraft(value); setFocused(true) }}
+        onBlur={commit}
+        className="w-[200px]"
+      >
+        <Input className="rounded-[8px]" aria-label={label} />
+      </TextField>
     </SettingsRow>
   )
 }

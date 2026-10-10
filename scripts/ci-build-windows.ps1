@@ -32,8 +32,7 @@ if (-not $pyInstallerRequirement) { throw 'PyInstaller requirement is missing' }
 & $hostPython -m pip install $pyInstallerRequirement
 Assert-NativeSuccess 'Install browser host build tool'
 & "$PSScriptRoot/build-browser-host.ps1" -Python $hostPython
-& "$PSScriptRoot/build-cpu-engine.ps1" -BasePython $basePython
-& "$PSScriptRoot/fetch-llama-cpu.ps1"
+& "$PSScriptRoot/build-python-base.ps1" -BasePython $basePython
 # Build separate x64 EXE and MSI installers.
 & node "$PSScriptRoot/ci-package-config.cjs"
 Assert-NativeSuccess 'Generate packaging configuration'

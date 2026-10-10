@@ -31,7 +31,7 @@ const channels = {
 export const APP_IPC_CHANNELS = channels
 
 /** Pages the caption overlay is allowed to send the main window to. */
-const OVERLAY_PAGES = new Set(['appearance', 'captions', 'resources', 'translation'])
+const OVERLAY_PAGES = new Set(['appearance', 'captions', 'resources', 'translation', 'torch', 'llama'])
 
 /** Top-level keys allowed in `credentials.json`. */
 const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'microsoft']

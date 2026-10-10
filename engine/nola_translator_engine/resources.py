@@ -25,7 +25,7 @@ from .models.catalog import (
 )
 from .models.manager import ModelManager, ModelSpec
 from .models.registry import CustomFile, CustomModelEntry, CustomModelRegistry
-from .protocol import ResourceChangedEvent, ResourceRecord, ModelConfiguration
+from .protocol import ResourceChangedEvent, ResourceRecord, ModelConfiguration, NetworkSettings
 from .model_capabilities import QWEN_LANGUAGES, normalize, recognition_configuration, translation_configuration, supports_translation
 from .hub import HYMT2_LANGUAGES
 from .translation.m2m100 import FLORES_LANGUAGES
@@ -278,7 +278,8 @@ class ResourceManager:
         )
 
     async def manage(
-        self, resource_id: str, action: Literal["install", "remove", "cancel"], use_mirror: bool = False
+        self, resource_id: str, action: Literal["install", "remove", "cancel"],
+        network: NetworkSettings | None = None,
     ) -> ResourceRecord:
         self._definition(resource_id)
         if action == "cancel":
@@ -307,7 +308,7 @@ class ResourceManager:
             cancel_event=threading.Event() if cancellable else None,
         )
         self.operations[resource_id] = operation
-        task = asyncio.create_task(self._run(resource_id, action, operation, use_mirror))
+        task = asyncio.create_task(self._run(resource_id, action, operation, network))
         self.tasks[resource_id] = task
         self._emit_changed(resource_id)
         return self.record(resource_id)
@@ -317,11 +318,11 @@ class ResourceManager:
         resource_id: str,
         action: Literal["install", "remove"],
         operation: Operation,
-        use_mirror: bool,
+        network: NetworkSettings | None,
     ) -> None:
         try:
             if action == "install":
-                await self._install(resource_id, operation, use_mirror)
+                await self._install(resource_id, operation, network)
             else:
                 await self._remove(resource_id)
         except ResourceOperationCancelled:
@@ -336,7 +337,9 @@ class ResourceManager:
             self.tasks.pop(resource_id, None)
             self._emit_changed(resource_id)
 
-    async def _install(self, resource_id: str, operation: Operation, use_mirror: bool) -> None:
+    async def _install(
+        self, resource_id: str, operation: Operation, network: NetworkSettings | None
+    ) -> None:
         spec = self._spec(resource_id)
         loop = asyncio.get_running_loop()
 
@@ -353,7 +356,7 @@ class ResourceManager:
                 return
             loop.call_soon_threadsafe(self._set_phase, resource_id, phase)
 
-        await asyncio.to_thread(self.models.ensure, spec, progress, on_phase, use_mirror)
+        await asyncio.to_thread(self.models.ensure, spec, progress, on_phase, network)
         # clean up legacy resources once the install succeeds; a cleanup failure doesn't change the result.
         await asyncio.to_thread(self._cleanup_after_install, resource_id)
 

@@ -1,4 +1,5 @@
 export const browserZh = {
+  torchUnavailable: 'PyTorch 未安装或无法调用，请前往 Nola 设置安装。', llamaUnavailable: 'llama.cpp 未安装或无法调用，请前往 Nola 设置安装。', runtimeSettings: '前往设置安装',
   chrome: 'Google Chrome', edge: 'Microsoft Edge', browserList: '浏览器扩展',
   settingsDescription: '在浏览器中使用 Nola 字幕。',
   extensionInstalled: '已安装', extensionNotInstalled: '未安装', extensionDisabled: '已停用', extensionDetecting: '正在检测', extensionUnknown: '无法确认扩展状态', browserUnavailable: '未检测到浏览器',
@@ -33,6 +34,7 @@ export const browserZh = {
   error: '字幕启动失败，请确认 Nola 正在运行且已启用浏览器连接。',
 } as const
 export const browserEn: { [K in keyof typeof browserZh]: string } = {
+  torchUnavailable: 'PyTorch is missing or unavailable. Install it in Nola settings.', llamaUnavailable: 'llama.cpp is missing or unavailable. Install it in Nola settings.', runtimeSettings: 'Install in settings',
   chrome: 'Google Chrome', edge: 'Microsoft Edge', browserList: 'Browser extensions',
   settingsDescription: 'Use Nola captions in your browser.',
   extensionInstalled: 'Installed', extensionNotInstalled: 'Not installed', extensionDisabled: 'Disabled', extensionDetecting: 'Detecting', extensionUnknown: 'Unable to confirm extension status', browserUnavailable: 'Browser not found',

@@ -45,6 +45,7 @@ export function Panel({ store }: PanelProps) {
     <ReadOnlyRow label={t('position')} value={`${Math.round(config.position)}%`} />
     <p className="nola-muted">{t('configManagedByDesktop')}</p>
     {state.error && <p role="alert" className="nola-error">{t(errorKey(state.error))}</p>}
+    {['torchUnavailable', 'llamaUnavailable'].includes(state.error ?? '') && <Button variant="secondary" onPress={() => { void store.openRuntimeSettings() }}>{t('runtimeSettings')}</Button>}
     <div className="nola-actions"><div className="nola-toggle"><Button variant={running || stopping ? 'danger' : 'primary'} isDisabled={running ? stopping : blocked} onPress={running ? () => { void store.stop() } : store.pressStart}>{running ? t('off') : stopping ? t('stopping') : startLabel}</Button></div>
       {!state.connected && <Button variant="secondary" isDisabled={locked} onPress={() => { void store.init() }}>{t('retry')}</Button>}
     </div>

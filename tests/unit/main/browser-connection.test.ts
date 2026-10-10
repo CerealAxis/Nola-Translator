@@ -16,7 +16,7 @@ import type { EngineCommand } from '../../../src/shared/contracts'
 import { ipcMain, dialog } from 'electron'
 import { BrowserIntegrations } from '../../../src/main/browser-integrations'
 
-vi.mock('electron', () => ({ app: { isPackaged: false, getPath: () => tmpdir() }, dialog: { showSaveDialog: vi.fn() }, ipcMain: { handle: vi.fn(), removeHandler: vi.fn() } }))
+vi.mock('electron', () => ({ app: { isPackaged: false, getPath: () => tmpdir(), getAppPath: () => resolve('.') }, dialog: { showSaveDialog: vi.fn() }, ipcMain: { handle: vi.fn(), removeHandler: vi.fn() } }))
 const disposers: Array<() => Promise<void>> = []
 afterEach(async () => { for (const dispose of disposers.splice(0)) await dispose(); vi.unstubAllEnvs() })
 

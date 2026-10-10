@@ -14,8 +14,12 @@ import { workspaceZh } from './workspace-ui'
 import { modelsSettingsZh } from './models-settings-ui'
 
 import { browserZh } from './browser-ui'
+import { runtimeZh } from './runtime-ui'
+import { computeUi } from '../features/settings/compute-ui'
 export const zhCN = {
   browser: browserZh,
+  runtime: runtimeZh,
+  compute: computeUi.zh,
   modelConfig: {
     title: '配置模型', pending: '待配置', edit: '编辑配置', configure: '配置并启用',
     description: '确认模型用途、运行引擎及语言能力。保存完整配置后，才能在同传中选择这个模型。',
@@ -349,12 +353,27 @@ export const zhCN = {
   },
 
   settings: {
+    loadFailed: '无法读取设置',
     title: '设置',
     groupAppearance: '外观',
     groupLanguage: '语言',
-    groupDownloads: '模型下载',
-    huggingFaceMirror: '使用 Hugging Face 镜像源',
-    huggingFaceMirrorHint: '模型权重通过 hf-mirror.com 下载。搜索和仓库信息仍从 Hugging Face 官方接口读取。',
+    /*
+     * 网络这一组按「谁负责加速哪一段下载」拆开：代理是一次性的通道，两个镜像各管一个上游，
+     * GitHub 前缀只补镜像覆盖不到的组件下载。地址与前缀留空都等于关闭，所以下面三条代理开关
+     * 在地址为空时是禁用状态。
+     */
+    groupNetwork: '网络设置',
+    proxyUrl: '代理服务器地址',
+    proxyUrlHint: '留空表示不使用代理，填写地址后下面三项开关才生效，例如 http://127.0.0.1:7890',
+    proxyForPip: '将代理应用到 Pip',
+    proxyForModelDownload: '将代理应用到模型下载',
+    proxyForRuntimeDownload: '将代理应用到组件下载',
+    pypiMirror: 'PyPI 国内镜像',
+    pypiMirrorHint: '通过国内镜像下载 Python 软件包',
+    huggingFaceMirror: 'Huggingface 国内镜像',
+    huggingFaceMirrorHint: '通过国内镜像下载 Huggingface 模型',
+    githubAccelerate: 'GitHub 加速',
+    githubAccelerateHint: '未镜像的组件下载加速；留空表示不加速，填写后拼在下载地址前，例如 https://ghfast.top',
     theme: '主题',
     reduceMotion: '减少动效',
     uiLanguage: '界面语言',

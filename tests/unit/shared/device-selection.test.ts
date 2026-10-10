@@ -10,8 +10,9 @@ const device: ComputeDevice = { id: 'llama:Vulkan1:Intel(R) UHD Graphics', name:
 
 describe('hardware device intent', () => {
   it('offers Intel Vulkan before its environment is installed, independent of local CUDA', () => {
-    expect(deviceCandidates(hardware, 'llama', runtime)).toEqual([expect.objectContaining({ value, supported: true, reason: '需准备环境' })])
-    expect(deviceCandidates(hardware, 'torch', runtime).every(c => !c.supported)).toBe(true)
+    expect(deviceCandidates(hardware, 'llama', runtime).map(c => c.backend)).toEqual(['vulkan', 'openvino', 'sycl'])
+    expect(deviceCandidates(hardware, 'llama', runtime)).toContainEqual(expect.objectContaining({ value, supported: true, reason: '需安装对应组件' }))
+    expect(deviceCandidates(hardware, 'torch', runtime).map(c => c.backend)).toEqual(['xpu', 'directml'])
   })
   it('resolves to the index from the newly selected backend, without modifying persisted intent', () => {
     expect(resolveDeviceIntent(value, hardware, [device], 'llama')).toBe(device.id)

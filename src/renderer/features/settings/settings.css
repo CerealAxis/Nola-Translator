@@ -138,3 +138,18 @@
   border-radius: var(--radius-md);
   color: var(--foreground);
 }
+
+.runtime-panels { display: flex; flex-direction: column; gap: var(--space-2); }
+.runtime-panel { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); }
+.runtime-panel-heading { padding: var(--space-2) var(--space-3); width: 100%; scroll-margin-top: var(--space-3); }
+.runtime-panel-heading > span { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); text-align: left; }
+.runtime-panel-heading strong { font: var(--nola-text-title); }
+.runtime-panel-heading small { font: var(--nola-text-caption); color: var(--muted); }
+.runtime-panel-body { padding: var(--space-2) var(--space-3); border-top: 1px solid var(--separator); display: flex; flex-direction: column; gap: var(--space-2); }
+.runtime-component-status { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; overflow-wrap: anywhere; text-align: right; }
+.runtime-component-status small { color: var(--success); }
+.runtime-actions, .runtime-progress { display: flex; justify-content: flex-end; align-items: center; gap: var(--space-2); }
+.runtime-progress { justify-content: space-between; }
+.runtime-progress-copy { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); overflow-wrap: anywhere; }
+.runtime-progress-copy small { font: var(--nola-text-caption); color: var(--muted); }
+.runtime-panel-body .select { min-width: 0; max-width: 100%; }

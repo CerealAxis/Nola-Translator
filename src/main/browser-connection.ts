@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { createServer, type Server, type Socket } from 'node:net'
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { appendFileSync } from 'node:fs'
@@ -29,6 +29,8 @@ const PUBLIC_ERRORS = ['sessionAlreadyRunning', 'sessionNotRunning', 'engineUpda
  */
 function publicErrorCode(error: unknown): string {
   const message = error instanceof Error ? error.message : ''
+  if (message.includes('RUNTIME_TORCH:')) return 'torchUnavailable'
+  if (message.includes('RUNTIME_LLAMA:')) return 'llamaUnavailable'
   const known = PUBLIC_ERRORS.find(code => message === code || message.includes(`：${code}`))
   if (known) return known
   console.error('browser request failed with an unmapped error', error)
@@ -337,6 +339,16 @@ export class BrowserConnection {
         return
       }
       const { engine, sessions } = this.options
+      if (request.type === 'runtimeSettings') {
+        const main = BrowserWindow.getAllWindows().find(window => !window.isDestroyed() && !window.webContents.getURL().includes('overlay=1'))
+        if (main) {
+          if (main.isMinimized()) main.restore()
+          main.show(); main.focus()
+          main.webContents.send('app:appearance-requested', request.component === 'engine' ? 'torch' : 'llama')
+        }
+        this.send(client, { type: 'result', id: request.id })
+        return
+      }
       if (request.type === 'hello') {
         await sessions.ensureReady()
         const settings = this.options.getSettings()

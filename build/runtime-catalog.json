@@ -2,29 +2,95 @@
   "version": 1,
   "packages": [
     {
-      "id": "llama-cuda-b11211",
-      "name": "llama.cpp CUDA 12.4",
+      "id": "llama-b11532-cpu",
+      "name": "llama.cpp b11532 \u00b7 Windows x64 (CPU)",
       "kind": "llama",
-      "backend": "cuda",
-      "version": "b11211",
-      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11211/llama-b11211-bin-win-cuda-12.4-x64.zip",
-      "sha256": "33c8475c137bdaf7d0c108b0e77cb02eddc26f53d193c3acf69f1e4237668081",
-      "bytes": 263078592,
-      "companions": [{
-        "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11211/cudart-llama-bin-win-cuda-12.4-x64.zip",
-        "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6",
-        "bytes": 391443627
-      }]
+      "backend": "cpu",
+      "version": "b11532",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11532/llama-b11532-bin-win-cpu-x64.zip",
+      "sha256": "db18cfa250eb692158eaf8fedb1dc5be0a9d280e87144b67465c774b664c5438",
+      "bytes": 19513620
     },
     {
-      "id": "llama-vulkan-b11211",
-      "name": "llama.cpp Vulkan",
+      "id": "llama-b11532-cuda-12-4",
+      "name": "llama.cpp b11532 \u00b7 Windows x64 (CUDA 12.4)",
+      "kind": "llama",
+      "backend": "cuda",
+      "version": "b11532",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11532/llama-b11532-bin-win-cuda-12.4-x64.zip",
+      "sha256": "520261241eacec1a3cc3b0ba2d9d731f969b7ab37891c80db8acf79559af8655",
+      "bytes": 265224412,
+      "companions": [
+        {
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11532/cudart-llama-bin-win-cuda-12.4-x64.zip",
+          "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6",
+          "bytes": 391443627
+        }
+      ]
+    },
+    {
+      "id": "llama-b11532-cuda-13-4",
+      "name": "llama.cpp b11532 \u00b7 Windows x64 (CUDA 13.4)",
+      "kind": "llama",
+      "backend": "cuda",
+      "version": "b11532",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11532/llama-b11532-bin-win-cuda-13.4-x64.zip",
+      "sha256": "6129dc25e278a21321f2d6f096da449c0577e76eb5d8da3abe1b7b9903d13026",
+      "bytes": 153460626,
+      "companions": [
+        {
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11532/cudart-llama-bin-win-cuda-13.4-x64.zip",
+          "sha256": "738f8c251ac22b70c3ae6f83a10cf222725df0395246a2cf58f32bdb85fbe668",
+          "bytes": 423535356
+        }
+      ]
+    },
+    {
+      "id": "llama-b11532-vulkan",
+      "name": "llama.cpp b11532 \u00b7 Windows x64 (Vulkan)",
       "kind": "llama",
       "backend": "vulkan",
-      "version": "b11211",
-      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11211/llama-b11211-bin-win-vulkan-x64.zip",
-      "sha256": "84205d373657d81e2ae272c2fefe72148e655d72684745aa8c137578d8e3a855",
-      "bytes": 33062372
+      "version": "b11532",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11532/llama-b11532-bin-win-vulkan-x64.zip",
+      "sha256": "33c3aed08c51abe576f741383796c012fb9cf06af40899ef2f5894d24463f18c",
+      "bytes": 33459042
+    },
+    {
+      "id": "llama-b11532-openvino-2026-4-1",
+      "name": "llama.cpp b11532 \u00b7 Windows x64 (OpenVINO 2026.4.1)",
+      "kind": "llama",
+      "backend": "openvino",
+      "version": "b11532",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11532/llama-b11532-bin-win-openvino-2026.4.1-x64.zip",
+      "sha256": "b75af11f21e634ff54e2046271cb937de7d55bf35625763e7c3b93941bf32c40",
+      "bytes": 89575930
+    },
+    {
+      "id": "llama-b11532-sycl",
+      "name": "llama.cpp b11532 \u00b7 Windows x64 (SYCL)",
+      "kind": "llama",
+      "backend": "sycl",
+      "version": "b11532",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11532/llama-b11532-bin-win-sycl-x64.zip",
+      "sha256": "e7e598485cb4c3a1ae59ca493b7abef0ef4f1dfc165f74e0c8ae9d9f74c5d26f",
+      "bytes": 148959686
+    },
+    {
+      "id": "llama-b11532-rocm-10-0",
+      "name": "llama.cpp b11532 \u00b7 Windows x64 (ROCm 10.0)",
+      "kind": "llama",
+      "backend": "rocm",
+      "version": "b11532",
+      "architecture": "x64",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11532/llama-b11532-bin-win-rocm-10.0-x64.zip",
+      "sha256": "14da7fb768d1ca3735227ce9e6bc7061722e9480acec115ec194a4d8a7f9758e",
+      "bytes": 257959818
     }
   ]
 }

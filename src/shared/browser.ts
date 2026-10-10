@@ -17,6 +17,7 @@ const timeline = { epoch: z.number().int().nonnegative(), videoTimeMs: z.number(
 const legacyLanguages = { sourceLanguage: z.string().min(1).max(32).optional(), targetLanguage: z.string().min(1).max(32).optional() }
 export const browserRequestSchema = z.discriminatedUnion('type', [
   z.object({ ...identity, type: z.literal('hello'), browser: z.enum(['chrome', 'edge']).optional() }).strict(),
+  z.object({ ...identity, type: z.literal('runtimeSettings'), component: z.enum(['engine', 'llama']) }).strict(),
   z.object({ ...identity, type: z.literal('start'), ...timeline, source: z.enum(['tab', 'system']), streamId: z.string().min(1).max(128), deviceId: z.string().min(1).max(512).optional(), ...legacyLanguages }).strict(),
   z.object({ ...session, type: z.literal('stop') }).strict(),
   z.object({ ...session, type: z.literal('finish'), epoch: timeline.epoch }).strict(),

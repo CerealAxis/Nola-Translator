@@ -428,6 +428,9 @@ export function createExtensionStore(dependencies: StoreDependencies) {
       } catch (error) { set({ connected: false, error: failCode(error) }) }
       scheduleSummaryRefresh()
     },
+    async openRuntimeSettings() {
+      await dependencies.bridge.request({ type: 'runtimeSettings', component: state.error === 'llamaUnavailable' ? 'llama' : 'engine' })
+    },
     togglePanel() { set({ panelOpen: !state.panelOpen }) },
     closePanel() { set({ panelOpen: false }) },
     chooseVideo(index: number) { if (state.status === 'idle') { explicitVideo = state.videos[index] ?? null; bind(explicitVideo) } },

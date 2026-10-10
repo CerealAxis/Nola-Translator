@@ -40,25 +40,21 @@ describe('Python 引擎进程', () => {
       await writeFile(join(managed, 'python.exe'), '')
       await writeFile(join(source, 'nola_translator_engine', '__main__.py'), '')
       const launch = createEngineLaunchSpec({ isPackaged, appPath: root, resourcesPath: resources, managedEngineDirectory: managed })
-      expect(launch.command).toBe(join(managed, 'python.exe'))
+      expect(launch.command).toBe(isPackaged ? join(resources, 'engine', 'python.exe') : join(root, 'engine', 'dist', 'NolaPythonEngine', 'python.exe'))
       expect(launch.args.slice(0, 2)).toEqual(['-I', '-c'])
-      expect(launch.args[2]).toContain(`sys.path.insert(0, ${JSON.stringify(source)})`)
+      expect(launch.args[2]).toContain(`sys.path[:0] = ${JSON.stringify([source, managed])}`)
       expect(launch.args[2]).toContain('runpy.run_module("nola_translator_engine", run_name="__main__")')
     } finally {
       await rm(root, { recursive: true, force: true })
     }
   })
 
-  it('开发态优先使用项目本地 Python，发布态使用打包后的 exe', () => {
-    expect(
-      createEngineLaunchSpec({ isPackaged: false, appPath: 'G:/app', resourcesPath: 'G:/resources' })
-    ).toMatchObject({
-      command: join('G:/app', '.venv', 'Scripts', 'python.exe'),
-      args: ['-m', 'nola_translator_engine'],
-    })
-    expect(
-      createEngineLaunchSpec({ isPackaged: true, appPath: 'G:/app', resourcesPath: 'G:/resources' })
-    ).toMatchObject({ command: join('G:/resources', 'engine', 'NolaTranslatorEngine.exe'), args: [] })
+  it('uses built-in Python 3.12 in development and packaged releases', () => {
+    const development = createEngineLaunchSpec({ isPackaged: false, appPath: 'G:/app', resourcesPath: 'G:/resources' })
+    expect(development.command).toBe(join('G:/app', 'engine', 'dist', 'NolaPythonEngine', 'python.exe'))
+    expect(development.args[2]).toContain('sys.version_info[:2] == (3,12)')
+    expect(createEngineLaunchSpec({ isPackaged: true, appPath: 'G:/app', resourcesPath: 'G:/resources' }).command)
+      .toBe(join('G:/resources', 'engine', 'python.exe'))
   })
 
   it('合并同一字幕段的中间版本，但不丢最终字幕、错误或模型进度', () => {

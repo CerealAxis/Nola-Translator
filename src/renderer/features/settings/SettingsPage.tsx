@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Alert, Card, Fieldset, ListBox, Spinner, Switch, Tabs, Tooltip } from '@heroui/react'
+import { Alert, Button, Card, Fieldset, ListBox, Spinner, Switch, Tabs, Tooltip } from '@heroui/react'
 import { Cpu, CircleHelp, Gauge, Database, Languages, Mic, Monitor, Settings, SlidersHorizontal } from 'lucide-react'
 
 import type { AppSettings } from '@/bridge'
 import { useI18n } from '@/i18n'
 import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, settingsPath, useRoute } from '@/routes'
 import type { SettingsTab } from '@/routes'
-import { stores, useStore } from '@/store'
+import { actions, isEngineConnected, stores, useStore } from '@/store'
 import { SelectField } from './index'
 import { GeneralTab } from './tabs/GeneralTab'
 import { AudioTab } from './tabs/AudioTab'
@@ -41,6 +41,17 @@ export function SettingsPage() {
   }, [])
 
   useEffect(() => { if (error) console.error('[settings]', error) }, [error])
+
+  if (!settings && (error || !isEngineConnected())) return (
+    <Alert status="danger">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>{t('settings.loadFailed')}</Alert.Title>
+        <Alert.Description>{error || t('errors.engineNotConnected')}</Alert.Description>
+        <Button variant="secondary" size="sm" onPress={() => void actions.settings.loadSettings().catch(() => undefined)}>{t('models.retry')}</Button>
+      </Alert.Content>
+    </Alert>
+  )
 
   if (!settings) return (
     <Card className="settings-group">
@@ -122,10 +133,10 @@ export function SettingSelect({ value, options, onChange, ariaLabel, className, 
   )
 }
 
-export interface SettingSwitchProps { isSelected: boolean; onChange: (next: boolean) => void; ariaLabel: string }
-export function SettingSwitch({ isSelected, onChange, ariaLabel }: SettingSwitchProps) {
+export interface SettingSwitchProps { isSelected: boolean; onChange: (next: boolean) => void; ariaLabel: string; isDisabled?: boolean }
+export function SettingSwitch({ isSelected, onChange, ariaLabel, isDisabled }: SettingSwitchProps) {
   return (
-    <Switch isSelected={isSelected} onChange={onChange} aria-label={ariaLabel}>
+    <Switch isSelected={isSelected} isDisabled={isDisabled} onChange={onChange} aria-label={ariaLabel}>
       <Switch.Content aria-label={ariaLabel}>
         <Switch.Control><Switch.Thumb /></Switch.Control>
       </Switch.Content>

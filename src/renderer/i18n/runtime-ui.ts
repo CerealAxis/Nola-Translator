@@ -1,0 +1,26 @@
+export const runtimeZh = {
+  components: '运行组件', python: 'Python', builtInPython: '内置 Python 3.12', installed: '已安装', missing: '未安装',
+  failed: '安装异常', incompatible: '与内置 Python 不兼容', recheck: '重新检查',
+  installTorch: '安装 PyTorch', installLlama: '安装 llama.cpp', torchDescription: '安装或切换用于语音识别与 PyTorch 翻译的组件',
+  llamaDescription: '安装或切换用于 GGUF 本地翻译的组件', current: '当前安装', select: '选择版本', choose: '请选择组合',
+  force: '强制重新安装', install: '安装', reinstall: '重新安装', cancel: '取消', repair: '环境修复', repairAction: '修复',
+  repairTorch: '重新安装当前 PyTorch 组合', repairLlama: '重新安装当前 llama.cpp 组合',
+  noticeTitle: '需要安装运行组件', noticeBody: '请选择适合电脑的版本与计算后端组合。安装完成后可开始同传。',
+  torchMissing: '尚未安装 PyTorch，语音识别功能无法启动。', llamaMissing: '尚未安装 llama.cpp，GGUF 本地翻译功能无法启动。',
+  goTorch: '前往设置安装 PyTorch', goLlama: '前往设置安装 llama.cpp', later: '稍后', busy: '请先结束同传，再安装或修复组件。',
+  engines: '推理引擎', recognitionEngine: '语音识别引擎', translationEngine: '本地翻译引擎', checking: '检查运行组件',
+  elapsed: '已用 {time}',
+}
+export const runtimeEn: typeof runtimeZh = {
+  components: 'Runtime components', python: 'Python', builtInPython: 'Built-in Python 3.12', installed: 'Installed', missing: 'Not installed',
+  failed: 'Installation error', incompatible: 'Incompatible with built-in Python', recheck: 'Check again',
+  installTorch: 'Install PyTorch', installLlama: 'Install llama.cpp', torchDescription: 'Install or switch components for recognition and PyTorch translation',
+  llamaDescription: 'Install or switch components for local GGUF translation', current: 'Current installation', select: 'Select version', choose: 'Select a combination',
+  force: 'Force reinstall', install: 'Install', reinstall: 'Reinstall', cancel: 'Cancel', repair: 'Repair components', repairAction: 'Repair',
+  repairTorch: 'Reinstall current PyTorch combination', repairLlama: 'Reinstall current llama.cpp combination',
+  noticeTitle: 'Runtime components need attention', noticeBody: 'Select a version and compute backend for your computer. Start captions after installation.',
+  torchMissing: 'PyTorch is not installed. Speech recognition cannot start.', llamaMissing: 'llama.cpp is not installed. Local GGUF translation cannot start.',
+  goTorch: 'Install PyTorch in settings', goLlama: 'Install llama.cpp in settings', later: 'Later', busy: 'End the caption session before installing or repairing components.',
+  engines: 'Inference engines', recognitionEngine: 'Speech recognition engine', translationEngine: 'Local translation engine', checking: 'Check runtime components',
+  elapsed: 'Elapsed {time}',
+}

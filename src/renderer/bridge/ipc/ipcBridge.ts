@@ -32,6 +32,8 @@ const OVERLAY_PAGE_TO_ROUTE: Record<OverlayTargetPage, { route: RouteId; path: s
   captions: { route: 'overlay', path: '#/overlay' },
   resources: { route: 'models', path: '#/models' },
   translation: { route: 'settings', path: '#/settings/translation' },
+  torch: { route: 'settings', path: '#/settings/compute?component=engine' },
+  llama: { route: 'settings', path: '#/settings/compute?component=llama' },
 }
 
 class MissingIpcApiError extends Error {
@@ -96,6 +98,7 @@ function subscribe<T>(method: keyof NolaTranslatorApi, run: (injected: NolaTrans
 export function createIpcBridge(): NolaBridge {
   return {
     runtimes: {
+      openSettings: component => call('openRuntimeSettings', injected => injected.openRuntimeSettings(component)),
       list: () => call('getRuntimes', (injected) => injected.getRuntimes()),
       prepare: () => call('prepareRuntimes', (injected) => injected.prepareRuntimes()),
       install: (id, repair) => call('installRuntime', (injected) => injected.installRuntime(id, repair)),

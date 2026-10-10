@@ -18,6 +18,7 @@ import { OverlayPage } from './features/overlay/OverlayPage'
 import { VideoCaptionsPage } from './features/video-captions/VideoCaptionsPage'
 import { ModelsPage } from './features/models'
 import { SettingsPage } from './features/settings'
+import { RuntimeNotice } from './features/settings/RuntimeNotice'
 
 /*
  * 桥接的唯一挂载点。
@@ -34,7 +35,7 @@ import { SettingsPage } from './features/settings'
 /** `?overlay=1` 走悬浮字幕的独立文档分叉，对齐主仓旧 `main.tsx` 的做法。 */
 const isOverlayDocument = new URLSearchParams(window.location.search).get('overlay') === '1'
 const bridge = createIpcBridge()
-initStores(bridge, { engineConnected: isIpcBridgeAvailable() })
+initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument })
 
 /** 页面表。四个 feature 都自己读路由取 id / tab，所以这里一律无 props。 */
 const PAGES = {
@@ -197,17 +198,7 @@ function dismissSplash() {
   window.setTimeout(() => splash.remove(), SPLASH_EXIT_MS)
 }
 
-/**
- * 启动画面盖到引擎结算为止。
- *
- * 冷启动要 `import torch`，实测 10 秒以上。splash 提前退场的话，用户看到的就是模型页
- * 一直转骨架屏 —— 那是"在等数据"，而此刻真正在等的是引擎本身，等它这段时间里界面
- * 本来就没有能显示的东西。
- *
- * `failed` 同样放行，不只有 `ready`：引擎失败是终态，而设置页里的运行时修复不依赖引擎，
- * 一直把 splash 盖着等于把唯一的自救入口也关在门外。没有 preload 的场合压根没有引擎状态
- * 可等，所以立刻退场，交给界面顶部那条横幅说话。
- */
+/** Release the splash after the component check and base engine settle; settings remain available on failure. */
 function useSplashUntilEngineSettles(): void {
   const engineStatus = useStore(stores.session, (state) => state.engineStatus)
   const settled = !isIpcBridgeAvailable() || engineStatus === 'ready' || engineStatus === 'failed'
@@ -240,6 +231,7 @@ function Root() {
     <ErrorBoundary>
       <Shell />
       <ModelCapabilityNotices />
+      <RuntimeNotice />
     </ErrorBoundary>
   )
 }

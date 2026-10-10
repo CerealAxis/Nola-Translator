@@ -1,5 +1,5 @@
 /**
- * The pre-start check: prepare the runtime, probe devices, then check models.
+ * The pre-start check: check components without installation, probe devices, then check models.
  *
  * A missing model is caught here rather than reported by the engine, so it
  * stays out of `errors.*` and out of the session status, and the dialog offers
@@ -18,10 +18,11 @@ import { Alert, Button, Modal, Spinner, toast } from '@heroui/react'
 import { CircleAlert } from 'lucide-react'
 
 import type { MissingResource } from '@/store'
-import { actions, getBridge, sessionStore, updateSettings } from '@/store'
+import { actions, sessionStore, stores } from '@/store'
 import { useI18n } from '@/i18n'
 import { computeUi } from '../settings/compute-ui'
-import type { RuntimeSnapshot } from '../../../shared/compute'
+import { translationEngine } from '../../../shared/model-engines'
+import { NO_TRANSLATION_LANGUAGE } from '../../../shared/settings'
 
 /** `engineFailed` is not "a step failed" but "this dialog cannot reach a verdict". */
 type Stage = 'environment' | 'environmentFailed' | 'devices' | 'models' | 'missing' | 'ready' | 'engineFailed'
@@ -39,7 +40,6 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
   const { t, language } = useI18n()
   const c = language === 'en' ? computeUi.en : computeUi.zh
   const [stage, setStage] = useState<Stage>('environment')
-  const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null)
   const [environmentError, setEnvironmentError] = useState('')
   const missingRef = useRef(missing)
   missingRef.current = missing
@@ -57,11 +57,15 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
     setDeviceOk(false)
     setInstalling(false)
 
-    const bridge = getBridge()
     void (async () => {
       try {
-        if (!bridge) throw new Error('IPC bridge unavailable')
-        await bridge.runtimes.prepare()
+        const runtime = await actions.settings.loadRuntimeComponents(true)
+        const settings = stores.settings.getState().settings
+        const resource = stores.models.getState().resources.find(r => r.resourceId === settings?.translation.localModelId)
+        const needsLlama = settings && settings.translation.provider === 'local' && settings.translation.targetLanguage !== NO_TRANSLATION_LANGUAGE &&
+          translationEngine(settings.compute, resource?.provider, settings.translation.localModelId) === 'llama'
+        if (runtime.local.engine.status !== 'ready') throw new Error(runtime.local.engine.reason || t('runtime.torchMissing'))
+        if (needsLlama && runtime.local.llama.status !== 'ready') throw new Error(runtime.local.llama.reason || t('runtime.llamaMissing'))
       } catch (error) {
         if (alive()) { setEnvironmentError(String(error)); setStage('environmentFailed') }
         return
@@ -73,7 +77,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
       // engine not answering, which makes a model conclusion false too.
       let engineIsCause = false
       try {
-        const devices = await bridge?.engine.listDevices()
+        const devices = await actions.models.probeAudioDevices()
         if (alive()) setDeviceOk((devices ?? []).length > 0)
       } catch {
         /*
@@ -125,15 +129,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
       if (!alive()) return
       setStage(missingRef.current ? 'missing' : 'ready')
     })()
-  }, [])
-
-  useEffect(() => {
-    if (!isOpen || stage !== 'environment') return
-    const refresh = () => { void getBridge()?.runtimes.list().then(setRuntime).catch(() => undefined) }
-    refresh()
-    const timer = setInterval(refresh, 1000)
-    return () => clearInterval(timer)
-  }, [isOpen, stage])
+  }, [t])
 
   // Re-run on every open: the model may have been installed after "later", so
   // the result cannot be cached.
@@ -180,7 +176,6 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
   const close = (open: boolean) => {
     if (!open) {
       runRef.current += 1
-      if (environmentPending) void getBridge()?.runtimes.cancel()
     }
     onOpenChange(open)
   }
@@ -199,16 +194,11 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
 
             <Modal.Body className="flex flex-col gap-3">
               <ChecklistRow done={!environmentPending && !environmentFailed} failed={environmentFailed}
-                pending={environmentPending} label={c.checkingEnvironment} failedLabel={c.environmentFailed} />
-              {environmentPending && runtime?.operation ? <p role="status" className="nola-caption text-muted">
-                {c[runtime.operation.phase]} · {Math.round(runtime.operation.bytes / 2 ** 20)} / {Math.round(runtime.operation.totalBytes / 2 ** 20)} MiB
-              </p> : null}
+                pending={environmentPending} label={t('runtime.checking')} failedLabel={t('runtime.noticeTitle')} />
               {environmentFailed ? <Alert status="danger"><Alert.Content><Alert.Description>{environmentError}</Alert.Description>
-                <Button variant="tertiary" size="sm" onPress={runCheck}>{c.retry}</Button>
-                <Button variant="tertiary" size="sm" onPress={() => {
-                  void updateSettings({ compute: { runtimeId: 'bundled', llamaRuntimeId: 'bundled', recognitionDevice: 'cpu', translationDevice: 'cpu', precision: 'auto', quantization: 'none' } })
-                    .then(runCheck).catch(error => setEnvironmentError(String(error)))
-                }}>{c.useCpu}</Button>
+                <Button variant="tertiary" size="sm" onPress={() => { close(false); void actions.settings.openRuntimeSettings('engine') }}>{t('runtime.goTorch')}</Button>
+                <Button variant="tertiary" size="sm" onPress={() => { close(false); void actions.settings.openRuntimeSettings('llama') }}>{t('runtime.goLlama')}</Button>
+                <Button variant="tertiary" size="sm" onPress={runCheck}>{t('runtime.recheck')}</Button>
               </Alert.Content></Alert> : null}
               {!environmentPending && !environmentFailed ? <>
               <ChecklistRow

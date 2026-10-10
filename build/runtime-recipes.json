@@ -2,18 +2,3168 @@
   "version": 1,
   "recipes": [
     {
-      "id": "torch-cuda-cu126",
-      "name": "PyTorch CUDA 12.6",
+      "id": "torch-2-14-1-cu132",
+      "name": "Torch 2.14.1 (CUDA 13.2)",
       "backend": "cuda",
-      "pythonAbi": "cp313-win_amd64",
-      "torchVersion": "2.13.0+cu126",
-      "minimumDriver": "560.76",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu132",
       "wheel": {
-        "url": "https://download.pytorch.org/whl/cu126/torch-2.13.0%2Bcu126-cp313-cp313-win_amd64.whl",
-        "filename": "torch-2.13.0+cu126-cp313-cp313-win_amd64.whl",
-        "sha256": "cb91b2f91d053bb91e413459a13ec8b036ff348d03e411e9c29988cc6edb7b32",
-        "bytes": 2594592768
-      }
+        "url": "https://download-r2.pytorch.org/whl/cu132/torch-2.14.1%2Bcu132-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.1+cu132-cp312-cp312-win_amd64.whl",
+        "sha256": "882a670a7e2a17f2eb351406dc4a235455fd9256ac737752de5f1279e2a1df8c",
+        "bytes": 1993688363
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-14-1-cu130",
+      "name": "Torch 2.14.1 (CUDA 13.0)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.14.1%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.1+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "0a09031e93632d14ef49553acd6211ece3ae9cdc0969a369b8c24e3cc4d15be9",
+        "bytes": 1990608063
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-14-1-cu130-xf-0-0-35",
+      "name": "Torch 2.14.1 (CUDA 13.0) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.14.1%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.1+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "0a09031e93632d14ef49553acd6211ece3ae9cdc0969a369b8c24e3cc4d15be9",
+        "bytes": 1990608063
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "517d5a92d0b08393185f02580cf03ad17e9db12d739fc21e790ed1393df85cf4",
+          "bytes": 4800048
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-14-1-cu126",
+      "name": "Torch 2.14.1 (CUDA 12.6)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.14.1%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.1+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "97e3bc87ea74367518b740d912a7f5259c25a3c8115bf5916abee1d53ff115a4",
+        "bytes": 2602768778
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-14-1-cu126-xf-0-0-35",
+      "name": "Torch 2.14.1 (CUDA 12.6) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.14.1%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.1+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "97e3bc87ea74367518b740d912a7f5259c25a3c8115bf5916abee1d53ff115a4",
+        "bytes": 2602768778
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu126/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "68f82ada282e30f8f3d61a6ba13d2baea92231dfa2e68795d616600e9cef4f57",
+          "bytes": 2638724
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-14-1-xpu",
+      "name": "Torch 2.14.1 (Intel XPU)",
+      "backend": "xpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.1",
+      "indexUrl": "https://download.pytorch.org/whl/xpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.14.1%2Bxpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.1+xpu-cp312-cp312-win_amd64.whl",
+        "sha256": "5023ab23acb1fee3f14559196a8db8e8014193c124ad0804d046a3bad82b1c63",
+        "bytes": 764641745
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-14-1-cpu",
+      "name": "Torch 2.14.1 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.1",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.1+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "c52adc3bd526ff7fc5bdcc58fc4a76e6214d09951b646ffe5256ebd7ba60cef1",
+        "bytes": 123996008
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-14-0-cu132",
+      "name": "Torch 2.14.0 (CUDA 13.2)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu132",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu132/torch-2.14.0%2Bcu132-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.0+cu132-cp312-cp312-win_amd64.whl",
+        "sha256": "c7883d0c3426136dce06aabbb7f6924c15ffa0aa79e2d2a3d9bdcd84bbccd54c",
+        "bytes": 1993738732
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-14-0-cu130",
+      "name": "Torch 2.14.0 (CUDA 13.0)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.14.0%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.0+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "6a20371bf5af2af933a6149e5ec13f7ea7ad506276137dae9386f98d236c02ff",
+        "bytes": 1990604486
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-14-0-cu130-xf-0-0-35",
+      "name": "Torch 2.14.0 (CUDA 13.0) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.14.0%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.0+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "6a20371bf5af2af933a6149e5ec13f7ea7ad506276137dae9386f98d236c02ff",
+        "bytes": 1990604486
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "517d5a92d0b08393185f02580cf03ad17e9db12d739fc21e790ed1393df85cf4",
+          "bytes": 4800048
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-14-0-cu126",
+      "name": "Torch 2.14.0 (CUDA 12.6)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.14.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "11a492e40dfd18597fdb8271879a3a09496a23140deb81a6b5a005d9cff7312b",
+        "bytes": 2602771598
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-14-0-cu126-xf-0-0-35",
+      "name": "Torch 2.14.0 (CUDA 12.6) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.14.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "11a492e40dfd18597fdb8271879a3a09496a23140deb81a6b5a005d9cff7312b",
+        "bytes": 2602771598
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu126/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "68f82ada282e30f8f3d61a6ba13d2baea92231dfa2e68795d616600e9cef4f57",
+          "bytes": 2638724
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-14-0-xpu",
+      "name": "Torch 2.14.0 (Intel XPU)",
+      "backend": "xpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.0",
+      "indexUrl": "https://download.pytorch.org/whl/xpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.14.0%2Bxpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.0+xpu-cp312-cp312-win_amd64.whl",
+        "sha256": "9acd595fe85000de53edcb6e0b176bb963b0eac8cf3239caf70b720041433fcb",
+        "bytes": 764639818
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-14-0-cpu",
+      "name": "Torch 2.14.0 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.14.0",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.14.0%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.14.0+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "738cd9237bf63443a5e5f9652e5115f7b0510b089636a43d4011e9fccede714f",
+        "bytes": 123996119
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-13-0-cu132",
+      "name": "Torch 2.13.0 (CUDA 13.2)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.13.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu132",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu132/torch-2.13.0%2Bcu132-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.13.0+cu132-cp312-cp312-win_amd64.whl",
+        "sha256": "0bcf7ae00b2e20ef2b53af2e764a4fd8646b913bfaaeba2b9c975e672e8c7902",
+        "bytes": 1917946849
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-13-0-cu130",
+      "name": "Torch 2.13.0 (CUDA 13.0)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.13.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.13.0%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.13.0+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "2efab1e83604ca628c6d85b9e188c153690980498d1297081a9dad704919303c",
+        "bytes": 1915519202
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-13-0-cu130-xf-0-0-35",
+      "name": "Torch 2.13.0 (CUDA 13.0) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.13.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.13.0%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.13.0+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "2efab1e83604ca628c6d85b9e188c153690980498d1297081a9dad704919303c",
+        "bytes": 1915519202
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "517d5a92d0b08393185f02580cf03ad17e9db12d739fc21e790ed1393df85cf4",
+          "bytes": 4800048
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-13-0-cu126",
+      "name": "Torch 2.13.0 (CUDA 12.6)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.13.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.13.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.13.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "380081ea098bf2b9e727aa85205d94790d884d17c62df3bb00a4f6a1047010a2",
+        "bytes": 2594590371
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-13-0-cu126-xf-0-0-35",
+      "name": "Torch 2.13.0 (CUDA 12.6) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.13.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.13.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.13.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "380081ea098bf2b9e727aa85205d94790d884d17c62df3bb00a4f6a1047010a2",
+        "bytes": 2594590371
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu126/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "68f82ada282e30f8f3d61a6ba13d2baea92231dfa2e68795d616600e9cef4f57",
+          "bytes": 2638724
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-13-0-xpu",
+      "name": "Torch 2.13.0 (Intel XPU)",
+      "backend": "xpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.13.0",
+      "indexUrl": "https://download.pytorch.org/whl/xpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.13.0%2Bxpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.13.0+xpu-cp312-cp312-win_amd64.whl",
+        "sha256": "f55f66c89c1151fba09da185bc005200b9270a4d00a7531e8b2e77facb54ca02",
+        "bytes": 786525195
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-13-0-cpu",
+      "name": "Torch 2.13.0 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.13.0",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.13.0%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.13.0+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "a8b450c1e58e5800e5b4691dac412f8d2d65a1dc3298166f91596603a3531e6f",
+        "bytes": 121933498
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-12-1-cu132",
+      "name": "Torch 2.12.1 (CUDA 13.2)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu132",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu132/torch-2.12.1%2Bcu132-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.1+cu132-cp312-cp312-win_amd64.whl",
+        "sha256": "5c6c00824a460bfc970d81fc869924b2510cc42e8857c4e87156b8b282e1f5c3",
+        "bytes": 1929153796
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-12-1-cu130",
+      "name": "Torch 2.12.1 (CUDA 13.0)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.12.1%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.1+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "52c5da6a0898d5d3473c02bd304b7a3bc0b72e351c6f3bfa0783e45ef9f4cd61",
+        "bytes": 1926431198
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-12-1-cu130-xf-0-0-35",
+      "name": "Torch 2.12.1 (CUDA 13.0) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.12.1%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.1+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "52c5da6a0898d5d3473c02bd304b7a3bc0b72e351c6f3bfa0783e45ef9f4cd61",
+        "bytes": 1926431198
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "517d5a92d0b08393185f02580cf03ad17e9db12d739fc21e790ed1393df85cf4",
+          "bytes": 4800048
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-12-1-cu126",
+      "name": "Torch 2.12.1 (CUDA 12.6)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.12.1%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.1+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "71ee0eca3bde3a4067dfbc28c705b914d0773edd29ac4a634ad5e7a07f336aa1",
+        "bytes": 2620768231
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-12-1-cu126-xf-0-0-35",
+      "name": "Torch 2.12.1 (CUDA 12.6) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.12.1%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.1+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "71ee0eca3bde3a4067dfbc28c705b914d0773edd29ac4a634ad5e7a07f336aa1",
+        "bytes": 2620768231
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu126/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "68f82ada282e30f8f3d61a6ba13d2baea92231dfa2e68795d616600e9cef4f57",
+          "bytes": 2638724
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-12-1-xpu",
+      "name": "Torch 2.12.1 (Intel XPU)",
+      "backend": "xpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.1",
+      "indexUrl": "https://download.pytorch.org/whl/xpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.12.1%2Bxpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.1+xpu-cp312-cp312-win_amd64.whl",
+        "sha256": "cfbe9f3ea7692977ce0184a8f0ffb2a616d29f48ca3ce751e33775bd1f44fe4b",
+        "bytes": 746583295
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-12-1-cpu",
+      "name": "Torch 2.12.1 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.1",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.12.1%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.1+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "51c6c6e26eaa0d64ed439ebdc9ce3b8cc2d5cfcc7cdd4e72f17831d80886b7f4",
+        "bytes": 122900729
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-12-0-cu132",
+      "name": "Torch 2.12.0 (CUDA 13.2)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu132",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu132/torch-2.12.0%2Bcu132-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.0+cu132-cp312-cp312-win_amd64.whl",
+        "sha256": "59d4ffe54376b8e6b78622cb8e2b186c4d84963c5a06ed56299d2eee6c5bcb85",
+        "bytes": 1929133628
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-12-0-cu130",
+      "name": "Torch 2.12.0 (CUDA 13.0)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.12.0%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.0+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "24e75a0c3ea4243067d7560955f2eef6466e9365de7dd4a3a4b8693c9ac4bccf",
+        "bytes": 1926429522
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-12-0-cu130-xf-0-0-35",
+      "name": "Torch 2.12.0 (CUDA 13.0) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.12.0%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.0+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "24e75a0c3ea4243067d7560955f2eef6466e9365de7dd4a3a4b8693c9ac4bccf",
+        "bytes": 1926429522
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "517d5a92d0b08393185f02580cf03ad17e9db12d739fc21e790ed1393df85cf4",
+          "bytes": 4800048
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-12-0-cu126",
+      "name": "Torch 2.12.0 (CUDA 12.6)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.12.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "194f5bd0721b968e769777b8ab4dbe51dd7ffdfdf295db045093b94a1b9765bb",
+        "bytes": 2620765517
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-12-0-cu126-xf-0-0-35",
+      "name": "Torch 2.12.0 (CUDA 12.6) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.12.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "194f5bd0721b968e769777b8ab4dbe51dd7ffdfdf295db045093b94a1b9765bb",
+        "bytes": 2620765517
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu126/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "68f82ada282e30f8f3d61a6ba13d2baea92231dfa2e68795d616600e9cef4f57",
+          "bytes": 2638724
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-12-0-xpu",
+      "name": "Torch 2.12.0 (Intel XPU)",
+      "backend": "xpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.0",
+      "indexUrl": "https://download.pytorch.org/whl/xpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.12.0%2Bxpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.0+xpu-cp312-cp312-win_amd64.whl",
+        "sha256": "7f1d40febf2b8724adf4ff23866897d87478cc43de2a20f7776dc00be334c464",
+        "bytes": 746584511
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-12-0-cpu",
+      "name": "Torch 2.12.0 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.12.0",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.12.0%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.12.0+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "70ead47f538417323a230c0e743e5cbb6d91f11bd8339abf8c05c9d02f8409bc",
+        "bytes": 122900744
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-11-0-cu130",
+      "name": "Torch 2.11.0 (CUDA 13.0)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.11.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.11.0%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.11.0+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "ef8beae16d781c3244ef28dc7bee6d8871c26bbde65d5bf66e902cb61972c4ab",
+        "bytes": 1915224818
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-11-0-cu130-xf-0-0-35",
+      "name": "Torch 2.11.0 (CUDA 13.0) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.11.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.11.0%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.11.0+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "ef8beae16d781c3244ef28dc7bee6d8871c26bbde65d5bf66e902cb61972c4ab",
+        "bytes": 1915224818
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "517d5a92d0b08393185f02580cf03ad17e9db12d739fc21e790ed1393df85cf4",
+          "bytes": 4800048
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-11-0-cu128",
+      "name": "Torch 2.11.0 (CUDA 12.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.11.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.11.0%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.11.0+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "7c78215c3af4f62e63f2b2e360f1722fc719b0853c7ac22666483d9810613a4c",
+        "bytes": 2753189216
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-11-0-cu128-xf-0-0-35",
+      "name": "Torch 2.11.0 (CUDA 12.8) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.11.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.11.0%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.11.0+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "7c78215c3af4f62e63f2b2e360f1722fc719b0853c7ac22666483d9810613a4c",
+        "bytes": 2753189216
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu128/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "57381ce3cbb79b593e6b62cb20a937885345fad2796de2aa6fbb66c033601179",
+          "bytes": 2638618
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-11-0-cu126",
+      "name": "Torch 2.11.0 (CUDA 12.6)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.11.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.11.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.11.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "1b7d728ddcf84b12f64ca10ec5f6ce91dd9edcc5e62ed5f0a7260ca00f029e8b",
+        "bytes": 2596453924
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-11-0-cu126-xf-0-0-35",
+      "name": "Torch 2.11.0 (CUDA 12.6) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.11.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.11.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.11.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "1b7d728ddcf84b12f64ca10ec5f6ce91dd9edcc5e62ed5f0a7260ca00f029e8b",
+        "bytes": 2596453924
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu126/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "68f82ada282e30f8f3d61a6ba13d2baea92231dfa2e68795d616600e9cef4f57",
+          "bytes": 2638724
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-11-0-xpu",
+      "name": "Torch 2.11.0 (Intel XPU)",
+      "backend": "xpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.11.0",
+      "indexUrl": "https://download.pytorch.org/whl/xpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.11.0%2Bxpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.11.0+xpu-cp312-cp312-win_amd64.whl",
+        "sha256": "095a50ae7d13fc91cdd07ab893129e10eb5b09e3baff686e91dffe59bfeadaa6",
+        "bytes": 724760669
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-11-0-cpu",
+      "name": "Torch 2.11.0 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.11.0",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.11.0+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "1abeaa46fa7532ed35ed79146f4de5d7a9d4b30462c98052ea4ddfe781ea3eca",
+        "bytes": 114469197
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-10-0-cu130",
+      "name": "Torch 2.10.0 (CUDA 13.0)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.10.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.10.0%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.10.0+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "224649fa0ab181ec483cc368e3303dda1760e4ba31bea806b88979f855436aaa",
+        "bytes": 1867405006
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-10-0-cu130-xf-0-0-35",
+      "name": "Torch 2.10.0 (CUDA 13.0) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.10.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.10.0%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.10.0+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "224649fa0ab181ec483cc368e3303dda1760e4ba31bea806b88979f855436aaa",
+        "bytes": 1867405006
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu130/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "517d5a92d0b08393185f02580cf03ad17e9db12d739fc21e790ed1393df85cf4",
+          "bytes": 4800048
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-10-0-cu128",
+      "name": "Torch 2.10.0 (CUDA 12.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.10.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.10.0%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.10.0+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "fbde8f6a9ec8c76979a0d14df21c10b9e5cab6f0d106a73ca73e2179bc597cae",
+        "bytes": 2867409626
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-10-0-cu128-xf-0-0-35",
+      "name": "Torch 2.10.0 (CUDA 12.8) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.10.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.10.0%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.10.0+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "fbde8f6a9ec8c76979a0d14df21c10b9e5cab6f0d106a73ca73e2179bc597cae",
+        "bytes": 2867409626
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu128/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "57381ce3cbb79b593e6b62cb20a937885345fad2796de2aa6fbb66c033601179",
+          "bytes": 2638618
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-10-0-cu126",
+      "name": "Torch 2.10.0 (CUDA 12.6)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.10.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.10.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.10.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "95d8409b8a15191de4c2958e86ca47f3ea8f9739b994ee4ca0e7586f37336413",
+        "bytes": 2589881452
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-10-0-cu126-xf-0-0-35",
+      "name": "Torch 2.10.0 (CUDA 12.6) + xFormers 0.0.35",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.10.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.10.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.10.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "95d8409b8a15191de4c2958e86ca47f3ea8f9739b994ee4ca0e7586f37336413",
+        "bytes": 2589881452
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu126/xformers-0.0.35-py39-none-win_amd64.whl",
+          "filename": "xformers-0.0.35-py39-none-win_amd64.whl",
+          "sha256": "68f82ada282e30f8f3d61a6ba13d2baea92231dfa2e68795d616600e9cef4f57",
+          "bytes": 2638724
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.35"
+    },
+    {
+      "id": "torch-2-10-0-xpu",
+      "name": "Torch 2.10.0 (Intel XPU)",
+      "backend": "xpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.10.0",
+      "indexUrl": "https://download.pytorch.org/whl/xpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.10.0%2Bxpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.10.0+xpu-cp312-cp312-win_amd64.whl",
+        "sha256": "3ad605be4728b6d3a28a44d07dd794b1a9e45551b0057815bf25eb2a6d6a56a7",
+        "bytes": 705492488
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-10-0-cpu",
+      "name": "Torch 2.10.0 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.10.0",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.10.0%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.10.0+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "21cb5436978ef47c823b7a813ff0f8c2892e266cfe0f1d944879b5fba81bf4e1",
+        "bytes": 113671330
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-9-1-cu130",
+      "name": "Torch 2.9.1 (CUDA 13.0)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.9.1%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.1+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "cd3232a562ad2a2699d48130255e1b24c07dfe694a40dcd24fad683c752de121",
+        "bytes": 1862081240
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-9-1-cu130-xf-0-0-33-post2",
+      "name": "Torch 2.9.1 (CUDA 13.0) + xFormers 0.0.33.post2",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.9.1%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.1+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "cd3232a562ad2a2699d48130255e1b24c07dfe694a40dcd24fad683c752de121",
+        "bytes": 1862081240
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu130/xformers-0.0.33.post2-cp39-abi3-win_amd64.whl",
+          "filename": "xformers-0.0.33.post2-cp39-abi3-win_amd64.whl",
+          "sha256": "fdf45507164c1a5fd03279c42fec82088b9fbec5af76cb0af69aa965a33f3802",
+          "bytes": 8312301
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.33.post2"
+    },
+    {
+      "id": "torch-2-9-1-cu128",
+      "name": "Torch 2.9.1 (CUDA 12.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.9.1%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.1+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "3a01f0b64c10a82d444d9fd06b3e8c567b1158b76b2764b8f51bfd8f535064b0",
+        "bytes": 2862033275
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-9-1-cu128-xf-0-0-33-post2",
+      "name": "Torch 2.9.1 (CUDA 12.8) + xFormers 0.0.33.post2",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.9.1%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.1+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "3a01f0b64c10a82d444d9fd06b3e8c567b1158b76b2764b8f51bfd8f535064b0",
+        "bytes": 2862033275
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu128/xformers-0.0.33.post2-cp39-abi3-win_amd64.whl",
+          "filename": "xformers-0.0.33.post2-cp39-abi3-win_amd64.whl",
+          "sha256": "4a0a59a0c698a483f13ecad967dbbe71386827985e80cc373bec4cdf9aed59cd",
+          "bytes": 105088221
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.33.post2"
+    },
+    {
+      "id": "torch-2-9-1-cu126",
+      "name": "Torch 2.9.1 (CUDA 12.6)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.9.1%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.1+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "f2f1c68c7957ed8b6b56fc450482eb3fa53947fb74838b03834a1760451cf60f",
+        "bytes": 2584508946
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-9-1-cu126-xf-0-0-33-post2",
+      "name": "Torch 2.9.1 (CUDA 12.6) + xFormers 0.0.33.post2",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.9.1%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.1+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "f2f1c68c7957ed8b6b56fc450482eb3fa53947fb74838b03834a1760451cf60f",
+        "bytes": 2584508946
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu126/xformers-0.0.33.post2-cp39-abi3-win_amd64.whl",
+          "filename": "xformers-0.0.33.post2-cp39-abi3-win_amd64.whl",
+          "sha256": "c1142f7418ff5e501675c52a7a87bcd2d085134f45fec80dd18045c0528703fc",
+          "bytes": 105088945
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.33.post2"
+    },
+    {
+      "id": "torch-2-9-1-xpu",
+      "name": "Torch 2.9.1 (Intel XPU)",
+      "backend": "xpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.1",
+      "indexUrl": "https://download.pytorch.org/whl/xpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.9.1%2Bxpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.1+xpu-cp312-cp312-win_amd64.whl",
+        "sha256": "bee9623254d0f95a1ca115dbd17e9a9d966fdb8ae123e2ada4a9eb2fb8d38db8",
+        "bytes": 639581369
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-9-1-cpu",
+      "name": "Torch 2.9.1 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.1",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.9.1%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.1+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "a4e06b4f441675d26b462123c8a83e77c55f1ec8ebc081203be2db1ea8054add",
+        "bytes": 110856378
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-9-0-cu130",
+      "name": "Torch 2.9.0 (CUDA 13.0)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.9.0%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.0+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "b9979a7c0a1c9544a857fc2390ebc89938f116eaaf6a359a0d46597402ca51da",
+        "bytes": 1860287546
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-9-0-cu130-xf-0-0-33",
+      "name": "Torch 2.9.0 (CUDA 13.0) + xFormers 0.0.33",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu130",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu130/torch-2.9.0%2Bcu130-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.0+cu130-cp312-cp312-win_amd64.whl",
+        "sha256": "b9979a7c0a1c9544a857fc2390ebc89938f116eaaf6a359a0d46597402ca51da",
+        "bytes": 1860287546
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu130/xformers-0.0.33-cp39-abi3-win_amd64.whl",
+          "filename": "xformers-0.0.33-cp39-abi3-win_amd64.whl",
+          "sha256": "40355aee094a9960959b2a6f05aabd50ec82b25aa1858cde0e8c7b12a90232da",
+          "bytes": 8312501
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.33"
+    },
+    {
+      "id": "torch-2-9-0-cu128",
+      "name": "Torch 2.9.0 (CUDA 12.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.9.0%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.0+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "c97dc47a1f64745d439dd9471a96d216b728d528011029b4f9ae780e985529e0",
+        "bytes": 2860231824
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-9-0-cu128-xf-0-0-33",
+      "name": "Torch 2.9.0 (CUDA 12.8) + xFormers 0.0.33",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.9.0%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.0+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "c97dc47a1f64745d439dd9471a96d216b728d528011029b4f9ae780e985529e0",
+        "bytes": 2860231824
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu128/xformers-0.0.33-cp39-abi3-win_amd64.whl",
+          "filename": "xformers-0.0.33-cp39-abi3-win_amd64.whl",
+          "sha256": "d5635ceac32c8216744a18fb328c0eafdcdb45aaab3de415edf9b1caf6fa9dcc",
+          "bytes": 105088697
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.33"
+    },
+    {
+      "id": "torch-2-9-0-cu126",
+      "name": "Torch 2.9.0 (CUDA 12.6)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.9.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "321de9e00dfb066fac4e182c62b6f0a10eb7943924daecb261a7490f98ce3641",
+        "bytes": 2582716822
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-9-0-cu126-xf-0-0-33",
+      "name": "Torch 2.9.0 (CUDA 12.6) + xFormers 0.0.33",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.9.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "321de9e00dfb066fac4e182c62b6f0a10eb7943924daecb261a7490f98ce3641",
+        "bytes": 2582716822
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu126/xformers-0.0.33-cp39-abi3-win_amd64.whl",
+          "filename": "xformers-0.0.33-cp39-abi3-win_amd64.whl",
+          "sha256": "958d1475199ffad3776c3e8d72b84ba1242d11a038ec0435e4e18c9cb648783b",
+          "bytes": 105088811
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.33"
+    },
+    {
+      "id": "torch-2-9-0-cu129",
+      "name": "Torch 2.9.0 (CUDA 12.9)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu129",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu129/torch-2.9.0%2Bcu129-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.0+cu129-cp312-cp312-win_amd64.whl",
+        "sha256": "890c0d395c529f8161b4e6423e5b2f758984721705cc6895aa3c3852da424d87",
+        "bytes": 3062478305
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-9-0-xpu",
+      "name": "Torch 2.9.0 (Intel XPU)",
+      "backend": "xpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.0",
+      "indexUrl": "https://download.pytorch.org/whl/xpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.9.0%2Bxpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.0+xpu-cp312-cp312-win_amd64.whl",
+        "sha256": "18cad93aaff76a01ce73aef6935ece7cfc03344b905592ec731446c44d44592b",
+        "bytes": 637930100
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-9-0-cpu",
+      "name": "Torch 2.9.0 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.9.0",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.9.0%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.9.0+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "e438061b87ec7dd6018fca9f975219889aa0a3f6cdc3ea10dd0ae2bc7f1c47ce",
+        "bytes": 109196696
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-8-0-cu129",
+      "name": "Torch 2.8.0 (CUDA 12.9)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.8.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu129",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu129/torch-2.8.0%2Bcu129-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.8.0+cu129-cp312-cp312-win_amd64.whl",
+        "sha256": "2bc729898e422b9f3da54349eed98f2f0b5dd415434508ee2ab2a13fb021815d",
+        "bytes": 3571765406
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-8-0-cu129-xf-0-0-32-post2",
+      "name": "Torch 2.8.0 (CUDA 12.9) + xFormers 0.0.32.post2",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.8.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu129",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu129/torch-2.8.0%2Bcu129-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.8.0+cu129-cp312-cp312-win_amd64.whl",
+        "sha256": "2bc729898e422b9f3da54349eed98f2f0b5dd415434508ee2ab2a13fb021815d",
+        "bytes": 3571765406
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu129/xformers-0.0.32.post2-cp39-abi3-win_amd64.whl",
+          "filename": "xformers-0.0.32.post2-cp39-abi3-win_amd64.whl",
+          "sha256": "82d7fb63cb9f61b0557238d1e2edccec4849c8199f626b186b2e6e9896691161",
+          "bytes": 106017640
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.32.post2"
+    },
+    {
+      "id": "torch-2-8-0-cu128",
+      "name": "Torch 2.8.0 (CUDA 12.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.8.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.8.0%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.8.0+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "0ad925202387f4e7314302a1b4f8860fa824357f9b1466d7992bf276370ebcff",
+        "bytes": 3461384651
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-8-0-cu128-xf-0-0-32-post2",
+      "name": "Torch 2.8.0 (CUDA 12.8) + xFormers 0.0.32.post2",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.8.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.8.0%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.8.0+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "0ad925202387f4e7314302a1b4f8860fa824357f9b1466d7992bf276370ebcff",
+        "bytes": 3461384651
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu128/xformers-0.0.32.post2-cp39-abi3-win_amd64.whl",
+          "filename": "xformers-0.0.32.post2-cp39-abi3-win_amd64.whl",
+          "sha256": "87fa13f4b406ed640554cea6687d0020b496bd6b446ca17d24f9438a079e6f09",
+          "bytes": 100221079
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.32.post2"
+    },
+    {
+      "id": "torch-2-8-0-cu126",
+      "name": "Torch 2.8.0 (CUDA 12.6)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.8.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.8.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.8.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "f6c79eac0018f9d131479ee1b7a68edb030619a316bfbc69275043aa4f338e4c",
+        "bytes": 2915418348
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-8-0-cu126-xf-0-0-32-post2",
+      "name": "Torch 2.8.0 (CUDA 12.6) + xFormers 0.0.32.post2",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.8.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.8.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.8.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "f6c79eac0018f9d131479ee1b7a68edb030619a316bfbc69275043aa4f338e4c",
+        "bytes": 2915418348
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu126/xformers-0.0.32.post2-cp39-abi3-win_amd64.whl",
+          "filename": "xformers-0.0.32.post2-cp39-abi3-win_amd64.whl",
+          "sha256": "f6634c152bd84ae59f5ff1db147576973d8b38f0286d03c35e9ae5519e5dd792",
+          "bytes": 100221307
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.32.post2"
+    },
+    {
+      "id": "torch-2-8-0-xpu",
+      "name": "Torch 2.8.0 (Intel XPU)",
+      "backend": "xpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.8.0",
+      "indexUrl": "https://download.pytorch.org/whl/xpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.8.0%2Bxpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.8.0+xpu-cp312-cp312-win_amd64.whl",
+        "sha256": "0937d8943c145a83d9bafc6f80ef28971167817f9eda26066d33f72caf8a6646",
+        "bytes": 1152478666
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-8-0-cpu",
+      "name": "Torch 2.8.0 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.8.0",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.8.0%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.8.0+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "2be20b2c05a0cce10430cc25f32b689259640d273232b2de357c35729132256d",
+        "bytes": 619352539
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-7-1-cu128",
+      "name": "Torch 2.7.1 (CUDA 12.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.7.1%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.1+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "2bb8c05d48ba815b316879a18195d53a6472a03e297d971e916753f8e1053d30",
+        "bytes": 3273024349
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-7-1-cu128-xf-0-0-31-post1",
+      "name": "Torch 2.7.1 (CUDA 12.8) + xFormers 0.0.31.post1",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.7.1%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.1+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "2bb8c05d48ba815b316879a18195d53a6472a03e297d971e916753f8e1053d30",
+        "bytes": 3273024349
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu128/xformers-0.0.31.post1-cp39-abi3-win_amd64.whl",
+          "filename": "xformers-0.0.31.post1-cp39-abi3-win_amd64.whl",
+          "sha256": "cbe0db2fcb8ec68f7bac0f13ee71450452506857e375be34001b339947369e33",
+          "bytes": 100216866
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.31.post1"
+    },
+    {
+      "id": "torch-2-7-1-cu126",
+      "name": "Torch 2.7.1 (CUDA 12.6)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.7.1%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.1+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "7d897b5ff67e778de4a2a05d4528377003105e29854fd73ecbe965287533f08b",
+        "bytes": 2716918001
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-7-1-cu126-xf-0-0-31-post1",
+      "name": "Torch 2.7.1 (CUDA 12.6) + xFormers 0.0.31.post1",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.7.1%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.1+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "7d897b5ff67e778de4a2a05d4528377003105e29854fd73ecbe965287533f08b",
+        "bytes": 2716918001
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu126/xformers-0.0.31.post1-cp39-abi3-win_amd64.whl",
+          "filename": "xformers-0.0.31.post1-cp39-abi3-win_amd64.whl",
+          "sha256": "294c30125442f5a84964e5b87b3cd5e83b87053896a13bbfee17c0043ee66e62",
+          "bytes": 100216491
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.31.post1"
+    },
+    {
+      "id": "torch-2-7-1-cu118",
+      "name": "Torch 2.7.1 (CUDA 11.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu118",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu118/torch-2.7.1%2Bcu118-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.1+cu118-cp312-cp312-win_amd64.whl",
+        "sha256": "80855ec840b7b06372ff43535d01393a8ec101842618d1f9ed629572b52aed71",
+        "bytes": 2817174610
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-7-1-xpu",
+      "name": "Torch 2.7.1 (Intel XPU)",
+      "backend": "xpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.1",
+      "indexUrl": "https://download.pytorch.org/whl/xpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.7.1%2Bxpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.1+xpu-cp312-cp312-win_amd64.whl",
+        "sha256": "9b65dc8562521b60d77aa653132bc03a19da0291318fcf919faa3f03080d8f7e",
+        "bytes": 733308979
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-7-1-cpu",
+      "name": "Torch 2.7.1 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.1",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.7.1%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.1+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "0bc887068772233f532b51a3e8c8cfc682ae62bef74bf4e0c53526c8b9e4138f",
+        "bytes": 215985616
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-7-0-cu128",
+      "name": "Torch 2.7.0 (CUDA 12.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.7.0%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.0+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "1704e5dd66c9221e4e8b6ae2d80cbf54e129571e643f5fa9ca78cc6d2096403a",
+        "bytes": 3338279484
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-7-0-cu128-xf-0-0-30",
+      "name": "Torch 2.7.0 (CUDA 12.8) + xFormers 0.0.30",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu128",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu128/torch-2.7.0%2Bcu128-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.0+cu128-cp312-cp312-win_amd64.whl",
+        "sha256": "1704e5dd66c9221e4e8b6ae2d80cbf54e129571e643f5fa9ca78cc6d2096403a",
+        "bytes": 3338279484
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu128/xformers-0.0.30-cp312-cp312-win_amd64.whl",
+          "filename": "xformers-0.0.30-cp312-cp312-win_amd64.whl",
+          "sha256": "097610300c1498f3d26823a77b32825e25f0ecb35ce1d7a12e5cdab5c7e81e99",
+          "bytes": 108449948
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.30"
+    },
+    {
+      "id": "torch-2-7-0-cu126",
+      "name": "Torch 2.7.0 (CUDA 12.6)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.7.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "30bd9e92038c391b3b08b541c9bc803cb54e45fda63b61f7469bba6de372b065",
+        "bytes": 2770843831
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-7-0-cu126-xf-0-0-30",
+      "name": "Torch 2.7.0 (CUDA 12.6) + xFormers 0.0.30",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.7.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "30bd9e92038c391b3b08b541c9bc803cb54e45fda63b61f7469bba6de372b065",
+        "bytes": 2770843831
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu126/xformers-0.0.30-cp312-cp312-win_amd64.whl",
+          "filename": "xformers-0.0.30-cp312-cp312-win_amd64.whl",
+          "sha256": "8549ca30700d70dae904ec4407c6188cd73fd551e585f862c1d3aca3b7bc371c",
+          "bytes": 108011356
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.30"
+    },
+    {
+      "id": "torch-2-7-0-cu118",
+      "name": "Torch 2.7.0 (CUDA 11.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu118",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu118/torch-2.7.0%2Bcu118-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.0+cu118-cp312-cp312-win_amd64.whl",
+        "sha256": "bf9bdc73cf5f086ca5ec905dcef1e2d87eaa47509437f7216d26b39b89c1cb10",
+        "bytes": 2908405973
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-7-0-xpu",
+      "name": "Torch 2.7.0 (Intel XPU)",
+      "backend": "xpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.0",
+      "indexUrl": "https://download.pytorch.org/whl/xpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.7.0%2Bxpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.0+xpu-cp312-cp312-win_amd64.whl",
+        "sha256": "94739e665d9b4d5cd7af5f517cb6103f6f9fb421c095184609653a24524040f5",
+        "bytes": 733302950
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-7-0-cpu",
+      "name": "Torch 2.7.0 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.7.0",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.7.0%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.7.0+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "69e25c973bdd7ea24b0fa9f9792114950afaeb8f819e5723819b923f50989175",
+        "bytes": 215126881
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-6-0-cu126",
+      "name": "Torch 2.6.0 (CUDA 12.6)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.6.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.6.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.6.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "b10c39c83e5d1afd639b5c9f5683b351e97e41390a93f59c59187004a9949924",
+        "bytes": 2496082434
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-6-0-cu126-xf-0-0-29-post3",
+      "name": "Torch 2.6.0 (CUDA 12.6) + xFormers 0.0.29.post3",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.6.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu126",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu126/torch-2.6.0%2Bcu126-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.6.0+cu126-cp312-cp312-win_amd64.whl",
+        "sha256": "b10c39c83e5d1afd639b5c9f5683b351e97e41390a93f59c59187004a9949924",
+        "bytes": 2496082434
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu126/xformers-0.0.29.post3-cp312-cp312-win_amd64.whl",
+          "filename": "xformers-0.0.29.post3-cp312-cp312-win_amd64.whl",
+          "sha256": "2e658e2b2c45229e5c74d527055b51616d24f8bac243dbf1b2817ce525b9d8ba",
+          "bytes": 169030593
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.29.post3"
+    },
+    {
+      "id": "torch-2-6-0-cu124",
+      "name": "Torch 2.6.0 (CUDA 12.4)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.6.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu124",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu124/torch-2.6.0%2Bcu124-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.6.0+cu124-cp312-cp312-win_amd64.whl",
+        "sha256": "3313061c1fec4c7310cf47944e84513dcd27b6173b72a349bb7ca68d0ee6e9c0",
+        "bytes": 2532302369
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-6-0-cu124-xf-0-0-29-post3",
+      "name": "Torch 2.6.0 (CUDA 12.4) + xFormers 0.0.29.post3",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.6.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu124",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu124/torch-2.6.0%2Bcu124-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.6.0+cu124-cp312-cp312-win_amd64.whl",
+        "sha256": "3313061c1fec4c7310cf47944e84513dcd27b6173b72a349bb7ca68d0ee6e9c0",
+        "bytes": 2532302369
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu124/xformers-0.0.29.post3-cp312-cp312-win_amd64.whl",
+          "filename": "xformers-0.0.29.post3-cp312-cp312-win_amd64.whl",
+          "sha256": "3706eca371767ff9709595185910d809fc817ec3cf4234ef44d70d2b8844d7e2",
+          "bytes": 167743565
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.29.post3"
+    },
+    {
+      "id": "torch-2-6-0-cu118",
+      "name": "Torch 2.6.0 (CUDA 11.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.6.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu118",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu118/torch-2.6.0%2Bcu118-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.6.0+cu118-cp312-cp312-win_amd64.whl",
+        "sha256": "6c040e4181c5dae73b965b61394ec431c93b2018165e2be8f15fc68d44444cb3",
+        "bytes": 2728858831
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-6-0-xpu",
+      "name": "Torch 2.6.0 (Intel XPU)",
+      "backend": "xpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.6.0",
+      "indexUrl": "https://download.pytorch.org/whl/xpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/xpu/torch-2.6.0%2Bxpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.6.0+xpu-cp312-cp312-win_amd64.whl",
+        "sha256": "16e31709ce8c9038ffa1f1c0cd4d7a45c93db2d3ff7881a2aedc6dcffb9046fc",
+        "bytes": 1203149983
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-6-0-cpu",
+      "name": "Torch 2.6.0 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.6.0",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.6.0%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.6.0+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "4027d982eb2781c93825ab9527f17fbbb12dbabf422298e4b954be60016f87d8",
+        "bytes": 206493444
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-5-1-cu124",
+      "name": "Torch 2.5.1 (CUDA 12.4)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.5.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu124",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu124/torch-2.5.1%2Bcu124-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.5.1+cu124-cp312-cp312-win_amd64.whl",
+        "sha256": "3c3f705fb125edbd77f9579fa11a138c56af8968a10fc95834cdd9fdf4f1f1a6",
+        "bytes": 2510680879
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-5-1-cu124-xf-0-0-28-post3",
+      "name": "Torch 2.5.1 (CUDA 12.4) + xFormers 0.0.28.post3",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.5.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu124",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu124/torch-2.5.1%2Bcu124-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.5.1+cu124-cp312-cp312-win_amd64.whl",
+        "sha256": "3c3f705fb125edbd77f9579fa11a138c56af8968a10fc95834cdd9fdf4f1f1a6",
+        "bytes": 2510680879
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu124/xformers-0.0.28.post3-cp312-cp312-win_amd64.whl",
+          "filename": "xformers-0.0.28.post3-cp312-cp312-win_amd64.whl",
+          "sha256": "3a3a0b8b12fadff6a111effcdc3573c6a584a8d71fbd5ead77999fec658ab919",
+          "bytes": 168805232
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.28.post3"
+    },
+    {
+      "id": "torch-2-5-1-cu121",
+      "name": "Torch 2.5.1 (CUDA 12.1)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.5.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu121",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu121/torch-2.5.1%2Bcu121-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.5.1+cu121-cp312-cp312-win_amd64.whl",
+        "sha256": "473d76257636c66b22cbfac6f616d6b522ef3d3473c13decb1afda22a7b059eb",
+        "bytes": 2449331371
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-5-1-cu118",
+      "name": "Torch 2.5.1 (CUDA 11.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.5.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu118",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu118/torch-2.5.1%2Bcu118-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.5.1+cu118-cp312-cp312-win_amd64.whl",
+        "sha256": "3edf97d9b0a17e3f764a511ed084e866c086af76c9d489cc51d5edb77ca7c936",
+        "bytes": 2700097337
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-5-1-cpu",
+      "name": "Torch 2.5.1 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.5.1",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.5.1%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.5.1+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "a6b720410350765d3d77c01a5ce098a6c45af446284e45e87a98b8a16e7d564d",
+        "bytes": 205405035
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-5-0-cu124",
+      "name": "Torch 2.5.0 (CUDA 12.4)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.5.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu124",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu124/torch-2.5.0%2Bcu124-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.5.0+cu124-cp312-cp312-win_amd64.whl",
+        "sha256": "cc08ff3a26dbba92b4d9ae007a64da294270abe662fdac197f1e0a4880afe3bd",
+        "bytes": 2510708604
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-5-0-cu124-xf-0-0-28-post2",
+      "name": "Torch 2.5.0 (CUDA 12.4) + xFormers 0.0.28.post2",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.5.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu124",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu124/torch-2.5.0%2Bcu124-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.5.0+cu124-cp312-cp312-win_amd64.whl",
+        "sha256": "cc08ff3a26dbba92b4d9ae007a64da294270abe662fdac197f1e0a4880afe3bd",
+        "bytes": 2510708604
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu124/xformers-0.0.28.post2-cp312-cp312-win_amd64.whl",
+          "filename": "xformers-0.0.28.post2-cp312-cp312-win_amd64.whl",
+          "sha256": "a8f52e4519640f58c92a2b1e1ad0e1c479b8406eb50f56920d97c3143039f0d2",
+          "bytes": 168805521
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ],
+      "xformersVersion": "0.0.28.post2"
+    },
+    {
+      "id": "torch-2-5-0-cu121",
+      "name": "Torch 2.5.0 (CUDA 12.1)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.5.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu121",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu121/torch-2.5.0%2Bcu121-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.5.0+cu121-cp312-cp312-win_amd64.whl",
+        "sha256": "47c7c44710bc91f1bd1a8012b4e43da57ca6e71589296bba146c1b18f2639efe",
+        "bytes": 2449355322
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-5-0-cu118",
+      "name": "Torch 2.5.0 (CUDA 11.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.5.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu118",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu118/torch-2.5.0%2Bcu118-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.5.0+cu118-cp312-cp312-win_amd64.whl",
+        "sha256": "fd9541dce6bd704b83172b688fdec01fa700edd3e7b4e2a20a83e05666c69ac4",
+        "bytes": 2700120937
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-5-0-cpu",
+      "name": "Torch 2.5.0 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.5.0",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.5.0%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.5.0+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "3815a38bbe31d0c546a33a0c59a5426563e94aea6d32eb4cf07b6a99bfa7130f",
+        "bytes": 205429655
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==5.17.0"
+      ]
+    },
+    {
+      "id": "torch-2-4-1-cu124",
+      "name": "Torch 2.4.1 (CUDA 12.4)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.4.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu124",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu124/torch-2.4.1%2Bcu124-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.4.1+cu124-cp312-cp312-win_amd64.whl",
+        "sha256": "d077728576768acbf0e4ce1b87164d1f3f75c17a9b1676c09e84c32ceeac1c06",
+        "bytes": 2506198781
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ]
+    },
+    {
+      "id": "torch-2-4-1-cu124-xf-0-0-28-post1",
+      "name": "Torch 2.4.1 (CUDA 12.4) + xFormers 0.0.28.post1",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.4.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu124",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu124/torch-2.4.1%2Bcu124-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.4.1+cu124-cp312-cp312-win_amd64.whl",
+        "sha256": "d077728576768acbf0e4ce1b87164d1f3f75c17a9b1676c09e84c32ceeac1c06",
+        "bytes": 2506198781
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu124/xformers-0.0.28.post1-cp312-cp312-win_amd64.whl",
+          "filename": "xformers-0.0.28.post1-cp312-cp312-win_amd64.whl",
+          "sha256": "ae863a42667c65b470c390527ab09adabd0270e1ba1c063a9df832f32962984a",
+          "bytes": 168812955
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ],
+      "xformersVersion": "0.0.28.post1"
+    },
+    {
+      "id": "torch-2-4-1-cu121",
+      "name": "Torch 2.4.1 (CUDA 12.1)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.4.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu121",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu121/torch-2.4.1%2Bcu121-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.4.1+cu121-cp312-cp312-win_amd64.whl",
+        "sha256": "b30faf3224697eaed131939690e8877b05b4d4cb6da5b12cfdcba3d742e9afd0",
+        "bytes": 2444846875
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ]
+    },
+    {
+      "id": "torch-2-4-1-cu118",
+      "name": "Torch 2.4.1 (CUDA 11.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.4.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu118",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu118/torch-2.4.1%2Bcu118-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.4.1+cu118-cp312-cp312-win_amd64.whl",
+        "sha256": "1ea70f54853744dd097992ef88d86d4ab793df0df4c41d1e37313ef4b80ef93f",
+        "bytes": 2695396543
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ]
+    },
+    {
+      "id": "torch-2-4-1-cpu",
+      "name": "Torch 2.4.1 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.4.1",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.4.1%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.4.1+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "3a570e5c553415cdbddfe679207327b3a3806b21c6adea14fba77684d1619e97",
+        "bytes": 201717875
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ]
+    },
+    {
+      "id": "torch-2-4-0-cu121",
+      "name": "Torch 2.4.0 (CUDA 12.1)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.4.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu121",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu121/torch-2.4.0%2Bcu121-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.4.0+cu121-cp312-cp312-win_amd64.whl",
+        "sha256": "b5c27549daf5f3209da6e07607f2bb8d02712555734fcd8cd7a23703a6e7d639",
+        "bytes": 2441898671
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ]
+    },
+    {
+      "id": "torch-2-4-0-cu121-xf-0-0-27-post2",
+      "name": "Torch 2.4.0 (CUDA 12.1) + xFormers 0.0.27.post2",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.4.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu121",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu121/torch-2.4.0%2Bcu121-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.4.0+cu121-cp312-cp312-win_amd64.whl",
+        "sha256": "b5c27549daf5f3209da6e07607f2bb8d02712555734fcd8cd7a23703a6e7d639",
+        "bytes": 2441898671
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu121/xformers-0.0.27.post2-cp312-cp312-win_amd64.whl",
+          "filename": "xformers-0.0.27.post2-cp312-cp312-win_amd64.whl",
+          "sha256": "0454ba745babf43500320b1d171ef4e44dec38f279fab9df1710ca5ce44a749c",
+          "bytes": 88973702
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ],
+      "xformersVersion": "0.0.27.post2"
+    },
+    {
+      "id": "torch-2-4-0-cu118",
+      "name": "Torch 2.4.0 (CUDA 11.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.4.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu118",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu118/torch-2.4.0%2Bcu118-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.4.0+cu118-cp312-cp312-win_amd64.whl",
+        "sha256": "bd16a12a003fe58276d7b7394a3760d576eb8dbfb4bacea025eb52a1eaf5172b",
+        "bytes": 2692469972
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ]
+    },
+    {
+      "id": "torch-2-4-0-cu118-xf-0-0-27-post2",
+      "name": "Torch 2.4.0 (CUDA 11.8) + xFormers 0.0.27.post2",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.4.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu118",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu118/torch-2.4.0%2Bcu118-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.4.0+cu118-cp312-cp312-win_amd64.whl",
+        "sha256": "bd16a12a003fe58276d7b7394a3760d576eb8dbfb4bacea025eb52a1eaf5172b",
+        "bytes": 2692469972
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu118/xformers-0.0.27.post2%2Bcu118-cp312-cp312-win_amd64.whl",
+          "filename": "xformers-0.0.27.post2+cu118-cp312-cp312-win_amd64.whl",
+          "sha256": "ffad418be192becf08413e3cd66d1c9ce20fecd8bdb61a05cddb4f0139165fa4",
+          "bytes": 10762499
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ],
+      "xformersVersion": "0.0.27.post2"
+    },
+    {
+      "id": "torch-2-4-0-cu124",
+      "name": "Torch 2.4.0 (CUDA 12.4)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.4.0",
+      "indexUrl": "https://download.pytorch.org/whl/cu124",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu124/torch-2.4.0%2Bcu124-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.4.0+cu124-cp312-cp312-win_amd64.whl",
+        "sha256": "22bc926ac3c2f2e4f483f2a201a0ab8a701cc1104ddd74469763f652f3856ec2",
+        "bytes": 2503253561
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ]
+    },
+    {
+      "id": "torch-2-4-0-cpu",
+      "name": "Torch 2.4.0 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.4.0",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.4.0%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.4.0+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "f59c53a1c3247efb3700f9f78bdd289712177037a85b5519b9ecdef7c77c1fee",
+        "bytes": 200123891
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.50.2",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ]
+    },
+    {
+      "id": "torch-2-3-1-cu121",
+      "name": "Torch 2.3.1 (CUDA 12.1)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.3.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu121",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu121/torch-2.3.1%2Bcu121-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.3.1+cu121-cp312-cp312-win_amd64.whl",
+        "sha256": "065a92a5ea2c89aad2bcd93e54c85c04a65c3e4a91cec2815e22c22706ec5183",
+        "bytes": 2423460849
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.45.5",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ]
+    },
+    {
+      "id": "torch-2-3-1-cu121-xf-0-0-27",
+      "name": "Torch 2.3.1 (CUDA 12.1) + xFormers 0.0.27",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.3.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu121",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu121/torch-2.3.1%2Bcu121-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.3.1+cu121-cp312-cp312-win_amd64.whl",
+        "sha256": "065a92a5ea2c89aad2bcd93e54c85c04a65c3e4a91cec2815e22c22706ec5183",
+        "bytes": 2423460849
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu121/xformers-0.0.27-cp312-cp312-win_amd64.whl",
+          "filename": "xformers-0.0.27-cp312-cp312-win_amd64.whl",
+          "sha256": "eb2ca11ee4f189f96ac10698e81aeec7dfe157c4180bb6a88e37ad50b14c7d7d",
+          "bytes": 152085972
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.45.5",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ],
+      "xformersVersion": "0.0.27"
+    },
+    {
+      "id": "torch-2-3-1-cu118",
+      "name": "Torch 2.3.1 (CUDA 11.8)",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.3.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu118",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu118/torch-2.3.1%2Bcu118-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.3.1+cu118-cp312-cp312-win_amd64.whl",
+        "sha256": "f44c7b64d990a6b1a382d1cd63c359806153974e7db8d16f6780645a8a9c9fe0",
+        "bytes": 2672929104
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.45.5",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ]
+    },
+    {
+      "id": "torch-2-3-1-cu118-xf-0-0-27",
+      "name": "Torch 2.3.1 (CUDA 11.8) + xFormers 0.0.27",
+      "backend": "cuda",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.3.1",
+      "indexUrl": "https://download.pytorch.org/whl/cu118",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cu118/torch-2.3.1%2Bcu118-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.3.1+cu118-cp312-cp312-win_amd64.whl",
+        "sha256": "f44c7b64d990a6b1a382d1cd63c359806153974e7db8d16f6780645a8a9c9fe0",
+        "bytes": 2672929104
+      },
+      "companions": [
+        {
+          "url": "https://download.pytorch.org/whl/cu118/xformers-0.0.27%2Bcu118-cp312-cp312-win_amd64.whl",
+          "filename": "xformers-0.0.27+cu118-cp312-cp312-win_amd64.whl",
+          "sha256": "be9d5e849e3249332f843a8c871177c540521b60d3265fb84f9215cde1f919c0",
+          "bytes": 73883880
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.45.5",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ],
+      "xformersVersion": "0.0.27"
+    },
+    {
+      "id": "torch-2-3-1-cpu",
+      "name": "Torch 2.3.1 (CPU)",
+      "backend": "cpu",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.3.1",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.3.1%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.3.1+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "6acdca2530462611095c44fd95af75ecd5b9646eac813452fe0adf31a9bc310a",
+        "bytes": 161676135
+      },
+      "companions": [],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.45.5",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ]
+    },
+    {
+      "id": "torch-2-3-1-directml",
+      "name": "Torch 2.3.1 (DirectML)",
+      "backend": "directml",
+      "pythonAbi": "cp312-win_amd64",
+      "torchVersion": "2.3.1",
+      "indexUrl": "https://download.pytorch.org/whl/cpu",
+      "wheel": {
+        "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.3.1%2Bcpu-cp312-cp312-win_amd64.whl",
+        "filename": "torch-2.3.1+cpu-cp312-cp312-win_amd64.whl",
+        "sha256": "6acdca2530462611095c44fd95af75ecd5b9646eac813452fe0adf31a9bc310a",
+        "bytes": 161676135
+      },
+      "companions": [
+        {
+          "url": "https://files.pythonhosted.org/packages/99/04/0072adfd65d8f047bd236c8fd6c3b5b0c95392e0271f3c1fa308e2e2b2a9/torch_directml-0.2.4.dev240815-cp312-cp312-win_amd64.whl",
+          "filename": "torch_directml-0.2.4.dev240815-cp312-cp312-win_amd64.whl",
+          "sha256": "8ae8bf8217477a538e3fb089086a1ba666af17dfa8aafedf22b6be8849b51227",
+          "bytes": 8955971
+        }
+      ],
+      "requirements": [
+        "numpy==1.26.4",
+        "accelerate==1.15.0",
+        "bitsandbytes==0.45.5",
+        "funasr==1.4.16",
+        "sentencepiece==0.2.1",
+        "transformers==4.46.3"
+      ],
+      "directmlVersion": "0.2.4.dev240815"
     }
   ]
 }

@@ -62,9 +62,7 @@ export interface SessionState {
   /** Timer reading. Frozen while paused, resumes from the frozen point. */
   elapsedMs: number
   /**
-   * Diagnostic string, verbatim from the engine and possibly Chinese. It never
-   * goes through i18n, so the UI shows `errorCode` via `t('errors.*')` instead
-   * and this one is for the console and "copy diagnostics".
+   * The concrete engine reason, shown with translated actions and included in diagnostics.
    */
   error: string | null
   /** UPPER_SNAKE code; the UI looks its copy up by this. */
@@ -140,7 +138,7 @@ function errorMessage(error: unknown): string {
 
 function errorCodeOf(error: unknown): string {
   const message = errorMessage(error)
-  const match = /([a-zA-Z]+):/.exec(message)
+  const match = /([a-zA-Z_]+):/.exec(message)
   return match ? match[1].toUpperCase() : 'SESSION_ERROR'
 }
 

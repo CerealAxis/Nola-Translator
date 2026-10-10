@@ -1,6 +1,6 @@
 # GitHub Actions builds
 
-Two workflows build separate Windows x64 EXE (NSIS) and MSI installers, plus a source ZIP. End users do not need to install Python. GPU dependencies remain managed by the application. Model weights are not bundled.
+Two workflows build separate Windows x64 EXE (NSIS) and MSI installers, plus a source ZIP. End users do not need to install Python. PyTorch and llama.cpp are selected and installed in application settings. Neither inference components nor model weights are bundled.
 
 Both workflows rebuild the browser extension from the checked-out source, create `Nola-Browser-Extension.zip`, and build the Native Messaging host before packaging. EXE and MSI installations include these files; the settings download uses the bundled extension ZIP. The host uses a separate build environment and the PyInstaller version declared in `engine/pyproject.toml`.
 
@@ -26,9 +26,9 @@ git push origin v0.1.5
 
 Enable GitHub Actions in the repository. No personal access token is needed: release publishing uses `GITHUB_TOKEN` with `contents: write`. These installers are unsigned. Fork PR builds receive read-only permissions and never publish Releases.
 
-Commit `package-lock.json`, `build/icon.ico`, the runtime catalogs, all referenced build scripts, and the engine sources before pushing. CPU dependency imports are checked during packaging. Pip and npm caches accelerate subsequent builds; generated Python environments are rebuilt for each checkout.
+Commit `package-lock.json`, `build/icon.ico`, the runtime catalogs, all referenced build scripts, and the engine sources before pushing. Base dependency imports are checked during packaging. Pip and npm caches accelerate subsequent builds; generated Python environments are rebuilt for each checkout.
 
-Local CPU runtime builds require the standard Windows x64 CPython 3.13 layout. Conda keeps some native dependencies under `Library/bin`, which this relocatable runtime builder does not copy. When preparing a new CPU build environment, pass a standard interpreter with `./scripts/build-cpu-engine.ps1 -BasePython <path-to-python.exe>`; GitHub Actions already supplies standard CPython through `actions/setup-python`.
+Local base runtime builds require the standard Windows x64 CPython 3.12 layout. Conda keeps some native dependencies under `Library/bin`, which this relocatable runtime builder does not copy. When preparing a new base build environment, pass a standard interpreter with `./scripts/build-python-base.ps1 -BasePython <path-to-python.exe>`; GitHub Actions already supplies standard CPython through `actions/setup-python`.
 
 The build script explicitly runs Electron's binary installer and checks its version before building. This supports clean runners where npm lifecycle policy does not run Electron's postinstall; a matching existing binary is reused.
 

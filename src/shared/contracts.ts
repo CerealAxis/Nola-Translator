@@ -1,5 +1,5 @@
 import type { ModelConfiguration } from './model-capabilities'
-import type { CloudApiFormat } from './settings'
+import type { CloudApiFormat, NetworkSettings } from './settings'
 import type { ComputeSettings, ComputeSnapshot } from './compute'
 
 export const PROTOCOL_VERSION = 1 as const
@@ -167,7 +167,9 @@ export type EngineCommand =
   | (Envelope<'manageResource'> & {
       resourceId: string
       action: 'install' | 'remove' | 'cancel'
-      useHuggingFaceMirror?: boolean
+      // Every command that reaches the network carries its own copy, so a settings change
+      // applies to the next request instead of needing an engine restart.
+      network?: NetworkSettings
     })
   | (Envelope<'startSession'> & { config: SessionConfig })
   | (Envelope<'prewarmModels'> & { config: PrewarmConfig })
@@ -179,9 +181,9 @@ export type EngineCommand =
   /** One diagnostic line for the shared pipeline log; the engine writes it and answers with `debugLogged`. */
   | (Envelope<'debugLog'> & { layer: string; event: string; data: Record<string, unknown> })
   | Envelope<'shutdown'>
-  | (Envelope<'searchHubModels'> & { query: string; slot?: 'recognition' | 'translation'; limit?: number; weightFormat?: 'gguf'; cursor?: string })
-  | (Envelope<'inspectHubRepo'> & { repo: string })
-  | (Envelope<'installHubRepo'> & { repo: string; slot?: 'recognition' | 'translation'; useHuggingFaceMirror?: boolean })
+  | (Envelope<'searchHubModels'> & { query: string; slot?: 'recognition' | 'translation'; limit?: number; weightFormat?: 'gguf'; cursor?: string; network?: NetworkSettings })
+  | (Envelope<'inspectHubRepo'> & { repo: string; network?: NetworkSettings })
+  | (Envelope<'installHubRepo'> & { repo: string; slot?: 'recognition' | 'translation'; network?: NetworkSettings })
   | (Envelope<'configureModel'> & { resourceId: string; configuration: ModelConfiguration })
 
 export type AudioDevice = {

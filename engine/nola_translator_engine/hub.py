@@ -26,20 +26,22 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 import json
 import re
 from typing import Literal
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, urlencode, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import OpenerDirector, Request
 
+from .models.manager import HF_ENDPOINT, hf_endpoint, http_opener
+from .protocol import NetworkSettings
 from .translation.m2m100 import FLORES_LANGUAGES
 
 
 Slot = Literal["recognition", "translation"]
 Loader = Literal["llama.cpp", "transformers", "funasr"]
 
-HF_ROOT = "https://huggingface.co"
 USER_AGENT = "Nola Translator/0.1"
 #: The model card, the config and a sharded index are all small; a repo whose file list would
 #: exceed this is answered as unreadable rather than buffered into memory.
@@ -680,23 +682,29 @@ def _no_adapter_reason(matched_by: str, info: HubRepoInfo) -> str:
 HubFetcher = Callable[[str], bytes]
 
 
-def _http_get(url: str) -> bytes:
+def _http_get(url: str, opener: OpenerDirector) -> bytes:
     request = Request(url, headers={"User-Agent": USER_AGENT})
-    with urlopen(request, timeout=30) as response:
+    with opener.open(request, timeout=30) as response:
         return response.read(MAX_INSPECTION_BYTES)
 
 
-def _http_get_search_page(url: str) -> tuple[bytes, str | None]:
+def _http_get_search_page(url: str, opener: OpenerDirector) -> tuple[bytes, str | None]:
     """Read one search page and the opaque cursor in Hugging Face's next-page link."""
     request = Request(url, headers={"User-Agent": USER_AGENT})
-    with urlopen(request, timeout=30) as response:
+    with opener.open(request, timeout=30) as response:
         payload = response.read(MAX_INSPECTION_BYTES)
         link = response.headers.get("Link", "")
     match = re.search(r'<([^>]+)>\s*;\s*rel="?next"?', link)
     if not match:
         return payload, None
     next_url = urlparse(match.group(1))
-    if next_url.scheme != "https" or next_url.netloc != "huggingface.co" or next_url.path != "/api/models":
+    # The cursor is only followed back onto the host that served this page: the mirror publishes
+    # its own origin in Link, and a cursor is opaque enough to be worth confirming at all.
+    if (
+        next_url.scheme != "https"
+        or next_url.netloc != urlparse(url).netloc
+        or next_url.path != "/api/models"
+    ):
         return payload, None
     return payload, parse_qs(next_url.query).get("cursor", [None])[0]
 
@@ -714,7 +722,7 @@ def _parse_json(payload: bytes, what: str) -> dict[str, object]:
 def _normalize_repo(repo: str) -> str:
     """``owner/name`` with the URL-ish spellings people paste trimmed off; validated, not guessed."""
     trimmed = repo.strip().strip("/")
-    for prefix in (f"{HF_ROOT}/", "huggingface.co/"):
+    for prefix in (f"{HF_ENDPOINT}/", "huggingface.co/"):
         if trimmed.casefold().startswith(prefix.casefold()):
             trimmed = trimmed[len(prefix) :]
             break
@@ -782,14 +790,14 @@ def _repo_info_from_api(repo: str, payload: dict[str, object]) -> HubRepoInfo:
 
 
 def _config_archetypes(
-    fetch: HubFetcher, repo: str, revision: str
+    fetch: HubFetcher, repo: str, revision: str, endpoint: str
 ) -> tuple[str | None, tuple[str, ...]]:
     """``model_type`` and ``architectures`` from config.json, or empty when there is none.
 
     A 404 here is normal — plenty of repos ship no config.json at all — and is not a failure. Any
     other error is left to the caller so the status code keeps its meaning.
     """
-    url = f"{HF_ROOT}/{repo}/resolve/{revision}/config.json"
+    url = f"{endpoint}/{repo}/resolve/{revision}/config.json"
     try:
         payload = _parse_json(fetch(url), "config.json")
     except HTTPError as error:
@@ -806,16 +814,24 @@ def _config_archetypes(
     )
 
 
-def inspect_repo(repo: str, *, fetch: HubFetcher = _http_get) -> HubRepoInfo:
+def inspect_repo(
+    repo: str,
+    *,
+    network: NetworkSettings | None = None,
+    fetch: HubFetcher | None = None,
+) -> HubRepoInfo:
     """Read what a repo declares about itself. Downloads nothing but the API and config.json.
 
     ``fetch`` is injected so the whole decision path can be exercised against recorded payloads
-    without touching the network; the default is the engine's only HTTP read, ``urlopen`` over
-    plain HTTPS, the same transport ``models/manager.py`` uses for weights.
+    without touching the network; left out, the engine reads through its own client — pointed at
+    the host and the proxy these settings select, the same transport ``models/manager.py`` uses
+    for weights.
     """
     normalized = _normalize_repo(repo)
+    endpoint = hf_endpoint(network)
+    reader = fetch if fetch is not None else partial(_http_get, opener=http_opener(network))
     payload = _parse_json(
-        fetch(f"{HF_ROOT}/api/models/{normalized}?blobs=true"),
+        reader(f"{endpoint}/api/models/{normalized}?blobs=true"),
         "模型信息",
     )
     info = _repo_info_from_api(normalized, payload)
@@ -823,7 +839,9 @@ def inspect_repo(repo: str, *, fetch: HubFetcher = _http_get) -> HubRepoInfo:
         # A GGUF repo has no transformers config worth reading, and asking for a config.json the
         # repo does not publish only buys a 404.
         return info
-    model_type, architectures = _config_archetypes(fetch, normalized, info.revision or "main")
+    model_type, architectures = _config_archetypes(
+        reader, normalized, info.revision or "main", endpoint
+    )
     return HubRepoInfo(
         repo=info.repo,
         revision=info.revision,
@@ -869,6 +887,7 @@ class HubSearchResult:
 def search_url(
     query: str, slot: Slot | None, limit: int,
     weight_format: str | None = None, cursor: str | None = None,
+    network: NetworkSettings | None = None,
 ) -> str:
     """The search endpoint URL for a query, as a single string.
 
@@ -892,7 +911,7 @@ def search_url(
         parameters.append(("filter", "gguf"))
     if cursor:
         parameters.append(("cursor", cursor))
-    return f"{HF_ROOT}/api/models?{urlencode(parameters, quote_via=quote)}"
+    return f"{hf_endpoint(network)}/api/models?{urlencode(parameters, quote_via=quote)}"
 
 
 def _parse_list(payload: bytes, what: str) -> list[dict[str, object]]:
@@ -932,7 +951,8 @@ def search_repos(
     *,
     slot: Slot | None = None,
     limit: int = 20,
-    fetch: Callable[[str], bytes | tuple[bytes, str | None]] = _http_get_search_page,
+    network: NetworkSettings | None = None,
+    fetch: Callable[[str], bytes | tuple[bytes, str | None]] | None = None,
     weight_format: str | None = None,
     cursor: str | None = None,
 ) -> HubSearchResult:
@@ -942,7 +962,10 @@ def search_repos(
     Runtime inspection remains on the install path, where it can check an exact revision.
     """
     limit = max(1, min(20, limit))
-    page = fetch(search_url(query.strip(), slot, limit, weight_format, cursor))
+    reader = (
+        fetch if fetch is not None else partial(_http_get_search_page, opener=http_opener(network))
+    )
+    page = reader(search_url(query.strip(), slot, limit, weight_format, cursor, network))
     payload, next_cursor = page if isinstance(page, tuple) else (page, None)
     hits = _parse_list(payload, "搜索结果")
     allowed = set(_search_hit_repos(hits, slot))

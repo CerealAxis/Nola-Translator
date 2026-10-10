@@ -6,7 +6,7 @@
 ## 1. 技术栈
 
 - 桌面应用：Electron + React + TypeScript
-- 引擎：Python（模型能力持久化在自定义模型注册表，启动与逐句翻译必须校验配置）
+- 引擎：内置 Windows x64 Python 3.12；PyTorch 与 llama.cpp 由设置页按组合安装或复用本地组件（模型能力持久化在自定义模型注册表，启动与逐句翻译必须校验配置）
 - UI：Tailwind CSS + HeroUI
 - 构建：electron-vite
 - 测试：Vitest + Testing Library
@@ -16,7 +16,7 @@
 
 ```
 src/
-├── main/        # Electron 主进程：IPC 注册、窗口、设置/凭据持久化、引擎子进程；browser-integrations.ts 只读检测浏览器扩展状态并打开管理页
+├── main/        # Electron 主进程：IPC 注册、窗口、设置/凭据持久化、引擎子进程；runtime-manager.ts／python-environments.ts 管理组件，runtime-files.ts 处理 Windows 目录切换；browser-integrations.ts 只读检测浏览器扩展状态并打开管理页
 ├── preload/     # 单文件，contextBridge 暴露 window.nolaTranslator
 ├── shared/      # 跨进程契约：类型 + zod + 默认值；languages.ts 为语言代码目录，model-capabilities.ts 为模型能力与推荐预设。**改枚举必看这里**
 └── renderer/    # React 应用
@@ -32,7 +32,7 @@ browser/
 ├── extension/                 # MV3 扩展、播放器适配、临时 store、Shadow DOM；build.mjs 独立构建到 dist/
 ├── native_host/               # 标准库 stdio／当前用户命名管道连接程序及帧协议测试
 └── tests/                     # 隔离配置的浏览器冒烟测试（Playwright，可选开发依赖）
-scripts/                        # PowerShell 构建脚本
+scripts/                        # PowerShell 构建脚本；build-python-base.ps1 构建不含 Torch 的 Python 3.12，generate-runtime-catalog.py 维护组合清单
 ```
 
 - 组件文件名 PascalCase，逻辑模块 camelCase，测试 `*.test.ts(x)` 与源文件同目录
@@ -71,6 +71,8 @@ scripts/                        # PowerShell 构建脚本
 - z-index 只用 `.z-*` 类（见 DESIGN.MD 第 8 节），**禁 `z-50` 字面量**
 
 ## 4. 注释规范
+
+- Runtime catalogs record official wheel ABI, SHA-256 and backend combinations. Checks use built-in Python 3.12 without installing; repair ownership requires an app installation record.
 
 - 模型语言目录、推荐能力与运行引擎限制的注释须注明来源或限制原因；用户配置不代表模型自动获得新能力。
 - 浏览器采集限制注释须注明浏览器 API 原因；`getDisplayMedia` 必须在用户动作的原调用栈发起，Capture Handle 校验后仅处理音频。
@@ -120,7 +122,8 @@ npm run build          # typecheck && electron-vite build
 npm run build:browser  # 构建可手动加载的 MV3 扩展
 npm run package:browser # release/Nola-Browser-Extension.zip
 npm run build:browser-host # PyInstaller Native Messaging EXE
-npm run dist:win       # 完整发布：build → build:engine:cpu → prepare:llama:cpu → electron-builder（EXE + MSI）
+npm run build:python   # 内置 Python 3.12 基础组件，不包含 Torch／llama
+npm run dist:win       # 完整发布：build → build:python → electron-builder（EXE + MSI）
 ```
 
 ## 6. 约定与协作

@@ -72,6 +72,25 @@ class TranslationOptions(ProtocolModel):
     apiKey: str = Field(default="", max_length=4096)
 
 
+class NetworkSettings(ProtocolModel):
+    """Where outbound downloads are fetched from, and whether they go through a proxy.
+
+    A copy rides along with each command that reaches the network instead of being fixed once at
+    startup, so a settings change applies to the next download without an engine restart.
+    """
+
+    useHuggingFaceMirror: bool = True
+    #: pip's default index only; the PyTorch ``--extra-index-url`` is never mirrored.
+    usePypiMirror: bool = False
+    #: Prefixed onto a GitHub release asset URL as ``prefix + url``; empty leaves the URL alone.
+    githubAccelerateUrl: str = Field(default="", max_length=2048)
+    #: Empty means no proxy, whatever the three scope switches below say.
+    proxyUrl: str = Field(default="", max_length=2048)
+    proxyForPip: bool = False
+    proxyForModelDownload: bool = False
+    proxyForRuntimeDownload: bool = False
+
+
 class ModelSelection(ProtocolModel):
     """Which models a request needs and how it wants them placed.
 
@@ -207,7 +226,7 @@ class ManageResourceCommand(Envelope):
     type: Literal["manageResource"]
     resourceId: str = Field(min_length=1, max_length=256)
     action: Literal["install", "remove", "cancel"]
-    useHuggingFaceMirror: bool = True
+    network: NetworkSettings = Field(default_factory=NetworkSettings)
 
 
 class SearchHubModelsCommand(Envelope):
@@ -221,6 +240,7 @@ class SearchHubModelsCommand(Envelope):
     weightFormat: Literal["gguf"] | None = None
     cursor: str | None = Field(default=None, min_length=1, max_length=2048)
     limit: int = Field(default=20, ge=1, le=50)
+    network: NetworkSettings = Field(default_factory=NetworkSettings)
 
 
 class InspectHubRepoCommand(Envelope):
@@ -228,6 +248,7 @@ class InspectHubRepoCommand(Envelope):
 
     type: Literal["inspectHubRepo"]
     repo: str = Field(min_length=3, max_length=256)
+    network: NetworkSettings = Field(default_factory=NetworkSettings)
 
 
 class TranslationPair(ProtocolModel):
@@ -260,7 +281,7 @@ class InstallHubRepoCommand(Envelope):
     #: The slot the caller expects. Mismatched against the repo's own verdict so a click on the
     #: wrong filter cannot install a translation model into the recognition list.
     slot: Literal["recognition", "translation"] | None = None
-    useHuggingFaceMirror: bool = True
+    network: NetworkSettings = Field(default_factory=NetworkSettings)
 
 
 class DebugLogCommand(Envelope):

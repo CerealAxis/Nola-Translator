@@ -42,6 +42,7 @@ class ComputeDevice:
     translation: bool = False
     reason: str = ""
     score: float = 0
+    llamaDeviceNative: str | None = None
 
 
 def cpu_threads(requested: int = 0) -> int:
@@ -72,20 +73,31 @@ def probe_devices(llama_dir: Path | None) -> tuple[list[ComputeDevice], list[str
                     score=float(getattr(props, "multi_processor_count", 1)) * 10 + props.major * 100,
                 ))
         if hasattr(torch, "xpu") and torch.xpu.is_available():
-            enabled = "xpu" in os.environ.get("NOLA_TRANSLATOR_COMPUTE_BACKENDS", "").split(",")
+            enabled = True
             for index in range(torch.xpu.device_count()):
                 props = torch.xpu.get_device_properties(index)
                 uuid = str(getattr(props, "uuid", "") or "")
                 total = getattr(props, "total_memory", 0)
                 # Shared memory is deliberately excluded from placement capacity.
                 integrated = bool(getattr(props, "is_integrated", False))
-                free = 0 if integrated else torch.xpu.mem_get_info(index)[0]
+                free = 0 if integrated else getattr(torch.xpu, "mem_get_info", lambda _index: (total, total))(index)[0]
                 devices.append(ComputeDevice(
                     id=f"xpu:{uuid}" if uuid else f"xpu:{props.name}:{index}", name=props.name,
                     backend="xpu", torchDevice=f"xpu:{index}", totalMemoryMb=total / 2**20,
                     freeMemoryMb=free / 2**20, integrated=integrated, stableId=bool(uuid),
                     recognition=enabled, translation=enabled,
                     reason="" if enabled else "此运行包尚未声明 Intel 模型适配", score=100,
+                ))
+        try:
+            import torch_directml
+        except ImportError:
+            torch_directml = None
+        if torch_directml is not None:
+            for index in range(torch_directml.device_count()):
+                devices.append(ComputeDevice(
+                    id=f"directml:{index}:{torch_directml.device_name(index)}", name=torch_directml.device_name(index),
+                    backend="directml", torchDevice=str(torch_directml.device(index)),
+                    stableId=False, recognition=True, translation=True, score=100,
                 ))
     except Exception as error:
         notes.append(f"PyTorch 设备探测失败：{type(error).__name__}: {str(error)[:256]}")
@@ -99,9 +111,13 @@ def probe_devices(llama_dir: Path | None) -> tuple[list[ComputeDevice], list[str
             if result.returncode:
                 notes.append(f"llama.cpp 设备探测退出（{result.returncode}）：{result.stderr[-256:].strip()}")
             matches = [match for line in (result.stdout + result.stderr).splitlines()
-                       if (match := re.match(r"\s*(CUDA\d+|Vulkan\d+|SYCL\d+|HIP\d+):\s*(.*?)\s*\((\d+)\s*MiB,\s*(\d+)\s*MiB free\)", line))]
+                       if (match := re.match(r"\s*((?:CUDA|Vulkan|SYCL|HIP|ROCm|OpenVINO)\d+):\s*(.*?)\s*\((\d+)\s*MiB,\s*(\d+)\s*MiB free\)", line, re.IGNORECASE))]
             for match in matches:
                 identifier, name, total, free = match.groups()
+                native = re.search(r"GGML_OPENVINO_DEVICE=([A-Za-z0-9_.]+)", name)
+                native_name = native.group(1) if native else None
+                if native:
+                    name = name.split(" - ", 1)[-1]
                 # CUDA enumeration in both children inherits the same visibility environment.
                 index = int(re.search(r"\d+$", identifier).group())
                 existing = next((i for i, d in enumerate(devices)
@@ -119,8 +135,8 @@ def probe_devices(llama_dir: Path | None) -> tuple[list[ComputeDevice], list[str
                     # llama's backend index is not a stable physical ID; preserve it as a named choice,
                     # and refuse the choice if the name/index no longer exists on the next probe.
                     devices.append(ComputeDevice(
-                        id=f"llama:{identifier}:{name}", name=name, backend=re.sub(r"\d+$", "", identifier).lower(),
-                        llamaDevice=identifier, totalMemoryMb=float(total), freeMemoryMb=float(free),
+                        id=f"llama:{identifier}:{name}", name=name, backend="rocm" if identifier.upper().startswith("HIP") else re.sub(r"\d+$", "", identifier).lower(),
+                        llamaDevice=identifier, llamaDeviceNative=native_name, totalMemoryMb=float(total), freeMemoryMb=float(free),
                         stableId=False, translation=True, score=100,
                         reason="当前仅由 llama.cpp 使用；语音识别需要匹配的 PyTorch 环境",
                     ))
@@ -179,12 +195,13 @@ def choose_devices(devices: list[ComputeDevice], options: ComputeOptions,
             ambiguous_shared = a.id != b.id and a.id != "cpu" and b.id != "cpu" and a.name == b.name and a.backend != b.backend
             if ambiguous_shared:
                 # Treat an unidentifiable cross-backend pair conservatively as sharing memory.
-                if min(a.freeMemoryMb, b.freeMemoryMb) < recognition_mb + translation_mb + options.reservedVramMb:
+                if any(d.totalMemoryMb > 0 and not d.integrated and d.freeMemoryMb < recognition_mb + translation_mb + options.reservedVramMb for d in (a, b)):
                     continue
             budgets: dict[str, float] = {}
             if a.id != "cpu": budgets[a.id] = recognition_mb
             if b.id != "cpu": budgets[b.id] = budgets.get(b.id, 0) + translation_mb
-            if any(by_id[k].freeMemoryMb < need + options.reservedVramMb for k, need in budgets.items()):
+            # DirectML/OpenVINO/SYCL can report no memory budget. Actual allocation at model load decides availability.
+            if any(by_id[k].totalMemoryMb > 0 and not by_id[k].integrated and by_id[k].freeMemoryMb < need + options.reservedVramMb for k, need in budgets.items()):
                 continue
             # Preference only: prioritize ASR headroom and usable discrete GPUs. The score is
             # an inventory heuristic; a second very weak GPU is not required to be used.
@@ -208,12 +225,17 @@ def resolve_dtype(device: str, precision: str):
         if precision in ("fp16", "bf16"):
             raise ValueError("当前 CPU 基线使用 FP32，请将计算精度设为自动或 FP32")
         return torch.float32
+    if device.startswith("privateuseone"):
+        if precision in ("fp16", "bf16"):
+            raise ValueError("DirectML 模型当前使用 FP32，请选择自动或 FP32")
+        return torch.float32
     bf16 = False
     if device.startswith("cuda"):
         with torch.cuda.device(device):
-            bf16 = torch.cuda.is_bf16_supported(including_emulation=False)
+            # Older selectable Torch versions do not expose including_emulation.
+            bf16 = torch.cuda.is_bf16_supported()
     elif device.startswith("xpu"):
-        bf16 = torch.xpu.is_bf16_supported()
+        bf16 = getattr(torch.xpu, "is_bf16_supported", lambda: False)()
     if precision == "bf16" and not bf16:
         raise ValueError("所选显卡不支持当前模型要求的 BF16 计算")
     return {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}.get(

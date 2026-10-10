@@ -57,13 +57,27 @@ export type VideoCaptionSettings = {
   audioDeviceId?: string
 }
 
+/** Network sources and proxying for every outbound download the app makes. */
+export type NetworkSettings = {
+  /** Weight files go to hf-mirror.com instead of huggingface.co when enabled. */
+  useHuggingFaceMirror: boolean
+  /** pip's default index only; the PyTorch `--extra-index-url` is never mirrored. */
+  usePypiMirror: boolean
+  /** Prefixed onto a GitHub release asset URL (`prefix + url`); empty disables the rewrite. */
+  githubAccelerateUrl: string
+  /** Empty disables proxying whatever the three scope switches below say. */
+  proxyUrl: string
+  proxyForPip: boolean
+  proxyForModelDownload: boolean
+  proxyForRuntimeDownload: boolean
+}
+
 export type AppSettings = {
   version: 1
   theme: 'system' | 'light' | 'dark'
   uiLanguage: 'zh-CN' | 'en'
   modelStoragePath: string
-  /** Download Hugging Face model files through hf-mirror.com when enabled. */
-  useHuggingFaceMirror: boolean
+  network: NetworkSettings
   recognition: RecognitionSettings
   recording: RecordingSettings
   appearance: AppearancePrefs
@@ -150,7 +164,8 @@ export type CloudFormatDefaults = {
   cloudModel: string
 }
 
-export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recording' | 'appearance' | 'overlay' | 'videoCaptions' | 'translation' | 'compute' | 'modelStoragePath' | 'version' | 'browserConnection'> & {
+export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recording' | 'appearance' | 'overlay' | 'videoCaptions' | 'translation' | 'compute' | 'network' | 'modelStoragePath' | 'version' | 'browserConnection'> & {
+  network?: Partial<NetworkSettings>
   compute?: Partial<ComputeSettings>
   recognition?: Partial<RecognitionSettings>
   recording?: Partial<RecordingSettings>
@@ -193,7 +208,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   uiLanguage: 'zh-CN',
   modelStoragePath: '',
-  useHuggingFaceMirror: true,
+  network: {
+    useHuggingFaceMirror: true,
+    usePypiMirror: false,
+    githubAccelerateUrl: '',
+    proxyUrl: '',
+    proxyForPip: false,
+    proxyForModelDownload: false,
+    proxyForRuntimeDownload: false,
+  },
   recognition: {
     modelId: 'qwen3-asr-1.7b-hf',
     sourceLanguage: 'auto',
