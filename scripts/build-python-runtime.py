@@ -99,10 +99,16 @@ def main() -> None:
         system = Path(os.environ["SystemRoot"]) / "System32"
         for name in ("concrt140.dll", "msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll",
                      "msvcp140_atomic_wait.dll", "msvcp140_codecvt_ids.dll", "vcruntime140.dll",
-                     "vcruntime140_1.dll", "vcruntime140_threads.dll"):
+                     "vcruntime140_1.dll", "vcruntime140_threads.dll", "vcomp140.dll"):
             source = system / name
             if source.exists():
                 shutil.copy2(source, staging / name)
+        # CPU/DirectML Torch 2.3.1 links to VCOMP140; a developer's system DLL can mask a broken release.
+        # Source: official torch-2.3.1+cpu Windows wheel's torch_cpu.dll import table.
+        required_vc = ("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll", "vcomp140.dll")
+        missing_vc = [name for name in required_vc if not (staging / name).is_file()]
+        if missing_vc:
+            raise RuntimeError(f"Microsoft VC++ x64 runtime is incomplete: {', '.join(missing_vc)}")
         versions = sorted(f"{d.metadata['Name']}=={d.version}" for d in importlib.metadata.distributions())
         digest = hashlib.sha256(json.dumps({"python": sys.version, "dependencies": versions}, sort_keys=True).encode())
         for source in sorted(engine.rglob("*.py")):

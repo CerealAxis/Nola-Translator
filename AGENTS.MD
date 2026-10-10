@@ -16,7 +16,7 @@
 
 ```
 src/
-├── main/        # Electron 主进程：IPC 注册、窗口、设置/凭据持久化、引擎子进程；runtime-manager.ts／python-environments.ts 管理组件，runtime-files.ts 处理 Windows 目录切换；browser-integrations.ts 只读检测浏览器扩展状态并打开管理页
+├── main/        # Electron 主进程：IPC 注册、窗口、设置/凭据持久化、引擎子进程；runtime-manager.ts／python-environments.ts 管理组件，python-runtime-paths.ts 统一 Python 导入与 DLL 路径，runtime-files.ts 处理 Windows 目录切换；browser-integrations.ts 只读检测浏览器扩展状态并打开管理页
 ├── preload/     # 单文件，contextBridge 暴露 window.nolaTranslator
 ├── shared/      # 跨进程契约：类型 + zod + 默认值；languages.ts 为语言代码目录，model-capabilities.ts 为模型能力与推荐预设。**改枚举必看这里**
 └── renderer/    # React 应用
@@ -73,6 +73,7 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 ## 4. 注释规范
 
 - Runtime catalogs record official wheel ABI, SHA-256 and backend combinations. Checks use built-in Python 3.12 without installing; repair ownership requires an app installation record.
+- Component DLL paths must match in probes and engine startup; keep Windows DLL-directory handles alive for inference. Older Torch uses MKL in the component's `Library/bin`, and the Python base bundles the VC++ OpenMP runtime.
 
 - 模型语言目录、推荐能力与运行引擎限制的注释须注明来源或限制原因；用户配置不代表模型自动获得新能力。
 - 浏览器采集限制注释须注明浏览器 API 原因；`getDisplayMedia` 必须在用户动作的原调用栈发起，Capture Handle 校验后仅处理音频。

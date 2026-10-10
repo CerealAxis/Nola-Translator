@@ -3,6 +3,7 @@ import { access, readdir } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type { LocalRuntime } from '../shared/compute'
+import { pythonRuntimePaths } from './python-runtime-paths'
 
 const run = promisify(execFile)
 export function missingLocalRuntime(path = ''): LocalRuntime {
@@ -17,7 +18,8 @@ export async function probeLocalEngine(python: string, directory: string): Promi
   const abi = extensions.find(name => /^_C\.cp\d+-win_amd64\.pyd$/i.test(name))?.match(/cp\d+/)?.[0]
   if (abi && abi !== 'cp312') return { ...result, status: 'incompatible', reason: `已有 PyTorch 使用 ${abi}，无法由内置 Python 3.12 加载；请在设置中选择 Python 3.12 组合安装。` }
   try {
-    const script = `import sys,json,importlib.util; sys.path[:0] = ${JSON.stringify([join(dirname(python), "Lib", "site-packages"), directory])}; import torch; xpu=getattr(getattr(torch,'xpu',None),'_is_compiled',lambda:False)(); dml=importlib.util.find_spec('torch_directml') is not None; importlib.import_module('torch_directml') if dml else None; backend='directml' if dml else 'rocm' if torch.version.hip else 'cuda' if torch.version.cuda else 'xpu' if xpu else 'cpu'; xf=importlib.util.find_spec('xformers'); from importlib.metadata import version; print(json.dumps(dict(torch=str(torch.__version__),backend=backend,path=str(__import__('pathlib').Path(torch.__file__).parent.parent),xformersVersion=version('xformers') if xf else '')))`
+    const setup = pythonRuntimePaths([join(dirname(python), 'Lib', 'site-packages'), directory], dirname(python), directory)
+    const script = `${setup}; import json,importlib.util; import torch; xpu=getattr(getattr(torch,'xpu',None),'_is_compiled',lambda:False)(); dml=importlib.util.find_spec('torch_directml') is not None; importlib.import_module('torch_directml') if dml else None; backend='directml' if dml else 'rocm' if torch.version.hip else 'cuda' if torch.version.cuda else 'xpu' if xpu else 'cpu'; xf=importlib.util.find_spec('xformers'); from importlib.metadata import version; print(json.dumps(dict(torch=str(torch.__version__),backend=backend,path=str(__import__('pathlib').Path(torch.__file__).parent.parent),xformersVersion=version('xformers') if xf else '')))`
     const probe = await run(python, ['-I', '-c', script], { windowsHide: true, timeout: 30_000, maxBuffer: 1024 * 1024,
       env: { ...process.env, PYTHONUTF8: '1' } })
     const actual = JSON.parse(probe.stdout.trim()) as { torch: string; backend: string; path: string; xformersVersion: string }

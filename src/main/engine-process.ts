@@ -7,6 +7,7 @@ import { createInterface, type Interface as ReadlineInterface } from 'node:readl
 import { PREWARM_ERROR_CODES } from '../shared/contracts'
 import type { EngineCommand, EngineEvent, EngineProcessState, PrewarmConfig, PrewarmErrorCode, PrewarmResult } from '../shared/contracts'
 import { engineCommandSchema, parseEventLine } from '../shared/schemas'
+import { pythonRuntimePaths } from './python-runtime-paths'
 
 /** Re-exported so a caller can read the state union without importing a main-process module. */
 export type { EngineProcessState }
@@ -54,7 +55,7 @@ export function createEngineLaunchSpec(options: {
   const sourceDirectory = options.isPackaged ? join(pythonDirectory, 'Lib', 'site-packages') : join(options.appPath, 'engine')
   const paths = options.managedEngineDirectory ? [sourceDirectory, options.managedEngineDirectory] : [sourceDirectory]
   // Python is fixed; only component search paths change. App code always comes from this release.
-  const bootstrap = `import runpy, sys; assert sys.version_info[:2] == (3,12), "Python 3.12 required"; sys.path[:0] = ${JSON.stringify(paths)}; runpy.run_module("nola_translator_engine", run_name="__main__")`
+  const bootstrap = `${pythonRuntimePaths(paths, pythonDirectory, options.managedEngineDirectory)}; import runpy; assert sys.version_info[:2] == (3,12), "Python 3.12 required"; runpy.run_module("nola_translator_engine", run_name="__main__")`
   return { command: join(pythonDirectory, 'python.exe'), args: ['-I', '-c', bootstrap], cwd: pythonDirectory }
 }
 
