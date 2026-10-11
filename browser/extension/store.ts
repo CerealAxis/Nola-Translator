@@ -311,12 +311,10 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     // and every other signal looks healthy, so the session would otherwise sit at "recognizing"
     // with nothing to show and no reason given. Advancing playback plus a few seconds of exact
     // digital silence is a capture that will not recover on its own.
-    if (sampleWindow.count === 0) {
-      silenceChunks = peakOf(chunk.buffer) > 0 ? 0 : silenceChunks + 1
-      if (silenceChunks >= SILENCE_CHUNKS_TO_FAIL && advancing() && (chunk.sourcePeak ?? 0) <= 0) {
-        debug('ext.silent', { silenceChunks, sourcePeakDbfs: dbfs(chunk.sourcePeak ?? 0), workletPeakDbfs: dbfs(chunk.workletPeak ?? 0) })
-        void stop('tabAudioSilent'); return
-      }
+    silenceChunks = peakOf(chunk.buffer) > 0 ? 0 : silenceChunks + 1
+    if (silenceChunks >= SILENCE_CHUNKS_TO_FAIL && advancing() && (chunk.sourcePeak ?? 0) <= 0) {
+      debug('ext.silent', { silenceChunks, sourcePeakDbfs: dbfs(chunk.sourcePeak ?? 0), workletPeakDbfs: dbfs(chunk.workletPeak ?? 0) })
+      void stop('tabAudioSilent'); return
     }
     const duration = chunk.buffer.byteLength / 2 / chunk.sampleRate * 1000
     if (pendingMs + duration > 2000) { void stop('slowAudio'); return }
