@@ -1,6 +1,6 @@
 import { LANGUAGE_CODES } from './languages'
 import { DEFAULT_COMPUTE_SETTINGS, type ComputeSettings } from './compute'
-import { GITHUB_PROXY_AUTO } from './github-proxies'
+import { GITHUB_PROXY_DEFAULT } from './github-proxies'
 
 export type OverlaySettings = {
   mode: 'free' | 'top' | 'bottom'
@@ -68,7 +68,8 @@ export type NetworkSettings = {
   useGithubAccelerate: boolean
   /**
    * Prefixed onto a GitHub release asset URL (`prefix + url`). Holds a `GITHUB_PROXY_NODES` entry or
-   * `GITHUB_PROXY_AUTO`, which probes the catalog and uses whichever node answers first.
+   * `GITHUB_PROXY_AUTO`, which probes the catalog and uses the lowest-latency node that serves the
+   * pinned runtime archive. New settings default to the verified `GITHUB_PROXY_DEFAULT` node.
    */
   githubAccelerateUrl: string
   /** Empty disables proxying whatever the three scope switches below say. */
@@ -237,7 +238,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     useHuggingFaceMirror: true,
     usePypiMirror: true,
     useGithubAccelerate: true,
-    githubAccelerateUrl: GITHUB_PROXY_AUTO,
+    githubAccelerateUrl: GITHUB_PROXY_DEFAULT,
     proxyUrl: '',
     proxyForPip: false,
     proxyForModelDownload: false,

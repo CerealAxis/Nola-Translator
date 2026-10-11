@@ -3,7 +3,7 @@ import { dirname, isAbsolute } from 'node:path'
 import { computeSettingsSchema, DEFAULT_COMPUTE_SETTINGS } from '../shared/compute'
 
 import { DEFAULT_SETTINGS, RECOGNITION_MODEL_IDS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
-import { findGithubProxyNode, GITHUB_PROXY_AUTO } from '../shared/github-proxies'
+import { findGithubProxyNode, GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT } from '../shared/github-proxies'
 import { ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS } from '../shared/settings'
 import { remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../shared/cloud-config'
 
@@ -135,12 +135,10 @@ function sanitizeTargetLanguage(value: unknown): string {
 /**
  * Moves the GitHub accelerator off the old free-text box, where a filled address meant acceleration
  * was on and an empty one meant it was off, onto a node picker that has no room for a custom address.
- * A value outside the catalog therefore has no entry to land on and becomes `auto`, which measures the
- * catalog instead.
+ * A value outside the catalog therefore has no entry to land on and becomes the verified default node.
  *
- * An empty value stays the empty string rather than being rewritten to `auto`, because the next load
- * reads an empty field as "off" again: filling it in would switch a user's disabled accelerator back
- * on one launch later, so the migration has to leave it exactly as it found it.
+ * An empty value normalizes to the default node without changing the accelerator toggle, so a user's
+ * disabled setting stays disabled while every stored node value remains a valid catalog value.
  *
  * A file that already carries the toggle is not one of these older files, and its boolean is the
  * newer answer: deriving the switch from the address alone would turn a user back on who had turned
@@ -153,9 +151,11 @@ function migrateGithubAccelerate(raw: Partial<AppSettings['network']> | undefine
   // Normalizing here as well as in the older branch below keeps the stored address and the node the
   // picker highlights the same one: the picker resolves anything outside the catalog to `auto`, so a
   // value left unnormalized would sit behind a row that is not the address actually in use.
-  const node = trimmed ? findGithubProxyNode(trimmed) ?? GITHUB_PROXY_AUTO : ''
+  const node = trimmed === GITHUB_PROXY_AUTO
+    ? GITHUB_PROXY_AUTO
+    : trimmed ? findGithubProxyNode(trimmed) ?? GITHUB_PROXY_DEFAULT : GITHUB_PROXY_DEFAULT
   if (typeof raw?.useGithubAccelerate === 'boolean') return { githubAccelerateUrl: node }
-  if (!trimmed) return { useGithubAccelerate: false, githubAccelerateUrl: '' }
+  if (!trimmed) return { useGithubAccelerate: false, githubAccelerateUrl: node }
   return { useGithubAccelerate: true, githubAccelerateUrl: node }
 }
 

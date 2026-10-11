@@ -18,7 +18,7 @@ import { useNolaTheme } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import type { UiLanguage } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
-import { GITHUB_PROXY_AUTO, GITHUB_PROXY_NODES, findGithubProxyNode } from '../../../../shared/github-proxies'
+import { GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PROXY_NODES, findGithubProxyNode } from '../../../../shared/github-proxies'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 
@@ -219,7 +219,7 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
               network: {
                 useGithubAccelerate,
                 ...(useGithubAccelerate && network.githubAccelerateUrl.trim() === ''
-                  ? { githubAccelerateUrl: GITHUB_PROXY_AUTO }
+                  ? { githubAccelerateUrl: GITHUB_PROXY_DEFAULT }
                   : {}),
               },
             }).catch(() => undefined)
@@ -228,7 +228,9 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
       </SettingsRow>
       <SettingsRow label={t('settings.githubAccelerateNode')} desc={t('settings.githubAccelerateNodeHint')} descriptionTooltip>
         <SettingSelect
-          value={findGithubProxyNode(network.githubAccelerateUrl) ?? GITHUB_PROXY_AUTO}
+          value={network.githubAccelerateUrl === GITHUB_PROXY_AUTO
+            ? GITHUB_PROXY_AUTO
+            : findGithubProxyNode(network.githubAccelerateUrl) ?? GITHUB_PROXY_DEFAULT}
           options={nodeOptions}
           isDisabled={!network.useGithubAccelerate}
           ariaLabel={t('settings.githubAccelerateNode')}

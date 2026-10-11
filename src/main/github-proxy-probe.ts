@@ -11,16 +11,19 @@ const PROBE_TTL_MS = 30 * 60_000
 /** Per-request budget, and therefore the deadline of the whole round: it is asked only once. */
 const PROBE_TIMEOUT_MS = 3000
 
+/** Keep this asset in sync with the llama.cpp release pinned by the runtime catalog generator. */
+const PROBE_ASSET_URL = 'https://github.com/ggml-org/llama.cpp/releases/download/b11532/llama-b11532-bin-win-cpu-x64.zip'
+const PROBE_ASSET_FILENAME = 'llama-b11532-bin-win-cpu-x64.zip'
+
 let cached: { node: string; at: number } | null = null
 let inFlight: Promise<string> | null = null
 
 /**
- * Asks every catalog node at the same time and takes the first one to answer.
+ * Asks every catalog node at the same time and takes the first one to serve the runtime archive.
  *
- * Any HTTP status counts as reachable. A proxy front page answers 200, 301, 403 or 404 long before it
- * serves an asset, while a node that is genuinely gone fails at the socket or TLS layer, so the status
- * itself carries no information about the download that follows. Leaving on the first answer also
- * bounds the round by the winner instead of the slowest node.
+ * A proxy front page or error page can answer HTTP while the download route is broken, so the probe
+ * checks the expected archive headers instead of treating every HTTP response as reachable. Leaving
+ * on the first valid answer bounds the round by the winner instead of the slowest node.
  */
 function probeFastestNode(): Promise<string> {
   const controller = new AbortController()
@@ -32,10 +35,17 @@ function probeFastestNode(): Promise<string> {
     if (remaining === 0) { reject(new Error('github proxy catalog is empty')); return }
     for (const node of GITHUB_PROXY_NODES) {
       const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(PROBE_TIMEOUT_MS)])
-      void net.fetch(node, { method: 'HEAD', signal }).then(
-        () => resolve(node),
-        () => { if (--remaining === 0) reject(new Error(`no github proxy node answered within ${PROBE_TIMEOUT_MS} ms`)) },
-      )
+      void net.fetch(`${node}${PROBE_ASSET_URL}`, { method: 'HEAD', signal }).then(response => {
+        const contentType = response.headers.get('content-type') ?? ''
+        const contentDisposition = response.headers.get('content-disposition') ?? ''
+        const servesArchive = response.ok
+          && contentType.includes('application/octet-stream')
+          && contentDisposition.toLowerCase().includes(PROBE_ASSET_FILENAME)
+        if (servesArchive) resolve(node)
+        else if (--remaining === 0) reject(new Error(`no github proxy node served the runtime archive within ${PROBE_TIMEOUT_MS} ms`))
+      }, () => {
+        if (--remaining === 0) reject(new Error(`no github proxy node answered within ${PROBE_TIMEOUT_MS} ms`))
+      })
     }
   })
   return probed.finally(() => { clearTimeout(deadline); controller.abort() })
