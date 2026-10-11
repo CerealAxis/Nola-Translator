@@ -14,6 +14,7 @@ import { NotesPanel } from '@/components/notes'
 import { useI18n } from '@/i18n'
 import { recordPath, useRoute } from '@/routes'
 import { NO_TRANSLATION_LANGUAGE } from '@/bridge'
+import type { DiagnosticCopyContext } from '@/bridge'
 import { targetLanguagePatch, translationModelPatch } from '@/session-config'
 
 import { PreflightDialog } from './PreflightDialog'
@@ -241,9 +242,9 @@ export function WorkspacePage() {
     }
   }, [navigate, t])
 
-  const copyDiagnostics = useCallback(async () => {
+  const copyDiagnostics = useCallback(async (context?: DiagnosticCopyContext) => {
     try {
-      await getBridge()?.diagnostics.copy()
+      await getBridge()?.diagnostics.copy(context)
       toast.success(t('common.copied'))
     } catch {
       toast.danger(t('errors.copyDiagnosticsAction'))
@@ -299,7 +300,7 @@ export function WorkspacePage() {
         }}
         translationModelId={currentConfig?.translationModelId ?? settings?.translation.localModelId ?? ''}
         translationProvider={currentConfig?.translationProvider ?? settings?.translation.provider ?? 'local'}
-        translationProviderLabel={settings?.translation.provider === 'cloud' ? settings.translation.cloudModel || t('settings.providerCloud') : t('settings.providerMicrosoft')}
+        translationProviderLabel={settings?.translation.provider === 'cloud' ? settings.translation.cloudModel || t('settings.providerCloud') : settings?.translation.provider === 'mymemory' ? t('settings.providerMyMemory') : settings?.translation.provider === 'recognition' ? t('settings.providerRecognitionTranslation') : t('settings.providerMicrosoft')}
         onTranslationModelChange={(value) => {
           if (!settings) return
           const previousTarget = settings.translation.targetLanguage
@@ -413,12 +414,13 @@ export function WorkspacePage() {
         onOpenChange={setPreflightOpen}
         missing={missing}
         onStart={() => void start()}
+        onCopyDiagnostics={copyDiagnostics}
       />
 
       <StopSessionDialog isOpen={stopConfirmOpen} onOpenChange={setStopConfirmOpen} onEnd={() => void stop()} />
 
       {/* Session failure: copy comes from the errorCode table; the diagnostic reason remains visible alongside the translated action. */}
-      <SessionErrorDialog state={session} onCopyDiagnostics={() => void copyDiagnostics()} onReset={resetError} onViewRecord={viewRecord} />
+      <SessionErrorDialog state={session} onCopyDiagnostics={(context) => void copyDiagnostics(context)} onReset={resetError} onViewRecord={viewRecord} />
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { createInterface, type Interface as ReadlineInterface } from 'node:readl
 import { PREWARM_ERROR_CODES } from '../shared/contracts'
 import type { EngineCommand, EngineEvent, EngineProcessState, PrewarmConfig, PrewarmErrorCode, PrewarmResult } from '../shared/contracts'
 import { engineCommandSchema, parseEventLine } from '../shared/schemas'
+import { supportErrorCodeForCause } from '../shared/error-catalog'
 import { pythonRuntimePaths } from './python-runtime-paths'
 import { logActivity, logDiagnostic } from './session-log'
 
@@ -36,6 +37,8 @@ export type EngineProcessOptions = EngineLaunchSpec & {
 
 type PendingRequest = {
   expectedType: EngineEvent['type']
+  commandType: EngineCommand['type']
+  action?: string
   /** Whether a matching event is the answer, or progress the caller merely streams onward. */
   isFinal: (event: EngineEvent) => boolean
   resolve: (event: EngineEvent) => void
@@ -43,6 +46,23 @@ type PendingRequest = {
   /** `null` when the request is bounded by child lifetime instead of a deadline. */
   timer: ReturnType<typeof setTimeout> | null
   clear(): void
+}
+
+function withRequestId(error: Error, requestId: string, context: Pick<PendingRequest, 'commandType' | 'action'>): Error {
+  const source = error as Error & { code?: string | number; engineCode?: string; signal?: string; commandType?: string; action?: string }
+  if (typeof (error as Error & { requestId?: unknown }).requestId === 'string'
+    && typeof source.commandType === 'string') return error
+  const correlated = new Error(error.message)
+  correlated.name = error.name
+  correlated.stack = error.stack
+  return Object.assign(correlated, {
+    requestId,
+    code: source.code,
+    engineCode: source.engineCode,
+    signal: source.signal,
+    commandType: source.commandType ?? context.commandType,
+    action: source.action ?? context.action,
+  })
 }
 
 export function createEngineLaunchSpec(options: {
@@ -183,10 +203,15 @@ export class EngineProcess extends EventEmitter {
         : setTimeout(() => {
           this.pending.delete(validated.requestId)
           logDiagnostic('engine.request.timeout', { requestId: validated.requestId, command: validated.type, expectedType, timeoutMs })
-          reject(new Error(`等待 ${expectedType} 超时`))
+          reject(withRequestId(new Error(`等待 ${expectedType} 超时`), validated.requestId, {
+            commandType: validated.type,
+            action: validated.type === 'manageResource' ? validated.action : undefined,
+          }))
         }, timeoutMs)
       const entry: PendingRequest = {
         expectedType,
+        commandType: validated.type,
+        action: validated.type === 'manageResource' ? validated.action : undefined,
         isFinal: event => isFinal(event as Extract<EngineEvent, { type: TType }>),
         resolve,
         reject,
@@ -203,7 +228,10 @@ export class EngineProcess extends EventEmitter {
       if (pending) {
         pending.clear()
         this.pending.delete(validated.requestId)
-        pending.reject(error instanceof Error ? error : new Error(String(error)))
+        pending.reject(withRequestId(error instanceof Error ? error : new Error(String(error)), validated.requestId, {
+          commandType: validated.type,
+          action: validated.type === 'manageResource' ? validated.action : undefined,
+        }))
       }
     }
     return (await response) as Extract<EngineEvent, { type: TType }>
@@ -332,9 +360,11 @@ export class EngineProcess extends EventEmitter {
           if (/timing|fail|error/.test(category)) logDiagnostic(`pipeline.${category}`, observation)
           else logActivity(`pipeline.${category}`, observation)
           return
-        } catch { /* Unparseable diagnostics remain visible as ordinary stderr. */ }
+        } catch { /* Unparseable diagnostics are reduced to safe output metadata below. */ }
       }
-      this.emit('log', line)
+      const level = /\b(error|exception|failed|fatal)\b/i.test(line) ? 'error'
+        : /\b(warn|warning)\b/i.test(line) ? 'warning' : 'info'
+      this.emit('log', JSON.stringify({ kind: 'unstructured-stderr', level, bytes: Buffer.byteLength(line) }))
     }
     child.stderr.on('data', (chunk: Buffer) => {
       stderrPending += chunk.toString('utf8')
@@ -401,7 +431,18 @@ export class EngineProcess extends EventEmitter {
 
     const pending = this.pending.get(event.requestId)
     if (event.type === 'caption' || event.type === 'audioAccepted' || event.type === 'modelProgress') logActivity(`engine.event.${event.type}`, event)
-    else logDiagnostic(`engine.event.${event.type}`, event)
+    else {
+      const operation = { commandType: pending?.commandType, action: pending?.action }
+      const failedResource = event.type === 'resourceActionResult' || event.type === 'resourceChanged'
+        ? event.resource.state === 'failed' ? event.resource : undefined
+        : undefined
+      const diagnosticEvent = event.type === 'error'
+        ? { ...event, ...operation, supportCode: supportErrorCodeForCause(event.code, operation) }
+        : failedResource
+          ? { ...event, supportCode: supportErrorCodeForCause(failedResource.errorCode, operation) }
+          : event
+      logDiagnostic(`engine.event.${event.type}`, diagnosticEvent)
+    }
     if (pending && (event.type === 'error' || (event.type === pending.expectedType && pending.isFinal(event)))) {
       pending.clear()
       this.pending.delete(event.requestId)
@@ -409,7 +450,12 @@ export class EngineProcess extends EventEmitter {
         const reason = typeof event.details?.reason === 'string' ? `：${event.details.reason.slice(0, 512)}` : ''
         // The code rides along as a property so a caller that branches on it does not have to take
         // a localized message apart to find it. The message itself is unchanged.
-        pending.reject(Object.assign(new Error(`引擎错误：${event.code}${reason}`), { engineCode: event.code }))
+        pending.reject(Object.assign(new Error(`引擎错误：${event.code}${reason}`), {
+          engineCode: event.code,
+          requestId: event.requestId,
+          commandType: pending.commandType,
+          action: pending.action,
+        }))
       } else {
         pending.resolve(event)
       }
@@ -454,9 +500,9 @@ export class EngineProcess extends EventEmitter {
   }
 
   private rejectPending(error: Error): void {
-    for (const pending of this.pending.values()) {
+    for (const [requestId, pending] of this.pending) {
       pending.clear()
-      pending.reject(error)
+      pending.reject(withRequestId(error, requestId, { commandType: pending.commandType, action: pending.action }))
     }
     this.pending.clear()
   }

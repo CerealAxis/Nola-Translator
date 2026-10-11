@@ -112,18 +112,34 @@ export type AppearancePrefs = {
 export type RecognitionModelId = 'qwen3-asr-1.7b-hf' | 'qwen3-asr-0.6b-hf' | 'sensevoice-small' | (string & {})
 
 export type RecognitionSettings = {
+  provider?: RecognitionProvider
+  aliyunWorkspaceId?: string
+  aliyunRegion?: 'cn-beijing' | 'ap-southeast-1'
+  aliyunModel?: AliyunRecognitionModel
+  /**
+   * MiniMax ASR address. `api.minimax.cn` serves mainland accounts and `api.minimax.io` serves
+   * international ones against the same `/v1/speech_to_text` path, so this is a setting rather
+   * than a constant. Aliyun derives its address from the workspace and region instead.
+   */
+  minimaxEndpoint?: string
+  minimaxModel?: MinimaxRecognitionModel
   modelId: RecognitionModelId
   sourceLanguage: string
   /** `defaultOutput` or an audio device id; shared so the overlay can start a session with the same source. */
   audioSource: string
 }
 
-/**
- * Partitioned by **who translates**, not by which model: `local` is this machine's weights
- * whichever loader owns them, `cloud` is an HTTP request whichever wire format it speaks. The
- * model and the protocol are a sub-selection under each.
- */
-export type TranslationProvider = 'local' | 'cloud' | 'microsoft'
+/** Cloud recognition selects its remote model independently of the saved local model id. */
+export type RecognitionProvider = 'local' | 'aliyun' | 'minimax'
+export type AliyunRecognitionModel = 'qwen3.8-livetranslate-flash-realtime' | 'qwen3.5-livetranslate-flash-realtime'
+export const ALIYUN_RECOGNITION_MODELS: readonly AliyunRecognitionModel[] = ['qwen3.8-livetranslate-flash-realtime', 'qwen3.5-livetranslate-flash-realtime']
+/** `asr-1.0` is the only model the endpoint enumerates. */
+export type MinimaxRecognitionModel = 'asr-1.0'
+export const MINIMAX_RECOGNITION_MODELS: readonly MinimaxRecognitionModel[] = ['asr-1.0']
+export const RECOGNITION_PROVIDERS: readonly RecognitionProvider[] = ['local', 'aliyun', 'minimax']
+
+/** Native recognition translation reuses the Aliyun socket; other providers run separately. */
+export type TranslationProvider = 'local' | 'cloud' | 'microsoft' | 'mymemory' | 'recognition'
 
 /**
  * The HTTP protocol a cloud endpoint actually speaks.
@@ -136,7 +152,8 @@ export type CloudApiFormat = 'chat-completions' | 'chat-responses' | 'anthropic'
  * the Authorization header when the key is empty, while the Anthropic and Microsoft shapes
  * refuse without one.
  */
-export type CredentialProvider = 'cloud' | 'microsoft'
+export type CredentialProvider = 'cloud' | 'microsoft' | 'aliyun-asr' | 'minimax-asr'
+export const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'microsoft', 'aliyun-asr', 'minimax-asr']
 
 /**
  * The three local Hy-MT2 quantization tiers, or a `hub:<owner>/<name>` id for an installed GGUF.
@@ -157,6 +174,8 @@ export type TranslationSettings = {
   cloudMaxOutputTokens: number
   microsoftEndpoint: string
   microsoftRegion: string
+  mymemoryEndpoint?: string
+  mymemoryEmail?: string
   translateIntermediate: boolean
   targetLanguage: string
 }
@@ -189,7 +208,7 @@ export const RECOGNITION_MODEL_LABELS: Record<RecognitionModelId, string> = {
   'sensevoice-small': 'SenseVoiceSmall',
 }
 
-export const TRANSLATION_PROVIDERS: readonly TranslationProvider[] = ['local', 'cloud', 'microsoft']
+export const TRANSLATION_PROVIDERS: readonly TranslationProvider[] = ['local', 'cloud', 'microsoft', 'mymemory', 'recognition']
 
 export const CLOUD_API_FORMATS: readonly CloudApiFormat[] = ['chat-completions', 'chat-responses', 'anthropic', 'ollama']
 
@@ -225,6 +244,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
     proxyForRuntimeDownload: false,
   },
   recognition: {
+    provider: 'local',
+    aliyunWorkspaceId: '',
+    aliyunRegion: 'cn-beijing',
+    aliyunModel: 'qwen3.8-livetranslate-flash-realtime',
+    minimaxEndpoint: 'https://api.minimax.cn/v1/speech_to_text',
+    minimaxModel: 'asr-1.0',
     modelId: 'qwen3-asr-1.7b-hf',
     sourceLanguage: 'auto',
     audioSource: 'defaultOutput',
@@ -274,6 +299,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     cloudMaxOutputTokens: 4096,
     microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com',
     microsoftRegion: '',
+    mymemoryEndpoint: 'https://api.mymemory.translated.net/get',
+    mymemoryEmail: '',
     translateIntermediate: false,
     targetLanguage: 'zh',
   },

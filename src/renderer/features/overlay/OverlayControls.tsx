@@ -130,6 +130,7 @@ function startConfigOf(settings: AppSettings, devices: readonly AudioDevice[]): 
     // Kept for protocol compatibility; realtime is the only mode the app runs.
     recognitionMode: 'realtime',
     recognitionModelId: settings.recognition.modelId,
+    ...recognitionFieldsOf(settings.recognition),
     sourceLanguage: settings.recognition.sourceLanguage,
     // No target language: the setting's `translation.targetLanguage` applies,
     // and the pill is what edits it.
@@ -319,7 +320,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
           <Dropdown>
             <Dropdown.Trigger isDisabled={active || locked} className={`${CAPSULE} nola-caption-pill--mode`}>
               <span className="nola-caption-mode-dot" aria-hidden="true" />
-              <span>{modelOptions.recognition?.name ?? modelId}</span>
+              <span>{modelOptions.recognitionModels.find(model => model.value === modelId)?.label ?? modelId}</span>
             </Dropdown.Trigger>
             {/*
               Selection is computed by the Menu, not set per item: `Dropdown.Item`
@@ -468,3 +469,4 @@ function LanguagePill({
     </Dropdown>
   )
 }
+import { recognitionFieldsOf } from '../../../shared/cloud-config'

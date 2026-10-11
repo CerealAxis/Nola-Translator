@@ -68,7 +68,7 @@ class EngineService:
                 return [
                     self._error(
                         command.requestId,
-                        "audioDeviceUnavailable",
+                        "audioDeviceEnumerationFailed",
                         {"reason": type(error).__name__},
                     )
                 ]

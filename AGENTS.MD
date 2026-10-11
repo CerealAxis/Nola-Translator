@@ -7,10 +7,11 @@
 
 - 桌面应用：Electron + React + TypeScript
 - 引擎：内置 Windows x64 Python 3.12；PyTorch 与 llama.cpp 由设置页按组合安装或复用本地组件（模型能力持久化在自定义模型注册表，启动与逐句翻译必须校验配置）
+- 云端识别：Aliyun LiveTranslate 3.5／3.8 使用 WebSocket 持续输入 PCM16；MiniMax Speech-to-Text 不接受音频流式输入，改由引擎侧 VAD 切段后逐段上传 WAV，SSE 只推送响应增量。云端翻译支持 MyMemory REST 与识别连接自带的流式译文（仅阿里云具备，MiniMax 无内置译文）。
 - UI：Tailwind CSS + HeroUI
 - 构建：electron-vite
 - 测试：Vitest + Testing Library
-- 诊断：主进程使用 Node 文件 API 保存每次启动的独立日志，自动脱敏并限制保留数量和文件大小。
+- 诊断：主进程使用 Node 文件 API 每次启动保存一份不拆分的 JSONL 日志，自动脱敏、限制单条大小并保留最近启动记录。
 - 浏览器：Chrome／Edge Manifest V3 + React／TypeScript；Python 标准库 Native Messaging 连接程序由 PyInstaller 打包
 
 ## 2. 目录结构
@@ -19,7 +20,7 @@
 src/
 ├── main/        # Electron 主进程：IPC 注册、窗口、设置/凭据持久化、引擎子进程；session-log.ts 保存每次启动的诊断日志；runtime-manager.ts／python-environments.ts 管理组件，python-runtime-paths.ts 统一 Python 导入与 DLL 路径，runtime-files.ts 处理 Windows 目录切换；browser-integrations.ts 只读检测浏览器扩展状态并打开管理页
 ├── preload/     # 单文件，contextBridge 暴露 window.nolaTranslator
-├── shared/      # 跨进程契约：类型 + zod + 默认值；languages.ts 为语言代码目录，model-capabilities.ts 为模型能力与推荐预设。**改枚举必看这里**
+├── shared/      # 跨进程契约：类型 + zod + 默认值；error-catalog.ts 定义稳定用户支持码，languages.ts 为语言代码目录，cloud-config.ts 统一云端识别与翻译连接配置及语言限制，model-capabilities.ts 为模型能力与推荐预设。**改枚举必看这里**
 └── renderer/    # React 应用
     ├── bridge/  # 渲染进程唯一的数据出口（NolaBridge）
     ├── assets/browsers/ # Chrome／Edge 图标，用于浏览器连接设置
@@ -29,6 +30,9 @@ src/
     ├── i18n/         # zh-CN.ts 为 Dictionary 源，en.ts 受其类型约束
     └── theme/        # 设计 token 唯一来源（CSS）
 engine/nola_translator_engine/  # Python 引擎，协议定义在 protocol.py，model_capabilities.py 为引擎能力校验
+├── recognition/aliyun.py       # LiveTranslate WebSocket、原文与内置译文关联及结束排空
+├── recognition/minimax.py      # VAD 切段后逐段上传 WAV、SSE 增量、失败锁存与并发上限
+└── translation/mymemory.py     # 公共 REST 翻译、UTF-8 请求分段及业务状态校验
 browser/
 ├── extension/                 # MV3 扩展、播放器适配、临时 store、Shadow DOM；build.mjs 独立构建到 dist/
 ├── native_host/               # 标准库 stdio／当前用户命名管道连接程序及帧协议测试
@@ -75,8 +79,11 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 
 - Runtime catalogs record official wheel ABI, SHA-256 and backend combinations. Checks use built-in Python 3.12 without installing; repair ownership requires an app installation record.
 - Cloud translation uses a session-scoped HTTP pool and streams Chat Completions / Anthropic text; final captions supersede obsolete network intermediates, while native inference retains its reservation. Timing diagnostics distinguish queue, first text, and request duration.
+- Aliyun cloud recognition bypasses local ASR weights and component checks. LiveTranslate 3.8 uses delta events and auto source detection; 3.5 uses text/stash snapshots. Native translations join their source items; stream completion sends session.finish and awaits session.finished. Reset closes the old connection before opening another. Credentials remain in encrypted main-process slots, outside settings and browser contracts. MyMemory translates confirmed sentences through REST, checks embedded quota errors, and splits q by UTF-8 bytes; it does not provide token streaming.
+- MiniMax speech-to-text accepts one complete audio file per request and has no audio streaming input, so its `stream=true` is response-side only and begins after the upload completes — captions therefore arrive at gate closures rather than mid-utterance. Segments reuse `VolumeGateSegmenter`, which splits on silence and keeps adjacent segments from overlapping, so no text is recognized twice and billing matches the audio. Its 6 s ceiling is a caption-lag budget for speech with no pause to close the gate on, not a service limit; billing follows audio duration, so splitting more often costs the same money. `accept` only hands finished segments to background tasks and returns immediately, because it runs inside the audio capture loop; `flush` drains those uploads so the tail caption lands, cancelling rather than orphaning one that outruns its budget. Deltas are keyed by the server's event `index` rather than arrival order, and a stream cut before its finish event still publishes the partial transcript it already carried. A failure latches on the first error, so one invalid key cannot repeat a billable call for every remaining segment. Its `language` travels as a request header, with app code `tl` rewritten to the provider's `fil`. HTTP 402 and 429 map to separate reason words because they call for opposite user action.
+- Cloud recognition failures carry the cause in the engine's wire `code`, because `supportErrorCodeForCause()` and `errorCopyOf()` both read that field; `details.reason` only reaches the rendered message text and the launch log. Auth failures, a spent balance and a rate limit each emit their own code rather than the generic `modelUnavailable`, whose copy points at installing a local model and cannot help a cloud account problem.
 - Meeting transcripts persist confirmed speech and settled translation changes, not streamed token revisions; segment counts count unique confirmed segments.
-- `src/main/session-log.ts` records application activity in English JSONL under Electron userData/logs. `logged-ipc.ts` correlates every IPC operation; engine commands/events and UI/browser activity share the launch trace. Files rotate at 4 MB and retain the latest 20 files. Credential/audio/caption contents are omitted; localized native diagnostics remain recoverable as UTF-8 base64. Pipeline diagnostics travel over stderr to the main logger, which alone owns rotation. The settings feedback area reveals the current log through IPC and a store action.
+- `src/main/session-log.ts` records application activity in English JSONL under Electron userData/logs, with one unsplit file per app launch and the latest 20 launches retained. Entries are capped individually; there is no file rollover within a launch. `logged-ipc.ts` correlates every IPC operation and records sanitized results; engine commands/events and UI/browser activity share the launch trace. Credentials, audio, device IDs, captions, transcripts, prompts, translation text, free-form error reasons and renderer console message text are omitted; localized diagnostics that survive field redaction remain recoverable as UTF-8 base64. High-frequency audio, caption-update and model-progress events are summarized per second. Pipeline diagnostics travel over stderr to the main logger, which alone owns log retention. `src/shared/error-catalog.ts` owns stable user support codes separately from wire error names; copied feedback includes the support code, request correlation ID and current launch-log path, and is never uploaded automatically.
 - Installation caches and staging files are temporary on success, failure, and cancellation; startup cleanup uses known artifact names, skips junctions, and recovers backups before deleting leftovers. Pip does not retain an additional user cache.
 - Component DLL paths must match in probes and engine startup; keep Windows DLL-directory handles alive for inference. Older Torch uses MKL in the component's `Library/bin`, and the Python base bundles the VC++ OpenMP runtime.
 - Caption startup reuses validated components and one recent device inventory. Recognition and enabled local translation models load concurrently without trial inference; only the selected configuration stays resident across stops. Native jobs retain their reservation until idle. Service close, model changes and shutdown release weights; dependency imports run in the background after the engine handshake and stage timings reach the launch log.

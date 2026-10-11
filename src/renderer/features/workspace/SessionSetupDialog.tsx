@@ -101,7 +101,7 @@ export function SessionSetupDialog({
   const signature = `${draft.translationModelId}|${draft.sourceLanguage}|${draft.targetLanguage}`
   const incompatible = draft.translate && translation.provider === 'local' && !!configurationOf(modelOptions.translation) && !supportsTranslation(modelOptions.translation, draft.sourceLanguage, draft.targetLanguage)
   const recognitionValid = modelOptions.sourceLanguages.includes(draft.sourceLanguage)
-  const modelsConfigured = !!configurationOf(modelOptions.recognition) && (!draft.translate || translation.provider !== 'local' || !!configurationOf(modelOptions.translation))
+  const modelsConfigured = modelOptions.configured && (!draft.translate || translation.provider !== 'local' || !!configurationOf(modelOptions.translation))
   const meetings = useStore(stores.meetings, (state) => state.meetings)
 
   /**
@@ -198,6 +198,7 @@ export function SessionSetupDialog({
       audioSource: audioSourceFrom(option, draft.audioSource),
       recognitionMode: 'realtime',
       recognitionModelId: draft.recognitionModelId,
+      ...recognitionFieldsOf(settings.recognition),
       sourceLanguage: draft.sourceLanguage,
       /*
        * Provider, quantization and cloud credential all come from settings.
@@ -217,7 +218,7 @@ export function SessionSetupDialog({
         modelId: draft.translationModelId,
       }),
     })
-  }, [audioOptions, draft, onSubmit, translation, incompatible, modelsConfigured, recognitionValid])
+  }, [audioOptions, draft, onSubmit, translation, settings.recognition, incompatible, modelsConfigured, recognitionValid])
 
   return (
     <>
@@ -320,7 +321,7 @@ export function SessionSetupDialog({
                 value={draft.recognitionModelId}
                 onChange={(key) => {
                   if (typeof key === 'string') {
-                    const codes = recognitionLanguages(resources.find(model => model.resourceId === key))
+                    const codes = (settings.recognition.provider ?? 'local') === 'local' ? recognitionLanguages(resources.find(model => model.resourceId === key)) : modelOptions.sourceLanguages
                     patch({ recognitionModelId: key as RecognitionModelId, sourceLanguage: codes.includes(draft.sourceLanguage) ? draft.sourceLanguage : codes[0] ?? draft.sourceLanguage })
                   }
                 }}
@@ -452,3 +453,4 @@ export function audioSourceFrom(option: AudioSourceOption | undefined, fallbackV
     ? { kind: 'microphone', deviceId: option.deviceId }
     : { kind: 'systemOutput', deviceId: option.deviceId || fallbackValue }
 }
+import { recognitionFieldsOf } from '../../../shared/cloud-config'

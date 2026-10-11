@@ -95,7 +95,7 @@ export function OverlayPage() {
                * the real window.
                */}
               <span className="nola-caption-preview__mic">{sessionActive ? <Square /> : <Mic />}</span>
-              <span className="nola-caption-preview__pill">{modelOptions.recognition?.name ?? settings.recognition.modelId}</span>
+              <span className="nola-caption-preview__pill">{modelOptions.recognitionModels.find(model => model.value === settings.recognition.modelId)?.label ?? settings.recognition.modelId}</span>
               <span className="nola-caption-preview__pill">{label(settings.recognition.sourceLanguage)}</span>
               <span className="nola-caption-preview__pill">{label(settings.translation.targetLanguage)}</span>
               <span className="nola-caption-preview__pill">{t(display === 'both' ? 'workspace.modeBoth' : display === 'source' ? 'workspace.modeSource' : 'workspace.modeTranslation')}<ChevronDown /></span>

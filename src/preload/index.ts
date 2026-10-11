@@ -4,14 +4,18 @@ import type { NolaTranslatorApi, EngineChannelEvent, OverlayTargetPage } from '.
 import type { EngineProcessState, HubInspectResult, HubSearchResult, PrewarmResult, ResourceRecord, SessionConfig } from '../shared/contracts'
 import { stripIpcErrorMessage } from '../shared/ipc-error'
 
-// Observe structural UI activity in the isolated world; never read labels or form values.
+// Observe structural UI activity in the isolated world; never read labels, page text or form values.
 window.addEventListener('DOMContentLoaded', () => {
   const navigation = () => ipcRenderer.send('diagnostics:ui-activity', { type: 'navigation', route: location.hash })
   navigation()
   window.addEventListener('hashchange', navigation)
   document.addEventListener('click', event => {
     const target = event.target instanceof Element ? event.target.closest('button,a,[role="button"]') : null
-    if (target) ipcRenderer.send('diagnostics:ui-activity', { type: 'interaction', route: location.hash, element: target.tagName.toLowerCase() })
+    if (target) ipcRenderer.send('diagnostics:ui-activity', { type: 'interaction', route: location.hash, element: {
+      tag: target.tagName.toLowerCase(), id: target.id || undefined,
+      role: target.getAttribute('role') ?? undefined, type: target.getAttribute('type') ?? undefined,
+      name: target.getAttribute('name') ?? undefined, action: target.getAttribute('data-action') ?? undefined,
+    } })
   }, true)
 })
 
@@ -143,7 +147,7 @@ const api: NolaTranslatorApi = {
   exportMeeting: (meetingId, format) => invoke(channels.exportMeeting, meetingId, format),
   getMeetingAudioUrl: (meetingId) => invoke(channels.meetingAudioUrl, meetingId),
   getDiagnostics: () => invoke(channels.getDiagnostics),
-  copyDiagnostics: () => invoke(channels.copyDiagnostics),
+  copyDiagnostics: (context) => invoke(channels.copyDiagnostics, context),
   openLogs: () => invoke(channels.openLogs),
   hasTranslationCredential: (provider) => invoke(channels.hasTranslationCredential, provider),
   setTranslationCredential: (provider, value) => invoke(channels.setTranslationCredential, provider, value),

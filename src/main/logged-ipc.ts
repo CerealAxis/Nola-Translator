@@ -14,7 +14,7 @@ export function loggedHandle(channel: string, listener: Parameters<typeof ipcMai
       const result: unknown = await listener(event, ...args)
       logDiagnostic('ipc.complete', { operationId, channel, durationMs: Math.round(performance.now() - started),
         resultType: result === null ? 'null' : Array.isArray(result) ? 'array' : typeof result,
-        resultCount: Array.isArray(result) ? result.length : undefined })
+        resultCount: Array.isArray(result) ? result.length : undefined, result })
       return result
     } catch (error) {
       logDiagnostic('ipc.failed', { operationId, channel, durationMs: Math.round(performance.now() - started), error })

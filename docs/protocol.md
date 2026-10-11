@@ -5,11 +5,21 @@ Nola Translator 的 Electron 主进程通过标准输入和标准输出管理独
 ## 边界与安全约束
 
 - Python 的 stdout 只允许输出协议 JSON；诊断日志只写 stderr。
-- 单行序列化后不得超过 32 KiB，超过时返回 `lineTooLarge`。
+- 单行序列化后不得超过 512 KiB，超过时返回 `lineTooLarge`。
 - 所有命令和事件必须包含非空 `requestId`，请求响应沿用同一个 ID。
 - 未知消息类型、缺少必填字段或非法数值会被拒绝；未知的非关键字段会被忽略，以便旧版本读取新版本消息。
 - `error.code` 必须使用协议中的枚举代码，`details` 只能包含不敏感的结构化上下文，不依赖自然语言错误文本进行程序判断。
-- 字幕正文、密钥和完整音频设备 ID 不写入主进程日志。
+- 字幕正文、译文、密钥、完整音频设备 ID、自由格式错误原因和渲染进程控制台消息不写入主进程日志；保留字段名、错误码、错误类别、请求 ID、来源文件与行号等诊断上下文。
+- `listDevices` 为音频源选择提供设备清单；清单读取失败不等于已保存的默认或指定来源不可用。`startSession` 会重新解析实际选择的来源，预检可以提示设备清单异常，但不应仅因清单读取失败禁用开始操作。
+
+## 错误码与问题反馈
+
+- 协议 `error.code` 表示机器可处理的原因；例如 `audioDeviceEnumerationFailed` 表示设备枚举本身失败，`audioDeviceUnavailable` 表示枚举成功但没有可用设备，或所选设备无法解析。
+- 面向用户的支持码由 `src/shared/error-catalog.ts` 维护，与协议枚举分离。支持码含稳定域前缀和编号；已发布编号不改义、不复用。新增问题应分配新编号，中英文文案由界面统一追加相同支持码。
+- 域前缀分别表示识别（ASR）、音频设备（AUD）、引擎（ENG）、未知原因（ERR）、导出（EXP）、模型（MDL）、翻译（MT）、网络与下载（NET）、本地运行组件（RNT）、会话（SES）、存储（STO）和界面连接（UIP）。
+- ENG-001 表示本地引擎无法完成启动或握手，ENG-002 表示引擎在会话期间退出，ENG-003 表示引擎操作失败；AUD-001 表示设备枚举失败，AUD-002 表示成功枚举后没有可用设备；ERR-999 是未知原因的兜底码。
+- 用户主动复制的诊断报告包含应用/运行时状态、支持码、可用的引擎请求 ID、启动日志标识和日志路径。报告和日志不包含字幕、译文、提示词、完整音频或凭据；日志可能包含设备名称和本地路径。应用不会自动上传报告。
+- 每次应用启动写入一个不拆分的 JSONL 文件，单条日志有大小上限并保留最近 20 次启动。高频音频、字幕修订和模型进度按秒汇总，避免数据流淹没关键操作记录。
 
 ## 启动与退出
 
@@ -36,6 +46,14 @@ sequenceDiagram
 开发态使用项目已有的 `.venv\\Scripts\\python.exe -m nola_translator_engine`；打包后使用 `resources\\engine\\NolaTranslatorEngine.exe`，最终用户无需安装 Python。
 
 ## 会话配置
+
+云端识别通过 `recognitionProvider: "aliyun"` 和 `recognitionOptions: { workspaceId, region, model }` 选择。`region` 为 `cn-beijing` 或 `ap-southeast-1`，`model` 为 `qwen3.8-livetranslate-flash-realtime` 或 `qwen3.5-livetranslate-flash-realtime`。本地 `recognitionModelId` 保留，以便切回本地模式；云端模式不加载该模型。3.8 的 `sourceLanguage` 必须为 `auto`。
+
+`translationProvider: "recognition"` 复用阿里云 WebSocket 连接的流式译文，只支持单目标语言；`targetLanguages: []` 仍可关闭翻译。`translationProvider: "mymemory"` 的 `translationOptions` 为 `{ endpoint, email? }`，只在原文确认后调用 REST，不支持 token 流。MyMemory 请求按 500 UTF-8 字节分段，并检查 HTTP 与响应体内的配额状态。
+
+阿里云密钥存于主进程加密凭据槽 `aliyun-asr`，只在启动识别时注入 `recognitionOptions.apiKey`。渲染进程提交的密钥字段会被清除，预热不会读取凭据或建立云端连接。浏览器扩展只提交受限的采集参数，连接配置和凭据由桌面主进程添加。Microsoft 与已有云端翻译的凭据槽保持独立。
+
+Aliyun 使用单声道 PCM16／16 kHz 输入，握手依次等待 `session.created` 和 `session.updated`；3.8 增量累加 `delta`，3.5 用 `text` + `stash` 替换快照。自然结束发送 `session.finish` 并等待 `session.finished` 排空尾句；重置使用新连接，旧连接回调不能更新新会话。仅请求文本输出。LiveTranslate 调用按量计费，改用 MyMemory 不会免除识别连接的费用。
 
 `startSession.config` 包含音频来源、识别模式、具体识别模型、源语言、最多八个目标语言和翻译 Provider。例如：
 

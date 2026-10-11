@@ -67,6 +67,8 @@ export interface SessionState {
   error: string | null
   /** UPPER_SNAKE code; the UI looks its copy up by this. */
   errorCode: string | null
+  /** Engine request identifier that lets support find the matching launch-log event. */
+  errorRequestId: string | null
   /** Missing model caught by preflight, so the UI can offer "install now". */
   missing: MissingResource | null
   /**
@@ -89,6 +91,7 @@ const initialState: SessionState = {
   elapsedMs: 0,
   error: null,
   errorCode: null,
+  errorRequestId: null,
   missing: null,
   engineStatus: 'idle',
   engineVersion: null,
@@ -137,9 +140,18 @@ function errorMessage(error: unknown): string {
 }
 
 function errorCodeOf(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'engineCode' in error && typeof error.engineCode === 'string') {
+    return error.engineCode.toUpperCase()
+  }
   const message = errorMessage(error)
-  const match = /([a-zA-Z_]+):/.exec(message)
+  const match = /([a-zA-Z_]+)[:：]/.exec(message)
   return match ? match[1].toUpperCase() : 'SESSION_ERROR'
+}
+
+function errorRequestIdOf(error: unknown): string | null {
+  return typeof error === 'object' && error !== null && 'requestId' in error && typeof error.requestId === 'string'
+    ? error.requestId
+    : null
 }
 
 /**
@@ -193,6 +205,7 @@ function abandonSessionOnEngineLoss(): void {
     // Diagnostic only: exit code and signal live in the main process, not on this edge.
     error: '本地引擎进程已退出',
     errorCode: ENGINE_LOST_CODE,
+    errorRequestId: null,
     sessionId: null,
     meetingId: null,
     startedAtMs: null,
@@ -214,7 +227,7 @@ export function findMissingResource(
   const translationResourceId = config.targetLanguages.length === 0 || config.translationProvider !== 'local'
     ? null
     : config.translationModelId?.trim() || DEFAULT_SETTINGS.translation.localModelId
-  const requiredIds = [config.recognitionModelId, ...(translationResourceId ? [translationResourceId] : [])]
+  const requiredIds = [...((config.recognitionProvider ?? 'local') === 'local' ? [config.recognitionModelId] : []), ...(translationResourceId ? [translationResourceId] : [])]
 
   for (const id of requiredIds) {
     const record = id ? snapshot.resources.find((item) => item.resourceId === id) : undefined
@@ -292,7 +305,7 @@ export async function startSession(config: SessionConfig): Promise<void> {
     throw new Error('已有会话在运行')
   }
 
-  sessionStore.setState({ status: 'starting', error: null, errorCode: null, missing: null })
+  sessionStore.setState({ status: 'starting', error: null, errorCode: null, errorRequestId: null, missing: null })
 
   // Preflight stays outside the try: its failure means no session started, not an engine fault.
   let missing: MissingResource | null
@@ -308,12 +321,13 @@ export async function startSession(config: SessionConfig): Promise<void> {
       status: 'error',
       error: errorMessage(error),
       errorCode: errorCodeOf(error),
+      errorRequestId: errorRequestIdOf(error),
     })
     throw error
   }
   if (missing) {
     // Back to `idle`; the UI drives the install from `missing`.
-    sessionStore.setState({ status: 'idle', missing, errorCode: 'MODEL_MISSING' })
+    sessionStore.setState({ status: 'idle', missing, errorCode: 'MODEL_MISSING', errorRequestId: null })
     throw new Error(`缺少模型：${missing.name}`)
   }
 
@@ -331,6 +345,7 @@ export async function startSession(config: SessionConfig): Promise<void> {
       interim: null,
       error: null,
       errorCode: null,
+      errorRequestId: null,
     })
     startTicker()
   } catch (error) {
@@ -339,6 +354,7 @@ export async function startSession(config: SessionConfig): Promise<void> {
       status: 'error',
       error: errorMessage(error),
       errorCode: errorCodeOf(error),
+      errorRequestId: errorRequestIdOf(error),
     })
     throw error
   }
@@ -363,17 +379,19 @@ export async function stopSession(): Promise<void> {
     resumeSession()
   }
 
-  sessionStore.setState({ status: 'stopping', error: null, errorCode: null })
+  sessionStore.setState({ status: 'stopping', error: null, errorCode: null, errorRequestId: null })
   try {
     await bridge.engine.stopSession(sessionId)
-    sessionStore.setState({ status: 'idle', error: null, errorCode: null })
+    sessionStore.setState({ status: 'idle', error: null, errorCode: null, errorRequestId: null })
   } catch (error) {
     // Keep `ENGINE_LOST`: that edge told the truth, and a code guessed from the text inverts it.
     const engineLost = sessionStore.getState().errorCode === ENGINE_LOST_CODE
+    const priorErrorRequestId = sessionStore.getState().errorRequestId
     sessionStore.setState({
       status: 'error',
       error: errorMessage(error),
       errorCode: engineLost ? ENGINE_LOST_CODE : errorCodeOf(error),
+      errorRequestId: errorRequestIdOf(error) ?? (engineLost ? priorErrorRequestId : null),
       elapsedMs: elapsedNow(),
     })
     throw error
@@ -411,7 +429,7 @@ export function resumeSession(): void {
 export function resetSessionError(): void {
   if (sessionStore.getState().status !== 'error') return
   // `engineStatus` stays untouched: the guide's own ENG-001 alert owns it, and only the main process clears it.
-  sessionStore.setState({ status: 'idle', error: null, errorCode: null })
+  sessionStore.setState({ status: 'idle', error: null, errorCode: null, errorRequestId: null })
 }
 
 /**
@@ -496,6 +514,7 @@ export function attachSessionStore(next: NolaBridge): void {
           status: sessionStore.getState().sessionId === null ? sessionStore.getState().status : 'error',
           error: event.code,
           errorCode: event.code.toUpperCase(),
+          errorRequestId: event.requestId,
         })
         break
       /*

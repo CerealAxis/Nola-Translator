@@ -19,6 +19,9 @@ import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
+import { ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS, type AliyunRecognitionModel, type MinimaxRecognitionModel, type RecognitionProvider, type RecognitionSettings } from '../../../../shared/settings'
+import { ApiKeyRow, TextRow } from './TranslationTab'
+import { supportsRecognitionNativeTranslation } from '../../../../shared/cloud-config'
 
 const DEFAULT_OUTPUT = 'defaultOutput'
 
@@ -26,6 +29,8 @@ export function AudioTab({ settings }: SettingsPanelProps) {
   const { t, language } = useI18n()
   const modelChoices = useModelOptions()
   const devices = useStore(stores.models, (state) => state.devices)
+  const credentials = useStore(stores.models, state => state.credentials)
+  const provider = settings.recognition.provider ?? 'local'
   // Retention is on by default: with it off nothing can be replayed or exported, and
   // `ipc.ts` reads the flag to decide both `recordAudio` and the `recordingPath` it injects,
   // so a toggle that only looked saved would leave audio nobody can play back.
@@ -62,6 +67,17 @@ export function AudioTab({ settings }: SettingsPanelProps) {
     [modelChoices.recognitionModels],
   )
 
+  // The option list comes from `RECOGNITION_PROVIDERS`, so the dropdown cannot offer a provider
+  // the main process would sanitize back to `local`.
+  const providerOptions = useMemo<PickerOption[]>(() => RECOGNITION_PROVIDERS.map((id) => ({
+    value: id,
+    label: {
+      local: t('settings.providerLocal'),
+      aliyun: t('settings.providerAliyun'),
+      minimax: t('settings.providerMiniMax'),
+    }[id],
+  })), [t])
+
   return (
     <div className="settings-panel">
       <SettingGroup legend={t('settings.groupInput')}>
@@ -87,6 +103,21 @@ export function AudioTab({ settings }: SettingsPanelProps) {
       </SettingGroup>
 
       <SettingGroup legend={t('settings.groupRecognition')}>
+        <SettingsRow label={t('settings.provider')}>
+          <SettingSelect value={provider} ariaLabel={t('settings.provider')} options={providerOptions} onChange={value => {
+            const next = value as RecognitionProvider
+            // Only Aliyun's socket returns a translation of its own, so leaving it retires the
+            // native-translation provider rather than leaving a target language untranslated.
+            void updateSettings({ recognition: { provider: next, sourceLanguage: 'auto' },
+              ...(!supportsRecognitionNativeTranslation(next) && settings.translation.provider === 'recognition' ? { translation: { provider: 'mymemory' as const } } : {}),
+            }).catch(() => undefined)
+          }} />
+        </SettingsRow>
+        {provider === 'local' ? (modelOptions.length === 0 ? (
+          <SettingsRow label={t('settings.recognitionModel')}>
+            <span className="nola-caption text-muted">{t('settings.recognitionModelEmpty')}</span>
+          </SettingsRow>
+        ) : (
         <SettingsRow label={t('settings.recognitionModel')}>
           <SettingSelect
             value={settings.recognition.modelId}
@@ -99,6 +130,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
             }}
           />
         </SettingsRow>
+        )) : provider === 'minimax' ? <MiniMaxConnection recognition={settings.recognition} stored={credentials['minimax-asr']} /> : <AliyunConnection recognition={settings.recognition} stored={credentials['aliyun-asr']} />}
         <SettingsRow label={t('settings.sourceLanguage')}>
           <SettingSelect
             value={settings.recognition.sourceLanguage}
@@ -122,6 +154,51 @@ export function AudioTab({ settings }: SettingsPanelProps) {
       </SettingGroup>
     </div>
   )
+}
+
+interface CloudConnectionProps { recognition: RecognitionSettings; stored: boolean }
+
+/**
+ * Aliyun streams over a persistent WebSocket, so it carries the region and workspace its socket
+ * is opened against in addition to the model.
+ */
+function AliyunConnection({ recognition, stored }: CloudConnectionProps) {
+  const { t } = useI18n()
+  return <>
+    <SettingsRow label={t('settings.recognitionModel')} desc={t('settings.aliyunHint')} descriptionTooltip>
+      <SettingSelect value={recognition.aliyunModel ?? ALIYUN_RECOGNITION_MODELS[0]} ariaLabel={t('settings.recognitionModel')} options={ALIYUN_RECOGNITION_MODELS.map(value => ({ value, label: value }))} onChange={value => {
+        void updateSettings({ recognition: { aliyunModel: value as AliyunRecognitionModel, sourceLanguage: 'auto' } }).catch(() => undefined)
+      }} />
+    </SettingsRow>
+    <SettingsRow label={t('settings.region')}>
+      <SettingSelect value={recognition.aliyunRegion ?? 'cn-beijing'} ariaLabel={t('settings.region')} options={[
+        { value: 'cn-beijing', label: t('settings.aliyunBeijing') },
+        { value: 'ap-southeast-1', label: t('settings.aliyunSingapore') },
+      ]} onChange={value => { void updateSettings({ recognition: { aliyunRegion: value as 'cn-beijing' | 'ap-southeast-1' } }).catch(() => undefined) }} />
+    </SettingsRow>
+    <TextRow label={t('settings.aliyunWorkspace')} value={recognition.aliyunWorkspaceId ?? ''} onCommit={value => { void updateSettings({ recognition: { aliyunWorkspaceId: value.trim() } }).catch(() => undefined) }} />
+    <ApiKeyRow provider="aliyun-asr" stored={stored} />
+  </>
+}
+
+/**
+ * MiniMax takes an uploaded file rather than a stream, so it carries no region and no workspace:
+ * the endpoint picks the account's region instead. The notice is a row of its own rather than a
+ * tooltip because captions arriving a sentence at a time reads as a stall unless it says why
+ * before the session starts.
+ */
+function MiniMaxConnection({ recognition, stored }: CloudConnectionProps) {
+  const { t } = useI18n()
+  return <>
+    <SettingsRow label={t('settings.recognitionModel')}>
+      <SettingSelect value={recognition.minimaxModel ?? MINIMAX_RECOGNITION_MODELS[0]} ariaLabel={t('settings.recognitionModel')} options={MINIMAX_RECOGNITION_MODELS.map(value => ({ value, label: value }))} onChange={value => {
+        void updateSettings({ recognition: { minimaxModel: value as MinimaxRecognitionModel } }).catch(() => undefined)
+      }} />
+    </SettingsRow>
+    <TextRow label={t('settings.endpoint')} value={recognition.minimaxEndpoint ?? ''} onCommit={value => { void updateSettings({ recognition: { minimaxEndpoint: value.trim() } }).catch(() => undefined) }} />
+    <ApiKeyRow provider="minimax-asr" stored={stored} />
+    <p className="nola-caption text-muted">{t('settings.minimaxNotice')}</p>
+  </>
 }
 
 /** A real check: re-list the devices and confirm the selected one is still there. */

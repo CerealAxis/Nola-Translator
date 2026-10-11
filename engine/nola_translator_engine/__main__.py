@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import traceback
 from typing import TextIO
 from uuid import uuid4
 
@@ -110,6 +111,29 @@ async def _run() -> int:
             events = await handle(command)
         except Exception as error:  # one bad command must not wedge the sidecar; the detail only goes to stderr.
             print(f"engine command failed: {type(error).__name__}", file=sys.stderr, flush=True)
+            details: dict[str, object] = {
+                "requestId": request_id,
+                "commandType": type(command).__name__,
+                "exceptionType": type(error).__name__,
+                "frames": [
+                    {"file": frame.filename, "line": frame.lineno, "function": frame.name}
+                    for frame in traceback.extract_tb(error.__traceback__)[-12:]
+                ],
+            }
+            if isinstance(error, ValidationError):
+                details["validationErrors"] = [
+                    {
+                        "location": [
+                            part if isinstance(part, int) or (isinstance(part, str) and part.isidentifier()) else "[value]"
+                            for part in item["loc"]
+                        ],
+                        "type": item["type"],
+                        "message": item["msg"][:256],
+                    }
+                    for item in error.errors(include_input=False, include_context=False)[:32]
+                ]
+            diagnostic = {"layer": "engine", "event": "command.failed", "data": details}
+            print("NOLA_DIAGNOSTIC " + json.dumps(diagnostic, ensure_ascii=True), file=sys.stderr, flush=True)
             _write_error(protocol_out, request_id, "internalError")
             continue
 

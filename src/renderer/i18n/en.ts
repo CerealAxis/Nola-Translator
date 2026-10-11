@@ -110,13 +110,14 @@ export const en: Dictionary = {
 
   preflight: {
     title: 'Pre-flight check',
-    checkingDevices: 'Detecting audio input',
+    checkingDevices: 'Detecting audio devices',
     checkingModels: 'Verifying models',
-    deviceUnavailable: 'No usable audio input found',
+    deviceUnavailable: 'No usable audio device found',
+    deviceCheckWarning: 'The device list could not be confirmed. You can still try to start; the selected audio source will be checked again.',
     // The device row when the engine never answered. Deliberately says nothing about devices:
     // the probe also boots the engine, so a device verdict here would misreport an engine
-    // failure as a hardware one. `errors.engineNotReady` (ENG-001) carries the real cause.
-    deviceCheckBlocked: 'Audio input check could not complete',
+    // failure as a hardware one. `errors.engineNotReady` carries the real cause.
+    deviceCheckBlocked: 'Audio device check could not complete',
     modelMissing: 'Missing model: {name}',
     installNow: 'Install now',
     later: 'Later',
@@ -174,7 +175,7 @@ export const en: Dictionary = {
     // gate closed the button itself is the whole signal, so no text joins it.
     serviceRunning: 'The browser is generating captions',
     serviceFailed: 'Could not enable the caption service',
-    errorOpeningBrowser: 'Could not open the default browser. Set a default browser in system settings, then try again. Code UIP-017',
+    errorOpeningBrowser: 'Could not open the default browser. Set a default browser in system settings, then try again.',
     // A real bilingual pair rather than two near-identical English lines: the preview
     // exists to show what a source line above a translation line looks like, and one
     // language would not show that. Spanish is a supported target language.
@@ -386,6 +387,7 @@ export const en: Dictionary = {
     testAudio: 'Test audio',
     sourceLanguage: 'Source language',
     recognitionModel: 'Recognition model',
+    recognitionModelEmpty: 'No local recognition model is installed yet. Download one in Models first.',
     keepAudio: 'Keep audio',
     keepAudioHint: 'Without audio you cannot replay or export the session.',
     groupProvider: 'Translation provider',
@@ -408,9 +410,22 @@ export const en: Dictionary = {
      * Only "Microsoft Translator" is a product name and stays put.
      */
     providerLocal: 'Local model',
+    providerDisabled: 'Translation disabled',
     providerCloud: 'Cloud model',
     providerMicrosoft: 'Microsoft Translator',
-    groupLocalModel: 'Local model in use',
+    providerMyMemory: 'MyMemory Free Translation',
+    providerRecognitionTranslation: 'Aliyun',
+    providerAliyun: 'Aliyun LiveTranslate',
+    providerMiniMax: 'MiniMax Speech Recognition',
+    aliyunTranslationHint: 'To enable Aliyun, first enable Aliyun speech recognition. MiniMax returns no translation of its own, so that option is unavailable while it is selected.',
+    aliyunBeijing: 'North China 2 (Beijing)',
+    aliyunSingapore: 'Singapore',
+    aliyunWorkspace: 'Model Studio workspace ID',
+    aliyunHint: 'Continuous audio input and streaming text. 3.8 detects the source language automatically. The workspace and API key must use the same region. LiveTranslate is billed even when another translation service is selected.',
+    minimaxNotice: 'Audio is split at pauses into clips of at most 15 seconds and uploaded one by one, so captions appear as whole sentences at the pauses rather than word by word. 20 languages are supported and there is no built-in translation, so pick another service under Translation. Billed at CNY 2.50 per hour of audio.',
+    mymemoryHint: 'No API key. Confirmed sentences use REST translation with no token streaming. The free service has quotas and rate limits; source text is sent to MyMemory.',
+    mymemoryEmail: 'Contact email (optional)',
+    nativeTranslationHint: 'Use streamed translations from the active Aliyun recognition connection, with no separate translation API. Requires Aliyun LiveTranslate.',
     localModelEmpty: 'No local translation model is installed yet. Download one in Models first.',
     /*
      * The seven cloud fields. The API format decides how deep the endpoint has to go (Anthropic
@@ -470,7 +485,7 @@ export const en: Dictionary = {
     protocolVersion: 'Protocol',
     copyDiagnostics: 'Copy diagnostics',
     openLogs: 'Open log folder',
-    openLogsHint: 'Each launch records application activity in English. Reproduce the issue and send the current log. Files roll over at about 4 MB; keeps the latest 20 files. Logs may include device names and local paths.',
+    openLogsHint: 'Each launch creates one unsplit log file; the latest 20 launches are kept. Reproduce the issue, copy diagnostics, and attach the current log. Logs omit captions, translations, prompts, and audio; they may include device names and local paths.',
     copied: 'Copied',
     githubIssue: 'GitHub issue',
     githubIssueHint: 'Report bugs and request features here',
@@ -508,49 +523,52 @@ export const en: Dictionary = {
   },
 
   errors: {
-    /*
-     * 每条错误**只写一句完整的话**（发生了什么 + 错误码）。不要再补第二行"你该做什么"：
-     * 第二行原本直接复用了按钮那一条，于是对话框里"Retry start"会连着出现两遍。
-     * 按钮自己就是出路，正文再加一遍只是重复。
-     */
-    engineNotReady: 'The local engine is not running, so recognition cannot start. Code ENG-001',
+    errorCodeLabel: 'Code {code}',
+    cloudRecognitionCredentialMissing: 'Save the cloud recognition API key in Settings → Audio and recognition before starting captions.',
+    // A spent account and a rejected key need different user action, so they stay separate sentences.
+    cloudRecognitionInsufficientBalance: 'The cloud recognition account is out of credit. Top it up before recognition continues.',
+    cloudRecognitionRateLimited: 'Too many cloud recognition requests. This retries on its own shortly.',
+    // Keep the sentence self-contained; the locale layer appends its catalog code.
+    engineNotReady: 'The local engine is not running, so recognition cannot start.',
     // 预检状态不是失败：用户还没动手，所以不给错误码，也不用"yet"以外的 scary 语气。
     // **当前没有界面在用这一条**：冷启动不再报"引擎没运行"，引擎起不来走的是上面
-    // `engineNotReady`（带 ENG-001）。留着是为了不删掉 `i18n.test.ts` 的 `noCodeByDesign`
-    // 里点名的那一条；**别拿它把冷启动那条 Alert 加回来** —— 那正是它当初的错误用法。
+    // Keep this status-only copy free of a support code; no failure has happened yet.
     engineNotReadyPreflight: 'The local engine is not running, so recognition cannot start yet.',
-    // 会话中途引擎掉了。不能说"无法开始"——这场已经在跑了，说的是"停了"。
-    engineStopped: 'The local engine stopped, so recognition has stopped.',
     // 进程没了：重连出来的是新进程，这场会回不来，出路是那条记录而不是"重试"。
-    engineLost: 'The local engine stopped during the session, which ended early. Captions captured so far are saved. Code ENG-002',
+    engineLost: 'The local engine stopped during the session, which ended early. Captions captured so far are saved.',
     engineLostAction: 'Open the record',
     engineNotReadyAction: 'Retry start',
-    deviceNotFound: 'No usable audio input device was found. Code AUD-002',
+    audioDeviceEnumerationFailed: 'The audio device list could not be read. Check the system audio service and try again.',
+    deviceNotFound: 'No usable audio device was found.',
     deviceNotFoundAction: 'Check the system sound settings',
-    modelMissing: 'The recognition model is not installed yet. Code MDL-003',
+    modelMissing: 'The recognition model is not installed yet.',
     modelMissingAction: 'Install the model',
-    startFailed: 'The session could not start. Check the selected model, compute device and runtime. Code SES-004',
+    startFailed: 'The session could not start. Check the selected model, compute device and runtime.',
     startFailedAction: 'Start the session again',
-    downloadFailed: 'The model download stopped, partial files were kept. Code NET-006',
+    downloadFailed: 'The model download stopped, partial files were kept.',
     downloadFailedAction: 'Retry the download',
-    searchFailed: 'Model search is unavailable. What follows is not a search result; Hugging Face may well have this model. Code NET-006',
+    searchFailed: 'Model search is unavailable. What follows is not a search result; Hugging Face may well have this model.',
     searchFailedAction: 'Retry the search',
-    translateFailed: 'The translation service did not respond, showing source only. Code MT-007',
+    translateFailed: 'The translation service did not respond, showing source only.',
     translateFailedAction: 'Check the API key and your network',
-    storageChanged: 'The save location is no longer valid, captions cannot reach disk. Code STO-008',
+    storageChanged: 'The save location is no longer valid, captions cannot reach disk.',
     storageChangedAction: 'Pick a new save location',
     // Why a settings write failed. The main process only fails when the filesystem refuses, so
     // the page dispatches on the errno; an unrecognised one only says the change was not saved
     // rather than repeating the storage-location claim `storageChanged` makes.
-    settingsWriteDenied: 'The app is not allowed to write its settings, so this change was not saved. Code STO-018',
-    settingsFileLocked: 'Another program is holding the settings file, so this change was not saved. Code STO-019',
-    settingsDiskFull: 'The disk is full, so this change was not saved. Code STO-020',
-    settingsSaveFailed: 'This change was not saved. Try again. Code STO-021',
-    exportFailed: 'Export failed, no file was written. Code EXP-009',
+    settingsWriteDenied: 'The app is not allowed to write its settings, so this change was not saved.',
+    settingsFileLocked: 'Another program is holding the settings file, so this change was not saved.',
+    settingsDiskFull: 'The disk is full, so this change was not saved.',
+    settingsSaveFailed: 'This change was not saved. Try again.',
+    exportFailed: 'Export failed, no file was written.',
     // The preload never ran, so this window has no engine behind it. UIP rather than ENG:
     // the engine is fine, the wiring is not.
-    engineNotConnected: 'The local engine is not connected, so settings, records, and models cannot be read. Code UIP-011',
-    pageCrashed: 'The interface stopped rendering, the session is still running. Code UIP-010',
+    engineNotConnected: 'The local engine is not connected, so settings, records, and models cannot be read.',
+    pageCrashed: 'The interface stopped rendering, the session is still running.',
+    engineOperationFailed: 'The engine could not complete this operation. Try again, and copy diagnostics if it keeps happening.',
+    unknownFailure: 'The operation could not be completed. Copy diagnostics and report the issue.',
+    torchRuntimeUnavailable: 'The PyTorch runtime is unavailable. Check or repair it in settings.',
+    llamaRuntimeUnavailable: 'The llama.cpp runtime is unavailable. Check or repair it in settings.',
     pageCrashedAction: 'Reload the window',
     copyDiagnosticsAction: 'Copy diagnostics',
 
@@ -559,8 +577,8 @@ export const en: Dictionary = {
      * storage, network and translation are all fine — the desktop side's own toggle or
      * stop call is what failed, which is the same family as `engineNotConnected`.
      */
-    captionServiceToggleFailed: 'The caption service switch did not flip. Try again. Code UIP-022',
-    captionServiceStopFailed: 'The caption service is off, but a caption session did not end. Recognition may still be running. Code UIP-023',
+    captionServiceToggleFailed: 'The caption service switch did not flip. Try again.',
+    captionServiceStopFailed: 'The caption service is off, but a caption session did not end. Recognition may still be running.',
 
     /*
      * Why the engine refused a prewarm. Each one says what to do next: "load failed"
@@ -568,11 +586,11 @@ export const en: Dictionary = {
      * used for these languages.
      */
     prewarm: {
-      modelUnavailable: 'The required model is not downloaded yet. Download it in Models first. Code MDL-012',
-      resourceUnavailable: 'The model files are incomplete or could not be read. Download the model again in Models. Code MDL-013',
-      invalidConfiguration: 'The current model or language settings cannot be used for captions. Finish the model setup in Models first. Code MDL-014',
-      resourceBusy: 'A model is unloading or switching. Wait a moment, then enable the caption service again. Code MDL-015',
-      sessionAlreadyRunning: 'A caption session is already running. End it before enabling the caption service. Code MDL-016',
+      modelUnavailable: 'The required model is not downloaded yet. Download it in Models first.',
+      resourceUnavailable: 'The model files are incomplete or could not be read. Download the model again in Models.',
+      invalidConfiguration: 'The current model or language settings cannot be used for captions. Finish the model setup in Models first.',
+      resourceBusy: 'A model is unloading or switching. Wait a moment, then enable the caption service again.',
+      sessionAlreadyRunning: 'A caption session is already running. End it before enabling the caption service.',
     },
   },
 

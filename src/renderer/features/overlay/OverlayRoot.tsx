@@ -51,6 +51,7 @@ export function OverlayRoot() {
   const overlay = useStore(stores.settings, (state) => state.settings?.overlay)
   const session = useStore(sessionStore, (state) => state)
   const [hovered, setHovered] = useState(false)
+  const [captionTextSelected, setCaptionTextSelected] = useState(false)
   const [closing, setClosing] = useState(false)
   const [closePending, setClosePending] = useState(false)
   const [closeFailed, setCloseFailed] = useState(false)
@@ -147,6 +148,20 @@ export function OverlayRoot() {
    * the pointer land on the wrapper, so both drop the synthetic events.
    */
   const cardRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const updateSelection = (): void => {
+      const card = cardRef.current
+      const selection = window.getSelection()
+      if (!card || !selection || selection.isCollapsed || selection.rangeCount === 0) {
+        setCaptionTextSelected(false)
+        return
+      }
+      setCaptionTextSelected(card.contains(selection.getRangeAt(0).commonAncestorContainer))
+    }
+    document.addEventListener('selectionchange', updateSelection)
+    return () => document.removeEventListener('selectionchange', updateSelection)
+  }, [])
+
   useEffect(() => {
     const card = cardRef.current
     if (!card) return
@@ -247,11 +262,20 @@ export function OverlayRoot() {
         data-locked={config.locked ? 'true' : 'false'}
         data-confirm-open={closing ? 'true' : 'false'}
         data-hover={hovered ? 'true' : 'false'}
+        data-text-selected={captionTextSelected ? 'true' : 'false'}
         data-layout={config.layout}
         data-bilingual={config.showSource && config.showTranslation ? 'true' : 'false'}
         data-transparent={opacity <= 0 ? 'true' : 'false'}
         className="nola-caption-card"
         style={cardStyle}
+        onPointerDownCapture={() => {
+          const selection = window.getSelection()
+          const card = cardRef.current
+          if (selection && !selection.isCollapsed && selection.rangeCount > 0
+            && card?.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+            selection.removeAllRanges()
+          }
+        }}
       >
         <div ref={stageRef} className="nola-caption-stage">
           {hasCaption ? (

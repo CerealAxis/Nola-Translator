@@ -1,7 +1,7 @@
 import { loggedHandle } from './logged-ipc'
 import { writeFile } from 'node:fs/promises'
 import { sessionLogPath } from './session-log'
-import { isAbsolute, join, normalize } from 'node:path'
+import { basename, isAbsolute, join, normalize } from 'node:path'
 
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, screen, shell } from 'electron'
 
@@ -14,10 +14,11 @@ import type { SettingsStore } from './settings-store'
 import type { SecureCredentialStore } from './secure-store'
 import { computeOverlayBounds, getOverlayInteractionPolicy, overlayMinimumHeight, OVERLAY_MIN_WIDTH } from './windows'
 import type { AppSettings, AppSettingsPatch, CredentialProvider } from '../shared/settings'
-import { RECOGNITION_MODEL_LABELS } from '../shared/settings'
+import { CREDENTIAL_PROVIDERS, RECOGNITION_MODEL_LABELS } from '../shared/settings'
 import type { ModelStorageInfo } from '../shared/bridge'
 import { modelStorageEnvironment, readEngineStatus, validateModelStorageDirectory } from './model-storage'
 import { settingsPatchSchema } from './settings-schema'
+import { diagnosticCopyContextSchema } from '../shared/schemas'
 import { checkLatestRelease, isTrustedReleaseUrl } from './github-updates'
 
 const channels = {
@@ -41,7 +42,6 @@ export const APP_IPC_CHANNELS = channels
 const OVERLAY_PAGES = new Set(['appearance', 'captions', 'resources', 'translation', 'torch', 'llama'])
 
 /** Top-level keys allowed in `credentials.json`. */
-const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'microsoft']
 
 function assertCredentialProvider(value: unknown): CredentialProvider {
   if (!CREDENTIAL_PROVIDERS.includes(value as CredentialProvider)) throw new Error('凭据类型无效')
@@ -288,7 +288,18 @@ export function registerAppIpc(options: {
     if (!path) throw new Error('日志目录不可用')
     shell.showItemInFolder(path)
   })
-  loggedHandle(channels.copyDiagnostics, async () => clipboard.writeText(JSON.stringify(await diagnostics(options.engine, current), null, 2)))
+  loggedHandle(channels.copyDiagnostics, async (_event, rawContext: unknown) => {
+    const context = diagnosticCopyContextSchema.parse(rawContext ?? {})
+    const logPath = sessionLogPath()
+    const report = {
+      ...await diagnostics(options.engine, current),
+      supportCode: context.supportCode,
+      correlationId: context.correlationId,
+      launchId: logPath ? basename(logPath, '.jsonl') : undefined,
+      logPath: logPath || undefined,
+    }
+    await clipboard.writeText(JSON.stringify(report, null, 2))
+  })
   loggedHandle(channels.hasTranslationCredential, (_event, provider: unknown) =>
     options.credentials.has(assertCredentialProvider(provider)))
   loggedHandle(channels.setTranslationCredential, (_event, provider: unknown, value: unknown) => {

@@ -4,6 +4,8 @@ import { computeSettingsSchema, DEFAULT_COMPUTE_SETTINGS } from '../shared/compu
 
 import { DEFAULT_SETTINGS, RECOGNITION_MODEL_IDS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
 import { findGithubProxyNode, GITHUB_PROXY_AUTO } from '../shared/github-proxies'
+import { ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS } from '../shared/settings'
+import { remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../shared/cloud-config'
 
 // Store-internal patches may also touch fields the IPC schema exposes only through their own channels.
 export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 1; browserConnection?: { enabled: boolean } }
@@ -38,6 +40,28 @@ function sanitizeVideoCaptionDeviceId(value: unknown): string | undefined {
 
 /** A pre-migration `settings.json` `translation` block: old key names, every value unknown. */
 type LegacyTranslation = Record<string, unknown>
+
+/** Old installations default to local recognition; malformed connection fields never survive reload. */
+function sanitizeCloudSettings(settings: AppSettings): void {
+  const recognition = settings.recognition
+  recognition.provider = RECOGNITION_PROVIDERS.includes(recognition.provider ?? 'local') ? recognition.provider ?? 'local' : 'local'
+  recognition.aliyunRegion = recognition.aliyunRegion === 'ap-southeast-1' ? 'ap-southeast-1' : 'cn-beijing'
+  recognition.aliyunModel = ALIYUN_RECOGNITION_MODELS.includes(recognition.aliyunModel ?? ALIYUN_RECOGNITION_MODELS[0]) ? recognition.aliyunModel ?? ALIYUN_RECOGNITION_MODELS[0] : ALIYUN_RECOGNITION_MODELS[0]
+  const bounded = (value: unknown, fallback: string, max: number) => typeof value === 'string' && value.length <= max ? value : fallback
+  recognition.aliyunWorkspaceId = bounded(recognition.aliyunWorkspaceId, '', 128)
+  recognition.minimaxEndpoint = bounded(recognition.minimaxEndpoint, DEFAULT_SETTINGS.recognition.minimaxEndpoint ?? '', 2048)
+  recognition.minimaxModel = MINIMAX_RECOGNITION_MODELS.includes(recognition.minimaxModel ?? MINIMAX_RECOGNITION_MODELS[0]) ? recognition.minimaxModel ?? MINIMAX_RECOGNITION_MODELS[0] : MINIMAX_RECOGNITION_MODELS[0]
+  settings.translation.mymemoryEndpoint = bounded(settings.translation.mymemoryEndpoint, DEFAULT_SETTINGS.translation.mymemoryEndpoint ?? '', 2048)
+  settings.translation.mymemoryEmail = bounded(settings.translation.mymemoryEmail, '', 320)
+  // A provider whose remote connection was just selected cannot hold a source language its
+  // language table does not carry, so the saved choice falls back to detection rather than
+  // reaching the engine as an unsupported code.
+  if (recognition.provider !== 'local' && !remoteSourceLanguages(recognition).includes(recognition.sourceLanguage)) recognition.sourceLanguage = 'auto'
+  // `translation.provider: 'recognition'` reuses one provider's socket; for the others it would
+  // leave the target language untranslated, so it falls back rather than silently producing
+  // source-only captions.
+  if (!supportsRecognitionNativeTranslation(recognition.provider) && settings.translation.provider === 'recognition') settings.translation.provider = 'mymemory'
+}
 
 const LEGACY_TRANSLATION_KEYS = ['hymt2ModelId', 'openaiEndpoint', 'openaiModel', 'ollamaEndpoint', 'ollamaModel'] as const
 
@@ -225,6 +249,7 @@ export class SettingsStore {
       this.settings.translation.localModelId = sanitizeLocalModelId(
         this.settings.translation.localModelId,
       )
+      sanitizeCloudSettings(this.settings)
       // Old default caption colors are upgraded to the video-reference style, but only while the user has customized neither.
       const overlay = this.settings.overlay
       if (rawOverlay.translationColor?.toUpperCase() === '#BFC2C8') {
@@ -292,6 +317,7 @@ export class SettingsStore {
     next.recognition.sourceLanguage = sanitizeSourceLanguage(next.recognition.sourceLanguage)
     next.translation.targetLanguage = sanitizeTargetLanguage(next.translation.targetLanguage)
     next.translation.localModelId = sanitizeLocalModelId(next.translation.localModelId)
+    sanitizeCloudSettings(next)
     next.videoCaptions.audioSource = sanitizeVideoCaptionAudioSource(next.videoCaptions.audioSource)
     next.videoCaptions.audioDeviceId = next.videoCaptions.audioSource === 'system'
       ? sanitizeVideoCaptionDeviceId(next.videoCaptions.audioDeviceId)

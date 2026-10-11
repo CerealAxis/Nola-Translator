@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { en, zhCN } from './index'
 import { appNameForLanguage, translate } from '../i18n'
+import { supportErrorCodeForMessage } from '../../shared/error-catalog'
 
 /*
  * 迁移说明：原型那版还测了 `resolveLanguage()` / `UI_LANGUAGES` / `LANGUAGE_STORAGE_KEY`。
@@ -140,22 +141,21 @@ describe('文案纪律（§1.5）', () => {
     expect(homeSubtitleKeys).toEqual([])
   })
 
-  it('错误文案全部带可复制的错误码', () => {
+  it('错误码由共享目录提供，不嵌入本地化句子', () => {
     /*
      * 两条**故意**不带错误码，都是"没发生故障"的情况：
      *   · engineNotReadyPreflight  冷启动预检。引擎没起来是一个状态，用户还没动手，
      *     摆一个 ENG-001 在那儿会让人以为出了事、还要去翻诊断。
-     *   · engineStopped           会话中途崩掉且 `errorCode` 认不出来时的兜底。码都没认出来，
-     *     报一个编号等于编一个不存在的码。
-     * 除了这两条，其余每条都必须能被用户复制去搜。
+     *   · errorCodeLabel           由格式化器追加的固定标签，本身没有独立故障码。
+     * 其余支持错误都必须有稳定目录项；文案自身不再维护重复的编号。
      */
-    const noCodeByDesign = new Set(['engineNotReadyPreflight', 'engineStopped'])
+    const noCodeByDesign = new Set(['engineNotReadyPreflight', 'errorCodeLabel'])
     const errors = leaves((zhCN as Record<string, unknown>).errors)
-    const withoutCode = Object.entries(errors)
+    const withoutCatalogEntry = Object.entries(errors)
       .filter(([k]) => !k.endsWith('Action'))
       .filter(([k]) => !noCodeByDesign.has(k))
-      .filter(([, v]) => !/[A-Z]{2,4}-\d{2,3}/.test(v))
+      .filter(([k]) => !supportErrorCodeForMessage(`errors.${k}`))
       .map(([k]) => k)
-    expect(withoutCode).toEqual([])
+    expect(withoutCatalogEntry).toEqual([])
   })
 })

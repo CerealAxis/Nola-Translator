@@ -94,7 +94,7 @@ export function defaultTargetOf(record: ResourceRecord): AppSettingsPatch | null
 export function isDefaultOf(record: ResourceRecord, settings: AppSettings | null): boolean {
   if (!settings || !configurationOf(record)) return false
   return (
-    settings.recognition.modelId === record.resourceId ||
+    (settings.recognition.provider === 'local' && settings.recognition.modelId === record.resourceId) ||
     (settings.translation.provider === 'local' && settings.translation.localModelId === record.resourceId)
   )
 }

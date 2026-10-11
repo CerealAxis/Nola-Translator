@@ -61,12 +61,12 @@ export function browserSessionConfig(settings: AppSettings, request: Extract<Bro
   return {
     audioSource: request.source === 'tab' ? { kind: 'browserTab', streamId: request.streamId } : request.deviceId ? { kind: 'systemOutput', deviceId: request.deviceId } : { kind: 'defaultOutput' },
     recognitionMode: 'realtime', recognitionModelId: settings.recognition.modelId,
+    ...recognitionFieldsOf(settings.recognition),
     sourceLanguage: settings.recognition.sourceLanguage,
     targetLanguages: translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? [] : [translation.targetLanguage],
     translationProvider: translation.provider, translationModelId: translation.localModelId,
-    allowIntermediateTranslation: translation.translateIntermediate,
-    ...(translation.provider === 'cloud' ? { translationOptions: { endpoint: translation.cloudEndpoint, model: translation.cloudModel, apiFormat: translation.cloudApiFormat, contextWindow: translation.cloudContextWindow, maxOutputTokens: translation.cloudMaxOutputTokens } } : {}),
-    ...(translation.provider === 'microsoft' ? { translationOptions: { endpoint: translation.microsoftEndpoint, region: translation.microsoftRegion } } : {}),
+    allowIntermediateTranslation: translation.provider === 'mymemory' ? false : translation.translateIntermediate,
+    translationOptions: translationOptionsOf(translation),
     browserTimeline: { epoch: request.epoch, videoTimeMs: request.videoTimeMs, playbackRate: request.playbackRate },
   }
 }
@@ -419,3 +419,4 @@ export class BrowserConnection {
     if (['failed', 'recovering', 'stopped'].includes(state)) for (const client of this.clients) if (client.sessionId) client.socket.destroy()
   }
 }
+import { recognitionFieldsOf, translationOptionsOf } from '../shared/cloud-config'

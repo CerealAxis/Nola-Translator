@@ -47,3 +47,14 @@ it('rechecks a component that disappeared before using the cached readiness', as
   await expect(manager.prepare(DEFAULT_SETTINGS.compute, 'none')).rejects.toThrow('RUNTIME_TORCH')
   expect(recheck).toHaveBeenCalledOnce()
 })
+
+it('starts remote-only captions without Torch and still requires local translation components', async () => {
+  const { manager, engine, local } = await validatedManager()
+  await rm(join(engine, 'torch', '__init__.py'))
+  Object.assign(manager, { local: { ...local, engine: missingLocalRuntime(engine) } })
+  const recheck = vi.spyOn(manager, 'recheck').mockResolvedValue(undefined)
+  await expect(manager.prepare(DEFAULT_SETTINGS.compute, 'none', false)).resolves.toBeUndefined()
+  expect(recheck).not.toHaveBeenCalled()
+  await expect(manager.prepare(DEFAULT_SETTINGS.compute, 'llama', false)).resolves.toBeUndefined()
+  await expect(manager.prepare(DEFAULT_SETTINGS.compute, 'torch', false)).rejects.toThrow('RUNTIME_TORCH')
+})

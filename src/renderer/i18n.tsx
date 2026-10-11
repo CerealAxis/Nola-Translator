@@ -21,6 +21,7 @@ import type { ReactNode } from 'react'
 import { zhCN } from './i18n/zh-CN'
 import { en } from './i18n/en'
 import type { Dictionary } from './i18n/zh-CN'
+import { supportErrorCodeForMessage } from '../shared/error-catalog'
 
 /** 与 `AppSettings.uiLanguage` 同一个并集。 */
 export type UiLanguage = 'zh-CN' | 'en'
@@ -66,7 +67,11 @@ export function translate(key: string, language: UiLanguage, values: Translation
     // 中文表缺键时把键原样返回：它至少是个可搜索的标识，比 `missing:` 之类占位符有用。
     return interpolate(key, values)
   }
-  return interpolate(template, values)
+  const message = interpolate(template, values)
+  const supportCode = supportErrorCodeForMessage(key)
+  if (!supportCode) return message
+  const codeLabel = lookup(dictionary, 'errors.errorCodeLabel')
+  return codeLabel ? `${message} ${interpolate(codeLabel, { code: supportCode })}` : message
 }
 
 export interface I18nContextValue {

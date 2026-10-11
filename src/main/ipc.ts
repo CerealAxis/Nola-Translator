@@ -44,18 +44,18 @@ export const IPC_CHANNELS = {
  * sequence read one source. The credential is left out — a cloud provider keeps no local weights,
  * so there is nothing to load and no key to hand over.
  */
-function prewarmConfigFrom(settings: AppSettings): PrewarmConfig {
+export function prewarmConfigFrom(settings: AppSettings): PrewarmConfig {
   const translation = settings.translation
   return {
     compute: { ...settings.compute },
+    ...recognitionFieldsOf(settings.recognition),
     recognitionModelId: settings.recognition.modelId,
     sourceLanguage: settings.recognition.sourceLanguage,
     targetLanguages: translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? [] : [translation.targetLanguage],
-    allowIntermediateTranslation: translation.translateIntermediate,
+    allowIntermediateTranslation: translation.provider === 'mymemory' ? false : translation.translateIntermediate,
     translationProvider: translation.provider,
     translationModelId: translation.localModelId,
-    ...(translation.provider === 'cloud' ? { translationOptions: { endpoint: translation.cloudEndpoint, model: translation.cloudModel, apiFormat: translation.cloudApiFormat, contextWindow: translation.cloudContextWindow, maxOutputTokens: translation.cloudMaxOutputTokens } } : {}),
-    ...(translation.provider === 'microsoft' ? { translationOptions: { endpoint: translation.microsoftEndpoint, region: translation.microsoftRegion } } : {}),
+    translationOptions: translationOptionsOf(translation),
   }
 }
 
@@ -386,3 +386,4 @@ export function registerEngineIpc(
     }
   }
 }
+import { recognitionFieldsOf, translationOptionsOf } from '../shared/cloud-config'

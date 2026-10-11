@@ -22,8 +22,8 @@ it('creates independent launch logs and preserves Windows crash details without 
   })))
   const contents = await readFile(first, 'utf8')
   expect(contents).toContain('0xC0000135')
-  expect(contents).toContain('missing.dll')
-  for (const secret of ['opaque-credential-example', 'sk-example123', 'another-secret']) expect(contents).not.toContain(secret)
+  expect(contents).toContain('stderrBytes')
+  for (const privateValue of ['opaque-credential-example', 'sk-example123', 'another-secret', 'missing.dll']) expect(contents).not.toContain(privateValue)
   initializeSessionLog(path, { version: 'next' })
   expect(sessionLogPath()).not.toBe(first)
   expect(await readdir(path)).toHaveLength(2)
@@ -38,14 +38,14 @@ it('retains only twenty launch logs and preserves unrelated files', async () => 
   expect(names).toContain('keep.txt')
 })
 
-it('rolls over full logs without dropping subsequent activity and survives an unavailable directory', async () => {
+it('keeps one unsplit launch log regardless of size and survives an unavailable directory', async () => {
   const path = await directory()
   initializeSessionLog(path, {})
   for (let index = 0; index < 400; index++) logDiagnostic('output', 'x'.repeat(16000))
-  expect((await stat(sessionLogPath())).size).toBeLessThanOrEqual(4 * 1024 * 1024)
+  expect((await stat(sessionLogPath())).size).toBeGreaterThan(4 * 1024 * 1024)
   logDiagnostic('operation.after-rollover', { finished: true })
   expect(await readFile(sessionLogPath(), 'utf8')).toContain('operation.after-rollover')
-  expect((await readdir(path)).some(name => name.includes('-part-'))).toBe(true)
+  expect((await readdir(path)).filter(name => name.endsWith('.jsonl'))).toHaveLength(1)
   const blocked = join(path, 'file')
   await writeFile(blocked, '')
   expect(() => initializeSessionLog(blocked, {})).not.toThrow()

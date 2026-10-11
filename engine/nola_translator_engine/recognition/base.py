@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 import numpy as np
 from numpy.typing import NDArray
 
 from ..audio.resample import AudioFrame
+
+
+@dataclass(frozen=True, slots=True)
+class NativeTranslation:
+    target_language: str
+    text: str | None = None
+    state: Literal["pending", "complete", "failed"] = "pending"
+    error_code: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +28,7 @@ class RecognitionUpdate:
     source_text: str
     language: str | None
     is_final: bool
+    native_translation: NativeTranslation | None = None
 
 
 class ModelUnavailable(RuntimeError):

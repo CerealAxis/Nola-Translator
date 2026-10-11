@@ -16,6 +16,13 @@ import type { AppSettings, AppSettingsPatch, CredentialProvider } from './settin
 import type { ComputeSnapshot, RuntimeSnapshot } from './compute'
 import type { BrowserConnectionAction, BrowserConnectionStatus, BrowserKind } from './browser'
 import type { AppUpdateCheckResult } from './app-updates'
+import type { SupportErrorCode } from './error-catalog'
+
+export type DiagnosticCopyContext = {
+  supportCode?: SupportErrorCode
+  /** Engine request ID, when the failing operation reached the engine. */
+  correlationId?: string
+}
 
 export type SessionStartResult = { sessionId: string; meetingId: string | null }
 
@@ -142,7 +149,7 @@ export type NolaTranslatorApi = {
   exportMeeting(meetingId: string, format: 'txt' | 'srt' | 'vtt'): Promise<string | null>
   getMeetingAudioUrl(meetingId: string): Promise<string | null>
   getDiagnostics(): Promise<Record<string, string | number>>
-  copyDiagnostics(): Promise<void>
+  copyDiagnostics(context?: DiagnosticCopyContext): Promise<void>
   openLogs(): Promise<void>
   hasTranslationCredential(provider: CredentialProvider): Promise<boolean>
   setTranslationCredential(provider: CredentialProvider, value: string): Promise<void>

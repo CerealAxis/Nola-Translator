@@ -6,6 +6,22 @@ import { SettingsStore } from '../../../src/main/settings-store'
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 
 describe('设置存储', () => {
+  it('persists regional cloud configuration and keeps credentials outside settings', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-cloud-settings-'))
+    const path = join(directory, 'settings.json')
+    try {
+      const store = new SettingsStore(path)
+      await store.update({ recognition: { provider: 'aliyun', aliyunWorkspaceId: 'workspace-123', aliyunRegion: 'ap-southeast-1', aliyunModel: 'qwen3.5-livetranslate-flash-realtime', sourceLanguage: 'ja' },
+        translation: { provider: 'mymemory', mymemoryEmail: 'test@example.com' } })
+      const restored = await new SettingsStore(path).load()
+      expect(restored.recognition).toMatchObject({ provider: 'aliyun', aliyunWorkspaceId: 'workspace-123', aliyunRegion: 'ap-southeast-1', aliyunModel: 'qwen3.5-livetranslate-flash-realtime', sourceLanguage: 'ja', modelId: DEFAULT_SETTINGS.recognition.modelId })
+      expect(restored.translation).toMatchObject({ provider: 'mymemory', mymemoryEmail: 'test@example.com' })
+      expect(await readFile(path, 'utf8')).not.toContain('apiKey')
+      await store.update({ recognition: { aliyunModel: 'qwen3.8-livetranslate-flash-realtime' } })
+      expect(store.current().recognition.sourceLanguage).toBe('auto')
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+
   it('serializes concurrent patches and restores language/storage choices', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
     const path = join(directory, 'settings.json')

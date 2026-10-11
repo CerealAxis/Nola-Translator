@@ -87,6 +87,11 @@ html.is-overlay body {
   -webkit-app-region: drag;
 }
 
+/* Let native caption selection start inside a drag window and remain clickable until it is cleared. */
+.nola-caption-card[data-text-selected='true'] {
+  -webkit-app-region: no-drag;
+}
+
 /* A confirmation must be clickable across the whole window, including unlocked drag regions. */
 .nola-caption-card[data-confirm-open='true'] {
   -webkit-app-region: no-drag;
@@ -214,6 +219,7 @@ html.is-overlay body {
 /* Each sentence stays its own node so the text wraps and scrolls as one block. */
 .nola-caption-segment {
   display: inline;
+  -webkit-app-region: no-drag;
 }
 
 /*

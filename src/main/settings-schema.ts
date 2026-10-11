@@ -54,6 +54,14 @@ export const settingsPatchSchema = z.object({
     proxyForRuntimeDownload: z.boolean().optional(),
   }).partial().optional(),
   recognition: z.object({
+    provider: z.enum(['local', 'aliyun', 'minimax']).optional(),
+    aliyunWorkspaceId: z.string().max(128).optional(),
+    aliyunRegion: z.enum(['cn-beijing', 'ap-southeast-1']).optional(),
+    aliyunModel: z.enum(['qwen3.8-livetranslate-flash-realtime', 'qwen3.5-livetranslate-flash-realtime']).optional(),
+    // `api.minimax.cn` and `api.minimax.io` serve different accounts, so the address is stored
+    // rather than fixed; the bound only keeps a hand-built request from riding it to the engine.
+    minimaxEndpoint: z.string().max(2048).optional(),
+    minimaxModel: z.enum(['asr-1.0']).optional(),
     modelId: recognitionModelIdSchema.optional(),
     sourceLanguage: z.string().min(1).max(32).optional(),
     audioSource: z.string().min(1).max(128).optional(),
@@ -86,7 +94,9 @@ export const settingsPatchSchema = z.object({
     audioDeviceId: z.string().min(1).max(512).optional(),
   }).partial().optional(),
   translation: z.object({
-    provider: z.enum(['local', 'cloud', 'microsoft']).optional(),
+    provider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'recognition']).optional(),
+    mymemoryEndpoint: z.string().max(2048).optional(),
+    mymemoryEmail: z.string().max(320).optional(),
     localModelId: localModelIdSchema.optional(),
     microsoftEndpoint: z.string().min(1).max(2048).optional(), microsoftRegion: z.string().max(128).optional(),
     cloudEndpoint: z.string().max(2048).optional(), cloudModel: z.string().max(256).optional(),

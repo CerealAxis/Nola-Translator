@@ -27,10 +27,16 @@ describe('translation language choices', () => {
     expect(translationModelPatch(DEFAULT_SETTINGS, { ...translator, configuration: undefined })).toBeNull()
     expect(translationModelPatch({ ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, sourceLanguage: 'zh' } }, translator)).toBeNull()
   })
-  it.each(['local', 'cloud', 'microsoft'] as const)('omits the %s translation pipeline when no translation is selected', provider => {
+  it.each(['local', 'cloud', 'microsoft', 'mymemory', 'recognition'] as const)('omits the %s translation pipeline when no translation is selected', provider => {
     const translation = { ...DEFAULT_SETTINGS.translation, provider, targetLanguage: NO_TRANSLATION_LANGUAGE }
     expect(translationFieldsOf(translation, { enabled: true })).toEqual({ targetLanguages: [] })
     expect(translationFieldsOf(DEFAULT_SETTINGS.translation, { enabled: true, targetLanguage: NO_TRANSLATION_LANGUAGE })).toEqual({ targetLanguages: [] })
+  })
+
+  it('uses confirmed-only MyMemory translation even when an older setting enables intermediates', () => {
+    const fields = translationFieldsOf({ ...DEFAULT_SETTINGS.translation, provider: 'mymemory', translateIntermediate: true, mymemoryEmail: 'test@example.com' }, { enabled: true })
+    expect(fields).toMatchObject({ translationProvider: 'mymemory', allowIntermediateTranslation: false, translationOptions: { endpoint: 'https://api.mymemory.translated.net/get', email: 'test@example.com' } })
+    expect(fields.translationModelId).toBeUndefined()
   })
 
   it('allows a session to explicitly re-enable translation with a concrete language', () => {

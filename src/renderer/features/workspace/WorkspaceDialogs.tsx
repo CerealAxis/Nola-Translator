@@ -6,7 +6,9 @@ import { AlertDialog, Button } from '@heroui/react'
 
 import { ENGINE_LOST_CODE, actions } from '@/store'
 import type { SessionState } from '@/store'
+import type { DiagnosticCopyContext } from '@/bridge'
 import { useI18n } from '@/i18n'
+import { supportErrorCodeForCause, supportErrorCodeForMessage } from '../../../shared/error-catalog'
 
 import { errorCopyOf } from './error-copy'
 
@@ -53,7 +55,7 @@ export interface SessionErrorDialogProps {
    * state, so a caller outside a live session passes one to show it.
    */
   state: SessionState
-  onCopyDiagnostics: () => void
+  onCopyDiagnostics: (context: DiagnosticCopyContext) => void
   onReset: () => void
   onViewRecord: () => void
 }
@@ -78,8 +80,7 @@ export interface SessionErrorDialogProps {
  * changing the `errorCopyOf` signature, which the overlay's `StartFailureNotice`
  * also calls.
  *
- * `state.error` is a diagnostic string for the console and "copy diagnostics",
- * never rendered.
+ * Raw error details stay out of the UI because provider errors can contain private request data.
  */
 export function SessionErrorDialog({ state, onCopyDiagnostics, onReset, onViewRecord }: SessionErrorDialogProps) {
   const { t } = useI18n()
@@ -108,13 +109,16 @@ export function SessionErrorDialog({ state, onCopyDiagnostics, onReset, onViewRe
                 {t(handle.message)}
               </AlertDialog.Heading>
             </AlertDialog.Header>
-            {state.error || handle.detail ? (
+            {handle.detail ? (
               <AlertDialog.Body>
-                <p className="nola-body text-muted">{state.error || (handle.detail ? t(handle.detail) : null)}</p>
+                <p className="nola-body text-muted">{t(handle.detail)}</p>
               </AlertDialog.Body>
             ) : null}
             <AlertDialog.Footer>
-              <Button variant="tertiary" size="sm" className="rounded-xl" onPress={onCopyDiagnostics}>
+              <Button variant="tertiary" size="sm" className="rounded-xl" onPress={() => onCopyDiagnostics({
+                supportCode: supportErrorCodeForMessage(handle.message) ?? supportErrorCodeForCause(state.errorCode),
+                correlationId: state.errorRequestId ?? undefined,
+              })}>
                 {t('errors.copyDiagnosticsAction')}
               </Button>
               <Button

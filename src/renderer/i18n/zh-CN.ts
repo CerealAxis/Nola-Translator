@@ -1,11 +1,11 @@
 /**
  * 中文词典。`en.ts` 的类型由本文件推导，缺 key 会在编译期报错。
  *
- * 文案纪律：
+ * Copy rules:
  * - 标题与说明不复述，说明只写用户不知道的信息
  * - 占位符不充当 label，占位符只在能减少输入错误时出现
  * - 不用破折号
- * - 错误信息三要素：发生了什么 / 用户能做什么 / 可复制的错误码
+ * - The locale layer appends the stable support code from the shared catalog.
  */
 
 import { shellZh } from './shell-ui'
@@ -114,15 +114,16 @@ export const zhCN = {
 
   preflight: {
     title: '开始前检查',
-    checkingDevices: '正在检测音频输入',
+    checkingDevices: '正在检测音频设备',
     checkingModels: '正在校验模型',
-    deviceUnavailable: '没有检测到可用的音频输入',
+    deviceUnavailable: '没有检测到可用的音频设备',
+    deviceCheckWarning: '暂时无法确认设备列表，仍可尝试开始；启动时会重新检查所选音频源。',
     /**
      * 设备行在"引擎没答上话"时的读法。**这一条故意不写任何设备相关的结论**：
      * 探设备那一次调用同时兼着启动引擎，引擎起不来时它没能探成，报"没有检测到可用的音频
      * 输入"就是把引擎故障说成硬件故障。真原因由 `errors.engineNotReady`（ENG-001）承担。
      */
-    deviceCheckBlocked: '音频输入检测未能完成',
+    deviceCheckBlocked: '音频设备检测未能完成',
     modelMissing: '缺少模型：{name}',
     installNow: '现在安装',
     later: '稍后再说',
@@ -179,7 +180,7 @@ export const zhCN = {
     // 开着且有会话 = 扩展正在用它（转圈）。关着的时候按钮本身就是唯一信号，不再加文字。
     serviceRunning: '浏览器正在生成字幕',
     serviceFailed: '字幕服务开启失败',
-    errorOpeningBrowser: '无法打开默认浏览器，请在系统里设置一个默认浏览器后重试。错误码 UIP-017',
+    errorOpeningBrowser: '无法打开默认浏览器，请在系统里设置一个默认浏览器后重试。',
     /*
      * 预览里的示例句：第一行原文、第二行译文，双语对照就长这样。
      * 用一句真实语料而不是 lorem —— 占位文本看不出换行与字号对不对。
@@ -400,6 +401,7 @@ export const zhCN = {
     testAudio: '测试音频',
     sourceLanguage: '原文语言',
     recognitionModel: '识别模型',
+    recognitionModelEmpty: '尚未安装本地识别模型，请先到「模型管理」下载。',
     keepAudio: '保存录音',
     keepAudioHint: '关闭后不保存音频，无法回放与导出。',
     groupProvider: '翻译服务',
@@ -422,9 +424,27 @@ export const zhCN = {
      * 所以这两行必须跟着界面语言走；产品名只剩 Microsoft Translator 一个。
      */
     providerLocal: '本地模型',
+    providerDisabled: '不启用翻译服务',
     providerCloud: '云端模型',
     providerMicrosoft: 'Microsoft Translator',
-    groupLocalModel: '选择使用的本地模型',
+    providerMyMemory: 'MyMemory 免费翻译',
+    providerRecognitionTranslation: '阿里云',
+    providerAliyun: '阿里云 LiveTranslate',
+    providerMiniMax: 'MiniMax 语音识别',
+    aliyunTranslationHint: '若启用阿里云服务，请先启用阿里云语音识别服务。MiniMax 没有自带译文，选它时这一项不可用。',
+    aliyunBeijing: '华北 2（北京）',
+    aliyunSingapore: '新加坡',
+    aliyunWorkspace: '百炼业务空间 ID',
+    aliyunHint: '持续音频输入与流式文字输出。3.8 自动识别源语言；业务空间和 API Key 须属于同一地域。LiveTranslate 按量计费，改用其他翻译服务也会产生阿里云调用费用。',
+    /*
+     * MiniMax 的三条限制都是「用户会以为坏了」而不是「功能缺失」：音频不是流式上传而是切段后
+     * 逐段提交，字幕因此在停顿处成句出现；语种只有 20 个，比阿里云少；没有自带译文。
+     * 价格按音频时长计费，与调用次数无关，所以放在同一句里说清。
+     */
+    minimaxNotice: '按静音把音频切成不超过 15 秒的片段后逐段上传，字幕在停顿处整句出现，不是逐字实时。支持 20 种语言，没有自带译文，需要翻译请在「翻译服务」里另选。按音频时长计费 2.50 元/小时。',
+    mymemoryHint: '无需 API Key。每句确认后通过 REST 翻译，无逐字流式输出；免费服务有配额和限流，原文会发给 MyMemory。',
+    mymemoryEmail: '联系邮箱（可选）',
+    nativeTranslationHint: '使用当前阿里云识别连接返回的流式译文，无需额外翻译接口。仅支持阿里云 LiveTranslate。',
     localModelEmpty: '尚未安装本地翻译模型，请先到「模型管理」下载。',
     /*
      * 云端那七项。**API 格式决定接口地址该填到哪一层**（Anthropic 只填站点根地址，
@@ -482,7 +502,7 @@ export const zhCN = {
     protocolVersion: '通信协议',
     copyDiagnostics: '复制诊断信息',
     openLogs: '打开日志目录',
-    openLogsHint: '每次启动记录运行过程；复现问题后发送本次日志。日志统一使用英文，单份约 4 MB 时自动续写，保留最近 20 份。日志可能包含设备名称和本地路径。',
+    openLogsHint: '每次启动生成一份独立日志，不拆分文件，保留最近 20 次启动。复现问题后可复制诊断信息并附上本次日志。日志不记录字幕、译文、提示词或音频；可能包含设备名称和本地路径。',
     copied: '已复制',
     githubIssue: 'GitHub issue',
     githubIssueHint: '在这里提交问题与需求',
@@ -521,64 +541,63 @@ export const zhCN = {
   },
 
   errors: {
-    /*
-     * 每条错误**只写一句完整的话**（发生了什么 + 错误码）。不要再补第二行"你该做什么"：
-     * 第二行原本直接复用了按钮那一条，于是对话框里"重试启动"会连着出现两遍。
-     * 按钮自己就是出路，正文再加一遍只是重复。
-     */
-    engineNotReady: '本地引擎没有运行，识别无法开始。错误码 ENG-001',
+    errorCodeLabel: '错误码 {code}',
+    cloudRecognitionCredentialMissing: '请在设置 → 音频与识别中保存云端识别服务的 API Key，再启动字幕。',
+    // 余额与限流是两家云端都会遇到的事，所以文案不点名服务商，只说该做什么。
+    cloudRecognitionInsufficientBalance: '云端识别服务商账户余额不足，充值后才能继续识别。',
+    cloudRecognitionRateLimited: '云端识别请求过于频繁，稍后会自动重试。',
+    // Keep the sentence self-contained; the locale layer appends its catalog code.
+    engineNotReady: '本地引擎没有运行，识别无法开始。',
     // 预检状态不是失败：用户还没动手，所以不给错误码。
     // **当前没有界面在用这一条**：冷启动不再报「引擎没运行」（主进程在 app ready 时就启动
     // 引擎，应用刚打开那几秒是 `booting`，什么都没坏，报故障等于报一件没发生的事）；
-    // 引擎真的起不来走的是上面 `engineNotReady`（带 ENG-001）+ `engineNotReadyAction`。
+    // An actual startup failure uses `engineNotReady` and the shared catalog code.
     // 留着是因为 `i18n.test.ts` 的 `noCodeByDesign` 点名了这一条，删掉会让那条断言的注释悬空。
     engineNotReadyPreflight: '本地引擎没有运行，识别暂时无法开始。',
-    // 会话中途引擎掉了。不能说"无法开始"——这场已经在跑了，说的是"停了"。
-    engineStopped: '本地引擎已经停止，识别随之停止。',
-    /*
-     * 引擎进程在同传途中没了（`sessionStore` 的 `ENGINE_LOST`）。与上面 `engineStopped`
-     * 的区别是**引擎自己会不会回来**：那一条说的是会话级的停止，这一条说的是进程没了，
-     * 而重连出来的是新进程，这场会一定回不来 —— 所以出路是"去那条记录"，不是"重试"。
-     * 字幕逐句落盘（主进程 `meetings.append`），所以"已保存"这句话是实情。
-     */
-    engineLost: '本地引擎在同传中停止，这场同传已中断，已经识别到的字幕已保存。错误码 ENG-002',
+    // Engine loss ends the session; finalized captions remain persisted in the meeting record.
+    engineLost: '本地引擎在同传中停止，这场同传已中断，已经识别到的字幕已保存。',
     engineLostAction: '查看这场记录',
     engineNotReadyAction: '重试启动',
-    deviceNotFound: '没有找到可用的音频输入设备。错误码 AUD-002',
+    audioDeviceEnumerationFailed: '读取音频设备列表失败，请检查系统音频服务后重试。',
+    deviceNotFound: '没有找到可用的音频设备。',
     deviceNotFoundAction: '检查系统声音设置',
-    modelMissing: '识别模型还没有安装。错误码 MDL-003',
+    modelMissing: '识别模型还没有安装。',
     modelMissingAction: '去安装模型',
-    startFailed: '同传未能启动，请检查所选模型、计算设备和运行环境。错误码 SES-004',
+    startFailed: '同传未能启动，请检查所选模型、计算设备和运行环境。',
     startFailedAction: '重新开始同传',
-    downloadFailed: '模型下载中断，已保留部分文件。错误码 NET-006',
+    downloadFailed: '模型下载中断，已保留部分文件。',
     downloadFailedAction: '重试下载',
-    searchFailed: '模型搜索暂不可用，下面不是搜索结果，Hugging Face 上未必没有这个模型。错误码 NET-006',
+    searchFailed: '模型搜索暂不可用，下面不是搜索结果，Hugging Face 上未必没有这个模型。',
     searchFailedAction: '重试搜索',
-    translateFailed: '翻译服务没有响应，只显示原文。错误码 MT-007',
+    translateFailed: '翻译服务没有响应，只显示原文。',
     translateFailedAction: '检查密钥与网络',
-    storageChanged: '保存位置已失效，字幕暂时写不进磁盘。错误码 STO-008',
+    storageChanged: '保存位置已失效，字幕暂时写不进磁盘。',
     storageChangedAction: '重新选择保存位置',
     // 设置保存失败的真实原因。主进程只有被文件系统拒绝写入时才会失败，所以界面按 errno 分派；
     // 认不出 errno 时只能说「没能保存」，不能像 `storageChanged` 那样断言保存位置已经失效。
-    // 编号接着全局序列往下排，全局最后一个是 `videoCaptions.errorOpeningBrowser` 的 UIP-017。
-    settingsWriteDenied: '没有写入设置的权限，这次改动没能保存。错误码 STO-018',
-    settingsFileLocked: '设置文件正被其他程序占用，这次改动没能保存。错误码 STO-019',
-    settingsDiskFull: '磁盘空间不足，这次改动没能保存。错误码 STO-020',
-    settingsSaveFailed: '这次改动没能保存，请重试。错误码 STO-021',
-    exportFailed: '导出失败，没有生成文件。错误码 EXP-009',
+    // Support IDs are owned by the shared error catalog and appended by the locale layer.
+    settingsWriteDenied: '没有写入设置的权限，这次改动没能保存。',
+    settingsFileLocked: '设置文件正被其他程序占用，这次改动没能保存。',
+    settingsDiskFull: '磁盘空间不足，这次改动没能保存。',
+    settingsSaveFailed: '这次改动没能保存，请重试。',
+    exportFailed: '导出失败，没有生成文件。',
     // preload 没注入 = 这个窗口压根没接到引擎。给 UIP 而不是 ENG：引擎本身没坏，坏的是接线。
-    engineNotConnected: '没有连上本地引擎，设置、记录和模型都读不到。错误码 UIP-011',
-    pageCrashed: '界面渲染中断，同传仍在后台运行。错误码 UIP-010',
+    engineNotConnected: '没有连上本地引擎，设置、记录和模型都读不到。',
+    pageCrashed: '界面渲染中断，同传仍在后台运行。',
+    engineOperationFailed: '引擎处理本次请求时出错，请重试；若反复出现，请复制诊断信息。',
+    unknownFailure: '操作未能完成，请复制诊断信息并反馈。',
+    torchRuntimeUnavailable: 'PyTorch 运行组件不可用，请前往设置检查或修复。',
+    llamaRuntimeUnavailable: 'llama.cpp 运行组件不可用，请前往设置检查或修复。',
     pageCrashedAction: '重新载入界面',
     copyDiagnosticsAction: '复制诊断信息',
 
     /*
      * 字幕服务闸门操作失败。域前缀用 UIP：这两条里引擎、模型、存储、网络和翻译都是好的，
      * 坏的是桌面端自己那条开关 / 停会话的调用，所以和 `engineNotConnected`、`errorOpeningBrowser`
-     * 归在一起。编号接着全局序列往下排，全局最后一个是 `settingsSaveFailed` 的 STO-021。
+     * 归在一起。具体支持码由共享错误目录分配。
      */
-    captionServiceToggleFailed: '字幕服务的开关没有切换成功，请重试。错误码 UIP-022',
-    captionServiceStopFailed: '字幕服务已关闭，但有一场字幕会话没能结束，识别可能还在继续。错误码 UIP-023',
+    captionServiceToggleFailed: '字幕服务的开关没有切换成功，请重试。',
+    captionServiceStopFailed: '字幕服务已关闭，但有一场字幕会话没能结束，识别可能还在继续。',
 
     /*
      * 预热被引擎拒绝的原因。每条都要说清现在该做什么：只写「加载失败」的话，
@@ -587,11 +606,11 @@ export const zhCN = {
      * 这五条都是模型侧的拒绝，不是引擎进程本身的问题。
      */
     prewarm: {
-      modelUnavailable: '所需模型还没有下载，请先到模型管理里下载该模型。错误码 MDL-012',
-      resourceUnavailable: '模型文件不完整或读取失败，请到模型管理里重新下载。错误码 MDL-013',
-      invalidConfiguration: '当前的模型或语言设置无法用于字幕，请先到模型管理里完成模型配置。错误码 MDL-014',
-      resourceBusy: '模型正在卸载或切换，请稍候再开启字幕服务。错误码 MDL-015',
-      sessionAlreadyRunning: '已有一场字幕会话在运行，请先结束它再开启字幕服务。错误码 MDL-016',
+      modelUnavailable: '所需模型还没有下载，请先到模型管理里下载该模型。',
+      resourceUnavailable: '模型文件不完整或读取失败，请到模型管理里重新下载。',
+      invalidConfiguration: '当前的模型或语言设置无法用于字幕，请先到模型管理里完成模型配置。',
+      resourceBusy: '模型正在卸载或切换，请稍候再开启字幕服务。',
+      sessionAlreadyRunning: '已有一场字幕会话在运行，请先结束它再开启字幕服务。',
     },
   },
 

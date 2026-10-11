@@ -6,6 +6,7 @@ license = "GPL-3.0-only"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "httpx==0.28.1",
+  "websockets==15.0.1",
   "accelerate==1.15.0",
   "bitsandbytes==0.50.2",
   "funasr==1.4.16",

@@ -46,9 +46,12 @@
 /* Colour, radius and height come from .nola-segmented in theme/app.css; this only controls width. */
 .settings-row__control .nola-segmented { width:100%; }
 .settings-row__control .toggle-button { flex:1; }
-.settings-slider { display:flex; align-items:center; gap:12px; width:100%; min-width:0; }
-.settings-slider .slider { flex:1; min-width:0; }
-.settings-slider .number-field { width:72px; flex-shrink:0; }
+/* Three fixed columns so every track is the same length: the optional unit ("px" is wider than
+   "%", and line height carries none) otherwise leaves each row a different amount of slack, which
+   the `flex:1` slider absorbs. */
+.settings-slider { display:grid; grid-template-columns:minmax(0,1fr) 72px 2ch; align-items:center; gap:12px; width:100%; min-width:0; }
+.settings-slider .slider { min-width:0; }
+.settings-slider .number-field { width:72px; }
 .settings-slider .number-field__group { background:transparent; border:0; box-shadow:none; }
 .settings-slider .number-field__input { text-align:right; padding:4px; font-size:13px; }
 .settings-slider__unit { color:var(--muted); font-size:12px; }

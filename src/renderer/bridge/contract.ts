@@ -15,6 +15,7 @@ import type {
   AudioDevice,
   CaptionSegment,
   CredentialProvider,
+  DiagnosticCopyContext,
   EngineChannelEvent,
   EngineEvent,
   EngineProcessState,
@@ -125,7 +126,7 @@ export interface NolaBridge {
     export(id: string, format: ExportFormat): Promise<string | null>
     audioUrl(id: string): Promise<string | null>
   }
-  diagnostics: { get(): Promise<Record<string, string | number>>; copy(): Promise<void>; openLogs?(): Promise<void> }
+  diagnostics: { get(): Promise<Record<string, string | number>>; copy(context?: DiagnosticCopyContext): Promise<void>; openLogs?(): Promise<void> }
   /**
    * Opens the user's default browser with **no URL** — the video-captions page's "open browser"
    * button, which must not invent a start page to satisfy `shell.openExternal`.

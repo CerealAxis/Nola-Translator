@@ -40,6 +40,17 @@ export function ModelsPage() {
   const recognition = resources.find((item) => item.resourceId === settings?.recognition.modelId)
   const translation = resources.find((item) => item.resourceId === settings?.translation.localModelId)
   const localTranslation = settings?.translation.provider === 'local'
+  const remoteRecognition = !!settings?.recognition.provider && settings.recognition.provider !== 'local'
+  /*
+   * The catalog always carries every model the engine knows about, installed or not, so finding a
+   * record by id says nothing about whether it can run. Both overview cards ask `installed`
+   * instead: an uninstalled model would otherwise be announced as the one in use, right above the
+   * list that marks it as uninstalled. Cloud recognition names its remote model instead, chosen
+   * independently of the local id.
+   */
+  const currentRecognition = remoteRecognition && settings
+    ? recognitionLabel(settings.recognition)
+    : recognition?.installed ? recognition.name : t('modelsSettingsUi.noModelSelected')
   /*
    * 服务商显示名跟着界面语言走：「本地模型 / 云端模型」是界面概念而非产品名
    * （Hy-MT2 与 M2M100 合并成前者，OpenAI 与 Ollama 合并成后者）。
@@ -49,6 +60,8 @@ export function ModelsPage() {
     local: t('settings.providerLocal'),
     cloud: t('settings.providerCloud'),
     microsoft: t('settings.providerMicrosoft'),
+    mymemory: t('settings.providerMyMemory'),
+    recognition: t('settings.providerRecognitionTranslation'),
   }
   /*
    * 云端那一栏显示**模型 ID**，不是服务商名。服务商名在这一栏是废话：三家云端服务商
@@ -59,10 +72,10 @@ export function ModelsPage() {
    */
   const cloudModel = settings?.translation.cloudModel?.trim() ?? ''
   const currentTranslation = localTranslation
-    ? translation?.name ?? settings?.translation.localModelId ?? '—'
+    ? translation?.installed ? translation.name : t('modelsSettingsUi.noModelSelected')
     : settings?.translation.provider === 'cloud'
       ? cloudModel || providerNames.cloud
-      : providerNames.microsoft
+      : providerNames[settings?.translation.provider ?? 'microsoft']
 
   // error 是诊断串，不进界面（store 约定）：只送 console，界面走 errors.* 的错误码文案。
   useEffect(() => {
@@ -110,7 +123,7 @@ export function ModelsPage() {
           <div><h1>{t('models.title')}</h1><p>{t('modelsSettingsUi.modelsSubtitle')}</p></div>
         </header>
         <div className="models-overview__summaries">
-          <CurrentModel label={t('modelsSettingsUi.currentRecognition')} name={recognition?.name ?? settings?.recognition.modelId ?? '—'} record={recognition ?? null} installed={recognition?.installed ?? false} kind="recognitionModel" />
+          <CurrentModel label={t('modelsSettingsUi.currentRecognition')} name={currentRecognition} record={remoteRecognition ? null : recognition ?? null} installed={remoteRecognition ? null : recognition?.installed ?? false} kind="recognitionModel" />
           <CurrentModel label={t('modelsSettingsUi.currentTranslation')} name={currentTranslation} record={localTranslation ? translation ?? null : null} installed={localTranslation ? translation?.installed ?? false : null} kind="translationModel" />
         </div>
       </section>
@@ -291,3 +304,4 @@ function countActive(records: readonly ResourceRecordWithRate[]): number {
     (item) => item.state === 'running' || item.state === 'cancelling' || item.state === 'failed',
   ).length
 }
+import { recognitionLabel } from '../../../shared/cloud-config'

@@ -1,5 +1,5 @@
 import type { ModelConfiguration } from './model-capabilities'
-import type { CloudApiFormat, NetworkSettings } from './settings'
+import type { CloudApiFormat, NetworkSettings, RecognitionProvider, TranslationProvider } from './settings'
 import type { ComputeSettings, ComputeSnapshot } from './compute'
 
 export const PROTOCOL_VERSION = 1 as const
@@ -21,6 +21,13 @@ export type AudioSource =
   | { kind: 'browserTab'; streamId: string }
 
 export type SessionConfig = {
+  recognitionProvider?: RecognitionProvider
+  /**
+   * Cloud connection options, credential-free. Each provider reads only its own fields: Aliyun
+   * takes `workspaceId`/`region`/`model`, MiniMax takes `endpoint`/`model`. The shape matches the
+   * engine's `RecognitionOptions`, so a field no provider reads is never written here.
+   */
+  recognitionOptions?: { endpoint?: string; workspaceId?: string; region?: string; model?: string; apiKey?: string }
   compute?: ComputeSettings
   audioSource: AudioSource
   recognitionMode: 'realtime' | 'accurate'
@@ -29,7 +36,7 @@ export type SessionConfig = {
   sourceLanguage: string
   targetLanguages: string[]
   allowIntermediateTranslation?: boolean
-  translationProvider?: 'local' | 'cloud' | 'microsoft'
+  translationProvider?: TranslationProvider
   /**
    * Local translation model id. The engine refuses an id no resource resolves rather than falling
    * back to a default.
@@ -48,6 +55,7 @@ export type SessionConfig = {
     contextWindow?: number
     maxOutputTokens?: number
     apiKey?: string
+    email?: string
   }
   /** Absolute path the engine records this meeting's audio to. Omitted means no audio file. */
   recordingPath?: string
@@ -65,12 +73,14 @@ export type SessionConfig = {
  * no local weights, so there is nothing to prewarm and no reason to hand over an API key.
  */
 export type PrewarmConfig = {
+  recognitionProvider?: RecognitionProvider
+  recognitionOptions?: SessionConfig['recognitionOptions']
   compute: ComputeSettings
   recognitionModelId: string
   sourceLanguage: string
   targetLanguages: string[]
   allowIntermediateTranslation?: boolean
-  translationProvider?: 'local' | 'cloud' | 'microsoft'
+  translationProvider?: TranslationProvider
   translationModelId?: string
   translationOptions?: SessionConfig['translationOptions']
 }
@@ -287,6 +297,7 @@ export type EngineErrorCode =
   | 'invalidConfiguration'
   | 'sessionNotRunning'
   | 'sessionAlreadyRunning'
+  | 'audioDeviceEnumerationFailed'
   | 'audioDeviceUnavailable'
   | 'audioBufferOverflow'
   | 'modelUnavailable'

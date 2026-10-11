@@ -12,13 +12,15 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button, Input, TextField, toast } from '@heroui/react'
 
-import { CLOUD_API_FORMATS, CLOUD_FORMAT_DEFAULTS, TRANSLATION_PROVIDERS } from '@/bridge'
+import { CLOUD_API_FORMATS, CLOUD_FORMAT_DEFAULTS, NO_TRANSLATION_LANGUAGE, TRANSLATION_PROVIDERS } from '@/bridge'
 import type { CloudApiFormat, CredentialProvider, TranslationProvider, TranslationSettings } from '@/bridge'
 import { SettingsRow } from '../SettingsRow'
 import { useI18n } from '@/i18n'
-import { actions, getBridge, stores, updateSettings, useStore } from '@/store'
+import { actions, stores, updateSettings, useStore } from '@/store'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
+import { ALIYUN_LANGUAGES, supportsRecognitionNativeTranslation } from '../../../../shared/cloud-config'
+import { targetLanguagePatch } from '../../../session-config'
 
 export function TranslationTab({ settings }: SettingsPanelProps) {
   const { t } = useI18n()
@@ -34,11 +36,19 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
     local: t('settings.providerLocal'),
     cloud: t('settings.providerCloud'),
     microsoft: t('settings.providerMicrosoft'),
+    mymemory: t('settings.providerMyMemory'),
+    recognition: t('settings.providerRecognitionTranslation'),
   }), [t])
 
   const providerOptions = useMemo<PickerOption[]>(
-    () => TRANSLATION_PROVIDERS.map((id) => ({ value: id, label: providerLabels[id] })),
-    [providerLabels],
+    () => [
+      { value: 'disabled', label: t('settings.providerDisabled') },
+      // Only Aliyun's recognition connection carries its own translation; the other providers would
+      // leave the chosen target language untranslated, so the option is unavailable rather than
+      // selectable and then reverted.
+      ...TRANSLATION_PROVIDERS.map((id) => ({ value: id, label: providerLabels[id], isDisabled: id === 'recognition' && !supportsRecognitionNativeTranslation(settings.recognition.provider) })),
+    ],
+    [providerLabels, settings.recognition.provider, t],
   )
 
   const apiFormatLabels = useMemo<Record<CloudApiFormat, string>>(() => ({
@@ -89,7 +99,18 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
   }, [translation.cloudApiFormat, t])
 
   const setProvider = (value: string) => {
-    void updateSettings({ translation: { provider: value as TranslationProvider } }).catch(() => undefined)
+    if (value === 'disabled') {
+      void updateSettings(targetLanguagePatch(NO_TRANSLATION_LANGUAGE, translation.targetLanguage)).catch(() => undefined)
+      return
+    }
+    const restoredTarget = translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? 'zh' : translation.targetLanguage
+    const targetLanguage = value === 'recognition' && !(ALIYUN_LANGUAGES as readonly string[]).includes(restoredTarget)
+      ? 'zh' : restoredTarget
+    const languagePatch = targetLanguagePatch(targetLanguage, translation.targetLanguage)
+    void updateSettings({
+      ...languagePatch,
+      translation: { ...languagePatch.translation, provider: value as TranslationProvider },
+    }).catch(() => undefined)
   }
 
   /**
@@ -113,15 +134,35 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
   return (
     <div className="settings-panel">
       <SettingGroup legend={t('settings.groupProvider')}>
-        <SettingsRow label={t('settings.provider')}>
+        <SettingsRow
+          label={t('settings.provider')}
+          desc={t('settings.aliyunTranslationHint')}
+          descriptionTooltip
+        >
           <SettingSelect
-            value={translation.provider}
+            value={translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? 'disabled' : translation.provider}
             options={providerOptions}
             ariaLabel={t('settings.provider')}
             onChange={setProvider}
           />
         </SettingsRow>
-        <SettingsRow label={t('settings.translateIntermediate')} desc={t('settings.translateIntermediateHint')} descriptionTooltip>
+        {translation.provider === 'local' && translation.targetLanguage !== NO_TRANSLATION_LANGUAGE ? (localModelOptions.length === 0 ? (
+          <SettingsRow label={t('settings.model')}>
+            <span className="nola-caption text-muted">{t('settings.localModelEmpty')}</span>
+          </SettingsRow>
+        ) : (
+          <SettingsRow label={t('settings.model')}>
+            <SettingSelect
+              value={translation.localModelId}
+              options={localModelOptions}
+              ariaLabel={t('settings.model')}
+              onChange={(value) => {
+                void updateSettings({ translation: { localModelId: value } }).catch(() => undefined)
+              }}
+            />
+          </SettingsRow>
+        )) : null}
+        {translation.targetLanguage !== NO_TRANSLATION_LANGUAGE && translation.provider !== 'recognition' && translation.provider !== 'mymemory' ? <SettingsRow label={t('settings.translateIntermediate')} desc={t('settings.translateIntermediateHint')} descriptionTooltip>
           <SettingSwitch
             isSelected={translation.translateIntermediate}
             ariaLabel={t('settings.translateIntermediate')}
@@ -129,28 +170,17 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
               void updateSettings({ translation: { translateIntermediate: next } }).catch(() => undefined)
             }}
           />
-        </SettingsRow>
+        </SettingsRow> : null}
       </SettingGroup>
 
-      {translation.provider === 'local' ? (
-        <SettingGroup legend={t('settings.groupLocalModel')}>
-          {localModelOptions.length === 0 ? (
-            <SettingsRow label={t('settings.model')}>
-              <span className="nola-caption text-muted">{t('settings.localModelEmpty')}</span>
-            </SettingsRow>
-          ) : (
-            <SettingsRow label={t('settings.model')}>
-              <SettingSelect
-                value={translation.localModelId}
-                options={localModelOptions}
-                ariaLabel={t('settings.model')}
-                onChange={(value) => {
-                  void updateSettings({ translation: { localModelId: value } }).catch(() => undefined)
-                }}
-              />
-            </SettingsRow>
-          )}
+      {translation.provider === 'mymemory' ? (
+        <SettingGroup legend={t('settings.groupConnection')}>
+          <SettingsRow label={t('settings.providerMyMemory')} desc={t('settings.mymemoryHint')} children={null} />
+          <TextRow label={t('settings.endpoint')} value={translation.mymemoryEndpoint ?? 'https://api.mymemory.translated.net/get'} onCommit={value => { void updateSettings({ translation: { mymemoryEndpoint: value } }).catch(() => undefined) }} />
+          <TextRow label={t('settings.mymemoryEmail')} value={translation.mymemoryEmail ?? ''} onCommit={value => { void updateSettings({ translation: { mymemoryEmail: value } }).catch(() => undefined) }} />
         </SettingGroup>
+      ) : translation.provider === 'recognition' ? (
+        <SettingGroup legend={t('settings.groupConnection')}><SettingsRow label={t('settings.providerRecognitionTranslation')} desc={t('settings.nativeTranslationHint')} children={null} /></SettingGroup>
       ) : null}
 
       {translation.provider === 'cloud' ? (
@@ -230,21 +260,23 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
 }
 
 /** Label above, input below; the placeholder only shows the expected format. */
-function TextRow({
-  label,
-  desc,
-  placeholder,
-  descriptionTooltip,
-  value,
-  onCommit,
-}: {
+export interface TextRowProps {
   label: string
   desc?: ReactNode
   placeholder?: string
   descriptionTooltip?: boolean
   value: string
   onCommit: (value: string) => void
-}) {
+}
+
+export function TextRow({
+  label,
+  desc,
+  placeholder,
+  descriptionTooltip,
+  value,
+  onCommit,
+}: TextRowProps) {
   const [draft, setDraft] = useState(value)
   const [focused, setFocused] = useState(false)
 
@@ -259,6 +291,7 @@ function TextRow({
   return (
     <SettingsRow label={label} desc={desc} descriptionTooltip>
       <TextField
+        aria-label={label}
         value={shown}
         onChange={setDraft}
         onFocus={() => { setDraft(value); setFocused(true) }}
@@ -316,7 +349,9 @@ function NumberRow({
   )
 }
 
-function ApiKeyRow({ provider, stored }: { provider: CredentialProvider; stored: boolean }) {
+export interface ApiKeyRowProps { provider: CredentialProvider; stored: boolean }
+
+export function ApiKeyRow({ provider, stored }: ApiKeyRowProps) {
   const { t } = useI18n()
   const [draft, setDraft] = useState('')
   const [editing, setEditing] = useState(false)
@@ -351,8 +386,7 @@ function ApiKeyRow({ provider, stored }: { provider: CredentialProvider; stored:
     if (draft.trim() !== '' && !(await save(draft))) return
     setState('testing')
     try {
-      const bridge = getBridge()
-      const ok = bridge ? await bridge.translation.hasCredential(provider) : false
+      const ok = await actions.models.checkCredential(provider)
       if (ok) toast.success(t('status.ok'))
       else toast.danger(t('errors.translateFailed'))
     } catch {
@@ -378,7 +412,7 @@ function ApiKeyRow({ provider, stored }: { provider: CredentialProvider; stored:
 
   return (
     <SettingsRow label={t('settings.apiKey')} desc={t('settings.apiKeyHint')} descriptionTooltip>
-      <TextField value={masked ? `sk-${'*'.repeat(80)}` : draft} onChange={setDraft}
+      <TextField aria-label={t('settings.apiKey')} value={masked ? `sk-${'*'.repeat(80)}` : draft} onChange={setDraft}
         onFocus={() => setEditing(true)} onBlur={() => { setEditing(false); void save(draft) }} className="settings-control-field">
         {/*
           `type` and the placeholder belong on `Input`: the `TextField` root takes only value

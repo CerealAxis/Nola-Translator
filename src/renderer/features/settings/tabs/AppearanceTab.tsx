@@ -108,7 +108,9 @@ function SliderRow({ label, value, min, max, step, unit, onChange }: { label:str
   return <SettingsRow label={label}><div className="settings-slider">
     <Slider value={value} minValue={min} maxValue={max} step={step} onChange={scalar} aria-label={label}><Slider.Track><Slider.Fill /><Slider.Thumb /></Slider.Track></Slider>
     <NumberField value={value} minValue={min} maxValue={max} step={step} onChange={scalar} aria-label={label}><NumberField.Group><NumberField.Input className="tabular" /></NumberField.Group></NumberField>
-    {unit ? <span className="settings-slider__unit">{unit}</span> : null}
+    {/* Always rendered, empty included: `.settings-slider` is a three-column grid, so a row that
+        omitted this element would leave the third column unfilled and run its track long. */}
+    <span className="settings-slider__unit">{unit}</span>
   </div></SettingsRow>
 }
 

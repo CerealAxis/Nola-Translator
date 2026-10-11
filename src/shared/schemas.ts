@@ -1,10 +1,19 @@
 import { modelConfigurationSchema } from './model-capabilities'
 import { z } from 'zod'
 import { computeSettingsSchema, computeSnapshotSchema } from './compute'
+import { SUPPORT_ERROR_CODES } from './error-catalog'
 
 import type { EngineCommand, EngineEvent } from './contracts'
 
 export const MAX_PROTOCOL_LINE_BYTES = 512 * 1024
+
+const recognitionOptionsSchema = z.object({
+  endpoint: z.string().max(2048).optional(),
+  workspaceId: z.string().max(128).optional(),
+  region: z.string().max(128).optional(),
+  model: z.string().max(256).optional(),
+  apiKey: z.string().max(4096).optional(),
+}).strip()
 
 const requestId = z.string().min(1).max(128)
 const envelope = {
@@ -56,15 +65,18 @@ export const sessionConfigSchema = z
     audioSource: audioSourceSchema,
     compute: computeSettingsSchema.optional(),
     recognitionMode: z.enum(['realtime', 'accurate']),
+    recognitionProvider: z.enum(['local', 'aliyun', 'minimax']).optional(),
+    recognitionOptions: recognitionOptionsSchema.optional(),
     recognitionModelId: recognitionModelIdSchema.optional(),
     sourceLanguage: z.string().min(1).max(32),
     targetLanguages: z.array(z.string().min(1).max(32)).max(8),
     allowIntermediateTranslation: z.boolean().optional(),
-    translationProvider: z.enum(['local', 'cloud', 'microsoft']).optional(),
+    translationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'recognition']).optional(),
     translationModelId: translationModelIdSchema.optional(),
     translationOptions: z.object({
       endpoint: z.string().max(2048).optional(),
       apiKey: z.string().max(4096).optional(),
+      email: z.string().max(320).optional(),
       region: z.string().max(128).optional(),
       model: z.string().max(256).optional(),
       apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
@@ -85,16 +97,19 @@ export const sessionConfigSchema = z
  * defaulted copy is a different key from the one the session will ask for.
  */
 const prewarmConfigSchema = z.object({
+  recognitionProvider: z.enum(['local', 'aliyun', 'minimax']).optional(),
+  recognitionOptions: recognitionOptionsSchema.optional(),
   compute: computeSettingsSchema,
   recognitionModelId: z.string().min(1).max(256).optional(),
   sourceLanguage: z.string().min(1).max(32),
   targetLanguages: z.array(z.string().min(1).max(32)).max(8),
   allowIntermediateTranslation: z.boolean().optional(),
-  translationProvider: z.enum(['local', 'cloud', 'microsoft']).optional(),
+  translationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'recognition']).optional(),
   translationModelId: translationModelIdSchema.optional(),
   translationOptions: z.object({
     endpoint: z.string().max(2048).optional(),
     apiKey: z.string().max(4096).optional(),
+    email: z.string().max(320).optional(),
     region: z.string().max(128).optional(),
     model: z.string().max(256).optional(),
     apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
@@ -211,9 +226,13 @@ const errorCodes = [
   'invalidConfiguration',
   'sessionNotRunning',
   'sessionAlreadyRunning',
+  'audioDeviceEnumerationFailed',
   'audioDeviceUnavailable',
   'audioBufferOverflow',
   'modelUnavailable',
+  'cloudRecognitionCredentialMissing',
+  'cloudRecognitionInsufficientBalance',
+  'cloudRecognitionRateLimited',
   'resourceUnavailable',
   'resourceNotFound',
   'resourceBusy',
@@ -224,6 +243,11 @@ const errorCodes = [
   'lineTooLarge',
   'internalError',
 ] as const
+
+export const diagnosticCopyContextSchema = z.object({
+  supportCode: z.enum(SUPPORT_ERROR_CODES).optional(),
+  correlationId: z.string().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/).optional(),
+}).strip()
 
 const resourceSchema = z
   .object({

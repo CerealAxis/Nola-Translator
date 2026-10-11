@@ -76,6 +76,8 @@ from .protocol import (
     Translation,
 )
 from .recognition.base import ModelUnavailable, RecognitionUpdate, Recognizer
+from .recognition.aliyun import MODELS as ALIYUN_RECOGNITION_MODELS, AliyunRecognizer, CloudRecognitionError
+from .recognition.minimax import MODELS as MINIMAX_RECOGNITION_MODELS, MiniMaxRecognizer
 from .recognition.qwen_runtime import QwenRuntime, get_qwen_runtime
 from .recognition.qwen_streaming import create_qwen_recognizer
 from .recognition.sensevoice_runtime import SenseVoiceRuntime, get_sensevoice_runtime
@@ -115,6 +117,7 @@ from .translation.network import (
     OpenAIResponsesProvider,
 )
 from .translation.scheduler import TranslationScheduler
+from .translation.mymemory import DEFAULT_MYMEMORY_ENDPOINT, MyMemoryTranslationProvider
 
 
 EventSink = Callable[[EngineEvent], None]
@@ -123,6 +126,27 @@ EventSink = Callable[[EngineEvent], None]
 #: so the load path is shared rather than typed twice.
 ModelSelectionCommand = StartSessionCommand | PrewarmModelsCommand
 LoadResult = TypeVar('LoadResult')
+
+
+#: Cloud recognition reasons that name their own remedy get their own wire code. A revoked key
+#: or a spent account is not a missing model, so sending the user to install one cannot resolve
+#: it. Reasons absent here keep `modelUnavailable`, which stays the right answer when no
+#: recognition source could produce captions.
+CLOUD_RECOGNITION_ERROR_CODES: dict[str, str] = {
+    "recognitionUnauthorized": "cloudRecognitionCredentialMissing",
+    "recognitionInsufficientBalance": "cloudRecognitionInsufficientBalance",
+    "recognitionRateLimited": "cloudRecognitionRateLimited",
+}
+
+
+class RemoteRecognitionRuntime:
+    loaded = False
+
+    def __init__(self, provider: str, model: str) -> None:
+        self.provider, self.model = provider, model
+
+    def describe(self) -> str:
+        return f"{self.provider}:{self.model}"
 
 
 class UnknownTranslationModel(ValueError):
@@ -355,6 +379,8 @@ class EngineRuntime:
         return self.service.handle(command)
 
     async def _import_recognition_dependencies(self, model_id: str) -> None:
+        if not model_id.strip():
+            return
         started_at = monotonic()
         try:
             adapter = self.resources.adapter_for(model_id)
@@ -700,8 +726,16 @@ class EngineRuntime:
         A prewarm runs this before loading, so a config it accepted is one the session start
         accepts, with the same error code and the same ``reason``.
         """
-        model_id = config.recognitionModelId or QWEN_RESOURCE_ID
-        required_resources = [model_id]
+        remote = config.recognitionProvider != "local"
+        if config.translationProvider == "recognition" and config.recognitionProvider != "aliyun":
+            raise ResourceActionError("invalidConfiguration", {"reason": "nativeTranslationRequiresAliyun"})
+        if remote:
+            try:
+                self._remote_recognizer(config)
+            except ValueError as error:
+                raise ResourceActionError("invalidConfiguration", {"reason": str(error)}) from None
+        model_id = self._model_id_from_config(config)
+        required_resources = [] if remote else [model_id]
         if config.targetLanguages and config.translationProvider == "local":
             # Resolved from the resource table, so a GGUF or a
             # transformers repo the user installed themselves is the thing that gets
@@ -710,10 +744,11 @@ class EngineRuntime:
         for resource_id in required_resources:
             if self.resources.configuration(resource_id) is None:
                 raise ResourceActionError("invalidConfiguration", {"resourceId": resource_id, "reason": "modelNeedsConfiguration"})
-        recognition = self.resources.configuration(model_id)
         source = normalize(config.sourceLanguage)
-        if source == "auto" and not recognition.supportsAutoDetection or source != "auto" and source not in {normalize(code) for code in recognition.languages}:
-            raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedRecognitionLanguage", "language": source})
+        if not remote:
+            recognition = self.resources.configuration(model_id)
+            if source == "auto" and not recognition.supportsAutoDetection or source != "auto" and source not in {normalize(code) for code in recognition.languages}:
+                raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedRecognitionLanguage", "language": source})
         if config.translationProvider == "local" and config.targetLanguages:
             capability = self.resources.configuration(self._local_translation_model_id(config))
             if any(not supports_translation(capability, source, target) for target in config.targetLanguages):
@@ -785,12 +820,14 @@ class EngineRuntime:
             protocolVersion=1, type="modelsPrewarmed", requestId=command.requestId,
             state="ready", recognitionModelId=model_id, translationModelId=translation_model_id,
             elapsedMs=(monotonic() - started_at) * 1000,
-            device=self._recognition_device.torchDevice,
+            device="cloud" if config.recognitionProvider != "local" else self._recognition_device.torchDevice,
             runtime=self._active_recognition_runtime.describe(),
         )]
 
     async def _prepare_models(self, command: ModelSelectionCommand) -> Recognizer:
         config = command.config
+        if config.recognitionProvider != "local":
+            return await self._prepare_remote_models(command)
         local_translation = bool(config.targetLanguages and config.translationProvider == 'local')
         translation_id = self._local_translation_model_id(config) if local_translation else None
         key = (self._model_id(command), translation_id, json.dumps(config.compute.model_dump(), sort_keys=True))
@@ -824,6 +861,43 @@ class EngineRuntime:
         self._retain_models = True
         return results[0]
 
+    @staticmethod
+    def _remote_recognizer(config: ModelSelection) -> AliyunRecognizer | MiniMaxRecognizer:
+        if config.recognitionProvider == "minimax":
+            return MiniMaxRecognizer(config)
+        return AliyunRecognizer(config)
+
+    async def _prepare_remote_models(self, command: ModelSelectionCommand) -> Recognizer:
+        config = command.config
+        local_translation = bool(config.targetLanguages and config.translationProvider == "local")
+        translation_id = self._local_translation_model_id(config) if local_translation else None
+        options = config.recognitionOptions.model_dump(exclude={"apiKey"}) if config.recognitionOptions else {}
+        key = (self._model_id(command), translation_id, json.dumps({"provider": config.recognitionProvider,
+            "options": options, "compute": config.compute.model_dump()}, sort_keys=True))
+        if key != self._loaded_model_key:
+            if self._loaded_model_key is not None:
+                await self._unload_session_models()
+            await self._configure_device_plan(command)
+        self.active_model_id = self._model_id(command)
+        self._active_recognition_runtime = RemoteRecognitionRuntime(config.recognitionProvider, self.active_model_id)
+        if config.targetLanguages and config.translationProvider != "recognition" and (local_translation or isinstance(command, StartSessionCommand)):
+            self._configure_translation(command)
+        recognizer = self._remote_recognizer(config)
+        try:
+            # Prewarm validates settings and may load the local translator. It must never
+            # authenticate or open a billable remote recognition session.
+            if isinstance(command, StartSessionCommand):
+                recognizer.validate_credentials()
+                await recognizer.start()
+            await self._ensure_translation_server(command)
+        except BaseException:
+            await recognizer.close()
+            raise
+        self._loaded_model_key = key
+        self._loaded_translation_model_id = translation_id
+        self._retain_models = True
+        return recognizer
+
     async def _timed_model_load(self, task: str, work: Awaitable[LoadResult]) -> LoadResult:
         started_at = monotonic()
         outcome = 'failed'
@@ -856,9 +930,13 @@ class EngineRuntime:
     async def _configure_device_plan(self, command: ModelSelectionCommand) -> None:
         self._device_plan = None
         config = command.config
+        remote = config.recognitionProvider != "local"
+        if remote and (not config.targetLanguages or config.translationProvider != "local"):
+            self._device_plan = None
+            return
         devices, notes, _version = await self._probe_compute_inventory()
-        adapter = self.resources.adapter_for(self._model_id(command))
-        recognition_mb = model_memory_mb(self.resources.model_path(self._model_id(command)), adapter, config.compute)
+        adapter = None if remote else self.resources.adapter_for(self._model_id(command))
+        recognition_mb = 0.0 if remote else model_memory_mb(self.resources.model_path(self._model_id(command)), adapter, config.compute)
         translation_adapter = None
         translation_mb = 0.0
         if config.targetLanguages and config.translationProvider == "local":
@@ -925,6 +1003,9 @@ class EngineRuntime:
                 endpoint=resolved(endpoint, DEFAULT_MICROSOFT_ENDPOINT),
                 region=region,
             )
+        elif config.translationProvider == "mymemory":
+            provider = MyMemoryTranslationProvider(endpoint=resolved(endpoint, DEFAULT_MYMEMORY_ENDPOINT),
+                email=options.email if options else "")
         elif config.translationProvider == "cloud":
             limits = {
                 "context_window": context_window,
@@ -1091,7 +1172,7 @@ class EngineRuntime:
         recognizer.on_update = self._emit_update
         return recognizer
 
-    def _recognition_runtime(self) -> QwenRuntime | SenseVoiceRuntime:
+    def _recognition_runtime(self) -> QwenRuntime | SenseVoiceRuntime | RemoteRecognitionRuntime:
         """Runtime of the currently selected recognition model."""
         if self._active_recognition_runtime is not None:
             return self._active_recognition_runtime
@@ -1102,7 +1183,16 @@ class EngineRuntime:
 
     @staticmethod
     def _model_id(command: ModelSelectionCommand) -> str:
-        return command.config.recognitionModelId or QWEN_RESOURCE_ID
+        return EngineRuntime._model_id_from_config(command.config)
+
+    @staticmethod
+    def _model_id_from_config(config: ModelSelection) -> str:
+        if config.recognitionProvider != "local":
+            # The reported id and `RemoteRecognitionRuntime.describe()` name the provider's own
+            # model, so an unset field falls back to that provider's default rather than Aliyun's.
+            default = MINIMAX_RECOGNITION_MODELS[0] if config.recognitionProvider == "minimax" else ALIYUN_RECOGNITION_MODELS[0]
+            return (config.recognitionOptions.model if config.recognitionOptions else "") or default
+        return config.recognitionModelId or QWEN_RESOURCE_ID
 
     def _local_translation_model_id(self, config: ModelSelection) -> str:
         """The local translation model the session selected, whichever loader owns it.
@@ -1192,6 +1282,20 @@ class EngineRuntime:
             await self._emit_stream_update(update, session_id, generation)
 
         recognizer.on_update = on_update
+        # Any remote recognizer owns a background connection, so the error channel is what tells
+        # the session its captions stopped arriving; keying off the capability keeps a new cloud
+        # provider from silently losing it.
+        if hasattr(recognizer, "on_error"):
+            def on_error(error: CloudRecognitionError) -> None:
+                if session_id == self.service.session_id and generation == self._stream_generation:
+                    # `details.reason` stays the launch-log diagnostic, but it is the code the
+                    # session reads to pick user-facing copy, so the meaning rides on the code.
+                    self.emit(self._resource_error(
+                        self.session_request_id,
+                        CLOUD_RECOGNITION_ERROR_CODES.get(error.reason, "modelUnavailable"),
+                        {"reason": error.reason},
+                    ))
+            recognizer.on_error = on_error
 
     async def _emit_stream_update(
         self, update: RecognitionUpdate, session_id: str | None, generation: int,
@@ -1202,7 +1306,6 @@ class EngineRuntime:
             "segmentId": update.segment_id, "isFinal": update.is_final,
             "startedAtMs": round(update.started_at_ms, 1),
             "endedAtMs": round(update.ended_at_ms, 1) if update.ended_at_ms is not None else None,
-            "text": update.source_text[:120],
         })
         if self._stream_epoch is not None:
             update = replace(update, segment_id=f"e{self._stream_epoch}-{update.segment_id}")
@@ -1225,6 +1328,20 @@ class EngineRuntime:
             targets = [target for target in targets if supports_translation(capability, source, target)]
         previous_update = self.latest_updates.get(update.segment_id)
         self.latest_updates[update.segment_id] = update
+        if provider == "recognition":
+            native = update.native_translation
+            # The caption names the connection the text came from, which is the recognition
+            # provider rather than the translation one this branch is keyed on.
+            recognition_provider = getattr(config, "recognitionProvider", "local")
+            visible = [Translation(targetLanguage=target, text=native.text if native else None,
+                state=native.state if native else "pending", provider=recognition_provider,
+                errorCode=native.error_code if native else None)
+                for target in targets]
+            self.latest_translations[update.segment_id] = visible
+            self.emit(self._caption_event(update, visible))
+            if update.is_final and (not visible or all(item.state != "pending" for item in visible)):
+                self._retire_completed(update)
+            return
         if not targets:
             self.translation_requests.pop(update.segment_id, None)
             self.latest_translations.pop(update.segment_id, None)
@@ -1280,7 +1397,8 @@ class EngineRuntime:
         try:
             while segment_id in self.translation_requests:
                 request = self.translation_requests[segment_id]
-                if not request.update.is_final and not request.allow_intermediate:
+                if not request.update.is_final and (not request.allow_intermediate
+                        or self.translation_scheduler.provider.name == "mymemory"):
                     # only final captions get translated by default; intermediates need the user to opt in.
                     self.translation_requests.pop(segment_id, None)
                     continue
@@ -1509,7 +1627,6 @@ class EngineRuntime:
         write_debug("engine", "engine.caption", {
             "segmentId": update.segment_id, "revision": revision, "isFinal": update.is_final,
             "videoStartedAtMs": self._timeline.videoTimeMs + (update.started_at_ms - self._timeline_origin_ms) * self._timeline.playbackRate if self._timeline is not None else None,
-            "text": update.source_text[:120],
         })
         return CaptionEvent(
             protocolVersion=1,
@@ -1656,7 +1773,16 @@ class EngineRuntime:
         self._stream_anchored = True
         self._epoch_initialized = True
         self._stream_finishing = False
-        self.recognizer = self._fresh_recognizer()
+        if config.recognitionProvider != "local":
+            self.recognizer = self._remote_recognizer(config)
+            try:
+                await self.recognizer.start()
+            except Exception as error:
+                await self.recognizer.close()
+                self._stream_anchored = False
+                return [self._resource_error(command.requestId, "modelUnavailable", {"reason": str(error)[:256]})]
+        else:
+            self.recognizer = self._fresh_recognizer()
         self._bind_recognizer(self.recognizer)
         if capture is not None and not self.session_paused:
             capture.resume()
@@ -1802,7 +1928,8 @@ class EngineRuntime:
         if self.service.session_id is None or command.sessionId != self.service.session_id:
             return self.service.handle(command)
         browser_session = self._timeline is not None or isinstance(self.capture, BrowserAudioCapture)
-        if browser_session:
+        remote = hasattr(self.recognizer, "on_error")
+        if browser_session or remote:
             self._finalize_browser_partials()
             self._stream_generation += 1
             await self._cancel_stream_tasks()
@@ -1826,9 +1953,9 @@ class EngineRuntime:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         await self.translation_scheduler.close()
-        if browser_session:
-            # Cancelling a to_thread ASR job cannot release its native inference lock.
-            # Retain its reservation until native work finishes, without delaying stop.
+        if browser_session or remote:
+            # Cancelling native ASR or local translation cannot release its inference lock.
+            # Remote recognition must also acknowledge stop before a local translator idles.
             self._model_cleanup_task = asyncio.create_task(self._cleanup_browser_models(command.requestId))
         else:
             await self._settle_session_models()
@@ -1862,14 +1989,15 @@ class EngineRuntime:
     def _finalize_browser_partials(self) -> None:
         """Retain already recognized stop tails without waiting for uninterruptible inference."""
         for update in list(self.latest_updates.values()):
-            if update.is_final:
+            visible = self.latest_translations.get(update.segment_id, [])
+            if update.is_final and not any(item.state == "pending" for item in visible):
                 continue
-            final = replace(update, is_final=True,
+            final = update if update.is_final else replace(update, is_final=True,
                 ended_at_ms=max(update.started_at_ms, self._last_frame_end_ms))
             translations = [
                 item.model_copy(update={"state": "failed", "errorCode": "translationCancelled"})
                 if item.state == "pending" else item
-                for item in self.latest_translations.get(update.segment_id, [])
+                for item in visible
             ]
             self.emit(self._caption_event(final, translations))
 

@@ -175,7 +175,7 @@ class TranslationScheduler:
                 target,
                 "failed",
                 self.provider.name,
-                error_code=type(error).__name__,
+                error_code=getattr(error, "error_code", type(error).__name__),
             )
         finally:
             # Log timings only: credentials and caption text are not needed to locate queue delay.

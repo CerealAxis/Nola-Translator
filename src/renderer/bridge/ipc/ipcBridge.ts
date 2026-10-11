@@ -179,7 +179,7 @@ export function createIpcBridge(): NolaBridge {
     },
     diagnostics: {
       get: () => call('getDiagnostics', (injected) => injected.getDiagnostics()),
-      copy: () => call('copyDiagnostics', (injected) => injected.copyDiagnostics()),
+      copy: (context) => call('copyDiagnostics', (injected) => injected.copyDiagnostics(context)),
       openLogs: () => call('openLogs', (injected) => injected.openLogs()),
     },
     app: {

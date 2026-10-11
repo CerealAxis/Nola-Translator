@@ -20,8 +20,8 @@ export interface ErrorCopy {
 /**
  * `errorCode` to `errors.*` copy.
  *
- * `sessionStore.errorCodeOf()` takes the prefix of a thrown `FOO: ...` and
- * uppercases it, while engine events are uppercased directly, so one fault can
+ * `sessionStore.errorCodeOf()` prefers a structured engine code and falls back
+ * to the prefix of a thrown `FOO: ...`; engine events are uppercased directly, so one fault can
  * arrive three ways (`MODEL_MISSING` / `MODELUNAVAILABLE` / `MODEL_UNAVAILABLE`).
  * Normalise before lookup, and fall back on context: an imprecise message beats
  * the UI rendering `missing:errors.xxx`, which is what the i18n layer does with
@@ -38,18 +38,28 @@ export interface ErrorCopy {
  * fallback and leaves a matched row alone.
  */
 const ERROR_TABLE: Record<string, ErrorCopy> = {
-  RUNTIMETORCH: { message: 'runtime.noticeTitle', detail: null, action: 'runtime.goTorch' },
-  RUNTIMELLAMA: { message: 'runtime.noticeTitle', detail: null, action: 'runtime.goLlama' },
+  CLOUDRECOGNITIONCREDENTIALMISSING: { message: 'errors.cloudRecognitionCredentialMissing', detail: null, action: 'modelsSettingsUi.audio' },
+  CLOUDRECOGNITIONRATELIMITED: { message: 'errors.cloudRecognitionRateLimited', detail: null, action: 'errors.startFailedAction' },
+  // Balance is topped up in the provider's console, so retrying here cannot help and the
+  // primary button ends the session instead of inviting another dead attempt.
+  CLOUDRECOGNITIONINSUFFICIENTBALANCE: { message: 'errors.cloudRecognitionInsufficientBalance', detail: null, action: 'workspace.end' },
+  RUNTIMETORCH: { message: 'errors.torchRuntimeUnavailable', detail: null, action: 'runtime.goTorch' },
+  RUNTIMELLAMA: { message: 'errors.llamaRuntimeUnavailable', detail: null, action: 'runtime.goLlama' },
   MODELMISSING: { message: 'errors.modelMissing', detail: null, action: 'errors.modelMissingAction' },
   MODELUNAVAILABLE: { message: 'errors.modelMissing', detail: null, action: 'errors.modelMissingAction' },
-  RESOURCEUNAVAILABLE: { message: 'errors.modelMissing', detail: null, action: 'errors.modelMissingAction' },
+  RESOURCEUNAVAILABLE: { message: 'errors.prewarm.resourceUnavailable', detail: null, action: 'errors.modelMissingAction' },
   RESOURCEUNFOUND: { message: 'errors.modelMissing', detail: null, action: 'errors.modelMissingAction' },
+  RESOURCEBUSY: { message: 'errors.prewarm.resourceBusy', detail: null, action: 'errors.startFailedAction' },
+  INVALIDCONFIGURATION: { message: 'errors.prewarm.invalidConfiguration', detail: null, action: 'errors.modelMissingAction' },
+  SESSIONALREADYRUNNING: { message: 'errors.prewarm.sessionAlreadyRunning', detail: null, action: 'errors.startFailedAction' },
   ENGINENOTREADY: { message: 'errors.engineNotReady', detail: null, action: 'errors.engineNotReadyAction' },
   ENGINENOTRUNNING: { message: 'errors.engineNotReady', detail: null, action: 'errors.engineNotReadyAction' },
-  INTERNALERROR: { message: 'errors.engineNotReady', detail: null, action: 'errors.engineNotReadyAction' },
+  INTERNALERROR: { message: 'errors.engineOperationFailed', detail: null, action: 'errors.startFailedAction' },
+  SESSIONERROR: { message: 'errors.startFailed', detail: null, action: 'errors.startFailedAction' },
   // The normalised form of `ENGINE_LOST` (uppercase, separators removed) —
   // the same code as `sessionStore.ENGINE_LOST_CODE`, not a second code.
   ENGINELOST: { message: 'errors.engineLost', detail: null, action: 'errors.engineLostAction' },
+  AUDIODEVICEENUMERATIONFAILED: { message: 'errors.audioDeviceEnumerationFailed', detail: null, action: 'errors.deviceNotFoundAction' },
   AUDIODEVICEUNAVAILABLE: { message: 'errors.deviceNotFound', detail: null, action: 'errors.deviceNotFoundAction' },
   DEVICENOTFOUND: { message: 'errors.deviceNotFound', detail: null, action: 'errors.deviceNotFoundAction' },
   TRANSLATIONUNAVAILABLE: { message: 'errors.translateFailed', detail: null, action: 'errors.translateFailedAction' },
@@ -57,19 +67,13 @@ const ERROR_TABLE: Record<string, ErrorCopy> = {
 
 const FALLBACK: Record<'start' | 'stop', ErrorCopy> = {
   start: { message: 'errors.startFailed', detail: null, action: 'errors.startFailedAction' },
-  // A session that died mid-run with an unrecognised code is closest to
-  // "the engine stopped". `engineNotReady` says recognition cannot start,
-  // which is the opposite of what happened here. The code stays off because it
-  // could not be read.
-  stop: { message: 'errors.engineStopped', detail: null, action: 'workspace.end' },
+  stop: { message: 'errors.unknownFailure', detail: null, action: 'workspace.end' },
 }
 
 /**
  * Copy whose subject is "starting recognition", so it reads backwards once a
- * session is already running. `errorCopyOf(code, 'stop')` would otherwise take
- * `errors.engineNotReady` ("local engine not running, recognition cannot
- * start") from the table for an `internalError` raised mid-session, telling the
- * user it could not start when it actually stopped.
+ * session is already running. A startup-specific message becomes the generic
+ * unknown-failure copy in that context; the original cause remains in diagnostics.
  */
 const START_ONLY_MESSAGES: ReadonlySet<TranslationKey> = new Set<TranslationKey>([
   'errors.engineNotReady',
@@ -79,14 +83,17 @@ const START_ONLY_MESSAGES: ReadonlySet<TranslationKey> = new Set<TranslationKey>
 /** Normalise, look up, and pick the primary button by context. */
 export function errorCopyOf(code: string | null, context: 'start' | 'stop'): ErrorCopy {
   const normalized = code === null ? '' : code.toUpperCase().replace(/[^A-Z0-9]/g, '')
-  const base = (normalized.length > 0 ? ERROR_TABLE[normalized] : undefined) ?? FALLBACK[context]
+  const base = (normalized.length > 0 ? ERROR_TABLE[normalized] : undefined)
+    ?? (normalized.length > 0
+      ? { ...FALLBACK[context], message: 'errors.unknownFailure' as const }
+      : FALLBACK[context])
   // A live session always gets "end session": saving the captions already
   // recognised is the only useful thing left, and a "retry" would invite
   // clicking a session whose engine is already gone.
   if (context !== 'stop') return base
   return {
     ...base,
-    message: START_ONLY_MESSAGES.has(base.message) ? 'errors.engineStopped' : base.message,
+    message: START_ONLY_MESSAGES.has(base.message) ? 'errors.unknownFailure' : base.message,
     action: 'workspace.end',
   }
 }

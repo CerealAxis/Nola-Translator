@@ -132,6 +132,7 @@ export const DEMO_ERROR_SESSION: SessionState = {
   elapsedMs: 0,
   error: 'Demo ASR (Simulated Recognition Model) is not installed',
   errorCode: 'MODEL_MISSING',
+  errorRequestId: null,
   missing: DEMO_MISSING,
   engineStatus: 'ready',
   engineVersion: null,

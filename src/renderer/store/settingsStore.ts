@@ -324,7 +324,7 @@ export async function updateSettings(patch: AppSettingsPatch): Promise<void> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
   const base = confirmed ?? settingsStore.getState().settings
   if (!base) throw new Error('设置还没有加载完成')
-  if (patch.recognition?.modelId) {
+  if (patch.recognition?.modelId && (patch.recognition.provider ?? base.recognition.provider ?? 'local') === 'local') {
     const model = modelsStore.getState().resources.find(item => item.resourceId === patch.recognition?.modelId)
     const codes = recognitionLanguages(model)
     const source = patch.recognition.sourceLanguage ?? settingsStore.getState().settings?.recognition.sourceLanguage ?? base.recognition.sourceLanguage

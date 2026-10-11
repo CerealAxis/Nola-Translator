@@ -2,9 +2,18 @@ import { randomUUID } from 'node:crypto'
 import { logDiagnostic } from './session-log'
 import type { EngineEvent, PrewarmConfig, PrewarmResult, SessionConfig } from '../shared/contracts'
 import { sessionConfigSchema } from '../shared/schemas'
-import { NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider } from '../shared/settings'
+import { NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider, type RecognitionProvider } from '../shared/settings'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
+
+/**
+ * Each cloud recognition provider owns one slot of `credentials.json`. A provider absent here has
+ * no key to inject, so its session carries no `apiKey` at all.
+ */
+const RECOGNITION_CREDENTIAL_SLOTS: Partial<Record<RecognitionProvider, CredentialProvider>> = {
+  aliyun: 'aliyun-asr',
+  minimax: 'minimax-asr',
+}
 
 export type SessionOwner = 'desktop' | 'browser'
 export interface SessionControllerOptions {
@@ -60,6 +69,7 @@ export class SessionController {
     logDiagnostic('session.start.requested', { owner })
     if (this.busy) throw new Error('sessionAlreadyRunning')
     const parsed = sessionConfigSchema.parse(raw) as SessionConfig
+    if (parsed.translationProvider === 'mymemory') parsed.allowIntermediateTranslation = false
     if (owner === 'desktop' && (parsed.audioSource.kind === 'browserTab' || parsed.browserTimeline)) throw new Error('invalidConfiguration')
     if (owner === 'browser' && (!parsed.browserTimeline || parsed.audioSource.kind === 'microphone')) throw new Error('invalidConfiguration')
     parsed.compute = { ...this.options.getSettings().compute }
@@ -71,18 +81,32 @@ export class SessionController {
     this.options.startingChanged(true)
     let meetingId: string | null = null
     try {
+      // Untrusted IPC payloads cannot supply credentials, including for no-key providers.
+      if (parsed.recognitionOptions) delete parsed.recognitionOptions.apiKey
+      if (parsed.translationOptions) delete parsed.translationOptions.apiKey
+      const recognitionProvider = parsed.recognitionProvider ?? 'local'
+      const credentialSlot = RECOGNITION_CREDENTIAL_SLOTS[recognitionProvider]
+      // A provider without a slot of its own carries no key, so its options are dropped rather
+      // than forwarded with whatever the renderer sent.
+      if (!credentialSlot) delete parsed.recognitionOptions
+      else {
+        const apiKey = await this.options.getCredential(credentialSlot)
+        checkCancelled()
+        if (!apiKey) throw new Error(`CLOUD_RECOGNITION_CREDENTIAL_MISSING: ${credentialSlot} API key is required`)
+        parsed.recognitionOptions = { ...parsed.recognitionOptions, apiKey }
+      }
+      const provider = parsed.translationProvider ?? 'local'
+      if (provider === 'local' || provider === 'recognition') delete parsed.translationOptions
+      if (provider === 'cloud' || provider === 'microsoft') {
+        const apiKey = await this.options.getCredential(provider)
+        checkCancelled()
+        if (apiKey) parsed.translationOptions = { ...parsed.translationOptions, apiKey }
+      }
       await this.options.prepare(parsed, () => operation !== this.operation)
       checkCancelled()
       await this.ensureReady()
       checkCancelled()
       if (owner === 'browser' && !this.options.engine.supports('browserAudio')) throw new Error('engineUpdateRequired')
-      const provider = parsed.translationProvider ?? 'local'
-      if (provider === 'local') delete parsed.translationOptions
-      else {
-        const apiKey = await this.options.getCredential(provider)
-        checkCancelled()
-        if (apiKey) parsed.translationOptions = { ...parsed.translationOptions, apiKey }
-      }
       const keepAudio = this.options.getSettings().recording.keepAudio
       if (owner === 'desktop' && this.options.meetings) {
         const meeting = await this.options.meetings.begin({ sourceLanguage: parsed.sourceLanguage, targetLanguage: parsed.targetLanguages[0] ?? NO_TRANSLATION_LANGUAGE, recordAudio: keepAudio })

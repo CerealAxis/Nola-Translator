@@ -5,11 +5,9 @@
  * stays out of `errors.*` and out of the session status, and the dialog offers
  * the action that resolves it instead.
  *
- * With the engine down, none of the later steps can complete and the dialog
- * stops at the first one. `listDevices` starts with `await ensureReady()` in the
- * main process, so that probe rejects when the engine is unavailable, and the
- * rejection alone cannot tell "engine down" from "no input device". See the
- * device check below for how the two are told apart.
+ * Device discovery is advisory: it populates source choices, but `startSession`
+ * resolves the selected source again. A transient listing failure must not block
+ * a session that can still open its configured source.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -18,14 +16,31 @@ import { Alert, Button, Modal, Spinner, toast } from '@heroui/react'
 import { CircleAlert } from 'lucide-react'
 
 import type { MissingResource } from '@/store'
+import type { DiagnosticCopyContext } from '@/bridge'
 import { actions, sessionStore, stores } from '@/store'
 import { useI18n } from '@/i18n'
-import { computeUi } from '../settings/compute-ui'
 import { translationEngine } from '../../../shared/model-engines'
 import { NO_TRANSLATION_LANGUAGE } from '../../../shared/settings'
 
 /** `engineFailed` is not "a step failed" but "this dialog cannot reach a verdict". */
-type Stage = 'environment' | 'environmentFailed' | 'devices' | 'models' | 'missing' | 'ready' | 'engineFailed'
+type Stage = 'environment' | 'environmentFailed' | 'devices' | 'models' | 'missing' | 'ready' | 'engineFailed' | 'modelCheckFailed'
+type PreflightFailure = DiagnosticCopyContext & { supportCode: NonNullable<DiagnosticCopyContext['supportCode']> }
+
+function correlationIdOf(error: unknown): string | undefined {
+  return typeof error === 'object' && error !== null && 'requestId' in error && typeof error.requestId === 'string'
+    ? error.requestId
+    : undefined
+}
+
+function engineErrorCodeOf(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null
+  if ('engineCode' in error && typeof error.engineCode === 'string') return error.engineCode.toUpperCase()
+  if (error instanceof Error) {
+    const match = /引擎错误[：:]\s*([a-z][a-z0-9_]*)/i.exec(error.message)
+    return match?.[1]?.toUpperCase() ?? null
+  }
+  return null
+}
 
 export interface PreflightDialogProps {
   isOpen: boolean
@@ -34,16 +49,18 @@ export interface PreflightDialogProps {
   missing: MissingResource | null
   /** Start the session. The page holds the config and calls `startSession`. */
   onStart: () => void
+  /** Opens the existing safe report-copy path with this failure's correlation details. */
+  onCopyDiagnostics?: (context: DiagnosticCopyContext) => void
 }
 
-export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: PreflightDialogProps) {
-  const { t, language } = useI18n()
-  const c = language === 'en' ? computeUi.en : computeUi.zh
+export function PreflightDialog({ isOpen, onOpenChange, missing, onStart, onCopyDiagnostics }: PreflightDialogProps) {
+  const { t } = useI18n()
   const [stage, setStage] = useState<Stage>('environment')
-  const [environmentError, setEnvironmentError] = useState('')
   const missingRef = useRef(missing)
   missingRef.current = missing
   const [deviceOk, setDeviceOk] = useState(false)
+  const [deviceFailure, setDeviceFailure] = useState<'enumeration' | 'operation' | 'empty' | null>(null)
+  const [failureContext, setFailureContext] = useState<PreflightFailure | null>(null)
   const [installing, setInstalling] = useState(false)
   const openedRef = useRef(false)
   const runRef = useRef(0)
@@ -53,21 +70,33 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
     const alive = (): boolean => runRef.current === run
 
     setStage('environment')
-    setEnvironmentError('')
     setDeviceOk(false)
+    setDeviceFailure(null)
+    setFailureContext(null)
     setInstalling(false)
+    const previousErrorRequestId = sessionStore.getState().errorRequestId
 
     void (async () => {
+      let environmentSupportCode: PreflightFailure['supportCode'] = 'ERR-999'
       try {
         const runtime = await actions.settings.loadRuntimeComponents(true)
         const settings = stores.settings.getState().settings
         const resource = stores.models.getState().resources.find(r => r.resourceId === settings?.translation.localModelId)
         const needsLlama = settings && settings.translation.provider === 'local' && settings.translation.targetLanguage !== NO_TRANSLATION_LANGUAGE &&
           translationEngine(settings.compute, resource?.provider, settings.translation.localModelId) === 'llama'
-        if (runtime.local.engine.status !== 'ready') throw new Error(runtime.local.engine.reason || t('runtime.torchMissing'))
-        if (needsLlama && runtime.local.llama.status !== 'ready') throw new Error(runtime.local.llama.reason || t('runtime.llamaMissing'))
-      } catch (error) {
-        if (alive()) { setEnvironmentError(String(error)); setStage('environmentFailed') }
+        if (runtime.local.engine.status !== 'ready') {
+          environmentSupportCode = 'RNT-001'
+          throw new Error(t('errors.torchRuntimeUnavailable'))
+        }
+        if (needsLlama && runtime.local.llama.status !== 'ready') {
+          environmentSupportCode = 'RNT-002'
+          throw new Error(t('errors.llamaRuntimeUnavailable'))
+        }
+      } catch {
+        if (alive()) {
+          setFailureContext({ supportCode: environmentSupportCode })
+          setStage('environmentFailed')
+        }
         return
       }
       if (!alive()) return
@@ -78,35 +107,33 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
       let engineIsCause = false
       try {
         const devices = await actions.models.probeAudioDevices()
-        if (alive()) setDeviceOk((devices ?? []).length > 0)
-      } catch {
+        if (alive()) {
+          const foundDevices = (devices ?? []).length > 0
+          setDeviceOk(foundDevices)
+          setDeviceFailure(foundDevices ? null : 'empty')
+          setFailureContext(foundDevices ? null : { supportCode: 'AUD-002' })
+        }
+      } catch (error) {
         /*
-         * A `listDevices` rejection cannot tell these two failures apart on its own,
-         * and the error text is no help: in the main process the throw may come
-         * from `engine.start()` (handshake failed, retries exhausted) or from the
-         * later `engine.request` timing out.
-         *
-         * The discriminator is `sessionStore.engineStatus`, an observation: the
-         * main process forwards `EngineProcess` `state` on the same `engine:event`
-         * channel as `engineStateChanged`, and `applyEngineState` is the only writer.
-         * So:
-         *   · not `ready` -> the engine never completed a handshake this round, so
-         *     the failure is in the handshake and ENG-001 is the honest report;
-         *   · already `ready` -> the engine did answer, so the failure is after the
-         *     handshake and belongs to device enumeration.
-         *
-         * No ordering compensation is needed. The main process sets the state
-         * before it throws (`setState('failed')` -> `emit('fatalError')` -> `throw`)
-         * and `engineStateChanged` shares one IPC pipe with this rejection, so the
-         * state is already `failed` by the time this `catch` runs. A mid-run crash
-         * lands here too: `handleTermination` sets `recovering` or `failed` before
-         * emitting, so the crash is already visible in the status.
-         *
-         * Written as `!== 'ready'` rather than only `failed` so that `recovering`
-         * counts as engine-side: the process is gone and nothing was listening for
-         * that probe, so ENG-001 is the truth.
+         * A new engine error event or structured engine code means the command
+         * reached the engine. That evidence wins over the lifecycle status, which
+         * may still be stale in this renderer. Only a failure before an engine
+         * reply, combined with a non-ready process state, is a startup fault.
+         * A timed-out request while the process still appears ready is an operation
+         * failure (ENG-003), not proof that audio enumeration itself failed.
          */
-        engineIsCause = sessionStore.getState().engineStatus !== 'ready'
+        const latestSession = sessionStore.getState()
+        const engineRepliedWithError = engineErrorCodeOf(error) !== null
+          || (latestSession.errorRequestId !== null && latestSession.errorRequestId !== previousErrorRequestId)
+        engineIsCause = !engineRepliedWithError && latestSession.engineStatus !== 'ready'
+        const requestTimedOut = correlationIdOf(error) !== undefined && !engineRepliedWithError
+        if (alive()) {
+          setDeviceFailure(engineIsCause ? null : requestTimedOut ? 'operation' : 'enumeration')
+          setFailureContext({
+            supportCode: engineIsCause ? 'ENG-001' : requestTimedOut ? 'ENG-003' : 'AUD-001',
+            correlationId: correlationIdOf(error),
+          })
+        }
       }
       if (!alive()) return
       if (engineIsCause) {
@@ -121,8 +148,15 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
         return
       }
       setStage('models')
-      try { await actions.models.loadModels() }
-      catch { if (alive()) setStage('engineFailed'); return }
+      try { await actions.models.loadModels({ includeDevices: false }) }
+      catch (error) {
+        if (alive()) {
+          const engineUnavailable = sessionStore.getState().engineStatus !== 'ready'
+          setFailureContext({ supportCode: engineUnavailable ? 'ENG-001' : 'ENG-003', correlationId: correlationIdOf(error) })
+          setStage(engineUnavailable ? 'engineFailed' : 'modelCheckFailed')
+        }
+        return
+      }
       // `missing` is computed by the parent from the resource snapshot; this
       // pause lets "checking models" be seen at least once.
       await new Promise((resolve) => setTimeout(resolve, 260))
@@ -154,7 +188,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
     setInstalling(true)
     try {
       await actions.models.manageResource(missing.resourceId, 'install')
-      await actions.models.loadModels()
+      await actions.models.loadModels({ includeDevices: false })
       toast.success(t('preflight.allReady'))
     } catch {
       toast.danger(t('errors.downloadFailed'))
@@ -195,7 +229,13 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
             <Modal.Body className="flex flex-col gap-3">
               <ChecklistRow done={!environmentPending && !environmentFailed} failed={environmentFailed}
                 pending={environmentPending} label={t('runtime.checking')} failedLabel={t('runtime.noticeTitle')} />
-              {environmentFailed ? <Alert status="danger"><Alert.Content><Alert.Description>{environmentError}</Alert.Description>
+              {environmentFailed ? <Alert status="danger"><Alert.Content><Alert.Description>{
+                failureContext?.supportCode === 'RNT-001'
+                  ? t('errors.torchRuntimeUnavailable')
+                  : failureContext?.supportCode === 'RNT-002'
+                    ? t('errors.llamaRuntimeUnavailable')
+                    : t('errors.unknownFailure')
+              }</Alert.Description>
                 <Button variant="tertiary" size="sm" onPress={() => { close(false); void actions.settings.openRuntimeSettings('engine') }}>{t('runtime.goTorch')}</Button>
                 <Button variant="tertiary" size="sm" onPress={() => { close(false); void actions.settings.openRuntimeSettings('llama') }}>{t('runtime.goLlama')}</Button>
                 <Button variant="tertiary" size="sm" onPress={runCheck}>{t('runtime.recheck')}</Button>
@@ -206,10 +246,13 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
                 failed={stage !== 'devices' && !deviceOk}
                 pending={stage === 'devices'}
                 label={t('preflight.checkingDevices')}
-                // Never "no audio input detected" when the engine did not answer:
-                // nothing was probed on any device, so that would report a real
-                // fault as a hardware one.
-                failedLabel={engineFailed ? t('preflight.deviceCheckBlocked') : t('preflight.deviceUnavailable')}
+                failedLabel={engineFailed
+                  ? t('preflight.deviceCheckBlocked')
+                  : deviceFailure === 'operation'
+                    ? t('errors.engineOperationFailed')
+                    : deviceFailure === 'enumeration'
+                      ? t('errors.audioDeviceEnumerationFailed')
+                      : t('errors.deviceNotFound')}
               />
               {/* The model step has not run yet: no verdict to show. */}
               {engineFailed ? null : (
@@ -217,8 +260,10 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
                   done={stage === 'ready'}
                   pending={stage === 'models'}
                   label={t('preflight.checkingModels')}
-                  failedLabel={t('preflight.modelMissing', { name: missing?.name ?? '' })}
-                  failed={stage === 'missing'}
+                  failedLabel={stage === 'modelCheckFailed'
+                    ? t('errors.engineOperationFailed')
+                    : t('preflight.modelMissing', { name: missing?.name ?? '' })}
+                  failed={stage === 'missing' || stage === 'modelCheckFailed'}
                 />
               )}
               </> : null}
@@ -248,15 +293,28 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
                   </Alert.Content>
                 </Alert>
               ) : null}
+              {stage === 'modelCheckFailed' ? (
+                <Alert status="danger">
+                  <Alert.Indicator />
+                  <Alert.Content><Alert.Title className="nola-body-strong">{t('errors.engineOperationFailed')}</Alert.Title></Alert.Content>
+                </Alert>
+              ) : null}
               {stage === 'ready' ? (
-                <p className="nola-caption flex items-center gap-2 text-success">
-                  <span className="size-1.5 shrink-0 rounded-full bg-success" aria-hidden="true" />
-                  {t('preflight.allReady')}
-                </p>
+                deviceOk ? (
+                  <p className="nola-caption flex items-center gap-2 text-success">
+                    <span className="size-1.5 shrink-0 rounded-full bg-success" aria-hidden="true" />
+                    {t('preflight.allReady')}
+                  </p>
+                ) : <p className="nola-caption text-warning">{t('preflight.deviceCheckWarning')}</p>
               ) : null}
             </Modal.Body>
 
             <Modal.Footer>
+              {failureContext && onCopyDiagnostics ? (
+                <Button variant="tertiary" size="sm" className="rounded-xl" onPress={() => onCopyDiagnostics(failureContext)}>
+                  {t('errors.copyDiagnosticsAction')}
+                </Button>
+              ) : null}
               <Button variant="tertiary" size="sm" className="rounded-xl" onPress={() => close(false)}>
                 {stage === 'missing' ? t('preflight.later') : t('session.cancel')}
               </Button>
@@ -271,13 +329,9 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart }: Pref
                   size="sm"
                   className="rounded-full px-5"
                   onPress={onStart}
-                  // Disabled here when the engine is down, but not because a press
-                  // would "inevitably fail": `startSession` begins with
-                  // `prepareEnvironment` and then `ensureReady()`, so a press can
-                  // still bring the engine up. When it cannot, the same ENG-001 and
-                  // the same way out are already on this screen, so a second press
-                  // adds nothing — the "retry" above is the useful action.
-                  isDisabled={stage !== 'ready' || !deviceOk}
+                  // Device enumeration is advisory: the selected source is resolved again
+                  // by startSession, so a transient list failure must not block a usable source.
+                  isDisabled={stage !== 'ready'}
                 >
                   {t('preflight.start')}
                 </Button>

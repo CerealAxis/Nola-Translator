@@ -70,6 +70,17 @@ class TranslationOptions(ProtocolModel):
     #: 4096 is far above any issued key — real ones run a few hundred bytes — but self-hosted
     #: gateways mint signed tokens well past 1 KiB, and the TS schema agrees on the same number.
     apiKey: str = Field(default="", max_length=4096)
+    email: str = Field(default="", max_length=320)
+
+
+class RecognitionOptions(ProtocolModel):
+    endpoint: str = Field(default="", max_length=2048)
+    workspaceId: str = Field(default="", max_length=128)
+    region: str = Field(default="", max_length=128)
+    model: str = Field(default="", max_length=256)
+    #: Written by the main process from the provider's credential slot, never by the renderer,
+    #: so the renderer cannot choose whose key a session spends.
+    apiKey: str = Field(default="", max_length=4096)
 
 
 class NetworkSettings(ProtocolModel):
@@ -105,13 +116,15 @@ class ModelSelection(ProtocolModel):
     # A request may name any model the engine has a loader for, and the resource table is
     # where "is this id real" is decided.
     recognitionModelId: str | None = Field(default=None, min_length=1, max_length=256)
+    recognitionProvider: Literal["local", "aliyun", "minimax"] = "local"
+    recognitionOptions: RecognitionOptions | None = None
     sourceLanguage: str = Field(min_length=1, max_length=32)
     targetLanguages: list[str] = Field(max_length=8)
     allowIntermediateTranslation: bool = False
     # `local` and `cloud` are provider names, not wire formats. `local` dispatches on the adapter
     # the selected model's own metadata resolved to, so a hub GGUF and the bundled transformers
     # model are both "local"; `cloud` dispatches on `translationOptions.apiFormat`.
-    translationProvider: Literal["local", "cloud", "microsoft"] = "local"
+    translationProvider: Literal["local", "cloud", "microsoft", "mymemory", "recognition"] = "local"
     translationModelId: str | None = Field(default=None, min_length=1, max_length=256)
     translationOptions: TranslationOptions | None = None
 
@@ -555,9 +568,16 @@ ErrorCode = Literal[
     "invalidConfiguration",
     "sessionNotRunning",
     "sessionAlreadyRunning",
+    "audioDeviceEnumerationFailed",
     "audioDeviceUnavailable",
     "audioBufferOverflow",
     "modelUnavailable",
+  # Cloud recognition failures that carry their own remedy, kept apart from
+  # `modelUnavailable` because the user action is the opposite: top up the account or replace
+  # the key, rather than install a local model that would not fix either.
+  "cloudRecognitionCredentialMissing",
+  "cloudRecognitionInsufficientBalance",
+  "cloudRecognitionRateLimited",
     "resourceUnavailable",
     "resourceNotFound",
     "resourceBusy",

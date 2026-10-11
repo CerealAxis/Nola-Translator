@@ -28,7 +28,7 @@ Nola Translator is a real-time captioning and translation app that supports both
 ## Features
 
 - **Local models:** Run recognition models such as Qwen3-ASR and SenseVoiceSmall, and translation models such as HY-MT2 locally. The app can also search for and install other models from Hugging Face.
-- **Cloud models:** Use LLM providers that support protocols such as OpenAI-compatible APIs, Anthropic, and Ollama for caption translation. Cloud ASR support is planned for a future release.
+- **Cloud models:** Supports cloud ASR models from Aliyun, MiniMax, and others; supports LLM protocols such as OpenAI-compatible APIs, Anthropic, and Ollama; and supports the free MyMemory translation service.
 - **GPU acceleration:** Detects available compute devices and lets you configure separate devices for recognition and translation.
 - **Browser extension:** Includes a browser extension for Chrome and Edge that displays bilingual captions on video pages. You can also configure desktop system audio as an input source.
 - **Real-time caption overlay:** Supports system output, a selected audio device, or a microphone. Captions appear in a separate overlay, where you can adjust its position, font size, colors, opacity, and original/translated text layout.
@@ -71,10 +71,17 @@ Windows x64 is supported. You can choose the EXE or MSI installer. Support for o
 | HY-MT2 1.8B | 37 | Simplified Chinese, Traditional Chinese, English, French, Portuguese, Spanish, Japanese, Turkish, Russian, Arabic, Korean, Thai, Italian, German, Vietnamese, Malay, Indonesian, Filipino, Hindi, Polish, Czech, Dutch, Khmer, Burmese, Persian, Gujarati, Urdu, Telugu, Marathi, Hebrew, Bengali, Tamil, Ukrainian, Tibetan, Kazakh, Mongolian, and Uyghur |
 | M2M100 418M | 100 | Afrikaans, Amharic, Arabic, Asturian, Azerbaijani, Bashkir, Belarusian, Bulgarian, Bengali, Breton, Bosnian, Catalan, Cebuano, Czech, Welsh, Danish, German, Greek, English, Spanish, Estonian, Persian, Fula, Finnish, French, Western Frisian, Irish, Scottish Gaelic, Galician, Gujarati, Hausa, Hebrew, Hindi, Croatian, Haitian Creole, Hungarian, Armenian, Indonesian, Igbo, Ilocano, Icelandic, Italian, Japanese, Javanese, Georgian, Kazakh, Khmer, Kannada, Korean, Luxembourgish, Ganda (Luganda), Lingala, Lao, Lithuanian, Latvian, Malagasy, Macedonian, Malayalam, Mongolian, Marathi, Malay, Burmese, Nepali, Dutch, Norwegian, Northern Sotho, Occitan, Odia, Punjabi, Polish, Pashto, Portuguese, Romanian, Russian, Sindhi, Sinhala, Slovak, Slovenian, Somali, Albanian, Serbian, Swati, Sundanese, Swedish, Swahili, Tamil, Thai, Filipino, Tswana, Turkish, Ukrainian, Urdu, Uzbek, Vietnamese, Wolof, Xhosa, Yiddish, Yoruba, Chinese, and Zulu |
 
+## Cloud Models
+
+| Provider | Model | Supported languages | Details |
+|---|---|---|---|
+| Aliyun | Qwen3.5 / Qwen3.8 LiveTranslate | 60 | Chinese, English, Arabic, German, French, Spanish, Portuguese, Indonesian, Italian, Korean, Russian, Thai, Vietnamese, Japanese, Turkish, Hindi, Malay, Dutch, Urdu, Norwegian Bokmål, Swedish, Danish, Hebrew, Finnish, Polish, Icelandic, Czech, Filipino, Persian, Cantonese, Greek, Afrikaans, Asturian, Belarusian, Bulgarian, Bengali, Bosnian, Catalan, Cebuano, Estonian, Galician, Gujarati, Croatian, Hungarian, Javanese, Kazakh, Kannada, Kyrgyz, Latvian, Macedonian, Malayalam, Marathi, Punjabi, Romanian, Slovak, Slovenian, Swahili, Tajik, Azerbaijani, and Ukrainian. Version 3.8 detects the source language automatically; version 3.5 allows you to specify the source language. |
+| MiniMax | Speech-to-Text `asr-1.0` | 20 | Arabic, Cantonese, Chinese, English, Filipino, French, German, Indonesian, Italian, Japanese, Korean, Malay, Polish, Portuguese, Russian, Spanish, Thai, Turkish, Ukrainian, and Vietnamese. |
+
 ## LLM API Configuration
 
 > [!TIP]
-> LLMs are used only for translation. No API configuration is needed when using local models or other local translation options. Cloud ASR support is planned for a future release.
+> The LLM protocols here are used for translation. Aliyun and MiniMax ASR models use separate connection settings and credentials under Audio and Recognition. Local models require no API configuration.
 
 ### Supported Protocols
 

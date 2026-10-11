@@ -17,6 +17,7 @@ import type {
   ResourceRecordWithRate,
 } from '@/bridge'
 import { createStore, createWriteQueue } from './createStore'
+import { CREDENTIAL_PROVIDERS } from '../../shared/settings'
 
 export type HubKind = 'all' | 'asr' | 'mt' | 'quant'
 
@@ -64,7 +65,7 @@ const initialState: ModelsState = {
   error: null,
   busyIds: [],
   engineVersion: null,
-  credentials: { cloud: false, microsoft: false },
+  credentials: { cloud: false, microsoft: false, 'aliyun-asr': false, 'minimax-asr': false },
   hub: { query: '', kind: 'asr', results: [], candidates: 0, rateLimited: false, loading: false, failed: false },
 }
 
@@ -106,16 +107,18 @@ export async function probeAudioDevices(): Promise<AudioDevice[]> {
   return devices
 }
 
-export async function loadModels(): Promise<void> {
+export async function loadModels(options: { includeDevices?: boolean } = {}): Promise<void> {
   if (!bridge) return
   if (modelsStore.getState().loading) return
+  const includeDevices = options.includeDevices ?? true
   modelsStore.setState({ loading: true, error: null })
   try {
     // Both engine calls block until the handshake finishes, so on a cold start this
-    // resolves after the engine is up rather than answering empty.
+    // resolves after the engine is up rather than answering empty. Preflight can skip
+    // the independent device probe so a transient enumeration fault does not hide models.
     const [snapshot, devices, credentials] = await Promise.all([
       bridge.engine.listResources(),
-      bridge.engine.listDevices(),
+      includeDevices ? bridge.engine.listDevices() : Promise.resolve(modelsStore.getState().devices),
       loadCredentials(bridge),
     ])
     modelsStore.setState({
@@ -133,7 +136,6 @@ export async function loadModels(): Promise<void> {
 }
 
 /** Providers that need a query, i.e. the top-level keys of `credentials.json`. */
-const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'microsoft']
 
 async function loadCredentials(target: NolaBridge): Promise<Record<CredentialProvider, boolean>> {
   const entries = await Promise.all(
@@ -144,7 +146,7 @@ async function loadCredentials(target: NolaBridge): Promise<Record<CredentialPro
       flags[provider] = present
       return flags
     },
-    { cloud: false, microsoft: false },
+    { cloud: false, microsoft: false, 'aliyun-asr': false, 'minimax-asr': false },
   )
 }
 
@@ -264,6 +266,13 @@ export async function setTranslationCredential(
     modelsStore.setState({ error: errorMessage(error) })
     throw error
   }
+}
+
+export async function checkCredential(provider: CredentialProvider): Promise<boolean> {
+  if (!bridge) return false
+  const present = await bridge.translation.hasCredential(provider)
+  modelsStore.setState(state => ({ credentials: { ...state.credentials, [provider]: present } }))
+  return present
 }
 
 export function clearModelsError(): void {

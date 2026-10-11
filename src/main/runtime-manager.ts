@@ -137,21 +137,22 @@ export class RuntimeManager {
     return { engine: this.local.engine.status === 'ready' ? this.local.engine.path : undefined,
       llama: this.local.llama.status === 'ready' ? this.local.llama.path : undefined }
   }
-  async prepare(compute: ComputeSettings, translation: 'torch' | 'llama' | 'none' = 'llama'): Promise<void> {
+  async prepare(compute: ComputeSettings, translation: 'torch' | 'llama' | 'none' = 'llama', localRecognition = true): Promise<void> {
     if (this.operation || this.python?.operation) throw new Error('组件安装中，请等待完成')
     if (this.checking) await this.checking
     // Initialization and explicit rechecks validate the ABI; each caption start only verifies
     // that those components still exist, avoiding another cold Python/Torch import.
-    const files = [this.pythonState.path, join(this.local.engine.path, 'torch', '__init__.py'),
+    const needsTorch = localRecognition || translation === 'torch'
+    const files = [this.pythonState.path, ...(needsTorch ? [join(this.local.engine.path, 'torch', '__init__.py')] : []),
       ...(translation === 'llama' ? [join(this.local.llama.path, 'llama-server.exe')] : [])]
     if (!(await Promise.all(files.map(path => path ? access(path).then(() => true, () => false) : false))).every(Boolean)) {
       await this.recheck()
     }
-    for (const kind of ['engine', ...(translation === 'llama' ? ['llama'] as const : [])] as const) {
+    for (const kind of [...(needsTorch ? ['engine'] as const : []), ...(translation === 'llama' ? ['llama'] as const : [])]) {
       const component = this.local[kind]
       if (component.status !== 'ready') throw new Error(`RUNTIME_${kind === 'engine' ? 'TORCH' : 'LLAMA'}: ${component.reason || (kind === 'engine' ? '尚未安装 PyTorch' : '尚未安装 llama.cpp')}；请前往设置 → 计算设备选择组合${component.managed ? '重新安装／修复' : '安装'}`)
     }
-    for (const [value, kind] of [[compute.recognitionDevice, 'engine'], ...(translation !== 'none' ? [[compute.translationDevice, translation === 'torch' ? 'engine' : 'llama']] : [])]) {
+    for (const [value, kind] of [...(localRecognition ? [[compute.recognitionDevice, 'engine']] : []), ...(translation !== 'none' ? [[compute.translationDevice, translation === 'torch' ? 'engine' : 'llama']] : [])]) {
       const intent = decodeDeviceIntent(value)
       if (!intent) continue
       if (!this.hardware.adapters.some(a => a.hardwareId === intent.hardwareId)) throw new Error('指定显卡已断开，请重新选择计算设备')

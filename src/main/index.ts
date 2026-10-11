@@ -121,7 +121,7 @@ if (!hasSingleInstanceLock) {
       contents.on('destroyed', () => logDiagnostic('ui.window.closed'))
       contents.on('console-message', details => {
         if (details.level !== 'error' && details.level !== 'warning') return
-        logDiagnostic('renderer.console', { level: details.level, message: details.message, source: details.sourceId, line: details.lineNumber })
+        logDiagnostic('renderer.console', { level: details.level, messageBytes: Buffer.byteLength(details.message), source: details.sourceId, line: details.lineNumber })
       })
       contents.on('did-fail-load', (_event, code, description, _url, isMainFrame) => {
         if (isMainFrame) logDiagnostic('renderer.load-failed', { code, description })
@@ -135,7 +135,7 @@ if (!hasSingleInstanceLock) {
       if (item.type !== 'navigation' && item.type !== 'interaction') return
       logDiagnostic(`ui.${item.type}`, { windowId: event.sender.id,
         route: typeof item.route === 'string' ? item.route.slice(0, 120) : '',
-        element: typeof item.element === 'string' ? item.element.slice(0, 64) : '' })
+        element: typeof item.element === 'string' ? item.element.slice(0, 64) : item.element })
     })
     app.on('will-quit', () => { logActivityTotals(); logDiagnostic('app.quit') })
     const healthTimer = setInterval(() => logDiagnostic('app.health', {
@@ -261,7 +261,7 @@ if (!hasSingleInstanceLock) {
             // The main logger receives structured pipeline diagnostics on stderr, keeping one
             // ordered trace without giving multiple processes ownership of file rotation.
             NOLA_TRANSLATOR_RUN_LOG_STDERR: '1',
-            NOLA_TRANSLATOR_RECOGNITION_MODEL_ID: settings.current().recognition.modelId,
+            NOLA_TRANSLATOR_RECOGNITION_MODEL_ID: (settings.current().recognition.provider ?? 'local') === 'local' ? settings.current().recognition.modelId : '',
           },
         }
       },
@@ -296,6 +296,7 @@ if (!hasSingleInstanceLock) {
         await whenRuntimeReady()
         checkCancelled()
         const translationSettings = settings.current().translation
+        const localRecognition = (session?.recognitionProvider ?? settings.current().recognition.provider ?? 'local') === 'local'
         const provider = session ? session.translationProvider ?? 'local' : translationSettings.provider
         const modelId = session?.translationModelId ?? translationSettings.localModelId
         let translation: 'torch' | 'llama' | 'none' = provider !== 'local' || (session ? !session.targetLanguages.length : translationSettings.targetLanguage === NO_TRANSLATION_LANGUAGE)
@@ -308,14 +309,14 @@ if (!hasSingleInstanceLock) {
           } catch { /* Best-effort probe: a failed reply leaves the runtime chosen from the model id. */ }
         }
         if (session) {
-          if (compute.recognitionEngine !== 'pytorch') throw new Error('所选识别模型是 PyTorch 格式，请选择兼容的识别引擎；当前识别资源尚未提供 GGUF 版本')
+          if (localRecognition && compute.recognitionEngine !== 'pytorch') throw new Error('所选识别模型是 PyTorch 格式，请选择兼容的识别引擎；当前识别资源尚未提供 GGUF 版本')
           if (translation !== 'none') {
             const expected = translation === 'torch' ? 'pytorch' : 'llama'
             const selected = translationEngine(compute, expected === 'pytorch' ? 'm2m100' : 'llama.cpp', modelId)
             if (selected !== expected) throw new Error('所选翻译模型与推理引擎不兼容，请重新选择模型或引擎')
           }
         }
-        await runtimes.prepare(compute, translation)
+        await runtimes.prepare(compute, translation, localRecognition)
         checkCancelled()
         const next = JSON.stringify(runtimes.selectedDirectories(compute))
         launchCompute = compute
@@ -326,13 +327,15 @@ if (!hasSingleInstanceLock) {
           checkCancelled()
           currentDirectories = next
         } else if (engine!.currentState !== 'ready') await engine!.start()
-        if (session) {
+        if (session && (localRecognition || translation !== 'none')) {
           const response = await engine!.request({ protocolVersion: 1, type: 'listComputeDevices', requestId: `resolve-${randomUUID()}` }, 'computeDevices', 30_000)
           const hardware = (await runtimes.snapshot()).hardware
           session.compute = { ...compute,
-            recognitionDevice: resolveDeviceIntent(compute.recognitionDevice, hardware, response.devices, 'torch'),
+            recognitionDevice: localRecognition ? resolveDeviceIntent(compute.recognitionDevice, hardware, response.devices, 'torch') : 'auto',
             translationDevice: translation === 'none' ? 'auto' : resolveDeviceIntent(compute.translationDevice, hardware, response.devices, translation),
           }
+        } else if (session) {
+          session.compute = { ...compute, recognitionDevice: 'auto', translationDevice: 'auto' }
         }
         logDiagnostic('runtime.prepare.complete', { durationMs: Math.round(performance.now() - startedAt), translation })
       })().finally(() => { preparation = null })
