@@ -297,7 +297,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
            * moment worth showing.
            */}
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             isIconOnly
             onPress={toggleMic}

@@ -7,7 +7,7 @@ export function modelEngines(model: Pick<ResourceRecord, 'provider'>): Inference
   if (['qwen3-asr', 'sensevoice', 'm2m100', 'transformers', 'funasr'].includes(model.provider)) return ['pytorch']
   // `provider` arrives in two vocabularies: built-in Hy-MT2 reports `hymt2`, a hub GGUF passes
   // through its adapter id `llama.cpp`. Missing either yields an empty set with no error.
-  if (['hymt2', 'llama.cpp'].includes(model.provider)) return ['llama']
+  if (['hymt2', 'llama.cpp', 'index-translate'].includes(model.provider)) return ['llama']
   return []
 }
 export function translationEngine(compute: ComputeSettings, provider?: string, modelId?: string): InferenceEngine {

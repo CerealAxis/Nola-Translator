@@ -24,10 +24,6 @@ export function OverlayPage() {
   const sessionActive = !['idle', 'error'].includes(session.status)
   const [opening, setOpening] = useState(false)
   const config = settings.overlay
-  const latest = session.interim ?? session.segments.at(-1)
-  const sourceText = latest?.sourceText || t('overlay.notStarted')
-  const originalOnly = latest?.translations.length === 0
-  const translationText = latest?.translations.find(item => item.state !== 'failed' && item.text)?.text || t('overlay.notStartedHint')
   const translationDisabled = settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE
   const display = translationDisabled ? 'source' : config.showSource && config.showTranslation ? 'both' : config.showSource ? 'source' : 'translation'
   const label = (code: string) => {
@@ -79,8 +75,9 @@ export function OverlayPage() {
             aria-hidden="true"
           >
             <div className="nola-caption-preview__text">
-              {translationDisabled || config.showSource || originalOnly ? <p className="nola-caption-preview__source">{sourceText}</p> : null}
-              {!translationDisabled && config.showTranslation && !originalOnly ? <p className="nola-caption-preview__translation">{translationText}</p> : null}
+              {config.showSource ? <p className="nola-caption-preview__source">{t('modelsSettingsUi.previewSource')}</p> : null}
+              {config.showTranslation ? <p className="nola-caption-preview__translation">{t('modelsSettingsUi.previewTranslation')}</p> : null}
+              {!config.showSource && !config.showTranslation ? <p className="nola-caption-preview__source">{t('modelsSettingsUi.previewHidden')}</p> : null}
             </div>
             <div className="nola-caption-preview__scrim" data-edge="top" />
             <div className="nola-caption-preview__scrim" data-edge="bottom" />
@@ -173,7 +170,7 @@ export function OverlayPage() {
           </div>}
         </Card.Content>
         <Card.Footer className="nola-overlay-footer">
-          <Button variant="ghost" onPress={() => navigate('#/settings/appearance')}><Settings aria-hidden="true" />{t('shellUi.appearance')}<ArrowRight aria-hidden="true" /></Button>
+          <Button variant="secondary" onPress={() => navigate('#/settings/appearance')}><Settings aria-hidden="true" />{t('shellUi.appearance')}<ArrowRight aria-hidden="true" /></Button>
         </Card.Footer>
       </Card>
     </div>

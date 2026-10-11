@@ -199,7 +199,7 @@ function SubCard({
 }: SubCardProps): ReactNode {
   const button = (
     <Button
-      variant="ghost"
+      variant="secondary"
       isDisabled={isDisabled}
       onPress={onPress}
       aria-label={ariaLabel ?? title}

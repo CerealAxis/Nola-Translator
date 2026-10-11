@@ -1,5 +1,6 @@
 import { modelConfigurationSchema } from './model-capabilities'
 import { z } from 'zod'
+import { INDEX_TRANSLATE_MODEL_IDS } from './index-translate'
 import { computeSettingsSchema, computeSnapshotSchema } from './compute'
 import { SUPPORT_ERROR_CODES } from './error-catalog'
 
@@ -40,7 +41,7 @@ const recognitionModelIdSchema = z.union([
 ])
 
 const translationModelIdSchema = z.union([
-  z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m', 'm2m100-418m']),
+  z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m', 'hy-mt2-7b-q4-k-m', 'm2m100-418m', ...INDEX_TRANSLATE_MODEL_IDS]),
   hubModelId,
 ])
 
@@ -71,7 +72,7 @@ export const sessionConfigSchema = z
     sourceLanguage: z.string().min(1).max(32),
     targetLanguages: z.array(z.string().min(1).max(32)).max(8),
     allowIntermediateTranslation: z.boolean().optional(),
-    translationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'recognition']).optional(),
+    translationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'index-translate', 'recognition']).optional(),
     translationModelId: translationModelIdSchema.optional(),
     translationOptions: z.object({
       endpoint: z.string().max(2048).optional(),
@@ -104,7 +105,7 @@ const prewarmConfigSchema = z.object({
   sourceLanguage: z.string().min(1).max(32),
   targetLanguages: z.array(z.string().min(1).max(32)).max(8),
   allowIntermediateTranslation: z.boolean().optional(),
-  translationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'recognition']).optional(),
+  translationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'index-translate', 'recognition']).optional(),
   translationModelId: translationModelIdSchema.optional(),
   translationOptions: z.object({
     endpoint: z.string().max(2048).optional(),

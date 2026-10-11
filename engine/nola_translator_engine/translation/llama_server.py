@@ -121,6 +121,7 @@ class LlamaServerManager:
         self._log_thread: threading.Thread | None = None
         self._offloaded_layers: int | None = None
         self.fallback_reason: str | None = None
+        self.chat_template: str | None = None
 
     def configure_compute(self, device: ComputeDevice, options: ComputeOptions) -> None:
         # Free VRAM and probe scores change while weights are resident; only launch arguments
@@ -162,7 +163,7 @@ class LlamaServerManager:
         return self._device
 
     def switch_gguf(self, gguf_path: Path) -> bool:
-        """Switch to another Hy-MT2 quantization; returns whether anything actually changed.
+        """Switch the selected GGUF; returns whether anything actually changed.
 
         llama-server cannot hot-swap models, so this clears the ready flag and lets the
         next start() relaunch with the new GGUF. stop() is async, so this only invalidates
@@ -237,6 +238,8 @@ class LlamaServerManager:
                 "--no-warmup",
             ]
             child_env = dict(os.environ)
+            if self.chat_template is not None:
+                args.extend(["--chat-template", self.chat_template])
             if ngl != 0 and self._selected_device and self._selected_device.backend == "openvino":
                 # b11532 chooses its native OpenVINO device via this variable, not --device.
                 # Source: ggml/src/ggml-openvino/ggml-openvino.cpp device descriptions.
@@ -295,18 +298,22 @@ class LlamaServerManager:
         self._terminate(process)
 
     def chat_sync(
-        self, messages: list[dict], *, timeout_s: float = 10.0
+        self, messages: list[dict], *, timeout_s: float = 10.0,
+        chat_template_kwargs: dict[str, object] | None = None, max_tokens: int | None = None,
     ) -> str:
         """POST /v1/chat/completions (temperature=0), returns the stripped translation."""
         with self._inference_lock:
-            return self._chat_locked(messages, timeout_s=timeout_s)
+            return self._chat_locked(messages, timeout_s=timeout_s,
+                chat_template_kwargs=chat_template_kwargs, max_tokens=max_tokens)
 
     def wait_idle(self) -> None:
         """A cancelled HTTP worker can still be using the resident native server."""
         with self._inference_lock:
             pass
 
-    def _chat_locked(self, messages: list[dict], *, timeout_s: float) -> str:
+    def _chat_locked(self, messages: list[dict], *, timeout_s: float,
+                     chat_template_kwargs: dict[str, object] | None = None,
+                     max_tokens: int | None = None) -> str:
         port = self._port
         if (
             not self._ready
@@ -315,15 +322,23 @@ class LlamaServerManager:
             or self._process.poll() is not None
         ):
             raise LlamaServerError("llama-server 未就绪")
+        payload = {"messages": messages, "temperature": 0, "stream": False}
+        if chat_template_kwargs is not None:
+            payload["chat_template_kwargs"] = chat_template_kwargs
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
         result = _post_chat(
             f"http://{_HOST}:{port}/v1/chat/completions",
-            {"messages": messages, "temperature": 0, "stream": False},
+            payload,
             timeout_s,
         )
         try:
-            content = result["choices"][0]["message"]["content"]  # type: ignore[index]
+            choice = result["choices"][0]  # type: ignore[index]
+            content = choice["message"]["content"]
         except (KeyError, IndexError, TypeError) as error:
             raise LlamaServerError("llama-server 响应格式无效") from error
+        if choice.get("finish_reason") == "length":
+            raise LlamaServerError("llama-server 翻译达到输出上限，请缩短原文或增大上下文窗口")
         return str(content).strip()
 
     async def _wait_ready(self, process: Any, port: int, timeout_s: float) -> bool:

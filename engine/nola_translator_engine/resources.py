@@ -15,9 +15,13 @@ from uuid import uuid4
 
 from .hub import adapter_by_id, classify_hub_error
 from .models.catalog import (
+    INDEX_TRANSLATE_2B_Q4_K_M,
+    INDEX_TRANSLATE_9B_Q4_K_M,
+    INDEX_TRANSLATE_35B_A3B_Q4_K_M,
     HYMT2_1_8B_IQ2_M,
     HYMT2_1_8B_Q3_K_M,
     HYMT2_1_8B_Q4_K_M,
+    HYMT2_7B_Q4_K_M,
     M2M100_418M,
     QWEN3_ASR_0_6B_HF,
     QWEN3_ASR_1_7B_HF,
@@ -29,6 +33,10 @@ from .protocol import ResourceChangedEvent, ResourceRecord, ModelConfiguration, 
 from .model_capabilities import QWEN_LANGUAGES, normalize, recognition_configuration, translation_configuration, supports_translation
 from .hub import HYMT2_LANGUAGES
 from .translation.m2m100 import FLORES_LANGUAGES
+from .translation.index_translate import LANGUAGE_NAMES as INDEX_TRANSLATE_LANGUAGE_NAMES
+
+INDEX_TRANSLATE_SPECS = (INDEX_TRANSLATE_2B_Q4_K_M, INDEX_TRANSLATE_9B_Q4_K_M, INDEX_TRANSLATE_35B_A3B_Q4_K_M)
+INDEX_TRANSLATE_RESOURCE_IDS = tuple(spec.model_id for spec in INDEX_TRANSLATE_SPECS)
 
 
 QWEN_RESOURCE_ID = QWEN3_ASR_1_7B_HF.model_id
@@ -37,10 +45,11 @@ SENSEVOICE_RESOURCE_ID = SENSEVOICE_SMALL.model_id
 HYMT2_RESOURCE_ID = HYMT2_1_8B_Q4_K_M.model_id
 HYMT2_Q3_RESOURCE_ID = HYMT2_1_8B_Q3_K_M.model_id
 HYMT2_IQ2_RESOURCE_ID = HYMT2_1_8B_IQ2_M.model_id
+HYMT2_7B_RESOURCE_ID = HYMT2_7B_Q4_K_M.model_id
 M2M100_RESOURCE_ID = M2M100_418M.model_id
 
-# all three quantization tiers share one llama-server path; the resource id picks which GGUF to load.
-HYMT2_RESOURCE_IDS = (HYMT2_RESOURCE_ID, HYMT2_Q3_RESOURCE_ID, HYMT2_IQ2_RESOURCE_ID)
+# The selected family and quantization share the same llama-server lifecycle.
+HYMT2_RESOURCE_IDS = (HYMT2_RESOURCE_ID, HYMT2_Q3_RESOURCE_ID, HYMT2_IQ2_RESOURCE_ID, HYMT2_7B_RESOURCE_ID)
 
 # Legacy recognition model directories and leftover files, only ever removed by exact known name.
 _LEGACY_ASR_DIRS = (
@@ -162,7 +171,14 @@ def _definitions() -> tuple[ResourceDefinition, ...]:
     )
 
 
-RESOURCE_DEFINITIONS = _definitions()
+RESOURCE_DEFINITIONS = _definitions() + tuple(
+    ResourceDefinition(spec.model_id, "translationModel", "index-translate",
+        f"Index-Translate {size} Q4_K_M", "官方 Q4_K_M 文本翻译模型。",
+        tuple(INDEX_TRANSLATE_LANGUAGE_NAMES), sum(entry.size for entry in spec.files))
+    for spec, size in zip(INDEX_TRANSLATE_SPECS, ("2B", "9B", "35B-A3B preview"))
+) + (ResourceDefinition(HYMT2_7B_RESOURCE_ID, "translationModel", "hymt2",
+    "Hy-MT2 7B Q4_K_M", "腾讯官方 7B Q4_K_M 多语言翻译模型。",
+    tuple(HYMT2_LANGUAGES), HYMT2_7B_Q4_K_M.total_bytes),)
 RESOURCE_BY_ID = {item.resource_id: item for item in RESOURCE_DEFINITIONS}
 
 
@@ -232,7 +248,7 @@ class ResourceManager:
             return "qwen3-asr"
         if resource_id == M2M100_RESOURCE_ID:
             return "m2m100"
-        if resource_id in HYMT2_RESOURCE_IDS:
+        if resource_id in HYMT2_RESOURCE_IDS or resource_id in INDEX_TRANSLATE_RESOURCE_IDS:
             return "llama.cpp"
         return None
 
@@ -381,7 +397,7 @@ class ResourceManager:
                         shutil.rmtree(path, ignore_errors=True)
                     else:
                         path.unlink(missing_ok=True)
-            elif resource_id in HYMT2_RESOURCE_IDS:
+            elif resource_id in (HYMT2_RESOURCE_ID, HYMT2_Q3_RESOURCE_ID, HYMT2_IQ2_RESOURCE_ID):
                 for variable in ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
                     value = os.environ.get(variable)
                     if not value:
@@ -541,7 +557,9 @@ class ResourceManager:
             HYMT2_RESOURCE_ID: HYMT2_1_8B_Q4_K_M,
             HYMT2_Q3_RESOURCE_ID: HYMT2_1_8B_Q3_K_M,
             HYMT2_IQ2_RESOURCE_ID: HYMT2_1_8B_IQ2_M,
+            HYMT2_7B_RESOURCE_ID: HYMT2_7B_Q4_K_M,
             M2M100_RESOURCE_ID: M2M100_418M,
+            **{spec.model_id: spec for spec in INDEX_TRANSLATE_SPECS},
         }.get(resource_id)
         if builtin is not None:
             return builtin

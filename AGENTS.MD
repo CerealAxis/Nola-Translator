@@ -7,12 +7,14 @@
 
 - 桌面应用：Electron + React + TypeScript
 - 引擎：内置 Windows x64 Python 3.12；PyTorch 与 llama.cpp 由设置页按组合安装或复用本地组件（模型能力持久化在自定义模型注册表，启动与逐句翻译必须校验配置）
+- Index-Translate：推荐官方 2B／9B／35B-A3B-preview Q4_K_M 文本权重，通过 llama.cpp 推理；独立免费 API 使用官方公开 35B-A3B 模型，无需密钥，支持 SSE 译文。
+- Hy-MT2：推荐 1.8B 三个量化档位与腾讯官方 7B Q4_K_M；7B 显式使用官方独立 Jinja 对话模板。
 - 云端识别：Aliyun LiveTranslate 3.5／3.8 使用 WebSocket 持续输入 PCM16；MiniMax Speech-to-Text 不接受音频流式输入，改由引擎侧 VAD 切段后逐段上传 WAV，SSE 只推送响应增量。云端翻译支持 MyMemory REST 与识别连接自带的流式译文（仅阿里云具备，MiniMax 无内置译文）。
 - UI：Tailwind CSS + HeroUI
 - 构建：electron-vite
 - 测试：Vitest + Testing Library
 - 诊断：主进程使用 Node 文件 API 每次启动保存一份不拆分的 JSONL 日志，自动脱敏、限制单条大小并保留最近启动记录。
-- 浏览器：Chrome／Edge Manifest V3 + React／TypeScript；Python 标准库 Native Messaging 连接程序由 PyInstaller 打包
+- 浏览器：Chrome／Edge Manifest V3 + React／TypeScript；扩展独立版本由 browser/version.json 管理，CHANGELOG.md 记录发布；Python 标准库 Native Messaging 连接程序由 PyInstaller 打包
 
 ## 2. 目录结构
 
@@ -20,7 +22,7 @@
 src/
 ├── main/        # Electron 主进程：IPC 注册、窗口、设置/凭据持久化、引擎子进程；session-log.ts 保存每次启动的诊断日志；runtime-manager.ts／python-environments.ts 管理组件，python-runtime-paths.ts 统一 Python 导入与 DLL 路径，runtime-files.ts 处理 Windows 目录切换；browser-integrations.ts 只读检测浏览器扩展状态并打开管理页
 ├── preload/     # 单文件，contextBridge 暴露 window.nolaTranslator
-├── shared/      # 跨进程契约：类型 + zod + 默认值；error-catalog.ts 定义稳定用户支持码，languages.ts 为语言代码目录，cloud-config.ts 统一云端识别与翻译连接配置及语言限制，model-capabilities.ts 为模型能力与推荐预设。**改枚举必看这里**
+├── shared/      # 跨进程契约：类型 + zod + 默认值；error-catalog.ts 定义稳定用户支持码，languages.ts 为语言代码目录，cloud-config.ts 统一云端识别与翻译连接配置及语言限制，index-translate.ts 定义公开 API、模型及已核实语言预设，model-capabilities.ts 为模型能力与推荐预设。**改枚举必看这里**
 └── renderer/    # React 应用
     ├── bridge/  # 渲染进程唯一的数据出口（NolaBridge）
     ├── assets/browsers/ # Chrome／Edge 图标，用于浏览器连接设置
@@ -32,8 +34,10 @@ src/
 engine/nola_translator_engine/  # Python 引擎，协议定义在 protocol.py，model_capabilities.py 为引擎能力校验
 ├── recognition/aliyun.py       # LiveTranslate WebSocket、原文与内置译文关联及结束排空
 ├── recognition/minimax.py      # VAD 切段后逐段上传 WAV、SSE 增量、失败锁存与并发上限
-└── translation/mymemory.py     # 公共 REST 翻译、UTF-8 请求分段及业务状态校验
+├── translation/mymemory.py     # 公共 REST 翻译、UTF-8 请求分段及业务状态校验
+└── translation/index_translate.py # 官方 Index-Translate 提示词、本地 GGUF 与无密钥公开 API
 browser/
+├── version.json / CHANGELOG.md # 独立扩展版本与发布记录；构建 manifest 与桌面兼容校验共用版本
 ├── extension/                 # MV3 扩展、播放器适配、临时 store、Shadow DOM；build.mjs 独立构建到 dist/
 ├── native_host/               # 标准库 stdio／当前用户命名管道连接程序及帧协议测试
 └── tests/                     # 隔离配置的浏览器冒烟测试（Playwright，可选开发依赖）
@@ -71,13 +75,16 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 
 **样式**
 - 颜色/间距/圆角/字号一律用 token（见 `renderer/theme/`），**不写字面值**
-- 圆角写数字任意值 `rounded-[8px]`，theme 里**没有** `rounded-pill` 这个档位
+- 按钮统一使用 `--radius-xl` 大圆角，禁止 ghost 变体；图标按钮必须有区别于底层的可见底色，标题栏控件是唯一例外
+- 非按钮圆角按语义使用 token，theme 里**没有** `rounded-pill` 这个档位
 - 字阶压 HeroUI 原子组件时用 utilities 层任意值类（`text-[11px]`），`.nola-*` 在 base 层会被 components 层覆盖
 - z-index 只用 `.z-*` 类（见 DESIGN.MD 第 8 节），**禁 `z-50` 字面量**
 
 ## 4. 注释规范
 
 - Runtime catalogs record official wheel ABI, SHA-256 and backend combinations. Checks use built-in Python 3.12 without installing; repair ownership requires an app installation record.
+- Index-Translate presets pin official GGUF revisions, sizes and SHA-256, downloading text weights without the vision projector. Both local and public inference use the official single-user translation prompt with thinking disabled. The public service fixes its endpoint and 35B-A3B model and never consumes a saved cloud credential. Language presets expose the 32 names verified in the official reference client rather than assuming the entire 150-language inventory; invalid public targets fail before capture starts.
+- The official Hy-MT2 7B preset uses its separately published chat_template.jinja; its role tokens differ from ChatML. Switching to a different GGUF clears this template override.
 - Cloud translation uses a session-scoped HTTP pool and streams Chat Completions / Anthropic text; final captions supersede obsolete network intermediates, while native inference retains its reservation. Timing diagnostics distinguish queue, first text, and request duration.
 - Aliyun cloud recognition bypasses local ASR weights and component checks. LiveTranslate 3.8 uses delta events and auto source detection; 3.5 uses text/stash snapshots. Native translations join their source items; stream completion sends session.finish and awaits session.finished. Reset closes the old connection before opening another. Credentials remain in encrypted main-process slots, outside settings and browser contracts. MyMemory translates confirmed sentences through REST, checks embedded quota errors, and splits q by UTF-8 bytes; it does not provide token streaming.
 - MiniMax speech-to-text accepts one complete audio file per request and has no audio streaming input, so its `stream=true` is response-side only and begins after the upload completes — captions therefore arrive at gate closures rather than mid-utterance. Segments reuse `VolumeGateSegmenter`, which splits on silence and keeps adjacent segments from overlapping, so no text is recognized twice and billing matches the audio. Its 6 s ceiling is a caption-lag budget for speech with no pause to close the gate on, not a service limit; billing follows audio duration, so splitting more often costs the same money. `accept` only hands finished segments to background tasks and returns immediately, because it runs inside the audio capture loop; `flush` drains those uploads so the tail caption lands, cancelling rather than orphaning one that outruns its budget. Deltas are keyed by the server's event `index` rather than arrival order, and a stream cut before its finish event still publishes the partial transcript it already carried. A failure latches on the first error, so one invalid key cannot repeat a billable call for every remaining segment. Its `language` travels as a request header, with app code `tl` rewritten to the provider's `fil`. HTTP 402 and 429 map to separate reason words because they call for opposite user action.
@@ -91,6 +98,7 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 - 模型语言目录、推荐能力与运行引擎限制的注释须注明来源或限制原因；用户配置不代表模型自动获得新能力。
 - 浏览器采集限制注释须注明浏览器 API 原因；`getDisplayMedia` 必须在用户动作的原调用栈发起，Capture Handle 校验后仅处理音频。
 - 浏览器安装状态只读 Preferences／Secure Preferences 或以实际连接确认；不得修改浏览器受保护配置。每浏览器开关仅控制 Nola 连接权限，不能冒充浏览器扩展开关。
+- Extension handshakes report the content bundle version compiled from the same source as the manifest; desktop checks it against browser/version.json before starting recognition. A reloaded background must not overwrite the version of an old page. Installation detection reads cached or registered manifests, while live handshakes take precedence. Missing or incompatible extensions produce deduplicated desktop toasts with a download action. Playback capture disables microphone voice processing; digital silence is a recoverable warning, not proof that sharing failed.
 - 浏览器音频块为单声道 PCM16、约 100 ms，输入与确认各限两秒；epoch／sequence／session 校验与 TS、zod、Python 协议同步维护。视频时间通过 browserTimeline 映射，禁止直接使用会话相对时间。
 - 重置保留加载的模型，隔离旧推理和翻译；停止回执不得等待不可取消的原生推理线程，后台原生任务结束前锁定资源。自然结束用 finishStream 排空尾句。
 

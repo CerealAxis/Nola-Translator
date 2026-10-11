@@ -105,7 +105,7 @@ export function RecordDetailPage(): ReactNode {
           actions={
             <>
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="sm"
                 isIconOnly
                 onPress={() => changeScale(-SCALE_STEP)}
@@ -116,7 +116,7 @@ export function RecordDetailPage(): ReactNode {
                 <Minus aria-hidden="true" />
               </Button>
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="sm"
                 isIconOnly
                 onPress={() => changeScale(SCALE_STEP)}

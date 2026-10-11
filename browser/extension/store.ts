@@ -1,18 +1,17 @@
 import type { BrowserResponse, BrowserSummary } from '../../src/shared/browser'
-import type { VideoCaptionAudioSource, VideoCaptionSettings } from '../../src/shared/settings'
+import type { BrowserCaptionStyleSettings, VideoCaptionAudioSource } from '../../src/shared/settings'
 import type { CaptionSegment } from '../../src/shared/contracts'
 import { BrowserFailure, type ExtensionBridge } from './bridge'
 import { CAPTURE_OPTIONS, createAudioCapture, pcmBase64, releaseTracks, validateCapture, type AudioCapture, type AudioChunk } from './capture'
 
 export interface Caption extends CaptionSegment { videoStartedAtMs: number; videoEndedAtMs?: number }
 /**
- * Caption presentation owned by the desktop application. The extension only reads it: font size is
- * in pixels and `position` is the percent of the video height at which the caption block's bottom
- * edge rests, matching the desktop settings units.
+ * Caption presentation owned by the desktop application. The extension only reads it; `bottomOffset`
+ * is the percent of video height reserved between the caption block and the bottom edge.
  */
-export type CaptionConfig = VideoCaptionSettings & { sourceLanguage: string; targetLanguage: string }
+export type CaptionConfig = BrowserCaptionStyleSettings & { audioSource: VideoCaptionAudioSource; audioDeviceId?: string; sourceLanguage: string; targetLanguage: string }
 /** Mirrors the desktop defaults so a desktop without the config field still renders as configured there. */
-const DEFAULT_CAPTION_CONFIG: CaptionConfig = { showSource: true, showTranslation: true, layout: 'sentence', fontSize: 24, position: 82, sourceLanguage: 'auto', targetLanguage: 'none', audioSource: 'tab' }
+const DEFAULT_CAPTION_CONFIG: CaptionConfig = { showSource: true, showTranslation: true, colorScheme: 'dark', fontFamily: 'Segoe UI Variable', sourceFontSize: 20, translationFontSize: 16, lineHeight: 1.3, sourceColor: '#F7F7F7', translationColor: '#D7DEE8', backgroundColor: '#0D0E10', backgroundOpacity: 0.85, bottomOffset: 5, sourceLanguage: 'auto', targetLanguage: 'none', audioSource: 'system' }
 /**
  * The desktop picker stores the system default output as a device id, because one flat list drives
  * the setting. It names a source kind rather than a device, so it never appears in `summary.devices`.
@@ -27,6 +26,8 @@ export interface ExtensionState {
   status: 'idle' | 'starting' | 'active' | 'stopping'
   playbackPaused: boolean
   connected: boolean
+  capturePending: boolean
+  audioCaptured: boolean
   panelOpen: boolean
   summary?: BrowserSummary
   /** Mirrors the desktop's caption-service gate. A closed gate admits no session, so the panel cannot offer to start. */
@@ -70,17 +71,24 @@ const measure = (value: unknown, min: number, max: number, fallback: number): nu
 function mergeDesktopConfig(previous: CaptionConfig, incoming: unknown): CaptionConfig {
   const root = record(incoming)
   if (!root) return previous
-  const videoCaptions = record(root.videoCaptions)
+  const appearance = record(root.appearance)
   return {
-    showSource: flag(videoCaptions?.showSource, previous.showSource),
-    showTranslation: flag(videoCaptions?.showTranslation, previous.showTranslation),
-    layout: 'sentence',
-    fontSize: measure(videoCaptions?.fontSize, 8, 96, previous.fontSize),
-    position: measure(videoCaptions?.position, 0, 100, previous.position),
+    showSource: flag(appearance?.showSource, previous.showSource),
+    showTranslation: flag(appearance?.showTranslation, previous.showTranslation),
+    colorScheme: appearance?.colorScheme === 'light' ? 'light' : 'dark',
+    fontFamily: code(appearance?.fontFamily, previous.fontFamily),
+    sourceFontSize: measure(appearance?.sourceFontSize, 10, 96, previous.sourceFontSize),
+    translationFontSize: measure(appearance?.translationFontSize, 10, 96, previous.translationFontSize),
+    lineHeight: measure(appearance?.lineHeight, 1, 2.5, previous.lineHeight),
+    sourceColor: code(appearance?.sourceColor, previous.sourceColor),
+    translationColor: code(appearance?.translationColor, previous.translationColor),
+    backgroundColor: code(appearance?.backgroundColor, previous.backgroundColor),
+    backgroundOpacity: measure(appearance?.backgroundOpacity, 0, 1, previous.backgroundOpacity),
+    bottomOffset: measure(appearance?.bottomOffset, 0, 30, previous.bottomOffset),
+    audioSource: root.audioSource === 'tab' ? 'tab' : 'system',
+    audioDeviceId: device(root.audioDeviceId, previous.audioDeviceId),
     sourceLanguage: code(root.sourceLanguage, previous.sourceLanguage),
     targetLanguage: code(root.targetLanguage, previous.targetLanguage),
-    audioSource: videoCaptions?.audioSource === 'system' ? 'system' : previous.audioSource,
-    audioDeviceId: device(videoCaptions?.audioDeviceId, previous.audioDeviceId),
   }
 }
 /**
@@ -115,7 +123,7 @@ function energyOf(buffer: ArrayBuffer): number {
   return total
 }
 export function createExtensionStore(dependencies: StoreDependencies) {
-  let state: ExtensionState = { status: 'idle', playbackPaused: false, connected: false, panelOpen: false, captionServiceActive: false, config: DEFAULT_CAPTION_CONFIG, videos: [], selectedVideo: null, epoch: 0, captions: [] }
+  let state: ExtensionState = { status: 'idle', playbackPaused: false, connected: false, capturePending: false, audioCaptured: false, panelOpen: false, captionServiceActive: false, config: DEFAULT_CAPTION_CONFIG, videos: [], selectedVideo: null, epoch: 0, captions: [] }
   const listeners = new Set<() => void>()
   let sessionId: string | null = null
   let streamId = ''
@@ -131,7 +139,6 @@ export function createExtensionStore(dependencies: StoreDependencies) {
   let endingTimer: ReturnType<typeof setTimeout> | null = null
   let gateTimer: ReturnType<typeof setInterval> | null = null
   let refreshingSummary = false
-  let explicitVideo: HTMLVideoElement | null = null
   let playbackVersion = 0
   let timelineVersion = 0
   let previousStatus = state.status
@@ -176,7 +183,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     if (media) { releaseTracks(media); media = null }
     const previousAudio = audio; audio = null
     await previousAudio?.close().catch(() => undefined)
-    set({ captions: [] })
+    set({ captions: [], audioCaptured: false, capturePending: false })
   }
   const stop = async (error?: string): Promise<void> => {
     const stopGeneration = ++generation; fence()
@@ -307,15 +314,13 @@ export function createExtensionStore(dependencies: StoreDependencies) {
       sampleWindow.count = 0; sampleWindow.peak = 0; sampleWindow.energy = 0; sampleWindow.samples = 0; sampleWindow.atMs = Date.now()
       debug('ext.chunk', reported)
     }
-    // A tab that was shared without its audio still delivers chunks at the right rate, on zeroes,
-    // and every other signal looks healthy, so the session would otherwise sit at "recognizing"
-    // with nothing to show and no reason given. Advancing playback plus a few seconds of exact
-    // digital silence is a capture that will not recover on its own.
+    // Digital silence is also a valid quiet scene or muted player. Warn without destroying capture;
+    // sharing settings cannot be inferred from PCM, and a later audible scene must recover unaided.
     silenceChunks = peakOf(chunk.buffer) > 0 ? 0 : silenceChunks + 1
     if (silenceChunks >= SILENCE_CHUNKS_TO_FAIL && advancing() && (chunk.sourcePeak ?? 0) <= 0) {
       debug('ext.silent', { silenceChunks, sourcePeakDbfs: dbfs(chunk.sourcePeak ?? 0), workletPeakDbfs: dbfs(chunk.workletPeak ?? 0) })
-      void stop('tabAudioSilent'); return
-    }
+      if (state.error !== 'tabAudioSilent') set({ error: 'tabAudioSilent' })
+    } else if (silenceChunks === 0 && state.error === 'tabAudioSilent') set({ error: undefined })
     const duration = chunk.buffer.byteLength / 2 / chunk.sampleRate * 1000
     if (pendingMs + duration > 2000) { void stop('slowAudio'); return }
     const capturedAtMs = epochSamples / chunk.sampleRate * 1000
@@ -332,6 +337,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
         if (startGeneration !== generation) { releaseTracks(stream); return }
         media = stream
         validateCapture(stream, document.documentElement.dataset.nolaCaptureHandle, location.origin)
+        set({ audioCaptured: true })
         // The audio track's own settings and mute state are the only place a wrong or silent
         // track shows up before any sample reaches the worklet.
         try {
@@ -407,7 +413,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     try {
       const summary = readSummary(await dependencies.bridge.request({ type: 'hello' }))
       if (!summary) return
-      set({ summary, captionServiceActive: summary.captionServiceActive, config: mergeDesktopConfig(state.config, summary.config) })
+      set({ summary, captionServiceActive: summary.captionServiceActive, config: mergeDesktopConfig(state.config, summary.config), ...(summary.extensionCompatible === false ? { error: 'extensionVersionMismatch' } : {}) })
     } catch { /* A hello that times out or loses a race with a disconnect says nothing about the session. */ }
     finally { refreshingSummary = false }
   }
@@ -422,7 +428,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
       try {
         const summary = readSummary(await dependencies.bridge.request({ type: 'hello' }))
         if (!summary) throw new BrowserFailure('updateRequired')
-        set({ summary, connected: true, captionServiceActive: summary.captionServiceActive, config: mergeDesktopConfig(state.config, summary.config), error: summary.browserAudio ? undefined : 'updateRequired' })
+        set({ summary, connected: true, captionServiceActive: summary.captionServiceActive, config: mergeDesktopConfig(state.config, summary.config), error: summary.extensionCompatible === false ? 'extensionVersionMismatch' : summary.browserAudio ? undefined : 'updateRequired' })
       } catch (error) { set({ connected: false, error: failCode(error) }) }
       scheduleSummaryRefresh()
     },
@@ -431,29 +437,54 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     },
     togglePanel() { set({ panelOpen: !state.panelOpen }) },
     closePanel() { set({ panelOpen: false }) },
-    chooseVideo(index: number) { if (state.status === 'idle') { explicitVideo = state.videos[index] ?? null; bind(explicitVideo) } },
+    async close() { set({ panelOpen: false }); await stop() },
+    async refresh() { await this.init(); if (state.status === 'active') reset() },
+    pressCapture() {
+      if (state.status !== 'idle' || state.capturePending || captionAudioSource(state.config) !== 'tab') return
+      const captureGeneration = ++generation
+      let promise: Promise<MediaStream>
+      // Screen Capture requires transient activation in this original press handler.
+      try { promise = (dependencies.getDisplayMedia ?? (options => navigator.mediaDevices.getDisplayMedia(options)))(CAPTURE_OPTIONS) }
+      catch (error) { set({ error: failCode(error) }); return }
+      set({ capturePending: true, error: undefined })
+      void promise.then(stream => {
+        if (captureGeneration !== generation) { releaseTracks(stream); return }
+        try { validateCapture(stream, document.documentElement.dataset.nolaCaptureHandle, location.origin) }
+        catch (error) { releaseTracks(stream); throw error }
+        if (media) releaseTracks(media)
+        media = stream
+        for (const track of stream.getTracks()) track.addEventListener('ended', () => { if (media === stream) void stop('captureCancelled') }, { once: true })
+        set({ audioCaptured: true })
+      }).catch(error => { if (captureGeneration === generation) set({ error: failCode(error) }) })
+        .finally(() => { if (captureGeneration === generation) set({ capturePending: false }) })
+    },
+    chooseVideo(index: number) { if (state.status === 'idle') bind(state.videos[index] ?? null) },
     updateVideos(videos: HTMLVideoElement[]) {
       set({ videos })
-      if (state.status === 'idle' && videos.length > 1 && explicitVideo !== state.selectedVideo) { bind(null); return }
-      if (!state.selectedVideo) { if (videos.length === 1) bind(videos[0]); return }
+      // Prefer the playing, largest visible player; thumbnail/preview videos need no selector UI.
+      const preferred = [...videos].sort((left, right) => {
+        const playing = Number(!right.paused && !right.ended) - Number(!left.paused && !left.ended)
+        if (playing) return playing
+        const a = left.getBoundingClientRect(); const b = right.getBoundingClientRect()
+        return b.width * b.height - a.width * a.height
+      })[0]
+      if (!state.selectedVideo) { if (preferred) bind(preferred); return }
       if (!videos.includes(state.selectedVideo)) {
-        explicitVideo = null
-        if (videos.length === 1) { bind(videos[0]); if (endingTimer) { clearTimeout(endingTimer); endingTimer = null }; reset() }
-        else if (videos.length > 1) { bind(null); if (state.status !== 'idle') void stop() }
+        if (preferred) { bind(preferred); if (endingTimer) { clearTimeout(endingTimer); endingTimer = null }; reset() }
         else if (state.status !== 'idle') { fence(); endingTimer ??= setTimeout(() => { endingTimer = null; if (!state.videos.length) void stop() }, 1000) }
         else bind(null)
       }
     },
     timelineChanged: reset,
     pressStart() {
-      if (state.status !== 'idle' || !state.selectedVideo) return
+      if (state.status !== 'idle' || state.capturePending || !state.selectedVideo || state.summary?.extensionCompatible === false) return
       debug('ext.pressStart', { source: captionAudioSource(state.config) })
       if (!videoCleanup) bind(state.selectedVideo)
       // getDisplayMedia must run in the original onPress stack, before any await or desktop request.
       // A system capture needs neither the picker nor a gesture: the desktop owns the capture.
       let capturePromise: Promise<MediaStream> | null = null
       if (captionAudioSource(state.config) === 'tab') {
-        try { capturePromise = (dependencies.getDisplayMedia ?? (options => navigator.mediaDevices.getDisplayMedia(options)))(CAPTURE_OPTIONS) }
+        try { capturePromise = media ? Promise.resolve(media) : (dependencies.getDisplayMedia ?? (options => navigator.mediaDevices.getDisplayMedia(options)))(CAPTURE_OPTIONS) }
         catch (error) { set({ error: failCode(error) }); return }
       }
       set({ status: 'starting', error: undefined })

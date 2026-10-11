@@ -4,6 +4,28 @@ from __future__ import annotations
 
 from .manager import FileEntry, ModelSpec
 
+# Official GGUF Q4_K_M artifacts, pinned from Hugging Face's blobs API.
+# Text captions do not need the separate mmproj vision weights.
+# Source: https://huggingface.co/IndexTeam/Index-Translate-2B-GGUF (and 9B / 35B-A3B-preview).
+INDEX_TRANSLATE_2B_Q4_K_M = ModelSpec(
+    model_id="index-translate-2b-q4-k-m", directory="index-translate-2b-q4-k-m",
+    repo="IndexTeam/Index-Translate-2B-GGUF", revision="3a0eca6ce931d88d00614d427ab3ed8ff0743902",
+    files=(FileEntry("Index-Translate-2B.Q4_K_M.gguf", 1_312_164_352,
+        "044b313d29342bd3b2c77cbb64023ca0d209bd9b3247763f9d162767ef2d746a"),),
+)
+INDEX_TRANSLATE_9B_Q4_K_M = ModelSpec(
+    model_id="index-translate-9b-q4-k-m", directory="index-translate-9b-q4-k-m",
+    repo="IndexTeam/Index-Translate-9B-GGUF", revision="645939fbab839a656f1bc39975a872bc8ad749f8",
+    files=(FileEntry("Index-Translate-9B.Q4_K_M.gguf", 5_780_090_304,
+        "9cc6758b0007f4cbf42ea3400768cbff91ae74ef8d640e467158348426d33713"),),
+)
+INDEX_TRANSLATE_35B_A3B_Q4_K_M = ModelSpec(
+    model_id="index-translate-35b-a3b-q4-k-m", directory="index-translate-35b-a3b-q4-k-m",
+    repo="IndexTeam/Index-Translate-35B-A3B-preview-GGUF", revision="3319ce338363a181c6c20c06b7379063d9baf484",
+    files=(FileEntry("Index-Translate-35B-A3B-preview.Q4_K_M.gguf", 21_713_462_400,
+        "7d803928b68110b64880206f79ccd18e209d11091a21c689ca9e369687cb93f6"),),
+)
+
 
 # Qwen3-ASR 1.7B: BF16 weights on disk, run NF4 4-bit quantized in memory.
 QWEN3_ASR_1_7B_HF = ModelSpec(
@@ -178,6 +200,15 @@ HYMT2_1_8B_Q4_K_M = ModelSpec(
             "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
         ),
     ),
+)
+
+# Official 7B Q4_K_M artifact; the runtime supplies its separate official chat template.
+# Source: https://huggingface.co/tencent/Hy-MT2-7B-GGUF/tree/ab8472660ac61fac25f1af43fac2599d52a8a775
+HYMT2_7B_Q4_K_M = ModelSpec(
+    model_id="hy-mt2-7b-q4-k-m", directory="hy-mt2-7b-q4-k-m",
+    repo="tencent/Hy-MT2-7B-GGUF", revision="ab8472660ac61fac25f1af43fac2599d52a8a775",
+    files=(FileEntry("Hy-MT2-7B-Q4_K_M.gguf", 4_624_648_896,
+        "9f96256500f3fc1ab4d64336b58f52a949a95ad7516b0c229476eef782f9f77b"),),
 )
 
 

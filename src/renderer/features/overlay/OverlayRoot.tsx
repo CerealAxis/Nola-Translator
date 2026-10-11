@@ -486,7 +486,7 @@ function GhostButton({
    */
   return (
     <Button
-      variant="ghost"
+      variant="secondary"
       size="sm"
       isIconOnly={children === undefined}
       onPress={onPress}

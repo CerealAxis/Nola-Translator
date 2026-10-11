@@ -61,6 +61,7 @@ export function ModelsPage() {
     cloud: t('settings.providerCloud'),
     microsoft: t('settings.providerMicrosoft'),
     mymemory: t('settings.providerMyMemory'),
+    'index-translate': t('settings.providerIndexTranslate'),
     recognition: t('settings.providerRecognitionTranslation'),
   }
   /*
@@ -261,11 +262,18 @@ function Catalog({ records, loading, card, emptyAction }: CatalogProps) {
 
   const recognition = records.filter((item) => item.kind === 'recognitionModel')
   const translation = records.filter((item) => item.kind === 'translationModel')
+  const hunyuan = translation.filter((item) => item.resourceId.startsWith('hy-mt2-'))
+  const bilibili = translation.filter((item) => item.resourceId.startsWith('index-translate-'))
+  const otherTranslation = translation.filter(
+    (item) => !item.resourceId.startsWith('hy-mt2-') && !item.resourceId.startsWith('index-translate-'),
+  )
 
   return (
     <div className="flex flex-col gap-6">
       <Section title={t('models.asrModels')} records={recognition} card={card} />
-      <Section title={t('models.mtModels')} records={translation} card={card} />
+      <Section title={t('models.hunyuanModels')} records={hunyuan} card={card} />
+      <Section title={t('models.bilibiliModels')} records={bilibili} card={card} />
+      <Section title={t('models.otherMtModels')} records={otherTranslation} card={card} />
     </div>
   )
 }

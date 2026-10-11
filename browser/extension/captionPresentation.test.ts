@@ -3,7 +3,7 @@ import { CaptionClock, captionLines, deepFullscreenElement, fullscreenCueBounds,
 import type { Caption, CaptionConfig } from './store'
 
 const phrase: Caption = { segmentId: 'phrase', revision: 1, startedAtMs: 0, videoStartedAtMs: 12000, videoEndedAtMs: 13000, sourceText: 'Hello', translations: [], isFinal: true }
-const config = (patch: Partial<CaptionConfig> = {}): CaptionConfig => ({ showSource: true, showTranslation: false, layout: 'sentence', fontSize: 24, position: 82, sourceLanguage: 'en', targetLanguage: 'zh', ...patch })
+const config = (patch: Partial<CaptionConfig> = {}): CaptionConfig => ({ showSource: true, showTranslation: false, colorScheme: 'dark', fontFamily: 'Segoe UI Variable', sourceFontSize: 24, translationFontSize: 22, lineHeight: 1.3, sourceColor: '#F7F7F7', translationColor: '#D7DEE8', backgroundColor: '#0D0E10', backgroundOpacity: 0.85, bottomOffset: 5, audioSource: 'tab', sourceLanguage: 'en', targetLanguage: 'zh', ...patch })
 describe('live caption presentation', () => {
   it('keeps recognition visible while translation is pending or unavailable', () => {
     expect(captionLines(phrase, config())).toEqual(['Hello'])

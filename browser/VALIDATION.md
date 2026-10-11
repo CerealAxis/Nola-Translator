@@ -1,5 +1,21 @@
 # 浏览器字幕首版验证记录
 
+## 扩展 1.1.0 修复验证（2026-10-11）
+
+- 当前启动日志确认故障时源音频、Worklet 和 PCM 均为全零；采集的回声消除、降噪、自动增益处于开启状态。新版显式关闭这些语音处理选项；全零输入仅提示，不结束静音片段的会话。
+- TypeScript 类型检查、桌面生产构建、扩展生产构建与 ZIP 打包通过；Vitest 全量 58 文件、352 项通过。
+- Chrome、Edge 在独立临时配置中加载真实 MV3 产物，生成并播放 440 Hz 音频，使用真实共享与 Worklet 验证非零 PCM。测试替身只替换 Native Messaging 响应，验证返回的双语字幕实际绘制到页面；不调用收费识别服务。
+- 已检查开始／刷新／关闭、标签页音频采集操作、自动选视频、页面刷新清理、10px 网站根字号下的 14px 控件字体，以及关闭后的共享释放。
+- 已覆盖扩展磁盘版本、未缓存 manifest 的解压安装、页面脚本版本握手、旧版本启动拦截、Toast 去重和对应浏览器下载动作。
+- 本轮没有把真实网站 ASR／翻译验收标记为通过。合成音频＋替身字幕不能证明 YouTube／B 站上的具体模型识别效果。
+
+验证截图和报告：`artifacts/browser-smoke/chrome-pipeline/` 与 `artifacts/browser-smoke/edge-pipeline/`。重现：
+
+```powershell
+python browser/tests/smoke.py --executable "C:/Program Files/Google/Chrome/Application/chrome.exe" --name chrome-pipeline --cdp-load --pipeline
+python browser/tests/smoke.py --executable "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" --name edge-pipeline --pipeline
+```
+
 本记录对应 2026-10-08 的本地开发版本。安装包用于测试；下列“尚未验收”项目不能由协议单测或界面冒烟测试代替。
 
 ## 已验证

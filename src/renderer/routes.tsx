@@ -31,9 +31,9 @@ const ALL_SETTINGS_TABS: readonly SettingsTab[] = [
   'compute',
   'performance',
   'appearance',
+  'browser',
   'storage',
   'advanced',
-  'browser',
   'developer',
 ]
 

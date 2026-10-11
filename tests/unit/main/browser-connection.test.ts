@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BrowserConnection } from '../../../src/main/browser-connection'
 import { SessionController } from '../../../src/main/session-controller'
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
-import { BROWSER_EXTENSION_ID, type BrowserResponse } from '../../../src/shared/browser'
+import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, type BrowserResponse } from '../../../src/shared/browser'
 import type { EngineProcess } from '../../../src/main/engine-process'
 import type { EngineCommand } from '../../../src/shared/contracts'
 import { ipcMain, dialog } from 'electron'
@@ -69,6 +69,19 @@ function send(socket: Socket, value: unknown) { socket.write(`${JSON.stringify(v
 const start = { id: 'start', type: 'start', source: 'tab', streamId: 'stream', sourceLanguage: 'auto', targetLanguage: 'en', epoch: 0, videoTimeMs: 0, playbackRate: 1 }
 
 describe('native pipe boundary', () => {
+  it('rejects an old extension before it can open a billable recognition session', async () => {
+    const f = await fixture()
+    const socket = await connect(f.descriptor.pipe); const values = responses(socket)
+    send(socket, f.descriptor)
+    send(socket, { id: 'old', type: 'hello', extensionVersion: '1.0.2' })
+    await expect.poll(() => values.length).toBe(1)
+    expect(values[0]).toMatchObject({ type: 'result', value: { extensionCompatible: false, extensionVersion: '1.1.0' } })
+    send(socket, start)
+    await expect.poll(() => values.length).toBe(2)
+    expect(values[1]).toMatchObject({ type: 'error', code: 'extensionVersionMismatch' })
+    expect(f.sessions.busy).toBe(false)
+    socket.destroy()
+  })
   it('releases resident models when the idle browser caption service is closed', async () => {
     const f = await fixture()
     const handler = vi.mocked(ipcMain.handle).mock.calls.filter(([channel]) => channel === 'browser:caption-service').at(-1)![1]
@@ -180,6 +193,7 @@ describe('native pipe boundary', () => {
     const socket = await connect(f.descriptor.pipe)
     const values = responses(socket)
     send(socket, f.descriptor)
+    send(socket, { id: 'compatible', type: 'hello', extensionVersion: BROWSER_EXTENSION_VERSION })
     send(socket, start)
     await expect.poll(() => values.some(value => value.type === 'result' && value.id === 'start')).toBe(true)
     const pcmBase64 = Buffer.alloc(3200).toString('base64')
@@ -194,8 +208,8 @@ describe('native pipe boundary', () => {
     const f = await fixture()
     const socket = await connect(f.descriptor.pipe)
     const values = responses(socket)
-    send(socket, f.descriptor); send(socket, start)
-    await expect.poll(() => values.length).toBe(1)
+    send(socket, f.descriptor); send(socket, { id: 'compatible', type: 'hello', extensionVersion: BROWSER_EXTENSION_VERSION }); send(socket, start)
+    await expect.poll(() => values.some(value => value.type === 'result' && value.id === 'start')).toBe(true)
     f.engine.currentState = 'recovering'
     f.engine.emit('state', 'recovering')
     await expect.poll(() => f.connection.status().connections).toBe(0)

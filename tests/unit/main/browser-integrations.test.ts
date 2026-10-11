@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, expect, it, vi } from 'vitest'
 import { BrowserIntegrations } from '../../../src/main/browser-integrations'
-import { BROWSER_EXTENSION_ID } from '../../../src/shared/browser'
+import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION } from '../../../src/shared/browser'
 
 const directories: string[] = []
 afterEach(async () => { await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true }))) })
@@ -24,6 +24,19 @@ it('reports actual extension state independently for each browser', async () => 
   await preferences(f.root, 'Chrome', 'Preferences', { extensions: { settings: { [BROWSER_EXTENSION_ID]: { state: 1 } } } })
   await f.integrations.inspect()
   expect(f.integrations.snapshot).toMatchObject([{ browser: 'chrome', available: true, extensionStatus: 'installed' }, { browser: 'edge', extensionStatus: 'notInstalled' }])
+})
+it('detects an installed extension version from the Chromium manifest record', async () => {
+  const f = await fixture()
+  await preferences(f.root, 'Chrome', 'Secure Preferences', { extensions: { settings: { [BROWSER_EXTENSION_ID]: { state: 1, manifest: { version: '1.0.2' } } } } })
+  await f.integrations.inspect()
+  expect(f.integrations.snapshot[0]).toMatchObject({ extensionStatus: 'installed', extensionVersion: '1.0.2', extensionCompatible: false })
+})
+it('reads an unpacked manifest when Chromium omits its cached copy', async () => {
+  const f = await fixture(); const unpacked = join(f.root, 'extension')
+  await mkdir(unpacked); await writeFile(join(unpacked, 'manifest.json'), JSON.stringify({ version: BROWSER_EXTENSION_VERSION }))
+  await preferences(f.root, 'Chrome', 'Secure Preferences', { extensions: { settings: { [BROWSER_EXTENSION_ID]: { path: unpacked, location: 4, disable_reasons: [] } } } })
+  await f.integrations.inspect()
+  expect(f.integrations.snapshot[0]).toMatchObject({ extensionStatus: 'installed', extensionVersion: BROWSER_EXTENSION_VERSION, extensionCompatible: true })
 })
 it('uses secure state ahead of stale preferences and treats corrupt data as unknown', async () => {
   const f = await fixture()

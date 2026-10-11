@@ -1,11 +1,14 @@
 import { z } from 'zod'
+import extensionRelease from '../../browser/version.json'
 import type { AudioDevice, EngineEvent } from './contracts'
-import type { VideoCaptionSettings } from './settings'
+import type { BrowserCaptionStyleSettings, VideoCaptionAudioSource } from './settings'
 
 export const BROWSER_HOST_NAME = 'com.nola.captions'
 export const BROWSER_EXTENSION_ID = 'cgbjfdpkcoapeiefeflikdolennbdcbe'
 export const BROWSER_EXTENSION_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoiJ7hfz9nPxIe4Iax2PF+o4Dtq8w1y2X/HGa6aPZRTZWBOYzr13mdqzCC+UfJKpAzeGIPL2V0xNvkCXoxCjUBCOduL36uaXwmSSUpNcg1wcob05ZTDod6XIxAOXViMcJKd+wLronqx9gy6bDigQm7J1c5f6Z7Iw9xmOdPS7n01LTqCQINrpEzU/DzAzFTTv9JUKd6Oy/PyzQg6BHzhIAhyBYhYJOsuhGIMQTE+pd/1xL/NKYAmrbNWOOYvrUxlcgk7TwORkdx/NpeA4E5R8dB4CtX14GL/Ktc7R9gAVptQH524j2ZUszKA/WrQU1CmRneS2bIyjOE0idJt1Xd3O9iQIDAQAB'
 export const BROWSER_PROTOCOL_VERSION = 1
+/** Exact release matching prevents a stale unpacked bundle from silently using obsolete capture code. */
+export const BROWSER_EXTENSION_VERSION = extensionRelease.version
 
 const identity = { id: z.string().min(1).max(128) }
 const session = { ...identity, sessionId: z.string().min(1).max(128) }
@@ -16,7 +19,7 @@ const timeline = { epoch: z.number().int().nonnegative(), videoTimeMs: z.number(
  */
 const legacyLanguages = { sourceLanguage: z.string().min(1).max(32).optional(), targetLanguage: z.string().min(1).max(32).optional() }
 export const browserRequestSchema = z.discriminatedUnion('type', [
-  z.object({ ...identity, type: z.literal('hello'), browser: z.enum(['chrome', 'edge']).optional() }).strict(),
+  z.object({ ...identity, type: z.literal('hello'), browser: z.enum(['chrome', 'edge']).optional(), extensionVersion: z.string().min(1).max(32).optional() }).strict(),
   z.object({ ...identity, type: z.literal('runtimeSettings'), component: z.enum(['engine', 'llama']) }).strict(),
   z.object({ ...identity, type: z.literal('start'), ...timeline, source: z.enum(['tab', 'system']), streamId: z.string().min(1).max(128), deviceId: z.string().min(1).max(512).optional(), ...legacyLanguages }).strict(),
   z.object({ ...session, type: z.literal('stop') }).strict(),
@@ -33,16 +36,19 @@ export const browserRequestSchema = z.discriminatedUnion('type', [
 ])
 export type BrowserRequest = z.infer<typeof browserRequestSchema>
 /**
- * What the desktop app has configured, handed to the extension on `hello`. The extension keeps no
- * settings of its own for this — it draws captions and nothing more.
+ * The browser caption appearance is configured independently from the desktop's video caption page.
  */
 export interface BrowserCaptionConfig {
-  videoCaptions: VideoCaptionSettings
+  appearance: BrowserCaptionStyleSettings
+  audioSource: VideoCaptionAudioSource
+  audioDeviceId?: string
   sourceLanguage: string
   targetLanguage: string
 }
 export interface BrowserSummary {
   protocolVersion: 1
+  extensionVersion?: string
+  extensionCompatible?: boolean
   uiLanguage: 'zh-CN' | 'en'
   sourceLanguage: string
   targetLanguage: string
@@ -61,6 +67,8 @@ export interface BrowserIntegrationInfo {
   browser: BrowserKind
   available: boolean
   extensionStatus: 'installed' | 'notInstalled' | 'disabled' | 'unknown'
+  extensionVersion?: string
+  extensionCompatible?: boolean
   connected: boolean
   enabled: boolean
 }
@@ -77,4 +85,4 @@ export interface BrowserConnectionStatus {
   browsers?: BrowserIntegrationInfo[]
   error?: string
 }
-export type BrowserConnectionAction = 'status' | 'repair' | 'enable' | 'extension' | 'download' | 'manage' | 'browserEnable'
+export type BrowserConnectionAction = 'status' | 'inspect' | 'repair' | 'enable' | 'extension' | 'download' | 'manage' | 'browserEnable'

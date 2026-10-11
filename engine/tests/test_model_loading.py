@@ -195,6 +195,56 @@ async def test_cloud_service_does_not_load_local_translation(models):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('provider', ['local', 'index-translate'])
+async def test_index_translate_routes_to_selected_local_or_fixed_public_provider(models, provider):
+    from nola_translator_engine.translation.index_translate import IndexTranslateLocalProvider, IndexTranslatePublicProvider
+    runtime, recognition, translation, _, _, command = models
+    command = command.model_copy(update={'config': command.config.model_copy(update={
+        'translationProvider': provider, 'translationModelId': 'index-translate-2b-q4-k-m',
+    })})
+    try:
+        result = await runtime.handle(command)
+        assert result[0].state == 'ready' and recognition.loaded
+        if provider == 'index-translate':
+            # Prewarm only loads local weights; network providers are configured at session start.
+            runtime._configure_translation(command)
+        assert isinstance(runtime.translation_provider, IndexTranslateLocalProvider if provider == 'local' else IndexTranslatePublicProvider)
+        assert translation.loads == (1 if provider == 'local' else 0)
+        if provider == 'local':
+            assert translation._gguf_path_explicit.name == 'Index-Translate-2B.Q4_K_M.gguf'
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_public_index_translate_refuses_unmapped_target_before_loading(models):
+    runtime, recognition, translation, _, _, command = models
+    command = command.model_copy(update={'config': command.config.model_copy(update={
+        'translationProvider': 'index-translate', 'targetLanguages': ['yue'],
+    })})
+    try:
+        result = await runtime.handle(command)
+        assert result[0].type == 'error' and result[0].code == 'invalidConfiguration'
+        assert recognition.loads == translation.loads == 0
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_hymt2_7b_loads_with_official_template_and_clears_it_for_index(models):
+    from nola_translator_engine.translation.hymt2 import HYMT2_7B_CHAT_TEMPLATE
+    runtime, _, translation, _, _, command = models
+    try:
+        for model_id, expected_template in [('hy-mt2-7b-q4-k-m', HYMT2_7B_CHAT_TEMPLATE), ('index-translate-2b-q4-k-m', None)]:
+            selected = command.model_copy(update={'config': command.config.model_copy(update={'translationModelId': model_id})})
+            result = await runtime.handle(selected)
+            assert result[0].state == 'ready'
+            assert translation.chat_template == expected_template
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
 async def test_handshake_imports_selected_dependency_in_background_without_loading_models(models, monkeypatch):
     runtime, recognition, translation, _, _, _ = models
     started = threading.Event()

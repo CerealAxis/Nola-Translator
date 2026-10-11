@@ -21,7 +21,7 @@ export function SettingsRow({ label, desc, children, className = '', description
         <div className="settings-row__title">
           <Label>{label}</Label>
           {desc && descriptionTooltip ? <Tooltip delay={300}>
-            <Button variant="ghost" size="sm" isIconOnly aria-label={typeof label === 'string' ? `${label} — Info` : 'Info'} className="settings-row__help">
+            <Button variant="secondary" size="sm" isIconOnly aria-label={typeof label === 'string' ? `${label} — Info` : 'Info'} className="settings-row__help">
               <CircleHelp size={15} aria-hidden="true" />
             </Button>
             <Tooltip.Content className="settings-row__tooltip">{desc}</Tooltip.Content>

@@ -1,4 +1,4 @@
-import type { BrowserRequest, BrowserResponse } from '../../src/shared/browser'
+import { BROWSER_EXTENSION_VERSION, type BrowserRequest, type BrowserResponse } from '../../src/shared/browser'
 
 export type RequestInput = BrowserRequest extends infer T ? T extends BrowserRequest ? Omit<T, 'id'> : never : never
 export interface ExtensionBridge {
@@ -53,7 +53,9 @@ export function createBridge(name = 'nola-captions'): ExtensionBridge {
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => { pending.delete(id); reject(new BrowserFailure(input.type === 'audio' ? 'slowAudio' : 'appUnavailable')) }, input.type === 'start' ? 180000 : input.type === 'audio' ? 2000 : input.type === 'finish' ? 11000 : 10000)
         pending.set(id, { resolve, reject, timer })
-        try { (port ?? connect()).postMessage({ ...input, id }) } catch { port = null; clearTimeout(timer); pending.delete(id); reject(new BrowserFailure('appUnavailable')) }
+        // Compile the content bundle's release into hello: getManifest() can already describe a
+        // reloaded background while an old page still runs its previous content script.
+        try { (port ?? connect()).postMessage({ ...input, ...(input.type === 'hello' ? { extensionVersion: BROWSER_EXTENSION_VERSION } : {}), id }) } catch { port = null; clearTimeout(timer); pending.delete(id); reject(new BrowserFailure('appUnavailable')) }
       })
     },
     subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener) } },

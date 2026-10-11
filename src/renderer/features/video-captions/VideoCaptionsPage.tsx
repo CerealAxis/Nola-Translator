@@ -84,13 +84,13 @@ export function VideoCaptionsPage() {
    * The picker is one flat list of strings while the setting is a source kind plus a device, so the
    * two are translated here rather than storing a sentinel inside the device id. Choosing a device
    * switches the kind to `system`; picking the tab entry drops the device, which no longer applies.
-   * Only an explicit `system` counts as one: the field is optional on the extension's config, and an
-   * absent value must read as the `tab` default rather than silently becoming a system capture.
    */
   const audioSourceValue = config.audioSource === 'system' ? config.audioDeviceId ?? SYSTEM_DEFAULT_OUTPUT : TAB_AUDIO_VALUE
   const audioSourcePatch = (value: string): AppSettingsPatch => value === TAB_AUDIO_VALUE
-    ? { videoCaptions: { audioSource: 'tab' } }
-    : { videoCaptions: { audioSource: 'system', audioDeviceId: value } }
+    ? { videoCaptions: { audioSource: 'tab', audioDeviceId: undefined } }
+    : value === SYSTEM_DEFAULT_OUTPUT
+      ? { videoCaptions: { audioSource: 'system', audioDeviceId: undefined } }
+      : { videoCaptions: { audioSource: 'system', audioDeviceId: value } }
   const openBrowser = async () => {
     setOpening(true)
     try { await openDefaultBrowser() } catch { toast.danger(t('videoCaptions.errorOpeningBrowser')) }
@@ -109,12 +109,31 @@ export function VideoCaptionsPage() {
     } catch (error) {
       const message = String(error)
       if (/RUNTIME_(TORCH|LLAMA)/.test(message)) {
-        toast.danger(message)
-        await actions.settings.openRuntimeSettings(message.includes('RUNTIME_TORCH') ? 'engine' : 'llama')
+        const isTorch = message.includes('RUNTIME_TORCH')
+        const mismatch = message.includes('_DEVICE_MISMATCH')
+        const key = isTorch
+          ? mismatch ? 'videoCaptions.torchDeviceMismatch' : 'videoCaptions.torchEnvironmentFailed'
+          : mismatch ? 'videoCaptions.llamaDeviceMismatch' : 'videoCaptions.llamaEnvironmentFailed'
+        toast.danger(t(key))
+        await actions.settings.openRuntimeSettings(isTorch ? 'engine' : 'llama')
       } else toast.danger(t('videoCaptions.serviceFailed'))
       return
     }
-    try { await setCaptionServiceActive(true) } catch { toast.danger(t('errors.captionServiceToggleFailed')) }
+    try {
+      await browserConnectionAction('inspect')
+      const status = await setCaptionServiceActive(true)
+      const browsers = status.browsers ?? []
+      const availableBrowsers = browsers.filter(browser => browser.available)
+      const extensionMissing = !browsers.some(browser => browser.extensionStatus === 'installed' || browser.extensionStatus === 'disabled')
+        && availableBrowsers.length > 0
+        && availableBrowsers.every(browser => browser.extensionStatus === 'notInstalled')
+      if (extensionMissing) {
+        toast.warning(t('videoCaptions.extensionSetupNotice'), {
+          timeout: 10000,
+          actionProps: { children: t('videoCaptions.browserSettings'), onPress: () => navigate(settingsPath('browser')) },
+        })
+      }
+    } catch { toast.danger(t('errors.captionServiceToggleFailed')) }
   }
   /*
    * Closing is the toggle first and the stop second, and a failed stop does not put the
@@ -190,16 +209,16 @@ export function VideoCaptionsPage() {
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('videoCaptions.audioSource')}</span>
             {/*
-             * The tab entry is the default and sits first; the system sources below it are the same
-             * set the floating-caption page offers, so one device list serves both pages.
+             * System output is the default; the tab capture stays last because it requires a browser
+             * sharing prompt, while system capture uses the configured desktop output directly.
              * A tab capture is taken inside the page and needs the extension's own confirmation,
              * while a system capture is taken by the desktop and starts without one.
              */}
             <SettingSelect value={audioSourceValue} ariaLabel={t('videoCaptions.audioSource')}
               options={[
-                { value: TAB_AUDIO_VALUE, label: t('videoCaptions.tabAudio') },
                 { value: SYSTEM_DEFAULT_OUTPUT, label: t('shellUi.audioSystem') },
                 ...devices.filter(device => device.deviceId !== SYSTEM_DEFAULT_OUTPUT).map(device => ({ value: device.deviceId, label: device.name })),
+                { value: TAB_AUDIO_VALUE, label: t('videoCaptions.tabAudio') },
               ]}
               onChange={next => patch(audioSourcePatch(next))} />
           </div>
@@ -267,7 +286,7 @@ export function VideoCaptionsPage() {
           </div>
         </Card.Content>
         <Card.Footer className="nola-overlay-footer">
-          <Button variant="ghost" onPress={() => navigate(settingsPath('browser'))}><Settings aria-hidden="true" />{t('videoCaptions.browserSettings')}<ArrowRight aria-hidden="true" /></Button>
+          <Button variant="secondary" onPress={() => navigate(settingsPath('browser'))}><Settings aria-hidden="true" />{t('videoCaptions.browserSettings')}<ArrowRight aria-hidden="true" /></Button>
         </Card.Footer>
       </Card>
       <div className="nola-video-service">

@@ -11,6 +11,21 @@ from .llama_server import LlamaServerManager
 # Keep prompt names aligned with the adapter's official model capability table.
 SUPPORTED_LANGUAGES: dict[str, str] = HYMT2_LANGUAGES
 
+# Use the separate official 7B template to avoid depending on an embedded GGUF template
+# or llama.cpp's ChatML fallback, whose role delimiters are different training tokens.
+# Source: https://huggingface.co/tencent/Hy-MT2-7B/blob/f1f6b69/chat_template.jinja
+HYMT2_7B_CHAT_TEMPLATE = (
+    "{% set ns = namespace(has_head=true) %}{% set loop_messages = messages %}"
+    "{% for message in loop_messages %}{% set content = message['content'] %}"
+    "{% if loop.index0 == 0 %}{% if content == '' %}{% set ns.has_head = false %}"
+    "{% elif message['role'] == 'system' %}{% set content = '<|startoftext|>' + content + '<|extra_4|>' %}"
+    "{% endif %}{% endif %}{% if message['role'] == 'user' %}"
+    "{% if loop.index0 == 1 and ns.has_head %}{% set content = content + '<|extra_0|>' %}"
+    "{% else %}{% set content = '<|startoftext|>' + content + '<|extra_0|>' %}{% endif %}"
+    "{% elif message['role'] == 'assistant' %}{% set content = content + '<|eos|>' %}"
+    "{% endif %}{{ content }}{% endfor %}"
+)
+
 _CASEFOLD_INDEX = {code.casefold(): code for code in SUPPORTED_LANGUAGES}
 _TRADITIONAL_ZH_SUFFIXES = {"tw", "hk", "mo"}
 

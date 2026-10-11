@@ -1,12 +1,13 @@
 import { useMemo } from 'react'
 import type { CSSProperties } from 'react'
 import { Button, ColorArea, ColorField, ColorPicker, ColorSlider, ColorSwatch, ColorSwatchPicker, NumberField, Slider, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
-import { CheckSquare, ChevronDown, CircleAlert } from 'lucide-react'
+import { CheckSquare, ChevronDown, CircleAlert, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Square, X } from 'lucide-react'
 
-import { DEFAULT_SETTINGS } from '@/bridge'
+import { useModelOptions } from '@/model-options'
+import { DEFAULT_SETTINGS, LANGUAGE_LABELS } from '@/bridge'
 import { CAPTION_SCHEMES } from '@/features/overlay'
 import { useI18n } from '@/i18n'
-import { stores, updateSettings, useStore } from '@/store'
+import { sessionStore, stores, updateSettings, useStore } from '@/store'
 import { SettingsRow } from '../SettingsRow'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
@@ -15,12 +16,20 @@ const FONT_FAMILIES = ['Segoe UI Variable', 'Microsoft YaHei UI', 'PingFang SC',
 const PRESET_COLORS = ['#F7F7F7', '#D7DEE8', '#87D5FF', '#0D0E10', '#FFFFFF', '#4C9AFF']
 
 export function AppearanceTab({ settings }: SettingsPanelProps) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const overlay = settings.overlay
+  const modelOptions = useModelOptions()
+  const session = useStore(sessionStore, (state) => state)
+  const sessionActive = !['idle', 'error'].includes(session.status)
   const pending = useStore(stores.settings, (state) => state.pending)
   const error = useStore(stores.settings, (state) => state.error)
   const fontOptions = useMemo<PickerOption[]>(() => FONT_FAMILIES.map((family) => ({ value: family, label: family })), [])
   const write = (patch: Partial<typeof overlay>) => { void updateSettings({ overlay: patch }).catch(() => undefined) }
+  const label = (code: string) => {
+    const entry = LANGUAGE_LABELS[code]
+    return entry ? language === 'zh-CN' ? entry.zh : entry.en : code
+  }
+  const display = overlay.showSource && overlay.showTranslation ? 'both' : overlay.showSource ? 'source' : 'translation'
 
   const restore = () => {
     // Only appearance preferences are reset; the window lock and pin are independent controls.
@@ -33,14 +42,44 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
   return (
     <div className="settings-panel">
       <SettingGroup legend={t('modelsSettingsUi.preview')}>
-        <div className="settings-preview__stage">
-          <div className="settings-preview" data-layout={overlay.layout} data-position={overlay.mode} style={{
-            '--preview-color': overlay.backgroundColor, '--preview-opacity': overlay.backgroundOpacity,
-            fontFamily: overlay.fontFamily,
-          } as CSSProperties}>
-            {overlay.showSource ? <p style={{ fontSize: overlay.fontSize, fontWeight: overlay.fontWeight, lineHeight: overlay.lineHeight, color: overlay.sourceColor }}>{t('modelsSettingsUi.previewSource')}</p> : null}
-            {overlay.showTranslation ? <p style={{ fontSize: overlay.translationFontSize, fontWeight: overlay.translationFontWeight, lineHeight: overlay.translationLineHeight, color: overlay.translationColor }}>{t('modelsSettingsUi.previewTranslation')}</p> : null}
-            {!overlay.showSource && !overlay.showTranslation ? <p style={{ color: overlay.sourceColor }}>{t('modelsSettingsUi.previewHidden')}</p> : null}
+        <div className="nola-overlay-stage">
+          <div
+            className="nola-caption-preview"
+            data-color-scheme={overlay.colorScheme}
+            data-transparent-background={overlay.backgroundOpacity <= 0}
+            style={{
+              '--preview-background-color': overlay.backgroundColor,
+              '--preview-background-alpha': `${Math.round(overlay.backgroundOpacity * 100)}%`,
+              '--preview-source-color': overlay.sourceColor,
+              '--preview-translation-color': overlay.translationColor,
+              '--preview-font-size': `${overlay.fontSize}px`,
+              '--preview-font-weight': overlay.fontWeight,
+              '--preview-line-height': overlay.lineHeight,
+              '--preview-translation-font-size': `${overlay.translationFontSize}px`,
+              '--preview-translation-font-weight': overlay.translationFontWeight,
+              '--preview-translation-line-height': overlay.translationLineHeight,
+              fontFamily: overlay.fontFamily,
+            } as CSSProperties}
+            aria-hidden="true"
+          >
+            <div className="nola-caption-preview__text">
+              {overlay.showSource ? <p className="nola-caption-preview__source">{t('modelsSettingsUi.previewSource')}</p> : null}
+              {overlay.showTranslation ? <p className="nola-caption-preview__translation">{t('modelsSettingsUi.previewTranslation')}</p> : null}
+              {!overlay.showSource && !overlay.showTranslation ? <p className="nola-caption-preview__source">{t('modelsSettingsUi.previewHidden')}</p> : null}
+            </div>
+            <div className="nola-caption-preview__scrim" data-edge="top" />
+            <div className="nola-caption-preview__scrim" data-edge="bottom" />
+            <div className="nola-caption-preview__actions">
+              <Monitor /><Lock /><Pin /><i /><MoreHorizontal /><Minus /><X />
+            </div>
+            <div className="nola-caption-preview__controls">
+              <span className="nola-caption-preview__mic">{sessionActive ? <Square /> : <Mic />}</span>
+              <span className="nola-caption-preview__pill">{modelOptions.recognitionModels.find(model => model.value === settings.recognition.modelId)?.label ?? settings.recognition.modelId}</span>
+              <span className="nola-caption-preview__pill">{label(settings.recognition.sourceLanguage)}</span>
+              <span className="nola-caption-preview__pill">{label(settings.translation.targetLanguage)}</span>
+              <span className="nola-caption-preview__pill">{t(display === 'both' ? 'workspace.modeBoth' : display === 'source' ? 'workspace.modeSource' : 'workspace.modeTranslation')}<ChevronDown /></span>
+              <span className="nola-caption-preview__pill">{t(overlay.layout === 'rolling' ? 'workspace.layoutSplit' : 'workspace.layoutSentence')}<ChevronDown /></span>
+            </div>
           </div>
         </div>
       </SettingGroup>

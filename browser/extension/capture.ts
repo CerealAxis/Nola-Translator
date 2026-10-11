@@ -2,7 +2,10 @@ import { BrowserFailure } from './bridge'
 
 export const CAPTURE_OPTIONS = {
   video: true,
-  audio: { suppressLocalAudioPlayback: false },
+  // Display capture has its own audio controls; microphone processing constraints are not effective here.
+  // Ask the picker to prioritize tab audio, while the user still decides whether to share it.
+  audio: { suppressLocalAudioPlayback: false, restrictOwnAudio: false },
+  audioSelection: 'preferred',
   preferCurrentTab: true,
   selfBrowserSurface: 'include',
   systemAudio: 'exclude',
@@ -23,9 +26,7 @@ export async function createAudioCapture(stream: MediaStream, onChunk: (chunk: A
   const report = (event: string, data: Record<string, unknown>): void => { try { onDebug?.(event, data) } catch { /* a diagnostic never fails capture */ } }
   const track = stream.getAudioTracks()[0]
   const trackRate = track.getSettings().sampleRate ?? 0
-  // The context is created at the track's own rate. Left to itself Chrome picks the output device
-  // rate instead, which put a resampler between the tab capture and the worklet; that path yielded
-  // an exact digital zero while the element played normally.
+  // Matching the track rate avoids an unnecessary resampler before PCM encoding.
   let context: AudioContext
   try { context = trackRate >= 8000 ? new AudioContext({ sampleRate: trackRate }) : new AudioContext() } catch { context = new AudioContext() }
   try {

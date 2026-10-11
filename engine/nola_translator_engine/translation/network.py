@@ -315,6 +315,9 @@ class _BudgetedChatProvider(_NetworkTransport):
     def _payload(self, text: str, system: str) -> dict[str, Any]:
         raise NotImplementedError
 
+    def _system_prompt(self, source: str, target: str) -> str:
+        return _system_prompt(source, target)
+
     def _extract(self, result: object) -> str:
         raise NotImplementedError
 
@@ -371,11 +374,11 @@ class _BudgetedChatProvider(_NetworkTransport):
         Clamped at MAX_CHUNKS because `translate` refuses anything longer before it makes a
         single request, so an unbounded paste cannot buy itself an unbounded deadline.
         """
-        chunks = len(self._plan_chunks(text, _system_prompt(source, target)))
+        chunks = len(self._plan_chunks(text, self._system_prompt(source, target)))
         return min(max(chunks, 1), MAX_CHUNKS) * HTTP_REQUEST_TIMEOUT_SECONDS
 
     async def translate(self, text: str, source: str, target: str) -> ProviderTranslation:
-        system = _system_prompt(source, target)
+        system = self._system_prompt(source, target)
         chunks = self._plan_chunks(text, system)
         if len(chunks) > MAX_CHUNKS:
             raise RuntimeError(
@@ -398,7 +401,7 @@ class _BudgetedChatProvider(_NetworkTransport):
                                on_text: Callable[[str], None]) -> ProviderTranslation:
         if not self.supports_streaming or self.requester is not _post_json:
             return await self.translate(text, source, target)
-        system = _system_prompt(source, target)
+        system = self._system_prompt(source, target)
         chunks = self._plan_chunks(text, system)
         if len(chunks) > MAX_CHUNKS:
             raise RuntimeError(f"{self.label}的原文过长，超过上限 {MAX_CHUNKS} 段")

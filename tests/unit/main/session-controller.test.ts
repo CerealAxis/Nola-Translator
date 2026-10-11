@@ -56,3 +56,14 @@ it('rejects a missing ASR credential before runtime preparation or capture', asy
   expect(request).not.toHaveBeenCalled()
   expect(sessions.busy).toBe(false)
 })
+
+it('starts the public Index-Translate service without reading or forwarding a cloud key', async () => {
+  const request = vi.fn(async () => ({ sessionId: 'public-session' }))
+  const getCredential = vi.fn(async () => 'saved-cloud-secret')
+  const sessions = new SessionController({ engine: { currentState: 'ready', start: vi.fn(), request } as unknown as EngineProcess, meetings: null,
+    getSettings: () => DEFAULT_SETTINGS, getCredential, whenReady: async () => {}, prepare: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+  })
+  await sessions.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: ['zh'], translationProvider: 'index-translate', translationOptions: { apiKey: 'caller-cloud-secret' } }, 'desktop')
+  expect(getCredential).not.toHaveBeenCalled()
+  expect(request).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ translationProvider: 'index-translate', translationOptions: {} }) }), 'sessionStarted', expect.any(Number))
+})

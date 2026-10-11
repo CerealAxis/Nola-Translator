@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_MODEL_IDS } from './index-translate'
 import { LANGUAGE_CODES, normalizeLanguage } from './languages'
 import type { ResourceRecord } from './contracts'
 
@@ -33,7 +34,9 @@ export const RECOMMENDED_CONFIGURATIONS: Record<string, ModelConfiguration> = {
   'hy-mt2-1.8b-q4-k-m': translation(HYMT2_LANGUAGES, 'llama'),
   'hy-mt2-1.8b-q3-k-m': translation(HYMT2_LANGUAGES, 'llama'),
   'hy-mt2-1.8b-iq2-m': translation(HYMT2_LANGUAGES, 'llama'),
+  'hy-mt2-7b-q4-k-m': translation(HYMT2_LANGUAGES, 'llama'),
   'm2m100-418m': translation(M2M100_LANGUAGES, 'pytorch'),
+  ...Object.fromEntries(INDEX_TRANSLATE_MODEL_IDS.map(id => [id, translation(INDEX_TRANSLATE_LANGUAGES, 'llama')])),
 }
 export function configurationOf(model: Pick<ResourceRecord, 'resourceId' | 'configuration'> | undefined): ModelConfiguration | undefined {
   return model?.configuration ?? (model ? RECOMMENDED_CONFIGURATIONS[model.resourceId] : undefined)

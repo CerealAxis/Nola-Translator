@@ -9,7 +9,7 @@ interface ChromePort {
 }
 interface ChromeScript { id: string; matches: string[]; js: string[]; runAt: 'document_start' | 'document_idle'; world?: 'MAIN' | 'ISOLATED'; persistAcrossSessions?: boolean }
 declare const chrome: {
-  runtime: { connect(options: { name: string }): ChromePort; connectNative(name: string): ChromePort; getURL(path: string): string; lastError?: { message?: string }; onConnect: ChromeEvent<(port: ChromePort) => void>; onInstalled: ChromeEvent<() => void>; onStartup: ChromeEvent<() => void>; onMessage: ChromeEvent<(message: unknown, sender: unknown, sendResponse: (response: unknown) => void) => void> }
+  runtime: { getManifest(): { version: string }; connect(options: { name: string }): ChromePort; connectNative(name: string): ChromePort; getURL(path: string): string; lastError?: { message?: string }; onConnect: ChromeEvent<(port: ChromePort) => void>; onInstalled: ChromeEvent<() => void>; onStartup: ChromeEvent<() => void>; onMessage: ChromeEvent<(message: unknown, sender: unknown, sendResponse: (response: unknown) => void) => void> }
   permissions: { request(permissions: { origins: string[] }): Promise<boolean>; getAll(): Promise<{ origins?: string[] }>; contains(permissions: { origins: string[] }): Promise<boolean> }
   scripting: { getRegisteredContentScripts(): Promise<ChromeScript[]>; registerContentScripts(scripts: ChromeScript[]): Promise<void>; updateContentScripts(scripts: ChromeScript[]): Promise<void>; executeScript(options: { target: { tabId: number; allFrames?: boolean }; files: string[]; world?: 'MAIN' | 'ISOLATED' }): Promise<unknown> }
   tabs: { query(query: { active: boolean; currentWindow: boolean }): Promise<{ id?: number; url?: string }[]> }

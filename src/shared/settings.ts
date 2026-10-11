@@ -58,6 +58,23 @@ export type VideoCaptionSettings = {
   audioDeviceId?: string
 }
 
+/** Appearance preferences for captions rendered by the browser extension. */
+export type BrowserCaptionStyleSettings = {
+  showSource: boolean
+  showTranslation: boolean
+  colorScheme: 'dark' | 'light'
+  fontFamily: string
+  sourceFontSize: number
+  translationFontSize: number
+  lineHeight: number
+  sourceColor: string
+  translationColor: string
+  backgroundColor: string
+  backgroundOpacity: number
+  /** Percent of video height between its bottom edge and the caption block, 0..30. */
+  bottomOffset: number
+}
+
 /** Network sources and proxying for every outbound download the app makes. */
 export type NetworkSettings = {
   /** Weight files go to hf-mirror.com instead of huggingface.co when enabled. */
@@ -90,6 +107,7 @@ export type AppSettings = {
   appearance: AppearancePrefs
   overlay: OverlaySettings
   videoCaptions: VideoCaptionSettings
+  browserCaptions: BrowserCaptionStyleSettings
   translation: TranslationSettings
   compute: ComputeSettings
   browserConnection: { enabled: boolean }
@@ -140,7 +158,7 @@ export const MINIMAX_RECOGNITION_MODELS: readonly MinimaxRecognitionModel[] = ['
 export const RECOGNITION_PROVIDERS: readonly RecognitionProvider[] = ['local', 'aliyun', 'minimax']
 
 /** Native recognition translation reuses the Aliyun socket; other providers run separately. */
-export type TranslationProvider = 'local' | 'cloud' | 'microsoft' | 'mymemory' | 'recognition'
+export type TranslationProvider = 'local' | 'cloud' | 'microsoft' | 'mymemory' | 'index-translate' | 'recognition'
 
 /**
  * The HTTP protocol a cloud endpoint actually speaks.
@@ -157,10 +175,10 @@ export type CredentialProvider = 'cloud' | 'microsoft' | 'aliyun-asr' | 'minimax
 export const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'microsoft', 'aliyun-asr', 'minimax-asr']
 
 /**
- * The three local Hy-MT2 quantization tiers, or a `hub:<owner>/<name>` id for an installed GGUF.
+ * Recommended Hy-MT2 sizes and quantizations, or a hub id for an installed GGUF.
  * Only meaningful when provider is `local`.
  */
-export type Hymt2ModelId = 'hy-mt2-1.8b-q4-k-m' | 'hy-mt2-1.8b-q3-k-m' | 'hy-mt2-1.8b-iq2-m' | (string & {})
+export type Hymt2ModelId = 'hy-mt2-1.8b-q4-k-m' | 'hy-mt2-1.8b-q3-k-m' | 'hy-mt2-1.8b-iq2-m' | 'hy-mt2-7b-q4-k-m' | (string & {})
 
 export type TranslationSettings = {
   provider: TranslationProvider
@@ -190,7 +208,7 @@ export type CloudFormatDefaults = {
   cloudModel: string
 }
 
-export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recording' | 'appearance' | 'overlay' | 'videoCaptions' | 'translation' | 'compute' | 'network' | 'modelStoragePath' | 'version' | 'browserConnection'> & {
+export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recording' | 'appearance' | 'overlay' | 'videoCaptions' | 'browserCaptions' | 'translation' | 'compute' | 'network' | 'modelStoragePath' | 'version' | 'browserConnection'> & {
   network?: Partial<NetworkSettings>
   compute?: Partial<ComputeSettings>
   recognition?: Partial<RecognitionSettings>
@@ -198,6 +216,7 @@ export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recor
   appearance?: Partial<AppearancePrefs>
   overlay?: Partial<OverlaySettings>
   videoCaptions?: Partial<VideoCaptionSettings>
+  browserCaptions?: Partial<BrowserCaptionStyleSettings>
   translation?: Partial<TranslationSettings>
 }
 
@@ -209,17 +228,18 @@ export const RECOGNITION_MODEL_LABELS: Record<RecognitionModelId, string> = {
   'sensevoice-small': 'SenseVoiceSmall',
 }
 
-export const TRANSLATION_PROVIDERS: readonly TranslationProvider[] = ['local', 'cloud', 'microsoft', 'mymemory', 'recognition']
+export const TRANSLATION_PROVIDERS: readonly TranslationProvider[] = ['local', 'cloud', 'microsoft', 'mymemory', 'index-translate', 'recognition']
 
 export const CLOUD_API_FORMATS: readonly CloudApiFormat[] = ['chat-completions', 'chat-responses', 'anthropic', 'ollama']
 
-/** The three Hy-MT2 tiers, ordered largest to smallest; ids come from the engine's models/catalog.py. */
-export const HYMT2_MODEL_IDS: readonly Hymt2ModelId[] = ['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m']
+/** Recommended Hy-MT2 presets; ids come from the engine's models/catalog.py. */
+export const HYMT2_MODEL_IDS: readonly Hymt2ModelId[] = ['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m', 'hy-mt2-7b-q4-k-m']
 
 export const HYMT2_MODEL_LABELS: Record<Hymt2ModelId, string> = {
   'hy-mt2-1.8b-q4-k-m': 'Q4_K_M · 1.13 GB · 质量基准',
   'hy-mt2-1.8b-q3-k-m': 'Q3_K_M · 951 MB · 专名最稳',
   'hy-mt2-1.8b-iq2-m': 'UD-IQ2_M · 723 MB · 体积最小',
+  'hy-mt2-7b-q4-k-m': '7B · Q4_K_M · 4.62 GB',
 }
 
 /** Catalog fallback for remote providers and persisted language validation. */
@@ -287,7 +307,21 @@ export const DEFAULT_SETTINGS: AppSettings = {
     layout: 'sentence',
     fontSize: 24,
     position: 82,
-    audioSource: 'tab',
+    audioSource: 'system',
+  },
+  browserCaptions: {
+    showSource: true,
+    showTranslation: true,
+    colorScheme: 'dark',
+    fontFamily: 'Segoe UI Variable',
+    sourceFontSize: 20,
+    translationFontSize: 16,
+    lineHeight: 1.3,
+    sourceColor: '#F7F7F7',
+    translationColor: '#D7DEE8',
+    backgroundColor: '#0D0E10',
+    backgroundOpacity: 0.85,
+    bottomOffset: 5,
   },
   translation: {
     provider: 'local',

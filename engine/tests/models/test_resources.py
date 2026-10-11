@@ -14,6 +14,9 @@ from nola_translator_engine.resources import (
     HYMT2_RESOURCE_ID,
     HYMT2_Q3_RESOURCE_ID,
     HYMT2_IQ2_RESOURCE_ID,
+    HYMT2_7B_RESOURCE_ID,
+    INDEX_TRANSLATE_RESOURCE_IDS,
+    INDEX_TRANSLATE_SPECS,
     M2M100_RESOURCE_ID,
     QWEN_06B_RESOURCE_ID,
     QWEN_RESOURCE_ID,
@@ -99,6 +102,8 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
         HYMT2_Q3_RESOURCE_ID,
         HYMT2_IQ2_RESOURCE_ID,
         M2M100_RESOURCE_ID,
+        *INDEX_TRANSLATE_RESOURCE_IDS,
+        HYMT2_7B_RESOURCE_ID,
     ]
     assert QWEN_RESOURCE_ID == "qwen3-asr-1.7b-hf"
     assert QWEN_06B_RESOURCE_ID == "qwen3-asr-0.6b-hf"
@@ -106,7 +111,7 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     assert HYMT2_RESOURCE_ID == "hy-mt2-1.8b-q4-k-m"
     assert M2M100_RESOURCE_ID == "m2m100-418m"
 
-    qwen, qwen_small, sensevoice, hymt2, hymt2_q3, hymt2_iq2, m2m100 = records
+    qwen, qwen_small, sensevoice, hymt2, hymt2_q3, hymt2_iq2, m2m100 = records[:7]
     assert qwen.kind == "recognitionModel"
     assert qwen.provider == "qwen3-asr"
     assert qwen.name == "Qwen3-ASR 1.7B"
@@ -153,6 +158,31 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
         assert 0 < len(record.languages) <= 128
         assert ResourceRecord.model_validate(record.model_dump()) == record
 
+
+@pytest.mark.parametrize("spec", INDEX_TRANSLATE_SPECS)
+def test_index_translate_presets_download_only_text_weights_and_use_llama(tmp_path, spec):
+    manager = ResourceManager(tmp_path / "models", lambda _event: None)
+    record = next(item for item in manager.list() if item.resourceId == spec.model_id)
+    assert len(spec.files) == 1
+    assert spec.files[0].path.endswith(".Q4_K_M.gguf")
+    assert record.downloadBytes == spec.files[0].size
+    assert manager.adapter_for(spec.model_id) == "llama.cpp"
+    capability = manager.configuration(spec.model_id)
+    assert capability.engine == "llama"
+    assert "ja" in capability.sourceLanguages
+    assert "zh" in capability.targetLanguages
+    assert len(capability.targetLanguages) == 32
+    assert manager.translation_gguf_path(spec.model_id).name == spec.files[0].path
+
+
+def test_hymt2_7b_uses_official_text_weights_and_existing_language_capabilities(tmp_path):
+    manager = ResourceManager(tmp_path / "models", lambda _event: None)
+    record = next(item for item in manager.list() if item.resourceId == HYMT2_7B_RESOURCE_ID)
+    assert record.name == 'Hy-MT2 7B Q4_K_M'
+    assert record.downloadBytes == 4_624_648_896
+    assert manager.adapter_for(record.resourceId) == 'llama.cpp'
+    assert manager.translation_gguf_path(record.resourceId).name == 'Hy-MT2-7B-Q4_K_M.gguf'
+    assert 'zh-Hant' in manager.configuration(record.resourceId).targetLanguages
 
 async def test_install_m2m100_leaves_xdg_dirs_untouched(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

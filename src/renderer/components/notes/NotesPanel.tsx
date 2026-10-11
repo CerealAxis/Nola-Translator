@@ -46,7 +46,7 @@ export function NotesPanel({ value, onChange, collapsed = false, onToggleCollaps
       <div className="nola-workspace-notes-tools" role="toolbar" aria-label={t('notes.title')}>
         {MARKERS.map((marker) => {
           const Icon = marker.icon
-          return <Button key={marker.key} isIconOnly variant="ghost" size="sm" aria-label={t(marker.labelKey)} onPress={() => applyMarker(marker)}><Icon aria-hidden="true" /></Button>
+          return <Button key={marker.key} isIconOnly variant="secondary" size="sm" aria-label={t(marker.labelKey)} onPress={() => applyMarker(marker)}><Icon aria-hidden="true" /></Button>
         })}
       </div>
       <Card.Content className="nola-workspace-notes-content">

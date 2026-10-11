@@ -4,6 +4,8 @@ import { parseCommandLine, parseEventLine } from './schemas'
 import { configurationOf, isModelReady, modelConfigurationSchema, recognitionLanguages, supportsTranslation, translationLanguages } from './model-capabilities'
 import type { ModelConfiguration } from './model-capabilities'
 import { LANGUAGE_LABELS } from './languages'
+import { INDEX_TRANSLATE_MODEL_IDS } from './index-translate'
+import { modelEngines } from './model-engines'
 
 function record(id: string, configuration?: ModelConfiguration): ResourceRecord {
   return { resourceId: id, kind: 'translationModel', provider: 'llama.cpp', name: id, description: 'Test model', languages: [], installed: true, installedBytes: 0, state: 'idle', cancellable: false, configuration }
@@ -11,11 +13,22 @@ function record(id: string, configuration?: ModelConfiguration): ResourceRecord 
 const bilingual: ModelConfiguration = { slot: 'translation', engine: 'llama', languages: [], supportsAutoDetection: false, sourceLanguages: ['en', 'ja'], targetLanguages: ['en', 'ja'] }
 
 describe('model language capabilities', () => {
+  it('offers the verified Index-Translate language presets through the llama engine', () => {
+    for (const id of INDEX_TRANSLATE_MODEL_IDS) {
+      const model = record(id)
+      expect(configurationOf(model)?.engine).toBe('llama')
+      expect(supportsTranslation(model, 'ja', 'zh')).toBe(true)
+      expect(supportsTranslation(model, 'auto', 'en')).toBe(true)
+      expect(supportsTranslation(model, 'en', 'yue')).toBe(false)
+    }
+    expect(modelEngines({ provider: 'index-translate' })).toEqual(['llama'])
+  })
   it('migrates recommended capabilities with their full language lists', () => {
     expect(recognitionLanguages(record('sensevoice-small'))).toEqual(['auto', 'zh', 'en', 'yue', 'ja', 'ko'])
     expect(configurationOf(record('qwen3-asr-1.7b-hf'))?.languages).toHaveLength(30)
     expect(configurationOf(record('m2m100-418m'))?.sourceLanguages).toHaveLength(100)
     expect(translationLanguages(record('hy-mt2-1.8b-q4-k-m'), 'en')).toContain('zh-Hant')
+    expect(translationLanguages(record('hy-mt2-7b-q4-k-m'), 'en')).toContain('yue')
   })
   it('retains custom downloads but refuses to enable them without a configuration', () => {
     const pending = record('hub:test/custom')

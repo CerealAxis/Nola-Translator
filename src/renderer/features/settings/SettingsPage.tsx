@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Alert, Button, Card, Fieldset, ListBox, Spinner, Switch, Tabs, Tooltip } from '@heroui/react'
-import { Cpu, CircleHelp, Gauge, Database, FlaskConical, Languages, Mic, Monitor, Settings, SlidersHorizontal } from 'lucide-react'
+import { Captions, Cpu, CircleHelp, Gauge, Database, FlaskConical, Languages, Mic, Monitor, Settings, SlidersHorizontal } from 'lucide-react'
 
 import type { AppSettings } from '@/bridge'
 import { useI18n } from '@/i18n'
@@ -24,7 +24,7 @@ import './settings.css'
 
 export interface SettingsPanelProps { settings: AppSettings }
 
-const NAV_ICONS = { browser: Monitor, general: Settings, audio: Mic, translation: Languages, compute: Cpu, performance: Gauge, appearance: Monitor, storage: Database, advanced: SlidersHorizontal, developer: FlaskConical }
+const NAV_ICONS = { browser: Captions, general: Settings, audio: Mic, translation: Languages, compute: Cpu, performance: Gauge, appearance: Monitor, storage: Database, advanced: SlidersHorizontal, developer: FlaskConical }
 
 export function SettingsPage() {
   const { t, language } = useI18n()

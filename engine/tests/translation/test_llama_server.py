@@ -299,12 +299,15 @@ async def test_chat_sync_parses_content_from_real_server(tmp_path) -> None:
     )
     try:
         await manager.start(timeout_s=5)
-        content = manager.chat_sync([{"role": "user", "content": "Hello"}])
+        content = manager.chat_sync([{"role": "user", "content": "Hello"}],
+            chat_template_kwargs={"enable_thinking": False}, max_tokens=1024)
         assert content == "你好，世界。"
         payload = captured["payload"]
         assert payload["temperature"] == 0
         assert payload["stream"] is False
         assert payload["messages"] == [{"role": "user", "content": "Hello"}]
+        assert payload["chat_template_kwargs"] == {"enable_thinking": False}
+        assert payload["max_tokens"] == 1024
     finally:
         _shutdown(servers)
 
@@ -322,6 +325,36 @@ async def test_chat_sync_non_2xx_raises(tmp_path) -> None:
             manager.chat_sync([{"role": "user", "content": "Hello"}])
     finally:
         _shutdown(servers)
+
+
+async def test_chat_sync_rejects_truncated_translation(tmp_path, monkeypatch):
+    from nola_translator_engine.translation import llama_server
+    manager, _, _ = make_manager(tmp_path, FakePopen(), health=scripted_health([200]))
+    await manager.start()
+    monkeypatch.setattr(llama_server, '_post_chat', lambda *_args: {
+        'choices': [{'message': {'content': 'partial'}, 'finish_reason': 'length'}],
+    })
+    try:
+        with pytest.raises(LlamaServerError, match='输出上限'):
+            manager.chat_sync([{'role': 'user', 'content': 'Hello'}], max_tokens=1024)
+    finally:
+        await manager.stop()
+
+
+async def test_official_hymt2_7b_template_reaches_server_and_renders_training_tokens(tmp_path):
+    from jinja2 import Template
+    from nola_translator_engine.translation.hymt2 import HYMT2_7B_CHAT_TEMPLATE
+    rendered = Template(HYMT2_7B_CHAT_TEMPLATE).render(messages=[{'role': 'user', 'content': 'Hello'}])
+    assert rendered == '<|startoftext|>Hello<|extra_0|>'
+    popen = FakePopen()
+    manager, _, _ = make_manager(tmp_path, popen, health=scripted_health([200]))
+    manager.chat_template = HYMT2_7B_CHAT_TEMPLATE
+    try:
+        await manager.start()
+        args = popen.calls[0]['args']
+        assert args[args.index('--chat-template') + 1] == HYMT2_7B_CHAT_TEMPLATE
+    finally:
+        await manager.stop()
 
 
 async def test_missing_exe_raises_with_path_context(tmp_path) -> None:

@@ -37,12 +37,13 @@
   .nola-app-body { display: flex; flex: 1; min-height: 0; min-width: 0; }
   .nola-sidebar { flex: 0 0 var(--nola-sidebar-w); width: var(--nola-sidebar-w); border-right: 1px solid color-mix(in oklch, var(--border) 65%, transparent); }
   .nola-sidebar-nav { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
-  .nola-nav-button { display: flex; width: 100%; height: 56px; min-width: 0; justify-content: flex-start; gap: 16px; padding: 0 16px; font-size: 14px; font-weight: 550; border: 0; box-shadow: none; border-radius: 12px; color: var(--foreground); background: transparent; }
+  .nola-nav-button { display: flex; width: 100%; height: 56px; min-width: 0; justify-content: flex-start; gap: 16px; padding: 0 16px; font-size: 14px; font-weight: 550; border: 0; box-shadow: none; border-radius: var(--radius-xl); color: var(--foreground); background: var(--surface-secondary); }
   .nola-nav-button svg { width: 23px; height: 23px; flex-shrink: 0; }
   .nola-nav-button[data-active="true"] { color: var(--accent-foreground); background: var(--nola-primary-gradient); box-shadow: 0 3px 12px color-mix(in oklch, var(--accent) 17%, transparent); }
-  .nola-nav-button:not([data-active="true"]):hover { background: color-mix(in oklch, var(--accent) 7%, transparent); }
+  .nola-nav-button:not([data-active="true"]):hover { background: var(--surface-tertiary); }
   .nola-nav-tooltip { display: none; }
-  .nola-main { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; overflow-x: hidden; }
+  /* Keep the centered route width fixed when navigation switches between tall and short pages. */
+  .nola-main { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
   .nola-route-content { display: flex; flex-direction: column; width: 100%; min-width: 0; max-width: var(--nola-content-max); margin: 0 auto; padding: var(--nola-page-padding); gap: 20px; }
   .nola-route-content > * { min-width: 0; }
   .nola-route-content[data-page="workspace"] { height: 100%; }
@@ -130,7 +131,7 @@
   height: 32px;
   padding: 0 16px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
@@ -143,7 +144,7 @@
    then re-applies `rounded-s-3xl` / `rounded-e-3xl` to the ends only. Without
    this the first and last buttons sit flush against the track. */
 .nola-segmented .toggle-button:first-child,
-.nola-segmented .toggle-button:last-child { border-radius: 12px; }
+.nola-segmented .toggle-button:last-child { border-radius: var(--radius-xl); }
 .nola-segmented .toggle-button:hover { background: color-mix(in oklch, var(--foreground) 7%, transparent); }
 .nola-segmented .toggle-button[data-selected="true"] {
   color: var(--segment-foreground);
@@ -161,4 +162,10 @@
 /* Narrow windows tighten the labels to the workspace toolbar's own breakpoint. */
 @media (max-width: 760px) {
   .nola-workspace-view-controls .nola-segmented .toggle-button { padding-inline: 9px; font-size: 12px; }
+}
+
+/* Action buttons use one large corner. Only the title-bar controls opt out. */
+.button:not(.nola-titlebar-icon):not(.nola-window-control):not(.nola-web-controls .button),
+.toggle-button {
+  border-radius: var(--radius-xl);
 }

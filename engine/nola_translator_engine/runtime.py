@@ -85,6 +85,8 @@ from .recognition.sensevoice_streaming import create_sensevoice_recognizer
 from .resources import (
     HYMT2_RESOURCE_ID,
     HYMT2_RESOURCE_IDS,
+    HYMT2_7B_RESOURCE_ID,
+    INDEX_TRANSLATE_RESOURCE_IDS,
     M2M100_RESOURCE_ID,
     QWEN_RESOURCE_ID,
     ResourceActionError,
@@ -118,6 +120,7 @@ from .translation.network import (
 )
 from .translation.scheduler import TranslationScheduler
 from .translation.mymemory import DEFAULT_MYMEMORY_ENDPOINT, MyMemoryTranslationProvider
+from .translation.index_translate import IndexTranslateLocalProvider, IndexTranslatePublicProvider
 
 
 EventSink = Callable[[EngineEvent], None]
@@ -156,7 +159,7 @@ class UnknownTranslationModel(ValueError):
     def __init__(self, model_id: str) -> None:
         super().__init__(
             f"未知的翻译模型 id：{model_id}。可用："
-            + "、".join((*HYMT2_RESOURCE_IDS, M2M100_RESOURCE_ID))
+            + "、".join((*HYMT2_RESOURCE_IDS, M2M100_RESOURCE_ID, *INDEX_TRANSLATE_RESOURCE_IDS))
         )
         self.model_id = model_id
 
@@ -729,6 +732,11 @@ class EngineRuntime:
         remote = config.recognitionProvider != "local"
         if config.translationProvider == "recognition" and config.recognitionProvider != "aliyun":
             raise ResourceActionError("invalidConfiguration", {"reason": "nativeTranslationRequiresAliyun"})
+        if config.translationProvider == "index-translate":
+            from .translation.index_translate import LANGUAGE_NAMES
+            for target in config.targetLanguages:
+                if normalize(target) not in LANGUAGE_NAMES:
+                    raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedTranslationLanguage", "language": target})
         if remote:
             try:
                 self._remote_recognizer(config)
@@ -1006,6 +1014,9 @@ class EngineRuntime:
         elif config.translationProvider == "mymemory":
             provider = MyMemoryTranslationProvider(endpoint=resolved(endpoint, DEFAULT_MYMEMORY_ENDPOINT),
                 email=options.email if options else "")
+        elif config.translationProvider == "index-translate":
+            # Public API configuration is fixed and never consumes a cloud credential.
+            provider = IndexTranslatePublicProvider()
         elif config.translationProvider == "cloud":
             limits = {
                 "context_window": context_window,
@@ -1046,7 +1057,7 @@ class EngineRuntime:
                 )
         else:
             raise ValueError(
-                f"未知翻译 Provider: {config.translationProvider}。可选：local、cloud、microsoft"
+                f"未知翻译 Provider: {config.translationProvider}"
             )
         self.translation_provider = provider
         self.translation_scheduler = TranslationScheduler(
@@ -1078,7 +1089,9 @@ class EngineRuntime:
                 precision="auto" if self._translation_device.id == "cpu" and config.compute.translationDevice != "cpu" and config.compute.allowCpuFallback else config.compute.precision,
                 threads=self._torch_threads)
         if adapter == "llama.cpp":
-            # all three quantization tiers share one llama-server; load whichever the session picked.
+            # Built-in and custom GGUF models share the same server and compute configuration.
+            from .translation.hymt2 import HYMT2_7B_CHAT_TEMPLATE
+            self.llama_manager.chat_template = HYMT2_7B_CHAT_TEMPLATE if model_id == HYMT2_7B_RESOURCE_ID else None
             self.llama_manager.switch_gguf(self.resources.translation_gguf_path(model_id))
             reserved_mb = config.compute.reservedVramMb
             if (self._recognition_device.id != 'cpu' and
@@ -1089,6 +1102,8 @@ class EngineRuntime:
                 reserved_mb = min(65536, reserved_mb + int(self._device_plan['recognitionEstimateMb']))
             self.llama_manager.configure_compute(self._translation_device,
                 config.compute.model_copy(update={"cpuThreads": self._llama_threads, "reservedVramMb": reserved_mb}))
+            if model_id in INDEX_TRANSLATE_RESOURCE_IDS:
+                return IndexTranslateLocalProvider(self.llama_manager)
             capability = self.resources.configuration(model_id)
             languages = {code: self._language_name(code) for code in set(capability.sourceLanguages + capability.targetLanguages)}
             return HyMt2TranslationProvider(self.llama_manager, languages=languages)
@@ -1524,7 +1539,7 @@ class EngineRuntime:
             self._publish_translation_result(request, result, session_id, generation)
 
         target_errors: dict[str, str] = {}
-        if provider_name == "hymt2":
+        if provider_name in {"hymt2", "index-translate-local"}:
             active = self.active_config
             try:
                 model_id = self._local_translation_model_id(active) if active else HYMT2_RESOURCE_ID

@@ -156,7 +156,10 @@ export class RuntimeManager {
       const intent = decodeDeviceIntent(value)
       if (!intent) continue
       if (!this.hardware.adapters.some(a => a.hardwareId === intent.hardwareId)) throw new Error('指定显卡已断开，请重新选择计算设备')
-      if (this.local[kind as 'engine' | 'llama'].backend !== intent.backend) throw new Error(`所选 ${intent.backend} 设备与已安装组件后端不匹配，请到设置选择对应组合`)
+      if (this.local[kind as 'engine' | 'llama'].backend !== intent.backend) {
+        const runtime = kind === 'engine' ? 'TORCH' : 'LLAMA'
+        throw new Error(`RUNTIME_${runtime}_DEVICE_MISMATCH: 所选 ${intent.backend} 设备与已安装组件后端不匹配，请到设置选择对应组合`)
+      }
     }
   }
   private inside(name: string): string {

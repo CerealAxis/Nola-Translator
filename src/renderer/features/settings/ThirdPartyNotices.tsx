@@ -39,7 +39,7 @@ export function ThirdPartyNotices() {
                 <pre className="settings-notices-text">{leftAlignedNotices}</pre>
               </Modal.Body>
               <Modal.Footer className="settings-notices-footer">
-                <Button variant="ghost" size="sm" className="settings-notices-close" onPress={() => setOpen(false)}>
+                <Button variant="secondary" size="sm" className="settings-notices-close" onPress={() => setOpen(false)}>
                   {t('common.close')}
                 </Button>
               </Modal.Footer>

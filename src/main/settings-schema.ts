@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { INDEX_TRANSLATE_MODEL_IDS } from '../shared/index-translate'
 import { computeSettingsPatchSchema } from '../shared/compute'
 
 /**
@@ -33,7 +34,7 @@ const recognitionModelIdSchema = z.union([
  * A closed union for the same reason as `recognitionModelIdSchema`.
  */
 const localModelIdSchema = z.union([
-  z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m', 'm2m100-418m']),
+  z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m', 'hy-mt2-7b-q4-k-m', 'm2m100-418m', ...INDEX_TRANSLATE_MODEL_IDS]),
   hubModelId,
 ])
 
@@ -93,8 +94,22 @@ export const settingsPatchSchema = z.object({
     audioSource: z.enum(['tab', 'system']).optional(),
     audioDeviceId: z.string().min(1).max(512).optional(),
   }).partial().optional(),
+  browserCaptions: z.object({
+    showSource: z.boolean().optional(),
+    showTranslation: z.boolean().optional(),
+    colorScheme: z.enum(['dark', 'light']).optional(),
+    fontFamily: z.string().min(1).max(128).optional(),
+    sourceFontSize: z.number().int().min(10).max(72).optional(),
+    translationFontSize: z.number().int().min(10).max(72).optional(),
+    lineHeight: z.number().min(1).max(2.5).optional(),
+    sourceColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    translationColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    backgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    backgroundOpacity: z.number().min(0).max(1).optional(),
+    bottomOffset: z.number().min(0).max(30).optional(),
+  }).partial().optional(),
   translation: z.object({
-    provider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'recognition']).optional(),
+    provider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'index-translate', 'recognition']).optional(),
     mymemoryEndpoint: z.string().max(2048).optional(),
     mymemoryEmail: z.string().max(320).optional(),
     localModelId: localModelIdSchema.optional(),

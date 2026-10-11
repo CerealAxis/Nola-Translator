@@ -1,7 +1,7 @@
 import { access, readFile, readdir, writeFile, mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { spawn } from 'node:child_process'
-import { BROWSER_EXTENSION_ID, type BrowserIntegrationInfo, type BrowserKind } from '../shared/browser'
+import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, type BrowserIntegrationInfo, type BrowserKind } from '../shared/browser'
 
 export interface BrowserIntegrationsOptions {
   localAppData: string
@@ -55,13 +55,14 @@ export class BrowserIntegrations {
       if (executable) this.executables[browser] = executable
       else delete this.executables[browser]
       const root = join(this.options.localAppData, browser === 'chrome' ? 'Google/Chrome/User Data' : 'Microsoft/Edge/User Data')
-      return { browser, available: !!executable, extensionStatus: await this.extensionState(root, BROWSER_EXTENSION_ID), connected: false, enabled: this.enabled[browser] }
+      return { browser, available: !!executable, ...await this.extensionState(root, BROWSER_EXTENSION_ID), connected: false, enabled: this.enabled[browser] }
     }))
   }
-  private async extensionState(root: string, id: string): Promise<BrowserIntegrationInfo['extensionStatus']> {
+  private async extensionState(root: string, id: string): Promise<Pick<BrowserIntegrationInfo, 'extensionStatus' | 'extensionVersion' | 'extensionCompatible'>> {
     let profiles: string[]
-    try { profiles = (await readdir(root, { withFileTypes: true })).filter(entry => entry.isDirectory() && /^(Default|Profile \d+)$/.test(entry.name)).map(entry => entry.name) } catch (error) { return (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'notInstalled' : 'unknown' }
+    try { profiles = (await readdir(root, { withFileTypes: true })).filter(entry => entry.isDirectory() && /^(Default|Profile \d+)$/.test(entry.name)).map(entry => entry.name) } catch (error) { return { extensionStatus: (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'notInstalled' : 'unknown' } }
     let disabled = false; let unknown = false
+    let installed: Pick<BrowserIntegrationInfo, 'extensionStatus' | 'extensionVersion' | 'extensionCompatible'> | undefined
     for (const profile of profiles) {
       for (const filename of ['Secure Preferences', 'Preferences']) {
         const path = join(root, profile, filename)
@@ -78,13 +79,20 @@ export class BrowserIntegrations {
         const installRecord = typeof entry.path === 'string' && entry.path.length > 0 && typeof entry.location === 'number'
         if (!validReasons) unknown = true
         else if (entry.state === 0 || hasReasons) disabled = true
-        else if (entry.state === 1 || (entry.state === undefined && installRecord)) return 'installed'
+        else if (entry.state === 1 || (entry.state === undefined && installRecord)) {
+          // Unpacked installs may omit the cached manifest. Read their registered path without editing preferences.
+          const manifest = object(entry.manifest) ?? (typeof entry.path === 'string' ? await json(join(isAbsolute(entry.path) ? entry.path : join(root, profile, 'Extensions', entry.path), 'manifest.json')) : null)
+          const version = typeof manifest?.version === 'string' ? manifest.version : undefined
+          const found = { extensionStatus: 'installed' as const, ...(version ? { extensionVersion: version, extensionCompatible: version === BROWSER_EXTENSION_VERSION } : {}) }
+          if (found.extensionCompatible) return found
+          installed ??= found
+        }
         else unknown = true
         // Secure Preferences is authoritative when it contains this extension.
         break
       }
     }
-    return disabled ? 'disabled' : unknown ? 'unknown' : 'notInstalled'
+    return installed ?? { extensionStatus: disabled ? 'disabled' : unknown ? 'unknown' : 'notInstalled' }
   }
   async setEnabled(browser: BrowserKind, enabled: boolean): Promise<void> {
     await this.inspect()

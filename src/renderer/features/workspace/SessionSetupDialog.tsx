@@ -252,7 +252,7 @@ export function SessionSetupDialog({
                   <Label className="text-[14px] leading-[1.45] font-semibold text-foreground">{t('session.name')}</Label>
                   <Tooltip delay={300}>
                     <Button
-                      variant="ghost"
+                      variant="secondary"
                       size="sm"
                       isIconOnly
                       aria-label={t('session.nameHelpAria')}

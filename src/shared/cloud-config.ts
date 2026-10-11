@@ -1,4 +1,5 @@
 import type { SessionConfig } from './contracts'
+import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_PUBLIC_MODEL } from './index-translate'
 import { DEFAULT_SETTINGS, MINIMAX_RECOGNITION_MODELS, type RecognitionProvider, type RecognitionSettings, type TranslationSettings } from './settings'
 
 /** Connection options are public configuration; credentials are injected only by the main process. */
@@ -22,6 +23,7 @@ export function translationOptionsOf(settings: TranslationSettings): SessionConf
     case 'cloud': return { endpoint: settings.cloudEndpoint, model: settings.cloudModel, apiFormat: settings.cloudApiFormat, contextWindow: settings.cloudContextWindow, maxOutputTokens: settings.cloudMaxOutputTokens }
     case 'microsoft': return { endpoint: settings.microsoftEndpoint, region: settings.microsoftRegion }
     case 'mymemory': return { endpoint: settings.mymemoryEndpoint ?? DEFAULT_SETTINGS.translation.mymemoryEndpoint, email: settings.mymemoryEmail ?? '' }
+    case 'index-translate': return { endpoint: INDEX_TRANSLATE_ENDPOINT, model: INDEX_TRANSLATE_PUBLIC_MODEL, apiFormat: 'chat-completions', contextWindow: 32768, maxOutputTokens: 1024 }
     default: return undefined
   }
 }

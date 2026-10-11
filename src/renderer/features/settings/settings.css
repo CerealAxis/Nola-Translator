@@ -55,11 +55,6 @@
 .settings-slider .number-field__group { background:transparent; border:0; box-shadow:none; }
 .settings-slider .number-field__input { text-align:right; padding:4px; font-size:13px; }
 .settings-slider__unit { color:var(--muted); font-size:12px; }
-.settings-preview { position:relative; isolation:isolate; overflow:hidden; border-radius:12px; padding:22px; min-height:112px; display:flex; justify-content:center; flex-direction:column; gap:6px; text-align:center; }
-.settings-preview::before { content:''; position:absolute; inset:0; background:var(--preview-color); opacity:var(--preview-opacity); }
-.settings-preview__stage { border-radius:12px; background:var(--surface-secondary); }
-.settings-preview p { position:relative; margin:0; overflow-wrap:anywhere; }
-.settings-preview[data-layout="sentence"] { text-align:left; }
 .settings-colors { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding-top:10px; border-top:1px solid var(--separator); }
 .settings-color { display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0; }
 .settings-color > span { font-size:13px; color:var(--muted); }

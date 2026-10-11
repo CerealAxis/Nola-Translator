@@ -4,7 +4,7 @@ import { BrowserFailure, type ExtensionBridge, type RequestInput } from './bridg
 import { createExtensionStore } from './store'
 import type { AudioChunk } from './capture'
 
-const summary: BrowserSummary = { protocolVersion: 1, uiLanguage: 'en', sourceLanguage: 'en', targetLanguage: 'zh', devices: [], browserAudio: true, captionServiceActive: true, config: { videoCaptions: { showSource: true, showTranslation: false, layout: 'sentence', fontSize: 28, position: 60 }, sourceLanguage: 'en', targetLanguage: 'zh' } }
+const summary: BrowserSummary = { protocolVersion: 1, uiLanguage: 'en', sourceLanguage: 'en', targetLanguage: 'zh', devices: [], browserAudio: true, captionServiceActive: true, config: { appearance: { showSource: true, showTranslation: false, colorScheme: 'dark', fontFamily: 'Segoe UI Variable', sourceFontSize: 28, translationFontSize: 22, lineHeight: 1.3, sourceColor: '#F7F7F7', translationColor: '#D7DEE8', backgroundColor: '#0D0E10', backgroundOpacity: 0.85, bottomOffset: 5 }, audioSource: 'tab', sourceLanguage: 'en', targetLanguage: 'zh' } }
 function setup(options: { wrongCapture?: boolean; deferredCapture?: boolean; deferredAudio?: boolean } = {}) {
   let listener: (response: BrowserResponse) => void = () => undefined
   let onChunk: (chunk: AudioChunk) => void = () => undefined
@@ -23,7 +23,7 @@ function setup(options: { wrongCapture?: boolean; deferredCapture?: boolean; def
   const audio = { enable: vi.fn(), close: vi.fn(async () => undefined) }
   const store = createExtensionStore({ bridge, getDisplayMedia, audioCapture: async (_stream, callback) => { onChunk = callback; return audio } })
   store.updateVideos([video])
-  return { store, bridge, requests, video, capture, audio, getDisplayMedia, stopVideo, stopAudio, resolveCapture: () => resolveCapture(capture), emit: (response: BrowserResponse) => listener(response), chunk: (epoch = store.getSnapshot().epoch) => onChunk({ buffer: new Int16Array(4800).buffer, sampleRate: 48000, epoch, sourcePeak: 0.1 }) }
+  return { store, bridge, requests, video, capture, audio, getDisplayMedia, stopVideo, stopAudio, resolveCapture: () => resolveCapture(capture), emit: (response: BrowserResponse) => listener(response), rawChunk: (sample: number) => onChunk({ buffer: new Int16Array(4800).fill(sample).buffer, sampleRate: 48000, epoch: store.getSnapshot().epoch, sourcePeak: 0 }), chunk: (epoch = store.getSnapshot().epoch) => onChunk({ buffer: new Int16Array(4800).buffer, sampleRate: 48000, epoch, sourcePeak: 0.1 }) }
 }
 beforeEach(() => { document.documentElement.dataset.nolaCaptureHandle = 'current' })
 function deferRequest(fixture: ReturnType<typeof setup>, matches: (request: RequestInput) => boolean) {
@@ -41,6 +41,36 @@ function deferRequest(fixture: ReturnType<typeof setup>, matches: (request: Requ
   return { get captured() { return captured }, resolve: () => resolve(), reject: () => reject(new BrowserFailure('appUnavailable')) }
 }
 describe('extension session lifecycle', () => {
+  it('keeps a quiet scene active and clears the audio warning when sound returns', async () => {
+    const fixture = setup(); await fixture.store.init(); fixture.store.pressStart()
+    await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('active'))
+    for (let index = 0; index < 35; index++) { fixture.rawChunk(0); await Promise.resolve() }
+    expect(fixture.store.getSnapshot()).toMatchObject({ status: 'active', error: 'tabAudioSilent' })
+    fixture.rawChunk(800)
+    expect(fixture.store.getSnapshot()).toMatchObject({ status: 'active', error: undefined })
+    await fixture.store.destroy()
+  })
+  it('prepares tab audio in a gesture and reuses the shared stream for start', async () => {
+    const fixture = setup(); await fixture.store.init(); fixture.store.pressCapture()
+    expect(fixture.getDisplayMedia).toHaveBeenCalledOnce()
+    await vi.waitFor(() => expect(fixture.store.getSnapshot().audioCaptured).toBe(true))
+    expect(fixture.requests.some(request => request.type === 'start')).toBe(false)
+    fixture.store.pressStart()
+    await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('active'))
+    expect(fixture.getDisplayMedia).toHaveBeenCalledOnce()
+    await fixture.store.close()
+    expect(fixture.store.getSnapshot()).toMatchObject({ status: 'idle', audioCaptured: false, panelOpen: false })
+    expect(fixture.stopAudio).toHaveBeenCalledOnce()
+    await fixture.store.destroy()
+  })
+  it('does not capture or start when the desktop rejects the extension release', async () => {
+    const fixture = setup()
+    vi.mocked(fixture.bridge.request).mockResolvedValue({ ...summary, extensionCompatible: false })
+    await fixture.store.init(); fixture.store.pressStart()
+    expect(fixture.store.getSnapshot().error).toBe('extensionVersionMismatch')
+    expect(fixture.getDisplayMedia).not.toHaveBeenCalled()
+    await fixture.store.destroy()
+  })
   it('unpauses before resetting the anchor after playback resumes', async () => {
     const fixture = setup()
     await fixture.store.init(); fixture.store.pressStart()
@@ -86,17 +116,16 @@ describe('extension session lifecycle', () => {
   })
   it('takes caption configuration from the desktop summary and keeps it out of the start request', async () => {
     const fixture = setup(); await fixture.store.init()
-    expect(fixture.store.getSnapshot().config).toMatchObject({ fontSize: 28, position: 60, showSource: true, showTranslation: false, targetLanguage: 'zh' })
+    expect(fixture.store.getSnapshot().config).toMatchObject({ sourceFontSize: 28, bottomOffset: 5, showSource: true, showTranslation: false, targetLanguage: 'zh' })
     fixture.store.pressStart(); await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('active'))
     expect(fixture.requests.find(request => request.type === 'start')).toMatchObject({ source: 'tab' })
     await fixture.store.destroy()
   })
-  it('requires an explicit video choice when several players are present', () => {
+  it('automatically selects the playing video when several players are present', () => {
     const fixture = setup(); const second = document.createElement('video')
     const separate = createExtensionStore({ bridge: fixture.bridge, getDisplayMedia: fixture.getDisplayMedia })
-    separate.updateVideos([fixture.video, second]); separate.pressStart()
-    expect(fixture.getDisplayMedia).not.toHaveBeenCalled()
-    separate.chooseVideo(1); expect(separate.getSnapshot().selectedVideo).toBe(second)
+    separate.updateVideos([second, fixture.video])
+    expect(separate.getSnapshot().selectedVideo).toBe(fixture.video)
   })
   it('fences audio immediately on seeking and discards stale epoch and caption revisions', async () => {
     const fixture = setup(); await fixture.store.init(); fixture.store.pressStart(); await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('active'))
@@ -216,19 +245,18 @@ describe('extension session lifecycle', () => {
     expect(fixture.requests.filter(request => request.type === 'stop')).toHaveLength(1)
     await fixture.store.destroy()
   })
-  it('requires a new explicit choice when a second video appears before start', () => {
+  it('keeps the selected player when a second video appears before start', () => {
     const fixture = setup(); const second = document.createElement('video')
-    fixture.store.updateVideos([fixture.video, second]); fixture.store.pressStart()
-    expect(fixture.store.getSnapshot().selectedVideo).toBeNull(); expect(fixture.getDisplayMedia).not.toHaveBeenCalled()
-    fixture.store.chooseVideo(0); fixture.store.updateVideos([fixture.video, second])
+    fixture.store.updateVideos([fixture.video, second])
     expect(fixture.store.getSnapshot().selectedVideo).toBe(fixture.video)
   })
-  it('stops when the pinned player disappears and its replacement is ambiguous', async () => {
+  it('reanchors to a replacement player without ending tab audio capture', async () => {
     const fixture = setup(); await fixture.store.init(); fixture.store.pressStart(); await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('active'))
     const replacements = [document.createElement('video'), document.createElement('video')]
     fixture.store.updateVideos(replacements)
-    await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('idle'))
-    expect(fixture.store.getSnapshot().selectedVideo).toBeNull(); expect(fixture.stopAudio).toHaveBeenCalledOnce()
+    expect(fixture.store.getSnapshot().status).toBe('active')
+    expect(fixture.store.getSnapshot().selectedVideo).toBe(replacements[0]); expect(fixture.stopAudio).not.toHaveBeenCalled()
+    await fixture.store.destroy()
   })
   it('exposes retry after disconnect even when a previous desktop summary remains', async () => {
     const fixture = setup(); await fixture.store.init()

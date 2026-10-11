@@ -5,25 +5,33 @@
  * match on the repo path, local ids on their resourceId, anything else stays `'unknown'`.
  */
 import Alibaba from '@lobehub/icons/es/Alibaba/components/Mono'
+import Bilibili from '@lobehub/icons/es/Bilibili/components/Mono'
 import Hunyuan from '@lobehub/icons/es/Hunyuan/components/Mono'
 import Meta from '@lobehub/icons/es/Meta/components/Mono'
 import Qwen from '@lobehub/icons/es/Qwen/components/Mono'
 import { AudioLines, Globe } from 'lucide-react'
 import type { ComponentType, SVGProps } from 'react'
 
-export type ModelBrand = 'qwen' | 'alibaba' | 'hunyuan' | 'meta' | 'unknown'
+export type ModelBrand = 'qwen' | 'alibaba' | 'hunyuan' | 'bilibili' | 'meta' | 'unknown'
 type KnownBrand = Exclude<ModelBrand, 'unknown'>
 
 type MarkProps = SVGProps<SVGSVGElement> & { size?: string | number; color?: string; title?: string }
 type Mark = ComponentType<MarkProps>
 
-const MARK_BY_BRAND: Record<KnownBrand, Mark> = { qwen: Qwen, alibaba: Alibaba, hunyuan: Hunyuan, meta: Meta }
+const MARK_BY_BRAND: Record<KnownBrand, Mark> = {
+  qwen: Qwen,
+  alibaba: Alibaba,
+  hunyuan: Hunyuan,
+  bilibili: Bilibili,
+  meta: Meta,
+}
 
 /** Brand tokens, first match wins. */
 const REPO_TOKENS: ReadonlyArray<readonly [RegExp, KnownBrand]> = [
   [/qwen/i, 'qwen'],
   [/sensevoice|funaudiollm/i, 'alibaba'],
   [/hy-?mt2|hunyuan/i, 'hunyuan'],
+  [/index-translate|indexteam|bilibili/i, 'bilibili'],
   [/m2m100|nllb|llama/i, 'meta'],
 ]
 
@@ -32,6 +40,7 @@ const LOCAL_TOKENS: ReadonlyArray<readonly [RegExp, KnownBrand]> = [
   [/qwen/i, 'qwen'],
   [/sensevoice/i, 'alibaba'],
   [/hy-?mt2|hunyuan/i, 'hunyuan'],
+  [/index-translate/i, 'bilibili'],
   [/m2m100/i, 'meta'],
 ]
 
@@ -40,6 +49,7 @@ const BY_PROVIDER: Record<string, KnownBrand> = {
   'qwen3-asr': 'qwen',
   sensevoice: 'alibaba',
   'hy-mt2': 'hunyuan',
+  'index-translate': 'bilibili',
   m2m100: 'meta',
 }
 
@@ -60,7 +70,7 @@ export function brandOf(record: { resourceId: string; provider: string }): Model
 
 /**
  * Hunyuan's glyph is a solid disc filling the whole 24×24 box, punched out with `fill-rule`,
- * while the other three are bare outlines, so at one size it reads much heavier and is scaled
+ * while the other brand marks are bare outlines, so at one size it reads much heavier and is scaled
  * down to balance the row.
  */
 const HUNYUAN_SCALE = 0.8

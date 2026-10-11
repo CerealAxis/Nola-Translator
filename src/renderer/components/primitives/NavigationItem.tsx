@@ -10,7 +10,7 @@ export function NavigationItem({ icon: Icon, label, active = false, onPress }: N
   return (
     <Tooltip delay={800}>
       <Button
-        variant="ghost"
+        variant="secondary"
         onPress={onPress}
         aria-label={label}
         aria-current={active ? 'page' : undefined}

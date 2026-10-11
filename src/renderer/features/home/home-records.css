@@ -62,9 +62,11 @@
 .nola-records-table__actions { width: 11%; }
 .nola-records-table__title { display: flex; align-items: center; min-width: 0; gap: 12px; color: var(--foreground); }
 .nola-records-table__title > svg { width: 22px; height: 22px; flex-shrink: 0; stroke-width: 1.8; }
-.nola-records-table__open { display: block; padding: 0; min-width: 0; min-height: 30px; height: auto; max-width: 100%; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 6px; color: var(--foreground); font-weight: 550; font-size: 14px; background: transparent; }
+.nola-records-table__open { display: block; padding: 4px 8px; min-width: 0; min-height: 30px; height: auto; max-width: 100%; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--foreground); font-weight: 550; font-size: 14px; background: var(--default); }
 .nola-records-table__action-group { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
-.nola-records-table__view { color: var(--accent); padding: 4px; font-size: 13px; min-width: 0; }
+.nola-records-table .nola-records-table__icon-action.button { width: 32px; min-width: 32px; height: 32px; padding: 0; border: 0; box-shadow: none; color: var(--accent); background: transparent; }
+.nola-records-table .nola-records-table__icon-action.button:hover { color: var(--foreground); background: transparent; }
+.nola-records-table__view { flex: none; }
 .nola-record-status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
 .nola-record-status i { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
 .nola-record-status--live { color: var(--accent); }

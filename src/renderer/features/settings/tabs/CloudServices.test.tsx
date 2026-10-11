@@ -35,3 +35,14 @@ it('keeps the local model choice inside the translation service card', () => {
   expect(screen.getByText('模型')).toBeInTheDocument()
   expect(document.querySelectorAll('.settings-group')).toHaveLength(1)
 })
+
+it('shows the fixed public Index-Translate model with streaming and no key field', () => {
+  const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'index-translate' as const } }
+  settingsStore.setState({ settings })
+  render(<TranslationTab settings={settings} />)
+  expect(screen.getByText('Index-Translate-35B-A3B')).toBeInTheDocument()
+  expect(screen.getByText('https://index-translate.bilibili.com/v1')).toBeInTheDocument()
+  expect(screen.getByText(/原文会发送给哔哩哔哩/)).toBeInTheDocument()
+  expect(screen.queryByLabelText('API 密钥')).not.toBeInTheDocument()
+  expect(screen.getByRole('switch')).toBeInTheDocument()
+})

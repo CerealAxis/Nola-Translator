@@ -80,15 +80,15 @@ export function RecordsTable({ meetings, onOpen, onRename, onExport, onDelete, p
                       <Checkbox.Content><Checkbox.Control><Checkbox.Indicator /></Checkbox.Control></Checkbox.Content>
                     </Checkbox>
                   </Table.Cell> : null}
-                  <Table.Cell className="nola-records-table__name"><div className="nola-records-table__title">{live ? <Mic aria-hidden="true" className="text-accent" /> : <FileText aria-hidden="true" />}<Button variant="ghost" onPress={() => onOpen(meeting.meetingId)} className="nola-records-table__open">{title}</Button></div></Table.Cell>
+                  <Table.Cell className="nola-records-table__name"><div className="nola-records-table__title">{live ? <Mic aria-hidden="true" className="text-accent" /> : <FileText aria-hidden="true" />}<Button variant="secondary" onPress={() => onOpen(meeting.meetingId)} className="nola-records-table__open">{title}</Button></div></Table.Cell>
                   <Table.Cell className="nola-records-table__time">{formatDateTime(meeting.endedAtMs ?? meeting.startedAtMs)}</Table.Cell>
                   <Table.Cell className="nola-records-table__duration">{formatClock(meeting.durationMs)}</Table.Cell>
                   <Table.Cell className="nola-records-table__language">{languageLabel(meeting.sourceLanguage)} → {languageLabel(meeting.targetLanguage)}</Table.Cell>
                   <Table.Cell className="nola-records-table__status"><span className={statusClass}><i aria-hidden="true" />{statusLabel}</span></Table.Cell>
                   <Table.Cell className="nola-records-table__actions"><div className="nola-records-table__action-group">
-                    {onRename ? <Button variant="ghost" size="sm" className="nola-records-table__view" onPress={() => onOpen(meeting.meetingId)}>{t('records.view')}</Button> : null}
+                    {onRename ? <Button variant="secondary" size="sm" isIconOnly aria-label={t('homeRecordsUi.detail')} className="nola-records-table__view nola-records-table__icon-action" onPress={() => onOpen(meeting.meetingId)}><Eye aria-hidden="true" size={18} /></Button> : null}
                     <Dropdown>
-                      <Button isIconOnly size="sm" variant="ghost" aria-label={t('homeRecordsUi.moreActions', { name: title })}><MoreHorizontal aria-hidden="true" size={18} /></Button>
+                      <Button isIconOnly size="sm" variant="secondary" className="nola-records-table__icon-action" aria-label={t('homeRecordsUi.moreActions', { name: title })}><MoreHorizontal aria-hidden="true" size={18} /></Button>
                       <Dropdown.Popover>
                         <Dropdown.Menu>
                           <Dropdown.Item id="view" textValue={t('homeRecordsUi.detail')} onAction={() => onOpen(meeting.meetingId)}><Eye aria-hidden="true" size={18} />{t('homeRecordsUi.detail')}</Dropdown.Item>

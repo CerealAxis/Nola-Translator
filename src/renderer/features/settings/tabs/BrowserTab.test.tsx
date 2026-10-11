@@ -105,7 +105,7 @@ it('keeps browser extension installation independent from Nola connection permis
 it('shows detecting only before the first status result', () => {
   settingsStore.setState({ browser: null })
   render(<BrowserTab />)
-  expect(screen.getAllByRole('status')).toHaveLength(2)
+  expect(within(screen.getByRole('list')).getAllByRole('status')).toHaveLength(2)
   expect(screen.getAllByText('正在检测')).toHaveLength(2)
   act(() => settingsStore.setState({ browser: { enabled: true, registered: true, captionServiceActive: false, sessionActive: false, connections: 0, browsers: [{ ...chrome, extensionStatus: 'unknown' }, { ...edge, extensionStatus: 'unknown' }] } }))
   expect(screen.queryByText('正在检测')).not.toBeInTheDocument()

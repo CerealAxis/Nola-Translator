@@ -6,6 +6,7 @@ import { DEFAULT_SETTINGS, RECOGNITION_MODEL_IDS, SOURCE_LANGUAGE_OPTIONS, TARGE
 import { findGithubProxyNode, GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT } from '../shared/github-proxies'
 import { ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS } from '../shared/settings'
 import { remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../shared/cloud-config'
+import { settingsPatchSchema } from './settings-schema'
 
 // Store-internal patches may also touch fields the IPC schema exposes only through their own channels.
 export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 1; browserConnection?: { enabled: boolean } }
@@ -35,7 +36,7 @@ function sanitizeVideoCaptionAudioSource(value: unknown): 'tab' | 'system' {
 
 /** A device id is a display-device string from `listDevices()`; anything else means "no device chosen". */
 function sanitizeVideoCaptionDeviceId(value: unknown): string | undefined {
-  return typeof value === 'string' && value.length > 0 && value.length <= 512 ? value : undefined
+  return typeof value === 'string' && value.length > 0 && value.length <= 512 && value !== 'defaultOutput' ? value : undefined
 }
 
 /** A pre-migration `settings.json` `translation` block: old key names, every value unknown. */
@@ -219,9 +220,12 @@ export class SettingsStore {
         browserConnection: { enabled: raw.browserConnection?.enabled === true },
         compute: computeSettingsSchema.safeParse(raw.compute ?? {}).data ?? { ...DEFAULT_COMPUTE_SETTINGS },
         overlay: { ...DEFAULT_SETTINGS.overlay, ...rawOverlay },
-        // Video caption settings are run-scoped, so a block an older build left here is ignored and
-        // every launch starts from the defaults. The write side keeps the same block in memory only.
+        // Video-session capture remains run-scoped; browser caption appearance is a saved preference.
         videoCaptions: structuredClone(DEFAULT_SETTINGS.videoCaptions),
+        browserCaptions: {
+          ...DEFAULT_SETTINGS.browserCaptions,
+          ...(settingsPatchSchema.safeParse({ browserCaptions: raw.browserCaptions }).data?.browserCaptions ?? {}),
+        },
         translation: {
           ...DEFAULT_SETTINGS.translation,
           ...rawTranslation,
@@ -309,6 +313,7 @@ export class SettingsStore {
       appearance: { ...this.settings.appearance, ...(patch.appearance ?? {}) },
       overlay: { ...this.settings.overlay, ...(patch.overlay ?? {}) },
       videoCaptions: { ...this.settings.videoCaptions, ...(patch.videoCaptions ?? {}) },
+      browserCaptions: { ...this.settings.browserCaptions, ...(patch.browserCaptions ?? {}) },
       translation: { ...this.settings.translation, ...(patch.translation ?? {}) },
       compute: { ...this.settings.compute, ...(patch.compute ?? {}) },
       network: { ...this.settings.network, ...(patch.network ?? {}) },
@@ -324,14 +329,7 @@ export class SettingsStore {
       : undefined
     await mkdir(dirname(this.path), { recursive: true })
     const temporary = `${this.path}.tmp`
-    /*
-     * A browser caption session creates no meeting and writes no file, so `videoCaptions` has no
-     * result to outlive and stays in memory for the running app only. The block is left out of the
-     * file rather than written with the defaults: an absent block can only read as "never
-     * persisted", while a defaulted block reads back as a remembered setting. `this.settings`
-     * still holds the live values, which is what `browserCaptionConfig()` reads.
-     */
-    const { videoCaptions: _runScoped, ...persisted } = next
+    const { videoCaptions: _runScopedVideoCaptions, ...persisted } = next
     await writeFile(temporary, JSON.stringify(persisted, null, 2), 'utf8')
     await rename(temporary, this.path)
     this.settings = next

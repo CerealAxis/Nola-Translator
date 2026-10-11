@@ -22,7 +22,11 @@ const BUILTIN_DESCRIPTION_KEYS: Readonly<Record<string, TranslationKey>> = {
   'hy-mt2-1.8b-q4-k-m': 'models.descriptions.hyMt2Q4',
   'hy-mt2-1.8b-q3-k-m': 'models.descriptions.hyMt2Q3',
   'hy-mt2-1.8b-iq2-m': 'models.descriptions.hyMt2Iq2',
+  'hy-mt2-7b-q4-k-m': 'models.descriptions.hyMt2SevenB',
   'm2m100-418m': 'models.descriptions.m2m100',
+  'index-translate-2b-q4-k-m': 'models.descriptions.indexTranslate2b',
+  'index-translate-9b-q4-k-m': 'models.descriptions.indexTranslate9b',
+  'index-translate-35b-a3b-q4-k-m': 'models.descriptions.indexTranslate35b',
 }
 
 /**
@@ -307,16 +311,13 @@ function Actions({
             {t('models.setDefault')}
           </Button>
         ) : null}
-        {/*
-          Removal stays ghost and only turns danger-coloured on hover: a screen of red buttons
-          makes scanning the list tense, and the irreversible click is already unambiguous.
-        */}
+        {/* Destructive removal stays visibly identifiable through its soft-danger fill. */}
         <Button
-          variant="ghost"
+          variant="danger-soft"
           isIconOnly
           aria-label={t('models.remove')}
           size="sm"
-          className="models-card__remove text-muted hover:bg-danger-soft hover:text-danger-soft-foreground"
+          className="models-card__remove"
           isPending={busy}
           onPress={onRemove}
         >

@@ -1,11 +1,12 @@
 import { build } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
+const release = JSON.parse(await readFile(resolve(root, '../version.json'), 'utf8'))
 const outDir = resolve(root, 'dist')
 const common = { configFile: false, root, define: { 'process.env.NODE_ENV': JSON.stringify('production') }, plugins: [react(), tailwindcss()], build: { outDir, emptyOutDir: false, minify: true } }
 await build({ ...common, build: { ...common.build, emptyOutDir: true, rollupOptions: { input: resolve(root, 'popup.html') } } })
@@ -23,4 +24,4 @@ const iconNames = (await readdir(resolve(root, 'icons'))).filter(name => name.en
 const icon = size => `icons/${iconNames.find(name => name === `icon-${size}.png`) ?? ''}`
 const icons = Object.fromEntries([16, 32, 48, 128].map(size => [size, icon(size)]))
 await Promise.all(iconNames.map(name => copyFile(resolve(root, 'icons', name), resolve(outDir, 'icons', name))))
-await writeFile(resolve(outDir, 'manifest.json'), JSON.stringify({ manifest_version: 3, name: 'Nola Captions', version: '1.0.2', key, description: 'Live video captions through Nola Translator.', icons, permissions: ['nativeMessaging', 'storage', 'scripting', 'activeTab'], host_permissions: ['https://www.youtube.com/*', 'https://www.bilibili.com/*'], optional_host_permissions: ['https://*/*'], background: { service_worker: 'background.js' }, action: { default_popup: 'popup.html', default_title: 'Nola Captions', default_icon: Object.fromEntries([16, 24, 32].map(size => [size, icon(size)])) }, content_scripts: [{ matches: ['https://www.youtube.com/*', 'https://www.bilibili.com/*'], js: ['capture-handle.js'], run_at: 'document_start', world: 'MAIN' }, { matches: ['https://www.youtube.com/*', 'https://www.bilibili.com/*'], js: ['content.js'], run_at: 'document_idle' }], web_accessible_resources: [{ resources: ['worklet.js'], matches: ['https://*/*'] }] }, null, 2))
+await writeFile(resolve(outDir, 'manifest.json'), JSON.stringify({ manifest_version: 3, name: 'Nola Captions', version: release.version, key, description: 'Live video captions through Nola Translator.', icons, permissions: ['nativeMessaging', 'storage', 'scripting', 'activeTab'], host_permissions: ['https://www.youtube.com/*', 'https://www.bilibili.com/*'], optional_host_permissions: ['https://*/*'], background: { service_worker: 'background.js' }, action: { default_popup: 'popup.html', default_title: 'Nola Captions', default_icon: Object.fromEntries([16, 24, 32].map(size => [size, icon(size)])) }, content_scripts: [{ matches: ['https://www.youtube.com/*', 'https://www.bilibili.com/*'], js: ['capture-handle.js'], run_at: 'document_start', world: 'MAIN' }, { matches: ['https://www.youtube.com/*', 'https://www.bilibili.com/*'], js: ['content.js'], run_at: 'document_idle' }], web_accessible_resources: [{ resources: ['worklet.js'], matches: ['https://*/*'] }] }, null, 2))

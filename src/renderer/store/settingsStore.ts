@@ -147,6 +147,11 @@ const DEBOUNCED_PATHS: ReadonlySet<string> = new Set([
   'overlay.backgroundColor',
   'videoCaptions.fontSize',
   'videoCaptions.position',
+  'browserCaptions.sourceFontSize',
+  'browserCaptions.translationFontSize',
+  'browserCaptions.lineHeight',
+  'browserCaptions.bottomOffset',
+  'browserCaptions.backgroundOpacity',
 ])
 
 let bridge: NolaBridge | null = null
@@ -206,6 +211,7 @@ export function mergeSettings(base: AppSettings, patch: AppSettingsPatch): AppSe
     recognition: { ...base.recognition, ...patch.recognition },
     overlay: { ...base.overlay, ...patch.overlay },
     videoCaptions: { ...base.videoCaptions, ...patch.videoCaptions },
+    browserCaptions: { ...base.browserCaptions, ...patch.browserCaptions },
     translation: { ...base.translation, ...patch.translation },
     compute: { ...base.compute, ...patch.compute },
     network: { ...base.network, ...patch.network },
@@ -248,6 +254,7 @@ function mergePatches(a: AppSettingsPatch, b: AppSettingsPatch): AppSettingsPatc
       : {}),
     ...(a.overlay || b.overlay ? { overlay: { ...a.overlay, ...b.overlay } } : {}),
     ...(a.videoCaptions || b.videoCaptions ? { videoCaptions: { ...a.videoCaptions, ...b.videoCaptions } } : {}),
+    ...(a.browserCaptions || b.browserCaptions ? { browserCaptions: { ...a.browserCaptions, ...b.browserCaptions } } : {}),
     ...(a.translation || b.translation ? { translation: { ...a.translation, ...b.translation } } : {}),
     ...(a.compute || b.compute ? { compute: { ...a.compute, ...b.compute } } : {}),
     ...(a.network || b.network ? { network: { ...a.network, ...b.network } } : {}),

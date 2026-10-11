@@ -7,7 +7,7 @@ import { mkdir, writeFile, access, rm, copyFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { BROWSER_EXTENSION_ID, BROWSER_HOST_NAME, browserRequestSchema, type BrowserCaptionConfig, type BrowserConnectionStatus, type BrowserRequest, type BrowserResponse, type BrowserKind } from '../shared/browser'
+import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, BROWSER_HOST_NAME, browserRequestSchema, type BrowserCaptionConfig, type BrowserConnectionStatus, type BrowserRequest, type BrowserResponse, type BrowserKind } from '../shared/browser'
 import type { BrowserIntegrations } from './browser-integrations'
 import type { AudioDevice, SessionConfig, EngineEvent, EngineProcessState } from '../shared/contracts'
 import { NO_TRANSLATION_LANGUAGE, type AppSettings } from '../shared/settings'
@@ -37,7 +37,7 @@ function publicErrorCode(error: unknown): string {
   console.error('browser request failed with an unmapped error', error)
   return 'internalError'
 }
-interface Client { socket: Socket; browser: BrowserKind; authenticated: boolean; sessionId: string | null; starting: boolean; closed: boolean; pending: number; pendingAudioMs: number; audioWindow: AudioWindow }
+interface Client { socket: Socket; browser: BrowserKind; extensionVersion?: string; helloReceived: boolean; authenticated: boolean; sessionId: string | null; starting: boolean; closed: boolean; pending: number; pendingAudioMs: number; audioWindow: AudioWindow }
 interface AudioWindow { count: number; lastBytes: number; lastAudioMs: number; loggedAtMs: number }
 export interface BrowserConnectionOptions {
   engine: EngineProcess
@@ -47,10 +47,12 @@ export interface BrowserConnectionOptions {
   integrations?: BrowserIntegrations
 }
 
-/** The desktop settings the extension renders captions from; it configures none of this itself. */
+/** The desktop's independent browser caption appearance and session audio source. */
 export function browserCaptionConfig(settings: AppSettings): BrowserCaptionConfig {
   return {
-    videoCaptions: settings.videoCaptions,
+    appearance: settings.browserCaptions,
+    audioSource: settings.videoCaptions.audioSource ?? 'system',
+    audioDeviceId: settings.videoCaptions.audioDeviceId,
     sourceLanguage: settings.recognition.sourceLanguage,
     targetLanguage: settings.translation.targetLanguage,
   }
@@ -58,8 +60,11 @@ export function browserCaptionConfig(settings: AppSettings): BrowserCaptionConfi
 
 export function browserSessionConfig(settings: AppSettings, request: Extract<BrowserRequest, { type: 'start' }>): SessionConfig {
   const translation = settings.translation
+  // `defaultOutput` is a UI sentinel, not a WASAPI loopback device id. Older settings may still
+  // carry it from the browser caption picker, so resolve it as the live system default.
+  const deviceId = request.deviceId === 'defaultOutput' ? undefined : request.deviceId
   return {
-    audioSource: request.source === 'tab' ? { kind: 'browserTab', streamId: request.streamId } : request.deviceId ? { kind: 'systemOutput', deviceId: request.deviceId } : { kind: 'defaultOutput' },
+    audioSource: request.source === 'tab' ? { kind: 'browserTab', streamId: request.streamId } : deviceId ? { kind: 'systemOutput', deviceId } : { kind: 'defaultOutput' },
     recognitionMode: 'realtime', recognitionModelId: settings.recognition.modelId,
     ...recognitionFieldsOf(settings.recognition),
     sourceLanguage: settings.recognition.sourceLanguage,
@@ -116,7 +121,8 @@ export class BrowserConnection {
       return this.status()
     })
     loggedHandle(CHANNEL, async (_event, action: unknown, enabled?: unknown, browser?: unknown) => {
-      if (action === 'status') { await options.integrations?.inspect(); return this.status() }
+      if (action === 'status') return this.status()
+      if (action === 'inspect') { await options.integrations?.inspect(); return this.status() }
       if (action === 'download' || action === 'manage' || action === 'browserEnable') {
         if (browser !== 'chrome' && browser !== 'edge') throw new Error('invalidConfiguration')
         if (action === 'download') {
@@ -175,7 +181,13 @@ export class BrowserConnection {
     // One session at a time by construction, so the first owner is the session; deriving both
     // fields from it keeps `sessionActive` and `sessionId` from ever disagreeing.
     const sessionId = [...this.clients].find(c => c.authenticated && c.sessionId)?.sessionId ?? undefined
-    return { enabled: this.enabled, registered: this.registered, connections: connected.length, captionServiceActive: this.captionServiceActive, sessionActive: sessionId !== undefined, ...(sessionId ? { sessionId } : {}), ...(this.options.integrations ? { browsers: this.options.integrations.snapshot.map(row => ({ ...row, connected: connected.some(client => client.browser === row.browser), ...(connected.some(client => client.browser === row.browser) ? { extensionStatus: 'installed' as const } : {}) })) } : {}), ...(this.error ? { error: this.error } : {}) }
+    const browsers = this.options.integrations?.snapshot.map(row => {
+      const live = connected.filter(client => client.browser === row.browser && client.helloReceived)
+      // A live old tab can outlast reloading an unpacked extension; its handshake outranks the disk manifest.
+      const client = live.find(item => item.extensionVersion !== BROWSER_EXTENSION_VERSION) ?? live[0]
+      return { ...row, available: row.available || !!client, connected: connected.some(item => item.browser === row.browser), ...(client ? { extensionStatus: 'installed' as const, extensionVersion: client.extensionVersion, extensionCompatible: client.extensionVersion === BROWSER_EXTENSION_VERSION } : {}) }
+    })
+    return { enabled: this.enabled, registered: this.registered, connections: connected.length, captionServiceActive: this.captionServiceActive, sessionActive: sessionId !== undefined, ...(sessionId ? { sessionId } : {}), ...(browsers ? { browsers } : {}), ...(this.error ? { error: this.error } : {}) }
   }
   async initialize(enabled: boolean): Promise<void> {
     const operation = this.operation
@@ -249,7 +261,7 @@ export class BrowserConnection {
     await this.setEnabled(false)
   }
   private accept(socket: Socket): void {
-    const client: Client = { socket, browser: 'chrome', authenticated: false, sessionId: null, starting: false, closed: false, pending: 0, pendingAudioMs: 0, audioWindow: { count: 0, lastBytes: 0, lastAudioMs: 0, loggedAtMs: 0 } }
+    const client: Client = { socket, browser: 'chrome', helloReceived: false, authenticated: false, sessionId: null, starting: false, closed: false, pending: 0, pendingAudioMs: 0, audioWindow: { count: 0, lastBytes: 0, lastAudioMs: 0, loggedAtMs: 0 } }
     this.clients.add(client)
     let buffer = Buffer.alloc(0)
     const authenticationDeadline = setTimeout(() => socket.destroy(), 5000)
@@ -320,7 +332,11 @@ export class BrowserConnection {
   private async handle(client: Client, request: BrowserRequest): Promise<void> {
     try {
       if (!this.enabled || this.disposing) throw new Error('browserConnectionDisabled')
-      if (request.type === 'hello') client.browser = request.browser ?? 'chrome'
+      if (request.type === 'hello') {
+        client.browser = request.browser ?? 'chrome'
+        client.extensionVersion = request.extensionVersion
+        client.helloReceived = true
+      }
       /*
        * Answered before every other check and outside the session owner test below, because a
        * diagnostic is worth having exactly when the session is in trouble. The engine call is
@@ -356,10 +372,14 @@ export class BrowserConnection {
       if (request.type === 'hello') {
         await sessions.ensureReady()
         const settings = this.options.getSettings()
-        this.send(client, { type: 'result', id: request.id, value: { protocolVersion: 1, uiLanguage: settings.uiLanguage, sourceLanguage: settings.recognition.sourceLanguage, targetLanguage: settings.translation.targetLanguage, devices: this.devices, browserAudio: engine.supports('browserAudio'), captionServiceActive: this.captionServiceActive, config: browserCaptionConfig(settings) } })
+        this.send(client, { type: 'result', id: request.id, value: { protocolVersion: 1, extensionVersion: BROWSER_EXTENSION_VERSION, extensionCompatible: client.extensionVersion === BROWSER_EXTENSION_VERSION, uiLanguage: settings.uiLanguage, sourceLanguage: settings.recognition.sourceLanguage, targetLanguage: settings.translation.targetLanguage, devices: this.devices, browserAudio: engine.supports('browserAudio'), captionServiceActive: this.captionServiceActive, config: browserCaptionConfig(settings) } })
         return
       }
       if (request.type === 'start') {
+        if (client.extensionVersion !== BROWSER_EXTENSION_VERSION) {
+          this.send(client, { type: 'error', id: request.id, code: 'extensionVersionMismatch', message: 'extensionVersionMismatch' })
+          return
+        }
         // Checked before the busy check: a closed gate admits no session at all, so reporting
         // "already running" would name a fault the extension cannot have.
         if (!this.captionServiceActive) throw new Error('captionServiceOff')

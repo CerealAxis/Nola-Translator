@@ -300,7 +300,7 @@ export function WorkspacePage() {
         }}
         translationModelId={currentConfig?.translationModelId ?? settings?.translation.localModelId ?? ''}
         translationProvider={currentConfig?.translationProvider ?? settings?.translation.provider ?? 'local'}
-        translationProviderLabel={settings?.translation.provider === 'cloud' ? settings.translation.cloudModel || t('settings.providerCloud') : settings?.translation.provider === 'mymemory' ? t('settings.providerMyMemory') : settings?.translation.provider === 'recognition' ? t('settings.providerRecognitionTranslation') : t('settings.providerMicrosoft')}
+        translationProviderLabel={settings?.translation.provider === 'cloud' ? settings.translation.cloudModel || t('settings.providerCloud') : settings?.translation.provider === 'index-translate' ? t('settings.providerIndexTranslate') : settings?.translation.provider === 'mymemory' ? t('settings.providerMyMemory') : settings?.translation.provider === 'recognition' ? t('settings.providerRecognitionTranslation') : t('settings.providerMicrosoft')}
         onTranslationModelChange={(value) => {
           if (!settings) return
           const previousTarget = settings.translation.targetLanguage

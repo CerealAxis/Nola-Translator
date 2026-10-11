@@ -20,6 +20,7 @@ function settingsWith(patch: AppSettingsPatch = {}): AppSettings {
     translation: { ...DEFAULT_SETTINGS.translation, ...(patch.translation ?? {}) },
     compute: { ...DEFAULT_SETTINGS.compute, ...(patch.compute ?? {}) },
     videoCaptions: { ...DEFAULT_SETTINGS.videoCaptions, ...(patch.videoCaptions ?? {}) },
+    browserCaptions: { ...DEFAULT_SETTINGS.browserCaptions, ...(patch.browserCaptions ?? {}) },
   }
 }
 

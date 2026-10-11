@@ -3,7 +3,7 @@ import { supportsSelectedEngine } from '../../../../shared/model-engines'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
 /**
  * Translation: provider, intermediate translation, per-provider connection fields, API key.
- * Hy-MT2 and M2M100 are both `local` — `localModelId` picks one, routed by id in the engine.
+ * Local model families share `local`; `localModelId` selects their engine adapter.
  * Ollama is a `CloudApiFormat`, not a provider. Keys live in `credentials.json` rather than
  * `AppSettings`, so the check button can only ask whether a key is stored: no endpoint probe.
  */
@@ -21,6 +21,7 @@ import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 import { ALIYUN_LANGUAGES, supportsRecognitionNativeTranslation } from '../../../../shared/cloud-config'
 import { targetLanguagePatch } from '../../../session-config'
+import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_PUBLIC_MODEL } from '../../../../shared/index-translate'
 
 export function TranslationTab({ settings }: SettingsPanelProps) {
   const { t } = useI18n()
@@ -28,15 +29,13 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
   const credentials = useStore(stores.models, (state) => state.credentials)
   const resources = useStore(stores.models, (state) => state.resources)
 
-  // "Local model" and "cloud model" are interface concepts rather than product names, so they
-  // go through i18n; Microsoft Translator is the only real product name left. The option list
-  // comes from `TRANSLATION_PROVIDERS` so the main process, whose sanitizer accepts nothing
-  // outside that table, stays the one place the set of providers is written down.
+  // Keep the settings picker in sync with the providers accepted by the main sanitizer.
   const providerLabels = useMemo<Record<TranslationProvider, string>>(() => ({
     local: t('settings.providerLocal'),
     cloud: t('settings.providerCloud'),
     microsoft: t('settings.providerMicrosoft'),
     mymemory: t('settings.providerMyMemory'),
+    'index-translate': t('settings.providerIndexTranslate'),
     recognition: t('settings.providerRecognitionTranslation'),
   }), [t])
 
@@ -104,7 +103,8 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
       return
     }
     const restoredTarget = translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? 'zh' : translation.targetLanguage
-    const targetLanguage = value === 'recognition' && !(ALIYUN_LANGUAGES as readonly string[]).includes(restoredTarget)
+    const supportedTargets = value === 'recognition' ? ALIYUN_LANGUAGES : value === 'index-translate' ? INDEX_TRANSLATE_LANGUAGES : undefined
+    const targetLanguage = supportedTargets && !supportedTargets.includes(restoredTarget)
       ? 'zh' : restoredTarget
     const languagePatch = targetLanguagePatch(targetLanguage, translation.targetLanguage)
     void updateSettings({
@@ -173,7 +173,13 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
         </SettingsRow> : null}
       </SettingGroup>
 
-      {translation.provider === 'mymemory' ? (
+      {translation.provider === 'index-translate' ? (
+        <SettingGroup legend={t('settings.groupConnection')}>
+          <SettingsRow label={t('settings.providerIndexTranslate')} children={null} />
+          <SettingsRow label={t('settings.model')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_PUBLIC_MODEL}</span></SettingsRow>
+          <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_ENDPOINT}</span></SettingsRow>
+        </SettingGroup>
+      ) : translation.provider === 'mymemory' ? (
         <SettingGroup legend={t('settings.groupConnection')}>
           <SettingsRow label={t('settings.providerMyMemory')} desc={t('settings.mymemoryHint')} children={null} />
           <TextRow label={t('settings.endpoint')} value={translation.mymemoryEndpoint ?? 'https://api.mymemory.translated.net/get'} onCommit={value => { void updateSettings({ translation: { mymemoryEndpoint: value } }).catch(() => undefined) }} />

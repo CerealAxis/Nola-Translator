@@ -2,6 +2,7 @@ import { expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from './settings'
 import { recognitionFieldsOf, recognitionLabel, remoteSourceLanguages, supportsRecognitionNativeTranslation, translationOptionsOf } from './cloud-config'
 import { sessionConfigSchema } from './schemas'
+import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_PUBLIC_MODEL } from './index-translate'
 
 it('builds credential-free Aliyun configuration without replacing the saved local model', () => {
   const recognition = { ...DEFAULT_SETTINGS.recognition, provider: 'aliyun' as const, aliyunWorkspaceId: 'workspace-123', aliyunRegion: 'ap-southeast-1' as const }
@@ -14,6 +15,12 @@ it('builds credential-free Aliyun configuration without replacing the saved loca
 it('passes MyMemory public settings while native translation has no separate connection', () => {
   expect(translationOptionsOf({ ...DEFAULT_SETTINGS.translation, provider: 'mymemory', mymemoryEmail: 'test@example.com' })).toEqual({ endpoint: 'https://api.mymemory.translated.net/get', email: 'test@example.com' })
   expect(translationOptionsOf({ ...DEFAULT_SETTINGS.translation, provider: 'recognition' })).toBeUndefined()
+})
+
+it('fixes the public Index-Translate connection independently of saved cloud settings', () => {
+  const options = translationOptionsOf({ ...DEFAULT_SETTINGS.translation, provider: 'index-translate', cloudEndpoint: 'https://other.example/v1', cloudModel: 'other-model' })
+  expect(options).toEqual({ endpoint: INDEX_TRANSLATE_ENDPOINT, model: INDEX_TRANSLATE_PUBLIC_MODEL, apiFormat: 'chat-completions', contextWindow: 32768, maxOutputTokens: 1024 })
+  expect(sessionConfigSchema.parse({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: ['zh'], translationProvider: 'index-translate', translationOptions: options }).translationProvider).toBe('index-translate')
 })
 
 it('preserves remote fields across the session IPC boundary and rejects deferred providers', () => {

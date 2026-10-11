@@ -342,7 +342,7 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   height: 26px;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.78);
   cursor: pointer;
@@ -379,7 +379,7 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   background: rgba(255, 255, 255, 0.16);
 }
 
-/* Microphone: a 26px circle that inverts to a white fill while recording, so "the mic is live" reads at a glance. */
+/* The microphone uses a visible filled control that inverts while recording. */
 .nola-caption-card .nola-caption-mic {
   /* `.button` computes its own colour from these, so they move with the literals above. */
   --button-fg: rgba(255, 255, 255, 0.8);
@@ -394,7 +394,7 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   padding: 0;
   margin-right: 14px;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
@@ -473,10 +473,7 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   height: 15px;
 }
 
-/* Text-only actions (the two in the idle state) skip the 26px circle and use a pill. */
-.nola-caption-card .nola-caption-action:not([data-icon-only]) {
-  border-radius: 13px;
-}
+/* Text and icon actions share the same large corner radius. */
 
 /* ── Control bar pill ──────────────────────────────────────────────────── */
 
@@ -589,7 +586,7 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   gap: 3px;
   padding: 0 12px;
   border: 0;
-  border-radius: 13px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.13);
   color: rgba(255, 255, 255, 0.92);
   font-size: 12.5px;
@@ -755,7 +752,7 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   width: 20px;
   height: 20px;
   padding: 3px;
-  border-radius: 50%;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.12);
 }
 
@@ -792,7 +789,7 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 
 .nola-caption-preview__mic,
 .nola-caption-preview__pill {
-  border-radius: 13px;
+  border-radius: var(--radius-xl);
   background: rgba(255, 255, 255, 0.13);
 }
 

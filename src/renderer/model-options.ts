@@ -6,6 +6,7 @@ import type { ResourceRecord } from '../shared/contracts'
 import { normalizeLanguage } from '../shared/languages'
 import { stores, useStore } from '@/store'
 import { DEFAULT_SETTINGS, TARGET_LANGUAGE_OPTIONS } from '@/bridge'
+import { INDEX_TRANSLATE_LANGUAGES } from '../shared/index-translate'
 import { ALIYUN_LANGUAGES, recognitionLabel, remoteSourceLanguages } from '../shared/cloud-config'
 
 export interface ModelChoice { value: string; label: string; isDisabled: boolean }
@@ -44,7 +45,7 @@ export function useModelOptions(recognitionId?: string, translationId?: string, 
     sourceLanguages: remote ? [...remoteSourceLanguages(settings.recognition)] : recognitionLanguages(recognition),
     // Native translation reuses the Aliyun socket, so its targets are that connection's language
     // table. A provider without one has already fallen back to MyMemory above.
-    targetLanguages: settings.translation.provider === 'recognition' ? ['none', ...ALIYUN_LANGUAGES] : settings.translation.provider === 'local' ? translationLanguages(translation, sourceLanguage) : [...TARGET_LANGUAGE_OPTIONS],
+    targetLanguages: settings.translation.provider === 'recognition' ? ['none', ...ALIYUN_LANGUAGES] : settings.translation.provider === 'index-translate' ? ['none', ...INDEX_TRANSLATE_LANGUAGES] : settings.translation.provider === 'local' ? translationLanguages(translation, sourceLanguage) : [...TARGET_LANGUAGE_OPTIONS],
     recognitionModels: remote ? [{ value: settings.recognition.modelId, label: recognitionLabel(settings.recognition), isDisabled: false }] : installedRecognitionModels(resources, settings.recognition.modelId, settings.compute ?? DEFAULT_COMPUTE_SETTINGS),
     translationModels: resources.filter(model => model.kind === 'translationModel' && model.installed).map(model => ({
       value: model.resourceId, label: model.name,

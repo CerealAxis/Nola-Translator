@@ -17,8 +17,6 @@ import css from './styles.css?inline'
  * player has painted underneath it: the bottom edge of the video, or the top of the control band when
  * the bar is on screen.
  */
-const CAPTION_BOTTOM_CLEARANCE = 0.05
-
 type CaptionPhase = 'idle' | 'appearing' | 'shown' | 'fading'
 interface PendingCaption { key: string; lines: string[] }
 
@@ -46,12 +44,16 @@ function install(): void {
   trigger.mount.classList.add('nola-trigger')
   const panel = shadow('panel', 'auto')
   const overlay = shadow('overlay', 'none')
+  const nativeCueStyles = document.createElement('style')
+  nativeCueStyles.dataset.nolaCaptionStyles = 'true'
+  ;(document.head ?? document.documentElement).append(nativeCueStyles)
   const triggerRoot = createRoot(trigger.mount)
   const panelRoot = createRoot(panel.mount)
   const caption = document.createElement('div'); caption.className = 'nola-caption'; caption.setAttribute('aria-live', 'polite'); overlay.mount.append(caption)
   const nativeTrack = new NativeCaptionTrack()
   let fingerprint = ''
   const captionClock = new CaptionClock()
+  let nativeCueStyleText = ''
   let captionPhase: CaptionPhase = 'idle'
   let captionKey = ''
   let pendingCaption: PendingCaption | null = null
@@ -64,14 +66,28 @@ function install(): void {
     caption.replaceChildren()
     overlay.host.hidden = true
   }
-  const updateCaptionLines = (lines: string[]): void => {
+  const updateCaptionLines = (lines: string[], config: CaptionConfig): void => {
     const rows = document.createDocumentFragment()
-    for (const line of lines) { const row = document.createElement('div'); row.textContent = line; rows.append(row) }
+    let sourceIndex = 0
+    for (const line of lines) {
+      const row = document.createElement('div')
+      row.textContent = line
+      const isSource = config.showSource && sourceIndex === 0
+      if (isSource) {
+        row.style.color = config.sourceColor
+        row.style.fontSize = `${config.sourceFontSize}px`
+        sourceIndex += 1
+      } else {
+        row.style.color = config.translationColor
+        row.style.fontSize = `${config.translationFontSize}px`
+      }
+      rows.append(row)
+    }
     caption.replaceChildren(rows)
   }
   /** Paints one phrase and lets it fade in as a whole, so a revision never reveals itself character by character. */
-  const paintCaption = (key: string, lines: string[]): void => {
-    updateCaptionLines(lines)
+  const paintCaption = (key: string, lines: string[], config: CaptionConfig): void => {
+    updateCaptionLines(lines, config)
     captionKey = key
     pendingCaption = null
     captionPhase = 'appearing'
@@ -94,6 +110,15 @@ function install(): void {
     captionPhase = 'fading'
     caption.dataset.phase = 'fading'
   }
+  const updateNativeCueStyles = (config: CaptionConfig): void => {
+    const fontFamily = config.fontFamily.replace(/[\\"\r\n]/g, character => `\\${character}`)
+    const background = `color-mix(in oklab, ${config.backgroundColor} ${config.backgroundOpacity * 100}%, transparent)`
+    const css = `video::cue(.nola-caption-source){color:${config.sourceColor};font-family:"${fontFamily}";font-size:${config.sourceFontSize}px;line-height:${config.lineHeight};background-color:${background}}video::cue(.nola-caption-translation){color:${config.translationColor};font-family:"${fontFamily}";font-size:${config.translationFontSize}px;line-height:${config.lineHeight};background-color:${background}}`
+    if (css === nativeCueStyleText) return
+    nativeCueStyles.textContent = css
+    nativeCueStyleText = css
+  }
+  const escapeCueText = (text: string): string => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
   /**
    * Height the painted text needs, measured against `auto`. Reading it off the box instead would feed
    * a transition's own intermediate height back into the measurement and stall it halfway.
@@ -108,7 +133,7 @@ function install(): void {
     if (event.target !== caption || (captionPhase !== 'appearing' && captionPhase !== 'fading')) return
     const next = pendingCaption
     pendingCaption = null
-    if (next && captionPhase === 'fading') { paintCaption(next.key, next.lines); return }
+    if (next && captionPhase === 'fading') { paintCaption(next.key, next.lines, store.getSnapshot().config); return }
     if (captionPhase === 'appearing') { captionPhase = 'shown'; caption.dataset.phase = 'shown' }
     else dismissCaption()
   })
@@ -142,7 +167,7 @@ function install(): void {
     trigger.host.hidden = fullscreen === video || rect.width < 160
     // HeroUI's Button props carry no `title`, so the native hover tooltip rides on the trigger host.
     trigger.host.title = t('button')
-    triggerRoot.render(<Button isIconOnly size="sm" variant="ghost" aria-label={t('button')} aria-expanded={state.panelOpen} onPress={store.togglePanel}><NolaLogo /></Button>)
+    triggerRoot.render(<Button isIconOnly size="sm" variant="secondary" aria-label={t('button')} aria-expanded={state.panelOpen} onPress={store.togglePanel}><NolaLogo /></Button>)
     const controls = adapter.controls
     if (controls) requestAnimationFrame(() => {
       if (!trigger.host.hidden && trigger.host.parentElement === controls) alignPlayerTrigger(controls, trigger.host)
@@ -153,7 +178,10 @@ function install(): void {
     panelRoot.render(<Panel store={store} />)
     overlay.host.style.left = `${rect.left + rect.width * 0.08}px`
     overlay.host.style.width = `${rect.width * 0.84}px`
-    caption.style.fontSize = `${state.config.fontSize}px`
+    caption.style.fontFamily = `${state.config.fontFamily}, ${theme.getPropertyValue('--font-ui')}`
+    caption.style.lineHeight = String(state.config.lineHeight)
+    caption.style.backgroundColor = `color-mix(in oklab, ${state.config.backgroundColor} ${state.config.backgroundOpacity * 100}%, transparent)`
+    updateNativeCueStyles(state.config)
     const segment = state.captions[0]
     const remaining = captionClock.update(segment ? `${state.epoch}:${segment.segmentId}:${segment.revision}` : '', performance.now(), state.playbackPaused || !segment?.isFinal, video.playbackRate)
     const lines = remaining > 0 ? captionLines(segment, state.config) : []
@@ -161,9 +189,9 @@ function install(): void {
     const key = lines.length ? `${state.epoch}:${segment?.segmentId}` : ''
     if (state.status !== 'active' || fullscreen === video) dismissCaption()
     else if (key && key === captionKey) {
-      updateCaptionLines(lines)
+      updateCaptionLines(lines, state.config)
     } else if (key) {
-      if (captionPhase === 'idle') paintCaption(key, lines)
+      if (captionPhase === 'idle') paintCaption(key, lines, state.config)
       else {
         pendingCaption = { key, lines }
         if (captionPhase !== 'fading') beginFade()
@@ -180,7 +208,7 @@ function install(): void {
     // block's own height: a phrase that grows from one line to two extends upward and leaves the
     // anchor where it was.
     const contentHeight = captionPhase === 'idle' ? 0 : captionContentHeight()
-    const clearance = CAPTION_BOTTOM_CLEARANCE
+    const clearance = state.config.bottomOffset / 100
     const band = subtitleGeometry(rect.height, clearance, contentHeight, reserve)
     overlay.host.style.bottom = `${Math.max(0, innerHeight - rect.top - band.top)}px`
     if (contentHeight) caption.style.height = `${Math.min(band.maxHeight, contentHeight)}px`
@@ -188,8 +216,12 @@ function install(): void {
     let cue: VTTCue | null = null
     if (fullscreen === video && state.status === 'active' && segment && lines.length) {
       const [start, end] = fullscreenCueBounds(segment, video.currentTime, remaining)
-      cue = new VTTCue(start, end, lines.join('\n'))
-      cue.line = Math.round(state.config.position); cue.snapToLines = false
+      const cueText = lines.map((line, index) => {
+        const kind = state.config.showSource && index === 0 ? 'source' : 'translation'
+        return `<c.nola-caption-${kind}>${escapeCueText(line)}</c>`
+      }).join('\n')
+      cue = new VTTCue(start, end, cueText)
+      cue.line = 100 - state.config.bottomOffset; cue.snapToLines = false
     }
     nativeTrack.update(fullscreen === video ? video : null, state.status === 'active', cue, t('button'), state.config.targetLanguage)
   }

@@ -2,6 +2,7 @@ import { expect, it } from 'vitest'
 
 import { settingsPatchSchema } from '../../../src/main/settings-schema'
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
+import { INDEX_TRANSLATE_MODEL_IDS } from '../../../src/shared/index-translate'
 
 /**
  * The nested patch objects strip unknown keys instead of rejecting them, so a field added to
@@ -36,4 +37,16 @@ it('round-trips the caption layout, which is what the overlay popover writes', (
 
 it('rejects a layout outside the declared union', () => {
   expect(() => settingsPatchSchema.parse({ overlay: { layout: 'columns' } })).toThrow()
+})
+
+it('accepts all Index-Translate presets and the public API provider through settings IPC', () => {
+  for (const localModelId of INDEX_TRANSLATE_MODEL_IDS) {
+    const translation = { provider: 'index-translate', localModelId }
+    expect(settingsPatchSchema.parse({ translation }).translation).toEqual(translation)
+  }
+})
+
+it('accepts the official Hy-MT2 7B preset as a local translator', () => {
+  const translation = { provider: 'local', localModelId: 'hy-mt2-7b-q4-k-m' }
+  expect(settingsPatchSchema.parse({ translation }).translation).toEqual(translation)
 })

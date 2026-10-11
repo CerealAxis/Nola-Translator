@@ -17,9 +17,12 @@ import {
   Modal,
   ProgressBar,
   Skeleton,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
   toast,
 } from '@heroui/react'
+import { ArrowRight, Check, Trash2 } from 'lucide-react'
 
 import { StatusPill } from '@/components/primitives'
 import type { StatusPillTone } from '@/components/primitives'
@@ -96,6 +99,7 @@ export function DeveloperTab() {
     <div className="settings-panel">
       <p className="nola-caption text-muted">{t('dev.intro')}</p>
 
+      <ButtonGroup />
       <ToastGroup />
       <DialogGroup />
       <DialogGalleryGroup />
@@ -103,6 +107,56 @@ export function DeveloperTab() {
       <TokenGroup />
       <MotionGroup reduceMotion={reduceMotion} preview={motionPreview} onPreviewChange={setMotionPreview} />
     </div>
+  )
+}
+
+/** Static samples show the button vocabulary currently used by the desktop UI. */
+function ButtonGroup() {
+  const { t } = useI18n()
+
+  return (
+    <SettingGroup legend={t('dev.sectionButtons')}>
+      <SettingsRow label={t('dev.buttonVariants')} desc={t('dev.buttonVariantsDesc')}>
+        <div className="dev-strip">
+          <Button variant="primary">{t('dev.buttonPrimary')}</Button>
+          <Button variant="secondary">{t('dev.buttonSecondary')}</Button>
+          <Button variant="tertiary">{t('dev.buttonTertiary')}</Button>
+          <Button variant="outline">{t('dev.buttonOutline')}</Button>
+          <Button variant="danger">{t('dev.buttonDanger')}</Button>
+          <Button variant="danger-soft">{t('dev.buttonDangerSoft')}</Button>
+        </div>
+      </SettingsRow>
+
+      <SettingsRow label={t('dev.buttonSizes')} desc={t('dev.buttonSizesDesc')}>
+        <div className="dev-strip">
+          <Button variant="primary" size="sm">{t('dev.buttonSmall')}</Button>
+          <Button variant="primary">{t('dev.buttonDefault')}</Button>
+        </div>
+      </SettingsRow>
+
+      <SettingsRow label={t('dev.buttonStates')} desc={t('dev.buttonStatesDesc')}>
+        <div className="dev-strip">
+          <Button variant="secondary" isDisabled>{t('dev.buttonDisabled')}</Button>
+          <Button variant="primary" isPending>{t('dev.buttonPending')}</Button>
+          <Button variant="secondary" isDisabled><Check aria-hidden="true" />{t('dev.buttonCurrent')}</Button>
+        </div>
+      </SettingsRow>
+
+      <SettingsRow label={t('dev.buttonIconOnly')} desc={t('dev.buttonIconOnlyDesc')}>
+        <div className="dev-strip">
+          <Button variant="secondary" isIconOnly aria-label={t('dev.buttonIconOnly')}><ArrowRight aria-hidden="true" /></Button>
+          <Button variant="danger-soft" isIconOnly aria-label={t('dev.buttonDelete')}><Trash2 aria-hidden="true" /></Button>
+        </div>
+      </SettingsRow>
+
+      <SettingsRow label={t('dev.buttonSegmented')} desc={t('dev.buttonSegmentedDesc')}>
+        <ToggleButtonGroup className="nola-segmented" selectionMode="single" selectedKeys={new Set(['selected'])} aria-label={t('dev.buttonSegmented')}>
+          <ToggleButton id="selected">{t('dev.buttonSelected')}</ToggleButton>
+          <ToggleButton id="unselected">{t('dev.buttonUnselected')}</ToggleButton>
+        </ToggleButtonGroup>
+      </SettingsRow>
+
+    </SettingGroup>
   )
 }
 
