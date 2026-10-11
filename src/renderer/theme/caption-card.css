@@ -231,6 +231,12 @@ html.is-overlay body {
   height: auto;
   max-height: 100%;
   overflow: hidden auto;
+  scrollbar-width: none;
+}
+
+/* Both bilingual tracks scroll to the newest sentence in code, so their browser scrollbars add no useful control. */
+.nola-caption-track-sentence::-webkit-scrollbar {
+  display: none;
 }
 
 .nola-caption-track-sentence .nola-caption-track-content {
