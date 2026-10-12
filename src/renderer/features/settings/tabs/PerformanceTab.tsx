@@ -6,11 +6,10 @@ import { updateSettings, stores, useStore } from '@/store'
 import { DEFAULT_COMPUTE_SETTINGS, type ComputeSettings } from '../../../../shared/compute'
 import { SettingsRow } from '../SettingsRow'
 import { SettingGroup, SettingSelect, type SettingsPanelProps } from '../SettingsPage'
-import { computeUi } from '../compute-ui'
 
 export function PerformanceTab({ settings }: SettingsPanelProps) {
-  const { language } = useI18n()
-  const c = language === 'en' ? computeUi.en : computeUi.zh
+  const { t, dictionary } = useI18n()
+  const c = dictionary.compute
   const compute = settings.compute ?? DEFAULT_COMPUTE_SETTINGS
   const resources = useStore(stores.models, state => state.resources)
   const adapter = resources.find(r => r.resourceId === settings.translation.localModelId)?.provider
@@ -31,7 +30,7 @@ export function PerformanceTab({ settings }: SettingsPanelProps) {
       <SettingsRow descriptionTooltip label={c.precision} desc={c.precisionHint}><SettingSelect ariaLabel={c.precision} value={compute.precision} options={[{ value: 'auto', label: c.automatic }, ...['fp32', 'fp16', 'bf16'].map(value => ({ value, label: value.toUpperCase() }))]} onChange={value => save({ precision: value as ComputeSettings['precision'] })} /></SettingsRow>
       <SettingsRow descriptionTooltip label={c.quantization} desc={c.quantHint}><SettingSelect ariaLabel={c.quantization} value={compute.quantization} options={[{ value: 'auto', label: c.automatic }, { value: 'none', label: c.none }, { value: 'nf4', label: 'NF4' }, { value: '8bit', label: '8bit' }]} onChange={value => save({ quantization: value as ComputeSettings['quantization'] })} /></SettingsRow>
     </SettingGroup> : null}
-    <SettingGroup legend={language === 'en' ? 'Memory and CPU' : '显存与 CPU'} actions={<Button variant="secondary" size="sm" onPress={() => save({ precision: 'auto', quantization: 'auto', reservedVramMb: 1024, cpuThreads: 0, gpuLayers: -1, contextSize: 2048, flashAttention: 'auto' })}>{c.restore}</Button>}>
+    <SettingGroup legend={t('compute.memoryCpu')} actions={<Button variant="secondary" size="sm" onPress={() => save({ precision: 'auto', quantization: 'auto', reservedVramMb: 1024, cpuThreads: 0, gpuLayers: -1, contextSize: 2048, flashAttention: 'auto' })}>{c.restore}</Button>}>
       {numeric('reservedVramMb', c.reserve, c.reserveHint, 256, 65536)}
       {numeric('cpuThreads', c.threads, c.threadsHint, 0, 256)}
     </SettingGroup>

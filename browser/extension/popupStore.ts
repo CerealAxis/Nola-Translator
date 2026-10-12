@@ -1,7 +1,8 @@
 import { BrowserFailure, createBridge } from './bridge'
-export interface PopupState { language: 'zh-CN' | 'en'; enabled: boolean; pending: boolean; error?: string; origin?: string; tabId?: number }
+import type { BrowserUiLanguage } from './i18n'
+export interface PopupState { language: BrowserUiLanguage; enabled: boolean; pending: boolean; error?: string; origin?: string; tabId?: number }
 export function createPopupStore() {
-  let state: PopupState = { language: navigator.language.startsWith('zh') ? 'zh-CN' : 'en', enabled: false, pending: false }
+  let state: PopupState = { language: 'auto', enabled: false, pending: false }
   const listeners = new Set<() => void>()
   const set = (patch: Partial<PopupState>) => { state = { ...state, ...patch }; for (const listener of listeners) listener() }
   return {

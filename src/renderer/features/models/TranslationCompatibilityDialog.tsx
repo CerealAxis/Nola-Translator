@@ -3,7 +3,7 @@ import { Button, Label, ListBox, Modal, Select } from '@heroui/react'
 import type { ComputeSettings } from '../../../shared/compute'
 import { isModelReady, recognitionLanguages, supportsTranslation } from '../../../shared/model-capabilities'
 import { supportsSelectedEngine } from '../../../shared/model-engines'
-import { LANGUAGE_LABELS } from '@/bridge'
+import { languageName } from '@/bridge'
 import type { ResourceRecord } from '@/bridge'
 import { useI18n } from '@/i18n'
 
@@ -24,7 +24,7 @@ export interface TranslationCompatibilityDialogProps {
 export function TranslationCompatibilityDialog(props: TranslationCompatibilityDialogProps) {
   const { t, language } = useI18n()
   const [choice, setChoice] = useState<'model' | 'language' | null>(null)
-  const label = (code: string) => LANGUAGE_LABELS[code]?.[language === 'zh-CN' ? 'zh' : 'en'] ?? code
+  const label = (code: string) => languageName(code, language)
   return <Modal isOpen={props.isOpen} onOpenChange={open => { if (!open) props.onClose() }}>
     <Modal.Backdrop className="z-overlay"><Modal.Container size="lg"><Modal.Dialog>
       <Modal.Header><Modal.Heading>{t('modelConfig.incompatibleTitle')}</Modal.Heading></Modal.Header>

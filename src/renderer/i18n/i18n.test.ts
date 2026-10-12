@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { en, zhCN } from './index'
-import { appNameForLanguage, translate } from '../i18n'
+import { en, ja, ko, zhCN, zhHK, zhTW } from './index'
+import { appNameForLanguage, resolveUiLanguage, translate } from '../i18n'
 import { supportErrorCodeForMessage } from '../../shared/error-catalog'
 
 /*
- * 迁移说明：原型那版还测了 `resolveLanguage()` / `UI_LANGUAGES` / `LANGUAGE_STORAGE_KEY`。
- * 那三个 API 连同 `localStorage` 持久化和 `'system'` 档位一起**被有意丢掉了** ——
- * 语言是 `AppSettings.uiLanguage`，只有 `'zh-CN' | 'en'`，存在主进程的 settings.json 里，
- * 多一个 `'system'` 会写出主进程 zod schema 拒收的值。下面保留的是与持久化无关、
- * 真正有价值的那几组断言：键树对齐、占位符一致、文案纪律。
+ * Interface language preferences live in the main-process settings store. The renderer resolves
+ * `auto` from the system locale; this file keeps dictionary structure, placeholders, and copy rules
+ * in sync without duplicating persistence tests.
  */
 
 /** 递归收集叶子字符串，键路径用点号连接。 */
@@ -24,12 +22,28 @@ function leaves(value: unknown, prefix = ''): Record<string, string> {
 
 const zh = leaves(zhCN)
 const enFlat = leaves(en)
+const localeFlats = {
+  en: enFlat,
+  'zh-CN': zh,
+  'zh-TW': leaves(zhTW),
+  'zh-HK': leaves(zhHK),
+  ko: leaves(ko),
+  ja: leaves(ja),
+}
 
 describe('语言由主进程设置决定', () => {
-  it('只有两个取值，没有 system 档位', () => {
-    // AppSettings.uiLanguage 的并集就是 'zh-CN' | 'en'；多一个档位会被主进程 schema 拒收。
+  it('核心品牌名按界面语言显示', () => {
     expect(appNameForLanguage('zh-CN')).toBe('诺拉翻译')
     expect(appNameForLanguage('en')).toBe('Nola Translator')
+  })
+
+  it('自动检测能识别繁体区域、韩语和日语', () => {
+    expect(resolveUiLanguage('auto', 'zh-TW')).toBe('zh-TW')
+    expect(resolveUiLanguage('auto', 'zh-Hant-HK')).toBe('zh-HK')
+    expect(resolveUiLanguage('auto', 'zh-Hant-MO')).toBe('zh-HK')
+    expect(resolveUiLanguage('auto', 'ko-KR')).toBe('ko')
+    expect(resolveUiLanguage('auto', 'ja-JP')).toBe('ja')
+    expect(resolveUiLanguage('auto', 'fr-FR')).toBe('en')
   })
 
   it('中文界面直接返回词典里的中文原文', () => {
@@ -48,6 +62,24 @@ describe('语言由主进程设置决定', () => {
   it('按 {name} 插值，未给的值保留原样', () => {
     expect(translate('shellUi.translationFailed', 'zh-CN', { reason: '网络不可达' })).toContain('网络不可达')
     expect(translate('shellUi.translationFailed', 'zh-CN', {})).toContain('{reason}')
+  })
+})
+
+describe('所有界面语言都有完整词典', () => {
+  const placeholders = (s: string) => (s.match(/\{[a-zA-Z0-9_]+\}/g) ?? []).sort()
+
+  it('每种语言的键都与简体中文完全对齐', () => {
+    for (const [locale, dictionary] of Object.entries(localeFlats)) {
+      expect(Object.keys(dictionary).sort(), locale).toEqual(Object.keys(zh).sort())
+    }
+  })
+
+  it('所有语言的插值占位符都与源词条一致', () => {
+    for (const [locale, dictionary] of Object.entries(localeFlats)) {
+      for (const [key, source] of Object.entries(zh)) {
+        expect(placeholders(dictionary[key]), `${locale}: ${key}`).toEqual(placeholders(source))
+      }
+    }
   })
 })
 

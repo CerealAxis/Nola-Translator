@@ -4,7 +4,7 @@ import { Button, ColorArea, ColorField, ColorPicker, ColorSlider, ColorSwatch, C
 import { CheckSquare, ChevronDown, CircleAlert, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Square, X } from 'lucide-react'
 
 import { useModelOptions } from '@/model-options'
-import { DEFAULT_SETTINGS, LANGUAGE_LABELS } from '@/bridge'
+import { DEFAULT_SETTINGS, LANGUAGE_LABELS, languageName } from '@/bridge'
 import { CAPTION_SCHEMES } from '@/features/overlay'
 import { useI18n } from '@/i18n'
 import { sessionStore, stores, updateSettings, useStore } from '@/store'
@@ -12,7 +12,7 @@ import { SettingsRow } from '../SettingsRow'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 
-const FONT_FAMILIES = ['Segoe UI Variable', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans SC', 'Cascadia Mono', 'Source Han Sans SC']
+const FONT_FAMILIES = ['Segoe UI Variable', 'Noto Sans SC', 'Noto Sans TC', 'Noto Sans HK', 'Noto Sans JP', 'Noto Sans KR', 'Microsoft YaHei UI', 'PingFang SC', 'Cascadia Mono', 'Source Han Sans SC']
 const PRESET_COLORS = ['#F7F7F7', '#D7DEE8', '#87D5FF', '#0D0E10', '#FFFFFF', '#4C9AFF']
 
 export function AppearanceTab({ settings }: SettingsPanelProps) {
@@ -27,7 +27,7 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
   const write = (patch: Partial<typeof overlay>) => { void updateSettings({ overlay: patch }).catch(() => undefined) }
   const label = (code: string) => {
     const entry = LANGUAGE_LABELS[code]
-    return entry ? language === 'zh-CN' ? entry.zh : entry.en : code
+    return entry ? languageName(code, language) : code
   }
   const display = overlay.showSource && overlay.showTranslation ? 'both' : overlay.showSource ? 'source' : 'translation'
 
@@ -58,7 +58,7 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
               '--preview-translation-font-size': `${overlay.translationFontSize}px`,
               '--preview-translation-font-weight': overlay.translationFontWeight,
               '--preview-translation-line-height': overlay.translationLineHeight,
-              fontFamily: overlay.fontFamily,
+              fontFamily: `${overlay.fontFamily}, var(--font-cjk-fallback), var(--font-ui), sans-serif`,
             } as CSSProperties}
             aria-hidden="true"
           >

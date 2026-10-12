@@ -108,7 +108,7 @@ export type AudioSourceOption =
       isDefault: boolean
     }
 
-export { LANGUAGE_LABELS } from '../../shared/languages'
+export { LANGUAGE_LABELS, languageName } from '../../shared/languages'
 export type { LanguageLabel } from '../../shared/languages'
 export type { ModelConfiguration } from '../../shared/model-capabilities'
 

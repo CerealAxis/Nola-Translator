@@ -15,6 +15,7 @@ import type { SecureCredentialStore } from './secure-store'
 import { computeOverlayBounds, getOverlayInteractionPolicy, overlayMinimumHeight, OVERLAY_MIN_WIDTH } from './windows'
 import type { AppSettings, AppSettingsPatch, CredentialProvider } from '../shared/settings'
 import { CREDENTIAL_PROVIDERS, RECOGNITION_MODEL_LABELS } from '../shared/settings'
+import { resolveUiLanguage } from '../shared/languages'
 import type { ModelStorageInfo } from '../shared/bridge'
 import { modelStorageEnvironment, readEngineStatus, validateModelStorageDirectory } from './model-storage'
 import { settingsPatchSchema } from './settings-schema'
@@ -164,8 +165,13 @@ export function registerAppIpc(options: {
   })
   loggedHandle(channels.getModelStorage, () => storageInfo())
   loggedHandle(channels.chooseModelStorageDirectory, async () => {
+    const language = resolveUiLanguage(current.uiLanguage, app.getLocale())
     const result = await dialog.showOpenDialog({
-      title: current.uiLanguage === 'en' ? 'Choose data folder' : '选择数据文件夹',
+      title: language === 'zh-CN' ? '选择数据文件夹'
+        : language === 'zh-TW' ? '選擇資料夾'
+          : language === 'zh-HK' ? '選擇資料夾'
+          : language === 'ko' ? '데이터 폴더 선택'
+            : language === 'ja' ? 'データフォルダーを選択' : 'Choose data folder',
       defaultPath: configuredStoragePath(),
       properties: ['openDirectory', 'createDirectory'],
     })
@@ -271,8 +277,13 @@ export function registerAppIpc(options: {
     const value = String(format) as 'txt' | 'srt' | 'vtt'
     const meta = options.meetings.get(meetingId)
     if (!meta) throw new Error('会议不存在')
+    const language = resolveUiLanguage(current.uiLanguage, app.getLocale())
     const result = await dialog.showSaveDialog({
-      title: current.uiLanguage === 'en' ? 'Export captions' : '导出字幕',
+      title: language === 'zh-CN' ? '导出字幕'
+        : language === 'zh-TW' ? '匯出字幕'
+          : language === 'zh-HK' ? '匯出字幕'
+          : language === 'ko' ? '자막 내보내기'
+            : language === 'ja' ? '字幕をエクスポート' : 'Export captions',
       defaultPath: `${(meta.title || meetingId).slice(0, 60)}.${value}`,
       filters: [{ name: value.toUpperCase(), extensions: [value] }],
     })

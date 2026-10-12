@@ -21,7 +21,7 @@ export interface TitleBarProps {
   className?: string
 }
 export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actions, leading, helpItems, className = '' }: TitleBarProps) {
-  const { t, language, setLanguage } = useI18n()
+  const { t, uiLanguage, setLanguage } = useI18n()
   const { navigate } = useRoute()
   const { resolved, setTheme } = useNolaTheme()
   const native = isElectronShell()
@@ -39,7 +39,12 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
     void window.nolaTranslator?.toggleMainWindowMaximize().then(setMaximized).catch(() => undefined)
   }
   const options = [
+    { id: 'auto' as const, label: t('language.auto') },
     { id: 'zh-CN' as const, label: t('language.zhCN') },
+    { id: 'zh-TW' as const, label: t('language.zhTW') },
+    { id: 'zh-HK' as const, label: t('language.zhHK') },
+    { id: 'ko' as const, label: t('language.ko') },
+    { id: 'ja' as const, label: t('language.ja') },
     { id: 'en' as const, label: t('language.en') },
   ]
   const help = helpItems ?? [
@@ -59,7 +64,7 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
         <Dropdown>
           <Dropdown.Trigger className="nola-titlebar-icon" aria-label={t('titleBar.language')}><Languages aria-hidden="true" /></Dropdown.Trigger>
           <Dropdown.Popover>
-            <Dropdown.Menu selectionMode="single" selectedKeys={new Set([language])}>
+            <Dropdown.Menu selectionMode="single" selectedKeys={new Set([uiLanguage])}>
               {options.map(option => <Dropdown.Item key={option.id} id={option.id} textValue={option.label} onAction={() => setLanguage(option.id)}>{option.label}<Dropdown.ItemIndicator type="checkmark" /></Dropdown.Item>)}
             </Dropdown.Menu>
           </Dropdown.Popover>

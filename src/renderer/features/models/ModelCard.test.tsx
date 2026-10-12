@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import type { ReactElement } from 'react'
 
@@ -22,10 +22,17 @@ function record(partial: Partial<ResourceRecord> & Pick<ResourceRecord, 'resourc
   }
 }
 
-/*
- * No language needs pinning here: `I18nProvider` starts at `'zh-CN'` and jsdom has no preload,
- * so its `getSettings()` never resolves a value and the assertions below stay in that language.
- */
+const originalLanguage = Object.getOwnPropertyDescriptor(navigator, 'language')
+
+beforeEach(() => {
+  Object.defineProperty(navigator, 'language', { configurable: true, value: 'zh-CN' })
+})
+
+afterEach(() => {
+  if (originalLanguage) Object.defineProperty(navigator, 'language', originalLanguage)
+  else Reflect.deleteProperty(navigator, 'language')
+})
+
 function renderWithI18n(node: ReactElement) {
   return render(<I18nProvider>{node}</I18nProvider>)
 }

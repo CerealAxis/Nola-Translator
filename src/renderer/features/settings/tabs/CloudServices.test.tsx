@@ -42,7 +42,7 @@ it('shows the fixed public Index-Translate model with streaming and no key field
   render(<TranslationTab settings={settings} />)
   expect(screen.getByText('Index-Translate-35B-A3B')).toBeInTheDocument()
   expect(screen.getByText('https://index-translate.bilibili.com/v1')).toBeInTheDocument()
-  expect(screen.getByText(/原文会发送给哔哩哔哩/)).toBeInTheDocument()
+  expect(screen.queryByText(/原文会发送给哔哩哔哩/)).not.toBeInTheDocument()
   expect(screen.queryByLabelText('API 密钥')).not.toBeInTheDocument()
   expect(screen.getByRole('switch')).toBeInTheDocument()
 })

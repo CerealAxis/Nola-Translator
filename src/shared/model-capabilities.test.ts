@@ -41,8 +41,10 @@ describe('model language capabilities', () => {
     const targets = translationLanguages(record('hy-mt2-1.8b-q4-k-m'), 'en')
     expect(targets).toContain('bo')
     expect(targets).toContain('yue')
-    expect(LANGUAGE_LABELS.bo).toEqual({ code: 'bo', zh: '藏语', en: 'Tibetan' })
-    expect(LANGUAGE_LABELS.yue).toEqual({ code: 'yue', zh: '粤语', en: 'Cantonese' })
+    expect(LANGUAGE_LABELS.bo).toMatchObject({ code: 'bo', zh: '藏语', zhTW: '藏語', zhHK: '藏語', en: 'Tibetan' })
+    expect(LANGUAGE_LABELS.bo.ko).toBeTruthy()
+    expect(LANGUAGE_LABELS.bo.ja).toBeTruthy()
+    expect(LANGUAGE_LABELS.yue).toMatchObject({ code: 'yue', zh: '粤语', zhTW: '粵語', zhHK: '粵語', en: 'Cantonese' })
   })
   it('allows Chinese recognition while rejecting it as a source of the English/Japanese translator', () => {
     const translator = record('hub:test/bilingual', bilingual)

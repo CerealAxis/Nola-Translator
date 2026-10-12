@@ -7,7 +7,7 @@ import { ErrorBoundary } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import { pathOf, recordPath, useRoute } from '@/routes'
 import { actions, stores, useStore } from '@/store'
-import { LANGUAGE_LABELS } from '@/bridge'
+import { LANGUAGE_LABELS, languageName } from '@/bridge'
 import type { MeetingMeta } from '@/bridge'
 import { RenameDialog } from './RenameDialog'
 import { ExportDialog } from './ExportDialog'
@@ -46,7 +46,7 @@ export function RecordsPage(): ReactNode {
     const text = filterText.trim().toLowerCase()
     const languageLabel = (code: string) => {
       const label = LANGUAGE_LABELS[code]
-      return label ? (language === 'zh-CN' ? label.zh : label.en) : code
+      return label ? languageName(code, language) : code
     }
     return sortByEndTime(meetings.filter((meeting) => matches(meeting, text) ||
       languageLabel(meeting.sourceLanguage).toLowerCase().includes(text) ||

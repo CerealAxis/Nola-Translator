@@ -5,6 +5,7 @@ import { createBridge } from './bridge'
 import { createExtensionStore } from './store'
 import { alignPlayerTrigger, detectVideos, playerAdapter } from './adapters'
 import { browserText } from './i18n'
+import { resolveUiLanguage } from '../../src/shared/languages'
 import { Panel } from './components'
 import { NolaLogo } from './logo'
 import { CaptionClock, captionLines, deepFullscreenElement, fullscreenCueBounds, subtitleGeometry, visibleControlReserve } from './captionPresentation'
@@ -139,7 +140,9 @@ function install(): void {
   })
   function render(): void {
     const state = store.getSnapshot()
+    const language = resolveUiLanguage(state.summary?.uiLanguage ?? 'auto', navigator.language)
     const t = browserText(state.summary?.uiLanguage)
+    for (const host of [trigger.host, panel.host, overlay.host]) host.lang = language
     const video = state.selectedVideo ?? state.videos[0]
     const fullscreen = deepFullscreenElement(document)
     if (!video) { for (const host of hosts) host.hidden = true; return }

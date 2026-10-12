@@ -28,8 +28,7 @@
 @layer base {
   :root {
     /* --- Font families -------------------------------------------------------
-       Per DESIGN.md §8.2. Defined before the scale below, which references them. */
-    --font-ui: "Segoe UI Variable Text", "Microsoft YaHei UI", "PingFang SC", system-ui, -apple-system, "Segoe UI", sans-serif;
+       typography.css selects bundled CJK faces from the document language. */
     --font-mono: "Cascadia Mono", "SF Mono", Consolas, ui-monospace, monospace;
 
     /* --- Typography scale ----------------------------------------------------

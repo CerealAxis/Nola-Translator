@@ -1,4 +1,7 @@
 import { browserEn, browserZh } from '../../src/renderer/i18n/browser-ui'
+import { browserJa, browserKo, browserZhHK, browserZhTW } from '../../src/renderer/i18n/browser-locales'
+import { resolveUiLanguage } from '../../src/shared/languages'
+import type { UiLanguage, UiLanguagePreference } from '../../src/shared/languages'
 export type BrowserKey = keyof typeof browserZh
 /**
  * An unrecognised code keeps its own spelling so the user can report it and the
@@ -20,8 +23,20 @@ const ERROR_ALIASES: Record<string, BrowserKey> = {
 function isDictionaryKey(key: BrowserTextKey): key is BrowserKey {
   return !(key as string).startsWith(UNKNOWN_PREFIX)
 }
-export function browserText(language: 'zh-CN' | 'en' = 'en') {
-  const dictionary = language === 'zh-CN' ? browserZh : browserEn
+export type BrowserUiLanguage = UiLanguagePreference
+
+const dictionaries: Record<UiLanguage, Record<BrowserKey, string>> = {
+  'zh-CN': browserZh,
+  'zh-TW': browserZhTW,
+  'zh-HK': browserZhHK,
+  ko: browserKo,
+  ja: browserJa,
+  en: browserEn,
+}
+
+export function browserText(language: BrowserUiLanguage = 'en') {
+  const locale = resolveUiLanguage(language, navigator.language)
+  const dictionary = dictionaries[locale]
   return (key: BrowserTextKey): string => {
     if (isDictionaryKey(key)) return dictionary[key]
     // A code arrives from the desktop process, so it is capped before it reaches the DOM.

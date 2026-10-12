@@ -13,7 +13,7 @@ import { useModelOptions } from '@/model-options'
 import { useCallback, useMemo, useState } from 'react'
 import { Alert, Button, InputGroup, toast } from '@heroui/react'
 
-import { LANGUAGE_LABELS } from '@/bridge'
+import { languageName } from '@/bridge'
 import { SettingsRow } from '../SettingsRow'
 import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
@@ -57,7 +57,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
     () =>
       modelChoices.sourceLanguages.map((code) => ({
         value: code,
-        label: LANGUAGE_LABELS[code]?.[language === 'zh-CN' ? 'zh' : 'en'] ?? code,
+        label: languageName(code, language),
       })),
     [language, modelChoices.sourceLanguages],
   )

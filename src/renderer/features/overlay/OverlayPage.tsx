@@ -4,7 +4,7 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button, Card, Label, ListBox, Popover, Select, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
 import { ArrowRight, ArrowRightLeft, ChevronDown, ExternalLink, Languages, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Settings, Square, X } from 'lucide-react'
-import { DEFAULT_SETTINGS, LANGUAGE_LABELS, NO_TRANSLATION_LANGUAGE } from '@/bridge'
+import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { AppSettingsPatch } from '@/bridge'
 import { useI18n } from '@/i18n'
 import { useRoute } from '@/routes'
@@ -26,10 +26,7 @@ export function OverlayPage() {
   const config = settings.overlay
   const translationDisabled = settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE
   const display = translationDisabled ? 'source' : config.showSource && config.showTranslation ? 'both' : config.showSource ? 'source' : 'translation'
-  const label = (code: string) => {
-    const entry = LANGUAGE_LABELS[code]
-    return entry ? language === 'zh-CN' ? entry.zh : entry.en : code
-  }
+  const label = (code: string) => languageName(code, language)
   const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch((error: unknown) => toast.danger(t(SETTINGS_WRITE_FAILURE_KEYS[settingsWriteFailure(error)]))) }
   const open = async () => {
     setOpening(true)
@@ -50,7 +47,7 @@ export function OverlayPage() {
     '--preview-translation-font-size': `${config.translationFontSize}px`,
     '--preview-translation-font-weight': config.translationFontWeight,
     '--preview-translation-line-height': config.translationLineHeight,
-    fontFamily: config.fontFamily,
+    fontFamily: `${config.fontFamily}, var(--font-cjk-fallback), var(--font-ui), sans-serif`,
   } as CSSProperties
   return (
     <div className="nola-overlay-page">

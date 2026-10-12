@@ -1,6 +1,6 @@
 THE FOLLOWING SETS FORTH ATTRIBUTION NOTICES FOR THIRD PARTY SOFTWARE THAT MAY BE CONTAINED IN PORTIONS OF THIS PRODUCT
 
-The following software may be included in this product: @adobe/react-spectrum (3.47.5)
+The following software may be included in this product: @adobe/react-spectrum (3.47.7)
 This software contains the following license and notice below:
 
 Apache License
@@ -666,7 +666,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
-The following software may be included in this product: @babel/generator (7.29.7)
+The following software may be included in this product: @babel/generator (7.29.8)
 This software contains the following license and notice below:
 
 MIT License
@@ -806,7 +806,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
-The following software may be included in this product: @babel/parser (7.29.7)
+The following software may be included in this product: @babel/parser (7.29.9)
 This software contains the following license and notice below:
 
 Copyright (C) 2012-2014 by various contributors (see AUTHORS)
@@ -831,7 +831,7 @@ THE SOFTWARE.
 
 ---
 
-The following software may be included in this product: @babel/runtime (7.29.7)
+The following software may be included in this product: @babel/runtime (7.29.10)
 This software contains the following license and notice below:
 
 MIT License
@@ -887,7 +887,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
-The following software may be included in this product: @babel/traverse (7.29.7)
+The following software may be included in this product: @babel/traverse (7.29.10)
 This software contains the following license and notice below:
 
 MIT License
@@ -915,7 +915,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
-The following software may be included in this product: @babel/types (7.29.7)
+The following software may be included in this product: @babel/types (7.29.8)
 This software contains the following license and notice below:
 
 MIT License
@@ -1024,7 +1024,7 @@ SOFTWARE.
 
 ---
 
-The following software may be included in this product: @emotion/hash (0.9.2)
+The following software may be included in this product: @emotion/hash (0.8.0)
 This software contains the following license and notice below:
 
 MIT License
@@ -1159,7 +1159,7 @@ SOFTWARE.
 
 ---
 
-The following software may be included in this product: @emotion/unitless (0.10.0)
+The following software may be included in this product: @emotion/unitless (0.7.5)
 This software contains the following license and notice below:
 
 MIT License
@@ -1884,7 +1884,7 @@ limitations under the License.
 
 ---
 
-The following software may be included in this product: @internationalized/number (3.6.8)
+The following software may be included in this product: @internationalized/number (3.6.9)
 This software contains the following license and notice below:
 
 Apache License
@@ -2347,7 +2347,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ---
 
-The following software may be included in this product: @jridgewell/sourcemap-codec (1.5.5)
+The following software may be included in this product: @jridgewell/sourcemap-codec (1.6.0)
 This software contains the following license and notice below:
 
 Copyright 2024 Justin Ridgewell <justin@ridgewell.name>
@@ -2397,7 +2397,7 @@ SOFTWARE.
 
 ---
 
-The following software may be included in this product: @lobehub/icons (5.22.0)
+The following software may be included in this product: @lobehub/icons (5.23.0)
 This software contains the following license and notice below:
 
 MIT License
@@ -2559,7 +2559,7 @@ SOFTWARE.
 
 ---
 
-The following software may be included in this product: @radix-ui/react-slot (1.3.3)
+The following software may be included in this product: @radix-ui/react-slot (1.5.0)
 This software contains the following license and notice below:
 
 MIT License
@@ -5472,6 +5472,104 @@ IN THE SOFTWARE.
 
 The Node.js license applies to all parts of Node.js that are not externally
 maintained libraries.
+---
+
+The following software may be included in this product: Noto Sans CJK (f8d157532fbfaeda587e826d4cd5b21a49186f7c)
+This software contains the following license and notice below:
+
+This Font Software is licensed under the SIL Open Font License,
+Version 1.1.
+
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font
+creation efforts of academic and linguistic communities, and to
+provide a free and open framework in which fonts may be shared and
+improved in partnership with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply to
+any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software
+components as distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to,
+deleting, or substituting -- in part or in whole -- any of the
+components of the Original Version, by changing formats or by porting
+the Font Software to a new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed,
+modify, redistribute, and sell modified and unmodified copies of the
+Font Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components, in
+Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the
+corresponding Copyright Holder. This restriction only applies to the
+primary font name as presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created using
+the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+
 ---
 
 The following software may be included in this product: PyAudioWPatch (0.2.12.8)
@@ -10817,7 +10915,7 @@ SOFTWARE.
 
 ---
 
-The following software may be included in this product: react-aria (3.52.1)
+The following software may be included in this product: react-aria (3.53.1)
 This software contains the following license and notice below:
 
 Apache License
@@ -11024,7 +11122,7 @@ limitations under the License.
 
 ---
 
-The following software may be included in this product: react-aria-components (1.21.1)
+The following software may be included in this product: react-aria-components (1.22.1)
 This software contains the following license and notice below:
 
 Apache License
@@ -11258,12 +11356,12 @@ SOFTWARE.
 
 ---
 
-The following software may be included in this product: react-is (17.0.2)
+The following software may be included in this product: react-is (19.3.0)
 This software contains the following license and notice below:
 
 MIT License
 
-Copyright (c) Facebook, Inc. and its affiliates.
+Copyright (c) Meta Platforms, Inc. and affiliates.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -11923,7 +12021,7 @@ of your accepting any such warranty or additional liability.
 
 ---
 
-The following software may be included in this product: resolve (1.22.12)
+The following software may be included in this product: resolve (1.22.13)
 This software contains the following license and notice below:
 
 MIT License
@@ -13515,7 +13613,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ---
 
-The following software may be included in this product: source-map (0.6.1)
+The following software may be included in this product: source-map (0.7.6)
 This software contains the following license and notice below:
 
 
@@ -15324,6 +15422,25 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+---
+
+The following software may be included in this product: yaml (1.10.3)
+This software contains the following license and notice below:
+
+Copyright 2018 Eemeli Aro <eemeli@gmail.com>
+
+Permission to use, copy, modify, and/or distribute this software for any purpose
+with or without fee is hereby granted, provided that the above copyright notice
+and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+THIS SOFTWARE.
 
 ---
 

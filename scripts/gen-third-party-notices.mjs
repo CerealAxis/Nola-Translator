@@ -1520,6 +1520,14 @@ function collectPythonTree() {
 // ---------------------------------------------------------------------------
 
 collectRendererTree()
+const NOTO_CJK_REVISION = 'f8d157532fbfaeda587e826d4cd5b21a49186f7c'
+const notoCjkLicense = readText(join(ROOT, 'src', 'renderer', 'assets', 'fonts', 'OFL-Noto-CJK.txt'))
+if (notoCjkLicense === null) {
+  report('unresolved', 'Noto Sans CJK', 'src/renderer/assets/fonts/OFL-Noto-CJK.txt is missing')
+} else {
+  addEntry('Noto Sans CJK', NOTO_CJK_REVISION, notoCjkLicense, 'renderer')
+  report('embedded', `Noto Sans CJK ${NOTO_CJK_REVISION}`, 'OFL-1.1 text is bundled from src/renderer/assets/fonts/OFL-Noto-CJK.txt; font sources are pinned to https://github.com/notofonts/noto-cjk/tree/f8d157532fbfaeda587e826d4cd5b21a49186f7c')
+}
 collectPlatformRuntime()
 collectPythonTree()
 

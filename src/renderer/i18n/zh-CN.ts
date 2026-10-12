@@ -78,7 +78,12 @@ export const zhCN = {
   },
 
   language: {
+    auto: '自动检测',
     zhCN: '简体中文',
+    zhTW: '繁體中文（台灣）',
+    zhHK: '繁體中文（香港）',
+    ko: '한국어',
+    ja: '日本語',
     en: 'English',
   },
 
@@ -735,3 +740,6 @@ export const zhCN = {
 type Widen<T> = T extends string ? string : { readonly [K in keyof T]: Widen<T[K]> }
 
 export type Dictionary = Widen<typeof zhCN>
+export type DictionaryKey<T = Dictionary> = T extends string
+  ? never
+  : { [K in keyof T & string]: T[K] extends string ? K : `${K}.${DictionaryKey<T[K]>}` }[keyof T & string]

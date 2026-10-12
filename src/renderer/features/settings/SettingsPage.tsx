@@ -19,7 +19,6 @@ import { ComputeTab } from './tabs/ComputeTab'
 import { PerformanceTab } from './tabs/PerformanceTab'
 import { BrowserTab } from './tabs/BrowserTab'
 import { DeveloperTab } from './tabs/DeveloperTab'
-import { computeUi } from './compute-ui'
 import './settings.css'
 
 export interface SettingsPanelProps { settings: AppSettings }
@@ -27,7 +26,7 @@ export interface SettingsPanelProps { settings: AppSettings }
 const NAV_ICONS = { browser: Captions, general: Settings, audio: Mic, translation: Languages, compute: Cpu, performance: Gauge, appearance: Monitor, storage: Database, advanced: SlidersHorizontal, developer: FlaskConical }
 
 export function SettingsPage() {
-  const { t, language } = useI18n()
+  const { t, dictionary } = useI18n()
   const { tab, navigate } = useRoute()
   const settings = useStore(stores.settings, (state) => state.settings)
   const error = useStore(stores.settings, (state) => state.error)
@@ -62,15 +61,15 @@ export function SettingsPage() {
 
   const labels: Record<SettingsTab, string> = {
     browser: t('browser.title'),
-    compute: language === 'en' ? 'Compute devices' : '计算设备',
-    performance: language === 'en' ? 'Performance & memory' : '性能与显存',
+    compute: t('compute.devices'),
+    performance: t('compute.performance'),
     general: t('modelsSettingsUi.general'), audio: t('modelsSettingsUi.audio'),
     translation: t('modelsSettingsUi.translation'), appearance: t('modelsSettingsUi.appearance'),
     storage: t('modelsSettingsUi.storage'), advanced: t('modelsSettingsUi.advanced'),
     developer: t('dev.tabLabel'),
   }
 
-  const computeCopy = language === 'en' ? computeUi.en : computeUi.zh
+  const computeCopy = dictionary.compute
   const NAV_HINTS: Partial<Record<SettingsTab, string>> = {
     compute: computeCopy.nextSession, performance: computeCopy.nextSession,
   }

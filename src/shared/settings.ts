@@ -99,7 +99,7 @@ export type NetworkSettings = {
 export type AppSettings = {
   version: 1
   theme: 'system' | 'light' | 'dark'
-  uiLanguage: 'zh-CN' | 'en'
+  uiLanguage: 'auto' | 'zh-CN' | 'zh-TW' | 'zh-HK' | 'ko' | 'ja' | 'en'
   modelStoragePath: string
   network: NetworkSettings
   recognition: RecognitionSettings
@@ -252,7 +252,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   browserConnection: { enabled: false },
   version: 1,
   theme: 'system',
-  uiLanguage: 'zh-CN',
+  uiLanguage: 'auto',
   modelStoragePath: '',
   network: {
     useHuggingFaceMirror: true,

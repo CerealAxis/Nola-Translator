@@ -9,3 +9,7 @@
 export { zhCN } from './zh-CN'
 export type { Dictionary } from './zh-CN'
 export { en } from './en'
+export { zhTW } from './zh-TW'
+export { zhHK } from './zh-HK'
+export { ko } from './ko'
+export { ja } from './ja'

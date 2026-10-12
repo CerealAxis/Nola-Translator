@@ -41,7 +41,7 @@ const localModelIdSchema = z.union([
 export const settingsPatchSchema = z.object({
   compute: computeSettingsPatchSchema.optional(),
   theme: z.enum(['system', 'light', 'dark']).optional(),
-  uiLanguage: z.enum(['zh-CN', 'en']).optional(),
+  uiLanguage: z.enum(['auto', 'zh-CN', 'zh-TW', 'zh-HK', 'ko', 'ja', 'en']).optional(),
   network: z.object({
     useHuggingFaceMirror: z.boolean().optional(),
     usePypiMirror: z.boolean().optional(),

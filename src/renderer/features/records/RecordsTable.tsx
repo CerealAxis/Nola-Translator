@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Button, Checkbox, Dropdown, Table } from '@heroui/react'
 import type { Selection, SortDescriptor } from '@react-types/shared'
 import { Eye, FileText, Mic, MoreHorizontal, Pencil, Download, Trash2 } from 'lucide-react'
-import { LANGUAGE_LABELS } from '@/bridge'
+import { LANGUAGE_LABELS, languageName } from '@/bridge'
 import type { MeetingMeta } from '@/bridge'
 import { useI18n } from '@/i18n'
 import { meetingState } from '@/meeting-format'
@@ -27,7 +27,7 @@ export function RecordsTable({ meetings, onOpen, onRename, onExport, onDelete, p
   const selectable = !!onSelectionChange
   const languageLabel = (code: string) => {
     const label = LANGUAGE_LABELS[code]
-    return label ? (language === 'zh-CN' ? label.zh : label.en) : code
+    return label ? languageName(code, language) : code
   }
   return (
     <Table variant="secondary" className="nola-records-table">

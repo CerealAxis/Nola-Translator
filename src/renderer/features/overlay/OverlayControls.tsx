@@ -30,7 +30,7 @@ import { Mic, Square } from 'lucide-react'
 
 import {
   DEFAULT_SETTINGS,
-  LANGUAGE_LABELS,
+  languageName,
 } from '@/bridge'
 import type { AppSettings, AudioDevice, AudioSourceOption, RecognitionModelId, SessionConfig } from '@/bridge'
 import { audioSourceFrom } from '@/features/workspace/SessionSetupDialog'
@@ -206,11 +206,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
   const source = settings.recognition.sourceLanguage
   const target = settings.translation.targetLanguage
 
-  const label = (code: string): string => {
-    const entry = (LANGUAGE_LABELS as Record<string, { zh: string; en: string } | undefined>)[code]
-    if (!entry) return code
-    return language === 'zh-CN' ? entry.zh : entry.en
-  }
+  const label = (code: string): string => languageName(code, language)
 
   const patch = (next: Parameters<typeof actions.settings.updateSettings>[0]): void => {
     void actions.settings.updateSettings(next).catch(() => undefined)

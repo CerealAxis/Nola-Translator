@@ -74,7 +74,12 @@ export const en: Dictionary = {
   },
 
   language: {
+    auto: 'Auto detect',
     zhCN: '简体中文',
+    zhTW: 'Traditional Chinese (Taiwan)',
+    zhHK: 'Traditional Chinese (Hong Kong)',
+    ko: '한국어',
+    ja: '日本語',
     en: 'English',
   },
 

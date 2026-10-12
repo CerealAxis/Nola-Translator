@@ -3,15 +3,15 @@
    -----------------------------------------------------------------------------
    Imported into @layer base.
 
-   FONTS
-   System fonts only, no @font-face, so there is no webfont download and no
-   FOIT/FOUT window. The first entry is the Windows 11
-   system UI face; Microsoft YaHei UI covers CJK on Windows, PingFang SC on macOS.
+   FONT STACKS
+   Region-specific Noto faces are declared in cjk-fonts.css and loaded by the
+   desktop renderer. Shared theme consumers retain platform fallbacks.
    ========================================================================== */
 
 :root {
   --font-ui:
-    'Segoe UI Variable Text', 'Microsoft YaHei UI', 'PingFang SC', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    'Segoe UI Variable Text', 'Noto Sans SC', 'Microsoft YaHei UI', 'PingFang SC', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-cjk-fallback: 'Noto Sans SC';
   --font-mono: 'Cascadia Mono', 'SF Mono', Consolas, ui-monospace, monospace;
 
   /* --- Type scale ----------------------------------------------------------
@@ -32,6 +32,31 @@
 
   /* CJK <-> Latin gap. 1/4 em, applied by `text-autospace` where supported. */
   --nola-autospace: 0.25em;
+}
+
+:root:lang(zh-CN) {
+  --font-ui: 'Noto Sans SC', 'Microsoft YaHei UI', 'PingFang SC', system-ui, sans-serif;
+  --font-cjk-fallback: 'Noto Sans SC';
+}
+
+:root:lang(zh-TW) {
+  --font-ui: 'Noto Sans TC', 'Microsoft JhengHei UI', 'PingFang TC', system-ui, sans-serif;
+  --font-cjk-fallback: 'Noto Sans TC';
+}
+
+:root:lang(zh-HK) {
+  --font-ui: 'Noto Sans HK', 'Microsoft JhengHei UI', 'PingFang HK', system-ui, sans-serif;
+  --font-cjk-fallback: 'Noto Sans HK';
+}
+
+:root:lang(ko) {
+  --font-ui: 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+  --font-cjk-fallback: 'Noto Sans KR';
+}
+
+:root:lang(ja) {
+  --font-ui: 'Noto Sans JP', 'Yu Gothic UI', 'Meiryo', system-ui, sans-serif;
+  --font-cjk-fallback: 'Noto Sans JP';
 }
 
 /* --- Utility classes -------------------------------------------------------- */
@@ -104,7 +129,9 @@
 .nola-cjk,
 :lang(zh),
 :lang(zh-Hans),
-:lang(zh-Hant) {
+:lang(zh-Hant),
+:lang(ko),
+:lang(ja) {
   letter-spacing: normal;
 }
 

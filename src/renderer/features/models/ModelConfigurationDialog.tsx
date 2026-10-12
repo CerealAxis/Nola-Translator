@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Alert, Button, Label, ListBox, Modal, Select, Switch, toast } from '@heroui/react'
 import type { ResourceRecord } from '@/bridge'
-import { LANGUAGE_LABELS } from '@/bridge'
+import { languageName } from '@/bridge'
 import { actions } from '@/store'
 import { useI18n } from '@/i18n'
 import { LANGUAGE_CODES, normalizeLanguage } from '../../../shared/languages'
@@ -25,7 +25,7 @@ export interface ModelLanguageSelectProps {
 
 export function ModelLanguageSelect({ label, value, codes, onChange, multiple = true }: ModelLanguageSelectProps) {
   const { language, t } = useI18n()
-  const name = (code: string) => LANGUAGE_LABELS[code]?.[language === 'zh-CN' ? 'zh' : 'en'] ?? code
+  const name = (code: string) => languageName(code, language)
   return <Select fullWidth selectionMode={multiple ? 'multiple' : 'single'} value={multiple ? value : value[0] ?? null} onChange={keys => {
     if (Array.isArray(keys)) onChange(keys.map(String))
     else onChange(keys === null ? [] : [String(keys)])
@@ -59,7 +59,7 @@ export function ModelConfigurationDialog({ record, onClose }: ModelConfiguration
       : record.provider === 'sensevoice' ? ['zh', 'en', 'yue', 'ja', 'ko']
         : LANGUAGE_CODES
   const valid = modelConfigurationSchema.safeParse(draft).success && engines.includes(draft.engine)
-  const name = (code: string) => LANGUAGE_LABELS[code]?.[language === 'zh-CN' ? 'zh' : 'en'] ?? code
+  const name = (code: string) => languageName(code, language)
   const save = async () => {
     if (!valid || saving) return
     setSaving(true)

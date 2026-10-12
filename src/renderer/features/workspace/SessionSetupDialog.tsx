@@ -41,12 +41,13 @@ import { CircleHelp } from 'lucide-react'
 
 import {
   DEFAULT_SETTINGS,
-  LANGUAGE_LABELS,
+  languageName,
   NO_TRANSLATION_LANGUAGE,
 } from '@/bridge'
 import type { AudioDevice, AudioSourceOption, RecognitionModelId, SessionConfig } from '@/bridge'
 import { SettingRow } from '@/components/primitives'
 import { useI18n } from '@/i18n'
+import type { UiLanguage } from '@/i18n'
 import { autoMeetingTitle, nextDaySequence } from '@/meeting-format'
 import { stores, useStore } from '@/store'
 import { translationFieldsOf } from '@/session-config'
@@ -71,7 +72,7 @@ export interface SessionSetupDialogProps {
   onDraftChange: (draft: SetupDraft) => void
   devices: readonly AudioDevice[]
   /** Language names come from the dictionary data (`LANGUAGE_LABELS`), not UI copy, so they are not i18n keys. */
-  language: 'zh-CN' | 'en'
+  language: UiLanguage
   /** Called with the draft turned into the engine's SessionConfig. */
   onSubmit: (config: SessionConfig) => void
 }
@@ -131,11 +132,7 @@ export function SessionSetupDialog({
   )
 
   const languageLabel = useCallback(
-    (code: string): string => {
-      const entry = (LANGUAGE_LABELS as Record<string, { zh: string; en: string } | undefined>)[code]
-      if (!entry) return code
-      return language === 'zh-CN' ? entry.zh : entry.en
-    },
+    (code: string): string => languageName(code, language),
     [language],
   )
 

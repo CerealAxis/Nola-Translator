@@ -16,14 +16,14 @@ import { Button, Input, TextField, ToggleButton, ToggleButtonGroup, toast } from
 
 import { useNolaTheme } from '@/components/primitives'
 import { useI18n } from '@/i18n'
-import type { UiLanguage } from '@/i18n'
+import type { UiLanguagePreference } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PROXY_NODES, findGithubProxyNode } from '../../../../shared/github-proxies'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 
 export function GeneralTab({ settings }: SettingsPanelProps) {
-  const { t, language, setLanguage } = useI18n()
+  const { t, uiLanguage, setLanguage } = useI18n()
   const reduceMotion = settings.appearance?.reduceMotion ?? false
   const appUpdateChecking = useStore(stores.settings, (state) => state.appUpdateChecking)
 
@@ -35,10 +35,13 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
     void updateSettings({ appearance: { reduceMotion: next } }).catch(() => undefined)
   }, [])
 
-  // Only two options, and no "follow the system": `uiLanguage` is a main-process zod enum of
-  // exactly these, and the store coerces anything else to `zh-CN`.
   const languageOptions: PickerOption[] = [
+    { value: 'auto', label: t('language.auto') },
     { value: 'zh-CN', label: t('language.zhCN') },
+    { value: 'zh-TW', label: t('language.zhTW') },
+    { value: 'zh-HK', label: t('language.zhHK') },
+    { value: 'ko', label: t('language.ko') },
+    { value: 'ja', label: t('language.ja') },
     { value: 'en', label: t('language.en') },
   ]
 
@@ -58,14 +61,14 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
       <SettingGroup legend={t('settings.groupLanguage')}>
         <SettingsRow label={t('settings.uiLanguage')}>
           <SettingSelect
-            value={language}
+            value={uiLanguage}
             options={languageOptions}
             ariaLabel={t('settings.uiLanguage')}
             onChange={(next) => {
               // `setLanguage` already updates optimistically and rolls back a failed write,
               // so calling `updateSettings` here too would let the second rollback undo the
               // first write's success.
-              void setLanguage(next as UiLanguage).catch(() => undefined)
+              void setLanguage(next as UiLanguagePreference).catch(() => undefined)
             }}
           />
         </SettingsRow>

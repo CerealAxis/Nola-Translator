@@ -1,5 +1,6 @@
 import { ModelCapabilityNotices } from './features/models/ModelCapabilityNotices'
 import './index.css'
+import './theme/cjk-fonts.css'
 import { StrictMode, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'

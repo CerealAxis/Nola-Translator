@@ -85,7 +85,7 @@ AppShell 不包第二层 padding/max-width。整窗 overflow:hidden，main 可�
 四色入口：蓝=快速同传、紫=悬浮字幕、橙=记录、薄荷绿=模型，仅用于对应入口卡/装饰。
 中性色与彩色的背景混合使用 oklab，避免 oklch 的色相插值把橙色/薄荷绿混成紫蓝色。
 深色模式几何不变，表面/边框/文字随 token 切换；独立浮窗配色由用户单独选择。
-字体：Segoe UI Variable Text / Microsoft YaHei UI / PingFang SC / system-ui。
+字体：按界面区域加载随软件打包的 Noto Sans SC / TC / HK / KR / JP 可变字体，系统 UI 字体作为后备；字幕自选字体后仍追加当前区域字体，避免缺少可选系统语言包时出现方框字。字体许可证随第三方声明发布。
 Hero标题44–52px/700（窄窗32px）；页面标题32px/700；小节20px/650；卡片22px/650；正文14px；说明13px；元信息12px。
 字幕阅读默认16px，实际字幕字号由用户设置。时间与数值 tabular-nums。
 卡片允许轻投影 0 2px 10px rgba(35,72,125,.04)，菜单/弹窗 0 12px 36px rgba(35,72,125,.14)。

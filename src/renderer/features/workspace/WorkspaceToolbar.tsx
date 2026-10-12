@@ -3,11 +3,12 @@ import { translationLanguages } from '../../../shared/model-capabilities'
 import { Button, Card, Dropdown, Label, ListBox, ListBoxItem, Popover, Select, Switch, ToggleButton, ToggleButtonGroup } from '@heroui/react'
 import { Captions, ChevronDown, Languages, Minus, Plus, SlidersHorizontal, StickyNote, Volume2 } from 'lucide-react'
 
-import { LANGUAGE_LABELS, NO_TRANSLATION_LANGUAGE } from '@/bridge'
+import { languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { AudioDevice, RecognitionModelId, TranslationProvider } from '@/bridge'
 import { useI18n } from '@/i18n'
 import type { CaptionDisplayMode, CaptionLayout } from '@/components/caption'
 import { swappedLanguagesOf } from '@/session-config'
+import type { UiLanguage } from '@/i18n'
 
 export interface WorkspaceToolbarProps {
   modelId: RecognitionModelId
@@ -34,7 +35,7 @@ export interface WorkspaceToolbarProps {
   notesOpen: boolean
   onToggleNotes: () => void
   sessionLocked: boolean
-  language: 'zh-CN' | 'en'
+  language: UiLanguage
 }
 
 export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
@@ -48,10 +49,7 @@ export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
   const translationValue = props.targetLanguage === NO_TRANSLATION_LANGUAGE ? NO_TRANSLATION_LANGUAGE : props.translationProvider === 'local' ? props.translationModelId : props.translationProvider
   if (!translationChoices.some(option => option.value === translationValue)) translationChoices.push({ value: translationValue, label: translationValue, isDisabled: true })
   const swappedLanguages = swappedLanguagesOf(props.sourceLanguage, props.targetLanguage, sourceLanguages, translation ? translationLanguages(translation, props.targetLanguage) : targetLanguages)
-  const languageLabel = (code: string): string => {
-    const entry = LANGUAGE_LABELS[code as keyof typeof LANGUAGE_LABELS]
-    return entry ? props.language === 'zh-CN' ? entry.zh : entry.en : code
-  }
+  const languageLabel = (code: string): string => languageName(code, props.language)
   const audioOptions = [{ value: 'defaultOutput', label: t('workspaceUi.systemAudio') }, ...props.devices.filter((device) => device.deviceId !== 'defaultOutput').map((device) => ({ value: device.deviceId, label: device.name }))]
   const modes = [{ id: 'both', label: t('workspace.modeBoth') }, { id: 'source', label: t('workspace.modeSource') }, { id: 'translation', label: t('workspace.modeTranslation') }] as const
   return (

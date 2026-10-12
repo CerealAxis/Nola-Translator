@@ -26,11 +26,12 @@ src/
 └── renderer/    # React 应用
     ├── bridge/  # 渲染进程唯一的数据出口（NolaBridge）
     ├── assets/browsers/ # Chrome／Edge 图标，用于浏览器连接设置
+    ├── assets/fonts/    # 随桌面应用打包的 Noto CJK 区域可变字体与 OFL 许可证
     ├── store/   # 4 个域 store，自研 useSyncExternalStore 实现
     ├── components/  # primitives/（封闭 8 个）+ caption/ home/ notes/ reading/
     ├── features/    # home/ workspace/ overlay/ records/ models/ settings/
-    ├── i18n/         # zh-CN.ts 为 Dictionary 源，en.ts 受其类型约束
-    └── theme/        # 设计 token 唯一来源（CSS）
+    ├── i18n/         # zh-CN.ts 定义 Dictionary；locale-builder.ts 组装完整词典；browser-locales.ts 提供扩展文案；en／zh-TW／zh-HK／ko／ja 各有完整强类型词典
+    └── theme/        # 设计 token 唯一来源（CSS）；cjk-fonts.css 仅由桌面渲染器加载区域字体
 engine/nola_translator_engine/  # Python 引擎，协议定义在 protocol.py，model_capabilities.py 为引擎能力校验
 ├── recognition/aliyun.py       # LiveTranslate WebSocket、原文与内置译文关联及结束排空
 ├── recognition/minimax.py      # VAD 切段后逐段上传 WAV、SSE 增量、失败锁存与并发上限
@@ -69,8 +70,8 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 - `src/shared/browser.ts` 定义受限的扩展契约、固定开发 ID 和 Native Messaging 名称；不得在该接口暴露凭据、文件或模型管理。
 
 **i18n**
-- 界面字符串走 `t()`，语言只有 `'zh-CN' | 'en'`
-- `en.ts` 声明为 `const en: Dictionary`，`t()` 收 `Leaves<Dictionary>`，写错 key 是**编译错误**
+- 界面字符串走 `t()`；界面语言偏好为 `auto`、`zh-CN`、`zh-TW`、`zh-HK`、`ko`、`ja` 或 `en`，`auto` 按系统区域解析；`src/renderer/i18n/` 每个区域语言必须各有完整 `Dictionary` 文件
+- `en.ts` 与 `zh-TW`／`zh-HK`／`ko`／`ja` 都必须填满 `Dictionary`；`t()` 收 `Leaves<Dictionary>`，写错 key 是**编译错误**
 - 新增 key 只改 `zh-CN.ts`，`en.ts` 会因类型不匹配而报错
 
 **样式**

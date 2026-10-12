@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Alert, Button, Card, Label, Link, ListBox, Popover, Select, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
 import { AppWindow, ArrowRight, ArrowRightLeft, ChevronDown, Languages, Settings } from 'lucide-react'
-import { DEFAULT_SETTINGS, LANGUAGE_LABELS, NO_TRANSLATION_LANGUAGE } from '@/bridge'
+import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { AppSettingsPatch, PrewarmErrorCode } from '@/bridge'
 import { useModelOptions } from '@/model-options'
 import { useI18n } from '@/i18n'
@@ -75,10 +75,7 @@ export function VideoCaptionsPage() {
   const targetLanguage = settings.translation.targetLanguage
   const translationDisabled = targetLanguage === NO_TRANSLATION_LANGUAGE
   const display = translationDisabled ? 'source' : config.showSource && config.showTranslation ? 'both' : config.showSource ? 'source' : 'translation'
-  const label = (code: string) => {
-    const entry = LANGUAGE_LABELS[code]
-    return entry ? language === 'zh-CN' ? entry.zh : entry.en : code
-  }
+  const label = (code: string) => languageName(code, language)
   const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch((error: unknown) => toast.danger(t(SETTINGS_WRITE_FAILURE_KEYS[settingsWriteFailure(error)]))) }
   /*
    * The picker is one flat list of strings while the setting is a source kind plus a device, so the

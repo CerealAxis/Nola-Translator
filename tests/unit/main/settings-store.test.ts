@@ -62,13 +62,13 @@ describe('设置存储', () => {
     try {
       await writeFile(path, JSON.stringify({ version: 1, theme: 'system', overlay: { mode: 'top' } }), 'utf8')
       const legacy = await new SettingsStore(path).load()
-      expect(legacy.uiLanguage).toBe('zh-CN')
+      expect(legacy.uiLanguage).toBe('auto')
       expect(legacy.modelStoragePath).toBe('')
       expect(legacy.overlay.mode).toBe('top')
 
       await writeFile(path, JSON.stringify({ version: 1, uiLanguage: 'fr', modelStoragePath: 'relative/models' }), 'utf8')
       const garbage = await new SettingsStore(path).load()
-      expect(garbage.uiLanguage).toBe('zh-CN')
+      expect(garbage.uiLanguage).toBe('auto')
       expect(garbage.modelStoragePath).toBe('')
     } finally {
       await rm(directory, { recursive: true, force: true })

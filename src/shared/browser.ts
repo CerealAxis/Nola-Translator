@@ -49,7 +49,7 @@ export interface BrowserSummary {
   protocolVersion: 1
   extensionVersion?: string
   extensionCompatible?: boolean
-  uiLanguage: 'zh-CN' | 'en'
+  uiLanguage: 'auto' | 'zh-CN' | 'zh-TW' | 'zh-HK' | 'ko' | 'ja' | 'en'
   sourceLanguage: string
   targetLanguage: string
   devices: AudioDevice[]
