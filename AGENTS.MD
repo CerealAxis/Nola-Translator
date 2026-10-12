@@ -146,6 +146,7 @@ npm run package:browser # release/Nola-Browser-Extension.zip
 npm run build:browser-host # PyInstaller Native Messaging EXE
 npm run build:python   # 内置 Python 3.12 基础组件，不包含 Torch／llama
 npm run dist:win       # 完整发布：build → build:python → electron-builder（EXE + MSI）
+node scripts/check-installer-paths.mjs [makensis.exe] # Windows NSIS 目录回归检查；可指定编译器路径
 ```
 
 ## 6. 约定与协作

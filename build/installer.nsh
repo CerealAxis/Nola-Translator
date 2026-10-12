@@ -18,27 +18,37 @@ LangString nolaUninstallDeleteData 2052 "是否同时删除 Data 文件夹？其
 LangString nolaUninstallKeepingData 2052 "正在保留 Data 文件夹"
 LangString nolaUninstallRemovingData 2052 "正在删除 Data 文件夹"
 
-; A macro expanded into the page list contributes page declarations, not runnable code, so the path
-; fix has to hang off a Function that NSIS calls at run time. The directory page cannot supply its
-; own: MUI_PAGE_CUSTOMFUNCTION_PRE is taken by instFilesPre, and its own PRE/LEAVE pair would be
-; overwritten by whatever the next page declares.
 !ifndef BUILD_UNINSTALLER
 !include "FileFunc.nsh"
 !include "LogicLib.nsh"
 
+; Own the directory page so the assisted template does not generate its product-name sanitizer.
+; Restore its flag after declaring our page; later shortcut handling still needs the option.
+!ifdef allowToChangeInstallationDirectory
+  !define NOLA_DIRECTORY_PAGE
+  !undef allowToChangeInstallationDirectory
+!endif
+
 Function nolaFixInstallDir
-  ; The directory page yields the install root; the program needs its own subfolder under it. This
-  ; also runs on an update, where $INSTDIR already ends in \App because it came from the registry,
-  ; so the append is conditional or the path would gain one \App per upgrade.
-  ; Use the built-in helper: electron-builder may register plugin directories after this include.
+  ; The registry stores the executable's directory, while a fresh selection supplies its parent.
+  ; Match the final component rather than the product name so custom and legacy roots stay valid.
+  Push $0
   ${GetFileName} "$INSTDIR" $0
   ${If} $0 != "${NOLA_APP_DIR_NAME}"
     StrCpy $INSTDIR "$INSTDIR\${NOLA_APP_DIR_NAME}"
   ${EndIf}
+  Pop $0
 FunctionEnd
 
 !macro customPageAfterChangeDir
-  Page custom nolaFixInstallDir
+  !ifdef NOLA_DIRECTORY_PAGE
+    !insertmacro skipPageIfUpdated
+    !insertmacro MUI_PAGE_DIRECTORY
+    !define allowToChangeInstallationDirectory
+  !endif
+  ; MUI_PAGE_INSTFILES consumes this callback immediately after the hook. Finalize the path once,
+  ; without a custom page that mutates it on Back or a sanitizer that appends APP_FILENAME.
+  !define MUI_PAGE_CUSTOMFUNCTION_PRE nolaFixInstallDir
 !macroend
 !endif
 
