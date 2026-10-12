@@ -19,7 +19,7 @@ import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
-import { ALIYUN_LANGUAGES, supportsRecognitionNativeTranslation } from '../../../../shared/cloud-config'
+import { ALIYUN_LANGUAGES, supportsIntermediateTranslation, supportsRecognitionNativeTranslation } from '../../../../shared/cloud-config'
 import { targetLanguagePatch } from '../../../session-config'
 import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_PUBLIC_MODEL } from '../../../../shared/index-translate'
 
@@ -162,7 +162,7 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
             />
           </SettingsRow>
         )) : null}
-        {translation.targetLanguage !== NO_TRANSLATION_LANGUAGE && translation.provider !== 'recognition' && translation.provider !== 'mymemory' ? <SettingsRow label={t('settings.translateIntermediate')} desc={t('settings.translateIntermediateHint')} descriptionTooltip>
+        {translation.targetLanguage !== NO_TRANSLATION_LANGUAGE && supportsIntermediateTranslation(translation.provider) ? <SettingsRow label={t('settings.translateIntermediate')} desc={t('settings.translateIntermediateHint')} descriptionTooltip>
           <SettingSwitch
             isSelected={translation.translateIntermediate}
             ariaLabel={t('settings.translateIntermediate')}

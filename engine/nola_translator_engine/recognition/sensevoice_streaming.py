@@ -16,13 +16,13 @@ def create_sensevoice_recognizer(
 
     No ``prefix_builder``: a non-autoregressive model re-transcribes the whole accumulated
     audio on every block. Silence still does the segmenting, and only continuous speech past
-    12 s is force-split, which bounds the cost of re-transcribing the whole segment.
+    6 s is force-split, which bounds final-caption latency and cumulative re-transcription cost.
     Load failures (SenseVoiceModelUnavailable) surface from accept()/flush().
     """
     return StreamingRecognizer(
         runtime or get_sensevoice_runtime(model_dir),
         source_language=source_language,
-        segmenter=VolumeGateSegmenter(max_segment_ms=12000),
+        segmenter=VolumeGateSegmenter(),
         block_ms=1200,
         first_block_ms=600,
     )

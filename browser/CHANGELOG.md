@@ -2,6 +2,13 @@
 
 The extension has its own release version in `browser/version.json`. The extension build and desktop compatibility check both read that file. Every extension release must update the version and this log together. Desktop app versions remain independent.
 
+## 1.1.1 — 2026-10-12
+
+- Keep tab capture connected across seeks by isolating old audio acknowledgements and errors from the new timeline.
+- Reset the desktop audio backlog per timeline and discard packets arriving after a pause or seek.
+- Recover the playback gate on a later time update when rapid player transitions exhaust pause synchronization.
+- Extend the playback processing controls introduced in 1.1.0 by explicitly setting echo cancellation, noise suppression and automatic gain control to false in capture requests.
+
 ## 1.1.0 — 2026-10-11
 
 - Disable echo cancellation, noise suppression and automatic gain control for tab playback capture.

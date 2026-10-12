@@ -18,6 +18,7 @@ describe('tab capture validation', () => {
     for (const track of capture.getTracks()) expect(track.stop).toHaveBeenCalledOnce()
   })
   it('prioritizes tab audio and keeps local playback without requesting system audio', () => {
+    expect(CAPTURE_OPTIONS.audio).toMatchObject({ echoCancellation: false, noiseSuppression: false, autoGainControl: false })
     expect(CAPTURE_OPTIONS).toMatchObject({ audio: { suppressLocalAudioPlayback: false, restrictOwnAudio: false }, audioSelection: 'preferred', video: true, preferCurrentTab: true, selfBrowserSurface: 'include', systemAudio: 'exclude', monitorTypeSurfaces: 'exclude', surfaceSwitching: 'exclude' })
     expect(pcmBase64(new Uint8Array([0, 255, 12, 34]).buffer)).toBe('AP8MIg==')
   })

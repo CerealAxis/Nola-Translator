@@ -95,6 +95,40 @@ def test_stable_ids_do_not_use_temporary_portaudio_indices() -> None:
     assert [item.backend_index for item in before] != [item.backend_index for item in after]
 
 
+def test_enumeration_failure_records_native_error_and_releases_backend(monkeypatch):
+    from nola_translator_engine.audio import devices as devices_module
+
+    observations = []
+    backend = FakePyAudio()
+    monkeypatch.setattr(devices_module, "write_debug", lambda layer, event, data: observations.append((event, data)))
+
+    def unavailable():
+        raise OSError(-9996, "default WASAPI endpoint unavailable")
+
+    monkeypatch.setattr(backend, "get_default_wasapi_loopback", unavailable)
+    enumerate_wasapi_devices(lambda: backend)
+    event, data = next(item for item in observations if item[0] == "audio.devices.default.failed")
+    assert event == "audio.devices.default.failed"
+    assert data["stage"] == "defaultLoopback"
+    assert data["errorCode"] == -9996
+    assert "default WASAPI endpoint unavailable" in data["message"]
+    assert backend.terminated
+
+
+def test_missing_default_loopback_does_not_hide_explicit_outputs_or_microphones(monkeypatch):
+    backend = FakePyAudio()
+
+    def missing_default():
+        raise LookupError("default playback endpoint has no loopback")
+
+    monkeypatch.setattr(backend, "get_default_wasapi_loopback", missing_default)
+    devices = enumerate_wasapi_devices(lambda: backend)
+    assert any(device.kind == "systemOutput" for device in devices)
+    assert any(device.kind == "microphone" and device.is_default for device in devices)
+    assert all(not device.is_default for device in devices if device.kind == "systemOutput")
+    assert backend.terminated
+
+
 @pytest.mark.parametrize("name", ["", "   ", "[Loopback]", " [Loopback] "])
 @pytest.mark.parametrize("kind", ["systemOutput", "microphone"])
 def test_unnamed_devices_do_not_break_protocol_or_default_capture(name: str, kind: str) -> None:

@@ -23,7 +23,8 @@ it('creates independent launch logs and preserves Windows crash details without 
   const contents = await readFile(first, 'utf8')
   expect(contents).toContain('0xC0000135')
   expect(contents).toContain('stderrBytes')
-  for (const privateValue of ['opaque-credential-example', 'sk-example123', 'another-secret', 'missing.dll']) expect(contents).not.toContain(privateValue)
+  expect(contents).toContain('missing.dll')
+  for (const privateValue of ['opaque-credential-example', 'sk-example123', 'another-secret']) expect(contents).not.toContain(privateValue)
   initializeSessionLog(path, { version: 'next' })
   expect(sessionLogPath()).not.toBe(first)
   expect(await readdir(path)).toHaveLength(2)
@@ -52,14 +53,41 @@ it('keeps one unsplit launch log regardless of size and survives an unavailable 
   expect(() => logDiagnostic('failure')).not.toThrow()
 })
 
-it('writes structured English diagnostics and omits captured content', async () => {
+it('preserves readable diagnostics and device identifiers while omitting speech and translation content', async () => {
   const path = await directory()
   initializeSessionLog(path, {})
-  logDiagnostic('engine.event.caption', { sourceText: 'private speech', pcmBase64: 'private audio', message: '运行失败', revision: 3 })
+  logDiagnostic('engine.event.caption', { sourceText: 'private speech', translatedText: 'private translation',
+    pcmBase64: 'private audio', prompt: 'private translation prompt', message: '运行失败', revision: 3,
+    deviceId: 'wasapi:systemOutput:example', reason: '原始设备异常', errorDetail: 'native host error',
+    notes: 'private meeting notes', title: 'private meeting title' })
   const contents = await readFile(sessionLogPath(), 'utf8')
-  expect(contents).not.toMatch(/[^\x00-\x7F]/)
+  expect(contents).toContain('运行失败')
+  expect(contents).toContain('原始设备异常')
+  expect(contents).toContain('wasapi:systemOutput:example')
+  expect(contents).toContain('native host error')
+  expect(contents).not.toContain('private meeting notes')
+  expect(contents).not.toContain('private meeting title')
   expect(contents).not.toContain('private speech')
   expect(contents).not.toContain('private audio')
-  expect(contents).toContain('originalBase64')
+  expect(contents).not.toContain('private translation')
   expect(JSON.parse(contents.trim().split('\n').at(-1)!).data.revision).toBe(3)
+})
+
+it('preserves original exceptions, nested causes and process output while redacting credentials', async () => {
+  const path = await directory()
+  initializeSessionLog(path, {})
+  const cause = new Error('原始 WASAPI 错误')
+  const error = Object.assign(new Error('采集启动失败', { cause }), {
+    stderr: 'PortAudio initialization failed; api_key=private-key', stdout: 'probe output', code: -9999,
+  })
+  logDiagnostic('audio.capture.failed', error)
+  const contents = await readFile(sessionLogPath(), 'utf8')
+  const data = JSON.parse(contents.trim().split('\n').at(-1)!).data
+  expect(data.message).toBe('采集启动失败')
+  expect(data.cause.message).toBe('原始 WASAPI 错误')
+  expect(data.stackFrames).toContain('session-log.test.ts')
+  expect(data.stderr).toContain('PortAudio initialization failed')
+  expect(data.stdout).toBe('probe output')
+  expect(data.code).toBe(-9999)
+  expect(contents).not.toContain('private-key')
 })

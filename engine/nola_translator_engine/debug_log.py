@@ -15,14 +15,32 @@ import json
 import os
 import sys
 import threading
+import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-MAX_DATA_CHARS = 4096
+MAX_DATA_CHARS = 64 * 1024
 _lock = threading.Lock()
 _path: Path | None = None
 _resolved = False
+
+
+def exception_fields(error: Exception) -> dict[str, object]:
+    """Keep the original exception and numeric codes for cross-process diagnosis."""
+    fields: dict[str, object] = {"errorClass": type(error).__name__, "message": str(error),
+                                "stackTrace": "".join(traceback.format_exception(error))}
+    if isinstance(error, ModuleNotFoundError):
+        fields["missingModule"] = error.name
+    code = getattr(error, "errno", None)
+    if type(code) is not int:
+        code = next((value for value in error.args if type(value) is int), None)
+    if type(code) is int:
+        fields["errorCode"] = code
+    win_error = getattr(error, "winerror", None)
+    if type(win_error) is int:
+        fields["windowsErrorCode"] = win_error
+    return fields
 
 
 def resolve_path() -> Path | None:
@@ -35,6 +53,11 @@ def resolve_path() -> Path | None:
     if configured:
         _path = Path(configured)
     return _path
+
+
+def is_enabled() -> bool:
+    """Diagnostics can target a file or the desktop's stderr log transport."""
+    return resolve_path() is not None or os.environ.get("NOLA_TRANSLATOR_RUN_LOG_STDERR") == "1"
 
 
 def write(layer: str, event: str, data: dict[str, Any] | None = None) -> None:

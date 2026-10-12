@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 const root = fileURLToPath(new URL('.', import.meta.url))
 const release = JSON.parse(await readFile(resolve(root, '../version.json'), 'utf8'))
 const outDir = resolve(root, 'dist')
-const common = { configFile: false, root, define: { 'process.env.NODE_ENV': JSON.stringify('production') }, plugins: [react(), tailwindcss()], build: { outDir, emptyOutDir: false, minify: true } }
+const common = { configFile: false, root, resolve: { dedupe: ['react-stately'] }, define: { 'process.env.NODE_ENV': JSON.stringify('production') }, plugins: [react(), tailwindcss()], build: { outDir, emptyOutDir: false, minify: true } }
 await build({ ...common, build: { ...common.build, emptyOutDir: true, rollupOptions: { input: resolve(root, 'popup.html') } } })
 for (const name of ['background', 'content', 'capture-handle', 'worklet']) {
   await build({ ...common, build: { ...common.build, lib: { entry: resolve(root, `${name}.${name === 'content' ? 'tsx' : 'ts'}`), name: `Nola_${name.replace('-', '_')}`, formats: ['iife'], fileName: () => `${name}.js` }, rollupOptions: { output: { inlineDynamicImports: true } } } })

@@ -12,7 +12,7 @@
   --font-ui:
     'Segoe UI Variable Text', 'Noto Sans SC', 'Microsoft YaHei UI', 'PingFang SC', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-cjk-fallback: 'Noto Sans SC';
-  --font-mono: 'Cascadia Mono', 'SF Mono', Consolas, ui-monospace, monospace;
+  --font-mono: 'Cascadia Mono', 'SF Mono', Consolas, var(--font-cjk-fallback), ui-monospace, monospace;
 
   /* --- Type scale ----------------------------------------------------------
      Every entry is a complete `font` shorthand, family included, so it applies
@@ -22,8 +22,8 @@
   --nola-text-subtitle: 600 14px/1.45 var(--font-ui); /* card title, table head */
   --nola-text-body: 400 14px/1.65 var(--font-ui); /* body copy */
   --nola-text-body-strong: 600 14px/1.45 var(--font-ui); /* emphasis, control label */
-  --nola-text-caption: 400 12.5px/1.5 var(--font-ui); /* help text, meta */
-  --nola-text-micro: 400 11px/1.45 var(--font-ui); /* status pill, AI disclaimer */
+  --nola-text-caption: 400 13px/1.5 var(--font-ui); /* help text, meta */
+  --nola-text-micro: 400 12px/1.45 var(--font-ui); /* status pill, AI disclaimer */
   --nola-text-mono: 500 14px/1 var(--font-mono); /* timer, table figures */
 
   /* Shared baseline for the two-column transcript (14 x 1.65). Consumed by

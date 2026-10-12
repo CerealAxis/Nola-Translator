@@ -1,5 +1,6 @@
 import { loggedHandle } from './logged-ipc'
 import { modelConfigurationSchema } from '../shared/model-capabilities'
+import { audioTestSourceSchema } from '../shared/schemas'
 import { randomUUID } from 'node:crypto'
 
 import { BrowserWindow, ipcMain, net, screen } from 'electron'
@@ -16,6 +17,7 @@ import { openDefaultBrowser as launchDefaultBrowser } from './open-default-brows
 export const IPC_CHANNELS = {
   listComputeDevices: 'engine:list-compute-devices',
   listDevices: 'engine:list-devices',
+  testAudio: 'engine:test-audio',
   listResources: 'engine:list-resources',
   manageResource: 'engine:manage-resource',
   searchHuggingFace: 'hub:search',
@@ -52,7 +54,7 @@ export function prewarmConfigFrom(settings: AppSettings): PrewarmConfig {
     recognitionModelId: settings.recognition.modelId,
     sourceLanguage: settings.recognition.sourceLanguage,
     targetLanguages: translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? [] : [translation.targetLanguage],
-    allowIntermediateTranslation: translation.provider === 'mymemory' ? false : translation.translateIntermediate,
+    allowIntermediateTranslation: supportsIntermediateTranslation(translation.provider) && translation.translateIntermediate,
     translationProvider: translation.provider,
     translationModelId: translation.localModelId,
     translationOptions: translationOptionsOf(translation),
@@ -92,6 +94,10 @@ export function registerEngineIpc(
     )
     const { protocolVersion: _version, type: _type, requestId: _request, ...snapshot } = response
     return snapshot
+  })
+
+  loggedHandle(IPC_CHANNELS.testAudio, async (_event, audioSource: unknown) => {
+    return controller.testAudio(audioTestSourceSchema.parse(audioSource))
   })
 
   loggedHandle(IPC_CHANNELS.listResources, async () => {
@@ -386,4 +392,4 @@ export function registerEngineIpc(
     }
   }
 }
-import { recognitionFieldsOf, translationOptionsOf } from '../shared/cloud-config'
+import { recognitionFieldsOf, supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'

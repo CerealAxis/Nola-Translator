@@ -41,6 +41,23 @@ function deferRequest(fixture: ReturnType<typeof setup>, matches: (request: Requ
   return { get captured() { return captured }, resolve: () => resolve(), reject: () => reject(new BrowserFailure('appUnavailable')) }
 }
 describe('extension session lifecycle', () => {
+  it('keeps tab capture alive when audio from before a seek fails after the new epoch starts', async () => {
+    const fixture = setup(); await fixture.store.init(); fixture.store.pressStart()
+    await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('active'))
+    const pending = deferRequest(fixture, request => request.type === 'audio')
+    fixture.chunk(0)
+    fixture.video.dispatchEvent(new Event('seeking'))
+    fixture.video.currentTime = 45
+    fixture.video.dispatchEvent(new Event('seeked'))
+    await vi.waitFor(() => expect(fixture.audio.enable).toHaveBeenLastCalledWith(true, 2))
+    pending.reject()
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(fixture.store.getSnapshot()).toMatchObject({ status: 'active', audioCaptured: true, epoch: 2 })
+    expect(fixture.stopAudio).not.toHaveBeenCalled()
+    fixture.chunk(2)
+    expect(fixture.requests.filter(request => request.type === 'audio').at(-1)).toMatchObject({ epoch: 2, capturedAtMs: 0 })
+    await fixture.store.destroy()
+  })
   it('keeps a quiet scene active and clears the audio warning when sound returns', async () => {
     const fixture = setup(); await fixture.store.init(); fixture.store.pressStart()
     await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('active'))

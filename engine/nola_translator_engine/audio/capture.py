@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import io
 import math
+import wave
 from dataclasses import dataclass
 from collections import deque
 from queue import Empty, Full, Queue
@@ -15,7 +18,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .devices import AudioDeviceRecord
-from .resample import AudioFrame, FRAME_DURATION_MS, StreamingAudioNormalizer
+from .resample import AudioFrame, FRAME_DURATION_MS, TARGET_SAMPLE_RATE, StreamingAudioNormalizer
+from ..debug_log import exception_fields, write as write_debug
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +74,42 @@ class PortAudioStream(Protocol):
 
 class AudioDeviceDisconnectedError(RuntimeError):
     """The active stream stopped because the device disconnected."""
+
+
+async def capture_audio_test(capture: PortAudioCapture) -> dict[str, object]:
+    """Preview the same 16 kHz mono input ASR receives, without gain or noise processing."""
+    target_samples = TARGET_SAMPLE_RATE * 2
+    chunks: list[NDArray[np.float32]] = []
+    samples = 0
+    try:
+        capture.start()
+        try:
+            async with asyncio.timeout(2.0):
+                async for frame in capture.frames():
+                    chunk = frame.samples[:target_samples - samples]
+                    chunks.append(chunk)
+                    samples += chunk.size
+                    if samples >= target_samples:
+                        break
+        except TimeoutError:
+            pass
+    finally:
+        capture.stop()
+    values = np.concatenate(chunks) if chunks else np.empty(0, dtype=np.float32)
+    has_signal = bool(np.any(values != 0))
+    write_debug("engine", "audio.test.complete", {"requestId": capture.request_id,
+        "capturedSamples": samples, "durationMs": 2000, "hasSignal": has_signal})
+    # PCM16 WAV requires integer full-scale encoding; this is conversion, not volume normalization.
+    pcm = np.rint(np.clip(values, -1.0, 32767 / 32768) * 32768).astype("<i2")
+    pcm = np.pad(pcm, (0, target_samples - pcm.size))
+    output = io.BytesIO()
+    with wave.open(output, "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(TARGET_SAMPLE_RATE)
+        audio.writeframes(pcm.tobytes())
+    return {"audioBase64": base64.b64encode(output.getvalue()).decode("ascii"),
+            "durationMs": 2000, "hasSignal": has_signal}
 
 
 class BrowserAudioCapture:
@@ -188,6 +228,8 @@ class PortAudioCapture:
         device: AudioDeviceRecord,
         backend_factory: Callable[[], object] = pyaudio.PyAudio,
         queue_capacity: int = 100,
+        *,
+        request_id: str | None = None,
     ) -> None:
         self.device = device
         self.backend_factory = backend_factory
@@ -198,6 +240,7 @@ class PortAudioCapture:
         self.running = False
         self.paused = False
         self._finishing = False
+        self.request_id = request_id
 
     @property
     def dropped_chunks(self) -> int:
@@ -216,9 +259,18 @@ class PortAudioCapture:
     def start(self) -> None:
         if self.running:
             return
-        backend = self.backend_factory()
-        self.backend = backend
+        context = {"requestId": self.request_id, "kind": self.device.kind,
+                   "deviceId": self.device.device_id, "deviceName": self.device.name,
+                   "backendIndex": self.device.backend_index, "isDefault": self.device.is_default,
+                   "sampleRate": self.device.sample_rate, "channels": self.device.channels,
+                   "sampleFormat": "float32", "framesPerBuffer": max(1, self.device.sample_rate // 50)}
+        started_at = monotonic()
+        stage = "initialize"
         try:
+            backend = self.backend_factory()
+            self.backend = backend
+            stage = "open"
+            write_debug("engine", "audio.capture.open.start", context)
             self.stream = backend.open(
                 format=pyaudio.paFloat32,
                 channels=self.device.channels,
@@ -229,13 +281,24 @@ class PortAudioCapture:
                 stream_callback=self._callback,
                 start=False,
             )
-        except Exception:
-            backend.terminate()
-            self.backend = None
+            stage = "start"
+            write_debug("engine", "audio.capture.open.ready", context)
+            self.running = True
+            self.paused = False
+            self.stream.start_stream()
+        except Exception as error:
+            write_debug("engine", "audio.capture.failed", {
+                **context, "stage": stage, **exception_fields(error),
+                "elapsedMs": round((monotonic() - started_at) * 1000),
+                "streamAllocated": self.stream is not None, "backendAllocated": self.backend is not None,
+                "running": self.running,
+            })
+            self.stop()
+            write_debug("engine", "audio.capture.cleanup.complete", {**context,
+                "backendAllocated": self.backend is not None, "streamAllocated": self.stream is not None,
+                "running": self.running})
             raise
-        self.running = True
-        self.paused = False
-        self.stream.start_stream()
+        write_debug("engine", "audio.capture.started", {**context, "elapsedMs": round((monotonic() - started_at) * 1000)})
 
     def pause(self) -> None:
         """Stop the device stream but keep it open, so a resume costs nothing to set up.
@@ -311,14 +374,16 @@ class PortAudioCapture:
     def stop(self) -> None:
         self.running = False
         self.paused = False
-        if self.stream is not None:
+        stream, backend = self.stream, self.backend
+        self.stream = None
+        self.backend = None
+        # A failed stop/close must still release PortAudio and preserve the original startup error.
+        operations = [("stop", stream.stop_stream), ("close", stream.close)] if stream is not None else []
+        if backend is not None:
+            operations.append(("terminate", backend.terminate))
+        for stage, operation in operations:
             try:
-                self.stream.stop_stream()
-            except OSError:
-                pass
-            finally:
-                self.stream.close()
-            self.stream = None
-        if self.backend is not None:
-            self.backend.terminate()
-            self.backend = None
+                operation()
+            except Exception as error:
+                write_debug("engine", "audio.capture.cleanup.failed", {"requestId": self.request_id,
+                    "deviceId": self.device.device_id, "stage": stage, **exception_fields(error)})

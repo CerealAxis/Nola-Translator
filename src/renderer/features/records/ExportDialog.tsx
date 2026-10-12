@@ -96,7 +96,7 @@ export function ExportDialog({
                     <ToggleButton
                       key={value}
                       id={value}
-                      className="rounded-[10px] text-[12.5px] leading-[1.5] font-normal uppercase"
+                      className="rounded-[10px] text-[13px] leading-[1.5] font-normal uppercase"
                     >
                       {value}
                     </ToggleButton>
@@ -114,7 +114,7 @@ export function ExportDialog({
                   <Alert role="alert" status="danger" className="rounded-[8px]">
                     <Alert.Indicator />
                     <Alert.Content>
-                      <Alert.Description className="text-[12.5px] leading-[1.5]">
+                      <Alert.Description className="text-[13px] leading-[1.5]">
                         {t('errors.exportFailed')}
                       </Alert.Description>
                     </Alert.Content>

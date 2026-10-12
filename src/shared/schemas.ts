@@ -22,6 +22,11 @@ const envelope = {
   requestId,
 }
 
+export const audioTestSourceSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('defaultOutput') }).strip(),
+  z.object({ kind: z.enum(['systemOutput', 'microphone']), deviceId: z.string().min(1).max(512) }).strip(),
+])
+
 const audioSourceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('defaultOutput') }).strip(),
   z.object({ kind: z.literal('systemOutput'), deviceId: z.string().min(1).max(512) }).strip(),
@@ -154,6 +159,7 @@ function boundDebugData(data: Record<string, unknown>): Record<string, unknown> 
 export const engineCommandSchema = z.discriminatedUnion('type', [
   z.object({ ...envelope, type: z.literal('hello'), clientVersion: z.string().min(1).max(64) }).strip(),
   z.object({ ...envelope, type: z.literal('listDevices') }).strip(),
+  z.object({ ...envelope, type: z.literal('testAudio'), audioSource: audioTestSourceSchema }).strip(),
   z.object({ ...envelope, type: z.literal('listComputeDevices') }).strip(),
   z.object({ ...envelope, type: z.literal('listResources') }).strip(),
   z.object({
@@ -321,6 +327,7 @@ export const engineEventSchema = z.discriminatedUnion('type', [
     })
     .strip(),
   z.object({ ...envelope, type: z.literal('devices'), devices: z.array(audioDeviceSchema).max(256) }).strip(),
+  z.object({ ...envelope, type: z.literal('audioTested'), audioBase64: z.string().min(4).max(100000), durationMs: z.literal(2000), hasSignal: z.boolean() }).strip(),
   z.object({
     ...envelope,
     type: z.literal('resources'),

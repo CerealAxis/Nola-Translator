@@ -7,7 +7,7 @@ import { normalizeLanguage } from '../shared/languages'
 import { supportsSelectedEngine } from '../shared/model-engines'
 import { DEFAULT_COMPUTE_SETTINGS } from '../shared/compute'
 import type { TranslationSettings } from '@/bridge'
-import { translationOptionsOf } from '../shared/cloud-config'
+import { supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'
 
 /** Auto detection has no reverse translation target, so swapping resolves it to English. */
 export function swappedLanguagesOf(sourceLanguage: string, targetLanguage: string, sourceOptions: readonly string[] = SOURCE_LANGUAGE_OPTIONS, targetOptions: readonly string[] = TARGET_LANGUAGE_OPTIONS): { sourceLanguage: string; targetLanguage: string } | null {
@@ -97,7 +97,7 @@ export function translationFieldsOf(
 
   return {
     targetLanguages,
-    allowIntermediateTranslation: translation.provider === 'mymemory' ? false : translation.translateIntermediate,
+    allowIntermediateTranslation: supportsIntermediateTranslation(translation.provider) && translation.translateIntermediate,
     // 见文件头第 3 条：全部取自设置，不写死。
     translationProvider: translation.provider,
     /*

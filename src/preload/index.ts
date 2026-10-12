@@ -32,6 +32,7 @@ const channels = {
   getHuggingFaceModelCard: 'hub:model-card',
   installHuggingFaceModel: 'hub:install', configureModel: 'model:configure',
   startSession: 'engine:start-session',
+  testAudio: 'engine:test-audio',
   prewarmModels: 'engine:prewarm-models',
   ensureEngineReady: 'engine:ensure-ready',
   stopSession: 'engine:stop-session',
@@ -90,6 +91,7 @@ const api: NolaTranslatorApi = {
   importRuntime: () => invoke(channels.importRuntime),
   cancelRuntimeInstall: () => invoke(channels.cancelRuntimeInstall),
   listDevices: () => invoke(channels.listDevices),
+  testAudio: source => invoke(channels.testAudio, source),
   listResources: () => invoke(channels.listResources),
   manageResource: (resourceId, action) => invoke(channels.manageResource, resourceId, action),
   searchHuggingFace: (query, kind, cursor): Promise<HubSearchResult> =>

@@ -1,4 +1,7 @@
 import asyncio
+import base64
+import io
+import wave
 
 import numpy as np
 import pytest
@@ -11,6 +14,65 @@ from nola_translator_engine.audio.capture import (
 )
 from nola_translator_engine.audio.devices import AudioDeviceRecord
 from nola_translator_engine.audio.resample import FRAME_DURATION_MS
+
+
+def test_audio_preview_records_two_seconds_and_preserves_level():
+    from nola_translator_engine.audio.capture import capture_audio_test
+    from nola_translator_engine.audio.resample import AudioFrame
+
+    class PreviewCapture:
+        request_id = None
+        stopped = False
+
+        def start(self):
+            pass
+
+        def stop(self):
+            self.stopped = True
+
+        async def frames(self):
+            for index in range(100):
+                yield AudioFrame(np.full(320, 0.125, dtype=np.float32), index * 20)
+
+    capture = PreviewCapture()
+    result = asyncio.run(capture_audio_test(capture))
+    assert capture.stopped
+    assert result["durationMs"] == 2000
+    assert result["hasSignal"]
+    with wave.open(io.BytesIO(base64.b64decode(result["audioBase64"])), "rb") as audio:
+        assert audio.getframerate() == 16000
+        assert audio.getnchannels() == 1
+        assert audio.getnframes() == 32000
+        assert np.max(np.abs(np.frombuffer(audio.readframes(32000), dtype="<i2"))) == 4096
+
+
+def test_audio_preview_marks_silence_and_releases_capture_on_failure():
+    from nola_translator_engine.audio.capture import capture_audio_test
+    from nola_translator_engine.audio.resample import AudioFrame
+
+    class PreviewCapture:
+        request_id = None
+        stopped = False
+        fail = False
+
+        def start(self):
+            if self.fail:
+                raise OSError("preview device unavailable")
+
+        def stop(self):
+            self.stopped = True
+
+        async def frames(self):
+            yield AudioFrame(np.zeros(32000, dtype=np.float32), 0)
+
+    capture = PreviewCapture()
+    assert not asyncio.run(capture_audio_test(capture))["hasSignal"]
+    assert capture.stopped
+    capture = PreviewCapture()
+    capture.fail = True
+    with pytest.raises(OSError):
+        asyncio.run(capture_audio_test(capture))
+    assert capture.stopped
 
 
 def test_bounded_callback_queue_drops_oldest_chunk_without_blocking() -> None:
@@ -100,6 +162,59 @@ def test_capture_releases_backend_when_open_fails() -> None:
         capture.start()
     assert backend.terminated is True
     assert capture.backend is None
+
+
+def test_capture_releases_stream_and_backend_when_start_fails(monkeypatch):
+    backend = FakeBackend()
+
+    def fail_start(self):
+        raise OSError(-9999, "WASAPI start failed")
+
+    monkeypatch.setattr(FakeStream, "start_stream", fail_start)
+    capture = PortAudioCapture(_device(), backend_factory=lambda: backend)
+    with pytest.raises(OSError):
+        capture.start()
+    assert backend.stream.closed
+    assert backend.terminated
+    assert not capture.running
+    assert capture.stream is None
+    assert capture.backend is None
+
+
+@pytest.mark.parametrize("stage", ["initialize", "open", "start"])
+def test_capture_diagnostics_identify_failure_stage_and_original_error(monkeypatch, stage):
+    from nola_translator_engine.audio import capture as capture_module
+
+    observations = []
+    monkeypatch.setattr(capture_module, "write_debug", lambda layer, event, data: observations.append((event, data)))
+    backend = FakeBackend()
+
+    def fail(*args, **kwargs):
+        raise OSError(-9999, "original WASAPI failure")
+
+    if stage == "open":
+        monkeypatch.setattr(backend, "open", fail)
+    elif stage == "start":
+        monkeypatch.setattr(FakeStream, "start_stream", fail)
+    capture = PortAudioCapture(_device(), backend_factory=fail if stage == "initialize" else lambda: backend,
+                               request_id="audio-test-request")
+    try:
+        with pytest.raises(OSError):
+            capture.start()
+        failed = next(data for event, data in observations if event == "audio.capture.failed")
+        assert failed["stage"] == stage
+        assert failed["errorCode"] == -9999
+        assert "original WASAPI failure" in failed["message"]
+        assert failed["requestId"] == "audio-test-request"
+        assert failed["deviceId"] == _device().device_id
+        assert failed["deviceName"] == _device().name
+        assert failed["sampleRate"] == 48_000
+        assert failed["channels"] == 2
+        assert failed["streamAllocated"] is (stage == "start")
+        if stage == "open":
+            assert any(event == "audio.capture.cleanup.complete" for event, _ in observations)
+    finally:
+        capture.stop()
 
 
 @pytest.mark.asyncio

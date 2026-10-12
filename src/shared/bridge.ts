@@ -1,6 +1,8 @@
 import type { ModelConfiguration } from './model-capabilities'
 import type {
   AudioDevice,
+  AudioTestSource,
+  AudioTestResult,
   CaptionSegment,
   EngineEvent,
   EngineProcessState,
@@ -74,6 +76,7 @@ export type NolaTranslatorApi = {
   openRuntimeSettings(component: 'engine' | 'llama'): Promise<void>
   browserConnection?(action: BrowserConnectionAction, enabled?: boolean, browser?: BrowserKind): Promise<BrowserConnectionStatus>
   listDevices(): Promise<AudioDevice[]>
+  testAudio(source: AudioTestSource): Promise<AudioTestResult>
   listComputeDevices(): Promise<ComputeSnapshot>
   getRuntimes(): Promise<RuntimeSnapshot>
   prepareRuntimes(): Promise<RuntimeSnapshot>

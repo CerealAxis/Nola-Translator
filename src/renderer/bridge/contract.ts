@@ -13,6 +13,8 @@ import type {
   AppSettings,
   AppSettingsPatch,
   AudioDevice,
+  AudioTestSource,
+  AudioTestResult,
   CaptionSegment,
   CredentialProvider,
   DiagnosticCopyContext,
@@ -50,6 +52,7 @@ export interface NolaBridge {
   engine: {
     listComputeDevices(): Promise<ComputeSnapshot>
     listDevices(): Promise<AudioDevice[]>
+    testAudio(source: AudioTestSource): Promise<AudioTestResult>
     listResources(): Promise<ResourceSnapshotWithRate>
     manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel'): Promise<ResourceRecord>
     startSession(config: SessionConfig): Promise<SessionStartResult>
@@ -183,6 +186,7 @@ export interface NolaBridge {
  */
 export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'engine.listDevices': 'ipc',
+  'engine.testAudio': 'ipc',
   'engine.listResources': 'ipc',
   'engine.manageResource': 'ipc',
   'engine.startSession': 'ipc',

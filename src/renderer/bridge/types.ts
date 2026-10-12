@@ -11,6 +11,8 @@ import type { ResourceRecord, ResourceSnapshot } from '../../shared/contracts'
 
 export type {
   AudioDevice,
+  AudioTestSource,
+  AudioTestResult,
   AudioSource,
   CaptionSegment,
   EngineCommand,

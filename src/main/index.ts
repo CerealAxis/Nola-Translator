@@ -121,7 +121,7 @@ if (!hasSingleInstanceLock) {
       contents.on('destroyed', () => logDiagnostic('ui.window.closed'))
       contents.on('console-message', details => {
         if (details.level !== 'error' && details.level !== 'warning') return
-        logDiagnostic('renderer.console', { level: details.level, messageBytes: Buffer.byteLength(details.message), source: details.sourceId, line: details.lineNumber })
+        logDiagnostic('renderer.console', { level: details.level, message: details.message, messageBytes: Buffer.byteLength(details.message), source: details.sourceId, line: details.lineNumber })
       })
       contents.on('did-fail-load', (_event, code, description, _url, isMainFrame) => {
         if (isMainFrame) logDiagnostic('renderer.load-failed', { code, description })
@@ -277,7 +277,6 @@ if (!hasSingleInstanceLock) {
       },
     })
     let sessionActive = false
-    engine.on('log', (message: string) => console.error('[engine]', message.trimEnd()))
     engine.on('protocolError', (error: unknown) => console.error('engine protocol failed', error))
     engine.on('state', state => logDiagnostic('engine.state', { state }))
     engine.on('crash', error => logDiagnostic('engine.crash', error))

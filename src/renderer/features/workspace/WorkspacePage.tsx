@@ -354,7 +354,7 @@ export function WorkspacePage() {
           className="flex shrink-0 items-center gap-2 bg-warning-soft px-6 py-2 text-warning-soft-foreground"
         >
           <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden="true" />
-          <span className="nola-caption text-[12.5px] leading-[1.5] font-normal">{t('workspace.paused')}</span>
+          <span className="nola-caption text-[13px] leading-[1.5] font-normal">{t('workspace.paused')}</span>
         </div>
       ) : null}
 

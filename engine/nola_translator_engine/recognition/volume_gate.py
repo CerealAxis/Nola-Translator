@@ -37,12 +37,13 @@ class _Frame:
 
 class VolumeGateSegmenter:
     """Gate opens and closes on 20 ms frame energy: ~200 ms pre-roll, 600 ms of silence ends
-    a segment, 30 s force-splits, and anything under MIN_VOICED_MS is dropped.
+    a segment, 6 s force-splits, and anything under MIN_VOICED_MS is dropped.
     """
 
     PRE_ROLL_MS = 200
     SILENCE_END_MS = 600
-    MAX_SEGMENT_MS = 30_000
+    # A caption latency budget, not a model limit: final-only translation must progress during uninterrupted speech.
+    MAX_SEGMENT_MS = 6_000
     MIN_VOICED_MS = 250
     FRAME_MS = 20
 

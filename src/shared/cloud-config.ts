@@ -1,6 +1,6 @@
 import type { SessionConfig } from './contracts'
 import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_PUBLIC_MODEL } from './index-translate'
-import { DEFAULT_SETTINGS, MINIMAX_RECOGNITION_MODELS, type RecognitionProvider, type RecognitionSettings, type TranslationSettings } from './settings'
+import { DEFAULT_SETTINGS, MINIMAX_RECOGNITION_MODELS, type RecognitionProvider, type RecognitionSettings, type TranslationProvider, type TranslationSettings } from './settings'
 
 /** Connection options are public configuration; credentials are injected only by the main process. */
 export function recognitionFieldsOf(settings: RecognitionSettings): Pick<SessionConfig, 'recognitionProvider' | 'recognitionOptions'> {
@@ -52,6 +52,20 @@ export const MINIMAX_LANGUAGES = ['zh', 'yue', 'en', 'fr', 'de', 'es', 'it', 'pt
  */
 export function supportsRecognitionNativeTranslation(provider: RecognitionProvider | undefined): boolean {
   return provider === 'aliyun'
+}
+
+/**
+ * Whether a translation provider can accept source text that is still settling.
+ *
+ * `mymemory` spends a slice of a shared free quota per request and every revision replaces the
+ * previous one, so translating a superseded intermediate produces nothing. `recognition` takes
+ * its translation from the Aliyun recognition socket rather than from this path, so a preference
+ * about intermediate text carries no meaning there. `microsoft` answers one request with a whole
+ * sentence instead of streaming tokens, which does not exclude it: what decides the answer is
+ * the text a provider accepts as input, not the shape of what it sends back.
+ */
+export function supportsIntermediateTranslation(provider: TranslationProvider): boolean {
+  return provider !== 'mymemory' && provider !== 'recognition'
 }
 
 export function remoteSourceLanguages(settings: RecognitionSettings): readonly string[] {

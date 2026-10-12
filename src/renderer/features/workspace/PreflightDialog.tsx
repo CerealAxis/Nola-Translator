@@ -221,7 +221,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart, onCopy
           <Modal.Dialog className="rounded-2xl border border-border">
             <Modal.Header>
               <Modal.Heading className="nola-title text-foreground">{t('preflight.title')}</Modal.Heading>
-              <span className="nola-micro text-[11px] leading-[1.45] font-normal text-muted">
+              <span className="nola-micro text-[12px] leading-[1.45] font-normal text-muted">
                 {t('session.stepPreflight')}
               </span>
             </Modal.Header>

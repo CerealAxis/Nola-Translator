@@ -20,6 +20,13 @@ export type AudioSource =
   | { kind: 'microphone'; deviceId: string }
   | { kind: 'browserTab'; streamId: string }
 
+export type AudioTestSource = Exclude<AudioSource, { kind: 'browserTab' }>
+export interface AudioTestResult {
+  audioBase64: string
+  durationMs: 2000
+  hasSignal: boolean
+}
+
 export type SessionConfig = {
   recognitionProvider?: RecognitionProvider
   /**
@@ -172,6 +179,7 @@ type Envelope<TType extends string> = {
 export type EngineCommand =
   | (Envelope<'hello'> & { clientVersion: string })
   | Envelope<'listDevices'>
+  | (Envelope<'testAudio'> & { audioSource: AudioTestSource })
   | Envelope<'listComputeDevices'>
   | Envelope<'listResources'>
   | (Envelope<'manageResource'> & {
@@ -314,6 +322,7 @@ export type EngineErrorCode =
 export type EngineEvent =
   | (Envelope<'ready'> & { engineVersion: string; capabilities: string[] })
   | (Envelope<'devices'> & { devices: AudioDevice[] })
+  | (Envelope<'audioTested'> & AudioTestResult)
   | (Envelope<'computeDevices'> & ComputeSnapshot)
   | (Envelope<'resources'> & ResourceSnapshot)
   | (Envelope<'resourceActionResult'> & { resource: ResourceRecord })

@@ -6,6 +6,7 @@ from collections.abc import Callable
 from uuid import uuid4
 
 from . import __version__
+from .debug_log import exception_fields, write as write_debug
 from .audio.devices import (
     AudioDeviceRecord,
     AudioDeviceRegistry,
@@ -55,7 +56,7 @@ class EngineService:
                     engineVersion=__version__,
                     capabilities=[
                         "devices", "captions", "translation", "resources", "pause", "hubInspect", "browserAudio",
-                        "prewarmModels",
+                        "prewarmModels", "audioTest",
                         "releaseModels",
                     ],
                 )
@@ -65,6 +66,7 @@ class EngineService:
             try:
                 devices = self.device_enumerator()
             except Exception as error:
+                write_debug("engine", "audio.devices.list.failed", {"requestId": command.requestId, **exception_fields(error)})
                 return [
                     self._error(
                         command.requestId,
@@ -97,9 +99,9 @@ class EngineService:
                 if source.kind == "browserTab":
                     self.active_device = None
                 elif source.kind == "defaultOutput":
-                    self.active_device = self.device_registry.resolve("systemOutput")
+                    self.active_device = self.device_registry.resolve("systemOutput", request_id=command.requestId)
                 else:
-                    self.active_device = self.device_registry.resolve(source.kind, source.deviceId)
+                    self.active_device = self.device_registry.resolve(source.kind, source.deviceId, request_id=command.requestId)
             except (AudioDeviceUnavailableError, OSError) as error:
                 return [
                     self._error(

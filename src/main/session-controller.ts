@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { logDiagnostic } from './session-log'
-import type { EngineEvent, PrewarmConfig, PrewarmResult, SessionConfig } from '../shared/contracts'
+import type { EngineEvent, PrewarmConfig, PrewarmResult, SessionConfig, AudioTestSource, AudioTestResult } from '../shared/contracts'
 import { sessionConfigSchema } from '../shared/schemas'
 import { NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider, type RecognitionProvider } from '../shared/settings'
+import { supportsIntermediateTranslation } from '../shared/cloud-config'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
 
@@ -49,6 +50,21 @@ export class SessionController {
     if ('sessionId' in event) return this.browserSessions.has(event.sessionId) || (this.starting && this.browserActive)
     return this.browserActive && (event.type === 'status' || event.type === 'error')
   }
+  async testAudio(audioSource: AudioTestSource): Promise<AudioTestResult> {
+    if (this.busy) throw new Error('sessionAlreadyRunning')
+    this.starting = true
+    this.options.startingChanged(true)
+    try {
+      await this.ensureReady()
+      if (!this.options.engine.supports('audioTest')) throw new Error('engineUpdateRequired')
+      const result = await this.options.engine.request({ protocolVersion: 1, type: 'testAudio',
+        requestId: `audio-test-${randomUUID()}`, audioSource }, 'audioTested', 8000)
+      return { audioBase64: result.audioBase64, durationMs: result.durationMs, hasSignal: result.hasSignal }
+    } finally {
+      this.starting = false
+      this.options.startingChanged(false)
+    }
+  }
   async prewarm(config: PrewarmConfig): Promise<PrewarmResult> {
     if (this.busy) return { state: 'failed', code: 'sessionAlreadyRunning' }
     // Model preparation owns the same reservation as starting capture, so neither a second
@@ -69,7 +85,9 @@ export class SessionController {
     logDiagnostic('session.start.requested', { owner })
     if (this.busy) throw new Error('sessionAlreadyRunning')
     const parsed = sessionConfigSchema.parse(raw) as SessionConfig
-    if (parsed.translationProvider === 'mymemory') parsed.allowIntermediateTranslation = false
+    // The provider gate lives in `supportsIntermediateTranslation`. Re-applying it here keeps a
+    // stale or hand-assembled config from carrying a preference the chosen provider cannot act on.
+    if (parsed.translationProvider && !supportsIntermediateTranslation(parsed.translationProvider)) parsed.allowIntermediateTranslation = false
     if (owner === 'desktop' && (parsed.audioSource.kind === 'browserTab' || parsed.browserTimeline)) throw new Error('invalidConfiguration')
     if (owner === 'browser' && (!parsed.browserTimeline || parsed.audioSource.kind === 'microphone')) throw new Error('invalidConfiguration')
     parsed.compute = { ...this.options.getSettings().compute }

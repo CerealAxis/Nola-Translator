@@ -220,7 +220,7 @@ function CountTab({ id, label, count }: CountTabProps) {
             color="default"
             variant="soft"
             // `.nola-micro` 在 base 层，压不过 components 层的 `.chip`，所以字阶用任意值工具类。
-            className="rounded-full text-[11px] leading-[1.45] font-normal tabular"
+            className="rounded-full text-[12px] leading-[1.45] font-normal tabular"
           >
             {count}
           </Chip>

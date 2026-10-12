@@ -69,13 +69,39 @@ function send(socket: Socket, value: unknown) { socket.write(`${JSON.stringify(v
 const start = { id: 'start', type: 'start', source: 'tab', streamId: 'stream', sourceLanguage: 'auto', targetLanguage: 'en', epoch: 0, videoTimeMs: 0, playbackRate: 1 }
 
 describe('native pipe boundary', () => {
+  it('discards pre-seek audio errors without stopping the new timeline', async () => {
+    const f = await fixture()
+    const socket = await connect(f.descriptor.pipe); const values = responses(socket)
+    send(socket, f.descriptor)
+    send(socket, { id: 'hello', type: 'hello', extensionVersion: BROWSER_EXTENSION_VERSION })
+    send(socket, start)
+    await expect.poll(() => values.some(value => value.type === 'result' && value.id === 'start')).toBe(true)
+    let failOldAudio: (error: Error) => void = () => undefined
+    const original = f.engine.request.getMockImplementation()!
+    f.engine.request.mockImplementation(async command => {
+      if (command.type === 'pushAudio') return new Promise((_resolve, reject) => { failOldAudio = reject })
+      return original(command)
+    })
+    send(socket, { id: 'old-audio', type: 'audio', sessionId: 'session', streamId: 'stream', epoch: 0,
+      sequence: 0, sampleRate: 8000, capturedAtMs: 0, pcmBase64: Buffer.alloc(1600).toString('base64') })
+    await expect.poll(() => f.engine.request.mock.calls.some(([command]) => command.type === 'pushAudio')).toBe(true)
+    send(socket, { id: 'seek', type: 'reset', sessionId: 'session', epoch: 1, videoTimeMs: 45000, playbackRate: 1 })
+    await expect.poll(() => values.some(value => value.type === 'result' && value.id === 'seek')).toBe(true)
+    const audioCommand = f.engine.request.mock.calls.find(([command]) => command.type === 'pushAudio')![0]
+    f.engine.emit('event', { protocolVersion: 1, type: 'error', requestId: audioCommand.requestId, code: 'invalidConfiguration', recoverable: true })
+    failOldAudio(Object.assign(new Error('invalidConfiguration'), { engineCode: 'invalidConfiguration' }))
+    await expect.poll(() => values.some(value => value.type === 'result' && value.id === 'old-audio')).toBe(true)
+    expect(f.sessions.activeSessionId).toBe('session')
+    expect(values.some(value => value.type === 'event' && value.event.type === 'error')).toBe(false)
+    socket.destroy()
+  })
   it('rejects an old extension before it can open a billable recognition session', async () => {
     const f = await fixture()
     const socket = await connect(f.descriptor.pipe); const values = responses(socket)
     send(socket, f.descriptor)
     send(socket, { id: 'old', type: 'hello', extensionVersion: '1.0.2' })
     await expect.poll(() => values.length).toBe(1)
-    expect(values[0]).toMatchObject({ type: 'result', value: { extensionCompatible: false, extensionVersion: '1.1.0' } })
+    expect(values[0]).toMatchObject({ type: 'result', value: { extensionCompatible: false, extensionVersion: '1.1.1' } })
     send(socket, start)
     await expect.poll(() => values.length).toBe(2)
     expect(values[1]).toMatchObject({ type: 'error', code: 'extensionVersionMismatch' })

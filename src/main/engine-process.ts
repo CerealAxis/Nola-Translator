@@ -357,13 +357,19 @@ export class EngineProcess extends EventEmitter {
         try {
           const observation = JSON.parse(line.slice('NOLA_DIAGNOSTIC '.length)) as Record<string, unknown>
           const category = [observation.layer, observation.event].filter(value => typeof value === 'string').join('.').replace(/[^a-zA-Z0-9_.-]/g, '_')
-          if (/timing|fail|error/.test(category)) logDiagnostic(`pipeline.${category}`, observation)
-          else logActivity(`pipeline.${category}`, observation)
+          // Caption revisions and successful audio observations can arrive for every chunk/token.
+          const frequent = observation.layer === 'engine'
+            && (observation.event === 'engine.update' || observation.event === 'engine.caption')
+            || observation.layer === 'ext'
+            && (observation.event === 'ext.chunk' || observation.event === 'ext.silent')
+          if (frequent) logActivity(`pipeline.${category}`, observation)
+          else logDiagnostic(`pipeline.${category}`, observation)
           return
         } catch { /* Unparseable diagnostics are reduced to safe output metadata below. */ }
       }
       const level = /\b(error|exception|failed|fatal)\b/i.test(line) ? 'error'
         : /\b(warn|warning)\b/i.test(line) ? 'warning' : 'info'
+      logDiagnostic(`engine.stderr.${level}`, { message: line, bytes: Buffer.byteLength(line) })
       this.emit('log', JSON.stringify({ kind: 'unstructured-stderr', level, bytes: Buffer.byteLength(line) }))
     }
     child.stderr.on('data', (chunk: Buffer) => {
@@ -430,7 +436,7 @@ export class EngineProcess extends EventEmitter {
     }
 
     const pending = this.pending.get(event.requestId)
-    if (event.type === 'caption' || event.type === 'audioAccepted' || event.type === 'modelProgress') logActivity(`engine.event.${event.type}`, event)
+    if (event.type === 'caption' || event.type === 'audioAccepted' || event.type === 'modelProgress' || event.type === 'debugLogged') logActivity(`engine.event.${event.type}`, event)
     else {
       const operation = { commandType: pending?.commandType, action: pending?.action }
       const failedResource = event.type === 'resourceActionResult' || event.type === 'resourceChanged'

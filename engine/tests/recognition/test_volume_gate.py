@@ -12,6 +12,16 @@ FRAME_SAMPLES = 320
 FRAME_MS = 20
 
 
+def test_continuous_speech_produces_a_final_segment_within_six_seconds():
+    segmenter = VolumeGateSegmenter()
+    completed = feed(segmenter, range(310), 0.2)
+    assert completed
+    assert completed[0].end_ms - completed[0].start_ms <= 6000
+    from nola_translator_engine.recognition.sensevoice_streaming import create_sensevoice_recognizer
+    recognizer = create_sensevoice_recognizer(None, runtime=object())
+    assert recognizer.segmenter.max_segment_ms <= 6000
+
+
 def make_frame(index: int, amplitude: float) -> AudioFrame:
     start = index * FRAME_SAMPLES
     t = np.arange(start, start + FRAME_SAMPLES, dtype=np.float64)

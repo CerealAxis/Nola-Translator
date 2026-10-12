@@ -2,20 +2,23 @@ import { useModelOptions } from '@/model-options'
 /**
  * Audio and recognition: source device, recognition model, source language, audio retention.
  *
- * `recognition.audioSource` ships as the protocol sentinel `'defaultOutput'`, which is not a
- * device. `AudioDevice.isDefault` already names the system default, so the sentinel is mapped
- * onto that device when reading and the real device id is written back.
+ * `recognition.audioSource` is either a device id or the protocol sentinel `'defaultOutput'`,
+ * which the dropdown offers as its own first option: the sentinel resolves to whatever Windows
+ * plays through when the session starts, so it follows the user after they switch output, while
+ * a device id pins the choice. The enumerated devices also list the live default under its own
+ * entry.
  *
  * There is no level meter: the bridge exposes no channel that starts a capture and reports
  * volume, so a moving `Meter` could only invent its numbers.
  */
 
-import { useCallback, useMemo, useState } from 'react'
-import { Alert, Button, InputGroup, toast } from '@heroui/react'
+import { useCallback, useEffect, useMemo } from 'react'
+import { Button, toast } from '@heroui/react'
 
 import { languageName } from '@/bridge'
 import { SettingsRow } from '../SettingsRow'
 import { useI18n } from '@/i18n'
+import { errorCopyOf } from '@/features/workspace/error-copy'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
@@ -40,18 +43,15 @@ export function AudioTab({ settings }: SettingsPanelProps) {
     void updateSettings({ recording: { keepAudio: next } }).catch(() => undefined)
   }, [])
 
+  // The sentinel is a protocol value rather than a device id, so the option carrying it is
+  // built here; the enumerated devices follow as the pinned choices.
   const deviceOptions = useMemo<PickerOption[]>(
-    () => devices.map((device) => ({ value: device.deviceId, label: device.name })),
-    [devices],
+    () => [
+      { value: DEFAULT_OUTPUT, label: t('settings.audioSourceSystem') },
+      ...devices.map((device) => ({ value: device.deviceId, label: device.name })),
+    ],
+    [devices, t],
   )
-
-  const selectedDeviceId = useMemo(() => {
-    const current = settings.recognition.audioSource
-    if (current !== DEFAULT_OUTPUT) return current
-    return devices.find((device) => device.isDefault)?.deviceId ?? current
-  }, [settings.recognition.audioSource, devices])
-
-  const activeDevice = devices.find((device) => device.deviceId === selectedDeviceId)
 
   const languageOptions = useMemo<PickerOption[]>(
     () =>
@@ -82,23 +82,17 @@ export function AudioTab({ settings }: SettingsPanelProps) {
     <div className="settings-panel">
       <SettingGroup legend={t('settings.groupInput')}>
         <SettingsRow label={t('settings.audioSource')}>
-          {deviceOptions.length === 0 ? (
-            <InputGroup className="settings-control-field">
-              <InputGroup.Input readOnly value={t('errors.deviceNotFound')} aria-label={t('settings.audioSource')} />
-            </InputGroup>
-          ) : (
-            <SettingSelect
-              value={selectedDeviceId}
-              options={deviceOptions}
-              ariaLabel={t('settings.audioSource')}
-              onChange={(value) => {
-                void updateSettings({ recognition: { audioSource: value } }).catch(() => undefined)
-              }}
-            />
-          )}
+          <SettingSelect
+            value={settings.recognition.audioSource}
+            options={deviceOptions}
+            ariaLabel={t('settings.audioSource')}
+            onChange={(value) => {
+              void updateSettings({ recognition: { audioSource: value } }).catch(() => undefined)
+            }}
+          />
         </SettingsRow>
-        <SettingsRow label={t('settings.testAudio')} descriptionTooltip desc={activeDevice ? activeDevice.name : undefined}>
-          <DeviceTest expect={selectedDeviceId} />
+        <SettingsRow label={t('settings.testAudio')} descriptionTooltip desc={t('settings.audioTestHint')}>
+          <DeviceTest expect={settings.recognition.audioSource} />
         </SettingsRow>
       </SettingGroup>
 
@@ -201,53 +195,31 @@ function MiniMaxConnection({ recognition, stored }: CloudConnectionProps) {
   </>
 }
 
-/** A real check: re-list the devices and confirm the selected one is still there. */
+/** Preview the selected ASR input through the same capture path as a caption session. */
 function DeviceTest({ expect }: { expect: string }) {
   const { t } = useI18n()
-  const [state, setState] = useState<'idle' | 'pending' | 'failed'>('idle')
-
-  const run = useCallback(async () => {
-    setState('pending')
+  const state = useStore(stores.settings, value => value.audioTestState)
+  const busy = state === 'capturing' || state === 'playing'
+  useEffect(() => () => actions.settings.cancelAudioTest(), [expect])
+  const runTest = async () => {
     try {
-      await actions.models.loadModels()
-      const stillThere = stores.models.getState().devices.some((device) => device.deviceId === expect)
-      if (stillThere) {
-        setState('idle')
-        toast.success(t('status.ok'))
-        return
-      }
-      setState('failed')
-      toast.danger(t('errors.deviceNotFound'))
-    } catch {
-      setState('failed')
+      const hasSignal = await actions.settings.testAudio(expect)
+      if (hasSignal) toast.success(t('settings.audioTestSuccess'), { description: t('settings.audioTestReady') })
+      else toast.warning(t('settings.audioTestSilent'))
+    } catch (error) {
+      const code = typeof error === 'object' && error !== null && 'engineCode' in error && typeof error.engineCode === 'string'
+        ? error.engineCode
+        : error instanceof Error ? /([a-zA-Z_]+)[:：]/.exec(error.message)?.[1] ?? error.message : null
+      toast.danger(t('settings.audioTestFailed'), {
+        description: t(errorCopyOf(code, 'stop').message),
+      })
     }
-  }, [expect, t])
-
-  if (state === 'failed') {
-    return (
-      <Alert status="danger">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title className="nola-caption">{t('errors.deviceNotFound')}</Alert.Title>
-          <Alert.Description className="nola-micro">
-            {t('errors.deviceNotFoundAction')}
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
-    )
   }
-
   return (
-    <Button
-      variant="tertiary"
-      size="sm"
-      className="rounded-[6px]"
-      isPending={state === 'pending'}
-      onPress={() => {
-        void run()
-      }}
-    >
-      {state === 'pending' ? t('settings.testing') : t('settings.testAudio')}
+    <Button variant="tertiary" size="sm" className="rounded-[var(--radius-xl)]"
+      isPending={state === 'capturing'} isDisabled={busy}
+      onPress={() => { void runTest() }}>
+      {t('settings.testAudio')}
     </Button>
   )
 }

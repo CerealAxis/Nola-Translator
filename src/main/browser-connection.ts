@@ -37,7 +37,7 @@ function publicErrorCode(error: unknown): string {
   console.error('browser request failed with an unmapped error', error)
   return 'internalError'
 }
-interface Client { socket: Socket; browser: BrowserKind; extensionVersion?: string; helloReceived: boolean; authenticated: boolean; sessionId: string | null; starting: boolean; closed: boolean; pending: number; pendingAudioMs: number; audioWindow: AudioWindow }
+interface Client { socket: Socket; browser: BrowserKind; extensionVersion?: string; helloReceived: boolean; authenticated: boolean; sessionId: string | null; starting: boolean; closed: boolean; pending: number; pendingAudioMs: number; epoch: number; paused: boolean; audioGeneration: number; audioRequestPrefix: string; audioWindow: AudioWindow }
 interface AudioWindow { count: number; lastBytes: number; lastAudioMs: number; loggedAtMs: number }
 export interface BrowserConnectionOptions {
   engine: EngineProcess
@@ -70,7 +70,7 @@ export function browserSessionConfig(settings: AppSettings, request: Extract<Bro
     sourceLanguage: settings.recognition.sourceLanguage,
     targetLanguages: translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? [] : [translation.targetLanguage],
     translationProvider: translation.provider, translationModelId: translation.localModelId,
-    allowIntermediateTranslation: translation.provider === 'mymemory' ? false : translation.translateIntermediate,
+    allowIntermediateTranslation: supportsIntermediateTranslation(translation.provider) && translation.translateIntermediate,
     translationOptions: translationOptionsOf(translation),
     browserTimeline: { epoch: request.epoch, videoTimeMs: request.videoTimeMs, playbackRate: request.playbackRate },
   }
@@ -96,6 +96,7 @@ export class BrowserConnection {
   private readonly cleanup = new Set<Promise<void>>()
   private error: string | undefined
   private devices: AudioDevice[] = []
+  private readonly audioRequestPrefix = `browser-audio-${randomUUID()}-`
   constructor(private readonly options: BrowserConnectionOptions) {
     options.engine.on('event', this.onEvent)
     options.engine.on('state', this.onState)
@@ -261,7 +262,7 @@ export class BrowserConnection {
     await this.setEnabled(false)
   }
   private accept(socket: Socket): void {
-    const client: Client = { socket, browser: 'chrome', helloReceived: false, authenticated: false, sessionId: null, starting: false, closed: false, pending: 0, pendingAudioMs: 0, audioWindow: { count: 0, lastBytes: 0, lastAudioMs: 0, loggedAtMs: 0 } }
+    const client: Client = { socket, browser: 'chrome', helloReceived: false, authenticated: false, sessionId: null, starting: false, closed: false, pending: 0, pendingAudioMs: 0, epoch: 0, paused: false, audioGeneration: 0, audioRequestPrefix: `${this.audioRequestPrefix}${randomUUID()}-`, audioWindow: { count: 0, lastBytes: 0, lastAudioMs: 0, loggedAtMs: 0 } }
     this.clients.add(client)
     let buffer = Buffer.alloc(0)
     const authenticationDeadline = setTimeout(() => socket.destroy(), 5000)
@@ -269,6 +270,8 @@ export class BrowserConnection {
     socket.on('close', () => {
       clearTimeout(authenticationDeadline)
       client.closed = true
+      client.audioGeneration++
+      client.pendingAudioMs = 0
       this.clients.delete(client)
       if (!this.disposing) {
         const task = client.sessionId ? this.options.sessions.stop(client.sessionId) : client.starting ? this.options.sessions.cancelBrowserStart() : null
@@ -299,6 +302,10 @@ export class BrowserConnection {
         const request = parsed.data
         let audioMs = 0
         if (request.type === 'audio') {
+          if (request.sessionId === client.sessionId && (request.epoch < client.epoch || client.paused)) {
+            this.send(client, { type: 'result', id: request.id })
+            continue
+          }
           const bytes = Buffer.from(request.pcmBase64, 'base64').length
           audioMs = bytes / 2 / request.sampleRate * 1000
           const window = client.audioWindow
@@ -319,7 +326,11 @@ export class BrowserConnection {
         } else if (client.pending >= 24 && request.type !== 'stop' && request.type !== 'reset' && request.type !== 'debug') { socket.destroy(); return }
         client.pending++
         client.pendingAudioMs += audioMs
-        void this.handle(client, request).finally(() => { client.pending--; client.pendingAudioMs -= audioMs }).catch(() => socket.destroy())
+        const queuedEpoch = client.epoch
+        void this.handle(client, request).finally(() => {
+          client.pending--
+          if (queuedEpoch === client.epoch) client.pendingAudioMs = Math.max(0, client.pendingAudioMs - audioMs)
+        }).catch(() => socket.destroy())
       }
       if (buffer.length > MAX_MESSAGE) socket.destroy()
     })
@@ -330,6 +341,8 @@ export class BrowserConnection {
     client.socket.write(`${JSON.stringify(response)}\n`)
   }
   private async handle(client: Client, request: BrowserRequest): Promise<void> {
+    const audioGeneration = client.audioGeneration
+    const audioSessionId = client.sessionId
     try {
       if (!this.enabled || this.disposing) throw new Error('browserConnectionDisabled')
       if (request.type === 'hello') {
@@ -389,6 +402,10 @@ export class BrowserConnection {
         try {
           const started = await sessions.start(browserSessionConfig(this.options.getSettings(), request), 'browser')
           client.sessionId = started.sessionId
+          client.audioGeneration++
+          client.epoch = request.epoch
+          client.paused = false
+          client.pendingAudioMs = 0
           // The client stays in the set unless its socket died, so a session unwound here has to
           // drop the id too — otherwise status() advertises a session that no longer exists.
           if (client.closed || !this.enabled || this.options.integrations?.allows(client.browser) === false) { client.sessionId = null; await sessions.stop(started.sessionId); return }
@@ -400,14 +417,19 @@ export class BrowserConnection {
       sessions.assertOwner(request.sessionId, 'browser')
       if (request.type === 'stop') { this.debugLog('stop', { sessionId: request.sessionId }); await sessions.stop(request.sessionId); client.sessionId = null }
       else if (request.type === 'finish') { this.debugLog('finish', { epoch: request.epoch }); await engine.request({ protocolVersion: 1, type: 'finishStream', requestId: request.id, sessionId: request.sessionId, epoch: request.epoch }, 'streamFinished', 10_000) }
-      else if (request.type === 'pause') { this.debugLog('pause', { paused: request.paused }); await sessions.pause(request.sessionId, request.paused) }
+      else if (request.type === 'pause') { if (request.paused) client.audioGeneration++; client.paused = request.paused; this.debugLog('pause', { paused: request.paused }); await sessions.pause(request.sessionId, request.paused) }
       else if (request.type === 'reset') {
+        client.audioGeneration++
+        client.epoch = request.epoch
+        client.pendingAudioMs = 0
         this.debugLog('reset', { epoch: request.epoch, videoTimeMs: request.videoTimeMs, playbackRate: request.playbackRate })
         await engine.request({ protocolVersion: 1, type: 'resetStream', requestId: request.id, sessionId: request.sessionId, epoch: request.epoch, videoTimeMs: request.videoTimeMs, playbackRate: request.playbackRate }, 'streamReset', 30_000)
       } else {
-        const { id, type: _type, ...audio } = request
+        const { id: _id, type: _type, ...audio } = request
+        // PushAudio errors are answered by this request, not broadcast as session failures.
+        const engineRequestId = `${client.audioRequestPrefix}${randomUUID()}`
         try {
-          await engine.request({ protocolVersion: 1, type: 'pushAudio', requestId: id, ...audio }, 'audioAccepted', 2000)
+          await engine.request({ protocolVersion: 1, type: 'pushAudio', requestId: engineRequestId, ...audio }, 'audioAccepted', 2000)
           this.debugLog('audioAccepted', { sequence: audio.sequence, ok: true })
         } catch (error) {
           const code = publicErrorCode(error)
@@ -417,12 +439,18 @@ export class BrowserConnection {
       }
       this.send(client, { type: 'result', id: request.id })
     } catch (error) {
+      if (request.type === 'audio' && (client.closed || audioSessionId !== client.sessionId || audioGeneration !== client.audioGeneration || request.epoch !== client.epoch || client.paused)) {
+        this.send(client, { type: 'result', id: request.id })
+        return
+      }
       const code = publicErrorCode(error)
       this.send(client, { type: 'error', id: request.id, code, message: code })
       if (request.type === 'audio' && client.sessionId) { const id = client.sessionId; client.sessionId = null; await this.options.sessions.stop(id).catch(() => undefined) }
     }
   }
   private readonly onEvent = (event: EngineEvent): void => {
+    // The request promise routes audio failures; the prefix also identifies replies arriving after its timeout.
+    if (event.type === 'error' && event.requestId.startsWith(this.audioRequestPrefix)) return
     // Reuse desktop device discovery: summary polling must not open PortAudio in the command loop.
     if (event.type === 'devices') { this.devices = event.devices.filter(device => device.kind === 'systemOutput'); return }
     if (event.type !== 'caption' && event.type !== 'sessionStopped' && event.type !== 'error') return
@@ -439,4 +467,4 @@ export class BrowserConnection {
     if (['failed', 'recovering', 'stopped'].includes(state)) for (const client of this.clients) if (client.sessionId) client.socket.destroy()
   }
 }
-import { recognitionFieldsOf, translationOptionsOf } from '../shared/cloud-config'
+import { recognitionFieldsOf, supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'

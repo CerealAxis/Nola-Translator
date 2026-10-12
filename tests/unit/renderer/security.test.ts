@@ -21,8 +21,13 @@ describe('renderer content security policy', () => {
     expect(html).toContain("form-action 'none'")
   })
 
-  it('allows playback from the isolated meeting audio scheme', () => {
-    expect(html).toContain("media-src 'self' nola-audio:")
+  it('allows playback from the isolated meeting audio scheme and in-memory preview blobs', () => {
+    // The two-second capture preview plays from a `URL.createObjectURL` of the WAV bytes,
+    // so its URL scheme is `blob:`, which `'self'` does not match. A media element whose
+    // URL misses media-src fires `error` and nothing else — no thrown error, no failed
+    // capture. The scheme source covers both runtimes: `blob:http://localhost:...` in dev,
+    // `blob:null/...` once the packaged document is loaded over `file://`.
+    expect(html).toContain("media-src 'self' blob: nola-audio:")
   })
 
   it('keeps dev HMR reachable on localhost', () => {

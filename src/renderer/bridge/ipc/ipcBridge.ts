@@ -108,6 +108,7 @@ export function createIpcBridge(): NolaBridge {
     engine: {
       listComputeDevices: () => call('listComputeDevices', (injected) => injected.listComputeDevices()),
       listDevices: () => call('listDevices', (injected) => injected.listDevices()),
+      testAudio: source => call('testAudio', injected => injected.testAudio(source)),
       listResources: () => call('listResources', (injected) => injected.listResources() as Promise<ResourceSnapshotWithRate>),
       manageResource: (resourceId, action) => call('manageResource', (injected) => injected.manageResource(resourceId, action)),
       startSession: (config) => call('startSession', (injected) => injected.startSession(config)) as Promise<SessionStartResult>,

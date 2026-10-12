@@ -21,6 +21,7 @@ import type { ComputeSnapshot, RuntimeSnapshot } from '../../shared/compute'
 export type CaptionServiceState = 'idle' | 'loading' | 'ready' | 'failed'
 
 export interface SettingsState {
+  audioTestState: 'idle' | 'capturing' | 'playing'
   settings: AppSettings | null
   loaded: boolean
   loading: boolean
@@ -50,6 +51,7 @@ export interface SettingsState {
 }
 
 const initialState: SettingsState = {
+  audioTestState: 'idle',
   settings: null,
   loaded: false,
   loading: false,
@@ -69,6 +71,64 @@ const initialState: SettingsState = {
 }
 
 export const settingsStore = createStore<SettingsState>(initialState)
+
+let audioTestGeneration = 0
+let audioTestPlayback: HTMLAudioElement | null = null
+let audioTestUrl: string | null = null
+let finishAudioPlayback: (() => void) | null = null
+
+export function cancelAudioTest(): void {
+  audioTestGeneration++
+  if (audioTestPlayback) {
+    audioTestPlayback.onended = null
+    audioTestPlayback.onerror = null
+    audioTestPlayback.pause()
+    audioTestPlayback.src = ''
+    audioTestPlayback = null
+  }
+  finishAudioPlayback?.()
+  finishAudioPlayback = null
+  if (audioTestUrl) URL.revokeObjectURL(audioTestUrl)
+  audioTestUrl = null
+  settingsStore.setState({ audioTestState: 'idle' })
+}
+
+export async function testAudio(source: string): Promise<boolean> {
+  cancelAudioTest()
+  const generation = audioTestGeneration
+  settingsStore.setState({ audioTestState: 'capturing' })
+  try {
+    if (!bridge) throw new Error('engineNotReady')
+    const selected = modelsStore.getState().devices.find(device => device.deviceId === source)
+    if (source !== 'defaultOutput' && !selected) throw new Error('audioDeviceUnavailable')
+    const result = await bridge.engine.testAudio(source === 'defaultOutput' ? { kind: 'defaultOutput' }
+      : { kind: selected!.kind, deviceId: selected!.deviceId })
+    if (generation !== audioTestGeneration) return false
+    const decoded = atob(result.audioBase64)
+    const bytes = new Uint8Array(decoded.length)
+    for (let index = 0; index < decoded.length; index++) bytes[index] = decoded.charCodeAt(index)
+    audioTestUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }))
+    audioTestPlayback = new Audio(audioTestUrl)
+    settingsStore.setState({ audioTestState: 'playing' })
+    await new Promise<void>((resolve, reject) => {
+      finishAudioPlayback = resolve
+      const playback = audioTestPlayback!
+      playback.onended = () => resolve()
+      playback.onerror = () => reject(new Error('audioPlaybackFailed'))
+      void playback.play().catch(reject)
+    })
+    if (generation === audioTestGeneration) {
+      cancelAudioTest()
+      settingsStore.setState({ audioTestState: 'idle' })
+    }
+    return result.hasSignal
+  } catch (error) {
+    if (generation !== audioTestGeneration) return false
+    cancelAudioTest()
+    settingsStore.setState({ audioTestState: 'idle' })
+    throw error
+  }
+}
 
 export async function loadRuntimeComponents(recheck = false): Promise<RuntimeSnapshot> {
   if (!bridge) throw new Error('IPC bridge unavailable')
@@ -563,6 +623,7 @@ export async function openLogs(): Promise<void> {
 }
 
 export function detachSettingsStore(): void {
+  cancelAudioTest()
   unsubscribe?.()
   unsubscribe = null
   unsubscribeCaptionService?.()

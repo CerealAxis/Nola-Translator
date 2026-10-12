@@ -2,9 +2,8 @@ import { BrowserFailure } from './bridge'
 
 export const CAPTURE_OPTIONS = {
   video: true,
-  // Display capture has its own audio controls; microphone processing constraints are not effective here.
-  // Ask the picker to prioritize tab audio, while the user still decides whether to share it.
-  audio: { suppressLocalAudioPlayback: false, restrictOwnAudio: false },
+  // These requests also describe the desired track settings on browsers that support processing controls.
+  audio: { suppressLocalAudioPlayback: false, restrictOwnAudio: false, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
   audioSelection: 'preferred',
   preferCurrentTab: true,
   selfBrowserSurface: 'include',

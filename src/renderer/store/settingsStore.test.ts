@@ -1,11 +1,52 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { createIpcBridge } from '@/bridge/ipc/ipcBridge'
 import { disposeStores, initStores } from './index'
-import { attachSettingsStore, checkForAppUpdate, detachSettingsStore, loadSettings, refreshComputeDevices, settingsStore } from './settingsStore'
+import { attachSettingsStore, checkForAppUpdate, detachSettingsStore, loadSettings, refreshComputeDevices, settingsStore, testAudio, cancelAudioTest } from './settingsStore'
 import { DEFAULT_SETTINGS } from '../../shared/settings'
 import type { ComputeSnapshot } from '../../shared/compute'
 
 const snapshot: ComputeSnapshot = { devices: [], notes: [], torchVersion: '', activePlan: null }
+
+it('captures the selected source and plays the returned audio before reporting completion', async () => {
+  const bridge = createIpcBridge()
+  const recording = deferred<{ audioBase64: string; durationMs: 2000; hasSignal: boolean }>()
+  const request = vi.spyOn(bridge.engine, 'testAudio').mockReturnValue(recording.promise)
+  const revoke = vi.fn()
+  const NativeUrl = URL
+  vi.stubGlobal('URL', class extends NativeUrl { static createObjectURL = vi.fn(() => 'blob:preview'); static revokeObjectURL = revoke })
+  let finish: (() => void) | undefined
+  const play = vi.fn(async () => undefined)
+  vi.stubGlobal('Audio', class {
+    src = ''; onerror: (() => void) | null = null
+    set onended(value: (() => void) | null) { finish = value ?? undefined }
+    play = play; pause = vi.fn()
+  })
+  try {
+    attachSettingsStore(bridge, false)
+    const tested = testAudio('defaultOutput')
+    expect(request).toHaveBeenCalledWith({ kind: 'defaultOutput' })
+    expect(settingsStore.getState().audioTestState).toBe('capturing')
+    recording.resolve({ audioBase64: btoa('wave data'), durationMs: 2000, hasSignal: true })
+    await vi.waitFor(() => expect(settingsStore.getState().audioTestState).toBe('playing'))
+    expect(play).toHaveBeenCalledOnce()
+    finish?.()
+    await expect(tested).resolves.toBe(true)
+    expect(settingsStore.getState()).toMatchObject({ audioTestState: 'idle' })
+    expect(revoke).toHaveBeenCalledWith('blob:preview')
+  } finally { cancelAudioTest(); vi.unstubAllGlobals() }
+})
+
+it('does not play an audio test that was cancelled while capture was pending', async () => {
+  const bridge = createIpcBridge()
+  const recording = deferred<{ audioBase64: string; durationMs: 2000; hasSignal: boolean }>()
+  vi.spyOn(bridge.engine, 'testAudio').mockReturnValue(recording.promise)
+  attachSettingsStore(bridge, false)
+  const tested = testAudio('defaultOutput')
+  cancelAudioTest()
+  recording.resolve({ audioBase64: btoa('wave data'), durationMs: 2000, hasSignal: false })
+  await tested
+  expect(settingsStore.getState().audioTestState).toBe('idle')
+})
 
 function deferred<T>() {
   let resolve!: (value: T) => void

@@ -196,10 +196,11 @@ export function createExtensionStore(dependencies: StoreDependencies) {
   }
   const enqueue = (operation: () => Promise<void>): void => {
     const operationGeneration = generation; const operationSession = sessionId
+    const operationEpoch = state.epoch
     transition = transition.then(async () => {
-      if (operationGeneration === generation && operationSession === sessionId) await operation()
+      if (operationGeneration === generation && operationSession === sessionId && operationEpoch === state.epoch) await operation()
     }).catch(error => {
-      if (operationGeneration === generation && operationSession === sessionId) void stop(failCode(error))
+      if (operationGeneration === generation && operationSession === sessionId && operationEpoch === state.epoch) void stop(failCode(error))
     })
   }
   const synchronizePause = async (id: string, operationGeneration: number, epoch: number): Promise<void> => {
@@ -218,6 +219,8 @@ export function createExtensionStore(dependencies: StoreDependencies) {
         return
       }
     }
+    // A player that changes state during every acknowledgement must recover on its next timeupdate.
+    if (id === sessionId && operationGeneration === generation && epoch === state.epoch) set({ playbackPaused: true })
   }
   const reset = (): void => {
     timelineVersion++
@@ -226,6 +229,8 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     fence()
     set({ epoch: state.epoch + 1, captions: [] })
     const epoch = state.epoch
+    // Audio acknowledgements from the old timeline cannot consume the new epoch's buffer budget.
+    pendingMs = 0
     const id = sessionId
     const operationGeneration = generation
     enqueue(async () => {
@@ -327,7 +332,8 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     epochSamples += chunk.buffer.byteLength / 2
     pendingMs += duration
     const requestGeneration = generation
-    void dependencies.bridge.request({ type: 'audio', sessionId, streamId, epoch: state.epoch, sequence: sequence++, sampleRate: chunk.sampleRate, capturedAtMs, pcmBase64: pcmBase64(chunk.buffer) }).catch(error => { if (requestGeneration === generation) { debug('ext.audioFailed', { code: failCode(error) }); void stop(failCode(error)) } }).finally(() => { if (requestGeneration === generation) pendingMs = Math.max(0, pendingMs - duration) })
+    const requestEpoch = state.epoch
+    void dependencies.bridge.request({ type: 'audio', sessionId, streamId, epoch: requestEpoch, sequence: sequence++, sampleRate: chunk.sampleRate, capturedAtMs, pcmBase64: pcmBase64(chunk.buffer) }).catch(error => { if (requestGeneration === generation && requestEpoch === state.epoch && accepting) { debug('ext.audioFailed', { code: failCode(error) }); void stop(failCode(error)) } }).finally(() => { if (requestGeneration === generation && requestEpoch === state.epoch) pendingMs = Math.max(0, pendingMs - duration) })
   }
   const start = async (capturePromise: Promise<MediaStream> | null, startGeneration: number): Promise<void> => {
     try {

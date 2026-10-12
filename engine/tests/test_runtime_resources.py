@@ -145,7 +145,7 @@ class _FakeCapture:
 
     dropped_chunks = 0
 
-    def __init__(self, _device: object) -> None:
+    def __init__(self, _device: object, *, request_id: str | None = None) -> None:
         self.started = False
 
     def start(self) -> None:

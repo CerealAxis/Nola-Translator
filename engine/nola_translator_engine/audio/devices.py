@@ -12,6 +12,8 @@ from typing import Any, Literal, Protocol
 
 import pyaudiowpatch as pyaudio
 
+from ..debug_log import exception_fields, write as write_debug
+
 
 DeviceKind = Literal["systemOutput", "microphone"]
 
@@ -53,14 +55,29 @@ class AudioDeviceRegistry:
         self.devices = self.enumerator()
         return self.devices
 
-    def resolve(self, kind: DeviceKind, device_id: str | None = None) -> AudioDeviceRecord:
-        devices = [device for device in self.refresh() if device.kind == kind]
+    def resolve(self, kind: DeviceKind, device_id: str | None = None, *, request_id: str | None = None) -> AudioDeviceRecord:
+        context = {"requestId": request_id, "kind": kind, "deviceId": device_id,
+                   "selection": "explicit" if device_id is not None else "default"}
+        try:
+            devices = [device for device in self.refresh() if device.kind == kind]
+        except Exception as error:
+            write_debug("engine", "audio.device.resolve.failed", {**context, "stage": "enumerate", **exception_fields(error)})
+            raise
         if device_id is not None:
             match = next((device for device in devices if device.device_id == device_id), None)
         else:
             match = next((device for device in devices if device.is_default), None)
         if match is None:
+            write_debug("engine", "audio.device.resolve.failed", {
+                **context, "stage": "match", "candidateCount": len(devices),
+                "defaultCount": sum(device.is_default for device in devices),
+            })
             raise AudioDeviceUnavailableError(device_id or f"default:{kind}")
+        write_debug("engine", "audio.device.resolved", {
+            **context, "candidateCount": len(devices), "backendIndex": match.backend_index,
+            "deviceId": match.device_id, "deviceName": match.name,
+            "isDefault": match.is_default, "sampleRate": match.sample_rate, "channels": match.channels,
+        })
         return match
 
     async def wait_until_available(
@@ -116,18 +133,29 @@ def enumerate_wasapi_devices(
 ) -> list[AudioDeviceRecord]:
     """List WASAPI loopback and real input devices, releasing PortAudio before returning."""
 
-    backend = backend_factory()
+    backend = None
+    stage = "initialize"
     try:
+        backend = backend_factory()
+        stage = "hostApi"
         host = backend.get_host_api_info_by_type(pyaudio.paWASAPI)
         host_index = int(host["index"])
         default_input_index = int(host.get("defaultInputDevice", -1))
-        default_loopback_index = int(backend.get_default_wasapi_loopback()["index"])
+        stage = "defaultLoopback"
+        try:
+            default_loopback_index = int(backend.get_default_wasapi_loopback()["index"])
+        except (LookupError, OSError) as error:
+            # One missing default endpoint must not hide valid explicit outputs and microphones.
+            default_loopback_index = -1
+            write_debug("engine", "audio.devices.default.failed", {"stage": stage, **exception_fields(error)})
 
+        stage = "outputs"
         outputs = [
             _record(info, "systemOutput", int(info["index"]) == default_loopback_index)
             for info in backend.get_loopback_device_info_generator()
         ]
 
+        stage = "microphones"
         microphones: list[AudioDeviceRecord] = []
         for host_device_index in range(int(host["deviceCount"])):
             info = backend.get_device_info_by_host_api_device_index(host_index, host_device_index)
@@ -139,6 +167,18 @@ def enumerate_wasapi_devices(
 
         outputs.sort(key=lambda device: (not device.is_default, device.name.casefold()))
         microphones.sort(key=lambda device: (not device.is_default, device.name.casefold()))
-        return outputs + microphones
+        devices = outputs + microphones
+        write_debug("engine", "audio.devices.enumerated", {
+            "hostApiIndex": host_index, "outputCount": len(outputs), "microphoneCount": len(microphones),
+            "devices": [{"deviceId": device.device_id, "deviceName": device.name,
+                         "backendIndex": device.backend_index, "kind": device.kind,
+                         "isDefault": device.is_default, "sampleRate": device.sample_rate,
+                         "channels": device.channels} for device in devices],
+        })
+        return devices
+    except Exception as error:
+        write_debug("engine", "audio.devices.enumeration.failed", {"stage": stage, **exception_fields(error)})
+        raise
     finally:
-        backend.terminate()
+        if backend is not None:
+            backend.terminate()

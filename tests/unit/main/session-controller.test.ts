@@ -5,6 +5,30 @@ import type { PrewarmConfig, PrewarmResult } from '../../../src/shared/contracts
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 import type { SessionConfig } from '../../../src/shared/contracts'
 
+it('reserves a two-second audio preview without preparing models, recording or opening the overlay', async () => {
+  let finish!: (value: { audioBase64: string; durationMs: 2000; hasSignal: boolean }) => void
+  const engine = { currentState: 'ready', start: vi.fn(), supports: () => true,
+    request: vi.fn(() => new Promise(resolve => { finish = resolve })),
+  }
+  const prepare = vi.fn()
+  const overlay = vi.fn()
+  const sessions = new SessionController({ engine: engine as unknown as EngineProcess, meetings: null,
+    getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', whenReady: async () => {},
+    prepare, startingChanged: () => {}, showOverlay: overlay, hideOverlay: () => {},
+  })
+  const preview = sessions.testAudio({ kind: 'microphone', deviceId: 'selected' })
+  await vi.waitFor(() => expect(engine.request).toHaveBeenCalledOnce())
+  expect(sessions.busy).toBe(true)
+  await expect(sessions.start({}, 'browser')).rejects.toThrow('sessionAlreadyRunning')
+  expect(engine.request).toHaveBeenCalledWith(expect.objectContaining({ type: 'testAudio',
+    audioSource: { kind: 'microphone', deviceId: 'selected' } }), 'audioTested', 8000)
+  finish({ audioBase64: 'preview', durationMs: 2000, hasSignal: true })
+  await expect(preview).resolves.toMatchObject({ durationMs: 2000, hasSignal: true })
+  expect(sessions.busy).toBe(false)
+  expect(prepare).not.toHaveBeenCalled()
+  expect(overlay).not.toHaveBeenCalled()
+})
+
 it('reserves model loading across both clients and uses the resolved compute configuration', async () => {
   let finish!: (result: PrewarmResult) => void
   const engine = {

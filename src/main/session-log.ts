@@ -26,16 +26,14 @@ export function logActivityTotals(): void {
   logDiagnostic('activity.totals', Object.fromEntries([...activity].map(([key, value]) => [key, value.count])))
 }
 
-// Preserve native localized diagnostics without mixing UI-language prose into the English log.
-function englishText(value: string): string | { encoding: string; originalBase64: string } {
-  const text = redactLog(value).slice(-16000)
-  return /[^\x00-\x7F]/.test(text) ? { encoding: 'utf8-base64', originalBase64: Buffer.from(text).toString('base64') } : text
+function diagnosticText(value: string): string {
+  return redactLog(value).slice(-16000)
 }
 
 export function sanitizeLogData(value: unknown, depth = 0): unknown {
   if (depth > 6) return '[depth limit]'
   if (value === null || value === undefined || typeof value === 'number' || typeof value === 'boolean') return value
-  if (typeof value === 'string') return englishText(value)
+  if (typeof value === 'string') return diagnosticText(value)
   if (Buffer.isBuffer(value)) return { bytes: value.length }
   if (value instanceof Error) {
     const frames = value.stack?.split(/\r?\n/).slice(1, 13).join('\n')
@@ -44,7 +42,8 @@ export function sanitizeLogData(value: unknown, depth = 0): unknown {
     const failureRecord = typeof failureData === 'object' && failureData !== null && !Array.isArray(failureData)
       ? failureData as Record<string, unknown>
       : {}
-    return { name, ...failureRecord, stackFrames: frames ? englishText(frames) : undefined }
+    return { name, ...failureRecord, stackFrames: frames ? diagnosticText(frames) : undefined,
+      cause: value.cause === undefined ? undefined : sanitizeLogData(value.cause, depth + 1) }
   }
   if (Array.isArray(value)) return value.slice(0, 64).map(item => sanitizeLogData(item, depth + 1))
   if (typeof value === 'object') {
@@ -63,9 +62,9 @@ export function sanitizeLogData(value: unknown, depth = 0): unknown {
 
 const PRIVATE_LOG_KEYS = new Set([
   'apikey', 'accesskey', 'password', 'passwd', 'token', 'accesstoken', 'refreshtoken', 'secret', 'secretkey', 'clientsecret', 'privatekey',
-  'authorization', 'credentials', 'credential', 'deviceid', 'text', 'sourcetext', 'translatedtext',
+  'authorization', 'credentials', 'credential', 'text', 'sourcetext', 'translatedtext',
   'translationtext', 'caption', 'captiontext', 'transcript', 'transcription', 'recognizedtext',
-  'reason', 'errordetail', 'rawtext', 'originaltext', 'inputtext', 'outputtext', 'displaytext', 'utterance', 'utterancetext',
+  'rawtext', 'originaltext', 'inputtext', 'outputtext', 'displaytext', 'utterance', 'utterancetext',
   'prompt', 'completion', 'content', 'notes', 'note', 'title', 'audio', 'audiodata',
   'audiobase64', 'pcm', 'pcmdata', 'pcmbase64', 'database64',
 ])
@@ -141,22 +140,11 @@ export function processFailure(error: unknown): Record<string, unknown> {
   const failure = error as Error & { code?: number | string; engineCode?: string; requestId?: string; commandType?: string; action?: string; signal?: string; killed?: boolean; stdout?: string; stderr?: string }
   const code = failure?.code
   const errorName = typeof failure?.name === 'string' && /^[A-Za-z][A-Za-z0-9_.]{0,63}$/.test(failure.name) ? failure.name : 'Error'
-  const nativeMessage = failure?.message ?? String(error)
-  const englishReasons: [RegExp, string][] = [
-    [/安装组合不在清单中/, 'Runtime package is not listed in the catalog'],
-    [/安装已取消/, 'Installation was cancelled'],
-    [/运行包 ID 无效/, 'Runtime package ID is invalid'],
-    [/已有组件检查或安装任务|已有组件安装任务/, 'Another runtime operation is already active'],
-    [/引擎已退出/, 'Engine process exited'],
-    [/Python 引擎尚未运行/, 'Python engine is not running'],
-    [/下载校验失败/, 'Downloaded artifact failed integrity verification'],
-    [/下载文件不完整/, 'Downloaded artifact is incomplete'],
-    [/超时/, 'Operation timed out'],
-  ]
-  const message = failure?.engineCode ? `Engine operation failed: ${failure.engineCode}`
-    : englishReasons.find(([pattern]) => pattern.test(nativeMessage))?.[1]
-      ?? 'Operation failed; raw error text omitted'
-  return { message, errorName,
+  const nativeMessage = typeof failure?.message === 'string' && failure.message.trim()
+    ? failure.message : error instanceof Error
+      ? `${errorName}: Operation failed without an error message`
+      : String(error).trim() || `${errorName}: Operation failed without an error message`
+  return { message: nativeMessage, errorName,
     category: failure?.killed ? 'process-terminated-or-timed-out' : typeof code === 'number' ? 'process-exit-failure' : 'operation-error', code, engineCode: failure?.engineCode,
     windowsStatus: typeof code === 'number' ? `0x${(code >>> 0).toString(16).toUpperCase().padStart(8, '0')}` : undefined,
     supportCode: failure?.engineCode ? supportErrorCodeForCause(failure.engineCode, { commandType: failure.commandType, action: failure.action }) : undefined,
@@ -164,6 +152,8 @@ export function processFailure(error: unknown): Record<string, unknown> {
     commandType: failure?.commandType,
     action: failure?.action,
     signal: failure?.signal, killed: failure?.killed,
+    stdout: failure?.stdout,
+    stderr: failure?.stderr,
     stdoutBytes: typeof failure?.stdout === 'string' ? Buffer.byteLength(failure.stdout) : undefined,
     stderrBytes: typeof failure?.stderr === 'string' ? Buffer.byteLength(failure.stderr) : undefined }
 }

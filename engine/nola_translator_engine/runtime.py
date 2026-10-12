@@ -15,9 +15,9 @@ from time import monotonic
 from typing import TypeVar
 from uuid import uuid4
 
-from .audio.capture import AudioDeviceDisconnectedError, BrowserAudioCapture, PortAudioCapture
+from .audio.capture import AudioDeviceDisconnectedError, BrowserAudioCapture, PortAudioCapture, capture_audio_test
 from . import debug_log
-from .debug_log import write as write_debug
+from .debug_log import exception_fields, write as write_debug
 from .compute import ComputeDevice, choose_devices, model_memory_mb, probe_devices, resource_failure, cpu_threads, release_failed_load
 from .audio.recorder import WavRecorder
 from .hub import (
@@ -33,6 +33,8 @@ from .model_capabilities import normalize, supports_translation
 from .models.manager import ModelManager
 from .models.registry import CustomFile
 from .protocol import (
+    TestAudioCommand,
+    AudioTestedEvent,
     CaptionEvent,
     AudioAcceptedEvent,
     BrowserTimeline,
@@ -275,6 +277,21 @@ class EngineRuntime:
 
 
     async def handle(self, command: EngineCommand) -> list[EngineEvent]:
+        if isinstance(command, TestAudioCommand):
+            if self.service.session_id is not None:
+                return [self._resource_error(command.requestId, "sessionAlreadyRunning")]
+            source = command.audioSource
+            try:
+                device = self.service.device_registry.resolve(
+                    "systemOutput" if source.kind == "defaultOutput" else source.kind,
+                    None if source.kind == "defaultOutput" else source.deviceId,
+                    request_id=command.requestId,
+                )
+                result = await capture_audio_test(PortAudioCapture(device, request_id=command.requestId))
+                return [AudioTestedEvent(protocolVersion=1, type="audioTested", requestId=command.requestId, **result)]
+            except Exception as error:
+                write_debug("engine", "audio.test.failed", {"requestId": command.requestId, **exception_fields(error)})
+                return [self._resource_error(command.requestId, "audioDeviceUnavailable", {"reason": str(error)})]
         if isinstance(command, HelloCommand):
             # FunASR discovers many adapters on its first import. Do that once after the
             # handshake, while the UI is usable, without loading weights or running inference.
@@ -393,7 +410,7 @@ class EngineRuntime:
                 write_debug('engine', 'recognition.dependencies.timing', {'adapter': adapter, 'elapsedMs': round((monotonic() - started_at) * 1000)})
         except Exception as error:
             # The actual loader remains the authority for errors and device fallback.
-            write_debug('engine', 'recognition.dependencies.failed', {'error': type(error).__name__})
+            write_debug('engine', 'recognition.dependencies.failed', {'modelId': model_id, **exception_fields(error)})
 
     async def _probe_compute_inventory(self, *, refresh: bool = False) -> tuple[list[ComputeDevice], list[str], str]:
         # Main-process device-intent resolution and model placement run back to back. Reuse
@@ -637,6 +654,7 @@ class EngineRuntime:
             recognizer = await self._prepare_models(command)
             self._update_compute_plan(self.llama_manager.fallback_reason)
         except ValueError as error:
+            write_debug("engine", "model.prepare.failed", {"requestId": command.requestId, "operation": "startSession", **exception_fields(error)})
             await self._unload_session_models()
             return [
                 ErrorEvent(
@@ -649,6 +667,7 @@ class EngineRuntime:
                 )
             ]
         except Exception as error:
+            write_debug("engine", "model.prepare.failed", {"requestId": command.requestId, "operation": "startSession", **exception_fields(error)})
             await self._unload_session_models()
             return [
                 ErrorEvent(
@@ -670,7 +689,7 @@ class EngineRuntime:
             capture = BrowserAudioCapture()
         else:
             assert self.service.active_device is not None
-            capture = PortAudioCapture(self.service.active_device)
+            capture = PortAudioCapture(self.service.active_device, request_id=command.requestId)
         try:
             capture.start()
         except Exception as error:
@@ -809,6 +828,7 @@ class EngineRuntime:
             recognizer = await self._prepare_models(command)
             await recognizer.close()
         except ValueError as error:
+            write_debug("engine", "model.prepare.failed", {"requestId": command.requestId, "operation": "prewarmModels", **exception_fields(error)})
             await self._unload_session_models()
             return [
                 self._resource_error(
@@ -816,6 +836,7 @@ class EngineRuntime:
                 )
             ]
         except Exception as error:
+            write_debug("engine", "model.prepare.failed", {"requestId": command.requestId, "operation": "prewarmModels", **exception_fields(error)})
             await self._unload_session_models()
             return [
                 self._resource_error(
@@ -2105,7 +2126,7 @@ class EngineRuntime:
         would stay silent exactly when it is needed. The numbers are cumulative per capture and
         recognizer, so consecutive lines read as deltas.
         """
-        if debug_log.resolve_path() is None:
+        if not debug_log.is_enabled():
             return
         now = monotonic()
         if self._last_heartbeat_at is not None and now - self._last_heartbeat_at < 1.0:
@@ -2151,7 +2172,7 @@ class EngineRuntime:
 
     def _start_pipeline_heartbeat(self) -> None:
         """Run the heartbeat on its own task for as long as a session lasts."""
-        if debug_log.resolve_path() is None or self._heartbeat_task is not None:
+        if not debug_log.is_enabled() or self._heartbeat_task is not None:
             return
         self._last_heartbeat_at = None
 

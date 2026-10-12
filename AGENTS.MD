@@ -6,7 +6,8 @@
 ## 1. 技术栈
 
 - 桌面应用：Electron + React + TypeScript
-- 引擎：内置 Windows x64 Python 3.12；PyTorch 与 llama.cpp 由设置页按组合安装或复用本地组件（模型能力持久化在自定义模型注册表，启动与逐句翻译必须校验配置）
+- 音频测试：复用所选设备的实际采集链路，在内存采集两秒并回放；不加载模型、不创建记录。应用仅做 ASR 必需的采样率／声道／PCM 格式转换，不做增益或降噪。
+- 引擎：内置 Windows x64 Python 3.12；PyTorch 与 llama.cpp 由设置页按组合安装或复用本地组件（模型能力持久化在自定义模型注册表，启动与逐句翻译必须校验配置）；开发环境的 llama 下载工具复用运行时清单中的版本与校验值
 - Index-Translate：推荐官方 2B／9B／35B-A3B-preview Q4_K_M 文本权重，通过 llama.cpp 推理；独立免费 API 使用官方公开 35B-A3B 模型，无需密钥，支持 SSE 译文。
 - Hy-MT2：推荐 1.8B 三个量化档位与腾讯官方 7B Q4_K_M；7B 显式使用官方独立 Jinja 对话模板。
 - 云端识别：Aliyun LiveTranslate 3.5／3.8 使用 WebSocket 持续输入 PCM16；MiniMax Speech-to-Text 不接受音频流式输入，改由引擎侧 VAD 切段后逐段上传 WAV，SSE 只推送响应增量。云端翻译支持 MyMemory REST 与识别连接自带的流式译文（仅阿里云具备，MiniMax 无内置译文）。
@@ -33,6 +34,7 @@ src/
     ├── i18n/         # zh-CN.ts 定义 Dictionary；locale-builder.ts 组装完整词典；browser-locales.ts 提供扩展文案；en／zh-TW／zh-HK／ko／ja 各有完整强类型词典
     └── theme/        # 设计 token 唯一来源（CSS）；cjk-fonts.css 仅由桌面渲染器加载区域字体
 engine/nola_translator_engine/  # Python 引擎，协议定义在 protocol.py，model_capabilities.py 为引擎能力校验
+├── audio/capture.py            # WASAPI 与浏览器音频采集、失败资源释放、两秒内存试听
 ├── recognition/aliyun.py       # LiveTranslate WebSocket、原文与内置译文关联及结束排空
 ├── recognition/minimax.py      # VAD 切段后逐段上传 WAV、SSE 增量、失败锁存与并发上限
 ├── translation/mymemory.py     # 公共 REST 翻译、UTF-8 请求分段及业务状态校验
@@ -42,7 +44,7 @@ browser/
 ├── extension/                 # MV3 扩展、播放器适配、临时 store、Shadow DOM；build.mjs 独立构建到 dist/
 ├── native_host/               # 标准库 stdio／当前用户命名管道连接程序及帧协议测试
 └── tests/                     # 隔离配置的浏览器冒烟测试（Playwright，可选开发依赖）
-scripts/                        # PowerShell 构建脚本；build-python-base.ps1 构建不含 Torch 的 Python 3.12，generate-runtime-catalog.py 维护组合清单
+scripts/                        # PowerShell 构建脚本；build-python-base.ps1 构建不含 Torch 的 Python 3.12，generate-runtime-catalog.py 维护组合清单；fetch-llama*.ps1 按清单准备开发运行时
 ```
 
 - 组件文件名 PascalCase，逻辑模块 camelCase，测试 `*.test.ts(x)` 与源文件同目录
@@ -83,7 +85,7 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 
 ## 4. 注释规范
 
-- Runtime catalogs record official wheel ABI, SHA-256 and backend combinations. Checks use built-in Python 3.12 without installing; repair ownership requires an app installation record.
+- Runtime catalogs record official wheel ABI, SHA-256 and backend combinations. Checks use built-in Python 3.12 without installing; repair ownership requires an app installation record. Development llama downloads use the same catalog URLs, companions and hashes; a source marker identifies reusable vendor directories.
 - Index-Translate presets pin official GGUF revisions, sizes and SHA-256, downloading text weights without the vision projector. Both local and public inference use the official single-user translation prompt with thinking disabled. The public service fixes its endpoint and 35B-A3B model and never consumes a saved cloud credential. Language presets expose the 32 names verified in the official reference client rather than assuming the entire 150-language inventory; invalid public targets fail before capture starts.
 - The official Hy-MT2 7B preset uses its separately published chat_template.jinja; its role tokens differ from ChatML. Switching to a different GGUF clears this template override.
 - Cloud translation uses a session-scoped HTTP pool and streams Chat Completions / Anthropic text; final captions supersede obsolete network intermediates, while native inference retains its reservation. Timing diagnostics distinguish queue, first text, and request duration.
@@ -91,10 +93,11 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 - MiniMax speech-to-text accepts one complete audio file per request and has no audio streaming input, so its `stream=true` is response-side only and begins after the upload completes — captions therefore arrive at gate closures rather than mid-utterance. Segments reuse `VolumeGateSegmenter`, which splits on silence and keeps adjacent segments from overlapping, so no text is recognized twice and billing matches the audio. Its 6 s ceiling is a caption-lag budget for speech with no pause to close the gate on, not a service limit; billing follows audio duration, so splitting more often costs the same money. `accept` only hands finished segments to background tasks and returns immediately, because it runs inside the audio capture loop; `flush` drains those uploads so the tail caption lands, cancelling rather than orphaning one that outruns its budget. Deltas are keyed by the server's event `index` rather than arrival order, and a stream cut before its finish event still publishes the partial transcript it already carried. A failure latches on the first error, so one invalid key cannot repeat a billable call for every remaining segment. Its `language` travels as a request header, with app code `tl` rewritten to the provider's `fil`. HTTP 402 and 429 map to separate reason words because they call for opposite user action.
 - Cloud recognition failures carry the cause in the engine's wire `code`, because `supportErrorCodeForCause()` and `errorCopyOf()` both read that field; `details.reason` only reaches the rendered message text and the launch log. Auth failures, a spent balance and a rate limit each emit their own code rather than the generic `modelUnavailable`, whose copy points at installing a local model and cannot help a cloud account problem.
 - Meeting transcripts persist confirmed speech and settled translation changes, not streamed token revisions; segment counts count unique confirmed segments.
-- `src/main/session-log.ts` records application activity in English JSONL under Electron userData/logs, with one unsplit file per app launch and the latest 20 launches retained. Entries are capped individually; there is no file rollover within a launch. `logged-ipc.ts` correlates every IPC operation and records sanitized results; engine commands/events and UI/browser activity share the launch trace. Credentials, audio, device IDs, captions, transcripts, prompts, translation text, free-form error reasons and renderer console message text are omitted; localized diagnostics that survive field redaction remain recoverable as UTF-8 base64. High-frequency audio, caption-update and model-progress events are summarized per second. Pipeline diagnostics travel over stderr to the main logger, which alone owns log retention. `src/shared/error-catalog.ts` owns stable user support codes separately from wire error names; copied feedback includes the support code, request correlation ID and current launch-log path, and is never uploaded automatically.
+- `src/main/session-log.ts` records application activity in UTF-8 JSONL under Electron userData/logs, with one unsplit file per app launch and the latest 20 launches retained. Entries are capped individually; there is no file rollover within a launch. `logged-ipc.ts` correlates every IPC operation and records sanitized results; engine commands/events and UI/browser activity share the launch trace. Device IDs, names, original exception messages and stacks, error reasons, process output and renderer console diagnostics are retained as readable UTF-8; credentials, raw audio, ASR transcripts, MT output and prompts carrying that content are omitted or redacted. Audio diagnostics distinguish enumeration, device matching, stream opening and stream startup, with request IDs, formats, native error codes and cleanup state. High-frequency audio, caption-update and model-progress events are summarized per second. Pipeline diagnostics travel over stderr to the main logger, which alone owns log retention. `src/shared/error-catalog.ts` owns stable user support codes separately from wire error names; copied feedback includes the support code, request correlation ID and current launch-log path, and is never uploaded automatically.
 - Installation caches and staging files are temporary on success, failure, and cancellation; startup cleanup uses known artifact names, skips junctions, and recovers backups before deleting leftovers. Pip does not retain an additional user cache.
 - Component DLL paths must match in probes and engine startup; keep Windows DLL-directory handles alive for inference. Older Torch uses MKL in the component's `Library/bin`, and the Python base bundles the VC++ OpenMP runtime.
 - Caption startup reuses validated components and one recent device inventory. Recognition and enabled local translation models load concurrently without trial inference; only the selected configuration stays resident across stops. Native jobs retain their reservation until idle. Service close, model changes and shutdown release weights; dependency imports run in the background after the engine handshake and stage timings reach the launch log.
+- Audio preview reserves capture through the session controller, returns a two-second in-memory WAV of the 16 kHz mono ASR input, and distinguishes silence from successful signal capture. It never loads weights or creates a meeting. Startup failure releases both the stream and PortAudio backend. A missing default loopback does not hide explicit output or microphone endpoints. Browser pause and seek fence old audio requests on both sides of the native pipe; their delayed errors cannot terminate the new epoch. Continuous local speech force-splits at six seconds to bound final-caption and final-only translation latency; volume gating only selects segment boundaries and never applies gain or denoising.
 
 - 模型语言目录、推荐能力与运行引擎限制的注释须注明来源或限制原因；用户配置不代表模型自动获得新能力。
 - 浏览器采集限制注释须注明浏览器 API 原因；`getDisplayMedia` 必须在用户动作的原调用栈发起，Capture Handle 校验后仅处理音频。
