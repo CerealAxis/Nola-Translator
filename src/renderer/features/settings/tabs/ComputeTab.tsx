@@ -83,7 +83,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
     </SettingGroup>
     <SettingGroup legend={t('compute.detected')}>
       {!snapshot ? <p className="compute-hint" role="status">{loading ? <><Spinner size="sm" /> {t('compute.checkingDevices')}</> : t('compute.deviceCheckFailed')}</p> : null}
-      {snapshot?.devices.map(d => <SettingsRow key={d.id} label={d.name} desc={d.reason || (!d.stableId ? t('compute.weakId') : d.integrated ? t('compute.shared') : undefined)}><span className="compute-device-info">{d.backend.toUpperCase()}{d.totalMemoryMb > 0 ? ` · ${t('compute.free')} ${Math.round(d.freeMemoryMb)} / ${Math.round(d.totalMemoryMb)} MiB` : ''}</span></SettingsRow>)}
+      {snapshot?.devices.map(d => <SettingsRow key={d.id} label={d.name} desc={!d.stableId ? t('compute.weakId') : d.integrated ? t('compute.shared') : undefined}><span className="compute-device-info">{d.backend.toUpperCase()}{d.totalMemoryMb > 0 ? ` · ${t('compute.free')} ${Math.round(d.freeMemoryMb)} / ${Math.round(d.totalMemoryMb)} MiB` : ''}</span></SettingsRow>)}
       {snapshot?.notes.map((note, i) => <p className="compute-hint" key={i}>{note}</p>)}
     </SettingGroup>
     <SettingGroup legend={t('compute.actual')}>

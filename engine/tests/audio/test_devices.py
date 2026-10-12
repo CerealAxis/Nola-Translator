@@ -95,6 +95,35 @@ def test_stable_ids_do_not_use_temporary_portaudio_indices() -> None:
     assert [item.backend_index for item in before] != [item.backend_index for item in after]
 
 
+@pytest.mark.parametrize("name", ["", "   ", "[Loopback]", " [Loopback] "])
+@pytest.mark.parametrize("kind", ["systemOutput", "microphone"])
+def test_unnamed_devices_do_not_break_protocol_or_default_capture(name: str, kind: str) -> None:
+    from nola_translator_engine.protocol import ListDevicesCommand
+    from nola_translator_engine.service import EngineService
+
+    backend = FakePyAudio()
+    endpoint = backend.loopbacks[0] if kind == "systemOutput" else backend.native_devices[0]
+    endpoint["name"] = name
+    enumerate_devices = lambda: enumerate_wasapi_devices(lambda: backend)
+    service = EngineService(device_enumerator=enumerate_devices)
+
+    events = service.handle(ListDevicesCommand(
+        protocolVersion=1, type="listDevices", requestId="unnamed-devices",
+    ))
+
+    assert events[0].type == "devices"
+    assert len(events[0].devices) == 3
+    assert all(device.name.strip() for device in events[0].devices)
+    default = service.device_registry.resolve("systemOutput")
+    assert default.backend_index == 33
+    moved = FakePyAudio(moved_indices=True)
+    moved_endpoint = moved.loopbacks[0] if kind == "systemOutput" else moved.native_devices[0]
+    moved_endpoint["name"] = name
+    assert [device.device_id for device in enumerate_devices()] == [
+        device.device_id for device in enumerate_wasapi_devices(lambda: moved)
+    ]
+
+
 def _record(device_id: str, *, default: bool) -> AudioDeviceRecord:
     return AudioDeviceRecord(
         device_id=device_id,

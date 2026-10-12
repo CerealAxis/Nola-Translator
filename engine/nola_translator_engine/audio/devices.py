@@ -95,8 +95,13 @@ def _record(info: dict[str, Any], kind: DeviceKind, is_default: bool) -> AudioDe
         name = _friendly_loopback_name(name)
     sample_rate = round(float(info["defaultSampleRate"]))
     channels = max(1, int(info["maxInputChannels"]))
+    device_id = _stable_device_id(kind, name, sample_rate, channels)
+    # PortAudio can report empty endpoint names; display fallbacks must not change persisted IDs.
+    if not name.strip():
+        label = "System output" if kind == "systemOutput" else "Microphone"
+        name = f"{label} ({device_id.rsplit(':', 1)[-1]})"
     return AudioDeviceRecord(
-        device_id=_stable_device_id(kind, name, sample_rate, channels),
+        device_id=device_id,
         backend_index=int(info["index"]),
         name=name,
         kind=kind,
