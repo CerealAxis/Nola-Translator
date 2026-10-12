@@ -175,7 +175,7 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
 
       {translation.provider === 'index-translate' ? (
         <SettingGroup legend={t('settings.groupConnection')}>
-          <SettingsRow label={t('settings.providerIndexTranslate')} children={null} />
+          <SettingsRow label={t('settings.providerIndexTranslate')} desc={t('settings.indexTranslateHint')} children={null} />
           <SettingsRow label={t('settings.model')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_PUBLIC_MODEL}</span></SettingsRow>
           <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_ENDPOINT}</span></SettingsRow>
         </SettingGroup>

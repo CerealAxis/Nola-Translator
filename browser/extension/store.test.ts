@@ -109,7 +109,7 @@ describe('extension session lifecycle', () => {
     expect(fixture.requests.some(request => request.type === 'start')).toBe(false)
   })
   it('stops a late sharing result after cancelling startup', async () => {
-    const fixture = setup({ deferredCapture: true }); fixture.store.pressStart(); await fixture.store.stop(); fixture.resolveCapture()
+    const fixture = setup({ deferredCapture: true }); await fixture.store.init(); fixture.store.pressStart(); await fixture.store.stop(); fixture.resolveCapture()
     await vi.waitFor(() => expect(fixture.stopVideo).toHaveBeenCalledOnce())
     expect(fixture.store.getSnapshot().status).toBe('idle')
     expect(fixture.requests.some(request => request.type === 'start')).toBe(false)

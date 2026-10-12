@@ -441,6 +441,7 @@ export const zhCN = {
     providerMicrosoft: 'Microsoft Translator',
     providerMyMemory: 'MyMemory 免费翻译',
     providerIndexTranslate: '哔哩哔哩 免费API',
+    indexTranslateHint: '使用官方免费 API，支持流式译文；原文会发送给哔哩哔哩。当前语言预设覆盖官方客户端映射的 32 种语言。',
     providerRecognitionTranslation: '阿里云',
     providerAliyun: '阿里云 LiveTranslate',
     providerMiniMax: 'MiniMax 语音识别',

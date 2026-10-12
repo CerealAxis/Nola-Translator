@@ -427,6 +427,7 @@ export const en: Dictionary = {
     providerMicrosoft: 'Microsoft Translator',
     providerMyMemory: 'MyMemory Free Translation',
     providerIndexTranslate: 'bilibili Free API',
+    indexTranslateHint: 'Official free API with streaming translation; source text is sent to bilibili. The current preset covers the 32 languages mapped by the official client.',
     providerRecognitionTranslation: 'Aliyun',
     providerAliyun: 'Aliyun LiveTranslate',
     providerMiniMax: 'MiniMax Speech Recognition',
