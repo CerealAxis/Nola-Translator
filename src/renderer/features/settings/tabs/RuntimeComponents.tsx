@@ -81,7 +81,10 @@ export function RuntimeComponents() {
           </Accordion.Trigger></Accordion.Heading>
           <Accordion.Panel><Accordion.Body className="runtime-panel-body">
             <SettingsRow label={t('runtime.current')}><span className="runtime-component-status">{component ? description(kind, component) : t('runtime.missing')}</span></SettingsRow>
-            <SettingsRow label={t('runtime.select')}><SettingSelect value={selected[kind]} options={choices} ariaLabel={t(kind === 'engine' ? 'runtime.installTorch' : 'runtime.installLlama')} isDisabled={busy}
+            <SettingsRow label={t('runtime.select')} desc={kind === 'engine' ? <>
+              {t('runtime.versionHelpPrefix')} <a className="text-accent underline" href="https://licyk.github.io/SDNote/sd_launcher/advance/env/#pytorch" target="_blank" rel="noreferrer">{t('runtime.versionHelpLink')}</a><br />
+              {t('runtime.versionHelpSuffix')}
+            </> : undefined} descriptionTooltip={kind === 'engine'}><SettingSelect value={selected[kind]} options={choices} ariaLabel={t(kind === 'engine' ? 'runtime.installTorch' : 'runtime.installLlama')} isDisabled={busy}
               onChange={value => { setSelected(previous => ({ ...previous, [kind]: value })); setForce(previous => ({ ...previous, [kind]: false })) }} /></SettingsRow>
             <SettingsRow label={t('runtime.force')}><SettingSwitch isSelected={force[kind]} isDisabled={busy || !owned} ariaLabel={t('runtime.force')}
               onChange={value => setForce(previous => ({ ...previous, [kind]: value }))} /></SettingsRow>
