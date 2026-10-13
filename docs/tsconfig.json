@@ -1,0 +1,5 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "types": ["vite/client", "node"] },
+  "include": ["media-src/**/*.ts", "media-src/**/*.tsx", ".vitepress/theme/**/*.tsx", ".vitepress/theme/content.ts", "../src/renderer/global.d.ts", "../src/renderer/vite-env.d.ts", "../browser/extension/chrome.d.ts"]
+}

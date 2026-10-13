@@ -1,0 +1,25 @@
+@import '../../../src/renderer/theme/nola-light.css';
+@import '../../../src/renderer/theme/typography.css';
+
+:root {
+  --vp-font-family-base: var(--font-ui);
+  --vp-c-brand-1: var(--accent);
+  --vp-c-brand-2: var(--accent);
+  --vp-c-brand-3: var(--accent);
+  --vp-c-bg: var(--surface);
+}
+:root { --site-loader-size: 96px; --site-loader-mark: 40px; --site-loader-gap: 24px; --site-loader-bar: 4px; --site-loader-wave-height: 24px; }
+.site-loading { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--site-loader-gap); color: var(--foreground); font: var(--nola-text-display); background: radial-gradient(ellipse at center, color-mix(in oklch, var(--accent) 8%, var(--background)), var(--background) 65%); }
+.site-loading p { margin: 0; font-family: var(--font-ui); font-weight: 600; }
+.site-loader-symbol { position: relative; display: grid; place-items: center; width: var(--site-loader-size); height: var(--site-loader-size); }
+.site-loader-symbol img { width: var(--site-loader-mark); height: var(--site-loader-mark); animation: site-loader-breathe 2.4s ease-in-out infinite; }
+.site-loader-orbit { position: absolute; inset: 0; border: 1px solid color-mix(in oklch, var(--accent) 14%, transparent); border-top: 2px solid var(--accent); border-radius: 50%; animation: site-loader-turn 2.4s linear infinite; }
+.site-loader-orbit--second { inset: calc(var(--site-loader-gap) / 2); border-top-color: transparent; border-bottom: 2px solid color-mix(in oklch, var(--accent) 55%, transparent); animation-duration: 3.6s; animation-direction: reverse; }
+.site-loader-wave { display: flex; gap: var(--site-loader-bar); align-items: center; height: var(--site-loader-wave-height); }
+.site-loader-wave i { width: var(--site-loader-bar); height: var(--site-loader-wave-height); border-radius: var(--site-loader-bar); background: var(--accent); animation: site-loader-wave 1.2s ease-in-out infinite; }
+.site-loader-wave i:nth-child(2), .site-loader-wave i:nth-child(4) { animation-delay: -1s; }
+.site-loader-wave i:nth-child(3) { animation-delay: -.8s; }
+@keyframes site-loader-turn { to { transform: rotate(360deg); } }
+@keyframes site-loader-breathe { 50% { transform: translateY(-4px); opacity: .75; } }
+@keyframes site-loader-wave { 0%, 100% { transform: scaleY(.25); opacity: .4; } 50% { transform: scaleY(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .site-loader-symbol img, .site-loader-orbit, .site-loader-wave i { animation: none; } }

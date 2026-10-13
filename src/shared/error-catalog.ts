@@ -90,6 +90,8 @@ const SUPPORT_ERROR_MESSAGE_CANONICAL_CODES = {
   'errors.engineOperationFailed': 'ENG-003',
   'errors.modelMissing': 'MDL-003',
   'errors.modelLoadFailed': 'MDL-017',
+  'errors.deviceNotFound': 'AUD-002',
+  'errors.translateFailed': 'MT-007',
 } as const satisfies Readonly<Record<string, SupportErrorCode>>
 
 /** Localized messages use this map so the same code is rendered in every locale. */

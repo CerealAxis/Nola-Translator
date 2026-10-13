@@ -23,6 +23,7 @@ Thumbs.db
 .venv/
 /.codex/
 /docs/.vitepress/cache/
+/docs/.vitepress/.temp/
 /docs/.media-dist/
 /docs/docs备份.zip
 engine/build/

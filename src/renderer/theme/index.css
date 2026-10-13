@@ -255,6 +255,17 @@
     border-width: 1px;
   }
 
+  /* HeroUI's `.select__value` is `flex: 1` with the default `min-width: auto`, so
+     a long device name sizes the item itself instead of shrinking, and
+     `wrap-break-word` folds it onto a second line inside the trigger. `min-width: 0`
+     lets the item shrink; the rest ellipsises whatever no longer fits. */
+  .select__value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .input:not([data-invalid='true']):focus,
   .input:not([data-invalid='true'])[data-focused='true'],
   .textarea:not([data-invalid='true']):focus,

@@ -1,0 +1,17 @@
+{
+  "name": "nola-translator-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run demo:build && vitepress dev .",
+    "build": "npm run typecheck && npm run demo:build && vitepress build .",
+    "demo:build": "node scripts/build-demo.mjs",
+    "typecheck": "node ../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
+    "preview": "vitepress preview .",
+    "media": "node scripts/generate-screenshots.mjs"
+  },
+  "devDependencies": {
+    "vitepress": "1.6.4",
+    "vue": "^3.5.22"
+  }
+}

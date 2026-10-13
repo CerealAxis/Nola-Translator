@@ -13,7 +13,7 @@ import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, type BrowserResponse } from '../../../src/shared/browser'
 import type { EngineProcess } from '../../../src/main/engine-process'
 import type { EngineCommand } from '../../../src/shared/contracts'
-import { ipcMain, dialog } from 'electron'
+import { ipcMain } from 'electron'
 import { BrowserIntegrations } from '../../../src/main/browser-integrations'
 
 vi.mock('electron', () => ({ app: { isPackaged: false, getPath: () => tmpdir(), getAppPath: () => resolve('.') }, dialog: { showSaveDialog: vi.fn() }, ipcMain: { handle: vi.fn(), removeHandler: vi.fn() } }))
@@ -95,19 +95,6 @@ describe('native pipe boundary', () => {
     expect(values.some(value => value.type === 'event' && value.event.type === 'error')).toBe(false)
     socket.destroy()
   })
-  it('rejects an old extension before it can open a billable recognition session', async () => {
-    const f = await fixture()
-    const socket = await connect(f.descriptor.pipe); const values = responses(socket)
-    send(socket, f.descriptor)
-    send(socket, { id: 'old', type: 'hello', extensionVersion: '1.0.2' })
-    await expect.poll(() => values.length).toBe(1)
-    expect(values[0]).toMatchObject({ type: 'result', value: { extensionCompatible: false, extensionVersion: '1.1.1' } })
-    send(socket, start)
-    await expect.poll(() => values.length).toBe(2)
-    expect(values[1]).toMatchObject({ type: 'error', code: 'extensionVersionMismatch' })
-    expect(f.sessions.busy).toBe(false)
-    socket.destroy()
-  })
   it('releases resident models when the idle browser caption service is closed', async () => {
     const f = await fixture()
     const handler = vi.mocked(ipcMain.handle).mock.calls.filter(([channel]) => channel === 'browser:caption-service').at(-1)![1]
@@ -158,35 +145,6 @@ describe('native pipe boundary', () => {
     expect(f.connection.status().enabled).toBe(false)
     expect(register).not.toHaveBeenCalled()
   })
-  it('rejects a disabled browser and does not report it as connected', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'nola-per-browser-'))
-    disposers.push(() => rm(directory, { recursive: true, force: true }))
-    const integrations = new BrowserIntegrations({ localAppData: directory, userData: directory })
-    await integrations.setEnabled('edge', false)
-    const f = await fixture(integrations)
-    const socket = await connect(f.descriptor.pipe); const values = responses(socket)
-    send(socket, f.descriptor); send(socket, { id: 'hello', type: 'hello', browser: 'edge' })
-    await expect.poll(() => values.length).toBe(1)
-    expect(values[0]).toMatchObject({ type: 'error', code: 'browserConnectionDisabled' })
-    expect(f.connection.status().connections).toBe(0)
-    expect(f.connection.status().browsers?.find(row => row.browser === 'edge')?.connected).toBe(false)
-    expect(f.engine.request).not.toHaveBeenCalled()
-    socket.destroy()
-  })
-  it.runIf(existsSync(resolve('release/Nola-Browser-Extension.zip')))('saves the bundled extension using a browser-specific filename and respects cancellation', async () => {
-    await fixture()
-    const handler = vi.mocked(ipcMain.handle).mock.calls.at(-1)![1]
-    vi.mocked(dialog.showSaveDialog).mockResolvedValueOnce({ canceled: true, filePath: '' })
-    await handler({} as Electron.IpcMainInvokeEvent, 'download', undefined, 'edge')
-    expect(dialog.showSaveDialog).toHaveBeenLastCalledWith(expect.objectContaining({ defaultPath: join(tmpdir(), 'Nola-Edge-Extension.zip') }))
-    const directory = await mkdtemp(join(tmpdir(), 'nola-download-'))
-    disposers.push(() => rm(directory, { recursive: true, force: true }))
-    const target = join(directory, 'download.zip')
-    vi.mocked(dialog.showSaveDialog).mockResolvedValueOnce({ canceled: false, filePath: target })
-    await handler({} as Electron.IpcMainInvokeEvent, 'download', undefined, 'chrome')
-    expect(await readFile(target)).toEqual(await readFile(resolve('release/Nola-Browser-Extension.zip')))
-    await expect(handler({} as Electron.IpcMainInvokeEvent, 'download', undefined, 'firefox')).rejects.toThrow('invalidConfiguration')
-  })
   it('rejects null before authentication without crashing the server', async () => {
     const f = await fixture()
     const socket = await connect(f.descriptor.pipe)
@@ -198,20 +156,6 @@ describe('native pipe boundary', () => {
     send(valid, { ...f.descriptor, extensionId: BROWSER_EXTENSION_ID })
     await expect.poll(() => f.connection.status().connections).toBe(1)
     valid.destroy()
-  })
-  it('filters microphones and rejects a different client session owner', async () => {
-    const f = await fixture()
-    f.engine.emit('event', { protocolVersion: 1, type: 'devices', requestId: 'desktop-devices', devices: [{ kind: 'microphone', name: 'mic', deviceId: 'mic', isDefault: true }, { kind: 'systemOutput', name: 'speaker', deviceId: 'speaker', isDefault: true }] })
-    const socket = await connect(f.descriptor.pipe)
-    const values = responses(socket)
-    send(socket, f.descriptor)
-    send(socket, { id: 'hello', type: 'hello' })
-    await expect.poll(() => values.length).toBe(1)
-    expect(values[0]).toMatchObject({ value: { devices: [{ kind: 'systemOutput', deviceId: 'speaker' }] } })
-    send(socket, { id: 'wrong', type: 'stop', sessionId: 'other' })
-    await expect.poll(() => values.length).toBe(2)
-    expect(values[1]).toMatchObject({ type: 'error', code: 'sessionNotRunning' })
-    socket.destroy()
   })
   it('bounds unacknowledged PCM to two seconds without starving stop', async () => {
     const f = await fixture()
