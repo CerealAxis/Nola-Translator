@@ -7,7 +7,7 @@ import base64
 import io
 import math
 import wave
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from collections import deque
 from queue import Empty, Full, Queue
 from time import monotonic
@@ -17,7 +17,7 @@ import pyaudiowpatch as pyaudio
 import numpy as np
 from numpy.typing import NDArray
 
-from .devices import AudioDeviceRecord
+from .devices import AudioDeviceRecord, resolve_capture_device
 from .resample import AudioFrame, FRAME_DURATION_MS, TARGET_SAMPLE_RATE, StreamingAudioNormalizer
 from ..debug_log import exception_fields, write as write_debug
 
@@ -241,6 +241,7 @@ class PortAudioCapture:
         self.paused = False
         self._finishing = False
         self.request_id = request_id
+        self._sample_format = pyaudio.paFloat32
 
     @property
     def dropped_chunks(self) -> int:
@@ -269,18 +270,45 @@ class PortAudioCapture:
         try:
             backend = self.backend_factory()
             self.backend = backend
+            stage = "resolve"
+            # Registry discovery uses a different PortAudio lifetime; its numeric index can move.
+            self.device = resolve_capture_device(backend, self.device)
+            context.update(backendIndex=self.device.backend_index, sampleRate=self.device.sample_rate,
+                           channels=self.device.channels, framesPerBuffer=max(1, self.device.sample_rate // 50))
             stage = "open"
-            write_debug("engine", "audio.capture.open.start", context)
-            self.stream = backend.open(
-                format=pyaudio.paFloat32,
-                channels=self.device.channels,
-                rate=self.device.sample_rate,
-                input=True,
-                input_device_index=self.device.backend_index,
-                frames_per_buffer=max(1, self.device.sample_rate // 50),
-                stream_callback=self._callback,
-                start=False,
-            )
+            channels = [self.device.channels]
+            if self.device.kind == "systemOutput" and self.device.channels > 2:
+                channels.append(2)
+            # WASAPI may advertise more channels than its current shared mix accepts. PortAudio
+            # also maps IAudioClient initialization failures to paInvalidDevice, so try compatible
+            # PCM layouts on this same endpoint before declaring it unavailable.
+            formats = [pyaudio.paFloat32, pyaudio.paInt16] if self.device.kind == "systemOutput" else [pyaudio.paFloat32]
+            candidates = [(count, sample_format) for sample_format in formats for count in channels]
+            for attempt, (count, sample_format) in enumerate(candidates):
+                context.update(channels=count, sampleFormat="float32" if sample_format == pyaudio.paFloat32 else "int16")
+                write_debug("engine", "audio.capture.open.start", {**context, "attempt": attempt + 1})
+                try:
+                    self.stream = backend.open(
+                        format=sample_format,
+                        channels=count,
+                        rate=self.device.sample_rate,
+                        input=True,
+                        input_device_index=self.device.backend_index,
+                        frames_per_buffer=max(1, self.device.sample_rate // 50),
+                        stream_callback=self._callback,
+                        start=False,
+                    )
+                    break
+                except OSError as error:
+                    if (attempt + 1 == len(candidates) or error.errno not in {
+                            pyaudio.paInvalidDevice, pyaudio.paInvalidChannelCount,
+                            pyaudio.paInvalidSampleRate, pyaudio.paSampleFormatNotSupported}):
+                        raise
+                    write_debug("engine", "audio.capture.open.retry", {**context, "attempt": attempt + 1,
+                        **exception_fields(error)})
+            self.device = replace(self.device, channels=count)
+            self._sample_format = sample_format
+            self.normalizer = StreamingAudioNormalizer(self.device.sample_rate, count)
             stage = "start"
             write_debug("engine", "audio.capture.open.ready", context)
             self.running = True
@@ -364,7 +392,9 @@ class PortAudioCapture:
                     raise AudioDeviceDisconnectedError(self.device.device_id)
                 continue
             last_seen_ms = monotonic() * 1000
-            samples = self.normalizer.accept_float32(np.frombuffer(chunk.data, dtype="<f4"), chunk.captured_at_ms)
+            samples = (self.normalizer.accept_int16(chunk.data, chunk.captured_at_ms)
+                       if self._sample_format == pyaudio.paInt16 else
+                       self.normalizer.accept_float32(np.frombuffer(chunk.data, dtype="<f4"), chunk.captured_at_ms))
             for frame in samples:
                 yield frame
         if self._finishing:

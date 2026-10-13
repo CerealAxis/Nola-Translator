@@ -1,3 +1,12 @@
+---
+prev:
+  text: 홈으로 돌아가기
+  link: /ko/
+next:
+  text: Nola Translator 다운로드
+  link: https://github.com/CerealAxis/Nola-Translator/releases/latest
+---
+
 # 빠른 시작
 
 Nola Translator는 시스템 오디오 또는 마이크 음성을 실시간으로 텍스트 변환하고 이중 언어 자막으로 번역합니다. 아래 단계에 따라 Windows x64 환경을 설정하세요.

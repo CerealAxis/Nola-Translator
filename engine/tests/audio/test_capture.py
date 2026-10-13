@@ -2,6 +2,7 @@ import asyncio
 import base64
 import io
 import wave
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -12,7 +13,7 @@ from nola_translator_engine.audio.capture import (
     RawAudioChunk,
     RawAudioQueue,
 )
-from nola_translator_engine.audio.devices import AudioDeviceRecord
+from nola_translator_engine.audio.devices import AudioDeviceRecord, _stable_device_id
 from nola_translator_engine.audio.resample import FRAME_DURATION_MS
 
 
@@ -115,6 +116,11 @@ class FakeBackend:
         self.open_options = None
         self.stream = None
         self.terminated = False
+        self.device = _device()
+
+    def get_loopback_device_info_generator(self):
+        yield {"index": self.device.backend_index, "name": self.device.name + " [Loopback]",
+               "defaultSampleRate": self.device.sample_rate, "maxInputChannels": self.device.channels}
 
     def open(self, **options):
         self.open_options = options
@@ -129,7 +135,7 @@ class FakeBackend:
 
 def _device() -> AudioDeviceRecord:
     return AudioDeviceRecord(
-        device_id="wasapi:systemOutput:test",
+        device_id=_stable_device_id("systemOutput", "测试扬声器", 48_000, 2),
         backend_index=33,
         name="测试扬声器",
         kind="systemOutput",
@@ -137,6 +143,43 @@ def _device() -> AudioDeviceRecord:
         sample_rate=48_000,
         channels=2,
     )
+
+
+@pytest.mark.asyncio
+async def test_loopback_remaps_device_and_recovers_invalid_multichannel_format(monkeypatch):
+    import pyaudiowpatch as pyaudio
+
+    device = replace(_device(), channels=8,
+                     device_id=_stable_device_id("systemOutput", _device().name, 48_000, 8))
+    backend = FakeBackend()
+    backend.device = replace(device, backend_index=41)
+    attempts = []
+    original_open = backend.open
+
+    def compatible_open(**options):
+        attempts.append(options)
+        if options["input_device_index"] != 41 or options["channels"] != 2 or options["format"] != pyaudio.paInt16:
+            raise OSError(-9996, "Invalid device")
+        return original_open(**options)
+
+    def start_pcm16(stream):
+        stream.started = True
+        pcm = np.full(stream.frame_count * stream.channels, 4096, dtype="<i2")
+        stream.callback(pcm.tobytes(), stream.frame_count, {}, 0)
+
+    monkeypatch.setattr(backend, "open", compatible_open)
+    monkeypatch.setattr(FakeStream, "start_stream", start_pcm16)
+    capture = PortAudioCapture(device, backend_factory=lambda: backend)
+    try:
+        capture.start()
+        frame = await asyncio.wait_for(anext(capture.frames()), 1)
+        assert frame.samples.shape == (320,)
+        assert np.mean(frame.samples) == pytest.approx(0.125, abs=0.001)
+        assert all(attempt["input_device_index"] == 41 for attempt in attempts)
+        assert len(attempts) <= 4
+    finally:
+        capture.stop()
+    assert backend.terminated
 
 
 @pytest.mark.asyncio

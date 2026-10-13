@@ -165,6 +165,34 @@ async def test_start_waits_for_anchor_never_opens_device_or_records(tmp_path, mo
 
 
 @pytest.mark.asyncio
+async def test_seeks_keep_one_consumer_and_deliver_audio_to_the_new_recognizer(tmp_path, monkeypatch):
+    runtime, _, session_id, _ = await started_runtime(tmp_path, monkeypatch)
+    await runtime.handle(reset(session_id))
+    try:
+        for epoch in (1, 2):
+            await runtime.handle(SetSessionPausedCommand(protocolVersion=1, type="setSessionPaused",
+                requestId="pause", sessionId=session_id, paused=True))
+            await runtime.handle(reset(session_id, epoch=epoch, video_time=epoch * 10000))
+            await runtime.handle(SetSessionPausedCommand(protocolVersion=1, type="setSessionPaused",
+                requestId="resume", sessionId=session_id, paused=False))
+            await asyncio.sleep(0)
+            consumers = [task for task in asyncio.all_tasks()
+                         if task.get_coro().__qualname__ == "EngineRuntime._run_session"]
+            assert consumers == [runtime.session_task]
+            assert (await runtime.handle(audio(session_id, epoch=epoch)))[0].type == "audioAccepted"
+            await asyncio.wait_for(runtime.recognizer.accept_started.wait(), 1)
+            assert runtime.recognizer.accepted_frames == 1
+    finally:
+        await runtime.close()
+        # Also clean up the orphan produced by the pre-fix implementation.
+        consumers = [task for task in asyncio.all_tasks()
+                     if task.get_coro().__qualname__ == "EngineRuntime._run_session"]
+        for task in consumers:
+            task.cancel()
+        await asyncio.gather(*consumers, return_exceptions=True)
+
+
+@pytest.mark.asyncio
 async def test_bounded_queue_ack_sequences_and_stream_isolation(tmp_path, monkeypatch):
     runtime, _, session_id, _ = await started_runtime(tmp_path, monkeypatch)
     await runtime.handle(reset(session_id))
@@ -228,7 +256,7 @@ async def test_pause_flush_is_async_resume_requires_new_anchor(tmp_path, monkeyp
     await asyncio.wait_for(old.flush_started.wait(), 1)
     await runtime.handle(pause.model_copy(update={"paused": False}))
     assert (await runtime.handle(audio(session_id)))[0].code == "invalidConfiguration"
-    assert (await runtime.handle(reset(session_id)))[0].code == "invalidMessage"
+    assert (await runtime.handle(reset(session_id)))[0].code == "sessionStaleEpoch"
     await asyncio.wait_for(runtime.handle(reset(session_id, epoch=1)), 0.5)
     assert old.closed
     assert (await runtime.handle(audio(session_id, epoch=1)))[0].type == "audioAccepted"

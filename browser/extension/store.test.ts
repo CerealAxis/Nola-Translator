@@ -207,6 +207,22 @@ describe('extension session lifecycle', () => {
       expect(fixture.store.getSnapshot().status).toBe('idle')
     } finally { vi.useRealTimers() }
   })
+  it('cancels a queued video end when seeking reopens the timeline', async () => {
+    const fixture = setup(); await fixture.store.init(); fixture.store.pressStart()
+    await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('active'))
+    Object.defineProperty(fixture.video, 'ended', { value: true, writable: true })
+    vi.useFakeTimers()
+    try {
+      fixture.video.dispatchEvent(new Event('ended'))
+      fixture.video.dispatchEvent(new Event('seeking'))
+      fixture.video.currentTime = 45
+      fixture.video.dispatchEvent(new Event('seeked'))
+      await vi.advanceTimersByTimeAsync(350)
+      expect(fixture.store.getSnapshot()).toMatchObject({ status: 'active', audioCaptured: true })
+      expect(fixture.requests.some(request => request.type === 'finish' || request.type === 'stop')).toBe(false)
+      expect(fixture.stopAudio).not.toHaveBeenCalled()
+    } finally { vi.useRealTimers(); await fixture.store.destroy() }
+  })
   it('reuses tab capture when an automatic next player replaces the ended element', async () => {
     const fixture = setup(); await fixture.store.init(); fixture.store.pressStart(); await vi.waitFor(() => expect(fixture.store.getSnapshot().status).toBe('active'))
     const replacement = document.createElement('video')

@@ -1,3 +1,12 @@
+---
+prev:
+  text: 返回首页
+  link: /
+next:
+  text: 下载 Nola Translator
+  link: https://github.com/CerealAxis/Nola-Translator/releases/latest
+---
+
 # 快速上手
 
 Nola Translator 将系统音频或麦克风语音实时转写并翻译为双语字幕。以下步骤帮助你在 Windows x64 上完成初始配置。

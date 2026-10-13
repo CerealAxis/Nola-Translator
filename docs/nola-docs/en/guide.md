@@ -1,3 +1,12 @@
+---
+prev:
+  text: Home
+  link: /en/
+next:
+  text: Download Nola Translator
+  link: https://github.com/CerealAxis/Nola-Translator/releases/latest
+---
+
 # Quick start
 
 Nola Translator transcribes and translates system audio or microphone speech into bilingual captions in real time. The steps below help you set up on Windows x64.

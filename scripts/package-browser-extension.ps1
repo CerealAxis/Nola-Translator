@@ -3,6 +3,8 @@ $Workspace = Split-Path -Parent $PSScriptRoot
 $ExtensionDirectory = Join-Path $Workspace 'browser\extension\dist'
 $ReleaseDirectory = Join-Path $Workspace 'release'
 $Destination = Join-Path $ReleaseDirectory 'Nola-Browser-Extension.zip'
+$BrowserVersion = (Get-Content -LiteralPath (Join-Path $Workspace 'browser\version.json') -Raw | ConvertFrom-Json).version
+if ($BrowserVersion -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') { throw "Invalid browser extension version: $BrowserVersion" }
 if (-not (Test-Path -LiteralPath (Join-Path $ExtensionDirectory 'manifest.json'))) { throw 'Build the browser extension first' }
 New-Item -ItemType Directory -Path $ReleaseDirectory -Force | Out-Null
 
@@ -25,3 +27,8 @@ try {
 } finally {
   $archive.Dispose()
 }
+
+# Chrome and Edge use the same unpacked MV3 payload; keep browser-specific names
+# on release assets while preserving the generic archive embedded by the desktop app.
+Copy-Item -LiteralPath $Destination -Destination (Join-Path $ReleaseDirectory "Nola-Chrome-Extension-v$BrowserVersion.zip") -Force
+Copy-Item -LiteralPath $Destination -Destination (Join-Path $ReleaseDirectory "Nola-Edge-Extension-v$BrowserVersion.zip") -Force

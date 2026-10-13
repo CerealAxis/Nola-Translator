@@ -128,6 +128,23 @@ def _record(info: dict[str, Any], kind: DeviceKind, is_default: bool) -> AudioDe
     )
 
 
+def resolve_capture_device(backend: PyAudioBackend, device: AudioDeviceRecord) -> AudioDeviceRecord:
+    """Re-map the selected endpoint in the PortAudio instance that will actually open it."""
+    if device.kind == "systemOutput":
+        infos = backend.get_loopback_device_info_generator()
+    else:
+        host = backend.get_host_api_info_by_type(pyaudio.paWASAPI)
+        infos = (backend.get_device_info_by_host_api_device_index(int(host["index"]), index)
+                 for index in range(int(host["deviceCount"])))
+    for info in infos:
+        if device.kind == "microphone" and (info.get("isLoopbackDevice") or int(info.get("maxInputChannels", 0)) <= 0):
+            continue
+        candidate = _record(info, device.kind, device.is_default)
+        if candidate.device_id == device.device_id:
+            return candidate
+    raise AudioDeviceUnavailableError(device.device_id)
+
+
 def enumerate_wasapi_devices(
     backend_factory: Callable[[], PyAudioBackend] = pyaudio.PyAudio,
 ) -> list[AudioDeviceRecord]:

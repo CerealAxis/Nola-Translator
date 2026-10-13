@@ -115,7 +115,7 @@ html { scroll-behavior: smooth; }
 .site-scenario-copy > span { font: var(--site-kicker-font); letter-spacing: .08em; color: var(--muted); }
 .site-scenario-copy h3 { font-size: var(--site-feature-size); font-weight: 550; line-height: 1.4; margin-block: var(--space-3) var(--space-2); }
 .site-scenario-copy p { font-size: var(--site-body-regular-size); color: var(--muted); }
-.site-scenario-copy .button { margin-top: var(--space-4); background: var(--color-accent-soft); color: var(--accent); }
+.site-scenario-copy .button { width: max-content; min-width: max-content; margin-top: var(--space-4); gap: var(--space-1); padding-inline: var(--space-2); white-space: nowrap; background: var(--color-accent-soft); color: var(--accent); }
 .site-scenario-panel .site-poster { aspect-ratio: 16 / 10; }
 .site-scenario-panel .site-poster-window { width: 90%; left: 5%; top: 10%; }
 .site-feature { display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--space-7); align-items: center; margin-top: calc(var(--space-8) + var(--space-4)); }

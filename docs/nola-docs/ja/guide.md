@@ -1,3 +1,12 @@
+---
+prev:
+  text: ホームに戻る
+  link: /ja/
+next:
+  text: Nola Translator をダウンロード
+  link: https://github.com/CerealAxis/Nola-Translator/releases/latest
+---
+
 # はじめに
 
 Nola Translator は、システム音声やマイクの音声を即座に書き起こし、二言語字幕として翻訳します。以下の手順で Windows x64 環境をセットアップしてください。

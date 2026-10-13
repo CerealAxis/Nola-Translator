@@ -224,6 +224,8 @@ export function createExtensionStore(dependencies: StoreDependencies) {
   }
   const reset = (): void => {
     timelineVersion++
+    // Seeking or replacing metadata invalidates an end notification from the old position.
+    if (endingTimer) { clearTimeout(endingTimer); endingTimer = null }
     if (state.status === 'starting') { fence(); set({ captions: [] }); return }
     if (!sessionId || state.status !== 'active') return
     fence()
@@ -275,11 +277,14 @@ export function createExtensionStore(dependencies: StoreDependencies) {
       ['timeupdate', () => { if (state.playbackPaused && advancing()) resume() }],
       ['ended', () => {
         fence(); set({ playbackPaused: true })
+        const version = timelineVersion; const operationGeneration = generation
+        if (endingTimer) clearTimeout(endingTimer)
         // A short grace period allows an automatic next-player replacement to reuse the existing tab stream.
         endingTimer = setTimeout(() => {
           endingTimer = null
           const id = sessionId; const epoch = state.epoch
-          if (!id || state.selectedVideo !== video || !video.ended) return
+          if (!id || version !== timelineVersion || operationGeneration !== generation
+            || state.selectedVideo !== video || !video.ended || video.seeking) return
           enqueue(async () => {
             try { await dependencies.bridge.request({ type: 'finish', sessionId: id, epoch }) } catch { /* A failed tail flush still ends the session. */ }
             if (sessionId === id && state.epoch === epoch) await stop()

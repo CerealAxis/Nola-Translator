@@ -1274,8 +1274,10 @@ class EngineRuntime:
         last_ended_at = self.session_started_at_ms
         try:
             async for frame in capture.frames():
-                if (self.session_paused or generation != self._stream_generation
-                        or self._timeline is not None and not self._stream_anchored):
+                # A superseded consumer must release the queue, not drain the next timeline.
+                if generation != self._stream_generation:
+                    return
+                if (self.session_paused or self._timeline is not None and not self._stream_anchored):
                     continue
                 last_ended_at = frame.started_at_ms + 20
                 self._last_frame_end_ms = last_ended_at
@@ -1865,7 +1867,9 @@ class EngineRuntime:
         self._bind_recognizer(self.recognizer)
         if capture is not None and not self.session_paused:
             capture.resume()
-        self.session_task = asyncio.create_task(self._run_session())
+        # Resume owns creation while paused; otherwise it would overwrite a waiting consumer.
+        if not self.session_paused:
+            self.session_task = asyncio.create_task(self._run_session())
         return [StreamResetEvent(protocolVersion=1, type="streamReset", requestId=command.requestId,
             sessionId=command.sessionId, epoch=command.epoch)]
 
@@ -1915,7 +1919,8 @@ class EngineRuntime:
             if self.capture is not None:
                 self.capture.resume()
             self._stream_anchored = True
-            self.session_task = asyncio.create_task(self._run_session())
+            if self.session_task is None or self.session_task.done():
+                self.session_task = asyncio.create_task(self._run_session())
         return [self._listening_status(command.requestId)]
 
     async def _finish_stream(self, command: FinishStreamCommand) -> list[EngineEvent]:

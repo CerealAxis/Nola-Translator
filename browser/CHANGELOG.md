@@ -2,6 +2,11 @@
 
 The extension has its own release version in `browser/version.json`. The extension build and desktop compatibility check both read that file. Every extension release must update the version and this log together. Desktop app versions remain independent.
 
+## 1.1.2 — 2026-10-13
+
+- Cancel queued video-end cleanup when a seek or metadata change opens a new timeline, preserving the shared tab audio track.
+- Pair with the desktop engine fix that keeps one audio consumer across paused resets and resumes, preventing old consumers from discarding post-seek audio.
+
 ## 1.1.1 — 2026-10-12
 
 - Keep tab capture connected across seeks by isolating old audio acknowledgements and errors from the new timeline.

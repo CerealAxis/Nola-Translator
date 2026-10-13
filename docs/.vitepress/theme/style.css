@@ -1,4 +1,5 @@
 @import '../../../src/renderer/theme/nola-light.css';
+@import '../../../src/renderer/theme/nola-dark.css';
 @import '../../../src/renderer/theme/typography.css';
 
 :root {
@@ -7,6 +8,24 @@
   --vp-c-brand-2: var(--accent);
   --vp-c-brand-3: var(--accent);
   --vp-c-bg: var(--surface);
+  --vp-c-bg-alt: var(--surface);
+  --vp-c-bg-elv: var(--surface);
+  --vp-c-bg-soft: var(--surface);
+}
+
+.dark {
+  --vp-c-bg: var(--background);
+  --vp-c-bg-alt: var(--background);
+  --vp-c-bg-elv: var(--surface);
+  --vp-c-bg-soft: var(--surface);
+}
+
+.VPNavBarSearch .DocSearch-Button {
+  border-color: var(--vp-c-divider);
+}
+
+.VPNavBarSearch .DocSearch-Button:hover {
+  border-color: var(--vp-c-brand-1);
 }
 :root { --site-loader-size: 96px; --site-loader-mark: 40px; --site-loader-gap: 24px; --site-loader-bar: 4px; --site-loader-wave-height: 24px; }
 .site-loading { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--site-loader-gap); color: var(--foreground); font: var(--nola-text-display); background: radial-gradient(ellipse at center, color-mix(in oklch, var(--accent) 8%, var(--background)), var(--background) 65%); }

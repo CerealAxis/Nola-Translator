@@ -2,20 +2,22 @@
 
 Two workflows build separate Windows x64 EXE (NSIS) and MSI installers, plus a source ZIP. End users do not need to install Python. PyTorch and llama.cpp are selected and installed in application settings. Neither inference components nor model weights are bundled.
 
-Both workflows rebuild the browser extension from the checked-out source, create `Nola-Browser-Extension.zip`, and build the Native Messaging host before packaging. EXE and MSI installations include these files; the settings download uses the bundled extension ZIP. The host uses a separate build environment and the PyInstaller version declared in `engine/pyproject.toml`.
+Both workflows rebuild the browser extension from the checked-out source, create `Nola-Browser-Extension.zip`, and build the Native Messaging host before packaging. EXE and MSI installations include these files; the settings download uses the bundled extension ZIP. The release workflow also publishes the same MV3 payload as `Nola-Chrome-Extension-v<browser-version>.zip` and `Nola-Edge-Extension-v<browser-version>.zip`. The host uses a separate build environment and the PyInstaller version declared in `engine/pyproject.toml`.
 
 `npm run dist:win` also builds both EXE and MSI installers locally. The EXE embeds a ZIP payload and extracts it directly into the installation directory instead of extracting and copying a temporary application tree. It remains an offline NSIS installer; the ZIP is an internal build artifact, not a portable download. Differential NSIS packages are disabled to keep the payload format and extraction plugin consistent. After installation, the embedded temporary ZIP is deleted before the finish page, and NSIS cleans up the remaining plugin temporary directory when the installer exits. MSI continues to use Windows Installer packaging.
 
 - `build.yml`: every branch push, pull request, or manual run. Download the installer from the run's **Artifacts** section. Development versions use `package version-dev.run number`. Artifacts expire after 14 days; newer runs cancel older builds on the same branch/PR.
-- `release.yml`: push a version tag such as `v0.1.5`, or publish a GitHub Release for an existing version tag. The workflow checks out that tag and sets the installer version from it. It creates a Release if needed and uploads all three files. Tags such as `v0.1.6-rc.1` create prereleases.
+- `release.yml`: push a version tag such as `v0.1.5`, or publish a GitHub Release for an existing version tag. The workflow checks out that tag and sets the installer version from it. It creates a Release if needed and uploads both installers, the source ZIP, and the two browser extension ZIPs. Tags such as `v0.1.6-rc.1` create prereleases.
 
-For version `0.1.5`, the downloads are:
+For application version `0.1.5` and browser extension version `1.1.2`, the downloads are:
 
 - `Nola-Translator-0.1.5-Windows-x64-Setup.exe`
 - `Nola-Translator-0.1.5-Windows-x64-Setup.msi`
 - `Nola-Translator-0.1.5-Source.zip`
+- `Nola-Chrome-Extension-v1.1.2.zip`
+- `Nola-Edge-Extension-v1.1.2.zip`
 
-Actions uploads each file separately without an additional ZIP wrapper. Development filenames use the development version, for example `0.1.5-dev.2`, without a full commit hash. SHA-256 values are listed in the run summary. The source archive comes from the checked-out Git commit, excluding generated runtimes and model weights; the CI-only package version change is not included. GitHub Releases also display GitHub's automatic source archives.
+Actions uploads the EXE, MSI, and source files separately without an additional ZIP wrapper. Development filenames use the development version, for example `0.1.5-dev.2`, without a full commit hash. SHA-256 values for the installer and release assets are listed in the run summary. The source archive comes from the checked-out Git commit, excluding generated runtimes and model weights; the CI-only package version change is not included. GitHub Releases also display GitHub's automatic source archives.
 
 Example:
 

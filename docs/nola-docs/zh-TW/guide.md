@@ -1,3 +1,12 @@
+---
+prev:
+  text: 返回首頁
+  link: /zh-TW/
+next:
+  text: 下載 Nola Translator
+  link: https://github.com/CerealAxis/Nola-Translator/releases/latest
+---
+
 # 快速入門
 
 Nola Translator 將系統音訊或麥克風語音即時轉寫並翻譯為雙語字幕。以下步驟協助你在 Windows x64 上完成初始設定。
