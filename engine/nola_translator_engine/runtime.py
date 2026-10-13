@@ -133,15 +133,30 @@ ModelSelectionCommand = StartSessionCommand | PrewarmModelsCommand
 LoadResult = TypeVar('LoadResult')
 
 
-#: Cloud recognition reasons that name their own remedy get their own wire code. A revoked key
-#: or a spent account is not a missing model, so sending the user to install one cannot resolve
-#: it. Reasons absent here keep `modelUnavailable`, which stays the right answer when no
-#: recognition source could produce captions.
+#: Cloud recognition reasons retain provider-specific compatibility while mapping transport
+#: and response failures to stable engine codes.
 CLOUD_RECOGNITION_ERROR_CODES: dict[str, str] = {
     "recognitionUnauthorized": "cloudRecognitionCredentialMissing",
     "recognitionInsufficientBalance": "cloudRecognitionInsufficientBalance",
     "recognitionRateLimited": "cloudRecognitionRateLimited",
+    "recognitionNetworkError": "recognitionNetworkUnavailable",
+    "recognitionNetworkUnavailable": "recognitionNetworkUnavailable",
+    "recognitionTimeout": "recognitionTimeout",
+    "recognitionInvalidResponse": "recognitionInvalidResponse",
+    "recognitionInvalidHandshake": "recognitionInvalidResponse",
+    "recognitionRejected": "recognitionInvalidResponse",
 }
+
+
+def _model_load_error_code(error: Exception) -> str:
+    text = f"{type(error).__name__} {error}".lower()
+    if any(token in text for token in ("out of memory", "outofmemory", "cuda error", "memoryerror")) or isinstance(error, MemoryError):
+        return "modelOutOfMemory"
+    if isinstance(error, ModuleNotFoundError) or any(token in text for token in ("no module named", "importerror", "dependency", "missing package")):
+        return "modelDependencyMissing"
+    if any(token in text for token in ("weight", "checkpoint", "safetensors", "state_dict", "invalid model", "corrupt")):
+        return "modelWeightsInvalid"
+    return "modelLoadFailed"
 
 
 class RemoteRecognitionRuntime:
@@ -289,6 +304,9 @@ class EngineRuntime:
                 )
                 result = await capture_audio_test(PortAudioCapture(device, request_id=command.requestId))
                 return [AudioTestedEvent(protocolVersion=1, type="audioTested", requestId=command.requestId, **result)]
+            except AudioDeviceDisconnectedError:
+                write_debug("engine", "audio.test.failed", {"requestId": command.requestId, "reason": "disconnected"})
+                return [self._resource_error(command.requestId, "audioDeviceDisconnected", {"reason": "disconnected"})]
             except Exception as error:
                 write_debug("engine", "audio.test.failed", {"requestId": command.requestId, **exception_fields(error)})
                 return [self._resource_error(command.requestId, "audioDeviceUnavailable", {"reason": str(error)})]
@@ -674,7 +692,7 @@ class EngineRuntime:
                     protocolVersion=1,
                     type="error",
                     requestId=command.requestId,
-                    code="modelUnavailable",
+                    code=_model_load_error_code(error),
                     recoverable=True,
                     details={"reason": str(error)[:1024] or type(error).__name__},
                 )
@@ -840,7 +858,7 @@ class EngineRuntime:
             await self._unload_session_models()
             return [
                 self._resource_error(
-                    command.requestId, "modelUnavailable",
+                    command.requestId, _model_load_error_code(error),
                     {"reason": str(error)[:1024] or type(error).__name__},
                 )
             ]
@@ -1280,7 +1298,7 @@ class EngineRuntime:
                     protocolVersion=1,
                     type="error",
                     requestId=self.session_request_id,
-                    code="audioDeviceUnavailable",
+                    code="audioDeviceDisconnected",
                     recoverable=True,
                     details={"reason": "disconnected"},
                 )
@@ -1292,7 +1310,8 @@ class EngineRuntime:
                     protocolVersion=1,
                     type="error",
                     requestId=self.session_request_id,
-                    code="modelUnavailable",
+                    code=CLOUD_RECOGNITION_ERROR_CODES.get(error.reason, "recognitionNetworkUnavailable")
+                    if isinstance(error, CloudRecognitionError) else "modelUnavailable",
                     recoverable=True,
                     details={"reason": str(error)[:512]},
                 )
@@ -1328,7 +1347,7 @@ class EngineRuntime:
                     # session reads to pick user-facing copy, so the meaning rides on the code.
                     self.emit(self._resource_error(
                         self.session_request_id,
-                        CLOUD_RECOGNITION_ERROR_CODES.get(error.reason, "modelUnavailable"),
+                        CLOUD_RECOGNITION_ERROR_CODES.get(error.reason, "recognitionNetworkUnavailable"),
                         {"reason": error.reason},
                     ))
             recognizer.on_error = on_error
@@ -1528,6 +1547,9 @@ class EngineRuntime:
         displayed_revision = self.translation_display_revision.get(display_key, -1)
         if request.update.revision < displayed_revision:
             return
+        # Keep an intermediate failure out of the caption; a later recognition revision can retry it.
+        if not request.update.is_final and result.state == "failed":
+            return
         if result.state != "pending" or result.text:
             self.translation_display_revision[display_key] = request.update.revision
         replacement = Translation(
@@ -1556,7 +1578,16 @@ class EngineRuntime:
                 "currentSource": text,
             }, ensure_ascii=False)
         session_id, generation = self.service.session_id, self._stream_generation
+        retry_codes = {"URLError", "HTTPError", "translationRateLimited", "translationTimeout", "RuntimeError"}
+        retry_enabled = request.update.is_final and provider_name not in {"hymt2", "index-translate-local", "m2m100"}
+        max_attempts = 3 if retry_enabled else 1
+        attempt = 0
+
         def publish(result: ScheduledTranslation) -> None:
+            # Preserve visible text while a final network translation still has retries remaining.
+            if (result.state == "failed" and result.error_code in retry_codes
+                    and attempt < max_attempts):
+                return
             self._publish_translation_result(request, result, session_id, generation)
 
         target_errors: dict[str, str] = {}
@@ -1588,20 +1619,31 @@ class EngineRuntime:
                     if not m2m100_is_supported(target):
                         target_errors[target] = "unsupportedLanguagePair"
 
-        available_targets = [target for target in targets if target not in target_errors]
-        scheduled = (
-            await self.translation_scheduler.translate(
+        retry_targets = [target for target in targets if target not in target_errors]
+        completed_by_target: dict[str, ScheduledTranslation] = {}
+        while retry_targets and attempt < max_attempts:
+            if (self.service.session_id != session_id
+                    or self._stream_generation != generation):
+                return []
+            attempt += 1
+            scheduled = await self.translation_scheduler.translate(
                 request.update.segment_id,
                 request.update.revision,
                 text,
                 request.source,
-                available_targets,
+                retry_targets,
                 on_result=publish,
             )
-            if available_targets
-            else []
-        )
-        completed_by_target = {item.target_language: item for item in scheduled}
+            failed_targets: list[str] = []
+            for result in scheduled:
+                completed_by_target[result.target_language] = result
+                if (result.state == "failed" and result.error_code in retry_codes
+                        and attempt < max_attempts):
+                    failed_targets.append(result.target_language)
+            retry_targets = failed_targets
+            if retry_targets:
+                await asyncio.sleep(0.5 if attempt == 1 else 1.0)
+
         translations = []
         for target in targets:
             result = completed_by_target.get(target)
@@ -1732,7 +1774,7 @@ class EngineRuntime:
                 "lastAudioSequence": self._last_audio_sequence, "capturedAtMs": command.capturedAtMs,
                 "lastAudioEndMs": self._last_audio_end_ms,
             })
-            return [self._resource_error(command.requestId, "invalidMessage", {"reason": "audioOutOfOrder"})]
+            return [self._resource_error(command.requestId, "sessionAudioOutOfOrder", {"reason": "audioOutOfOrder"})]
         data = base64.b64decode(command.pcmBase64, validate=True)
         if not capture.push(data, command.sampleRate, command.capturedAtMs):
             write_debug("engine", "engine.pushAudio.reject", {
@@ -1788,7 +1830,7 @@ class EngineRuntime:
             return [self._resource_error(command.requestId, "invalidConfiguration", {"reason": "notBrowserTimeline"})]
         if self._stream_epoch is not None and (command.epoch < self._stream_epoch
                 or command.epoch == self._stream_epoch and self._epoch_initialized):
-            return [self._resource_error(command.requestId, "invalidMessage", {"reason": "staleEpoch"})]
+            return [self._resource_error(command.requestId, "sessionStaleEpoch", {"reason": "staleEpoch"})]
         self._stream_generation += 1
         capture = self.capture
         if capture is not None:
@@ -1816,7 +1858,8 @@ class EngineRuntime:
             except Exception as error:
                 await self.recognizer.close()
                 self._stream_anchored = False
-                return [self._resource_error(command.requestId, "modelUnavailable", {"reason": str(error)[:256]})]
+                return [self._resource_error(command.requestId, CLOUD_RECOGNITION_ERROR_CODES.get(
+                    error.reason, "recognitionNetworkUnavailable"), {"reason": str(error)[:256]})]
         else:
             self.recognizer = self._fresh_recognizer()
         self._bind_recognizer(self.recognizer)
@@ -1858,7 +1901,8 @@ class EngineRuntime:
                         raise
                     except Exception as error:
                         if generation == self._stream_generation and session_id == self.service.session_id:
-                            self.emit(self._resource_error(command.requestId, "modelUnavailable",
+                            self.emit(self._resource_error(command.requestId, CLOUD_RECOGNITION_ERROR_CODES.get(
+                                getattr(error, "reason", ""), "recognitionNetworkUnavailable"),
                                 {"reason": type(error).__name__}))
 
             # Final inference may take seconds; seek/reset remains available while it runs.

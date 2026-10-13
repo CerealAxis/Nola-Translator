@@ -22,7 +22,9 @@ coverage/
 Thumbs.db
 .venv/
 /.codex/
-/docs
+/docs/.vitepress/cache/
+/docs/.media-dist/
+/docs/docs备份.zip
 engine/build/
 engine/dist/
 release/

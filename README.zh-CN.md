@@ -116,7 +116,7 @@ Nola Translator 是一款实时字幕与翻译软件，支持本地模型和云�
 
 ```text
 assets/brand/                  Logo 与品牌资源
-docs/                          设计与实现文档
+docs/                          VitePress 产品官网与多语言文档
 engine/nola_translator_engine/  Python 音频、识别和翻译引擎
 engine/tests/                   Python 测试
 scripts/                        安装与构建脚本
@@ -144,7 +144,7 @@ npm run dist:win
 
 ## 参与贡献
 
-Fork 仓库、创建分支、提交修改并发起 Pull Request。请简要描述修改内容及已运行的检查。设计和代码约定可参考[界面规范](docs/design-system.md)与[实现说明](docs/implementation.md)。
+Fork 仓库、创建分支、提交修改并发起 Pull Request。请简要描述修改内容及已运行的检查。设计和代码约定可参考[界面规范](DESIGN.md)与[项目规范](AGENTS.md)。
 
 ## 许可证
 

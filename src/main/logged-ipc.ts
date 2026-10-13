@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
+import { normalizeThrownError } from '../shared/ipc-error'
 import { logDiagnostic } from './session-log'
 
 /** Record IPC operations centrally without persisting credential or document payloads. */
@@ -17,8 +18,12 @@ export function loggedHandle(channel: string, listener: Parameters<typeof ipcMai
         resultCount: Array.isArray(result) ? result.length : undefined, result })
       return result
     } catch (error) {
-      logDiagnostic('ipc.failed', { operationId, channel, durationMs: Math.round(performance.now() - started), error })
-      throw error
+      const correlationId = randomUUID()
+      const classification = normalizeThrownError(error, { correlationId, operation: channel })
+      logDiagnostic('ipc.failed', { operationId, channel, durationMs: Math.round(performance.now() - started), correlationId, classification, error })
+      const rendererError = new Error(classification.code)
+      Object.assign(rendererError, classification)
+      throw rendererError
     }
   })
 }

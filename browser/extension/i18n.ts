@@ -19,6 +19,20 @@ const ERROR_ALIASES: Record<string, BrowserKey> = {
   invalidMessage: 'updateRequired',
   audioBufferOverflow: 'slowAudio',
   lineTooLarge: 'internalError',
+  browserConnectionUnavailable: 'appUnavailable',
+  browserConnectionLost: 'connectionLost',
+  browserPermissionDenied: 'permissionFailed',
+  browserExtensionVersionMismatch: 'updateRequired',
+  browserProtocolMismatch: 'updateRequired',
+  browserCaptureUnsupported: 'captureUnsupported',
+  browserCaptureTargetMismatch: 'wrongCapture',
+  browserCaptureCancelled: 'captureCancelled',
+  browserAudioSilent: 'tabAudioSilent',
+  browserAudioBacklog: 'slowAudio',
+  browserSessionAlreadyRunning: 'busy',
+  browserSessionNotRunning: 'appUnavailable',
+  browserCaptionServiceDisabled: 'appUnavailable',
+  browserIntegrationDisabled: 'appUnavailable',
 }
 function isDictionaryKey(key: BrowserTextKey): key is BrowserKey {
   return !(key as string).startsWith(UNKNOWN_PREFIX)

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import extensionRelease from '../../browser/version.json'
-import type { AudioDevice, EngineEvent } from './contracts'
+import type { AudioDevice, EngineErrorCode, EngineEvent } from './contracts'
+import type { SupportErrorCode } from './error-catalog'
 import type { BrowserCaptionStyleSettings, VideoCaptionAudioSource } from './settings'
 
 export const BROWSER_HOST_NAME = 'com.nola.captions'
@@ -35,6 +36,34 @@ export const browserRequestSchema = z.discriminatedUnion('type', [
   z.object({ ...identity, type: z.literal('debug'), event: z.string().min(1).max(64), data: z.record(z.string(), z.unknown()).optional() }).strict(),
 ])
 export type BrowserRequest = z.infer<typeof browserRequestSchema>
+export type BrowserWireErrorCode =
+  | 'browserConnectionUnavailable'
+  | 'browserConnectionLost'
+  | 'browserPermissionDenied'
+  | 'browserExtensionVersionMismatch'
+  | 'browserProtocolMismatch'
+  | 'browserCaptureUnsupported'
+  | 'browserCaptureTargetMismatch'
+  | 'browserCaptureCancelled'
+  | 'browserAudioSilent'
+  | 'browserAudioBacklog'
+  | 'browserSessionAlreadyRunning'
+  | 'browserSessionNotRunning'
+  | 'browserCaptionServiceDisabled'
+  | 'browserIntegrationDisabled'
+  | 'internalError'
+  | 'connectionLost'
+  | 'appUnavailable'
+  | 'slowAudio'
+  | 'permissionFailed'
+  | 'captureUnsupported'
+  | 'wrongCapture'
+  | 'captureCancelled'
+  | 'tabAudioSilent'
+  | 'updateRequired'
+  | 'error'
+  | EngineErrorCode
+  | SupportErrorCode
 /**
  * The browser caption appearance is configured independently from the desktop's video caption page.
  */
@@ -60,7 +89,7 @@ export interface BrowserSummary {
 }
 export type BrowserResponse =
   | { type: 'result'; id: string; value?: BrowserSummary | { sessionId: string } }
-  | { type: 'error'; id: string; code: string; message: string }
+  | { type: 'error'; id: string; code: BrowserWireErrorCode; message: string }
   | { type: 'event'; event: EngineEvent }
 export type BrowserKind = 'chrome' | 'edge'
 export interface BrowserIntegrationInfo {

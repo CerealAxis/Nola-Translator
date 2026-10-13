@@ -100,7 +100,7 @@ export type PrewarmConfig = {
  * `invalidConfiguration` carrying a per-language `details.reason` (`unsupportedRecognitionLanguage`
  * or `unsupportedTranslationLanguage` on the prewarm path).
  */
-export const PREWARM_ERROR_CODES = ['resourceBusy', 'sessionAlreadyRunning', 'invalidConfiguration', 'resourceUnavailable', 'modelUnavailable'] as const
+export const PREWARM_ERROR_CODES = ['resourceBusy', 'sessionAlreadyRunning', 'invalidConfiguration', 'resourceUnavailable', 'modelUnavailable', 'modelLoadFailed'] as const
 export type PrewarmErrorCode = (typeof PREWARM_ERROR_CODES)[number]
 
 /** The settled answer of a prewarm; the `loading` state stays on the event channel. */
@@ -115,6 +115,7 @@ export type Translation = {
   text?: string
   state: 'pending' | 'complete' | 'failed'
   provider: string
+  /** Compatibility boundary for engine/provider-defined codes; migrate to EngineErrorCode after wire codes stabilize. */
   errorCode?: string
 }
 
@@ -234,6 +235,7 @@ export type ResourceRecord = {
   phase?: 'resolve' | 'download' | 'verify' | 'install' | 'remove' | 'cleanup'
   progress?: number
   cancellable: boolean
+  /** Compatibility boundary for engine/provider-defined codes; migrate to EngineErrorCode after wire codes stabilize. */
   errorCode?: string
 }
 
@@ -309,6 +311,29 @@ export type EngineErrorCode =
   | 'audioDeviceUnavailable'
   | 'audioBufferOverflow'
   | 'modelUnavailable'
+  | 'modelLoadFailed'
+  | 'sessionInvalidStream'
+  | 'sessionStaleEpoch'
+  | 'sessionAudioOutOfOrder'
+  | 'audioDeviceDisconnected'
+  | 'modelDependencyMissing'
+  | 'modelWeightsInvalid'
+  | 'modelOutOfMemory'
+  | 'recognitionNetworkUnavailable'
+  | 'recognitionTimeout'
+  | 'recognitionInvalidResponse'
+  | 'cloudRecognitionCredentialMissing'
+  | 'cloudRecognitionInsufficientBalance'
+  | 'cloudRecognitionRateLimited'
+  | 'translationProviderUnavailable'
+  | 'translationNetworkUnavailable'
+  | 'translationInvalidResponse'
+  | 'translationUnsupportedLanguagePair'
+  | 'resourceVerificationFailed'
+  | 'resourceRemoveFailed'
+  | 'resourceDiskSpaceInsufficient'
+  | 'protocolValidationFailed'
+  | 'engineTransportUnavailable'
   | 'resourceUnavailable'
   | 'resourceNotFound'
   | 'resourceBusy'

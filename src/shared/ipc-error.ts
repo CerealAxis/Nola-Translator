@@ -1,3 +1,61 @@
+import { supportErrorCodeForCause } from './error-catalog'
+
+export type AppErrorShape = {
+  code: string
+  supportCode?: string
+  retryable?: boolean
+  correlationId?: string
+}
+
+type ErrorLike = {
+  code?: unknown
+  engineCode?: unknown
+  errno?: unknown
+  message?: unknown
+  correlationId?: unknown
+}
+
+const KNOWN_ERROR_CODES: Readonly<Record<string, string>> = {
+  ETIMEDOUT: 'REQUEST_TIMEOUT',
+  ESOCKETTIMEDOUT: 'REQUEST_TIMEOUT',
+  ECONNRESET: 'NETWORK_UNAVAILABLE',
+  ECONNREFUSED: 'ENGINE_UNAVAILABLE',
+  ENOTFOUND: 'NETWORK_UNAVAILABLE',
+  ENOENT: 'ENGINE_UNAVAILABLE',
+  EACCES: 'ENGINE_UNAVAILABLE',
+  EPERM: 'ENGINE_UNAVAILABLE',
+}
+
+/** Converts arbitrary thrown values into the stable fields allowed across the IPC boundary. */
+export function normalizeThrownError(
+  error: unknown,
+  context: { correlationId?: string; operation?: string } = {}
+): AppErrorShape {
+  const source = error && typeof error === 'object' ? error as ErrorLike : undefined
+  const rawCode = typeof source?.engineCode === 'string'
+    ? source.engineCode
+    : typeof source?.code === 'string' ? source.code : undefined
+  const errno = typeof source?.errno === 'string' ? source.errno : undefined
+  const message = typeof source?.message === 'string' ? source.message : ''
+  const normalizedMessage = message.toUpperCase().replace(/[^A-Z0-9]+/g, '_')
+  const code = rawCode
+    ?? (errno ? KNOWN_ERROR_CODES[errno] ?? errno : undefined)
+    ?? (/(TIMEOUT|TIMED_OUT|超时)/i.test(message) ? 'REQUEST_TIMEOUT' : undefined)
+    ?? (/(PROTOCOL|INVALID.*(DATA|RESPONSE)|通信数据无效)/i.test(message) ? 'ENGINE_PROTOCOL_ERROR' : undefined)
+    ?? (/(ENGINE|PYTHON).*(NOT|尚未|不可用|退出|停止)|引擎.*(不可用|退出|停止)/i.test(message) ? 'ENGINE_UNAVAILABLE' : undefined)
+    ?? (normalizedMessage && KNOWN_ERROR_CODES[normalizedMessage])
+    ?? 'UNKNOWN_ERROR'
+  const supportCode = supportErrorCodeForCause(rawCode ?? errno ?? message, {
+    commandType: context.operation,
+  })
+  return {
+    code,
+    supportCode,
+    retryable: code === 'REQUEST_TIMEOUT' || code === 'NETWORK_UNAVAILABLE' || code === 'ENGINE_UNAVAILABLE',
+    ...(context.correlationId ? { correlationId: context.correlationId } : {}),
+  }
+}
+
 /**
  * Electron frames anything an IPC handler throws as
  * `Error invoking remote method '<channel>': [ClassName: ]<message>`; that framing is a transport

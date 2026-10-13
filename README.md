@@ -115,7 +115,7 @@ The app supports the following API protocols:
 
 ```text
 assets/brand/                  Logo and brand assets
-docs/                          Design and implementation documents
+docs/                          VitePress product website and multilingual documentation
 engine/nola_translator_engine/  Python audio, recognition, and translation engine
 engine/tests/                   Python tests
 scripts/                        Setup and build scripts
@@ -143,7 +143,7 @@ npm run dist:win
 
 ## Contributing
 
-Fork the repository, create a branch, make your changes, and open a pull request. Briefly describe your changes and the checks you ran. For design and code conventions, see the [interface guidelines](docs/design-system.md) and [implementation notes](docs/implementation.md).
+Fork the repository, create a branch, make your changes, and open a pull request. Briefly describe your changes and the checks you ran. For design and code conventions, see [DESIGN.md](DESIGN.md) and [AGENTS.md](AGENTS.md).
 
 ## License
 

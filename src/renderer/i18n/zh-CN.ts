@@ -571,6 +571,9 @@ export const zhCN = {
     // 余额与限流是两家云端都会遇到的事，所以文案不点名服务商，只说该做什么。
     cloudRecognitionInsufficientBalance: '云端识别服务商账户余额不足，充值后才能继续识别。',
     cloudRecognitionRateLimited: '云端识别请求过于频繁，稍后会自动重试。',
+    cloudRecognitionNetworkUnavailable: '无法连接到云端识别服务，请检查网络后重试。',
+    cloudRecognitionTimeout: '云端识别服务响应超时，稍后会自动重试。',
+    cloudRecognitionInvalidResponse: '云端识别服务返回了无法识别的响应，请稍后重试或联系服务商。',
     // Keep the sentence self-contained; the locale layer appends its catalog code.
     engineNotReady: '本地引擎没有运行，识别无法开始。',
     // 预检状态不是失败：用户还没动手，所以不给错误码。
@@ -588,6 +591,8 @@ export const zhCN = {
     deviceNotFoundAction: '检查系统声音设置',
     modelMissing: '识别模型还没有安装。',
     modelMissingAction: '去安装模型',
+    modelLoadFailed: '模型已找到但加载失败，请检查运行环境或重新下载模型。',
+    modelLoadFailedAction: '检查运行环境或重新下载',
     startFailed: '同传未能启动，请检查所选模型、计算设备和运行环境。',
     startFailedAction: '重新开始同传',
     downloadFailed: '模型下载中断，已保留部分文件。',
@@ -595,7 +600,7 @@ export const zhCN = {
     searchFailed: '模型搜索暂不可用，下面不是搜索结果，Hugging Face 上未必没有这个模型。',
     searchFailedAction: '重试搜索',
     translateFailed: '翻译服务没有响应，只显示原文。',
-    translateFailedAction: '检查密钥与网络',
+    translateFailedAction: '检查网络与服务状态',
     storageChanged: '保存位置已失效，字幕暂时写不进磁盘。',
     storageChangedAction: '重新选择保存位置',
     // 设置保存失败的真实原因。主进程只有被文件系统拒绝写入时才会失败，所以界面按 errno 分派；

@@ -30,6 +30,7 @@ const PREWARM_ERROR_KEYS: Record<PrewarmErrorCode, TranslationKey> = {
   invalidConfiguration: 'errors.prewarm.invalidConfiguration',
   resourceBusy: 'errors.prewarm.resourceBusy',
   sessionAlreadyRunning: 'errors.prewarm.sessionAlreadyRunning',
+  modelLoadFailed: 'errors.modelLoadFailed',
 }
 
 /**

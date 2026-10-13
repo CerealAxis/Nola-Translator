@@ -553,6 +553,9 @@ export const en: Dictionary = {
     // A spent account and a rejected key need different user action, so they stay separate sentences.
     cloudRecognitionInsufficientBalance: 'The cloud recognition account is out of credit. Top it up before recognition continues.',
     cloudRecognitionRateLimited: 'Too many cloud recognition requests. This retries on its own shortly.',
+    cloudRecognitionNetworkUnavailable: 'Could not connect to the cloud recognition service. Check your network and try again.',
+    cloudRecognitionTimeout: 'The cloud recognition service timed out. It will retry shortly.',
+    cloudRecognitionInvalidResponse: 'The cloud recognition service returned an unreadable response. Try again later or contact the provider.',
     // Keep the sentence self-contained; the locale layer appends its catalog code.
     engineNotReady: 'The local engine is not running, so recognition cannot start.',
     // 预检状态不是失败：用户还没动手，所以不给错误码，也不用"yet"以外的 scary 语气。
@@ -568,6 +571,8 @@ export const en: Dictionary = {
     deviceNotFoundAction: 'Check the system sound settings',
     modelMissing: 'The recognition model is not installed yet.',
     modelMissingAction: 'Install the model',
+    modelLoadFailed: 'The model was found but could not be loaded. Check the runtime environment or download it again.',
+    modelLoadFailedAction: 'Check the runtime or download again',
     startFailed: 'The session could not start. Check the selected model, compute device and runtime.',
     startFailedAction: 'Start the session again',
     downloadFailed: 'The model download stopped, partial files were kept.',
@@ -575,7 +580,7 @@ export const en: Dictionary = {
     searchFailed: 'Model search is unavailable. What follows is not a search result; Hugging Face may well have this model.',
     searchFailedAction: 'Retry the search',
     translateFailed: 'The translation service did not respond, showing source only.',
-    translateFailedAction: 'Check the API key and your network',
+    translateFailedAction: 'Check your network and the service status',
     storageChanged: 'The save location is no longer valid, captions cannot reach disk.',
     storageChangedAction: 'Pick a new save location',
     // Why a settings write failed. The main process only fails when the filesystem refuses, so

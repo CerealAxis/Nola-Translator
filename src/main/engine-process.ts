@@ -49,7 +49,7 @@ type PendingRequest = {
 }
 
 function withRequestId(error: Error, requestId: string, context: Pick<PendingRequest, 'commandType' | 'action'>): Error {
-  const source = error as Error & { code?: string | number; engineCode?: string; signal?: string; commandType?: string; action?: string }
+  const source = error as Error & { code?: string | number; engineCode?: string; reason?: string; signal?: string; commandType?: string; action?: string }
   if (typeof (error as Error & { requestId?: unknown }).requestId === 'string'
     && typeof source.commandType === 'string') return error
   const correlated = new Error(error.message)
@@ -60,6 +60,7 @@ function withRequestId(error: Error, requestId: string, context: Pick<PendingReq
     code: source.code,
     engineCode: source.engineCode,
     signal: source.signal,
+    reason: source.reason,
     commandType: source.commandType ?? context.commandType,
     action: source.action ?? context.action,
   })
@@ -194,7 +195,7 @@ export class EngineProcess extends EventEmitter {
   ): Promise<Extract<EngineEvent, { type: TType }>> {
     const validated = engineCommandSchema.parse(command) as EngineCommand
     if (this.pending.has(validated.requestId)) {
-      throw new Error(`重复的 requestId：${validated.requestId}`)
+      throw Object.assign(new Error('REQUEST_DUPLICATE'), { code: 'REQUEST_DUPLICATE' })
     }
 
     const response = new Promise<EngineEvent>((resolve, reject) => {
@@ -203,7 +204,8 @@ export class EngineProcess extends EventEmitter {
         : setTimeout(() => {
           this.pending.delete(validated.requestId)
           logDiagnostic('engine.request.timeout', { requestId: validated.requestId, command: validated.type, expectedType, timeoutMs })
-          reject(withRequestId(new Error(`等待 ${expectedType} 超时`), validated.requestId, {
+          const timeoutError = Object.assign(new Error('REQUEST_TIMEOUT'), { code: 'REQUEST_TIMEOUT' })
+          reject(withRequestId(timeoutError, validated.requestId, {
             commandType: validated.type,
             action: validated.type === 'manageResource' ? validated.action : undefined,
           }))
@@ -380,10 +382,17 @@ export class EngineProcess extends EventEmitter {
       if (stderrPending.length > 32000) { recordStderr(stderrPending); stderrPending = '' }
     })
     child.stderr.once('end', () => recordStderr(stderrPending))
-    child.once('error', (error) => this.handleTermination(child, error))
+    child.once('error', (error) => {
+      const processError = error as NodeJS.ErrnoException
+      this.handleTermination(child, Object.assign(new Error('ENGINE_UNAVAILABLE'), {
+        code: processError.code,
+        engineCode: 'ENGINE_UNAVAILABLE',
+        reason: processError.message,
+      }))
+    })
     child.once('exit', (code, signal) => {
       logDiagnostic(code ? 'engine.process.failed' : 'engine.process.exited', { pid: child.pid, code, signal })
-      this.handleTermination(child, Object.assign(new Error(`引擎已退出（code=${code}, signal=${signal ?? 'none'}）`), { code, signal }))
+      this.handleTermination(child, Object.assign(new Error('ENGINE_UNAVAILABLE'), { code, signal, engineCode: 'ENGINE_UNAVAILABLE', reason: `exit code=${code}, signal=${signal ?? 'none'}` }))
     })
 
     /*
@@ -430,7 +439,7 @@ export class EngineProcess extends EventEmitter {
       event = parseEventLine(line)
     } catch (error) {
       this.emit('protocolError', error)
-      this.rejectPending(new Error(`引擎通信数据无效：${String(error).slice(0, 1024)}`))
+      this.rejectPending(Object.assign(new Error('ENGINE_PROTOCOL_ERROR'), { code: 'ENGINE_PROTOCOL_ERROR', reason: error instanceof Error ? error.message : String(error) }))
       this.child?.kill()
       return
     }
@@ -453,11 +462,11 @@ export class EngineProcess extends EventEmitter {
       pending.clear()
       this.pending.delete(event.requestId)
       if (event.type === 'error') {
-        const reason = typeof event.details?.reason === 'string' ? `：${event.details.reason.slice(0, 512)}` : ''
-        // The code rides along as a property so a caller that branches on it does not have to take
-        // a localized message apart to find it. The message itself is unchanged.
-        pending.reject(Object.assign(new Error(`引擎错误：${event.code}${reason}`), {
+        const reason = typeof event.details?.reason === 'string' ? event.details.reason : undefined
+        pending.reject(Object.assign(new Error(event.code), {
+          code: event.code,
           engineCode: event.code,
+          reason,
           requestId: event.requestId,
           commandType: pending.commandType,
           action: pending.action,

@@ -140,6 +140,7 @@ class TranslationScheduler:
         started: float | None = None
         first_text: float | None = None
         outcome = 'cancelled'
+        error_code: str | None = None
         def progress(text: str) -> None:
             nonlocal first_text
             if first_text is None:
@@ -159,29 +160,32 @@ class TranslationScheduler:
                 outcome = 'complete'
         except (TimeoutError, httpx.TimeoutException):
             outcome = 'timeout'
+            error_code = 'translationTimeout'
             return ScheduledTranslation(
-                target, "failed", self.provider.name, error_code="translationTimeout"
+                target, "failed", self.provider.name, error_code=error_code
             )
         except httpx.HTTPStatusError as error:
             outcome = 'failed'
-            return ScheduledTranslation(target, 'failed', self.provider.name,
-                error_code='translationRateLimited' if error.response.status_code == 429 else 'HTTPError')
+            error_code = 'translationRateLimited' if error.response.status_code == 429 else 'HTTPError'
+            return ScheduledTranslation(target, 'failed', self.provider.name, error_code=error_code)
         except httpx.RequestError:
             outcome = 'failed'
-            return ScheduledTranslation(target, 'failed', self.provider.name, error_code='URLError')
+            error_code = 'URLError'
+            return ScheduledTranslation(target, 'failed', self.provider.name, error_code=error_code)
         except Exception as error:
             outcome = 'failed'
+            error_code = getattr(error, "error_code", type(error).__name__)
             return ScheduledTranslation(
                 target,
                 "failed",
                 self.provider.name,
-                error_code=getattr(error, "error_code", type(error).__name__),
+                error_code=error_code,
             )
         finally:
-            # Log timings only: credentials and caption text are not needed to locate queue delay.
+            # Timings and error codes locate request failures without credentials or caption text.
             ended = monotonic()
             write_debug('engine', 'translation.timing', {
-                'provider': self.provider.name, 'target': target, 'outcome': outcome,
+                'provider': self.provider.name, 'target': target, 'outcome': outcome, 'code': error_code,
                 'queueMs': round(((started if started is not None else ended) - queued) * 1000),
                 'requestMs': round((ended - started) * 1000) if started is not None else 0,
                 'firstTextMs': round((first_text - started) * 1000) if first_text is not None and started is not None else None,

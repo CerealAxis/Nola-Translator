@@ -7,7 +7,7 @@ import { mkdir, writeFile, access, rm, copyFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, BROWSER_HOST_NAME, browserRequestSchema, type BrowserCaptionConfig, type BrowserConnectionStatus, type BrowserRequest, type BrowserResponse, type BrowserKind } from '../shared/browser'
+import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, BROWSER_HOST_NAME, browserRequestSchema, type BrowserCaptionConfig, type BrowserConnectionStatus, type BrowserRequest, type BrowserResponse, type BrowserKind, type BrowserWireErrorCode } from '../shared/browser'
 import type { BrowserIntegrations } from './browser-integrations'
 import type { AudioDevice, SessionConfig, EngineEvent, EngineProcessState } from '../shared/contracts'
 import { NO_TRANSLATION_LANGUAGE, type AppSettings } from '../shared/settings'
@@ -21,19 +21,39 @@ const CAPTION_SERVICE_CHANNEL = 'browser:caption-service'
 const MAX_MESSAGE = 160 * 1024
 /** How often the desktop summarizes the audio it received; 10 chunks/second would be unreadable. */
 const AUDIO_LOG_INTERVAL_MS = 1000
-const PUBLIC_ERRORS = ['sessionAlreadyRunning', 'sessionNotRunning', 'engineUpdateRequired', 'audioBufferOverflow', 'audioDeviceUnavailable', 'invalidConfiguration', 'modelUnavailable', 'resourceUnavailable', 'resourceBusy', 'browserConnectionDisabled', 'sessionStartCancelled', 'captionServiceOff', 'internalError'] as const
+const LEGACY_BROWSER_ERROR_CODES: Readonly<Record<string, BrowserWireErrorCode>> = {
+  sessionAlreadyRunning: 'browserSessionAlreadyRunning',
+  sessionNotRunning: 'browserSessionNotRunning',
+  browserConnectionDisabled: 'browserIntegrationDisabled',
+  captionServiceOff: 'browserCaptionServiceDisabled',
+  extensionVersionMismatch: 'browserExtensionVersionMismatch',
+  audioBufferOverflow: 'browserAudioBacklog',
+  appUnavailable: 'browserConnectionUnavailable',
+  connectionLost: 'browserConnectionLost',
+  permissionFailed: 'browserPermissionDenied',
+  captureUnsupported: 'browserCaptureUnsupported',
+  wrongCapture: 'browserCaptureTargetMismatch',
+  captureCancelled: 'browserCaptureCancelled',
+  tabAudioSilent: 'browserAudioSilent',
+  slowAudio: 'browserAudioBacklog',
+}
+const PUBLIC_ERRORS = new Set<BrowserWireErrorCode>([
+  'browserConnectionUnavailable', 'browserConnectionLost', 'browserPermissionDenied',
+  'browserExtensionVersionMismatch', 'browserProtocolMismatch', 'browserCaptureUnsupported',
+  'browserCaptureTargetMismatch', 'browserCaptureCancelled', 'browserAudioSilent',
+  'browserAudioBacklog', 'browserSessionAlreadyRunning', 'browserSessionNotRunning',
+  'browserCaptionServiceDisabled', 'browserIntegrationDisabled', 'internalError',
+  'invalidMessage', 'unsupportedProtocol', 'invalidConfiguration', 'audioDeviceUnavailable',
+  'modelUnavailable', 'resourceUnavailable', 'resourceBusy', 'lineTooLarge',
+])
 
-/**
- * The extension only ever receives a whitelisted code. Anything unrecognised is reported
- * here and mapped to `internalError`, because an exception message can quote request
- * credentials and must not cross the pipe.
- */
-function publicErrorCode(error: unknown): string {
+function publicErrorCode(error: unknown): BrowserWireErrorCode {
   const message = error instanceof Error ? error.message : ''
-  if (message.includes('RUNTIME_TORCH:')) return 'torchUnavailable'
-  if (message.includes('RUNTIME_LLAMA:')) return 'llamaUnavailable'
-  const known = PUBLIC_ERRORS.find(code => message === code || message.includes(`：${code}`))
-  if (known) return known
+  const legacy = LEGACY_BROWSER_ERROR_CODES[message]
+  if (legacy) return legacy
+  if (message === 'RUNTIME_TORCH:') return 'modelUnavailable'
+  if (message === 'RUNTIME_LLAMA:') return 'resourceUnavailable'
+  if (PUBLIC_ERRORS.has(message as BrowserWireErrorCode)) return message as BrowserWireErrorCode
   console.error('browser request failed with an unmapped error', error)
   return 'internalError'
 }
@@ -367,7 +387,7 @@ export class BrowserConnection {
         return
       }
       if (this.options.integrations && !this.options.integrations.allows(client.browser)) {
-        this.send(client, { type: 'error', id: request.id, code: 'browserConnectionDisabled', message: 'browserConnectionDisabled' })
+        this.send(client, { type: 'error', id: request.id, code: 'browserIntegrationDisabled', message: 'browserIntegrationDisabled' })
         client.socket.end()
         return
       }
@@ -390,7 +410,7 @@ export class BrowserConnection {
       }
       if (request.type === 'start') {
         if (client.extensionVersion !== BROWSER_EXTENSION_VERSION) {
-          this.send(client, { type: 'error', id: request.id, code: 'extensionVersionMismatch', message: 'extensionVersionMismatch' })
+          this.send(client, { type: 'error', id: request.id, code: 'browserExtensionVersionMismatch', message: 'browserExtensionVersionMismatch' })
           return
         }
         // Checked before the busy check: a closed gate admits no session at all, so reporting

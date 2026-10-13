@@ -1,7 +1,7 @@
 {
   "name": "nola-translator",
   "productName": "Nola Translator",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "license": "GPL-3.0-only",
   "description": "Real-time Captions and Translation",
   "author": "CerealAxis",
@@ -10,6 +10,9 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
+    "docs:dev": "npm --prefix docs run dev",
+    "docs:build": "npm --prefix docs run build",
+    "docs:media": "npm --prefix docs run media",
     "build": "npm run typecheck && electron-vite build",
     "build:python": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-python-base.ps1",
     "dist:win": "npm run build && npm run build:browser && npm run package:browser && npm run build:browser-host && npm run build:python && electron-builder --win nsis msi --x64",
