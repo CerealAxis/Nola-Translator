@@ -56,12 +56,22 @@ export function prepareDemo(locale: UiLanguage, page: string): AppSettings {
   const targetLanguage = locale === 'en' ? 'en' : locale === 'ja' ? 'ja' : locale === 'ko' ? 'ko' : locale === 'zh-CN' ? 'zh' : 'zh-Hant'
   const sourceLanguage = locale === 'en' ? 'zh' : 'en'
   const settings: AppSettings = structuredClone(DEFAULT_SETTINGS)
-  settings.theme = 'light'
+  settings.theme = page === 'dark-mode' ? 'dark' : 'light'
   settings.uiLanguage = locale
   settings.modelStoragePath = ''
   settings.recording.keepAudio = false
   settings.recognition = { ...settings.recognition, provider: 'local', sourceLanguage, modelId: 'qwen3-asr-1.7b-hf' }
   settings.translation = { ...settings.translation, provider: 'local', targetLanguage, localModelId: 'hy-mt2-1.8b-q4-k-m' }
+  if (page === 'llm-configuration') {
+    settings.translation = {
+      ...settings.translation,
+      provider: 'cloud',
+      cloudName: 'DeepSeek',
+      cloudEndpoint: 'https://api.deepseek.com',
+      cloudApiFormat: 'chat-completions',
+      cloudModel: 'deepseek-chat',
+    }
+  }
   stores.settings.setState({ settings, loaded: true, loading: false, captionService: 'ready' })
   const resources: ResourceRecord[] = models.map(([resourceId, name, provider, downloadBytes]) => {
     const configuration = RECOMMENDED_CONFIGURATIONS[resourceId]

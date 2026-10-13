@@ -17,6 +17,8 @@ The demo imports the actual desktop pages, routes, dictionaries, and stores. `me
 
 `media-src/Scene.tsx` composes original scenery with the real floating caption component or the extension's caption presentation and stylesheet. `docs:media` renders all six languages and records source provenance in `public/screenshots/manifest.json`. The homepage uses these rendered surfaces for its posters, rather than maintaining another imitation of the product UI.
 
+The root README uses current `zh-CN` captures of the same React pages. Refresh those images, including its compute, dark-mode, and translation-settings examples, with `node docs/scripts/generate-screenshots.mjs --readme`.
+
 Commit `public/screenshots/` and its manifest: the homepage directly references the five images per locale, and normal site builds do not regenerate them. Keep dependencies, `dist/`, `public/demo/`, media capture caches, and VitePress temporary files out of Git; the ignore rules cover these generated directories.
 
 The homepage layout is reviewed at **1920 × 1080 (16:9)**. Download URLs and all localized website copy live in `.vitepress/theme/content.ts`. Windows links to the latest GitHub Release; macOS and CLI display the localized coming-soon label.

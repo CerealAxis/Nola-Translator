@@ -11,7 +11,7 @@ from nola_translator_engine import resources as resources_module
 from nola_translator_engine.audio.devices import AudioDeviceRecord
 from nola_translator_engine import runtime as runtime_module
 from nola_translator_engine.models.manager import FileEntry, ModelSpec
-from nola_translator_engine.protocol import parse_command_line
+from nola_translator_engine.protocol import NetworkSettings, parse_command_line
 from nola_translator_engine.resources import (
     HYMT2_IQ2_RESOURCE_ID,
     HYMT2_Q3_RESOURCE_ID,
@@ -215,7 +215,8 @@ def test_install_requires_explicit_manage_resource_action(tmp_path, monkeypatch)
     monkeypatch.setattr(resources_module, "QWEN3_ASR_1_7B_HF", spec)
 
     def fetch(url: str, destination, progress) -> None:
-        data = {spec.url_for(entry): payloads[entry.path] for entry in spec.files}[url]
+        network = NetworkSettings()
+        data = {spec.url_for(entry, network): payloads[entry.path] for entry in spec.files}[url]
         destination.write_bytes(data)
         progress(len(data), len(data))
 

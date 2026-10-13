@@ -1,5 +1,5 @@
 name: Upload application downloads
-description: Upload two x64 installers and source ZIP as three separate files
+description: Upload two x64 installers, both browser extension archives and the source ZIP as separate files
 inputs:
   exe-x64:
     required: true
@@ -10,6 +10,12 @@ inputs:
   source:
     required: true
     description: source file path
+  chrome-extension:
+    required: true
+    description: chrome extension file path
+  edge-extension:
+    required: true
+    description: edge extension file path
   retention-days:
     default: '14'
     description: Artifact retention period
@@ -34,6 +40,20 @@ runs:
       uses: actions/upload-artifact@v7
       with:
         path: ${{ inputs.source }}
+        archive: false
+        if-no-files-found: error
+        retention-days: ${{ inputs.retention-days }}
+    - name: Upload Chrome extension
+      uses: actions/upload-artifact@v7
+      with:
+        path: ${{ inputs.chrome-extension }}
+        archive: false
+        if-no-files-found: error
+        retention-days: ${{ inputs.retention-days }}
+    - name: Upload Edge extension
+      uses: actions/upload-artifact@v7
+      with:
+        path: ${{ inputs.edge-extension }}
         archive: false
         if-no-files-found: error
         retention-days: ${{ inputs.retention-days }}

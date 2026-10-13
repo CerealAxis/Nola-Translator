@@ -3,15 +3,21 @@ const fs = require('node:fs/promises')
 const path = require('node:path')
 
 const baseUrl = process.argv[2]
+const readmeOnly = process.argv.includes('--readme')
 app.commandLine.appendSwitch('force-device-scale-factor', '1')
 app.setPath('userData', path.resolve(__dirname, '../media-src/.electron-cache'))
 const root = path.resolve(__dirname, '../..')
-const locales = ['zh-CN', 'zh-TW', 'zh-HK', 'en', 'ja', 'ko']
-const pages = ['home', 'workspace', 'models', 'overlay-scene', 'browser-scene']
-const routes = { home: '#/', workspace: '#/workspace', models: '#/models', 'overlay-scene': '#/', 'browser-scene': '#/' }
+const locales = readmeOnly ? ['zh-CN'] : ['zh-CN', 'zh-TW', 'zh-HK', 'en', 'ja', 'ko']
+const pages = readmeOnly
+  ? ['home', 'overlay-scene', 'browser-scene', 'models', 'compute-environment', 'dark-mode', 'llm-configuration']
+  : ['home', 'workspace', 'models', 'overlay-scene', 'browser-scene']
+const routes = { home: '#/', workspace: '#/workspace', models: '#/models', 'overlay-scene': '#/', 'browser-scene': '#/', 'compute-environment': '#/settings/compute', 'dark-mode': '#/', 'llm-configuration': '#/settings/translation' }
 const sourceComponents = {
   'overlay-scene': ['src/renderer/features/overlay/OverlayRoot.tsx', 'src/renderer/features/overlay/CaptionTrack.tsx', 'docs/media-src/Scene.tsx'],
   'browser-scene': ['browser/extension/styles.css', 'browser/extension/captionPresentation.ts', 'docs/media-src/Scene.tsx'],
+  'compute-environment': ['src/renderer/features/settings/tabs/ComputeTab.tsx', 'src/renderer/features/settings/SettingsPage.tsx'],
+  'dark-mode': ['src/renderer/features/home/HomePage.tsx', 'src/renderer/components/primitives/AppShell.tsx'],
+  'llm-configuration': ['src/renderer/features/settings/tabs/TranslationTab.tsx', 'src/renderer/features/settings/SettingsPage.tsx'],
   home: ['src/renderer/features/home/HomePage.tsx', 'src/renderer/features/home/RecentMeetings.tsx', 'src/renderer/components/home/HeroSection.tsx', 'src/renderer/components/primitives/AppShell.tsx'],
   workspace: ['src/renderer/features/workspace/WorkspacePage.tsx', 'src/renderer/components/caption/CaptionStage.tsx', 'src/renderer/components/notes/NotesPanel.tsx', 'src/renderer/features/workspace/WorkspaceToolbar.tsx'],
   models: ['src/renderer/features/models/ModelsPage.tsx', 'src/renderer/features/models/ModelCard.tsx', 'src/shared/model-capabilities.ts', 'engine/nola_translator_engine/resources.py'],
@@ -28,7 +34,13 @@ async function main() {
   })
   const outputRoot = path.join(root, 'docs/public/screenshots')
   await fs.mkdir(outputRoot, { recursive: true })
-  const manifest = { generatedAt: new Date().toISOString(), viewport: { width: 1440, height: 1000 }, demoOnly: true, images: [] }
+  let manifest
+  const manifestPath = path.join(outputRoot, 'manifest.json')
+  if (readmeOnly) {
+    try { manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) } catch { manifest = { viewport: { width: 1440, height: 1000 }, demoOnly: true, images: [] } }
+    manifest.images = manifest.images.filter(item => item.locale !== 'zh-CN' || !pages.includes(item.page))
+  } else manifest = { viewport: { width: 1440, height: 1000 }, demoOnly: true, images: [] }
+  manifest.generatedAt = new Date().toISOString()
   try {
     for (const locale of locales) {
       const localeDir = path.join(outputRoot, locale)

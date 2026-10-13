@@ -2,7 +2,7 @@
   <img src="assets/brand/nola-logo.svg" alt="Nola Translator Logo" width="112" height="112">
   <h1>Nola Translator</h1>
   <p>A real-time captioning and translation app.</p>
-  <p><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a></p>
+  <p><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文（台灣）</a> · <a href="README.zh-HK.md">繁體中文（香港）</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a></p>
 </div>
 
 <p align="center">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="https://picui.ogmua.cn/s1/2026/10/11/6acafb5f8d672.webp" alt="Nola Translator interface preview" width="1000">
+  <img src="docs/public/screenshots/zh-CN/home.png" alt="Nola Translator interface preview" width="1000">
 </p>
 
 ## Overview
@@ -39,11 +39,11 @@ Nola Translator is a real-time captioning and translation app that supports both
 
 | Home | Floating Captions | Video Captions |
 |---|---|---|
-| ![Home](https://picui.ogmua.cn/s1/2026/10/11/6acafb5f8d672.webp) | ![Floating captions](https://picui.ogmua.cn/s1/2026/10/11/6acb08b27982a.webp) | ![Video captions](https://picui.ogmua.cn/s1/2026/10/11/6acb08df31f5d.webp) |
+| ![Home](docs/public/screenshots/zh-CN/home.png) | ![Floating captions](docs/public/screenshots/zh-CN/overlay-scene.png) | ![Video captions](docs/public/screenshots/zh-CN/browser-scene.png) |
 
 | Local Model Installation | Inference Environment Settings | Dark Mode Support |
 |---|---|---|
-| ![Local model installation](https://picui.ogmua.cn/s1/2026/10/11/6acb09045cfab.webp) | ![Inference environment settings](https://picui.ogmua.cn/s1/2026/10/11/6acb098cb9a51.webp) | ![Dark mode support](https://picui.ogmua.cn/s1/2026/10/11/6acb09476cbdf.webp) |
+| ![Local model installation](docs/public/screenshots/zh-CN/models.png) | ![Inference environment settings](docs/public/screenshots/zh-CN/compute-environment.png) | ![Dark mode support](docs/public/screenshots/zh-CN/dark-mode.png) |
 
 ## Installation
 
@@ -104,7 +104,7 @@ The app supports the following API protocols:
 
 ### Configuration Steps
 
-![LLM configuration screen](https://picui.ogmua.cn/s1/2026/10/11/6acb06f580b12.webp)
+![LLM configuration screen](docs/public/screenshots/zh-CN/llm-configuration.png)
 
 1. Select **Cloud Translation** in the translation settings.
 2. Choose the **API format** supported by your provider.

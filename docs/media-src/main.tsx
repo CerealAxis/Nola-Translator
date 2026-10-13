@@ -28,6 +28,12 @@ const locale: UiLanguage = requestedLocale in demoCopy ? requestedLocale as UiLa
 const page = params.get('page') ?? 'home'
 const snapshot = params.get('snapshot') === '1'
 const settings = prepareDemo(locale, page)
+if (page === 'compute-environment') {
+  stores.settings.setState({ computeSnapshot: {
+    devices: [{ id: 'demo-gpu', name: 'NVIDIA GeForce RTX 4070', backend: 'cuda', torchDevice: 'cuda:0', llamaDevice: 'CUDA0', llamaDeviceNative: 'CUDA0', totalMemoryMb: 12282, freeMemoryMb: 9216, integrated: false, stableId: true, recognition: true, translation: true, reason: '', score: 100 }],
+    notes: [], torchVersion: '2.8.0', activePlan: null,
+  } })
+}
 if (page.endsWith('-scene')) stores.session.setState({ status: 'running', segments: stores.session.getState().segments.slice(0, 1) })
 const sampleSegments = stores.session.getState().segments
 let showOverlay: (open: boolean) => void = () => undefined

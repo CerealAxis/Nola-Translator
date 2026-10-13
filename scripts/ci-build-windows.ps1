@@ -54,10 +54,12 @@ $sourceName = "$distributionPrefix-Source.zip"
 Assert-NativeSuccess 'Source archive'
 $assets += $sourceName
 $browserVersion = (Get-Content -LiteralPath 'browser/version.json' -Raw | ConvertFrom-Json).version
+$extensionOutputs = @()
 foreach ($browser in @('Chrome', 'Edge')) {
     $name = "Nola-$browser-Extension-v$browserVersion.zip"
     if (-not (Test-Path -LiteralPath "release/$name")) { throw "Missing browser extension: $name" }
     $assets += $name
+    $extensionOutputs += "$($browser.ToLowerInvariant())-extension=release/$name"
 }
 $checksum = foreach ($name in $assets) {
     $file = Get-Item -LiteralPath "release/$name"
@@ -65,11 +67,11 @@ $checksum = foreach ($name in $assets) {
 }
 Set-Content -LiteralPath 'release/SHA256SUMS.txt' -Value $checksum -Encoding ascii
 if ($env:GITHUB_OUTPUT) {
-    Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8 -Value @(
+    Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8 -Value (@(
         "exe-x64=release/$distributionPrefix-Windows-x64-Setup.exe",
         "msi-x64=release/$distributionPrefix-Windows-x64-Setup.msi",
         "source=release/$sourceName"
-    )
+    ) + $extensionOutputs)
 }
 if ($env:GITHUB_STEP_SUMMARY) {
     Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Value @(

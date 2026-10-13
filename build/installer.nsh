@@ -22,6 +22,8 @@ LangString nolaUninstallRemovingData 2052 "正在删除 Data 文件夹"
 !include "FileFunc.nsh"
 !include "LogicLib.nsh"
 
+Var NolaExistingInstallDir
+
 ; Own the directory page so the assisted template does not generate its product-name sanitizer.
 ; Restore its flag after declaring our page; later shortcut handling still needs the option.
 !ifdef allowToChangeInstallationDirectory
@@ -30,15 +32,28 @@ LangString nolaUninstallRemovingData 2052 "正在删除 Data 文件夹"
 !endif
 
 Function nolaFixInstallDir
-  ; The registry stores the executable's directory, while a fresh selection supplies its parent.
-  ; Match the final component rather than the product name so custom and legacy roots stay valid.
-  Push $0
-  ${GetFileName} "$INSTDIR" $0
-  ${If} $0 != "${NOLA_APP_DIR_NAME}"
-    StrCpy $INSTDIR "$INSTDIR\${NOLA_APP_DIR_NAME}"
+  ${If} $NolaExistingInstallDir != ""
+    ; Keep the registered executable directory unchanged when this is an upgrade.
+    StrCpy $INSTDIR $NolaExistingInstallDir
+  ${Else}
+    ; Fresh selections use the chosen parent as the install root.
+    Push $0
+    ${GetFileName} "$INSTDIR" $0
+    ${If} $0 != "${NOLA_APP_DIR_NAME}"
+      StrCpy $INSTDIR "$INSTDIR\${NOLA_APP_DIR_NAME}"
+    ${EndIf}
+    Pop $0
   ${EndIf}
-  Pop $0
 FunctionEnd
+
+!macro customInit
+  StrCpy $NolaExistingInstallDir ""
+  IfFileExists "$INSTDIR\${APP_EXECUTABLE_FILENAME}" nolaExistingInstallFound
+  Goto nolaExistingInstallChecked
+  nolaExistingInstallFound:
+  StrCpy $NolaExistingInstallDir "$INSTDIR"
+  nolaExistingInstallChecked:
+!macroend
 
 !macro customPageAfterChangeDir
   !ifdef NOLA_DIRECTORY_PAGE

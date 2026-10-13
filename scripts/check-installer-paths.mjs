@@ -38,6 +38,7 @@ const customPages = [...readFileSync(include, 'utf8').matchAll(/^\s*Page custom 
   .map(match => `Call ${match[1]}`).join('\n')
 
 const cases = [
+  ['registered install survives a directory-page edit', 'D:\\UserChanged', 'C:\\Program Files\\NolaTranslator\\App', 'C:\\Program Files\\NolaTranslator\\App'],
   ['existing compact name', 'C:\\Program Files\\NolaTranslator\\App', 'C:\\Program Files\\NolaTranslator\\App'],
   ['existing product name', 'C:\\Program Files\\Nola Translator\\App', 'C:\\Program Files\\Nola Translator\\App'],
   ['custom install root', 'D:\\Tools\\Captions', 'D:\\Tools\\Captions\\App'],
@@ -58,8 +59,9 @@ function nsis(value) {
 mkdirSync(join(root, 'artifacts'), { recursive: true })
 const directory = mkdtempSync(join(root, 'artifacts/installer-paths-'))
 writeFileSync(join(directory, 'assistedInstaller.nsh'), patchedAssisted)
-const checks = cases.map(([name, input]) => `
+const checks = cases.map(([name, input, , existingInstallDir = '']) => `
   StrCpy $INSTDIR "${nsis(input)}"
+  StrCpy $NolaExistingInstallDir "${nsis(existingInstallDir)}"
   !insertmacro testInstallPre
   FileWriteUTF16LE $R0 "${name}$\\t$INSTDIR$\\r$\\n"
   !insertmacro testInstallPre

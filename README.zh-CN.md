@@ -2,7 +2,7 @@
   <img src="assets/brand/nola-logo.svg" alt="Nola Translator Logo" width="112" height="112">
   <h1>Nola Translator</h1>
   <p>Nola Translator 是一个实时字幕与翻译软件</p>
-  <p><a href="README.md">English</a> · 简体中文</p>
+  <p><a href="README.md">English</a> · 简体中文 · <a href="README.zh-TW.md">繁體中文（台灣）</a> · <a href="README.zh-HK.md">繁體中文（香港）</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a></p>
 </div>
 
 <p align="center">
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="https://picui.ogmua.cn/s1/2026/10/11/6acafb5f8d672.webp" alt="Nola Translator 界面概念图" width="1000">
+  <img src="docs/public/screenshots/zh-CN/home.png" alt="Nola Translator 界面概念图" width="1000">
 </p>
 
 ## 项目简介
@@ -39,11 +39,11 @@ Nola Translator 是一款实时字幕与翻译软件，支持本地模型和云�
 
 | 主页 | 悬浮字幕 | 视频字幕 |
 |---|---|---|
-| ![主页](https://picui.ogmua.cn/s1/2026/10/11/6acafb5f8d672.webp) | ![悬浮字幕](https://picui.ogmua.cn/s1/2026/10/11/6acb08b27982a.webp) | ![视频字幕](https://picui.ogmua.cn/s1/2026/10/11/6acb08df31f5d.webp) |
+| ![主页](docs/public/screenshots/zh-CN/home.png) | ![悬浮字幕](docs/public/screenshots/zh-CN/overlay-scene.png) | ![视频字幕](docs/public/screenshots/zh-CN/browser-scene.png) |
 
 | 本地模型安装 | 推理环境设置 | 深色模式支持 |
 |---|---|---|
-| ![本地模型安装](https://picui.ogmua.cn/s1/2026/10/11/6acb09045cfab.webp) | ![推理环境设置](https://picui.ogmua.cn/s1/2026/10/11/6acb098cb9a51.webp) | ![深色模式支持](https://picui.ogmua.cn/s1/2026/10/11/6acb09476cbdf.webp) |
+| ![本地模型安装](docs/public/screenshots/zh-CN/models.png) | ![推理环境设置](docs/public/screenshots/zh-CN/compute-environment.png) | ![深色模式支持](docs/public/screenshots/zh-CN/dark-mode.png) |
 
 ## 安装
 
@@ -105,7 +105,7 @@ Nola Translator 是一款实时字幕与翻译软件，支持本地模型和云�
 
 ### 填写步骤
 
-![LLM 配置界面](https://picui.ogmua.cn/s1/2026/10/11/6acb06f580b12.webp)
+![LLM 配置界面](docs/public/screenshots/zh-CN/llm-configuration.png)
 
 1. 在翻译设置中选择 **云端翻译**。
 2. 选择与服务商匹配的 **API 格式**。

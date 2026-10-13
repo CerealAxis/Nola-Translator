@@ -4,16 +4,20 @@ snapshots and single-file models.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import partial
 from hashlib import sha1, sha256
+import json
 import os
 from pathlib import Path
 import re
 import shutil
 import tempfile
-from urllib.error import URLError
+from threading import Event, Lock
+import time
+from http.client import HTTPException
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import OpenerDirector, ProxyHandler, Request, build_opener
 
@@ -113,17 +117,282 @@ class ModelSpec:
         return f"{endpoint}/{self.repo}/resolve/{self.revision}/{entry.path}"
 
 
-def _download(
-    url: str, destination: Path, progress: ProgressCallback, opener: OpenerDirector
-) -> None:
-    request = Request(url, headers={"User-Agent": "Nola Translator/0.1"})
-    with opener.open(request, timeout=30) as response, destination.open("wb") as output:
-        total = int(response.headers.get("Content-Length", 0))
-        current = 0
-        while chunk := response.read(1024 * 1024):
-            output.write(chunk)
-            current += len(chunk)
-            progress(current, total)
+class _DownloadStopped(RuntimeError):
+    """A sibling range stopped after another range failed."""
+
+
+class _DownloadProtocolError(RuntimeError):
+    """The server returned bytes that cannot safely be associated with a requested range."""
+
+
+class ResumableParallelDownloader:
+    """Download model files with bounded HTTP ranges and persistent completed chunks."""
+
+    def __init__(
+        self,
+        model_root: Path,
+        opener: OpenerDirector,
+        *,
+        chunk_size: int = 16 * 1024 * 1024,
+        max_workers: int = 4,
+        parallel_threshold: int = 32 * 1024 * 1024,
+        max_retries: int = 2,
+    ) -> None:
+        self.model_root = model_root
+        self.opener = opener
+        self.chunk_size = max(1, chunk_size)
+        self.max_workers = max(1, max_workers)
+        self.parallel_threshold = max(1, parallel_threshold)
+        self.max_retries = max(0, max_retries)
+
+    def download(
+        self,
+        url: str,
+        destination: Path,
+        entry: FileEntry,
+        progress: ProgressCallback,
+    ) -> None:
+        cache_dir = self._cache_dir(url, entry)
+        if entry.size >= self.parallel_threshold and self._supports_ranges(url, entry.size):
+            self._download_parallel(url, destination, entry.size, cache_dir, progress)
+        else:
+            self._download_sequential(url, destination, entry.size, cache_dir, progress)
+        shutil.rmtree(cache_dir, ignore_errors=True)
+        self._remove_empty_cache_root()
+
+    def _cache_dir(self, url: str, entry: FileEntry) -> Path:
+        identity_data = json.dumps(
+            {
+                "url": url,
+                "path": entry.path,
+                "size": entry.size,
+                "sha256": entry.sha256,
+                "blob_sha1": entry.blob_sha1,
+                "chunk_size": self.chunk_size,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        identity = sha256(identity_data).hexdigest()
+        cache_root = self.model_root / ".downloads"
+        if cache_root.is_symlink() or cache_root.is_junction() or (
+            cache_root.exists() and not cache_root.is_dir()
+        ):
+            raise ModelStorageError("模型下载缓存目录不是本地目录")
+        cache_root.mkdir(parents=True, exist_ok=True)
+        cache_dir = cache_root / identity
+        metadata = {
+            "identity": identity,
+            "size": entry.size,
+            "chunk_size": self.chunk_size,
+        }
+        if cache_dir.is_symlink() or cache_dir.is_junction() or (
+            cache_dir.exists() and not cache_dir.is_dir()
+        ):
+            raise ModelStorageError("模型下载缓存不是本地目录")
+        if cache_dir.exists():
+            try:
+                current = json.loads((cache_dir / "metadata.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                current = None
+            if current != metadata:
+                shutil.rmtree(cache_dir)
+        cache_dir.mkdir(exist_ok=True)
+        metadata_path = cache_dir / "metadata.json"
+        if not metadata_path.exists():
+            temporary = cache_dir / "metadata.json.tmp"
+            temporary.write_text(json.dumps(metadata), encoding="utf-8")
+            os.replace(temporary, metadata_path)
+        return cache_dir
+
+    def _supports_ranges(self, url: str, size: int) -> bool:
+        request = Request(url, headers={"User-Agent": "Nola Translator/0.1", "Range": "bytes=0-0"})
+        try:
+            response = self.opener.open(request, timeout=30)
+        except HTTPError as error:
+            if error.code in (400, 403, 405, 416):
+                error.close()
+                return False
+            raise
+        with response:
+            if self._status(response) != 206:
+                return False
+            return response.headers.get("Content-Range", "") == f"bytes 0-0/{size}"
+
+    def _download_parallel(
+        self,
+        url: str,
+        destination: Path,
+        size: int,
+        cache_dir: Path,
+        progress: ProgressCallback,
+    ) -> None:
+        chunk_count = (size + self.chunk_size - 1) // self.chunk_size
+        completed: dict[int, int] = {}
+        active: dict[int, int] = {}
+        lock = Lock()
+        stopped = Event()
+
+        def report(index: int, current: int, complete: bool = False) -> None:
+            with lock:
+                if complete:
+                    completed[index] = current
+                    active.pop(index, None)
+                else:
+                    active[index] = current
+                progress(sum(completed.values()) + sum(active.values()), size)
+
+        def fetch(index: int) -> None:
+            if stopped.is_set():
+                raise _DownloadStopped()
+            start = index * self.chunk_size
+            end = min(size, start + self.chunk_size) - 1
+            expected = end - start + 1
+            chunk = cache_dir / f"chunk-{index:06d}.part"
+            temporary = cache_dir / f"chunk-{index:06d}.tmp"
+            if chunk.is_file() and chunk.stat().st_size == expected:
+                report(index, expected, complete=True)
+                return
+            chunk.unlink(missing_ok=True)
+
+            last_error: Exception | None = None
+            for attempt in range(self.max_retries + 1):
+                if stopped.is_set():
+                    raise _DownloadStopped()
+                request = Request(
+                    url,
+                    headers={
+                        "User-Agent": "Nola Translator/0.1",
+                        "Range": f"bytes={start}-{end}",
+                    },
+                )
+                written = 0
+                try:
+                    with self.opener.open(request, timeout=30) as response:
+                        if self._status(response) != 206:
+                            raise _DownloadProtocolError("下载服务器未返回分块响应")
+                        expected_range = f"bytes {start}-{end}/{size}"
+                        if response.headers.get("Content-Range", "") != expected_range:
+                            raise _DownloadProtocolError("下载服务器返回了不匹配的字节范围")
+                        with temporary.open("wb") as output:
+                            while data := response.read(1024 * 1024):
+                                if stopped.is_set():
+                                    raise _DownloadStopped()
+                                written += len(data)
+                                if written > expected:
+                                    raise _DownloadProtocolError("下载分块长度超过请求范围")
+                                output.write(data)
+                                report(index, written)
+                    if written != expected:
+                        raise _DownloadProtocolError("下载分块长度不完整")
+                    os.replace(temporary, chunk)
+                    report(index, expected, complete=True)
+                    return
+                except Exception as error:
+                    temporary.unlink(missing_ok=True)
+                    with lock:
+                        active.pop(index, None)
+                    if isinstance(error, _DownloadStopped):
+                        raise
+                    if not self._retryable(error) or attempt == self.max_retries:
+                        stopped.set()
+                        raise
+                    last_error = error
+                    time.sleep(0.25 * (attempt + 1))
+            if last_error is not None:
+                raise last_error
+
+        first_error: Exception | None = None
+        with ThreadPoolExecutor(max_workers=self.max_workers, thread_name_prefix="model-download") as pool:
+            futures = [pool.submit(fetch, index) for index in range(chunk_count)]
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except _DownloadStopped:
+                    continue
+                except Exception as error:
+                    if first_error is None:
+                        first_error = error
+                        stopped.set()
+                        for pending in futures:
+                            pending.cancel()
+        if first_error is not None:
+            raise first_error
+
+        with destination.open("wb") as output:
+            for index in range(chunk_count):
+                with (cache_dir / f"chunk-{index:06d}.part").open("rb") as source:
+                    shutil.copyfileobj(source, output, length=1024 * 1024)
+        progress(size, size)
+
+    def _download_sequential(
+        self,
+        url: str,
+        destination: Path,
+        size: int,
+        cache_dir: Path,
+        progress: ProgressCallback,
+    ) -> None:
+        partial_path = cache_dir / "sequential.part"
+        offset = partial_path.stat().st_size if partial_path.is_file() else 0
+        if offset > size:
+            partial_path.unlink()
+            offset = 0
+        if offset == size:
+            progress(size, size)
+            shutil.copyfile(partial_path, destination)
+            return
+
+        request_headers = {"User-Agent": "Nola Translator/0.1"}
+        if offset:
+            request_headers["Range"] = f"bytes={offset}-"
+        request = Request(url, headers=request_headers)
+        response = self.opener.open(request, timeout=30)
+        status = self._status(response)
+        append = False
+        if offset and status == 206:
+            append = response.headers.get("Content-Range", "") == f"bytes {offset}-{size - 1}/{size}"
+        if offset and not append:
+            response.close()
+            request = Request(url, headers={"User-Agent": "Nola Translator/0.1"})
+            response = self.opener.open(request, timeout=30)
+            status = self._status(response)
+            offset = 0
+        if status not in (200, 206) or (status == 206 and not append):
+            response.close()
+            raise _DownloadProtocolError("下载服务器返回了不支持的响应")
+
+        current = offset
+        mode = "ab" if append else "wb"
+        with response, partial_path.open(mode) as output:
+            progress(current, size)
+            while data := response.read(1024 * 1024):
+                output.write(data)
+                current += len(data)
+                if current > size:
+                    raise _DownloadProtocolError("下载文件长度超过模型清单")
+                progress(current, size)
+        if current != size:
+            raise _DownloadProtocolError("下载文件长度与模型清单不匹配")
+        shutil.copyfile(partial_path, destination)
+
+    @staticmethod
+    def _status(response: object) -> int:
+        status = getattr(response, "status", None)
+        return int(status if status is not None else response.getcode())
+
+    @staticmethod
+    def _retryable(error: Exception) -> bool:
+        if isinstance(error, HTTPError):
+            return error.code in (408, 429, 500, 502, 503, 504)
+        return isinstance(error, (URLError, HTTPException, ConnectionError, TimeoutError))
+
+    def _remove_empty_cache_root(self) -> None:
+        cache_root = self.model_root / ".downloads"
+        try:
+            cache_root.rmdir()
+        except OSError:
+            pass
 
 
 class ModelManager:
@@ -133,11 +402,9 @@ class ModelManager:
         # settings; an injected fetcher arrives with its own.
         self.fetcher = fetcher
 
-    def _fetcher_for(self, network: NetworkSettings | None) -> Fetcher:
-        """The downloader for one install, with the proxy bound once for every file it fetches."""
-        if self.fetcher is not None:
-            return self.fetcher
-        return partial(_download, opener=http_opener(network))
+    def _downloader_for(self, network: NetworkSettings | None) -> ResumableParallelDownloader:
+        """Bind one proxy-aware HTTP opener for all ranges in this model operation."""
+        return ResumableParallelDownloader(self.model_root, http_opener(network))
 
     def model_path(self, spec: ModelSpec) -> Path:
         target = self.model_root / spec.directory
@@ -154,6 +421,21 @@ class ModelManager:
         if not self.model_root.exists():
             return
         names = list(self.model_root.iterdir())
+        cache_root = self.model_root / ".downloads"
+        if cache_root.is_dir() and not cache_root.is_symlink() and not cache_root.is_junction():
+            cutoff = time.time() - 30 * 24 * 60 * 60
+            for cache in cache_root.iterdir():
+                try:
+                    is_stale = cache.stat().st_mtime < cutoff
+                except OSError:
+                    continue
+                if (cache.is_dir() and not cache.is_symlink() and not cache.is_junction()
+                        and is_stale):
+                    shutil.rmtree(cache, ignore_errors=True)
+            try:
+                cache_root.rmdir()
+            except OSError:
+                pass
         for spec in specs:
             target = self.model_path(spec)
             prefix = _UNSAFE_PATH_CHARS.sub('-', spec.directory)[:_SAFE_PREFIX_LIMIT] or 'model'
@@ -189,8 +471,9 @@ class ModelManager:
     ) -> Path:
         """Download file by file into a temp dir, then switch to the target atomically once verification passes.
 
-        Progress is reported in cumulative bytes; an exception from progress means cancelled, and the
-        temp dir is cleaned up with it. Phases run in order: download → verify → install.
+        Progress is reported in cumulative bytes; an exception from progress means cancelled. The
+        temporary install directory is removed, while completed download ranges remain resumable.
+        Phases run in order: download → verify → install.
         """
         if self.is_installed(spec):
             return self.model_path(spec)
@@ -214,7 +497,8 @@ class ModelManager:
         done = 0
         try:
             phase("download")
-            fetcher = self._fetcher_for(network)
+            fetcher = self.fetcher
+            downloader = None if fetcher is not None else self._downloader_for(network)
             for entry in spec.files:
                 part = temp / f".{entry.path}.part"
                 part.parent.mkdir(parents=True, exist_ok=True)
@@ -225,7 +509,12 @@ class ModelManager:
                 def file_progress(current: int, _file_total: int, base: int = base) -> None:
                     progress(base + current, total)
 
-                fetcher(spec.url_for(entry, network), part, file_progress)
+                url = spec.url_for(entry, network)
+                if downloader is not None:
+                    downloader.download(url, part, entry, file_progress)
+                else:
+                    assert fetcher is not None
+                    fetcher(url, part, file_progress)
                 done += entry.size
 
             phase("verify")

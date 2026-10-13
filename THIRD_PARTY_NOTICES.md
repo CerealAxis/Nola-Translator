@@ -1,6 +1,6 @@
 THE FOLLOWING SETS FORTH ATTRIBUTION NOTICES FOR THIRD PARTY SOFTWARE THAT MAY BE CONTAINED IN PORTIONS OF THIS PRODUCT
 
-The following software may be included in this product: @adobe/react-spectrum (3.47.7)
+The following software may be included in this product: @adobe/react-spectrum (3.47.5)
 This software contains the following license and notice below:
 
 Apache License
@@ -666,7 +666,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
-The following software may be included in this product: @babel/generator (7.29.8)
+The following software may be included in this product: @babel/generator (7.29.7)
 This software contains the following license and notice below:
 
 MIT License
@@ -806,7 +806,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
-The following software may be included in this product: @babel/parser (7.29.9)
+The following software may be included in this product: @babel/parser (7.29.7)
 This software contains the following license and notice below:
 
 Copyright (C) 2012-2014 by various contributors (see AUTHORS)
@@ -831,7 +831,7 @@ THE SOFTWARE.
 
 ---
 
-The following software may be included in this product: @babel/runtime (7.29.10)
+The following software may be included in this product: @babel/runtime (7.29.7)
 This software contains the following license and notice below:
 
 MIT License
@@ -887,7 +887,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
-The following software may be included in this product: @babel/traverse (7.29.10)
+The following software may be included in this product: @babel/traverse (7.29.7)
 This software contains the following license and notice below:
 
 MIT License
@@ -915,7 +915,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ---
 
-The following software may be included in this product: @babel/types (7.29.8)
+The following software may be included in this product: @babel/types (7.29.7)
 This software contains the following license and notice below:
 
 MIT License
@@ -1024,7 +1024,7 @@ SOFTWARE.
 
 ---
 
-The following software may be included in this product: @emotion/hash (0.8.0)
+The following software may be included in this product: @emotion/hash (0.9.2)
 This software contains the following license and notice below:
 
 MIT License
@@ -1159,7 +1159,7 @@ SOFTWARE.
 
 ---
 
-The following software may be included in this product: @emotion/unitless (0.7.5)
+The following software may be included in this product: @emotion/unitless (0.10.0)
 This software contains the following license and notice below:
 
 MIT License
@@ -1884,7 +1884,7 @@ limitations under the License.
 
 ---
 
-The following software may be included in this product: @internationalized/number (3.6.9)
+The following software may be included in this product: @internationalized/number (3.6.8)
 This software contains the following license and notice below:
 
 Apache License
@@ -2347,7 +2347,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ---
 
-The following software may be included in this product: @jridgewell/sourcemap-codec (1.6.0)
+The following software may be included in this product: @jridgewell/sourcemap-codec (1.5.5)
 This software contains the following license and notice below:
 
 Copyright 2024 Justin Ridgewell <justin@ridgewell.name>
@@ -2397,7 +2397,7 @@ SOFTWARE.
 
 ---
 
-The following software may be included in this product: @lobehub/icons (5.23.0)
+The following software may be included in this product: @lobehub/icons (5.22.0)
 This software contains the following license and notice below:
 
 MIT License
@@ -2559,7 +2559,7 @@ SOFTWARE.
 
 ---
 
-The following software may be included in this product: @radix-ui/react-slot (1.5.0)
+The following software may be included in this product: @radix-ui/react-slot (1.3.3)
 This software contains the following license and notice below:
 
 MIT License
@@ -10915,7 +10915,7 @@ SOFTWARE.
 
 ---
 
-The following software may be included in this product: react-aria (3.53.1)
+The following software may be included in this product: react-aria (3.52.1)
 This software contains the following license and notice below:
 
 Apache License
@@ -11122,7 +11122,7 @@ limitations under the License.
 
 ---
 
-The following software may be included in this product: react-aria-components (1.22.1)
+The following software may be included in this product: react-aria-components (1.21.1)
 This software contains the following license and notice below:
 
 Apache License
@@ -11356,12 +11356,12 @@ SOFTWARE.
 
 ---
 
-The following software may be included in this product: react-is (19.3.0)
+The following software may be included in this product: react-is (17.0.2)
 This software contains the following license and notice below:
 
 MIT License
 
-Copyright (c) Meta Platforms, Inc. and affiliates.
+Copyright (c) Facebook, Inc. and its affiliates.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -12021,7 +12021,7 @@ of your accepting any such warranty or additional liability.
 
 ---
 
-The following software may be included in this product: resolve (1.22.13)
+The following software may be included in this product: resolve (1.22.12)
 This software contains the following license and notice below:
 
 MIT License
@@ -13613,7 +13613,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ---
 
-The following software may be included in this product: source-map (0.7.6)
+The following software may be included in this product: source-map (0.6.1)
 This software contains the following license and notice below:
 
 
@@ -15422,25 +15422,6 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
----
-
-The following software may be included in this product: yaml (1.10.3)
-This software contains the following license and notice below:
-
-Copyright 2018 Eemeli Aro <eemeli@gmail.com>
-
-Permission to use, copy, modify, and/or distribute this software for any purpose
-with or without fee is hereby granted, provided that the above copyright notice
-and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
-THIS SOFTWARE.
 
 ---
 

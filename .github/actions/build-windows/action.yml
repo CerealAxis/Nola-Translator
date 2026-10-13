@@ -10,6 +10,12 @@ outputs:
   source:
     description: Source ZIP
     value: ${{ steps.package.outputs.source }}
+  chrome-extension:
+    description: Chrome MV3 extension archive
+    value: ${{ steps.package.outputs.chrome-extension }}
+  edge-extension:
+    description: Edge MV3 extension archive
+    value: ${{ steps.package.outputs.edge-extension }}
 runs:
   using: composite
   steps:

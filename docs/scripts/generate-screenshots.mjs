@@ -21,7 +21,9 @@ try {
   const url = `http://127.0.0.1:${address.port}`
   const env = { ...process.env }
   delete env.ELECTRON_RUN_AS_NODE
-  const child = spawn(electron, [resolve(root, 'docs/scripts/capture-screenshots.cjs'), url], { cwd: root, env, stdio: 'inherit' })
+  const childArgs = [resolve(root, 'docs/scripts/capture-screenshots.cjs'), url]
+  if (process.argv.includes('--readme')) childArgs.push('--readme')
+  const child = spawn(electron, childArgs, { cwd: root, env, stdio: 'inherit' })
   process.exitCode = await new Promise((resolveExit, reject) => {
     child.once('error', reject)
     child.once('exit', code => resolveExit(code ?? 1))
