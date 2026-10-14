@@ -331,6 +331,7 @@ function Actions({
     <Button
       variant="primary"
       size="sm"
+      data-onboarding="download-model"
       className="rounded-full"
       isDisabled={!installable}
       isPending={busy}

@@ -1,7 +1,9 @@
 import type { Dictionary } from './zh-CN'
+import { onboardingTW } from './onboarding-ui'
 
 /** Complete Traditional Chinese dictionary for Taiwan. */
 export const zhTW: Dictionary = {
+  onboarding: onboardingTW,
   more: {
     "tabLabel": "更多",
     "authorDescription": "Nola Translator 的開發者",

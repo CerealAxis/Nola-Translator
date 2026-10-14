@@ -75,7 +75,7 @@ export function RuntimeComponents() {
         choices.unshift({ value: '', label: t('runtime.choose') })
         const same = component?.status === 'ready' && (selected[kind] === component.id || selected[kind] === 'current')
         const owned = selected[kind] !== 'current' && (kind === 'engine' ? runtimes?.recipes : runtimes?.packages)?.some(p => p.id === selected[kind] && p.installed)
-        return <Accordion.Item key={kind} id={kind} className="runtime-panel">
+        return <Accordion.Item key={kind} id={kind} className="runtime-panel" data-onboarding={`runtime-${kind}`}>
           <Accordion.Heading><Accordion.Trigger id={`runtime-${kind}`} className="runtime-panel-heading">
             <Tooltip delay={300}><Tooltip.Trigger className="runtime-panel-heading__title"><strong>{t(kind === 'engine' ? 'runtime.installTorch' : 'runtime.installLlama')}</strong></Tooltip.Trigger><Tooltip.Content className="settings-row__tooltip">{t(kind === 'engine' ? 'runtime.torchDescription' : 'runtime.llamaDescription')}</Tooltip.Content></Tooltip><Accordion.Indicator />
           </Accordion.Trigger></Accordion.Heading>

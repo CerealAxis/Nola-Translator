@@ -1,12 +1,13 @@
 import type { LucideIcon } from 'lucide-react'
 import { Button, Tooltip } from '@heroui/react'
 export interface NavigationItemProps {
+  id?: string
   icon: LucideIcon
   label: string
   active?: boolean
   onPress?: () => void
 }
-export function NavigationItem({ icon: Icon, label, active = false, onPress }: NavigationItemProps) {
+export function NavigationItem({ id, icon: Icon, label, active = false, onPress }: NavigationItemProps) {
   return (
     <Tooltip delay={800}>
       <Button
@@ -15,6 +16,7 @@ export function NavigationItem({ icon: Icon, label, active = false, onPress }: N
         aria-label={label}
         aria-current={active ? 'page' : undefined}
         data-active={active}
+        data-onboarding={id ? `nav-${id}` : undefined}
         className="nola-nav-button"
       >
         <Icon aria-hidden="true" />

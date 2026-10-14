@@ -3,6 +3,7 @@ import { Button, Card } from '@heroui/react'
 import { ArrowRight, ChevronRight } from 'lucide-react'
 
 export interface FeatureCardProps {
+  onboardingTarget?: string
   variant: 'primary' | 'secondary' | 'tertiary' | 'quaternary'
   icon: ReactNode
   title: string
@@ -10,9 +11,9 @@ export interface FeatureCardProps {
   buttonText: string
   onButtonClick: () => void
 }
-export function FeatureCard({ variant, icon, title, description, buttonText, onButtonClick }: FeatureCardProps): ReactNode {
+export function FeatureCard({ variant, icon, title, description, buttonText, onButtonClick, onboardingTarget }: FeatureCardProps): ReactNode {
   return (
-    <Card className={'nola-entry nola-entry--' + variant}>
+    <Card className={'nola-entry nola-entry--' + variant} data-onboarding={onboardingTarget}>
       <div className="nola-entry__top"><span className="nola-entry__icon">{icon}</span><ChevronRight aria-hidden="true" /></div>
       <Card.Header><Card.Title>{title}</Card.Title><Card.Description>{description}</Card.Description></Card.Header>
       <Card.Footer><Button variant={variant === 'primary' ? 'primary' : 'secondary'} onPress={onButtonClick} className="nola-entry__action">{buttonText}<ArrowRight aria-hidden="true" size={16} /></Button></Card.Footer>

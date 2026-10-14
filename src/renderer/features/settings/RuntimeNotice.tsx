@@ -39,7 +39,8 @@ export function RuntimeNoticeDialog({ issues, isOpen, onOpenChange, onOpenSettin
 }
 
 export function RuntimeNotice() {
-  const { runtimes, runtimeNoticeDismissed, settings } = useStore(stores.settings, state => state)
+  const { runtimes, runtimeNoticeDismissed, settings, onboardingActive, onboardingAutoAttempted } = useStore(stores.settings, state => state)
+  const deferForTour = onboardingActive || (!!settings && !settings.onboardingSeen && !onboardingAutoAttempted)
   const resources = useStore(stores.models, state => state.resources)
   const modelId = settings?.translation.localModelId
   const model = resources.find(resource => resource.resourceId === modelId)
@@ -56,7 +57,7 @@ export function RuntimeNotice() {
     : []
   return <RuntimeNoticeDialog
     issues={issues}
-    isOpen={issues.length > 0 && !runtimeNoticeDismissed}
+    isOpen={issues.length > 0 && !runtimeNoticeDismissed && !deferForTour}
     onOpenChange={open => { if (!open) actions.settings.dismissRuntimeNotice() }}
     onOpenSettings={component => { void actions.settings.openRuntimeSettings(component) }}
     onDismiss={() => actions.settings.dismissRuntimeNotice()}

@@ -20,6 +20,7 @@
     "test": "vitest run",
     "test:ui": "electron tests/e2e/capture-ui.mjs",
     "test:layout": "electron tests/e2e/check-layout.mjs",
+    "test:onboarding": "electron tests/e2e/check-onboarding.mjs",
     "test:overlay": "electron tests/e2e/capture-overlay.mjs",
     "test:packaged-ui": "node scripts/check-packaged-ui.mjs",
     "gen:notices": "node scripts/gen-third-party-notices.mjs",

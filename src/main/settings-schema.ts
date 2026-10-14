@@ -40,6 +40,7 @@ const localModelIdSchema = z.union([
 ])
 
 export const settingsPatchSchema = z.object({
+  onboardingSeen: z.boolean().optional(),
   compute: computeSettingsPatchSchema.optional(),
   theme: z.enum(['system', 'light', 'dark']).optional(),
   uiLanguage: z.enum(['auto', 'zh-CN', 'zh-TW', 'zh-HK', 'ko', 'ja', 'en']).optional(),

@@ -1,7 +1,9 @@
 import { buildLocaleDictionary } from './locale-builder'
+import { onboardingEntries, onboardingKo } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const koMessages: Record<DictionaryKey, string> = {
+  ...onboardingEntries(onboardingKo),
   'more.tabLabel': "더 보기",
   'more.authorDescription': "Nola Translator 개발자",
   'more.appVersion': "현재 버전: {version}",

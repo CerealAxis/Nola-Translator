@@ -20,8 +20,8 @@ export function HomePage(): ReactNode {
       <div className="nola-home">
         <HeroSection />
         <div className="nola-home__entries">
-          <FeatureCard variant="primary" icon={<Mic aria-hidden="true" />} title={t('home.quickStart')} description={t('homeRecordsUi.quickDescription')} buttonText={t('workspace.start')} onButtonClick={goWorkspace} />
-          <FeatureCard variant="secondary" icon={<Captions aria-hidden="true" />} title={t('home.overlayCaptions')} description={t('homeRecordsUi.overlayDescription')} buttonText={t('homeRecordsUi.openOverlay')} onButtonClick={() => navigate('#/overlay')} />
+          <FeatureCard onboardingTarget="home-quick" variant="primary" icon={<Mic aria-hidden="true" />} title={t('home.quickStart')} description={t('homeRecordsUi.quickDescription')} buttonText={t('workspace.start')} onButtonClick={goWorkspace} />
+          <FeatureCard onboardingTarget="home-overlay" variant="secondary" icon={<Captions aria-hidden="true" />} title={t('home.overlayCaptions')} description={t('homeRecordsUi.overlayDescription')} buttonText={t('homeRecordsUi.openOverlay')} onButtonClick={() => navigate('#/overlay')} />
           <FeatureCard variant="tertiary" icon={<Clock aria-hidden="true" />} title={t('home.records')} description={t('homeRecordsUi.recordsDescription')} buttonText={t('homeRecordsUi.openRecords')} onButtonClick={goRecords} />
           <FeatureCard variant="quaternary" icon={<SlidersHorizontal aria-hidden="true" />} title={t('home.models')} description={t('homeRecordsUi.modelsDescription')} buttonText={t('homeRecordsUi.openModels')} onButtonClick={() => navigate(pathOf('models'))} />
         </div>

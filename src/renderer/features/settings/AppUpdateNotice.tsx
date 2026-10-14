@@ -84,6 +84,7 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
 export function AppUpdateNotice(): React.JSX.Element | null {
   const { t } = useI18n()
   const result = useStore(stores.settings, (state) => state.appUpdate)
+  const deferForTour = useStore(stores.settings, state => state.onboardingActive || (!!state.settings && !state.settings.onboardingSeen && !state.onboardingAutoAttempted))
   const [isOpen, setIsOpen] = useState(false)
   const [opening, setOpening] = useState(false)
 
@@ -113,7 +114,7 @@ export function AppUpdateNotice(): React.JSX.Element | null {
   return (
     <AppUpdateDialog
       result={result}
-      isOpen={isOpen}
+      isOpen={isOpen && !deferForTour}
       onOpenChange={setIsOpen}
       onOpenRelease={url => { void openRelease(url) }}
       isOpening={opening}

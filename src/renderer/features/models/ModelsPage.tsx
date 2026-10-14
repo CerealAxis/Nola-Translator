@@ -169,7 +169,7 @@ export function ModelsPage() {
           </Tabs.List>
         </Tabs.ListContainer>
 
-        <Tabs.Panel id="recommended">
+        <Tabs.Panel id="recommended" data-onboarding="model-downloads">
           <Catalog
             records={resources.filter(record => !record.resourceId.startsWith('hub:'))}
             loading={loading && !loaded}

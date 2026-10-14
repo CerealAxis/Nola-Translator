@@ -1,4 +1,5 @@
 import type { Dictionary } from './zh-CN'
+import { onboardingEn } from './onboarding-ui'
 import { shellEn } from './shell-ui'
 import { homeRecordsEn } from './home-records-ui'
 import { workspaceEn } from './workspace-ui'
@@ -13,6 +14,7 @@ import { browserEn } from './browser-ui'
 import { runtimeEn } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const en: Dictionary = {
+  onboarding: onboardingEn,
   more: {
     "tabLabel": "More",
     "authorDescription": "Developer of Nola Translator",

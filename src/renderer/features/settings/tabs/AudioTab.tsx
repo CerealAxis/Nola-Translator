@@ -79,7 +79,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
   })), [t])
 
   return (
-    <div className="settings-panel">
+    <div className="settings-panel" data-onboarding="recognition-settings">
       <SettingGroup legend={t('settings.groupInput')}>
         <SettingsRow label={t('settings.audioSource')}>
           <SettingSelect

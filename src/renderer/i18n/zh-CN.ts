@@ -9,6 +9,7 @@
  */
 
 import { shellZh } from './shell-ui'
+import { onboardingZh } from './onboarding-ui'
 import { homeRecordsZh } from './home-records-ui'
 import { workspaceZh } from './workspace-ui'
 import { modelsSettingsZh } from './models-settings-ui'
@@ -17,6 +18,7 @@ import { browserZh } from './browser-ui'
 import { runtimeZh } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const zhCN = {
+  onboarding: onboardingZh,
   more: {
     "tabLabel": "更多",
     "authorDescription": "Nola Translator 的开发者",

@@ -10,7 +10,7 @@ const delay = ms => new Promise(done => setTimeout(done, ms))
 const preloadSource = `
 const { contextBridge } = require('electron');
 let settings = {
-  version: 1, theme: 'light', uiLanguage: 'zh-CN', modelStoragePath: '',
+  version: 1, onboardingSeen: true, theme: 'light', uiLanguage: 'zh-CN', modelStoragePath: '',
   recognition: { modelId: 'sensevoice-small', sourceLanguage: 'auto', audioSource: 'defaultOutput' },
   recording: { keepAudio: true }, appearance: { reduceMotion: true },
   compute: { recognitionEngine: 'pytorch', translationEngine: 'auto' },

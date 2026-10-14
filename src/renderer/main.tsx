@@ -22,6 +22,7 @@ import { ModelsPage } from './features/models'
 import { SettingsPage } from './features/settings'
 import { RuntimeNotice } from './features/settings/RuntimeNotice'
 import { AppUpdateNotice } from './features/settings/AppUpdateNotice'
+import { OnboardingTour } from './features/onboarding'
 
 /*
  * 桥接的唯一挂载点。
@@ -176,6 +177,7 @@ function Shell() {
     <AppShell navigation={navigation}>
       {isEngineConnected() ? null : <EngineDisconnectedNotice />}
       <Routes pages={PAGES} />
+      <OnboardingTour />
     </AppShell>
   )
 }

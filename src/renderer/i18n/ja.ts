@@ -1,7 +1,9 @@
 import { buildLocaleDictionary } from './locale-builder'
+import { onboardingEntries, onboardingJa } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const jaMessages: Record<DictionaryKey, string> = {
+  ...onboardingEntries(onboardingJa),
   'more.tabLabel': "その他",
   'more.authorDescription': "Nola Translator の開発者",
   'more.appVersion': "現在のバージョン：{version}",

@@ -155,7 +155,7 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
   }
 
   return (
-    <div className="settings-panel">
+    <div className="settings-panel" data-onboarding="translation-settings">
       <SettingGroup legend={t('settings.groupProvider')}>
         <SettingsRow
           label={t('settings.provider')}

@@ -25,6 +25,8 @@ const COPIED_HOLD_MS = 1500
 export function MoreTab() {
   const { t } = useI18n()
   const updateChecking = useStore(stores.settings, state => state.appUpdateChecking)
+  const sessionBusy = useStore(stores.session, state => ['starting', 'running', 'paused', 'stopping'].includes(state.status))
+  const runtimeBusy = useStore(stores.settings, state => state.runtimeBusy)
   const [announcement, setAnnouncement] = useState<AppUpdateCheckResult | null>(null)
   const [announcementOpen, setAnnouncementOpen] = useState(false)
   const [announcementOpening, setAnnouncementOpening] = useState(false)
@@ -62,6 +64,12 @@ export function MoreTab() {
 
   return (
     <div className="settings-panel settings-more">
+      <SettingGroup legend={t('onboarding.title')}>
+        <SettingsRow label={t('onboarding.title')} desc={t('onboarding.replayHint')}>
+          <Button variant="secondary" size="sm" data-onboarding="replay" isDisabled={sessionBusy || runtimeBusy}
+            onPress={() => { actions.settings.startOnboarding('welcome') }}>{t('onboarding.replay')}</Button>
+        </SettingsRow>
+      </SettingGroup>
       <SettingGroup legend={t('settings.groupAbout')}>
         <IdentityRow name={packageInfo.author} description={t('more.authorDescription')} image={authorAvatarUrl}
           action={<ExternalAction href={AUTHOR_URL} label={t('more.githubProfile')} icon={<Github aria-hidden="true" />} />} />

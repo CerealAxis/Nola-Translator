@@ -1,7 +1,9 @@
 import type { Dictionary } from './zh-CN'
+import { onboardingHK } from './onboarding-ui'
 
 /** Complete Traditional Chinese dictionary for Hong Kong. */
 export const zhHK: Dictionary = {
+  onboarding: onboardingHK,
   more: {
     "tabLabel": "更多",
     "authorDescription": "Nola Translator 的開發者",

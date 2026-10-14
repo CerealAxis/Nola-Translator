@@ -12,6 +12,7 @@
 - Hy-MT2：推荐 1.8B 三个量化档位与腾讯官方 7B Q4_K_M；7B 显式使用官方独立 Jinja 对话模板。
 - 云端识别：Aliyun LiveTranslate 3.5／3.8 使用 WebSocket 持续输入 PCM16；MiniMax Speech-to-Text 不接受音频流式输入，改由引擎侧 VAD 切段后逐段上传 WAV，SSE 只推送响应增量。云端翻译支持 MyMemory REST 与识别连接自带的流式译文（仅阿里云具备，MiniMax 无内置译文）。
 - UI：Tailwind CSS + HeroUI；设置“更多”页使用 Avatar／AvatarGroup 展示作者、开源鸣谢及明确的赞助空位
+- 新手教程：首次先显示 HeroUI 欢迎弹窗，包含教程说明、GitHub Star 请求和仓库链接；点击开始后，用 Card／Button 与镂空蒙层介绍首页入口、运行组件、识别、翻译和模型下载；设置“更多”的“再次查看”重新打开欢迎页，点击开始后进入教程，首次展示状态按本地用户配置保存。
 - 构建：electron-vite
 - 产品与文档站：VitePress 工程位于 `docs/`，六种语言的首页与 Markdown 页面集中在 `docs/nola-docs/` 并作为 `srcDir`；Vue 容器挂载 React + HeroUI 首页，直接复用桌面主题与区域字体。站点默认自动检测浏览器语言，未匹配时使用英文，手动选择持久化；加载页与首屏使用声波动效。独立构建的 React 演示应用复用真实软件页面与内存 bridge，下载指向 GitHub Releases；展示素材同源渲染。
 - 测试：Vitest + Testing Library
@@ -31,7 +32,7 @@ src/
     ├── assets/fonts/    # 随桌面应用打包的 Noto CJK 区域可变字体与 OFL 许可证
     ├── store/   # 4 个域 store，自研 useSyncExternalStore 实现
     ├── components/  # primitives/（封闭 8 个）+ caption/ home/ notes/ reading/
-    ├── features/    # home/ workspace/ overlay/ records/ models/ settings/
+    ├── features/    # home/ workspace/ overlay/ records/ models/ settings/ onboarding/（主窗口跨页面蒙层教程与定位）
     ├── i18n/         # zh-CN.ts 定义 Dictionary；locale-builder.ts 组装完整词典；browser-locales.ts 提供扩展文案；en／zh-TW／zh-HK／ko／ja 各有完整强类型词典
     └── theme/        # 设计 token 唯一来源（CSS）；cjk-fonts.css 仅由桌面渲染器加载区域字体
 engine/nola_translator_engine/  # Python 引擎，协议定义在 protocol.py，model_capabilities.py 为引擎能力校验；translation/index_translate_languages.py 维护 Index-Translate 官方语言名称
@@ -92,6 +93,8 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 - z-index 只用 `.z-*` 类（见 DESIGN.MD 第 8 节），**禁 `z-50` 字面量**
 
 ## 4. 注释规范
+
+- Onboarding opens a HeroUI welcome modal before the first automatic tour, with an optional GitHub Star request and repository link. Mark the invitation when its content mounts so Later and Escape do not repeat it next launch. Manual replay bypasses the invitation. The tour uses actual main-window controls with stable data-onboarding anchors and a rounded SVG cutout. HeroUI Card and Button own the tip; the underlying shell is inert during the tour. settingsStore owns presentation actions and AppSettings.onboardingSeen persists through the main settings patch schema. Missing markers in legacy profiles mean unseen, and replay never clears the marker. The tour only navigates and explains: it never installs components, downloads weights, captures audio, or changes inference preferences. Startup notices wait until onboarding ends; the website demo and floating-caption document do not auto-start the tour. All six locales carry plain instructional copy.
 
 - Runtime catalogs record official wheel ABI, SHA-256 and backend combinations. Checks use built-in Python 3.12 without installing; repair ownership requires an app installation record. Development llama downloads use the same catalog URLs, companions and hashes; a source marker identifies reusable vendor directories.
 - Index-Translate presets pin official GGUF revisions, sizes and SHA-256, downloading text weights without the vision projector. Both local and public inference use the official single-user translation prompt with thinking disabled. The public service fixes its endpoint and 35B-A3B model and never consumes a saved cloud credential. Language choices use the 150 distinct names in the official reference website language table; frontend presets, Python prompt names, resource metadata, and protocol validation must stay aligned. Invalid public targets fail before capture starts.
@@ -159,6 +162,7 @@ npm run dev            # 开发（electron-vite）
 npm run typecheck      # tsc --noEmit
 npm test               # vitest run
 npm run build          # typecheck && electron-vite build
+npm run test:onboarding # 构建后检查首次引导、再次查看及六语言／深浅主题／三种窗口尺寸
 npm run build:browser  # 构建可手动加载的 MV3 扩展
 npm run package:browser # release/Nola-Browser-Extension.zip
 npm run build:browser-host # PyInstaller Native Messaging EXE

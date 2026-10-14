@@ -21,6 +21,10 @@ import type { ComputeSnapshot, RuntimeSnapshot } from '../../shared/compute'
 export type CaptionServiceState = 'idle' | 'loading' | 'ready' | 'failed'
 
 export interface SettingsState {
+  onboardingActive: boolean
+  onboardingWelcome: boolean
+  onboardingRun: number
+  onboardingAutoAttempted: boolean
   audioTestState: 'idle' | 'capturing' | 'playing'
   settings: AppSettings | null
   loaded: boolean
@@ -51,6 +55,10 @@ export interface SettingsState {
 }
 
 const initialState: SettingsState = {
+  onboardingActive: false,
+  onboardingWelcome: false,
+  onboardingRun: 0,
+  onboardingAutoAttempted: false,
   audioTestState: 'idle',
   settings: null,
   loaded: false,
@@ -71,6 +79,27 @@ const initialState: SettingsState = {
 }
 
 export const settingsStore = createStore<SettingsState>(initialState)
+
+/** Automatic presentation is attempted once per launch, even before its disk write settles. */
+export function startOnboarding(mode: 'automatic' | 'welcome' | 'tour' = 'tour'): boolean {
+  const state = settingsStore.getState()
+  if (state.onboardingActive || !state.settings) return false
+  if (mode === 'automatic' && (state.settings.onboardingSeen || state.onboardingAutoAttempted)) return false
+  settingsStore.setState({ onboardingActive: true, onboardingWelcome: mode !== 'tour', onboardingRun: state.onboardingRun + 1, onboardingAutoAttempted: true })
+  return true
+}
+
+export function stopOnboarding(): void {
+  settingsStore.setState({ onboardingActive: false, onboardingWelcome: false })
+}
+
+export function beginOnboarding(): void {
+  if (settingsStore.getState().onboardingActive) settingsStore.setState({ onboardingWelcome: false })
+}
+
+export async function markOnboardingSeen(): Promise<void> {
+  if (!settingsStore.getState().settings?.onboardingSeen) await updateSettings({ onboardingSeen: true })
+}
 
 let audioTestGeneration = 0
 let audioTestPlayback: HTMLAudioElement | null = null
@@ -274,6 +303,7 @@ export function mergeSettings(base: AppSettings, patch: AppSettingsPatch): AppSe
     ...base,
     ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
     ...(patch.uiLanguage !== undefined ? { uiLanguage: patch.uiLanguage } : {}),
+    ...(patch.onboardingSeen !== undefined ? { onboardingSeen: patch.onboardingSeen } : {}),
     recognition: { ...base.recognition, ...patch.recognition },
     overlay: { ...base.overlay, ...patch.overlay },
     videoCaptions: { ...base.videoCaptions, ...patch.videoCaptions },

@@ -10,6 +10,7 @@ import { ModelConfigurationDialog } from './ModelConfigurationDialog'
 /** User changes are handled here; detected speech never changes the saved language pair. */
 export function ModelCapabilityNotices() {
   const settings = useStore(stores.settings, state => state.settings)
+  const deferForTour = useStore(stores.settings, state => state.onboardingActive || (!!state.settings && !state.settings.onboardingSeen && !state.onboardingAutoAttempted))
   const resources = useStore(stores.models, state => state.resources)
   const status = useStore(stores.session, state => state.status)
   const [dismissed, setDismissed] = useState<string | null>(null)
@@ -22,7 +23,7 @@ export function ModelCapabilityNotices() {
     previous.current = installed
     if (justInstalled.length > 0) setConfigurationQueue(queue => [...new Set([...queue, ...justInstalled])])
   }, [resources])
-  if (!settings) return null
+  if (!settings || deferForTour) return null
   const configuring = resources.find(record => record.resourceId === configurationQueue[0])
   const recognition = resources.find(record => record.resourceId === settings.recognition.modelId)
   const translation = resources.find(record => record.resourceId === settings.translation.localModelId)

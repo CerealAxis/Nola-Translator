@@ -101,6 +101,8 @@ export type NetworkSettings = {
 
 export type AppSettings = {
   version: 1
+  /** Presentation is profile-scoped, so upgrades do not repeat the first-run tour. */
+  onboardingSeen: boolean
   theme: 'system' | 'light' | 'dark'
   uiLanguage: 'auto' | 'zh-CN' | 'zh-TW' | 'zh-HK' | 'ko' | 'ja' | 'en'
   modelStoragePath: string
@@ -269,6 +271,7 @@ export const NO_TRANSLATION_LANGUAGE = 'none'
 export const TARGET_LANGUAGE_OPTIONS: readonly string[] = [NO_TRANSLATION_LANGUAGE, ...LANGUAGE_CODES]
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  onboardingSeen: false,
   compute: { ...DEFAULT_COMPUTE_SETTINGS },
   browserConnection: { enabled: false },
   version: 1,

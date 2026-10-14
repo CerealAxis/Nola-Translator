@@ -211,6 +211,7 @@ export class SettingsStore {
         ...structuredClone(DEFAULT_SETTINGS),
         ...raw,
         version: 1,
+        onboardingSeen: raw.onboardingSeen === true,
         uiLanguage: typeof raw.uiLanguage === 'string' && ['auto', 'zh-CN', 'zh-TW', 'zh-HK', 'ko', 'ja', 'en'].includes(raw.uiLanguage)
           ? raw.uiLanguage as AppSettings['uiLanguage']
           : DEFAULT_SETTINGS.uiLanguage,
