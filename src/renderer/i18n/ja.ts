@@ -2,6 +2,16 @@ import { buildLocaleDictionary } from './locale-builder'
 import type { DictionaryKey } from './zh-CN'
 
 const jaMessages: Record<DictionaryKey, string> = {
+  'more.tabLabel': "その他",
+  'more.authorDescription': "Nola Translator の開発者",
+  'more.appVersion': "現在のバージョン：{version}",
+  'more.githubProfile': "GitHub プロフィール",
+  'more.sourceCode': "ソースコードを見る",
+  'more.specialThanks': "謝辞",
+  'more.heroThanks': "Nola の美しく使いやすい UI を支える、HeroUI のオープンソースコンポーネントライブラリに感謝します。",
+  'more.heroWebsite': "HeroUI 公式サイト",
+  'more.sponsors': "スポンサー",
+  'more.sponsorVacancies': "スポンサー募集中",
   'browser.start': '開始',
   'browser.end': '終了',
   'browser.refresh': '更新',
@@ -362,6 +372,8 @@ const jaMessages: Record<DictionaryKey, string> = {
   'appUpdate.upToDateStatus': '最新バージョン {version} を使用しています',
   'appUpdate.checkFailed': 'GitHub からバージョン情報を取得できません。しばらくしてからもう一度お試しください。',
   'appUpdate.title': '新しいバージョンがあります',
+  'appUpdate.currentReleaseTitle': '現在のバージョンの更新内容',
+  'appUpdate.viewAnnouncement': '更新内容を見る',
   'appUpdate.version': '最新バージョン {version}',
   'appUpdate.currentVersion': '現在のバージョン {version}',
   'appUpdate.notes': '更新内容',

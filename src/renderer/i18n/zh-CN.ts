@@ -17,6 +17,18 @@ import { browserZh } from './browser-ui'
 import { runtimeZh } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const zhCN = {
+  more: {
+    "tabLabel": "更多",
+    "authorDescription": "Nola Translator 的开发者",
+    "appVersion": "当前版本：{version}",
+    "githubProfile": "GitHub 主页",
+    "sourceCode": "查看源代码",
+    "specialThanks": "特别鸣谢",
+    "heroThanks": "感谢 HeroUI 开源的组件库，让 Nola 的界面更美观、易用。",
+    "heroWebsite": "HeroUI 官网",
+    "sponsors": "赞助者",
+    "sponsorVacancies": "虚位以待",
+  },
   browser: browserZh,
   runtime: runtimeZh,
   compute: computeUi.zh,
@@ -45,7 +57,7 @@ export const zhCN = {
     group: '软件更新', versionCheck: '版本检查',
     checkNow: '检查更新', availableStatus: '发现新版本 {version}', upToDateStatus: '已是最新版本 {version}',
     checkFailed: '暂时无法从 GitHub 获取版本信息，请稍后重试。',
-    title: '发现新版本', version: '最新版本 {version}', currentVersion: '当前版本 {version}',
+    title: '发现新版本', currentReleaseTitle: "当前版本公告", viewAnnouncement: "查看版本公告", version: '最新版本 {version}', currentVersion: '当前版本 {version}',
     notes: '更新内容', notesUnavailable: '此版本没有提供更新说明。',
     openRelease: '查看 GitHub 下载页', later: '稍后提醒', openFailed: '无法打开 GitHub 发布页，请检查网络后重试。',
   },

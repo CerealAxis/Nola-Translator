@@ -19,6 +19,7 @@ export interface AppUpdateDialogProps {
   onOpenRelease: (releaseUrl: string) => void
   /** Whether the release page call is still in flight. */
   isOpening: boolean
+  isCurrentVersion?: boolean
 }
 
 function displayVersion(value: string): string {
@@ -32,7 +33,7 @@ function displayReleaseName(value: string | null): string | null {
     : value
 }
 
-export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, isOpening }: AppUpdateDialogProps): ReactNode {
+export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, isOpening, isCurrentVersion = false }: AppUpdateDialogProps): ReactNode {
   const { t } = useI18n()
   // A result without these renders nothing in the wrapper, so the fallbacks never show.
   const latestVersion = displayVersion(result.latestVersion ?? '')
@@ -43,7 +44,7 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
         <Modal.Container size="lg" placement="center">
           <Modal.Dialog className="app-update-dialog rounded-2xl border border-border">
             <Modal.Header>
-              <Modal.Heading className="nola-title text-foreground">{t('appUpdate.title')}</Modal.Heading>
+              <Modal.Heading className="nola-title text-foreground">{t(isCurrentVersion ? 'appUpdate.currentReleaseTitle' : 'appUpdate.title')}</Modal.Heading>
             </Modal.Header>
             <Modal.Body className="app-update-dialog-body flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
               <div className="nola-body-strong">{displayReleaseName(result.releaseName)}</div>
@@ -68,9 +69,9 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
                 : <div className="nola-caption text-muted">{t('appUpdate.notesUnavailable')}</div>}
             </Modal.Body>
             <Modal.Footer>
-              <Button variant="tertiary" onPress={() => onOpenChange(false)}>{t('appUpdate.later')}</Button>
+              <Button variant="tertiary" onPress={() => onOpenChange(false)}>{t(isCurrentVersion ? 'common.close' : 'appUpdate.later')}</Button>
               <Button onPress={() => void onOpenRelease(releaseUrl)} isPending={isOpening}>
-                <ArrowUpRight aria-hidden="true" />{t('appUpdate.openRelease')}
+                <ArrowUpRight aria-hidden="true" />{t(isCurrentVersion ? 'appUpdate.viewAnnouncement' : 'appUpdate.openRelease')}
               </Button>
             </Modal.Footer>
           </Modal.Dialog>

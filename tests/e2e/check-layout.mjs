@@ -18,7 +18,7 @@ app.disableHardwareAcceleration()
 const output = resolve('artifacts/layout')
 const delay = (ms) => new Promise((done) => setTimeout(done, ms))
 
-const SETTINGS_TABS = ['general', 'audio', 'translation', 'appearance', 'storage', 'browser', 'advanced']
+const SETTINGS_TABS = ['general', 'audio', 'translation', 'appearance', 'storage', 'browser', 'advanced', 'more']
 
 /** Each entry names the `data-page` its route root renders, which is what the run asserts; the settings tabs all collapse to `settings`. */
 const PAGES = [
@@ -194,6 +194,7 @@ contextBridge.exposeInMainWorld('nolaTranslator', {
   getMeetingAudioUrl: async id => (meetings.find(m => m.meetingId === id)?.audioFile ? 'nola-audio://local/' + id + '/audio.wav' : null),
   getDiagnostics: async () => ({ '引擎状态': 'ready', '语音识别': 'Qwen3-ASR 1.7B（nf4）', '本地翻译': 'Hy-MT2 · llama.cpp（cuda）' }),
   copyDiagnostics: async () => {},
+  checkLatestRelease: async () => ({ currentVersion: '1.0.7', latestVersion: null, updateAvailable: false, releaseName: null, releaseNotes: '', releaseUrl: null }),
   hasTranslationCredential: async () => false,
   setTranslationCredential: async () => {},
   showOverlay: async () => {},

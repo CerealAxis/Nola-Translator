@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { detachSettingsStore, settingsStore } from '@/store/settingsStore'
 import * as settingsActions from '@/store/settingsStore'
@@ -6,6 +6,8 @@ import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import { ComputeTab } from './tabs/ComputeTab'
 import { GeneralTab } from './tabs/GeneralTab'
 import { SettingsPage } from './SettingsPage'
+import { MoreTab } from './tabs/MoreTab'
+import { AdvancedTab } from './tabs/AdvancedTab'
 
 beforeEach(() => {
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
@@ -42,4 +44,31 @@ it('starts a forced version check from General settings', () => {
   fireEvent.click(screen.getByRole('button', { name: '检查更新' }))
 
   expect(check).toHaveBeenCalledWith(true)
+})
+
+it('keeps reset in Advanced and moves licenses and feedback to More', async () => {
+  vi.spyOn(settingsActions, 'readDiagnostics').mockResolvedValue({ version: '1.0.7' })
+  settingsStore.setState({ settings: DEFAULT_SETTINGS, loaded: true })
+  const advanced = render(<AdvancedTab settings={DEFAULT_SETTINGS} />)
+  expect(screen.getByRole('button', { name: '恢复出厂设置' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '复制诊断信息' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '查看' })).not.toBeInTheDocument()
+  await waitFor(() => expect(screen.getByText('version')).toBeInTheDocument())
+  advanced.unmount()
+
+  render(<MoreTab />)
+  expect(screen.queryByRole('button', { name: '恢复出厂设置' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '查看' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'GitHub 主页' })).toHaveAttribute('href', 'https://github.com/CerealAxis')
+  expect(screen.getByRole('link', { name: 'HeroUI 官网' })).toHaveAttribute('href', 'https://heroui.com/')
+  expect(screen.getByRole('group', { name: '虚位以待' })).toBeInTheDocument()
+  expect(screen.getByText('701699932')).toBeInTheDocument()
+})
+
+it('confirms copying diagnostics only after the store action succeeds', async () => {
+  const copy = vi.spyOn(settingsActions, 'copyDiagnostics').mockResolvedValue()
+  render(<MoreTab />)
+  fireEvent.click(screen.getByRole('button', { name: '复制诊断信息' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '已复制' })).toBeInTheDocument())
+  expect(copy).toHaveBeenCalledOnce()
 })

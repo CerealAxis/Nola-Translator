@@ -50,6 +50,7 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
   const help = helpItems ?? [
     { key: 'settings', label: t('nav.settings'), onSelect: () => navigate('#/settings/general') },
     { key: 'advanced', label: t('modelsSettingsUi.advanced'), onSelect: () => navigate('#/settings/advanced') },
+    { key: 'more', label: t('more.tabLabel'), onSelect: () => navigate('#/settings/more') },
   ]
   return (
     <header className={`nola-titlebar nola-drag z-titlebar-drag ${className}`} onDoubleClick={event => {

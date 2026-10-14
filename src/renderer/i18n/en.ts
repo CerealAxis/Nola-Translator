@@ -13,6 +13,18 @@ import { browserEn } from './browser-ui'
 import { runtimeEn } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const en: Dictionary = {
+  more: {
+    "tabLabel": "More",
+    "authorDescription": "Developer of Nola Translator",
+    "appVersion": "Current version: {version}",
+    "githubProfile": "GitHub profile",
+    "sourceCode": "View source code",
+    "specialThanks": "Special thanks",
+    "heroThanks": "Thanks to HeroUI for its open source component library, making Nola more beautiful and easier to use.",
+    "heroWebsite": "HeroUI website",
+    "sponsors": "Sponsors",
+    "sponsorVacancies": "Awaiting sponsors",
+  },
   browser: browserEn,
   runtime: runtimeEn,
   compute: computeUi.en,
@@ -41,7 +53,7 @@ export const en: Dictionary = {
     group: 'Software updates', versionCheck: 'Version check',
     checkNow: 'Check for updates', availableStatus: 'Version {version} is available', upToDateStatus: 'You have the latest version {version}',
     checkFailed: 'GitHub version information is unavailable. Try again later.',
-    title: 'An update is available', version: 'Latest version {version}', currentVersion: 'Current version {version}',
+    title: 'An update is available', currentReleaseTitle: "Current release notes", viewAnnouncement: "View release notes", version: 'Latest version {version}', currentVersion: 'Current version {version}',
     notes: 'What’s new', notesUnavailable: 'No release notes were provided.',
     openRelease: 'View GitHub release', later: 'Remind me later', openFailed: 'Could not open the GitHub release page. Check your connection and try again.',
   },

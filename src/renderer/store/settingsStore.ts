@@ -624,6 +624,16 @@ export function attachSettingsStore(next: NolaBridge, watchComputeChanges = true
   })
 }
 
+export async function readDiagnostics(): Promise<Record<string, string | number>> {
+  if (!bridge) throw new Error('diagnosticsUnavailable')
+  return bridge.diagnostics.get()
+}
+
+export async function copyDiagnostics(): Promise<void> {
+  if (!bridge) throw new Error('diagnosticsUnavailable')
+  await bridge.diagnostics.copy()
+}
+
 export async function openLogs(): Promise<void> {
   try {
     if (!bridge?.diagnostics.openLogs) throw new Error('diagnosticsUnavailable')

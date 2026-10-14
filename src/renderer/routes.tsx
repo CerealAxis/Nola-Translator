@@ -22,7 +22,7 @@ import { EmptyState, Spinner } from '@heroui/react'
 import type { RouteId } from '@/bridge'
 import { useI18n } from '@/i18n'
 
-export type SettingsTab = 'general' | 'audio' | 'translation' | 'compute' | 'performance' | 'appearance' | 'storage' | 'advanced' | 'browser' | 'developer'
+export type SettingsTab = 'general' | 'audio' | 'translation' | 'compute' | 'performance' | 'appearance' | 'storage' | 'advanced' | 'more' | 'browser' | 'developer'
 
 const ALL_SETTINGS_TABS: readonly SettingsTab[] = [
   'general',
@@ -34,6 +34,7 @@ const ALL_SETTINGS_TABS: readonly SettingsTab[] = [
   'browser',
   'storage',
   'advanced',
+  'more',
   'developer',
 ]
 

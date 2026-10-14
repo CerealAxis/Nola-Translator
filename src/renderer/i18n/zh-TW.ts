@@ -2,6 +2,18 @@ import type { Dictionary } from './zh-CN'
 
 /** Complete Traditional Chinese dictionary for Taiwan. */
 export const zhTW: Dictionary = {
+  more: {
+    "tabLabel": "更多",
+    "authorDescription": "Nola Translator 的開發者",
+    "appVersion": "目前版本：{version}",
+    "githubProfile": "GitHub 個人頁面",
+    "sourceCode": "檢視原始碼",
+    "specialThanks": "特別鳴謝",
+    "heroThanks": "感謝 HeroUI 的開源元件庫，讓 Nola 的介面更美觀、易用。",
+    "heroWebsite": "HeroUI 官網",
+    "sponsors": "贊助者",
+    "sponsorVacancies": "虛位以待",
+  },
   "browser": {
     "start": "開始",
     "end": "結束",
@@ -383,6 +395,8 @@ export const zhTW: Dictionary = {
     "upToDateStatus": "已是最新版本 {version}",
     "checkFailed": "暫時無法從 GitHub 獲取版本資訊，請稍後重試。",
     "title": "發現新版本",
+    "currentReleaseTitle": "目前版本公告",
+    "viewAnnouncement": "查看版本公告",
     "version": "最新版本 {version}",
     "currentVersion": "當前版本 {version}",
     "notes": "更新內容",

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Alert, Button, Card, Fieldset, ListBox, Spinner, Switch, Tabs, Tooltip } from '@heroui/react'
-import { Captions, Cpu, CircleHelp, Gauge, Database, FlaskConical, Languages, Mic, Monitor, Settings, SlidersHorizontal } from 'lucide-react'
+import { Captions, Cpu, CircleHelp, Gauge, Database, FlaskConical, Grid2X2, Languages, Mic, Monitor, Settings, SlidersHorizontal } from 'lucide-react'
 
 import type { AppSettings } from '@/bridge'
 import { useI18n } from '@/i18n'
@@ -15,6 +15,7 @@ import { TranslationTab } from './tabs/TranslationTab'
 import { AppearanceTab } from './tabs/AppearanceTab'
 import { StorageTab } from './tabs/StorageTab'
 import { AdvancedTab } from './tabs/AdvancedTab'
+import { MoreTab } from './tabs/MoreTab'
 import { ComputeTab } from './tabs/ComputeTab'
 import { PerformanceTab } from './tabs/PerformanceTab'
 import { BrowserTab } from './tabs/BrowserTab'
@@ -23,7 +24,7 @@ import './settings.css'
 
 export interface SettingsPanelProps { settings: AppSettings }
 
-const NAV_ICONS = { browser: Captions, general: Settings, audio: Mic, translation: Languages, compute: Cpu, performance: Gauge, appearance: Monitor, storage: Database, advanced: SlidersHorizontal, developer: FlaskConical }
+const NAV_ICONS = { browser: Captions, general: Settings, audio: Mic, translation: Languages, compute: Cpu, performance: Gauge, appearance: Monitor, storage: Database, advanced: SlidersHorizontal, more: Grid2X2, developer: FlaskConical }
 
 export function SettingsPage() {
   const { t, dictionary } = useI18n()
@@ -66,6 +67,7 @@ export function SettingsPage() {
     general: t('modelsSettingsUi.general'), audio: t('modelsSettingsUi.audio'),
     translation: t('modelsSettingsUi.translation'), appearance: t('modelsSettingsUi.appearance'),
     storage: t('modelsSettingsUi.storage'), advanced: t('modelsSettingsUi.advanced'),
+    more: t('more.tabLabel'),
     developer: t('dev.tabLabel'),
   }
 
@@ -101,6 +103,7 @@ export function SettingsPage() {
           <Tabs.Panel id="appearance"><AppearanceTab settings={settings} /></Tabs.Panel>
           <Tabs.Panel id="storage"><StorageTab settings={settings} /></Tabs.Panel>
           <Tabs.Panel id="advanced"><AdvancedTab settings={settings} /></Tabs.Panel>
+          <Tabs.Panel id="more"><MoreTab /></Tabs.Panel>
           <Tabs.Panel id="browser"><BrowserTab /></Tabs.Panel>
           <Tabs.Panel id="developer"><DeveloperTab /></Tabs.Panel>
         </div>

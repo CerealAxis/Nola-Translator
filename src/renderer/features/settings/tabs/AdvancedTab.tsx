@@ -1,10 +1,6 @@
 import { SettingsRow } from '../SettingsRow'
 /**
- * Advanced diagnostics: engine state, versions and paths, copy diagnostics, factory reset.
- *
- * Copying writes the whole `DiagnosticsPayload` to the clipboard and then holds the checkmark
- * in place on the button itself: the user's eyes are on the button they just pressed, so the
- * confirmation belongs there rather than in a corner toast.
+ * Advanced diagnostics: engine state, versions and paths, factory reset.
  *
  * Factory reset confirms through `AlertDialog`, which is the only destructive path in the app
  * that is not a single click.
@@ -18,24 +14,16 @@ import {
   Surface,
   Typography,
 } from '@heroui/react'
-import { Check, ExternalLink } from 'lucide-react'
 
 import { DEFAULT_SETTINGS, PROTOCOL_VERSION } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
 import type { StatusPillTone } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
-import { getBridge, openLogs, stores, updateSettings, useStore } from '@/store'
+import { actions, stores, updateSettings, useStore } from '@/store'
 import type { EngineStatus } from '@/store'
 import { SettingGroup } from '../SettingsPage'
 import type { SettingsPanelProps } from '../SettingsPage'
-import { ThirdPartyNotices } from '../ThirdPartyNotices'
-
-/** How long the copied checkmark stays up. */
-const COPIED_HOLD_MS = 1500
-
-const ISSUES_URL = 'https://github.com/CerealAxis/Nola-Translator/issues'
-const QQ_GROUP = '701699932'
 
 /**
  * Engine state, keyed exhaustively: a new `EngineStatus` fails to compile here instead of
@@ -69,32 +57,7 @@ export function AdvancedTab(_props: SettingsPanelProps) {
         <CodeRow label={t('settings.protocolVersion')} value={String(PROTOCOL_VERSION)} />
       </SettingGroup>
 
-      <SettingGroup legend={t('settings.groupAbout')}>
-        <SettingsRow label={t('settings.thirdPartyNotices')} desc={t('settings.thirdPartyNoticesHint')} descriptionTooltip>
-          <ThirdPartyNotices />
-        </SettingsRow>
-      </SettingGroup>
-
-      <SettingGroup legend={t('settings.groupReport')}>
-        <SettingsRow label={t('settings.copyDiagnostics')}>
-          <CopyDiagnostics />
-        </SettingsRow>
-        <SettingsRow label={t('settings.openLogs')} desc={t('settings.openLogsHint')} descriptionTooltip>
-          <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={() => { void openLogs() }}>{t('settings.openLogs')}</Button>
-        </SettingsRow>
-        {/*
-          The main process `setWindowOpenHandler` hands `https:` targets to the shell and
-          denies the window, so this anchor leaves the app instead of navigating the renderer.
-        */}
-        <SettingsRow label={t('settings.githubIssue')} desc={t('settings.githubIssueHint')} descriptionTooltip>
-          <a className="inline-flex items-center gap-1 text-accent underline" href={ISSUES_URL} target="_blank" rel="noreferrer">
-            {t('settings.openInBrowser')}
-            <ExternalLink className="size-4" aria-hidden="true" />
-          </a>
-        </SettingsRow>
-        <SettingsRow label={t('settings.qqGroup')}>
-          <CodeValue value={QQ_GROUP} />
-        </SettingsRow>
+      <SettingGroup legend={t('settings.resetAll')}>
         <SettingsRow label={t('settings.resetAll')}>
           <ResetAll pending={pending} />
         </SettingsRow>
@@ -128,12 +91,7 @@ function DiagnosticsReport() {
 
   useEffect(() => {
     let active = true
-    const bridge = getBridge()
-    if (!bridge) {
-      setError(t('settings.diagnosticsUnavailable'))
-      return
-    }
-    bridge.diagnostics.get()
+    actions.settings.readDiagnostics()
       .then((payload) => {
         if (!active) return
         setRows(Object.entries(payload).map(([key, value]) => [key, String(value)]))
@@ -177,35 +135,6 @@ function CodeRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function CopyDiagnostics() {
-  const { t } = useI18n()
-  const [copied, setCopied] = useState(false)
-
-  useEffect(() => {
-    if (!copied) return
-    const timer = setTimeout(() => setCopied(false), COPIED_HOLD_MS)
-    return () => clearTimeout(timer)
-  }, [copied])
-
-  const run = useCallback(async () => {
-    const bridge = getBridge()
-    if (!bridge) return
-    try {
-      await bridge.diagnostics.copy()
-      setCopied(true)
-    } catch (error) {
-      console.error('[diagnostics]', error)
-    }
-  }, [])
-
-  return (
-    <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={() => void run()}>
-      {copied ? <Check className="size-4" aria-hidden="true" /> : null}
-      {copied ? t('common.copied') : t('settings.copyDiagnostics')}
-    </Button>
-  )
-}
-
 function ResetAll({ pending }: { pending: boolean }) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
@@ -234,7 +163,7 @@ function ResetAll({ pending }: { pending: boolean }) {
       <Button
         variant="danger"
         size="sm"
-        className="rounded-[6px]"
+        className="rounded-[var(--radius-xl)]"
         isPending={pending}
         onPress={() => setOpen(true)}
       >
@@ -257,7 +186,7 @@ function ResetAll({ pending }: { pending: boolean }) {
                 <Button
                   variant="tertiary"
                   size="sm"
-                  className="rounded-[6px]"
+                  className="rounded-[var(--radius-xl)]"
                   onPress={() => setOpen(false)}
                 >
                   {t('common.cancel')}
@@ -265,7 +194,7 @@ function ResetAll({ pending }: { pending: boolean }) {
                 <Button
                   variant="danger-soft"
                   size="sm"
-                  className="rounded-[6px]"
+                  className="rounded-[var(--radius-xl)]"
                   isPending={state === 'pending'}
                   onPress={() => {
                     void reset()

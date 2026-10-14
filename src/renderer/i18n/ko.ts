@@ -2,6 +2,16 @@ import { buildLocaleDictionary } from './locale-builder'
 import type { DictionaryKey } from './zh-CN'
 
 const koMessages: Record<DictionaryKey, string> = {
+  'more.tabLabel': "더 보기",
+  'more.authorDescription': "Nola Translator 개발자",
+  'more.appVersion': "현재 버전: {version}",
+  'more.githubProfile': "GitHub 프로필",
+  'more.sourceCode': "소스 코드 보기",
+  'more.specialThanks': "특별히 감사한 분들",
+  'more.heroThanks': "Nola의 인터페이스를 아름답고 편리하게 만들어 주는 HeroUI 오픈 소스 컴포넌트 라이브러리에 감사드립니다.",
+  'more.heroWebsite': "HeroUI 공식 사이트",
+  'more.sponsors': "후원자",
+  'more.sponsorVacancies': "후원자를 기다립니다",
   'browser.start': '시작',
   'browser.end': '종료',
   'browser.refresh': '새로고침',
@@ -362,6 +372,8 @@ const koMessages: Record<DictionaryKey, string> = {
   'appUpdate.upToDateStatus': '최신 버전 {version}을(를) 사용 중입니다',
   'appUpdate.checkFailed': 'GitHub에서 버전 정보를 가져올 수 없습니다. 잠시 후 다시 시도하세요.',
   'appUpdate.title': '새 버전을 사용할 수 있습니다',
+  'appUpdate.currentReleaseTitle': '현재 버전 변경 사항',
+  'appUpdate.viewAnnouncement': '변경 사항 보기',
   'appUpdate.version': '최신 버전 {version}',
   'appUpdate.currentVersion': '현재 버전 {version}',
   'appUpdate.notes': '변경 사항',
