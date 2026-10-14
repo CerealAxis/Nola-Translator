@@ -274,6 +274,8 @@ export const en: Dictionary = {
     italic: 'Italic',
     underline: 'Underline',
     strikethrough: 'Strikethrough',
+    preview: 'Preview',
+    edit: 'Edit',
   },
 
   models: {

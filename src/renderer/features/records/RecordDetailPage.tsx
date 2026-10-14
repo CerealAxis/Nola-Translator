@@ -12,6 +12,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Breadcrumbs, Button, Card, EmptyState, Skeleton } from '@heroui/react'
 import { Download, Minus, Plus } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 import { AudioPlayerBar, DualColumnView } from '@/components/reading'
 import type { DualColumnSegment } from '@/components/reading'
@@ -203,21 +205,15 @@ export function RecordDetailPage(): ReactNode {
           </div>
         </Card.Content></Card>
 
-        {/*
-         * The notes written before the meeting ended, which is what
-         * `workspaceUi.notesLocalHint` promises when it says they stay readable here.
-         *
-         * Read-only: editing happens on the quick-session screen. Markdown markers show as
-         * the plain text they are — there is no renderer in the repo, and the panel that
-         * writes them is plain text by design. The block only takes space when there are
-         * notes, and its height is capped so a long one cannot squeeze out the columns.
-         */}
+        {/* Notes are stored as Markdown and rendered read-only in the meeting detail. */}
         {notes ? (
           <Card className="nola-record-card">
             <Card.Content>
               <div className="flex flex-col gap-3">
                 <h2 className="nola-subtitle text-foreground">{t('homeRecordsUi.notes')}</h2>
-                <p className="nola-body max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-foreground">{notes}</p>
+                <div className="nola-record-notes-markdown nola-body max-h-64 overflow-y-auto break-words text-foreground">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{notes}</ReactMarkdown>
+                </div>
               </div>
             </Card.Content>
           </Card>

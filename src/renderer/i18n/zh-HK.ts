@@ -596,7 +596,9 @@ export const zhHK: Dictionary = {
     "bold": "加粗",
     "italic": "斜體",
     "underline": "下劃線",
-    "strikethrough": "刪除線"
+    "strikethrough": "刪除線",
+    "preview": "預覽",
+    "edit": "編輯"
   },
   "models": {
     "title": "模型管理",

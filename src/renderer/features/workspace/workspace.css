@@ -64,6 +64,19 @@
   .nola-workspace-notes-tools .button:first-child { color: var(--accent); }
   .nola-workspace-notes-content { display: flex; flex: 1; min-height: 0; padding: 16px 0 8px; }
   .nola-workspace-notes-area { flex: 1; width: 100%; min-width: 0; min-height: 0; padding: 0; resize: none; background: transparent; border: none; border-radius: 0; box-shadow: none; font-size: 14px; line-height: 1.7; }
+  .nola-workspace-notes-mode { margin-inline-start: auto; }
+  .nola-workspace-notes-mode svg { width: 14px; height: 14px; }
+  .nola-workspace-notes-preview { flex: 1; min-width: 0; overflow-y: auto; overflow-wrap: anywhere; color: var(--foreground); font-size: 14px; line-height: 1.7; }
+  .nola-workspace-notes-preview > :first-child { margin-top: 0; }
+  .nola-workspace-notes-preview > :last-child { margin-bottom: 0; }
+  .nola-workspace-notes-preview :is(p, ul, ol, blockquote, pre, table) { margin-block: 0 12px; }
+  .nola-workspace-notes-preview :is(ul, ol) { padding-inline-start: 22px; }
+  .nola-workspace-notes-preview blockquote { padding-inline-start: 12px; border-inline-start: 2px solid var(--border); color: var(--muted); }
+  .nola-workspace-notes-preview :not(pre) > code { padding: 1px 4px; border-radius: var(--radius-sm); background: var(--surface-secondary); }
+  .nola-workspace-notes-preview pre { overflow-x: auto; padding: 10px; border-radius: var(--radius-md); background: var(--surface-secondary); }
+  .nola-workspace-notes-preview table { width: 100%; border-collapse: collapse; }
+  .nola-workspace-notes-preview :is(th, td) { padding: 5px 7px; border: 1px solid var(--border); text-align: start; }
+  .nola-workspace-notes-empty { color: var(--muted); }
   .nola-workspace-notes-handle { align-self: start; width: 36px; min-width: 36px; height: 36px; border-radius: 10px; color: var(--accent); }
   .nola-workspace-session-bar { display: flex; flex: none; flex-wrap: wrap; min-width: 0; min-height: 72px; gap: 14px; align-items: center; padding: 14px 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
   .nola-workspace-audio-status { display: flex; min-width: 0; align-items: center; gap: 10px; font-size: 13px; }

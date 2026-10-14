@@ -40,12 +40,12 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
       <Modal.Backdrop className="z-overlay">
-        <Modal.Container size="md" placement="center">
-          <Modal.Dialog className="rounded-2xl border border-border">
+        <Modal.Container size="lg" placement="center">
+          <Modal.Dialog className="app-update-dialog rounded-2xl border border-border">
             <Modal.Header>
               <Modal.Heading className="nola-title text-foreground">{t('appUpdate.title')}</Modal.Heading>
             </Modal.Header>
-            <Modal.Body className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
+            <Modal.Body className="app-update-dialog-body flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
               <div className="nola-body-strong">{displayReleaseName(result.releaseName)}</div>
               <div className="nola-caption text-muted">{t('appUpdate.version', { version: latestVersion })}</div>
               <div className="nola-caption text-muted">{t('appUpdate.currentVersion', { version: displayVersion(result.currentVersion) })}</div>

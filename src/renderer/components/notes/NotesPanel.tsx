@@ -1,8 +1,10 @@
-/** Plain text notes with Markdown shortcuts, held by the workspace page. */
-import { useCallback, useRef } from 'react'
+/** Markdown notes with an editable source and rendered preview. */
+import { useCallback, useRef, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Button, Card, TextArea } from '@heroui/react'
-import { Bold, Italic, StickyNote, Strikethrough, Underline } from 'lucide-react'
+import { Bold, FilePenLine, Italic, StickyNote, Strikethrough, Underline } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 
@@ -25,6 +27,8 @@ export interface NotesPanelProps {
 export function NotesPanel({ value, onChange, collapsed = false, onToggleCollapsed, className }: NotesPanelProps) {
   const { t } = useI18n()
   const areaRef = useRef<HTMLTextAreaElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [editing, setEditing] = useState(true)
   const applyMarker = useCallback((marker: Marker) => {
     const area = areaRef.current
     const start = area?.selectionStart ?? value.length
@@ -38,23 +42,34 @@ export function NotesPanel({ value, onChange, collapsed = false, onToggleCollaps
     return <Button variant="secondary" isIconOnly onPress={onToggleCollapsed} aria-label={t('workspaceUi.notesExpand')} data-slot="notes-handle" className="nola-workspace-notes-handle"><StickyNote aria-hidden="true" /></Button>
   }
   return (
-    <Card role="complementary" data-slot="notes-panel" aria-label={t('notes.title')} className={['nola-workspace-notes', className ?? ''].join(' ')}>
+    <Card ref={panelRef} role="complementary" data-slot="notes-panel" aria-label={t('notes.title')} className={['nola-workspace-notes', className ?? ''].join(' ')}>
       <Card.Header className="nola-workspace-notes-heading">
         <Card.Title>{t('notes.title')}</Card.Title>
         <span className="nola-workspace-notes-state" title={t('workspaceUi.notesLocalHint')}>{t('workspaceUi.notesLocal')}</span>
       </Card.Header>
       <div className="nola-workspace-notes-tools" role="toolbar" aria-label={t('notes.title')}>
-        {MARKERS.map((marker) => {
+        {editing ? MARKERS.map((marker) => {
           const Icon = marker.icon
           return <Button key={marker.key} isIconOnly variant="secondary" size="sm" aria-label={t(marker.labelKey)} onPress={() => applyMarker(marker)}><Icon aria-hidden="true" /></Button>
-        })}
+        }) : null}
+        <Button variant="secondary" size="sm" className="nola-workspace-notes-mode" onPress={() => setEditing((current) => !current)}>
+          <FilePenLine aria-hidden="true" />{editing ? t('notes.preview') : t('notes.edit')}
+        </Button>
       </div>
       <Card.Content className="nola-workspace-notes-content">
-        <TextArea ref={areaRef} value={value} onChange={(event) => onChange(event.target.value)} placeholder={t('notes.placeholder')} aria-label={t('notes.title')} className="nola-workspace-notes-area" onKeyDown={(event) => {
-          if (!(event.ctrlKey || event.metaKey)) return
-          const marker = event.key.toLowerCase() === 'b' ? MARKERS[0] : event.key.toLowerCase() === 'i' ? MARKERS[1] : null
-          if (marker) { event.preventDefault(); applyMarker(marker) }
-        }} />
+        {editing ? (
+          <TextArea ref={areaRef} value={value} onChange={(event) => onChange(event.target.value)} placeholder={t('notes.placeholder')} aria-label={t('notes.title')} className="nola-workspace-notes-area" onFocus={() => setEditing(true)} onBlur={() => requestAnimationFrame(() => {
+            if (!panelRef.current?.contains(document.activeElement)) setEditing(false)
+          })} onKeyDown={(event) => {
+            if (!(event.ctrlKey || event.metaKey)) return
+            const marker = event.key.toLowerCase() === 'b' ? MARKERS[0] : event.key.toLowerCase() === 'i' ? MARKERS[1] : null
+            if (marker) { event.preventDefault(); applyMarker(marker) }
+          }} />
+        ) : (
+          <div className="nola-workspace-notes-preview" aria-label={t('notes.title')}>
+            {value.trim() ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown> : <p className="nola-workspace-notes-empty">{t('notes.placeholder')}</p>}
+          </div>
+        )}
       </Card.Content>
     </Card>
   )

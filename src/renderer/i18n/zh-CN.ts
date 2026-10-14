@@ -285,6 +285,8 @@ export const zhCN = {
     italic: '斜体',
     underline: '下划线',
     strikethrough: '删除线',
+    preview: '预览',
+    edit: '编辑',
   },
 
   models: {

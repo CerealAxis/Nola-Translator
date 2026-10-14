@@ -138,4 +138,13 @@
 /* Pushes the dismiss and delete pair to the far end, so "select all" stays next
    to the count it widens. */
 .nola-record-page__bulk-dismiss { margin-left: auto; }
+.nola-record-notes-markdown > :first-child { margin-top: 0; }
+.nola-record-notes-markdown > :last-child { margin-bottom: 0; }
+.nola-record-notes-markdown :is(p, ul, ol, blockquote, pre, table) { margin-block: 0 12px; }
+.nola-record-notes-markdown :is(ul, ol) { padding-inline-start: 22px; }
+.nola-record-notes-markdown blockquote { padding-inline-start: 12px; border-inline-start: 2px solid var(--border); color: var(--muted); }
+.nola-record-notes-markdown :not(pre) > code { padding: 1px 4px; border-radius: var(--radius-sm); background: var(--surface-secondary); }
+.nola-record-notes-markdown pre { overflow-x: auto; padding: 10px; border-radius: var(--radius-md); background: var(--surface-secondary); }
+.nola-record-notes-markdown table { width: 100%; border-collapse: collapse; }
+.nola-record-notes-markdown :is(th, td) { padding: 5px 7px; border: 1px solid var(--border); text-align: start; }
 

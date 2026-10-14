@@ -1,3 +1,16 @@
+.app-update-dialog.modal__dialog--lg {
+  width: min(56rem, calc(100vw - var(--space-6) - var(--space-6)));
+  max-width: none;
+}
+
+.app-update-dialog-body {
+  scrollbar-width: none;
+}
+
+.app-update-dialog-body::-webkit-scrollbar {
+  display: none;
+}
+
 .app-update-markdown {
   min-width: 0;
   color: var(--muted);

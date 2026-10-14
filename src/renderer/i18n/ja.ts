@@ -554,6 +554,8 @@ const jaMessages: Record<DictionaryKey, string> = {
   'notes.italic': '斜体',
   'notes.underline': '下線',
   'notes.strikethrough': '取り消し線',
+  'notes.preview': 'プレビュー',
+  'notes.edit': '編集',
   'common.cancel': 'キャンセル',
   'common.confirm': '確認',
   'common.close': '閉じる',

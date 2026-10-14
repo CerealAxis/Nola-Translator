@@ -554,6 +554,8 @@ const koMessages: Record<DictionaryKey, string> = {
   'notes.italic': '기울임꼴',
   'notes.underline': '밑줄',
   'notes.strikethrough': '취소선',
+  'notes.preview': '미리 보기',
+  'notes.edit': '편집',
   'common.cancel': '취소',
   'common.confirm': '확인',
   'common.close': '닫기',
