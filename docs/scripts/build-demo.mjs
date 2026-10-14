@@ -6,13 +6,19 @@ import { fileURLToPath } from 'node:url'
 import { normalizeEmptyIsCss } from './normalize-empty-is-css.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+const toy = process.argv.includes('--toy')
+const outDir = resolve(root, toy ? 'artifacts/toy' : 'docs/public/demo')
 await build({
   configFile: false,
   root: resolve(root, 'docs/media-src'),
   base: './',
+  mode: toy ? 'toy' : 'production',
   publicDir: resolve(root, 'src/renderer/public'),
   plugins: [react(), tailwindcss()],
   css: { postcss: { plugins: [normalizeEmptyIsCss()] } },
   resolve: { alias: { '@': resolve(root, 'src/renderer'), '@renderer': resolve(root, 'src/renderer') } },
-  build: { outDir: resolve(root, 'docs/public/demo'), emptyOutDir: true },
+  build: { outDir, emptyOutDir: true },
 })
+if (toy) {
+  console.log(`Toy package: ${outDir}`)
+}

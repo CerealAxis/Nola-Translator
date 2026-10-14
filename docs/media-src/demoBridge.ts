@@ -1,8 +1,8 @@
-import type { AppSettings, AppSettingsPatch, CaptionSegment, EngineChannelEvent, MeetingMeta, NolaBridge, ResourceRecord } from '@/bridge'
+import type { AppSettings, AppSettingsPatch, CredentialProvider, EngineChannelEvent, MeetingMeta, NolaBridge, ResourceRecord } from '@/bridge'
 import { initStores, stores } from '@/store'
 import { mergeSettings } from '@/store/settingsStore'
 import type { BrowserConnectionStatus } from '../../src/shared/browser'
-import type { RuntimeSnapshot } from '../../src/shared/compute'
+import { createDemoRuntime, DEMO_COMPUTE } from './demoRuntime'
 
 const noop = () => undefined
 const done = async () => undefined
@@ -10,30 +10,17 @@ const done = async () => undefined
 /** All desktop actions stay in memory. No IPC, captures, model downloads, or credentials exist here. */
 export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => void) {
   let settings = initial
+  const credentials = new Set<CredentialProvider>()
   const transcript = [...stores.session.getState().segments]
-  let overlayTranscript: { segments: readonly CaptionSegment[]; interim: CaptionSegment | null } | null = null
   const settingListeners = new Set<(settings: AppSettings) => void>()
   const engineListeners = new Set<(event: EngineChannelEvent) => void>()
   const publish = (event: EngineChannelEvent) => {
-    // The website plays one utterance at a time; the workspace retains its complete sample transcript.
-    if (overlayTranscript && event.type === 'caption') {
-      stores.session.setState({ segments: [event.segment], interim: null })
-      return
-    }
     engineListeners.forEach(listener => listener(event))
   }
   const openOverlay = async () => {
-    if (!overlayTranscript) {
-      const session = stores.session.getState()
-      overlayTranscript = { segments: session.segments, interim: session.interim }
-      const current = session.interim ?? session.segments.at(-1) ?? transcript[0]
-      stores.session.setState({ segments: current ? [current] : [], interim: null })
-    }
     onOverlay(true)
   }
   const closeOverlay = () => {
-    if (overlayTranscript) stores.session.setState(overlayTranscript)
-    overlayTranscript = null
     onOverlay(false)
   }
   const subscribe = <T,>(listeners: Set<(value: T) => void>, listener: (value: T) => void) => {
@@ -44,14 +31,7 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
     enabled: true, registered: true, connections: 1, captionServiceActive: true, sessionActive: false,
     browsers: ['chrome', 'edge'].map(browser => ({ browser: browser as 'chrome' | 'edge', available: true, extensionStatus: 'installed', connected: true, enabled: true })),
   }
-  const runtimes: RuntimeSnapshot = {
-    packages: [], recipes: [], hardware: { adapters: [], nvidiaDriver: null, notes: [] },
-    recommendation: { engineId: null, llamaId: null, reasons: [] },
-    local: {
-      engine: { path: 'Demo', status: 'ready', backend: 'cpu', version: '2.8', gpuAvailable: false, reason: '' },
-      llama: { path: 'Demo', status: 'ready', backend: 'cpu', version: 'demo', gpuAvailable: false, reason: '' },
-    }, operation: null, lastError: null, directory: '',
-  }
+  const runtimes = createDemoRuntime()
   const update = async (patch: AppSettingsPatch) => {
     settings = mergeSettings(settings, patch)
     settingListeners.forEach(listener => listener(settings))
@@ -69,14 +49,15 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
   }
   const bridge: NolaBridge = {
     engine: {
-      listComputeDevices: async () => ({ devices: [], notes: [], torchVersion: 'Demo', activePlan: null }),
+      listComputeDevices: async () => ({ ...DEMO_COMPUTE, torchVersion: runtimes.local.engine.version }),
       listDevices: async () => stores.models.getState().devices,
       testAudio: async () => { throw new Error('Audio capture is not part of the website demo') },
       listResources: async () => ({ storagePath: '', resources: stores.models.getState().resources }),
       manageResource: async (id, action) => {
         const existing = stores.models.getState().resources.find(item => item.resourceId === id)
         if (!existing) throw new Error('Unknown demo model')
-        const resource: ResourceRecord = { ...existing, installed: action === 'install', installedBytes: action === 'install' ? existing.downloadBytes ?? 0 : 0 }
+        const installed = action === 'cancel' ? existing.installed : action === 'install'
+        const resource: ResourceRecord = { ...existing, installed, installedBytes: installed ? existing.downloadBytes ?? 0 : 0, state: 'idle', cancellable: false }
         publish({ type: 'resourceChanged', protocolVersion: 1, requestId: 'demo', resource })
         return resource
       },
@@ -96,7 +77,23 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
       setCaptionService: async active => { browser.captionServiceActive = active; return { ...browser } },
     },
     overlay: { show: openOverlay, hide: async () => closeOverlay(), close: async () => closeOverlay(), minimize: async () => closeOverlay(), resize: done },
-    runtimes: { list: async () => runtimes, prepare: async () => runtimes, openSettings: done, install: done, import: async () => false, cancel: done },
+    runtimes: {
+      list: async () => runtimes, prepare: async () => runtimes,
+      openSettings: async component => { location.hash = `#/settings/compute?component=${component}` },
+      install: async id => {
+        const recipe = runtimes.recipes.find(item => item.id === id)
+        const pkg = runtimes.packages.find(item => item.id === id)
+        if (recipe) {
+          recipe.installed = true
+          runtimes.local = { ...runtimes.local, engine: { id, path: 'Demo', status: 'ready', backend: recipe.backend, version: recipe.torchVersion, gpuAvailable: recipe.backend !== 'cpu', reason: '' } }
+        } else if (pkg) {
+          pkg.installed = true
+          runtimes.local = { ...runtimes.local, llama: { id, path: 'Demo', status: 'ready', backend: pkg.backend, version: pkg.version, gpuAvailable: pkg.backend !== 'cpu', reason: '' } }
+        }
+        stores.settings.setState({ runtimes: { ...runtimes } })
+      },
+      import: async () => false, cancel: done,
+    },
     storage: { get: async () => ({ activePath: '', configuredPath: '', restartRequired: false }), choose: async () => null, restartApp: done },
     meetings: {
       list: async () => stores.meetings.getState().meetings,
@@ -129,7 +126,11 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
       checkLatestRelease: async () => ({ currentVersion: 'Demo', latestVersion: null, updateAvailable: false, releaseName: null, releaseNotes: '', releaseUrl: null }),
       openReleasePage: done,
     },
-    translation: { hasCredential: async () => false, setCredential: done },
+    translation: {
+      hasCredential: async provider => credentials.has(provider),
+      // Only remember presence, never the entered secret, even within the demo tab.
+      setCredential: async (provider, value) => { if (value) credentials.add(provider); else credentials.delete(provider) },
+    },
     models: {
       configureModel: async (id, configuration) => {
         const existing = stores.models.getState().resources.find(item => item.resourceId === id)
@@ -156,6 +157,6 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
     openAppearance: async () => { closeOverlay(); location.hash = '#/settings/appearance' },
   } })
   initStores(bridge, { backgroundChecks: false })
-  stores.settings.setState({ browser, runtimes })
+  stores.settings.setState({ browser, runtimes, computeSnapshot: { ...DEMO_COMPUTE, torchVersion: runtimes.local.engine.version } })
   return { publish, closeOverlay }
 }

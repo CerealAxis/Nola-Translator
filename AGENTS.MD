@@ -14,7 +14,7 @@
 - UI：Tailwind CSS + HeroUI；设置“更多”页使用 Avatar／AvatarGroup 展示作者、开源鸣谢及明确的赞助空位
 - 新手教程：首次先显示 HeroUI 欢迎弹窗，包含教程说明、GitHub Star 请求和仓库链接；点击开始后，用 Card／Button 与镂空蒙层介绍首页入口、运行组件、识别、翻译和模型下载；设置“更多”的“再次查看”重新打开欢迎页，点击开始后进入教程，首次展示状态按本地用户配置保存。
 - 构建：electron-vite
-- 产品与文档站：VitePress 工程位于 `docs/`，六种语言的首页与 Markdown 页面集中在 `docs/nola-docs/` 并作为 `srcDir`；Vue 容器挂载 React + HeroUI 首页，直接复用桌面主题与区域字体。站点默认自动检测浏览器语言，未匹配时使用英文，手动选择持久化；加载页与首屏使用声波动效。独立构建的 React 演示应用复用真实软件页面与内存 bridge，下载指向 GitHub Releases；展示素材同源渲染。
+- 产品与文档站：VitePress 工程位于 `docs/`，六种语言的首页与 Markdown 页面集中在 `docs/nola-docs/` 并作为 `srcDir`；Vue 容器挂载 React + HeroUI 首页，直接复用桌面主题与区域字体。站点默认自动检测浏览器语言，未匹配时使用英文，手动选择持久化；加载页与首屏使用声波动效。文档站与哔哩哔哩 Toy 共用独立 React 演示入口、真实软件页面与内存 bridge，并通过 `renderer/application.tsx` 与桌面端共享页面及导航注册；下载指向 GitHub Releases，展示素材同源渲染。
 - 测试：Vitest + Testing Library
 - 诊断：主进程使用 Node 文件 API 每次启动保存一份不拆分的 JSONL 日志，自动脱敏、限制单条大小并保留最近启动记录。
 - 浏览器：Chrome／Edge Manifest V3 + React／TypeScript；扩展独立版本由 browser/version.json 管理，CHANGELOG.md 记录发布；Python 标准库 Native Messaging 连接程序由 PyInstaller 打包
@@ -27,6 +27,7 @@ src/
 ├── preload/     # 单文件，contextBridge 暴露 window.nolaTranslator
 ├── shared/      # 跨进程契约：类型 + zod + 默认值；error-catalog.ts 定义稳定用户支持码，languages.ts 为语言代码目录，cloud-config.ts 统一云端识别与翻译连接配置及语言限制，index-translate.ts 定义公开 API、模型及已核实语言预设，model-capabilities.ts 为模型能力与推荐预设。**改枚举必看这里**
 └── renderer/    # React 应用
+    ├── application.tsx # 桌面、文档站与 Toy 共用的页面及导航注册
     ├── bridge/  # 渲染进程唯一的数据出口（NolaBridge）
     ├── assets/browsers/ # Chrome／Edge 图标，用于浏览器连接设置
     ├── assets/fonts/    # 随桌面应用打包的 Noto CJK 区域可变字体与 OFL 许可证
@@ -49,8 +50,8 @@ browser/
 docs/                           # VitePress 站点工程
 ├── nola-docs/                   # 配置为 srcDir；默认中文与 en／ja／ko／zh-HK／zh-TW 页面集中存放
 ├── .vitepress/                  # 站点配置、主题、六语言首页与设计样式
-├── media-src/                   # 复用真实 React 页面，demoBridge.ts 提供纯内存交互，Scene.tsx 组合字幕与原创场景
-├── scripts/                     # 构建演示应用并生成素材
+├── media-src/                   # 文档站与 Toy 共用入口；demoBridge.ts 提供纯内存交互，demoRuntime.ts 复用运行组件清单，Scene.tsx 组合字幕与原创场景
+├── scripts/                     # 构建演示与 Toy 包、生成素材；check-demo 检查子路径部署、页面布局与交互
 └── public/                      # 静态资源；demo 为忽略的构建输出，screenshots 保存六语言海报源图
 assets/brand/                   # 应用 Logo 与设置“更多”页打包的 GitHub 官方头像；sources.md 记录头像来源
 scripts/                        # PowerShell 构建脚本；build-python-base.ps1 构建不含 Torch 的 Python 3.12，generate-runtime-catalog.py 维护组合清单；fetch-llama*.ps1 按清单准备开发运行时
@@ -103,7 +104,7 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 - Aliyun cloud recognition bypasses local ASR weights and component checks. LiveTranslate 3.8 uses delta events and auto source detection; 3.5 uses text/stash snapshots. Native translations join their source items; stream completion sends session.finish and awaits session.finished. Reset closes the old connection before opening another. Credentials remain in encrypted main-process slots, outside settings and browser contracts. MyMemory translates confirmed sentences through REST, checks embedded quota errors, and splits q by UTF-8 bytes; it does not provide token streaming.
 - MiniMax speech-to-text accepts one complete audio file per request and has no audio streaming input, so its `stream=true` is response-side only and begins after the upload completes — captions therefore arrive at gate closures rather than mid-utterance. Segments reuse `VolumeGateSegmenter`, which splits on silence and keeps adjacent segments from overlapping, so no text is recognized twice and billing matches the audio. Its 6 s ceiling is a caption-lag budget for speech with no pause to close the gate on, not a service limit; billing follows audio duration, so splitting more often costs the same money. `accept` only hands finished segments to background tasks and returns immediately, because it runs inside the audio capture loop; `flush` drains those uploads so the tail caption lands, cancelling rather than orphaning one that outruns its budget. Deltas are keyed by the server's event `index` rather than arrival order, and a stream cut before its finish event still publishes the partial transcript it already carried. A failure latches on the first error, so one invalid key cannot repeat a billable call for every remaining segment. Its `language` travels as a request header, with app code `tl` rewritten to the provider's `fil`. HTTP 402 and 429 map to separate reason words because they call for opposite user action.
 - Cloud recognition failures carry the cause in the engine's wire `code`, because `supportErrorCodeForCause()` and `errorCopyOf()` both read that field; `details.reason` only reaches the rendered message text and the launch log. Auth failures, a spent balance and a rate limit each emit their own code rather than the generic `modelUnavailable`, whose copy points at installing a local model and cannot help a cloud account problem.
-- VitePress uses `docs/nola-docs/` as `srcDir` for the default Chinese and five regional Markdown routes; a Vue lifecycle container mounts the React/HeroUI homepage. Marketing styles import desktop tokens and regional fonts rather than duplicating them. The isolated iframe app reuses actual desktop pages, hash routes and stores; its typed bridge simulates settings, sessions, notes and model actions exclusively in memory. Scenario artwork uses the actual OverlayRoot or extension caption styles and captionLines with original surrounding scenery. The demo is built before site dev/build, its output is ignored, and screenshots plus their source provenance are maintained under docs/public/screenshots. Validate website geometry at 1920 x 1080. Windows downloads link to latest GitHub Releases; unreleased desktop/CLI entries say downloads are coming soon.
+- VitePress uses `docs/nola-docs/` as `srcDir` for the default Chinese and five regional Markdown routes; a Vue lifecycle container mounts the React/HeroUI homepage. Marketing styles import desktop tokens and regional fonts rather than duplicating them. The isolated iframe app and Bilibili Toy share the same demo entry, actual desktop pages, hash routes and stores; `renderer/application.tsx` owns page registration and navigation for all three hosts. The typed demo bridge simulates settings, sessions, notes, runtime and model actions exclusively in memory, never invoking inference or remote credentials. Runtime choices come from the checked-in catalogs; hardware and installed state are fictional. Interactive demos start idle, while explicit screenshot mode seeds a deterministic running session. Manual onboarding is available without an automatic welcome. Toy builds use relative assets under artifacts/toy, preserve the desktop UI and show a localized demo-data label. Scenario artwork uses the actual OverlayRoot or extension caption styles and captionLines with original surrounding scenery. The demo is built before site dev/build, its output is ignored, and screenshots plus their source provenance are maintained under docs/public/screenshots. Validate website geometry at 1920 x 1080. Windows downloads link to latest GitHub Releases; unreleased desktop/CLI entries say downloads are coming soon.
 - Website language detection uses navigator.languages in preference order, distinguishes Chinese regions/scripts, and falls back to English. siteLocale.ts owns the shared homepage/document preference; choosing auto resumes detection. Pointer traces are decorative, ignore demo interactions, expire while stationary, and stop their animation loop when empty. Reduced-motion preferences disable decorative motion.
 - Settings More follows the existing Card layout and uses bundled GitHub profile avatars with recorded origins. Sponsor silhouettes show a localized vacancy tooltip, never fabricated supporters. About, licenses and feedback live in More; engine diagnostics and factory reset stay in Advanced. All six UI locales must remain complete.
 - Meeting transcripts persist confirmed speech and settled translation changes, not streamed token revisions; segment counts count unique confirmed segments.
@@ -162,6 +163,8 @@ npm run dev            # 开发（electron-vite）
 npm run typecheck      # tsc --noEmit
 npm test               # vitest run
 npm run build          # typecheck && electron-vite build
+npm run build:toy      # 与文档站共用真实 UI，产物 artifacts/toy
+npm run test:demo      # 构建 Toy 后检查子路径部署、17 页面／三种尺寸、会话与六语言深色 UI
 npm run test:onboarding # 构建后检查首次引导、再次查看及六语言／深浅主题／三种窗口尺寸
 npm run build:browser  # 构建可手动加载的 MV3 扩展
 npm run package:browser # release/Nola-Browser-Extension.zip

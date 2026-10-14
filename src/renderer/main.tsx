@@ -6,20 +6,13 @@ import { StrictMode, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
 import { Alert, Button, Toast } from '@heroui/react'
-import { Home, Mic, Captions, Clock, SlidersHorizontal, Settings, Video } from 'lucide-react'
+import { APPLICATION_PAGES, useApplicationNavigation } from './application'
 import { createIpcBridge, isIpcBridgeAvailable } from './bridge/ipc/ipcBridge'
 import { I18nProvider, useI18n } from './i18n'
 import { AppShell, ErrorBoundary } from './components/primitives'
 import { Routes, useRoute } from './routes'
 import { disposeStores, initStores, isEngineConnected, stores, useStore } from './store'
-import { HomePage } from './features/home'
-import { RecordsPage, RecordDetailPage } from './features/records'
-import { WorkspacePage } from './features/workspace'
 import { OverlayRoot } from './features/overlay'
-import { OverlayPage } from './features/overlay/OverlayPage'
-import { VideoCaptionsPage } from './features/video-captions/VideoCaptionsPage'
-import { ModelsPage } from './features/models'
-import { SettingsPage } from './features/settings'
 import { RuntimeNotice } from './features/settings/RuntimeNotice'
 import { AppUpdateNotice } from './features/settings/AppUpdateNotice'
 import { OnboardingTour } from './features/onboarding'
@@ -40,18 +33,6 @@ import { OnboardingTour } from './features/onboarding'
 const isOverlayDocument = new URLSearchParams(window.location.search).get('overlay') === '1'
 const bridge = createIpcBridge()
 initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument })
-
-/** 页面表。四个 feature 都自己读路由取 id / tab，所以这里一律无 props。 */
-const PAGES = {
-  home: () => <HomePage />,
-  workspace: () => <WorkspacePage />,
-  overlay: () => <OverlayPage />,
-  'video-captions': () => <VideoCaptionsPage />,
-  records: () => <RecordsPage />,
-  record: () => <RecordDetailPage />,
-  models: () => <ModelsPage />,
-  settings: () => <SettingsPage />
-} as const
 
 /**
  * 浮窗点「字幕外观」→ 主窗跳到对应设置页。
@@ -110,73 +91,13 @@ function EngineDisconnectedNotice() {
 
 /** 侧边栏导航 + 路由联动 */
 function Shell() {
-  const { route, navigate } = useRoute()
-  const { t } = useI18n()
+  const navigation = useApplicationNavigation()
   useOverlayNavigation()
-
-  const navigation = [
-    {
-      id: 'home',
-      label: t('nav.home'),
-      icon: Home,
-      path: '#/',
-      active: route === 'home',
-      onPress: () => navigate('#/'),
-    },
-    {
-      id: 'workspace',
-      label: t('nav.workspace'),
-      icon: Mic,
-      path: '#/workspace',
-      active: route === 'workspace',
-      onPress: () => navigate('#/workspace'),
-    },
-    {
-      id: 'overlay',
-      label: t('shellUi.overlay'),
-      icon: Captions,
-      path: '#/overlay',
-      active: route === 'overlay',
-      onPress: () => navigate('#/overlay'),
-    },
-    {
-      id: 'video-captions',
-      label: t('videoCaptions.title'),
-      icon: Video,
-      path: '#/video-captions',
-      active: route === 'video-captions',
-      onPress: () => navigate('#/video-captions'),
-    },
-    {
-      id: 'records',
-      label: t('nav.records'),
-      icon: Clock,
-      path: '#/records',
-      active: route === 'records' || route === 'record',
-      onPress: () => navigate('#/records'),
-    },
-    {
-      id: 'models',
-      label: t('nav.models'),
-      icon: SlidersHorizontal,
-      path: '#/models',
-      active: route === 'models',
-      onPress: () => navigate('#/models'),
-    },
-    {
-      id: 'settings',
-      label: t('nav.settings'),
-      icon: Settings,
-      path: '#/settings/appearance',
-      active: route === 'settings',
-      onPress: () => navigate('#/settings/appearance'),
-    },
-  ]
 
   return (
     <AppShell navigation={navigation}>
       {isEngineConnected() ? null : <EngineDisconnectedNotice />}
-      <Routes pages={PAGES} />
+      <Routes pages={APPLICATION_PAGES} />
       <OnboardingTour />
     </AppShell>
   )
