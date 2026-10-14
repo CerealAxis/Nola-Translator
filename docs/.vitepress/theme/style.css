@@ -39,6 +39,16 @@
   padding: 0;
 }
 
+/* HeroUI's global .menu also matches VitePress's flyout panels, so the language
+   menu inherits a padded, clipped flex column instead of sizing to its content. */
+.VPFlyout .menu {
+  display: block;
+  width: auto;
+  gap: 0;
+  overflow: visible;
+  padding: 0;
+}
+
 /* Keep VitePress's mobile navigation controls intact when the landing page's
    utility styles have been loaded during client-side navigation. */
 .VPLocalNav .menu {
