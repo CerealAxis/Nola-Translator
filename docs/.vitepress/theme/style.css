@@ -28,6 +28,17 @@
   border-color: var(--vp-c-brand-1);
 }
 
+/* HeroUI's global .menu styles also match VitePress's desktop navigation.
+   Restore its inline layout without overriding the mobile visibility rule. */
+.VPNavBar .VPNavBarMenu.menu {
+  position: static;
+  flex-direction: row;
+  width: auto;
+  gap: 0;
+  overflow: visible;
+  padding: 0;
+}
+
 /* Keep VitePress's mobile navigation controls intact when the landing page's
    utility styles have been loaded during client-side navigation. */
 .VPLocalNav .menu {
