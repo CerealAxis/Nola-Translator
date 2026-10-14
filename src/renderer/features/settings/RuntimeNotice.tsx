@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 import { Modal, Button } from '@heroui/react'
 import { actions, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
+import { translationEngine } from '../../../shared/model-engines'
+import { NO_TRANSLATION_LANGUAGE } from '../../../shared/settings'
 
 /** A runtime component that is not ready. */
 export interface RuntimeIssue {
@@ -37,10 +39,19 @@ export function RuntimeNoticeDialog({ issues, isOpen, onOpenChange, onOpenSettin
 }
 
 export function RuntimeNotice() {
-  const { runtimes, runtimeNoticeDismissed } = useStore(stores.settings, state => state)
+  const { runtimes, runtimeNoticeDismissed, settings } = useStore(stores.settings, state => state)
+  const resources = useStore(stores.models, state => state.resources)
+  const modelId = settings?.translation.localModelId
+  const model = resources.find(resource => resource.resourceId === modelId)
+  const usesLocalTranslation = settings?.translation.provider === 'local'
+    && settings.translation.targetLanguage !== NO_TRANSLATION_LANGUAGE
+  const selectedTranslationEngine = settings ? translationEngine(settings.compute, model?.provider, modelId) : 'llama'
+  const needsTorch = settings?.recognition.provider === 'local'
+    || (usesLocalTranslation && selectedTranslationEngine === 'pytorch')
+  const needsLlama = usesLocalTranslation && selectedTranslationEngine === 'llama'
   const issues: RuntimeIssue[] = runtimes
     ? (['engine', 'llama'] as const)
-      .filter(kind => runtimes.local[kind].status !== 'ready')
+      .filter(kind => (kind === 'engine' ? needsTorch : needsLlama) && runtimes.local[kind].status !== 'ready')
       .map(kind => ({ kind, reason: runtimes.local[kind].reason }))
     : []
   return <RuntimeNoticeDialog

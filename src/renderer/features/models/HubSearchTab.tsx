@@ -1,5 +1,6 @@
 import { configurationOf } from '../../../shared/model-capabilities'
 import { ModelConfigurationDialog } from './ModelConfigurationDialog'
+import { DownloadSourceDialog } from './DownloadSourceDialog'
 /** Hub metadata hits arrive before the README card or any runtime inspection finishes. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Card, Drawer, EmptyState, SearchField, Tag, TagGroup, toast } from '@heroui/react'
@@ -107,6 +108,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
   const { t } = useI18n()
   const [query, setQuery] = useState('')
   const [configuring, setConfiguring] = useState<ResourceRecord | null>(null)
+  const [downloadTarget, setDownloadTarget] = useState<HubHit | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [hits, setHits] = useState<HubHit[]>([])
   const [descriptions, setDescriptions] = useState<Record<string, string>>({})
@@ -213,15 +215,23 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
     { id: 'quant', label: t('models.filterQuant') },
   ]
   const install = (hit: HubHit) => {
-    void actions.models.installHubModel(hit.summary.repo, installSlotOf(hit)).catch((error: unknown) => {
-      console.error('[models] hub install failed', error)
-      toast.danger(t('models.installFailed'))
-    })
+    setDownloadTarget(hit)
   }
   const descriptionOf = (summary: HubModelSummary) => summary.description
     ?? descriptions[summary.repo] ?? ''
 
   return <div className="flex flex-col gap-4">
+    <DownloadSourceDialog record={downloadTarget ? {
+      resourceId: `hub:${downloadTarget.summary.repo}`,
+      name: downloadTarget.summary.repo,
+    } : null} onClose={() => setDownloadTarget(null)} onSelect={source => {
+      const target = downloadTarget
+      setDownloadTarget(null)
+      if (target) void actions.models.installHubModel(target.summary.repo, installSlotOf(target), source).catch((error: unknown) => {
+        console.error('[models] hub install failed', error)
+        toast.danger(t('models.installFailed'))
+      })
+    }} />
     {configuring ? <ModelConfigurationDialog key={configuring.resourceId} record={configuring} onClose={() => setConfiguring(null)} /> : null}
     <SearchField value={query} onChange={setQuery} fullWidth aria-label={t('models.searchPlaceholder')}>
       <SearchField.Group>

@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Modal, toast } from '@heroui/react'
+import { Button, Link, Modal, toast } from '@heroui/react'
 import { ArrowUpRight } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 import type { AppUpdateCheckResult } from '@/bridge'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
+import './AppUpdateNotice.css'
 
 export interface AppUpdateDialogProps {
   /** An update the caller has already checked for a version and a release page. */
@@ -18,10 +21,21 @@ export interface AppUpdateDialogProps {
   isOpening: boolean
 }
 
+function displayVersion(value: string): string {
+  return value.trim().replace(/^v(?=\d)/i, '')
+}
+
+function displayReleaseName(value: string | null): string | null {
+  if (!value) return value
+  return /^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/i.test(value.trim())
+    ? displayVersion(value)
+    : value
+}
+
 export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, isOpening }: AppUpdateDialogProps): ReactNode {
   const { t } = useI18n()
   // A result without these renders nothing in the wrapper, so the fallbacks never show.
-  const latestVersion = result.latestVersion ?? ''
+  const latestVersion = displayVersion(result.latestVersion ?? '')
   const releaseUrl = result.releaseUrl ?? ''
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
@@ -32,12 +46,25 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
               <Modal.Heading className="nola-title text-foreground">{t('appUpdate.title')}</Modal.Heading>
             </Modal.Header>
             <Modal.Body className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
-              <div className="nola-body-strong">{result.releaseName}</div>
+              <div className="nola-body-strong">{displayReleaseName(result.releaseName)}</div>
               <div className="nola-caption text-muted">{t('appUpdate.version', { version: latestVersion })}</div>
-              <div className="nola-caption text-muted">{t('appUpdate.currentVersion', { version: result.currentVersion })}</div>
+              <div className="nola-caption text-muted">{t('appUpdate.currentVersion', { version: displayVersion(result.currentVersion) })}</div>
               <h3 className="nola-body-strong mt-2">{t('appUpdate.notes')}</h3>
               {result.releaseNotes.trim()
-                ? <div className="nola-body whitespace-pre-wrap break-words">{result.releaseNotes}</div>
+                ? (
+                  <div className="app-update-markdown">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        a: ({ href, children }) => href
+                          ? <Link href={href} target="_blank" rel="noreferrer" className="app-update-markdown__link">{children}</Link>
+                          : <>{children}</>,
+                      }}
+                    >
+                      {result.releaseNotes}
+                    </ReactMarkdown>
+                  </div>
+                )
                 : <div className="nola-caption text-muted">{t('appUpdate.notesUnavailable')}</div>}
             </Modal.Body>
             <Modal.Footer>

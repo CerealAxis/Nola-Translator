@@ -21,7 +21,7 @@ export async function probeLocalEngine(python: string, directory: string): Promi
   try {
     const setup = pythonRuntimePaths([join(dirname(python), 'Lib', 'site-packages'), directory], dirname(python), directory)
     const script = `${setup}; import json,importlib.util; import torch; xpu=getattr(getattr(torch,'xpu',None),'_is_compiled',lambda:False)(); dml=importlib.util.find_spec('torch_directml') is not None; importlib.import_module('torch_directml') if dml else None; backend='directml' if dml else 'rocm' if torch.version.hip else 'cuda' if torch.version.cuda else 'xpu' if xpu else 'cpu'; xf=importlib.util.find_spec('xformers'); from importlib.metadata import version; print(json.dumps(dict(torch=str(torch.__version__),backend=backend,path=str(__import__('pathlib').Path(torch.__file__).parent.parent),xformersVersion=version('xformers') if xf else '')))`
-    const probe = await run(python, ['-I', '-c', script], { windowsHide: true, timeout: 30_000, maxBuffer: 1024 * 1024,
+    const probe = await run(python, ['-I', '-c', script], { windowsHide: true, timeout: 60_000, maxBuffer: 1024 * 1024,
       env: { ...process.env, PYTHONUTF8: '1' } })
     const actual = JSON.parse(probe.stdout.trim()) as { torch: string; backend: string; path: string; xformersVersion: string }
     return { ...result, path: actual.path, status: 'ready', backend: actual.backend, version: actual.torch,

@@ -65,7 +65,7 @@ const initialState: ModelsState = {
   error: null,
   busyIds: [],
   engineVersion: null,
-  credentials: { cloud: false, microsoft: false, 'aliyun-asr': false, 'minimax-asr': false },
+  credentials: { cloud: false, 'fallback-cloud': false, microsoft: false, 'aliyun-asr': false, 'minimax-asr': false },
   hub: { query: '', kind: 'asr', results: [], candidates: 0, rateLimited: false, loading: false, failed: false },
 }
 
@@ -75,6 +75,7 @@ let bridge: NolaBridge | null = null
 let unsubscribe: (() => void) | null = null
 let busy = new Set<string>()
 let searchGeneration = 0
+const downloadSamples = new Map<string, { at: number; bytes: number; rate?: number }>()
 
 const enqueue = createWriteQueue()
 
@@ -89,13 +90,29 @@ function setBusy(ids: Iterable<string>): void {
 
 /** Replaces one record in place, leaving list order and every other reference alone. */
 function patchResource(resource: ResourceRecord): void {
+  let measured: ResourceRecordWithRate = resource
+  if (resource.state === 'running' && resource.phase === 'download' && resource.downloadBytes && resource.progress !== undefined) {
+    const now = Date.now()
+    const bytes = resource.downloadBytes * Math.min(1, Math.max(0, resource.progress))
+    const previous = downloadSamples.get(resource.resourceId)
+    if (!previous || bytes < previous.bytes) downloadSamples.set(resource.resourceId, { at: now, bytes })
+    else {
+      const seconds = (now - previous.at) / 1000
+      if (seconds >= 0.5) {
+        const instant = (bytes - previous.bytes) / seconds
+        const rate = previous.rate === undefined ? instant : (previous.rate + instant) / 2
+        downloadSamples.set(resource.resourceId, { at: now, bytes, rate })
+      }
+      measured = { ...resource, bytesPerSecond: downloadSamples.get(resource.resourceId)?.rate }
+    }
+  } else downloadSamples.delete(resource.resourceId)
   modelsStore.setState((state) => {
     const index = state.resources.findIndex((item) => item.resourceId === resource.resourceId)
     if (index < 0) {
-      return { resources: [...state.resources, resource] }
+      return { resources: [...state.resources, measured] }
     }
     const next = [...state.resources]
-    next[index] = resource
+    next[index] = measured
     return { resources: next }
   })
 }
@@ -116,9 +133,13 @@ export async function loadModels(options: { includeDevices?: boolean } = {}): Pr
     // Both engine calls block until the handshake finishes, so on a cold start this
     // resolves after the engine is up rather than answering empty. Preflight can skip
     // the independent device probe so a transient enumeration fault does not hide models.
+    // Keep that isolation for the normal load too: device enumeration is not required to show
+    // the model catalog, and a transient audio-device fault must not discard a good resource list.
     const [snapshot, devices, credentials] = await Promise.all([
       bridge.engine.listResources(),
-      includeDevices ? bridge.engine.listDevices() : Promise.resolve(modelsStore.getState().devices),
+      includeDevices
+        ? bridge.engine.listDevices().catch(() => modelsStore.getState().devices)
+        : Promise.resolve(modelsStore.getState().devices),
       loadCredentials(bridge),
     ])
     modelsStore.setState({
@@ -146,20 +167,21 @@ async function loadCredentials(target: NolaBridge): Promise<Record<CredentialPro
       flags[provider] = present
       return flags
     },
-    { cloud: false, microsoft: false, 'aliyun-asr': false, 'minimax-asr': false },
+    { cloud: false, 'fallback-cloud': false, microsoft: false, 'aliyun-asr': false, 'minimax-asr': false },
   )
 }
 
 export async function manageResource(
   resourceId: string,
   action: 'install' | 'remove' | 'cancel',
+  source?: import('../../shared/contracts').ModelDownloadSource,
 ): Promise<ResourceRecord> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
   setBusy([...busy, resourceId])
   modelsStore.setState({ error: null })
   return enqueue(async () => {
     try {
-      const resource = await bridge!.engine.manageResource(resourceId, action)
+      const resource = await bridge!.engine.manageResource(resourceId, action, source)
       patchResource(resource)
       return resource
     } catch (error) {
@@ -216,12 +238,13 @@ export async function configureModel(resourceId: string, configuration: ModelCon
 export async function installHubModel(
   repo: string,
   slot: 'recognition' | 'translation',
+  source?: import('../../shared/contracts').ModelDownloadSource,
 ): Promise<ResourceRecord> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
   setBusy([...busy, repo])
   return enqueue(async () => {
     try {
-      const record = await bridge!.models.installHuggingFaceModel(repo, slot)
+      const record = await bridge!.models.installHuggingFaceModel(repo, slot, source)
       patchResource(record)
       return record
     } finally {
@@ -309,6 +332,7 @@ export function attachModelsStore(next: NolaBridge): void {
 }
 
 export function detachModelsStore(): void {
+  downloadSamples.clear()
   searchGeneration += 1
   unsubscribe?.()
   unsubscribe = null

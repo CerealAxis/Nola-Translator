@@ -58,3 +58,15 @@ it('starts remote-only captions without Torch and still requires local translati
   await expect(manager.prepare(DEFAULT_SETTINGS.compute, 'llama', false)).resolves.toBeUndefined()
   await expect(manager.prepare(DEFAULT_SETTINGS.compute, 'torch', false)).rejects.toThrow('RUNTIME_TORCH')
 })
+
+it('allows cloud-only service without either inference component and validates each selected local model', async () => {
+  const { manager, engine, local } = await validatedManager()
+  await rm(join(engine, 'torch', '__init__.py'))
+  await rm(join(local.llama.path, 'llama-server.exe'))
+  Object.assign(manager, { local: { engine: missingLocalRuntime(), llama: missingLocalRuntime() } })
+  const recheck = vi.spyOn(manager, 'recheck').mockResolvedValue(undefined)
+  await expect(manager.prepare(DEFAULT_SETTINGS.compute, 'none', false)).resolves.toBeUndefined()
+  expect(recheck).not.toHaveBeenCalled()
+  await expect(manager.prepare(DEFAULT_SETTINGS.compute, 'none', true)).rejects.toThrow('RUNTIME_TORCH')
+  await expect(manager.prepare(DEFAULT_SETTINGS.compute, 'llama', false)).rejects.toThrow('RUNTIME_LLAMA')
+})

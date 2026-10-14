@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PYPI_MIRROR_NODES } from '../shared/pypi-mirrors'
 import { INDEX_TRANSLATE_MODEL_IDS } from '../shared/index-translate'
 import { computeSettingsPatchSchema } from '../shared/compute'
 
@@ -45,6 +46,7 @@ export const settingsPatchSchema = z.object({
   network: z.object({
     useHuggingFaceMirror: z.boolean().optional(),
     usePypiMirror: z.boolean().optional(),
+    pypiMirrorUrl: z.enum(PYPI_MIRROR_NODES).optional(),
     useGithubAccelerate: z.boolean().optional(),
     // A node from the picker catalog or its `auto` sentinel; the catalog is not enforced here, so the
     // bound is what keeps a hand-built request from riding an oversized value onto every engine call.
@@ -123,5 +125,14 @@ export const settingsPatchSchema = z.object({
     cloudMaxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
     translateIntermediate: z.boolean().optional(),
     targetLanguage: z.string().min(1).max(32).optional(),
+    fallback: z.object({
+      provider: z.enum(['disabled', 'local', 'cloud', 'microsoft', 'mymemory', 'index-translate']).optional(),
+      cloudEndpoint: z.string().max(2048).optional(), cloudModel: z.string().max(256).optional(),
+      cloudApiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
+      cloudContextWindow: z.number().int().min(256).max(10_000_000).optional(),
+      cloudMaxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
+      microsoftEndpoint: z.string().min(1).max(2048).optional(), microsoftRegion: z.string().max(128).optional(),
+      mymemoryEndpoint: z.string().max(2048).optional(), mymemoryEmail: z.string().max(320).optional(),
+    }).partial().optional(),
   }).partial().optional(),
 }).strict()

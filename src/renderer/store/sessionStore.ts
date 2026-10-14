@@ -224,7 +224,7 @@ export function findMissingResource(
   config: SessionConfig,
 ): MissingResource | null {
   // No target language, or not a local provider: no local model to preflight.
-  const translationResourceId = config.targetLanguages.length === 0 || config.translationProvider !== 'local'
+  const translationResourceId = config.targetLanguages.length === 0 || config.translationProvider !== 'local' && config.fallbackTranslationProvider !== 'local'
     ? null
     : config.translationModelId?.trim() || DEFAULT_SETTINGS.translation.localModelId
   const requiredIds = [...((config.recognitionProvider ?? 'local') === 'local' ? [config.recognitionModelId] : []), ...(translationResourceId ? [translationResourceId] : [])]

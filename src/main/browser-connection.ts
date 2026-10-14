@@ -92,6 +92,7 @@ export function browserSessionConfig(settings: AppSettings, request: Extract<Bro
     translationProvider: translation.provider, translationModelId: translation.localModelId,
     allowIntermediateTranslation: supportsIntermediateTranslation(translation.provider) && translation.translateIntermediate,
     translationOptions: translationOptionsOf(translation),
+    ...fallbackTranslationFieldsOf(translation),
     browserTimeline: { epoch: request.epoch, videoTimeMs: request.videoTimeMs, playbackRate: request.playbackRate },
   }
 }
@@ -487,4 +488,4 @@ export class BrowserConnection {
     if (['failed', 'recovering', 'stopped'].includes(state)) for (const client of this.clients) if (client.sessionId) client.socket.destroy()
   }
 }
-import { recognitionFieldsOf, supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'
+import { fallbackTranslationFieldsOf, recognitionFieldsOf, supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'

@@ -27,6 +27,70 @@
 .VPNavBarSearch .DocSearch-Button:hover {
   border-color: var(--vp-c-brand-1);
 }
+
+/* Keep VitePress's mobile navigation controls intact when the landing page's
+   utility styles have been loaded during client-side navigation. */
+.VPLocalNav .menu {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  padding: 12px 24px 11px;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.VPLocalNav .menu-icon {
+  display: inline-block;
+  flex: none;
+  margin-right: 8px;
+}
+
+.VPLocalNavOutlineDropdown > button {
+  display: block;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.VPLocalNavOutlineDropdown .icon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 2px;
+}
+
+.VPNavScreen .VPNavScreenMenuLink {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--vp-c-divider);
+  border-radius: 0;
+  padding: 12px 0 11px;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+  text-decoration: none;
+}
+
+.VPNavScreen .VPNavScreenAppearance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 8px;
+  padding: 12px 14px 12px 16px;
+  background: var(--vp-c-bg-soft);
+}
 :root { --site-loader-size: 96px; --site-loader-mark: 40px; --site-loader-gap: 24px; --site-loader-bar: 4px; --site-loader-wave-height: 24px; }
 .site-loading { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--site-loader-gap); color: var(--foreground); font: var(--nola-text-display); background: radial-gradient(ellipse at center, color-mix(in oklch, var(--accent) 8%, var(--background)), var(--background) 65%); }
 .site-loading p { margin: 0; font-family: var(--font-ui); font-weight: 600; }

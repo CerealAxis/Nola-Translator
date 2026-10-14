@@ -3,9 +3,10 @@ import { dirname } from 'node:path'
 
 import type { AppUpdateCheckResult } from '../shared/app-updates'
 
-const RELEASE_FEED = 'https://github.com/CerealAxis/Nola-Translator/releases.atom'
+const RELEASE_ENDPOINT = 'https://api.github.com/repos/CerealAxis/Nola-Translator/releases/latest'
 const RELEASE_PAGE_PREFIX = 'https://github.com/CerealAxis/Nola-Translator/releases/tag/'
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
+const RELEASE_CACHE_FORMAT = 2
 
 interface ReleaseMetadata {
   tag: string
@@ -15,12 +16,17 @@ interface ReleaseMetadata {
 }
 
 interface ReleaseCache {
+  format: number
   checkedAt: number
   release: ReleaseMetadata
 }
 
+function withoutVersionPrefix(value: string): string {
+  return value.trim().replace(/^v(?=\d)/i, '')
+}
+
 function parseVersion(value: string): { parts: number[]; prerelease: boolean } | null {
-  const match = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(value.trim())
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(withoutVersionPrefix(value))
   if (!match) return null
   return { parts: [Number(match[1]), Number(match[2]), Number(match[3])], prerelease: Boolean(match[4]) }
 }
@@ -89,13 +95,13 @@ function releaseFromFeed(xml: string): ReleaseMetadata | null {
 function cachedMetadata(value: unknown): ReleaseCache | null {
   if (!value || typeof value !== 'object') return null
   const cache = value as Record<string, unknown>
-  if (typeof cache.checkedAt !== 'number' || !Number.isFinite(cache.checkedAt)) return null
+  if (cache.format !== RELEASE_CACHE_FORMAT || typeof cache.checkedAt !== 'number' || !Number.isFinite(cache.checkedAt)) return null
   const release = cache.release as Record<string, unknown> | undefined
   if (!release || typeof release !== 'object'
     || typeof release.tag !== 'string' || typeof release.name !== 'string'
     || typeof release.notes !== 'string' || typeof release.url !== 'string') return null
   const metadata = releaseMetadata({ tag_name: release.tag, name: release.name, body: release.notes, html_url: release.url })
-  return metadata ? { checkedAt: cache.checkedAt, release: metadata } : null
+  return metadata ? { format: RELEASE_CACHE_FORMAT, checkedAt: cache.checkedAt, release: metadata } : null
 }
 
 async function readCache(path: string, now: number): Promise<ReleaseMetadata | null> {
@@ -129,31 +135,45 @@ export async function checkLatestRelease(
   let release = force ? null : await readCache(cachePath, now)
   if (!release) {
     try {
-      const response = await fetcher(RELEASE_FEED, {
-        headers: { Accept: 'application/atom+xml' },
+      const response = await fetcher(RELEASE_ENDPOINT, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'Nola-Translator',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
         signal: AbortSignal.timeout(8_000),
       })
       if (!response.ok) return unavailable(currentVersion)
-      release = releaseFromFeed(await response.text())
+      release = releaseFromResponse(await response.text())
       if (!release) return unavailable(currentVersion)
-      await writeCache(cachePath, { checkedAt: now, release })
+      await writeCache(cachePath, { format: RELEASE_CACHE_FORMAT, checkedAt: now, release })
     } catch {
       return unavailable(currentVersion)
     }
   }
   const updateAvailable = isNewer(release.tag, currentVersion)
   return {
-    currentVersion,
-    latestVersion: release.tag,
+    currentVersion: withoutVersionPrefix(currentVersion),
+    latestVersion: withoutVersionPrefix(release.tag),
     updateAvailable,
-    releaseName: release.name,
+    releaseName: parseVersion(release.name) ? withoutVersionPrefix(release.name) : release.name,
     releaseNotes: release.notes,
     releaseUrl: release.url,
   }
 }
 
 function unavailable(currentVersion: string): AppUpdateCheckResult {
-  return { currentVersion, latestVersion: null, updateAvailable: false, releaseName: null, releaseNotes: '', releaseUrl: null }
+  return { currentVersion: withoutVersionPrefix(currentVersion), latestVersion: null, updateAvailable: false, releaseName: null, releaseNotes: '', releaseUrl: null }
+}
+
+function releaseFromResponse(body: string): ReleaseMetadata | null {
+  try {
+    const release = releaseMetadata(JSON.parse(body) as unknown)
+    if (release) return release
+  } catch {
+    // Older cached fixtures and the public Atom feed remain readable as plain XML.
+  }
+  return releaseFromFeed(body)
 }
 
 /** Accepts only release pages from the product's own GitHub repository. */

@@ -1,4 +1,4 @@
-.settings-page { --settings-control-width:500px; display:flex; flex-direction:column; gap:20px; min-width:0; }
+.settings-page { --settings-control-max-width:450px; display:flex; flex-direction:column; gap:20px; min-width:0; }
 .compute-hint { margin:0; color:var(--muted); font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
 .compute-device-info { font-size:13px; overflow-wrap:anywhere; text-align:end; }
 .compute-number { width:140px; max-width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:10px; color:var(--foreground); background:var(--surface); }
@@ -21,7 +21,7 @@
 .settings-panels { width:100%; min-width:0; }
 .settings-panels .tabs__panel { width:100%; padding:0; margin:0; }
 .settings-panel { display:flex; flex-direction:column; gap:16px; width:100%; min-width:0; }
-.settings-group.card { width:100%; padding:20px; border:1px solid var(--border); border-radius:16px; gap:8px; background:var(--surface); box-shadow:0 2px 10px color-mix(in oklch,var(--accent) 4%,transparent); min-width:0; }
+.settings-group.card { width:100%; padding:20px; border:1px solid var(--border); border-radius:16px; gap:8px; background:var(--surface); box-shadow:0 2px 10px color-mix(in oklch,var(--accent) 4%,transparent); min-width:0; container-type:inline-size; }
 .settings-group .card__header { padding:0; }
 .settings-group .card__title { font-size:20px; font-weight:650; line-height:1.4; }
 .settings-group .card__content { padding:0; min-width:0; }
@@ -33,13 +33,10 @@
 .settings-row__label .label { font-size:14px; font-weight:500; color:var(--foreground); }
 .settings-row__label .description { font-size:12px; color:var(--muted); }
 .settings-row__control { display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px; min-width:0; }
-.settings-row__control > .settings-control-field, .settings-row__control > .number-field { width:var(--settings-control-width); min-width:0; max-width:none; flex:0 0 var(--settings-control-width); }
+.settings-row__control > .settings-control-field, .settings-row__control > .number-field { width:100%; min-width:0; max-width:var(--settings-control-max-width); flex:0 1 var(--settings-control-max-width); }
 .settings-row__control > .meter { width:100%; min-width:0; }
-/* The data-folder path is a fixed path, not a field to type into, so it takes only as much room as
-   the longest path needs to look complete. Matching the selector above keeps the `width:100%` from
-   pushing the browse button onto its own line, and `:has()` keeps that row from wrapping at all. */
-.settings-row__control > .settings-path-input { width:var(--settings-control-width); flex:0 0 var(--settings-control-width); }
-.settings-row__control:has(.settings-path-input) { flex-wrap: nowrap; }
+/* Keep the folder path readable at normal widths while letting its row wrap around the browse action. */
+.settings-row__control > .settings-path-input { width:100%; min-width:0; max-width:var(--settings-control-max-width); flex:0 1 var(--settings-control-max-width); }
 .settings-row__control .select__trigger { width:100%; border-radius:10px; min-width:0; min-height:36px; }
 .select__popover.settings-select-popover { max-height:250px !important; overflow-y:auto !important; }
 .settings-row__control .button { border-radius:10px; }
@@ -83,6 +80,12 @@
  .settings-row__control { justify-content:flex-start; }
  .settings-row__control .switch { margin-left:auto; }
  .settings-nav .tabs__tab { flex-basis:100px; font-size:12px; }
+}
+
+@container (max-width:620px) {
+ .settings-row { grid-template-columns:minmax(0,1fr); gap:8px; padding:12px 0; }
+ .settings-row__control { justify-content:flex-start; }
+ .settings-row__control .switch { margin-left:auto; }
 }
 
 .settings-row__title { display: flex; align-items: center; gap: 0.35rem; }

@@ -1,5 +1,5 @@
 import type { ModelConfiguration } from './model-capabilities'
-import type { CloudApiFormat, NetworkSettings, RecognitionProvider, TranslationProvider } from './settings'
+import type { CloudApiFormat, FallbackTranslationProvider, NetworkSettings, RecognitionProvider, TranslationProvider } from './settings'
 import type { ComputeSettings, ComputeSnapshot } from './compute'
 
 export const PROTOCOL_VERSION = 1 as const
@@ -64,6 +64,9 @@ export type SessionConfig = {
     apiKey?: string
     email?: string
   }
+  /** Used only for a failed final caption; credentials are injected by the main process. */
+  fallbackTranslationProvider?: FallbackTranslationProvider
+  fallbackTranslationOptions?: NonNullable<SessionConfig['translationOptions']>
   /** Absolute path the engine records this meeting's audio to. Omitted means no audio file. */
   recordingPath?: string
   browserTimeline?: { epoch: number; videoTimeMs: number; playbackRate: number }
@@ -90,6 +93,8 @@ export type PrewarmConfig = {
   translationProvider?: TranslationProvider
   translationModelId?: string
   translationOptions?: SessionConfig['translationOptions']
+  fallbackTranslationProvider?: FallbackTranslationProvider
+  fallbackTranslationOptions?: SessionConfig['translationOptions']
 }
 
 /**
@@ -186,6 +191,7 @@ export type EngineCommand =
   | (Envelope<'manageResource'> & {
       resourceId: string
       action: 'install' | 'remove' | 'cancel'
+      downloadSource?: ModelDownloadSource
       // Every command that reaches the network carries its own copy, so a settings change
       // applies to the next request instead of needing an engine restart.
       network?: NetworkSettings
@@ -203,7 +209,7 @@ export type EngineCommand =
   | Envelope<'shutdown'>
   | (Envelope<'searchHubModels'> & { query: string; slot?: 'recognition' | 'translation'; limit?: number; weightFormat?: 'gguf'; cursor?: string; network?: NetworkSettings })
   | (Envelope<'inspectHubRepo'> & { repo: string; network?: NetworkSettings })
-  | (Envelope<'installHubRepo'> & { repo: string; slot?: 'recognition' | 'translation'; network?: NetworkSettings })
+  | (Envelope<'installHubRepo'> & { repo: string; slot?: 'recognition' | 'translation'; downloadSource?: Exclude<ModelDownloadSource, 'modelscope'>; network?: NetworkSettings })
   | (Envelope<'configureModel'> & { resourceId: string; configuration: ModelConfiguration })
 
 export type AudioDevice = {
@@ -238,6 +244,8 @@ export type ResourceRecord = {
   /** Compatibility boundary for engine/provider-defined codes; migrate to EngineErrorCode after wire codes stabilize. */
   errorCode?: string
 }
+
+export type ModelDownloadSource = 'huggingface' | 'hf-mirror' | 'modelscope'
 
 /**
  * Whether the engine can run a repo, plus the model-declared facts the call was made on. `reason`

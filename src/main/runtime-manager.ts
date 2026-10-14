@@ -52,7 +52,7 @@ export class RuntimeManager {
     this.packages = catalogSchema.parse(JSON.parse((await readFile(this.catalogPath, 'utf8')).replace(/^\uFEFF/, ''))).packages
     this.python = new PythonEnvironments(this.directory, this.options.baseDirectory, this.options.recipesPath,
       (item, path, signal, progress) => this.download(item, path, signal, progress), (path, signal) => this.digest(path, signal),
-      this.options.network)
+      this.options.network, (url, signal) => this.probeUrl(url, signal))
     await this.python.initialize()
     const names = await readdir(this.directory).catch(() => [] as string[])
     for (const item of this.packages) {
@@ -73,17 +73,20 @@ export class RuntimeManager {
       const saved = JSON.parse(await readFile(join(this.directory, 'current-components.json'), 'utf8')) as RuntimeSnapshot['local']
       for (const kind of ['engine', 'llama'] as const) if (typeof saved[kind]?.path === 'string') this.local[kind] = { ...missingLocalRuntime(saved[kind].path), id: saved[kind].id }
     } catch { /* First launch discovers existing installations. */ }
+    // Inventory is independent of model choice; prepare() alone enforces session requirements.
     await this.recheck()
   }
 
-  async recheck(): Promise<void> {
+  async recheck(components: readonly ('engine' | 'llama')[] = ['engine', 'llama']): Promise<void> {
     if (this.operation || this.python?.operation) throw new Error('组件安装中，请等待完成')
     if (this.checking) return this.checking
-    this.checking = this.checkComponents().finally(() => { this.checking = null })
+    this.checking = this.checkComponents(components).finally(() => { this.checking = null })
     return this.checking
   }
-  private async checkComponents(): Promise<void> {
+  private async checkComponents(components: readonly ('engine' | 'llama')[]): Promise<void> {
     const python = join(this.options.baseDirectory, 'python.exe')
+    this.pythonState = { ...this.pythonState, path: python }
+    const needsTorch = components.includes('engine')
     try {
       const result = await run(python, ['-I', '-c', 'import sys,struct; assert sys.version_info[:2] == (3,12) and struct.calcsize("P") == 8, "Windows x64 Python 3.12 required"; print(sys.version.split()[0])'],
         { windowsHide: true, timeout: 10_000 })
@@ -123,8 +126,12 @@ export class RuntimeManager {
       }
       return failure ?? missingLocalRuntime()
     }
-    const [engine, llama] = await Promise.all([inspect('engine', candidates.torch), inspect('llama', candidates.llama)])
+    const [engine, llama] = await Promise.all([
+      needsTorch ? inspect('engine', candidates.torch) : this.local.engine,
+      components.includes('llama') ? inspect('llama', candidates.llama) : this.local.llama,
+    ])
     this.local = { engine, llama }
+    logDiagnostic('runtime.components.checked', { components, python: this.pythonState, local: this.local })
     await this.saveSelection()
   }
   private async saveSelection(): Promise<void> {
@@ -322,6 +329,24 @@ export class RuntimeManager {
   private runtimeProxy(): string {
     const network = this.options.network?.()
     return network?.proxyForRuntimeDownload ? network.proxyUrl.trim() : ''
+  }
+  private async probeUrl(url: string, signal: AbortSignal): Promise<boolean> {
+    const proxy = this.pipProxy()
+    const timeout = AbortSignal.timeout(10_000)
+    const requestSignal = AbortSignal.any([signal, timeout])
+    try {
+      const response = await withSessionProxy(proxy, () => net.fetch(url, { method: 'HEAD', signal: requestSignal }))
+      await response.body?.cancel().catch(() => undefined)
+      return response.ok
+    } catch (error) {
+      signal.throwIfAborted()
+      logDiagnostic('runtime.python-mirror-probe.failed', { url, ...processFailure(error) })
+      return false
+    }
+  }
+  private pipProxy(): string {
+    const network = this.options.network?.()
+    return network?.proxyForPip ? network.proxyUrl.trim() : ''
   }
   private async accelerated(url: string): Promise<string> {
     let host: string

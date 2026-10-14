@@ -1,5 +1,6 @@
 """Model capability validation, independent of inference library imports."""
 from .protocol import ModelConfiguration
+from .translation.index_translate_languages import LANGUAGE_NAMES as INDEX_TRANSLATE_LANGUAGE_NAMES
 
 QWEN_LANGUAGES = ['zh', 'en', 'yue', 'ar', 'de', 'fr', 'es', 'pt', 'id', 'it', 'ko', 'ru', 'th', 'vi', 'ja', 'tr', 'hi', 'ms', 'nl', 'sv', 'da', 'fi', 'pl', 'cs', 'fil', 'fa', 'el', 'hu', 'mk', 'ro']
 
@@ -27,4 +28,4 @@ def recognition_configuration(languages: list[str]) -> ModelConfiguration:
 def translation_configuration(languages: list[str], engine: str) -> ModelConfiguration:
     return ModelConfiguration(slot="translation", engine=engine, languages=[], supportsAutoDetection=False, sourceLanguages=languages, targetLanguages=languages)
 
-LANGUAGE_CODES = frozenset(['zh', 'en', 'yue', 'ar', 'de', 'fr', 'es', 'pt', 'id', 'it', 'ko', 'ru', 'th', 'vi', 'ja', 'tr', 'hi', 'ms', 'nl', 'sv', 'da', 'fi', 'pl', 'cs', 'tl', 'fa', 'el', 'hu', 'mk', 'ro', 'zh-Hant', 'km', 'my', 'gu', 'ur', 'te', 'mr', 'he', 'bn', 'ta', 'uk', 'bo', 'kk', 'mn', 'ug', 'af', 'am', 'ast', 'az', 'ba', 'be', 'bg', 'br', 'bs', 'ca', 'ceb', 'cy', 'et', 'ff', 'fy', 'ga', 'gd', 'gl', 'ha', 'hr', 'ht', 'hy', 'ig', 'ilo', 'is', 'jv', 'ka', 'kn', 'lb', 'lg', 'ln', 'lo', 'lt', 'lv', 'mg', 'ml', 'ne', 'no', 'ns', 'oc', 'or', 'pa', 'ps', 'sd', 'si', 'sk', 'sl', 'so', 'sq', 'sr', 'ss', 'su', 'sw', 'tn', 'uz', 'wo', 'xh', 'yi', 'yo', 'zu'])
+LANGUAGE_CODES = frozenset(['zh', 'en', 'yue', 'ar', 'de', 'fr', 'es', 'pt', 'id', 'it', 'ko', 'ru', 'th', 'vi', 'ja', 'tr', 'hi', 'ms', 'nl', 'sv', 'da', 'fi', 'pl', 'cs', 'tl', 'fa', 'el', 'hu', 'mk', 'ro', 'zh-Hant', 'km', 'my', 'gu', 'ur', 'te', 'mr', 'he', 'bn', 'ta', 'uk', 'bo', 'kk', 'mn', 'ug', 'af', 'am', 'ast', 'az', 'ba', 'be', 'bg', 'br', 'bs', 'ca', 'ceb', 'cy', 'et', 'ff', 'fy', 'ga', 'gd', 'gl', 'ha', 'hr', 'ht', 'hy', 'ig', 'ilo', 'is', 'jv', 'ka', 'kn', 'lb', 'lg', 'ln', 'lo', 'lt', 'lv', 'mg', 'ml', 'ne', 'no', 'ns', 'oc', 'or', 'pa', 'ps', 'sd', 'si', 'sk', 'sl', 'so', 'sq', 'sr', 'ss', 'su', 'sw', 'tn', 'uz', 'wo', 'xh', 'yi', 'yo', 'zu']) | frozenset(INDEX_TRANSLATE_LANGUAGE_NAMES)

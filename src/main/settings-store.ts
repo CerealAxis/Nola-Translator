@@ -4,6 +4,7 @@ import { computeSettingsSchema, DEFAULT_COMPUTE_SETTINGS } from '../shared/compu
 
 import { DEFAULT_SETTINGS, RECOGNITION_MODEL_IDS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
 import { findGithubProxyNode, GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT } from '../shared/github-proxies'
+import { findPypiMirrorNode, PYPI_MIRROR_DEFAULT } from '../shared/pypi-mirrors'
 import { ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS } from '../shared/settings'
 import { remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../shared/cloud-config'
 import { settingsPatchSchema } from './settings-schema'
@@ -62,6 +63,17 @@ function sanitizeCloudSettings(settings: AppSettings): void {
   // leave the target language untranslated, so it falls back rather than silently producing
   // source-only captions.
   if (!supportsRecognitionNativeTranslation(recognition.provider) && settings.translation.provider === 'recognition') settings.translation.provider = 'mymemory'
+  settings.translation.fallback ??= structuredClone(DEFAULT_SETTINGS.translation.fallback)
+  const fallback = settings.translation.fallback
+  if (!['disabled', 'local', 'cloud', 'microsoft', 'mymemory', 'index-translate'].includes(fallback.provider)) fallback.provider = 'disabled'
+  // Fixed services own one connection slot; compatible cloud endpoints can each select a model.
+  if (fallback.provider !== 'disabled' && fallback.provider !== 'cloud' && fallback.provider === settings.translation.provider) fallback.provider = 'disabled'
+  fallback.mymemoryEndpoint = bounded(fallback.mymemoryEndpoint, DEFAULT_SETTINGS.translation.fallback.mymemoryEndpoint, 2048)
+  fallback.mymemoryEmail = bounded(fallback.mymemoryEmail, '', 320)
+  fallback.microsoftEndpoint = bounded(fallback.microsoftEndpoint, DEFAULT_SETTINGS.translation.fallback.microsoftEndpoint, 2048)
+  fallback.microsoftRegion = bounded(fallback.microsoftRegion, '', 128)
+  fallback.cloudEndpoint = bounded(fallback.cloudEndpoint, DEFAULT_SETTINGS.translation.fallback.cloudEndpoint, 2048)
+  fallback.cloudModel = bounded(fallback.cloudModel, DEFAULT_SETTINGS.translation.fallback.cloudModel, 256)
 }
 
 const LEGACY_TRANSLATION_KEYS = ['hymt2ModelId', 'openaiEndpoint', 'openaiModel', 'ollamaEndpoint', 'ollamaModel'] as const
@@ -206,6 +218,9 @@ export class SettingsStore {
         network: {
           ...DEFAULT_SETTINGS.network,
           ...(raw.network ?? {}),
+          pypiMirrorUrl: typeof raw.network?.pypiMirrorUrl === 'string'
+            ? findPypiMirrorNode(raw.network.pypiMirrorUrl) ?? PYPI_MIRROR_DEFAULT
+            : PYPI_MIRROR_DEFAULT,
           // A build from before the group kept the mirror toggle at the top level; reading it here
           // is the one place that value is honoured, so a user who turned it off does not get it
           // back from the default above.
@@ -231,6 +246,7 @@ export class SettingsStore {
         translation: {
           ...DEFAULT_SETTINGS.translation,
           ...rawTranslation,
+          fallback: { ...DEFAULT_SETTINGS.translation.fallback, ...(rawTranslation.fallback ?? {}) },
           translateIntermediate: typeof rawTranslation.translateIntermediate === 'boolean'
             ? rawTranslation.translateIntermediate
             : DEFAULT_SETTINGS.translation.translateIntermediate,
@@ -316,7 +332,10 @@ export class SettingsStore {
       overlay: { ...this.settings.overlay, ...(patch.overlay ?? {}) },
       videoCaptions: { ...this.settings.videoCaptions, ...(patch.videoCaptions ?? {}) },
       browserCaptions: { ...this.settings.browserCaptions, ...(patch.browserCaptions ?? {}) },
-      translation: { ...this.settings.translation, ...(patch.translation ?? {}) },
+      translation: {
+        ...this.settings.translation, ...(patch.translation ?? {}),
+        fallback: { ...this.settings.translation.fallback, ...(patch.translation?.fallback ?? {}) },
+      },
       compute: { ...this.settings.compute, ...(patch.compute ?? {}) },
       network: { ...this.settings.network, ...(patch.network ?? {}) },
     }

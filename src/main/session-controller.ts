@@ -102,6 +102,7 @@ export class SessionController {
       // Untrusted IPC payloads cannot supply credentials, including for no-key providers.
       if (parsed.recognitionOptions) delete parsed.recognitionOptions.apiKey
       if (parsed.translationOptions) delete parsed.translationOptions.apiKey
+      if (parsed.fallbackTranslationOptions) delete parsed.fallbackTranslationOptions.apiKey
       const recognitionProvider = parsed.recognitionProvider ?? 'local'
       const credentialSlot = RECOGNITION_CREDENTIAL_SLOTS[recognitionProvider]
       // A provider without a slot of its own carries no key, so its options are dropped rather
@@ -119,6 +120,13 @@ export class SessionController {
         const apiKey = await this.options.getCredential(provider)
         checkCancelled()
         if (apiKey) parsed.translationOptions = { ...parsed.translationOptions, apiKey }
+      }
+      const fallbackProvider = parsed.fallbackTranslationProvider
+      if (fallbackProvider === 'cloud' || fallbackProvider === 'microsoft') {
+        const slot: CredentialProvider = fallbackProvider === 'cloud' ? 'fallback-cloud' : 'microsoft'
+        const apiKey = await this.options.getCredential(slot)
+        checkCancelled()
+        if (apiKey) parsed.fallbackTranslationOptions = { ...parsed.fallbackTranslationOptions, apiKey }
       }
       await this.options.prepare(parsed, () => operation !== this.operation)
       checkCancelled()

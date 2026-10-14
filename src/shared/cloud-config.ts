@@ -28,6 +28,24 @@ export function translationOptionsOf(settings: TranslationSettings): SessionConf
   }
 }
 
+/** Resolves an independently configured backup provider without exposing its credential slot. */
+export function fallbackTranslationFieldsOf(settings: TranslationSettings): Partial<Pick<SessionConfig, 'fallbackTranslationProvider' | 'fallbackTranslationOptions'>> {
+  const fallback = settings.fallback
+  if (!fallback || fallback.provider === 'disabled') return {}
+  switch (fallback.provider) {
+    case 'cloud': return { fallbackTranslationProvider: 'cloud', fallbackTranslationOptions: {
+      endpoint: fallback.cloudEndpoint, model: fallback.cloudModel, apiFormat: fallback.cloudApiFormat,
+      contextWindow: fallback.cloudContextWindow, maxOutputTokens: fallback.cloudMaxOutputTokens,
+    } }
+    case 'microsoft': return { fallbackTranslationProvider: 'microsoft', fallbackTranslationOptions: { endpoint: fallback.microsoftEndpoint, region: fallback.microsoftRegion } }
+    case 'mymemory': return { fallbackTranslationProvider: 'mymemory', fallbackTranslationOptions: { endpoint: fallback.mymemoryEndpoint, email: fallback.mymemoryEmail } }
+    case 'index-translate': return { fallbackTranslationProvider: 'index-translate', fallbackTranslationOptions: {
+      endpoint: INDEX_TRANSLATE_ENDPOINT, model: INDEX_TRANSLATE_PUBLIC_MODEL, apiFormat: 'chat-completions', contextWindow: 32768, maxOutputTokens: 1024,
+    } }
+    case 'local': return { fallbackTranslationProvider: 'local' }
+  }
+}
+
 export function recognitionLabel(settings: RecognitionSettings): string {
   if (settings.provider === 'aliyun') return settings.aliyunModel ?? 'qwen3.8-livetranslate-flash-realtime'
   if (settings.provider === 'minimax') return settings.minimaxModel ?? MINIMAX_RECOGNITION_MODELS[0]

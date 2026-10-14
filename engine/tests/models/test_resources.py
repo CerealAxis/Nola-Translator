@@ -349,6 +349,27 @@ async def test_manage_unknown_id_raises_not_found(tmp_path: Path) -> None:
     assert excinfo.value.code == "resourceNotFound"
 
 
+async def test_cancel_failed_download_dismisses_task_and_keeps_resume_cache(tmp_path: Path, monkeypatch) -> None:
+    spec, _ = _tiny_qwen()
+    monkeypatch.setattr(resources_module, "QWEN3_ASR_1_7B_HF", spec)
+    manager = ResourceManager(tmp_path / "models", lambda _event: None)
+    cache = manager.model_root / ".downloads" / "saved" / "chunk-000000.part"
+    cache.parent.mkdir(parents=True)
+    cache.write_bytes(b"saved bytes")
+
+    def fail(*_args) -> None:
+        raise ConnectionError("connection interrupted")
+
+    manager.models.fetcher = fail
+    await manager.manage(QWEN_RESOURCE_ID, "install")
+    await manager.tasks[QWEN_RESOURCE_ID]
+    assert manager.record(QWEN_RESOURCE_ID).state == "failed"
+    dismissed = await manager.manage(QWEN_RESOURCE_ID, "cancel")
+    assert dismissed.state == "idle"
+    assert QWEN_RESOURCE_ID not in manager.operations
+    assert cache.read_bytes() == b"saved bytes"
+
+
 async def test_busy_and_cancel_guards(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

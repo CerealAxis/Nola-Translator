@@ -244,6 +244,8 @@ class EngineRuntime:
         self.llama_manager = LlamaServerManager(gguf_path=self.resources.hymt2_gguf_path)
         self.translation_provider = HyMt2TranslationProvider(self.llama_manager)
         self.translation_scheduler = TranslationScheduler(self.translation_provider)
+        self.fallback_translation_provider = None
+        self.fallback_translation_scheduler = None
         self.active_model_id = QWEN_RESOURCE_ID
         self.translation_tasks: dict[str, asyncio.Task[None]] = {}
         self.translation_jobs: dict[str, set[asyncio.Task[list[Translation]]]] = {}
@@ -348,7 +350,7 @@ class EngineRuntime:
                     await self._unload_session_models()
             try:
                 resource = await self.resources.manage(
-                    command.resourceId, command.action, command.network
+                    command.resourceId, command.action, command.network, command.downloadSource
                 )
             except ResourceActionError as error:
                 return [self._resource_error(command.requestId, error.code, error.details)]
@@ -622,6 +624,7 @@ class EngineRuntime:
                 requestId=command.requestId,
                 resourceId=resource_id,
                 action="install",
+                downloadSource=command.downloadSource,
                 network=command.network,
             )
         )
@@ -769,7 +772,7 @@ class EngineRuntime:
         remote = config.recognitionProvider != "local"
         if config.translationProvider == "recognition" and config.recognitionProvider != "aliyun":
             raise ResourceActionError("invalidConfiguration", {"reason": "nativeTranslationRequiresAliyun"})
-        if config.translationProvider == "index-translate":
+        if config.translationProvider == "index-translate" or config.fallbackTranslationProvider == "index-translate":
             from .translation.index_translate import LANGUAGE_NAMES
             for target in config.targetLanguages:
                 if normalize(target) not in LANGUAGE_NAMES:
@@ -781,7 +784,7 @@ class EngineRuntime:
                 raise ResourceActionError("invalidConfiguration", {"reason": str(error)}) from None
         model_id = self._model_id_from_config(config)
         required_resources = [] if remote else [model_id]
-        if config.targetLanguages and config.translationProvider == "local":
+        if config.targetLanguages and (config.translationProvider == "local" or config.fallbackTranslationProvider == "local"):
             # Resolved from the resource table, so a GGUF or a
             # transformers repo the user installed themselves is the thing that gets
             # checked for and loaded.
@@ -794,7 +797,7 @@ class EngineRuntime:
             recognition = self.resources.configuration(model_id)
             if source == "auto" and not recognition.supportsAutoDetection or source != "auto" and source not in {normalize(code) for code in recognition.languages}:
                 raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedRecognitionLanguage", "language": source})
-        if config.translationProvider == "local" and config.targetLanguages:
+        if (config.translationProvider == "local" or config.fallbackTranslationProvider == "local") and config.targetLanguages:
             capability = self.resources.configuration(self._local_translation_model_id(config))
             if any(not supports_translation(capability, source, target) for target in config.targetLanguages):
                 raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedTranslationLanguage", "language": source})
@@ -815,7 +818,7 @@ class EngineRuntime:
             model_id, missing_resources = self._validate_model_selection(config)
             translation_model_id = (
                 self._local_translation_model_id(config)
-                if config.targetLanguages and config.translationProvider == "local"
+                if config.targetLanguages and (config.translationProvider == "local" or config.fallbackTranslationProvider == "local")
                 else None
             )
         except ResourceActionError as error:
@@ -875,7 +878,7 @@ class EngineRuntime:
         config = command.config
         if config.recognitionProvider != "local":
             return await self._prepare_remote_models(command)
-        local_translation = bool(config.targetLanguages and config.translationProvider == 'local')
+        local_translation = bool(config.targetLanguages and (config.translationProvider == 'local' or config.fallbackTranslationProvider == 'local'))
         translation_id = self._local_translation_model_id(config) if local_translation else None
         key = (self._model_id(command), translation_id, json.dumps(config.compute.model_dump(), sort_keys=True))
         reuse = key == self._loaded_model_key
@@ -890,7 +893,12 @@ class EngineRuntime:
         # Free VRAM already excludes resident models; keep their placement instead of
         # charging the same weights against the remaining budget a second time.
         if config.targetLanguages and (local_translation or isinstance(command, StartSessionCommand)):
-            self._configure_translation(command)
+            if config.translationProvider == "recognition":
+                self.fallback_translation_provider = None
+                self.fallback_translation_scheduler = None
+                self._configure_translation(command, fallback=True)
+            else:
+                self._configure_translation(command)
         results = await asyncio.gather(
             self._timed_model_load('recognition', self._create_recognizer(command)),
             self._timed_model_load('translation', self._ensure_translation_server(command)),
@@ -916,7 +924,7 @@ class EngineRuntime:
 
     async def _prepare_remote_models(self, command: ModelSelectionCommand) -> Recognizer:
         config = command.config
-        local_translation = bool(config.targetLanguages and config.translationProvider == "local")
+        local_translation = bool(config.targetLanguages and (config.translationProvider == "local" or config.fallbackTranslationProvider == "local"))
         translation_id = self._local_translation_model_id(config) if local_translation else None
         options = config.recognitionOptions.model_dump(exclude={"apiKey"}) if config.recognitionOptions else {}
         key = (self._model_id(command), translation_id, json.dumps({"provider": config.recognitionProvider,
@@ -927,8 +935,13 @@ class EngineRuntime:
             await self._configure_device_plan(command)
         self.active_model_id = self._model_id(command)
         self._active_recognition_runtime = RemoteRecognitionRuntime(config.recognitionProvider, self.active_model_id)
-        if config.targetLanguages and config.translationProvider != "recognition" and (local_translation or isinstance(command, StartSessionCommand)):
-            self._configure_translation(command)
+        if config.targetLanguages and (local_translation or isinstance(command, StartSessionCommand)):
+            if config.translationProvider == "recognition":
+                self.fallback_translation_provider = None
+                self.fallback_translation_scheduler = None
+                self._configure_translation(command, fallback=True)
+            else:
+                self._configure_translation(command)
         recognizer = self._remote_recognizer(config)
         try:
             # Prewarm validates settings and may load the local translator. It must never
@@ -978,7 +991,7 @@ class EngineRuntime:
         self._device_plan = None
         config = command.config
         remote = config.recognitionProvider != "local"
-        if remote and (not config.targetLanguages or config.translationProvider != "local"):
+        if remote and (not config.targetLanguages or config.translationProvider != "local" and config.fallbackTranslationProvider != "local"):
             self._device_plan = None
             return
         devices, notes, _version = await self._probe_compute_inventory()
@@ -986,7 +999,7 @@ class EngineRuntime:
         recognition_mb = 0.0 if remote else model_memory_mb(self.resources.model_path(self._model_id(command)), adapter, config.compute)
         translation_adapter = None
         translation_mb = 0.0
-        if config.targetLanguages and config.translationProvider == "local":
+        if config.targetLanguages and (config.translationProvider == "local" or config.fallbackTranslationProvider == "local"):
             model_id = self._local_translation_model_id(config)
             translation_adapter = self.resources.adapter_for(model_id)
             path = self.resources.translation_gguf_path(model_id) if translation_adapter == "llama.cpp" else self.resources.model_path(model_id)
@@ -1010,8 +1023,10 @@ class EngineRuntime:
         self._device_plan["translation"] = asdict(self._translation_device) if self._device_plan.get("translation") else None
         runtime = self._active_recognition_runtime
         self._device_plan["recognitionActual"] = runtime.describe() if runtime else "unloaded"
-        if isinstance(self.translation_provider, M2M100TranslationProvider):
-            self._device_plan["translationActual"] = (self.translation_provider.runtime.device or "unknown") if self.translation_provider.runtime.loaded else "unloaded"
+        local_provider = next((provider for provider in (self.translation_provider, self.fallback_translation_provider)
+            if isinstance(provider, M2M100TranslationProvider)), None)
+        if local_provider is not None:
+            self._device_plan["translationActual"] = (local_provider.runtime.device or "unknown") if local_provider.runtime.loaded else "unloaded"
         else:
             self._device_plan["translationActual"] = self.llama_manager.device or "unloaded"
             self._device_plan["offloadedLayers"] = self.llama_manager.offloaded_layers
@@ -1019,9 +1034,12 @@ class EngineRuntime:
             self._device_plan["reasons"].append(reason)
         self._write_engine_status()
 
-    def _configure_translation(self, command: ModelSelectionCommand) -> None:
+    def _configure_translation(self, command: ModelSelectionCommand, *, fallback: bool = False) -> None:
         config = command.config
-        options = config.translationOptions
+        provider_name = config.fallbackTranslationProvider if fallback else config.translationProvider
+        options = config.fallbackTranslationOptions if fallback else config.translationOptions
+        if provider_name is None:
+            return
         endpoint = options.endpoint if options else ""
         api_key = options.apiKey if options else ""
         region = options.region if options else ""
@@ -1039,9 +1057,9 @@ class EngineRuntime:
         api_format = options.apiFormat if options else "chat-completions"
         context_window = options.contextWindow if options else DEFAULT_CONTEXT_WINDOW
         max_output_tokens = options.maxOutputTokens if options else DEFAULT_MAX_OUTPUT_TOKENS
-        if config.translationProvider == "local":
+        if provider_name == "local":
             provider = self._local_translation_provider(config)
-        elif config.translationProvider == "microsoft":
+        elif provider_name == "microsoft":
             # The endpoint guard lives in `MicrosoftTranslatorProvider`, like the other four:
             # an empty address reaches the provider as an empty string and is refused there
             # with the message written for the user to read.
@@ -1050,13 +1068,13 @@ class EngineRuntime:
                 endpoint=resolved(endpoint, DEFAULT_MICROSOFT_ENDPOINT),
                 region=region,
             )
-        elif config.translationProvider == "mymemory":
+        elif provider_name == "mymemory":
             provider = MyMemoryTranslationProvider(endpoint=resolved(endpoint, DEFAULT_MYMEMORY_ENDPOINT),
                 email=options.email if options else "")
-        elif config.translationProvider == "index-translate":
+        elif provider_name == "index-translate":
             # Public API configuration is fixed and never consumes a cloud credential.
             provider = IndexTranslatePublicProvider()
-        elif config.translationProvider == "cloud":
+        elif provider_name == "cloud":
             limits = {
                 "context_window": context_window,
                 "max_output_tokens": max_output_tokens,
@@ -1096,15 +1114,22 @@ class EngineRuntime:
                 )
         else:
             raise ValueError(
-                f"未知翻译 Provider: {config.translationProvider}"
+                f"未知翻译 Provider: {provider_name}"
             )
-        self.translation_provider = provider
-        self.translation_scheduler = TranslationScheduler(
+        scheduler = TranslationScheduler(
             provider,
             # One at a time for `local`: the model already owns the accelerator and its
             # tokenizer state is not re-entrant. The network formats are free to fan out.
-            max_concurrency=1 if config.translationProvider == "local" else 3,
+            max_concurrency=1 if provider_name == "local" else 3,
         )
+        if fallback:
+            self.fallback_translation_provider = provider
+            self.fallback_translation_scheduler = scheduler
+        else:
+            self.translation_provider = provider
+            self.translation_scheduler = scheduler
+            if config.fallbackTranslationProvider:
+                self._configure_translation(command, fallback=True)
 
     def _local_translation_provider(self, config: ModelSelection) -> TranslationProvider:
         """Build the local provider for whichever translation model the session selected.
@@ -1156,25 +1181,34 @@ class EngineRuntime:
 
     async def _ensure_translation_server(self, command: ModelSelectionCommand) -> None:
         """A selected local translator must load successfully before reporting readiness."""
-        if not command.config.targetLanguages or command.config.translationProvider != "local":
+        config = command.config
+        if not config.targetLanguages or not (config.translationProvider == "local" or config.fallbackTranslationProvider == "local"):
             return
-        model_id = self._local_translation_model_id(command.config)
+        model_id = self._local_translation_model_id(config)
         if not self.resources.is_installed(model_id):
             raise ModelUnavailable(f"翻译模型不可用：{model_id}")
         if self.resources.adapter_for(model_id) == "m2m100":
-            if isinstance(self.translation_provider, M2M100TranslationProvider):
+            local_providers = [provider for provider in (self.translation_provider, self.fallback_translation_provider)
+                if isinstance(provider, M2M100TranslationProvider)]
+            for local_provider in local_providers:
                 try:
-                    await asyncio.to_thread(self.translation_provider.runtime.load)
+                    await asyncio.to_thread(local_provider.runtime.load)
                 except Exception as error:
                     if not (command.config.compute.allowCpuFallback and
                             self._translation_device.id != "cpu" and resource_failure(error)):
                         raise
                     release_failed_load(error)
-                    await asyncio.to_thread(self.translation_provider.runtime.unload)
+                    await asyncio.to_thread(local_provider.runtime.unload)
                     self._translation_device = ComputeDevice("cpu", "CPU", "cpu", "cpu", translation=True)
-                    self.translation_provider = M2M100TranslationProvider(self.resources.model_path(model_id),
+                    replacement = M2M100TranslationProvider(self.resources.model_path(model_id),
                         device="cpu", precision="auto", threads=self._torch_threads)
-                    await asyncio.to_thread(self.translation_provider.runtime.load)
+                    await asyncio.to_thread(replacement.runtime.load)
+                    if local_provider is self.translation_provider:
+                        self.translation_provider = replacement
+                        self.translation_scheduler = TranslationScheduler(replacement, max_concurrency=1)
+                    else:
+                        self.fallback_translation_provider = replacement
+                        self.fallback_translation_scheduler = TranslationScheduler(replacement, max_concurrency=1)
                     self._update_compute_plan("翻译 GPU 加载失败，回退 CPU")
             return
         try:
@@ -1390,12 +1424,18 @@ class EngineRuntime:
             # The caption names the connection the text came from, which is the recognition
             # provider rather than the translation one this branch is keyed on.
             recognition_provider = getattr(config, "recognitionProvider", "local")
+            use_fallback = bool(update.is_final and native is not None and native.state == "failed"
+                and self.fallback_translation_scheduler is not None)
             visible = [Translation(targetLanguage=target, text=native.text if native else None,
-                state=native.state if native else "pending", provider=recognition_provider,
-                errorCode=native.error_code if native else None)
+                state="pending" if use_fallback else native.state if native else "pending",
+                provider=self.fallback_translation_scheduler.provider.name if use_fallback else recognition_provider,
+                errorCode=None if use_fallback else native.error_code if native else None)
                 for target in targets]
             self.latest_translations[update.segment_id] = visible
             self.emit(self._caption_event(update, visible))
+            if use_fallback and native is not None:
+                request = TranslationRequest(update=update, source=source, targets=tuple(targets), allow_intermediate=False)
+                asyncio.create_task(self._run_native_translation_fallback(request, self.service.session_id, self._stream_generation))
             if update.is_final and (not visible or all(item.state != "pending" for item in visible)):
                 self._retire_completed(update)
             return
@@ -1448,6 +1488,22 @@ class EngineRuntime:
             self.translation_tasks[update.segment_id] = asyncio.create_task(
                 self._translation_worker(update.segment_id)
             )
+
+    async def _run_native_translation_fallback(
+        self, request: TranslationRequest, session_id: str | None, generation: int,
+    ) -> None:
+        scheduler = self.fallback_translation_scheduler
+        if scheduler is None:
+            return
+        results = await scheduler.translate(
+            request.update.segment_id, request.update.revision, request.update.source_text,
+            request.source, list(request.targets),
+            on_result=lambda result: self._publish_translation_result(request, result, session_id, generation),
+        )
+        if self.service.session_id == session_id and self._stream_generation == generation:
+            for result in results:
+                self._publish_translation_result(request, result, session_id, generation)
+            self._retire_completed(request.update)
 
     async def _translation_worker(self, segment_id: str) -> None:
         session_id, generation = self.service.session_id, self._stream_generation
@@ -1590,6 +1646,9 @@ class EngineRuntime:
             if (result.state == "failed" and result.error_code in retry_codes
                     and attempt < max_attempts):
                 return
+            # Keep a final caption pending while the configured backup service gets its turn.
+            if result.state == "failed" and request.update.is_final and self.fallback_translation_scheduler is not None:
+                return
             self._publish_translation_result(request, result, session_id, generation)
 
         target_errors: dict[str, str] = {}
@@ -1645,6 +1704,19 @@ class EngineRuntime:
             retry_targets = failed_targets
             if retry_targets:
                 await asyncio.sleep(0.5 if attempt == 1 else 1.0)
+
+        if request.update.is_final and self.fallback_translation_scheduler is not None:
+            failed_targets = [target for target in targets
+                if target_errors.get(target) or target not in completed_by_target
+                or completed_by_target[target].state == "failed"]
+            if failed_targets:
+                backup_results = await self.fallback_translation_scheduler.translate(
+                    request.update.segment_id, request.update.revision,
+                    request.update.source_text, request.source, failed_targets,
+                    on_result=lambda result: self._publish_translation_result(request, result, session_id, generation),
+                )
+                for result in backup_results:
+                    completed_by_target[result.target_language] = result
 
         translations = []
         for target in targets:
@@ -1804,6 +1876,8 @@ class EngineRuntime:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         await self.translation_scheduler.close()
+        if self.fallback_translation_scheduler is not None:
+            await self.fallback_translation_scheduler.close()
         self.translation_tasks.clear()
         self.translation_jobs.clear()
         self.translation_display_revision.clear()
@@ -2038,6 +2112,8 @@ class EngineRuntime:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         await self.translation_scheduler.close()
+        if self.fallback_translation_scheduler is not None:
+            await self.fallback_translation_scheduler.close()
         if browser_session or remote:
             # Cancelling native ASR or local translation cannot release its inference lock.
             # Remote recognition must also acknowledge stop before a local translator idles.
@@ -2136,8 +2212,9 @@ class EngineRuntime:
         self._loaded_translation_model_id = None
         await self.llama_manager.stop()
         runtimes = [self._recognition_runtime()]
-        if isinstance(self.translation_provider, M2M100TranslationProvider):
-            runtimes.append(self.translation_provider.runtime)
+        for provider in (self.translation_provider, self.fallback_translation_provider):
+            if isinstance(provider, M2M100TranslationProvider):
+                runtimes.append(provider.runtime)
         for runtime in runtimes:
             if getattr(runtime, "loaded", False):
                 await asyncio.to_thread(runtime.unload)

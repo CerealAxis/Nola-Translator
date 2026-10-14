@@ -413,6 +413,7 @@ export function WorkspacePage() {
         isOpen={preflightOpen}
         onOpenChange={setPreflightOpen}
         missing={missing}
+        config={pendingConfig ?? undefined}
         onStart={() => void start()}
         onCopyDiagnostics={copyDiagnostics}
       />

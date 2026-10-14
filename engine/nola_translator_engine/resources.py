@@ -10,8 +10,10 @@ import os
 from pathlib import Path
 import shutil
 import threading
+import time
 from typing import Literal
 from uuid import uuid4
+from .debug_log import exception_fields, write as write_diagnostic
 
 from .hub import adapter_by_id, classify_hub_error
 from .models.catalog import (
@@ -299,10 +301,15 @@ class ResourceManager:
     async def manage(
         self, resource_id: str, action: Literal["install", "remove", "cancel"],
         network: NetworkSettings | None = None,
+        download_source: str | None = None,
     ) -> ResourceRecord:
         self._definition(resource_id)
         if action == "cancel":
             operation = self.operations.get(resource_id)
+            if operation is not None and operation.state == "failed" and resource_id not in self.tasks:
+                self.operations.pop(resource_id, None)
+                self._emit_changed(resource_id)
+                return self.record(resource_id)
             if operation is None or not operation.cancellable or operation.cancel_event is None:
                 raise ResourceActionError("resourceBusy", {"reason": "operationNotCancellable"})
             operation.state = "cancelling"
@@ -327,7 +334,7 @@ class ResourceManager:
             cancel_event=threading.Event() if cancellable else None,
         )
         self.operations[resource_id] = operation
-        task = asyncio.create_task(self._run(resource_id, action, operation, network))
+        task = asyncio.create_task(self._run(resource_id, action, operation, network, download_source))
         self.tasks[resource_id] = task
         self._emit_changed(resource_id)
         return self.record(resource_id)
@@ -338,15 +345,20 @@ class ResourceManager:
         action: Literal["install", "remove"],
         operation: Operation,
         network: NetworkSettings | None,
+        download_source: str | None,
     ) -> None:
         try:
             if action == "install":
-                await self._install(resource_id, operation, network)
+                await self._install(resource_id, operation, network, download_source)
             else:
                 await self._remove(resource_id)
         except ResourceOperationCancelled:
             self.operations.pop(resource_id, None)
         except Exception as error:
+            write_diagnostic("engine", "model.operation.failed", {
+                "resourceId": resource_id, "action": action, "source": download_source,
+                **exception_fields(error),
+            })
             operation.state = "failed"
             operation.cancellable = False
             operation.error_code = self._error_code(error)
@@ -357,14 +369,22 @@ class ResourceManager:
             self._emit_changed(resource_id)
 
     async def _install(
-        self, resource_id: str, operation: Operation, network: NetworkSettings | None
+        self, resource_id: str, operation: Operation, network: NetworkSettings | None,
+        download_source: str | None,
     ) -> None:
         spec = self._spec(resource_id)
         loop = asyncio.get_running_loop()
+        last_progress_at = 0.0
+        last_progress_bytes = -1
 
         def progress(current: int, total: int) -> None:
+            nonlocal last_progress_at, last_progress_bytes
             if operation.cancel_event and operation.cancel_event.is_set():
                 raise ResourceOperationCancelled()
+            now = time.monotonic()
+            if now - last_progress_at < 0.2 and not (current == total and current != last_progress_bytes):
+                return
+            last_progress_at, last_progress_bytes = now, current
             ratio = current / total if total else 0.0
             loop.call_soon_threadsafe(self._set_progress, resource_id, ratio)
 
@@ -375,7 +395,7 @@ class ResourceManager:
                 return
             loop.call_soon_threadsafe(self._set_phase, resource_id, phase)
 
-        await asyncio.to_thread(self.models.ensure, spec, progress, on_phase, network)
+        await asyncio.to_thread(self.models.ensure, spec, progress, on_phase, network, download_source)
         # clean up legacy resources once the install succeeds; a cleanup failure doesn't change the result.
         await asyncio.to_thread(self._cleanup_after_install, resource_id)
 

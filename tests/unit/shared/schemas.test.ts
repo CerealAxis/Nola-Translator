@@ -3,6 +3,27 @@ import messages from '../../fixtures/protocol/messages.json'
 import { MAX_PROTOCOL_LINE_BYTES, parseCommandLine, parseEventLine } from '../../../src/shared/schemas'
 
 describe('JSONL 协议校验', () => {
+  it.each(['huggingface', 'hf-mirror', 'modelscope'])('保留模型安装请求中的下载源 %s', downloadSource => {
+    expect(parseCommandLine(JSON.stringify({
+      protocolVersion: 1, type: 'manageResource', requestId: 'source-check',
+      resourceId: 'index-translate-2b-q4-k-m', action: 'install', downloadSource,
+    }))).toHaveProperty('downloadSource', downloadSource)
+  })
+
+  it.each(['huggingface', 'hf-mirror'])('保留自定义模型安装请求中的下载源 %s', downloadSource => {
+    expect(parseCommandLine(JSON.stringify({
+      protocolVersion: 1, type: 'installHubRepo', requestId: 'hub-source-check',
+      repo: 'owner/model', downloadSource,
+    }))).toHaveProperty('downloadSource', downloadSource)
+  })
+
+  it('拒绝未知模型下载源', () => {
+    expect(() => parseCommandLine(JSON.stringify({
+      protocolVersion: 1, type: 'manageResource', requestId: 'bad-source',
+      resourceId: 'index-translate-2b-q4-k-m', action: 'install', downloadSource: 'unknown',
+    }))).toThrow()
+  })
+
   it('接受 TS 与 Python 共用的全部命令样例', () => {
     for (const command of messages.commands) {
       expect(parseCommandLine(JSON.stringify(command))).toMatchObject(command)

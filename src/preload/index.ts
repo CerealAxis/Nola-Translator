@@ -93,13 +93,13 @@ const api: NolaTranslatorApi = {
   listDevices: () => invoke(channels.listDevices),
   testAudio: source => invoke(channels.testAudio, source),
   listResources: () => invoke(channels.listResources),
-  manageResource: (resourceId, action) => invoke(channels.manageResource, resourceId, action),
+  manageResource: (resourceId, action, source) => invoke(channels.manageResource, resourceId, action, source),
   searchHuggingFace: (query, kind, cursor): Promise<HubSearchResult> =>
     invoke(channels.searchHuggingFace, query, kind, cursor),
   inspectHuggingFace: (repo): Promise<HubInspectResult> => invoke(channels.inspectHuggingFace, repo),
   getHuggingFaceModelCard: (repo, revision) => invoke(channels.getHuggingFaceModelCard, repo, revision),
-  installHuggingFaceModel: (repo, slot): Promise<ResourceRecord> =>
-    invoke(channels.installHuggingFaceModel, repo, slot),
+  installHuggingFaceModel: (repo, slot, source): Promise<ResourceRecord> =>
+    invoke(channels.installHuggingFaceModel, repo, slot, source),
   configureModel: (resourceId, configuration) => invoke(channels.configureModel, resourceId, configuration),
   startSession: (config: SessionConfig) => invoke(channels.startSession, config),
   prewarmModels: (): Promise<PrewarmResult> => invoke(channels.prewarmModels),

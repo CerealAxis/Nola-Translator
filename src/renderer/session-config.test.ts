@@ -14,7 +14,10 @@ describe('translation language choices', () => {
     const settings = { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, sourceLanguage: 'en' }, translation: { ...DEFAULT_SETTINGS.translation, targetLanguage: NO_TRANSLATION_LANGUAGE } }
     const patch = translationModelPatch(settings, translator)
     expect(patch).toMatchObject({ translation: { provider: 'local', localModelId: translator.resourceId, targetLanguage: 'ja' }, overlay: { showTranslation: true } })
-    const translation = { ...settings.translation, ...patch?.translation }
+    const translation = {
+      ...settings.translation, ...patch?.translation,
+      fallback: { ...settings.translation.fallback, ...(patch?.translation?.fallback ?? {}) },
+    }
     expect(translationFieldsOf(translation, { enabled: true })).toMatchObject({ targetLanguages: ['ja'], translationModelId: translator.resourceId })
   })
 

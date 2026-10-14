@@ -130,11 +130,11 @@ export async function testAudio(source: string): Promise<boolean> {
   }
 }
 
-export async function loadRuntimeComponents(recheck = false): Promise<RuntimeSnapshot> {
+export async function loadRuntimeComponents(recheck = false, components?: readonly ('engine' | 'llama')[]): Promise<RuntimeSnapshot> {
   if (!bridge) throw new Error('IPC bridge unavailable')
   if (recheck) settingsStore.setState({ runtimeChecking: true, runtimeError: null })
   try {
-    const runtimes = await (recheck ? bridge.runtimes.prepare() : bridge.runtimes.list())
+    const runtimes = await (recheck && components?.length !== 0 ? bridge.runtimes.prepare(components) : bridge.runtimes.list())
     settingsStore.setState({ runtimes })
     return runtimes
   } catch (error) {
@@ -248,6 +248,12 @@ export function checkForAppUpdate(force = false): Promise<AppUpdateCheckResult |
   return appUpdateCheck
 }
 
+/** Fetches release metadata for previews without changing the app's update-notice state. */
+export async function fetchLatestRelease(force = false): Promise<AppUpdateCheckResult | null> {
+  if (!bridge) return null
+  return bridge.app.checkLatestRelease(force)
+}
+
 export async function openAppReleasePage(url: string): Promise<void> {
   await bridge?.app.openReleasePage(url)
 }
@@ -272,7 +278,10 @@ export function mergeSettings(base: AppSettings, patch: AppSettingsPatch): AppSe
     overlay: { ...base.overlay, ...patch.overlay },
     videoCaptions: { ...base.videoCaptions, ...patch.videoCaptions },
     browserCaptions: { ...base.browserCaptions, ...patch.browserCaptions },
-    translation: { ...base.translation, ...patch.translation },
+    translation: {
+      ...base.translation, ...patch.translation,
+      fallback: { ...base.translation.fallback, ...(patch.translation?.fallback ?? {}) },
+    },
     compute: { ...base.compute, ...patch.compute },
     network: { ...base.network, ...patch.network },
   }

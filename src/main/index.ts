@@ -25,7 +25,7 @@ import { SessionController } from './session-controller'
 import { BrowserConnection } from './browser-connection'
 import { BrowserIntegrations } from './browser-integrations'
 import { RuntimeManager } from './runtime-manager'
-import { registerRuntimeIpc } from './runtime-ipc'
+import { registerRuntimeIpc, recheckRuntimeEnvironment } from './runtime-ipc'
 import { SettingsStore } from './settings-store'
 import { SecureCredentialStore } from './secure-store'
 import { createMainWindowOptions, resolvePreloadPath } from './window-options'
@@ -298,7 +298,10 @@ if (!hasSingleInstanceLock) {
         const localRecognition = (session?.recognitionProvider ?? settings.current().recognition.provider ?? 'local') === 'local'
         const provider = session ? session.translationProvider ?? 'local' : translationSettings.provider
         const modelId = session?.translationModelId ?? translationSettings.localModelId
-        let translation: 'torch' | 'llama' | 'none' = provider !== 'local' || (session ? !session.targetLanguages.length : translationSettings.targetLanguage === NO_TRANSLATION_LANGUAGE)
+        const usesLocalTranslation = session
+          ? session.targetLanguages.length > 0 && (provider === 'local' || session.fallbackTranslationProvider === 'local')
+          : translationSettings.targetLanguage !== NO_TRANSLATION_LANGUAGE && (provider === 'local' || translationSettings.fallback.provider === 'local')
+        let translation: 'torch' | 'llama' | 'none' = !usesLocalTranslation
           ? 'none' : modelId === 'm2m100-418m' ? 'torch' : 'llama'
         if (translation !== 'none' && engine!.currentState === 'ready') {
           try {
@@ -340,7 +343,13 @@ if (!hasSingleInstanceLock) {
       })().finally(() => { preparation = null })
       return preparation
     }
-    disposeRuntimeIpc = registerRuntimeIpc(runtimes, () => mainWindow, () => runtimes.recheck(),
+    disposeRuntimeIpc = registerRuntimeIpc(runtimes, () => mainWindow, async components => {
+      if (sessionActive || sessionStarting || componentInstalling) throw new Error('请先停止同传，再检查运行组件')
+      componentInstalling = true
+      try {
+        currentDirectories = JSON.stringify(await recheckRuntimeEnvironment(runtimes, engine!, components))
+      } finally { componentInstalling = false }
+    },
       () => sessionActive || sessionStarting || componentInstalling, whenRuntimeReady, async (id, repair) => {
         componentInstalling = true
         try {

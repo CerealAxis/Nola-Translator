@@ -10,18 +10,21 @@ from .manager import FileEntry, ModelSpec
 INDEX_TRANSLATE_2B_Q4_K_M = ModelSpec(
     model_id="index-translate-2b-q4-k-m", directory="index-translate-2b-q4-k-m",
     repo="IndexTeam/Index-Translate-2B-GGUF", revision="3a0eca6ce931d88d00614d427ab3ed8ff0743902",
+    modelscope_repo="IndexTeam/Index-Translate-2B-GGUF",
     files=(FileEntry("Index-Translate-2B.Q4_K_M.gguf", 1_312_164_352,
         "044b313d29342bd3b2c77cbb64023ca0d209bd9b3247763f9d162767ef2d746a"),),
 )
 INDEX_TRANSLATE_9B_Q4_K_M = ModelSpec(
     model_id="index-translate-9b-q4-k-m", directory="index-translate-9b-q4-k-m",
     repo="IndexTeam/Index-Translate-9B-GGUF", revision="645939fbab839a656f1bc39975a872bc8ad749f8",
+    modelscope_repo="IndexTeam/Index-Translate-9B-GGUF",
     files=(FileEntry("Index-Translate-9B.Q4_K_M.gguf", 5_780_090_304,
         "9cc6758b0007f4cbf42ea3400768cbff91ae74ef8d640e467158348426d33713"),),
 )
 INDEX_TRANSLATE_35B_A3B_Q4_K_M = ModelSpec(
     model_id="index-translate-35b-a3b-q4-k-m", directory="index-translate-35b-a3b-q4-k-m",
     repo="IndexTeam/Index-Translate-35B-A3B-preview-GGUF", revision="3319ce338363a181c6c20c06b7379063d9baf484",
+    modelscope_repo="IndexTeam/Index-Translate-35B-A3B-preview-GGUF",
     files=(FileEntry("Index-Translate-35B-A3B-preview.Q4_K_M.gguf", 21_713_462_400,
         "7d803928b68110b64880206f79ccd18e209d11091a21c689ca9e369687cb93f6"),),
 )
@@ -32,6 +35,7 @@ QWEN3_ASR_1_7B_HF = ModelSpec(
     model_id="qwen3-asr-1.7b-hf",
     directory="qwen3-asr-1.7b-hf",
     repo="Qwen/Qwen3-ASR-1.7B-hf",
+    modelscope_repo="Qwen/Qwen3-ASR-1.7B-hf",
     revision="bcd2b5b7f32b480ab5790554cfa8347f246a14f3",
     files=(
         FileEntry(
@@ -92,6 +96,7 @@ QWEN3_ASR_0_6B_HF = ModelSpec(
     model_id="qwen3-asr-0.6b-hf",
     directory="qwen3-asr-0.6b-hf",
     repo="Qwen/Qwen3-ASR-0.6B-hf",
+    modelscope_repo="Qwen/Qwen3-ASR-0.6B-hf",
     revision="7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c",
     files=(
     FileEntry(
@@ -152,6 +157,7 @@ SENSEVOICE_SMALL = ModelSpec(
     model_id="sensevoice-small",
     directory="sensevoice-small",
     repo="FunAudioLLM/SenseVoiceSmall",
+    modelscope_repo="iic/SenseVoiceSmall",
     revision="3847d57b6bdf2dd8875cb1508d2af43d80a16bf7",
     files=(
         FileEntry(
@@ -192,6 +198,7 @@ HYMT2_1_8B_Q4_K_M = ModelSpec(
     model_id="hy-mt2-1.8b-q4-k-m",
     directory="hy-mt2-1.8b-q4-k-m",
     repo="tencent/Hy-MT2-1.8B-GGUF",
+    modelscope_repo="Tencent-Hunyuan/Hy-MT2-1.8B-GGUF",
     revision="a0c709d9fac510f2c807aa3af52872340dc37a4a",
     files=(
         FileEntry(
@@ -207,6 +214,7 @@ HYMT2_1_8B_Q4_K_M = ModelSpec(
 HYMT2_7B_Q4_K_M = ModelSpec(
     model_id="hy-mt2-7b-q4-k-m", directory="hy-mt2-7b-q4-k-m",
     repo="tencent/Hy-MT2-7B-GGUF", revision="ab8472660ac61fac25f1af43fac2599d52a8a775",
+    modelscope_repo="Tencent-Hunyuan/Hy-MT2-7B-GGUF",
     files=(FileEntry("Hy-MT2-7B-Q4_K_M.gguf", 4_624_648_896,
         "9f96256500f3fc1ab4d64336b58f52a949a95ad7516b0c229476eef782f9f77b"),),
 )
@@ -219,12 +227,14 @@ HYMT2_7B_Q4_K_M = ModelSpec(
 # Pro), UD-IQ2_M is the smallest but flattens them to literal meaning.
 _UNSLOTH_HYMT2_REPO = "unsloth/Hy-MT2-1.8B-GGUF"
 _UNSLOTH_HYMT2_REVISION = "0378cc2780f462f0fd397d0cdd244d2f769de40e"
+_MODELSCOPE_HYMT2_REPO = "fss618/Hy-MT2-1.8B-GGUF"
 
 HYMT2_1_8B_Q3_K_M = ModelSpec(
     model_id="hy-mt2-1.8b-q3-k-m",
     directory="hy-mt2-1.8b-q3-k-m",
     repo=_UNSLOTH_HYMT2_REPO,
     revision=_UNSLOTH_HYMT2_REVISION,
+    modelscope_repo=_MODELSCOPE_HYMT2_REPO,
     files=(
         FileEntry(
             "Hy-MT2-1.8B-Q3_K_M.gguf",
@@ -255,6 +265,7 @@ M2M100_418M = ModelSpec(
     model_id="m2m100-418m",
     directory="m2m100-418m",
     repo="facebook/m2m100_418M",
+    modelscope_repo="facebook/m2m100_418M",
     revision="55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636",
     files=(
         FileEntry(

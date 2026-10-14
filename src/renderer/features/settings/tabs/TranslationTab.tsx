@@ -83,6 +83,17 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
     return installed
   }, [resources, translation.localModelId, translation.targetLanguage, settings.recognition.sourceLanguage, settings.compute])
 
+  const fallbackProviderOptions = useMemo<PickerOption[]>(() => [
+    { value: 'disabled', label: t('settings.fallbackDisabled') },
+    ...TRANSLATION_PROVIDERS.filter((id) => id !== 'recognition').map((id) => ({
+      value: id,
+      label: providerLabels[id],
+      isDisabled: id === 'local'
+        ? !localModelOptions.some((option) => option.value === translation.localModelId && !option.isDisabled)
+        : id === translation.provider && id !== 'cloud',
+    })),
+  ], [localModelOptions, providerLabels, t, translation.localModelId, translation.provider])
+
   /*
    * How deep the address goes depends on the format: Anthropic takes a bare origin and Ollama
    * a bare host, while the OpenAI shapes include the version segment. Getting that depth wrong
@@ -131,6 +142,18 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
     void updateSettings({ translation: patch }).catch(() => undefined)
   }
 
+  const setFallbackApiFormat = (value: string) => {
+    const next = value as CloudApiFormat
+    const previous = translation.fallback.cloudApiFormat
+    if (next === previous) return
+    const from = CLOUD_FORMAT_DEFAULTS[previous]
+    const to = CLOUD_FORMAT_DEFAULTS[next]
+    const patch: Partial<TranslationSettings['fallback']> = { cloudApiFormat: next }
+    if (translation.fallback.cloudEndpoint === from.cloudEndpoint) patch.cloudEndpoint = to.cloudEndpoint
+    if (translation.fallback.cloudModel === from.cloudModel) patch.cloudModel = to.cloudModel
+    void updateSettings({ translation: { fallback: patch } }).catch(() => undefined)
+  }
+
   return (
     <div className="settings-panel">
       <SettingGroup legend={t('settings.groupProvider')}>
@@ -171,6 +194,38 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
             }}
           />
         </SettingsRow> : null}
+      </SettingGroup>
+
+      <SettingGroup legend={t('settings.fallbackTranslation')}>
+        <SettingsRow label={t('settings.fallbackProvider')} desc={t('settings.fallbackTranslationHint')} descriptionTooltip>
+          <SettingSelect
+            value={translation.fallback?.provider ?? 'disabled'}
+            options={fallbackProviderOptions}
+            ariaLabel={t('settings.fallbackProvider')}
+            onChange={(value) => { void updateSettings({ translation: { fallback: { provider: value as TranslationSettings['fallback']['provider'] } } }).catch(() => undefined) }}
+          />
+        </SettingsRow>
+        {translation.fallback?.provider === 'local' ? <SettingsRow label={t('settings.model')} desc={t('settings.fallbackLocalModelHint')} descriptionTooltip>
+          <span className="nola-caption text-muted">{localModelOptions.find((option) => option.value === translation.localModelId)?.label ?? translation.localModelId}</span>
+        </SettingsRow> : null}
+        {translation.fallback?.provider === 'cloud' ? <>
+          <TextRow label={t('settings.endpoint')} value={translation.fallback.cloudEndpoint} onCommit={(value) => { void updateSettings({ translation: { fallback: { cloudEndpoint: value } } }).catch(() => undefined) }} />
+          <ApiKeyRow provider="fallback-cloud" stored={credentials['fallback-cloud']} />
+          <SettingsRow label={t('settings.apiFormat')}><SettingSelect value={translation.fallback.cloudApiFormat} options={apiFormatOptions} ariaLabel={t('settings.apiFormat')} onChange={setFallbackApiFormat} /></SettingsRow>
+          <TextRow label={t('settings.modelId')} value={translation.fallback.cloudModel} onCommit={(value) => { void updateSettings({ translation: { fallback: { cloudModel: value } } }).catch(() => undefined) }} />
+          <NumberRow label={t('settings.contextWindow')} value={translation.fallback.cloudContextWindow} onCommit={(value) => { void updateSettings({ translation: { fallback: { cloudContextWindow: value } } }).catch(() => undefined) }} />
+          <NumberRow label={t('settings.maxOutputTokens')} value={translation.fallback.cloudMaxOutputTokens} onCommit={(value) => { void updateSettings({ translation: { fallback: { cloudMaxOutputTokens: value } } }).catch(() => undefined) }} />
+        </> : null}
+        {translation.fallback?.provider === 'microsoft' ? <>
+          <TextRow label={t('settings.endpoint')} value={translation.fallback.microsoftEndpoint} onCommit={(value) => { void updateSettings({ translation: { fallback: { microsoftEndpoint: value } } }).catch(() => undefined) }} />
+          <TextRow label={t('settings.region')} value={translation.fallback.microsoftRegion} onCommit={(value) => { void updateSettings({ translation: { fallback: { microsoftRegion: value } } }).catch(() => undefined) }} />
+          <ApiKeyRow provider="microsoft" stored={credentials.microsoft} />
+        </> : null}
+        {translation.fallback?.provider === 'mymemory' ? <>
+          <TextRow label={t('settings.endpoint')} value={translation.fallback.mymemoryEndpoint} onCommit={(value) => { void updateSettings({ translation: { fallback: { mymemoryEndpoint: value } } }).catch(() => undefined) }} />
+          <TextRow label={t('settings.mymemoryEmail')} value={translation.fallback.mymemoryEmail} onCommit={(value) => { void updateSettings({ translation: { fallback: { mymemoryEmail: value } } }).catch(() => undefined) }} />
+        </> : null}
+        {translation.fallback?.provider === 'index-translate' ? <SettingsRow label={t('settings.providerIndexTranslate')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_PUBLIC_MODEL}</span></SettingsRow> : null}
       </SettingGroup>
 
       {translation.provider === 'index-translate' ? (

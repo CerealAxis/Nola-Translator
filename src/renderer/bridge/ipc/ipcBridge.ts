@@ -100,7 +100,7 @@ export function createIpcBridge(): NolaBridge {
     runtimes: {
       openSettings: component => call('openRuntimeSettings', injected => injected.openRuntimeSettings(component)),
       list: () => call('getRuntimes', (injected) => injected.getRuntimes()),
-      prepare: () => call('prepareRuntimes', (injected) => injected.prepareRuntimes()),
+      prepare: (components) => call('prepareRuntimes', (injected) => injected.prepareRuntimes(components)),
       install: (id, repair) => call('installRuntime', (injected) => injected.installRuntime(id, repair)),
       import: () => call('importRuntime', (injected) => injected.importRuntime()),
       cancel: () => call('cancelRuntimeInstall', (injected) => injected.cancelRuntimeInstall()),
@@ -110,7 +110,7 @@ export function createIpcBridge(): NolaBridge {
       listDevices: () => call('listDevices', (injected) => injected.listDevices()),
       testAudio: source => call('testAudio', injected => injected.testAudio(source)),
       listResources: () => call('listResources', (injected) => injected.listResources() as Promise<ResourceSnapshotWithRate>),
-      manageResource: (resourceId, action) => call('manageResource', (injected) => injected.manageResource(resourceId, action)),
+      manageResource: (resourceId, action, source) => call('manageResource', (injected) => injected.manageResource(resourceId, action, source)),
       startSession: (config) => call('startSession', (injected) => injected.startSession(config)) as Promise<SessionStartResult>,
       /*
        * No payload crosses this call: the main process builds the prewarm config from
@@ -219,8 +219,8 @@ export function createIpcBridge(): NolaBridge {
       inspectHuggingFace: (repo) => call('inspectHuggingFace', (injected) => injected.inspectHuggingFace(repo)),
       getHuggingFaceModelCard: (repo, revision) =>
         call('getHuggingFaceModelCard', (injected) => injected.getHuggingFaceModelCard(repo, revision)),
-      installHuggingFaceModel: (repo, slot) =>
-        call('installHuggingFaceModel', (injected) => injected.installHuggingFaceModel(repo, slot)),
+      installHuggingFaceModel: (repo, slot, source) =>
+        call('installHuggingFaceModel', (injected) => injected.installHuggingFaceModel(repo, slot, source)),
     },
     feedback: {
       // tier 'ipc-new': the main process has no `app:feedback` channel. See BRIDGE_TIERS.

@@ -1,5 +1,6 @@
 import { modelConfigurationSchema } from './model-capabilities'
 import { z } from 'zod'
+import { PYPI_MIRROR_NODES } from './pypi-mirrors'
 import { INDEX_TRANSLATE_MODEL_IDS } from './index-translate'
 import { computeSettingsSchema, computeSnapshotSchema } from './compute'
 import { SUPPORT_ERROR_CODES } from './error-catalog'
@@ -58,6 +59,7 @@ const translationModelIdSchema = z.union([
 const networkSettingsSchema = z.object({
   useHuggingFaceMirror: z.boolean().optional(),
   usePypiMirror: z.boolean().optional(),
+  pypiMirrorUrl: z.enum(PYPI_MIRROR_NODES).optional(),
   useGithubAccelerate: z.boolean().optional(),
   githubAccelerateUrl: z.string().max(2048).optional(),
   proxyUrl: z.string().max(2048).optional(),
@@ -92,6 +94,14 @@ export const sessionConfigSchema = z
       contextWindow: z.number().int().min(256).max(10_000_000).optional(),
       maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
     }).strip().optional(),
+    fallbackTranslationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'index-translate']).optional(),
+    fallbackTranslationOptions: z.object({
+      endpoint: z.string().max(2048).optional(), apiKey: z.string().max(4096).optional(),
+      email: z.string().max(320).optional(), region: z.string().max(128).optional(), model: z.string().max(256).optional(),
+      apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
+      contextWindow: z.number().int().min(256).max(10_000_000).optional(),
+      maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
+    }).strip().optional(),
     recordingPath: z.string().min(1).max(4096).optional(),
     browserTimeline: z.object({ epoch: z.number().int().nonnegative(), videoTimeMs: z.number().nonnegative().finite(), playbackRate: z.number().positive().max(16) }).strip().optional(),
   })
@@ -118,6 +128,14 @@ const prewarmConfigSchema = z.object({
     email: z.string().max(320).optional(),
     region: z.string().max(128).optional(),
     model: z.string().max(256).optional(),
+    apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
+    contextWindow: z.number().int().min(256).max(10_000_000).optional(),
+    maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
+  }).strip().optional(),
+  fallbackTranslationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'index-translate']).optional(),
+  fallbackTranslationOptions: z.object({
+    endpoint: z.string().max(2048).optional(), apiKey: z.string().max(4096).optional(),
+    email: z.string().max(320).optional(), region: z.string().max(128).optional(), model: z.string().max(256).optional(),
     apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
     contextWindow: z.number().int().min(256).max(10_000_000).optional(),
     maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
@@ -167,6 +185,7 @@ export const engineCommandSchema = z.discriminatedUnion('type', [
     type: z.literal('manageResource'),
     resourceId: z.string().min(1).max(256),
     action: z.enum(['install', 'remove', 'cancel']),
+    downloadSource: z.enum(['huggingface', 'hf-mirror', 'modelscope']).optional(),
     network: networkSettingsSchema.optional(),
   }).strip(),
   z.object({ ...envelope, type: z.literal('configureModel'), resourceId: z.string().min(1).max(256), configuration: modelConfigurationSchema }).strip(),
@@ -213,6 +232,7 @@ export const engineCommandSchema = z.discriminatedUnion('type', [
       type: z.literal('installHubRepo'),
       repo: z.string().min(3).max(256),
       slot: z.enum(['recognition', 'translation']).optional(),
+      downloadSource: z.enum(['huggingface', 'hf-mirror']).optional(),
       network: networkSettingsSchema.optional(),
     })
     .strip(),
@@ -287,7 +307,7 @@ const resourceSchema = z
     provider: z.string().min(1).max(64),
     name: z.string().min(1).max(256),
     description: z.string().min(1).max(1024),
-    languages: z.array(z.string().min(1).max(32)).max(128),
+    languages: z.array(z.string().min(1).max(32)).max(200),
     configuration: modelConfigurationSchema.optional(),
     sourceLanguage: z.string().max(32).optional(),
     targetLanguage: z.string().max(32).optional(),

@@ -17,7 +17,10 @@ function settingsWith(patch: AppSettingsPatch = {}): AppSettings {
     recording: { ...DEFAULT_SETTINGS.recording, ...(patch.recording ?? {}) },
     appearance: { ...DEFAULT_SETTINGS.appearance, ...(patch.appearance ?? {}) },
     overlay: { ...DEFAULT_SETTINGS.overlay, ...(patch.overlay ?? {}) },
-    translation: { ...DEFAULT_SETTINGS.translation, ...(patch.translation ?? {}) },
+    translation: {
+      ...DEFAULT_SETTINGS.translation, ...(patch.translation ?? {}),
+      fallback: { ...DEFAULT_SETTINGS.translation.fallback, ...(patch.translation?.fallback ?? {}) },
+    },
     compute: { ...DEFAULT_SETTINGS.compute, ...(patch.compute ?? {}) },
     videoCaptions: { ...DEFAULT_SETTINGS.videoCaptions, ...(patch.videoCaptions ?? {}) },
     browserCaptions: { ...DEFAULT_SETTINGS.browserCaptions, ...(patch.browserCaptions ?? {}) },

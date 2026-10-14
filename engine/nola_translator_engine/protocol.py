@@ -93,6 +93,8 @@ class NetworkSettings(ProtocolModel):
     useHuggingFaceMirror: bool = True
     #: pip's default index only; the PyTorch ``--extra-index-url`` is never mirrored.
     usePypiMirror: bool = True
+    #: Selected pip default index; the main process consumes it when installing runtime packages.
+    pypiMirrorUrl: str = "https://mirrors.aliyun.com/pypi/simple/"
     #: Whether ``githubAccelerateUrl`` is applied to GitHub asset URLs at all.
     useGithubAccelerate: bool = True
     #: Prefixed onto a GitHub release asset URL as ``prefix + url``; empty leaves the URL alone.
@@ -127,6 +129,8 @@ class ModelSelection(ProtocolModel):
     translationProvider: Literal["local", "cloud", "microsoft", "mymemory", "index-translate", "recognition"] = "local"
     translationModelId: str | None = Field(default=None, min_length=1, max_length=256)
     translationOptions: TranslationOptions | None = None
+    fallbackTranslationProvider: Literal["local", "cloud", "microsoft", "mymemory", "index-translate"] | None = None
+    fallbackTranslationOptions: TranslationOptions | None = None
 
 
 class SessionConfig(ModelSelection):
@@ -250,6 +254,7 @@ class ManageResourceCommand(Envelope):
     type: Literal["manageResource"]
     resourceId: str = Field(min_length=1, max_length=256)
     action: Literal["install", "remove", "cancel"]
+    downloadSource: Literal["huggingface", "hf-mirror", "modelscope"] | None = None
     network: NetworkSettings = Field(default_factory=NetworkSettings)
 
 
@@ -283,10 +288,10 @@ class TranslationPair(ProtocolModel):
 class ModelConfiguration(ProtocolModel):
     slot: Literal["recognition", "translation"]
     engine: Literal["pytorch", "llama"]
-    languages: list[str] = Field(max_length=128)
+    languages: list[str] = Field(max_length=200)
     supportsAutoDetection: bool
-    sourceLanguages: list[str] = Field(max_length=128)
-    targetLanguages: list[str] = Field(max_length=128)
+    sourceLanguages: list[str] = Field(max_length=200)
+    targetLanguages: list[str] = Field(max_length=200)
     translationPairs: list[TranslationPair] | None = Field(default=None, max_length=512)
 
 
@@ -305,6 +310,7 @@ class InstallHubRepoCommand(Envelope):
     #: The slot the caller expects. Mismatched against the repo's own verdict so a click on the
     #: wrong filter cannot install a translation model into the recognition list.
     slot: Literal["recognition", "translation"] | None = None
+    downloadSource: Literal["huggingface", "hf-mirror"] | None = None
     network: NetworkSettings = Field(default_factory=NetworkSettings)
 
 
@@ -463,7 +469,7 @@ class ResourceRecord(ProtocolModel):
     provider: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=256)
     description: str = Field(min_length=1, max_length=1024)
-    languages: list[str] = Field(max_length=128)
+    languages: list[str] = Field(max_length=200)
     configuration: ModelConfiguration | None = None
     sourceLanguage: str | None = Field(default=None, max_length=32)
     targetLanguage: str | None = Field(default=None, max_length=32)

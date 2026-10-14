@@ -9,13 +9,14 @@ import { execFile } from 'node:child_process'
 import { z } from 'zod'
 import { runtimeRecipeSchema, type RuntimeRecipe, type RuntimeRecipeState, type RuntimeSnapshot } from '../shared/compute'
 import type { NetworkSettings } from '../shared/settings'
+import { PYPI_MIRROR_DEFAULT } from '../shared/pypi-mirrors'
 import { probeLocalEngine } from './local-runtimes'
 
-const PYPI_INDEX = 'https://pypi.org/simple'
-const PYPI_MIRROR = 'https://pypi.tuna.tsinghua.edu.cn/simple'
+const PYPI_INDEX = 'https://pypi.org/simple/'
 const recipesSchema = z.object({ version: z.literal(1), recipes: z.array(runtimeRecipeSchema).max(256) })
 type Download = (wheel: RuntimeRecipe['wheel'], path: string, signal: AbortSignal, progress: (bytes: number) => void) => Promise<void>
 type Verify = (path: string, signal: AbortSignal) => Promise<string>
+type Probe = (url: string, signal: AbortSignal) => Promise<boolean>
 
 /** Install only libraries; every combination shares the app's Python 3.12 interpreter. */
 export class PythonEnvironments {
@@ -26,7 +27,7 @@ export class PythonEnvironments {
   private controller: AbortController | null = null
   constructor(private readonly directory: string, private readonly baseDirectory: string,
     private readonly recipesPath: string, private readonly download: Download, private readonly digest: Verify,
-    private readonly network?: () => NetworkSettings) {}
+    private readonly network?: () => NetworkSettings, private readonly probe?: Probe) {}
   private inside(name: string): string {
     const target = resolve(this.directory, name)
     const path = relative(resolve(this.directory), target)
@@ -78,27 +79,40 @@ export class PythonEnvironments {
     const backup = this.inside(`backup-${id}-${randomUUID()}`)
     let movedOld = false
     try {
-      await mkdir(cache, { recursive: true })
-      const paths: string[] = []
-      let completed = 0
-      for (const item of wheels) {
-        // Different CUDA builds of xFormers may share a filename; their hashes identify the cache.
-        const folder = join(cache, item.sha256)
-        await mkdir(folder, { recursive: true })
-        const wheel = join(folder, item.filename)
-        await this.download(item, wheel, controller.signal, bytes => { if (this.operation) this.operation.bytes = completed + bytes })
-        this.operation.phase = 'verify'
-        if (await this.digest(wheel, controller.signal) !== item.sha256) {
-          await rm(wheel, { force: true })
-          throw new Error('组件下载校验失败，请重试安装')
+      const network = this.network?.()
+      const useMirror = network?.usePypiMirror === true
+      let artifacts: string[]
+      if (useMirror) {
+        if (this.operation) this.operation.phase = 'prepare'
+        artifacts = []
+        for (const item of wheels) {
+          const mirrorUrl = network.pypiMirrorUrl === PYPI_MIRROR_DEFAULT ? aliyunTorchWheelUrl(item.url) : null
+          const url = mirrorUrl && this.probe && await this.probe(mirrorUrl, controller.signal) ? mirrorUrl : item.url
+          artifacts.push(`${url}#sha256=${item.sha256}`)
         }
-        paths.push(wheel)
-        completed += item.bytes
-        this.operation.phase = 'download'
+      } else {
+        await mkdir(cache, { recursive: true })
+        artifacts = []
+        let completed = 0
+        for (const item of wheels) {
+          // Different CUDA builds of xFormers may share a filename; their hashes identify the cache.
+          const folder = join(cache, item.sha256)
+          await mkdir(folder, { recursive: true })
+          const wheel = join(folder, item.filename)
+          await this.download(item, wheel, controller.signal, bytes => { if (this.operation) this.operation.bytes = completed + bytes })
+          this.operation.phase = 'verify'
+          if (await this.digest(wheel, controller.signal) !== item.sha256) {
+            await rm(wheel, { force: true })
+            throw new Error('组件下载校验失败，请重试安装')
+          }
+          artifacts.push(wheel)
+          completed += item.bytes
+          this.operation.phase = 'download'
+        }
       }
       await mkdir(staging, { recursive: true })
       this.operation.phase = 'prepare'
-      await this.installLibraries(state, paths, staging, controller.signal)
+      await this.installLibraries(state, artifacts, staging, controller.signal)
       this.operation.phase = 'check'
       const actual = await probeLocalEngine(join(this.baseDirectory, 'python.exe'), staging)
       if (actual.status !== 'ready' || actual.backend !== state.backend || actual.version.split('+')[0] !== state.torchVersion ||
@@ -134,7 +148,7 @@ export class PythonEnvironments {
     }
   }
 
-  private async installLibraries(state: RuntimeRecipe, paths: string[], staging: string, signal: AbortSignal): Promise<void> {
+  private async installLibraries(state: RuntimeRecipe, artifacts: string[], staging: string, signal: AbortSignal): Promise<void> {
     const temporary = this.inside('pip-temp')
     await mkdir(temporary, { recursive: true })
     const log = createWriteStream(this.inside(`install-${state.id}.log`))
@@ -142,18 +156,17 @@ export class PythonEnvironments {
     // `--isolated` together with PIP_CONFIG_FILE=nul discards whatever pip.conf the machine
     // carries, so the flag below is the only route a configured proxy can take into pip.
     const network = this.network?.()
-    const index = network?.usePypiMirror ? PYPI_MIRROR : PYPI_INDEX
+    const index = network?.usePypiMirror ? network.pypiMirrorUrl : PYPI_INDEX
     const proxy = network?.proxyForPip ? network.proxyUrl.trim() : ''
     let childClosed: Promise<void> | undefined
-    try {
-      await new Promise<void>((resolveInstall, reject) => {
+    const runPip = (pipIndex: string): Promise<void> => new Promise((resolveInstall, reject) => {
         // Same-volume temporary files avoid copying the whole CUDA package a second time.
         // Compile only imported modules at runtime, rather than every dependency during installation.
         const child = execFile(join(this.baseDirectory, 'python.exe'), ['-I', '-u', '-m', 'pip', '--isolated', 'install',
           '--disable-pip-version-check', '--no-warn-script-location', '--no-cache-dir', '--no-compile', '--progress-bar', 'off', '--target', staging,
-          '--index-url', index, '--extra-index-url', state.indexUrl,
+          '--index-url', pipIndex,
           ...(proxy ? ['--proxy', proxy] : []),
-          ...paths, ...state.requirements], {
+          ...artifacts, ...state.requirements], {
           cwd: this.baseDirectory, windowsHide: true, signal, timeout: 30 * 60_000, maxBuffer: 4 * 1024 * 1024,
           env: { ...process.env, PYTHONUTF8: '1', PIP_CONFIG_FILE: 'nul', TEMP: temporary, TMP: temporary },
         }, error => error ? reject(error) : resolveInstall())
@@ -168,6 +181,17 @@ export class PythonEnvironments {
           })
         }
       })
+    try {
+      try {
+        await runPip(index)
+      } catch (error) {
+        if (!network?.usePypiMirror || !isMissingPackageError(error)) throw error
+        await childClosed
+        signal.throwIfAborted()
+        await rm(staging, { recursive: true, force: true })
+        await mkdir(staging, { recursive: true })
+        await runPip(PYPI_INDEX)
+      }
     } finally {
       // Abort callbacks can run before close; cleanup must wait until pip releases its files.
       if (signal.aborted) await childClosed
@@ -176,4 +200,19 @@ export class PythonEnvironments {
       if (error instanceof Error) throw error
     }
   }
+}
+
+function aliyunTorchWheelUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    if (parsed.hostname !== 'download-r2.pytorch.org' || !parsed.pathname.startsWith('/whl/')) return null
+    return `https://mirrors.aliyun.com/pytorch-wheels/${parsed.pathname.slice('/whl/'.length)}${parsed.search}`
+  } catch { return null }
+}
+
+function isMissingPackageError(error: unknown): boolean {
+  const detail = error && typeof error === 'object' && 'stderr' in error && typeof error.stderr === 'string'
+    ? `${String(error)}\n${error.stderr}`
+    : String(error)
+  return /No matching distribution found|Could not find a version that satisfies the requirement/i.test(detail)
 }

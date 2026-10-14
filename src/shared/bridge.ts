@@ -9,6 +9,7 @@ import type {
   HubInspectResult,
   HubSearchResult,
   MeetingMeta,
+  ModelDownloadSource,
   PrewarmResult,
   ResourceRecord,
   ResourceSnapshot,
@@ -79,12 +80,12 @@ export type NolaTranslatorApi = {
   testAudio(source: AudioTestSource): Promise<AudioTestResult>
   listComputeDevices(): Promise<ComputeSnapshot>
   getRuntimes(): Promise<RuntimeSnapshot>
-  prepareRuntimes(): Promise<RuntimeSnapshot>
+  prepareRuntimes(components?: readonly ('engine' | 'llama')[]): Promise<RuntimeSnapshot>
   installRuntime(id: string, repair?: boolean): Promise<void>
   importRuntime(): Promise<boolean>
   cancelRuntimeInstall(): Promise<void>
   listResources(): Promise<ResourceSnapshot>
-  manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel'): Promise<ResourceRecord>
+  manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel', source?: ModelDownloadSource): Promise<ResourceRecord>
   /**
    * Search Hugging Face for candidate models. Filters published PyTorch/GGUF weights from one
    * metadata response; the category narrows the server query, while README reads and runtime
@@ -101,7 +102,8 @@ export type NolaTranslatorApi = {
    */
   installHuggingFaceModel(
     repo: string,
-    slot?: 'recognition' | 'translation'
+    slot?: 'recognition' | 'translation',
+    source?: ModelDownloadSource,
   ): Promise<ResourceRecord>
   configureModel(resourceId: string, configuration: ModelConfiguration): Promise<ResourceRecord>
   startSession(config: SessionConfig): Promise<SessionStartResult>

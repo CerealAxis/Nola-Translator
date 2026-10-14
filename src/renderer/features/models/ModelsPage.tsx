@@ -15,6 +15,7 @@ import type { ResourceRecord, ResourceRecordWithRate } from '@/bridge'
 import { DownloadsTab } from './DownloadsTab'
 import { HubSearchTab } from './HubSearchTab'
 import { ModelCard, ModelCardSkeleton, defaultTargetOf, isDefaultOf } from './ModelCard'
+import { DownloadSourceDialog } from './DownloadSourceDialog'
 import { ModelMark } from './modelBrand'
 import './models.css'
 
@@ -27,6 +28,7 @@ export function ModelsPage() {
   const { t } = useI18n()
   const [tab, setTab] = useState<ModelsTab>('recommended')
   const [configuring, setConfiguring] = useState<ResourceRecord | null>(null)
+  const [downloadTarget, setDownloadTarget] = useState<ResourceRecord | null>(null)
 
   const resources = useStore(stores.models, (state) => state.resources)
   const loaded = useStore(stores.models, (state) => state.loaded)
@@ -83,8 +85,12 @@ export function ModelsPage() {
     if (error) console.error('[models]', error)
   }, [error])
 
-  const run = (id: string, action: 'install' | 'remove' | 'cancel') => () => {
-    void actions.models.manageResource(id, action).catch(() => {
+  const run = (record: ResourceRecord, action: 'install' | 'remove' | 'cancel') => () => {
+    if (action === 'install') {
+      setDownloadTarget(record)
+      return
+    }
+    void actions.models.manageResource(record.resourceId, action).catch(() => {
       // 失败已经写进 store.error，界面上由下面的 Alert 呈现。
     })
   }
@@ -107,9 +113,9 @@ export function ModelsPage() {
       busy={busyIds.includes(record.resourceId)}
       isDefault={isDefaultOf(record, settings)}
       canBeDefault={isModelReady(record) && defaultTargetOf(record) !== null && supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)}
-      onInstall={run(record.resourceId, 'install')}
-      onCancel={run(record.resourceId, 'cancel')}
-      onRemove={run(record.resourceId, 'remove')}
+      onInstall={run(record, 'install')}
+      onCancel={run(record, 'cancel')}
+      onRemove={run(record, 'remove')}
       onSetDefault={() => setDefault(record)}
       footer={record.resourceId.startsWith('hub:') && record.installed ? <Button variant="secondary" onPress={() => setConfiguring(record)}>{t(configurationOf(record) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : undefined}
     />
@@ -118,6 +124,13 @@ export function ModelsPage() {
   return (
     <div className="models-page">
       {configuring ? <ModelConfigurationDialog key={configuring.resourceId} record={configuring} onClose={() => setConfiguring(null)} /> : null}
+      <DownloadSourceDialog record={downloadTarget} onClose={() => setDownloadTarget(null)} onSelect={source => {
+        const target = downloadTarget
+        setDownloadTarget(null)
+        if (target) void actions.models.manageResource(target.resourceId, 'install', source).catch(() => {
+          toast.danger(t('models.downloadError', { name: target.name }))
+        })
+      }} />
       <section className="models-overview">
         <header className="models-overview__heading">
           <span className="models-overview__icon"><Box aria-hidden="true" /></span>

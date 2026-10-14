@@ -22,6 +22,7 @@ from urllib.parse import urlparse
 from urllib.request import OpenerDirector, ProxyHandler, Request, build_opener
 
 from ..protocol import NetworkSettings
+from ..debug_log import write as write_diagnostic
 
 
 ProgressCallback = Callable[[int, int], None]
@@ -32,6 +33,7 @@ PhaseCallback = Callable[[str], None]
 #: choice is a user setting, so it is resolved per operation instead of frozen at import time.
 HF_ENDPOINT = "https://huggingface.co"
 HF_MIRROR_ENDPOINT = "https://hf-mirror.com"
+MODELSCOPE_ENDPOINT = "https://www.modelscope.cn/models"
 
 
 def hf_endpoint(network: NetworkSettings | None) -> str:
@@ -107,13 +109,27 @@ class ModelSpec:
     repo: str
     revision: str
     files: tuple[FileEntry, ...]
+    modelscope_repo: str | None = None
+    modelscope_revision: str = "master"
 
     @property
     def total_bytes(self) -> int:
         return sum(entry.size for entry in self.files)
 
-    def url_for(self, entry: FileEntry, network: NetworkSettings | None = None) -> str:
-        endpoint = hf_endpoint(network)
+    def url_for(
+        self, entry: FileEntry, network: NetworkSettings | None = None,
+        source: str | None = None,
+    ) -> str:
+        if source == "modelscope":
+            if self.modelscope_repo is None:
+                raise ValueError("modelscopeSourceUnavailable")
+            return f"{MODELSCOPE_ENDPOINT}/{self.modelscope_repo}/resolve/{self.modelscope_revision}/{entry.path}"
+        if source == "huggingface":
+            endpoint = HF_ENDPOINT
+        elif source == "hf-mirror":
+            endpoint = HF_MIRROR_ENDPOINT
+        else:
+            endpoint = hf_endpoint(network)
         return f"{endpoint}/{self.repo}/resolve/{self.revision}/{entry.path}"
 
 
@@ -125,6 +141,10 @@ class _DownloadProtocolError(RuntimeError):
     """The server returned bytes that cannot safely be associated with a requested range."""
 
 
+class _DownloadTruncatedError(_DownloadProtocolError):
+    """A valid response ended early; retrying the same range can recover it."""
+
+
 class ResumableParallelDownloader:
     """Download model files with bounded HTTP ranges and persistent completed chunks."""
 
@@ -134,9 +154,9 @@ class ResumableParallelDownloader:
         opener: OpenerDirector,
         *,
         chunk_size: int = 16 * 1024 * 1024,
-        max_workers: int = 4,
+        max_workers: int = 8,
         parallel_threshold: int = 32 * 1024 * 1024,
-        max_retries: int = 2,
+        max_retries: int = 3,
     ) -> None:
         self.model_root = model_root
         self.opener = opener
@@ -153,12 +173,24 @@ class ResumableParallelDownloader:
         progress: ProgressCallback,
     ) -> None:
         cache_dir = self._cache_dir(url, entry)
-        if entry.size >= self.parallel_threshold and self._supports_ranges(url, entry.size):
-            self._download_parallel(url, destination, entry.size, cache_dir, progress)
+        started_at = time.monotonic()
+        download_url, ranges = (self._resolve_download(url, entry.size, progress)
+                                if entry.size >= self.parallel_threshold else (url, False))
+        write_diagnostic('engine', 'model.download.start', {
+            'file': entry.path, 'sourceHost': urlparse(url).hostname,
+            'downloadHost': urlparse(download_url).hostname, 'bytes': entry.size,
+            'workers': self.max_workers if ranges else 1, 'chunkBytes': self.chunk_size,
+        })
+        if ranges:
+            self._download_parallel(download_url, destination, entry.size, cache_dir, progress)
         else:
-            self._download_sequential(url, destination, entry.size, cache_dir, progress)
+            self._download_sequential(download_url, destination, entry.size, cache_dir, progress)
         shutil.rmtree(cache_dir, ignore_errors=True)
         self._remove_empty_cache_root()
+        write_diagnostic('engine', 'model.download.complete', {
+            'file': entry.path, 'bytes': entry.size,
+            'durationMs': round((time.monotonic() - started_at) * 1000),
+        })
 
     def _cache_dir(self, url: str, entry: FileEntry) -> Path:
         identity_data = json.dumps(
@@ -205,19 +237,31 @@ class ResumableParallelDownloader:
             os.replace(temporary, metadata_path)
         return cache_dir
 
-    def _supports_ranges(self, url: str, size: int) -> bool:
-        request = Request(url, headers={"User-Agent": "Nola Translator/0.1", "Range": "bytes=0-0"})
-        try:
-            response = self.opener.open(request, timeout=30)
-        except HTTPError as error:
-            if error.code in (400, 403, 405, 416):
-                error.close()
-                return False
-            raise
-        with response:
-            if self._status(response) != 206:
-                return False
-            return response.headers.get("Content-Range", "") == f"bytes 0-0/{size}"
+    def _resolve_download(self, url: str, size: int, progress: ProgressCallback) -> tuple[str, bool]:
+        # Resolve repository redirects once; every worker can then use the same CDN URL without
+        # repeating the origin request. Cache identity still uses the stable repository URL.
+        for attempt in range(self.max_retries + 1):
+            if attempt:
+                progress(0, size)
+            request = Request(url, headers={"User-Agent": "Nola Translator/0.1", "Range": "bytes=0-0"})
+            try:
+                with self.opener.open(request, timeout=30) as response:
+                    resolved = response.geturl()
+                    ranges = (self._status(response) == 206 and
+                              response.headers.get('Content-Range', '') == f'bytes 0-0/{size}')
+                    return resolved, ranges
+            except HTTPError as error:
+                if error.code in (400, 403, 405, 416):
+                    error.close()
+                    return url, False
+                if not self._retryable(error) or attempt == self.max_retries:
+                    raise
+                self._retry_pause(error, attempt)
+            except (URLError, HTTPException, ConnectionError, TimeoutError) as error:
+                if attempt == self.max_retries:
+                    raise
+                self._retry_pause(error, attempt)
+        raise _DownloadProtocolError('下载服务器无法响应')
 
     def _download_parallel(
         self,
@@ -284,7 +328,7 @@ class ResumableParallelDownloader:
                                 output.write(data)
                                 report(index, written)
                     if written != expected:
-                        raise _DownloadProtocolError("下载分块长度不完整")
+                        raise _DownloadTruncatedError("下载分块长度不完整")
                     os.replace(temporary, chunk)
                     report(index, expected, complete=True)
                     return
@@ -298,7 +342,7 @@ class ResumableParallelDownloader:
                         stopped.set()
                         raise
                     last_error = error
-                    time.sleep(0.25 * (attempt + 1))
+                    self._retry_pause(error, attempt)
             if last_error is not None:
                 raise last_error
 
@@ -326,6 +370,21 @@ class ResumableParallelDownloader:
         progress(size, size)
 
     def _download_sequential(
+        self, url: str, destination: Path, size: int, cache_dir: Path,
+        progress: ProgressCallback,
+    ) -> None:
+        for attempt in range(self.max_retries + 1):
+            partial = cache_dir / 'sequential.part'
+            progress(partial.stat().st_size if partial.is_file() else 0, size)
+            try:
+                self._download_sequential_once(url, destination, size, cache_dir, progress)
+                return
+            except Exception as error:
+                if not self._retryable(error) or attempt == self.max_retries:
+                    raise
+                self._retry_pause(error, attempt)
+
+    def _download_sequential_once(
         self,
         url: str,
         destination: Path,
@@ -373,7 +432,7 @@ class ResumableParallelDownloader:
                     raise _DownloadProtocolError("下载文件长度超过模型清单")
                 progress(current, size)
         if current != size:
-            raise _DownloadProtocolError("下载文件长度与模型清单不匹配")
+            raise _DownloadTruncatedError("下载文件长度与模型清单不匹配")
         shutil.copyfile(partial_path, destination)
 
     @staticmethod
@@ -385,7 +444,20 @@ class ResumableParallelDownloader:
     def _retryable(error: Exception) -> bool:
         if isinstance(error, HTTPError):
             return error.code in (408, 429, 500, 502, 503, 504)
-        return isinstance(error, (URLError, HTTPException, ConnectionError, TimeoutError))
+        return isinstance(error, (URLError, HTTPException, ConnectionError, TimeoutError, _DownloadTruncatedError))
+
+    @staticmethod
+    def _retry_pause(error: Exception, attempt: int) -> None:
+        delay = min(2.0, 0.25 * 2 ** attempt)
+        if isinstance(error, HTTPError):
+            retry_after = error.headers.get('Retry-After', '') if error.headers else ''
+            if retry_after.isdigit():
+                delay = min(10.0, max(delay, float(retry_after)))
+            error.close()
+        write_diagnostic('engine', 'model.download.retry', {
+            'attempt': attempt + 1, 'delayMs': round(delay * 1000), 'reason': type(error).__name__,
+        })
+        time.sleep(delay)
 
     def _remove_empty_cache_root(self) -> None:
         cache_root = self.model_root / ".downloads"
@@ -468,6 +540,7 @@ class ModelManager:
         progress: ProgressCallback = lambda _current, _total: None,
         on_phase: PhaseCallback | None = None,
         network: NetworkSettings | None = None,
+        source: str | None = None,
     ) -> Path:
         """Download file by file into a temp dir, then switch to the target atomically once verification passes.
 
@@ -509,7 +582,7 @@ class ModelManager:
                 def file_progress(current: int, _file_total: int, base: int = base) -> None:
                     progress(base + current, total)
 
-                url = spec.url_for(entry, network)
+                url = spec.url_for(entry, network, source)
                 if downloader is not None:
                     downloader.download(url, part, entry, file_progress)
                 else:
@@ -520,7 +593,7 @@ class ModelManager:
             phase("verify")
             for entry in spec.files:
                 part = temp / f".{entry.path}.part"
-                self._verify_file(part, entry, lambda: progress(done, total))
+                self._verify_file(part, entry, lambda: progress(done, total), verify_digest=source != "modelscope")
                 os.replace(part, temp / entry.path)
 
             phase("install")
@@ -549,14 +622,18 @@ class ModelManager:
             shutil.rmtree(temp, ignore_errors=True)
 
     @staticmethod
-    def _verify_file(path: Path, entry: FileEntry, checkpoint: Callable[[], None] = lambda: None) -> None:
+    def _verify_file(
+        path: Path, entry: FileEntry, checkpoint: Callable[[], None] = lambda: None,
+        *, verify_digest: bool = True,
+    ) -> None:
         if not path.is_file():
             raise ModelIntegrityError("模型文件缺失")
         if path.stat().st_size != entry.size:
             raise ModelIntegrityError("模型文件大小不匹配")
-        # Exactly one digest is checked, and which one is fixed by what HuggingFace published for
-        # this file. Falling through to "size matched, assume it is fine" is the one outcome a
-        # supply chain must never produce, so a spec with no digest fails loudly instead.
+        # ModelScope is an explicitly selected alternate source; those repository copies may not
+        # publish the same Hugging Face digest, so that path retains the size check only.
+        if not verify_digest:
+            return
         if entry.sha256:
             expected, actual = entry.sha256.casefold(), _file_sha256(path, checkpoint)
         elif entry.blob_sha1:

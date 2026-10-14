@@ -17,10 +17,12 @@ import { CircleAlert } from 'lucide-react'
 
 import type { MissingResource } from '@/store'
 import type { DiagnosticCopyContext } from '@/bridge'
+import type { SessionConfig } from '../../../shared/contracts'
 import { actions, sessionStore, stores } from '@/store'
 import { useI18n } from '@/i18n'
 import { translationEngine } from '../../../shared/model-engines'
 import { NO_TRANSLATION_LANGUAGE } from '../../../shared/settings'
+import { DownloadSourceDialog } from '../models/DownloadSourceDialog'
 
 /** `engineFailed` is not "a step failed" but "this dialog cannot reach a verdict". */
 type Stage = 'environment' | 'environmentFailed' | 'devices' | 'models' | 'missing' | 'ready' | 'engineFailed' | 'modelCheckFailed'
@@ -47,13 +49,15 @@ export interface PreflightDialogProps {
   onOpenChange: (open: boolean) => void
   /** The missing resource, computed by `findMissingResource` from the `listResources()` snapshot. */
   missing: MissingResource | null
+  /** The exact session settings that will be passed to `startSession`. */
+  config?: SessionConfig
   /** Start the session. The page holds the config and calls `startSession`. */
   onStart: () => void
   /** Opens the existing safe report-copy path with this failure's correlation details. */
   onCopyDiagnostics?: (context: DiagnosticCopyContext) => void
 }
 
-export function PreflightDialog({ isOpen, onOpenChange, missing, onStart, onCopyDiagnostics }: PreflightDialogProps) {
+export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart, onCopyDiagnostics }: PreflightDialogProps) {
   const { t } = useI18n()
   const [stage, setStage] = useState<Stage>('environment')
   const missingRef = useRef(missing)
@@ -62,6 +66,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart, onCopy
   const [deviceFailure, setDeviceFailure] = useState<'enumeration' | 'operation' | 'empty' | null>(null)
   const [failureContext, setFailureContext] = useState<PreflightFailure | null>(null)
   const [installing, setInstalling] = useState(false)
+  const [downloadTarget, setDownloadTarget] = useState<MissingResource | null>(null)
   const openedRef = useRef(false)
   const runRef = useRef(0)
 
@@ -79,12 +84,20 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart, onCopy
     void (async () => {
       let environmentSupportCode: PreflightFailure['supportCode'] = 'ERR-999'
       try {
-        const runtime = await actions.settings.loadRuntimeComponents(true)
         const settings = stores.settings.getState().settings
-        const resource = stores.models.getState().resources.find(r => r.resourceId === settings?.translation.localModelId)
-        const needsLlama = settings && settings.translation.provider === 'local' && settings.translation.targetLanguage !== NO_TRANSLATION_LANGUAGE &&
-          translationEngine(settings.compute, resource?.provider, settings.translation.localModelId) === 'llama'
-        if (runtime.local.engine.status !== 'ready') {
+        const recognitionProvider = config?.recognitionProvider ?? settings?.recognition.provider ?? 'local'
+        const translationProvider = config?.translationProvider ?? settings?.translation.provider ?? 'local'
+        const targetLanguages = config?.targetLanguages ?? (settings?.translation.targetLanguage && settings.translation.targetLanguage !== NO_TRANSLATION_LANGUAGE ? [settings.translation.targetLanguage] : [])
+        const modelId = config?.translationModelId ?? settings?.translation.localModelId
+        const compute = config?.compute ?? settings?.compute
+        const resource = stores.models.getState().resources.find(r => r.resourceId === modelId)
+        const usesLocalTranslation = (translationProvider === 'local' || config?.fallbackTranslationProvider === 'local') && targetLanguages.length > 0
+        const selectedEngine = compute ? translationEngine(compute, resource?.provider, modelId) : 'llama'
+        const needsTorch = recognitionProvider === 'local' || (usesLocalTranslation && selectedEngine === 'pytorch')
+        const needsLlama = usesLocalTranslation && selectedEngine === 'llama'
+        const requiredComponents = [...(needsTorch ? ['engine' as const] : []), ...(needsLlama ? ['llama' as const] : [])]
+        const runtime = await actions.settings.loadRuntimeComponents(true, requiredComponents)
+        if (needsTorch && runtime.local.engine.status !== 'ready') {
           environmentSupportCode = 'RNT-001'
           throw new Error(t('errors.torchRuntimeUnavailable'))
         }
@@ -163,7 +176,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart, onCopy
       if (!alive()) return
       setStage(missingRef.current ? 'missing' : 'ready')
     })()
-  }, [t])
+  }, [config, t])
 
   // Re-run on every open: the model may have been installed after "later", so
   // the result cannot be cached.
@@ -183,19 +196,22 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart, onCopy
     }
   }, [isOpen, runCheck])
 
-  const install = useCallback(async () => {
+  const install = useCallback(async (source: import('../../../shared/contracts').ModelDownloadSource) => {
     if (!missing) return
     setInstalling(true)
     try {
-      await actions.models.manageResource(missing.resourceId, 'install')
+      await actions.models.manageResource(missing.resourceId, 'install', source)
       await actions.models.loadModels({ includeDevices: false })
-      toast.success(t('preflight.allReady'))
     } catch {
       toast.danger(t('errors.downloadFailed'))
     } finally {
       setInstalling(false)
     }
   }, [missing, t])
+
+  const requestInstall = useCallback(() => {
+    if (missing) setDownloadTarget(missing)
+  }, [missing])
 
   // The parent's recomputed `missing` becomes null once installed, which is
   // read as passing. Not a full re-run: the devices were just probed, so probing
@@ -210,11 +226,17 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart, onCopy
   const close = (open: boolean) => {
     if (!open) {
       runRef.current += 1
+      setDownloadTarget(null)
     }
     onOpenChange(open)
   }
 
   return (
+    <>
+    <DownloadSourceDialog record={downloadTarget} onClose={() => setDownloadTarget(null)} onSelect={source => {
+      setDownloadTarget(null)
+      void install(source)
+    }} />
     <Modal isOpen={isOpen} onOpenChange={close}>
       <Modal.Backdrop className="z-overlay">
         <Modal.Container size="sm" placement="center">
@@ -236,8 +258,8 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart, onCopy
                     ? t('errors.llamaRuntimeUnavailable')
                     : t('errors.unknownFailure')
               }</Alert.Description>
-                <Button variant="tertiary" size="sm" onPress={() => { close(false); void actions.settings.openRuntimeSettings('engine') }}>{t('runtime.goTorch')}</Button>
-                <Button variant="tertiary" size="sm" onPress={() => { close(false); void actions.settings.openRuntimeSettings('llama') }}>{t('runtime.goLlama')}</Button>
+                {failureContext?.supportCode === 'RNT-001' ? <Button variant="tertiary" size="sm" onPress={() => { close(false); void actions.settings.openRuntimeSettings('engine') }}>{t('runtime.goTorch')}</Button> : null}
+                {failureContext?.supportCode === 'RNT-002' ? <Button variant="tertiary" size="sm" onPress={() => { close(false); void actions.settings.openRuntimeSettings('llama') }}>{t('runtime.goLlama')}</Button> : null}
                 <Button variant="tertiary" size="sm" onPress={runCheck}>{t('runtime.recheck')}</Button>
               </Alert.Content></Alert> : null}
               {!environmentPending && !environmentFailed ? <>
@@ -319,7 +341,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart, onCopy
                 {stage === 'missing' ? t('preflight.later') : t('session.cancel')}
               </Button>
               {stage === 'missing' ? (
-                <Button variant="primary" size="sm" className="rounded-full px-5" onPress={install} isPending={installing}>
+                <Button variant="primary" size="sm" className="rounded-full px-5" onPress={requestInstall} isPending={installing}>
                   <CircleAlert aria-hidden="true" />
                   {t('preflight.installNow')}
                 </Button>
@@ -341,6 +363,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, onStart, onCopy
         </Modal.Container>
       </Modal.Backdrop>
     </Modal>
+    </>
   )
 }
 

@@ -6,6 +6,7 @@ import { languageName } from '@/bridge'
 import { actions } from '@/store'
 import { useI18n } from '@/i18n'
 import { LANGUAGE_CODES, normalizeLanguage } from '../../../shared/languages'
+import { INDEX_TRANSLATE_LANGUAGES } from '../../../shared/index-translate'
 import { modelEngines } from '../../../shared/model-engines'
 import { configurationOf, modelConfigurationSchema, QWEN_LANGUAGES, M2M100_LANGUAGES } from '../../../shared/model-capabilities'
 import type { ModelConfiguration } from '../../../shared/model-capabilities'
@@ -57,6 +58,7 @@ export function ModelConfigurationDialog({ record, onClose }: ModelConfiguration
   const codes = record.provider === 'qwen3-asr' ? QWEN_LANGUAGES
     : record.provider === 'm2m100' ? M2M100_LANGUAGES
       : record.provider === 'sensevoice' ? ['zh', 'en', 'yue', 'ja', 'ko']
+        : record.provider === 'index-translate' ? [...LANGUAGE_CODES, ...INDEX_TRANSLATE_LANGUAGES]
         : LANGUAGE_CODES
   const valid = modelConfigurationSchema.safeParse(draft).success && engines.includes(draft.engine)
   const name = (code: string) => languageName(code, language)

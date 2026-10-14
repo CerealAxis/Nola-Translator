@@ -1,31 +1,22 @@
-/**
- * Download tasks: one `Table` row each, a `ProgressBar` where a task is in flight, and an
- * `EmptyState` when idle.
- *
- * There is no speed column because no rate field exists to fill one — `ResourceRecord` carries
- * only `progress` and `downloadBytes`. The progress column therefore reports the two facts it
- * actually has: the percentage, and written bytes over total.
- *
- * The row carries an `Alert` and a retry button, the message comes from `errors.*`, and
- * the `state.error` diagnostic string stays in the console.
- */
-
-import { Alert, Button, Card, EmptyState, ProgressBar, Table } from '@heroui/react'
+import { Button, Card, EmptyState, ProgressBar, Table, toast } from '@heroui/react'
+import { useState } from 'react'
 
 import { resourceStateOf } from '@/bridge'
-import type { ResourceRecord } from '@/bridge'
+import type { ResourceRecord, ResourceRecordWithRate } from '@/bridge'
+import { StatusPill } from '@/components/primitives'
 import { actions, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
 import { formatBytes } from './ModelCard'
+import { DownloadSourceDialog } from './DownloadSourceDialog'
 
 export function DownloadsTab() {
   const { t } = useI18n()
+  const [downloadTarget, setDownloadTarget] = useState<ResourceRecord | null>(null)
   const resources = useStore(stores.models, (state) => state.resources)
   const busyIds = useStore(stores.models, (state) => state.busyIds)
-  const error = useStore(stores.models, (state) => state.error)
 
   const rows = resources.filter(
-    (item) => resourceStateOf(item) !== 'absent' && resourceStateOf(item) !== 'installed',
+    (item) => item.state === 'cancelling' || (resourceStateOf(item) !== 'absent' && resourceStateOf(item) !== 'installed'),
   )
 
   if (rows.length === 0) {
@@ -39,17 +30,13 @@ export function DownloadsTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      {error ? (
-        <Alert status="danger">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title className="nola-body-strong">{t('errors.downloadFailed')}</Alert.Title>
-            <Alert.Description className="nola-caption">
-              {t('errors.downloadFailedAction')}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
-      ) : null}
+      <DownloadSourceDialog record={downloadTarget} onClose={() => setDownloadTarget(null)} onSelect={source => {
+        const target = downloadTarget
+        setDownloadTarget(null)
+        if (target) void actions.models.manageResource(target.resourceId, 'install', source).catch(() => {
+          toast.danger(t('models.downloadError', { name: target.name }))
+        })
+      }} />
 
       {/* `Table` is only the root; the semantic table is `Table.Content`, inside a `ScrollContainer`. */}
       <Card className="models-downloads"><Card.Content><Table>
@@ -67,6 +54,7 @@ export function DownloadsTab() {
                   key={record.resourceId}
                   record={record}
                   busy={busyIds.includes(record.resourceId)}
+                  onRetry={() => setDownloadTarget(record)}
                 />
               ))}
             </Table.Body>
@@ -77,35 +65,30 @@ export function DownloadsTab() {
   )
 }
 
-function Row({ record, busy }: { record: ResourceRecord; busy: boolean }) {
+function Row({ record, busy, onRetry }: { record: ResourceRecordWithRate; busy: boolean; onRetry: () => void }) {
   const { t } = useI18n()
   const state = resourceStateOf(record)
   const failed = state === 'failed'
+  const cancelling = record.state === 'cancelling'
   const total = record.downloadBytes ?? record.installedBytes
   const raw = record.progress ?? 0
-  const value = failed ? 0 : Math.min(1, Math.max(0, raw > 1 ? raw / 100 : raw))
+  const value = Math.min(1, Math.max(0, raw > 1 ? raw / 100 : raw))
   const done = Math.round(total * value)
+  const label = cancelling ? t('models.cancelling')
+    : failed ? t('models.downloadFailed')
+    : state === 'verifying' ? t('models.verifying')
+    : state === 'queued' ? t('models.queued') : t('status.downloading')
 
   return (
     <Table.Row>
       <Table.Cell>
         <span className="nola-body-strong text-foreground">{record.name}</span>
       </Table.Cell>
+      <Table.Cell><span className="nola-caption tabular whitespace-nowrap">{formatBytes(total)}</span></Table.Cell>
       <Table.Cell>
-        {failed ? (
-          <Alert status="danger">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title className="nola-caption">
-                {t('models.downloadFailed')}
-              </Alert.Title>
-              <Alert.Description className="nola-micro">
-                {t('errors.downloadFailedAction')}
-              </Alert.Description>
-            </Alert.Content>
-          </Alert>
-        ) : (
-          <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex min-w-0 flex-col items-start gap-[var(--space-1)]">
+          <StatusPill label={label} tone={failed ? 'danger' : cancelling ? 'warning' : 'accent'} live={!failed && !cancelling} />
+          {!failed && !cancelling ? <div className="flex w-full min-w-0 flex-col gap-[var(--space-1)]">
             <ProgressBar value={value} maxValue={1} className="w-full" aria-label={t('models.stateLabel')}>
               <ProgressBar.Track>
                 <ProgressBar.Fill />
@@ -115,50 +98,38 @@ function Row({ record, busy }: { record: ResourceRecord; busy: boolean }) {
               {t('models.progress', { percent: Math.round(value * 100) })}
               {' · '}
               {formatBytes(done)}
-              {' / '}
-              {formatBytes(total)}
+              {record.bytesPerSecond !== undefined ? <> · {t('models.downloadRate', { speed: formatBytes(record.bytesPerSecond) })}</> : null}
             </span>
-          </div>
-        )}
+          </div> : null}
+        </div>
       </Table.Cell>
       <Table.Cell>
-        <span className="nola-caption text-muted">
-          {state === 'failed'
-            ? t('models.downloadFailed')
-            : state === 'verifying'
-              ? t('models.verifying')
-              : state === 'queued'
-                ? t('models.queued')
-                : t('status.downloading')}
-        </span>
-      </Table.Cell>
-      <Table.Cell>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-[var(--space-2)]">
           {failed ? (
             <Button
-              variant="tertiary"
+              variant="secondary"
               size="sm"
-              className="rounded-[6px]"
+              className="rounded-[var(--radius-xl)]"
               isPending={busy}
-              onPress={() => {
-                void actions.models.manageResource(record.resourceId, 'install').catch(() => undefined)
-              }}
+              onPress={onRetry}
             >
               {t('models.retry')}
             </Button>
-          ) : (
+          ) : null}
             <Button
               variant="tertiary"
               size="sm"
-              className="rounded-[6px]"
-              isDisabled={!record.cancellable}
+              className="rounded-[var(--radius-xl)]"
+              isDisabled={busy || cancelling || (!failed && !record.cancellable)}
+              isPending={cancelling}
               onPress={() => {
-                void actions.models.manageResource(record.resourceId, 'cancel').catch(() => undefined)
+                void actions.models.manageResource(record.resourceId, 'cancel').catch(() => {
+                  toast.danger(t('errors.engineOperationFailed'))
+                })
               }}
             >
-              {t('models.cancel')}
+              {t('models.cancelTask')}
             </Button>
-          )}
         </div>
       </Table.Cell>
     </Table.Row>

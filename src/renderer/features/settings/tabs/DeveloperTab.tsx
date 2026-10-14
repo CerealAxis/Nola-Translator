@@ -1,10 +1,10 @@
 /**
  * Developer-only triggers for every shared visual primitive, plus a gallery of the dialogs the
- * app really ships, each driven by fabricated data.
+ * app really ships. Most use fabricated data; the update notice fetches the latest real release.
  *
  * Every dialog here is handed made-up ids, so confirming one lands on its failure state instead of
- * writing to a real record. Two paths still reach outward: opening the preflight dialog probes the
- * runtime and starts the engine, and opening the export dialog clears the meetings error.
+ * writing to a real record. Preflight probes the runtime, export clears the meetings error, and the
+ * update notice trigger fetches release metadata from GitHub.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -28,8 +28,9 @@ import { StatusPill } from '@/components/primitives'
 import type { StatusPillTone } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
-import { stores, useStore } from '@/store'
+import { actions, stores, useStore } from '@/store'
 import type { SessionState } from '@/store'
+import type { AppUpdateCheckResult } from '@/bridge'
 import { ModelConfigurationDialog } from '../../models/ModelConfigurationDialog'
 import { DetailDrawer } from '../../models/HubSearchTab'
 import { TranslationCompatibilityDialog } from '../../models/TranslationCompatibilityDialog'
@@ -45,7 +46,6 @@ import { ThirdPartyNotices } from '../ThirdPartyNotices'
 import { AppUpdateDialog } from '../AppUpdateNotice'
 import { RuntimeNoticeDialog } from '../RuntimeNotice'
 import {
-  DEMO_APP_UPDATE,
   DEMO_ASR_RECORD,
   DEMO_BULK_COUNT,
   DEMO_DEVICES,
@@ -492,17 +492,17 @@ function GalleryRow({ label, desc, children }: { label: string; desc: string; ch
   )
 }
 
-function RunButton({ onPress }: { onPress: () => void }) {
+function RunButton({ onPress, isPending = false }: { onPress: () => void; isPending?: boolean }) {
   const { t } = useI18n()
   return (
-    <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={onPress}>
+    <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={onPress} isPending={isPending}>
       {t('dev.run')}
     </Button>
   )
 }
 
 /**
- * The dialogs the app really ships, each driven by fabricated data.
+ * The dialogs the app really ships, mostly driven by fabricated data.
  *
  * They stay mounted while closed so the first open costs the same as a page mount. The two that
  * open on mount instead (the model configuration dialog, and the session error dialog whose open
@@ -516,11 +516,43 @@ function DialogGalleryGroup() {
   const [draft, setDraft] = useState<SetupDraft>(DEMO_DRAFT)
   const [renameId, setRenameId] = useState<string | null>(null)
   const [errorSession, setErrorSession] = useState<SessionState | null>(null)
+  const [appUpdateResult, setAppUpdateResult] = useState<AppUpdateCheckResult | null>(null)
+  const [appUpdateChecking, setAppUpdateChecking] = useState(false)
+  const [appUpdateOpening, setAppUpdateOpening] = useState(false)
 
   const show = (key: GalleryDialog): void => setOpen(previous => ({ ...previous, [key]: true }))
   const track = (key: GalleryDialog): ((next: boolean) => void) =>
     next => setOpen(previous => ({ ...previous, [key]: next }))
   const hide = (key: GalleryDialog): void => setOpen(previous => ({ ...previous, [key]: false }))
+
+  const showLatestRelease = async (): Promise<void> => {
+    setAppUpdateChecking(true)
+    try {
+      const result = await actions.settings.fetchLatestRelease(true)
+      if (!result?.latestVersion || !result.releaseName) {
+        toast.danger(t('appUpdate.checkFailed'))
+        return
+      }
+      setAppUpdateResult(result)
+      show('appUpdate')
+    } catch {
+      toast.danger(t('appUpdate.checkFailed'))
+    } finally {
+      setAppUpdateChecking(false)
+    }
+  }
+
+  const openLatestRelease = async (url: string): Promise<void> => {
+    setAppUpdateOpening(true)
+    try {
+      await actions.settings.openAppReleasePage(url)
+      hide('appUpdate')
+    } catch {
+      toast.danger(t('appUpdate.openFailed'))
+    } finally {
+      setAppUpdateOpening(false)
+    }
+  }
 
   return (
     <>
@@ -559,7 +591,7 @@ function DialogGalleryGroup() {
           <RunButton onPress={() => show('runtimeMissing')} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogAppUpdate')} desc={t('dev.dialogAppUpdateDesc')}>
-          <RunButton onPress={() => show('appUpdate')} />
+          <RunButton onPress={() => { void showLatestRelease() }} isPending={appUpdateChecking} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogModelDetail')} desc={t('dev.dialogModelDetailDesc')}>
           <RunButton onPress={() => show('modelDetail')} />
@@ -627,13 +659,15 @@ function DialogGalleryGroup() {
         onOpenSettings={inert}
         onDismiss={() => hide('runtimeMissing')}
       />
-      <AppUpdateDialog
-        result={DEMO_APP_UPDATE}
-        isOpen={open.appUpdate}
-        onOpenChange={track('appUpdate')}
-        onOpenRelease={inert}
-        isOpening={false}
-      />
+      {appUpdateResult ? (
+        <AppUpdateDialog
+          result={appUpdateResult}
+          isOpen={open.appUpdate}
+          onOpenChange={track('appUpdate')}
+          onOpenRelease={url => { void openLatestRelease(url) }}
+          isOpening={appUpdateOpening}
+        />
+      ) : null}
       {/* The gallery key is the only open state here, so the drawer cannot drift out of sync with its row. */}
       <DetailDrawer
         hit={open.modelDetail ? DEMO_HUB_HIT : null}

@@ -7,7 +7,7 @@ import { normalizeLanguage } from '../shared/languages'
 import { supportsSelectedEngine } from '../shared/model-engines'
 import { DEFAULT_COMPUTE_SETTINGS } from '../shared/compute'
 import type { TranslationSettings } from '@/bridge'
-import { supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'
+import { fallbackTranslationFieldsOf, supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'
 
 /** Auto detection has no reverse translation target, so swapping resolves it to English. */
 export function swappedLanguagesOf(sourceLanguage: string, targetLanguage: string, sourceOptions: readonly string[] = SOURCE_LANGUAGE_OPTIONS, targetOptions: readonly string[] = TARGET_LANGUAGE_OPTIONS): { sourceLanguage: string; targetLanguage: string } | null {
@@ -42,7 +42,7 @@ export function translationModelPatch(settings: AppSettings, model: ResourceReco
 /** `SessionConfig` 里由翻译设置决定的那几个字段。 */
 export type TranslationFields = Pick<
   SessionConfig,
-  'targetLanguages' | 'allowIntermediateTranslation' | 'translationProvider' | 'translationModelId' | 'translationOptions'
+  'targetLanguages' | 'allowIntermediateTranslation' | 'translationProvider' | 'translationModelId' | 'translationOptions' | 'fallbackTranslationProvider' | 'fallbackTranslationOptions'
 >
 
 export interface TranslationFieldOptions {
@@ -106,8 +106,9 @@ export function translationFieldsOf(
      * 服务商托管，本机不需要它，所以这个字段整个缺席。取值与"缺席/空白"的区别见上面的
      * `modelOverride`。
      */
-    translationModelId: translation.provider === 'local' ? modelOverride ?? translation.localModelId : undefined,
+    translationModelId: translation.provider === 'local' || translation.fallback.provider === 'local' ? modelOverride ?? translation.localModelId : undefined,
     // 见文件头第 2 条：本地 provider 必须是 `undefined`，不是 `{}`。
     translationOptions: translationOptionsOf(translation),
+    ...fallbackTranslationFieldsOf(translation),
   }
 }

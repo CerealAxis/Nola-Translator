@@ -1,4 +1,5 @@
 import { ModelCapabilityNotices } from './features/models/ModelCapabilityNotices'
+import { ModelDownloadNotice } from './features/models/ModelDownloadNotice'
 import './index.css'
 import './theme/cjk-fonts.css'
 import { StrictMode, useEffect } from 'react'
@@ -232,6 +233,7 @@ function Root() {
   return (
     <ErrorBoundary>
       <Shell />
+      <ModelDownloadNotice />
       <ModelCapabilityNotices />
       <RuntimeNotice />
       <AppUpdateNotice />

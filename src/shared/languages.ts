@@ -1,3 +1,5 @@
+import { INDEX_TRANSLATE_LANGUAGE_NAMES } from './index-translate'
+
 /** Language identity is shared; model capabilities decide which codes are selectable. */
 export const LANGUAGE_CODES: readonly string[] = ["ky", "tg", "zh", "en", "yue", "ar", "de", "fr", "es", "pt", "id", "it", "ko", "ru", "th", "vi", "ja", "tr", "hi", "ms", "nl", "sv", "da", "fi", "pl", "cs", "tl", "fa", "el", "hu", "mk", "ro", "zh-Hant", "km", "my", "gu", "ur", "te", "mr", "he", "bn", "ta", "uk", "bo", "kk", "mn", "ug", "af", "am", "ast", "az", "ba", "be", "bg", "br", "bs", "ca", "ceb", "cy", "et", "ff", "fy", "ga", "gd", "gl", "ha", "hr", "ht", "hy", "ig", "ilo", "is", "jv", "ka", "kn", "lb", "lg", "ln", "lo", "lt", "lv", "mg", "ml", "ne", "no", "ns", "oc", "or", "pa", "ps", "sd", "si", "sk", "sl", "so", "sq", "sr", "ss", "su", "sw", "tn", "uz", "wo", "xh", "yi", "yo", "zu"]
 export interface LanguageLabel { code: string; zh: string; zhTW: string; zhHK: string; ko: string; ja: string; en: string }
@@ -50,6 +52,10 @@ const specialLabel = (code: string, zh: string, en: string, localized: Partial<P
   ko: localized.ko ?? korean?.of(code) ?? code,
   ja: localized.ja ?? japanese?.of(code) ?? code,
 })
+Object.assign(LANGUAGE_LABELS, Object.fromEntries(Object.entries(INDEX_TRANSLATE_LANGUAGE_NAMES).map(([code, zh]) => [
+  code,
+  specialLabel(code, zh, english?.of(code) ?? code),
+])))
 Object.assign(LANGUAGE_LABELS, {
   auto: specialLabel('auto', '自动检测', 'Auto detect', { zhTW: '自動偵測', zhHK: '自動偵測', ko: '자동 감지', ja: '自動検出' }),
   none: specialLabel('none', '不翻译', 'No translation', { zhTW: '不翻譯', zhHK: '不翻譯', ko: '번역 안 함', ja: '翻訳しない' }),

@@ -6,7 +6,7 @@
  * touching a real meeting, file or model.
  */
 
-import type { AppUpdateCheckResult, AudioDevice, ResourceRecord } from '@/bridge'
+import type { AudioDevice, ResourceRecord } from '@/bridge'
 import type { MissingResource, SessionState } from '@/store'
 import type { RuntimeIssue } from './RuntimeNotice'
 import type { HubHit } from '../models/HubSearchTab'
@@ -148,17 +148,3 @@ export const DEMO_RUNTIME_ISSUES: RuntimeIssue[] = [
   { kind: 'engine', reason: 'Demo probe: the torch wheel is not in the shared Python environment' },
   { kind: 'llama' },
 ]
-
-/** The notes are several paragraphs, so the dialog body has real text to wrap and scroll. */
-export const DEMO_APP_UPDATE: AppUpdateCheckResult = {
-  currentVersion: '1.0.0',
-  latestVersion: '1.1.0',
-  updateAvailable: true,
-  releaseName: 'Nola Translator 1.1.0 (Demo Release)',
-  releaseNotes: `Captions no longer drop when the window moves to another display.
-
-The PyTorch engine and llama.cpp can now be pointed at different GPUs: the backend picker is per model slot, and each slot keeps its own choice after a restart.
-
-Release notes keep the line breaks they were written with, which is what this sample is here to show. The body scrolls, so a long note list stays inside the dialog instead of pushing the buttons off screen.`,
-  releaseUrl: 'https://example.invalid/nola-translator/releases/tag/demo-1.1.0',
-}

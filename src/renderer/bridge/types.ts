@@ -20,6 +20,7 @@ export type {
   EngineEvent,
   EngineProcessState,
   MeetingMeta,
+  ModelDownloadSource,
   ResourceRecord,
   ResourceSnapshot,
   SessionConfig,

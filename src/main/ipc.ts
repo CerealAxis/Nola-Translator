@@ -58,6 +58,7 @@ export function prewarmConfigFrom(settings: AppSettings): PrewarmConfig {
     translationProvider: translation.provider,
     translationModelId: translation.localModelId,
     translationOptions: translationOptionsOf(translation),
+    ...fallbackTranslationFieldsOf(translation),
   }
 }
 
@@ -111,9 +112,12 @@ export function registerEngineIpc(
 
   loggedHandle(
     IPC_CHANNELS.manageResource,
-    async (_event, resourceId: unknown, action: unknown) => {
+    async (_event, resourceId: unknown, action: unknown, downloadSource: unknown) => {
       if (typeof resourceId !== 'string' || !['install', 'remove', 'cancel'].includes(String(action))) {
         throw new Error('资源操作参数无效')
+      }
+      if (downloadSource !== undefined && !['huggingface', 'hf-mirror', 'modelscope'].includes(String(downloadSource))) {
+        throw new Error('模型下载源无效')
       }
       await ensureReady()
       const response = await engine.request(
@@ -123,6 +127,7 @@ export function registerEngineIpc(
           requestId: `resource-action-${randomUUID()}`,
           resourceId,
           action: action as 'install' | 'remove' | 'cancel',
+          downloadSource: downloadSource as 'huggingface' | 'hf-mirror' | 'modelscope' | undefined,
           network: getSettings().network,
         },
         'resourceActionResult'
@@ -212,12 +217,15 @@ export function registerEngineIpc(
 
   loggedHandle(
     IPC_CHANNELS.installHuggingFaceModel,
-    async (_event, repo: unknown, slot: unknown) => {
+    async (_event, repo: unknown, slot: unknown, downloadSource: unknown) => {
       if (typeof repo !== 'string' || repo.length < 3 || repo.length > 256) {
         throw new Error('仓库名无效')
       }
       if (slot !== undefined && slot !== 'recognition' && slot !== 'translation') {
         throw new Error('模型类别无效')
+      }
+      if (downloadSource !== undefined && !['huggingface', 'hf-mirror'].includes(String(downloadSource))) {
+        throw new Error('模型下载源无效')
       }
       if (slot !== undefined && controller.busy) {
         // An install rewrites files a live session has already loaded, and forcing a
@@ -233,6 +241,7 @@ export function registerEngineIpc(
           requestId: `hub-install-${randomUUID()}`,
           repo,
           ...(slot ? { slot } : {}),
+          downloadSource: downloadSource as 'huggingface' | 'hf-mirror' | undefined,
           network: getSettings().network,
         },
         'resourceActionResult',
@@ -392,4 +401,4 @@ export function registerEngineIpc(
     }
   }
 }
-import { recognitionFieldsOf, supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'
+import { fallbackTranslationFieldsOf, recognitionFieldsOf, supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'

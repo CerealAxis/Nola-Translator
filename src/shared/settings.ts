@@ -1,6 +1,7 @@
 import { LANGUAGE_CODES } from './languages'
 import { DEFAULT_COMPUTE_SETTINGS, type ComputeSettings } from './compute'
 import { GITHUB_PROXY_DEFAULT } from './github-proxies'
+import { PYPI_MIRROR_DEFAULT } from './pypi-mirrors'
 
 export type OverlaySettings = {
   mode: 'free' | 'top' | 'bottom'
@@ -79,8 +80,10 @@ export type BrowserCaptionStyleSettings = {
 export type NetworkSettings = {
   /** Weight files go to hf-mirror.com instead of huggingface.co when enabled. */
   useHuggingFaceMirror: boolean
-  /** pip's default index only; the PyTorch `--extra-index-url` is never mirrored. */
+  /** Prefer the selected PyPI mirror for component requirements and supported PyTorch wheels. */
   usePypiMirror: boolean
+  /** Selected pip index; missing dependencies can fall back to official PyPI. */
+  pypiMirrorUrl: string
   /** Whether `githubAccelerateUrl` is applied to GitHub asset URLs at all. */
   useGithubAccelerate: boolean
   /**
@@ -159,6 +162,8 @@ export const RECOGNITION_PROVIDERS: readonly RecognitionProvider[] = ['local', '
 
 /** Native recognition translation reuses the Aliyun socket; other providers run separately. */
 export type TranslationProvider = 'local' | 'cloud' | 'microsoft' | 'mymemory' | 'index-translate' | 'recognition'
+/** Native recognition translation is not an independent service that can be retried as a backup. */
+export type FallbackTranslationProvider = Exclude<TranslationProvider, 'recognition'>
 
 /**
  * The HTTP protocol a cloud endpoint actually speaks.
@@ -171,8 +176,8 @@ export type CloudApiFormat = 'chat-completions' | 'chat-responses' | 'anthropic'
  * the Authorization header when the key is empty, while the Anthropic and Microsoft shapes
  * refuse without one.
  */
-export type CredentialProvider = 'cloud' | 'microsoft' | 'aliyun-asr' | 'minimax-asr'
-export const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'microsoft', 'aliyun-asr', 'minimax-asr']
+export type CredentialProvider = 'cloud' | 'fallback-cloud' | 'microsoft' | 'aliyun-asr' | 'minimax-asr'
+export const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'fallback-cloud', 'microsoft', 'aliyun-asr', 'minimax-asr']
 
 /**
  * Recommended Hy-MT2 sizes and quantizations, or a hub id for an installed GGUF.
@@ -197,6 +202,22 @@ export type TranslationSettings = {
   mymemoryEmail?: string
   translateIntermediate: boolean
   targetLanguage: string
+  /** Optional provider used only after every final-caption attempt with the primary has failed. */
+  fallback: FallbackTranslationSettings
+}
+
+/** Independent connection settings for the final-caption fallback translator. */
+export type FallbackTranslationSettings = {
+  provider: FallbackTranslationProvider | 'disabled'
+  cloudEndpoint: string
+  cloudModel: string
+  cloudApiFormat: CloudApiFormat
+  cloudContextWindow: number
+  cloudMaxOutputTokens: number
+  microsoftEndpoint: string
+  microsoftRegion: string
+  mymemoryEndpoint: string
+  mymemoryEmail: string
 }
 
 /**
@@ -217,7 +238,7 @@ export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recor
   overlay?: Partial<OverlaySettings>
   videoCaptions?: Partial<VideoCaptionSettings>
   browserCaptions?: Partial<BrowserCaptionStyleSettings>
-  translation?: Partial<TranslationSettings>
+  translation?: Omit<Partial<TranslationSettings>, 'fallback'> & { fallback?: Partial<FallbackTranslationSettings> }
 }
 
 export const RECOGNITION_MODEL_IDS: readonly RecognitionModelId[] = ['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf', 'sensevoice-small']
@@ -257,6 +278,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   network: {
     useHuggingFaceMirror: true,
     usePypiMirror: true,
+    pypiMirrorUrl: PYPI_MIRROR_DEFAULT,
     useGithubAccelerate: true,
     githubAccelerateUrl: GITHUB_PROXY_DEFAULT,
     proxyUrl: '',
@@ -338,6 +360,18 @@ export const DEFAULT_SETTINGS: AppSettings = {
     mymemoryEmail: '',
     translateIntermediate: false,
     targetLanguage: 'zh',
+    fallback: {
+      provider: 'disabled',
+      cloudEndpoint: 'https://api.openai.com/v1',
+      cloudModel: 'gpt-4.1-mini',
+      cloudApiFormat: 'chat-completions',
+      cloudContextWindow: 128000,
+      cloudMaxOutputTokens: 4096,
+      microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com',
+      microsoftRegion: '',
+      mymemoryEndpoint: 'https://api.mymemory.translated.net/get',
+      mymemoryEmail: '',
+    },
   },
 }
 

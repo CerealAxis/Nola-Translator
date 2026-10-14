@@ -3,8 +3,8 @@ import { INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_MODEL_IDS } from './index-tr
 import { LANGUAGE_CODES, normalizeLanguage } from './languages'
 import type { ResourceRecord } from './contracts'
 
-const language = z.string().refine(code => LANGUAGE_CODES.includes(normalizeLanguage(code)))
-const languages = z.array(language).max(128)
+const language = z.string().refine(code => LANGUAGE_CODES.includes(normalizeLanguage(code)) || INDEX_TRANSLATE_LANGUAGES.includes(normalizeLanguage(code)))
+const languages = z.array(language).max(200)
 export const modelConfigurationSchema = z.object({
   slot: z.enum(['recognition', 'translation']),
   engine: z.enum(['pytorch', 'llama']),
@@ -26,7 +26,7 @@ export const QWEN_LANGUAGES: readonly string[] = ["zh", "en", "yue", "ar", "de",
 export const HYMT2_LANGUAGES: readonly string[] = ["zh", "en", "fr", "pt", "es", "ja", "tr", "ru", "ar", "ko", "th", "it", "de", "vi", "ms", "id", "tl", "hi", "zh-Hant", "pl", "cs", "nl", "km", "my", "fa", "gu", "ur", "te", "mr", "he", "bn", "ta", "uk", "bo", "kk", "mn", "ug", "yue"]
 export const M2M100_LANGUAGES: readonly string[] = ["af", "am", "ar", "ast", "az", "ba", "be", "bg", "bn", "br", "bs", "ca", "ceb", "cs", "cy", "da", "de", "el", "en", "es", "et", "fa", "ff", "fi", "fr", "fy", "ga", "gd", "gl", "gu", "ha", "he", "hi", "hr", "ht", "hu", "hy", "id", "ig", "ilo", "is", "it", "ja", "jv", "ka", "kk", "km", "kn", "ko", "lb", "lg", "ln", "lo", "lt", "lv", "mg", "mk", "ml", "mn", "mr", "ms", "my", "ne", "nl", "no", "ns", "oc", "or", "pa", "pl", "ps", "pt", "ro", "ru", "sd", "si", "sk", "sl", "so", "sq", "sr", "ss", "su", "sv", "sw", "ta", "th", "tl", "tn", "tr", "uk", "ur", "uz", "vi", "wo", "xh", "yi", "yo", "zh", "zu"]
 const recognition = (codes: readonly string[]): ModelConfiguration => ({ slot: 'recognition', engine: 'pytorch', languages: [...codes], supportsAutoDetection: true, sourceLanguages: [], targetLanguages: [] })
-const translation = (codes: readonly string[], engine: 'llama' | 'pytorch'): ModelConfiguration => ({ slot: 'translation', engine, languages: [], supportsAutoDetection: false, sourceLanguages: [...codes], targetLanguages: [...codes] })
+const translation = (codes: readonly string[], engine: 'llama' | 'pytorch', targetCodes: readonly string[] = codes): ModelConfiguration => ({ slot: 'translation', engine, languages: [], supportsAutoDetection: false, sourceLanguages: [...codes], targetLanguages: [...targetCodes] })
 export const RECOMMENDED_CONFIGURATIONS: Record<string, ModelConfiguration> = {
   'qwen3-asr-1.7b-hf': recognition(QWEN_LANGUAGES),
   'qwen3-asr-0.6b-hf': recognition(QWEN_LANGUAGES),
@@ -36,7 +36,7 @@ export const RECOMMENDED_CONFIGURATIONS: Record<string, ModelConfiguration> = {
   'hy-mt2-1.8b-iq2-m': translation(HYMT2_LANGUAGES, 'llama'),
   'hy-mt2-7b-q4-k-m': translation(HYMT2_LANGUAGES, 'llama'),
   'm2m100-418m': translation(M2M100_LANGUAGES, 'pytorch'),
-  ...Object.fromEntries(INDEX_TRANSLATE_MODEL_IDS.map(id => [id, translation(INDEX_TRANSLATE_LANGUAGES, 'llama')])),
+  ...Object.fromEntries(INDEX_TRANSLATE_MODEL_IDS.map(id => [id, translation(LANGUAGE_CODES, 'llama', INDEX_TRANSLATE_LANGUAGES)])),
 }
 export function configurationOf(model: Pick<ResourceRecord, 'resourceId' | 'configuration'> | undefined): ModelConfiguration | undefined {
   return model?.configuration ?? (model ? RECOMMENDED_CONFIGURATIONS[model.resourceId] : undefined)

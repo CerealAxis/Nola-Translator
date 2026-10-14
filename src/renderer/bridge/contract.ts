@@ -23,6 +23,7 @@ import type {
   EngineProcessState,
   ExportFormat,
   MeetingMeta,
+  ModelDownloadSource,
   ModelStorageInfo,
   ResourceRecord,
   ResourceSnapshotWithRate,
@@ -54,7 +55,7 @@ export interface NolaBridge {
     listDevices(): Promise<AudioDevice[]>
     testAudio(source: AudioTestSource): Promise<AudioTestResult>
     listResources(): Promise<ResourceSnapshotWithRate>
-    manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel'): Promise<ResourceRecord>
+    manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel', source?: ModelDownloadSource): Promise<ResourceRecord>
     startSession(config: SessionConfig): Promise<SessionStartResult>
     stopSession(sessionId: string): Promise<void>
     /**
@@ -111,7 +112,7 @@ export interface NolaBridge {
   runtimes: {
     openSettings(component: 'engine' | 'llama'): Promise<void>
     list(): Promise<RuntimeSnapshot>
-    prepare(): Promise<RuntimeSnapshot>
+    prepare(components?: readonly ('engine' | 'llama')[]): Promise<RuntimeSnapshot>
     install(id: string, repair?: boolean): Promise<void>
     import(): Promise<boolean>
     cancel(): Promise<void>
@@ -172,7 +173,7 @@ export interface NolaBridge {
      * compatibility reason, not a half-finished download. Progress, cancel and
      * removal afterwards take the built-in model's route (`resourceChanged`).
      */
-    installHuggingFaceModel(repo: string, slot?: 'recognition' | 'translation'): Promise<ResourceRecord>
+    installHuggingFaceModel(repo: string, slot?: 'recognition' | 'translation', source?: ModelDownloadSource): Promise<ResourceRecord>
   }
   /**
    * tier 'ipc-new': the main process has no feedback channel.

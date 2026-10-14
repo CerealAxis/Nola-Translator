@@ -1,0 +1,87 @@
+.app-update-markdown {
+  min-width: 0;
+  color: var(--muted);
+  font: var(--nola-text-body);
+  overflow-wrap: anywhere;
+}
+
+.app-update-markdown > :first-child {
+  margin-top: 0;
+}
+
+.app-update-markdown :is(h1, h2, h3, h4) {
+  margin: var(--space-2) 0 var(--space-1);
+  color: var(--foreground);
+  font: var(--nola-text-subtitle);
+}
+
+.app-update-markdown :is(p, ul, ol, blockquote, pre, table) {
+  margin: 0 0 var(--space-2);
+}
+
+.app-update-markdown :is(ul, ol) {
+  padding-inline-start: var(--space-3);
+}
+
+.app-update-markdown li + li {
+  margin-top: var(--space-1);
+}
+
+.app-update-markdown a {
+  display: inline;
+  pointer-events: auto;
+  cursor: pointer;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.app-update-markdown blockquote {
+  padding-inline-start: var(--space-2);
+  border-inline-start: 2px solid var(--separator);
+}
+
+.app-update-markdown :not(pre) > code {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--surface-secondary);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+}
+
+.app-update-markdown pre {
+  max-width: 100%;
+  padding: var(--space-2);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+}
+
+.app-update-markdown pre code {
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  white-space: pre;
+}
+
+.app-update-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.app-update-markdown :is(th, td) {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  text-align: start;
+}
+
+.app-update-markdown th {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.app-update-markdown > :last-child {
+  margin-bottom: 0;
+}

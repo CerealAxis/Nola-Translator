@@ -8,25 +8,11 @@ from typing import Any
 from .base import ProviderTranslation
 from .llama_server import LlamaServerManager
 from .network import JsonRequester, OpenAICompatibleProvider, _post_json
+from .index_translate_languages import LANGUAGE_NAMES
 from ..model_capabilities import normalize
 
 PUBLIC_ENDPOINT = "https://index-translate.bilibili.com/v1"
 PUBLIC_MODEL = "Index-Translate-35B-A3B"
-# Restrict the preset to the language names mapped by the official client rather than
-# inferring all 150 languages from the model card. App aliases replace its FLORES codes.
-# Source: https://github.com/bilibili/Index-Translate/blob/main/inference/llm/call_api.py
-LANGUAGE_NAMES = {
-    "en": "英语", "zh": "中文", "de": "德语", "fr": "法语", "es": "西班牙语",
-    "ja": "日语", "ko": "韩语", "pt": "葡萄牙语", "ru": "俄语", "ar": "阿拉伯语",
-    "it": "意大利语", "nl": "荷兰语", "pl": "波兰语", "ro": "罗马尼亚语",
-    "sv": "瑞典语", "tr": "土耳其语", "hi": "印地语", "vi": "越南语",
-    "th": "泰语", "id": "印尼语", "ms": "马来语", "tl": "菲律宾语",
-    "uk": "乌克兰语", "fa": "波斯语", "cs": "捷克语", "el": "希腊语",
-    "da": "丹麦语", "hu": "匈牙利语", "fi": "芬兰语", "no": "书面挪威语",
-    "sk": "斯洛伐克语", "bg": "保加利亚语",
-}
-
-
 def prompt_header(source: str, target: str) -> str:
     source, target = normalize(source), normalize(target)
     if target not in LANGUAGE_NAMES:

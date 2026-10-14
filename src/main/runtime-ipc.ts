@@ -1,9 +1,23 @@
 import { loggedHandle } from './logged-ipc'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { RuntimeManager } from './runtime-manager'
+import type { EngineProcess } from './engine-process'
+
+/** Python import and DLL paths are fixed at launch; a changed selection needs a new child. */
+export async function recheckRuntimeEnvironment(manager: Pick<RuntimeManager, 'recheck' | 'selectedDirectories'>,
+  engine: Pick<EngineProcess, 'currentState' | 'stop' | 'start'>, components?: readonly ('engine' | 'llama')[]) {
+  const previous = JSON.stringify(manager.selectedDirectories())
+  await manager.recheck(components)
+  const directories = manager.selectedDirectories()
+  if (JSON.stringify(directories) !== previous || engine.currentState !== 'ready') {
+    await engine.stop()
+    await engine.start()
+  }
+  return directories
+}
 
 export function registerRuntimeIpc(manager: RuntimeManager, window: () => BrowserWindow | null,
-  prepare: () => Promise<void>, isSessionBusy: () => boolean,
+  prepare: (components?: readonly ('engine' | 'llama')[]) => Promise<void>, isSessionBusy: () => boolean,
   whenRuntimeReady: () => Promise<void> = async () => {},
   install: (id: string, repair: boolean) => Promise<void> = (id, repair) => manager.install(id, repair)): () => void {
   const channels = ['runtime:list', 'runtime:install', 'runtime:import', 'runtime:cancel', 'runtime:prepare', 'runtime:settings']
@@ -36,6 +50,13 @@ export function registerRuntimeIpc(manager: RuntimeManager, window: () => Browse
     return true
   })
   loggedHandle(channels[3], () => manager.cancel())
-  loggedHandle(channels[4], async () => { await whenRuntimeReady(); await prepare(); return manager.snapshot() })
+  loggedHandle(channels[4], async (_event, requested: unknown) => {
+    await whenRuntimeReady()
+    if (requested !== undefined && (!Array.isArray(requested) || requested.some(kind => kind !== 'engine' && kind !== 'llama'))) {
+      throw new Error('运行组件列表无效')
+    }
+    await prepare(requested as ('engine' | 'llama')[] | undefined)
+    return manager.snapshot()
+  })
   return () => { manager.cancel(); for (const channel of channels) ipcMain.removeHandler(channel) }
 }

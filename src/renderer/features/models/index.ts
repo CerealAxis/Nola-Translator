@@ -17,3 +17,6 @@ export type { ModelConfigurationDialogProps, ModelLanguageSelectProps } from './
 export { TranslationCompatibilityDialog } from './TranslationCompatibilityDialog'
 export type { TranslationCompatibilityDialogProps } from './TranslationCompatibilityDialog'
 export { ModelCapabilityNotices } from './ModelCapabilityNotices'
+export { ModelDownloadNotice } from './ModelDownloadNotice'
+export { DownloadSourceDialog } from './DownloadSourceDialog'
+export type { DownloadSourceDialogProps } from './DownloadSourceDialog'

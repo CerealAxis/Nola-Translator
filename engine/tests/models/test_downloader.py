@@ -20,7 +20,10 @@ import nola_translator_engine.models.manager as manager_module
 
 
 class _RangeServer:
-    def __init__(self, payload: bytes, *, fail_range: tuple[int, int] | None = None) -> None:
+    def __init__(
+        self, payload: bytes, *, fail_range: tuple[int, int] | None = None,
+        redirect: bool = False, truncate_once: tuple[int, int] | None = None,
+    ) -> None:
         self.payload = payload
         self.fail_range = fail_range
         self.fail_enabled = True
@@ -28,11 +31,18 @@ class _RangeServer:
         self.lock = Lock()
         self.active = 0
         self.max_active = 0
+        self.resolutions = 0
 
         owner = self
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self) -> None:
+                if redirect and self.path.endswith('/model.bin'):
+                    owner.resolutions += 1
+                    self.send_response(302)
+                    self.send_header('Location', '/asset.bin')
+                    self.end_headers()
+                    return
                 value = self.headers.get("Range")
                 if value:
                     start_text, end_text = value.removeprefix("bytes=").split("-")
@@ -51,6 +61,8 @@ class _RangeServer:
                         self.send_error(503)
                         return
                     body = owner.payload[start : end + 1]
+                    if key == truncate_once and owner.counts[key] == 1:
+                        body = body[:len(body) // 2]
                     time.sleep(0.02)
                     self.send_response(206)
                     self.send_header("Content-Range", f"bytes {start}-{end}/{len(owner.payload)}")
@@ -107,6 +119,71 @@ def test_parallel_ranges_download_and_report_progress(tmp_path: Path) -> None:
         assert not (tmp_path / "models" / ".downloads").exists()
     finally:
         server.close()
+
+
+def test_parallel_download_resolves_cdn_redirect_only_once(tmp_path: Path) -> None:
+    payload = bytes(range(64))
+    server = _RangeServer(payload, redirect=True)
+    try:
+        downloader = ResumableParallelDownloader(
+            tmp_path / 'models', build_opener(), chunk_size=8, max_workers=4, parallel_threshold=1,
+        )
+        destination = tmp_path / 'model.bin'
+        downloader.download(server.url, destination, _entry(payload), lambda *_: None)
+        assert destination.read_bytes() == payload
+        assert server.resolutions == 1
+    finally:
+        server.close()
+
+
+def test_incomplete_range_retries_without_losing_finished_chunks(tmp_path: Path) -> None:
+    payload = bytes(range(32))
+    server = _RangeServer(payload, truncate_once=(8, 15))
+    try:
+        downloader = ResumableParallelDownloader(
+            tmp_path / 'models', build_opener(), chunk_size=8, max_workers=4, parallel_threshold=1,
+        )
+        destination = tmp_path / 'model.bin'
+        downloader.download(server.url, destination, _entry(payload), lambda *_: None)
+        assert destination.read_bytes() == payload
+        assert server.counts[(8, 15)] == 2
+        assert server.counts[(0, 7)] == 1
+    finally:
+        server.close()
+
+
+def test_small_download_retries_transient_failure(tmp_path: Path) -> None:
+    payload = bytes(range(64))
+
+    class Handler(BaseHTTPRequestHandler):
+        requests = 0
+
+        def do_GET(self) -> None:
+            type(self).requests += 1
+            if type(self).requests == 1:
+                self.send_error(503)
+                return
+            self.send_response(200)
+            self.send_header('Content-Length', str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        downloader = ResumableParallelDownloader(tmp_path / 'models', build_opener())
+        destination = tmp_path / 'model.bin'
+        downloader.download(f'http://127.0.0.1:{server.server_port}/model.bin', destination, _entry(payload), lambda *_: None)
+        assert destination.read_bytes() == payload
+        assert Handler.requests == 2
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
 
 
 def test_completed_ranges_resume_after_a_failed_request(tmp_path: Path) -> None:
