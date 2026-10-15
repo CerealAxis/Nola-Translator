@@ -14,6 +14,8 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
   const transcript = [...stores.session.getState().segments]
   const settingListeners = new Set<(settings: AppSettings) => void>()
   const engineListeners = new Set<(event: EngineChannelEvent) => void>()
+  const lockListeners = new Set<(locked: boolean) => void>()
+  let overlayLock = false
   const publish = (event: EngineChannelEvent) => {
     engineListeners.forEach(listener => listener(event))
   }
@@ -76,7 +78,16 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
       },
       setCaptionService: async active => { browser.captionServiceActive = active; return { ...browser } },
     },
-    overlay: { show: openOverlay, hide: async () => closeOverlay(), close: async () => closeOverlay(), minimize: async () => closeOverlay(), resize: done },
+    overlay: {
+      show: openOverlay, hide: async () => closeOverlay(), close: async () => closeOverlay(), minimize: async () => closeOverlay(), resize: done,
+      // Session-scoped like the desktop: the demo keeps it in memory for the lifetime of the scene.
+      setLocked: async (locked: boolean) => {
+        const changed = locked !== overlayLock
+        overlayLock = locked
+        if (changed) lockListeners.forEach(listener => listener(locked))
+        return overlayLock
+      },
+    },
     runtimes: {
       list: async () => runtimes, prepare: async () => runtimes,
       openSettings: async component => { location.hash = `#/settings/compute?component=${component}` },
@@ -147,6 +158,7 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
       onEngineEvent: listener => subscribe(engineListeners, listener),
       onSettingsChanged: listener => subscribe(settingListeners, listener),
       onOverlayRequest: () => noop,
+      onOverlayLockChanged: listener => subscribe(lockListeners, listener),
     },
   }
   // The title bar and locale provider use this limited facade; stores use the typed bridge above.

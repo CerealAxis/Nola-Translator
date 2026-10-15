@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/public/screenshots/zh-CN/home.png" alt="Nola Translator の画面プレビュー" width="1000">
+  <img src="docs/public/screenshots/ja/home.png" alt="Nola Translator の画面プレビュー" width="1000">
 </p>
 
 ## 概要
@@ -39,11 +39,11 @@ Nola Translator は、ローカルモデルとクラウドモデルに対応し�
 
 | ホーム | フローティング字幕 | 動画字幕 |
 |---|---|---|
-| ![ホーム](docs/public/screenshots/zh-CN/home.png) | ![フローティング字幕](docs/public/screenshots/zh-CN/overlay-scene.png) | ![動画字幕](docs/public/screenshots/zh-CN/browser-scene.png) |
+| ![ホーム](docs/public/screenshots/ja/home.png) | ![フローティング字幕](docs/public/screenshots/ja/overlay-scene.png) | ![動画字幕](docs/public/screenshots/ja/browser-scene.png) |
 
 | ローカルモデルのインストール | 推論環境の設定 | ダークモード |
 |---|---|---|
-| ![ローカルモデルのインストール](docs/public/screenshots/zh-CN/models.png) | ![推論環境の設定](docs/public/screenshots/zh-CN/compute-environment.png) | ![ダークモード](docs/public/screenshots/zh-CN/dark-mode.png) |
+| ![ローカルモデルのインストール](docs/public/screenshots/ja/models.png) | ![推論環境の設定](docs/public/screenshots/zh-CN/compute-environment.png) | ![ダークモード](docs/public/screenshots/zh-CN/dark-mode.png) |
 
 ## インストール
 

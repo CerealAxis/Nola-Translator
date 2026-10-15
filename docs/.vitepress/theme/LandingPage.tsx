@@ -27,7 +27,7 @@ export function LandingPage({ locale, base }: LandingPageProps) {
     const path = localizedSitePath(location.pathname, next, base)
     if (path !== location.pathname) location.href = `${path}${location.search}${location.hash}`
   }
-  const docUrl = `${base}${localePath(locale).slice(1)}guide`
+  const docUrl = `${base}${localePath(locale).slice(1)}getting-started/`
   const image = (name: string) => `${base}screenshots/${locale}/${name}.png`
   useEffect(() => {
     const sync = () => setScrolled(window.scrollY > 40)

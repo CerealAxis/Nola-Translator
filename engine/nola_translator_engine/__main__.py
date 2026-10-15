@@ -33,6 +33,25 @@ def _request_id(raw_line: bytes) -> str:
     return f"invalid-{uuid4()}"
 
 
+def _force_utf8_streams() -> None:
+    """Pin the text streams to UTF-8 so non-ASCII diagnostics survive the pipe.
+
+    The desktop decodes this process's stdout and stderr as UTF-8, while a zh-CN Windows
+    install defaults them to GBK. Every Chinese error message then crosses the pipe as bytes
+    the reader cannot decode, so the exported diagnostic log keeps replacement characters
+    instead of the reason the run failed. ``errors="replace"`` keeps a lone unencodable
+    character from raising out of a diagnostic write.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
+
 def _redirect_third_party_stdout() -> TextIO:
     """Point ``sys.stdout`` at stderr and hand back the real protocol stream.
 
@@ -147,6 +166,7 @@ async def _run() -> int:
 
 
 def main() -> int:
+    _force_utf8_streams()
     if os.environ.get("NOLA_TRANSLATOR_RUNTIME_PROBE") == "1":
         protocol_out = _redirect_third_party_stdout()
         try:

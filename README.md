@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/public/screenshots/zh-CN/home.png" alt="Nola Translator interface preview" width="1000">
+  <img src="docs/public/screenshots/en/home.png" alt="Nola Translator interface preview" width="1000">
 </p>
 
 ## Overview
@@ -39,11 +39,11 @@ Nola Translator is a real-time captioning and translation app that supports both
 
 | Home | Floating Captions | Video Captions |
 |---|---|---|
-| ![Home](docs/public/screenshots/zh-CN/home.png) | ![Floating captions](docs/public/screenshots/zh-CN/overlay-scene.png) | ![Video captions](docs/public/screenshots/zh-CN/browser-scene.png) |
+| ![Home](docs/public/screenshots/en/home.png) | ![Floating captions](docs/public/screenshots/en/overlay-scene.png) | ![Video captions](docs/public/screenshots/en/browser-scene.png) |
 
 | Local Model Installation | Inference Environment Settings | Dark Mode Support |
 |---|---|---|
-| ![Local model installation](docs/public/screenshots/zh-CN/models.png) | ![Inference environment settings](docs/public/screenshots/zh-CN/compute-environment.png) | ![Dark mode support](docs/public/screenshots/zh-CN/dark-mode.png) |
+| ![Local model installation](docs/public/screenshots/en/models.png) | ![Inference environment settings](docs/public/screenshots/zh-CN/compute-environment.png) | ![Dark mode support](docs/public/screenshots/zh-CN/dark-mode.png) |
 
 ## Installation
 

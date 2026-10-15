@@ -279,7 +279,7 @@ try {
   /**
    * 旧版在这里断言"点过『调整位置和大小』之后 mode === 'free' 且 locked === false"。
    * 新 UI 没有 free 模式（mode 只有 top/bottom），等价的能力是**锁定开关**：
-   * 解锁 → data-locked 变 false → 整块卡片成为 -webkit-app-region: drag，且改动要落进设置。
+   * 解锁 → data-locked 变 false → 整块卡片成为 -webkit-app-region: drag，且锁定不进设置文件。
    *
    * 怎么认出"哪一颗是锁"：**不能按 aria-label**（文案随界面语言变，中英文各一套），
    * **也不能按 DOM 次序**（位置/锁定/置顶三颗都是 aria-pressed 开关，按次序找就是按位置找）。
@@ -315,7 +315,10 @@ try {
     if (!lockButton) return { clicked: false, before, after: readCard(), settingsLocked: null };
     const after = readCard();
     let settingsLocked = null;
-    try { settingsLocked = (await window.nolaTranslator.getSettings()).overlay.locked } catch { settingsLocked = 'threw' }
+    try {
+      const overlay = (await window.nolaTranslator.getSettings()).overlay;
+      settingsLocked = 'locked' in overlay ? 'persisted' : 'absent';
+    } catch { settingsLocked = 'threw' }
     lockButton.click();
     await new Promise((done) => setTimeout(done, 400));
     return { clicked: true, before, after, settingsLocked, restored: readCard(), label: lockButton.getAttribute('aria-label') };
@@ -330,7 +333,7 @@ try {
   await delay(150)
   const overlayHidden = await evaluate(overlayTarget, 'document.visibilityState === "hidden"')
   await evaluate(target, `(async () => {
-    await window.nolaTranslator.updateSettings({ overlay: { backgroundOpacity: 0, locked: true } });
+    await window.nolaTranslator.updateSettings({ overlay: { backgroundOpacity: 0 } });
     await window.nolaTranslator.showOverlay();
     await new Promise((resolve) => setTimeout(resolve, 150));
     return true;
@@ -385,10 +388,11 @@ try {
     ['overlay-action-buttons', overlayWindowProbe.actionButtonCount >= 6, { actionButtonCount: overlayWindowProbe.actionButtonCount }],
     ['overlay-controls-present', overlayWindowProbe.controlsCount === 1, { controlsCount: overlayWindowProbe.controlsCount }],
     ['overlay-no-stale-panels', overlayWindowProbe.statusBar === 0 && overlayWindowProbe.editBar === 0, { statusBar: overlayWindowProbe.statusBar, editBar: overlayWindowProbe.editBar }],
-    // 解锁后 data-locked 变 false、整块卡片成为拖拽区，而且这个改动落进了设置。
-    // 三条一起才说明"锁定"这个能力真的存在且真的接通了。
+    // 解锁后 data-locked 变 false、整块卡片成为拖拽区。锁定是会话级状态：它必须能改卡片，
+    // 又不能落进设置，所以第二条查的是设置里**没有**这个字段，而不是曾经那条"落盘了"。
+    // 三条一起才说明"锁定"这个能力真的存在、真的接通了主进程、又没有变成偏好。
     ['overlay-unlock-drags', unlockProbe.clicked && unlockProbe.after.locked === 'false' && unlockProbe.after.dragRegion === 'drag', unlockProbe],
-    ['overlay-unlock-persisted', unlockProbe.settingsLocked === false, { settingsLocked: unlockProbe.settingsLocked }],
+    ['overlay-lock-not-persisted', unlockProbe.settingsLocked === 'absent', { settingsLocked: unlockProbe.settingsLocked }],
     // 试出来的其它开关（位置/置顶）必须被点回去：没复原就是脚本在改用户的设置。
     ['overlay-restored', unlockProbe.restored?.locked === unlockProbe.before.locked, { before: unlockProbe.before, restored: unlockProbe.restored }],
 

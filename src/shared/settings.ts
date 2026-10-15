@@ -6,7 +6,6 @@ import { PYPI_MIRROR_DEFAULT } from './pypi-mirrors'
 export type OverlaySettings = {
   mode: 'free' | 'top' | 'bottom'
   colorScheme: 'dark' | 'light'
-  locked: boolean
   alwaysOnTop: boolean
   fontFamily: string
   fontSize: number
@@ -309,7 +308,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   overlay: {
     mode: 'bottom',
     colorScheme: 'dark',
-    locked: false,
     alwaysOnTop: true,
     fontFamily: 'Segoe UI Variable',
     fontSize: 17,

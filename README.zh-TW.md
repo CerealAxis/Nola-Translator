@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/public/screenshots/zh-CN/home.png" alt="Nola Translator 介面預覽" width="1000">
+  <img src="docs/public/screenshots/zh-TW/home.png" alt="Nola Translator 介面預覽" width="1000">
 </p>
 
 ## 專案簡介
@@ -39,11 +39,11 @@ Nola Translator 是一款即時字幕與翻譯軟體，支援本機模型與雲�
 
 | 首頁 | 浮動字幕 | 影片字幕 |
 |---|---|---|
-| ![首頁](docs/public/screenshots/zh-CN/home.png) | ![浮動字幕](docs/public/screenshots/zh-CN/overlay-scene.png) | ![影片字幕](docs/public/screenshots/zh-CN/browser-scene.png) |
+| ![首頁](docs/public/screenshots/zh-TW/home.png) | ![浮動字幕](docs/public/screenshots/zh-TW/overlay-scene.png) | ![影片字幕](docs/public/screenshots/zh-TW/browser-scene.png) |
 
 | 本機模型安裝 | 推論環境設定 | 深色模式 |
 |---|---|---|
-| ![本機模型安裝](docs/public/screenshots/zh-CN/models.png) | ![推論環境設定](docs/public/screenshots/zh-CN/compute-environment.png) | ![深色模式](docs/public/screenshots/zh-CN/dark-mode.png) |
+| ![本機模型安裝](docs/public/screenshots/zh-TW/models.png) | ![推論環境設定](docs/public/screenshots/zh-CN/compute-environment.png) | ![深色模式](docs/public/screenshots/zh-CN/dark-mode.png) |
 
 ## 安裝
 

@@ -77,6 +77,15 @@ def main() -> int:
         return 1
     if os.name != "nt":
         return 1
+    # Chrome reads this process's stderr as UTF-8, while a localized Windows install
+    # encodes it with the system code page, so a non-ASCII path in a failure message
+    # would reach the browser log as replacement characters.
+    reconfigure = getattr(sys.stderr, "reconfigure", None)
+    if reconfigure is not None:
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
     import msvcrt
     msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
     msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)

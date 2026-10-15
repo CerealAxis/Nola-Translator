@@ -67,13 +67,12 @@ const FAILURE_NOTICE_ID = 'overlay-start-failure'
 
 export interface OverlayControlsProps {
   /*
-   * `locked` means neither content nor position may change, so it has to close
-   * both: dropping `-webkit-app-region: drag` alone stops the card from moving
-   * but leaves every pill on the bar clickable, which is a half-lock.
+   * Locked removes the whole bar rather than greying its pills out. The bar floats over the last
+   * line of caption text and takes its pointer events with it, so a locked window that still
+   * showed it would swallow the drag-select that locking is for.
    *
-   * The mic is not locked with the rest. What is locked is "do not change my
-   * settings", not "do not let me start a session" — otherwise locking the
-   * position would also remove the only way to start recognition.
+   * The mic goes with the bar: a product decision, accepted so that nothing floats over the text
+   * in a locked window, which also means a session cannot be started until the user unlocks.
    */
   active: boolean
   locked: boolean
@@ -284,101 +283,103 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
 
   return (
     <>
-      <div data-slot="overlay-controls" className="nola-caption-controls">
-        <div className="nola-no-drag flex min-w-0 flex-1 items-center justify-center gap-2">
-          {/*
-           * A spinner marks `starting` rather than greying the button out: greyed
-           * and unresponsive reads as broken, a spinner reads as waiting on the
-           * engine. Same for `stopping`, where unloading weights also takes a
-           * moment worth showing.
-           */}
-          <Button
-            variant="secondary"
-            size="sm"
-            isIconOnly
-            onPress={toggleMic}
-            isDisabled={status === 'starting' || status === 'stopping'}
-            aria-label={micLabel}
-            aria-busy={starting || undefined}
-            // Point the button at the notice below so a screen reader announces
-            // why the press did nothing, instead of the user having to find the
-            // line on screen.
-            aria-describedby={failureMessage ? FAILURE_NOTICE_ID : undefined}
-            // `.nola-caption-mic` in `caption-card.css` paints the recording
-            // state; this only supplies it.
-            className="nola-caption-mic"
-            data-active={running ? 'true' : 'false'}
-            data-loading={starting ? 'true' : 'false'}
-          >
-            {starting ? <Spinner size="sm" color="current" /> : running ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}
-          </Button>
-
-          <Dropdown>
-            <Dropdown.Trigger isDisabled={active || locked} className={`${CAPSULE} nola-caption-pill--mode`}>
-              <span className="nola-caption-mode-dot" aria-hidden="true" />
-              <span>{modelOptions.recognitionModels.find(model => model.value === modelId)?.label ?? modelId}</span>
-            </Dropdown.Trigger>
+      {locked ? null : (
+        <div data-slot="overlay-controls" className="nola-caption-controls">
+          <div className="nola-no-drag flex min-w-0 flex-1 items-center justify-center gap-2">
             {/*
-              Selection is computed by the Menu, not set per item: `Dropdown.Item`
-              has no `isSelected` prop. The chain is `selectionMode` plus
-              `selectedKeys` on the Menu, and `id` on each item.
+             * A spinner marks `starting` rather than greying the button out: greyed
+             * and unresponsive reads as broken, a spinner reads as waiting on the
+             * engine. Same for `stopping`, where unloading weights also takes a
+             * moment worth showing.
+             */}
+            <Button
+              variant="secondary"
+              size="sm"
+              isIconOnly
+              onPress={toggleMic}
+              isDisabled={status === 'starting' || status === 'stopping'}
+              aria-label={micLabel}
+              aria-busy={starting || undefined}
+              // Point the button at the notice below so a screen reader announces
+              // why the press did nothing, instead of the user having to find the
+              // line on screen.
+              aria-describedby={failureMessage ? FAILURE_NOTICE_ID : undefined}
+              // `.nola-caption-mic` in `caption-card.css` paints the recording
+              // state; this only supplies it.
+              className="nola-caption-mic"
+              data-active={running ? 'true' : 'false'}
+              data-loading={starting ? 'true' : 'false'}
+            >
+              {starting ? <Spinner size="sm" color="current" /> : running ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}
+            </Button>
 
-              `selectedKeys` must be a Set. A string type-checks, but selection
-              silently fails and every item reports aria-checked="false".
+            <Dropdown>
+              <Dropdown.Trigger isDisabled={active} className={`${CAPSULE} nola-caption-pill--mode`}>
+                <span className="nola-caption-mode-dot" aria-hidden="true" />
+                <span>{modelOptions.recognitionModels.find(model => model.value === modelId)?.label ?? modelId}</span>
+              </Dropdown.Trigger>
+              {/*
+                Selection is computed by the Menu, not set per item: `Dropdown.Item`
+                has no `isSelected` prop. The chain is `selectionMode` plus
+                `selectedKeys` on the Menu, and `id` on each item.
 
-              The checkmark goes after the label because its slot is already
-              absolutely positioned on the inline-start edge.
-            */}
-            <Dropdown.Popover className="nola-caption-menu" maxHeight={menuMaxHeight}>
-              <Dropdown.Menu
-                className="nola-caption-menu-list"
-                style={{ maxHeight: menuMaxHeight }}
-                selectionMode="single"
-                selectedKeys={new Set([modelId])}
-                onSelectionChange={(key) => {
-                  if (typeof key === 'string') patch({ recognition: { modelId: key as RecognitionModelId } })
-                }}
-              >
-                {modelOptions.recognitionModels.map(model => (
-                  <Dropdown.Item
-                    key={model.value}
-                    id={model.value}
-                    isDisabled={model.isDisabled}
-                    className="nola-menu-item"
-                    textValue={model.label}
-                    onAction={() => patch({ recognition: { modelId: model.value as RecognitionModelId } })}
-                  >
-                    {model.label}
-                    <Dropdown.ItemIndicator type="checkmark" />
-                  </Dropdown.Item>
-                ))}
-              </Dropdown.Menu>
-            </Dropdown.Popover>
-          </Dropdown>
+                `selectedKeys` must be a Set. A string type-checks, but selection
+                silently fails and every item reports aria-checked="false".
 
-          <LanguagePill
-            caption={t('session.sourceLanguage')}
-            value={source}
-            options={modelOptions.sourceLanguages}
-            labelOf={label}
-            isDisabled={active || locked}
-            maxHeight={menuMaxHeight}
-            onChange={next => patch({ recognition: { sourceLanguage: next } })}
-          />
-          <LanguagePill
-            caption={t('session.targetLanguage')}
-            value={target}
-            options={modelOptions.targetLanguages}
-            labelOf={label}
-            isDisabled={active || locked}
-            maxHeight={menuMaxHeight}
-            onChange={next => patch(targetLanguagePatch(next, target))}
-          />
+                The checkmark goes after the label because its slot is already
+                absolutely positioned on the inline-start edge.
+              */}
+              <Dropdown.Popover className="nola-caption-menu" maxHeight={menuMaxHeight}>
+                <Dropdown.Menu
+                  className="nola-caption-menu-list"
+                  style={{ maxHeight: menuMaxHeight }}
+                  selectionMode="single"
+                  selectedKeys={new Set([modelId])}
+                  onSelectionChange={(key) => {
+                    if (typeof key === 'string') patch({ recognition: { modelId: key as RecognitionModelId } })
+                  }}
+                >
+                  {modelOptions.recognitionModels.map(model => (
+                    <Dropdown.Item
+                      key={model.value}
+                      id={model.value}
+                      isDisabled={model.isDisabled}
+                      className="nola-menu-item"
+                      textValue={model.label}
+                      onAction={() => patch({ recognition: { modelId: model.value as RecognitionModelId } })}
+                    >
+                      {model.label}
+                      <Dropdown.ItemIndicator type="checkmark" />
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown.Popover>
+            </Dropdown>
 
-          <OverlayDisplayMenu isDisabled={locked} />
-          <OverlayLayoutMenu isDisabled={locked} />
+            <LanguagePill
+              caption={t('session.sourceLanguage')}
+              value={source}
+              options={modelOptions.sourceLanguages}
+              labelOf={label}
+              isDisabled={active}
+              maxHeight={menuMaxHeight}
+              onChange={next => patch({ recognition: { sourceLanguage: next } })}
+            />
+            <LanguagePill
+              caption={t('session.targetLanguage')}
+              value={target}
+              options={modelOptions.targetLanguages}
+              labelOf={label}
+              isDisabled={active}
+              maxHeight={menuMaxHeight}
+              onChange={next => patch(targetLanguagePatch(next, target))}
+            />
+
+            <OverlayDisplayMenu />
+            <OverlayLayoutMenu />
+          </div>
         </div>
-      </div>
+      )}
 
       <StartFailureNotice message={failureMessage} action={runtimeComponent ? t(runtimeComponent === 'engine' ? 'runtime.goTorch' : 'runtime.goLlama') : undefined}
         onAction={runtimeComponent ? () => void actions.settings.openRuntimeSettings(runtimeComponent) : undefined} />

@@ -1,0 +1,16 @@
+/* 文档站主题入口。顺序即覆盖顺序：先 token，后组件模块。 */
+@import './var.css';
+@import './link.css';
+@import './linkcard.css';
+@import './custom-block.css';
+@import './blockquote.css';
+@import './badge.css';
+@import './vp-code.css';
+@import './vp-code-title.css';
+@import './vp-code-group.css';
+@import './task-list.css';
+@import './sidebarIcon.css';
+@import './marker.css';
+@import './blur.css';
+@import './hidden.css';
+@import './doc-effects.css';

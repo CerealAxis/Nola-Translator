@@ -147,6 +147,7 @@ export function createIpcBridge(): NolaBridge {
       close: () => call('closeOverlay', (injected) => injected.closeOverlay()),
       minimize: () => call('minimizeOverlay', (injected) => injected.minimizeOverlay()),
       resize: (width, height) => call('resizeOverlay', (injected) => injected.resizeOverlay(width, height)),
+      setLocked: (locked) => call('setOverlayLocked', (injected) => injected.setOverlayLocked(locked)),
     },
     settings: {
       browserConnection: (action, enabled, browser) => call('browserConnection', api => api.browserConnection ? api.browserConnection(action, enabled, browser) : Promise.reject(new MissingIpcApiError('browserConnection'))),
@@ -207,6 +208,7 @@ export function createIpcBridge(): NolaBridge {
         const target = OVERLAY_PAGE_TO_ROUTE[page]
         cb(target.route, target.path)
       }),
+      onOverlayLockChanged: (cb) => subscribe('onOverlayLockChanged', (injected) => injected.onOverlayLockChanged, cb),
     },
     models: {
       configureModel: (resourceId, configuration) => call('configureModel', injected => injected.configureModel(resourceId, configuration)),

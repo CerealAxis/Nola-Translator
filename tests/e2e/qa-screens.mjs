@@ -5,7 +5,7 @@ app.disableHardwareAcceleration()
 const out = resolve('artifacts/layout')
 const settings = { version:1, theme:'system', uiLanguage:'zh-CN', modelStoragePath:'',
   recognition:{modelId:'qwen3-asr-1.7b-hf',sourceLanguage:'auto'},
-  overlay:{mode:'bottom',colorScheme:'dark',locked:true,alwaysOnTop:true,fontFamily:'Segoe UI Variable',fontSize:26,fontWeight:600,translationFontSize:22,translationFontWeight:500,sourceColor:'#FFFFFF',translationColor:'#FFFFFF',backgroundColor:'#111111',backgroundOpacity:0.84,lineHeight:1.3,translationLineHeight:1.35,showSource:true,showTranslation:true,layout:'rolling'},
+  overlay:{mode:'bottom',colorScheme:'dark',alwaysOnTop:true,fontFamily:'Segoe UI Variable',fontSize:26,fontWeight:600,translationFontSize:22,translationFontWeight:500,sourceColor:'#FFFFFF',translationColor:'#FFFFFF',backgroundColor:'#111111',backgroundOpacity:0.84,lineHeight:1.3,translationLineHeight:1.35,showSource:true,showTranslation:true,layout:'rolling'},
   translation:{provider:'local',localModelId:'m2m100-418m',microsoftEndpoint:'https://api.cognitive.microsofttranslator.com',microsoftRegion:'',cloudEndpoint:'https://api.openai.com/v1',cloudModel:'gpt-4.1-mini',cloudApiFormat:'chat-completions',translateIntermediate:false,targetLanguage:'zh'} }
 const rec = { resourceId:'qwen3-asr-1.7b-hf', kind:'recognitionModel', provider:'qwen3-asr', name:'Qwen3-ASR 1.7B', description:'x', languages:['zh'], installed:true, installedBytes:4300000000, state:'idle', cancellable:false }
 const rec2 = { resourceId:'qwen3-asr-0.6b-hf', kind:'recognitionModel', provider:'qwen3-asr', name:'Qwen3-ASR 0.6B', description:'x', languages:['zh'], installed:false, installedBytes:0, downloadBytes:1880619678, state:'idle', cancellable:false }

@@ -51,6 +51,13 @@ export function OverlayRoot() {
   const overlay = useStore(stores.settings, (state) => state.settings?.overlay)
   const session = useStore(sessionStore, (state) => state)
   const [hovered, setHovered] = useState(false)
+  /*
+   * Session state rather than a setting: locking exists to make this window behave like a burned-in
+   * caption, and a lock the user has to clear by hand after every restart would outlive its reason.
+   * The main process holds its own copy for the window flags, so the two are reconciled through
+   * the bridge instead of through the settings file.
+   */
+  const [locked, setLocked] = useState(false)
   const [captionTextSelected, setCaptionTextSelected] = useState(false)
   const [closing, setClosing] = useState(false)
   const [closePending, setClosePending] = useState(false)
@@ -101,6 +108,24 @@ export function OverlayRoot() {
    */
   const openAppearanceSettings = (): void => {
     void window.nolaTranslator?.openAppearance('appearance').catch(() => undefined)
+  }
+
+  useEffect(() => {
+    const bridge = getBridge()
+    if (!bridge) return
+    return bridge.events.onOverlayLockChanged(setLocked)
+  }, [])
+
+  /*
+   * The main process answers with the lock actually in force, so the button cannot settle on a
+   * state the window flags disagree with; the same value also arrives on the broadcast.
+   */
+  const toggleLock = (): void => {
+    const bridge = getBridge()
+    if (!bridge) return
+    void bridge.overlay.setLocked(!locked).then(setLocked, (error: unknown) => {
+      console.warn('[overlay] lock failed', error)
+    })
   }
 
   const active = session.status === 'running' || session.status === 'paused' || session.status === 'starting'
@@ -259,7 +284,7 @@ export function OverlayRoot() {
         ref={cardRef}
         data-slot="caption-surface"
         data-scheme={scheme}
-        data-locked={config.locked ? 'true' : 'false'}
+        data-locked={locked ? 'true' : 'false'}
         data-confirm-open={closing ? 'true' : 'false'}
         data-hover={hovered ? 'true' : 'false'}
         data-text-selected={captionTextSelected ? 'true' : 'false'}
@@ -358,12 +383,12 @@ export function OverlayRoot() {
             <Monitor aria-hidden="true" />
           </GhostButton>
           <GhostButton
-            label={config.locked ? t('overlay.unlock') : t('overlay.lock')}
-            active={config.locked}
-            onPress={() => patchOverlay({ locked: !config.locked })}
+            label={locked ? t('overlay.unlock') : t('overlay.lock')}
+            active={locked}
+            onPress={toggleLock}
             color={palette.chrome}
           >
-            {config.locked ? <Lock aria-hidden="true" /> : <Unlock aria-hidden="true" />}
+            {locked ? <Lock aria-hidden="true" /> : <Unlock aria-hidden="true" />}
           </GhostButton>
           <GhostButton
             label={config.alwaysOnTop ? t('overlay.unpin') : t('overlay.pin')}
@@ -399,7 +424,7 @@ export function OverlayRoot() {
           </GhostButton>
         </div>
 
-        <OverlayControls active={active} locked={config.locked} />
+        <OverlayControls active={active} locked={locked} />
 
         {/*
          * Not `AlertDialog`: its backdrop is `position: fixed; inset: 0`, which

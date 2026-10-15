@@ -95,7 +95,8 @@ describe('设置存储', () => {
       const oldDefault = await new SettingsStore(path).load()
       expect(oldDefault.overlay.backgroundColor).toBe(DEFAULT_SETTINGS.overlay.backgroundColor)
       expect(oldDefault.overlay.fontSize).toBe(DEFAULT_SETTINGS.overlay.fontSize)
-      expect(oldDefault.overlay.locked).toBe(false)
+      // 锁定是会话级状态，旧文件里残留的值不再被读回，也不会被下一次写盘带回去。
+      expect(oldDefault.overlay).not.toHaveProperty('locked')
 
       await writeFile(path, JSON.stringify({
         version: 1,

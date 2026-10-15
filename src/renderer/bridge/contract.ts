@@ -97,6 +97,8 @@ export interface NolaBridge {
     close(): Promise<void>
     minimize(): Promise<void>
     resize(width: number, height: number): Promise<void>
+    /** Session-scoped: the lock is never written to the settings file. Returns the value in force. */
+    setLocked(locked: boolean): Promise<boolean>
   }
   settings: {
     get(): Promise<AppSettings>
@@ -156,6 +158,8 @@ export interface NolaBridge {
      * `route: 'settings'` cannot tell the appearance tab from translation.
      */
     onOverlayRequest(cb: (route: RouteId, path: string) => void): () => void
+    /** The caption lock moving, so every window showing the overlay draws the same lock state. */
+    onOverlayLockChanged(cb: (locked: boolean) => void): () => void
   }
   /**
    * Hugging Face metadata search, filtered by PyTorch/GGUF. The README loads
@@ -201,6 +205,7 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'overlay.close': 'ipc',
   'overlay.minimize': 'ipc',
   'overlay.resize': 'ipc',
+  'overlay.setLocked': 'ipc',
   'settings.get': 'ipc',
   'settings.update': 'ipc',
   'settings.setCaptionService': 'ipc',
@@ -225,6 +230,7 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'events.onEngineEvent': 'ipc',
   'events.onSettingsChanged': 'ipc',
   'events.onOverlayRequest': 'ipc',
+  'events.onOverlayLockChanged': 'ipc',
   'models.searchHuggingFace': 'ipc',
   'models.configureModel': 'ipc',
   'models.inspectHuggingFace': 'ipc',
@@ -260,6 +266,8 @@ export const BRIDGE_ADAPTER_NOTES: Record<string, string> = {
   'meetings.export': 'preload: exportMeeting(meetingId, format) · meeting:export（返回写好的文件路径，不是文本）',
   'events.onOverlayRequest':
     'preload: onOpenAppearance(listener) · app:appearance-requested — 载荷类型不同：主仓发 OverlayTargetPage，界面用 RouteId + 目标 hash；ipcBridge 负责映射',
+  'overlay.setLocked': 'preload: setOverlayLocked(locked) · overlay:set-locked — 会话级状态，不进设置文件；返回值是主进程当前生效的值',
+  'events.onOverlayLockChanged': 'preload: onOverlayLockChanged(listener) · overlay:locked-changed — 锁变化时向所有窗口广播，适配器原样透传布尔值',
   'models.searchHuggingFace':
     "preload: searchHuggingFace(query, kind) · hub:search — kind 是界面词汇，'asr'→slot recognition、'mt'→slot translation，映射在主进程；返回值是 HubSearchResult 而不是 ResourceRecord[]，因为能不能装是引擎判定的，不是一条本地记录",
   'models.configureModel': 'preload: configureModel(resourceId, configuration)',

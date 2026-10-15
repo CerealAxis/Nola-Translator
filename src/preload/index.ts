@@ -44,6 +44,7 @@ const channels = {
   closeOverlay: 'overlay:close',
   minimizeOverlay: 'overlay:minimize',
   resizeOverlay: 'overlay:resize',
+  setOverlayLocked: 'overlay:set-locked', overlayLockChanged: 'overlay:locked-changed',
   openAppearance: 'app:open-appearance',
   appearanceRequested: 'app:appearance-requested',
   getSettings: 'app:get-settings', updateSettings: 'app:update-settings', settingsChanged: 'settings:changed',
@@ -124,6 +125,12 @@ const api: NolaTranslatorApi = {
   closeOverlay: () => invoke(channels.closeOverlay),
   minimizeOverlay: () => invoke(channels.minimizeOverlay),
   resizeOverlay: (width, height) => invoke(channels.resizeOverlay, width, height),
+  setOverlayLocked: (locked) => invoke<boolean>(channels.setOverlayLocked, locked),
+  onOverlayLockChanged: (listener) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, locked: boolean): void => listener(locked)
+    ipcRenderer.on(channels.overlayLockChanged, wrapped)
+    return () => ipcRenderer.off(channels.overlayLockChanged, wrapped)
+  },
   openAppearance: (page?: OverlayTargetPage) => invoke(channels.openAppearance, page),
   onOpenAppearance: (listener) => {
     const wrapped = (_event: Electron.IpcRendererEvent, page: OverlayTargetPage): void => listener(page)

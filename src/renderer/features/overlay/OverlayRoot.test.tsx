@@ -11,7 +11,10 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); store.sessionStore.setState({ status: 'idle', sessionId: null }) })
 
 function setup(close: () => Promise<void>) {
-  vi.spyOn(store, 'getBridge').mockReturnValue({ overlay: { close } } as unknown as NolaBridge)
+  vi.spyOn(store, 'getBridge').mockReturnValue({
+    overlay: { close },
+    events: { onOverlayLockChanged: () => () => undefined },
+  } as unknown as NolaBridge)
   const stop = vi.spyOn(store.actions.session, 'stopSession').mockResolvedValue(undefined)
   render(<OverlayRoot />)
   fireEvent.click(screen.getByRole('button', { name: '关闭悬浮窗' }))

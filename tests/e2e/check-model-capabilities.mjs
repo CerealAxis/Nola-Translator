@@ -14,7 +14,7 @@ let settings = {
   recognition: { modelId: 'sensevoice-small', sourceLanguage: 'auto', audioSource: 'defaultOutput' },
   recording: { keepAudio: true }, appearance: { reduceMotion: true },
   compute: { recognitionEngine: 'pytorch', translationEngine: 'auto' },
-  overlay: { locked: true, fontSize: 26, translationFontSize: 22, showSource: true, showTranslation: true, layout: 'rolling' },
+  overlay: { fontSize: 26, translationFontSize: 22, showSource: true, showTranslation: true, layout: 'rolling' },
   translation: { provider: 'local', localModelId: 'hub:test/translator', targetLanguage: 'en', translateIntermediate: false },
 };
 const resources = [

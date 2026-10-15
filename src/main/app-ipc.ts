@@ -35,9 +35,34 @@ const channels = {
   meetingAudioUrl: 'meeting:audio-url',
   getDiagnostics: 'diagnostics:get', copyDiagnostics: 'diagnostics:copy', openLogs: 'diagnostics:open-logs',
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
+  setOverlayLocked: 'overlay:set-locked', overlayLockChanged: 'overlay:locked-changed',
 } as const
 
 export const APP_IPC_CHANNELS = channels
+
+/*
+ * The caption lock is state about this run of the app rather than a preference: it is what the
+ * window flags and the overlay UI both need, and it is worth nothing once the process ends, so it
+ * is deliberately absent from `AppSettings` and therefore from `settings.json`.
+ *
+ * Module scope rather than a closure field, because a rebuilt overlay window has to be able to
+ * drop the lock without holding a reference to the IPC registration.
+ */
+let overlayLocked = false
+const overlayLockListeners = new Set<(locked: boolean) => void>()
+
+/** Returns the lock now in force, notifying listeners only when it actually moved. */
+function publishOverlayLock(next: boolean): boolean {
+  const changed = next !== overlayLocked
+  overlayLocked = next
+  if (changed) overlayLockListeners.forEach(listener => listener(overlayLocked))
+  return overlayLocked
+}
+
+/** Called when an overlay window is built: a fresh window starts unlocked rather than inheriting one. */
+export function resetOverlayLock(): void {
+  publishOverlayLock(false)
+}
 
 /** Pages the caption overlay is allowed to send the main window to. */
 const OVERLAY_PAGES = new Set(['appearance', 'captions', 'resources', 'translation', 'torch', 'llama'])
@@ -108,7 +133,7 @@ export function registerAppIpc(options: {
   const applyOverlay = (reposition = false): void => {
     const window = options.getOverlayWindow()
     if (!window) return
-    const interaction = getOverlayInteractionPolicy(current.overlay.locked)
+    const interaction = getOverlayInteractionPolicy(overlayLocked)
     window.setAlwaysOnTop(current.overlay.alwaysOnTop, 'screen-saver')
     window.setIgnoreMouseEvents(interaction.ignoreMouseEvents, { forward: true })
     window.setFocusable(interaction.focusable)
@@ -132,6 +157,19 @@ export function registerAppIpc(options: {
       if (!window.isDestroyed()) window.webContents.send('settings:changed', current)
     }
   }
+  const broadcastOverlayLock = (): void => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(channels.overlayLockChanged, overlayLocked)
+    }
+  }
+  // The lock moves on its own channel, so the window flags follow it here instead of waiting for
+  // some unrelated settings change to re-run `applyOverlay`.
+  const onOverlayLock = (): void => {
+    applyOverlay()
+    broadcastOverlayLock()
+  }
+  overlayLockListeners.add(onOverlayLock)
+  loggedHandle(channels.setOverlayLocked, (_event, value: unknown) => publishOverlayLock(value === true))
   const applyTheme = (): void => {
     // The app shell follows `settings.theme`, not Windows. nativeTheme stays on 'system' so that
     // media queries (prefers-color-scheme) keep describing the *user's* system. Other platforms
@@ -322,6 +360,7 @@ export function registerAppIpc(options: {
   return () => {
     mainWindow?.off('maximize', onMaximize)
     mainWindow?.off('unmaximize', onUnmaximize)
+    overlayLockListeners.delete(onOverlayLock)
     Object.values(channels).forEach((channel) => ipcMain.removeHandler(channel))
   }
 }

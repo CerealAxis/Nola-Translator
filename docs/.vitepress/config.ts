@@ -1,9 +1,14 @@
 import { defineConfig } from 'vitepress'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { groupIconMdPlugin, groupIconVitePlugin } from 'vitepress-plugin-group-icons'
+import markdownItTaskCheckbox from 'markdown-it-task-checkbox'
+import timeline from 'vitepress-markdown-timeline'
+import { withMermaid } from 'vitepress-plugin-mermaid'
+import { generateSidebar } from 'vitepress-sidebar'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { copy, localeNames, localePath, downloadUrl, repositoryUrl, license, type Locale } from './theme/content'
+import { copy, docsNav, localeNames, localePath, downloadUrl, repositoryUrl, license, type Locale } from './theme/content'
 import { normalizeEmptyIsCss } from '../scripts/normalize-empty-is-css.mjs'
 
 const base = process.env.DOCS_BASE ?? '/'
@@ -18,6 +23,39 @@ const searchTranslations = {
   ko: { button: { buttonText: '검색', buttonAriaLabel: '문서 검색' }, modal: { displayDetails: '자세한 목록 표시', resetButtonTitle: '검색 지우기', backButtonTitle: '검색 닫기', noResultsText: '결과가 없습니다', footer: { selectText: '선택', selectKeyAriaLabel: 'Enter', navigateText: '이동', navigateUpKeyAriaLabel: '위쪽 화살표', navigateDownKeyAriaLabel: '아래쪽 화살표', closeText: '닫기', closeKeyAriaLabel: 'Esc' } } },
 } satisfies Record<Locale, import('vitepress').DefaultTheme.LocalSearchOptions['translations']>
 
+const sidebarForLocale = (locale: Locale) => {
+  const path = localePath(locale)
+  const localeFolder = locale === 'zh-CN' ? '' : locale
+  const label = docsNav[locale].root
+  return generateSidebar({
+    documentRootPath: './nola-docs',
+    ...(localeFolder ? { scanStartPath: localeFolder } : {}),
+    resolvePath: path,
+    useTitleFromFileHeading: true,
+    useFolderTitleFromIndexFile: true,
+    useFolderLinkFromIndexFile: true,
+    includeRootIndexFile: false,
+    includeFolderIndexFile: false,
+    excludeByGlobPattern: [
+      'README.md', 'docs.md',
+      ...Object.keys(localeNames).filter(name => name !== 'zh-CN').map(name => `${name}/**`),
+    ],
+    rootGroupText: label,
+    rootGroupLink: `${path}docs`,
+    collapsed: true,
+    collapseDepth: 1,
+    manualSortFileNameByPriority: [
+      'getting-started', 'features', 'troubleshooting', 'contributing', 'developers', 'legal',
+      'introduction.md', 'download-and-install.md', 'environment.md', 'local-models.md', 'cloud-models.md',
+      'live-translation.md', 'floating-captions.md', 'browser-captions.md', 'settings.md',
+      'feedback.md', 'faq.md',
+      'how-to-contribute.md', 'writing-guidelines.md',
+      'development-setup.md', 'gpg-signing.md', 'api.md',
+      'user-agreement.md', 'privacy-policy.md',
+    ],
+  })
+}
+
 const locales = Object.fromEntries((Object.keys(localeNames) as Locale[]).map(locale => {
   const text = copy[locale]
   const path = localePath(locale)
@@ -31,7 +69,7 @@ const locales = Object.fromEntries((Object.keys(localeNames) as Locale[]).map(lo
         { text: text.nav.home, link: path },
         { text: text.nav.download, link: downloadUrl },
       ],
-      sidebar: [{ text: text.documentation.quickStart, link: `${path}guide` }],
+      sidebar: sidebarForLocale(locale),
       outline: { label: text.documentation.outline },
       docFooter: { prev: text.documentation.previous, next: text.documentation.next },
       editLink: { pattern: `${repositoryUrl}/edit/main/docs/nola-docs/:path`, text: text.documentation.editPage },
@@ -44,7 +82,7 @@ const locales = Object.fromEntries((Object.keys(localeNames) as Locale[]).map(lo
   }]
 }))
 
-export default defineConfig({
+export default withMermaid(defineConfig({
   base,
   title: 'Nola Translator',
   description: copy['zh-CN'].hero.subtitle,
@@ -62,18 +100,27 @@ export default defineConfig({
     image: { lazyLoad: true },
     config(md) {
       md.set({ linkify: true })
+      // VitePress core has no task-list rule; task-list.css styles the markup this produces.
+      md.use(markdownItTaskCheckbox)
+      md.use(timeline)
+      // Produces the .vp-code-block-title / .vp-code-group markup styled by vp-code-title.css and vp-code-group.css.
+      md.use(groupIconMdPlugin)
     },
   },
   head: [['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}nola-logo.svg` }], ['meta', { name: 'theme-color', content: '#f6f9ff' }]],
   locales,
   vite: {
-    plugins: [react({ exclude: /node_modules|\.vitepress\/cache/ }), tailwindcss()],
+    plugins: [react({ exclude: /node_modules|\.vitepress\/cache/ }), tailwindcss(), groupIconVitePlugin()],
     css: { postcss: { plugins: [normalizeEmptyIsCss()] } },
     resolve: { alias: { '@': resolve(workspace, 'src/renderer'), '@renderer': resolve(workspace, 'src/renderer') }, dedupe: ['react', 'react-dom'] },
     publicDir: resolve(workspace, 'docs/public'),
     server: { fs: { allow: [workspace] }, watch: { ignored: ['**/.electron-cache/**', '**/.vitepress/.temp/**', '**/.vitepress/cache/**', '**/dist/**', '**/public/demo/**', '**/public/screenshots/**'] } },
     // The isolated desktop demo is built separately and never scanned as a VitePress entry.
-    optimizeDeps: { entries: ['.vitepress/theme/index.ts'] },
+    optimizeDeps: {
+      entries: ['.vitepress/theme/index.ts'],
+      // Mermaid's lazy layout chunks import this CommonJS package outside the entry scan.
+      include: ['fastdom', 'fastdom/extensions/fastdom-promised.js'],
+    },
   },
   themeConfig: {
     logo: `${base}nola-logo.svg`,
@@ -90,4 +137,4 @@ export default defineConfig({
     externalLinkIcon: true,
     footer: { message: `© Nola Translator · ${license}` },
   },
-})
+}))

@@ -22,7 +22,7 @@ const settings = {
   recording: { keepAudio: true },
   appearance: { reduceMotion: false },
   overlay: {
-    mode: 'bottom', colorScheme: 'dark', locked: false, alwaysOnTop: true,
+    mode: 'bottom', colorScheme: 'dark', alwaysOnTop: true,
     fontFamily: 'Segoe UI Variable', fontSize: 17, fontWeight: 500,
     translationFontSize: 16, translationFontWeight: 400,
     sourceColor: '#F7F7F7', translationColor: '#D7DEE8',

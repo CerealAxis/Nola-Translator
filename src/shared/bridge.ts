@@ -136,6 +136,12 @@ export type NolaTranslatorApi = {
   closeOverlay(): Promise<void>
   minimizeOverlay(): Promise<void>
   resizeOverlay(width: number, height: number): Promise<void>
+  /**
+   * The caption lock is session state: the main process holds it for the window flags and returns
+   * the value now in force, so a caller never has to guess what the lock is after a race.
+   */
+  setOverlayLocked(locked: boolean): Promise<boolean>
+  onOverlayLockChanged(listener: (locked: boolean) => void): () => void
   openAppearance(page?: OverlayTargetPage): Promise<void>
   onOpenAppearance(listener: (page: OverlayTargetPage) => void): () => void
   getSettings(): Promise<AppSettings>

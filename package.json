@@ -90,6 +90,10 @@
     ],
     "extraResources": [
       {
+        "from": "src/renderer/assets/fonts/OFL-Noto-CJK.txt",
+        "to": "licenses/OFL-Noto-CJK.txt"
+      },
+      {
         "from": "engine/dist/NolaPythonEngine",
         "to": "engine"
       },

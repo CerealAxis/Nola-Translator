@@ -12,7 +12,7 @@ import { NO_TRANSLATION_LANGUAGE } from '../shared/settings'
 import type { SessionConfig } from '../shared/contracts'
 import { randomUUID } from 'node:crypto'
 import { handleMeetingAudio, MEETING_AUDIO_SCHEME, registerMeetingAudioScheme } from './audio-protocol'
-import { registerAppIpc } from './app-ipc'
+import { registerAppIpc, resetOverlayLock } from './app-ipc'
 import { createEngineLaunchSpec, EngineProcess } from './engine-process'
 import { clearDataRootPointer, clearPendingDataMigration, fallbackDataRoot, readPendingDataMigration, resolveDataRoot, writeDataRootPointer } from './data-root'
 import { freeBytesForDirectory } from './disk-usage'
@@ -80,6 +80,9 @@ function createOverlayWindow(theme: AppSettings['theme'], overlay: OverlaySettin
   overlayWindow = window
   window.setAlwaysOnTop(true, 'screen-saver')
   window.setBounds(computeOverlayBounds('bottom', display.workArea, window.getBounds()))
+  // The lock belongs to the window that carried it, so a rebuilt one starts unlocked; the reset
+  // also re-applies the window flags through `applyOverlay` instead of leaving them stale.
+  resetOverlayLock()
   window.on('closed', () => {
     if (overlayWindow === window) overlayWindow = null
   })

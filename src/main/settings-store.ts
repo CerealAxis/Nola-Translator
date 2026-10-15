@@ -194,6 +194,8 @@ export class SettingsStore {
           /** Retired; the rolling overlay derives its own budget from the stage height. */
           maxLines?: unknown
           translationMaxLines?: unknown
+          /** The caption lock is session state now, so a stored value is discarded rather than restored. */
+          locked?: unknown
         }
         /** The pre-`network` top-level mirror toggle; migrated into `network` on load. */
         useHuggingFaceMirror?: unknown
@@ -207,6 +209,7 @@ export class SettingsStore {
       const rawOverlay = { ...(raw.overlay ?? {}) }
       delete rawOverlay.maxLines
       delete rawOverlay.translationMaxLines
+      delete rawOverlay.locked
       this.settings = {
         ...structuredClone(DEFAULT_SETTINGS),
         ...raw,
@@ -291,7 +294,6 @@ export class SettingsStore {
         if (rawOverlay.translationFontSize === 22) overlay.translationFontSize = DEFAULT_SETTINGS.overlay.translationFontSize
         if (rawOverlay.sourceColor === '#FFFFFF') overlay.sourceColor = DEFAULT_SETTINGS.overlay.sourceColor
         if (rawOverlay.translationColor === '#FFFFFF') overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
-        overlay.locked = false
       }
       if (rawOverlay.backgroundColor === '#30343A' && rawOverlay.backgroundOpacity === 0.62) {
         overlay.backgroundColor = DEFAULT_SETTINGS.overlay.backgroundColor

@@ -32,9 +32,8 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
   const display = overlay.showSource && overlay.showTranslation ? 'both' : overlay.showSource ? 'source' : 'translation'
 
   const restore = () => {
-    // Only appearance preferences are reset; the window lock and pin are independent controls.
-    const { locked, alwaysOnTop, ...appearance } = DEFAULT_SETTINGS.overlay
-    void locked
+    // Only appearance preferences are reset; the window pin is an independent control.
+    const { alwaysOnTop, ...appearance } = DEFAULT_SETTINGS.overlay
     void alwaysOnTop
     void updateSettings({ overlay: appearance }).catch(() => toast.danger(t('modelsSettingsUi.restoreFailed')))
   }

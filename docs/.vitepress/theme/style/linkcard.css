@@ -1,0 +1,37 @@
+/* Link cards. Authors write the markup by hand:
+   <div class="linkcard"><div class="logo"><img src="..."></div>
+   <a href="..."><div class="description">Title<span>Subtitle</span></div></a></div> */
+.vp-doc .linkcard {
+  background-color: var(--vp-c-bg-soft);
+  border-radius: 8px;
+  padding: 8px 16px 8px 8px;
+  transition: color 0.5s, background-color 0.5s;
+}
+
+.vp-doc .linkcard:hover {
+  background-color: var(--vp-c-yellow-soft);
+}
+
+.vp-doc .linkcard a {
+  display: flex;
+  align-items: center;
+}
+
+.vp-doc .linkcard .description {
+  flex: 1;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 25px;
+  color: var(--vp-c-text-1);
+  margin: 0 0 0 16px;
+  transition: color 0.5s;
+}
+
+.vp-doc .linkcard .description span {
+  font-size: 14px;
+}
+
+.vp-doc .linkcard .logo img {
+  width: 80px;
+  object-fit: contain;
+}

@@ -77,7 +77,7 @@ export const settingsPatchSchema = z.object({
     reduceMotion: z.boolean().optional(),
   }).partial().optional(),
   overlay: z.object({
-    mode: z.enum(['free', 'top', 'bottom']).optional(), locked: z.boolean().optional(),
+    mode: z.enum(['free', 'top', 'bottom']).optional(),
     colorScheme: z.enum(['dark', 'light']).optional(),
     alwaysOnTop: z.boolean().optional(), fontFamily: z.string().max(128).optional(),
     fontSize: z.number().min(14).max(72).optional(), fontWeight: z.number().min(300).max(800).optional(),

@@ -1,0 +1,11 @@
+/* 徽标行。VitePress 默认主题把 img 设为 display:block
+   （vitepress/dist/client/theme-default/styles/base.css），
+   shields.io 与 GitHub Actions 徽标因此各自独占一行。
+   截图、图表这类真正的插图仍需保持块级居中，所以按图片来源区分而不是按容器区分。
+   构建后的 HTML 会把相邻徽标之间的换行全部压掉，彼此之间没有任何空白，间距必须自己给。 */
+.vp-doc img[src*='img.shields.io'],
+.vp-doc img[src$='badge.svg'] {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0 2px;
+}

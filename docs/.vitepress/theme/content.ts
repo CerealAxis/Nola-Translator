@@ -7,7 +7,7 @@ export function localePath(locale: Locale) { return locale === 'zh-CN' ? '/' : `
 
 export interface LandingCopy {
   nav: { home: string; product: string; scenarios: string; download: string; docs: string; language: string; menu: string; skip: string }
-  documentation: { quickStart: string; outline: string; backToTop: string; editPage: string; lastUpdated: string; previous: string; next: string; home: string; search: string }
+  documentation: { outline: string; backToTop: string; editPage: string; lastUpdated: string; previous: string; next: string; home: string; search: string }
   hero: { title: string; subtitle: string; cta: string; note: string }
   demo: { hint: string; expand: string; close: string; reset: string; loading: string; title: string; intro: string; tabs: string[] }
   features: { title: string; body: string; tags: string[] }[]
@@ -18,10 +18,39 @@ export interface LandingCopy {
   footer: { tagline: string; releases: string; copyright: string }
 }
 
+/** Sidebar labels for the help documentation. Slugs live in config.ts; only display text is per-locale. */
+export interface DocsNavCopy {
+  root: string
+  gettingStarted: string
+  introduction: string
+  downloadAndInstall: string
+  environment: string
+  localModels: string
+  cloudModels: string
+  features: string
+  liveTranslation: string
+  floatingCaptions: string
+  browserCaptions: string
+  settings: string
+  troubleshooting: string
+  feedback: string
+  faq: string
+  contributing: string
+  howToContribute: string
+  writingGuidelines: string
+  developers: string
+  developmentSetup: string
+  gpgSigning: string
+  api: string
+  legal: string
+  userAgreement: string
+  privacyPolicy: string
+}
+
 export const copy: Record<Locale, LandingCopy> = {
   'zh-CN': {
     nav: { home: '首页', product: '产品', scenarios: '使用场景', download: '下载', docs: '文档', language: '选择语言', menu: '菜单', skip: '跳到内容' },
-    documentation: { quickStart: '快速上手', outline: '目录', backToTop: '返回顶部', editPage: '在 GitHub 上编辑此页面', lastUpdated: '最后更新于', previous: '上一页', next: '下一页', home: '返回首页', search: '搜索' },
+    documentation: { outline: '目录', backToTop: '返回顶部', editPage: '在 GitHub 上编辑此页面', lastUpdated: '最后更新于', previous: '上一页', next: '下一页', home: '返回首页', search: '搜索' },
     hero: { title: '让每一种声音，都被听懂', subtitle: '从跨语言会议到外语视频，Nola Translator 把你听到的声音变成双语字幕。\n快速同传、悬浮字幕、浏览器字幕，用你喜欢的方式，听懂世界。', cta: '下载 Nola Translator', note: '免费开源 · 本地模型与云端模型' },
     demo: { hint: '试着点击侧栏，体验 Nola', expand: '展开体验', close: '退出全屏体验', reset: '重新体验', loading: '正在打开 Nola…', title: '一种声音，三种打开方式', intro: '会议里、屏幕上、播放器中。选择你的场景，看看 Nola 如何融入其中', tabs: ['快速同传', '悬浮字幕', '浏览器字幕'] },
     features: [
@@ -47,7 +76,7 @@ export const copy: Record<Locale, LandingCopy> = {
   },
   'zh-TW': {
     nav: { home: '首頁', product: '產品', scenarios: '使用情境', download: '下載', docs: '文件', language: '選擇語言', menu: '選單', skip: '跳到內容' },
-    documentation: { quickStart: '快速入門', outline: '目錄', backToTop: '返回頂部', editPage: '在 GitHub 上編輯此頁面', lastUpdated: '最後更新於', previous: '上一頁', next: '下一頁', home: '返回首頁', search: '搜尋' },
+    documentation: { outline: '目錄', backToTop: '返回頂部', editPage: '在 GitHub 上編輯此頁面', lastUpdated: '最後更新於', previous: '上一頁', next: '下一頁', home: '返回首頁', search: '搜尋' },
     hero: { title: '讓每一種聲音，都被聽懂', subtitle: '從跨語言會議到外語影片，Nola Translator 把你聽到的聲音變成雙語字幕。\n即時口譯、浮動字幕、瀏覽器字幕，用你喜歡的方式，聽懂世界。', cta: '下載 Nola Translator', note: '免費開源 · 本機模型與雲端模型' },
     demo: { hint: '試著點選側欄，體驗 Nola', expand: '展開體驗', close: '退出全螢幕體驗', reset: '重新體驗', loading: '正在開啟 Nola…', title: '一種聲音，三種開啟方式', intro: '會議裡、螢幕上、播放器中。選擇你的情境，看看 Nola 如何融入其中', tabs: ['即時口譯', '浮動字幕', '瀏覽器字幕'] },
     features: [
@@ -63,7 +92,7 @@ export const copy: Record<Locale, LandingCopy> = {
   },
   'zh-HK': {
     nav: { home: '首頁', product: '產品', scenarios: '使用場景', download: '下載', docs: '文件', language: '選擇語言', menu: '選單', skip: '跳到內容' },
-    documentation: { quickStart: '快速入門', outline: '目錄', backToTop: '返回頂部', editPage: '在 GitHub 上編輯此頁面', lastUpdated: '最後更新於', previous: '上一頁', next: '下一頁', home: '返回首頁', search: '搜尋' },
+    documentation: { outline: '目錄', backToTop: '返回頂部', editPage: '在 GitHub 上編輯此頁面', lastUpdated: '最後更新於', previous: '上一頁', next: '下一頁', home: '返回首頁', search: '搜尋' },
     hero: { title: '讓每一種聲音，都被聽懂', subtitle: '從跨語言會議到外語影片，Nola Translator 將你聽到的聲音變成雙語字幕。\n即時傳譯、懸浮字幕、瀏覽器字幕，用你喜歡的方式，聽懂世界。', cta: '下載 Nola Translator', note: '免費開源 · 本機模型與雲端模型' },
     demo: { hint: '試試點選側欄，體驗 Nola', expand: '展開體驗', close: '退出全螢幕體驗', reset: '重新體驗', loading: '正在開啟 Nola…', title: '一種聲音，三種開啟方式', intro: '會議裡、螢幕上、播放器中。選擇你的場景，看看 Nola 如何融入其中', tabs: ['即時傳譯', '懸浮字幕', '瀏覽器字幕'] },
     features: [
@@ -79,7 +108,7 @@ export const copy: Record<Locale, LandingCopy> = {
   },
   en: {
     nav: { home: 'Home', product: 'Product', scenarios: 'Use cases', download: 'Download', docs: 'Docs', language: 'Choose language', menu: 'Menu', skip: 'Skip to content' },
-    documentation: { quickStart: 'Quick start', outline: 'Contents', backToTop: 'Back to top', editPage: 'Edit this page on GitHub', lastUpdated: 'Last updated', previous: 'Previous page', next: 'Next page', home: 'Home', search: 'Search' },
+    documentation: { outline: 'Contents', backToTop: 'Back to top', editPage: 'Edit this page on GitHub', lastUpdated: 'Last updated', previous: 'Previous page', next: 'Next page', home: 'Home', search: 'Search' },
     hero: { title: 'Every voice. Understood', subtitle: 'From multilingual meetings to videos in another language, turn what you hear into bilingual captions.\nLive translation, floating captions, and browser captions. Your way into the conversation.', cta: 'Download Nola Translator', note: 'Free & open source · Local and cloud models' },
     demo: { hint: 'Explore Nola — try the sidebar', expand: 'Expand demo', close: 'Close expanded demo', reset: 'Restart demo', loading: 'Opening Nola…', title: 'One voice. Three ways to follow', intro: 'In meetings, on your desktop, inside your player. Find your setting and make yourself at home', tabs: ['Live translation', 'Floating captions', 'Browser captions'] },
     features: [
@@ -95,7 +124,7 @@ export const copy: Record<Locale, LandingCopy> = {
   },
   ja: {
     nav: { home: 'ホーム', product: '製品', scenarios: '活用シーン', download: 'ダウンロード', docs: 'ドキュメント', language: '言語を選択', menu: 'メニュー', skip: 'コンテンツへ' },
-    documentation: { quickStart: 'クイックスタート', outline: '目次', backToTop: 'ページ上部へ戻る', editPage: 'GitHub でこのページを編集', lastUpdated: '最終更新', previous: '前のページ', next: '次のページ', home: 'ホームに戻る', search: '検索' },
+    documentation: { outline: '目次', backToTop: 'ページ上部へ戻る', editPage: 'GitHub でこのページを編集', lastUpdated: '最終更新', previous: '前のページ', next: '次のページ', home: 'ホームに戻る', search: '検索' },
     hero: { title: 'すべての声を、理解へ', subtitle: '多言語の会議から外国語の動画まで、聞こえる声を二言語の字幕に。\nリアルタイム翻訳、フローティング字幕、ブラウザー字幕。あなたの方法で世界を理解する。', cta: 'Nola Translator をダウンロード', note: '無料・オープンソース · ローカルとクラウド' },
     demo: { hint: 'サイドバーを選んで Nola を体験', expand: 'デモを拡大', close: '拡大表示を終了', reset: 'デモをリセット', loading: 'Nola を開いています…', title: 'ひとつの声。三つの使い方', intro: '会議、デスクトップ、プレーヤー。あなたの場面に合う Nola を見つけてください', tabs: ['リアルタイム翻訳', 'フローティング字幕', 'ブラウザー字幕'] },
     features: [
@@ -111,7 +140,7 @@ export const copy: Record<Locale, LandingCopy> = {
   },
   ko: {
     nav: { home: '홈', product: '제품', scenarios: '활용 사례', download: '다운로드', docs: '문서', language: '언어 선택', menu: '메뉴', skip: '본문으로 이동' },
-    documentation: { quickStart: '빠른 시작', outline: '목차', backToTop: '맨 위로 이동', editPage: 'GitHub에서 이 페이지 편집', lastUpdated: '마지막 업데이트', previous: '이전 페이지', next: '다음 페이지', home: '홈으로 돌아가기', search: '검색' },
+    documentation: { outline: '목차', backToTop: '맨 위로 이동', editPage: 'GitHub에서 이 페이지 편집', lastUpdated: '마지막 업데이트', previous: '이전 페이지', next: '다음 페이지', home: '홈으로 돌아가기', search: '검색' },
     hero: { title: '모든 목소리를, 이해하다', subtitle: '다국어 회의부터 외국어 영상까지, 들리는 소리를 두 언어의 자막으로.\n실시간 통역, 플로팅 자막, 브라우저 자막. 나만의 방식으로 세상을 이해하세요.', cta: 'Nola Translator 다운로드', note: '무료 오픈 소스 · 로컬 및 클라우드 모델' },
     demo: { hint: '사이드바를 눌러 Nola를 체험하세요', expand: '데모 확대', close: '확대 보기 종료', reset: '데모 다시 시작', loading: 'Nola 여는 중…', title: '하나의 목소리, 세 가지 방식', intro: '회의에서, 데스크톱에서, 플레이어 안에서. 내 상황에 맞는 Nola를 만나보세요', tabs: ['실시간 통역', '플로팅 자막', '브라우저 자막'] },
     features: [
@@ -124,5 +153,62 @@ export const copy: Record<Locale, LandingCopy> = {
     platforms: { title: '익숙한 곳에서 Nola를 만나세요', intro: '데스크톱, 브라우저, 터미널. 하나의 익숙한 경험', soonLabel: '다운로드 곧 공개', desktop: '데스크톱', desktopBody: '통역 작업 공간, 플로팅 자막, 모델 관리까지.', browser: '브라우저', browserBody: 'Chrome과 Edge의 웹 영상에 이중 언어 자막을.', terminal: '터미널', terminalBody: '명령줄에서 Nola를 작업 흐름에 연결하세요.', extension: '브라우저 확장 다운로드' },
     faq: { title: 'Nola에 대해 더 알고 싶다면', items: [{ question: '무료인가요?', answer: 'Nola는 GPL-3.0 무료 오픈 소스 소프트웨어입니다. 로컬 추론은 API 비용이 없으며, 클라우드 가격과 할당량은 서비스 제공자가 정합니다.' }, { question: '어떤 컴퓨터가 필요한가요?', answer: '현재 Windows 버전은 x64를 지원합니다. CPU 또는 모델과 런타임에 맞는 NVIDIA·Intel·AMD GPU를 사용할 수 있습니다. 메모리 요구량은 모델과 양자화 방식에 따라 다릅니다.' }, { question: '어떤 언어를 지원하나요?', answer: '인터페이스는 중국어 간체·번체(대만 / 홍콩), 일본어, 한국어, 영어를 지원합니다. 인식과 번역 언어는 선택한 모델이나 클라우드에 따라 다릅니다.' }, { question: '데모에서 마이크를 사용하나요?', answer: '아니요. 실제 앱 화면에 사전 설정된 데모 데이터를 표시합니다. 페이지 전환, 자막 설정, 메모 편집을 체험할 수 있습니다. 실시간 인식과 번역은 데스크톱 앱에서 이용하세요.' }] },
     final: { title: '세상을 이해하는 시작\n바로 지금', body: '목소리가 언어를 넘어, 대화가 자연스럽게.', cta: 'Windows 버전 다운로드' }, footer: { tagline: '무료 오픈 소스 실시간 번역 자막 소프트웨어', releases: '업데이트 기록', copyright: '© 2026 Nola Translator' },
+  },
+}
+
+export const docsNav: Record<Locale, DocsNavCopy> = {
+  'zh-CN': {
+    root: 'Nola Translator 帮助文档',
+    gettingStarted: '开始入门', introduction: '产品介绍', downloadAndInstall: '下载与安装', environment: '环境配置', localModels: '本地模型配置', cloudModels: '云端模型配置',
+    features: '功能介绍', liveTranslation: '快速同传', floatingCaptions: '悬浮字幕', browserCaptions: '浏览器字幕', settings: '系统设定',
+    troubleshooting: '疑难解答', feedback: '如何反馈', faq: '常见问题',
+    contributing: '参与贡献', howToContribute: '如何贡献', writingGuidelines: '编写规范',
+    developers: '开发者指南', developmentSetup: '开发环境配置', gpgSigning: 'GPG 签名配置', api: 'API 文档',
+    legal: '软件协议', userAgreement: '用户协议', privacyPolicy: '隐私协议',
+  },
+  'zh-TW': {
+    root: 'Nola Translator 說明文件',
+    gettingStarted: '開始入門', introduction: '產品介紹', downloadAndInstall: '下載與安裝', environment: '環境設定', localModels: '本機模型設定', cloudModels: '雲端模型設定',
+    features: '功能介紹', liveTranslation: '即時口譯', floatingCaptions: '浮動字幕', browserCaptions: '瀏覽器字幕', settings: '系統設定',
+    troubleshooting: '疑難解答', feedback: '如何回報', faq: '常見問題',
+    contributing: '參與貢獻', howToContribute: '如何貢獻', writingGuidelines: '編寫規範',
+    developers: '開發者指南', developmentSetup: '開發環境設定', gpgSigning: 'GPG 簽章設定', api: 'API 文件',
+    legal: '軟體協定', userAgreement: '使用者條款', privacyPolicy: '隱私權政策',
+  },
+  'zh-HK': {
+    root: 'Nola Translator 說明文件',
+    gettingStarted: '開始入門', introduction: '產品介紹', downloadAndInstall: '下載與安裝', environment: '環境設定', localModels: '本機模型設定', cloudModels: '雲端模型設定',
+    features: '功能介紹', liveTranslation: '即時傳譯', floatingCaptions: '懸浮字幕', browserCaptions: '瀏覽器字幕', settings: '系統設定',
+    troubleshooting: '疑難解答', feedback: '如何回報', faq: '常見問題',
+    contributing: '參與貢獻', howToContribute: '如何貢獻', writingGuidelines: '編寫規範',
+    developers: '開發者指南', developmentSetup: '開發環境設定', gpgSigning: 'GPG 簽署設定', api: 'API 文件',
+    legal: '軟體協議', userAgreement: '使用者條款', privacyPolicy: '私隱政策',
+  },
+  en: {
+    root: 'Nola Translator Documentation',
+    gettingStarted: 'Getting Started', introduction: 'Product Overview', downloadAndInstall: 'Download and Install', environment: 'Environment Setup', localModels: 'Local Models', cloudModels: 'Cloud Models',
+    features: 'Features', liveTranslation: 'Live Translation', floatingCaptions: 'Floating Captions', browserCaptions: 'Browser Captions', settings: 'Settings',
+    troubleshooting: 'Troubleshooting', feedback: 'Reporting Issues', faq: 'FAQ',
+    contributing: 'Contributing', howToContribute: 'How to Contribute', writingGuidelines: 'Writing Guidelines',
+    developers: 'Developer Guide', developmentSetup: 'Development Setup', gpgSigning: 'GPG Signing', api: 'API Reference',
+    legal: 'Legal', userAgreement: 'Terms of Service', privacyPolicy: 'Privacy Policy',
+  },
+  ja: {
+    root: 'Nola Translator ドキュメント',
+    gettingStarted: 'はじめに', introduction: '製品紹介', downloadAndInstall: 'ダウンロードとインストール', environment: '環境設定', localModels: 'ローカルモデル設定', cloudModels: 'クラウドモデル設定',
+    features: '機能紹介', liveTranslation: 'リアルタイム翻訳', floatingCaptions: 'フローティング字幕', browserCaptions: 'ブラウザー字幕', settings: 'システム設定',
+    troubleshooting: 'トラブルシューティング', feedback: '問題の報告', faq: 'よくある質問',
+    contributing: '貢献する', howToContribute: '貢献の方法', writingGuidelines: '執筆ガイドライン',
+    developers: '開発者ガイド', developmentSetup: '開発環境構築', gpgSigning: 'GPG 署名設定', api: 'API リファレンス',
+    legal: 'ライセンス', userAgreement: '利用規約', privacyPolicy: 'プライバシーポリシー',
+  },
+  ko: {
+    root: 'Nola Translator 문서',
+    gettingStarted: '시작하기', introduction: '제품 소개', downloadAndInstall: '다운로드 및 설치', environment: '환경 설정', localModels: '로컬 모델 설정', cloudModels: '클라우드 모델 설정',
+    features: '기능 소개', liveTranslation: '실시간 통역', floatingCaptions: '플로팅 자막', browserCaptions: '브라우저 자막', settings: '시스템 설정',
+    troubleshooting: '문제 해결', feedback: '문제 신고', faq: '자주 묻는 질문',
+    contributing: '기여하기', howToContribute: '기여 방법', writingGuidelines: '작성 규칙',
+    developers: '개발자 가이드', developmentSetup: '개발 환경 설정', gpgSigning: 'GPG 서명 설정', api: 'API 문서',
+    legal: '법적 고지', userAgreement: '이용약관', privacyPolicy: '개인정보 처리방침',
   },
 }

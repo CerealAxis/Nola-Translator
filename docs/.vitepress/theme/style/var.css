@@ -1,0 +1,32 @@
+/* 主题色与正文排版。品牌色取自 assets/brand 的 Logo 渐变（#168BD9 → #2255C7），
+   而不是上游示例的绿色，否则与站点 Logo 和桌面端界面不匹配。
+   brand-1 是正文链接色（在 VitePress 里被引用 15 次），brand-3 只作实心按钮底色。 */
+:root {
+  --vp-c-brand-1: #1163a8;
+  --vp-c-brand-2: #168bd9;
+  --vp-c-brand-3: #1e5fc4;
+}
+
+.dark {
+  --vp-c-brand-1: #6cb8f5;
+  --vp-c-brand-2: #3f9be2;
+  --vp-c-brand-3: #1c7cc9;
+}
+
+/* 页面标题用 Logo 同款渐变。标题里的锚点图标由 VitePress 注入，
+   必须还原文字填充色，否则它会跟着标题一起变透明。 */
+.VPDoc h1 {
+  background: linear-gradient(120deg, #168bd9 15%, #2255c7 85%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.VPDoc h1 .header-anchor {
+  -webkit-text-fill-color: currentColor;
+}
+
+/* VitePress 给正文所有链接加下划线，在语言表格这类密集内容里会连成一片。 */
+.vp-doc a {
+  text-decoration: none;
+}

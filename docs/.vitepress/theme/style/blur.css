@@ -1,0 +1,2 @@
+/* Restrict translucency to the document shell. */
+.VPNavBar.has-sidebar .content-body, .VPSidebar .curtain, .VPLocalNav { background:color-mix(in srgb,var(--vp-c-bg) 85%,transparent); backdrop-filter:blur(12px); }

@@ -1,0 +1,8 @@
+/* Linked groups also have is-link; children identify folders. */
+.VPSidebar .VPSidebarItem > .item { display:flex; align-items:center; gap:6px; }
+.VPSidebar .VPSidebarItem > .item::before { content:''; flex:none; width:16px; height:16px; background:currentColor; mask:url('../../../public/svg/file.svg') center / contain no-repeat; opacity:.65; }
+.VPSidebar .VPSidebarItem:has(> .items) > .item::before { mask-image:url('../../../public/svg/document-open.svg'); }
+.VPSidebar .VPSidebarItem.collapsed:has(> .items) > .item::before { mask-image:url('../../../public/svg/document.svg'); }
+.VPSidebar .VPSidebarItem > .item > .link { flex:1; }
+.VPSidebar .VPSidebarItem:has(> .items) > .items { margin-left:8px; padding-left:12px; border-left:1px solid var(--vp-c-divider); }
+.VPSidebar .VPSidebarItem.is-active > .item::before { color:var(--vp-c-brand-1); opacity:1; }

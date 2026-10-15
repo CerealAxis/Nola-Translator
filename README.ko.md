@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/public/screenshots/zh-CN/home.png" alt="Nola Translator 인터페이스 미리보기" width="1000">
+  <img src="docs/public/screenshots/ko/home.png" alt="Nola Translator 인터페이스 미리보기" width="1000">
 </p>
 
 ## 개요
@@ -39,11 +39,11 @@ Nola Translator는 로컬 모델과 클라우드 모델을 모두 지원하는 �
 
 | 홈 | 플로팅 자막 | 동영상 자막 |
 |---|---|---|
-| ![홈](docs/public/screenshots/zh-CN/home.png) | ![플로팅 자막](docs/public/screenshots/zh-CN/overlay-scene.png) | ![동영상 자막](docs/public/screenshots/zh-CN/browser-scene.png) |
+| ![홈](docs/public/screenshots/ko/home.png) | ![플로팅 자막](docs/public/screenshots/ko/overlay-scene.png) | ![동영상 자막](docs/public/screenshots/ko/browser-scene.png) |
 
 | 로컬 모델 설치 | 추론 환경 설정 | 다크 모드 |
 |---|---|---|
-| ![로컬 모델 설치](docs/public/screenshots/zh-CN/models.png) | ![추론 환경 설정](docs/public/screenshots/zh-CN/compute-environment.png) | ![다크 모드](docs/public/screenshots/zh-CN/dark-mode.png) |
+| ![로컬 모델 설치](docs/public/screenshots/ko/models.png) | ![추론 환경 설정](docs/public/screenshots/zh-CN/compute-environment.png) | ![다크 모드](docs/public/screenshots/zh-CN/dark-mode.png) |
 
 ## 설치
 

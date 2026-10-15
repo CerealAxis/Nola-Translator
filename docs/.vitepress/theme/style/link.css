@@ -1,0 +1,23 @@
+/* Site icons for external links. Only href prefixes listed here get an icon; the
+   matching SVG lives in docs/public/svg and is referenced by absolute path, the
+   same convention sidebarIcon.css already uses. */
+.vp-doc a[href^='https://www.youtube.com/']:before,
+.vp-doc a[href^='https://www.bilibili.com/']:before {
+  content: '';
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  vertical-align: middle;
+  position: relative;
+  background-size: cover;
+  margin-right: 4px;
+}
+
+.vp-doc a[href^='https://www.youtube.com/']:before {
+  background-image: url(/svg/youtube.svg);
+}
+
+.vp-doc a[href^='https://www.bilibili.com/']:before {
+  background-image: url(/svg/bilibili.svg);
+  top: -2px;
+}
