@@ -35,6 +35,7 @@ function fixture() {
     <div className="nola-app-shell">
       <div className="nola-app-body" />
       {['home-quick', 'home-overlay', 'nav-video-captions', 'replay'].map(target => <div key={target} data-onboarding={target} />)}
+      <div className="settings-group" data-onboarding="network-settings" />
       {['engine', 'llama'].map(kind => <div key={kind} data-onboarding={`runtime-${kind}`}><div className="settings-row" /><div className="settings-row" /></div>)}
       <div data-onboarding="recognition-settings"><div className="settings-group" /><div className="settings-group"><div className="settings-row" /></div></div>
       <div data-onboarding="translation-settings"><div className="settings-group"><div className="settings-row" /></div></div>
@@ -49,7 +50,8 @@ it('welcomes first-run users before the tour and includes the repository link an
   expect(await screen.findByRole('dialog', { name: '欢迎使用 Nola Translator' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '下一步' })).not.toBeInTheDocument()
   expect(screen.getByText('这对我们十分重要。')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'GitHub 链接' })).toHaveAttribute('href', 'https://github.com/CerealAxis/Nola-Translator')
+  expect(screen.getByRole('link', { name: '帮助文档' })).toHaveAttribute('href', 'https://nola.xaviermc.top')
+  expect(screen.getByRole('link', { name: 'GitHub' })).toHaveAttribute('href', 'https://github.com/CerealAxis/Nola-Translator')
   fireEvent.click(screen.getByRole('button', { name: '开始指引' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled())
   expect(screen.getByRole('dialog', { name: '快速同传' })).toBeInTheDocument()
@@ -71,11 +73,11 @@ it('shows only once automatically, marks the first visible step, and supports ma
   expect(await screen.findByRole('dialog', { name: '快速同传' })).toBeInTheDocument()
 })
 
-it('navigates through all nine steps and finishes at the replay entry', async () => {
+it('navigates through all ten steps and finishes at the replay entry', async () => {
   fixture()
   fireEvent.click(await screen.findByRole('button', { name: '开始指引' }))
-  const titles = ['快速同传', '悬浮字幕', '浏览器字幕', '安装 PyTorch', '安装 llama.cpp', '配置语音识别', '配置翻译', '下载模型', '再次查看教程']
-  const paths = ['#/', '#/', '#/', '#/settings/compute', '#/settings/compute', '#/settings/audio', '#/settings/translation', '#/models', '#/settings/more']
+  const titles = ['快速同传', '悬浮字幕', '浏览器字幕', '网络与下载加速', '安装 PyTorch', '安装 llama.cpp', '配置语音识别', '配置翻译', '下载模型', '再次查看教程']
+  const paths = ['#/', '#/', '#/', '#/settings/general', '#/settings/compute', '#/settings/compute', '#/settings/audio', '#/settings/translation', '#/models', '#/settings/more']
   for (let index = 0; index < titles.length; index++) {
     const button = await screen.findByRole('button', { name: index === 8 ? '完成' : '下一步' })
     await waitFor(() => expect(button).toBeEnabled())

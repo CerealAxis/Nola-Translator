@@ -53,13 +53,13 @@ const models = [
   ['index-translate-35b-a3b-q4-k-m', 'Index-Translate 35B-A3B preview Q4_K_M', 'index-translate', 21713462400],
 ] as const
 
-export function prepareDemo(locale: UiLanguage, page: string, snapshot = false): AppSettings {
+export function prepareDemo(locale: UiLanguage, page: string, snapshot = false, theme?: 'light' | 'dark'): AppSettings {
   const copy = demoCopy[locale]
   const targetLanguage = locale === 'en' ? 'en' : locale === 'ja' ? 'ja' : locale === 'ko' ? 'ko' : locale === 'zh-CN' ? 'zh' : 'zh-Hant'
   const sourceLanguage = locale === 'en' ? 'zh' : 'en'
   const settings: AppSettings = structuredClone(DEFAULT_SETTINGS)
   settings.onboardingSeen = true
-  settings.theme = page === 'dark-mode' ? 'dark' : 'light'
+  settings.theme = theme ?? (page === 'dark-mode' ? 'dark' : 'light')
   settings.uiLanguage = locale
   settings.modelStoragePath = ''
   settings.recording.keepAudio = false

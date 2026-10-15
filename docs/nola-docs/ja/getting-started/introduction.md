@@ -1,4 +1,4 @@
-# 製品紹介
+# 製品概要
 
 <div align="center">
   <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/assets/brand/nola-logo.svg" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/assets/brand/nola-logo.svg" alt="Nola Translator Logo" width="112" height="112"></a>
@@ -25,21 +25,21 @@
 
 ## 概要
 
-Nola Translator は、ローカルモデルとクラウドモデルに対応したリアルタイム字幕・翻訳アプリです。用途に応じてローカルの計算リソースで音声認識と翻訳を行うことも、クラウドモデルに接続して認識と翻訳を行うこともできます。
+Nola Translator は、ローカルモデルとクラウドモデルを使えるリアルタイム字幕・翻訳アプリです。お使いの環境や用途に合わせて、PC 上で音声認識・翻訳を行う方法と、クラウドモデルを利用する方法を選べます。
 
 ## 機能
 
 - **ローカルモデル:** Qwen3-ASR や SenseVoiceSmall などの認識モデル、HY-MT2 などの翻訳モデルをローカルで実行できます。Hugging Face の他のモデルを検索してインストールすることもできます。
-- **クラウドモデル:** Aliyun、MiniMax などのクラウド ASR モデルに対応し、OpenAI 互換 API、Anthropic、Ollama などの LLM プロトコルと、無料の MyMemory 翻訳サービスも利用できます。
+- **クラウドモデル:** Aliyun、MiniMax などのクラウド音声認識モデルに対応しています。OpenAI 互換 API、Anthropic、Ollama などの LLM プロトコルのほか、無料の MyMemory 翻訳サービスも利用できます。
 - **GPU アクセラレーション:** 利用可能な計算デバイスを検出し、認識と翻訳に別々のデバイスを設定できます。
 - **ブラウザー拡張機能:** Chrome と Edge 用の拡張機能で動画ページに二言語字幕を表示できます。デスクトップのシステム音声を入力ソースに設定することもできます。
-- **リアルタイム字幕オーバーレイ:** システム出力、選択したオーディオデバイス、またはマイクに対応します。字幕は独立したウィンドウに表示され、位置、フォントサイズ、色、不透明度、原文と翻訳のレイアウトを調整できます。
+- **字幕オーバーレイ:** システム音声、選択したオーディオデバイス、またはマイクの音声を字幕にできます。字幕は独立したウィンドウに表示され、位置、文字サイズ、色、不透明度、原文と翻訳の配置を調整できます。
 - **柔軟な設定:** 必要なモデルをインストールし、認識・翻訳方式、言語の組み合わせ、計算デバイス、字幕スタイルを選択できます。API 認証情報はアプリ内に安全に保存されます。
 - **履歴とエクスポート:** 字幕履歴を保存し、TXT、SRT、WebVTT 形式でエクスポートできます。音声録音の保存は任意です。
 
 ## 画面プレビュー
 
-| ホーム | フローティング字幕 | 動画字幕 |
+| ホーム | 字幕オーバーレイ | 動画字幕 |
 |---|---|---|
 | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/ja/home.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/ja/overlay-scene.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/ja/browser-scene.png) |
 
@@ -51,12 +51,12 @@ Nola Translator は、ローカルモデルとクラウドモデルに対応し�
 
 - [最新リリースをダウンロード](https://github.com/CerealAxis/Nola-Translator/releases/latest)
 
-Windows x64 に対応しています。EXE または MSI インストーラーを選択できます。他のプラットフォームは開発が安定した後に対応予定です。
+対応 OS は Windows x64 です。EXE または MSI インストーラーを選べます。ほかのプラットフォームにも今後対応する予定です。
 
 ## 対応する認識言語
 
 ::: tip
-認識と翻訳で利用できる言語は、選択したモデルの能力によって異なります。以下の表は、アプリに含まれる推奨モデルの対応状況です。おすすめのモデルがあれば issue でお知らせください。採用を検討します。初めての方には、認識に **SenseVoiceSmall**、翻訳に **HY-MT2 1.8B** をおすすめします。
+認識・翻訳に使える言語は、選択したモデルによって異なります。以下の表は、アプリで推奨しているモデルの対応言語です。ほかにおすすめのモデルがあれば、GitHub の Issue でお知らせください。アプリへの追加を検討します。初めて使う方には、音声認識に **SenseVoiceSmall**、翻訳に **HY-MT2 1.8B** がおすすめです。
 :::
 
 ### 認識モデル
@@ -84,7 +84,7 @@ Windows x64 に対応しています。EXE または MSI インストーラー�
 ## LLM API の設定
 
 ::: tip
-ここで設定する LLM プロトコルは翻訳に使用します。Aliyun と MiniMax の ASR モデルは、「オーディオと認識」にある専用の接続設定と認証情報を使用します。ローカルモデルに API 設定は不要です。
+ここで設定する LLM プロトコルは翻訳に使用します。Aliyun と MiniMax の音声認識モデルには、「音声と認識」ページの専用接続設定と認証情報を使います。ローカルモデルを使う場合、API の設定は必要ありません。
 :::
 
 ### 対応プロトコル
@@ -110,10 +110,10 @@ Windows x64 に対応しています。EXE または MSI インストーラー�
 
 ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-CN/llm-configuration.png)
 
-1. 翻訳設定で **クラウド翻訳** を選択します。
+1. 翻訳設定で **クラウド翻訳** を選びます。
 2. プロバイダーが対応する **API 形式** を選択します。
 3. **API URL**、**API キー**、**モデル ID** を入力します。
-4. 必要に応じてコンテキスト長と最大出力 Token 数を調整します。
+4. 必要に応じて、コンテキスト長と最大出力トークン数を調整します。
 
 ## プロジェクト構成
 
@@ -151,6 +151,6 @@ npm run dist:win
 
 ## ライセンス
 
-Nola Translator のオリジナルコードは [GNU GPL v3.0 only](https://github.com/CerealAxis/Nola-Translator/blob/main/LICENSE) の下で公開されています。サードパーティのコンポーネントとモデルにはそれぞれのライセンスが適用されます。詳しくは [Third-Party Notices](https://github.com/CerealAxis/Nola-Translator/blob/main/THIRD_PARTY_NOTICES.md) を参照してください。
+Nola Translator のコードは [GNU GPL v3.0 only](https://github.com/CerealAxis/Nola-Translator/blob/main/LICENSE) の下で公開されています。サードパーティ製コンポーネントとモデルには、それぞれのライセンスが適用されます。詳しくは [Third-Party Notices](https://github.com/CerealAxis/Nola-Translator/blob/main/THIRD_PARTY_NOTICES.md) をご覧ください。
 
 [![Star History Chart](https://api.star-history.com/svg?repos=CerealAxis/Nola-Translator&type=Date)](https://star-history.com/#CerealAxis/Nola-Translator)

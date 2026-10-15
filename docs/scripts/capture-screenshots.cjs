@@ -4,6 +4,7 @@ const path = require('node:path')
 
 const baseUrl = process.argv[2]
 const readmeOnly = process.argv.includes('--readme')
+const darkOnly = process.argv.includes('--dark')
 app.commandLine.appendSwitch('force-device-scale-factor', '1')
 app.setPath('userData', path.resolve(__dirname, '../media-src/.electron-cache'))
 const root = path.resolve(__dirname, '../..')
@@ -36,27 +37,34 @@ async function main() {
   await fs.mkdir(outputRoot, { recursive: true })
   let manifest
   const manifestPath = path.join(outputRoot, 'manifest.json')
-  if (readmeOnly) {
-    try { manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) } catch { manifest = { viewport: { width: 1440, height: 1000 }, demoOnly: true, images: [] } }
-    manifest.images = manifest.images.filter(item => item.locale !== 'zh-CN' || !pages.includes(item.page))
-  } else manifest = { viewport: { width: 1440, height: 1000 }, demoOnly: true, images: [] }
+  try { manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) } catch { manifest = { viewport: { width: 1440, height: 1000 }, demoOnly: true, images: [] } }
+  // Replace only captured paths, preserving README illustrations and the other theme.
+  const themes = readmeOnly ? ['light'] : darkOnly ? ['dark'] : ['light', 'dark']
+  const capturedPaths = new Set(locales.flatMap(locale => themes.flatMap(theme => pages.map(page => `screenshots/${locale}/${page}${theme === 'dark' ? '-dark' : ''}.png`))))
+  manifest.images = manifest.images.filter(item => !capturedPaths.has(item.path))
   manifest.generatedAt = new Date().toISOString()
   try {
     for (const locale of locales) {
       const localeDir = path.join(outputRoot, locale)
       await fs.mkdir(localeDir, { recursive: true })
-      for (const page of pages) {
-        const url = `${baseUrl}/?locale=${encodeURIComponent(locale)}&page=${page}&snapshot=1${routes[page]}`
-        await win.loadURL(url)
-        await win.webContents.executeJavaScript(`new Promise((resolve, reject) => { const deadline = Date.now() + 30000; const check = () => document.documentElement.dataset.captureReady === 'true' ? resolve() : Date.now() > deadline ? reject(new Error('UI demo did not finish rendering')) : setTimeout(check, 25); check() })`)
-        await new Promise(resolve => setTimeout(resolve, 120))
-        const png = await win.webContents.capturePage()
-        const buffer = png.toPNG()
-        const size = png.getSize()
-        const file = path.join(localeDir, `${page}.png`)
-        await fs.writeFile(file, buffer)
-        manifest.images.push({ locale, page, path: `screenshots/${locale}/${page}.png`, width: size.width, height: size.height, bytes: buffer.length, sourceComponents: sourceComponents[page], demoDescription: '真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。' })
-        console.log(`captured ${locale}/${page}.png`)
+      for (const theme of themes) {
+        for (const page of pages) {
+          const suffix = theme === 'dark' ? '-dark' : ''
+          const url = `${baseUrl}/?locale=${encodeURIComponent(locale)}&page=${page}&snapshot=1${theme === 'dark' ? '&theme=dark' : ''}${routes[page]}`
+          await win.loadURL(url)
+          await win.webContents.executeJavaScript(`new Promise((resolve, reject) => { const deadline = Date.now() + 30000; const check = () => document.documentElement.dataset.captureReady === 'true' ? resolve() : Date.now() > deadline ? reject(new Error('UI demo did not finish rendering')) : setTimeout(check, 25); check() })`)
+          if (theme === 'dark') {
+            if (!await win.webContents.executeJavaScript("document.documentElement.classList.contains('dark')")) throw new Error(`Dark theme missing: ${locale}/${page}`)
+          }
+          await new Promise(resolve => setTimeout(resolve, 120))
+          const png = await win.webContents.capturePage()
+          const buffer = png.toPNG()
+          const size = png.getSize()
+          const file = path.join(localeDir, `${page}${suffix}.png`)
+          await fs.writeFile(file, buffer)
+          manifest.images.push({ locale, page, theme: page === 'dark-mode' ? 'dark' : theme, path: `screenshots/${locale}/${page}${suffix}.png`, width: size.width, height: size.height, bytes: buffer.length, sourceComponents: sourceComponents[page], demoDescription: '真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。' })
+          console.log(`captured ${locale}/${page}${suffix}.png`)
+        }
       }
     }
     await fs.writeFile(path.join(outputRoot, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n', 'utf8')

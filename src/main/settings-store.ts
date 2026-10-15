@@ -231,14 +231,18 @@ export class SettingsStore {
           ...(typeof raw.useHuggingFaceMirror === 'boolean' && typeof raw.network?.useHuggingFaceMirror !== 'boolean'
             ? { useHuggingFaceMirror: raw.useHuggingFaceMirror }
             : {}),
-          // A file that never carried the field leaves the spread above to the current default,
-          // which is on with `auto`; only a stored value decides the outcome for one that did.
+          // A legacy file with a non-empty address predates the explicit switch, so preserve its
+          // implied enabled state; files without the address use the current default.
           ...migrateGithubAccelerate(raw.network),
         },
         recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}) },
         recording: { ...DEFAULT_SETTINGS.recording, ...(raw.recording ?? {}) },
         appearance: { ...DEFAULT_SETTINGS.appearance, ...(raw.appearance ?? {}) },
-        browserConnection: { enabled: raw.browserConnection?.enabled === true },
+        browserConnection: {
+          enabled: typeof raw.browserConnection?.enabled === 'boolean'
+            ? raw.browserConnection.enabled
+            : DEFAULT_SETTINGS.browserConnection.enabled,
+        },
         compute: computeSettingsSchema.safeParse(raw.compute ?? {}).data ?? { ...DEFAULT_COMPUTE_SETTINGS },
         overlay: { ...DEFAULT_SETTINGS.overlay, ...rawOverlay },
         // Video-session capture remains run-scoped; browser caption appearance is a saved preference.

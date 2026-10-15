@@ -442,7 +442,475 @@
         "docs/media-src/Scene.tsx"
       ],
       "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "home",
+      "theme": "dark",
+      "path": "screenshots/zh-CN/home-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 497576,
+      "sourceComponents": [
+        "src/renderer/features/home/HomePage.tsx",
+        "src/renderer/features/home/RecentMeetings.tsx",
+        "src/renderer/components/home/HeroSection.tsx",
+        "src/renderer/components/primitives/AppShell.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "workspace",
+      "theme": "dark",
+      "path": "screenshots/zh-CN/workspace-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 320772,
+      "sourceComponents": [
+        "src/renderer/features/workspace/WorkspacePage.tsx",
+        "src/renderer/components/caption/CaptionStage.tsx",
+        "src/renderer/components/notes/NotesPanel.tsx",
+        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "models",
+      "theme": "dark",
+      "path": "screenshots/zh-CN/models-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 407968,
+      "sourceComponents": [
+        "src/renderer/features/models/ModelsPage.tsx",
+        "src/renderer/features/models/ModelCard.tsx",
+        "src/shared/model-capabilities.ts",
+        "engine/nola_translator_engine/resources.py"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "overlay-scene",
+      "theme": "dark",
+      "path": "screenshots/zh-CN/overlay-scene-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 412067,
+      "sourceComponents": [
+        "src/renderer/features/overlay/OverlayRoot.tsx",
+        "src/renderer/features/overlay/CaptionTrack.tsx",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "browser-scene",
+      "theme": "dark",
+      "path": "screenshots/zh-CN/browser-scene-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 393684,
+      "sourceComponents": [
+        "browser/extension/styles.css",
+        "browser/extension/captionPresentation.ts",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-TW",
+      "page": "home",
+      "theme": "dark",
+      "path": "screenshots/zh-TW/home-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 500002,
+      "sourceComponents": [
+        "src/renderer/features/home/HomePage.tsx",
+        "src/renderer/features/home/RecentMeetings.tsx",
+        "src/renderer/components/home/HeroSection.tsx",
+        "src/renderer/components/primitives/AppShell.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-TW",
+      "page": "workspace",
+      "theme": "dark",
+      "path": "screenshots/zh-TW/workspace-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 325590,
+      "sourceComponents": [
+        "src/renderer/features/workspace/WorkspacePage.tsx",
+        "src/renderer/components/caption/CaptionStage.tsx",
+        "src/renderer/components/notes/NotesPanel.tsx",
+        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-TW",
+      "page": "models",
+      "theme": "dark",
+      "path": "screenshots/zh-TW/models-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 411651,
+      "sourceComponents": [
+        "src/renderer/features/models/ModelsPage.tsx",
+        "src/renderer/features/models/ModelCard.tsx",
+        "src/shared/model-capabilities.ts",
+        "engine/nola_translator_engine/resources.py"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-TW",
+      "page": "overlay-scene",
+      "theme": "dark",
+      "path": "screenshots/zh-TW/overlay-scene-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 412774,
+      "sourceComponents": [
+        "src/renderer/features/overlay/OverlayRoot.tsx",
+        "src/renderer/features/overlay/CaptionTrack.tsx",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-TW",
+      "page": "browser-scene",
+      "theme": "dark",
+      "path": "screenshots/zh-TW/browser-scene-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 394422,
+      "sourceComponents": [
+        "browser/extension/styles.css",
+        "browser/extension/captionPresentation.ts",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-HK",
+      "page": "home",
+      "theme": "dark",
+      "path": "screenshots/zh-HK/home-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 504103,
+      "sourceComponents": [
+        "src/renderer/features/home/HomePage.tsx",
+        "src/renderer/features/home/RecentMeetings.tsx",
+        "src/renderer/components/home/HeroSection.tsx",
+        "src/renderer/components/primitives/AppShell.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-HK",
+      "page": "workspace",
+      "theme": "dark",
+      "path": "screenshots/zh-HK/workspace-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 324215,
+      "sourceComponents": [
+        "src/renderer/features/workspace/WorkspacePage.tsx",
+        "src/renderer/components/caption/CaptionStage.tsx",
+        "src/renderer/components/notes/NotesPanel.tsx",
+        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-HK",
+      "page": "models",
+      "theme": "dark",
+      "path": "screenshots/zh-HK/models-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 412069,
+      "sourceComponents": [
+        "src/renderer/features/models/ModelsPage.tsx",
+        "src/renderer/features/models/ModelCard.tsx",
+        "src/shared/model-capabilities.ts",
+        "engine/nola_translator_engine/resources.py"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-HK",
+      "page": "overlay-scene",
+      "theme": "dark",
+      "path": "screenshots/zh-HK/overlay-scene-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 410962,
+      "sourceComponents": [
+        "src/renderer/features/overlay/OverlayRoot.tsx",
+        "src/renderer/features/overlay/CaptionTrack.tsx",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-HK",
+      "page": "browser-scene",
+      "theme": "dark",
+      "path": "screenshots/zh-HK/browser-scene-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 392517,
+      "sourceComponents": [
+        "browser/extension/styles.css",
+        "browser/extension/captionPresentation.ts",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "en",
+      "page": "home",
+      "theme": "dark",
+      "path": "screenshots/en/home-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 496603,
+      "sourceComponents": [
+        "src/renderer/features/home/HomePage.tsx",
+        "src/renderer/features/home/RecentMeetings.tsx",
+        "src/renderer/components/home/HeroSection.tsx",
+        "src/renderer/components/primitives/AppShell.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "en",
+      "page": "workspace",
+      "theme": "dark",
+      "path": "screenshots/en/workspace-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 290915,
+      "sourceComponents": [
+        "src/renderer/features/workspace/WorkspacePage.tsx",
+        "src/renderer/components/caption/CaptionStage.tsx",
+        "src/renderer/components/notes/NotesPanel.tsx",
+        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "en",
+      "page": "models",
+      "theme": "dark",
+      "path": "screenshots/en/models-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 389210,
+      "sourceComponents": [
+        "src/renderer/features/models/ModelsPage.tsx",
+        "src/renderer/features/models/ModelCard.tsx",
+        "src/shared/model-capabilities.ts",
+        "engine/nola_translator_engine/resources.py"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "en",
+      "page": "overlay-scene",
+      "theme": "dark",
+      "path": "screenshots/en/overlay-scene-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 410123,
+      "sourceComponents": [
+        "src/renderer/features/overlay/OverlayRoot.tsx",
+        "src/renderer/features/overlay/CaptionTrack.tsx",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "en",
+      "page": "browser-scene",
+      "theme": "dark",
+      "path": "screenshots/en/browser-scene-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 386068,
+      "sourceComponents": [
+        "browser/extension/styles.css",
+        "browser/extension/captionPresentation.ts",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ja",
+      "page": "home",
+      "theme": "dark",
+      "path": "screenshots/ja/home-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 517361,
+      "sourceComponents": [
+        "src/renderer/features/home/HomePage.tsx",
+        "src/renderer/features/home/RecentMeetings.tsx",
+        "src/renderer/components/home/HeroSection.tsx",
+        "src/renderer/components/primitives/AppShell.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ja",
+      "page": "workspace",
+      "theme": "dark",
+      "path": "screenshots/ja/workspace-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 342581,
+      "sourceComponents": [
+        "src/renderer/features/workspace/WorkspacePage.tsx",
+        "src/renderer/components/caption/CaptionStage.tsx",
+        "src/renderer/components/notes/NotesPanel.tsx",
+        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ja",
+      "page": "models",
+      "theme": "dark",
+      "path": "screenshots/ja/models-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 427633,
+      "sourceComponents": [
+        "src/renderer/features/models/ModelsPage.tsx",
+        "src/renderer/features/models/ModelCard.tsx",
+        "src/shared/model-capabilities.ts",
+        "engine/nola_translator_engine/resources.py"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ja",
+      "page": "overlay-scene",
+      "theme": "dark",
+      "path": "screenshots/ja/overlay-scene-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 414727,
+      "sourceComponents": [
+        "src/renderer/features/overlay/OverlayRoot.tsx",
+        "src/renderer/features/overlay/CaptionTrack.tsx",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ja",
+      "page": "browser-scene",
+      "theme": "dark",
+      "path": "screenshots/ja/browser-scene-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 397101,
+      "sourceComponents": [
+        "browser/extension/styles.css",
+        "browser/extension/captionPresentation.ts",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ko",
+      "page": "home",
+      "theme": "dark",
+      "path": "screenshots/ko/home-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 481683,
+      "sourceComponents": [
+        "src/renderer/features/home/HomePage.tsx",
+        "src/renderer/features/home/RecentMeetings.tsx",
+        "src/renderer/components/home/HeroSection.tsx",
+        "src/renderer/components/primitives/AppShell.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ko",
+      "page": "workspace",
+      "theme": "dark",
+      "path": "screenshots/ko/workspace-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 305457,
+      "sourceComponents": [
+        "src/renderer/features/workspace/WorkspacePage.tsx",
+        "src/renderer/components/caption/CaptionStage.tsx",
+        "src/renderer/components/notes/NotesPanel.tsx",
+        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ko",
+      "page": "models",
+      "theme": "dark",
+      "path": "screenshots/ko/models-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 395231,
+      "sourceComponents": [
+        "src/renderer/features/models/ModelsPage.tsx",
+        "src/renderer/features/models/ModelCard.tsx",
+        "src/shared/model-capabilities.ts",
+        "engine/nola_translator_engine/resources.py"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ko",
+      "page": "overlay-scene",
+      "theme": "dark",
+      "path": "screenshots/ko/overlay-scene-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 411672,
+      "sourceComponents": [
+        "src/renderer/features/overlay/OverlayRoot.tsx",
+        "src/renderer/features/overlay/CaptionTrack.tsx",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ko",
+      "page": "browser-scene",
+      "theme": "dark",
+      "path": "screenshots/ko/browser-scene-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 393174,
+      "sourceComponents": [
+        "browser/extension/styles.css",
+        "browser/extension/captionPresentation.ts",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
     }
   ],
-  "generatedAt": "2026-10-14T10:14:25.215Z"
+  "generatedAt": "2026-10-15T06:55:15.004Z"
 }

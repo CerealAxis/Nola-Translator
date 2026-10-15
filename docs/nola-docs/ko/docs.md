@@ -1,4 +1,4 @@
-# Nola Translator 문서
+# Nola Translator 도움말
 
 Nola Translator 설치부터 주요 기능, 문제가 생겼을 때의 대처 방법까지 정리했습니다.
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Button, Card, Link, Modal, Spinner, toast } from '@heroui/react'
-import { Github } from 'lucide-react'
+import { BookOpen, Github } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import type { DictionaryKey } from '@/i18n/zh-CN'
 import { useRoute } from '@/routes'
@@ -23,6 +23,7 @@ const STEPS: readonly TourStep[] = [
   { path: '#/', target: '[data-onboarding="home-quick"]', title: 'onboarding.quickTitle', body: 'onboarding.quickBody' },
   { path: '#/', target: '[data-onboarding="home-overlay"]', title: 'onboarding.overlayTitle', body: 'onboarding.overlayBody' },
   { path: '#/', target: '[data-onboarding="nav-video-captions"]', title: 'onboarding.browserTitle', body: 'onboarding.browserBody' },
+  { path: '#/settings/general', target: '[data-onboarding="network-settings"]', title: 'onboarding.networkTitle', body: 'onboarding.networkBody' },
   { path: '#/settings/compute', target: '[data-onboarding="runtime-engine"] .settings-row:nth-child(2)', title: 'onboarding.torchTitle', body: 'onboarding.torchBody' },
   { path: '#/settings/compute', target: '[data-onboarding="runtime-llama"] .settings-row:nth-child(2)', title: 'onboarding.llamaTitle', body: 'onboarding.llamaBody' },
   { path: '#/settings/audio', target: '[data-onboarding="recognition-settings"] .settings-group:nth-child(2) .settings-row', title: 'onboarding.recognitionTitle', body: 'onboarding.recognitionBody' },
@@ -77,9 +78,12 @@ function WelcomeDialog() {
             </div>
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="secondary" size="sm" onPress={() => actions.settings.stopOnboarding()}>{t('onboarding.later')}</Button>
             <Button variant="primary" size="sm" autoFocus onPress={() => actions.settings.beginOnboarding()}>{t('onboarding.begin')}</Button>
-            <Link className="onboarding-welcome__github button button--sm button--tertiary" href="https://github.com/CerealAxis/Nola-Translator" target="_blank" rel="noreferrer">
+            <Button variant="secondary" size="sm" onPress={() => actions.settings.stopOnboarding()}>{t('onboarding.later')}</Button>
+            <Link className="onboarding-welcome__link button button--sm button--secondary" href="https://nola.xaviermc.top" target="_blank" rel="noreferrer">
+              <BookOpen aria-hidden="true" />{t('onboarding.helpDocs')}
+            </Link>
+            <Link className="onboarding-welcome__link button button--sm button--secondary" href="https://github.com/CerealAxis/Nola-Translator" target="_blank" rel="noreferrer">
               <Github aria-hidden="true" />{t('onboarding.github')}
             </Link>
           </Modal.Footer>

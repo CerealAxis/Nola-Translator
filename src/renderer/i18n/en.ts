@@ -6,8 +6,8 @@ import { workspaceEn } from './workspace-ui'
 import { modelsSettingsEn } from './models-settings-ui'
 
 /**
- * 英文词典。类型来自 `zh-CN.ts`，漏 key 会在这里报错。
- * 不直译中文的啰嗦：中文那句是废话的，英文删掉或压缩。
+ * English dictionary. The type comes from `zh-CN.ts`, so missing keys are caught here.
+ * Prefer concise, natural English over literal translations of verbose Chinese copy.
  */
 
 import { browserEn } from './browser-ui'
@@ -77,7 +77,7 @@ export const en: Dictionary = {
     language: 'Interface language',
     themeLight: 'Light',
     themeDark: 'Dark',
-    themeSystem: 'Match system',
+    themeSystem: 'System',
     themeToLight: 'Switch to light',
     themeToDark: 'Switch to dark',
     helpMenu: 'Help menu',
@@ -88,10 +88,10 @@ export const en: Dictionary = {
   },
 
   language: {
-    auto: 'Auto detect',
+    auto: 'Auto-detect',
     zhCN: '简体中文',
-    zhTW: 'Traditional Chinese (Taiwan)',
-    zhHK: 'Traditional Chinese (Hong Kong)',
+    zhTW: '繁體中文（台灣）',
+    zhHK: '繁體中文（香港）',
     ko: '한국어',
     ja: '日本語',
     en: 'English',
@@ -210,7 +210,6 @@ export const en: Dictionary = {
   overlay: {
     title: 'Floating captions',
     notStarted: 'Click the microphone button below to start captioning',
-    // 译文轨道那一侧。中文界面下这里也保持英文：那一行的语义就是「译文」，写成中文会让人以为翻译失败。
     notStartedHint: 'Click the microphone button below to start captioning',
     micStart: 'Start mic',
     micStop: 'Stop mic',
@@ -243,7 +242,7 @@ export const en: Dictionary = {
     // transcript body. See `features/records/recordLogic.ts`.
     searchPlaceholder: 'Search by name or language',
     noRecords: 'No records yet',
-    noRecordsHint: 'Every finished session lands here automatically.',
+    noRecordsHint: 'Completed sessions appear here automatically.',
     startFirst: 'Start your first session',
     noResults: 'No matching records',
     noResultsHint: 'Try another keyword, or clear the search.',
@@ -298,7 +297,7 @@ export const en: Dictionary = {
     title: 'Models',
     downloadSources: {
       title: 'Choose a download source',
-      official: 'Hugging Face Official',
+      official: 'Official Hugging Face',
       officialHint: 'Download directly from the official Hugging Face site.',
       mirror: 'HF-Mirror',
       mirrorHint: 'Download through the Hugging Face mirror.',
@@ -311,8 +310,8 @@ export const en: Dictionary = {
     tabDownloads: 'Downloads',
     asrModels: 'Speech recognition',
     mtModels: 'Translation',
-    hunyuanModels: 'Translation model Hunyuan',
-    bilibiliModels: 'Translation model Index-Translate',
+    hunyuanModels: 'Hunyuan translation models',
+    bilibiliModels: 'Index-Translate models',
     otherMtModels: 'Other translation models',
     install: 'Install',
     cancel: 'Cancel download',
@@ -335,7 +334,7 @@ export const en: Dictionary = {
     filterAll: 'All',
     filterAsr: 'Recognition',
     filterMt: 'Translation',
-    filterQuant: 'Quantisation',
+    filterQuant: 'Quantization',
     details: 'Model details',
     openDetails: 'View details',
     noDescription: 'No model description available',
@@ -350,7 +349,7 @@ export const en: Dictionary = {
       indexTranslate2b: 'Q4_K_M quantization; translates 150 languages and follows terminology, formatting, and style instructions.',
       hyMt2SevenB: 'Q4_K_M quantization; translates 36 languages and follows translation instructions.',
       indexTranslate9b: 'Q4_K_M quantization; translates 150 languages and follows terminology, formatting, and style instructions.',
-      indexTranslate35b: 'Q4_K_M preview; 35B MoE with 3B active parameters, supporting 150-language translation and instructions.',
+      indexTranslate35b: 'Preview release. Q4_K_M quantization; 35B MoE with 3B active parameters, supporting translation across 150 languages and following translation instructions.',
     },
     noResults: 'No matching models',
     loadMore: 'Load more',
@@ -364,12 +363,12 @@ export const en: Dictionary = {
     queued: 'Queued',
     stateLabel: 'State',
     size: 'Size',
-    quantization: 'Quantisation',
+    quantization: 'Quantization',
     // The engine inspects a bounded number of hits, so say outright that this is not everything.
-    // The list is NOT filtered on `compatible` — un-installable repos stay on screen, so
+    // The list is NOT filtered on `compatible` — repositories this app cannot install stay visible, so
     // "{installable} of those can be installed" is exactly what explains that screen of disabled
-    // buttons. It counts the inspected entries, independent of the quantisation filter.
-    searchTruncated: 'The hub listed {candidates} candidates. {inspected} were checked, {installable} of those can be installed by this app. The rest were not judged.',
+    // buttons. It counts the inspected entries, independent of the quantization filter.
+    searchTruncated: 'The hub listed {candidates} candidates. We checked {inspected}; this app can install {installable} of them. The remaining repositories were not evaluated.',
     searchRateLimited: 'Hugging Face rate limited the search, so it stopped early and the results may be incomplete.',
     // An empty box is "browse", not "no search". The whole popular list is shown, including what
     // this app cannot install: Hugging Face's top ASR (whisper/t5/wav2vec2) and translation
@@ -386,7 +385,7 @@ export const en: Dictionary = {
     verdictCode: 'Verdict code',
     evidence: 'Evidence',
     recheck: 'Check again',
-    recheckFailed: 'No fresh verdict came back. The one on screen still stands.',
+    recheckFailed: 'Could not refresh the result. The previous result is still shown.',
     reasonCode: {
       adapterMatched: 'Matched a registered adapter',
       llamaCppTranslationModel: 'llama.cpp can load it',
@@ -398,8 +397,8 @@ export const en: Dictionary = {
       ggufFileMissing: 'The repo has no GGUF weights',
       hubNoPublishedDigest: 'The weights have no verifiable digest',
       whisperCppFormat: 'whisper.cpp specific format',
-      hubGated: 'Gated repo, not authorised',
-      hubPrivate: 'Private repo, not authorised',
+      hubGated: 'Gated repository; access required',
+      hubPrivate: 'Private repository; access required',
       repositoryInstallsDependencies: 'The repo installs its own dependencies',
       missingRequiredFiles: 'Files the loader needs are missing',
       missingWeights: 'Configuration only, no weights',
@@ -418,18 +417,18 @@ export const en: Dictionary = {
     proxyForModelDownload: 'Apply proxy to model downloads',
     proxyForRuntimeDownload: 'Apply proxy to component downloads',
     pypiMirror: 'PyPI mirror',
-    pypiMirrorHint: 'Download Python packages from a domestic mirror',
+    pypiMirrorHint: 'Download Python packages through a mirror. Recommended for users in mainland China.',
     pypiMirrorNode: 'PyPI mirror node',
     pypiAliyun: 'Alibaba Cloud',
     pypiTsinghua: 'Tsinghua University (TUNA)',
     pypiHuawei: 'Huawei Cloud',
     pypiTencent: 'Tencent Cloud',
-    huggingFaceMirror: 'Huggingface mirror',
-    huggingFaceMirrorHint: 'Download Huggingface models from a domestic mirror',
+    huggingFaceMirror: 'Hugging Face mirror',
+    huggingFaceMirrorHint: 'Download Hugging Face models through a mirror. Recommended for users in mainland China.',
     githubAccelerate: 'GitHub acceleration',
-    githubAccelerateHint: 'Routes downloads that no mirror covers through an accelerator node, mainly the PyTorch and llama.cpp installers on GitHub',
+    githubAccelerateHint: 'Routes GitHub downloads not covered by mirrors through an accelerator node, mainly PyTorch and llama.cpp installers. Recommended for users in mainland China.',
     githubAccelerateNode: 'Accelerator node',
-    githubAccelerateNodeHint: 'Auto measures every node and keeps the fastest that answers; choose a node yourself when one route is down or the automatic pick is slow on your line',
+    githubAccelerateNodeHint: 'Automatically tests each node and selects the fastest one that responds. Choose a node yourself if a route is down or the automatic choice is slow on your connection.',
     githubAccelerateAuto: 'Auto',
     theme: 'Theme',
     reduceMotion: 'Reduce motion',
@@ -478,13 +477,13 @@ export const en: Dictionary = {
     providerDisabled: 'Translation disabled',
     providerCloud: 'Cloud model',
     providerMicrosoft: 'Microsoft Translator',
-    providerMyMemory: 'MyMemory Free Translation',
-    providerIndexTranslate: 'bilibili Free API',
-    indexTranslateHint: 'Official free API with streaming translation; source text is sent to bilibili. The current preset covers the 32 languages mapped by the official client.',
+    providerMyMemory: 'MyMemory (free translation)',
+    providerIndexTranslate: 'Bilibili free API',
+    indexTranslateHint: 'Free official API with streaming translation. Source text is sent to Bilibili. The current preset covers the 32 languages supported by the official client.',
     providerRecognitionTranslation: 'Aliyun',
     providerAliyun: 'Aliyun LiveTranslate',
     providerMiniMax: 'MiniMax Speech Recognition',
-    aliyunTranslationHint: 'To enable Aliyun, first enable Aliyun speech recognition. MiniMax returns no translation of its own, so that option is unavailable while it is selected.',
+    aliyunTranslationHint: 'To enable Aliyun, first enable Aliyun speech recognition.',
     aliyunBeijing: 'North China 2 (Beijing)',
     aliyunSingapore: 'Singapore',
     aliyunWorkspace: 'Model Studio workspace ID',
@@ -517,8 +516,6 @@ export const en: Dictionary = {
     modelId: 'Model ID',
     contextWindow: 'Context window',
     maxOutputTokens: 'Max output tokens',
-    // 分组名已经是 "Layout"，行标签再说一次 "Layout" 就在同一屏里出现两个一样的词。
-    // 行标签要说清它管的是哪一段排版：原文与译文怎么分区。
     captionLayout: 'Caption layout',
     overlayPosition: 'Overlay position',
     positionFree: 'Free placement',
@@ -552,7 +549,7 @@ export const en: Dictionary = {
     protocolVersion: 'Protocol',
     copyDiagnostics: 'Copy diagnostics',
     openLogs: 'Open log folder',
-    openLogsHint: 'Each launch creates one unsplit log file; the latest 20 launches are kept. Reproduce the issue, copy diagnostics, and attach the current log. Logs omit captions, translations, prompts, and audio; they may include device names and local paths.',
+    openLogsHint: 'Each launch creates one log, and the latest 10 launches are kept. The current log stays as JSONL; older logs are compressed as GZIP files. Reproduce the issue, copy diagnostics, and attach the current log. Logs omit captions, translations, prompts, and audio; they may include device names and local paths.',
     copied: 'Copied',
     githubIssue: 'GitHub issue',
     githubIssueHint: 'Report bugs and request features here',
@@ -567,6 +564,16 @@ export const en: Dictionary = {
     diagnosticsFailed: 'Could not read diagnostics',
     diagnosticsUnavailable: 'Diagnostics are unavailable',
     diagnosticsEmpty: 'Diagnostics are empty',
+    diagnosticAppVersion: 'App version',
+    diagnosticOperatingSystem: 'Operating system',
+    diagnosticEngineStatus: 'Engine status',
+    diagnosticRestartCount: 'Engine restart count',
+    diagnosticSpeechRecognition: 'Speech recognition',
+    diagnosticLocalTranslation: 'Local translation',
+    diagnosticDataDirectory: 'Data directory',
+    diagnosticCurrentLog: 'Current launch log',
+    diagnosticNotRunning: 'Not running',
+    diagnosticLogUnavailable: 'Log unavailable',
     resetAll: 'Reset all settings',
     resetAllTitle: 'Reset all settings?',
     resetAllBody: 'Preferences are cleared. Models and records stay.',
@@ -600,11 +607,8 @@ export const en: Dictionary = {
     cloudRecognitionInvalidResponse: 'The cloud recognition service returned an unreadable response. Try again later or contact the provider.',
     // Keep the sentence self-contained; the locale layer appends its catalog code.
     engineNotReady: 'The local engine is not running, so recognition cannot start.',
-    // 预检状态不是失败：用户还没动手，所以不给错误码，也不用"yet"以外的 scary 语气。
-    // **当前没有界面在用这一条**：冷启动不再报"引擎没运行"，引擎起不来走的是上面
     // Keep this status-only copy free of a support code; no failure has happened yet.
     engineNotReadyPreflight: 'The local engine is not running, so recognition cannot start yet.',
-    // 进程没了：重连出来的是新进程，这场会回不来，出路是那条记录而不是"重试"。
     engineLost: 'The local engine stopped during the session, which ended early. Captions captured so far are saved.',
     engineLostAction: 'Open the record',
     engineNotReadyAction: 'Retry start',

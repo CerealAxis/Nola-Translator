@@ -1,9 +1,11 @@
-import { appendFileSync, lstatSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs'
+import { appendFileSync, createReadStream, createWriteStream, lstatSync, mkdirSync, readdirSync, renameSync, unlinkSync, utimesSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { pipeline } from 'node:stream/promises'
+import { createGzip } from 'node:zlib'
 import { supportErrorCodeForCause } from '../shared/error-catalog'
 
-const KEEP_LAUNCHES = 20
+const KEEP_LAUNCHES = 10
 const MAX_ENTRY_BYTES = 256 * 1024
 const secrets = new Set<string>()
 let file = ''
@@ -69,18 +71,55 @@ const PRIVATE_LOG_KEYS = new Set([
   'audiobase64', 'pcm', 'pcmdata', 'pcmbase64', 'database64',
 ])
 
-function pruneLogs(directory: string, keep: number): void {
-  const names = readdirSync(directory).filter(name => /^startup-[\dTZ-]+-[a-f\d-]+(?:-part-\d+)?\.jsonl$/.test(name))
+interface LogFile { name: string; launch: string; modified: number; regularFile: boolean; compressed: boolean }
+
+function logFiles(directory: string): LogFile[] {
+  return readdirSync(directory).filter(name => /^startup-[\dTZ-]+-[a-f\d-]+(?:-part-\d+)?\.jsonl(?:\.gz)?$/.test(name))
     .map(name => {
       const entry = lstatSync(join(directory, name))
-      return { name, launch: name.replace(/-part-\d+\.jsonl$/, '.jsonl'), modified: entry.mtimeMs,
-        regularFile: entry.isFile() && !entry.isSymbolicLink() }
+      const baseName = name.replace(/\.gz$/, '')
+      return { name, launch: baseName.replace(/-part-\d+\.jsonl$/, '.jsonl'), modified: entry.mtimeMs,
+        regularFile: entry.isFile() && !entry.isSymbolicLink(), compressed: name.endsWith('.jsonl.gz') }
     })
+}
+
+function pruneLogs(directory: string, keep: number): string[] {
+  const names = logFiles(directory)
   const launches = new Map<string, number>()
   for (const entry of names) launches.set(entry.launch, Math.max(launches.get(entry.launch) ?? 0, entry.modified))
   const retained = new Set([...launches].sort((a, b) => b[1] - a[1]).slice(0, keep).map(([launch]) => launch))
   for (const entry of names) {
     if (!retained.has(entry.launch) && entry.regularFile) unlinkSync(join(directory, entry.name))
+  }
+  return names.filter(entry => retained.has(entry.launch) && entry.regularFile && !entry.compressed)
+    .map(entry => join(directory, entry.name))
+}
+
+async function compressPreviousLogs(paths: string[]): Promise<void> {
+  for (const path of paths) {
+    const compressed = `${path}.gz`
+    const partial = `${compressed}.partial`
+    try {
+      const source = lstatSync(path)
+      if (!source.isFile() || source.isSymbolicLink()) continue
+      let existing: ReturnType<typeof lstatSync> | null = null
+      try {
+        existing = lstatSync(compressed)
+      } catch { /* The archive does not exist yet. */ }
+      if (existing) {
+        if (!existing.isFile() || existing.isSymbolicLink()) continue
+        utimesSync(compressed, source.atime, source.mtime)
+        unlinkSync(path)
+        continue
+      }
+      await pipeline(createReadStream(path), createGzip(), createWriteStream(partial, { flags: 'wx' }))
+      renameSync(partial, compressed)
+      utimesSync(compressed, source.atime, source.mtime)
+      unlinkSync(path)
+    } catch (error) {
+      try { unlinkSync(partial) } catch { /* No partial archive was created. */ }
+      logDiagnostic('session-log.compression.failed', { fileName: path.split(/[\\/]/).at(-1), error })
+    }
   }
 }
 
@@ -120,11 +159,18 @@ export function initializeSessionLog(directory: string, metadata: unknown): void
   try {
     mkdirSync(directory, { recursive: true })
     file = ''
-    pruneLogs(directory, KEEP_LAUNCHES - 1)
+    for (const name of readdirSync(directory).filter(name => /^startup-[\dTZ-]+-[a-f\d-]+(?:-part-\d+)?\.jsonl\.gz\.partial$/.test(name))) {
+      try {
+        const partial = lstatSync(join(directory, name))
+        if (partial.isFile() && !partial.isSymbolicLink()) unlinkSync(join(directory, name))
+      } catch { /* A stale partial is best-effort cleanup. */ }
+    }
+    const previousLogs = pruneLogs(directory, KEEP_LAUNCHES - 1)
     file = join(directory, `startup-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID()}.jsonl`)
     sequence = 0
     activity.clear()
     logDiagnostic('app.start', metadata)
+    void compressPreviousLogs(previousLogs)
   } catch { file = '' }
 }
 

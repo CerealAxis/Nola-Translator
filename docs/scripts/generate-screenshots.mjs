@@ -23,6 +23,7 @@ try {
   delete env.ELECTRON_RUN_AS_NODE
   const childArgs = [resolve(root, 'docs/scripts/capture-screenshots.cjs'), url]
   if (process.argv.includes('--readme')) childArgs.push('--readme')
+  if (process.argv.includes('--dark')) childArgs.push('--dark')
   const child = spawn(electron, childArgs, { cwd: root, env, stdio: 'inherit' })
   process.exitCode = await new Promise((resolveExit, reject) => {
     child.once('error', reject)

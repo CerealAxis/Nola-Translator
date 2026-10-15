@@ -4,6 +4,7 @@ import type { Root } from 'react-dom/client'
 import { Button } from '@heroui/react'
 import { ArrowLeft, ArrowRight, RotateCw, LockKeyhole, Play, Pause, Volume2, Maximize, Captions } from 'lucide-react'
 import { OverlayRoot } from '@/features/overlay'
+import { useNolaTheme } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import { stores } from '@/store'
 import { captionLines } from '../../browser/extension/captionPresentation'
@@ -13,6 +14,7 @@ export interface SceneProps { browser?: boolean }
 
 /** Original scenery surrounds the real overlay component or the extension's exact caption styles. */
 export function Scene({ browser = false }: SceneProps) {
+  useNolaTheme()
   const { t } = useI18n()
   const [playing, setPlaying] = useState(true)
   return <div className={['docs-scene', browser && 'docs-scene--browser'].filter(Boolean).join(' ')}>

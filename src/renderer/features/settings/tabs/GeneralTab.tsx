@@ -160,7 +160,7 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
   ], [t])
 
   return (
-    <SettingGroup legend={t('settings.groupNetwork')}>
+    <SettingGroup onboardingTarget="network-settings" legend={t('settings.groupNetwork')}>
       <NetworkTextRow
         label={t('settings.proxyUrl')}
         desc={t('settings.proxyUrlHint')}

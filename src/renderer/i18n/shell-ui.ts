@@ -65,7 +65,7 @@ export const shellEn: EnOf<typeof shellZh> = {
     HTTPError: 'The service returned an error',
     TimeoutError: 'The request timed out',
     translationTimeout: 'Translation timed out',
-    translationRateLimited: 'Rate limit or usage limit reached. Check your provider quota',
+    translationRateLimited: 'A rate or usage limit was reached. Check your provider’s quota.',
     resourceUnavailable: 'Translation model is not installed',
     llamaServerUnavailable: 'The local translation service is not ready',
     unsupportedLanguagePair: 'This language pair is not supported',

@@ -19,7 +19,7 @@ export const homeRecordsZh = {
   durationHours: '{hours}小时',
 }
 export const homeRecordsEn: Record<keyof typeof homeRecordsZh, string> = {
-  tagline: 'Fast, stable, and simple real-time translation and interpretation',
+  tagline: 'Live captions and translation, wherever you need them',
   speech: 'Live transcription', multilingual: 'Multilingual translation', meetings: 'Meetings & learning', live: 'Live streaming',
   quickDescription: 'Live speech recognition and translation\nTranslate across languages',
   overlayDescription: 'Real-time translated captions\nFloat above your desktop',

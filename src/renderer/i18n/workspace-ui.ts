@@ -37,17 +37,17 @@ export const workspaceZh = {
 } as const
 
 export const workspaceEn: { [K in keyof typeof workspaceZh]: string } = {
-  idleTitle: 'Start a live interpretation',
+  idleTitle: 'Start live translation',
   input: 'Audio source',
   systemAudio: 'System audio',
-  languages: 'Languages',
+  languages: 'Language pair',
   translationOff: 'Disabled',
   fontSize: 'Text size',
   openOverlay: 'Floating captions',
   noLevel: 'Audio status illustration; live audio levels are unavailable',
-  notesLocal: 'Saved with the meeting',
-  notesLocalHint: 'Notes are stored locally with this meeting and stay readable in the record afterwards',
-  notesExpand: 'Expand interpretation notes',
+  notesLocal: 'Saved with the session',
+  notesLocalHint: 'Notes are stored on this device with the session and remain available in its record.',
+  notesExpand: 'Expand session notes',
   overlayFailed: 'Could not open floating captions. Try again',
   titleFailed: 'The session started, but its name was not saved. Rename it in records',
   engineRecovering: 'The engine connection dropped. Reconnecting',

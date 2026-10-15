@@ -112,11 +112,11 @@ export function SettingsPage() {
   )
 }
 
-export interface SettingGroupProps { legend: string; actions?: ReactNode; children: ReactNode }
+export interface SettingGroupProps { legend: string; actions?: ReactNode; children: ReactNode; onboardingTarget?: string }
 
-export function SettingGroup({ legend, actions, children }: SettingGroupProps) {
+export function SettingGroup({ legend, actions, children, onboardingTarget }: SettingGroupProps) {
   return (
-    <Card className="settings-group">
+    <Card className="settings-group" data-onboarding={onboardingTarget}>
       <Card.Header><Card.Title>{legend}</Card.Title></Card.Header>
       <Card.Content><Fieldset aria-label={legend}><div className="settings-group__rows">{children}</div></Fieldset></Card.Content>
       {actions ? <Card.Footer className="flex justify-end gap-2">{actions}</Card.Footer> : null}

@@ -13,7 +13,7 @@ import type { UiLanguage } from '@/i18n'
 import { AppShell, ErrorBoundary } from '@/components/primitives'
 import { OverlayRoot } from '@/features/overlay'
 import { Routes, useRoute } from '@/routes'
-import { stores } from '@/store'
+import { stores, updateSettings } from '@/store'
 import { demoCopy, prepareDemo } from './demo'
 import { connectDemo } from './demoBridge'
 import { Scene } from './Scene'
@@ -24,7 +24,8 @@ const requestedLocale = params.get('locale') ?? 'zh-CN'
 const locale: UiLanguage = Object.hasOwn(demoCopy, requestedLocale) ? requestedLocale as UiLanguage : 'zh-CN'
 const page = params.get('page') ?? 'home'
 const snapshot = params.get('snapshot') === '1'
-const settings = prepareDemo(locale, page, snapshot)
+const requestedTheme = params.get('theme')
+const settings = prepareDemo(locale, page, snapshot, requestedTheme === 'dark' || requestedTheme === 'light' ? requestedTheme : undefined)
 if (page.endsWith('-scene')) stores.session.setState({ status: 'running', segments: stores.session.getState().segments.slice(0, 1) })
 const sampleSegments = stores.session.getState().segments
 let showOverlay: (open: boolean) => void = () => undefined
@@ -77,7 +78,12 @@ function DemoApp() {
   }, [])
   useEffect(() => {
     const receive = (event: MessageEvent) => {
-      if (event.origin !== location.origin || event.source !== parent || event.data?.type !== 'nola-demo-navigate') return
+      if (event.origin !== location.origin || event.source !== parent) return
+      if (event.data?.type === 'nola-demo-theme' && (event.data.theme === 'dark' || event.data.theme === 'light')) {
+        void updateSettings({ theme: event.data.theme })
+        return
+      }
+      if (event.data?.type !== 'nola-demo-navigate') return
       const paths: Record<string, string> = { home: '#/', workspace: '#/workspace', overlay: '#/overlay', video: '#/video-captions', models: '#/models', appearance: '#/settings/appearance' }
       if (paths[event.data.page]) navigate(paths[event.data.page])
     }

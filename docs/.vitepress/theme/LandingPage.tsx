@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { Accordion, Button, Card, Dropdown, Tabs } from '@heroui/react'
-import { ArrowDown, ArrowUpRight, ChevronDown, Globe2, Monitor, Terminal, Apple, Mic, Captions, Video, Check, Github } from 'lucide-react'
+import { ArrowDown, ArrowUpRight, ChevronDown, Globe2, Monitor, Terminal, Apple, Mic, Captions, Video, Check, Github, Moon, Sun } from 'lucide-react'
 import { copy, downloadUrl, license, localeNames, localePath, repositoryUrl } from './content'
 import type { LandingCopy, Locale } from './content'
 import { autoLocaleNames, detectSiteLocale, localizedSitePath, readLocalePreference, saveLocalePreference } from './siteLocale'
@@ -10,11 +10,11 @@ import chromeIcon from '../../../src/renderer/assets/browsers/chrome.png'
 import edgeIcon from '../../../src/renderer/assets/browsers/edge.png'
 import './landing.css'
 
-export interface LandingPageProps { locale: Locale; base: string }
-export interface DemoFrameProps { locale: Locale; base: string; text: LandingCopy['demo']; page?: string }
-export interface ProductPosterProps { locale: Locale; base: string; kind: 'workspace' | 'overlay' | 'browser' | 'models'; label: string }
+export interface LandingPageProps { locale: Locale; base: string; dark: boolean; onToggleTheme: () => void }
+export interface DemoFrameProps { locale: Locale; base: string; dark: boolean; text: LandingCopy['demo']; page?: string }
+export interface ProductPosterProps { locale: Locale; base: string; dark: boolean; kind: 'workspace' | 'overlay' | 'browser' | 'models'; label: string }
 
-export function LandingPage({ locale, base }: LandingPageProps) {
+export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPageProps) {
   const t = copy[locale]
   const site = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
@@ -28,7 +28,7 @@ export function LandingPage({ locale, base }: LandingPageProps) {
     if (path !== location.pathname) location.href = `${path}${location.search}${location.hash}`
   }
   const docUrl = `${base}${localePath(locale).slice(1)}getting-started/`
-  const image = (name: string) => `${base}screenshots/${locale}/${name}.png`
+  const image = (name: string) => `${base}screenshots/${locale}/${name}${dark ? '-dark' : ''}.png`
   useEffect(() => {
     const sync = () => setScrolled(window.scrollY > 40)
     sync()
@@ -46,12 +46,13 @@ export function LandingPage({ locale, base }: LandingPageProps) {
       <nav className="site-nav-links" aria-label={t.nav.menu}><a href="#product">{t.nav.product}</a><a href="#scenarios">{t.nav.scenarios}</a><a href="#download">{t.nav.download}</a><a href={docUrl}>{t.nav.docs}</a></nav>
       <div className="site-nav-end">
         <Dropdown>
-          <Button variant="secondary" size="sm" className="site-locale" aria-label={t.nav.language}><Globe2 aria-hidden="true" /><span>{languagePreference === 'auto' ? `${autoLocaleNames[locale]} · ${localeNames[locale]}` : localeNames[locale]}</span><ChevronDown aria-hidden="true" /></Button>
+          <Button variant="secondary" size="sm" className="site-locale" aria-label={t.nav.language}><Globe2 aria-hidden="true" /><span>{languagePreference === 'auto' ? autoLocaleNames[locale] : localeNames[locale]}</span><ChevronDown aria-hidden="true" /></Button>
           <Dropdown.Popover className="site-locale-menu z-dropdown"><Dropdown.Menu aria-label={t.nav.language} selectionMode="single" selectedKeys={new Set([languagePreference])}>
             <Dropdown.Item id="auto" textValue={autoLocaleNames[locale]} onAction={() => selectLanguage('auto')}>{autoLocaleNames[locale]}<Dropdown.ItemIndicator /></Dropdown.Item>
             {(Object.keys(localeNames) as Locale[]).map(item => <Dropdown.Item key={item} id={item} textValue={localeNames[item]} onAction={() => selectLanguage(item)}>{localeNames[item]}<Dropdown.ItemIndicator /></Dropdown.Item>)}
           </Dropdown.Menu></Dropdown.Popover>
         </Dropdown>
+        <Button isIconOnly variant="secondary" size="sm" className="site-theme" aria-label={dark ? t.nav.themeToLight : t.nav.themeToDark} onPress={onToggleTheme}>{dark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}</Button>
       </div>
     </header>
     <main id="main">
@@ -71,7 +72,7 @@ export function LandingPage({ locale, base }: LandingPageProps) {
           <p className="site-hero-lede">{t.hero.subtitle}</p>
           <DownloadButton text={t.hero.cta} menuLabel={t.nav.download} soon={t.platforms.soonLabel} />
         </div>
-        <div className="site-hero-demo"><DemoFrame locale={locale} base={base} text={t.demo} /></div>
+        <div className="site-hero-demo"><DemoFrame locale={locale} base={base} dark={dark} text={t.demo} /></div>
       </section>
 
       <section id="scenarios" className="site-scenarios site-shell site-section" data-reveal>
@@ -81,7 +82,7 @@ export function LandingPage({ locale, base }: LandingPageProps) {
           {t.scenarios.items.map((item, i) => <Tabs.Panel id={String(i)} key={i}>
             <div className="site-scenario-panel">
               <div className="site-scenario-copy"><span>{item.label}</span><h3>{item.title}</h3><p>{item.body}</p><Button variant="secondary" onPress={() => { document.getElementById('product')?.scrollIntoView({ behavior: 'smooth' }); window.dispatchEvent(new CustomEvent('nola-demo-page', { detail: ['workspace', 'overlay', 'video'][i] })) }}>{t.demo.expand}<ArrowUpRight aria-hidden="true" /></Button></div>
-              <ProductPoster locale={locale} base={base} kind={i === 0 ? 'workspace' : i === 1 ? 'overlay' : 'browser'} label={item.title} />
+              <ProductPoster locale={locale} base={base} dark={dark} kind={i === 0 ? 'workspace' : i === 1 ? 'overlay' : 'browser'} label={item.title} />
             </div>
           </Tabs.Panel>)}
         </Tabs>
@@ -90,7 +91,7 @@ export function LandingPage({ locale, base }: LandingPageProps) {
       <section className="site-features site-shell site-section">
         <div className="site-heading" data-reveal><p className="site-kicker">MADE TO FIT YOUR DAY</p><h2>{t.scenarios.title}</h2><p>{t.scenarios.intro}</p></div>
         {t.features.map((feature, i) => <article key={i} className={['site-feature', i % 2 === 1 && 'site-feature--reverse'].filter(Boolean).join(' ')} data-reveal>
-          <ProductPoster locale={locale} base={base} kind={(['workspace', 'overlay', 'browser', 'models'] as const)[i]} label={feature.title.replace('\n', '')} />
+          <ProductPoster locale={locale} base={base} dark={dark} kind={(['workspace', 'overlay', 'browser', 'models'] as const)[i]} label={feature.title.replace('\n', '')} />
           <div className="site-feature-copy"><span className="site-feature-number">0{i + 1} / NOLA TRANSLATOR</span><h3>{feature.title}</h3><p>{feature.body}</p><div className="site-tags">{feature.tags.map(tag => <span key={tag}><Check aria-hidden="true" />{tag}</span>)}</div></div>
         </article>)}
       </section>
@@ -225,11 +226,16 @@ function DownloadButton({ text, menuLabel, soon }: { text: string; menuLabel: st
   </div>
 }
 
-export function DemoFrame({ locale, base, text, page = 'home' }: DemoFrameProps) {
+export function DemoFrame({ locale, base, dark, text, page = 'home' }: DemoFrameProps) {
   const viewport = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLIFrameElement>(null)
   const [scale, setScale] = useState(.8)
   const [ready, setReady] = useState(false)
+  // Keep the iframe mounted so a site theme change preserves the current demo session and page.
+  const [initialTheme] = useState(dark ? 'dark' : 'light')
+  useEffect(() => {
+    if (ready) frame.current?.contentWindow?.postMessage({ type: 'nola-demo-theme', theme: dark ? 'dark' : 'light' }, location.origin)
+  }, [dark, ready])
   useEffect(() => {
     const observer = new ResizeObserver(entries => setScale(entries[0].contentRect.width / 1440))
     if (viewport.current) observer.observe(viewport.current)
@@ -243,17 +249,17 @@ export function DemoFrame({ locale, base, text, page = 'home' }: DemoFrameProps)
   }, [])
   return <div className="site-demo-window">
     <div ref={viewport} className="site-demo-viewport" style={{ '--demo-scale': scale } as CSSProperties}>
-      <iframe ref={frame} key={locale} src={`${base}demo/index.html?locale=${locale}&page=${page}#/`} title={`Nola Translator — ${text.hint}`} style={{ visibility: ready ? 'visible' : 'hidden' }} />
-      {!ready ? <div className="site-demo-loading"><img src={`${base}screenshots/${locale}/home.png`} alt="" /><span>{text.loading}</span></div> : null}
+      <iframe ref={frame} key={locale} src={`${base}demo/index.html?locale=${locale}&page=${page}&theme=${initialTheme}#/`} title={`Nola Translator — ${text.hint}`} style={{ visibility: ready ? 'visible' : 'hidden' }} />
+      {!ready ? <div className="site-demo-loading"><img src={`${base}screenshots/${locale}/home${dark ? '-dark' : ''}.png`} alt="" /><span>{text.loading}</span></div> : null}
     </div>
   </div>
 }
 
-export function ProductPoster({ locale, base, kind, label }: ProductPosterProps) {
+export function ProductPoster({ locale, base, dark, kind, label }: ProductPosterProps) {
   const page = kind === 'overlay' ? 'overlay-scene' : kind === 'browser' ? 'browser-scene' : kind
   return <div className={`site-poster site-poster--${kind}`} role="img" aria-label={label}>
     <div className="site-poster-orbit" aria-hidden="true" />
-    <div className="site-poster-window"><img src={`${base}screenshots/${locale}/${page}.png`} loading="lazy" alt="" /></div>
+    <div className="site-poster-window"><img src={`${base}screenshots/${locale}/${page}${dark ? '-dark' : ''}.png`} loading="lazy" alt="" /></div>
     {kind === 'workspace' ? <div className="site-poster-caption" aria-hidden="true"><span>LIVE TRANSLATION</span><Mic /><i /><span>EN</span><ArrowUpRight /><span>{locale === 'en' ? 'ZH' : locale.startsWith('zh') ? 'ZH' : locale.toUpperCase()}</span></div> : null}
     {kind === 'models' ? <div className="site-poster-chip" aria-hidden="true">llama.cpp<span>+</span>PyTorch</div> : null}
   </div>

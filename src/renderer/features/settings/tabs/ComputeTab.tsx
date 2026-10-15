@@ -1,11 +1,11 @@
 import { translationEngine } from '../../../../shared/model-engines'
-import { useCallback, useRef, useState } from 'react'
-import { Alert, Button, Spinner } from '@heroui/react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Alert, Button, Spinner, toast } from '@heroui/react'
 import { RefreshCw } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import type { ComputeDevice } from '../../../../shared/compute'
-import { deviceCandidates } from '../../../../shared/device-selection'
+import { decodeDeviceIntent, deviceCandidates, resolveDeviceIntent } from '../../../../shared/device-selection'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
 import { SettingsRow } from '../SettingsRow'
 import { SettingGroup, SettingSelect, SettingSwitch, type SettingsPanelProps } from '../SettingsPage'
@@ -20,6 +20,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
   const deviceCheck = computeError ? 'failed' : loading || !snapshot ? 'loading' : 'ready'
   const [error, setError] = useState('')
   const pendingSave = useRef<Promise<unknown>>(Promise.resolve())
+  const fallbackPending = useRef(false)
   const resources = useStore(stores.models, state => state.resources)
   const adapter = resources.find(r => r.resourceId === settings.translation.localModelId)?.provider
   const compute = settings.compute ?? DEFAULT_COMPUTE_SETTINGS
@@ -32,10 +33,43 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
       setError('')
     } catch (error) { setError(String(error)) }
   }, [])
-  function save(patch: Partial<typeof compute>) {
+  function save(patch: Partial<typeof compute>): Promise<unknown> {
     pendingSave.current = pendingSave.current.catch(() => undefined).then(() => updateSettings({ compute: patch }))
     void pendingSave.current.catch(e => setError(`${t('compute.saveError')}: ${String(e)}`))
+    return pendingSave.current
   }
+  useEffect(() => {
+    if (deviceCheck !== 'ready' || !snapshot || !runtimes || fallbackPending.current) return
+    const unavailable = (value: string, kind: 'recognition' | 'translation', engine: 'torch' | 'llama') => {
+      if (value === 'auto' || value === 'cpu') return false
+      if (decodeDeviceIntent(value)) {
+        try {
+          resolveDeviceIntent(value, runtimes.hardware, snapshot.devices, engine)
+          return false
+        } catch {
+          return true
+        }
+      }
+      return !snapshot.devices.some(device => {
+        const deviceId = engine === 'torch' ? device.torchDevice : device.llamaDevice
+        return (device.id === value || deviceId === value) &&
+          (kind === 'recognition' ? device.recognition : device.translation) && !!deviceId
+      })
+    }
+    const patch: Partial<typeof compute> = {}
+    if (unavailable(compute.recognitionDevice, 'recognition', compute.recognitionEngine === 'pytorch' ? 'torch' : 'llama')) {
+      patch.recognitionDevice = 'auto'
+    }
+    if (unavailable(compute.translationDevice, 'translation', useTorch ? 'torch' : 'llama')) {
+      patch.translationDevice = 'auto'
+    }
+    if (!Object.keys(patch).length) return
+    fallbackPending.current = true
+    void save(patch)
+      .then(() => toast.warning(t('compute.deviceFallbackNotice')))
+      .catch(() => undefined)
+      .finally(() => { fallbackPending.current = false })
+  }, [compute.recognitionDevice, compute.recognitionEngine, compute.translationDevice, deviceCheck, runtimes, snapshot, t, useTorch])
   function options(task: 'recognition' | 'translation') {
     const supports = (d: ComputeDevice) => task === 'recognition'
       ? compute.recognitionEngine === 'pytorch' ? d.recognition && !!d.torchDevice : !!d.llamaDevice

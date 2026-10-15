@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
-import { withBase } from 'vitepress'
+import { useData, withBase } from 'vitepress'
 import type { Locale } from './content'
 
 const props = defineProps<{ locale?: Locale }>()
+const { isDark } = useData()
 const host = ref<HTMLElement>()
 let root: import('react-dom/client').Root | undefined
 let render: (() => void) | undefined
@@ -16,10 +17,14 @@ onMounted(async () => {
   ])
   if (disposed || !host.value) return
   root = createRoot(host.value)
-  render = () => root?.render(createElement(LandingPage, { locale: props.locale ?? 'zh-CN', base: withBase('/') }))
+  render = () => root?.render(createElement(LandingPage, {
+    locale: props.locale ?? 'zh-CN', base: withBase('/'), dark: isDark.value,
+    onToggleTheme: () => { isDark.value = !isDark.value },
+  }))
   render()
 })
 watch(() => props.locale, () => render?.())
+watch(isDark, () => render?.())
 onBeforeUnmount(() => { disposed = true; root?.unmount() })
 </script>
 

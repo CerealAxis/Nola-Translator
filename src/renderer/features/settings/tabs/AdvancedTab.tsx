@@ -38,6 +38,25 @@ const ENGINE_STATUS_ROW: Record<EngineStatus, { label: TranslationKey; tone: Sta
   failed: { label: 'titleBar.engineFailed', tone: 'danger' },
 }
 
+const DIAGNOSTIC_LABELS: Record<string, TranslationKey> = {
+  应用版本: 'settings.diagnosticAppVersion',
+  操作系统: 'settings.diagnosticOperatingSystem',
+  引擎状态: 'settings.diagnosticEngineStatus',
+  引擎重启次数: 'settings.diagnosticRestartCount',
+  语音识别: 'settings.diagnosticSpeechRecognition',
+  本地翻译: 'settings.diagnosticLocalTranslation',
+  数据目录: 'settings.diagnosticDataDirectory',
+  本次日志: 'settings.diagnosticCurrentLog',
+}
+
+const ENGINE_STATUS_LABELS: Record<string, TranslationKey> = {
+  idle: 'titleBar.engineIdle',
+  booting: 'titleBar.engineStarting',
+  ready: 'titleBar.engineReady',
+  recovering: 'titleBar.engineRecovering',
+  failed: 'titleBar.engineFailed',
+}
+
 export function AdvancedTab(_props: SettingsPanelProps) {
   const { t } = useI18n()
   const engineVersion = useStore(stores.models, (state) => state.engineVersion)
@@ -79,10 +98,8 @@ export function AdvancedTab(_props: SettingsPanelProps) {
 /**
  * Read-only list of what `getDiagnostics()` returns.
  *
- * The keys are Chinese literals hardcoded in the main process (`app-ipc.ts`) and never go
- * through i18n, so they are shown as they arrive: translating a diagnostics key would make
- * the on-screen Chinese and the copied report disagree, and a field that does not match is
- * useless in a bug report.
+ * Main-process diagnostic keys stay stable in copied reports; the renderer localizes their
+ * labels for display without changing the underlying diagnostic payload.
  */
 function DiagnosticsReport() {
   const { t } = useI18n()
@@ -114,7 +131,15 @@ function DiagnosticsReport() {
   }
   return (
     <>
-      {rows.map(([key, value]) => <CodeRow key={key} label={key} value={value} />)}
+      {rows.map(([key, value]) => {
+        const labelKey = DIAGNOSTIC_LABELS[key]
+        const statusKey = key === '引擎状态' ? ENGINE_STATUS_LABELS[value] : undefined
+        const displayValue = statusKey ? t(statusKey)
+          : value === '未运行' ? t('settings.diagnosticNotRunning')
+            : value === '日志不可用' ? t('settings.diagnosticLogUnavailable')
+              : value
+        return <CodeRow key={key} label={labelKey ? t(labelKey) : key} value={displayValue} />
+      })}
     </>
   )
 }

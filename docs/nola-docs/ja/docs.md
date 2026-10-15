@@ -1,4 +1,4 @@
-# Nola Translator ドキュメント
+# Nola Translator ヘルプ
 
 Nola Translator のインストールから主な機能、困ったときの対処までまとめています。
 
@@ -13,7 +13,7 @@ Nola Translator のインストールから主な機能、困ったときの対�
 ## 機能紹介
 
 - [リアルタイム翻訳](features/live-translation)
-- [フローティング字幕](features/floating-captions)
+- [字幕オーバーレイ](features/floating-captions)
 - [ブラウザー字幕](features/browser-captions)
 - [システム設定](features/settings)
 
@@ -22,14 +22,14 @@ Nola Translator のインストールから主な機能、困ったときの対�
 - [問題の報告](troubleshooting/feedback)
 - [よくある質問](troubleshooting/faq)
 
-## 貢献する
+## 開発に参加する
 
 - [貢献の方法](contributing/how-to-contribute)
 - [執筆ガイドライン](contributing/writing-guidelines)
 
 ## 開発者ガイド
 
-- [開発環境構築](developers/development-setup)
+- [開発環境の構築](developers/development-setup)
 - [GPG 署名設定](developers/gpg-signing)
 - [API リファレンス](developers/api)
 
@@ -40,4 +40,4 @@ Nola Translator のインストールから主な機能、困ったときの対�
 
 ---
 
-Nola Translator の自社コードは GNU GPL v3.0 でライセンスされています。第三者コンポーネントにはそれぞれのライセンスが適用されます。
+Nola Translator のコードは GNU GPL v3.0 の下で公開されています。サードパーティ製コンポーネントには、それぞれのライセンスが適用されます。

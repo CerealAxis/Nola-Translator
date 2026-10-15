@@ -90,13 +90,13 @@ class NetworkSettings(ProtocolModel):
     startup, so a settings change applies to the next download without an engine restart.
     """
 
-    useHuggingFaceMirror: bool = True
+    useHuggingFaceMirror: bool = False
     #: pip's default index only; the PyTorch ``--extra-index-url`` is never mirrored.
-    usePypiMirror: bool = True
+    usePypiMirror: bool = False
     #: Selected pip default index; the main process consumes it when installing runtime packages.
     pypiMirrorUrl: str = "https://mirrors.aliyun.com/pypi/simple/"
     #: Whether ``githubAccelerateUrl`` is applied to GitHub asset URLs at all.
-    useGithubAccelerate: bool = True
+    useGithubAccelerate: bool = False
     #: Prefixed onto a GitHub release asset URL as ``prefix + url``; empty leaves the URL alone.
     githubAccelerateUrl: str = Field(default="", max_length=2048)
     #: Empty means no proxy, whatever the three scope switches below say.

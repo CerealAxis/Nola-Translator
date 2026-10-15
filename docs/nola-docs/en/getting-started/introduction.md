@@ -3,7 +3,7 @@
 <div align="center">
   <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/assets/brand/nola-logo.svg" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/assets/brand/nola-logo.svg" alt="Nola Translator Logo" width="112" height="112"></a>
   <h1>Nola Translator</h1>
-  <p>A real-time captioning and translation app.</p>
+  <p>Real-time captions and translation for your desktop.</p>
   <p><a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.md">English</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-CN.md">简体中文</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-TW.md">繁體中文（台灣）</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.zh-HK.md">繁體中文（香港）</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.ja.md">日本語</a> · <a href="https://github.com/CerealAxis/Nola-Translator/blob/main/README.ko.md">한국어</a></p>
 </div>
 
@@ -25,12 +25,12 @@
 
 ## Overview
 
-Nola Translator is a real-time captioning and translation app that supports both local and cloud models. Depending on your needs, you can use local computing resources for speech recognition and translation, or connect to cloud models for recognition and translation.
+Nola Translator turns speech into real-time captions and translations. Run speech recognition and translation locally, use cloud services, or combine the two.
 
 ## Features
 
 - **Local models:** Run recognition models such as Qwen3-ASR and SenseVoiceSmall, and translation models such as HY-MT2 locally. The app can also search for and install other models from Hugging Face.
-- **Cloud models:** Supports cloud ASR models from Aliyun, MiniMax, and others; supports LLM protocols such as OpenAI-compatible APIs, Anthropic, and Ollama; and supports the free MyMemory translation service.
+- **Cloud models:** Use speech recognition from Aliyun, MiniMax, and other providers; connect translation models through OpenAI-compatible, Anthropic, or Ollama APIs; or use the free MyMemory translation service.
 - **GPU acceleration:** Detects available compute devices and lets you configure separate devices for recognition and translation.
 - **Browser extension:** Includes a browser extension for Chrome and Edge that displays bilingual captions on video pages. You can also configure desktop system audio as an input source.
 - **Real-time caption overlay:** Supports system output, a selected audio device, or a microphone. Captions appear in a separate overlay, where you can adjust its position, font size, colors, opacity, and original/translated text layout.
@@ -53,7 +53,7 @@ Nola Translator is a real-time captioning and translation app that supports both
 
 Windows x64 is supported. You can choose the EXE or MSI installer. Support for other platforms is planned once development has stabilized.
 
-## Supported Recognition Languages
+## Language Support
 
 ::: tip
 The languages available for recognition and translation depend on the selected model's capabilities. The tables below show the capabilities of the recommended models included in the app. If you have a model to recommend, submit it as an issue; we will evaluate it for possible inclusion. For first-time users, we recommend **SenseVoiceSmall** for recognition and **HY-MT2 1.8B** for translation.
