@@ -543,6 +543,8 @@ export const zhTW: Dictionary = {
     "notStartedHint": "Click the microphone button below to start captioning",
     "micStart": "開始收音",
     "micStop": "停止收音",
+    "micPause": "暫停字幕",
+    "micResume": "繼續字幕",
     "micLoading": "正在準備識別引擎",
     "pin": "置頂",
     "unpin": "取消置頂",

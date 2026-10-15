@@ -39,6 +39,7 @@ export function OverlayPage() {
   const previewStyle = {
     '--preview-background-color': config.backgroundColor,
     '--preview-background-alpha': `${Math.round(config.backgroundOpacity * 100)}%`,
+    '--preview-scrim-alpha': `${Math.round(config.backgroundOpacity * 15)}%`,
     '--preview-source-color': config.sourceColor,
     '--preview-translation-color': config.translationColor,
     '--preview-font-size': `${config.fontSize}px`,

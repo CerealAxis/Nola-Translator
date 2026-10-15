@@ -19,7 +19,7 @@ from .audio.capture import AudioDeviceDisconnectedError, BrowserAudioCapture, Po
 from . import debug_log
 from .debug_log import exception_fields, write as write_debug
 from .compute import ComputeDevice, choose_devices, model_memory_mb, probe_devices, resource_failure, cpu_threads, release_failed_load
-from .audio.recorder import WavRecorder
+from .audio.recorder import Mp3Recorder
 from .hub import (
     HubRepoInfo,
     RuntimeVerdict,
@@ -233,7 +233,7 @@ class EngineRuntime:
         self.emit = emit
         self.resources = ResourceManager(model_root, emit)
         self.capture: PortAudioCapture | BrowserAudioCapture | None = None
-        self.recorder: WavRecorder | None = None
+        self.recorder: Mp3Recorder | None = None
         self.recognizer: Recognizer | None = None
         self.session_task: asyncio.Task[None] | None = None
         self.session_request_id = ""
@@ -737,10 +737,15 @@ class EngineRuntime:
                 )
             ]
 
+        recording_capture = capture if isinstance(capture, PortAudioCapture) else None
         self.recorder = self._open_recorder(
             None if command.config.browserTimeline is not None or isinstance(capture, BrowserAudioCapture)
-            else command.config.recordingPath
+            else command.config.recordingPath,
+            sample_rate=recording_capture.device.sample_rate if recording_capture is not None else 16_000,
+            channels=recording_capture.device.channels if recording_capture is not None else 1,
         )
+        if recording_capture is not None:
+            recording_capture.recording_sink = self.recorder
         self.capture = capture
         self.recognizer = recognizer
         self.session_request_id = command.requestId
@@ -968,19 +973,25 @@ class EngineRuntime:
         finally:
             write_debug('engine', 'model.load.timing', {'task': task, 'outcome': outcome, 'elapsedMs': round((monotonic() - started_at) * 1000)})
 
-    def _open_recorder(self, path: str | None) -> WavRecorder | None:
-        """Start recording the meeting audio, or stay silent when the host did not ask for one."""
+    def _open_recorder(self, path: str | None, *, sample_rate: int, channels: int) -> Mp3Recorder | None:
+        """Record compressed device-rate audio, or stay silent when the host did not ask for one."""
         if not path:
             return None
         try:
-            return WavRecorder(path)
-        except OSError:
+            return Mp3Recorder(path, sample_rate=sample_rate, channels=channels)
+        except (OSError, ImportError, ValueError) as error:
             # A full disk or a locked path must not cost the user their captions; the meeting
             # still records its transcript, just without an audio file.
+            write_debug('engine', 'audio.recording.unavailable', {
+                'path': path,
+                'sampleRate': sample_rate,
+                'channels': channels,
+                **exception_fields(error),
+            })
             return None
 
     def _close_recorder(self) -> int:
-        """Finalize the WAV header and return the recorded duration in ms (0 when never opened)."""
+        """Finalize the MP3 stream and return its recorded duration in ms (0 when never opened)."""
         recorder, self.recorder = self.recorder, None
         if recorder is None:
             return 0
@@ -1315,8 +1326,6 @@ class EngineRuntime:
                     continue
                 last_ended_at = frame.started_at_ms + 20
                 self._last_frame_end_ms = last_ended_at
-                if self.recorder is not None:
-                    self.recorder.write(frame.samples)
                 for update in await recognizer.accept(frame):
                     await self._emit_stream_update(update, session_id, generation)
             for update in await recognizer.flush(last_ended_at):

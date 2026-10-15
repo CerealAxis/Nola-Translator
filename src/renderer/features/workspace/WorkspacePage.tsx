@@ -197,7 +197,7 @@ export function WorkspacePage() {
        * The recording toggle is a global preference rather than part of this
        * session: it writes `settings.recording.keepAudio`, and the main process
        * uses that to decide whether to hand the engine a `recordingPath`. No path
-       * means no WAV at all, so toggling it also changes the default for later
+       * means no audio file at all, so toggling it also changes the default for later
        * sessions.
        */
       try {

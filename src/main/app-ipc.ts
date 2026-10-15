@@ -286,7 +286,7 @@ export function registerAppIpc(options: {
     /*
      * `audioProtocol` already ends in `://`, so only the path is appended here.
      *
-     * The shape must be `nola-audio://local/<id>/audio.wav` with `local` as the **host**; the fake
+     * The shape must be `nola-audio://local/<id>/audio.mp3` with `local` as the **host**; the fake
      * bridge in `tests/e2e/check-layout.mjs` returns the same shape and the handler matches on
      * host + pathname.
      */

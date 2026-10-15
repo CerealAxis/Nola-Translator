@@ -26,7 +26,7 @@ import { useModelOptions } from '@/model-options'
 import { useLayoutEffect, useState } from 'react'
 
 import { Button, Dropdown, Spinner } from '@heroui/react'
-import { Mic, Square } from 'lucide-react'
+import { Mic, Pause, Play } from 'lucide-react'
 
 import {
   DEFAULT_SETTINGS,
@@ -240,8 +240,8 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
         : runtimeComponent || errorCode === 'SESSION_ERROR' ? diagnostic : t(errorCopyOf(errorCode, lastIntent).message)
 
   /**
-   * The mic is the single on/off control for a session: `idle` / `error` start,
-   * `running` / `paused` stop.
+   * The mic starts an idle session; while a session is active it toggles
+   * recognition and translation between running and paused.
    *
    * Presses are ignored while `starting` / `stopping`: the engine is loading or
    * unloading weights, so another press could neither stop nor switch anything
@@ -251,13 +251,12 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
    * `missing`, and `StartFailureNotice` renders them here.
    */
   const toggleMic = (): void => {
-    if (status === 'running' || status === 'paused') {
-      setLastIntent('stop')
-      // Rearm the notice first: pressing again is a retry.
-      setDismissedFailure(null)
-      void actions.session.stopSession().catch((error: unknown) => {
-        console.warn('[overlay] stopSession failed', error)
-      })
+    if (status === 'running') {
+      actions.session.pauseSession()
+      return
+    }
+    if (status === 'paused') {
+      actions.session.resumeSession()
       return
     }
     if (status === 'idle' || status === 'error') {
@@ -272,14 +271,15 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
   /*
    * Three looks, one button, with colour left to the `[data-*]` CSS:
    *   starting → spinner (engine loading)
-   *   running  → inverted button plus stop square (recording, press to end)
+   *   running  → pause control
+   *   paused   → resume control
    *   other    → plain mic (press to start)
    */
   const starting = status === 'starting' || status === 'stopping'
   const running = status === 'running'
   const micLabel = starting
     ? t('overlay.micLoading')
-    : running || status === 'paused' ? t('overlay.micStop') : t('overlay.micStart')
+    : running ? t('overlay.micPause') : status === 'paused' ? t('overlay.micResume') : t('overlay.micStart')
 
   return (
     <>
@@ -310,7 +310,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
               data-active={running ? 'true' : 'false'}
               data-loading={starting ? 'true' : 'false'}
             >
-              {starting ? <Spinner size="sm" color="current" /> : running ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}
+              {starting ? <Spinner size="sm" color="current" /> : running ? <Pause aria-hidden="true" /> : status === 'paused' ? <Play aria-hidden="true" /> : <Mic aria-hidden="true" />}
             </Button>
 
             <Dropdown>

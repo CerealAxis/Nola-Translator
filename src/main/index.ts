@@ -29,7 +29,7 @@ import { registerRuntimeIpc, recheckRuntimeEnvironment } from './runtime-ipc'
 import { SettingsStore } from './settings-store'
 import { SecureCredentialStore } from './secure-store'
 import { createMainWindowOptions, resolvePreloadPath } from './window-options'
-import { computeOverlayBounds, createOverlayWindowOptions } from './windows'
+import { computeOverlayBounds, createOverlayWindowOptions, suppressSystemMenuOnRightClick } from './windows'
 
 let mainWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
@@ -78,7 +78,9 @@ function createOverlayWindow(theme: AppSettings['theme'], overlay: OverlaySettin
     createOverlayWindowOptions(preload, display.workArea.width, overlay, display.workArea.height),
   )
   overlayWindow = window
-  window.setAlwaysOnTop(true, 'screen-saver')
+  suppressSystemMenuOnRightClick(window)
+  window.setAlwaysOnTop(overlay.alwaysOnTop, 'screen-saver')
+  window.setFocusable(true)
   window.setBounds(computeOverlayBounds('bottom', display.workArea, window.getBounds()))
   // The lock belongs to the window that carried it, so a rebuilt one starts unlocked; the reset
   // also re-applies the window flags through `applyOverlay` instead of leaving them stale.
@@ -365,10 +367,16 @@ if (!hasSingleInstanceLock) {
           finally { componentInstalling = false }
         }
       })
-    const sessions = new SessionController({ engine, meetings, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareEnvironment(true, config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => overlayWindow?.showInactive(), hideOverlay: () => overlayWindow?.hide() })
+    const getOverlayWindow = (): BrowserWindow => {
+      if (!overlayWindow || overlayWindow.isDestroyed()) {
+        createOverlayWindow(settings.current().theme, settings.current().overlay)
+      }
+      return overlayWindow!
+    }
+    const sessions = new SessionController({ engine, meetings, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareEnvironment(true, config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => getOverlayWindow().showInactive(), hideOverlay: () => overlayWindow?.hide() })
     disposeIpc = registerEngineIpc(
       engine,
-      () => overlayWindow,
+      getOverlayWindow,
       (provider) => credentials.get(provider),
       meetings,
       () => settings.current(),
@@ -389,7 +397,7 @@ if (!hasSingleInstanceLock) {
       audioProtocol: `${MEETING_AUDIO_SCHEME}://`,
       credentials,
       engine,
-      getOverlayWindow: () => overlayWindow,
+      getOverlayWindow,
       getMainWindow: () => mainWindow,
     })
     engine.on('event', (event) => {

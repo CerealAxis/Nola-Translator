@@ -30,7 +30,7 @@ export const workspaceZh = {
    *
    * 那条小字曾经写过「当前演示不生成真实录音」，**别再写回去**：录音早就是真的了 ——
    * 主进程 `ipc.ts` 按 `recording.keepAudio` 给引擎注入 `recordingPath`，`meeting-store.ts`
-   * 结束时按 WAV 字节数算出真实的 `audioDurationMs`，记录详情页的 `AudioPlayerBar` 放的就是
+   * 结束时校验录音文件并提供可播放地址，记录详情页的 `AudioPlayerBar` 放的就是
    * 那个文件。留着「演示」两个字会让用户以为关掉也没损失，反而不去开。
    */
   recordingPreferenceFailed: '录音偏好未保存，请重新开始同传',

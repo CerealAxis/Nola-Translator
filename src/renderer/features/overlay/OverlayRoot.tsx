@@ -268,6 +268,8 @@ export function OverlayRoot() {
   const cardStyle = {
     '--overlay-background-color': palette.bg,
     '--overlay-background-alpha': `${Math.round(opacity * 100)}%`,
+    // The scrim darkens the already-composited card fill, so its strength follows that fill's opacity.
+    '--overlay-scrim-alpha': `${Math.round(opacity * 15)}%`,
     '--overlay-source-color': palette.source,
     '--overlay-translation-color': palette.target,
     '--overlay-font-size': `${config.fontSize}px`,

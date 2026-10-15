@@ -1,4 +1,4 @@
-import type { BrowserWindowConstructorOptions, Rectangle } from 'electron'
+import type { BrowserWindow, BrowserWindowConstructorOptions, Rectangle } from 'electron'
 
 import { DEFAULT_SETTINGS, type OverlaySettings } from '../shared/settings'
 
@@ -153,4 +153,15 @@ export function createOverlayWindowOptions(
       nodeIntegration: false,
     },
   }
+}
+
+/**
+ * The caption card is a `-webkit-app-region: drag` surface, which Chromium reports as
+ * the window caption, so a right-click there can open the system menu over the card.
+ * Electron exposes a cancellable event for that menu; `hookWindowMessage` only observes
+ * Windows messages and cannot suppress their default handling.
+ */
+export function suppressSystemMenuOnRightClick(window: BrowserWindow): void {
+  if (process.platform !== 'win32' && process.platform !== 'linux') return
+  window.on('system-context-menu', event => event.preventDefault())
 }

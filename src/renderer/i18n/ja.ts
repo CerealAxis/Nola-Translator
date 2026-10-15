@@ -502,6 +502,8 @@ const jaMessages: Record<DictionaryKey, string> = {
   'overlay.notStartedHint': '下のマイクボタンを押して字幕認識を開始してください',
   'overlay.micStart': 'マイクを開始',
   'overlay.micStop': 'マイクを停止',
+  'overlay.micPause': '字幕を一時停止',
+  'overlay.micResume': '字幕を再開',
   'overlay.micLoading': '音声認識エンジンを準備中',
   'overlay.pin': '最前面に固定',
   'overlay.unpin': '最前面の固定を解除',

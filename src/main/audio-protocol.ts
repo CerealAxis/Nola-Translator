@@ -8,7 +8,7 @@ import type { MeetingStore } from './meeting-store'
 
 export const MEETING_AUDIO_SCHEME = 'nola-audio'
 /**
- * URL shape is `nola-audio://local/<meetingId>/audio.wav` — `local` is the HOST, not part of
+ * URL shape is `nola-audio://local/<meetingId>/audio.mp3` — `local` is the HOST, not part of
  * the pathname. The scheme is registered `standard: true`, so the WHATWG parser splits the
  * authority by http rules and the host must be compared separately.
  *
@@ -17,7 +17,7 @@ export const MEETING_AUDIO_SCHEME = 'nola-audio'
  * meeting id actually present in the cache resolves to a file.
  */
 const MEETING_AUDIO_HOST = 'local'
-const MEETING_AUDIO_PATH = /^\/([0-9A-Za-z-]{1,64})\/audio\.wav$/
+const MEETING_AUDIO_PATH = /^\/([0-9A-Za-z-]{1,64})\/audio\.(?:mp3|wav)$/
 
 /** Extracts the meeting id from a request URL. Any unexpected shape yields null. */
 function meetingIdOf(requestUrl: string): string | null {
@@ -45,6 +45,7 @@ export function registerMeetingAudioScheme(): void {
 }
 
 function audioResponse(path: string, range: string | null): Promise<Response> {
+  const contentType = path.toLowerCase().endsWith('.mp3') ? 'audio/mpeg' : 'audio/wav'
   return stat(path).then((info) => {
     const total = info.size
     const match = range ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null
@@ -56,7 +57,7 @@ function audioResponse(path: string, range: string | null): Promise<Response> {
         return new Response(Readable.toWeb(createReadStream(path, { start, end })) as ReadableStream, {
           status: 206,
           headers: {
-            'content-type': 'audio/wav',
+            'content-type': contentType,
             'accept-ranges': 'bytes',
             'content-range': 'bytes ' + start + '-' + end + '/' + total,
             'content-length': String(end - start + 1),
@@ -67,7 +68,7 @@ function audioResponse(path: string, range: string | null): Promise<Response> {
     return new Response(Readable.toWeb(createReadStream(path)) as ReadableStream, {
       status: 200,
       headers: {
-        'content-type': 'audio/wav',
+        'content-type': contentType,
         'accept-ranges': 'bytes',
         'content-length': String(total),
       },

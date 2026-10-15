@@ -11,7 +11,7 @@ from dataclasses import dataclass, replace
 from collections import deque
 from queue import Empty, Full, Queue
 from time import monotonic
-from typing import AsyncIterator, Callable, Protocol
+from typing import AsyncIterator, Callable, Literal, Protocol
 
 import pyaudiowpatch as pyaudio
 import numpy as np
@@ -70,6 +70,11 @@ class PortAudioStream(Protocol):
     def stop_stream(self) -> None: ...
     def close(self) -> None: ...
     def is_active(self) -> bool: ...
+
+
+class RawAudioSink(Protocol):
+    def write_capture(self, data: bytes, sample_format: Literal["int16", "float32"]) -> None: ...
+    def write_silence(self, duration_ms: float) -> None: ...
 
 
 class AudioDeviceDisconnectedError(RuntimeError):
@@ -242,6 +247,7 @@ class PortAudioCapture:
         self._finishing = False
         self.request_id = request_id
         self._sample_format = pyaudio.paFloat32
+        self.recording_sink: RawAudioSink | None = None
 
     @property
     def dropped_chunks(self) -> int:
@@ -276,13 +282,14 @@ class PortAudioCapture:
             context.update(backendIndex=self.device.backend_index, sampleRate=self.device.sample_rate,
                            channels=self.device.channels, framesPerBuffer=max(1, self.device.sample_rate // 50))
             stage = "open"
-            channels = [self.device.channels]
-            if self.device.kind == "systemOutput" and self.device.channels > 2:
-                channels.append(2)
+            # MP3 has no multichannel mode. Ask WASAPI for its stereo mix instead of
+            # averaging an unlabelled surround layout and risking phase cancellation.
+            channels = [min(self.device.channels, 2)]
             # WASAPI may advertise more channels than its current shared mix accepts. PortAudio
             # also maps IAudioClient initialization failures to paInvalidDevice, so try compatible
             # PCM layouts on this same endpoint before declaring it unavailable.
-            formats = [pyaudio.paFloat32, pyaudio.paInt16] if self.device.kind == "systemOutput" else [pyaudio.paFloat32]
+            # Prefer the recorder's native PCM16 representation; some input devices only expose float32.
+            formats = [pyaudio.paInt16, pyaudio.paFloat32]
             candidates = [(count, sample_format) for sample_format in formats for count in channels]
             for attempt, (count, sample_format) in enumerate(candidates):
                 context.update(channels=count, sampleFormat="float32" if sample_format == pyaudio.paFloat32 else "int16")
@@ -381,7 +388,10 @@ class PortAudioCapture:
                         # loopback pushes nothing while nothing is playing, so pad zero frames
                         # to hand the volume gate the silence — without it segments never close,
                         # and neither the final nor its translation ever fires.
-                        for frame in self.normalizer.silence(gap):
+                        silence_frames = self.normalizer.silence(gap)
+                        if self.recording_sink is not None and not self.paused and silence_frames:
+                            self.recording_sink.write_silence(len(silence_frames) * FRAME_DURATION_MS)
+                        for frame in silence_frames:
                             yield frame
                         last_seen_ms = monotonic() * 1000
                     continue
@@ -392,6 +402,11 @@ class PortAudioCapture:
                     raise AudioDeviceDisconnectedError(self.device.device_id)
                 continue
             last_seen_ms = monotonic() * 1000
+            if self.recording_sink is not None and not self.paused:
+                sample_format: Literal["int16", "float32"] = (
+                    "int16" if self._sample_format == pyaudio.paInt16 else "float32"
+                )
+                self.recording_sink.write_capture(chunk.data, sample_format)
             samples = (self.normalizer.accept_int16(chunk.data, chunk.captured_at_ms)
                        if self._sample_format == pyaudio.paInt16 else
                        self.normalizer.accept_float32(np.frombuffer(chunk.data, dtype="<f4"), chunk.captured_at_ms))

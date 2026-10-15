@@ -214,6 +214,8 @@ export const en: Dictionary = {
     notStartedHint: 'Click the microphone button below to start captioning',
     micStart: 'Start mic',
     micStop: 'Stop mic',
+    micPause: 'Pause captions',
+    micResume: 'Resume captions',
     micLoading: 'Preparing the recognition engine',
     pin: 'Pin',
     unpin: 'Unpin',

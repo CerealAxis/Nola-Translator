@@ -123,10 +123,10 @@ html.is-overlay body {
 }
 
 /*
- * Top and bottom fade scrims. Built from the card's own background colour, so
- * when the user changes the colour or opacity the captions still fade out of
- * what they chose rather than a fixed #0d0e10. Opacity 0 at rest: with no
- * interaction the captions should read to the edge, not sit behind two grey bands.
+ * Top and bottom fade scrims darken the card fill that is already composited
+ * over the desktop. Their black tint scales with the fill opacity, so the fade
+ * starts just darker than the selected colour at its configured opacity and
+ * disappears completely when the background is fully transparent.
  */
 .nola-caption-scrim {
   position: absolute;
@@ -143,7 +143,7 @@ html.is-overlay body {
   height: 62px;
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--overlay-background-color) 92%, transparent) 30%,
+    color-mix(in srgb, black var(--overlay-scrim-alpha), transparent) 30%,
     transparent
   );
 }
@@ -153,7 +153,7 @@ html.is-overlay body {
   height: 58px;
   background: linear-gradient(
     to top,
-    color-mix(in srgb, var(--overlay-background-color) 92%, transparent) 30%,
+    color-mix(in srgb, black var(--overlay-scrim-alpha), transparent) 30%,
     transparent
   );
 }
@@ -209,6 +209,12 @@ html.is-overlay body {
   position: relative;
   height: 100%;
   overflow: hidden;
+}
+
+/* Keep transcript hit-testing available inside the otherwise draggable card. */
+.nola-caption-track:not(.pointer-events-none) .nola-caption-entry,
+.nola-caption-track-sentence {
+  -webkit-app-region: no-drag;
 }
 
 .nola-caption-track-content {
@@ -642,6 +648,13 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   transition: opacity 180ms ease, transform 180ms ease;
 }
 
+/* Toolbar labels are controls, not transcript text that should join a drag selection. */
+.nola-caption-card .nola-caption-actions,
+.nola-caption-card .nola-caption-controls {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .nola-caption-card[data-hover='true'] .nola-caption-controls,
 .nola-caption-card:hover .nola-caption-controls,
 .nola-caption-card:has(:focus-visible) .nola-caption-controls,
@@ -711,13 +724,13 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 .nola-caption-preview__scrim[data-edge='top'] {
   top: 0;
   height: 46px;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--preview-background-color, #0d0e10) 92%, transparent) 30%, transparent);
+  background: linear-gradient(to bottom, color-mix(in srgb, black var(--preview-scrim-alpha), transparent) 30%, transparent);
 }
 
 .nola-caption-preview__scrim[data-edge='bottom'] {
   bottom: 0;
   height: 40px;
-  background: linear-gradient(to top, color-mix(in srgb, var(--preview-background-color, #0d0e10) 92%, transparent) 30%, transparent);
+  background: linear-gradient(to top, color-mix(in srgb, black var(--preview-scrim-alpha), transparent) 30%, transparent);
 }
 
 /*

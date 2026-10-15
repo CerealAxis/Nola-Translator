@@ -49,6 +49,7 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
             style={{
               '--preview-background-color': overlay.backgroundColor,
               '--preview-background-alpha': `${Math.round(overlay.backgroundOpacity * 100)}%`,
+              '--preview-scrim-alpha': `${Math.round(overlay.backgroundOpacity * 15)}%`,
               '--preview-source-color': overlay.sourceColor,
               '--preview-translation-color': overlay.translationColor,
               '--preview-font-size': `${overlay.fontSize}px`,

@@ -7,11 +7,24 @@ import type { CaptionSegment, MeetingMeta } from '../shared/contracts'
 
 const META_FILE = 'meeting.json'
 const SEGMENTS_FILE = 'segments.jsonl'
-const AUDIO_FILE = 'audio.wav'
+const AUDIO_FILE = 'audio.mp3'
+const LEGACY_AUDIO_FILE = 'audio.wav'
 const MIGRATION_MARKER = 'migrated-history-v1'
 const WAV_HEADER_BYTES = 44
-/** 16 kHz mono 16-bit PCM, the format audio/recorder.py writes. */
-const WAV_BYTES_PER_SECOND = 32_000
+
+function hasMpegAudioFrame(bytes: Buffer): boolean {
+  for (let index = 0; index + 3 < bytes.length; index += 1) {
+    if (bytes[index] !== 0xff || (bytes[index + 1] & 0xe0) !== 0xe0) continue
+    const version = (bytes[index + 1] >> 3) & 0x03
+    const layer = (bytes[index + 1] >> 1) & 0x03
+    const bitrateIndex = (bytes[index + 2] >> 4) & 0x0f
+    const sampleRateIndex = (bytes[index + 2] >> 2) & 0x03
+    if (version !== 0x01 && layer !== 0 && bitrateIndex !== 0 && bitrateIndex !== 0x0f && sampleRateIndex !== 0x03) {
+      return true
+    }
+  }
+  return false
+}
 
 function timestamp(milliseconds: number, decimal: ',' | '.'): string {
   const total = Math.max(0, Math.round(milliseconds))
@@ -370,37 +383,53 @@ export class MeetingStore {
     })
   }
 
-  /** Trust the WAV header, not the file size: the engine writes zero lengths up front and patches them only on close, so a killed engine leaves a data chunk of length 0. */
+  /** Validate the encoded stream before exposing it to the media player. */
   private async resolveAudio(
     meta: MeetingMeta,
   ): Promise<{ audioFile?: string; audioDurationMs?: number }> {
-    if (meta.audioFile !== AUDIO_FILE) return { audioFile: undefined, audioDurationMs: undefined }
+    if (meta.audioFile !== AUDIO_FILE && meta.audioFile !== LEGACY_AUDIO_FILE) {
+      return { audioFile: undefined, audioDurationMs: undefined }
+    }
     const path = join(this.directory(meta.meetingId), meta.audioFile)
     try {
       const handle = await open(path, 'r')
       try {
+        const file = await handle.stat()
+        if (meta.audioFile === AUDIO_FILE) {
+          if (file.size < 4) return { audioFile: undefined, audioDurationMs: undefined }
+          const prefix = Buffer.alloc(Math.min(file.size, 64 * 1024))
+          const { bytesRead } = await handle.read(prefix, 0, prefix.length, 0)
+          const hasFrame = hasMpegAudioFrame(prefix.subarray(0, bytesRead))
+          return hasFrame
+            ? { audioFile: meta.audioFile }
+            : { audioFile: undefined, audioDurationMs: undefined }
+        }
         const header = Buffer.alloc(WAV_HEADER_BYTES)
         const { bytesRead } = await handle.read(header, 0, WAV_HEADER_BYTES, 0)
+        const channels = header.readUInt16LE(22)
+        const sampleRate = header.readUInt32LE(24)
+        const byteRate = header.readUInt32LE(28)
+        const blockAlign = header.readUInt16LE(32)
+        const bytesPerSecond = sampleRate * blockAlign
         if (bytesRead !== WAV_HEADER_BYTES
           || header.toString('ascii', 0, 4) !== 'RIFF'
           || header.toString('ascii', 8, 12) !== 'WAVE'
           || header.toString('ascii', 12, 16) !== 'fmt '
           || header.readUInt32LE(16) !== 16
           || header.readUInt16LE(20) !== 1
-          || header.readUInt16LE(22) !== 1
-          || header.readUInt32LE(24) !== 16_000
-          || header.readUInt32LE(28) !== WAV_BYTES_PER_SECOND
-          || header.readUInt16LE(32) !== 2
+          || channels < 1
+          || sampleRate < 1
+          || byteRate !== bytesPerSecond
+          || blockAlign !== channels * 2
           || header.readUInt16LE(34) !== 16
           || header.toString('ascii', 36, 40) !== 'data') {
           return { audioFile: undefined, audioDurationMs: undefined }
         }
         const dataBytes = header.readUInt32LE(40)
-        const file = await handle.stat()
-        if (dataBytes === 0 || dataBytes % 2 !== 0 || file.size < WAV_HEADER_BYTES + dataBytes) {
+        if (dataBytes === 0 || dataBytes % blockAlign !== 0 || file.size < WAV_HEADER_BYTES + dataBytes) {
           return { audioFile: undefined, audioDurationMs: undefined }
         }
-        return { audioFile: meta.audioFile, audioDurationMs: Math.round((dataBytes / WAV_BYTES_PER_SECOND) * 1000) }
+        return { audioFile: meta.audioFile, audioDurationMs: Math.round((dataBytes / bytesPerSecond) * 1000) }
       } finally {
         await handle.close()
       }

@@ -502,6 +502,8 @@ const koMessages: Record<DictionaryKey, string> = {
   'overlay.notStartedHint': '아래 마이크 버튼을 눌러 자막 인식을 시작하세요',
   'overlay.micStart': '마이크 시작',
   'overlay.micStop': '마이크 중지',
+  'overlay.micPause': '자막 일시 중지',
+  'overlay.micResume': '자막 재개',
   'overlay.micLoading': '음성 인식 엔진을 준비하는 중',
   'overlay.pin': '항상 위에 표시',
   'overlay.unpin': '항상 위에 표시 해제',

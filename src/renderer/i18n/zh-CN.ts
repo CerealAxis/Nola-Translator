@@ -224,6 +224,8 @@ export const zhCN = {
     notStartedHint: 'Click the microphone button below to start captioning',
     micStart: '开始收音',
     micStop: '停止收音',
+    micPause: '暂停字幕',
+    micResume: '继续字幕',
     micLoading: '正在准备识别引擎',
     pin: '置顶',
     unpin: '取消置顶',
