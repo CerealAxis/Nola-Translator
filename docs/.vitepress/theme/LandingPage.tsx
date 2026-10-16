@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { Accordion, Button, Card, Dropdown, Tabs } from '@heroui/react'
 import { ArrowDown, ArrowUpRight, ChevronDown, Globe2, Monitor, Terminal, Apple, Mic, Captions, Video, Check, Github, Moon, Sun } from 'lucide-react'
-import { copy, downloadUrl, license, localeNames, localePath, repositoryUrl } from './content'
+import { copy, downloadSources, downloadUrl, license, localeNames, localePath, repositoryUrl } from './content'
 import type { LandingCopy, Locale } from './content'
 import { autoLocaleNames, detectSiteLocale, localizedSitePath, readLocalePreference, saveLocalePreference } from './siteLocale'
 import type { LocalePreference } from './siteLocale'
@@ -106,13 +106,13 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
         <div className="site-download-grid">
           <DownloadCard icon={<Monitor aria-hidden="true" />} title={t.platforms.desktop} description={t.platforms.desktopBody}>
             <div className="site-download-art site-download-art--desktop"><img src={image('home')} loading="lazy" alt="" /></div>
-            <a className="site-download-link" href={downloadUrl}><WindowsIcon />Windows<ArrowDown aria-hidden="true" /></a>
+            <DownloadSourceButton label={t.nav.download} className="site-download-link"><WindowsIcon />Windows<ArrowDown aria-hidden="true" /></DownloadSourceButton>
             <Button className="site-coming" variant="secondary" isDisabled><Apple aria-hidden="true" /><span>macOS</span><small>{t.platforms.soonLabel}</small></Button>
           </DownloadCard>
           <DownloadCard icon={<Globe2 aria-hidden="true" />} title={t.platforms.browser} description={t.platforms.browserBody}>
             <div className="site-download-art site-download-art--browser"><img src={image('browser-scene')} loading="lazy" alt="" /></div>
-            <a className="site-download-link" href={downloadUrl}><img src={chromeIcon} alt="" />Chrome<ArrowDown aria-hidden="true" /></a>
-            <a className="site-download-link site-download-link--secondary" href={downloadUrl}><img src={edgeIcon} alt="" />Microsoft Edge<ArrowDown aria-hidden="true" /></a>
+            <DownloadSourceButton label={t.nav.download} className="site-download-link"><img src={chromeIcon} alt="" />Chrome<ArrowDown aria-hidden="true" /></DownloadSourceButton>
+            <DownloadSourceButton label={t.nav.download} className="site-download-link site-download-link--secondary"><img src={edgeIcon} alt="" />Microsoft Edge<ArrowDown aria-hidden="true" /></DownloadSourceButton>
           </DownloadCard>
           <DownloadCard icon={<Terminal aria-hidden="true" />} title={t.platforms.terminal} description={t.platforms.terminalBody}>
             <div className="site-download-art site-download-art--terminal" aria-hidden="true"><div><i /><i /><i /></div><p><span>❯</span> nola<span className="site-terminal-cursor">▏</span></p><small>Nola Translator</small></div>
@@ -129,7 +129,7 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
         </Accordion.Item>)}</Accordion>
       </section>
 
-      <section className="site-final" data-reveal><div className="site-final-orb" aria-hidden="true" /><p className="site-kicker">NOLA TRANSLATOR</p><h2>{t.final.title}</h2><p>{t.final.body}</p><a className="site-final-link" href={downloadUrl}><WindowsIcon />{t.final.cta}<ArrowDown aria-hidden="true" /></a></section>
+      <section className="site-final" data-reveal><div className="site-final-orb" aria-hidden="true" /><p className="site-kicker">NOLA TRANSLATOR</p><h2>{t.final.title}</h2><p>{t.final.body}</p><DownloadSourceButton label={t.nav.download} className="site-final-link"><WindowsIcon />{t.final.cta}<ArrowDown aria-hidden="true" /></DownloadSourceButton></section>
     </main>
     <footer className="site-footer site-shell"><div><a className="site-brand" href={`${base}${localePath(locale).slice(1)}`}><img src={`${base}nola-logo.svg`} alt="" />Nola Translator</a><p>{t.footer.tagline}</p></div><nav aria-label={t.nav.menu}><a href={docUrl}>{t.nav.docs}</a><a href={downloadUrl}>{t.footer.releases}</a><a href={repositoryUrl}><Github aria-hidden="true" />GitHub</a></nav><div className="site-footer-bottom"><span>{t.footer.copyright}</span><a href={`${repositoryUrl}/blob/main/LICENSE`}>{license}</a></div></footer>
   </div>
@@ -210,15 +210,44 @@ function HeroPointerTrail() {
   return <canvas ref={canvas} className="site-pointer-trail" aria-hidden="true" />
 }
 
+interface DownloadSourceButtonProps {
+  children: ReactNode
+  className: string
+  label: string
+}
+
+function DownloadSourceMenu({ label }: { label: string }) {
+  return <Dropdown.Menu aria-label={label}>
+    {downloadSources.map(source => <Dropdown.Item key={source.id} id={source.id} textValue={source.name} href={source.url} target="_blank" rel="noopener noreferrer">
+      {source.icon ? <img className="site-download-source-icon" src={`${import.meta.env.BASE_URL}${source.icon}`} alt="" /> : <Github aria-hidden="true" />}
+      <span>{source.name}</span>
+    </Dropdown.Item>)}
+  </Dropdown.Menu>
+}
+
+function DownloadSourceButton({ children, className, label }: DownloadSourceButtonProps) {
+  return <Dropdown>
+    <Button variant="secondary" className={className}>{children}</Button>
+    <Dropdown.Popover className="site-download-menu z-dropdown" placement="bottom" offset={4}>
+      <DownloadSourceMenu label={label} />
+    </Dropdown.Popover>
+  </Dropdown>
+}
+
 function DownloadButton({ text, menuLabel, soon }: { text: string; menuLabel: string; soon: string }) {
   const anchor = useRef<HTMLDivElement>(null)
   return <div className="site-download-button" ref={anchor}>
-    <a href={downloadUrl}><WindowsIcon />{text}</a>
+    <DownloadSourceButton label={menuLabel} className="site-download-primary"><WindowsIcon />{text}</DownloadSourceButton>
     <Dropdown>
       <Button isIconOnly variant="secondary" className="site-download-trigger" aria-label={menuLabel}><ChevronDown aria-hidden="true" /></Button>
       <Dropdown.Popover className="site-download-menu z-dropdown" triggerRef={anchor} placement="bottom" offset={4}>
         <Dropdown.Menu aria-label={menuLabel}>
-          <Dropdown.Item id="windows" textValue="Windows" onAction={() => { location.href = downloadUrl }}><WindowsIcon /><span>Windows</span></Dropdown.Item>
+          <Dropdown.SubmenuTrigger>
+            <Dropdown.Item id="windows" textValue="Windows"><WindowsIcon /><span>Windows</span><Dropdown.SubmenuIndicator /></Dropdown.Item>
+            <Dropdown.Popover className="site-download-menu z-dropdown" placement="right top" offset={4}>
+              <DownloadSourceMenu label={menuLabel} />
+            </Dropdown.Popover>
+          </Dropdown.SubmenuTrigger>
           <Dropdown.Item id="macos" textValue="macOS" isDisabled><Apple aria-hidden="true" /><span>macOS</span><span className="site-menu-note">{soon}</span></Dropdown.Item>
         </Dropdown.Menu>
       </Dropdown.Popover>

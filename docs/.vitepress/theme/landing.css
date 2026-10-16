@@ -108,8 +108,8 @@ html { scroll-behavior: smooth; }
 .site-hero-copy h1 span { font-weight: 680; }
 .site-hero-lede { max-width: 820px; margin: var(--space-3) auto var(--space-4) !important; font-size: var(--site-lede-size); line-height: 1.7; color: color-mix(in oklch, var(--primary-foreground) 88%, transparent); white-space: pre-line; text-wrap: balance; }
 .site-download-button { display: inline-flex; align-items: stretch; padding: 2px; border-radius: var(--radius-xl); background: var(--site-download-background); color: var(--site-download-foreground); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 65%, transparent), 0 6px 32px color-mix(in oklch, var(--accent) 24%, transparent); }
-.site-download-button > a { display: inline-flex; align-items: center; gap: var(--space-1); padding: 10px var(--space-3); font-size: var(--site-control-size); font-weight: 600; border-radius: var(--radius-xl); transition: background 180ms; }
-.site-download-button > a:hover { background: color-mix(in oklab, var(--site-download-foreground) 8%, var(--site-download-background)); }
+.site-download-button .site-download-primary { display: inline-flex; align-items: center; gap: var(--space-1); padding: 10px var(--space-3); font-size: var(--site-control-size); font-weight: 600; border-radius: var(--radius-xl); transition: background 180ms; }
+.site-download-button .site-download-primary:hover { background: color-mix(in oklab, var(--site-download-foreground) 8%, var(--site-download-background)); }
 .site-download-button .site-download-trigger { min-height: 42px; width: 42px; border-radius: 0 var(--radius-xl) var(--radius-xl) 0; color: inherit; background: transparent; border-left: 1px solid color-mix(in oklab, var(--site-download-foreground) 20%, transparent); }
 .site-hero-demo { position: relative; width: min(var(--site-demo-width), calc(100% - var(--site-gutter) * 2)); margin: var(--space-5) auto 0; }
 .site-demo-window { background: var(--background); border: 1px solid color-mix(in oklch, var(--surface) 85%, transparent); border-radius: var(--radius-2xl); overflow: hidden; box-shadow: var(--site-shadow); }
@@ -249,3 +249,8 @@ html { scroll-behavior: smooth; }
   .site-footer > nav { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .nola-site *, .nola-site *::before, .nola-site *::after { animation: none !important; transition-duration: 0ms !important; } }
+
+.site-download-button .site-download-primary { height: auto; color: inherit; background: transparent; }
+.site-download-source-icon { width: var(--space-2); height: var(--space-2); object-fit: contain; flex: 0 0 var(--space-2); }
+.site-download-menu { max-width: calc(100vw - var(--space-4)); }
+.site-download-menu [role='menuitem'] > [data-slot='submenu-indicator'] { margin-left: auto; }

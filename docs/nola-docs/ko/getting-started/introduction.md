@@ -12,7 +12,7 @@
   <a href="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml"><img src="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml/badge.svg" alt="빌드 워크플로 상태"></a>
   <a href="https://github.com/CerealAxis/Nola-Translator/actions/workflows/build.yml"><img src="https://img.shields.io/badge/Actions-Download%20Artifacts-2088FF?style=flat-square&logo=githubactions&logoColor=white" alt="GitHub Actions 아티팩트 다운로드"></a>
   <a href="https://github.com/CerealAxis/Nola-Translator/releases"><img src="https://img.shields.io/github/v/release/CerealAxis/Nola-Translator?style=flat-square&label=Release" alt="최신 GitHub 릴리스"></a>
-  <a href="https://github.com/CerealAxis/Nola-Translator/releases/latest"><img src="https://img.shields.io/badge/Releases-Download%20Latest-2DA44E?style=flat-square&logo=github&logoColor=white" alt="최신 릴리스 다운로드"></a>
+  <a href="./download-and-install"><img src="https://img.shields.io/badge/Releases-Download%20Latest-2DA44E?style=flat-square&logo=github&logoColor=white" alt="최신 릴리스 다운로드"></a>
   <img src="https://img.shields.io/badge/QQ%E7%BE%A4-701699932-12B7F5?style=flat-square&logo=tencentqq&logoColor=white" alt="QQ 그룹: 701699932">
   <img src="https://img.shields.io/badge/Electron-43-47848F?style=flat-square&logo=electron&logoColor=white" alt="Electron">
   <img src="https://img.shields.io/badge/React-19-149ECA?style=flat-square&logo=react&logoColor=white" alt="React 19">
@@ -49,7 +49,12 @@ Nola Translator는 로컬 모델과 클라우드 모델을 모두 지원하는 �
 
 ## 설치
 
-- [최신 릴리스 다운로드](https://github.com/CerealAxis/Nola-Translator/releases/latest)
+- [百度网盘](https://pan.baidu.com/s/1vq6wMwdJo_0FGo_lu6FfuA?pwd=kna2)
+- [夸克网盘](https://pan.quark.cn/s/ef1e11262087)
+- [Github](https://github.com/CerealAxis/Nola-Translator/releases/latest)
+
+> [!TIP]
+> 如果可以的话希望大家优先通过夸克/百度网盘下载，网盘会为每笔转存给我结算费用，手机转存的单价更高，这笔费用能支持我的后续开发，谢谢大家
 
 Windows x64를 지원하며 EXE 또는 MSI 설치 프로그램을 선택할 수 있습니다. 다른 플랫폼은 개발이 안정된 후 지원할 예정입니다.
 

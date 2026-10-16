@@ -32,11 +32,18 @@ Nola Translator 的配套资源有不同用途，下载时先区分：
 
 重要数据应另行备份，尤其是在覆盖旧安装或迁移数据前。对已有安装，先在存储设置确认实际数据位置，不能假定所有文件都位于程序目录内。
 
-## 三、从官方发布页下载
+## 三、下载软件
 
-1. 打开 [Nola Translator Releases](https://github.com/CerealAxis/Nola-Translator/releases/latest)。
+- [百度网盘](https://pan.baidu.com/s/1vq6wMwdJo_0FGo_lu6FfuA?pwd=kna2)
+- [夸克网盘](https://pan.quark.cn/s/ef1e11262087)
+- [Github](https://github.com/CerealAxis/Nola-Translator/releases/latest)
+
+> [!TIP]
+> 如果可以的话希望大家优先通过夸克/百度网盘下载，网盘会为每笔转存给我结算费用，手机转存的单价更高，这笔费用能支持我的后续开发，谢谢大家
+
+1. 从上方选择下载源；通过 GitHub 下载时，打开对应发布页。
 2. 阅读对应发布说明，确认版本、已知问题及安装要求。
-3. 展开发布附件，选择 Windows x64 的 EXE 或 MSI。发布流水线使用 `Nola-Translator-版本号-Windows-x64-Setup.exe`／`.msi`；本地默认构建可能使用 `Nola-Translator-版本号-Setup-x64.exe`／`.msi`，以发布说明和附件为准。
+3. 使用 GitHub 时展开发布附件，选择 Windows x64 的 EXE 或 MSI。发布流水线使用 `Nola-Translator-版本号-Windows-x64-Setup.exe`／`.msi`；本地默认构建可能使用 `Nola-Translator-版本号-Setup-x64.exe`／`.msi`，以发布说明和附件为准。
 4. 下载完成后核对文件名和来源，再启动安装程序。不要选择 `Source code` 压缩包作为安装包。
 
 如果链接没有对应发布，或附件下载不完整，应检查发布状态及网络，不要根据文件名自行拼接未知下载地址。开发测试包只在清楚其用途时使用；可能包含尚未完成验证的改动。

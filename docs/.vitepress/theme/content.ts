@@ -1,4 +1,11 @@
 export const downloadUrl = 'https://github.com/CerealAxis/Nola-Translator/releases/latest'
+// Provider icons are bundled from pan.quark.cn/favicon.ico and nd-static.bdstatic.com/m-static/wp-brand/favicon.ico.
+// Replace these official share links when release share links are available.
+export const downloadSources = [
+  { id: 'quark', name: '夸克网盘', url: 'https://pan.quark.cn/s/ef1e11262087', icon: 'quark-pan.ico' },
+  { id: 'baidu', name: '百度网盘', url: 'https://pan.baidu.com/s/1vq6wMwdJo_0FGo_lu6FfuA?pwd=kna2', icon: 'baidu-pan.ico' },
+  { id: 'github', name: 'GitHub', url: downloadUrl, icon: null },
+] as const
 export const repositoryUrl = 'https://github.com/CerealAxis/Nola-Translator'
 export const siteUrl = 'https://nola.xaviermc.top'
 export const license = 'GPL-3.0'
