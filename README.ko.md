@@ -51,6 +51,8 @@ Nola Translator는 로컬 모델과 클라우드 모델을 모두 지원하는 �
 
 Windows x64를 지원하며 EXE 또는 MSI 설치 프로그램을 선택할 수 있습니다. 다른 플랫폼은 개발이 안정된 후 지원할 예정입니다.
 
+- [온라인 문서](https://nola.xaviermc.top/ko/)
+
 ## 인식 및 번역 지원 언어
 
 > [!TIP]

@@ -3,15 +3,59 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { groupIconMdPlugin, groupIconVitePlugin } from 'vitepress-plugin-group-icons'
 import markdownItTaskCheckbox from 'markdown-it-task-checkbox'
+import markdownItGithubAlerts from 'markdown-it-github-alerts'
 import timeline from 'vitepress-markdown-timeline'
 import { withMermaid } from 'vitepress-plugin-mermaid'
 import { generateSidebar } from 'vitepress-sidebar'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { copy, docsNav, localeNames, localePath, downloadUrl, repositoryUrl, license, type Locale } from './theme/content'
+import { copy, docsNav, localeNames, localePath, downloadUrl, repositoryUrl, siteUrl, license, type Locale } from './theme/content'
 import { normalizeEmptyIsCss } from '../scripts/normalize-empty-is-css.mjs'
 
 const base = process.env.DOCS_BASE ?? '/'
+
+// Search engines and social previews need a per-page URL, which the static head array cannot provide.
+const localeSegments: Record<Locale, string> = { 'zh-CN': '', 'zh-TW': 'zh-TW', 'zh-HK': 'zh-HK', en: 'en', ja: 'ja', ko: 'ko' }
+const socialLocales: Record<Locale, string> = { 'zh-CN': 'zh_CN', 'zh-TW': 'zh_TW', 'zh-HK': 'zh_HK', en: 'en_US', ja: 'ja_JP', ko: 'ko_KR' }
+
+// Only localized pages carry a locale folder; the default locale's first segment is real content and must survive.
+const dropLocaleSegment = (relativePath: string, locale: Locale) => locale === 'zh-CN' ? relativePath : relativePath.replace(/^[^/]+\/(?=[^/])/, '')
+
+const routeFor = (locale: Locale, rest: string) => {
+  const segment = localeSegments[locale]
+  const clean = `${segment ? `${segment}/` : ''}${rest}`.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')
+  return `${base}${clean}`.replace(/\/{2,}/g, '/')
+}
+
+function transformHead({ pageData }: { pageData: { relativePath: string; title?: string; description?: string } }) {
+  const leading = pageData.relativePath.split('/')[0]
+  const locale = (Object.keys(localeSegments) as Locale[]).find(name => name !== 'zh-CN' && localeSegments[name] === leading) ?? 'zh-CN'
+  const rest = dropLocaleSegment(pageData.relativePath, locale)
+  const canonical = `${siteUrl}${routeFor(locale, rest)}`
+  const title = pageData.title ? `${pageData.title} | Nola Translator` : 'Nola Translator'
+  const description = pageData.description || copy[locale].hero.subtitle
+  const image = `${siteUrl}${base}screenshots/${locale === 'zh-CN' ? 'zh-CN' : locale}/home.png`
+
+  const tags: import('vitepress').HeadConfig[] = [
+    ['link', { rel: 'canonical', href: canonical }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:site_name', content: 'Nola Translator' }],
+    ['meta', { property: 'og:locale', content: socialLocales[locale] }],
+    ['meta', { property: 'og:title', content: title }],
+    ['meta', { property: 'og:description', content: description }],
+    ['meta', { property: 'og:url', content: canonical }],
+    ['meta', { property: 'og:image', content: image }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+    ['meta', { name: 'twitter:title', content: title }],
+    ['meta', { name: 'twitter:description', content: description }],
+    ['meta', { name: 'twitter:image', content: image }],
+  ]
+  for (const alternate of Object.keys(localeSegments) as Locale[]) {
+    tags.push(['link', { rel: 'alternate', hreflang: alternate, href: `${siteUrl}${routeFor(alternate, rest)}` }])
+  }
+  tags.push(['link', { rel: 'alternate', hreflang: 'x-default', href: `${siteUrl}${routeFor('zh-CN', rest)}` }])
+  return tags
+}
 const workspace = fileURLToPath(new URL('../..', import.meta.url))
 
 const searchTranslations = {
@@ -93,7 +137,8 @@ export default withMermaid(defineConfig({
   cleanUrls: true,
   appearance: true,
   lastUpdated: true,
-  sitemap: { hostname: 'https://nola.xaviermc.top' },
+  sitemap: { hostname: siteUrl },
+  transformHead,
   markdown: {
     lineNumbers: true,
     math: true,
@@ -102,6 +147,7 @@ export default withMermaid(defineConfig({
       md.set({ linkify: true })
       // VitePress core has no task-list rule; task-list.css styles the markup this produces.
       md.use(markdownItTaskCheckbox)
+      md.use(markdownItGithubAlerts)
       md.use(timeline)
       // Produces the .vp-code-block-title / .vp-code-group markup styled by vp-code-title.css and vp-code-group.css.
       md.use(groupIconMdPlugin)

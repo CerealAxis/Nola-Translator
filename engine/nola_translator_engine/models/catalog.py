@@ -1,8 +1,12 @@
-"""Local model catalog: pinned HuggingFace revisions with a checksum per file."""
+"""Local model catalog: independent pinned Hugging Face and ModelScope file manifests."""
 
 from __future__ import annotations
 
 from .manager import FileEntry, ModelSpec
+
+# ModelScope metadata source: https://www.modelscope.cn/api/v1/models/{repo}/repo/files
+# Each manifest below was read again with Revision=<full commit>&Recursive=true;
+# sizes and SHA-256 belong to that repository, including its non-weight files.
 
 # Official GGUF Q4_K_M artifacts, pinned from Hugging Face's blobs API.
 # Text captions do not need the separate mmproj vision weights.
@@ -13,6 +17,11 @@ INDEX_TRANSLATE_2B_Q4_K_M = ModelSpec(
     modelscope_repo="IndexTeam/Index-Translate-2B-GGUF",
     files=(FileEntry("Index-Translate-2B.Q4_K_M.gguf", 1_312_164_352,
         "044b313d29342bd3b2c77cbb64023ca0d209bd9b3247763f9d162767ef2d746a"),),
+    modelscope_revision="b92a7c7bf499a6f05da1a66fab8549da3de5b603",
+    modelscope_files=(
+        FileEntry("Index-Translate-2B.Q4_K_M.gguf", 1_312_164_352,
+            "044b313d29342bd3b2c77cbb64023ca0d209bd9b3247763f9d162767ef2d746a"),
+    ),
 )
 INDEX_TRANSLATE_9B_Q4_K_M = ModelSpec(
     model_id="index-translate-9b-q4-k-m", directory="index-translate-9b-q4-k-m",
@@ -20,6 +29,11 @@ INDEX_TRANSLATE_9B_Q4_K_M = ModelSpec(
     modelscope_repo="IndexTeam/Index-Translate-9B-GGUF",
     files=(FileEntry("Index-Translate-9B.Q4_K_M.gguf", 5_780_090_304,
         "9cc6758b0007f4cbf42ea3400768cbff91ae74ef8d640e467158348426d33713"),),
+    modelscope_revision="e97205e0e68986a643eab5ebfd75cebeb67234d0",
+    modelscope_files=(
+        FileEntry("Index-Translate-9B.Q4_K_M.gguf", 5_780_090_304,
+            "9cc6758b0007f4cbf42ea3400768cbff91ae74ef8d640e467158348426d33713"),
+    ),
 )
 INDEX_TRANSLATE_35B_A3B_Q4_K_M = ModelSpec(
     model_id="index-translate-35b-a3b-q4-k-m", directory="index-translate-35b-a3b-q4-k-m",
@@ -27,6 +41,11 @@ INDEX_TRANSLATE_35B_A3B_Q4_K_M = ModelSpec(
     modelscope_repo="IndexTeam/Index-Translate-35B-A3B-preview-GGUF",
     files=(FileEntry("Index-Translate-35B-A3B-preview.Q4_K_M.gguf", 21_713_462_400,
         "7d803928b68110b64880206f79ccd18e209d11091a21c689ca9e369687cb93f6"),),
+    modelscope_revision="91f6e204309d1808f3779d4a3822f8ce011785bb",
+    modelscope_files=(
+        FileEntry("Index-Translate-35B-A3B-preview.Q4_K_M.gguf", 21_713_462_400,
+            "7d803928b68110b64880206f79ccd18e209d11091a21c689ca9e369687cb93f6"),
+    ),
 )
 
 
@@ -83,6 +102,27 @@ QWEN3_ASR_1_7B_HF = ModelSpec(
             998,
             "945e980986de2ca7768f3326bfdbb4fbea3406f972b8ae0be233089f2b253c11",
         ),
+    ),
+    modelscope_revision="fbdf079ca130130ace97d61dde535b3bebada633",
+    modelscope_files=(
+        FileEntry(".gitattributes", 2_129,
+            "0aefab68978f25d82421f2039b23711121eb624b23fac3376f941aab386c05be"),
+        FileEntry("README.md", 16_538,
+            "427b9a6a4a32477e9df8790ef92f5cbcde790ee148ee5dd8c36f77d9556998a2"),
+        FileEntry("chat_template.jinja", 1_434,
+            "f50e6b694fbf4a683206e37869990d68333fe95d285730f084c838a34b0d98c2"),
+        FileEntry("config.json", 2_399,
+            "117ac8e63e2af7cae3665e5a632d6eb03f5f384915519ceb6403c15ec6533f63"),
+        FileEntry("generation_config.json", 165,
+            "9939fc9388b79bd70757f938b87381e817173d6a6158f5af6506c0b73e775c3c"),
+        FileEntry("model.safetensors", 4_076_193_080,
+            "2db53c7d81bd9b8cbc6a074e89be2c968a0d373fb4ee68bb1b1e14f7042dfee1"),
+        FileEntry("processor_config.json", 487,
+            "bc0b230081b44e629dd5b9045b78495615c1831b4b9f4cffe97bd37e82a6156a"),
+        FileEntry("tokenizer.json", 11_429_653,
+            "fe1fad59be22a41ee293363fcf95fdedbc7c93f3b49270b1d2e18bd1399a7a05"),
+        FileEntry("tokenizer_config.json", 998,
+            "945e980986de2ca7768f3326bfdbb4fbea3406f972b8ae0be233089f2b253c11"),
     ),
 )
 
@@ -145,6 +185,27 @@ QWEN3_ASR_0_6B_HF = ModelSpec(
         "945e980986de2ca7768f3326bfdbb4fbea3406f972b8ae0be233089f2b253c11",
     ),
     ),
+    modelscope_revision="005b749cd1566dc579fe0238316087e2fc1945c0",
+    modelscope_files=(
+        FileEntry(".gitattributes", 2_129,
+            "0aefab68978f25d82421f2039b23711121eb624b23fac3376f941aab386c05be"),
+        FileEntry("README.md", 16_538,
+            "742006d0f99ce6475b1c5e7b66e4a2f166cce836dd7ce3d7f20707252859195a"),
+        FileEntry("chat_template.jinja", 1_434,
+            "f50e6b694fbf4a683206e37869990d68333fe95d285730f084c838a34b0d98c2"),
+        FileEntry("config.json", 2_398,
+            "9eecf6f1b383e343889c2e6010e632590fa57d4bc678e151c7d6a160a0dfb04a"),
+        FileEntry("generation_config.json", 165,
+            "9939fc9388b79bd70757f938b87381e817173d6a6158f5af6506c0b73e775c3c"),
+        FileEntry("model.safetensors", 1_564_928_088,
+            "d3f212dd20abecd315d830bc54ae3865e56ebfc3276484e57b771288ba27fd35"),
+        FileEntry("processor_config.json", 487,
+            "bc0b230081b44e629dd5b9045b78495615c1831b4b9f4cffe97bd37e82a6156a"),
+        FileEntry("tokenizer.json", 11_429_653,
+            "fe1fad59be22a41ee293363fcf95fdedbc7c93f3b49270b1d2e18bd1399a7a05"),
+        FileEntry("tokenizer_config.json", 998,
+            "945e980986de2ca7768f3326bfdbb4fbea3406f972b8ae0be233089f2b253c11"),
+    ),
 )
 
 
@@ -191,6 +252,21 @@ SENSEVOICE_SMALL = ModelSpec(
             "833ca2dcfdf8ec91bd4f31cfac36d6124e0c459074d5e909aec9cabe6204a3ea",
         ),
     ),
+    modelscope_revision="7bf452403abd7353a300cd760f7adae7701c92c1",
+    modelscope_files=(
+        FileEntry("README.md", 12_091,
+            "1e9a3ad58f907aeb099a650a2f2565c64f9936820c8654016c3980b767a6407b"),
+        FileEntry("am.mvn", 11_203,
+            "29b3c740a2c0cfc6b308126d31d7f265fa2be74f3bb095cd2f143ea970896ae5"),
+        FileEntry("chn_jpn_yue_eng_ko_spectok.bpe.model", 377_341,
+            "aa87f86064c3730d799ddf7af3c04659151102cba548bce325cf06ba4da4e6a8"),
+        FileEntry("config.yaml", 1_855,
+            "f71e239ba36705564b5bf2d2ffd07eece07b8e3f2bbf6d2c99d8df856339ac19"),
+        FileEntry("configuration.json", 396,
+            "02810a7f8e9e8aee10370a265f7e799728ce25b4c00cdbf4602b303ee395a38e"),
+        FileEntry("model.pt", 936_291_369,
+            "833ca2dcfdf8ec91bd4f31cfac36d6124e0c459074d5e909aec9cabe6204a3ea"),
+    ),
 )
 
 
@@ -207,6 +283,11 @@ HYMT2_1_8B_Q4_K_M = ModelSpec(
             "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
         ),
     ),
+    modelscope_revision="e97e6af0ec0950385644d7c0a8e5c899071f722b",
+    modelscope_files=(
+        FileEntry("Hy-MT2-1.8B-Q4_K_M.gguf", 1_133_080_448,
+            "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699"),
+    ),
 )
 
 # Official 7B Q4_K_M artifact; the runtime supplies its separate official chat template.
@@ -217,6 +298,11 @@ HYMT2_7B_Q4_K_M = ModelSpec(
     modelscope_repo="Tencent-Hunyuan/Hy-MT2-7B-GGUF",
     files=(FileEntry("Hy-MT2-7B-Q4_K_M.gguf", 4_624_648_896,
         "9f96256500f3fc1ab4d64336b58f52a949a95ad7516b0c229476eef782f9f77b"),),
+    modelscope_revision="47b1dd35c1f984e23ec7b3c72e5d01620dce8f40",
+    modelscope_files=(
+        FileEntry("Hy-MT2-7B-Q4_K_M.gguf", 4_624_648_896,
+            "9f96256500f3fc1ab4d64336b58f52a949a95ad7516b0c229476eef782f9f77b"),
+    ),
 )
 
 
@@ -227,6 +313,8 @@ HYMT2_7B_Q4_K_M = ModelSpec(
 # Pro), UD-IQ2_M is the smallest but flattens them to literal meaning.
 _UNSLOTH_HYMT2_REPO = "unsloth/Hy-MT2-1.8B-GGUF"
 _UNSLOTH_HYMT2_REVISION = "0378cc2780f462f0fd397d0cdd244d2f769de40e"
+# This ModelScope Q3 conversion is not byte-identical to unsloth's HF artifact;
+# keep its independently published size and SHA-256 in the alternate manifest.
 _MODELSCOPE_HYMT2_REPO = "fss618/Hy-MT2-1.8B-GGUF"
 
 HYMT2_1_8B_Q3_K_M = ModelSpec(
@@ -241,6 +329,11 @@ HYMT2_1_8B_Q3_K_M = ModelSpec(
             951_022_560,
             "d843f052e1adb61197156f534099cf9fb58353af7cc30999a2f1f717819936b8",
         ),
+    ),
+    modelscope_revision="356e2bd51dd91bc4a84444c2121c02a26fbe2ffd",
+    modelscope_files=(
+        FileEntry("Hy-MT2-1.8B-Q3_K_M.gguf", 951_021_472,
+            "bb16d8ec1442c8470e2023d4b9af13f893df9f85dbbc93cc1ed7fc90d13f661f"),
     ),
 )
 
@@ -313,5 +406,26 @@ M2M100_418M = ModelSpec(
             3_708_092,
             "b6e77e474aeea8f441363aca7614317c06381f3eacfe10fb9856d5081d1074cc",
         ),
+    ),
+    modelscope_revision="036fa2a4b203927f7ab61219b1039b269b4a6d07",
+    modelscope_files=(
+        FileEntry(".gitattributes", 2_075,
+            "247a3cfc672484dd40bdf07af0f83ee7a4457e9a995dadb47eedc36c630103b6"),
+        FileEntry("README.md", 4_603,
+            "1fd660f130aedc5ecf1796b47ab47d43d3c4b36541f5387b7adb3df75cb5dfdb"),
+        FileEntry("config.json", 908,
+            "df0ae43e4e4b0d7e3c97b7f447857a70ef6b6a2aa1f145cedbcc730d95f67134"),
+        FileEntry("generation_config.json", 233,
+            "aed76366507333ddbb8bd49960f23c82fe6446b3319a46a54befdb45324ccf61"),
+        FileEntry("pytorch_model.bin", 1_935_796_948,
+            "d907ea45e4e4b9db163382a6674f6218b3c59566fe06d77f4055c208b4e87ed1"),
+        FileEntry("sentencepiece.bpe.model", 2_423_393,
+            "d8f7c76ed2a5e0822be39f0a4f95a55eb19c78f4593ce609e2edbc2aea4d380a"),
+        FileEntry("special_tokens_map.json", 1_140,
+            "c1a4f86c3874d279ae1b2a05162858db5dd6c61665d84223ed886cbcff08fda6"),
+        FileEntry("tokenizer_config.json", 298,
+            "a53e6aa83da0b82565ed90c3849056307a9453843322ac5b8439ec4b9497fe48"),
+        FileEntry("vocab.json", 3_708_092,
+            "b6e77e474aeea8f441363aca7614317c06381f3eacfe10fb9856d5081d1074cc"),
     ),
 )

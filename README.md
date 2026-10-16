@@ -51,6 +51,8 @@ Nola Translator turns speech into real-time captions and translations. Run speec
 
 Windows x64 is supported. You can choose the EXE or MSI installer. Support for other platforms is planned once development has stabilized.
 
+- [Online documentation](https://nola.xaviermc.top/en/)
+
 ## Language Support
 
 > [!TIP]

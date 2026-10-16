@@ -1,6 +1,7 @@
 """ModelManager download, verification, atomic swap, and cancellation (fake fetcher, no network)."""
 
 from hashlib import sha256
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -78,6 +79,76 @@ def _leftovers(models_root: Path) -> list[Path]:
     if not models_root.exists():
         return []
     return list(models_root.iterdir())
+
+
+def _modelscope_spec() -> ModelSpec:
+    spec, _ = _snapshot_spec()
+    return replace(
+        spec, modelscope_repo="test/model", modelscope_revision="a" * 40,
+        modelscope_files=(_entry("config.json", b"modelscope configuration"),
+                         _entry("model.bin", b"modelscope weights")),
+    )
+
+
+def test_modelscope_install_uses_own_manifest_and_remains_installed(tmp_path: Path) -> None:
+    spec = _modelscope_spec()
+    payloads = {
+        spec.url_for(entry, source="modelscope"): data
+        for entry, data in zip(spec.modelscope_files,
+                               (b"modelscope configuration", b"modelscope weights"))
+    }
+    manager = ModelManager(tmp_path, _fetcher(payloads))
+    progress = []
+    target = manager.ensure(spec, lambda current, total: progress.append((current, total)),
+                            source="modelscope")
+    assert (target / "config.json").read_bytes() == b"modelscope configuration"
+    assert manager.is_installed(spec)
+    assert progress[-1] == (sum(f.size for f in spec.modelscope_files),) * 2
+    # An already installed alternate snapshot must survive startup and repeated install requests.
+    assert ModelManager(tmp_path, _fetcher({})).ensure(spec) == target
+
+
+def test_modelscope_rejects_same_size_corruption_without_replacing_install(tmp_path: Path) -> None:
+    spec = _modelscope_spec()
+    original, payloads = _snapshot_spec()
+    manager = ModelManager(tmp_path, _fetcher(payloads))
+    target = manager.ensure(original)
+    # Force a reinstall while preserving the existing directory for rollback.
+    (target / "tokens.txt").unlink()
+    manager.fetcher = _fetcher({
+        spec.url_for(entry, source="modelscope"): b"x" * entry.size
+        for entry in spec.modelscope_files
+    })
+    with pytest.raises(ModelIntegrityError, match="摘要"):
+        manager.ensure(spec, source="modelscope")
+    assert (target / "config.json").read_bytes() == payloads[original.url_for(original.files[0])]
+
+
+def test_modelscope_requires_a_complete_pinned_manifest(tmp_path: Path) -> None:
+    spec, _ = _snapshot_spec()
+    for incomplete in (
+        replace(spec, modelscope_repo="test/model"),
+        replace(_modelscope_spec(), modelscope_revision="master"),
+        replace(_modelscope_spec(), modelscope_files=(FileEntry("model.bin", 3),)),
+    ):
+        with pytest.raises(ValueError, match="modelscopeSourceUnavailable"):
+            ModelManager(tmp_path, _fetcher({})).ensure(incomplete, source="modelscope")
+
+
+def test_catalog_modelscope_manifests_are_independently_pinned() -> None:
+    from nola_translator_engine.models import catalog
+
+    specs = [value for value in vars(catalog).values()
+             if isinstance(value, ModelSpec) and value.modelscope_repo]
+    assert len(specs) == 10
+    for spec in specs:
+        assert len(spec.modelscope_revision) == 40
+        assert spec.modelscope_files
+        assert {f.path for f in spec.modelscope_files} == {f.path for f in spec.files}
+        for entry in spec.modelscope_files:
+            assert entry.size > 0
+            assert entry.sha256 and len(entry.sha256) == 64
+            assert f"/resolve/{spec.modelscope_revision}/" in spec.url_for(entry, source="modelscope")
 
 
 def test_catalog_pins_pinned_values() -> None:

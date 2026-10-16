@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -319,5 +320,45 @@ def test_model_manager_uses_parallel_downloader_and_verifies_result(tmp_path: Pa
         assert manager.is_installed(spec)
         assert len([key for key in server.counts if key != (0, 0)]) == 8
         assert not (manager.model_root / ".downloads").exists()
+    finally:
+        server.close()
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_modelscope_download_resumes_with_source_specific_size_and_digest(
+    tmp_path: Path, monkeypatch, parallel: bool,
+) -> None:
+    payload = bytes(range(64))
+    server = _RangeServer(payload)
+    monkeypatch.setattr(manager_module, "MODELSCOPE_ENDPOINT", server.url.removesuffix("/model.bin"))
+    spec = ModelSpec(
+        model_id="test-model", directory="test-model", repo="hf/model", revision="hf-commit",
+        files=(_entry(b"different HF size"),), modelscope_repo="ms/model",
+        modelscope_revision="a" * 40, modelscope_files=(_entry(payload),),
+    )
+    manager = ModelManager(tmp_path / "models")
+    downloader = ResumableParallelDownloader(
+        manager.model_root, build_opener(), chunk_size=8, max_workers=4,
+        parallel_threshold=1 if parallel else 100,
+    )
+    manager._downloader_for = lambda _network: downloader
+    try:
+        # A previously cached HF download must never satisfy the alternate source.
+        hf_cache = downloader._cache_dir(spec.url_for(spec.files[0]), spec.files[0])
+        (hf_cache / "sequential.part").write_bytes(b"different HF size")
+
+        def cancel(current: int, _total: int) -> None:
+            if current >= 16:
+                raise RuntimeError("cancelled")
+
+        with pytest.raises(RuntimeError, match="cancelled"):
+            manager.ensure(spec, cancel, source="modelscope")
+        installed = manager.ensure(spec, source="modelscope")
+        assert (installed / "model.bin").read_bytes() == payload
+        assert manager.is_installed(spec)
+        assert (hf_cache / "sequential.part").read_bytes() == b"different HF size"
+        # Restart inventory must accept this size while rejecting a mixed snapshot.
+        assert ModelManager(manager.model_root).is_installed(spec)
+        assert not manager.is_installed(replace(spec, modelscope_files=()))
     finally:
         server.close()

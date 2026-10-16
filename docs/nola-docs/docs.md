@@ -1,6 +1,6 @@
 # Nola Translator 帮助文档
 
-这里存放 Nola Translator 的安装配置、功能使用与问题排查，帮助你解决使用中可能遇到的各类问题。
+这里存放 Nola Translator 的帮助文档。
 
 ## 开始入门
 
@@ -38,6 +38,16 @@
 - [用户协议](legal/user-agreement)
 - [隐私协议](legal/privacy-policy)
 
----
+## 许可协议
 
-Nola Translator 自有代码采用 GNU GPL v3.0 授权，第三方组件适用各自的许可证。
+如无特别说明，本网站中发布的所有内容均按“知识共享署名—相同方式共享 4.0 国际公共许可协议（Creative Commons
+Attribution-ShareAlike 4.0 International Public License，CC BY-SA 4.0）”进行分发。
+
+<a href="https://creativecommons.org/licenses/by-sa/4.0/deed.zh-hans" target="_blank" rel="noopener">
+    <img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-sa.svg" alt="CC BY-SA">
+</a>
+
+参考项目：
+
+- [PCL CE帮助文档](https://github.com/PCL-Community/docs.pclc.cc)
+- 许可协议: [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)

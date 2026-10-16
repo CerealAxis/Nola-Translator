@@ -1,0 +1,170 @@
+{
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "demoOnly": true,
+  "images": [
+    {
+      "locale": "zh-CN",
+      "page": "home",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/home.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 487294,
+      "sourceComponents": [
+        "src/renderer/features/home/HomePage.tsx",
+        "src/renderer/features/home/RecentMeetings.tsx",
+        "src/renderer/components/home/HeroSection.tsx",
+        "src/renderer/components/primitives/AppShell.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "workspace",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/workspace.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 297885,
+      "sourceComponents": [
+        "src/renderer/features/workspace/WorkspacePage.tsx",
+        "src/renderer/components/caption/CaptionStage.tsx",
+        "src/renderer/components/notes/NotesPanel.tsx",
+        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "session-setup",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/session-setup.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 188793,
+      "sourceComponents": [
+        "src/renderer/features/workspace/SessionSetupDialog.tsx",
+        "src/renderer/features/workspace/WorkspacePage.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "session-check",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/session-check.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 184462,
+      "sourceComponents": [
+        "src/renderer/features/workspace/PreflightDialog.tsx",
+        "src/renderer/features/workspace/WorkspacePage.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "models",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/models.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 422045,
+      "sourceComponents": [
+        "src/renderer/features/models/ModelsPage.tsx",
+        "src/renderer/features/models/ModelCard.tsx",
+        "src/shared/model-capabilities.ts",
+        "engine/nola_translator_engine/resources.py"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "download-source",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/download-source.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 402553,
+      "sourceComponents": [
+        "src/renderer/features/models/DownloadSourceDialog.tsx",
+        "src/renderer/features/models/ModelsPage.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "compute-environment",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/compute.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 223756,
+      "sourceComponents": [
+        "src/renderer/features/settings/tabs/ComputeTab.tsx",
+        "src/renderer/features/settings/SettingsPage.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "compute-components",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/compute-components.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 191483,
+      "sourceComponents": [
+        "src/renderer/features/settings/tabs/RuntimeComponents.tsx",
+        "src/renderer/features/settings/tabs/ComputeTab.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "llm-configuration",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/translation.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 221077,
+      "sourceComponents": [
+        "src/renderer/features/settings/tabs/TranslationTab.tsx",
+        "src/renderer/features/settings/SettingsPage.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "audio",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/audio.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 205278,
+      "sourceComponents": [
+        "src/renderer/features/settings/tabs/AudioTab.tsx",
+        "src/renderer/features/settings/SettingsPage.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "browser",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/browser.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 266182,
+      "sourceComponents": [
+        "src/renderer/features/settings/tabs/BrowserTab.tsx",
+        "src/renderer/features/settings/SettingsPage.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    }
+  ],
+  "generatedAt": "2026-10-15T12:14:34.744Z"
+}

@@ -3,9 +3,7 @@ import type { Theme } from 'vitepress'
 import Landing from './Landing.vue'
 import DocLayout from './DocLayout.vue'
 import Linkcard from './Linkcard.vue'
-import mediumZoom from 'medium-zoom'
 import { NProgress } from 'nprogress-v2'
-import { nextTick } from 'vue'
 import 'nprogress-v2/dist/index.css'
 import 'vitepress-markdown-timeline/dist/theme/index.css'
 import { localePath } from './content'
@@ -22,16 +20,8 @@ export default {
     app.component('Linkcard', Linkcard)
     if (typeof window === 'undefined') return
     const base = siteData.value.base
-    const zoom = mediumZoom({ background: 'var(--vp-c-bg)', margin: 24 })
-    const refreshDocument = async () => {
-      await nextTick()
-      zoom.detach()
-      zoom.attach('.vp-doc img:not([src*="shields.io"]):not([src$="badge.svg"]):not(.linkcard img)')
-      NProgress.done()
-    }
     NProgress.configure({ showSpinner: false })
-    router.onAfterRouteChanged = refreshDocument
-    void refreshDocument()
+    router.onAfterRouteChanged = () => { NProgress.done() }
     const preference = readLocalePreference()
     const locale = preference === 'auto' ? detectSiteLocale(navigator.languages.length ? navigator.languages : [navigator.language]) : preference
     const target = localizedSitePath(location.pathname, locale, base)

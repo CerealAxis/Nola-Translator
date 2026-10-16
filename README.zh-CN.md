@@ -51,6 +51,8 @@ Nola Translator 是一款实时字幕与翻译软件，支持本地模型和云�
 
 支持 Windows x64，可选择 EXE 或 MSI 安装程序；其他平台会在软件开发稳定后提供支持。
 
+- [在线文档](https://nola.xaviermc.top/)
+
 ## 支持识别的语言
 
 > [!TIP]

@@ -110,7 +110,21 @@ class ModelSpec:
     revision: str
     files: tuple[FileEntry, ...]
     modelscope_repo: str | None = None
-    modelscope_revision: str = "master"
+    modelscope_revision: str = ""
+    modelscope_files: tuple[FileEntry, ...] = ()
+
+    def files_for(self, source: str | None = None) -> tuple[FileEntry, ...]:
+        if source != "modelscope":
+            return self.files
+        # ModelScope is a separate repository, not a byte-identical HF mirror. Never
+        # substitute HF metadata or a moving branch when its own manifest is missing.
+        if (not self.modelscope_repo or not re.fullmatch(r"[0-9a-f]{40}", self.modelscope_revision)
+                or not self.modelscope_files or any(
+                    not entry.sha256 or not re.fullmatch(r"[0-9a-f]{64}", entry.sha256)
+                    for entry in self.modelscope_files
+                )):
+            raise ValueError("modelscopeSourceUnavailable")
+        return self.modelscope_files
 
     @property
     def total_bytes(self) -> int:
@@ -121,8 +135,7 @@ class ModelSpec:
         source: str | None = None,
     ) -> str:
         if source == "modelscope":
-            if self.modelscope_repo is None:
-                raise ValueError("modelscopeSourceUnavailable")
+            self.files_for(source)
             return f"{MODELSCOPE_ENDPOINT}/{self.modelscope_repo}/resolve/{self.modelscope_revision}/{entry.path}"
         if source == "huggingface":
             endpoint = HF_ENDPOINT
@@ -528,11 +541,16 @@ class ModelManager:
 
     def is_installed(self, spec: ModelSpec) -> bool:
         target = self.model_path(spec)
-        return target.is_dir() and all(
+        # Startup has no download-source preference. Accept a complete snapshot from
+        # either pinned catalog, but never a mixture of files from different sources.
+        manifests = [spec.files]
+        if spec.modelscope_files:
+            manifests.append(spec.files_for("modelscope"))
+        return target.is_dir() and any(all(
             (target / entry.path).is_file()
             and (target / entry.path).stat().st_size == entry.size
-            for entry in spec.files
-        )
+            for entry in entries
+        ) for entries in manifests)
 
     def ensure(
         self,
@@ -548,6 +566,7 @@ class ModelManager:
         temporary install directory is removed, while completed download ranges remain resumable.
         Phases run in order: download → verify → install.
         """
+        files = spec.files_for(source)
         if self.is_installed(spec):
             return self.model_path(spec)
 
@@ -566,13 +585,13 @@ class ModelManager:
             raise ModelStorageError(
                 f"无法在模型目录 {self.model_root} 下创建临时目录：{error}"
             ) from error
-        total = spec.total_bytes
+        total = sum(entry.size for entry in files)
         done = 0
         try:
             phase("download")
             fetcher = self.fetcher
             downloader = None if fetcher is not None else self._downloader_for(network)
-            for entry in spec.files:
+            for entry in files:
                 part = temp / f".{entry.path}.part"
                 part.parent.mkdir(parents=True, exist_ok=True)
                 # cancellation checkpoint between files, so a fetcher that never reports per chunk still gets noticed
@@ -591,9 +610,9 @@ class ModelManager:
                 done += entry.size
 
             phase("verify")
-            for entry in spec.files:
+            for entry in files:
                 part = temp / f".{entry.path}.part"
-                self._verify_file(part, entry, lambda: progress(done, total), verify_digest=source != "modelscope")
+                self._verify_file(part, entry, lambda: progress(done, total))
                 os.replace(part, temp / entry.path)
 
             phase("install")
@@ -624,16 +643,11 @@ class ModelManager:
     @staticmethod
     def _verify_file(
         path: Path, entry: FileEntry, checkpoint: Callable[[], None] = lambda: None,
-        *, verify_digest: bool = True,
     ) -> None:
         if not path.is_file():
             raise ModelIntegrityError("模型文件缺失")
         if path.stat().st_size != entry.size:
             raise ModelIntegrityError("模型文件大小不匹配")
-        # ModelScope is an explicitly selected alternate source; those repository copies may not
-        # publish the same Hugging Face digest, so that path retains the size check only.
-        if not verify_digest:
-            return
         if entry.sha256:
             expected, actual = entry.sha256.casefold(), _file_sha256(path, checkpoint)
         elif entry.blob_sha1:

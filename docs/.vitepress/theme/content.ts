@@ -1,5 +1,6 @@
 export const downloadUrl = 'https://github.com/CerealAxis/Nola-Translator/releases/latest'
 export const repositoryUrl = 'https://github.com/CerealAxis/Nola-Translator'
+export const siteUrl = 'https://nola.xaviermc.top'
 export const license = 'GPL-3.0'
 export const localeNames = { 'zh-CN': '简体中文', 'zh-TW': '繁體中文（台灣）', 'zh-HK': '繁體中文（香港）', en: 'English', ja: '日本語', ko: '한국어' }
 export type Locale = keyof typeof localeNames

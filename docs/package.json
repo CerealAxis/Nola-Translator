@@ -13,6 +13,7 @@
   "devDependencies": {
     "@giscus/vue": "^3.1.1",
     "busuanzi.pure.js": "^1.0.3",
+    "markdown-it-github-alerts": "^1.0.1",
     "markdown-it-mathjax3": "^4.3.2",
     "markdown-it-task-checkbox": "^1.0.6",
     "medium-zoom": "^1.1.0",

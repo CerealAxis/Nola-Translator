@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import DefaultTheme from 'vitepress/theme'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useData } from 'vitepress'
 import Giscus from '@giscus/vue'
 import { copy } from './content'
@@ -14,6 +14,16 @@ const pageViewsLabel = computed(() => ({
   en: 'Page views', ja: 'ページビュー', ko: '페이지 조회수',
 } satisfies Record<Locale, string>)[lang.value as Locale])
 const showPageViews = ref(false)
+let zoom: ReturnType<typeof import('medium-zoom').default> | undefined
+const refreshImageZoom = async () => {
+  await nextTick()
+  const { default: mediumZoom } = await import('medium-zoom')
+  zoom ??= mediumZoom({ background: 'var(--vp-c-bg)', margin: 24 })
+  zoom.detach()
+  zoom.attach('.vp-doc img:not([src*="shields.io"]):not([src$="badge.svg"]):not(.linkcard img)')
+}
+onMounted(() => { void refreshImageZoom() })
+watch(() => page.value.relativePath, () => { void refreshImageZoom() }, { flush: 'post' })
 onMounted(() => {
   showPageViews.value = location.hostname === 'nola.xaviermc.top'
   if (showPageViews.value && page.value.relativePath !== 'index.md') void import('busuanzi.pure.js')

@@ -1,0 +1,37 @@
+/* GitHub-style blockquotes are parsed by markdown-it-github-alerts. */
+.vp-doc .markdown-alert {
+  margin: 16px 0;
+  padding: 16px 20px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--vp-c-text-1);
+}
+
+.vp-doc .markdown-alert > :last-child {
+  margin-bottom: 0;
+}
+
+.vp-doc .markdown-alert-title {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.vp-doc .markdown-alert-note {
+  background: var(--custom-block-note-bg);
+}
+
+.vp-doc .markdown-alert-tip {
+  background: var(--custom-block-tip-bg);
+}
+
+.vp-doc .markdown-alert-important {
+  background: var(--custom-block-important-bg);
+}
+
+.vp-doc .markdown-alert-warning {
+  background: var(--custom-block-warning-bg);
+}
+
+.vp-doc .markdown-alert-caution {
+  background: var(--custom-block-caution-bg);
+}

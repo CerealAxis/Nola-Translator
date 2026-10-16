@@ -24,6 +24,7 @@ try {
   const childArgs = [resolve(root, 'docs/scripts/capture-screenshots.cjs'), url]
   if (process.argv.includes('--readme')) childArgs.push('--readme')
   if (process.argv.includes('--dark')) childArgs.push('--dark')
+  if (process.argv.includes('--guide')) childArgs.push('--guide')
   const child = spawn(electron, childArgs, { cwd: root, env, stdio: 'inherit' })
   process.exitCode = await new Promise((resolveExit, reject) => {
     child.once('error', reject)

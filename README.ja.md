@@ -51,6 +51,8 @@ Nola Translator は、ローカルモデルとクラウドモデルを使える�
 
 対応 OS は Windows x64 です。EXE または MSI インストーラーを選べます。ほかのプラットフォームにも今後対応する予定です。
 
+- [ヘルプドキュメント](https://nola.xaviermc.top/ja/)
+
 ## 対応する認識言語
 
 > [!TIP]
