@@ -9,6 +9,7 @@ import { modelsStore } from './modelStore'
 
 import type { NolaBridge } from '@/bridge'
 import type { AppSettings, AppSettingsPatch, AppUpdateCheckResult, ModelStorageInfo, PrewarmErrorCode, PrewarmResult } from '@/bridge'
+import type { OverlayMenuRequest, OverlayMenuPresentation } from '../../shared/overlay-menu'
 import type { BrowserConnectionAction, BrowserConnectionStatus, BrowserKind } from '../../shared/browser'
 import { createStore, createWriteQueue } from './createStore'
 import type { ComputeSnapshot, RuntimeSnapshot } from '../../shared/compute'
@@ -21,6 +22,8 @@ import type { ComputeSnapshot, RuntimeSnapshot } from '../../shared/compute'
 export type CaptionServiceState = 'idle' | 'loading' | 'ready' | 'failed'
 
 export interface SettingsState {
+  overlayMenuOpen: boolean
+  overlayMenu: OverlayMenuPresentation | null
   onboardingActive: boolean
   onboardingWelcome: boolean
   onboardingRun: number
@@ -55,6 +58,8 @@ export interface SettingsState {
 }
 
 const initialState: SettingsState = {
+  overlayMenuOpen: false,
+  overlayMenu: null,
   onboardingActive: false,
   onboardingWelcome: false,
   onboardingRun: 0,
@@ -244,8 +249,34 @@ const DEBOUNCED_PATHS: ReadonlySet<string> = new Set([
 ])
 
 let bridge: NolaBridge | null = null
+let overlayMenuRequest = 0
+
+/** Resolve after dismissal so the caption keeps its controls visible while the native menu owns focus. */
+export async function openOverlayMenu(request: Omit<OverlayMenuRequest, 'settings' | 'resources'>): Promise<boolean> {
+  const owner = bridge
+  if (!owner?.overlay.openMenu) return false
+  const settings = settingsStore.getState().settings
+  if (!settings) return true
+  const version = ++overlayMenuRequest
+  settingsStore.setState({ overlayMenuOpen: true })
+  try {
+    await owner.overlay.openMenu({ ...request, settings, resources: modelsStore.getState().resources })
+    return true
+  } finally {
+    if (bridge === owner && version === overlayMenuRequest) settingsStore.setState({ overlayMenuOpen: false })
+  }
+}
+
+export async function presentOverlayMenu(id: number): Promise<void> {
+  await bridge?.overlay.presentMenu?.(id)
+}
+
+export async function closeOverlayMenu(id: number): Promise<void> {
+  await bridge?.overlay.closeMenu?.(id)
+}
 let appUpdateCheck: Promise<AppUpdateCheckResult | null> | null = null
 let unsubscribe: (() => void) | null = null
+let unsubscribeOverlayMenu: (() => void) | null = null
 let unsubscribeCaptionService: (() => void) | null = null
 
 /** The last full snapshot the engine confirmed. The rollback baseline. */
@@ -632,6 +663,15 @@ export function attachSettingsStore(next: NolaBridge, watchComputeChanges = true
     confirmed = settings
     publish(confirmed)
   })
+  unsubscribeOverlayMenu?.()
+  unsubscribeOverlayMenu = next.events.onOverlayMenuChanged?.(menu => {
+    if (menu) {
+      confirmed = menu.settings
+      publish(confirmed)
+      modelsStore.setState({ resources: menu.resources, loaded: true, loading: false })
+      settingsStore.setState({ overlayMenu: menu, loaded: true, loading: false })
+    } else settingsStore.setState({ overlayMenu: null })
+  }) ?? null
   unsubscribeCaptionService?.()
   unsubscribeCaptionService = next.events.onEngineEvent((event) => {
     if (event.type === 'computeDevices') {
@@ -672,11 +712,14 @@ export async function openLogs(): Promise<void> {
 }
 
 export function detachSettingsStore(): void {
+  overlayMenuRequest++
   cancelAudioTest()
   unsubscribe?.()
   unsubscribe = null
   unsubscribeCaptionService?.()
   unsubscribeCaptionService = null
+  unsubscribeOverlayMenu?.()
+  unsubscribeOverlayMenu = null
   bridge = null
   appUpdateCheck = null
   computeRefresh = null

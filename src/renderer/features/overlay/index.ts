@@ -4,6 +4,9 @@ export { CaptionTrack } from './CaptionTrack'
 export type { TrackLine } from './CaptionTrack'
 export { OverlayControls } from './OverlayControls'
 export type { OverlayControlsProps } from './OverlayControls'
+export { OverlayMenuRoot } from './OverlayMenuRoot'
+export { OverlayDropdown } from './OverlayDropdown'
+export type { OverlayDropdownProps } from './OverlayDropdown'
 // Two orthogonal dimensions: what is shown (which columns) and how it is
 // arranged.
 export { OverlayDisplayMenu, OverlayLayoutMenu } from './OverlayDisplayMenu'

@@ -30,6 +30,7 @@ import { SettingsStore } from './settings-store'
 import { SecureCredentialStore } from './secure-store'
 import { createMainWindowOptions, resolvePreloadPath } from './window-options'
 import { computeOverlayBounds, createOverlayWindowOptions, suppressSystemMenuOnRightClick } from './windows'
+import { prepareOverlayMenu } from './overlay-menu'
 
 let mainWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
@@ -78,6 +79,9 @@ function createOverlayWindow(theme: AppSettings['theme'], overlay: OverlaySettin
     createOverlayWindowOptions(preload, display.workArea.width, overlay, display.workArea.height),
   )
   overlayWindow = window
+  window.webContents.once('did-finish-load', () => {
+    if (!window.isDestroyed()) prepareOverlayMenu(window, theme)
+  })
   suppressSystemMenuOnRightClick(window)
   window.setAlwaysOnTop(overlay.alwaysOnTop, 'screen-saver')
   window.setFocusable(true)

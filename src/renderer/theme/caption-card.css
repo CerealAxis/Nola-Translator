@@ -18,12 +18,61 @@ html.is-overlay body {
   background: transparent;
 }
 
-/*
- * The overlay is a fixed-height physical window, not a scrollable page, and
- * react-aria positions a popup inside that window's rendering surface. A long
- * menu is therefore capped to the room the trigger really has — see
- * `useMenuMaxHeight` in `OverlayControls.tsx`, which measures it.
- */
+.nola-caption-menu-trigger {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+/* The invisible anchor occupies the same screen rectangle as the original pill. */
+.nola-overlay-menu-surface .nola-caption-menu-trigger {
+  position: absolute;
+  left: var(--nola-menu-trigger-x);
+  top: var(--space-2);
+  width: var(--nola-menu-trigger-width);
+  height: var(--nola-menu-trigger-height);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nola-overlay-menu-surface[data-placement='top'] .nola-caption-menu-trigger {
+  top: auto;
+  bottom: var(--space-2);
+}
+
+.nola-overlay-menu-surface .nola-caption-menu-trigger > button {
+  width: 100%;
+  height: 100%;
+}
+
+.nola-overlay-menu-surface .nola-caption-controls {
+  position: static;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.nola-overlay-menu-surface .nola-caption-mic {
+  display: none;
+}
+
+.nola-overlay-confirm-surface {
+  -webkit-app-region: no-drag;
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  place-items: center;
+}
+
+.nola-overlay-confirm-surface .nola-confirm-dialog button {
+  -webkit-app-region: no-drag;
+}
+
+/* Pointer input belongs to the caption document; a new menu document otherwise treats auto-focus as keyboard input. */
+html[data-overlay-menu-input='pointer'] .nola-caption-menu .nola-menu-item {
+  outline: none;
+  box-shadow: none;
+}
+
 .nola-overlay-window {
   box-sizing: border-box;
   /*
@@ -78,10 +127,6 @@ html.is-overlay body {
   color: #f5f5f5;
 }
 
-.nola-overlay-window[data-menu-open='true'] .nola-caption-card {
-  height: calc(100% - var(--nola-menu-headroom, 272px));
-}
-
 /* Unlocked is the drag region; locking is exactly "let me not move this". */
 .nola-caption-card[data-locked='false'] {
   -webkit-app-region: drag;
@@ -122,12 +167,7 @@ html.is-overlay body {
   overflow: hidden;
 }
 
-/*
- * Top and bottom fade scrims darken the card fill that is already composited
- * over the desktop. Their black tint scales with the fill opacity, so the fade
- * starts just darker than the selected colour at its configured opacity and
- * disappears completely when the background is fully transparent.
- */
+/* Fixed backdrop darkening keeps the toolbar readable even when the card fill is transparent. */
 .nola-caption-scrim {
   position: absolute;
   left: 0;
@@ -136,26 +176,26 @@ html.is-overlay body {
   pointer-events: none;
   opacity: 0;
   transition: opacity 180ms ease;
+  -webkit-backdrop-filter: brightness(0.5);
+  backdrop-filter: brightness(0.5);
 }
 
 .nola-caption-scrim[data-edge='top'] {
   top: 0;
   height: 62px;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, black var(--overlay-scrim-alpha), transparent) 30%,
-    transparent
-  );
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent);
+  mask-image: linear-gradient(to bottom, black 30%, transparent);
 }
 
 .nola-caption-scrim[data-edge='bottom'] {
   bottom: 0;
   height: 58px;
-  background: linear-gradient(
-    to top,
-    color-mix(in srgb, black var(--overlay-scrim-alpha), transparent) 30%,
-    transparent
-  );
+  border-bottom-right-radius: inherit;
+  border-bottom-left-radius: inherit;
+  -webkit-mask-image: linear-gradient(to top, black 30%, transparent);
+  mask-image: linear-gradient(to top, black 30%, transparent);
 }
 
 .nola-caption-card[data-hover='true'] .nola-caption-scrim,
@@ -163,8 +203,7 @@ html.is-overlay body {
   opacity: 1;
 }
 
-/* A bare-text overlay needs no scrim: with no fill to fade out of, it would only haze whatever is behind. */
-.nola-caption-card[data-transparent='true'] .nola-caption-scrim {
+.nola-caption-card[data-locked='true'] .nola-caption-scrim[data-edge='bottom'] {
   opacity: 0;
 }
 
@@ -648,6 +687,42 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   transition: opacity 180ms ease, transform 180ms ease;
 }
 
+.nola-caption-controls-row {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+.nola-caption-card .nola-caption-controls-row > .nola-caption-mic {
+  flex: 0 0 auto;
+}
+
+.nola-caption-card .nola-caption-controls-row > .nola-caption-menu-trigger[data-overflow-hidden] {
+  position: absolute;
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.nola-caption-card .nola-caption-menu-trigger[data-menu-kind='model'] {
+  min-width: 0;
+}
+
+.nola-caption-card .nola-caption-menu-trigger[data-menu-kind='model'] > .nola-caption-pill {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.nola-caption-model-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Toolbar labels are controls, not transcript text that should join a drag selection. */
 .nola-caption-card .nola-caption-actions,
 .nola-caption-card .nola-caption-controls {
@@ -710,27 +785,30 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   pointer-events: none;
   opacity: 0;
   transition: opacity 180ms ease;
+  -webkit-backdrop-filter: brightness(0.5);
+  backdrop-filter: brightness(0.5);
 }
 
 .nola-caption-preview:hover .nola-caption-preview__scrim {
   opacity: 1;
 }
 
-/* With no fill to fade out of, a scrim would only haze whatever is behind. */
-.nola-caption-preview[data-transparent-background='true'] .nola-caption-preview__scrim {
-  opacity: 0;
-}
-
 .nola-caption-preview__scrim[data-edge='top'] {
   top: 0;
   height: 46px;
-  background: linear-gradient(to bottom, color-mix(in srgb, black var(--preview-scrim-alpha), transparent) 30%, transparent);
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent);
+  mask-image: linear-gradient(to bottom, black 30%, transparent);
 }
 
 .nola-caption-preview__scrim[data-edge='bottom'] {
   bottom: 0;
   height: 40px;
-  background: linear-gradient(to top, color-mix(in srgb, black var(--preview-scrim-alpha), transparent) 30%, transparent);
+  border-bottom-right-radius: inherit;
+  border-bottom-left-radius: inherit;
+  -webkit-mask-image: linear-gradient(to top, black 30%, transparent);
+  mask-image: linear-gradient(to top, black 30%, transparent);
 }
 
 /*

@@ -68,6 +68,10 @@ export type EngineChannelEvent = EngineEvent | EngineLifecycleEvent
 export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'translation' | 'torch' | 'llama'
 
 export type NolaTranslatorApi = {
+  openOverlayMenu(request: import('./overlay-menu').OverlayMenuRequest): Promise<void>
+  presentOverlayMenu(id: number): Promise<void>
+  closeOverlayMenu(id: number): Promise<void>
+  onOverlayMenuChanged(listener: (menu: import('./overlay-menu').OverlayMenuPresentation | null) => void): () => void
   isWindows: boolean
   minimizeMainWindow(): Promise<void>
   toggleMainWindowMaximize(): Promise<boolean>

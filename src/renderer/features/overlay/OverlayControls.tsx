@@ -23,7 +23,7 @@ import { useModelOptions } from '@/model-options'
  * rather than sending the user to the main window.
  */
 
-import { useLayoutEffect, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 
 import { Button, Dropdown, Spinner } from '@heroui/react'
 import { Mic, Pause, Play } from 'lucide-react'
@@ -40,6 +40,8 @@ import { targetLanguagePatch, translationFieldsOf } from '@/session-config'
 import { useI18n } from '@/i18n'
 
 import { OverlayDisplayMenu, OverlayLayoutMenu } from './OverlayDisplayMenu'
+import { OverlayDropdown } from './OverlayDropdown'
+import { LANGUAGE_MENU_MAX_HEIGHT, LANGUAGE_MENU_SCREEN_FRACTION } from '../../../shared/overlay-menu'
 
 /**
  * Geometry and colour live in `.nola-caption-pill` (`caption-card.css`).
@@ -78,40 +80,17 @@ export interface OverlayControlsProps {
   locked: boolean
 }
 
-/**
- * Usable height for a menu anchored to a pill, in pixels.
- *
- * Measures the trigger's distance to the top and bottom viewport edges. The
- * viewport is the transparent caption window itself: pixels outside it are never
- * rendered, so only room inside it is usable.
- *
- * The larger of the two is passed because react-aria flips the popover to
- * whichever side has space, and it will not flip unless the overflow is worse
- * than the original side. Handing it the best of both sides leaves that choice
- * to react-aria.
- *
- * Every menu passes this to both its Popover and its Menu. The Popover needs it
- * to choose a side; the Menu is the element that scrolls, and a cap that stops
- * at the Popover leaves the Menu at its full content height — it then spills
- * past the window edge with nothing to scroll. `Dropdown.Menu` has no
- * `maxHeight` prop, so the second copy goes through `style`.
- */
+/** Cap both the positioning surface and its scrolling list, using the shared language-menu limit. */
 export function useMenuMaxHeight(): number {
+  const nativeLimit = useStore(stores.settings, state => state.overlayMenu?.maxHeight)
   const [maxHeight, setMaxHeight] = useState<number>(fallbackMaxHeight)
-
   useLayoutEffect(() => {
-    const measure = (): void => {
-      const next = fallbackMaxHeight()
-      setMaxHeight(previous => (previous === next ? previous : next))
-    }
+    const measure = (): void => setMaxHeight(fallbackMaxHeight())
     measure()
-    // Re-measure on resize: the window is draggable, and the resolution and the
-    // taskbar can change under it.
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
   }, [])
-
-  return maxHeight
+  return nativeLimit ?? maxHeight
 }
 
 /**
@@ -169,17 +148,52 @@ function fallbackMaxHeight(): number {
   const trigger = document.querySelector<HTMLElement>('.nola-caption-pill')
   const viewportHeight = window.innerHeight
   if (!trigger) {
-    return Math.max(MENU_ROW_MIN, Math.floor(viewportHeight / 2) - MENU_CHROME)
+    return Math.min(LANGUAGE_MENU_MAX_HEIGHT, Math.max(MENU_ROW_MIN, Math.floor(viewportHeight / 2) - MENU_CHROME))
   }
   const box = trigger.getBoundingClientRect()
   const roomUp = box.bottom
   const roomDown = viewportHeight - box.top
   // The larger side: react-aria flips to whichever side has room.
   const room = Math.max(roomUp, roomDown)
-  return Math.max(MENU_ROW_MIN, Math.floor(room) - MENU_CHROME)
+  return Math.max(MENU_ROW_MIN, Math.min(LANGUAGE_MENU_MAX_HEIGHT, Math.floor(viewportHeight * LANGUAGE_MENU_SCREEN_FRACTION), Math.floor(room) - MENU_CHROME))
 }
 
 export function OverlayControls({ active, locked }: OverlayControlsProps) {
+  const controlsRow = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const row = controlsRow.current
+    // The native menu document uses an invisible anchor, not the caption's visible toolbar.
+    if (!row?.closest('.nola-caption-card')) return
+    const measure = (): void => {
+      const width = row.clientWidth
+      if (width <= 0) return
+      const mic = row.querySelector<HTMLElement>(':scope > .nola-caption-mic')
+      const menus = Array.from(row.querySelectorAll<HTMLElement>(':scope > .nola-caption-menu-trigger'))
+      const gap = Number.parseFloat(getComputedStyle(row).columnGap) || 0
+      let used = mic?.offsetWidth ?? 0
+      let fits = true
+      for (const menu of menus) {
+        const required = menu.dataset.menuKind === 'model'
+        if (required) menu.style.maxWidth = `${Math.max(0, width - used - gap)}px`
+        const next = used + (used > 0 ? gap : 0) + menu.getBoundingClientRect().width
+        fits = required || fits && next <= width
+        menu.toggleAttribute('data-overflow-hidden', !fits)
+        if (fits) used = next
+      }
+    }
+    // Hidden pills retain their intrinsic width so widening can restore them without a visible measuring pass.
+    const resize = new ResizeObserver(measure)
+    const observe = (): void => {
+      resize.disconnect()
+      resize.observe(row)
+      for (const child of row.children) resize.observe(child)
+      measure()
+    }
+    const children = new MutationObserver(observe)
+    children.observe(row, { childList: true })
+    observe()
+    return () => { resize.disconnect(); children.disconnect() }
+  }, [locked])
   const { t, language } = useI18n()
   const menuMaxHeight = useMenuMaxHeight()
   /**
@@ -285,7 +299,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
     <>
       {locked ? null : (
         <div data-slot="overlay-controls" className="nola-caption-controls">
-          <div className="nola-no-drag flex min-w-0 flex-1 items-center justify-center gap-2">
+          <div ref={controlsRow} className="nola-caption-controls-row nola-no-drag">
             {/*
              * A spinner marks `starting` rather than greying the button out: greyed
              * and unresponsive reads as broken, a spinner reads as waiting on the
@@ -313,10 +327,10 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
               {starting ? <Spinner size="sm" color="current" /> : running ? <Pause aria-hidden="true" /> : status === 'paused' ? <Play aria-hidden="true" /> : <Mic aria-hidden="true" />}
             </Button>
 
-            <Dropdown>
+            <OverlayDropdown kind="model">
               <Dropdown.Trigger isDisabled={active} className={`${CAPSULE} nola-caption-pill--mode`}>
                 <span className="nola-caption-mode-dot" aria-hidden="true" />
-                <span>{modelOptions.recognitionModels.find(model => model.value === modelId)?.label ?? modelId}</span>
+                <span className="nola-caption-model-label">{modelOptions.recognitionModels.find(model => model.value === modelId)?.label ?? modelId}</span>
               </Dropdown.Trigger>
               {/*
                 Selection is computed by the Menu, not set per item: `Dropdown.Item`
@@ -354,9 +368,10 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
                   ))}
                 </Dropdown.Menu>
               </Dropdown.Popover>
-            </Dropdown>
+            </OverlayDropdown>
 
             <LanguagePill
+              kind="source"
               caption={t('session.sourceLanguage')}
               value={source}
               options={modelOptions.sourceLanguages}
@@ -366,6 +381,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
               onChange={next => patch({ recognition: { sourceLanguage: next } })}
             />
             <LanguagePill
+              kind="target"
               caption={t('session.targetLanguage')}
               value={target}
               options={modelOptions.targetLanguages}
@@ -418,14 +434,12 @@ function StartFailureNotice({ message, action, onAction }: { message: string | n
  * padding to weigh heavily on top of the captions, and whose rows do not
  * match the pill's.
  *
- * The list is long enough to need scrolling, with the scrollbar hidden in
- * `.nola-caption-menu-list`. It stays inside the window: the popover is a
- * separate layer over the card, but the window is a fixed-size transparent
- * rectangle, so anything past its bounds is simply not rendered. Direction
- * is left to react-aria, whose `shouldFlip` turns the popover upward when
- * there is no room below.
+ * The list is long enough to need the thin scrollbar in
+ * `.nola-caption-menu-list`. Desktop menus reuse this tree in a separate native
+ * surface; embedded demos keep the local portal.
  */
 function LanguagePill({
+  kind,
   caption,
   value,
   options,
@@ -434,6 +448,7 @@ function LanguagePill({
   maxHeight,
   onChange,
 }: {
+  kind: 'source' | 'target'
   caption: string
   value: string
   options: readonly string[]
@@ -443,7 +458,7 @@ function LanguagePill({
   onChange: (code: string) => void
 }) {
   return (
-    <Dropdown>
+    <OverlayDropdown kind={kind}>
       <Dropdown.Trigger isDisabled={isDisabled} className={CAPSULE} aria-label={caption}>
         <span>{labelOf(value)}</span>
       </Dropdown.Trigger>
@@ -463,7 +478,7 @@ function LanguagePill({
           ))}
         </Dropdown.Menu>
       </Dropdown.Popover>
-    </Dropdown>
+    </OverlayDropdown>
   )
 }
 import { recognitionFieldsOf } from '../../../shared/cloud-config'

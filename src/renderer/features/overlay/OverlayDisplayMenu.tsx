@@ -5,6 +5,7 @@ import type { OverlaySettings } from '@/bridge'
 import { NO_TRANSLATION_LANGUAGE } from '@/bridge'
 
 import { useMenuMaxHeight } from './OverlayControls'
+import { OverlayDropdown } from './OverlayDropdown'
 import { actions, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
@@ -40,7 +41,7 @@ export function OverlayDisplayMenu({ isDisabled = false }: { isDisabled?: boolea
   const display: DisplayKey = translationDisabled ? 'source' : showSource && showTranslation ? 'both' : showSource ? 'source' : 'translation'
 
   return (
-    <OverlayPill label={t('overlay.displayMode')} value={t(DISPLAY_LABELS[display])} isDisabled={isDisabled} options={[
+    <OverlayPill kind="display" label={t('overlay.displayMode')} value={t(DISPLAY_LABELS[display])} isDisabled={isDisabled} options={[
       { id: 'display:both', label: t('workspace.modeBoth'), active: display === 'both', patch: DISPLAY_PATCH.both },
       { id: 'display:source', label: t('workspace.modeSource'), active: display === 'source', patch: DISPLAY_PATCH.source },
       { id: 'display:translation', label: t('workspace.modeTranslation'), active: display === 'translation', patch: DISPLAY_PATCH.translation },
@@ -57,7 +58,7 @@ export function OverlayLayoutMenu({ isDisabled = false }: { isDisabled?: boolean
   if (translationDisabled) return null
 
   return (
-    <OverlayPill label={t('overlay.layout')} value={t(LAYOUT_LABELS[layout])} isDisabled={isDisabled} options={[
+    <OverlayPill kind="layout" label={t('overlay.layout')} value={t(LAYOUT_LABELS[layout])} isDisabled={isDisabled} options={[
       /*
         `layoutSplit` rather than `workspace.layout`: the latter is a group
         heading, and using it on a single item would label the row "layout"
@@ -75,12 +76,10 @@ export function OverlayLayoutMenu({ isDisabled = false }: { isDisabled?: boolean
  * An `options` array rather than `children`, because `selectedKeys` hangs off
  * the whole Menu and can only be derived from which option is active.
  */
-function OverlayPill({ label, value, options, isDisabled = false }: { label: string; value: string; options: readonly OptionSpec[]; isDisabled?: boolean }) {
-  // The same measurement the control bar uses: a value that tracks the
-  // window rather than a fixed constant.
+function OverlayPill({ kind, label, value, options, isDisabled = false }: { kind: 'display' | 'layout'; label: string; value: string; options: readonly OptionSpec[]; isDisabled?: boolean }) {
   const maxHeight = useMenuMaxHeight()
   return (
-    <Dropdown>
+    <OverlayDropdown kind={kind}>
       <Dropdown.Trigger isDisabled={isDisabled} className="nola-caption-pill" aria-label={label}>
         {/* The pill shows the active option, not a group heading: a heading
             reads as navigation, and then pressing it appears to do nothing. */}
@@ -91,9 +90,7 @@ function OverlayPill({ label, value, options, isDisabled = false }: { label: str
         `selectedKeys` must be a Set: a string type-checks but selection
         silently fails and every item reports aria-checked="false".
 
-        The popover may extend past the window, since it is a separate layer
-        over the caption card rather than a descendant of it, and react-aria
-        flips it upward when there is no room below.
+        Desktop and embedded menus share this same HeroUI portal and menu tree.
       */}
       <Dropdown.Popover className="nola-caption-menu" maxHeight={maxHeight}>
         <Dropdown.Menu
@@ -126,7 +123,7 @@ function OverlayPill({ label, value, options, isDisabled = false }: { label: str
           ))}
         </Dropdown.Menu>
       </Dropdown.Popover>
-    </Dropdown>
+    </OverlayDropdown>
   )
 }
 

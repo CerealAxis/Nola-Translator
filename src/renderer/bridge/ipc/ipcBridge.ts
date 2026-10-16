@@ -142,6 +142,9 @@ export function createIpcBridge(): NolaBridge {
       getEngineState: () => call('getEngineState', (injected) => injected.getEngineState()),
     },
     overlay: {
+      openMenu: request => call('openOverlayMenu', injected => injected.openOverlayMenu(request)),
+      presentMenu: id => call('presentOverlayMenu', injected => injected.presentOverlayMenu(id)),
+      closeMenu: id => call('closeOverlayMenu', injected => injected.closeOverlayMenu(id)),
       show: () => call('showOverlay', (injected) => injected.showOverlay()),
       hide: () => call('hideOverlay', (injected) => injected.hideOverlay()),
       close: () => call('closeOverlay', (injected) => injected.closeOverlay()),
@@ -196,6 +199,7 @@ export function createIpcBridge(): NolaBridge {
       setCredential: (provider, value) => call('setTranslationCredential', (injected) => injected.setTranslationCredential(provider, value)),
     },
     events: {
+      onOverlayMenuChanged: cb => subscribe('onOverlayMenuChanged', injected => injected.onOverlayMenuChanged, cb),
       onEngineEvent: (cb) => subscribe('onEngineEvent', (injected) => injected.onEngineEvent, cb),
       onSettingsChanged: (cb) => subscribe('onSettingsChanged', (injected) => injected.onSettingsChanged, cb),
       /**

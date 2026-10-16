@@ -20,6 +20,10 @@ window.addEventListener('DOMContentLoaded', () => {
 })
 
 const channels = {
+  openOverlayMenu: 'overlay:open-menu',
+  presentOverlayMenu: 'overlay:present-menu',
+  closeOverlayMenu: 'overlay:close-menu',
+  overlayMenuChanged: 'overlay:menu-changed',
   listComputeDevices: 'engine:list-compute-devices',
   getRuntimes: 'runtime:list', installRuntime: 'runtime:install', importRuntime: 'runtime:import', cancelRuntimeInstall: 'runtime:cancel',
   prepareRuntimes: 'runtime:prepare',
@@ -73,6 +77,14 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 }
 
 const api: NolaTranslatorApi = {
+  openOverlayMenu: request => invoke(channels.openOverlayMenu, request),
+  presentOverlayMenu: id => invoke(channels.presentOverlayMenu, id),
+  closeOverlayMenu: id => invoke(channels.closeOverlayMenu, id),
+  onOverlayMenuChanged: listener => {
+    const wrapped = (_event: Electron.IpcRendererEvent, value: Parameters<typeof listener>[0]): void => listener(value)
+    ipcRenderer.on(channels.overlayMenuChanged, wrapped)
+    return () => ipcRenderer.off(channels.overlayMenuChanged, wrapped)
+  },
   isWindows: process.platform === 'win32',
   minimizeMainWindow: () => invoke<void>(channels.minimizeMainWindow),
   toggleMainWindowMaximize: () => invoke<boolean>(channels.toggleMainWindowMaximize),

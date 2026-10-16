@@ -13,6 +13,7 @@ import { AppShell, ErrorBoundary } from './components/primitives'
 import { Routes, useRoute } from './routes'
 import { disposeStores, initStores, isEngineConnected, stores, useStore } from './store'
 import { OverlayRoot } from './features/overlay'
+import { OverlayMenuRoot } from './features/overlay/OverlayMenuRoot'
 import { RuntimeNotice } from './features/settings/RuntimeNotice'
 import { AppUpdateNotice } from './features/settings/AppUpdateNotice'
 import { OnboardingTour } from './features/onboarding'
@@ -31,8 +32,9 @@ import { OnboardingTour } from './features/onboarding'
 
 /** `?overlay=1` 走悬浮字幕的独立文档分叉，对齐主仓旧 `main.tsx` 的做法。 */
 const isOverlayDocument = new URLSearchParams(window.location.search).get('overlay') === '1'
+const isOverlayMenuDocument = new URLSearchParams(window.location.search).get('overlayMenu') === '1'
 const bridge = createIpcBridge()
-initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument })
+initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument, overlayMenu: isOverlayMenuDocument })
 
 /**
  * 浮窗点「字幕外观」→ 主窗跳到对应设置页。
@@ -145,6 +147,7 @@ function Root() {
   }, [])
 
   if (isOverlayDocument) {
+    if (isOverlayMenuDocument) return <ErrorBoundary><OverlayMenuRoot /></ErrorBoundary>
     return (
       <ErrorBoundary>
         <OverlayRoot />

@@ -46,6 +46,8 @@ export interface InitStoresOptions {
   engineConnected?: boolean
   /** Only the main window needs settings diagnostics; the caption overlay reuses engine events. */
   backgroundChecks?: boolean
+  /** A preloaded menu receives settings and model snapshots from its owner without engine or device queries. */
+  overlayMenu?: boolean
 }
 
 /**
@@ -60,8 +62,9 @@ export function initStores(bridge: NolaBridge, options: InitStoresOptions = {}):
   if (!engineConnected) return
 
   attachSettingsStore(bridge, options.backgroundChecks ?? true)
-  attachMeetingsStore(bridge)
   attachModelsStore(bridge)
+  if (options.overlayMenu) return
+  attachMeetingsStore(bridge)
   attachSessionStore(bridge)
 
   void actions.settings.loadSettings().catch(() => undefined)

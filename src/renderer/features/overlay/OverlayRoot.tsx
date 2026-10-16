@@ -47,6 +47,7 @@ export const CAPTION_SCHEMES = {
 export type CaptionScheme = keyof typeof CAPTION_SCHEMES
 
 export function OverlayRoot() {
+  const menuOpen = useStore(stores.settings, state => state.overlayMenuOpen)
   const { t } = useI18n()
   const overlay = useStore(stores.settings, (state) => state.settings?.overlay)
   const session = useStore(sessionStore, (state) => state)
@@ -62,6 +63,7 @@ export function OverlayRoot() {
   const [closing, setClosing] = useState(false)
   const [closePending, setClosePending] = useState(false)
   const [closeFailed, setCloseFailed] = useState(false)
+  const [detachedConfirmation, setDetachedConfirmation] = useState(false)
   const closeRequest = useRef(false)
 
   /*
@@ -108,6 +110,30 @@ export function OverlayRoot() {
    */
   const openAppearanceSettings = (): void => {
     void window.nolaTranslator?.openAppearance('appearance').catch(() => undefined)
+  }
+
+  const requestCloseConfirmation = (): void => {
+    setCloseFailed(false)
+    setClosing(true)
+    const card = cardRef.current
+    const openMenu = getBridge()?.overlay.openMenu
+    if (!card || !openMenu) {
+      setDetachedConfirmation(false)
+      return
+    }
+    const rect = card.getBoundingClientRect()
+    setDetachedConfirmation(true)
+    void actions.settings.openOverlayMenu({
+      kind: 'confirm',
+      anchor: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      modality: 'pointer',
+    }).then(opened => {
+      if (opened) setClosing(false)
+      else setDetachedConfirmation(false)
+    }).catch((error: unknown) => {
+      console.warn('[overlay] close confirmation failed', error)
+      setDetachedConfirmation(false)
+    })
   }
 
   useEffect(() => {
@@ -268,8 +294,6 @@ export function OverlayRoot() {
   const cardStyle = {
     '--overlay-background-color': palette.bg,
     '--overlay-background-alpha': `${Math.round(opacity * 100)}%`,
-    // The scrim darkens the already-composited card fill, so its strength follows that fill's opacity.
-    '--overlay-scrim-alpha': `${Math.round(opacity * 15)}%`,
     '--overlay-source-color': palette.source,
     '--overlay-translation-color': palette.target,
     '--overlay-font-size': `${config.fontSize}px`,
@@ -288,7 +312,7 @@ export function OverlayRoot() {
         data-scheme={scheme}
         data-locked={locked ? 'true' : 'false'}
         data-confirm-open={closing ? 'true' : 'false'}
-        data-hover={hovered ? 'true' : 'false'}
+        data-hover={hovered || menuOpen ? 'true' : 'false'}
         data-text-selected={captionTextSelected ? 'true' : 'false'}
         data-layout={config.layout}
         data-bilingual={config.showSource && config.showTranslation ? 'true' : 'false'}
@@ -421,7 +445,7 @@ export function OverlayRoot() {
            * Closing confirms first: it also stops recognition and is not
            * reversible, since restarting reloads several GB of weights.
            */}
-          <GhostButton label={t('overlay.close')} onPress={() => { setCloseFailed(false); setClosing(true) }} color={palette.chrome}>
+          <GhostButton label={t('overlay.close')} onPress={requestCloseConfirmation} color={palette.chrome}>
             <X aria-hidden="true" />
           </GhostButton>
         </div>
@@ -440,7 +464,7 @@ export function OverlayRoot() {
          */}
         {closing ? (
           <div className="nola-confirm-layer" role="dialog" aria-modal="true" aria-label={t('overlay.closeTitle')}>
-            <div className="nola-confirm-dialog">
+            {detachedConfirmation ? null : <div className="nola-confirm-dialog">
               <p className="nola-confirm-title">{t('overlay.closeTitle')}</p>
               <p className="nola-confirm-text">{t('overlay.closeBody')}</p>
               {closeFailed ? <p className="nola-confirm-text" role="alert">{t('overlay.closeFailed')}</p> : null}
@@ -454,7 +478,7 @@ export function OverlayRoot() {
                   {t(closePending ? 'overlay.closing' : 'overlay.closeConfirm')}
                 </Button>
               </div>
-            </div>
+            </div>}
           </div>
         ) : null}
       </section>

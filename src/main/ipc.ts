@@ -10,6 +10,7 @@ import { DEFAULT_SETTINGS, NO_TRANSLATION_LANGUAGE, type AppSettings, type Crede
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
 import { computeOverlayBounds } from './windows'
+import { openOverlayMenu, presentOverlayMenu, closeOverlayMenu } from './overlay-menu'
 import { readHubModelCard } from './hub-model-card'
 import { SessionController } from './session-controller'
 import { openDefaultBrowser as launchDefaultBrowser } from './open-default-browser'
@@ -36,6 +37,9 @@ export const IPC_CHANNELS = {
   closeOverlay: 'overlay:close',
   minimizeOverlay: 'overlay:minimize',
   resizeOverlay: 'overlay:resize',
+  openOverlayMenu: 'overlay:open-menu',
+  presentOverlayMenu: 'overlay:present-menu',
+  closeOverlayMenu: 'overlay:close-menu',
   openDefaultBrowser: 'app:open-default-browser',
 } as const
 
@@ -323,6 +327,13 @@ export function registerEngineIpc(
       height: Math.min(workArea.height, Math.max(52, Math.round(height as number))),
     }))
   })
+  loggedHandle(IPC_CHANNELS.openOverlayMenu, (event, request: unknown) => {
+    const window = getOverlayWindow()
+    if (!window || window.isDestroyed() || event.sender !== window.webContents) return
+    return openOverlayMenu(window, request, getSettings().theme)
+  })
+  loggedHandle(IPC_CHANNELS.presentOverlayMenu, (event, id: unknown) => presentOverlayMenu(BrowserWindow.fromWebContents(event.sender), id))
+  loggedHandle(IPC_CHANNELS.closeOverlayMenu, (event, id: unknown) => closeOverlayMenu(BrowserWindow.fromWebContents(event.sender), id))
   // "Open the browser", with no URL. `shell.openExternal` cannot express it, so the main process
   // resolves the user's own handler instead; see open-default-browser.ts for why.
   loggedHandle(IPC_CHANNELS.openDefaultBrowser, () => launchDefaultBrowser())
@@ -395,6 +406,9 @@ export function registerEngineIpc(
       IPC_CHANNELS.closeOverlay,
       IPC_CHANNELS.minimizeOverlay,
       IPC_CHANNELS.resizeOverlay,
+      IPC_CHANNELS.openOverlayMenu,
+      IPC_CHANNELS.presentOverlayMenu,
+      IPC_CHANNELS.closeOverlayMenu,
       IPC_CHANNELS.openDefaultBrowser,
     ]) {
       ipcMain.removeHandler(channel)
