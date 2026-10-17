@@ -1,8 +1,10 @@
+import { offlineKo, offlineEntries } from './offline-ui'
 import { buildLocaleDictionary } from './locale-builder'
 import { onboardingEntries, onboardingKo } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const koMessages: Record<DictionaryKey, string> = {
+  ...offlineEntries(offlineKo),
   ...onboardingEntries(onboardingKo),
   'more.tabLabel': "더 보기",
   'more.authorDescription': "Nola Translator 개발자",
@@ -25,6 +27,7 @@ const koMessages: Record<DictionaryKey, string> = {
   'browser.torchUnavailable': 'PyTorch가 설치되지 않았거나 사용할 수 없습니다. Nola 설정에서 설치하세요.',
   'browser.llamaUnavailable': 'llama.cpp가 설치되지 않았거나 사용할 수 없습니다. Nola 설정에서 설치하세요.',
   'browser.runtimeSettings': '설정에서 설치',
+  'browser.firefox': 'Mozilla Firefox',
   'browser.chrome': 'Google Chrome',
   'browser.edge': 'Microsoft Edge',
   'browser.browserList': '브라우저 확장 프로그램',
@@ -86,7 +89,7 @@ const koMessages: Record<DictionaryKey, string> = {
   'browser.updateRequired': 'Nola와 엔진을 업데이트한 후 다시 시도하세요.',
   'browser.wrongCapture': '현재 탭을 선택하고 오디오를 공유하세요.',
   'browser.captureCancelled': '공유가 취소되었습니다. 자막을 다시 켤 수 있습니다.',
-  'browser.captureUnsupported': '현재 브라우저에서 공유 대상을 확인할 수 없습니다. Chrome 또는 Edge를 업데이트하세요.',
+  'browser.captureUnsupported': 'Firefox에서는 데스크톱 설정에서 시스템 출력 장치를 선택하세요. 검증된 탭 오디오 캡처에는 Chrome 또는 Edge가 필요합니다.',
   'browser.slowAudio': '오디오 처리가 재생 속도를 따라가지 못해 세션이 종료되었습니다.',
   'browser.tabAudioSilent': '수신된 오디오 샘플에서 신호가 감지되지 않았습니다. 오디오 소스를 바꾸고 다시 시도하세요.',
   'browser.connectionLost': 'Nola 연결이 끊어졌습니다.',
@@ -331,6 +334,8 @@ const koMessages: Record<DictionaryKey, string> = {
   'workspaceUi.titleFailed': '세션이 시작되었지만 이름을 저장하지 못했습니다. 기록에서 이름을 변경하세요',
   'workspaceUi.engineRecovering': '엔진 연결이 끊겼습니다. 다시 연결하는 중입니다',
   'workspaceUi.recordingPreferenceFailed': '녹음 설정을 저장하지 못했습니다. 세션을 다시 시작하세요',
+  'modelsSettingsUi.removing': '삭제 중…',
+  'modelsSettingsUi.removeFailed': '삭제 실패',
   'modelsSettingsUi.modelsSubtitle': '로컬 음성 인식 및 번역 모델 관리',
   'modelsSettingsUi.currentRecognition': '현재 음성 인식 모델',
   'modelsSettingsUi.currentTranslation': '현재 번역 모델',

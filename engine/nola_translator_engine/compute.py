@@ -137,8 +137,8 @@ def probe_devices(llama_dir: Path | None) -> tuple[list[ComputeDevice], list[str
                     devices.append(ComputeDevice(
                         id=f"llama:{identifier}:{name}", name=name, backend="rocm" if identifier.upper().startswith("HIP") else re.sub(r"\d+$", "", identifier).lower(),
                         llamaDevice=identifier, llamaDeviceNative=native_name, totalMemoryMb=float(total), freeMemoryMb=float(free),
-                        stableId=False, translation=True, score=100,
-                        reason="当前仅由 llama.cpp 使用；语音识别需要匹配的 PyTorch 环境",
+                        stableId=False, recognition=True, translation=True, score=100,
+                        reason="由 llama.cpp 使用，支持兼容的语音识别或翻译 GGUF 模型",
                     ))
         except Exception as error:
             notes.append(f"llama.cpp 设备探测失败：{type(error).__name__}: {str(error)[:256]}")
@@ -157,13 +157,14 @@ def model_memory_mb(path: Path, adapter: str, options: ComputeOptions) -> float:
         factor = 0.5
     elif adapter == "qwen3-asr" and options.quantization == "8bit":
         factor = 0.75
-    elif options.precision == "fp32":
+    elif options.precision == "fp32" and adapter not in ("llama.cpp", "llama-asr"):
         factor = 2.0
-    return max(256, weight_mb * factor) + (512 + options.contextSize / 4 if adapter == "llama.cpp" else 1024)
+    return max(256, weight_mb * factor) + (512 + options.contextSize / 4 if adapter in ("llama.cpp", "llama-asr") else 1024)
 
 
 def choose_devices(devices: list[ComputeDevice], options: ComputeOptions,
-                   recognition_mb: float, translation_mb: float, translation_adapter: str | None
+                   recognition_mb: float, translation_mb: float, translation_adapter: str | None,
+                   recognition_adapter: str | None = None,
                    ) -> tuple[ComputeDevice, ComputeDevice, list[str]]:
     by_id = {d.id: d for d in devices}
     reasons: list[str] = []
@@ -171,7 +172,7 @@ def choose_devices(devices: list[ComputeDevice], options: ComputeOptions,
     def candidates(choice: str, task: str) -> list[ComputeDevice]:
         def supports(d: ComputeDevice) -> bool:
             if task == "recognition":
-                return d.recognition and d.torchDevice is not None
+                return d.id == "cpu" or (d.llamaDevice is not None if recognition_adapter == "llama-asr" else d.recognition and d.torchDevice is not None)
             return d.id == "cpu" or (d.translation and
                 (d.llamaDevice is not None if translation_adapter == "llama.cpp" else d.torchDevice is not None))
         if choice != "auto":
@@ -185,6 +186,8 @@ def choose_devices(devices: list[ComputeDevice], options: ComputeOptions,
         return [d for d in devices if supports(d)]
 
     recognition = candidates(options.recognitionDevice, "recognition")
+    if recognition_adapter == "llama-asr" and options.gpuLayers == 0:
+        recognition = [by_id["cpu"]]
     translation = candidates(options.translationDevice, "translation") if translation_adapter else [by_id["cpu"]]
     if translation_adapter == "llama.cpp" and options.gpuLayers == 0:
         translation = [by_id["cpu"]]

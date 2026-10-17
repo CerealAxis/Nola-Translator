@@ -1,3 +1,4 @@
+import { OfflineResources } from '../../offline'
 import { useEffect, useState } from 'react'
 import { Accordion, Alert, Button, Checkbox, Label, Tooltip } from '@heroui/react'
 import { useI18n } from '@/i18n'
@@ -58,6 +59,7 @@ export function RuntimeComponents() {
   const elapsedSeconds = operation?.startedAt ? Math.max(0, Math.floor((now - operation.startedAt) / 1000)) : null
   const elapsed = elapsedSeconds === null ? '' : `${Math.floor(elapsedSeconds / 60)}:${String(elapsedSeconds % 60).padStart(2, '0')}`
   return <>
+    <OfflineResources />
     <SettingGroup legend={t('runtime.components')} actions={<Button variant="secondary" size="sm" isDisabled={busy} isPending={state.runtimeChecking}
       onPress={() => void actions.settings.loadRuntimeComponents(true).then(() => actions.settings.refreshComputeDevices()).catch(() => undefined)}>{t('runtime.recheck')}</Button>}>
       <SettingsRow label={t('runtime.python')} desc={runtimes?.python?.reason || undefined}><span>{t('runtime.builtInPython')}</span></SettingsRow>

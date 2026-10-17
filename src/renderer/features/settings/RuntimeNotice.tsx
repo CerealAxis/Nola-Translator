@@ -47,9 +47,10 @@ export function RuntimeNotice() {
   const usesLocalTranslation = settings?.translation.provider === 'local'
     && settings.translation.targetLanguage !== NO_TRANSLATION_LANGUAGE
   const selectedTranslationEngine = settings ? translationEngine(settings.compute, model?.provider, modelId) : 'llama'
-  const needsTorch = settings?.recognition.provider === 'local'
+  const needsTorch = (settings?.recognition.provider === 'local' && settings.compute.recognitionEngine === 'pytorch')
     || (usesLocalTranslation && selectedTranslationEngine === 'pytorch')
-  const needsLlama = usesLocalTranslation && selectedTranslationEngine === 'llama'
+  const needsLlama = (settings?.recognition.provider === 'local' && settings.compute.recognitionEngine === 'llama')
+    || (usesLocalTranslation && selectedTranslationEngine === 'llama')
   const issues: RuntimeIssue[] = runtimes
     ? (['engine', 'llama'] as const)
       .filter(kind => (kind === 'engine' ? needsTorch : needsLlama) && runtimes.local[kind].status !== 'ready')

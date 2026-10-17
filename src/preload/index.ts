@@ -77,6 +77,16 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 }
 
 const api: NolaTranslatorApi = {
+  offline: {
+    selectModel: (kind, repo, path) => invoke('offline:select-model', kind, repo, path),
+    selectDestination: path => invoke('offline:select-destination', path),
+    selectBundle: () => invoke('offline:select-bundle'),
+    prepare: (request, destination) => invoke('offline:prepare', request, destination),
+    install: token => invoke('offline:install', token),
+    snapshot: () => invoke('offline:snapshot'),
+    cancel: () => invoke('offline:cancel'),
+    openOutput: () => invoke('offline:open-output'),
+  },
   openOverlayMenu: request => invoke(channels.openOverlayMenu, request),
   presentOverlayMenu: id => invoke(channels.presentOverlayMenu, id),
   closeOverlayMenu: id => invoke(channels.closeOverlayMenu, id),

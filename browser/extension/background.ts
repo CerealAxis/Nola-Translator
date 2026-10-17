@@ -42,7 +42,7 @@ chrome.runtime.onConnect.addListener(content => {
           if (!closed) content.postMessage({ type: 'error', id: '*', code: 'appUnavailable', message: diagnostic ?? '' })
         })
       }
-      native.postMessage(request.data.type === 'hello' ? { ...request.data, browser: navigator.userAgent.includes('Edg/') ? 'edge' : 'chrome' } : request.data)
+      native.postMessage(request.data.type === 'hello' ? { ...request.data, browser: navigator.userAgent.includes('Firefox/') ? 'firefox' : navigator.userAgent.includes('Edg/') ? 'edge' : 'chrome' } : request.data)
     } catch {
       content.postMessage({ type: 'error', id: request.data.id, code: 'appUnavailable', message: '' })
     }

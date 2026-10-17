@@ -77,6 +77,9 @@ from .protocol import (
     SessionConfig,
     Translation,
 )
+from .recognition.llama_asr import LlamaAsrRuntime
+from .recognition.streaming import StreamingRecognizer
+from .translation.transformers_causal import CausalTranslationProvider
 from .recognition.base import ModelUnavailable, RecognitionUpdate, Recognizer
 from .recognition.aliyun import MODELS as ALIYUN_RECOGNITION_MODELS, AliyunRecognizer, CloudRecognitionError
 from .recognition.minimax import MODELS as MINIMAX_RECOGNITION_MODELS, MiniMaxRecognizer
@@ -208,7 +211,14 @@ def _custom_files(info: HubRepoInfo) -> tuple[CustomFile, ...]:
     """The repo's file list as registry entries, carrying whichever digest HF published.
     """
     files: list[CustomFile] = []
+    selected_gguf = None
+    if detect_runtime(info).adapter_id == "llama-asr":
+        main = min((item for item in info.gguf_files if not Path(item.path).name.casefold().startswith("mmproj-")),
+            key=lambda item: (item.size or 2**63, item.path))
+        selected_gguf = {main.path, str(Path(main.path).with_name("mmproj-" + Path(main.path).name)).replace("\\", "/")}
     for item in info.files:
+        if selected_gguf is not None and item.path.casefold().endswith(".gguf") and item.path not in selected_gguf:
+            continue
         if item.size is None:
             continue
         if item.sha256 is None and item.blob_sha1 is None:
@@ -797,6 +807,12 @@ class EngineRuntime:
         for resource_id in required_resources:
             if self.resources.configuration(resource_id) is None:
                 raise ResourceActionError("invalidConfiguration", {"resourceId": resource_id, "reason": "modelNeedsConfiguration"})
+            capability = self.resources.configuration(resource_id)
+            is_recognition = not remote and resource_id == model_id
+            expected_slot = "recognition" if is_recognition else "translation"
+            engine = config.compute.recognitionEngine if is_recognition else config.compute.translationEngine
+            if capability.slot != expected_slot or engine != "auto" and capability.engine != engine:
+                raise ResourceActionError("invalidConfiguration", {"resourceId": resource_id, "reason": "modelLoaderMismatch"})
         source = normalize(config.sourceLanguage)
         if not remote:
             recognition = self.resources.configuration(model_id)
@@ -875,7 +891,9 @@ class EngineRuntime:
             protocolVersion=1, type="modelsPrewarmed", requestId=command.requestId,
             state="ready", recognitionModelId=model_id, translationModelId=translation_model_id,
             elapsedMs=(monotonic() - started_at) * 1000,
-            device="cloud" if config.recognitionProvider != "local" else self._recognition_device.torchDevice,
+            device="cloud" if config.recognitionProvider != "local" else (
+                self._recognition_device.llamaDevice or "cpu" if self.resources.adapter_for(model_id) == "llama-asr"
+                else self._recognition_device.torchDevice),
             runtime=self._active_recognition_runtime.describe(),
         )]
 
@@ -1015,11 +1033,11 @@ class EngineRuntime:
             translation_adapter = self.resources.adapter_for(model_id)
             path = self.resources.translation_gguf_path(model_id) if translation_adapter == "llama.cpp" else self.resources.model_path(model_id)
             translation_mb = model_memory_mb(path, translation_adapter, config.compute)
-        a, b, reasons = choose_devices(devices, config.compute, recognition_mb, translation_mb, translation_adapter)
+        a, b, reasons = choose_devices(devices, config.compute, recognition_mb, translation_mb, translation_adapter, adapter)
         self._recognition_device, self._translation_device = a, b
         total_threads = cpu_threads(config.compute.cpuThreads)
         # PyTorch shares one process-wide thread pool; llama is a separate CPU consumer.
-        share_cpu = translation_adapter == "llama.cpp"
+        share_cpu = translation_adapter == "llama.cpp" or adapter == "llama-asr"
         self._torch_threads = max(1, total_threads // 2) if share_cpu else total_threads
         self._llama_threads = max(1, total_threads - self._torch_threads) if share_cpu else total_threads
         self._device_plan = {"recognition": asdict(a), "translation": asdict(b) if translation_adapter else None,
@@ -1035,7 +1053,7 @@ class EngineRuntime:
         runtime = self._active_recognition_runtime
         self._device_plan["recognitionActual"] = runtime.describe() if runtime else "unloaded"
         local_provider = next((provider for provider in (self.translation_provider, self.fallback_translation_provider)
-            if isinstance(provider, M2M100TranslationProvider)), None)
+            if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider))), None)
         if local_provider is not None:
             self._device_plan["translationActual"] = (local_provider.runtime.device or "unknown") if local_provider.runtime.loaded else "unloaded"
         else:
@@ -1153,6 +1171,10 @@ class EngineRuntime:
         )
         targets = [self._language_code(item) for item in config.targetLanguages]
         adapter = self.resources.adapter_for(model_id)
+        if adapter == "transformers-causal":
+            return CausalTranslationProvider(self.resources.model_path(model_id), device=self._translation_device.torchDevice,
+                precision="auto" if self._translation_device.id == "cpu" and config.compute.allowCpuFallback else config.compute.precision,
+                threads=self._torch_threads, context_size=config.compute.contextSize)
         if adapter == "m2m100":
             unsupported = validate_m2m100_languages(source, targets)
             if unsupported:
@@ -1166,7 +1188,7 @@ class EngineRuntime:
         if adapter == "llama.cpp":
             # Built-in and custom GGUF models share the same server and compute configuration.
             from .translation.hymt2 import HYMT2_7B_CHAT_TEMPLATE
-            self.llama_manager.chat_template = HYMT2_7B_CHAT_TEMPLATE if model_id == HYMT2_7B_RESOURCE_ID else None
+            self.llama_manager.chat_template = HYMT2_7B_CHAT_TEMPLATE if model_id == HYMT2_7B_RESOURCE_ID else self.resources.translation_chat_template(model_id)
             self.llama_manager.switch_gguf(self.resources.translation_gguf_path(model_id))
             reserved_mb = config.compute.reservedVramMb
             if (self._recognition_device.id != 'cpu' and
@@ -1198,9 +1220,9 @@ class EngineRuntime:
         model_id = self._local_translation_model_id(config)
         if not self.resources.is_installed(model_id):
             raise ModelUnavailable(f"翻译模型不可用：{model_id}")
-        if self.resources.adapter_for(model_id) == "m2m100":
+        if self.resources.adapter_for(model_id) in ("m2m100", "transformers-causal"):
             local_providers = [provider for provider in (self.translation_provider, self.fallback_translation_provider)
-                if isinstance(provider, M2M100TranslationProvider)]
+                if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider))]
             for local_provider in local_providers:
                 try:
                     await asyncio.to_thread(local_provider.runtime.load)
@@ -1211,8 +1233,8 @@ class EngineRuntime:
                     release_failed_load(error)
                     await asyncio.to_thread(local_provider.runtime.unload)
                     self._translation_device = ComputeDevice("cpu", "CPU", "cpu", "cpu", translation=True)
-                    replacement = M2M100TranslationProvider(self.resources.model_path(model_id),
-                        device="cpu", precision="auto", threads=self._torch_threads)
+                    replacement = (CausalTranslationProvider(self.resources.model_path(model_id), context_size=config.compute.contextSize, device="cpu", precision="auto", threads=self._torch_threads)
+                        if isinstance(local_provider, CausalTranslationProvider) else M2M100TranslationProvider(self.resources.model_path(model_id), device="cpu", precision="auto", threads=self._torch_threads))
                     await asyncio.to_thread(replacement.runtime.load)
                     if local_provider is self.translation_provider:
                         self.translation_provider = replacement
@@ -1244,6 +1266,21 @@ class EngineRuntime:
         # shipped one, and the recognition guard in qwen_runtime.py stays the thing that decides
         # whether the checkpoint layout actually fits.
         compute = command.config.compute
+        if self.resources.adapter_for(model_id) == "llama-asr":
+            runtime = self._active_recognition_runtime
+            if not isinstance(runtime, LlamaAsrRuntime):
+                runtime = LlamaAsrRuntime(LlamaServerManager())
+            manager = runtime.manager
+            manager.switch_gguf(self.resources.translation_gguf_path(model_id))
+            manager.mmproj_path = self.resources.audio_projector_path(model_id)
+            manager.chat_template = self.resources.translation_chat_template(model_id)
+            reserved = compute.reservedVramMb
+            if self._translation_device.id != "cpu" and self._recognition_device.name == self._translation_device.name and self._device_plan:
+                reserved = min(65536, reserved + int(self._device_plan['translationEstimateMb']))
+            manager.configure_compute(self._recognition_device, compute.model_copy(update={"cpuThreads": self._llama_threads, "reservedVramMb": reserved}))
+            self._active_recognition_runtime = runtime
+            await manager.start(timeout_s=120)
+            return StreamingRecognizer(runtime, source_language=language, on_update=self._emit_update)
         if self._recognition_device.id == "cpu" and compute.recognitionDevice != "cpu" and compute.allowCpuFallback:
             compute = compute.model_copy(update={"precision": "auto", "quantization": "none"})
         for attempt in range(2):
@@ -1271,11 +1308,13 @@ class EngineRuntime:
         recognizer.on_update = self._emit_update
         return recognizer
 
-    def _recognition_runtime(self) -> QwenRuntime | SenseVoiceRuntime | RemoteRecognitionRuntime:
+    def _recognition_runtime(self) -> QwenRuntime | SenseVoiceRuntime | LlamaAsrRuntime | RemoteRecognitionRuntime:
         """Runtime of the currently selected recognition model."""
         if self._active_recognition_runtime is not None:
             return self._active_recognition_runtime
         model_path = self.resources.model_path(self.active_model_id)
+        if self.resources.adapter_for(self.active_model_id) == "llama-asr":
+            return LlamaAsrRuntime(LlamaServerManager())
         if self.resources.adapter_for(self.active_model_id) == "sensevoice":
             return get_sensevoice_runtime(model_path)
         return get_qwen_runtime(model_path)
@@ -1305,7 +1344,7 @@ class EngineRuntime:
         requested = config.translationModelId
         if requested is None:
             return HYMT2_RESOURCE_ID
-        if self.resources.adapter_for(requested) in ("llama.cpp", "m2m100"):
+        if self.resources.adapter_for(requested) in ("llama.cpp", "m2m100", "transformers-causal"):
             return requested
         raise UnknownTranslationModel(requested)
 
@@ -1454,6 +1493,10 @@ class EngineRuntime:
             task = self.translation_tasks.get(update.segment_id)
             if task is not None:
                 task.cancel()
+            # A language revision can remove every supported target while inference is
+            # already running. Drop its job; native runtime locks still retain ownership.
+            for job in tuple(self.translation_jobs.get(update.segment_id, ())):
+                job.cancel()
             self.emit(self._caption_event(update, []))
             self._retire_completed(update)
             return
@@ -1646,7 +1689,7 @@ class EngineRuntime:
             }, ensure_ascii=False)
         session_id, generation = self.service.session_id, self._stream_generation
         retry_codes = {"URLError", "HTTPError", "translationRateLimited", "translationTimeout", "RuntimeError"}
-        retry_enabled = request.update.is_final and provider_name not in {"hymt2", "index-translate-local", "m2m100"}
+        retry_enabled = request.update.is_final and provider_name not in {"hymt2", "index-translate-local", "m2m100", "transformers-causal"}
         max_attempts = 3 if retry_enabled else 1
         attempt = 0
 
@@ -1678,6 +1721,12 @@ class EngineRuntime:
                 target_errors = {target: "unsupportedLanguagePair" for target in targets if not supports_translation(capability, request.source, target)}
                 if not target_errors and not self.llama_manager.ready:
                     target_errors = dict.fromkeys(targets, "llamaServerUnavailable")
+        elif provider_name == "transformers-causal":
+            model_id = self._local_translation_model_id(self.active_config) if self.active_config else ""
+            capability = self.resources.configuration(model_id) if model_id else None
+            target_errors = {target: "unsupportedLanguagePair" for target in targets if not supports_translation(capability, request.source, target)}
+            if not model_id or not self.resources.is_installed(model_id):
+                target_errors = dict.fromkeys(targets, "resourceUnavailable")
         elif provider_name == "m2m100":
             model_id = self._local_translation_model_id(self.active_config) if self.active_config else M2M100_RESOURCE_ID
             if not self.resources.is_installed(model_id):
@@ -2206,8 +2255,9 @@ class EngineRuntime:
 
     async def _settle_session_models(self) -> None:
         runtimes = [self._recognition_runtime(), self.llama_manager]
-        if isinstance(self.translation_provider, M2M100TranslationProvider):
-            runtimes.append(self.translation_provider.runtime)
+        for provider in (self.translation_provider, self.fallback_translation_provider):
+            if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider)):
+                runtimes.append(provider.runtime)
         waits = [asyncio.to_thread(runtime.wait_idle) for runtime in runtimes if hasattr(runtime, 'wait_idle')]
         if waits:
             await asyncio.gather(*waits)
@@ -2222,11 +2272,15 @@ class EngineRuntime:
         await self.llama_manager.stop()
         runtimes = [self._recognition_runtime()]
         for provider in (self.translation_provider, self.fallback_translation_provider):
-            if isinstance(provider, M2M100TranslationProvider):
+            if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider)):
                 runtimes.append(provider.runtime)
         for runtime in runtimes:
             if getattr(runtime, "loaded", False):
-                await asyncio.to_thread(runtime.unload)
+                if isinstance(runtime, LlamaAsrRuntime):
+                    await runtime.unload()
+                else:
+                    await asyncio.to_thread(runtime.unload)
+        self._active_recognition_runtime = None
         self._update_compute_plan()
 
     async def close(self) -> None:

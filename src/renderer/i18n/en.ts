@@ -1,3 +1,4 @@
+import { offlineEn } from './offline-ui'
 import type { Dictionary } from './zh-CN'
 import { onboardingEn } from './onboarding-ui'
 import { shellEn } from './shell-ui'
@@ -14,6 +15,7 @@ import { browserEn } from './browser-ui'
 import { runtimeEn } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const en: Dictionary = {
+  offline: offlineEn,
   onboarding: onboardingEn,
   more: {
     "tabLabel": "More",

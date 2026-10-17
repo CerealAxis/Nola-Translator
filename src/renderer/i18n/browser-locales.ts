@@ -3,6 +3,7 @@ import { browserZh } from './browser-ui'
 type BrowserDictionary = { [K in keyof typeof browserZh]: string }
 
 export const browserZhTW: BrowserDictionary = {
+  "firefox": "Mozilla Firefox",
   "start": "開始",
   "end": "結束",
   "refresh": "重新整理",
@@ -75,7 +76,7 @@ export const browserZhTW: BrowserDictionary = {
   "updateRequired": "請更新 Nola 軟體和引擎後重試。",
   "wrongCapture": "請選擇當前標籤頁並共享音訊。",
   "captureCancelled": "共享已取消，可再次開啟字幕。",
-  "captureUnsupported": "當前瀏覽器無法確認共享目標，請更新 Chrome／Edge。",
+  "captureUnsupported": "目前瀏覽器不支援驗證分頁音訊。Firefox 請在桌面端選擇系統輸出裝置；分頁採集請使用 Chrome／Edge。",
   "slowAudio": "音訊處理跟不上播放速度，會話已結束。",
   "tabAudioSilent": "當前收到的音訊取樣沒有聲音訊號，可以更換聲源輸入再次嘗試。",
   "connectionLost": "與 Nola 的連線已斷開。",
@@ -107,6 +108,7 @@ export const browserZhTW: BrowserDictionary = {
 }
 
 export const browserZhHK: BrowserDictionary = {
+  "firefox": "Mozilla Firefox",
   "start": "開始",
   "end": "結束",
   "refresh": "刷新",
@@ -179,7 +181,7 @@ export const browserZhHK: BrowserDictionary = {
   "updateRequired": "請更新 Nola 軟件和引擎後重試。",
   "wrongCapture": "請選擇當前標籤頁並共享音頻。",
   "captureCancelled": "共享已取消，可再次開啓字幕。",
-  "captureUnsupported": "當前瀏覽器無法確認共享目標，請更新 Chrome／Edge。",
+  "captureUnsupported": "目前瀏覽器不支援驗證分頁音訊。Firefox 請在桌面端選擇系統輸出裝置；分頁採集請使用 Chrome／Edge。",
   "slowAudio": "音頻處理跟不上播放速度，會話已結束。",
   "tabAudioSilent": "當前收到的音頻採樣沒有聲音信號，可以更換聲源輸入再次嘗試。",
   "connectionLost": "與 Nola 的連接已斷開。",
@@ -211,6 +213,7 @@ export const browserZhHK: BrowserDictionary = {
 }
 
 export const browserKo: BrowserDictionary = {
+  "firefox": "Mozilla Firefox",
   "start": "시작",
   "end": "종료",
   "refresh": "새로고침",
@@ -283,7 +286,7 @@ export const browserKo: BrowserDictionary = {
   "updateRequired": "Nola와 엔진을 업데이트한 후 다시 시도하세요.",
   "wrongCapture": "현재 탭을 선택하고 오디오를 공유하세요.",
   "captureCancelled": "공유가 취소되었습니다. 자막을 다시 켤 수 있습니다.",
-  "captureUnsupported": "현재 브라우저에서 공유 대상을 확인할 수 없습니다. Chrome 또는 Edge를 업데이트하세요.",
+  "captureUnsupported": "Firefox에서는 데스크톱 설정에서 시스템 출력 장치를 선택하세요. 검증된 탭 오디오 캡처에는 Chrome 또는 Edge가 필요합니다.",
   "slowAudio": "오디오 처리가 재생 속도를 따라가지 못해 세션이 종료되었습니다.",
   "tabAudioSilent": "수신된 오디오 샘플에서 신호가 감지되지 않았습니다. 오디오 소스를 바꾸고 다시 시도하세요.",
   "connectionLost": "Nola 연결이 끊어졌습니다.",
@@ -315,6 +318,7 @@ export const browserKo: BrowserDictionary = {
 }
 
 export const browserJa: BrowserDictionary = {
+  "firefox": "Mozilla Firefox",
   "start": "開始",
   "end": "終了",
   "refresh": "更新",
@@ -387,7 +391,7 @@ export const browserJa: BrowserDictionary = {
   "updateRequired": "Nola とエンジンを更新してから、もう一度お試しください。",
   "wrongCapture": "現在のタブを選び、音声を共有してください。",
   "captureCancelled": "共有がキャンセルされました。字幕はもう一度有効にできます。",
-  "captureUnsupported": "現在のブラウザーでは共有対象を確認できません。Chrome または Edge を更新してください。",
+  "captureUnsupported": "Firefox ではデスクトップ設定でシステム出力デバイスを選択してください。検証付きタブ音声キャプチャには Chrome または Edge が必要です.",
   "slowAudio": "音声処理が再生速度に追いつかず、セッションを終了しました。",
   "tabAudioSilent": "受信した音声サンプルに信号がありません。音声ソースを変更して、もう一度お試しください。",
   "connectionLost": "Nola との接続が切れました。",

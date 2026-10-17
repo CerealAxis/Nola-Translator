@@ -6,6 +6,7 @@ import { DEFAULT_SETTINGS } from '@/bridge'
 import { BROWSER_EXTENSION_VERSION, type BrowserIntegrationInfo, type BrowserKind } from '../../../../shared/browser'
 import chromeIcon from '@/assets/browsers/chrome.png'
 import edgeIcon from '@/assets/browsers/edge.png'
+import firefoxIcon from '@/assets/browsers/firefox.svg'
 import { useI18n } from '@/i18n'
 import { stores, updateSettings, useStore } from '@/store'
 import { browserConnectionAction } from '@/store/settingsStore'
@@ -14,8 +15,8 @@ import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import '../../video-captions/video-captions.css'
 import './browserSettings.css'
 
-const BROWSERS: readonly BrowserKind[] = ['chrome', 'edge']
-const BROWSER_ICONS: Record<BrowserKind, string> = { chrome: chromeIcon, edge: edgeIcon }
+const BROWSERS: readonly BrowserKind[] = ['chrome', 'edge', 'firefox']
+const BROWSER_ICONS: Record<BrowserKind, string> = { chrome: chromeIcon, edge: edgeIcon, firefox: firefoxIcon }
 const FONT_FAMILIES = ['Segoe UI Variable', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans SC', 'Cascadia Mono', 'Source Han Sans SC']
 const PRESET_COLORS = ['#F7F7F7', '#D7DEE8', '#87D5FF', '#0D0E10', '#FFFFFF', '#4C9AFF']
 
@@ -28,7 +29,7 @@ export function BrowserTab() {
   useEffect(() => {
     void browserConnectionAction('inspect')
   }, [])
-  const browserName = (kind: BrowserKind) => t(kind === 'chrome' ? 'browser.chrome' : 'browser.edge')
+  const browserName = (kind: BrowserKind) => t(kind === 'firefox' ? 'browser.firefox' : kind === 'chrome' ? 'browser.chrome' : 'browser.edge')
   const getBrowser = (kind: BrowserKind): BrowserIntegrationInfo => browser?.browsers?.find(info => info.browser === kind)
     ?? { browser: kind, available: true, extensionStatus: 'unknown', connected: false, enabled: false }
   const hasExtension = (info: BrowserIntegrationInfo) => info.extensionStatus === 'installed' || info.extensionStatus === 'disabled'

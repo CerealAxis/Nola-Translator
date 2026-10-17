@@ -1,3 +1,4 @@
+import { offlineZh } from './offline-ui'
 /**
  * 中文词典。`en.ts` 的类型由本文件推导，缺 key 会在编译期报错。
  *
@@ -18,6 +19,7 @@ import { browserZh } from './browser-ui'
 import { runtimeZh } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const zhCN = {
+  offline: offlineZh,
   onboarding: onboardingZh,
   more: {
     "tabLabel": "更多",

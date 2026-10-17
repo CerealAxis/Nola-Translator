@@ -30,7 +30,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "build:browser": "node browser/extension/build.mjs",
+    "build:browser": "node browser/extension/build.mjs && node browser/extension/build.mjs --firefox",
     "build:browser-host": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-browser-host.ps1",
     "package:browser": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-browser-extension.ps1"
   },
@@ -89,6 +89,7 @@
       "package.json"
     ],
     "extraResources": [
+      { "from": "release/Nola-Firefox-Extension.zip", "to": "browser/Nola-Firefox-Extension.zip" },
       {
         "from": "src/renderer/assets/fonts/OFL-Noto-CJK.txt",
         "to": "licenses/OFL-Noto-CJK.txt"

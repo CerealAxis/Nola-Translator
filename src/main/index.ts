@@ -1,4 +1,4 @@
-import { translationEngine } from '../shared/model-engines'
+import { modelEngines, supportsSelectedEngine } from '../shared/model-engines'
 import { captureMainConsole, initializeSessionLog, logActivityTotals, logDiagnostic } from './session-log'
 import { resolveDeviceIntent } from '../shared/device-selection'
 import { join } from 'node:path'
@@ -26,6 +26,9 @@ import { BrowserConnection } from './browser-connection'
 import { BrowserIntegrations } from './browser-integrations'
 import { RuntimeManager } from './runtime-manager'
 import { registerRuntimeIpc, recheckRuntimeEnvironment } from './runtime-ipc'
+import { OfflineManager } from './offline-manager'
+import { registerOfflineIpc } from './offline-ipc'
+import { runOfflineModelWorker } from './offline-worker'
 import { SettingsStore } from './settings-store'
 import { SecureCredentialStore } from './secure-store'
 import { createMainWindowOptions, resolvePreloadPath } from './window-options'
@@ -38,6 +41,7 @@ let engine: EngineProcess | null = null
 let disposeIpc: (() => void) | null = null
 let disposeAppIpc: (() => void) | null = null
 let disposeRuntimeIpc: (() => void) | null = null
+let disposeOfflineIpc: (() => Promise<void>) | null = null
 let quitting = false
 let browserConnection: BrowserConnection | null = null
 
@@ -312,19 +316,22 @@ if (!hasSingleInstanceLock) {
           : translationSettings.targetLanguage !== NO_TRANSLATION_LANGUAGE && (provider === 'local' || translationSettings.fallback.provider === 'local')
         let translation: 'torch' | 'llama' | 'none' = !usesLocalTranslation
           ? 'none' : modelId === 'm2m100-418m' ? 'torch' : 'llama'
-        if (translation !== 'none' && engine!.currentState === 'ready') {
-          try {
-            const resources = await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: `prepare-${randomUUID()}` }, 'resources')
-            const model = resources.resources.find(r => r.resourceId === modelId)
-            if (model) translation = model.provider === 'm2m100' ? 'torch' : 'llama'
-          } catch { /* Best-effort probe: a failed reply leaves the runtime chosen from the model id. */ }
-        }
-        if (session) {
-          if (localRecognition && compute.recognitionEngine !== 'pytorch') throw new Error('所选识别模型是 PyTorch 格式，请选择兼容的识别引擎；当前识别资源尚未提供 GGUF 版本')
-          if (translation !== 'none') {
-            const expected = translation === 'torch' ? 'pytorch' : 'llama'
-            const selected = translationEngine(compute, expected === 'pytorch' ? 'm2m100' : 'llama.cpp', modelId)
-            if (selected !== expected) throw new Error('所选翻译模型与推理引擎不兼容，请重新选择模型或引擎')
+        if (localRecognition || usesLocalTranslation) {
+          if (engine!.currentState !== 'ready') await engine!.start()
+          const resources = await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: `prepare-${randomUUID()}` }, 'resources')
+          const recognitionId = session?.recognitionModelId ?? settings.current().recognition.modelId
+          const recognitionModel = resources.resources.find(r => r.resourceId === recognitionId)
+          const translationModel = resources.resources.find(r => r.resourceId === modelId)
+          if (usesLocalTranslation && translationModel) {
+            translation = modelEngines(translationModel)[0] === 'pytorch' ? 'torch' : 'llama'
+          }
+          if (session) {
+            if (localRecognition && (!recognitionModel || !supportsSelectedEngine(recognitionModel, compute, recognitionId))) {
+              throw new Error('所选识别模型与推理引擎不兼容，请选择匹配的模型格式和引擎')
+            }
+            if (usesLocalTranslation && (!translationModel || !supportsSelectedEngine(translationModel, compute, modelId))) {
+              throw new Error('所选翻译模型与推理引擎不兼容，请选择匹配的模型格式和引擎')
+            }
           }
         }
         await runtimes.prepare(compute, translation, localRecognition)
@@ -342,7 +349,7 @@ if (!hasSingleInstanceLock) {
           const response = await engine!.request({ protocolVersion: 1, type: 'listComputeDevices', requestId: `resolve-${randomUUID()}` }, 'computeDevices', 30_000)
           const hardware = (await runtimes.snapshot()).hardware
           session.compute = { ...compute,
-            recognitionDevice: localRecognition ? resolveDeviceIntent(compute.recognitionDevice, hardware, response.devices, 'torch') : 'auto',
+            recognitionDevice: localRecognition ? resolveDeviceIntent(compute.recognitionDevice, hardware, response.devices, compute.recognitionEngine === 'llama' ? 'llama' : 'torch') : 'auto',
             translationDevice: translation === 'none' ? 'auto' : resolveDeviceIntent(compute.translationDevice, hardware, response.devices, translation),
           }
         } else if (session) {
@@ -378,6 +385,36 @@ if (!hasSingleInstanceLock) {
       return overlayWindow!
     }
     const sessions = new SessionController({ engine, meetings, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareEnvironment(true, config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => getOverlayWindow().showInactive(), hideOverlay: () => overlayWindow?.hide() })
+    const offline = new OfflineManager({
+      modelRoot: resourceEnvironment.NOLA_TRANSLATOR_MODEL_DIR,
+      runtimeRoot: runtimes.directory,
+      appVersion: app.getVersion(), runtimes,
+      network: () => settings.current().network,
+      diagnostic: logDiagnostic,
+      models: (request, signal, progress) => runOfflineModelWorker(createEngineLaunchSpec({
+        isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
+        module: 'nola_translator_engine.offline_models',
+      }), request, signal, progress),
+      reserve: () => {
+        if (sessions.busy || componentInstalling || preparation) throw new Error('sessionAlreadyRunning')
+        componentInstalling = true
+        return async () => {
+          try {
+            await runtimes.recheck()
+            currentDirectories = JSON.stringify(runtimes.selectedDirectories(launchCompute))
+            if (!quitting) await engine!.start()
+          } finally { componentInstalling = false }
+        }
+      },
+      beforeInstall: async () => {
+        if (engine!.currentState === 'ready') {
+          const resources = await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: `offline-check-${randomUUID()}` }, 'resources')
+          if (resources.resources.some(resource => resource.state === 'running' || resource.state === 'cancelling')) throw new Error('resourceBusy')
+        }
+        await engine!.stop()
+      },
+    })
+    disposeOfflineIpc = registerOfflineIpc(offline, () => mainWindow, whenRuntimeReady)
     disposeIpc = registerEngineIpc(
       engine,
       getOverlayWindow,
@@ -440,5 +477,5 @@ app.on('before-quit', (event) => {
   disposeIpc?.()
   disposeAppIpc?.()
   disposeRuntimeIpc?.()
-  void (browserConnection?.dispose() ?? Promise.resolve()).catch(error => console.error('browser cleanup failed', error)).finally(() => engine!.stop().finally(() => app.quit()))
+  void Promise.allSettled([browserConnection?.dispose(), disposeOfflineIpc?.()]).finally(() => engine!.stop().finally(() => app.quit()))
 })

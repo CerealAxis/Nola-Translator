@@ -7,7 +7,7 @@ import { mkdir, writeFile, access, rm, copyFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, BROWSER_HOST_NAME, browserRequestSchema, type BrowserCaptionConfig, type BrowserConnectionStatus, type BrowserRequest, type BrowserResponse, type BrowserKind, type BrowserWireErrorCode } from '../shared/browser'
+import { FIREFOX_EXTENSION_ID, BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, BROWSER_HOST_NAME, browserRequestSchema, type BrowserCaptionConfig, type BrowserConnectionStatus, type BrowserRequest, type BrowserResponse, type BrowserKind, type BrowserWireErrorCode } from '../shared/browser'
 import type { BrowserIntegrations } from './browser-integrations'
 import type { AudioDevice, SessionConfig, EngineEvent, EngineProcessState } from '../shared/contracts'
 import { NO_TRANSLATION_LANGUAGE, type AppSettings } from '../shared/settings'
@@ -146,11 +146,11 @@ export class BrowserConnection {
       if (action === 'status') return this.status()
       if (action === 'inspect') { await options.integrations?.inspect(); return this.status() }
       if (action === 'download' || action === 'manage' || action === 'browserEnable') {
-        if (browser !== 'chrome' && browser !== 'edge') throw new Error('invalidConfiguration')
+        if (browser !== 'chrome' && browser !== 'edge' && browser !== 'firefox') throw new Error('invalidConfiguration')
         if (action === 'download') {
-          const zip = this.extensionZip()
+          const zip = this.extensionZip(browser === 'firefox')
           await access(zip)
-          const result = await dialog.showSaveDialog({ defaultPath: join(app.getPath('downloads'), `Nola-${browser === 'chrome' ? 'Chrome' : 'Edge'}-Extension.zip`), filters: [{ name: 'ZIP', extensions: ['zip'] }] })
+          const result = await dialog.showSaveDialog({ defaultPath: join(app.getPath('downloads'), `Nola-${browser === 'firefox' ? 'Firefox' : browser === 'chrome' ? 'Chrome' : 'Edge'}-Extension.zip`), filters: [{ name: 'ZIP', extensions: ['zip'] }] })
           if (!result.canceled && result.filePath && resolve(zip) !== resolve(result.filePath)) await copyFile(zip, result.filePath)
         } else {
           if (!options.integrations) throw new Error('invalidConfiguration')
@@ -165,7 +165,7 @@ export class BrowserConnection {
       }
       if (action === 'repair') { await this.register(); return this.status() }
       if (action === 'extension') {
-        const zip = this.extensionZip()
+        const zip = this.extensionZip(browser === 'firefox')
         await access(zip)
         shell.showItemInFolder(zip)
         return this.status()
@@ -182,7 +182,7 @@ export class BrowserConnection {
       throw new Error('invalidConfiguration')
     })
   }
-  private extensionZip(): string { return app.isPackaged ? join(process.resourcesPath, 'browser', 'Nola-Browser-Extension.zip') : resolve('release/Nola-Browser-Extension.zip') }
+  private extensionZip(firefox = false): string { const name = firefox ? 'Nola-Firefox-Extension.zip' : 'Nola-Browser-Extension.zip'; return app.isPackaged ? join(process.resourcesPath, 'browser', name) : resolve('release', name) }
   /**
    * Route browser lifecycle and pipeline activity into the shared launch trace. Only
    * high-frequency successful audio observations are sampled; failures remain individual.
@@ -216,6 +216,7 @@ export class BrowserConnection {
     await this.options.integrations?.inspect()
     try {
       await access(join(this.directory, 'native-host.json'))
+      await access(join(this.directory, 'native-host-firefox.json'))
       this.registered = true
     } catch { this.registered = false }
     if (enabled && !this.disposing && operation === this.operation) {
@@ -238,6 +239,9 @@ export class BrowserConnection {
     for (const browser of ['Google\\Chrome', 'Microsoft\\Edge']) {
       await run('reg.exe', ['add', `HKCU\\Software\\${browser}\\NativeMessagingHosts\\${BROWSER_HOST_NAME}`, '/ve', '/t', 'REG_SZ', '/d', manifest, '/f'], { windowsHide: true })
     }
+    const firefoxManifest = join(this.directory, 'native-host-firefox.json')
+    await writeFile(firefoxManifest, JSON.stringify({ name: BROWSER_HOST_NAME, description: 'Nola browser captions connection', path: executable, type: 'stdio', allowed_extensions: [FIREFOX_EXTENSION_ID] }))
+    await run('reg.exe', ['add', `HKCU\\Software\\Mozilla\\NativeMessagingHosts\\${BROWSER_HOST_NAME}`, '/ve', '/t', 'REG_SZ', '/d', firefoxManifest, '/f'], { windowsHide: true })
     this.registered = true
     this.error = undefined
   }

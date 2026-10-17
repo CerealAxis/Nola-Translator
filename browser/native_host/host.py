@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 EXTENSION_ID = "cgbjfdpkcoapeiefeflikdolennbdcbe"
+FIREFOX_EXTENSION_ID = "captions@nola-translator.app"
 MAX_MESSAGE_BYTES = 160 * 1024
 
 
@@ -72,8 +73,13 @@ def write_message(stream: BinaryIO, payload: bytes) -> None:
     stream.flush()
 
 
+def authorized_caller(arguments: list[str]) -> bool:
+    # Mozilla passes the manifest path followed by the add-on ID; Chromium passes its origin.
+    return (len(arguments) >= 1 and arguments[0] == f"chrome-extension://{EXTENSION_ID}/") or (len(arguments) == 2 and arguments[1] == FIREFOX_EXTENSION_ID)
+
+
 def main() -> int:
-    if len(sys.argv) < 2 or sys.argv[1] != f"chrome-extension://{EXTENSION_ID}/":
+    if not authorized_caller(sys.argv[1:]):
         return 1
     if os.name != "nt":
         return 1

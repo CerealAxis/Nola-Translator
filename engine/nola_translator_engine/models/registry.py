@@ -137,14 +137,16 @@ class CustomModelEntry:
     directory: str = ""
     languages: tuple[str, ...] = ()
     configuration: ModelConfiguration | None = None
+    description: str = ""
+    variant: str = ""
 
     @property
     def resource_id(self) -> str:
-        return resource_id_for_repo(self.repo)
+        return resource_id_for_repo(self.repo) + ("#" + self.variant if self.variant else "")
 
     @property
     def resolved_directory(self) -> str:
-        return self.directory or directory_for_repo(self.repo)
+        return self.directory or directory_for_repo(self.repo + ("#" + self.variant if self.variant else ""))
 
     @property
     def total_bytes(self) -> int:
@@ -190,11 +192,13 @@ class CustomModelEntry:
                 required = [candidate.languages] if slot == "recognition" else [candidate.sourceLanguages, candidate.targetLanguages]
                 codes = candidate.languages + candidate.sourceLanguages + candidate.targetLanguages
                 valid_pairs = candidate.translationPairs is None or bool(candidate.translationPairs) and all(supports_translation(candidate, pair.source, pair.target) for pair in candidate.translationPairs)
-                if candidate.slot == slot and candidate.engine == ("llama" if adapter_id == "llama.cpp" else "pytorch") and all(required) and all(normalize(code) in LANGUAGE_CODES for code in codes) and valid_pairs:
+                if candidate.slot == slot and candidate.engine == ("llama" if adapter_id in ("llama.cpp", "llama-asr") else "pytorch") and all(required) and all(normalize(code) in LANGUAGE_CODES for code in codes) and valid_pairs:
                     configuration = candidate
             except ValueError:
                 pass
         return cls(
+            variant=str(raw.get("variant", "")) if re.fullmatch(r"[a-f0-9]{8}", str(raw.get("variant", ""))) else "",
+            description=str(raw.get("description", ""))[:2000],
             configuration=configuration,
             repo=repo,
             revision=revision,
@@ -208,6 +212,15 @@ class CustomModelEntry:
             else (),
         )
 
+    @property
+    def display_name(self) -> str:
+        if self.repo.startswith("local/") and self.name == self.repo.split("/")[-1]:
+            weights = [item.path for item in self.files
+                       if item.path.lower().endswith(".gguf") and "mmproj" not in Path(item.path).name.lower()]
+            if weights:
+                return Path(weights[0]).stem[:200]
+        return self.name
+
     def to_json(self) -> dict[str, object]:
         return {
             "resourceId": self.resource_id,
@@ -217,6 +230,8 @@ class CustomModelEntry:
             "adapterId": self.adapter_id,
             "slot": self.slot,
             "name": self.name,
+            "description": self.description,
+            "variant": self.variant,
             "configuration": self.configuration.model_dump(exclude_none=True) if self.configuration else None,
             "languages": list(self.languages),
             "files": [item.to_json() for item in self.files],
@@ -259,7 +274,11 @@ class CustomModelRegistry:
     def remove(self, resource_id: str) -> CustomModelEntry | None:
         removed = self.entries().pop(resource_id, None)
         if removed is not None:
-            self._write()
+            try:
+                self._write()
+            except Exception:
+                self.entries()[resource_id] = removed
+                raise
         return removed
 
     def invalidate(self) -> None:

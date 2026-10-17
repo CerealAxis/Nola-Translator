@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { configurationOf, supportsTranslation } from '../../../shared/model-capabilities'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 import { actions, stores, useStore } from '@/store'
+import { offlineActions, offlineStore } from '@/store/offlineStore'
 import { NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import { targetLanguagePatch } from '@/session-config'
 import { TranslationCompatibilityDialog } from './TranslationCompatibilityDialog'
@@ -21,7 +22,11 @@ export function ModelCapabilityNotices() {
     const installed = new Set(resources.filter(record => record.installed).map(record => record.resourceId))
     const justInstalled = previous.current ? resources.filter(record => record.installed && record.resourceId.startsWith('hub:') && !configurationOf(record) && !previous.current?.has(record.resourceId)).map(record => record.resourceId) : []
     previous.current = installed
-    if (justInstalled.length > 0) setConfigurationQueue(queue => [...new Set([...queue, ...justInstalled])])
+    if (justInstalled.length > 0) {
+      const offline = offlineStore.getState()
+      if (offline.mode === 'model' && offline.task?.state === 'completed') offlineActions.close()
+      setConfigurationQueue(queue => [...new Set([...queue, ...justInstalled])])
+    }
   }, [resources])
   if (!settings || deferForTour) return null
   const configuring = resources.find(record => record.resourceId === configurationQueue[0])

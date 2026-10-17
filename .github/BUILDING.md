@@ -38,3 +38,5 @@ The private runtime flattens nested dependency license files inside each `.dist-
 
 The reference project's tag-triggered Release workflow informed the trigger/publish split:
 https://github.com/Xavier-MC/XavierChatSync/blob/master/.github/workflows/release.yml
+
+Firefox builds use an independent `dist-firefox` manifest and `Nola-Firefox-Extension-v<browser-version>.zip` release asset. The desktop bundles `Nola-Firefox-Extension.zip`. These are unsigned development packages; permanent Firefox installations require Mozilla signing. See `browser/extension/README.md` for temporary installation and the system-audio limitation.

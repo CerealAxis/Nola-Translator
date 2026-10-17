@@ -481,15 +481,16 @@ class ResumableParallelDownloader:
 
 
 class ModelManager:
-    def __init__(self, model_root: Path, fetcher: Fetcher | None = None) -> None:
+    def __init__(self, model_root: Path, fetcher: Fetcher | None = None, cache_root: Path | None = None) -> None:
         self.model_root = model_root.resolve()
+        self.cache_root = (cache_root or self.model_root).resolve()
         # `None` selects the engine's own downloader, the only transport that carries network
         # settings; an injected fetcher arrives with its own.
         self.fetcher = fetcher
 
     def _downloader_for(self, network: NetworkSettings | None) -> ResumableParallelDownloader:
         """Bind one proxy-aware HTTP opener for all ranges in this model operation."""
-        return ResumableParallelDownloader(self.model_root, http_opener(network))
+        return ResumableParallelDownloader(self.cache_root, http_opener(network))
 
     def model_path(self, spec: ModelSpec) -> Path:
         target = self.model_root / spec.directory

@@ -13,3 +13,9 @@ Tab audio is captured without microphone echo cancellation, noise suppression or
 For manual validation, serve `fixtures/player.html` over HTTPS and enable the site. Check selection between two players, wrong-tab/no-audio rejection, picker cancellation/retry, pause/resume, seeking, rate changes, DOM replacement, container and native-video fullscreen, sharing stop, page navigation, desktop shutdown, browser connection disable, and simultaneous desktop/browser session rejection. The fixture generates a tone, so real recognition should be tested separately with spoken audio. Test restrictive CSP sites as well: worklet loading first uses the extension resource URL, then tries an extension-fetched blob; both remain subject to browser security policies. Unsupported loading fails closed and releases the capture stream.
 
 The build emits standalone IIFE content, MAIN capture-handle, worker, and audio worklet scripts, plus a bundled popup; content scripts have no runtime ESM imports.
+
+## Firefox
+
+`npm run build:browser` also writes `dist-firefox/`. In Firefox 128 or newer, open `about:debugging#/runtime/this-firefox`, choose Load Temporary Add-on and select that manifest.json. Temporary installations expire when Firefox closes; permanent release installations require Mozilla signing. `npm run package:browser` creates a separate Firefox ZIP for signing.
+
+Enable/repair the desktop browser connection to register the Mozilla native host. In desktop browser caption settings choose a system output device, then start captions from the video player. Firefox does not implement the Capture Handle verification required by our tab sharing path, so tab audio capture is rejected before opening a picker. System output capture can include other applications playing through that device. Installation state is confirmed when the extension connects; management opens `about:addons`.

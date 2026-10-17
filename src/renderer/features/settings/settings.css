@@ -37,7 +37,7 @@
 .settings-row__control > .meter { width:100%; min-width:0; }
 /* Keep the folder path readable at normal widths while letting its row wrap around the browse action. */
 .settings-row__control > .settings-path-input { width:100%; min-width:0; max-width:var(--settings-control-max-width); flex:0 1 var(--settings-control-max-width); }
-.settings-row__control .select__trigger { width:100%; border-radius:10px; min-width:0; min-height:36px; }
+.settings-row__control .select__trigger { width:100%; border-radius:10px; min-width:0; height:var(--field-control-height); min-height:var(--field-control-height); }
 .select__popover.settings-select-popover { max-height:250px !important; overflow-y:auto !important; }
 .settings-row__control .button { border-radius:10px; }
 /* Colour, radius and height come from .nola-segmented in theme/app.css; this only controls width. */

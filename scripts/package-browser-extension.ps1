@@ -32,3 +32,17 @@ try {
 # on release assets while preserving the generic archive embedded by the desktop app.
 Copy-Item -LiteralPath $Destination -Destination (Join-Path $ReleaseDirectory "Nola-Chrome-Extension-v$BrowserVersion.zip") -Force
 Copy-Item -LiteralPath $Destination -Destination (Join-Path $ReleaseDirectory "Nola-Edge-Extension-v$BrowserVersion.zip") -Force
+
+$FirefoxDirectory = Join-Path $Workspace 'browser\extension\dist-firefox'
+if (-not (Test-Path -LiteralPath (Join-Path $FirefoxDirectory 'manifest.json'))) { throw 'Build the Firefox extension first' }
+$FirefoxDestination = Join-Path $ReleaseDirectory 'Nola-Firefox-Extension.zip'
+$firefoxRoot = (Resolve-Path -LiteralPath $FirefoxDirectory).Path.TrimEnd('\')
+$firefoxStream = [System.IO.File]::Open($FirefoxDestination, [System.IO.FileMode]::Create)
+$firefoxArchive = [System.IO.Compression.ZipArchive]::new($firefoxStream, [System.IO.Compression.ZipArchiveMode]::Create)
+try {
+  Get-ChildItem -LiteralPath $firefoxRoot -Recurse -File | ForEach-Object {
+    $entryName = $_.FullName.Substring($firefoxRoot.Length + 1).Replace('\', '/')
+    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($firefoxArchive, $_.FullName, $entryName, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
+  }
+} finally { $firefoxArchive.Dispose(); $firefoxStream.Dispose() }
+Copy-Item -LiteralPath $FirefoxDestination -Destination (Join-Path $ReleaseDirectory "Nola-Firefox-Extension-v$BrowserVersion.zip") -Force

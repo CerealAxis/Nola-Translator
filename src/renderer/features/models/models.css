@@ -47,10 +47,10 @@
 .models-card .card__content { padding:0; display:flex; flex-direction:column; gap:10px; }
 .models-card__status { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
 .models-card .card__footer { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:0; margin-top:auto; }
-.models-card .card__footer > .button { flex:1; border-radius:10px; min-width:0; height:40px; }
-.models-card .card__footer > .models-card__remove { flex:0 0 36px; width:36px; }
+.models-card .card__footer > .button { flex:1; border-radius:10px; min-width:0; min-height:40px; height:40px; }
+.models-card .card__footer > .models-card__remove { flex:0 0 40px; width:40px; min-width:40px; min-height:40px; height:40px; padding:0; border-radius:var(--radius-full); }
 .models-card__details { flex-basis:100%; }
-.models-card__details .button { width:100%; }
+.models-card__details .button { width:100%; min-height:40px; height:40px; }
 .models-downloads .table__scroll-container { overflow-x:hidden; }
 .models-downloads table { width:100%; table-layout:fixed; }
 .models-downloads .table__cell { overflow-wrap:anywhere; white-space:normal; }

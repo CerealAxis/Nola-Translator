@@ -16,7 +16,7 @@ export function DownloadsTab() {
   const busyIds = useStore(stores.models, (state) => state.busyIds)
 
   const rows = resources.filter(
-    (item) => item.state === 'cancelling' || (resourceStateOf(item) !== 'absent' && resourceStateOf(item) !== 'installed'),
+    (item) => item.phase !== 'remove' && (item.state === 'cancelling' || (resourceStateOf(item) !== 'absent' && resourceStateOf(item) !== 'installed')),
   )
 
   if (rows.length === 0) {

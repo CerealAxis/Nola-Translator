@@ -97,7 +97,7 @@ async def test_language_revision_cancels_previous_translation_when_no_longer_sup
     monkeypatch.setattr(runtime, "_translate_request", waiting_translation)
     await runtime._emit_update(RecognitionUpdate("segment", 1, 0, 100, "partial", "ja", False))
     await asyncio.wait_for(started.wait(), timeout=1)
-    task = runtime.translation_tasks["segment"]
+    task = next(iter(runtime.translation_jobs["segment"]))
     await runtime._emit_update(RecognitionUpdate("segment", 2, 0, 200, "你好", "zh", True))
     with pytest.raises(asyncio.CancelledError):
         await task

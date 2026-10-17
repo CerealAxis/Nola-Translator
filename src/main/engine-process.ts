@@ -71,13 +71,14 @@ export function createEngineLaunchSpec(options: {
   appPath: string
   resourcesPath: string
   managedEngineDirectory?: string
+  module?: 'nola_translator_engine.offline_models'
 }): EngineLaunchSpec {
   const pythonDirectory = options.isPackaged ? join(options.resourcesPath, 'engine')
     : join(options.appPath, 'engine', 'dist', 'NolaPythonEngine')
   const sourceDirectory = options.isPackaged ? join(pythonDirectory, 'Lib', 'site-packages') : join(options.appPath, 'engine')
   const paths = options.managedEngineDirectory ? [sourceDirectory, options.managedEngineDirectory] : [sourceDirectory]
   // Python is fixed; only component search paths change. App code always comes from this release.
-  const bootstrap = `${pythonRuntimePaths(paths, pythonDirectory, options.managedEngineDirectory)}; import runpy; assert sys.version_info[:2] == (3,12), "Python 3.12 required"; runpy.run_module("nola_translator_engine", run_name="__main__")`
+  const bootstrap = `${pythonRuntimePaths(paths, pythonDirectory, options.managedEngineDirectory)}; import runpy; assert sys.version_info[:2] == (3,12), "Python 3.12 required"; runpy.run_module(${JSON.stringify(options.module ?? 'nola_translator_engine')}, run_name="__main__")`
   return { command: join(pythonDirectory, 'python.exe'), args: ['-I', '-c', bootstrap], cwd: pythonDirectory }
 }
 

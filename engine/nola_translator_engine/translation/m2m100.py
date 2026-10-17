@@ -95,6 +95,8 @@ class _Bundle:
 class M2M100Runtime:
     """In-process M2M100 runtime: load once, serialize access to the stateful tokenizer, single-flight inference."""
 
+    model_label = "M2M100"
+
     def __init__(self, model_dir: Path, *, device: str | None = None,
                  precision: str = "auto", threads: int = 0) -> None:
         self.model_dir = Path(model_dir)
@@ -119,7 +121,7 @@ class M2M100Runtime:
                 bundle = self._load_bundle()
             except Exception as error:
                 raise M2M100ModelUnavailable(
-                    f"无法从 {self.model_dir} 加载 M2M100 模型：{type(error).__name__}: {error}"
+                    f"无法从 {self.model_dir} 加载 {self.model_label} 模型：{type(error).__name__}: {error}"
                 ) from error
             self._bundle = bundle
             self._loaded = True

@@ -1,4 +1,6 @@
 export const modelsSettingsZh = {
+  removing: '正在移除…',
+  removeFailed: '移除失败',
   modelsSubtitle: '管理本地语音识别与翻译模型',
   currentRecognition: '当前识别模型',
   currentTranslation: '当前翻译模型',
@@ -38,6 +40,8 @@ export const modelsSettingsZh = {
 }
 
 export const modelsSettingsEn: Record<keyof typeof modelsSettingsZh, string> = {
+  removing: 'Removing…',
+  removeFailed: 'Removal failed',
   modelsSubtitle: 'Manage local speech recognition and translation models',
   currentRecognition: 'Speech recognition model',
   currentTranslation: 'Translation model',

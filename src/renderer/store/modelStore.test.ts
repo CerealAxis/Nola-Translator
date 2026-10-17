@@ -26,3 +26,24 @@ it('measures download speed from progress events and clears it after failure or 
   publish(base)
   expect(modelsStore.getState().resources[0].bytesPerSecond).toBeUndefined()
 })
+
+
+it('removes custom rows on completion and ignores a delayed remove acknowledgement', () => {
+  const bridge = createIpcBridge()
+  let emit: (event: EngineChannelEvent) => void = () => undefined
+  vi.spyOn(bridge.events, 'onEngineEvent').mockImplementation(callback => { emit = callback; return () => undefined })
+  attachModelsStore(bridge)
+  const pending: ResourceRecord = {
+    resourceId: 'hub:local/example', kind: 'recognitionModel', provider: 'llama-asr',
+    name: 'Example', description: 'Example', languages: [], installed: true,
+    installedBytes: 100, state: 'running', phase: 'remove', cancellable: false,
+  }
+  const publish = (resource: ResourceRecord) => emit({ protocolVersion: 1, requestId: 'remove', type: 'resourceChanged', resource })
+  publish(pending)
+  publish({ ...pending, state: 'idle', installed: false, installedBytes: 0 })
+  expect(modelsStore.getState().resources).toEqual([])
+  emit({ protocolVersion: 1, requestId: 'late', type: 'resourceActionResult', resource: pending })
+  expect(modelsStore.getState().resources).toEqual([])
+  publish({ ...pending, state: 'idle', phase: undefined })
+  expect(modelsStore.getState().resources).toHaveLength(1)
+})

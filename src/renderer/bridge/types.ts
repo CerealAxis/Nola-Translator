@@ -88,7 +88,7 @@ export type SessionStatus = 'idle' | 'starting' | 'running' | 'paused' | 'stoppi
  * the coarser `state ('idle'|'running'|'cancelling'|'failed') + phase`, and
  * `resourceStateOf()` in `contract.ts` flattens the two.
  */
-export type ResourceState = 'absent' | 'queued' | 'downloading' | 'verifying' | 'installed' | 'failed'
+export type ResourceState = 'absent' | 'queued' | 'downloading' | 'verifying' | 'removing' | 'installed' | 'failed'
 
 /** Diagnostics payload shape; this is what the main process's `getDiagnostics()` returns. */
 export type DiagnosticsPayload = Record<string, string | number>

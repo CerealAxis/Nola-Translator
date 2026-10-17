@@ -8,6 +8,7 @@
 - 桌面应用：Electron + React + TypeScript
 - 音频测试：复用所选设备的实际采集链路，在内存采集两秒并回放；不加载模型、不创建记录。应用仅做 ASR 必需的采样率／声道／PCM 格式转换，不做增益或降噪。
 - 引擎：内置 Windows x64 Python 3.12；PyTorch 与 llama.cpp 由设置页按组合安装或复用本地组件（模型能力持久化在自定义模型注册表，启动与逐句翻译必须校验配置）；开发环境的 llama 下载工具复用运行时清单中的版本与校验值
+- Recognition and translation independently select PyTorch or llama.cpp by the installed loader. Recommendation defaults never impose a task/backend pairing; switching engines does not convert weights. Qwen3-ASR GGUF needs a matching qwen3a audio projector and the catalog llama.cpp b11532 audio support.
 - Index-Translate：推荐官方 2B／9B／35B-A3B-preview Q4_K_M 文本权重，通过 llama.cpp 推理；独立免费 API 使用官方公开 35B-A3B 模型，无需密钥，支持 SSE 译文。
 - Hy-MT2：推荐 1.8B 三个量化档位与腾讯官方 7B Q4_K_M；7B 显式使用官方独立 Jinja 对话模板。
 - 云端识别：Aliyun LiveTranslate 3.5／3.8 使用 WebSocket 持续输入 PCM16；MiniMax Speech-to-Text 不接受音频流式输入，改由引擎侧 VAD 切段后逐段上传 WAV，SSE 只推送响应增量。云端翻译支持 MyMemory REST 与识别连接自带的流式译文（仅阿里云具备，MiniMax 无内置译文）。
@@ -18,7 +19,7 @@
 - 中文帮助文档：沿用 `docs/nola-docs/` 既有大纲，写作规范位于 `contributing/writing-guidelines.md`；教程截图通过 `node docs/scripts/generate-screenshots.mjs --guide` 生成，仅更新中文 guide 资源与来源记录。
 - 测试：Vitest + Testing Library
 - 诊断：主进程使用 Node 文件 API 每次启动保存一份不拆分的 JSONL 日志，自动脱敏、限制单条大小并保留最近启动记录。
-- 浏览器：Chrome／Edge Manifest V3 + React／TypeScript；扩展独立版本由 browser/version.json 管理，CHANGELOG.md 记录发布；Python 标准库 Native Messaging 连接程序由 PyInstaller 打包
+- 浏览器：Chrome／Edge／Firefox Manifest V3 + React／TypeScript；扩展独立版本由 browser/version.json 管理，CHANGELOG.md 记录发布；Python 标准库 Native Messaging 连接程序由 PyInstaller 打包
 
 ## 2. 目录结构
 
@@ -30,22 +31,26 @@ src/
 └── renderer/    # React 应用
     ├── application.tsx # 桌面、文档站与 Toy 共用的页面及导航注册
     ├── bridge/  # 渲染进程唯一的数据出口（NolaBridge）
-    ├── assets/browsers/ # Chrome／Edge 图标，用于浏览器连接设置
+    ├── assets/browsers/ # Chrome／Edge／Firefox 图标，用于浏览器连接设置
     ├── assets/fonts/    # 随桌面应用打包的 Noto CJK 区域可变字体与 OFL 许可证
-    ├── store/   # 4 个域 store，自研 useSyncExternalStore 实现
+    ├── store/   # 5 个域 store（含独立 offlineStore），自研 useSyncExternalStore 实现
     ├── components/  # primitives/（封闭 8 个）+ caption/ home/ notes/ reading/
-    ├── features/    # home/ workspace/ overlay/ records/ models/ settings/ onboarding/（主窗口跨页面蒙层教程与定位）
+    ├── features/    # home/ workspace/ overlay/ records/ models/ settings/ offline/（模型本地导入、离线包准备与安装） onboarding/（主窗口跨页面蒙层教程与定位）
     ├── i18n/         # zh-CN.ts 定义 Dictionary；locale-builder.ts 组装完整词典；browser-locales.ts 提供扩展文案；en／zh-TW／zh-HK／ko／ja 各有完整强类型词典
     └── theme/        # 设计 token 唯一来源（CSS）；cjk-fonts.css 仅由桌面渲染器加载区域字体
 engine/nola_translator_engine/  # Python 引擎，协议定义在 protocol.py，model_capabilities.py 为引擎能力校验；translation/index_translate_languages.py 维护 Index-Translate 官方语言名称
+├── local_models.py             # Local snapshot compatibility, optional Hugging Face card metadata, atomic custom-registry imports
+├── offline_models.py           # 独立 JSONL worker，按可信清单预检、准备和导入模型，不加载推理组件
 ├── audio/capture.py            # WASAPI 与浏览器音频采集、失败资源释放、两秒内存试听
 ├── recognition/aliyun.py       # LiveTranslate WebSocket、原文与内置译文关联及结束排空
 ├── recognition/minimax.py      # VAD 切段后逐段上传 WAV、SSE 增量、失败锁存与并发上限
+├── recognition/llama_asr.py    # Qwen3-ASR GGUF audio input and output parsing through its own llama-server
+├── translation/transformers_causal.py # Local AutoModelForCausalLM text translation, independent of recommendation families
 ├── translation/mymemory.py     # 公共 REST 翻译、UTF-8 请求分段及业务状态校验
 └── translation/index_translate.py # 官方 Index-Translate 提示词、本地 GGUF 与无密钥公开 API
 browser/
 ├── version.json / CHANGELOG.md # 独立扩展版本与发布记录；构建 manifest 与桌面兼容校验共用版本
-├── extension/                 # MV3 扩展、播放器适配、临时 store、Shadow DOM；build.mjs 独立构建到 dist/
+├── extension/                 # MV3 扩展、播放器适配、临时 store、Shadow DOM；build.mjs 独立构建到 dist/ 与 dist-firefox/
 ├── native_host/               # 标准库 stdio／当前用户命名管道连接程序及帧协议测试
 └── tests/                     # 隔离配置的浏览器冒烟测试（Playwright，可选开发依赖）
 docs/                           # VitePress 站点工程
@@ -95,6 +100,10 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 - z-index 只用 `.z-*` 类（见 DESIGN.MD 第 8 节），**禁 `z-50` 字面量**
 
 ## 4. 注释规范
+
+- Offline resource workflows use `src/shared/offline.ts`, `main/offline-manager.ts` and main-window-only `offline-ipc.ts`. Model import and manual-download destinations use editable folder-path fields plus native folder pickers. Typed paths must be absolute existing directories validated by the main-window-only IPC, then represented by opaque preview/destination tokens; browsing returns the complete path. Editing a source clears its previous inspection and editing a destination invalidates its old token. Native dialogs or validated typed paths grant access through those tokens; preparation and imports remain background tasks after a dialog closes. Preview workers and installation tasks are cancelled and drained on shutdown. `main/offline-worker.ts` launches base Python's `nola_translator_engine.offline_models` without inference components. Built-in model manifests, including companion templates, are verified before copying and atomically installed. Local model selection uses local_models.py and the shared runtime adapter rules to validate architecture, required files, GGUF headers, safetensors payloads and shard indexes; it accepts compatible revisions beyond the recommendation catalog. It never executes repository scripts or installs arbitrary Python dependencies. Offline bundles retain their pinned portable-package manifests.
+- Local model import uses HeroUI Modal, Tabs, ListBox, Select and Tooltip. Supported model families stay visible; explanatory copy and the exact version list belong in tooltips. Recommended cards expose manual downloads even when installed. `src/shared/model-import-catalog.json` is generated from the engine catalog by `scripts/generate-model-import-catalog.py`; its pinned provider revisions and complete file lists define recommended downloads and identify exact built-in snapshots; compatible local models use the common adapter checks. Run the generator with `--check` after catalog changes. Hy-MT2 7B uses the embedded application template and needs only the catalog GGUF; snapshot templates such as Qwen3's remain required files.
+- Offline bundles are portable directories with `manifest.json` published last, `models.json` plus `models/`, and `runtimes/runtime-resources.json` plus per-recipe resources. The initial format requires the same app version and Windows x64 Python 3.12. `main/offline-runtimes.ts` prepares official pinned primary artifacts and uses the connected target-compatible interpreter to build source-only dependencies into wheels without installing the environment. Complete wheel closure is checked, hashes recorded, direct URL dependencies rejected, and import uses only local binary wheels with no index. Input media is never modified; lock and resolver scratch files live under the managed runtime directory. Package hashes provide integrity rather than publisher authentication. Only main-process installation reservations can stop/restart the engine or replace components, and offline preparation never switches the source computer's configuration.
 
 - Simplified Chinese help follows `docs/nola-docs/contributing/writing-guidelines.md`. Tutorial captures reuse the real React pages with fictional in-memory state; `generate-screenshots.mjs --guide` writes only `docs/public/screenshots/zh-CN/guide/`, with its own provenance manifest recording actual PNG dimensions. Other locales and existing marketing screenshots stay independent. Privacy descriptions must distinguish the relocatable data root from Electron userData logs and distinguish local inference from remote fallback translation.
 
@@ -203,3 +212,10 @@ node scripts/check-installer-paths.mjs [makensis.exe] # Windows NSIS 目录回�
 **维护本文件**
 
 - 项目结构变更必须同步更新第 1、2、4 节
+
+- Firefox uses a Gecko add-on ID, an event-page background and its own allowed_extensions Native Messaging manifest. Mozilla passes the manifest path and add-on ID to the native host. Firefox supports desktop system audio only: MDN documents no Capture Handle API for verifying tab audio. Never bypass capture target verification. Firefox installation caches are not authoritative; live handshakes confirm installation.
+
+- Local import metadata optionally comes from a user-supplied Hugging Face repo ID or local config/GGUF provenance. Network card failures do not block offline import. Exact built-in bytes retain their resource ID; other snapshots enter the custom registry with no inferred language configuration. Local variants from the same repo have distinct variant IDs/directories and preserve saved capabilities on reimport. The existing ModelCapabilityNotices queue owns post-import configuration prompts. Configuration uses the application language directory, and the engine still enforces implemented loader task/engine/tokenizer limits; a declared capability never creates new runtime support. Compatibility inspection is structural and does not trial-load inference weights or guarantee available memory.
+- GGUF audio detection uses Qwen3-ASR's qwen3vl decoder plus qwen3a projector metadata (source: llama.cpp b11532 multimodal docs and ggml-org official GGUFs). A qwen3vl decoder alone is not evidence of audio support. Local selection accepts one main GGUF and its matching mmproj companion, checks both headers and projector dimensions, and copies/hashes both. ASR and translation own independent loopback-only llama-server instances; neither can switch the other's model. PCM16 WAV audio requests stay in memory and reuse StreamingRecognizer's segmentation and epoch fencing. Component reservations, device planning and teardown use each actual loader, including llama-only ASR without Torch. Causal PyTorch translation uses local-only AutoModelForCausalLM/AutoTokenizer with repository code disabled, saved language capabilities and explicit context/output limits.
+
+- OfflineTaskProgress uses HeroUI v3 ProgressBar and a compact task step list with project tokens. offlineStore retains the workflow when a task continues in the background. Steps reflect the actual import/download/package phases; the bar measures only the current phase, uses indeterminate state when totals are unknown, and never displays 0 / 0 or invents total-time estimates.

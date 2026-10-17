@@ -226,10 +226,29 @@ class ResourceManager:
         """Absolute path of the single GGUF a llama.cpp translation resource loads.
         """
         spec = self._spec(resource_id)
-        ggufs = [entry for entry in spec.files if entry.path.casefold().endswith(".gguf")]
+        ggufs = [entry for entry in spec.files if entry.path.casefold().endswith(".gguf") and not Path(entry.path).name.casefold().startswith("mmproj-")]
         if not ggufs:
             raise ResourceActionError("invalidConfiguration", {"reason": "翻译模型资源里没有 GGUF 权重"})
         return self.model_root / spec.directory / ggufs[0].path
+
+    def audio_projector_path(self, resource_id: str) -> Path:
+        spec = self._spec(resource_id)
+        projectors = [entry for entry in spec.files if Path(entry.path).name.casefold().startswith("mmproj-") and entry.path.casefold().endswith(".gguf")]
+        if len(projectors) != 1:
+            raise ResourceActionError("invalidConfiguration", {"reason": "需要唯一的配套 mmproj 音频编码器"})
+        return self.model_root / spec.directory / projectors[0].path
+
+    def translation_chat_template(self, resource_id: str) -> str | None:
+        entry = self.registry.get(resource_id)
+        if entry is None or entry.adapter_id not in ("llama.cpp", "llama-asr"):
+            return None
+        template = next((item for item in entry.files if item.path == "chat_template.jinja"), None)
+        if template is None:
+            return None
+        path = self.model_path(resource_id) / template.path
+        if not path.is_file() or path.stat().st_size > 1024 * 1024:
+            raise ResourceActionError("invalidConfiguration", {"reason": "invalidChatTemplate"})
+        return path.read_text(encoding="utf-8")
 
     def model_path(self, resource_id: str) -> Path:
         """Resource id → local model directory; unknown ids fail the definition lookup before reaching here."""
@@ -322,7 +341,7 @@ class ResourceManager:
             raise ResourceActionError("resourceBusy")
         if action == "install" and self.is_installed(resource_id):
             return self.record(resource_id)
-        if action == "remove" and not self.is_installed(resource_id):
+        if action == "remove" and not self.is_installed(resource_id) and self.registry.get(resource_id) is None:
             return self.record(resource_id)
 
         cancellable = action == "install"
@@ -347,6 +366,7 @@ class ResourceManager:
         network: NetworkSettings | None,
         download_source: str | None,
     ) -> None:
+        original = self.record(resource_id)
         try:
             if action == "install":
                 await self._install(resource_id, operation, network, download_source)
@@ -366,12 +386,23 @@ class ResourceManager:
             self.operations.pop(resource_id, None)
         finally:
             self.tasks.pop(resource_id, None)
-            self._emit_changed(resource_id)
+            if action == "remove" and operation.state != "failed" and self.registry.get(resource_id) is None:
+                # The custom identity is gone. Emit its terminal snapshot without
+                # looking it up again; phase=remove lets clients discard the row.
+                self._emit_changed(resource_id, original.model_copy(update={
+                    "installed": False, "installedBytes": 0, "state": "idle",
+                    "phase": "remove", "progress": None, "cancellable": False, "errorCode": None,
+                }))
+            else:
+                self._emit_changed(resource_id)
 
     async def _install(
         self, resource_id: str, operation: Operation, network: NetworkSettings | None,
         download_source: str | None,
     ) -> None:
+        entry = self.registry.get(resource_id)
+        if entry is not None and entry.revision.startswith("local-"):
+            raise ResourceActionError("resourceUnavailable", {"reason": "Local model files must be imported again; a local snapshot is not a downloadable Hub revision."})
         spec = self._spec(resource_id)
         loop = asyncio.get_running_loop()
         last_progress_at = 0.0
@@ -430,7 +461,10 @@ class ResourceManager:
 
     async def _remove(self, resource_id: str) -> None:
         spec = self._spec(resource_id)
-        await asyncio.to_thread(shutil.rmtree, self.models.model_path(spec), True)
+        try:
+            await asyncio.to_thread(shutil.rmtree, self.models.model_path(spec))
+        except FileNotFoundError:
+            pass
         # A self-installed model is also an identity, not just a directory: keeping the registry
         # entry after the weights are gone would leave a row in the resource list that can never
         # become installed again and that nothing can install. Removing the weights without
@@ -453,13 +487,13 @@ class ResourceManager:
         operation.phase = phase
         self._emit_changed(resource_id)
 
-    def _emit_changed(self, resource_id: str) -> None:
+    def _emit_changed(self, resource_id: str, record: ResourceRecord | None = None) -> None:
         self.emit(
             ResourceChangedEvent(
                 protocolVersion=1,
                 type="resourceChanged",
                 requestId=f"resource-{uuid4()}",
-                resource=self.record(resource_id),
+                resource=record if record is not None else self.record(resource_id),
             )
         )
 
@@ -494,8 +528,8 @@ class ResourceManager:
             resource_id=entry.resource_id,
             kind=kind,
             provider=entry.adapter_id,
-            name=entry.name,
-            description=description,
+            name=entry.display_name,
+            description=entry.description or (entry.display_name if entry.repo.startswith("local/") else entry.repo if entry.revision.startswith("local-") else description),
             languages=tuple(dict.fromkeys((entry.configuration.languages + entry.configuration.sourceLanguages + entry.configuration.targetLanguages) if entry.configuration else entry.languages)),
             download_bytes=entry.total_bytes,
         )
@@ -514,7 +548,7 @@ class ResourceManager:
         entry = self.registry.get(resource_id)
         if entry is None:
             raise ResourceActionError("invalidConfiguration", {"reason": "recommendedConfigurationIsFixed"})
-        expected_engine = "llama" if entry.adapter_id == "llama.cpp" else "pytorch"
+        expected_engine = "llama" if entry.adapter_id in ("llama.cpp", "llama-asr") else "pytorch"
         if configuration.slot != entry.slot or configuration.engine != expected_engine:
             raise ResourceActionError("invalidConfiguration", {"reason": "modelLoaderMismatch"})
         required = [configuration.languages] if entry.slot == "recognition" else [configuration.sourceLanguages, configuration.targetLanguages]
@@ -525,7 +559,7 @@ class ResourceManager:
             raise ResourceActionError("invalidConfiguration", {"reason": "missingLanguages"})
         # Specialized tokenizers cannot accept language codes outside their vocabularies.
         canonical = {normalize(code) for code in (QWEN_LANGUAGES if entry.adapter_id == "qwen3-asr" else ["zh", "en", "yue", "ja", "ko"] if entry.adapter_id == "sensevoice" else FLORES_LANGUAGES)}
-        if entry.adapter_id != "llama.cpp" and any(normalize(code) not in canonical for codes in required for code in codes):
+        if entry.adapter_id in ("qwen3-asr", "sensevoice", "m2m100") and any(normalize(code) not in canonical for codes in required for code in codes):
             raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedLanguage"})
         if configuration.translationPairs is not None and (not configuration.translationPairs or any(not supports_translation(configuration, pair.source, pair.target) for pair in configuration.translationPairs)):
             raise ResourceActionError("invalidConfiguration", {"reason": "invalidPair"})
@@ -545,7 +579,7 @@ class ResourceManager:
         ``is_installed`` and ``model_path`` will consult afterwards. Nothing here downloads, so an
         entry that was written and then failed to install is still removable and still listed.
         """
-        if adapter_id not in ("qwen3-asr", "sensevoice", "m2m100", "llama.cpp"):
+        if adapter_id not in ("qwen3-asr", "sensevoice", "m2m100", "llama.cpp", "llama-asr", "transformers-causal"):
             raise ResourceActionError(
                 "invalidConfiguration", {"reason": f"没有可运行的加载器：{adapter_id}"}
             )

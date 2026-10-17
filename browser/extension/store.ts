@@ -452,6 +452,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     async refresh() { await this.init(); if (state.status === 'active') reset() },
     pressCapture() {
       if (state.status !== 'idle' || state.capturePending || captionAudioSource(state.config) !== 'tab') return
+      if (navigator.userAgent.includes('Firefox/')) { set({ error: 'captureUnsupported' }); return }
       const captureGeneration = ++generation
       let promise: Promise<MediaStream>
       // Screen Capture requires transient activation in this original press handler.
@@ -495,6 +496,8 @@ export function createExtensionStore(dependencies: StoreDependencies) {
       // A system capture needs neither the picker nor a gesture: the desktop owns the capture.
       let capturePromise: Promise<MediaStream> | null = null
       if (captionAudioSource(state.config) === 'tab') {
+        // Firefox lacks Capture Handle and verified tab audio (MDN Screen Capture compatibility).
+        if (navigator.userAgent.includes('Firefox/')) { set({ error: 'captureUnsupported' }); return }
         try { capturePromise = media ? Promise.resolve(media) : (dependencies.getDisplayMedia ?? (options => navigator.mediaDevices.getDisplayMedia(options)))(CAPTURE_OPTIONS) }
         catch (error) { set({ error: failCode(error) }); return }
       }

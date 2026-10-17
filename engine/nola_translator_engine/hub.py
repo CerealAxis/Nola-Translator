@@ -23,6 +23,7 @@ chasing a network problem they do not have.
 """
 
 from __future__ import annotations
+from pathlib import Path
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -130,6 +131,7 @@ class HubRepoInfo:
     tags: tuple[str, ...] = ()
     gguf_architecture: str | None = None
     gguf_chat_template: str | None = None
+    gguf_audio_projector: str | None = None
     model_type: str | None = None
     architectures: tuple[str, ...] = ()
     is_private: bool = False
@@ -269,10 +271,8 @@ LLAMA_CPP_ARCHITECTURES: frozenset[str] = frozenset(
     }
 )
 
-# Encoder-decoder families. llama.cpp implements decoder-only architectures and its
-# convert_hf_to_gguf.py raises NotImplementedError on anything else; the engine ships no
-# encoder-decoder loader of its own either. Naming them turns a bare "no adapter matched" into a
-# reason the user can act on instead of retrying with another repo of the same family.
+# These families need task-specific processors and output handling beyond the
+# implemented adapters. A backend supporting tensors alone is not sufficient.
 ENCODER_DECODER_MODEL_TYPES: frozenset[str] = frozenset(
     {
         "marian",
@@ -354,12 +354,23 @@ M2M100_ADAPTER = RuntimeAdapter(
     languages=tuple(sorted(FLORES_LANGUAGES)),
 )
 
+# AutoModelForCausalLM implementations in the bundled Transformers. Unlike the
+# recommendation list, these are format/loader capabilities, not repository IDs.
+CAUSAL_TRANSLATION_ADAPTER = RuntimeAdapter(
+    adapter_id="transformers-causal", loader="transformers", slot="translation",
+    label="transformers · AutoModelForCausalLM",
+    model_types=frozenset({"llama", "qwen2", "qwen3", "qwen3_moe", "mistral", "gemma", "gemma2", "gemma3_text", "hunyuan_v1_dense"}),
+    required_files=("config.json", "tokenizer_config.json", "tokenizer.json"),
+    weight_groups=(("model.safetensors",), ("model.safetensors.index.json",)),
+)
+
 # Order is the tie-break when two adapters could claim the same repo; a specific model_type match
 # always beats a layout match, which is why the registry is scanned by key before by layout.
 RUNTIME_ADAPTERS: tuple[RuntimeAdapter, ...] = (
     QWEN3_ASR_ADAPTER,
     SENSEVOICE_ADAPTER,
     M2M100_ADAPTER,
+    CAUSAL_TRANSLATION_ADAPTER,
 )
 
 _ADAPTER_BY_ID: dict[str, RuntimeAdapter] = {item.adapter_id: item for item in RUNTIME_ADAPTERS}
@@ -443,8 +454,25 @@ def _library_names(info: HubRepoInfo) -> set[str]:
 
 
 def _verdict_gguf(info: HubRepoInfo) -> RuntimeVerdict:
-    """The llama.cpp path: a GGUF is already converted, so the architecture is all we need."""
+    """Resolve decoder, task and optional audio projector before choosing a loader."""
     architecture = info.gguf_architecture
+    # Qwen3-ASR uses the qwen3vl decoder with a qwen3a audio projector;
+    # qwen3vl alone also describes vision models and is insufficient evidence.
+    # Source: llama.cpp b11532 docs/multimodal.md and the official GGUF metadata.
+    audio = info.gguf_audio_projector == "qwen3a" or (
+        architecture == "qwen3vl" and any("qwen3-asr" in item.path.casefold() for item in info.gguf_files)
+    )
+    if audio:
+        if architecture != "qwen3vl":
+            return _reject("audioArchitectureMismatch", "Qwen3-ASR 音频编码器需要 qwen3vl 主权重。", info)
+        if not any("mmproj-" + Path(main.path).name.casefold() == Path(projector.path).name.casefold()
+            for main in info.gguf_files if not Path(main.path).name.casefold().startswith("mmproj-")
+            for projector in info.gguf_files):
+            return _reject("missingRequiredFiles", "ASR GGUF 缺少配套 mmproj 音频编码器；请将主权重和同一模型的 mmproj 文件放在同一文件夹后导入。", info)
+        if _undigested_files(info):
+            return _reject("hubNoPublishedDigest", "音频权重缺少可校验摘要。", info)
+        return RuntimeVerdict(True, "llamaCppAudioModel", "由 llama.cpp / libmtmd 加载 Qwen3-ASR 主权重和音频编码器。",
+            slot="recognition", loader="llama.cpp", adapter_id="llama-asr", evidence=_evidence(info))
     if not architecture:
         return _reject(
             "ggufArchitectureUnknown",
@@ -456,22 +484,17 @@ def _verdict_gguf(info: HubRepoInfo) -> RuntimeVerdict:
     if architecture not in LLAMA_CPP_ARCHITECTURES:
         return _reject(
             "llamaCppUnsupportedArchitecture",
-            f"llama.cpp 不支持架构 {architecture}。引擎只接受 "
+            f"当前加载器尚未适配架构 {architecture}。文本翻译支持 "
             f"{'、'.join(sorted(LLAMA_CPP_ARCHITECTURES))} 这些 decoder-only 架构。",
             info,
         )
-    if info.pipeline_tag not in (None, "translation"):
-        # A *declared* different pipeline is a real refusal. An **absent** one is not: a GGUF
-        # repo that says nothing at all is common in practice (tencent/Hy-MT2-1.8B-GGUF, the
-        # one this app ships, carries no pipeline_tag), and reading silence as "this is not a
-        # translation model" refuses the model the app already depends on. The loader that
-        # consumes a GGUF here is llama-server, so silence leaves translation as the only
-        # remaining job for it; the evidence records that the tag was absent so the decision
-        # stays auditable.
+    if info.pipeline_tag not in (None, "translation", "text-generation", "conversational"):
+        # Instruction-tuned text models can translate through a prompt. Audio tasks
+        # still require the verified projector path above rather than a text prompt.
         return _reject(
             "slotUnsupportedForLoader",
             f"这个 GGUF 的 pipeline_tag 是 {info.pipeline_tag}，而引擎的 "
-            "llama-server 路径只服务翻译模型（llama.cpp 跑不了 encoder-decoder 的语音识别模型）。",
+            "文本加载路径不能处理该任务；语音模型需要音频加载器和配套编码器。",
             info,
         )
     if not info.gguf_files:
@@ -563,8 +586,7 @@ def detect_runtime(info: HubRepoInfo) -> RuntimeVerdict:
     if _library_names(info) & WHISPER_CPP_LIBRARIES:
         return _reject(
             "whisperCppFormat",
-            "这是 whisper.cpp 的仓库。它的 GGUF 是 whisper.cpp 的专有转换格式，llama.cpp "
-            "读不了；引擎的识别走 transformers/funasr，也不接受这种权重。",
+            "该仓库使用 whisper.cpp 权重；当前软件尚未提供 whisper.cpp 加载器，不能通过现有音频加载路径运行。",
             info,
         )
 
@@ -652,9 +674,8 @@ def detect_runtime(info: HubRepoInfo) -> RuntimeVerdict:
 def _no_adapter_reason(matched_by: str, info: HubRepoInfo) -> str:
     if matched_by == "encoderDecoder":
         return (
-            f"{info.model_type} 是 encoder-decoder 架构。引擎没有任何 encoder-decoder 加载器，"
-            "llama.cpp 也只实现 decoder-only 家族（convert_hf_to_gguf.py 会抛 "
-            "NotImplementedError），所以这个仓库装不了。"
+            f"当前尚未实现 {info.model_type} 对应的推理适配器。"
+            "PyTorch 支持多种任务，但模型还需要匹配的处理器、提示格式和输出解析。"
         )
     if matched_by == "unknownArchitecture":
         return (

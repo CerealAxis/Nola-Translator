@@ -38,6 +38,18 @@ it('reuses validated components on repeated caption starts without spawning anot
   expect(recheck).not.toHaveBeenCalled()
 })
 
+it('runs llama ASR without Torch and checks Torch only when translation needs it', async () => {
+  const { manager, engine, local } = await validatedManager()
+  await rm(join(engine, 'torch', '__init__.py'))
+  Object.assign(manager, { local: { ...local, engine: missingLocalRuntime(engine) } })
+  const recheck = vi.spyOn(manager, 'recheck').mockResolvedValue(undefined)
+  const compute = { ...DEFAULT_SETTINGS.compute, recognitionEngine: 'llama' as const }
+  await expect(manager.prepare(compute, 'none', true)).resolves.toBeUndefined()
+  await expect(manager.prepare(compute, 'llama', true)).resolves.toBeUndefined()
+  expect(recheck).not.toHaveBeenCalled()
+  await expect(manager.prepare(compute, 'torch', true)).rejects.toThrow('RUNTIME_TORCH')
+})
+
 it('rechecks a component that disappeared before using the cached readiness', async () => {
   const { manager, engine, local } = await validatedManager()
   await rm(join(engine, 'torch', '__init__.py'))
@@ -69,4 +81,33 @@ it('allows cloud-only service without either inference component and validates e
   expect(recheck).not.toHaveBeenCalled()
   await expect(manager.prepare(DEFAULT_SETTINGS.compute, 'none', true)).rejects.toThrow('RUNTIME_TORCH')
   await expect(manager.prepare(DEFAULT_SETTINGS.compute, 'llama', false)).rejects.toThrow('RUNTIME_LLAMA')
+})
+
+import { OfflineRuntimes } from '../../../src/main/offline-runtimes'
+import type { RuntimePackage } from '../../../src/shared/compute'
+const offlineProbes = vi.hoisted(() => ({ llama: vi.fn(), engine: vi.fn() }))
+vi.mock('../../../src/main/local-runtimes', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../src/main/local-runtimes')>()
+  return { ...actual, probeLocalLlama: offlineProbes.llama, probeLocalEngine: offlineProbes.engine }
+})
+
+it.each(['ready', 'corrupted'] as const)('revalidates an existing offline runtime before skipping it: %s', async state => {
+  const { manager } = await validatedManager()
+  const pkg: RuntimePackage = { id: 'llama-offline-test', name: 'Llama test', kind: 'llama', backend: 'cpu', architecture: 'x64', version: 'b123', bytes: 1, sha256: 'a'.repeat(64), url: 'https://example.com/archive.zip' }
+  const directory = join(manager.directory, pkg.id)
+  await mkdir(directory)
+  await writeFile(join(directory, 'runtime-installed.json'), JSON.stringify({ id: pkg.id, kind: 'llama' }))
+  const selected = { ...missingLocalRuntime(directory), id: pkg.id, managed: true, status: 'ready' as const, backend: 'cpu', version: 'b123' }
+  Object.assign(manager, { packages: [pkg], local: { engine: missingLocalRuntime(), llama: selected } })
+  offlineProbes.llama.mockResolvedValue({ ...selected, version: state === 'ready' ? 'b123' : 'b122' })
+  const inspect = vi.spyOn(OfflineRuntimes.prototype, 'inspect').mockResolvedValue([{ id: pkg.id, name: pkg.name, kind: 'runtime', bytes: 1, status: 'ready' }])
+  const install = vi.spyOn(OfflineRuntimes.prototype, 'install').mockResolvedValue(undefined)
+  try {
+    expect((await manager.inspectOffline('bundle'))[0].status).toBe(state === 'ready' ? 'installed' : 'ready')
+    await manager.installOffline([pkg.id], 'bundle', new AbortController().signal, vi.fn())
+    if (state === 'ready') expect(install).not.toHaveBeenCalled()
+    else expect(install).toHaveBeenCalledWith([pkg.id], 'bundle', expect.any(AbortSignal), expect.any(Function))
+    expect((await manager.snapshot()).local.llama).toEqual(selected)
+    expect(offlineProbes.llama).toHaveBeenCalledTimes(2)
+  } finally { inspect.mockRestore(); install.mockRestore(); vi.clearAllMocks() }
 })

@@ -13,6 +13,10 @@ function record(id: string, configuration?: ModelConfiguration): ResourceRecord 
 const bilingual: ModelConfiguration = { slot: 'translation', engine: 'llama', languages: [], supportsAutoDetection: false, sourceLanguages: ['en', 'ja'], targetLanguages: ['en', 'ja'] }
 
 describe('model language capabilities', () => {
+  it('selects backend by weight loader for both tasks', () => {
+    expect(modelEngines({ provider: 'llama-asr' })).toEqual(['llama'])
+    expect(modelEngines({ provider: 'transformers-causal' })).toEqual(['pytorch'])
+  })
   it('offers the verified Index-Translate language presets through the llama engine', () => {
     for (const id of INDEX_TRANSLATE_MODEL_IDS) {
       const model = record(id)

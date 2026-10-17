@@ -19,6 +19,16 @@ it('keeps a downloaded model gated until the user saves its configuration', asyn
   expect(close).toHaveBeenCalledOnce()
 })
 
+it('saves imported GGUF models as llama.cpp translation models', async () => {
+  const save = vi.spyOn(actions.models, 'configureModel').mockResolvedValue()
+  const translator: ResourceRecord = { ...pending, resourceId: 'hub:test/gguf', kind: 'translationModel', provider: 'llama.cpp' }
+  render(<ModelConfigurationDialog record={translator} onClose={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: '保存配置' }))
+  await waitFor(() => expect(save).toHaveBeenCalledWith(translator.resourceId, expect.objectContaining({
+    slot: 'translation', engine: 'llama', sourceLanguages: ['en', 'ja'], targetLanguages: ['en', 'ja'],
+  })))
+})
+
 it('explains the incompatible direction and offers the three agreed actions', () => {
   const disable = vi.fn(), close = vi.fn()
   const translator: ResourceRecord = { ...pending, resourceId: 'hub:test/translator', kind: 'translationModel', provider: 'llama.cpp', name: 'English/Japanese', configuration: { slot: 'translation', engine: 'llama', languages: [], supportsAutoDetection: false, sourceLanguages: ['en', 'ja'], targetLanguages: ['en', 'ja'] } }

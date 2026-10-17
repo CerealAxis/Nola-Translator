@@ -6,10 +6,10 @@ import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, type BrowserIntegratio
 export interface BrowserIntegrationsOptions {
   localAppData: string
   userData: string
-  executablePaths?: Record<BrowserKind, string[]>
+  executablePaths?: Partial<Record<BrowserKind, string[]>>
   launch?: (executable: string, url: string) => Promise<void>
 }
-const browsers: BrowserKind[] = ['chrome', 'edge']
+const browsers: BrowserKind[] = ['chrome', 'edge', 'firefox']
 function object(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : null
 }
@@ -24,7 +24,7 @@ async function launch(executable: string, url: string): Promise<void> {
 }
 /** Read extension state only; Chrome protects preference writes with integrity checks. */
 export class BrowserIntegrations {
-  private enabled: Record<BrowserKind, boolean> = { chrome: true, edge: true }
+  private enabled: Record<BrowserKind, boolean> = { chrome: true, edge: true, firefox: true }
   private executables: Partial<Record<BrowserKind, string>> = {}
   private writes: Promise<void> = Promise.resolve()
   private rows: BrowserIntegrationInfo[] = []
@@ -46,14 +46,17 @@ export class BrowserIntegrations {
       this.initialized = true
     }
     const executablePaths = this.options.executablePaths ?? {
+      firefox: [join(process.env.PROGRAMFILES ?? 'C:/Program Files', 'Mozilla Firefox/firefox.exe'), join(process.env['PROGRAMFILES(X86)'] ?? 'C:/Program Files (x86)', 'Mozilla Firefox/firefox.exe'), join(this.options.localAppData, 'Mozilla Firefox/firefox.exe')],
       chrome: [join(process.env.PROGRAMFILES ?? 'C:/Program Files', 'Google/Chrome/Application/chrome.exe'), join(process.env['PROGRAMFILES(X86)'] ?? 'C:/Program Files (x86)', 'Google/Chrome/Application/chrome.exe'), join(this.options.localAppData, 'Google/Chrome/Application/chrome.exe')],
       edge: [join(process.env['PROGRAMFILES(X86)'] ?? 'C:/Program Files (x86)', 'Microsoft/Edge/Application/msedge.exe'), join(process.env.PROGRAMFILES ?? 'C:/Program Files', 'Microsoft/Edge/Application/msedge.exe'), join(this.options.localAppData, 'Microsoft/Edge/Application/msedge.exe')],
     }
     this.rows = await Promise.all(browsers.map(async browser => {
-      const paths = await Promise.all(executablePaths[browser].map(async path => await exists(path) ? path : null))
+      const paths = await Promise.all((executablePaths[browser] ?? []).map(async path => await exists(path) ? path : null))
       const executable = paths.find(path => path !== null)
       if (executable) this.executables[browser] = executable
       else delete this.executables[browser]
+      // Firefox profile caches vary across channels; live handshakes provide authoritative state.
+      if (browser === 'firefox') return { browser, available: !!executable, extensionStatus: 'unknown' as const, connected: false, enabled: this.enabled[browser] }
       const root = join(this.options.localAppData, browser === 'chrome' ? 'Google/Chrome/User Data' : 'Microsoft/Edge/User Data')
       return { browser, available: !!executable, ...await this.extensionState(root, BROWSER_EXTENSION_ID), connected: false, enabled: this.enabled[browser] }
     }))
@@ -109,7 +112,7 @@ export class BrowserIntegrations {
     await this.inspect()
     const executable = this.executables[browser]
     if (!executable) throw new Error('browserNotFound')
-    const url = `${browser === 'chrome' ? 'chrome' : 'edge'}://extensions/?id=${BROWSER_EXTENSION_ID}`
+    const url = browser === 'firefox' ? 'about:addons' : `${browser === 'chrome' ? 'chrome' : 'edge'}://extensions/?id=${BROWSER_EXTENSION_ID}`
     await (this.options.launch ?? launch)(executable, url)
   }
 }

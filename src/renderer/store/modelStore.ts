@@ -75,6 +75,7 @@ let bridge: NolaBridge | null = null
 let unsubscribe: (() => void) | null = null
 let busy = new Set<string>()
 let searchGeneration = 0
+const removedResources = new Set<string>()
 const downloadSamples = new Map<string, { at: number; bytes: number; rate?: number }>()
 
 const enqueue = createWriteQueue()
@@ -90,6 +91,16 @@ function setBusy(ids: Iterable<string>): void {
 
 /** Replaces one record in place, leaving list order and every other reference alone. */
 function patchResource(resource: ResourceRecord): void {
+  if (resource.resourceId.startsWith('hub:') && resource.phase === 'remove') {
+    if (resource.state === 'idle' && !resource.installed) {
+      removedResources.add(resource.resourceId)
+      downloadSamples.delete(resource.resourceId)
+      modelsStore.setState(state => ({ resources: state.resources.filter(item => item.resourceId !== resource.resourceId) }))
+      return
+    }
+    // A fast removal may finish before its action acknowledgement arrives.
+    if (removedResources.has(resource.resourceId)) return
+  } else removedResources.delete(resource.resourceId)
   let measured: ResourceRecordWithRate = resource
   if (resource.state === 'running' && resource.phase === 'download' && resource.downloadBytes && resource.progress !== undefined) {
     const now = Date.now()
@@ -332,6 +343,7 @@ export function attachModelsStore(next: NolaBridge): void {
 }
 
 export function detachModelsStore(): void {
+  removedResources.clear()
   downloadSamples.clear()
   searchGeneration += 1
   unsubscribe?.()

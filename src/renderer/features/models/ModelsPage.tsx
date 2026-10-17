@@ -1,3 +1,6 @@
+import { LocalModelImport } from '../offline'
+import { offlineActions } from '@/store/offlineStore'
+import { modelImportEntry } from '../../../shared/model-import-catalog'
 import { configurationOf, isModelReady } from '../../../shared/model-capabilities'
 import { ModelConfigurationDialog } from './ModelConfigurationDialog'
 import { supportsSelectedEngine } from '../../../shared/model-engines'
@@ -117,7 +120,7 @@ export function ModelsPage() {
       onCancel={run(record, 'cancel')}
       onRemove={run(record, 'remove')}
       onSetDefault={() => setDefault(record)}
-      footer={record.resourceId.startsWith('hub:') && record.installed ? <Button variant="secondary" onPress={() => setConfiguring(record)}>{t(configurationOf(record) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : undefined}
+      footer={record.resourceId.startsWith('hub:') && record.installed ? <Button variant="secondary" onPress={() => setConfiguring(record)}>{t(configurationOf(record) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : modelImportEntry(record.resourceId) ? <Button variant="secondary" size="sm" onPress={() => offlineActions.openDownloads(record.resourceId)}>{t('offline.manualDownload')}</Button> : undefined}
     />
   )
 
@@ -134,7 +137,7 @@ export function ModelsPage() {
       <section className="models-overview">
         <header className="models-overview__heading">
           <span className="models-overview__icon"><Box aria-hidden="true" /></span>
-          <div><h1>{t('models.title')}</h1><p>{t('modelsSettingsUi.modelsSubtitle')}</p></div>
+          <div><h1>{t('models.title')}</h1><p>{t('modelsSettingsUi.modelsSubtitle')}</p></div><LocalModelImport />
         </header>
         <div className="models-overview__summaries">
           <CurrentModel label={t('modelsSettingsUi.currentRecognition')} name={currentRecognition} record={remoteRecognition ? null : recognition ?? null} installed={remoteRecognition ? null : recognition?.installed ?? false} kind="recognitionModel" />
@@ -322,7 +325,7 @@ function CurrentModel({ label, name, record, installed, kind }: { label:string; 
 /** 在飞 + 失败。失败的留在表里是为了让"重试"有个落点。 */
 function countActive(records: readonly ResourceRecordWithRate[]): number {
   return records.filter(
-    (item) => item.state === 'running' || item.state === 'cancelling' || item.state === 'failed',
+    (item) => item.phase !== 'remove' && (item.state === 'running' || item.state === 'cancelling' || item.state === 'failed'),
   ).length
 }
 import { recognitionLabel } from '../../../shared/cloud-config'

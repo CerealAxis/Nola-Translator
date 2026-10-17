@@ -1,7 +1,7 @@
 import io
 import struct
 import unittest
-from host import read_message, write_message, MAX_MESSAGE_BYTES
+from host import read_message, write_message, MAX_MESSAGE_BYTES, authorized_caller, FIREFOX_EXTENSION_ID, EXTENSION_ID
 
 
 class NativeFramingTests(unittest.TestCase):
@@ -21,6 +21,16 @@ class NativeFramingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             read_message(io.BytesIO(struct.pack('<I', 2) + b'xx'))
 
+
+
+
+class CallerTests(unittest.TestCase):
+    def test_browser_callers(self):
+        self.assertTrue(authorized_caller([f"chrome-extension://{EXTENSION_ID}/"]))
+        self.assertTrue(authorized_caller(["C:/host.json", FIREFOX_EXTENSION_ID]))
+        self.assertFalse(authorized_caller(["C:/host.json", "other@example.org"]))
+        self.assertFalse(authorized_caller([FIREFOX_EXTENSION_ID]))
+        self.assertFalse(authorized_caller([]))
 
 if __name__ == '__main__':
     unittest.main()

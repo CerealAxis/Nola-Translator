@@ -50,6 +50,7 @@ export type { PrewarmErrorCode, PrewarmResult } from '../../shared/contracts'
 export type RouteId = 'home' | 'workspace' | 'overlay' | 'video-captions' | 'records' | 'record' | 'models' | 'settings'
 
 export interface NolaBridge {
+  offline?: import('../../shared/offline').OfflineApi
   engine: {
     listComputeDevices(): Promise<ComputeSnapshot>
     listDevices(): Promise<AudioDevice[]>
@@ -294,6 +295,7 @@ export const BRIDGE_ADAPTER_NOTES: Record<string, string> = {
 export function resourceStateOf(record: ResourceRecord): ResourceState {
   if (record.state === 'failed') return 'failed'
   if (record.state === 'running') {
+    if (record.phase === 'remove') return 'removing'
     if (record.phase === 'verify' || record.phase === 'install') return 'verifying'
     if (record.phase === 'resolve') return 'queued'
     return 'downloading'

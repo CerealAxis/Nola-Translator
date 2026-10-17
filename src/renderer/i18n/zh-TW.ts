@@ -1,8 +1,10 @@
+import { offlineTw } from './offline-ui'
 import type { Dictionary } from './zh-CN'
 import { onboardingTW } from './onboarding-ui'
 
 /** Complete Traditional Chinese dictionary for Taiwan. */
 export const zhTW: Dictionary = {
+  offline: offlineTw,
   onboarding: onboardingTW,
   more: {
     "tabLabel": "更多",
@@ -17,6 +19,7 @@ export const zhTW: Dictionary = {
     "sponsorVacancies": "虛位以待",
   },
   "browser": {
+    "firefox": "Mozilla Firefox",
     "start": "開始",
     "end": "結束",
     "refresh": "重新整理",
@@ -350,6 +353,8 @@ export const zhTW: Dictionary = {
     "recordingPreferenceFailed": "錄音偏好未儲存，請重新開始口譯"
   },
   "modelsSettingsUi": {
+    "removing": "正在移除…",
+    "removeFailed": "移除失敗",
     "modelsSubtitle": "管理本機語音辨識與翻譯模型",
     "currentRecognition": "目前辨識模型",
     "currentTranslation": "目前翻譯模型",

@@ -11,10 +11,13 @@ import { z } from 'zod'
 import { runtimePackageSchema, type ComputeSettings, type LocalRuntime, type RuntimePackage, type RuntimeSnapshot, type HardwareInventory } from '../shared/compute'
 import type { NetworkSettings } from '../shared/settings'
 import { probeHardware } from './hardware-inventory'
-import { PythonEnvironments } from './python-environments'
+import { PythonEnvironments, aliyunTorchWheelUrl } from './python-environments'
+import { PYPI_MIRROR_DEFAULT } from '../shared/pypi-mirrors'
 import { localCandidates, missingLocalRuntime, probeLocalEngine, probeLocalLlama } from './local-runtimes'
 import { decodeDeviceIntent } from '../shared/device-selection'
 import { resolveGithubProxyNode } from './github-proxy-probe'
+import { OfflineRuntimes, type OfflineRuntimeProgress } from './offline-runtimes'
+import type { OfflineItem } from '../shared/offline'
 
 const run = promisify(execFile)
 const catalogSchema = z.object({ version: z.literal(1), packages: z.array(runtimePackageSchema).max(32) })
@@ -149,17 +152,18 @@ export class RuntimeManager {
     if (this.checking) await this.checking
     // Initialization and explicit rechecks validate the ABI; each caption start only verifies
     // that those components still exist, avoiding another cold Python/Torch import.
-    const needsTorch = localRecognition || translation === 'torch'
+    const needsTorch = (localRecognition && compute.recognitionEngine === 'pytorch') || translation === 'torch'
+    const needsLlama = (localRecognition && compute.recognitionEngine === 'llama') || translation === 'llama'
     const files = [this.pythonState.path, ...(needsTorch ? [join(this.local.engine.path, 'torch', '__init__.py')] : []),
-      ...(translation === 'llama' ? [join(this.local.llama.path, 'llama-server.exe')] : [])]
+      ...(needsLlama ? [join(this.local.llama.path, 'llama-server.exe')] : [])]
     if (!(await Promise.all(files.map(path => path ? access(path).then(() => true, () => false) : false))).every(Boolean)) {
       await this.recheck()
     }
-    for (const kind of [...(needsTorch ? ['engine'] as const : []), ...(translation === 'llama' ? ['llama'] as const : [])]) {
+    for (const kind of [...(needsTorch ? ['engine'] as const : []), ...(needsLlama ? ['llama'] as const : [])]) {
       const component = this.local[kind]
       if (component.status !== 'ready') throw new Error(`RUNTIME_${kind === 'engine' ? 'TORCH' : 'LLAMA'}: ${component.reason || (kind === 'engine' ? '尚未安装 PyTorch' : '尚未安装 llama.cpp')}；请前往设置 → 计算设备选择组合${component.managed ? '重新安装／修复' : '安装'}`)
     }
-    for (const [value, kind] of [...(localRecognition ? [[compute.recognitionDevice, 'engine']] : []), ...(translation !== 'none' ? [[compute.translationDevice, translation === 'torch' ? 'engine' : 'llama']] : [])]) {
+    for (const [value, kind] of [...(localRecognition ? [[compute.recognitionDevice, compute.recognitionEngine === 'pytorch' ? 'engine' : 'llama']] : []), ...(translation !== 'none' ? [[compute.translationDevice, translation === 'torch' ? 'engine' : 'llama']] : [])]) {
       const intent = decodeDeviceIntent(value)
       if (!intent) continue
       if (!this.hardware.adapters.some(a => a.hardwareId === intent.hardwareId)) throw new Error('指定显卡已断开，请重新选择计算设备')
@@ -214,13 +218,82 @@ export class RuntimeManager {
     logDiagnostic('runtime.install.complete', { id, actual })
   }
   async importArchive(_path: string): Promise<void> { throw new Error('请在设置页选择组合安装') }
+  private offlineService(): OfflineRuntimes {
+    return new OfflineRuntimes({ python: join(this.options.baseDirectory, 'python.exe'), temporaryDirectory: this.directory, recipes: this.python?.recipes ?? [], packages: this.packages,
+      network: this.options.network,
+      download: async (item, path, signal, progress) => {
+        const network = this.options.network?.()
+        const mirror = network?.usePypiMirror && network.pypiMirrorUrl === PYPI_MIRROR_DEFAULT ? aliyunTorchWheelUrl(item.url) : null
+        const url = mirror && await this.probeUrl(mirror, signal) ? mirror : item.url
+        await this.download({ ...item, url }, path, signal, progress)
+      },
+      installPython: async (id, wheelhouse, requirements, signal) => {
+        if (!this.python) throw new Error('Runtime manager is not initialized')
+        await this.python.install(id, true, { wheelhouse, requirements, signal })
+        const actual = await probeLocalEngine(this.pythonState.path, this.python.directoryFor(id))
+        if (actual.status !== 'ready') throw new Error(actual.reason)
+        this.local.engine = { ...actual, id, managed: true }
+        await this.saveSelection()
+      },
+      installLlama: async (id, files, signal) => {
+        const item = this.packages.find(pkg => pkg.id === id)
+        if (!item) throw new Error('Unknown runtime combination')
+        await this.perform(item, { files, signal })
+        const actual = await probeLocalLlama(this.inside(id))
+        if (actual.status !== 'ready') throw new Error(actual.reason)
+        this.local.llama = { ...actual, id, managed: true }
+        await this.saveSelection()
+      } })
+  }
+  private async reusableOfflineRuntime(id: string, signal?: AbortSignal): Promise<boolean> {
+    const recipe = this.python?.recipes.find(item => item.id === id)
+    const pkg = this.packages.find(item => item.id === id)
+    if (!recipe && !pkg) return false
+    const kind = recipe ? 'engine' : 'llama'
+    const selected = this.local[kind]
+    const directory = this.inside(id)
+    if (selected.id !== id || !selected.managed || selected.status !== 'ready' || resolve(selected.path) !== directory) return false
+    try {
+      signal?.throwIfAborted()
+      const marker = JSON.parse(await readFile(join(directory, 'runtime-installed.json'), 'utf8'))
+      if (marker.id !== id || marker.kind !== (recipe ? 'python' : 'llama')) return false
+      const actual = recipe ? await probeLocalEngine(this.pythonState.path, directory) : await probeLocalLlama(directory)
+      signal?.throwIfAborted()
+      if (actual.status !== 'ready') return false
+      return recipe
+        ? actual.backend === recipe.backend && actual.version.split('+')[0] === recipe.torchVersion && (!recipe.xformersVersion || actual.xformersVersion === recipe.xformersVersion)
+        : actual.backend === pkg!.backend && actual.version === pkg!.version
+    } catch {
+      signal?.throwIfAborted()
+      return false
+    }
+  }
+  async inspectOffline(directory: string, signal?: AbortSignal): Promise<OfflineItem[]> {
+    const items = await this.offlineService().inspect(directory, signal)
+    return Promise.all(items.map(async item => item.status === 'ready' && await this.reusableOfflineRuntime(item.id, signal)
+      ? { ...item, status: 'installed' as const } : item))
+  }
+  prepareOffline(ids: string[], directory: string, signal: AbortSignal, progress: OfflineRuntimeProgress): Promise<void> {
+    return this.offlineService().prepare(ids, directory, signal, progress)
+  }
+  async installOffline(ids: string[], directory: string, signal: AbortSignal, progress: OfflineRuntimeProgress): Promise<void> {
+    if (this.operation || this.python?.operation || this.checking) throw new Error('已有组件检查或安装任务')
+    if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('这些组合仅支持 Windows x64')
+    if (!this.pythonState.ready) throw new Error(this.pythonState.reason || '内置 Python 3.12 无法运行')
+    const items = await this.inspectOffline(directory, signal)
+    const pending = ids.filter(id => !items.some(item => item.id === id && item.status === 'installed'))
+    if (pending.length) await this.offlineService().install(pending, directory, signal, progress)
+  }
   private async digest(path: string, signal?: AbortSignal): Promise<string> {
     const hash = createHash('sha256')
     for await (const block of createReadStream(path, { signal })) hash.update(block as Buffer)
     return hash.digest('hex')
   }
-  private async perform(item: RuntimePackage): Promise<void> {
+  private async perform(item: RuntimePackage, offline?: { files: string[]; signal: AbortSignal }): Promise<void> {
     const controller = new AbortController()
+    const abort = (): void => controller.abort()
+    offline?.signal.throwIfAborted()
+    offline?.signal.addEventListener('abort', abort, { once: true })
     this.cancellation = controller
     this.lastError = null
     const parts = [item, ...(item.companions ?? [])]
@@ -233,12 +306,12 @@ export class RuntimeManager {
       let completed = 0
       for (const [index, part] of parts.entries()) {
         logDiagnostic('runtime.llama-install.download', { id: item.id, part: index, bytes: part.bytes })
-        const archive = this.inside(`${item.id}-${index}.zip.partial`)
+        const archive = offline ? offline.files[index] : this.inside(`${item.id}-${index}.zip.partial`)
         this.operation.phase = 'download'
-        await this.download(part, archive, controller.signal, bytes => { if (this.operation) this.operation.bytes = completed + bytes })
+        if (!offline) await this.download(part, archive, controller.signal, bytes => { if (this.operation) this.operation.bytes = completed + bytes })
         this.operation.phase = 'verify'
         if (await this.digest(archive, controller.signal) !== part.sha256) {
-          await rm(archive, { force: true })
+          if (!offline) await rm(archive, { force: true })
           throw new Error('运行组件下载校验失败，请重试')
         }
         this.operation.phase = 'extract'
@@ -291,6 +364,7 @@ export class RuntimeManager {
       }
       this.operation = null
       this.cancellation = null
+      offline?.signal.removeEventListener('abort', abort)
     }
   }
   private async download(item: Pick<RuntimePackage, 'url' | 'bytes'>, path: string, signal: AbortSignal, progress: (bytes: number) => void): Promise<void> {

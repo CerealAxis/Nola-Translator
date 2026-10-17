@@ -122,6 +122,7 @@ class LlamaServerManager:
         self._offloaded_layers: int | None = None
         self.fallback_reason: str | None = None
         self.chat_template: str | None = None
+        self.mmproj_path: Path | None = None
 
     def configure_compute(self, device: ComputeDevice, options: ComputeOptions) -> None:
         # Free VRAM and probe scores change while weights are resident; only launch arguments
@@ -238,6 +239,12 @@ class LlamaServerManager:
                 "--no-warmup",
             ]
             child_env = dict(os.environ)
+            if self.mmproj_path is not None:
+                if not self.mmproj_path.is_file():
+                    raise LlamaServerError("缺少配套 mmproj 音频编码器")
+                args.extend(["--mmproj", str(self.mmproj_path)])
+                if ngl == 0:
+                    args.append("--no-mmproj-offload")
             if self.chat_template is not None:
                 args.extend(["--chat-template", self.chat_template])
             if ngl != 0 and self._selected_device and self._selected_device.backend == "openvino":
@@ -301,7 +308,7 @@ class LlamaServerManager:
         self, messages: list[dict], *, timeout_s: float = 10.0,
         chat_template_kwargs: dict[str, object] | None = None, max_tokens: int | None = None,
     ) -> str:
-        """POST /v1/chat/completions (temperature=0), returns the stripped translation."""
+        """POST /v1/chat/completions for the owning task, returning generated text."""
         with self._inference_lock:
             return self._chat_locked(messages, timeout_s=timeout_s,
                 chat_template_kwargs=chat_template_kwargs, max_tokens=max_tokens)
@@ -338,7 +345,7 @@ class LlamaServerManager:
         except (KeyError, IndexError, TypeError) as error:
             raise LlamaServerError("llama-server 响应格式无效") from error
         if choice.get("finish_reason") == "length":
-            raise LlamaServerError("llama-server 翻译达到输出上限，请缩短原文或增大上下文窗口")
+            raise LlamaServerError("llama-server 达到输出上限，请缩短输入或增大上下文窗口")
         return str(content).strip()
 
     async def _wait_ready(self, process: Any, port: int, timeout_s: float) -> bool:

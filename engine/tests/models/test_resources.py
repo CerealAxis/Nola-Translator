@@ -155,7 +155,7 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     assert m2m100.installed is False
 
     for record in records:
-        assert 0 < len(record.languages) <= 128
+        assert 0 < len(record.languages) <= 200
         assert ResourceRecord.model_validate(record.model_dump()) == record
 
 
@@ -171,7 +171,8 @@ def test_index_translate_presets_download_only_text_weights_and_use_llama(tmp_pa
     assert capability.engine == "llama"
     assert "ja" in capability.sourceLanguages
     assert "zh" in capability.targetLanguages
-    assert len(capability.targetLanguages) == 32
+    from nola_translator_engine.translation.index_translate_languages import LANGUAGE_NAMES
+    assert set(capability.targetLanguages) == set(LANGUAGE_NAMES)
     assert manager.translation_gguf_path(spec.model_id).name == spec.files[0].path
 
 

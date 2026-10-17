@@ -4,6 +4,7 @@ import type { AudioDevice, EngineErrorCode, EngineEvent } from './contracts'
 import type { SupportErrorCode } from './error-catalog'
 import type { BrowserCaptionStyleSettings, VideoCaptionAudioSource } from './settings'
 
+export const FIREFOX_EXTENSION_ID = 'captions@nola-translator.app'
 export const BROWSER_HOST_NAME = 'com.nola.captions'
 export const BROWSER_EXTENSION_ID = 'cgbjfdpkcoapeiefeflikdolennbdcbe'
 export const BROWSER_EXTENSION_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoiJ7hfz9nPxIe4Iax2PF+o4Dtq8w1y2X/HGa6aPZRTZWBOYzr13mdqzCC+UfJKpAzeGIPL2V0xNvkCXoxCjUBCOduL36uaXwmSSUpNcg1wcob05ZTDod6XIxAOXViMcJKd+wLronqx9gy6bDigQm7J1c5f6Z7Iw9xmOdPS7n01LTqCQINrpEzU/DzAzFTTv9JUKd6Oy/PyzQg6BHzhIAhyBYhYJOsuhGIMQTE+pd/1xL/NKYAmrbNWOOYvrUxlcgk7TwORkdx/NpeA4E5R8dB4CtX14GL/Ktc7R9gAVptQH524j2ZUszKA/WrQU1CmRneS2bIyjOE0idJt1Xd3O9iQIDAQAB'
@@ -20,7 +21,7 @@ const timeline = { epoch: z.number().int().nonnegative(), videoTimeMs: z.number(
  */
 const legacyLanguages = { sourceLanguage: z.string().min(1).max(32).optional(), targetLanguage: z.string().min(1).max(32).optional() }
 export const browserRequestSchema = z.discriminatedUnion('type', [
-  z.object({ ...identity, type: z.literal('hello'), browser: z.enum(['chrome', 'edge']).optional(), extensionVersion: z.string().min(1).max(32).optional() }).strict(),
+  z.object({ ...identity, type: z.literal('hello'), browser: z.enum(['chrome', 'edge', 'firefox']).optional(), extensionVersion: z.string().min(1).max(32).optional() }).strict(),
   z.object({ ...identity, type: z.literal('runtimeSettings'), component: z.enum(['engine', 'llama']) }).strict(),
   z.object({ ...identity, type: z.literal('start'), ...timeline, source: z.enum(['tab', 'system']), streamId: z.string().min(1).max(128), deviceId: z.string().min(1).max(512).optional(), ...legacyLanguages }).strict(),
   z.object({ ...session, type: z.literal('stop') }).strict(),
@@ -91,7 +92,7 @@ export type BrowserResponse =
   | { type: 'result'; id: string; value?: BrowserSummary | { sessionId: string } }
   | { type: 'error'; id: string; code: BrowserWireErrorCode; message: string }
   | { type: 'event'; event: EngineEvent }
-export type BrowserKind = 'chrome' | 'edge'
+export type BrowserKind = 'chrome' | 'edge' | 'firefox'
 export interface BrowserIntegrationInfo {
   browser: BrowserKind
   available: boolean

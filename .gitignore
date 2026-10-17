@@ -28,6 +28,7 @@ Thumbs.db
 /docs/docs备份.zip
 engine/build/
 engine/dist/
+browser/extension/dist-firefox/
 release/
 release-verify*/
 release-v[0-9]*/

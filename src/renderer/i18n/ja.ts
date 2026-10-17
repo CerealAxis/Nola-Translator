@@ -1,8 +1,10 @@
+import { offlineJa, offlineEntries } from './offline-ui'
 import { buildLocaleDictionary } from './locale-builder'
 import { onboardingEntries, onboardingJa } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const jaMessages: Record<DictionaryKey, string> = {
+  ...offlineEntries(offlineJa),
   ...onboardingEntries(onboardingJa),
   'more.tabLabel': "その他",
   'more.authorDescription': "Nola Translator の開発者",
@@ -25,6 +27,7 @@ const jaMessages: Record<DictionaryKey, string> = {
   'browser.torchUnavailable': 'PyTorch がインストールされていないか、利用できません。Nola の設定からインストールしてください。',
   'browser.llamaUnavailable': 'llama.cpp がインストールされていないか、利用できません。Nola の設定からインストールしてください。',
   'browser.runtimeSettings': '設定でランタイムをインストール',
+  'browser.firefox': 'Mozilla Firefox',
   'browser.chrome': 'Google Chrome',
   'browser.edge': 'Microsoft Edge',
   'browser.browserList': 'ブラウザー拡張機能',
@@ -86,7 +89,7 @@ const jaMessages: Record<DictionaryKey, string> = {
   'browser.updateRequired': 'Nola とエンジンを更新してから、もう一度お試しください。',
   'browser.wrongCapture': '現在のタブを選び、音声を共有してください。',
   'browser.captureCancelled': '共有がキャンセルされました。字幕はもう一度有効にできます。',
-  'browser.captureUnsupported': '現在のブラウザーでは共有対象を確認できません。Chrome または Edge を更新してください。',
+  'browser.captureUnsupported': 'Firefox ではデスクトップ設定でシステム出力デバイスを選択してください。検証付きタブ音声キャプチャには Chrome または Edge が必要です.',
   'browser.slowAudio': '音声処理が再生速度に追いつかず、セッションを終了しました。',
   'browser.tabAudioSilent': '受信した音声サンプルに信号がありません。音声ソースを変更して、もう一度お試しください。',
   'browser.connectionLost': 'Nola との接続が切れました。',
@@ -331,6 +334,8 @@ const jaMessages: Record<DictionaryKey, string> = {
   'workspaceUi.titleFailed': 'セッションは開始しましたが、名前を保存できませんでした。記録から名前を変更してください',
   'workspaceUi.engineRecovering': 'エンジンとの接続が切れました。再接続しています',
   'workspaceUi.recordingPreferenceFailed': '録音設定を保存できませんでした。セッションをもう一度開始してください',
+  'modelsSettingsUi.removing': '削除中…',
+  'modelsSettingsUi.removeFailed': '削除に失敗しました',
   'modelsSettingsUi.modelsSubtitle': 'ローカルの音声認識・翻訳モデルを管理',
   'modelsSettingsUi.currentRecognition': '現在の音声認識モデル',
   'modelsSettingsUi.currentTranslation': '現在の翻訳モデル',

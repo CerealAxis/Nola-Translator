@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactElement } from 'react'
 
 import { DEFAULT_SETTINGS } from '@/bridge'
@@ -185,3 +185,32 @@ describe('ModelCard 三态', () => {
   })
 })
 
+
+
+it('does not present removal of an unconfigured model as a download', () => {
+  renderWithI18n(<ModelCard
+    record={record({ resourceId: 'hub:local/example', installed: true, state: 'running', phase: 'remove' })}
+    busy={false} isDefault={false} canBeDefault={false}
+    onInstall={noop} onCancel={noop} onRemove={noop} onSetDefault={noop}
+    footer={<span>Configure model</span>}
+  />)
+  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  expect(screen.queryByText('Configure model')).not.toBeInTheDocument()
+  expect(screen.getAllByText('正在移除…').length).toBeGreaterThan(0)
+})
+
+
+it('retries removal rather than downloading after a removal failure', () => {
+  const remove = vi.fn()
+  const install = vi.fn()
+  renderWithI18n(<ModelCard
+    record={record({ resourceId: 'hub:local/example', installed: true, state: 'failed', phase: 'remove' })}
+    busy={false} isDefault={false} canBeDefault={false}
+    onInstall={install} onCancel={noop} onRemove={remove} onSetDefault={noop}
+  />)
+  expect(screen.getByText('移除失败')).toBeInTheDocument()
+  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '卸载' }))
+  expect(remove).toHaveBeenCalledOnce()
+  expect(install).not.toHaveBeenCalled()
+})

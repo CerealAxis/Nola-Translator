@@ -97,6 +97,16 @@ function subscribe<T>(method: keyof NolaTranslatorApi, run: (injected: NolaTrans
 
 export function createIpcBridge(): NolaBridge {
   return {
+    offline: {
+      selectModel: (kind, repo, path) => call('offline', api => api.offline?.selectModel(kind, repo, path) ?? Promise.reject(new MissingIpcApiError('offline.selectModel'))),
+      selectDestination: path => call('offline', api => api.offline?.selectDestination(path) ?? Promise.reject(new MissingIpcApiError('offline.selectDestination'))),
+      selectBundle: () => call('offline', api => api.offline?.selectBundle() ?? Promise.reject(new MissingIpcApiError('offline.selectBundle'))),
+      prepare: (request, destination) => call('offline', api => api.offline?.prepare(request, destination) ?? Promise.reject(new MissingIpcApiError('offline.prepare'))),
+      install: token => call('offline', api => api.offline?.install(token) ?? Promise.reject(new MissingIpcApiError('offline.install'))),
+      snapshot: () => call('offline', api => api.offline?.snapshot() ?? Promise.reject(new MissingIpcApiError('offline.snapshot'))),
+      cancel: () => call('offline', api => api.offline?.cancel() ?? Promise.reject(new MissingIpcApiError('offline.cancel'))),
+      openOutput: () => call('offline', api => api.offline?.openOutput() ?? Promise.reject(new MissingIpcApiError('offline.openOutput'))),
+    },
     runtimes: {
       openSettings: component => call('openRuntimeSettings', injected => injected.openRuntimeSettings(component)),
       list: () => call('getRuntimes', (injected) => injected.getRuntimes()),

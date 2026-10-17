@@ -10,6 +10,7 @@ import { attachSettingsStore, detachSettingsStore, settingsStore, flushPendingSe
 import { attachMeetingsStore, detachMeetingsStore, meetingsStore } from './meetingStore'
 import { attachModelsStore, detachModelsStore, modelsStore } from './modelStore'
 import { attachSessionStore, detachSessionStore, sessionStore } from './sessionStore'
+import { initOfflineStore } from './offlineStore'
 
 import * as settingsActions from './settingsStore'
 import * as meetingsActions from './meetingStore'
@@ -33,6 +34,7 @@ export const actions = {
 export type AppStores = typeof stores
 
 let injected: NolaBridge | null = null
+let disposeOfflineStore: (() => void) | null = null
 /** Whether the engine is there. `initStores` records it so the UI can read an empty state or say it is not connected. */
 let engineConnected = true
 
@@ -66,6 +68,12 @@ export function initStores(bridge: NolaBridge, options: InitStoresOptions = {}):
   if (options.overlayMenu) return
   attachMeetingsStore(bridge)
   attachSessionStore(bridge)
+  disposeOfflineStore?.()
+  disposeOfflineStore = initOfflineStore(bridge, () => {
+    void actions.models.loadModels().catch(() => undefined)
+    void actions.settings.loadRuntimeComponents().catch(() => undefined)
+    void actions.settings.refreshComputeDevices().catch(() => undefined)
+  })
 
   void actions.settings.loadSettings().catch(() => undefined)
   if (options.backgroundChecks !== false) {
@@ -97,6 +105,8 @@ export async function disposeStores(): Promise<void> {
   detachMeetingsStore()
   detachModelsStore()
   detachSessionStore()
+  disposeOfflineStore?.()
+  disposeOfflineStore = null
   injected = null
   // Back to the default: the next `initStores` that passes no option means connected.
   engineConnected = true

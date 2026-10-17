@@ -68,6 +68,7 @@ export type EngineChannelEvent = EngineEvent | EngineLifecycleEvent
 export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'translation' | 'torch' | 'llama'
 
 export type NolaTranslatorApi = {
+  offline?: import('./offline').OfflineApi
   openOverlayMenu(request: import('./overlay-menu').OverlayMenuRequest): Promise<void>
   presentOverlayMenu(id: number): Promise<void>
   closeOverlayMenu(id: number): Promise<void>

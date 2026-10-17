@@ -11,6 +11,7 @@ import { runtimeRecipeSchema, type RuntimeRecipe, type RuntimeRecipeState, type 
 import type { NetworkSettings } from '../shared/settings'
 import { PYPI_MIRROR_DEFAULT } from '../shared/pypi-mirrors'
 import { probeLocalEngine } from './local-runtimes'
+import { offlinePipArguments } from './offline-runtimes'
 
 const PYPI_INDEX = 'https://pypi.org/simple/'
 const recipesSchema = z.object({ version: z.literal(1), recipes: z.array(runtimeRecipeSchema).max(256) })
@@ -63,13 +64,16 @@ export class PythonEnvironments {
   has(id: string): boolean { return this.recipes.some(r => r.id === id) }
   directoryFor(id: string): string { return this.inside(id) }
   cancel(): void { this.controller?.abort() }
-  async install(id: string, repair: boolean): Promise<void> {
+  async install(id: string, repair: boolean, offline?: { wheelhouse: string; requirements: string; signal: AbortSignal }): Promise<void> {
     if (this.operation) throw new Error('已有组件安装任务')
     const state = this.states().find(r => r.id === id)
     if (!state) throw new Error('安装组合不存在')
     if (state.installed && !repair) return
     const destination = this.inside(id)
     const controller = new AbortController()
+    const abort = (): void => controller.abort()
+    offline?.signal.throwIfAborted()
+    offline?.signal.addEventListener('abort', abort, { once: true })
     this.controller = controller
     this.lastError = null
     const wheels = [state.wheel, ...state.companions]
@@ -82,7 +86,9 @@ export class PythonEnvironments {
       const network = this.network?.()
       const useMirror = network?.usePypiMirror === true
       let artifacts: string[]
-      if (useMirror) {
+      if (offline) {
+        artifacts = []
+      } else if (useMirror) {
         if (this.operation) this.operation.phase = 'prepare'
         artifacts = []
         for (const item of wheels) {
@@ -112,7 +118,13 @@ export class PythonEnvironments {
       }
       await mkdir(staging, { recursive: true })
       this.operation.phase = 'prepare'
-      await this.installLibraries(state, artifacts, staging, controller.signal)
+      if (offline) {
+        await new Promise<void>((resolveInstall, reject) => {
+          execFile(join(this.baseDirectory, 'python.exe'), offlinePipArguments('install', offline.wheelhouse, offline.requirements, staging),
+            { windowsHide: true, signal: controller.signal, timeout: 30 * 60_000, maxBuffer: 4 * 1024 * 1024,
+              env: { ...process.env, PYTHONUTF8: '1', PIP_CONFIG_FILE: 'nul' } }, error => error ? reject(error) : resolveInstall())
+        })
+      } else await this.installLibraries(state, artifacts, staging, controller.signal)
       this.operation.phase = 'check'
       const actual = await probeLocalEngine(join(this.baseDirectory, 'python.exe'), staging)
       if (actual.status !== 'ready' || actual.backend !== state.backend || actual.version.split('+')[0] !== state.torchVersion ||
@@ -145,6 +157,7 @@ export class PythonEnvironments {
       }
       this.operation = null
       this.controller = null
+      offline?.signal.removeEventListener('abort', abort)
     }
   }
 
@@ -202,7 +215,7 @@ export class PythonEnvironments {
   }
 }
 
-function aliyunTorchWheelUrl(url: string): string | null {
+export function aliyunTorchWheelUrl(url: string): string | null {
   try {
     const parsed = new URL(url)
     if (parsed.hostname !== 'download-r2.pytorch.org' || !parsed.pathname.startsWith('/whl/')) return null

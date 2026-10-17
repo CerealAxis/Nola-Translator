@@ -299,3 +299,29 @@ describe('extension session lifecycle', () => {
     await fixture.store.init(); expect(fixture.store.getSnapshot()).toMatchObject({ connected: true, error: undefined })
   })
 })
+
+it('rejects Firefox tab capture before opening the picker', async () => {
+  const agent = vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 Firefox/128.0')
+  const f = setup()
+  try {
+    await f.store.init()
+    f.store.pressStart()
+    expect(f.getDisplayMedia).not.toHaveBeenCalled()
+    expect(f.store.getSnapshot().error).toBe('captureUnsupported')
+    expect(f.requests.some(request => request.type === 'start')).toBe(false)
+  } finally { await f.store.destroy(); agent.mockRestore() }
+})
+
+it('starts Firefox system capture without requesting tab sharing', async () => {
+  const agent = vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 Firefox/128.0')
+  const f = setup()
+  const request = vi.mocked(f.bridge.request).getMockImplementation()!
+  vi.mocked(f.bridge.request).mockImplementation(async input => input.type === 'hello' ? { ...summary, config: { ...summary.config, audioSource: 'system' } } : request(input))
+  try {
+    await f.store.init()
+    f.store.pressStart()
+    await vi.waitFor(() => expect(f.store.getSnapshot().status).toBe('active'))
+    expect(f.getDisplayMedia).not.toHaveBeenCalled()
+    expect(f.requests.find(input => input.type === 'start')).toMatchObject({ source: 'system' })
+  } finally { await f.store.destroy(); agent.mockRestore() }
+})

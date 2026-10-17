@@ -1,0 +1,866 @@
+[
+  {
+    "id": "qwen3-asr-1.7b-hf",
+    "name": "Qwen3-ASR 1.7B",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "bcd2b5b7f32b480ab5790554cfa8347f246a14f3",
+        "repositoryUrl": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf/tree/bcd2b5b7f32b480ab5790554cfa8347f246a14f3",
+        "files": [
+          {
+            "path": ".gitattributes",
+            "size": 1570,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/.gitattributes"
+          },
+          {
+            "path": "README.md",
+            "size": 16538,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/README.md"
+          },
+          {
+            "path": "chat_template.jinja",
+            "size": 1434,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 2399,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 165,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 4076193080,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/model.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 487,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/processor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 11429653,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 998,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/tokenizer_config.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "bcd2b5b7f32b480ab5790554cfa8347f246a14f3",
+        "repositoryUrl": "https://hf-mirror.com/Qwen/Qwen3-ASR-1.7B-hf/tree/bcd2b5b7f32b480ab5790554cfa8347f246a14f3",
+        "files": [
+          {
+            "path": ".gitattributes",
+            "size": 1570,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/.gitattributes"
+          },
+          {
+            "path": "README.md",
+            "size": 16538,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/README.md"
+          },
+          {
+            "path": "chat_template.jinja",
+            "size": 1434,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 2399,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 165,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 4076193080,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/model.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 487,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/processor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 11429653,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 998,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-1.7B-hf/resolve/bcd2b5b7f32b480ab5790554cfa8347f246a14f3/tokenizer_config.json"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "fbdf079ca130130ace97d61dde535b3bebada633",
+        "repositoryUrl": "https://modelscope.cn/models/Qwen/Qwen3-ASR-1.7B-hf/files?Revision=fbdf079ca130130ace97d61dde535b3bebada633",
+        "files": [
+          {
+            "path": ".gitattributes",
+            "size": 2129,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B-hf/resolve/fbdf079ca130130ace97d61dde535b3bebada633/.gitattributes"
+          },
+          {
+            "path": "README.md",
+            "size": 16538,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B-hf/resolve/fbdf079ca130130ace97d61dde535b3bebada633/README.md"
+          },
+          {
+            "path": "chat_template.jinja",
+            "size": 1434,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B-hf/resolve/fbdf079ca130130ace97d61dde535b3bebada633/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 2399,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B-hf/resolve/fbdf079ca130130ace97d61dde535b3bebada633/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 165,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B-hf/resolve/fbdf079ca130130ace97d61dde535b3bebada633/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 4076193080,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B-hf/resolve/fbdf079ca130130ace97d61dde535b3bebada633/model.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 487,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B-hf/resolve/fbdf079ca130130ace97d61dde535b3bebada633/processor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 11429653,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B-hf/resolve/fbdf079ca130130ace97d61dde535b3bebada633/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 998,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-1.7B-hf/resolve/fbdf079ca130130ace97d61dde535b3bebada633/tokenizer_config.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen3-asr-0.6b-hf",
+    "name": "Qwen3-ASR 0.6B",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c",
+        "repositoryUrl": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf/tree/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c",
+        "files": [
+          {
+            "path": ".gitattributes",
+            "size": 1570,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/.gitattributes"
+          },
+          {
+            "path": "README.md",
+            "size": 16538,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/README.md"
+          },
+          {
+            "path": "chat_template.jinja",
+            "size": 1434,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 2398,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 165,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 1564928088,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/model.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 487,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/processor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 11429653,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 998,
+            "url": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/tokenizer_config.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c",
+        "repositoryUrl": "https://hf-mirror.com/Qwen/Qwen3-ASR-0.6B-hf/tree/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c",
+        "files": [
+          {
+            "path": ".gitattributes",
+            "size": 1570,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/.gitattributes"
+          },
+          {
+            "path": "README.md",
+            "size": 16538,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/README.md"
+          },
+          {
+            "path": "chat_template.jinja",
+            "size": 1434,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 2398,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 165,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 1564928088,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/model.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 487,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/processor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 11429653,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 998,
+            "url": "https://hf-mirror.com/Qwen/Qwen3-ASR-0.6B-hf/resolve/7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c/tokenizer_config.json"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "005b749cd1566dc579fe0238316087e2fc1945c0",
+        "repositoryUrl": "https://modelscope.cn/models/Qwen/Qwen3-ASR-0.6B-hf/files?Revision=005b749cd1566dc579fe0238316087e2fc1945c0",
+        "files": [
+          {
+            "path": ".gitattributes",
+            "size": 2129,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-0.6B-hf/resolve/005b749cd1566dc579fe0238316087e2fc1945c0/.gitattributes"
+          },
+          {
+            "path": "README.md",
+            "size": 16538,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-0.6B-hf/resolve/005b749cd1566dc579fe0238316087e2fc1945c0/README.md"
+          },
+          {
+            "path": "chat_template.jinja",
+            "size": 1434,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-0.6B-hf/resolve/005b749cd1566dc579fe0238316087e2fc1945c0/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 2398,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-0.6B-hf/resolve/005b749cd1566dc579fe0238316087e2fc1945c0/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 165,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-0.6B-hf/resolve/005b749cd1566dc579fe0238316087e2fc1945c0/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 1564928088,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-0.6B-hf/resolve/005b749cd1566dc579fe0238316087e2fc1945c0/model.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 487,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-0.6B-hf/resolve/005b749cd1566dc579fe0238316087e2fc1945c0/processor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 11429653,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-0.6B-hf/resolve/005b749cd1566dc579fe0238316087e2fc1945c0/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 998,
+            "url": "https://www.modelscope.cn/models/Qwen/Qwen3-ASR-0.6B-hf/resolve/005b749cd1566dc579fe0238316087e2fc1945c0/tokenizer_config.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "sensevoice-small",
+    "name": "SenseVoiceSmall",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "3847d57b6bdf2dd8875cb1508d2af43d80a16bf7",
+        "repositoryUrl": "https://huggingface.co/FunAudioLLM/SenseVoiceSmall/tree/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7",
+        "files": [
+          {
+            "path": "README.md",
+            "size": 11952,
+            "url": "https://huggingface.co/FunAudioLLM/SenseVoiceSmall/resolve/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7/README.md"
+          },
+          {
+            "path": "am.mvn",
+            "size": 11203,
+            "url": "https://huggingface.co/FunAudioLLM/SenseVoiceSmall/resolve/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7/am.mvn"
+          },
+          {
+            "path": "chn_jpn_yue_eng_ko_spectok.bpe.model",
+            "size": 377341,
+            "url": "https://huggingface.co/FunAudioLLM/SenseVoiceSmall/resolve/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7/chn_jpn_yue_eng_ko_spectok.bpe.model"
+          },
+          {
+            "path": "config.yaml",
+            "size": 1855,
+            "url": "https://huggingface.co/FunAudioLLM/SenseVoiceSmall/resolve/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7/config.yaml"
+          },
+          {
+            "path": "configuration.json",
+            "size": 396,
+            "url": "https://huggingface.co/FunAudioLLM/SenseVoiceSmall/resolve/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7/configuration.json"
+          },
+          {
+            "path": "model.pt",
+            "size": 936291369,
+            "url": "https://huggingface.co/FunAudioLLM/SenseVoiceSmall/resolve/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7/model.pt"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "3847d57b6bdf2dd8875cb1508d2af43d80a16bf7",
+        "repositoryUrl": "https://hf-mirror.com/FunAudioLLM/SenseVoiceSmall/tree/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7",
+        "files": [
+          {
+            "path": "README.md",
+            "size": 11952,
+            "url": "https://hf-mirror.com/FunAudioLLM/SenseVoiceSmall/resolve/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7/README.md"
+          },
+          {
+            "path": "am.mvn",
+            "size": 11203,
+            "url": "https://hf-mirror.com/FunAudioLLM/SenseVoiceSmall/resolve/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7/am.mvn"
+          },
+          {
+            "path": "chn_jpn_yue_eng_ko_spectok.bpe.model",
+            "size": 377341,
+            "url": "https://hf-mirror.com/FunAudioLLM/SenseVoiceSmall/resolve/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7/chn_jpn_yue_eng_ko_spectok.bpe.model"
+          },
+          {
+            "path": "config.yaml",
+            "size": 1855,
+            "url": "https://hf-mirror.com/FunAudioLLM/SenseVoiceSmall/resolve/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7/config.yaml"
+          },
+          {
+            "path": "configuration.json",
+            "size": 396,
+            "url": "https://hf-mirror.com/FunAudioLLM/SenseVoiceSmall/resolve/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7/configuration.json"
+          },
+          {
+            "path": "model.pt",
+            "size": 936291369,
+            "url": "https://hf-mirror.com/FunAudioLLM/SenseVoiceSmall/resolve/3847d57b6bdf2dd8875cb1508d2af43d80a16bf7/model.pt"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "7bf452403abd7353a300cd760f7adae7701c92c1",
+        "repositoryUrl": "https://modelscope.cn/models/iic/SenseVoiceSmall/files?Revision=7bf452403abd7353a300cd760f7adae7701c92c1",
+        "files": [
+          {
+            "path": "README.md",
+            "size": 12091,
+            "url": "https://www.modelscope.cn/models/iic/SenseVoiceSmall/resolve/7bf452403abd7353a300cd760f7adae7701c92c1/README.md"
+          },
+          {
+            "path": "am.mvn",
+            "size": 11203,
+            "url": "https://www.modelscope.cn/models/iic/SenseVoiceSmall/resolve/7bf452403abd7353a300cd760f7adae7701c92c1/am.mvn"
+          },
+          {
+            "path": "chn_jpn_yue_eng_ko_spectok.bpe.model",
+            "size": 377341,
+            "url": "https://www.modelscope.cn/models/iic/SenseVoiceSmall/resolve/7bf452403abd7353a300cd760f7adae7701c92c1/chn_jpn_yue_eng_ko_spectok.bpe.model"
+          },
+          {
+            "path": "config.yaml",
+            "size": 1855,
+            "url": "https://www.modelscope.cn/models/iic/SenseVoiceSmall/resolve/7bf452403abd7353a300cd760f7adae7701c92c1/config.yaml"
+          },
+          {
+            "path": "configuration.json",
+            "size": 396,
+            "url": "https://www.modelscope.cn/models/iic/SenseVoiceSmall/resolve/7bf452403abd7353a300cd760f7adae7701c92c1/configuration.json"
+          },
+          {
+            "path": "model.pt",
+            "size": 936291369,
+            "url": "https://www.modelscope.cn/models/iic/SenseVoiceSmall/resolve/7bf452403abd7353a300cd760f7adae7701c92c1/model.pt"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "hy-mt2-1.8b-q4-k-m",
+    "name": "Hy-MT2 1.8B Q4_K_M",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "a0c709d9fac510f2c807aa3af52872340dc37a4a",
+        "repositoryUrl": "https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/tree/a0c709d9fac510f2c807aa3af52872340dc37a4a",
+        "files": [
+          {
+            "path": "Hy-MT2-1.8B-Q4_K_M.gguf",
+            "size": 1133080448,
+            "url": "https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/a0c709d9fac510f2c807aa3af52872340dc37a4a/Hy-MT2-1.8B-Q4_K_M.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "a0c709d9fac510f2c807aa3af52872340dc37a4a",
+        "repositoryUrl": "https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/tree/a0c709d9fac510f2c807aa3af52872340dc37a4a",
+        "files": [
+          {
+            "path": "Hy-MT2-1.8B-Q4_K_M.gguf",
+            "size": 1133080448,
+            "url": "https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/resolve/a0c709d9fac510f2c807aa3af52872340dc37a4a/Hy-MT2-1.8B-Q4_K_M.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "e97e6af0ec0950385644d7c0a8e5c899071f722b",
+        "repositoryUrl": "https://modelscope.cn/models/Tencent-Hunyuan/Hy-MT2-1.8B-GGUF/files?Revision=e97e6af0ec0950385644d7c0a8e5c899071f722b",
+        "files": [
+          {
+            "path": "Hy-MT2-1.8B-Q4_K_M.gguf",
+            "size": 1133080448,
+            "url": "https://www.modelscope.cn/models/Tencent-Hunyuan/Hy-MT2-1.8B-GGUF/resolve/e97e6af0ec0950385644d7c0a8e5c899071f722b/Hy-MT2-1.8B-Q4_K_M.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "hy-mt2-1.8b-q3-k-m",
+    "name": "Hy-MT2 1.8B Q3_K_M",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "0378cc2780f462f0fd397d0cdd244d2f769de40e",
+        "repositoryUrl": "https://huggingface.co/unsloth/Hy-MT2-1.8B-GGUF/tree/0378cc2780f462f0fd397d0cdd244d2f769de40e",
+        "files": [
+          {
+            "path": "Hy-MT2-1.8B-Q3_K_M.gguf",
+            "size": 951022560,
+            "url": "https://huggingface.co/unsloth/Hy-MT2-1.8B-GGUF/resolve/0378cc2780f462f0fd397d0cdd244d2f769de40e/Hy-MT2-1.8B-Q3_K_M.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "0378cc2780f462f0fd397d0cdd244d2f769de40e",
+        "repositoryUrl": "https://hf-mirror.com/unsloth/Hy-MT2-1.8B-GGUF/tree/0378cc2780f462f0fd397d0cdd244d2f769de40e",
+        "files": [
+          {
+            "path": "Hy-MT2-1.8B-Q3_K_M.gguf",
+            "size": 951022560,
+            "url": "https://hf-mirror.com/unsloth/Hy-MT2-1.8B-GGUF/resolve/0378cc2780f462f0fd397d0cdd244d2f769de40e/Hy-MT2-1.8B-Q3_K_M.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "356e2bd51dd91bc4a84444c2121c02a26fbe2ffd",
+        "repositoryUrl": "https://modelscope.cn/models/fss618/Hy-MT2-1.8B-GGUF/files?Revision=356e2bd51dd91bc4a84444c2121c02a26fbe2ffd",
+        "files": [
+          {
+            "path": "Hy-MT2-1.8B-Q3_K_M.gguf",
+            "size": 951021472,
+            "url": "https://www.modelscope.cn/models/fss618/Hy-MT2-1.8B-GGUF/resolve/356e2bd51dd91bc4a84444c2121c02a26fbe2ffd/Hy-MT2-1.8B-Q3_K_M.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "hy-mt2-1.8b-iq2-m",
+    "name": "Hy-MT2 1.8B UD-IQ2_M",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "0378cc2780f462f0fd397d0cdd244d2f769de40e",
+        "repositoryUrl": "https://huggingface.co/unsloth/Hy-MT2-1.8B-GGUF/tree/0378cc2780f462f0fd397d0cdd244d2f769de40e",
+        "files": [
+          {
+            "path": "Hy-MT2-1.8B-UD-IQ2_M.gguf",
+            "size": 722666176,
+            "url": "https://huggingface.co/unsloth/Hy-MT2-1.8B-GGUF/resolve/0378cc2780f462f0fd397d0cdd244d2f769de40e/Hy-MT2-1.8B-UD-IQ2_M.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "0378cc2780f462f0fd397d0cdd244d2f769de40e",
+        "repositoryUrl": "https://hf-mirror.com/unsloth/Hy-MT2-1.8B-GGUF/tree/0378cc2780f462f0fd397d0cdd244d2f769de40e",
+        "files": [
+          {
+            "path": "Hy-MT2-1.8B-UD-IQ2_M.gguf",
+            "size": 722666176,
+            "url": "https://hf-mirror.com/unsloth/Hy-MT2-1.8B-GGUF/resolve/0378cc2780f462f0fd397d0cdd244d2f769de40e/Hy-MT2-1.8B-UD-IQ2_M.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "hy-mt2-7b-q4-k-m",
+    "name": "Hy-MT2 7B Q4_K_M",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "ab8472660ac61fac25f1af43fac2599d52a8a775",
+        "repositoryUrl": "https://huggingface.co/tencent/Hy-MT2-7B-GGUF/tree/ab8472660ac61fac25f1af43fac2599d52a8a775",
+        "files": [
+          {
+            "path": "Hy-MT2-7B-Q4_K_M.gguf",
+            "size": 4624648896,
+            "url": "https://huggingface.co/tencent/Hy-MT2-7B-GGUF/resolve/ab8472660ac61fac25f1af43fac2599d52a8a775/Hy-MT2-7B-Q4_K_M.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "ab8472660ac61fac25f1af43fac2599d52a8a775",
+        "repositoryUrl": "https://hf-mirror.com/tencent/Hy-MT2-7B-GGUF/tree/ab8472660ac61fac25f1af43fac2599d52a8a775",
+        "files": [
+          {
+            "path": "Hy-MT2-7B-Q4_K_M.gguf",
+            "size": 4624648896,
+            "url": "https://hf-mirror.com/tencent/Hy-MT2-7B-GGUF/resolve/ab8472660ac61fac25f1af43fac2599d52a8a775/Hy-MT2-7B-Q4_K_M.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "47b1dd35c1f984e23ec7b3c72e5d01620dce8f40",
+        "repositoryUrl": "https://modelscope.cn/models/Tencent-Hunyuan/Hy-MT2-7B-GGUF/files?Revision=47b1dd35c1f984e23ec7b3c72e5d01620dce8f40",
+        "files": [
+          {
+            "path": "Hy-MT2-7B-Q4_K_M.gguf",
+            "size": 4624648896,
+            "url": "https://www.modelscope.cn/models/Tencent-Hunyuan/Hy-MT2-7B-GGUF/resolve/47b1dd35c1f984e23ec7b3c72e5d01620dce8f40/Hy-MT2-7B-Q4_K_M.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "m2m100-418m",
+    "name": "M2M100 418M",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636",
+        "repositoryUrl": "https://huggingface.co/facebook/m2m100_418M/tree/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636",
+        "files": [
+          {
+            "path": ".gitattributes",
+            "size": 690,
+            "url": "https://huggingface.co/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/.gitattributes"
+          },
+          {
+            "path": "README.md",
+            "size": 4603,
+            "url": "https://huggingface.co/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/README.md"
+          },
+          {
+            "path": "config.json",
+            "size": 908,
+            "url": "https://huggingface.co/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 233,
+            "url": "https://huggingface.co/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/generation_config.json"
+          },
+          {
+            "path": "pytorch_model.bin",
+            "size": 1935796948,
+            "url": "https://huggingface.co/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/pytorch_model.bin"
+          },
+          {
+            "path": "sentencepiece.bpe.model",
+            "size": 2423393,
+            "url": "https://huggingface.co/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/sentencepiece.bpe.model"
+          },
+          {
+            "path": "special_tokens_map.json",
+            "size": 1140,
+            "url": "https://huggingface.co/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/special_tokens_map.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 298,
+            "url": "https://huggingface.co/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/tokenizer_config.json"
+          },
+          {
+            "path": "vocab.json",
+            "size": 3708092,
+            "url": "https://huggingface.co/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/vocab.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636",
+        "repositoryUrl": "https://hf-mirror.com/facebook/m2m100_418M/tree/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636",
+        "files": [
+          {
+            "path": ".gitattributes",
+            "size": 690,
+            "url": "https://hf-mirror.com/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/.gitattributes"
+          },
+          {
+            "path": "README.md",
+            "size": 4603,
+            "url": "https://hf-mirror.com/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/README.md"
+          },
+          {
+            "path": "config.json",
+            "size": 908,
+            "url": "https://hf-mirror.com/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 233,
+            "url": "https://hf-mirror.com/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/generation_config.json"
+          },
+          {
+            "path": "pytorch_model.bin",
+            "size": 1935796948,
+            "url": "https://hf-mirror.com/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/pytorch_model.bin"
+          },
+          {
+            "path": "sentencepiece.bpe.model",
+            "size": 2423393,
+            "url": "https://hf-mirror.com/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/sentencepiece.bpe.model"
+          },
+          {
+            "path": "special_tokens_map.json",
+            "size": 1140,
+            "url": "https://hf-mirror.com/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/special_tokens_map.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 298,
+            "url": "https://hf-mirror.com/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/tokenizer_config.json"
+          },
+          {
+            "path": "vocab.json",
+            "size": 3708092,
+            "url": "https://hf-mirror.com/facebook/m2m100_418M/resolve/55c2e61bbf05dfb8d7abccdc3fae6fc8512fd636/vocab.json"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "036fa2a4b203927f7ab61219b1039b269b4a6d07",
+        "repositoryUrl": "https://modelscope.cn/models/facebook/m2m100_418M/files?Revision=036fa2a4b203927f7ab61219b1039b269b4a6d07",
+        "files": [
+          {
+            "path": ".gitattributes",
+            "size": 2075,
+            "url": "https://www.modelscope.cn/models/facebook/m2m100_418M/resolve/036fa2a4b203927f7ab61219b1039b269b4a6d07/.gitattributes"
+          },
+          {
+            "path": "README.md",
+            "size": 4603,
+            "url": "https://www.modelscope.cn/models/facebook/m2m100_418M/resolve/036fa2a4b203927f7ab61219b1039b269b4a6d07/README.md"
+          },
+          {
+            "path": "config.json",
+            "size": 908,
+            "url": "https://www.modelscope.cn/models/facebook/m2m100_418M/resolve/036fa2a4b203927f7ab61219b1039b269b4a6d07/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 233,
+            "url": "https://www.modelscope.cn/models/facebook/m2m100_418M/resolve/036fa2a4b203927f7ab61219b1039b269b4a6d07/generation_config.json"
+          },
+          {
+            "path": "pytorch_model.bin",
+            "size": 1935796948,
+            "url": "https://www.modelscope.cn/models/facebook/m2m100_418M/resolve/036fa2a4b203927f7ab61219b1039b269b4a6d07/pytorch_model.bin"
+          },
+          {
+            "path": "sentencepiece.bpe.model",
+            "size": 2423393,
+            "url": "https://www.modelscope.cn/models/facebook/m2m100_418M/resolve/036fa2a4b203927f7ab61219b1039b269b4a6d07/sentencepiece.bpe.model"
+          },
+          {
+            "path": "special_tokens_map.json",
+            "size": 1140,
+            "url": "https://www.modelscope.cn/models/facebook/m2m100_418M/resolve/036fa2a4b203927f7ab61219b1039b269b4a6d07/special_tokens_map.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 298,
+            "url": "https://www.modelscope.cn/models/facebook/m2m100_418M/resolve/036fa2a4b203927f7ab61219b1039b269b4a6d07/tokenizer_config.json"
+          },
+          {
+            "path": "vocab.json",
+            "size": 3708092,
+            "url": "https://www.modelscope.cn/models/facebook/m2m100_418M/resolve/036fa2a4b203927f7ab61219b1039b269b4a6d07/vocab.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "index-translate-2b-q4-k-m",
+    "name": "Index-Translate 2B Q4_K_M",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "3a0eca6ce931d88d00614d427ab3ed8ff0743902",
+        "repositoryUrl": "https://huggingface.co/IndexTeam/Index-Translate-2B-GGUF/tree/3a0eca6ce931d88d00614d427ab3ed8ff0743902",
+        "files": [
+          {
+            "path": "Index-Translate-2B.Q4_K_M.gguf",
+            "size": 1312164352,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-GGUF/resolve/3a0eca6ce931d88d00614d427ab3ed8ff0743902/Index-Translate-2B.Q4_K_M.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "3a0eca6ce931d88d00614d427ab3ed8ff0743902",
+        "repositoryUrl": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-GGUF/tree/3a0eca6ce931d88d00614d427ab3ed8ff0743902",
+        "files": [
+          {
+            "path": "Index-Translate-2B.Q4_K_M.gguf",
+            "size": 1312164352,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-GGUF/resolve/3a0eca6ce931d88d00614d427ab3ed8ff0743902/Index-Translate-2B.Q4_K_M.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "b92a7c7bf499a6f05da1a66fab8549da3de5b603",
+        "repositoryUrl": "https://modelscope.cn/models/IndexTeam/Index-Translate-2B-GGUF/files?Revision=b92a7c7bf499a6f05da1a66fab8549da3de5b603",
+        "files": [
+          {
+            "path": "Index-Translate-2B.Q4_K_M.gguf",
+            "size": 1312164352,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-GGUF/resolve/b92a7c7bf499a6f05da1a66fab8549da3de5b603/Index-Translate-2B.Q4_K_M.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "index-translate-9b-q4-k-m",
+    "name": "Index-Translate 9B Q4_K_M",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "645939fbab839a656f1bc39975a872bc8ad749f8",
+        "repositoryUrl": "https://huggingface.co/IndexTeam/Index-Translate-9B-GGUF/tree/645939fbab839a656f1bc39975a872bc8ad749f8",
+        "files": [
+          {
+            "path": "Index-Translate-9B.Q4_K_M.gguf",
+            "size": 5780090304,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-GGUF/resolve/645939fbab839a656f1bc39975a872bc8ad749f8/Index-Translate-9B.Q4_K_M.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "645939fbab839a656f1bc39975a872bc8ad749f8",
+        "repositoryUrl": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-GGUF/tree/645939fbab839a656f1bc39975a872bc8ad749f8",
+        "files": [
+          {
+            "path": "Index-Translate-9B.Q4_K_M.gguf",
+            "size": 5780090304,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-GGUF/resolve/645939fbab839a656f1bc39975a872bc8ad749f8/Index-Translate-9B.Q4_K_M.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "e97205e0e68986a643eab5ebfd75cebeb67234d0",
+        "repositoryUrl": "https://modelscope.cn/models/IndexTeam/Index-Translate-9B-GGUF/files?Revision=e97205e0e68986a643eab5ebfd75cebeb67234d0",
+        "files": [
+          {
+            "path": "Index-Translate-9B.Q4_K_M.gguf",
+            "size": 5780090304,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-GGUF/resolve/e97205e0e68986a643eab5ebfd75cebeb67234d0/Index-Translate-9B.Q4_K_M.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "index-translate-35b-a3b-q4-k-m",
+    "name": "Index-Translate 35B-A3B preview Q4_K_M",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "3319ce338363a181c6c20c06b7379063d9baf484",
+        "repositoryUrl": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-GGUF/tree/3319ce338363a181c6c20c06b7379063d9baf484",
+        "files": [
+          {
+            "path": "Index-Translate-35B-A3B-preview.Q4_K_M.gguf",
+            "size": 21713462400,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-GGUF/resolve/3319ce338363a181c6c20c06b7379063d9baf484/Index-Translate-35B-A3B-preview.Q4_K_M.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "3319ce338363a181c6c20c06b7379063d9baf484",
+        "repositoryUrl": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-GGUF/tree/3319ce338363a181c6c20c06b7379063d9baf484",
+        "files": [
+          {
+            "path": "Index-Translate-35B-A3B-preview.Q4_K_M.gguf",
+            "size": 21713462400,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-GGUF/resolve/3319ce338363a181c6c20c06b7379063d9baf484/Index-Translate-35B-A3B-preview.Q4_K_M.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "91f6e204309d1808f3779d4a3822f8ce011785bb",
+        "repositoryUrl": "https://modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-GGUF/files?Revision=91f6e204309d1808f3779d4a3822f8ce011785bb",
+        "files": [
+          {
+            "path": "Index-Translate-35B-A3B-preview.Q4_K_M.gguf",
+            "size": 21713462400,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-GGUF/resolve/91f6e204309d1808f3779d4a3822f8ce011785bb/Index-Translate-35B-A3B-preview.Q4_K_M.gguf"
+          }
+        ]
+      }
+    }
+  }
+]

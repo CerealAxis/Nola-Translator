@@ -64,7 +64,7 @@ export function quantizationOf(record: ResourceRecord): string | null {
   if (id.includes('q3-k-m')) return 'Q3_K_M'
   if (id.includes('iq2-m')) return 'UD-IQ2_M'
   if (id.includes('nf4')) return 'NF4'
-  if (id.includes('qwen3-asr')) return 'NF4'
+  if (id.includes('qwen3-asr') && record.provider === 'qwen3-asr') return 'NF4'
   return null
 }
 
@@ -150,6 +150,7 @@ export function ModelCard({
 }: ModelCardProps) {
   const { t } = useI18n()
   const state: ResourceState = resourceStateOf(record)
+  const removal = record.phase === 'remove' && (state === 'removing' || state === 'failed')
   const inFlight = state === 'queued' || state === 'downloading' || state === 'verifying'
   const descriptionKey = BUILTIN_DESCRIPTION_KEYS[record.resourceId]
   const description = descriptionKey ? t(descriptionKey) : record.description || descriptionFallback
@@ -176,7 +177,7 @@ export function ModelCard({
       <Card.Content>
       <div className="models-card__status">
         {isDefault && record.installed ? <Chip size="sm" variant="soft" color="accent">{t('modelsSettingsUi.default')}</Chip> : null}
-        {record.installed && !configurationOf(record) ? <StatusPill label={t('modelConfig.pending')} tone="warning" /> : <StatePill state={state} />}
+        {removal ? <StatusPill label={t(state === 'failed' ? 'modelsSettingsUi.removeFailed' : 'modelsSettingsUi.removing')} tone={state === 'failed' ? 'danger' : 'accent'} /> : record.installed && !configurationOf(record) ? <StatusPill label={t('modelConfig.pending')} tone="warning" /> : <StatePill state={state} />}
         {(supportedEngines ?? modelEngines(record)).map(engine => <Chip key={engine} size="sm" variant="soft">{engine === 'pytorch' ? 'PyTorch' : 'llama.cpp'}</Chip>)}
       </div>
 
@@ -186,6 +187,7 @@ export function ModelCard({
       <Card.Footer>
         <Actions
           state={state}
+          removal={removal}
           busy={busy}
           installable={installable}
           cancellable={record.cancellable}
@@ -196,7 +198,7 @@ export function ModelCard({
           onRemove={onRemove}
           onSetDefault={onSetDefault}
         />
-        {footer ? <div className="models-card__details">{footer}</div> : null}
+        {footer && !removal ? <div className="models-card__details">{footer}</div> : null}
       </Card.Footer>
     </Card>
   )
@@ -242,6 +244,7 @@ function ProgressLine({ record, state }: { record: ResourceRecord; state: Resour
 
 interface ActionsProps {
   state: ResourceState
+  removal: boolean
   busy: boolean
   installable: boolean
   cancellable: boolean
@@ -255,6 +258,7 @@ interface ActionsProps {
 
 function Actions({
   state,
+  removal,
   busy,
   installable,
   cancellable,
@@ -266,6 +270,12 @@ function Actions({
   onSetDefault,
 }: ActionsProps) {
   const { t } = useI18n()
+
+  if (removal) {
+    return <Button variant="danger-soft" isDisabled={state === 'removing'} isPending={busy || state === 'removing'} onPress={onRemove}>
+      {t(state === 'removing' ? 'modelsSettingsUi.removing' : 'models.remove')}
+    </Button>
+  }
 
   if (state === 'failed') {
     return (
