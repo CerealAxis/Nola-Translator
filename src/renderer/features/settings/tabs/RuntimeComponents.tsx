@@ -108,12 +108,11 @@ export function RuntimeComponents() {
       })}
     </SettingGroup>
     {local && (local.engine.managed || local.llama.managed || local.crisp?.managed) ? <SettingGroup legend={t('runtime.repair')} actions={<Button variant="secondary" isDisabled={busy || !Object.values(repairs).some(Boolean)} onPress={() => void install((['engine', 'llama', 'crisp'] as const).filter(kind => repairs[kind] && local[kind]?.managed).map(kind => local[kind]!.id!))}>{t('runtime.repairAction')}</Button>}>
-      <TagGroup aria-label={t('runtime.repair')} className="runtime-repair">
+      <TagGroup aria-label={t('runtime.repair')} className="runtime-repair" variant="surface" selectionMode="multiple"
+        selectedKeys={new Set(KINDS.filter(kind => repairs[kind]))}
+        onSelectionChange={keys => { const next = new Set(keys === 'all' ? KINDS : keys); setRepairs({ engine: next.has('engine'), llama: next.has('llama'), crisp: next.has('crisp') }) }}>
         <TagGroup.List className="runtime-repair__list">
-          {KINDS.filter(kind => local[kind]?.managed).map(kind => <Tag key={kind} data-on={repairs[kind] ? 'true' : 'false'}
-            isDisabled={busy} onPress={() => setRepairs(previous => ({ ...previous, [kind]: !previous[kind] }))}>
-            <Check className="runtime-repair__check" aria-hidden="true" />{brand(kind)}
-          </Tag>)}
+          {KINDS.filter(kind => local[kind]?.managed).map(kind => <Tag key={kind} id={kind} isDisabled={busy}>{brand(kind)}</Tag>)}
         </TagGroup.List>
       </TagGroup>
     </SettingGroup> : null}

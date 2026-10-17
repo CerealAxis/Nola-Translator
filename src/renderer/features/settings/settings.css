@@ -159,15 +159,13 @@
 /* The panel body is unhidden on tab change, so the anchor used by `#?component=` needs its own
    scroll offset from the sticky page header. */
 .runtime-panel-body[id] { scroll-margin-top: var(--space-3); }
-/* Repair targets are pills, not rows: each one names an engine, and the tick says whether this
-   repair run includes it. The unselected pill keeps its outline so the set stays legible
-   without colour alone. `data-on` is local state; `Tag` only renders its own selected styles
-   inside a selection-mode TagGroup. */
+/* Repair targets are pills, not rows: each one names an engine, and its fill says whether this
+   repair run includes it. `variant="surface"` keeps the unselected pill on the card background so
+   the three read as one set instead of three tinted chips, and HeroUI's own selected fill supplies
+   the accent. `gap: 0` is explicit because the pill holds a label and nothing else. */
 .runtime-repair__list { gap: var(--space-1); }
-.runtime-repair .tag { gap: 6px; padding: 6px 12px; border: 1px solid var(--border); font: var(--nola-text-body-strong); }
-.runtime-repair .tag[data-on='true'] { border-color: transparent; }
-.runtime-repair__check { opacity: 0; transition: opacity 150ms var(--ease-nola); }
-.runtime-repair .tag[data-on='true'] .runtime-repair__check { opacity: 1; }
+.runtime-repair .tag { gap: 0; padding: 6px 14px; border: 1px solid var(--border); font: var(--nola-text-body-strong); }
+.runtime-repair .tag[data-selected='true'] { border-color: transparent; }
 .runtime-progress { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); }
 .runtime-progress-copy { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); overflow-wrap: anywhere; }
 .runtime-progress-copy small { font: var(--nola-text-caption); color: var(--muted); }
