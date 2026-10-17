@@ -84,6 +84,9 @@ def recipe(args):
                                'bitsandbytes==0.45.5' if version == '2.3.1' else 'bitsandbytes==0.50.2',
                                'funasr==1.4.16', 'sentencepiece==0.2.1',
                                'transformers==4.46.3' if tuple(map(int, version.split('.'))) < (2, 5, 0) else 'transformers==5.17.0']}
+    if tuple(map(int, version.split('.'))) >= (2, 10, 0):
+        # Official Index-Translate FP8/NVFP4 snapshots use the compressed-tensors format.
+        result['requirements'].append('compressed-tensors==0.19.0')
     if xf:
         result['id'] += '-xf-' + xf.replace('.', '-')
         result['name'] += f' + xFormers {xf}'

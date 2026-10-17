@@ -21,6 +21,13 @@ import { computeUi } from '../features/settings/compute-ui'
 export const zhCN = {
   offline: offlineZh,
   onboarding: onboardingZh,
+  startup: {
+    failedTitle: '启动未完成',
+    timedOut: '等待本地引擎超过 45 秒，启动可能已卡住。',
+    engineFailed: '本地引擎启动失败。',
+    settingsHint: '可以继续进入软件检查运行组件和设置，或打开日志目录排查。',
+    continue: '进入软件',
+  },
   more: {
     "tabLabel": "更多",
     "authorDescription": "Nola Translator 的开发者",
@@ -48,7 +55,7 @@ export const zhCN = {
     incompatibleBody: '{name} 不支持 {source} → {target} 的翻译。可以更换翻译模型、更换识别语言，或者关闭翻译并只输出原文。',
     changeModel: '更换翻译模型', changeLanguage: '更换识别语言', disableTranslation: '关闭翻译',
     needsConfiguration: '模型尚未配置，请前往模型管理完成配置。', modelHelp: '用途和引擎必须与模型文件及软件支持的加载方式一致。',
-    selectLanguages: '选择语言', sourceUnsupported: '当前识别模型不支持所选语言，请重新选择。',
+    selectLanguages: '选择语言', selectedLanguageCount: '已选 {count} 种', sourceUnsupported: '当前识别模型不支持所选语言，请重新选择。',
   },
   shellUi: shellZh,
   homeRecordsUi: homeRecordsZh,
@@ -311,11 +318,11 @@ export const zhCN = {
     title: '模型管理',
     downloadSources: {
       title: '选择下载源',
-      official: 'Hugging Face 官方源',
+      official: 'Hugging Face',
       officialHint: '直接从 Hugging Face 官方站下载。',
       mirror: 'HF-Mirror 镜像站',
       mirrorHint: '通过 Hugging Face 镜像站下载。',
-      modelscope: 'ModelScope 国内源',
+      modelscope: 'ModelScope',
       modelscopeHint: '从 ModelScope 对应模型仓库下载。',
     },
     tabRecommended: '推荐',
@@ -350,6 +357,17 @@ export const zhCN = {
     filterMt: '翻译',
     filterQuant: '量化',
     details: '模型详情',
+    parameterScale: '参数规模',
+    familyDescriptions: {
+      qwen: '多语言语音识别系列，支持中文、英语、粤语等语言与中文方言。',
+      sensevoice: '支持普通话、粤语、英语、日语和韩语的语音识别与语言检测。',
+      funasr: 'Fun-ASR 语音识别系列，可选择不同大小的 GGUF 权重。',
+      vibevoice: 'VibeVoice-ASR 语音识别系列，可选择不同大小的 GGUF 权重。',
+      mimo: 'MiMo-V2.5-ASR 语音识别系列，可选择不同大小的 GGUF 权重。',
+      hymt2: '混元多语言翻译系列，可按参数规模和发布的模型文件选择适合的版本。',
+      index: '支持多语言文本翻译，并可遵循术语、格式和风格要求。',
+      other: '支持包括中文和英语在内的多语言互译。',
+    },
     openDetails: '查看详情',
     noDescription: '暂无模型介绍',
     descriptions: {
@@ -361,6 +379,9 @@ export const zhCN = {
       hyMt2Iq2: 'UD-IQ2_M 量化版本；支持 33 种语言互译，另含藏语、哈萨克语、蒙古语、维吾尔语和粤语。',
       m2m100: '支持中文、英语等 100 种语言互译。',
       indexTranslate2b: 'Q4_K_M 量化版本；支持 150 种语言文本翻译及术语、格式、风格等翻译指令。',
+      indexTranslate2bBf16: '官方 BF16 原始权重，通过 PyTorch Transformers 推理。权重约 4.55 GB。',
+      indexTranslate2bFp8: '官方 FP8 权重，通过 PyTorch Transformers 推理；需要 compressed-tensors 组件。',
+      indexTranslate2bFp4: '官方 NVFP4 权重；完整 FP4 加速需要 NVIDIA Blackwell（RTX 50 系列或更新）。',
       hyMt2SevenB: 'Q4_K_M 量化版本；支持 36 种语言互译及多种翻译指令。',
       indexTranslate9b: 'Q4_K_M 量化版本；支持 150 种语言文本翻译及术语、格式、风格等翻译指令。',
       indexTranslate35b: 'Q4_K_M 预览版；35B MoE 模型，激活 3B 参数，支持 150 种语言文本翻译及多类指令。',
@@ -681,6 +702,7 @@ export const zhCN = {
      * 归在一起。具体支持码由共享错误目录分配。
      */
     captionServiceToggleFailed: '字幕服务的开关没有切换成功，请重试。',
+    serviceConflict: '{running}服务正在运行中，请先关闭{running}服务。',
     captionServiceStopFailed: '字幕服务已关闭，但有一场字幕会话没能结束，识别可能还在继续。',
 
     /*
@@ -774,6 +796,7 @@ export const zhCN = {
     dialogRuntimeMissing: '缺少环境弹窗', dialogRuntimeMissingDesc: '运行组件缺失时的提示，示例里两个组件都缺，两个安装按钮都出现。按钮按下去不会跳页面，也不会改设置。',
     dialogAppUpdate: '软件更新弹窗', dialogAppUpdateDesc: '有新版本时的提示，示例里的版本是假的。按钮按下去不会打开浏览器，也不会改设置。',
     dialogModelDetail: '模型详情抽屉', dialogModelDetailDesc: '模型搜索结果点进详情时左侧滑出的面板，可选字段都填满了，正文和整列信息行一次看全。示例里的仓库是编的，链接打不开；按安装不会真的下载。',
+    dialogStartupFailure: '启动失败弹窗', dialogStartupFailureDesc: '预览引擎启动超时后显示的提示与按钮。',
 
     statusPill: '状态标签', statusPillDesc: '把一个短状态贴在内容旁边。',
     statusAlert: '内联提醒', statusAlertDesc: '带标题和说明的提示条。',

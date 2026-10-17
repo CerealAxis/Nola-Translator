@@ -57,6 +57,22 @@ export async function probeLocalLlama(directory: string): Promise<LocalRuntime> 
   }
 }
 
+export async function probeLocalCrisp(python: string, directory: string): Promise<LocalRuntime> {
+  const result = missingLocalRuntime(directory)
+  if (!await access(join(directory, 'crispasr', '__init__.py')).then(() => true, () => false)) return result
+  try {
+    const setup = pythonRuntimePaths([directory], dirname(python), directory)
+    const script = `${setup}; import json,crispasr; from importlib.metadata import version; from pathlib import Path; p=Path(crispasr.__file__).parent; print(json.dumps(dict(version=version('crispasr'),vulkan=(p/'vulkan'/'crispasr.dll').is_file(),path=str(p.parent))))`
+    const probe = await run(python, ['-I', '-c', script], { windowsHide: true, timeout: 30_000, maxBuffer: 1024 * 1024 })
+    const actual = JSON.parse(probe.stdout.trim()) as { version: string; vulkan: boolean; path: string }
+    if (actual.version !== '0.8.43') return { ...result, status: 'incompatible', version: actual.version, reason: `CrispASR ${actual.version} 与当前固定版本 0.8.43 不匹配` }
+    return { ...result, path: actual.path, status: 'ready', version: actual.version, backend: actual.vulkan ? 'vulkan' : 'cpu', gpuAvailable: actual.vulkan }
+  } catch (error) {
+    logDiagnostic('runtime.crisp-probe.failed', { directory, ...processFailure(error) })
+    return { ...result, status: 'failed', reason: String(error).slice(-2048) }
+  }
+}
+
 /** Read registered installations, PATH and known legacy directories; never run their Python. */
 export async function localCandidates(base: string, runtimes: string, legacyLlama?: string): Promise<{ torch: string[]; llama: string[] }> {
   const torch = [join(base, 'Lib', 'site-packages')]

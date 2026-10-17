@@ -287,7 +287,7 @@ class TranslationPair(ProtocolModel):
 
 class ModelConfiguration(ProtocolModel):
     slot: Literal["recognition", "translation"]
-    engine: Literal["pytorch", "llama"]
+    engine: Literal["pytorch", "llama", "crisp"]
     languages: list[str] = Field(max_length=200)
     supportsAutoDetection: bool
     sourceLanguages: list[str] = Field(max_length=200)

@@ -29,7 +29,7 @@ const MARK_BY_BRAND: Record<KnownBrand, Mark> = {
 /** Brand tokens, first match wins. */
 const REPO_TOKENS: ReadonlyArray<readonly [RegExp, KnownBrand]> = [
   [/qwen/i, 'qwen'],
-  [/sensevoice|funaudiollm/i, 'alibaba'],
+  [/sensevoice|funaudiollm|fun-asr/i, 'alibaba'],
   [/hy-?mt2|hunyuan/i, 'hunyuan'],
   [/index-translate|indexteam|bilibili/i, 'bilibili'],
   [/m2m100|nllb|llama/i, 'meta'],
@@ -38,7 +38,7 @@ const REPO_TOKENS: ReadonlyArray<readonly [RegExp, KnownBrand]> = [
 /** A local resource id is the family name itself, so it needs none of the repo heuristics. */
 const LOCAL_TOKENS: ReadonlyArray<readonly [RegExp, KnownBrand]> = [
   [/qwen/i, 'qwen'],
-  [/sensevoice/i, 'alibaba'],
+  [/sensevoice|fun-asr/i, 'alibaba'],
   [/hy-?mt2|hunyuan/i, 'hunyuan'],
   [/index-translate/i, 'bilibili'],
   [/m2m100/i, 'meta'],

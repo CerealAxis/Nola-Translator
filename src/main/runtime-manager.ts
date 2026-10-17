@@ -8,13 +8,12 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { net, session } from 'electron'
 import { z } from 'zod'
-import { runtimePackageSchema, type ComputeSettings, type LocalRuntime, type RuntimePackage, type RuntimeSnapshot, type HardwareInventory } from '../shared/compute'
+import { CRISP_RUNTIME_ID, runtimePackageSchema, type ComputeSettings, type LocalRuntime, type RuntimePackage, type RuntimeSnapshot, type HardwareInventory } from '../shared/compute'
 import type { NetworkSettings } from '../shared/settings'
 import { probeHardware } from './hardware-inventory'
 import { PythonEnvironments, aliyunTorchWheelUrl } from './python-environments'
 import { PYPI_MIRROR_DEFAULT } from '../shared/pypi-mirrors'
-import { localCandidates, missingLocalRuntime, probeLocalEngine, probeLocalLlama } from './local-runtimes'
-import { decodeDeviceIntent } from '../shared/device-selection'
+import { localCandidates, missingLocalRuntime, probeLocalCrisp, probeLocalEngine, probeLocalLlama } from './local-runtimes'
 import { resolveGithubProxyNode } from './github-proxy-probe'
 import { OfflineRuntimes, type OfflineRuntimeProgress } from './offline-runtimes'
 import type { OfflineItem } from '../shared/offline'
@@ -22,6 +21,13 @@ import type { OfflineItem } from '../shared/offline'
 const run = promisify(execFile)
 const catalogSchema = z.object({ version: z.literal(1), packages: z.array(runtimePackageSchema).max(32) })
 const GITHUB_ASSET_HOSTS = new Set(['github.com', 'objects.githubusercontent.com'])
+const CRISP_ID = CRISP_RUNTIME_ID
+const CRISP_FILES = [
+  { url: 'https://files.pythonhosted.org/packages/5c/06/2ed13aeedd45410c0d1ec1fd4e16aa645b4d197ff20243dd0cc893fcb6e5/crispasr-0.8.43-py3-none-win_amd64.whl',
+    name: 'crispasr-0.8.43-py3-none-win_amd64.whl', bytes: 14_522_754, sha256: '546184aa746ec9f46ca568ae98ec5e436edb518a9bb56b445d9cfdbec431db7f' },
+  { url: 'https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.43/crispasr-0.8.43%2Bvulkan-py3-none-win_amd64.whl',
+    name: 'crispasr-0.8.43+vulkan-py3-none-win_amd64.whl', bytes: 28_714_544, sha256: '08854cc005537d925ea3191e63b3dc840191a58a961844dc61403f64e5904678' },
+] as const
 type Options = { recipesPath: string; baseDirectory: string; localLlamaDirectory?: string; network?: () => NetworkSettings }
 
 /**
@@ -43,7 +49,7 @@ export class RuntimeManager {
   private lastError: string | null = null
   private python: PythonEnvironments | null = null
   private hardware: HardwareInventory = { adapters: [], nvidiaDriver: null, notes: [] }
-  private local: RuntimeSnapshot['local'] = { engine: missingLocalRuntime(), llama: missingLocalRuntime() }
+  private local: RuntimeSnapshot['local'] = { engine: missingLocalRuntime(), llama: missingLocalRuntime(), crisp: missingLocalRuntime() }
   private pythonState: NonNullable<RuntimeSnapshot['python']> = { path: '', version: '', ready: false, reason: '' }
   private checking: Promise<void> | null = null
   constructor(readonly directory: string, private readonly catalogPath: string, private readonly extractScript: string,
@@ -71,22 +77,34 @@ export class RuntimeManager {
         } catch { /* Unrecognized directories never grant permission to replace files. */ }
       }
     }
-    await cleanupRuntimeArtifacts(this.directory, this.packages.map(item => item.id))
+    const crispDestination = this.inside(CRISP_ID)
+    if (!await access(crispDestination).then(() => true, () => false)) {
+      for (const name of names.filter(n => n.startsWith(`backup-${CRISP_ID}-`))) {
+        try {
+          const backup = this.inside(name)
+          const marker = JSON.parse(await readFile(join(backup, 'runtime-installed.json'), 'utf8'))
+          if (marker.id !== CRISP_ID || marker.kind !== 'crisp') continue
+          await renameRuntimeDirectory(backup, crispDestination)
+          break
+        } catch { /* An unrecognized backup is left untouched. */ }
+      }
+    }
+    await cleanupRuntimeArtifacts(this.directory, [...this.packages.map(item => item.id), CRISP_ID])
     try {
       const saved = JSON.parse(await readFile(join(this.directory, 'current-components.json'), 'utf8')) as RuntimeSnapshot['local']
-      for (const kind of ['engine', 'llama'] as const) if (typeof saved[kind]?.path === 'string') this.local[kind] = { ...missingLocalRuntime(saved[kind].path), id: saved[kind].id }
+      for (const kind of ['engine', 'llama', 'crisp'] as const) if (typeof saved[kind]?.path === 'string') this.local[kind] = { ...missingLocalRuntime(saved[kind].path), id: saved[kind].id }
     } catch { /* First launch discovers existing installations. */ }
     // Inventory is independent of model choice; prepare() alone enforces session requirements.
     await this.recheck()
   }
 
-  async recheck(components: readonly ('engine' | 'llama')[] = ['engine', 'llama']): Promise<void> {
+  async recheck(components: readonly ('engine' | 'llama' | 'crisp')[] = ['engine', 'llama', 'crisp']): Promise<void> {
     if (this.operation || this.python?.operation) throw new Error('组件安装中，请等待完成')
     if (this.checking) return this.checking
     this.checking = this.checkComponents(components).finally(() => { this.checking = null })
     return this.checking
   }
-  private async checkComponents(components: readonly ('engine' | 'llama')[]): Promise<void> {
+  private async checkComponents(components: readonly ('engine' | 'llama' | 'crisp')[]): Promise<void> {
     const python = join(this.options.baseDirectory, 'python.exe')
     this.pythonState = { ...this.pythonState, path: python }
     const needsTorch = components.includes('engine')
@@ -133,7 +151,20 @@ export class RuntimeManager {
       needsTorch ? inspect('engine', candidates.torch) : this.local.engine,
       components.includes('llama') ? inspect('llama', candidates.llama) : this.local.llama,
     ])
-    this.local = { engine, llama }
+    let crisp = this.local.crisp ?? missingLocalRuntime()
+    if (components.includes('crisp')) {
+      const managed = this.inside(CRISP_ID)
+      const base = join(this.options.baseDirectory, 'Lib', 'site-packages')
+      const managedProbe = this.pythonState.ready ? await probeLocalCrisp(python, managed) : missingLocalRuntime(managed)
+      const baseProbe = this.pythonState.ready ? await probeLocalCrisp(python, base) : missingLocalRuntime(base)
+      const managedMarker = await readFile(join(managed, 'runtime-installed.json'), 'utf8')
+        .then(value => { try { return JSON.parse(value) as { id?: string; kind?: string } } catch { return null } }, () => null)
+      crisp = managedProbe.status === 'ready' && managedMarker?.id === CRISP_ID && managedMarker.kind === 'crisp' ? { ...managedProbe, id: CRISP_ID, managed: true }
+        : baseProbe.status === 'ready' ? { ...baseProbe, id: 'bundled', managed: false }
+          : managedProbe.status === 'ready' ? { ...managedProbe, status: 'incompatible', reason: 'CrispASR 目录缺少安装记录' }
+            : managedProbe.status !== 'missing' ? managedProbe : baseProbe
+    }
+    this.local = { engine, llama, crisp }
     logDiagnostic('runtime.components.checked', { components, python: this.pythonState, local: this.local })
     await this.saveSelection()
   }
@@ -143,9 +174,10 @@ export class RuntimeManager {
     await writeFile(temporary, JSON.stringify(this.local), 'utf8')
     await rename(temporary, join(this.directory, 'current-components.json'))
   }
-  selectedDirectories(_compute?: ComputeSettings): { engine?: string; llama?: string } {
+  selectedDirectories(_compute?: ComputeSettings): { engine?: string; llama?: string; crisp?: string } {
     return { engine: this.local.engine.status === 'ready' ? this.local.engine.path : undefined,
-      llama: this.local.llama.status === 'ready' ? this.local.llama.path : undefined }
+      llama: this.local.llama.status === 'ready' ? this.local.llama.path : undefined,
+      crisp: this.local.crisp?.status === 'ready' && this.local.crisp.managed ? this.local.crisp.path : undefined }
   }
   async prepare(compute: ComputeSettings, translation: 'torch' | 'llama' | 'none' = 'llama', localRecognition = true): Promise<void> {
     if (this.operation || this.python?.operation) throw new Error('组件安装中，请等待完成')
@@ -154,8 +186,10 @@ export class RuntimeManager {
     // that those components still exist, avoiding another cold Python/Torch import.
     const needsTorch = (localRecognition && compute.recognitionEngine === 'pytorch') || translation === 'torch'
     const needsLlama = (localRecognition && compute.recognitionEngine === 'llama') || translation === 'llama'
+    const needsCrisp = localRecognition && compute.recognitionEngine === 'crisp'
     const files = [this.pythonState.path, ...(needsTorch ? [join(this.local.engine.path, 'torch', '__init__.py')] : []),
-      ...(needsLlama ? [join(this.local.llama.path, 'llama-server.exe')] : [])]
+      ...(needsLlama ? [join(this.local.llama.path, 'llama-server.exe')] : []),
+      ...(needsCrisp && this.local.crisp?.path ? [join(this.local.crisp.path, 'crispasr', '__init__.py')] : [])]
     if (!(await Promise.all(files.map(path => path ? access(path).then(() => true, () => false) : false))).every(Boolean)) {
       await this.recheck()
     }
@@ -163,15 +197,7 @@ export class RuntimeManager {
       const component = this.local[kind]
       if (component.status !== 'ready') throw new Error(`RUNTIME_${kind === 'engine' ? 'TORCH' : 'LLAMA'}: ${component.reason || (kind === 'engine' ? '尚未安装 PyTorch' : '尚未安装 llama.cpp')}；请前往设置 → 计算设备选择组合${component.managed ? '重新安装／修复' : '安装'}`)
     }
-    for (const [value, kind] of [...(localRecognition ? [[compute.recognitionDevice, compute.recognitionEngine === 'pytorch' ? 'engine' : 'llama']] : []), ...(translation !== 'none' ? [[compute.translationDevice, translation === 'torch' ? 'engine' : 'llama']] : [])]) {
-      const intent = decodeDeviceIntent(value)
-      if (!intent) continue
-      if (!this.hardware.adapters.some(a => a.hardwareId === intent.hardwareId)) throw new Error('指定显卡已断开，请重新选择计算设备')
-      if (this.local[kind as 'engine' | 'llama'].backend !== intent.backend) {
-        const runtime = kind === 'engine' ? 'TORCH' : 'LLAMA'
-        throw new Error(`RUNTIME_${runtime}_DEVICE_MISMATCH: 所选 ${intent.backend} 设备与已安装组件后端不匹配，请到设置选择对应组合`)
-      }
-    }
+    if (needsCrisp && this.local.crisp?.status !== 'ready') throw new Error(`RUNTIME_CRISP: ${this.local.crisp?.reason || '尚未安装 CrispASR'}；请前往设置 → 计算设备安装`)
   }
   private inside(name: string): string {
     const target = resolve(this.directory, name)
@@ -199,6 +225,7 @@ export class RuntimeManager {
     if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('这些组合仅支持 Windows x64')
     if (!this.pythonState.ready) throw new Error(this.pythonState.reason || '内置 Python 3.12 无法运行')
     this.lastError = null
+    if (id === CRISP_ID) { await this.installCrisp(repair); return }
     const kind = this.python?.has(id) ? 'engine' : 'llama'
     const current = this.local[kind]
     if (!repair && current.status === 'ready' && current.id === id) return
@@ -216,6 +243,62 @@ export class RuntimeManager {
     this.local[kind] = { ...actual, id, managed: true }
     await this.saveSelection()
     logDiagnostic('runtime.install.complete', { id, actual })
+  }
+  private async installCrisp(repair: boolean): Promise<void> {
+    if (!repair && this.local.crisp?.status === 'ready' && this.local.crisp.id === CRISP_ID) return
+    const controller = new AbortController()
+    this.cancellation = controller
+    const totalBytes = CRISP_FILES.reduce((sum, item) => sum + item.bytes, 0)
+    this.operation = { id: CRISP_ID, phase: 'download', bytes: 0, totalBytes, startedAt: Date.now() }
+    const staging = this.inside(`staging-${CRISP_ID}-${randomUUID()}`)
+    const wheelDirectory = this.inside(`staging-${CRISP_ID}-dll-${randomUUID()}`)
+    const destination = this.inside(CRISP_ID)
+    const backup = this.inside(`backup-${CRISP_ID}-${randomUUID()}`)
+    const wheels = CRISP_FILES.map(item => join(wheelDirectory, item.name))
+    let backedUp = false
+    try {
+      await mkdir(staging, { recursive: true })
+      await mkdir(wheelDirectory, { recursive: true })
+      let completed = 0
+      for (const [index, item] of CRISP_FILES.entries()) {
+        await this.download(item, wheels[index], controller.signal, bytes => {
+          if (this.operation) this.operation.bytes = completed + bytes
+        })
+        this.operation!.phase = 'verify'
+        if (await this.digest(wheels[index], controller.signal) !== item.sha256) throw new Error('CrispASR wheel 校验失败')
+        completed += item.bytes
+        this.operation!.phase = 'download'
+      }
+      controller.signal.throwIfAborted()
+      this.operation!.phase = 'extract'
+      const python = this.pythonState.path
+      await run(python, ['-I', '-m', 'pip', '--isolated', 'install', '--no-deps', '--no-index', '--ignore-installed', '--target', staging, wheels[0]],
+        { windowsHide: true, timeout: 120_000, signal: controller.signal, env: { ...process.env, PIP_CONFIG_FILE: 'nul' } })
+      const extract = `import pathlib,sys,zipfile; wheel=zipfile.ZipFile(sys.argv[1]); root=pathlib.Path(sys.argv[2])/'crispasr'/'vulkan'; names={pathlib.PurePosixPath(n).name:n for n in wheel.namelist() if n.startswith('crispasr/') and n.lower().endswith('.dll')}; expected={'crispasr.dll','ggml-base.dll','ggml-cpu.dll','ggml-vulkan.dll','ggml.dll','whisper.dll'}; assert names.keys()==expected, 'Vulkan wheel library list changed'; root.mkdir(parents=True,exist_ok=True); [(root/name).write_bytes(wheel.read(member)) for name,member in names.items()]`
+      await run(python, ['-I', '-c', extract, wheels[1], staging], { windowsHide: true, timeout: 30_000, signal: controller.signal })
+      const actual = await probeLocalCrisp(python, staging)
+      if (actual.status !== 'ready' || actual.version !== '0.8.43' || actual.backend !== 'vulkan') throw new Error(actual.reason || 'CrispASR 组件验证失败')
+      await writeFile(join(staging, 'runtime-installed.json'), JSON.stringify({ id: CRISP_ID, kind: 'crisp', version: actual.version }), 'utf8')
+      controller.signal.throwIfAborted()
+      if (await access(destination).then(() => true, () => false)) {
+        const marker = JSON.parse(await readFile(join(destination, 'runtime-installed.json'), 'utf8'))
+        if (marker.id !== CRISP_ID || marker.kind !== 'crisp') throw new Error('目标目录不是软件安装的 CrispASR 组件')
+        await renameRuntimeDirectory(destination, backup)
+        backedUp = true
+      }
+      try { await renameRuntimeDirectory(staging, destination) }
+      catch (error) { if (backedUp) await renameRuntimeDirectory(backup, destination); throw error }
+      if (backedUp) await removeRuntimeArtifact(this.directory, backup)
+      this.local.crisp = { ...actual, path: destination, id: CRISP_ID, managed: true }
+      await this.saveSelection()
+    } catch (error) {
+      this.lastError = controller.signal.aborted ? '安装已取消' : String(error)
+      throw new Error(this.lastError)
+    } finally {
+      for (const artifact of [staging, wheelDirectory]) await removeRuntimeArtifact(this.directory, artifact).catch(() => undefined)
+      this.operation = null
+      this.cancellation = null
+    }
   }
   async importArchive(_path: string): Promise<void> { throw new Error('请在设置页选择组合安装') }
   private offlineService(): OfflineRuntimes {

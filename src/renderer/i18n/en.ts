@@ -17,6 +17,13 @@ import { computeUi } from '../features/settings/compute-ui'
 export const en: Dictionary = {
   offline: offlineEn,
   onboarding: onboardingEn,
+  startup: {
+    failedTitle: 'Startup did not finish',
+    timedOut: 'The local engine has not responded for 45 seconds. Startup may be stuck.',
+    engineFailed: 'The local engine failed to start.',
+    settingsHint: 'Continue to inspect runtime components and settings, or open the log folder.',
+    continue: 'Continue to app',
+  },
   more: {
     "tabLabel": "More",
     "authorDescription": "Developer of Nola Translator",
@@ -44,7 +51,7 @@ export const en: Dictionary = {
     incompatibleBody: '{name} does not support translation from {source} to {target}. Choose another translation model, change the recognition language, or turn off translation to keep the original text.',
     changeModel: 'Change translation model', changeLanguage: 'Change recognition language', disableTranslation: 'Turn off translation',
     needsConfiguration: 'Configure this model in Model management before using it.', modelHelp: 'The task and engine must match the model files and a loader supported by this app.',
-    selectLanguages: 'Select languages', sourceUnsupported: 'The recognition model does not support this language. Choose another language.',
+    selectLanguages: 'Select languages', selectedLanguageCount: '{count} selected', sourceUnsupported: 'The recognition model does not support this language. Choose another language.',
   },
   shellUi: shellEn,
   homeRecordsUi: homeRecordsEn,
@@ -299,7 +306,7 @@ export const en: Dictionary = {
     title: 'Models',
     downloadSources: {
       title: 'Choose a download source',
-      official: 'Official Hugging Face',
+      official: 'Hugging Face',
       officialHint: 'Download directly from the official Hugging Face site.',
       mirror: 'HF-Mirror',
       mirrorHint: 'Download through the Hugging Face mirror.',
@@ -338,6 +345,17 @@ export const en: Dictionary = {
     filterMt: 'Translation',
     filterQuant: 'Quantization',
     details: 'Model details',
+    parameterScale: 'Parameter size',
+    familyDescriptions: {
+      qwen: 'A multilingual speech recognition family covering Chinese, English, Cantonese, and Chinese dialects.',
+      sensevoice: 'Speech recognition and language detection for Mandarin, Cantonese, English, Japanese, and Korean.',
+      funasr: 'Fun-ASR speech recognition with several GGUF weight sizes.',
+      vibevoice: 'VibeVoice-ASR speech recognition with several GGUF weight sizes.',
+      mimo: 'MiMo-V2.5-ASR speech recognition with several GGUF weight sizes.',
+      hymt2: 'A multilingual translation family with several model sizes and published weight files.',
+      index: 'Multilingual text translation with terminology, formatting, and style instructions.',
+      other: 'Translation between many languages, including Chinese and English.',
+    },
     openDetails: 'View details',
     noDescription: 'No model description available',
     descriptions: {
@@ -349,6 +367,9 @@ export const en: Dictionary = {
       hyMt2Iq2: 'UD-IQ2_M quantization; translates 33 languages, plus Tibetan, Kazakh, Mongolian, Uyghur, and Cantonese.',
       m2m100: 'Translates between 100 languages, including Chinese and English.',
       indexTranslate2b: 'Q4_K_M quantization; translates 150 languages and follows terminology, formatting, and style instructions.',
+      indexTranslate2bBf16: 'Official BF16 original weights, run with PyTorch Transformers. Weights are about 4.55 GB.',
+      indexTranslate2bFp8: 'Official FP8 weights for PyTorch Transformers; requires the compressed-tensors component.',
+      indexTranslate2bFp4: 'Official NVFP4 weights; full FP4 acceleration requires NVIDIA Blackwell (RTX 50 series or newer).',
       hyMt2SevenB: 'Q4_K_M quantization; translates 36 languages and follows translation instructions.',
       indexTranslate9b: 'Q4_K_M quantization; translates 150 languages and follows terminology, formatting, and style instructions.',
       indexTranslate35b: 'Preview release. Q4_K_M quantization; 35B MoE with 3B active parameters, supporting translation across 150 languages and following translation instructions.',
@@ -656,6 +677,7 @@ export const en: Dictionary = {
      * stop call is what failed, which is the same family as `engineNotConnected`.
      */
     captionServiceToggleFailed: 'The caption service switch did not flip. Try again.',
+    serviceConflict: 'The {running} service is running. Please close the {running} service first.',
     captionServiceStopFailed: 'The caption service is off, but a caption session did not end. Recognition may still be running.',
 
     /*
@@ -749,6 +771,7 @@ export const en: Dictionary = {
     dialogRuntimeMissing: 'Missing environment dialog', dialogRuntimeMissingDesc: 'Shown when a runtime component is missing. The sample misses both, so both install buttons show. Pressing one does nothing: no page opens and no setting changes.',
     dialogAppUpdate: 'Update notice dialog', dialogAppUpdateDesc: 'Shown when a newer release exists. The release is fabricated, so the button does nothing: no browser opens and no setting changes.',
     dialogModelDetail: 'Model detail drawer', dialogModelDetailDesc: 'The left sliding panel behind a hub search result. Every optional field is filled, so the body text and the whole column of info rows show at once. The repository is invented and its link resolves to nothing, and pressing install downloads nothing.',
+    dialogStartupFailure: 'Startup failure dialog', dialogStartupFailureDesc: 'Preview the message and actions shown after an engine startup timeout.',
 
     statusPill: 'Status pill', statusPillDesc: 'Pins a short status next to the content it describes.',
     statusAlert: 'Inline alert', statusAlertDesc: 'A notice with a title and an explanation.',

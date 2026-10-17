@@ -35,19 +35,14 @@
 .model-import-path.button,
 .model-import-download.button { height: var(--field-control-height); min-height: var(--field-control-height); }
 .model-import-download { width: 100%; }
-.model-import-checking { display: flex; align-items: center; gap: var(--space-1); font: var(--font-caption); }
 
 .model-import-dialog .offline-body { gap: var(--space-2); }
 .model-import-preview { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-.model-import-results { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.model-import-results > li { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; overflow-wrap: anywhere; }
-.model-import-results strong { color: var(--foreground); font: var(--font-body-strong); }
-.model-import-results p { margin: 0; }
 .model-import-space { margin: 0; border-top: 1px solid var(--border); font: var(--font-caption); }
 .model-import-space > div { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--field-control-height); padding-block: var(--space-1); }
 .model-import-space > div + div { border-top: 1px solid var(--border); }
 .model-import-space dt { color: var(--foreground); }
-.model-import-space dd { margin: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+.model-import-space dd { min-width: 0; margin: 0; color: var(--muted); font-variant-numeric: tabular-nums; text-align: end; overflow-wrap: anywhere; }
 
 .offline-task { width: 100%; }
 .offline-task-progress { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; min-width: 0; }

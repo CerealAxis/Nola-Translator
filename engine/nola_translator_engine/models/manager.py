@@ -94,6 +94,8 @@ class FileEntry:
     size: int
     sha256: str | None = None
     blob_sha1: str | None = None
+    repo: str | None = None
+    revision: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,7 +145,7 @@ class ModelSpec:
             endpoint = HF_MIRROR_ENDPOINT
         else:
             endpoint = hf_endpoint(network)
-        return f"{endpoint}/{self.repo}/resolve/{self.revision}/{entry.path}"
+        return f"{endpoint}/{entry.repo or self.repo}/resolve/{entry.revision or self.revision}/{entry.path}"
 
 
 class _DownloadStopped(RuntimeError):

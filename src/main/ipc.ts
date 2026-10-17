@@ -282,7 +282,13 @@ export function registerEngineIpc(
     return controller.prewarm(prewarmConfigFrom(getSettings()))
   })
 
-  loggedHandle(IPC_CHANNELS.showOverlay, () => getOverlayWindow()?.show())
+  loggedHandle(IPC_CHANNELS.showOverlay, () => {
+    if (!controller.canShowOverlay()) return false
+    const window = getOverlayWindow()
+    if (!window) throw new Error('overlayWindowUnavailable')
+    window.show()
+    return true
+  })
   loggedHandle(IPC_CHANNELS.hideOverlay, () => getOverlayWindow()?.hide())
   // Closing the caption window ends the session, so recognition stops first and recordAudio
   // stops writing a file nobody can see. hideOverlay stays a pure hide for a caller that only

@@ -12,6 +12,7 @@ import type { AppSettings, AppSettingsPatch, AppUpdateCheckResult, ModelStorageI
 import type { OverlayMenuRequest, OverlayMenuPresentation } from '../../shared/overlay-menu'
 import type { BrowserConnectionAction, BrowserConnectionStatus, BrowserKind } from '../../shared/browser'
 import { createStore, createWriteQueue } from './createStore'
+import { isSessionAlreadyRunningError } from '../../shared/ipc-error'
 import type { ComputeSnapshot, RuntimeSnapshot } from '../../shared/compute'
 
 /**
@@ -164,7 +165,7 @@ export async function testAudio(source: string): Promise<boolean> {
   }
 }
 
-export async function loadRuntimeComponents(recheck = false, components?: readonly ('engine' | 'llama')[]): Promise<RuntimeSnapshot> {
+export async function loadRuntimeComponents(recheck = false, components?: readonly ('engine' | 'llama' | 'crisp')[]): Promise<RuntimeSnapshot> {
   if (!bridge) throw new Error('IPC bridge unavailable')
   if (recheck) settingsStore.setState({ runtimeChecking: true, runtimeError: null })
   try {
@@ -221,7 +222,7 @@ export async function installRuntimeComponent(id: string, reinstall = false): Pr
 
 export async function cancelRuntimeInstallation(): Promise<void> { await bridge?.runtimes.cancel() }
 export function dismissRuntimeNotice(): void { settingsStore.setState({ runtimeNoticeDismissed: true }) }
-export async function openRuntimeSettings(component: 'engine' | 'llama'): Promise<void> {
+export async function openRuntimeSettings(component: 'engine' | 'llama' | 'crisp'): Promise<void> {
   settingsStore.setState({ runtimeNoticeDismissed: true })
   await bridge?.runtimes.openSettings(component)
 }
@@ -578,6 +579,28 @@ export async function restartAppForStorage(): Promise<void> {
 
 export function clearSettingsError(): void {
   settingsStore.setState({ error: null })
+}
+
+/** False means browser captions reserve the service; no window was opened. */
+export async function showOverlay(): Promise<boolean> {
+  if (!bridge) throw new Error('Bridge unavailable')
+  if (!await canStartDesktopCaptions()) return false
+  try {
+    return await bridge.overlay.show()
+  } catch (error) {
+    // A reservation can change after the status query. Main-process rejection is
+    // the same expected conflict as a false result, including older running IPC handlers.
+    if (isSessionAlreadyRunningError(error)) return false
+    throw error
+  }
+}
+
+/** Read the main process reservation before opening setup or inspecting local weights. */
+export async function canStartDesktopCaptions(): Promise<boolean> {
+  if (!bridge) throw new Error('Bridge unavailable')
+  const status = await bridge.settings.browserConnection?.('status')
+  if (status) settingsStore.setState({ browser: status })
+  return !status?.captionServiceActive && !status?.sessionStarting
 }
 
 /**

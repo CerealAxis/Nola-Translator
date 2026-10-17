@@ -38,7 +38,7 @@ export async function cleanupRuntimeArtifacts(directory: string, ids: readonly s
       const entry = await lstat(join(directory, name))
       if (!entry.isDirectory() || entry.isSymbolicLink()) continue
       const marker = JSON.parse(await readFile(join(directory, name, 'runtime-installed.json'), 'utf8'))
-      if (marker.id === name && ['python', 'llama'].includes(marker.kind)) knownIds.add(name)
+      if (marker.id === name && ['python', 'llama', 'crisp'].includes(marker.kind)) knownIds.add(name)
     } catch { /* A folder name without an installation marker grants no cleanup ownership. */ }
   }
   for (const name of names) {
@@ -56,7 +56,7 @@ export async function cleanupRuntimeArtifacts(directory: string, ids: readonly s
             readFile(join(directory, id, 'runtime-installed.json'), 'utf8'),
           ])
           const a = JSON.parse(backup), b = JSON.parse(current)
-          if (a.id === id && b.id === id && a.kind === b.kind && ['python', 'llama'].includes(a.kind)) owned = true
+          if (a.id === id && b.id === id && a.kind === b.kind && ['python', 'llama', 'crisp'].includes(a.kind)) owned = true
         } catch { /* A missing replacement keeps the backup available for recovery. */ }
       }
     }

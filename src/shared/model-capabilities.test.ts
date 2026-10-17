@@ -4,7 +4,7 @@ import { parseCommandLine, parseEventLine } from './schemas'
 import { configurationOf, isModelReady, modelConfigurationSchema, recognitionLanguages, supportsTranslation, translationLanguages } from './model-capabilities'
 import type { ModelConfiguration } from './model-capabilities'
 import { LANGUAGE_LABELS } from './languages'
-import { INDEX_TRANSLATE_MODEL_IDS } from './index-translate'
+import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from './index-translate'
 import { modelEngines } from './model-engines'
 
 function record(id: string, configuration?: ModelConfiguration): ResourceRecord {
@@ -26,6 +26,15 @@ describe('model language capabilities', () => {
       expect(supportsTranslation(model, 'en', 'yue')).toBe(false)
     }
     expect(modelEngines({ provider: 'index-translate' })).toEqual(['llama'])
+  })
+  it('offers the official 2B BF16, FP8 and FP4 snapshots through the PyTorch loader', () => {
+    for (const id of INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS) {
+      const model = record(id)
+      expect(configurationOf(model)?.engine).toBe('pytorch')
+      expect(supportsTranslation(model, 'ja', 'zh')).toBe(true)
+      expect(supportsTranslation(model, 'auto', 'en')).toBe(true)
+    }
+    expect(modelEngines({ provider: 'index-translate-transformers' })).toEqual(['pytorch'])
   })
   it('migrates recommended capabilities with their full language lists', () => {
     expect(recognitionLanguages(record('sensevoice-small'))).toEqual(['auto', 'zh', 'en', 'yue', 'ja', 'ko'])

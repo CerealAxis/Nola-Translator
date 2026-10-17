@@ -20,6 +20,7 @@ import { HubSearchTab } from './HubSearchTab'
 import { ModelCard, ModelCardSkeleton, defaultTargetOf, isDefaultOf } from './ModelCard'
 import { DownloadSourceDialog } from './DownloadSourceDialog'
 import { ModelMark } from './modelBrand'
+import { RecommendedFamilyCard, RecommendedFamilyDialog, familyOf, type RecommendedFamily } from './RecommendedFamilies'
 import './models.css'
 
 export type ModelsTab = 'recommended' | 'installed' | 'search' | 'downloads'
@@ -32,6 +33,7 @@ export function ModelsPage() {
   const [tab, setTab] = useState<ModelsTab>('recommended')
   const [configuring, setConfiguring] = useState<ResourceRecord | null>(null)
   const [downloadTarget, setDownloadTarget] = useState<ResourceRecord | null>(null)
+  const [openFamily, setOpenFamily] = useState<RecommendedFamily | null>(null)
 
   const resources = useStore(stores.models, (state) => state.resources)
   const loaded = useStore(stores.models, (state) => state.loaded)
@@ -109,20 +111,27 @@ export function ModelsPage() {
     void updateSettings(patch).catch(() => toast.danger(t('modelsSettingsUi.defaultSaveFailed')))
   }
 
-  const card = (record: ResourceRecord) => (
-    <ModelCard
+  const card = (record: ResourceRecord) => {
+    const compute = settings?.compute ?? DEFAULT_COMPUTE_SETTINGS
+    const ready = isModelReady(record) && defaultTargetOf(record) !== null
+    const compatible = supportsSelectedEngine(record, compute, record.resourceId)
+    const defaultDisabledReason = record.installed && !configurationOf(record)
+      ? t('modelsSettingsUi.configureBeforeDefault')
+      : undefined
+    return <ModelCard
       key={record.resourceId}
       record={record}
       busy={busyIds.includes(record.resourceId)}
       isDefault={isDefaultOf(record, settings)}
-      canBeDefault={isModelReady(record) && defaultTargetOf(record) !== null && supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)}
+      canBeDefault={ready && compatible}
+      defaultDisabledReason={defaultDisabledReason}
       onInstall={run(record, 'install')}
       onCancel={run(record, 'cancel')}
       onRemove={run(record, 'remove')}
       onSetDefault={() => setDefault(record)}
       footer={record.resourceId.startsWith('hub:') && record.installed ? <Button variant="secondary" onPress={() => setConfiguring(record)}>{t(configurationOf(record) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : modelImportEntry(record.resourceId) ? <Button variant="secondary" size="sm" onPress={() => offlineActions.openDownloads(record.resourceId)}>{t('offline.manualDownload')}</Button> : undefined}
     />
-  )
+  }
 
   return (
     <div className="models-page">
@@ -134,6 +143,15 @@ export function ModelsPage() {
           toast.danger(t('models.downloadError', { name: target.name }))
         })
       }} />
+      {openFamily ? <RecommendedFamilyDialog
+        family={openFamily}
+        records={resources.filter(record => !record.resourceId.startsWith('hub:') && familyOf(record) === openFamily)}
+        busyIds={busyIds}
+        onClose={() => setOpenFamily(null)}
+        onInstall={(record, source) => { void actions.models.manageResource(record.resourceId, 'install', source).catch(() => toast.danger(t('models.downloadError', { name: record.name }))) }}
+        onCancel={record => { void actions.models.manageResource(record.resourceId, 'cancel').catch(() => undefined) }}
+        onManualDownload={record => { setOpenFamily(null); offlineActions.openDownloads(record.resourceId) }}
+      /> : null}
       <section className="models-overview">
         <header className="models-overview__heading">
           <span className="models-overview__icon"><Box aria-hidden="true" /></span>
@@ -173,10 +191,10 @@ export function ModelsPage() {
         </Tabs.ListContainer>
 
         <Tabs.Panel id="recommended" data-onboarding="model-downloads">
-          <Catalog
+          <RecommendedCatalog
             records={resources.filter(record => !record.resourceId.startsWith('hub:'))}
             loading={loading && !loaded}
-            card={card}
+            onOpen={setOpenFamily}
             emptyAction={
               <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={() => setTab('search')}>
                 {t('models.tabSearch')}
@@ -190,6 +208,7 @@ export function ModelsPage() {
             records={installed}
             loading={loading && !loaded}
             card={card}
+            compute={settings?.compute ?? DEFAULT_COMPUTE_SETTINGS}
             emptyAction={
               <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={() => setTab('recommended')}>
                 {t('models.tabRecommended')}
@@ -251,10 +270,33 @@ interface CatalogProps {
   records: readonly ResourceRecordWithRate[]
   loading: boolean
   card: (record: ResourceRecord) => ReactNode
+  compute: typeof DEFAULT_COMPUTE_SETTINGS
   emptyAction: ReactNode
 }
 
-function Catalog({ records, loading, card, emptyAction }: CatalogProps) {
+function RecommendedCatalog({ records, loading, onOpen, emptyAction }: Pick<CatalogProps, 'records' | 'loading' | 'emptyAction'> & { onOpen: (family: RecommendedFamily) => void }) {
+  const { t } = useI18n()
+  if (loading) return <div className={GRID}>{[0, 1, 2, 3].map(index => <ModelCardSkeleton key={index} />)}</div>
+  if (records.length === 0) return <EmptyState className="flex flex-col items-start gap-4 py-8"><p className="nola-title text-foreground">{t('models.notInstalled')}</p>{emptyAction}</EmptyState>
+  const groups = new Map<RecommendedFamily, ResourceRecord[]>()
+  for (const record of records) {
+    const family = familyOf(record)
+    groups.set(family, [...(groups.get(family) ?? []), record])
+  }
+  const sections: { title: string; families: RecommendedFamily[] }[] = [
+    { title: t('models.asrModels'), families: ['qwen', 'sensevoice', 'funasr', 'vibevoice', 'mimo'] },
+    { title: t('models.mtModels'), families: ['hymt2', 'index', 'other'] },
+  ]
+  return <div className="flex flex-col gap-6">{sections.map(section => <section key={section.title} className="flex flex-col gap-3">
+    <h2 className="models-section-title">{section.title}</h2>
+    <div className={GRID}>{section.families.map(family => {
+      const familyRecords = groups.get(family)
+      return familyRecords ? <RecommendedFamilyCard key={family} family={family} records={familyRecords} onOpen={() => onOpen(family)} /> : null
+    })}</div>
+  </section>)}</div>
+}
+
+function Catalog({ records, loading, card, emptyAction, compute }: CatalogProps) {
   const { t } = useI18n()
 
   if (loading) {
@@ -276,20 +318,30 @@ function Catalog({ records, loading, card, emptyAction }: CatalogProps) {
     )
   }
 
-  const recognition = records.filter((item) => item.kind === 'recognitionModel')
-  const translation = records.filter((item) => item.kind === 'translationModel')
+  const ordered = [...records].sort((left, right) =>
+    Number(supportsSelectedEngine(right, compute, right.resourceId)) - Number(supportsSelectedEngine(left, compute, left.resourceId)),
+  )
+  const recognition = ordered.filter((item) => item.kind === 'recognitionModel')
+  const translation = ordered.filter((item) => item.kind === 'translationModel')
   const hunyuan = translation.filter((item) => item.resourceId.startsWith('hy-mt2-'))
   const bilibili = translation.filter((item) => item.resourceId.startsWith('index-translate-'))
   const otherTranslation = translation.filter(
     (item) => !item.resourceId.startsWith('hy-mt2-') && !item.resourceId.startsWith('index-translate-'),
   )
 
+  const translationSections = [
+    { title: t('models.hunyuanModels'), records: hunyuan },
+    { title: t('models.bilibiliModels'), records: bilibili },
+    { title: t('models.otherMtModels'), records: otherTranslation },
+  ].sort((left, right) => {
+    const available = (section: typeof left) => section.records.some(record => supportsSelectedEngine(record, compute, record.resourceId))
+    return Number(available(right)) - Number(available(left))
+  })
+
   return (
     <div className="flex flex-col gap-6">
       <Section title={t('models.asrModels')} records={recognition} card={card} />
-      <Section title={t('models.hunyuanModels')} records={hunyuan} card={card} />
-      <Section title={t('models.bilibiliModels')} records={bilibili} card={card} />
-      <Section title={t('models.otherMtModels')} records={otherTranslation} card={card} />
+      {translationSections.map(section => <Section key={section.title} title={section.title} records={section.records} card={card} />)}
     </div>
   )
 }

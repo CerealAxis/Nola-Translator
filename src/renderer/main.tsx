@@ -2,7 +2,7 @@ import { ModelCapabilityNotices } from './features/models/ModelCapabilityNotices
 import { ModelDownloadNotice } from './features/models/ModelDownloadNotice'
 import './index.css'
 import './theme/cjk-fonts.css'
-import { StrictMode, useEffect } from 'react'
+import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
 import { Alert, Button, Toast } from '@heroui/react'
@@ -15,6 +15,7 @@ import { disposeStores, initStores, isEngineConnected, stores, useStore } from '
 import { OverlayRoot } from './features/overlay'
 import { OverlayMenuRoot } from './features/overlay/OverlayMenuRoot'
 import { RuntimeNotice } from './features/settings/RuntimeNotice'
+import { StartupFailureDialog } from './features/settings/StartupFailureDialog'
 import { AppUpdateNotice } from './features/settings/AppUpdateNotice'
 import { OnboardingTour } from './features/onboarding'
 
@@ -34,7 +35,7 @@ import { OnboardingTour } from './features/onboarding'
 const isOverlayDocument = new URLSearchParams(window.location.search).get('overlay') === '1'
 const isOverlayMenuDocument = new URLSearchParams(window.location.search).get('overlayMenu') === '1'
 const bridge = createIpcBridge()
-initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument, overlayMenu: isOverlayMenuDocument })
+initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument, overlayMenu: isOverlayMenuDocument, offline: !isOverlayDocument })
 
 /**
  * 浮窗点「字幕外观」→ 主窗跳到对应设置页。
@@ -127,17 +128,23 @@ function dismissSplash() {
 }
 
 /** Release the splash after the component check and base engine settle; settings remain available on failure. */
-function useSplashUntilEngineSettles(): void {
-  const engineStatus = useStore(stores.session, (state) => state.engineStatus)
-  const settled = !isIpcBridgeAvailable() || engineStatus === 'ready' || engineStatus === 'failed'
-
+function useSplashUntilEngineSettles(settled: boolean): void {
   useEffect(() => {
     if (settled) dismissSplash()
   }, [settled])
 }
 
 function Root() {
-  useSplashUntilEngineSettles()
+  const engineStatus = useStore(stores.session, state => state.engineStatus)
+  const [startupTimedOut, setStartupTimedOut] = useState(false)
+  const [startupDialogDismissed, setStartupDialogDismissed] = useState(false)
+  const engineSettled = engineStatus === 'ready' || engineStatus === 'failed'
+  useEffect(() => {
+    if (engineSettled || isOverlayDocument || !isIpcBridgeAvailable()) return
+    const timer = window.setTimeout(() => setStartupTimedOut(true), 45_000)
+    return () => window.clearTimeout(timer)
+  }, [engineSettled])
+  useSplashUntilEngineSettles(!isIpcBridgeAvailable() || engineSettled || startupTimedOut)
   useEffect(() => {
     const teardown = () => {
       void disposeStores()
@@ -163,6 +170,11 @@ function Root() {
       <ModelCapabilityNotices />
       <RuntimeNotice />
       <AppUpdateNotice />
+      <StartupFailureDialog
+        isOpen={!startupDialogDismissed && (engineStatus === 'failed' || (startupTimedOut && engineStatus !== 'ready'))}
+        onOpenChange={open => { if (!open) setStartupDialogDismissed(true) }}
+        timedOut={engineStatus !== 'failed'}
+      />
     </ErrorBoundary>
   )
 }

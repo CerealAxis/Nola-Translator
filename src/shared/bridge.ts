@@ -65,7 +65,7 @@ export type EngineLifecycleEvent = {
 export type EngineChannelEvent = EngineEvent | EngineLifecycleEvent
 
 /** Pages the caption overlay can send the main window to. */
-export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'translation' | 'torch' | 'llama'
+export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'translation' | 'torch' | 'llama' | 'crisp'
 
 export type NolaTranslatorApi = {
   offline?: import('./offline').OfflineApi
@@ -79,13 +79,13 @@ export type NolaTranslatorApi = {
   isMainWindowMaximized(): Promise<boolean>
   closeMainWindow(): Promise<void>
   onMainWindowMaximizedChanged(listener: (maximized: boolean) => void): () => void
-  openRuntimeSettings(component: 'engine' | 'llama'): Promise<void>
+  openRuntimeSettings(component: 'engine' | 'llama' | 'crisp'): Promise<void>
   browserConnection?(action: BrowserConnectionAction, enabled?: boolean, browser?: BrowserKind): Promise<BrowserConnectionStatus>
   listDevices(): Promise<AudioDevice[]>
   testAudio(source: AudioTestSource): Promise<AudioTestResult>
   listComputeDevices(): Promise<ComputeSnapshot>
   getRuntimes(): Promise<RuntimeSnapshot>
-  prepareRuntimes(components?: readonly ('engine' | 'llama')[]): Promise<RuntimeSnapshot>
+  prepareRuntimes(components?: readonly ('engine' | 'llama' | 'crisp')[]): Promise<RuntimeSnapshot>
   installRuntime(id: string, repair?: boolean): Promise<void>
   importRuntime(): Promise<boolean>
   cancelRuntimeInstall(): Promise<void>
@@ -135,7 +135,8 @@ export type NolaTranslatorApi = {
    * up emits nothing at all.
    */
   getEngineState(): Promise<EngineProcessState>
-  showOverlay(): Promise<void>
+  /** False is a browser-caption service conflict; the window was not shown. */
+  showOverlay(): Promise<boolean>
   hideOverlay(): Promise<void>
   /** Stops recognition and then hides the window. Distinct from hideOverlay, which only hides. */
   closeOverlay(): Promise<void>

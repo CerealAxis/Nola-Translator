@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const computeSettingsSchema = z.object({
-  recognitionEngine: z.enum(['pytorch', 'llama']).default('pytorch'),
+  recognitionEngine: z.enum(['pytorch', 'llama', 'crisp']).default('pytorch'),
   translationEngine: z.enum(['auto', 'pytorch', 'llama']).default('auto'),
   recognitionDevice: z.string().min(1).max(512).default('auto'),
   translationDevice: z.string().min(1).max(512).default('auto'),
@@ -103,9 +103,11 @@ export type RuntimeSnapshot = {
   recipes: RuntimeRecipeState[]
   hardware: HardwareInventory
   recommendation: RuntimeRecommendation
-  local: { engine: LocalRuntime; llama: LocalRuntime }
+  local: { engine: LocalRuntime; llama: LocalRuntime; crisp?: LocalRuntime }
   python?: { path: string; version: string; ready: boolean; reason: string }
   operation: { id: string; phase: 'download' | 'verify' | 'extract' | 'prepare' | 'check'; bytes: number; totalBytes: number; startedAt?: number; detail?: string } | null
   lastError: string | null
   directory: string
 }
+
+export const CRISP_RUNTIME_ID = 'crispasr-0-8-43-vulkan'

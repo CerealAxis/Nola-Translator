@@ -6,6 +6,10 @@ import { onboardingHK } from './onboarding-ui'
 export const zhHK: Dictionary = {
   offline: offlineHk,
   onboarding: onboardingHK,
+  startup: {
+    failedTitle: '啟動尚未完成', timedOut: '等待本機引擎超過 45 秒，啟動可能已停滯。',
+    engineFailed: '本機引擎啟動失敗。', settingsHint: '你可以繼續進入軟件檢查執行元件及設定，或開啟日誌資料夾排查。', continue: '進入軟件',
+  },
   more: {
     "tabLabel": "更多",
     "authorDescription": "Nola Translator 的開發者",
@@ -133,6 +137,8 @@ export const zhHK: Dictionary = {
     "recheck": "重新檢查",
     "installTorch": "安裝 PyTorch",
     "installLlama": "安裝 llama.cpp",
+    "installCrisp": "安裝 CrispASR",
+    "crispDescription": "安裝用於 GGUF 語音識別的 Vulkan 與 CPU 元件",
     "torchDescription": "安裝或切換用於語音辨識與 PyTorch 翻譯的元件",
     "llamaDescription": "安裝或切換用於 GGUF 本機翻譯的元件",
     "current": "目前安裝",
@@ -149,6 +155,7 @@ export const zhHK: Dictionary = {
     "repairAction": "修復",
     "repairTorch": "重新安裝目前 PyTorch 組合",
     "repairLlama": "重新安裝目前 llama.cpp 組合",
+    "repairCrisp": "重新安裝目前 CrispASR 元件",
     "noticeTitle": "需要安裝執行環境元件",
     "noticeBody": "請選擇適合電腦的版本與運算後端組合。安裝完成後可開始傳譯。",
     "torchMissing": "尚未安裝 PyTorch，語音辨識功能無法啟動。",
@@ -241,7 +248,12 @@ export const zhHK: Dictionary = {
     "environmentFailed": "運算環境準備未完成",
     "retry": "重試準備",
     "useCpu": "使用 CPU 繼續",
-    "saveError": "無法儲存設定"
+    "saveError": "無法儲存設定",
+    "recognitionTask": "語音識別",
+    "translationTask": "本機翻譯",
+    "engineChanged": "已將{task}引擎切換為 {engine}",
+    "modelChanged": "模型已由 {previousModel} 自動更換為 {nextModel}。",
+    "noCompatibleModel": "沒有已安裝且相容 {engine} 的{task}模型，未更改引擎。"
   },
   "modelConfig": {
     "title": "設定模型",
@@ -273,6 +285,7 @@ export const zhHK: Dictionary = {
     "needsConfiguration": "模型尚未設定，請前往模型管理完成設定。",
     "modelHelp": "用途和引擎必須與模型檔案及軟件支援的載入方式一致。",
     "selectLanguages": "選擇語言",
+    "selectedLanguageCount": "已選 {count} 種",
     "sourceUnsupported": "目前辨識模型不支援所選語言，請重新選擇。"
   },
   "shellUi": {
@@ -363,6 +376,9 @@ export const zhHK: Dictionary = {
     "noModelSelected": "未選中模型",
     "current": "目前使用",
     "default": "預設",
+    "localImport": "本機匯入",
+    "engineMismatch": "目前選擇的推理引擎是 {selected}，此模型需要 {required}。請切換推理引擎或選擇相容模型。",
+    "configureBeforeDefault": "請先完成模型設定，再將它設為預設模型。",
     "defaultSaveFailed": "無法設定預設模型，請重試",
     "settingsSubtitle": "調整應用程式偏好設定與字幕顯示",
     "general": "一般",
@@ -372,8 +388,8 @@ export const zhHK: Dictionary = {
     "storage": "儲存",
     "advanced": "進階",
     "preview": "字幕預覽",
-    "previewSource": "This is a live caption preview.",
-    "previewTranslation": "這是即時字幕的預覽效果。",
+    "previewSource": "這裡是字幕樣式預覽",
+    "previewTranslation": "This is a preview of the caption style.",
     "previewHidden": "原文和譯文均已隱藏",
     "layoutDisplay": "佈局與顯示",
     "fontColors": "字型與顏色",
@@ -628,11 +644,11 @@ export const zhHK: Dictionary = {
     "title": "模型管理",
     "downloadSources": {
       "title": "選擇下載來源",
-      "official": "Hugging Face 官方來源",
+      "official": "Hugging Face",
       "officialHint": "直接從 Hugging Face 官方網站下載。",
       "mirror": "HF-Mirror 鏡像站",
       "mirrorHint": "透過 Hugging Face 鏡像站下載。",
-      "modelscope": "ModelScope 中國大陸來源",
+      "modelscope": "ModelScope",
       "modelscopeHint": "從對應的 ModelScope 模型倉庫下載。"
     },
     "tabRecommended": "推薦",
@@ -667,6 +683,17 @@ export const zhHK: Dictionary = {
     "filterMt": "翻譯",
     "filterQuant": "量化",
     "details": "模型詳情",
+    "parameterScale": "參數規模",
+    "familyDescriptions": {
+      "qwen": "多語言語音辨識系列，支援中文、英文、廣東話等語言及中文方言。",
+      "sensevoice": "支援普通話、廣東話、英文、日語及韓語的語音辨識與語言偵測。",
+      "funasr": "Fun-ASR 語音辨識系列，可選擇不同大小的 GGUF 權重。",
+      "vibevoice": "VibeVoice-ASR 語音辨識系列，可選擇不同大小的 GGUF 權重。",
+      "mimo": "MiMo-V2.5-ASR 語音辨識系列，可選擇不同大小的 GGUF 權重。",
+      "hymt2": "混元多語言翻譯系列，可按參數規模及已發佈的模型檔案選擇版本。",
+      "index": "支援多語言文字翻譯，並可遵循術語、格式及風格要求。",
+      "other": "支援包括中文及英文在內的多語言互譯。"
+    },
     "openDetails": "查看詳情",
     "noDescription": "暫無模型介紹",
     "descriptions": {
@@ -678,6 +705,9 @@ export const zhHK: Dictionary = {
       "hyMt2Iq2": "UD-IQ2_M 量化版本；支援 33 種語言互譯，另含藏語、哈薩克語、蒙古語、維吾爾語和廣東話。",
       "m2m100": "支援中文、英文等 100 種語言互譯。",
       "indexTranslate2b": "Q4_K_M 量化版本；支援 150 種語言文本翻譯及術語、格式、風格等翻譯指令。",
+      "indexTranslate2bBf16": "官方 BF16 原始權重，透過 PyTorch Transformers 推理。權重約 4.55 GB。",
+      "indexTranslate2bFp8": "官方 FP8 權重，透過 PyTorch Transformers 推理；需要 compressed-tensors 元件。",
+      "indexTranslate2bFp4": "官方 NVFP4 權重；完整 FP4 加速需要 NVIDIA Blackwell（RTX 50 系列或更新）。",
       "hyMt2SevenB": "Q4_K_M 量化版本；支援 36 種語言互譯及多種翻譯指令。",
       "indexTranslate9b": "Q4_K_M 量化版本；支援 150 種語言文本翻譯及術語、格式、風格等翻譯指令。",
       "indexTranslate35b": "Q4_K_M 預覽版；35B MoE 模型，激活 3B 參數，支援 150 種語言文本翻譯及多類指令。"
@@ -944,6 +974,7 @@ export const zhHK: Dictionary = {
     "pageCrashedAction": "重新載入介面",
     "copyDiagnosticsAction": "複製診斷資訊",
     "captionServiceToggleFailed": "字幕服務的開關沒有切換成功，請重試。",
+    "serviceConflict": "{running}服務正在執行中，請先關閉{running}服務。",
     "captionServiceStopFailed": "字幕服務已關閉，但有一場字幕會話沒能結束，辨識可能還在繼續。",
     "prewarm": {
       "modelUnavailable": "所需模型還沒有下載，請先到模型管理裡下載該模型。",
@@ -1067,6 +1098,8 @@ export const zhHK: Dictionary = {
     "dialogAppUpdateDesc": "有新版本時顯示的提示。示範版本號並非真實版本；按下按鈕不會開啟瀏覽器或更改設定。",
     "dialogModelDetail": "模型詳情抽屜",
     "dialogModelDetailDesc": "按一下模型搜尋結果查看詳情時，左側滑出的面板。可選欄位均已填妥，內容和資訊列一目了然。示範用的儲存庫是虛構的，連結無法開啟；按下安裝也不會真的下載。",
+    "dialogStartupFailure": "啟動失敗彈窗",
+    "dialogStartupFailureDesc": "預覽引擎啟動逾時後顯示的提示及按鈕。",
     "statusPill": "狀態標籤",
     "statusPillDesc": "把一個短狀態貼在內容旁邊。",
     "statusAlert": "內聯提醒",

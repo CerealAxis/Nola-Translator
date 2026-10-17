@@ -16,6 +16,7 @@ type ErrorLike = {
 }
 
 const KNOWN_ERROR_CODES: Readonly<Record<string, string>> = {
+  SESSIONALREADYRUNNING: 'SESSION_ALREADY_RUNNING',
   ETIMEDOUT: 'REQUEST_TIMEOUT',
   ESOCKETTIMEDOUT: 'REQUEST_TIMEOUT',
   ECONNRESET: 'NETWORK_UNAVAILABLE',
@@ -24,6 +25,13 @@ const KNOWN_ERROR_CODES: Readonly<Record<string, string>> = {
   ENOENT: 'ENGINE_UNAVAILABLE',
   EACCES: 'ENGINE_UNAVAILABLE',
   EPERM: 'ENGINE_UNAVAILABLE',
+}
+
+/** Recognises a session-mutex refusal before or after Electron normalises its IPC error. */
+export function isSessionAlreadyRunningError(error: unknown): boolean {
+  const source = error && typeof error === 'object' ? error as ErrorLike : undefined
+  return [source?.code, source?.engineCode, source?.message, error instanceof Error ? error.message : error]
+    .some(value => typeof value === 'string' && value.toLowerCase().replace(/[^a-z0-9]/g, '').includes('sessionalreadyrunning'))
 }
 
 /** Converts arbitrary thrown values into the stable fields allowed across the IPC boundary. */

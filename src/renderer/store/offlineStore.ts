@@ -67,6 +67,22 @@ export const offlineActions = {
   selectBundle(): Promise<void> {
     return run(async () => bridge?.offline?.selectBundle() ?? null, preview => { if (preview) offlineStore.setState({ preview }) })
   },
+  pickBundle(): Promise<void> {
+    return (async () => {
+      if (offlineStore.getState().busy) return
+      offlineStore.setState({ busy: true, failed: false })
+      try {
+        const preview = await bridge?.offline?.selectBundle() ?? null
+        if (preview) offlineStore.setState({ preview })
+      } catch { offlineStore.setState({ failed: true }) }
+      finally {
+        // The dialog opens only once the picker resolved: an import already has its preview, a failure has
+        // an alert to show, and a cancelled picker leaves no empty dialog behind.
+        if (offlineStore.getState().preview || offlineStore.getState().failed) offlineStore.setState({ mode: 'bundle' })
+        offlineStore.setState({ busy: false })
+      }
+    })()
+  },
   prepare(request: OfflinePrepareRequest): Promise<void> {
     return run(async () => { if (!bridge?.offline) throw new Error('Unavailable'); const task = await bridge.offline.prepare(request); if (task) offlineStore.setState({ workflow: 'bundle-prepare' }); return task }, task => { if (task) accept(task) })
   },

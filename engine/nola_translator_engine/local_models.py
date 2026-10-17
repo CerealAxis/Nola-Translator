@@ -61,6 +61,38 @@ def _declared_languages(configs: list[dict]) -> tuple[str, ...]:
     return tuple(found)
 
 
+def _languages_from_model_card(card: str) -> tuple[str, ...]:
+    """Extract explicit ISO codes from a model card's supported-languages table."""
+    for line in card.splitlines():
+        columns = [column.strip() for column in line.strip().strip('|').split('|')]
+        if len(columns) < 2 or not re.search(r'Qwen3-ASR-(?:1\.7B|0\.6B)', columns[0], re.IGNORECASE):
+            continue
+        found: list[str] = []
+        for candidate in re.findall(r'\(([A-Za-z]{2,3})\)', columns[1]):
+            code = normalize(candidate)
+            if code in LANGUAGE_CODES and code not in found:
+                found.append(code)
+        if found:
+            return tuple(found)
+    return ()
+
+
+def declared_languages_from_snapshot(root: Path, filenames: tuple[str, ...]) -> tuple[str, ...]:
+    """Read saved language declarations from an already imported model without hashing its weights."""
+    metadata = {}
+    ggufs = [root / name for name in filenames if name.lower().endswith('.gguf') and not Path(name).name.lower().startswith('mmproj-')]
+    if len(ggufs) == 1 and ggufs[0].is_file():
+        try:
+            metadata = _gguf(ggufs[0])
+        except (OSError, ValueError, struct.error):
+            pass
+    configs = [_json(root / 'config.json'), metadata]
+    for filename in ('tokenizer_config.json', 'processor_config.json', 'generation_config.json'):
+        if filename in filenames:
+            configs.append(_json(root / filename))
+    return _declared_languages(configs)
+
+
 def _gguf(path: Path) -> dict:
     # Metadata is bounded independently of weight size; never import or execute model code.
     metadata = {}
@@ -206,15 +238,18 @@ def inspect_local(source: Path, repo: str | None = None, network=None, progress=
     if embedding is not None and projected is not None and embedding != projected:
         raise LocalModelError('invalidPackage', 'mmproj 音频编码器输出维度与主权重不匹配，请选择同一模型的配套文件。')
     config = {} if ggufs else _json(root / 'config.json')
-    language_configs = [config, metadata] if ggufs else [config]
-    if not ggufs:
-        for filename in ('tokenizer_config.json', 'processor_config.json', 'generation_config.json'):
-            candidate_path = root / filename
-            if candidate_path.is_file():
-                language_configs.append(_json(candidate_path))
+    # GGUF snapshots can still include the original Hugging Face config files.
+    # Read their declared language fields as well as GGUF metadata so local GGUF
+    # imports can prefill capabilities from the source files when available.
+    language_configs = [config, metadata]
+    for filename in ('tokenizer_config.json', 'processor_config.json', 'generation_config.json'):
+        candidate_path = root / filename
+        if candidate_path.is_file():
+            language_configs.append(_json(candidate_path))
     languages = _declared_languages(language_configs)
     cached_repo = next((part.removeprefix('models--').replace('--', '/', 1) for part in root.parts if part.startswith('models--') and part.count('--') == 2), None)
-    candidate = repo or cached_repo or config.get('_name_or_path') or metadata.get('general.source.huggingface.repository') or metadata.get('general.base_model.0.repo_url')
+    base_model_repo = metadata.get('general.base_model.0.repo_url')
+    candidate = repo or cached_repo or config.get('_name_or_path') or metadata.get('general.source.huggingface.repository') or base_model_repo
     if isinstance(candidate, str):
         candidate = candidate.removeprefix('https://huggingface.co/').strip('/')
     if not isinstance(candidate, str) or len(candidate) > 200 or not re.fullmatch(r'[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*', candidate):
@@ -250,15 +285,27 @@ def inspect_local(source: Path, repo: str | None = None, network=None, progress=
                 raise LocalModelError('missingFiles', 'Missing shards referenced by ' + name)
     fingerprint = sha256(json.dumps([(item.path, item.sha256) for item in hashed]).encode()).hexdigest()
     description = ''
-    if not candidate.startswith('local/'):
+    card_repositories = []
+    for card_repo in (candidate, base_model_repo):
+        if not isinstance(card_repo, str):
+            continue
+        card_repo = card_repo.removeprefix('https://huggingface.co/').strip('/')
+        if card_repo.startswith('local/') or not re.fullmatch(r'[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*', card_repo):
+            continue
+        if card_repo not in card_repositories:
+            card_repositories.append(card_repo)
+    for card_repo in card_repositories:
         try:
-            url = f'{hf_endpoint(network)}/{candidate}/raw/main/README.md'
+            url = f'{hf_endpoint(network)}/{card_repo}/raw/main/README.md'
             card = _http_get(url, http_opener(network)).decode('utf-8')
-            card = re.sub(r'^---\s*\n.*?\n---\s*\n', '', card, count=1, flags=re.S)
-            lines = [line.strip() for line in card.splitlines() if line.strip() and not line.lstrip().startswith(('#', '<', '!', '|', '[!'))]
-            description = re.sub(r'\[([^\]]+)\]\([^)]*\)', r'\1', ' '.join(lines))[:1000]
+            if not languages:
+                languages = _languages_from_model_card(card)
+            if not description:
+                clean_card = re.sub(r'^---\s*\n.*?\n---\s*\n', '', card, count=1, flags=re.S)
+                lines = [line.strip() for line in clean_card.splitlines() if line.strip() and not line.lstrip().startswith(('#', '<', '!', '|', '[!'))]
+                description = re.sub(r'\[([^\]]+)\]\([^)]*\)', r'\1', ' '.join(lines))[:1000]
         except (OSError, ValueError, UnicodeError):
-            pass
+            continue
     name = metadata.get('general.name')
     if not isinstance(name, str) or not name.strip():
         # Container folders and identity hashes are not model names. GGUF filenames

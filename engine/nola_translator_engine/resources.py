@@ -20,6 +20,15 @@ from .models.catalog import (
     INDEX_TRANSLATE_2B_Q4_K_M,
     INDEX_TRANSLATE_9B_Q4_K_M,
     INDEX_TRANSLATE_35B_A3B_Q4_K_M,
+    INDEX_TRANSLATE_2B_BF16,
+    INDEX_TRANSLATE_2B_FP8,
+    INDEX_TRANSLATE_2B_FP4,
+    INDEX_TRANSLATE_9B_BF16,
+    INDEX_TRANSLATE_9B_FP8,
+    INDEX_TRANSLATE_9B_FP4,
+    INDEX_TRANSLATE_35B_A3B_BF16,
+    INDEX_TRANSLATE_35B_A3B_FP8,
+    INDEX_TRANSLATE_35B_A3B_FP4,
     HYMT2_1_8B_IQ2_M,
     HYMT2_1_8B_Q3_K_M,
     HYMT2_1_8B_Q4_K_M,
@@ -30,7 +39,10 @@ from .models.catalog import (
     SENSEVOICE_SMALL,
 )
 from .models.manager import ModelManager, ModelSpec
+from .models.crisp_catalog import CRISP_ASR_SPECS
+from .models.qwen_gguf_catalog import QWEN3_ASR_GGUF_SPECS
 from .models.registry import CustomFile, CustomModelEntry, CustomModelRegistry
+from .local_models import declared_languages_from_snapshot
 from .protocol import ResourceChangedEvent, ResourceRecord, ModelConfiguration, NetworkSettings
 from .model_capabilities import QWEN_LANGUAGES, normalize, recognition_configuration, translation_configuration, supports_translation
 from .hub import HYMT2_LANGUAGES
@@ -39,6 +51,12 @@ from .translation.index_translate import LANGUAGE_NAMES as INDEX_TRANSLATE_LANGU
 
 INDEX_TRANSLATE_SPECS = (INDEX_TRANSLATE_2B_Q4_K_M, INDEX_TRANSLATE_9B_Q4_K_M, INDEX_TRANSLATE_35B_A3B_Q4_K_M)
 INDEX_TRANSLATE_RESOURCE_IDS = tuple(spec.model_id for spec in INDEX_TRANSLATE_SPECS)
+INDEX_TRANSLATE_TRANSFORMERS_SPECS = (
+    INDEX_TRANSLATE_2B_BF16, INDEX_TRANSLATE_2B_FP8, INDEX_TRANSLATE_2B_FP4,
+    INDEX_TRANSLATE_9B_BF16, INDEX_TRANSLATE_9B_FP8, INDEX_TRANSLATE_9B_FP4,
+    INDEX_TRANSLATE_35B_A3B_BF16, INDEX_TRANSLATE_35B_A3B_FP8, INDEX_TRANSLATE_35B_A3B_FP4,
+)
+INDEX_TRANSLATE_TRANSFORMERS_IDS = tuple(spec.model_id for spec in INDEX_TRANSLATE_TRANSFORMERS_SPECS)
 
 
 QWEN_RESOURCE_ID = QWEN3_ASR_1_7B_HF.model_id
@@ -178,6 +196,27 @@ RESOURCE_DEFINITIONS = _definitions() + tuple(
         f"Index-Translate {size} Q4_K_M", "官方 Q4_K_M 文本翻译模型。",
         tuple(INDEX_TRANSLATE_LANGUAGE_NAMES), sum(entry.size for entry in spec.files))
     for spec, size in zip(INDEX_TRANSLATE_SPECS, ("2B", "9B", "35B-A3B preview"))
+) + tuple(
+    ResourceDefinition(spec.model_id, "translationModel", "index-translate-transformers",
+        f"Index-Translate {size} {precision}", description,
+        tuple(INDEX_TRANSLATE_LANGUAGE_NAMES), spec.total_bytes)
+    for spec, size, precision, description in zip(INDEX_TRANSLATE_TRANSFORMERS_SPECS,
+        ("2B",)*3 + ("9B",)*3 + ("35B-A3B preview",)*3,
+        ("BF16", "FP8", "FP4")*3, (
+            "官方 BF16 原始权重；PyTorch Transformers 推理。",
+            "官方 FP8 权重；需要 compressed-tensors 组件，非支持硬件可能回退到解压执行。",
+            "官方 NVFP4 权重；需 compressed-tensors，完整 4-bit 加速要求 NVIDIA Blackwell。",
+        )*3)
+) + tuple(
+    ResourceDefinition(spec.model_id, "recognitionModel", "llama-asr",
+        f"Qwen3-ASR {'0.6B' if '-0.6b-' in spec.model_id else '1.7B'} {'Q4_K_M' if spec.model_id.endswith('q4-k-m') else 'Q8_0' if spec.model_id.endswith('q8-0') else 'BF16'}",
+        "Qwen3-ASR GGUF 权重，附带音频投影文件。", tuple(normalize(code) for code in QWEN_LANGUAGES), spec.total_bytes)
+    for spec in QWEN3_ASR_GGUF_SPECS
+) + tuple(
+    ResourceDefinition(spec.model_id, "recognitionModel", "crisp-asr",
+        ("Fun-ASR Nano" if spec.model_id.startswith("fun-") else "VibeVoice-ASR" if spec.model_id.startswith("vibevoice-") else "MiMo-V2.5-ASR" if spec.model_id.startswith("mimo-") else "SenseVoiceSmall" if spec.model_id.startswith("sensevoice-") else f"Qwen3-ASR {'0.6B' if '-0.6b-' in spec.model_id else '1.7B'}") + " " + ("Q4_K" if spec.model_id.endswith("q4-k") else "Q8_0" if spec.model_id.endswith("q8-0") else "F16"),
+        "CrispASR GGUF 语音识别模型。", tuple(normalize(code) for code in QWEN_LANGUAGES) if spec.model_id.startswith("qwen3-") else ("zh", "en", "yue", "ja", "ko") if spec.model_id.startswith("sensevoice-") else ("zh", "en"), spec.total_bytes)
+    for spec in CRISP_ASR_SPECS
 ) + (ResourceDefinition(HYMT2_7B_RESOURCE_ID, "translationModel", "hymt2",
     "Hy-MT2 7B Q4_K_M", "腾讯官方 7B Q4_K_M 多语言翻译模型。",
     tuple(HYMT2_LANGUAGES), HYMT2_7B_Q4_K_M.total_bytes),)
@@ -208,6 +247,21 @@ class ResourceManager:
         # hand-maintained list of models the app ships with, and a user's own download is not
         # something it should have to learn about at build time.
         self.registry = CustomModelRegistry(self.model_root)
+        # Older local imports could not read the sidecar language declarations of GGUF
+        # snapshots. Enrich those registry entries once at startup so users do not need
+        # to remove and re-import an otherwise valid model to get the detected defaults.
+        for entry in self.registry.all():
+            if entry.languages:
+                continue
+            try:
+                languages = declared_languages_from_snapshot(
+                    self.model_root / entry.resolved_directory,
+                    tuple(item.path for item in entry.files),
+                )
+            except (OSError, ValueError):
+                continue
+            if languages:
+                self.registry.put(replace(entry, languages=languages))
         specs = [self._spec(item.resource_id) for item in RESOURCE_DEFINITIONS]
         specs.extend(entry.spec() for entry in self.registry.all())
         self.models.cleanup_stale(specs)
@@ -226,14 +280,14 @@ class ResourceManager:
         """Absolute path of the single GGUF a llama.cpp translation resource loads.
         """
         spec = self._spec(resource_id)
-        ggufs = [entry for entry in spec.files if entry.path.casefold().endswith(".gguf") and not Path(entry.path).name.casefold().startswith("mmproj-")]
+        ggufs = [entry for entry in spec.files if entry.path.casefold().endswith(".gguf") and "mmproj-" not in Path(entry.path).name.casefold()]
         if not ggufs:
             raise ResourceActionError("invalidConfiguration", {"reason": "翻译模型资源里没有 GGUF 权重"})
         return self.model_root / spec.directory / ggufs[0].path
 
     def audio_projector_path(self, resource_id: str) -> Path:
         spec = self._spec(resource_id)
-        projectors = [entry for entry in spec.files if Path(entry.path).name.casefold().startswith("mmproj-") and entry.path.casefold().endswith(".gguf")]
+        projectors = [entry for entry in spec.files if "mmproj-" in Path(entry.path).name.casefold() and entry.path.casefold().endswith(".gguf")]
         if len(projectors) != 1:
             raise ResourceActionError("invalidConfiguration", {"reason": "需要唯一的配套 mmproj 音频编码器"})
         return self.model_root / spec.directory / projectors[0].path
@@ -265,12 +319,18 @@ class ResourceManager:
             return entry.adapter_id
         if resource_id == SENSEVOICE_RESOURCE_ID:
             return "sensevoice"
+        if resource_id in {spec.model_id for spec in CRISP_ASR_SPECS}:
+            return "crisp-asr"
+        if resource_id in {spec.model_id for spec in QWEN3_ASR_GGUF_SPECS}:
+            return "llama-asr"
         if resource_id in (QWEN_RESOURCE_ID, QWEN_06B_RESOURCE_ID):
             return "qwen3-asr"
         if resource_id == M2M100_RESOURCE_ID:
             return "m2m100"
         if resource_id in HYMT2_RESOURCE_IDS or resource_id in INDEX_TRANSLATE_RESOURCE_IDS:
             return "llama.cpp"
+        if resource_id in INDEX_TRANSLATE_TRANSFORMERS_IDS:
+            return "index-translate-transformers"
         return None
 
     def list(self) -> list[ResourceRecord]:
@@ -541,8 +601,8 @@ class ResourceManager:
             return entry.configuration if entry else None
         languages = list(definition.languages)
         if definition.kind == "recognitionModel":
-            return recognition_configuration(languages)
-        return translation_configuration(languages, "pytorch" if definition.provider == "m2m100" else "llama")
+            return recognition_configuration(languages, "crisp" if definition.provider == "crisp-asr" else "llama" if definition.provider == "llama-asr" else "pytorch")
+        return translation_configuration(languages, "pytorch" if definition.provider in ("m2m100", "index-translate-transformers") else "llama")
 
     def configure(self, resource_id: str, configuration: ModelConfiguration) -> ResourceRecord:
         entry = self.registry.get(resource_id)
@@ -614,6 +674,9 @@ class ResourceManager:
             HYMT2_7B_RESOURCE_ID: HYMT2_7B_Q4_K_M,
             M2M100_RESOURCE_ID: M2M100_418M,
             **{spec.model_id: spec for spec in INDEX_TRANSLATE_SPECS},
+            **{spec.model_id: spec for spec in INDEX_TRANSLATE_TRANSFORMERS_SPECS},
+            **{spec.model_id: spec for spec in CRISP_ASR_SPECS},
+            **{spec.model_id: spec for spec in QWEN3_ASR_GGUF_SPECS},
         }.get(resource_id)
         if builtin is not None:
             return builtin

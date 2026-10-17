@@ -30,15 +30,18 @@ export interface ModelLanguageSelectProps {
 export function ModelLanguageSelect({ label, value, codes, onChange, multiple = true }: ModelLanguageSelectProps) {
   const { language, t } = useI18n()
   const name = (code: string) => languageName(code, language)
-  return <Select fullWidth selectionMode={multiple ? 'multiple' : 'single'} value={multiple ? value : value[0] ?? null} onChange={keys => {
+  const valueLabel = value.length > 1 && multiple
+    ? t('modelConfig.selectedLanguageCount', { count: value.length })
+    : value.length ? name(value[0]) : t('modelConfig.selectLanguages')
+  return <SettingsRow className="model-configuration-dialog__row" label={label}><Select fullWidth selectionMode={multiple ? 'multiple' : 'single'} value={multiple ? value : value[0] ?? null} onChange={keys => {
     if (Array.isArray(keys)) onChange(keys.map(String))
     else onChange(keys === null ? [] : [String(keys)])
   }} placeholder={t('modelConfig.selectLanguages')}>
-    <Label>{label}</Label><Select.Trigger><Select.Value>{value.length ? new Intl.ListFormat(language, { style: 'short', type: 'unit' }).format(value.map(name)) : t('modelConfig.selectLanguages')}</Select.Value><Select.Indicator /></Select.Trigger>
+    <Select.Trigger><Select.Value>{valueLabel}</Select.Value><Select.Indicator /></Select.Trigger>
     <Select.Popover><ListBox className="nola-language-options">
       {codes.map(code => <ListBox.Item key={code} id={code} textValue={name(code)}>{name(code)}<ListBox.ItemIndicator /></ListBox.Item>)}
     </ListBox></Select.Popover>
-  </Select>
+  </Select></SettingsRow>
 }
 
 export function ModelConfigurationDialog({ record, onClose }: ModelConfigurationDialogProps) {
@@ -80,9 +83,9 @@ export function ModelConfigurationDialog({ record, onClose }: ModelConfiguration
   }
   return <Modal isOpen onOpenChange={open => { if (!open && !saving) onClose() }}>
     <Modal.Backdrop className="z-overlay"><Modal.Container size="lg" scroll="inside"><Modal.Dialog>
-      <Modal.Header><div className="settings-row__title"><Modal.Heading>{t('modelConfig.title')}</Modal.Heading><Tooltip delay={300}><Button variant="secondary" size="sm" isIconOnly className="settings-row__help" aria-label={t('modelConfig.title')}><CircleHelp aria-hidden="true" /></Button><Tooltip.Content className="settings-row__tooltip z-overlay">{t('modelConfig.description')}</Tooltip.Content></Tooltip></div><p className="nola-body-strong">{record.name}</p></Modal.Header>
-      <Modal.Body className="flex flex-col gap-[var(--space-2)]">
-        <SettingsRow label={t('modelConfig.slot')} desc={loaderHelp} descriptionTooltip>
+      <Modal.Header><div className="settings-row__title"><Modal.Heading>{t('modelConfig.title')}</Modal.Heading><Tooltip delay={300}><Button variant="secondary" size="sm" isIconOnly className="settings-row__help" aria-label={t('modelConfig.title')}><CircleHelp aria-hidden="true" /></Button><Tooltip.Content className="settings-row__tooltip z-overlay">{t('modelConfig.description')}</Tooltip.Content></Tooltip></div></Modal.Header>
+      <Modal.Body className="model-configuration-dialog__body flex flex-col gap-[var(--space-2)]">
+        <SettingsRow className="model-configuration-dialog__row" label={t('modelConfig.slot')} desc={loaderHelp} descriptionTooltip>
         <Select aria-label={t('modelConfig.slot')} fullWidth value={draft.slot} onChange={key => { if (key === 'recognition' || key === 'translation') patch({ slot: key }) }}>
           <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
           <Select.Popover><ListBox>
@@ -91,7 +94,7 @@ export function ModelConfigurationDialog({ record, onClose }: ModelConfiguration
           </ListBox></Select.Popover>
         </Select>
         </SettingsRow>
-        <SettingsRow label={t('modelConfig.engine')} desc={loaderHelp} descriptionTooltip>
+        <SettingsRow className="model-configuration-dialog__row" label={t('modelConfig.engine')} desc={loaderHelp} descriptionTooltip>
         <Select aria-label={t('modelConfig.engine')} fullWidth value={draft.engine} onChange={key => { if (key === 'pytorch' || key === 'llama') patch({ engine: key }) }}>
           <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
           <Select.Popover><ListBox><ListBox.Item id="pytorch" textValue="PyTorch">PyTorch</ListBox.Item><ListBox.Item id="llama" textValue="llama.cpp">llama.cpp</ListBox.Item></ListBox></Select.Popover>
@@ -117,7 +120,6 @@ export function ModelConfigurationDialog({ record, onClose }: ModelConfiguration
             </div>)}
           </> : null}
         </>}
-        {!valid ? <p className="nola-caption text-warning">{t('modelConfig.invalid')}</p> : null}
         {failed ? <Alert status="danger"><Alert.Indicator /><Alert.Content><Alert.Description>{t('modelConfig.saveFailed')}</Alert.Description></Alert.Content></Alert> : null}
       </Modal.Body>
       <Modal.Footer><Button variant="tertiary" isDisabled={saving} onPress={onClose}>{t('session.cancel')}</Button><Button isDisabled={!valid} isPending={saving} onPress={() => void save()}>{t('modelConfig.save')}</Button></Modal.Footer>

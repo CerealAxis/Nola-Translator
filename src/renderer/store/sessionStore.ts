@@ -17,6 +17,7 @@ import type {
   SessionStatus,
 } from '@/bridge'
 import { createStore } from './createStore'
+import { isSessionAlreadyRunningError } from '../../shared/ipc-error'
 
 /** Cap on finalized segments. Two to three hours of speech fits, and memory stays bounded. */
 export const MAX_FINALIZED_SEGMENTS = 2048
@@ -140,6 +141,7 @@ function errorMessage(error: unknown): string {
 }
 
 function errorCodeOf(error: unknown): string {
+  if (isSessionAlreadyRunningError(error)) return 'SESSION_ALREADY_RUNNING'
   if (typeof error === 'object' && error !== null && 'engineCode' in error && typeof error.engineCode === 'string') {
     return error.engineCode.toUpperCase()
   }
@@ -305,6 +307,14 @@ export async function startSession(config: SessionConfig): Promise<void> {
     throw new Error('已有会话在运行')
   }
 
+  const captionStatus = await bridge.settings?.browserConnection?.('status')
+  if (captionStatus?.captionServiceActive || captionStatus?.sessionStarting) {
+    sessionStore.setState({ status: 'idle', error: null, errorCode: null, errorRequestId: null })
+    throw new Error('SESSION_ALREADY_RUNNING')
+  }
+  // Another press can arrive while the read-only reservation query is in flight.
+  if (!['idle', 'error'].includes(sessionStore.getState().status)) throw new Error('上一次会话还没收尾')
+
   sessionStore.setState({ status: 'starting', error: null, errorCode: null, errorRequestId: null, missing: null })
 
   // Preflight stays outside the try: its failure means no session started, not an engine fault.
@@ -350,11 +360,12 @@ export async function startSession(config: SessionConfig): Promise<void> {
     startTicker()
   } catch (error) {
     // The session's own failure (bad config, one already running); `engineStatus` is left alone.
+    const conflict = isSessionAlreadyRunningError(error)
     sessionStore.setState({
-      status: 'error',
-      error: errorMessage(error),
-      errorCode: errorCodeOf(error),
-      errorRequestId: errorRequestIdOf(error),
+      status: conflict ? 'idle' : 'error',
+      error: conflict ? null : errorMessage(error),
+      errorCode: conflict ? null : errorCodeOf(error),
+      errorRequestId: conflict ? null : errorRequestIdOf(error),
     })
     throw error
   }

@@ -45,6 +45,7 @@ import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
 import { ThirdPartyNotices } from '../ThirdPartyNotices'
 import { AppUpdateDialog } from '../AppUpdateNotice'
 import { RuntimeNoticeDialog } from '../RuntimeNotice'
+import { StartupFailureDialog } from '../StartupFailureDialog'
 import {
   DEMO_ASR_RECORD,
   DEMO_BULK_COUNT,
@@ -465,6 +466,7 @@ type GalleryDialog =
   | 'runtimeMissing'
   | 'appUpdate'
   | 'modelDetail'
+  | 'startupFailure'
 
 const ALL_CLOSED: Record<GalleryDialog, boolean> = {
   sessionSetup: false,
@@ -479,6 +481,7 @@ const ALL_CLOSED: Record<GalleryDialog, boolean> = {
   runtimeMissing: false,
   appUpdate: false,
   modelDetail: false,
+  startupFailure: false,
 }
 
 /** The gallery has no page behind it, so an action that would belong to a page is deliberately inert. */
@@ -596,6 +599,9 @@ function DialogGalleryGroup() {
         <GalleryRow label={t('dev.dialogModelDetail')} desc={t('dev.dialogModelDetailDesc')}>
           <RunButton onPress={() => show('modelDetail')} />
         </GalleryRow>
+        <GalleryRow label={t('dev.dialogStartupFailure')} desc={t('dev.dialogStartupFailureDesc')}>
+          <RunButton onPress={() => show('startupFailure')} />
+        </GalleryRow>
       </SettingGroup>
 
       <SessionSetupDialog
@@ -675,6 +681,7 @@ function DialogGalleryGroup() {
         onClose={() => hide('modelDetail')}
         onInstall={inert}
       />
+      <StartupFailureDialog isOpen={open.startupFailure} onOpenChange={track('startupFailure')} timedOut />
     </>
   )
 }

@@ -1,0 +1,18 @@
+.startup-failure__body {
+  gap: var(--space-1);
+}
+
+.startup-failure__message,
+.startup-failure__hint {
+  margin: 0;
+  font: var(--nola-text-body);
+  line-height: 1.5;
+}
+
+.startup-failure__message {
+  color: var(--foreground);
+}
+
+.startup-failure__hint {
+  color: var(--muted);
+}

@@ -34,6 +34,7 @@ const OVERLAY_PAGE_TO_ROUTE: Record<OverlayTargetPage, { route: RouteId; path: s
   translation: { route: 'settings', path: '#/settings/translation' },
   torch: { route: 'settings', path: '#/settings/compute?component=engine' },
   llama: { route: 'settings', path: '#/settings/compute?component=llama' },
+  crisp: { route: 'settings', path: '#/settings/compute?component=crisp' },
 }
 
 class MissingIpcApiError extends Error {

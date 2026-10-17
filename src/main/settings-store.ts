@@ -261,7 +261,7 @@ export class SettingsStore {
         },
       }
       // The three retired recognition ids all migrate to Qwen3-ASR 1.7B; `sourceLanguage` is sanitized separately.
-      if (!RECOGNITION_MODEL_IDS.includes(this.settings.recognition.modelId)) {
+      if (!RECOGNITION_MODEL_IDS.some(id => id === this.settings.recognition.modelId) && !this.settings.recognition.modelId.startsWith('hub:')) {
         this.settings.recognition = { ...this.settings.recognition, modelId: 'qwen3-asr-1.7b-hf' }
       }
       this.settings.recognition = {

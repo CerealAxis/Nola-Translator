@@ -23,8 +23,8 @@ def supports_translation(configuration: ModelConfiguration | None, source: str, 
     pairs = configuration.translationPairs
     return pairs is None or any(normalize(pair.target) == target and (source == "auto" or normalize(pair.source) == source) for pair in pairs)
 
-def recognition_configuration(languages: list[str]) -> ModelConfiguration:
-    return ModelConfiguration(slot="recognition", engine="pytorch", languages=[normalize(code) for code in languages], supportsAutoDetection=True, sourceLanguages=[], targetLanguages=[])
+def recognition_configuration(languages: list[str], engine: str = "pytorch") -> ModelConfiguration:
+    return ModelConfiguration(slot="recognition", engine=engine, languages=[normalize(code) for code in languages], supportsAutoDetection=True, sourceLanguages=[], targetLanguages=[])
 
 def translation_configuration(languages: list[str], engine: str) -> ModelConfiguration:
     return ModelConfiguration(slot="translation", engine=engine, languages=[], supportsAutoDetection=False, sourceLanguages=languages, targetLanguages=languages)

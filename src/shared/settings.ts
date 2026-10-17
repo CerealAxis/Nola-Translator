@@ -242,12 +242,23 @@ export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recor
   translation?: Omit<Partial<TranslationSettings>, 'fallback'> & { fallback?: Partial<FallbackTranslationSettings> }
 }
 
-export const RECOGNITION_MODEL_IDS: readonly RecognitionModelId[] = ['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf', 'sensevoice-small']
+export const RECOGNITION_MODEL_IDS = [
+  'qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf', 'sensevoice-small',
+  'qwen3-asr-0.6b-gguf-q4-k-m', 'qwen3-asr-1.7b-gguf-q4-k-m', 'qwen3-asr-0.6b-gguf-q8-0',
+  'qwen3-asr-0.6b-gguf-bf16', 'qwen3-asr-1.7b-gguf-q8-0', 'qwen3-asr-1.7b-gguf-bf16',
+  'sensevoice-small-crisp-q4-k', 'sensevoice-small-crisp-q8-0', 'sensevoice-small-crisp-f16',
+  'qwen3-asr-0.6b-crisp-q4-k', 'qwen3-asr-0.6b-crisp-q8-0', 'qwen3-asr-0.6b-crisp-f16',
+  'qwen3-asr-1.7b-crisp-q4-k', 'qwen3-asr-1.7b-crisp-q8-0', 'qwen3-asr-1.7b-crisp-f16',
+  'fun-asr-nano-q4-k', 'fun-asr-nano-q8-0', 'fun-asr-nano-f16',
+  'vibevoice-asr-q4-k', 'vibevoice-asr-q8-0', 'vibevoice-asr-f16',
+  'mimo-v2.5-asr-q4-k', 'mimo-v2.5-asr-f16',
+] as const satisfies readonly RecognitionModelId[]
 
 export const RECOGNITION_MODEL_LABELS: Record<RecognitionModelId, string> = {
   'qwen3-asr-1.7b-hf': 'Qwen3-ASR 1.7B',
   'qwen3-asr-0.6b-hf': 'Qwen3-ASR 0.6B',
   'sensevoice-small': 'SenseVoiceSmall',
+  ...Object.fromEntries(RECOGNITION_MODEL_IDS.filter(id => !['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf', 'sensevoice-small'].includes(id)).map(id => [id, id])),
 }
 
 export const TRANSLATION_PROVIDERS: readonly TranslationProvider[] = ['local', 'cloud', 'microsoft', 'mymemory', 'index-translate', 'recognition']

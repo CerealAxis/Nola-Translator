@@ -11,6 +11,15 @@ const MODELSCOPE_MODELS = new Set([
   'index-translate-2b-q4-k-m',
   'index-translate-9b-q4-k-m',
   'index-translate-35b-a3b-q4-k-m',
+  'index-translate-2b-bf16',
+  'index-translate-2b-fp8',
+  'index-translate-2b-fp4',
+  'index-translate-9b-bf16',
+  'index-translate-9b-fp8',
+  'index-translate-9b-fp4',
+  'index-translate-35b-a3b-preview-bf16',
+  'index-translate-35b-a3b-preview-fp8',
+  'index-translate-35b-a3b-preview-fp4',
 ])
 
 export type DownloadSourceOption = {

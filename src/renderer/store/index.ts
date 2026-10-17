@@ -50,6 +50,8 @@ export interface InitStoresOptions {
   backgroundChecks?: boolean
   /** A preloaded menu receives settings and model snapshots from its owner without engine or device queries. */
   overlayMenu?: boolean
+  /** Offline IPC is restricted to the main window; overlay documents must not subscribe. */
+  offline?: boolean
 }
 
 /**
@@ -68,12 +70,14 @@ export function initStores(bridge: NolaBridge, options: InitStoresOptions = {}):
   if (options.overlayMenu) return
   attachMeetingsStore(bridge)
   attachSessionStore(bridge)
-  disposeOfflineStore?.()
-  disposeOfflineStore = initOfflineStore(bridge, () => {
-    void actions.models.loadModels().catch(() => undefined)
-    void actions.settings.loadRuntimeComponents().catch(() => undefined)
-    void actions.settings.refreshComputeDevices().catch(() => undefined)
-  })
+  if (options.offline !== false) {
+    disposeOfflineStore?.()
+    disposeOfflineStore = initOfflineStore(bridge, () => {
+      void actions.models.loadModels().catch(() => undefined)
+      void actions.settings.loadRuntimeComponents().catch(() => undefined)
+      void actions.settings.refreshComputeDevices().catch(() => undefined)
+    })
+  }
 
   void actions.settings.loadSettings().catch(() => undefined)
   if (options.backgroundChecks !== false) {

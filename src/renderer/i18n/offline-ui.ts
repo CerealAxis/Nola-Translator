@@ -165,7 +165,7 @@ export const offlineZh: OfflineCopy = {
   "verify": "校验",
   "pack": "打包",
 
-  modelHelp: '按架构、格式与必需文件检查兼容性，不限制推荐版本。自定义模型导入后请配置用途、引擎与语言能力。 ASR GGUF 还需要配套的 mmproj 音频编码器；请与主权重放在同一文件夹。',
+  modelHelp: '按架构、格式与必需文件检查兼容性。 ASR GGUF 还需要配套的 mmproj 音频编码器；请与主权重放在同一文件夹。',
   "targetHelp": "按目标电脑选择。准备电脑不需要安装这些组件。",
   "runtimeHelp": "GPU 驱动须在目标电脑上安装。CPU 方案兼容性较好，速度可能较慢。",
   "readyHelp": "安装材料均从包内读取，不连接网络。",
@@ -252,7 +252,7 @@ export const offlineEn: OfflineCopy = {
   "verify": "Verifying",
   "pack": "Packaging",
 
-  modelHelp: 'Compatibility is checked from architecture, format and required files, without a recommended-version restriction. Configure custom model tasks, engines and languages after import. ASR GGUF also requires its matching mmproj audio encoder in the same folder.',
+  modelHelp: 'Compatibility is checked from architecture, format and required files. ASR GGUF also requires its matching mmproj audio encoder in the same folder.',
   "targetHelp": "Choose for the target computer. Components do not need to be installed on this computer.",
   "runtimeHelp": "Install GPU drivers on the target computer. CPU offers broader compatibility with slower inference.",
   "readyHelp": "Installs only from package contents without internet access.",
@@ -339,7 +339,7 @@ export const offlineTw: OfflineCopy = {
   "verify": "驗證",
   "pack": "封裝",
 
-  modelHelp: '依架構、格式與必要檔案檢查相容性，不限推薦版本。匯入後請設定自訂模型的用途、引擎與語言。 ASR GGUF 另需配套的 mmproj 音訊編碼器，請與主權重放在同一資料夾。',
+  modelHelp: '依架構、格式與必要檔案檢查相容性。 ASR GGUF 另需配套的 mmproj 音訊編碼器，請與主權重放在同一資料夾。',
   "targetHelp": "依目標電腦選擇。準備電腦不需要安裝這些元件。",
   "runtimeHelp": "GPU 驅動程式須在目標電腦安裝。CPU 相容性較佳，速度可能較慢。",
   "readyHelp": "僅使用套件內的安裝資源，不連接網路。",
@@ -426,7 +426,7 @@ export const offlineHk: OfflineCopy = {
   "verify": "驗證",
   "pack": "封裝",
 
-  modelHelp: '按架構、格式及必要檔案檢查兼容性，不限推薦版本。匯入後請設定自訂模型的用途、引擎及語言。 ASR GGUF 另需配套的 mmproj 音訊編碼器，請與主權重放在同一資料夾。',
+  modelHelp: '按架構、格式及必要檔案檢查兼容性。 ASR GGUF 另需配套的 mmproj 音訊編碼器，請與主權重放在同一資料夾。',
   "targetHelp": "按目標電腦選擇。準備電腦不需要安裝這些元件。",
   "runtimeHelp": "GPU 驅動程式須在目標電腦安裝。CPU 相容性較好，速度可能較慢。",
   "readyHelp": "僅使用套件內的安裝資源，不連接網絡。",
@@ -513,7 +513,7 @@ export const offlineJa: OfflineCopy = {
   "verify": "検証中",
   "pack": "作成中",
 
-  modelHelp: '構造、形式と必須ファイルで互換性を確認します。推奨版以外も対象です。インポート後に用途、エンジンと言語を設定してください。 ASR GGUF には対応する mmproj 音声エンコーダーも必要です。同じフォルダーに置いてください。',
+  modelHelp: '構造、形式と必須ファイルで互換性を確認します。ASR GGUF には対応する mmproj 音声エンコーダーも必要です。同じフォルダーに置いてください。',
   "targetHelp": "利用先の PC に合わせて選択してください。この PC へのインストールは不要です。",
   "runtimeHelp": "GPU ドライバーは利用先の PC に必要です。CPU は幅広く対応しますが処理が遅くなります。",
   "readyHelp": "パッケージ内のファイルのみを使い、ネットに接続せずにインストールします。",
@@ -600,7 +600,7 @@ export const offlineKo: OfflineCopy = {
   "verify": "검증 중",
   "pack": "패키징 중",
 
-  modelHelp: '모델 구조, 형식 및 필수 파일로 호환성을 확인하며 권장 버전으로 제한하지 않습니다. 가져온 뒤 용도, 엔진과 언어를 설정하세요. ASR GGUF에는 같은 폴더에 해당 mmproj 오디오 인코더도 필요합니다.',
+  modelHelp: '모델 구조, 형식 및 필수 파일로 호환성을 확인합니다. ASR GGUF에는 같은 폴더에 해당 mmproj 오디오 인코더도 필요합니다.',
   "targetHelp": "대상 컴퓨터에 맞게 선택하세요. 준비하는 컴퓨터에는 설치하지 않아도 됩니다.",
   "runtimeHelp": "GPU 드라이버는 대상 컴퓨터에 필요합니다. CPU는 호환성이 높지만 느릴 수 있습니다.",
   "readyHelp": "인터넷에 연결하지 않고 패키지에 포함된 파일로만 설치합니다.",

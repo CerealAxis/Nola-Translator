@@ -36,3 +36,4 @@ export const INDEX_TRANSLATE_LANGUAGE_NAMES: Readonly<Record<string, string>> = 
 }
 export const INDEX_TRANSLATE_LANGUAGES: readonly string[] = Object.keys(INDEX_TRANSLATE_LANGUAGE_NAMES)
 export const INDEX_TRANSLATE_MODEL_IDS = ['index-translate-2b-q4-k-m', 'index-translate-9b-q4-k-m', 'index-translate-35b-a3b-q4-k-m'] as const
+export const INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS = ['index-translate-2b-bf16', 'index-translate-2b-fp8', 'index-translate-2b-fp4', 'index-translate-9b-bf16', 'index-translate-9b-fp8', 'index-translate-9b-fp4', 'index-translate-35b-a3b-preview-bf16', 'index-translate-35b-a3b-preview-fp8', 'index-translate-35b-a3b-preview-fp4'] as const

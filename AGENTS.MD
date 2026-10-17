@@ -6,66 +6,63 @@
 ## 1. 技术栈
 
 - 桌面应用：Electron + React + TypeScript
-- 音频测试：复用所选设备的实际采集链路，在内存采集两秒并回放；不加载模型、不创建记录。应用仅做 ASR 必需的采样率／声道／PCM 格式转换，不做增益或降噪。
-- 引擎：内置 Windows x64 Python 3.12；PyTorch 与 llama.cpp 由设置页按组合安装或复用本地组件（模型能力持久化在自定义模型注册表，启动与逐句翻译必须校验配置）；开发环境的 llama 下载工具复用运行时清单中的版本与校验值
-- Recognition and translation independently select PyTorch or llama.cpp by the installed loader. Recommendation defaults never impose a task/backend pairing; switching engines does not convert weights. Qwen3-ASR GGUF needs a matching qwen3a audio projector and the catalog llama.cpp b11532 audio support.
-- Index-Translate：推荐官方 2B／9B／35B-A3B-preview Q4_K_M 文本权重，通过 llama.cpp 推理；独立免费 API 使用官方公开 35B-A3B 模型，无需密钥，支持 SSE 译文。
-- Hy-MT2：推荐 1.8B 三个量化档位与腾讯官方 7B Q4_K_M；7B 显式使用官方独立 Jinja 对话模板。
-- 云端识别：Aliyun LiveTranslate 3.5／3.8 使用 WebSocket 持续输入 PCM16；MiniMax Speech-to-Text 不接受音频流式输入，改由引擎侧 VAD 切段后逐段上传 WAV，SSE 只推送响应增量。云端翻译支持 MyMemory REST 与识别连接自带的流式译文（仅阿里云具备，MiniMax 无内置译文）。
-- UI：Tailwind CSS + HeroUI；悬浮字幕菜单复用现有组件，在独立透明子窗口中显示；设置“更多”页使用 Avatar／AvatarGroup 展示作者、开源鸣谢及明确的赞助空位
-- 新手教程：首次先显示 HeroUI 欢迎弹窗，包含教程说明、GitHub Star 请求和仓库链接；点击开始后，用 Card／Button 与镂空蒙层介绍首页入口、运行组件、识别、翻译和模型下载；设置“更多”的“再次查看”重新打开欢迎页，点击开始后进入教程，首次展示状态按本地用户配置保存。
+- 音频测试：内存采集两秒 PCM，仅做格式转换，无模型加载
+- 引擎：内置 Python 3.12；PyTorch/llama.cpp/CrispASR 按需安装或复用本地组件
+- 识别后端：PyTorch、llama.cpp 或 CrispASR，根据安装的加载器自动选择
+- 翻译后端：PyTorch 或 llama.cpp，支持 Index-Translate 官方权重与独立免费 API
+- 云端识别：Aliyun WebSocket 流式输入；MiniMax VAD 切段上传 WAV
+- 云端翻译：MyMemory REST 或阿里云流式译文
+- UI：Tailwind CSS + HeroUI；悬浮字幕为独立透明子窗口
+- 新手教程：HeroUI 欢迎弹窗引导，状态持久化保存
 - 构建：electron-vite
-- 产品与文档站：VitePress 工程位于 `docs/`，六种语言的首页与 Markdown 页面集中在 `docs/nola-docs/` 并作为 `srcDir`；Vue 容器挂载 React + HeroUI 首页，直接复用桌面主题与区域字体。站点默认自动检测浏览器语言，未匹配时使用英文，手动选择持久化；加载页与首屏使用声波动效。文档站与哔哩哔哩 Toy 共用独立 React 演示入口、真实软件页面与内存 bridge，并通过 `renderer/application.tsx` 与桌面端共享页面及导航注册；下载指向 GitHub Releases，展示素材同源渲染。文档页的主题覆盖层是 `docs/.vitepress/theme/style/`，按模块拆分 CSS，品牌色取自 Logo 渐变。文档主题接入图片缩放、路由进度、时间线与 Mermaid，评论使用已配置到仓库 Ideas 分类的 Giscus，仅挂载在文档插槽，语言与深浅主题跟随站点。
-- 中文帮助文档：沿用 `docs/nola-docs/` 既有大纲，写作规范位于 `contributing/writing-guidelines.md`；教程截图通过 `node docs/scripts/generate-screenshots.mjs --guide` 生成，仅更新中文 guide 资源与来源记录。
+- 产品与文档站：VitePress 多语言站点，Vue 容器挂载 React，共享主题与演示入口
+- 中文帮助：沿用既定大纲，截图由脚本自动生成
 - 测试：Vitest + Testing Library
-- 诊断：主进程使用 Node 文件 API 每次启动保存一份不拆分的 JSONL 日志，自动脱敏、限制单条大小并保留最近启动记录。
-- 浏览器：Chrome／Edge／Firefox Manifest V3 + React／TypeScript；扩展独立版本由 browser/version.json 管理，CHANGELOG.md 记录发布；Python 标准库 Native Messaging 连接程序由 PyInstaller 打包
+- 诊断：JSONL 格式日志，自动脱敏并限制大小
+- 浏览器：Chrome/Edge/Firefox MV3 扩展，Python Native Messaging 连接程序
 
 ## 2. 目录结构
 
-```
 src/
-├── main/        # Electron 主进程：IPC 注册、窗口、设置/凭据持久化、引擎子进程；overlay-menu.ts 为原有字幕菜单提供独立透明子窗口；session-log.ts 保存每次启动的诊断日志；runtime-manager.ts／python-environments.ts 管理组件，python-runtime-paths.ts 统一 Python 导入与 DLL 路径，runtime-files.ts 处理 Windows 目录切换；browser-integrations.ts 只读检测浏览器扩展状态并打开管理页
+├── main/        # Electron 主进程：IPC、窗口、设置及引擎管理
 ├── preload/     # 单文件，contextBridge 暴露 window.nolaTranslator
-├── shared/      # 跨进程契约：类型 + zod + 默认值；error-catalog.ts 定义稳定用户支持码，languages.ts 为语言代码目录，cloud-config.ts 统一云端识别与翻译连接配置及语言限制，index-translate.ts 定义公开 API、模型及已核实语言预设，model-capabilities.ts 为模型能力与推荐预设。**改枚举必看这里**
-└── renderer/    # React 应用
+├── shared/      # 跨进程契约：类型定义、Zod 校验与默认值
+└── renderer/    # React 应用前端代码
     ├── application.tsx # 桌面、文档站与 Toy 共用的页面及导航注册
     ├── bridge/  # 渲染进程唯一的数据出口（NolaBridge）
-    ├── assets/browsers/ # Chrome／Edge／Firefox 图标，用于浏览器连接设置
-    ├── assets/fonts/    # 随桌面应用打包的 Noto CJK 区域可变字体与 OFL 许可证
-    ├── store/   # 5 个域 store（含独立 offlineStore），自研 useSyncExternalStore 实现
-    ├── components/  # primitives/（封闭 8 个）+ caption/ home/ notes/ reading/
-    ├── features/    # home/ workspace/ overlay/ records/ models/ settings/ offline/（模型本地导入、离线包准备与安装） onboarding/（主窗口跨页面蒙层教程与定位）
-    ├── i18n/         # zh-CN.ts 定义 Dictionary；locale-builder.ts 组装完整词典；browser-locales.ts 提供扩展文案；en／zh-TW／zh-HK／ko／ja 各有完整强类型词典
-    └── theme/        # 设计 token 唯一来源（CSS）；cjk-fonts.css 仅由桌面渲染器加载区域字体
-engine/nola_translator_engine/  # Python 引擎，协议定义在 protocol.py，model_capabilities.py 为引擎能力校验；translation/index_translate_languages.py 维护 Index-Translate 官方语言名称
-├── local_models.py             # Local snapshot compatibility, optional Hugging Face card metadata, atomic custom-registry imports
-├── offline_models.py           # 独立 JSONL worker，按可信清单预检、准备和导入模型，不加载推理组件
-├── audio/capture.py            # WASAPI 与浏览器音频采集、失败资源释放、两秒内存试听
-├── recognition/aliyun.py       # LiveTranslate WebSocket、原文与内置译文关联及结束排空
-├── recognition/minimax.py      # VAD 切段后逐段上传 WAV、SSE 增量、失败锁存与并发上限
-├── recognition/llama_asr.py    # Qwen3-ASR GGUF audio input and output parsing through its own llama-server
-├── translation/transformers_causal.py # Local AutoModelForCausalLM text translation, independent of recommendation families
-├── translation/mymemory.py     # 公共 REST 翻译、UTF-8 请求分段及业务状态校验
-└── translation/index_translate.py # 官方 Index-Translate 提示词、本地 GGUF 与无密钥公开 API
+    ├── assets/browsers/ # Chrome／Edge／Firefox 图标资源
+    ├── assets/fonts/    # 随桌面应用打包的 Noto CJK 区域可变字体
+    ├── store/   # 5 个域 store 及自研 useSyncExternalStore 实现
+    ├── components/  # 基础组件 primitives 及业务功能组件
+    ├── features/    # 各功能模块如 home, workspace, overlay 等
+    ├── i18n/         # 多语言字典定义与组装逻辑
+    └── theme/        # 设计 token 唯一来源及 CJK 字体样式
+engine/nola_translator_engine/  # Python 翻译引擎核心代码
+├── local_models.py             # 本地模型兼容性与自定义注册表导入
+├── offline_models.py           # 离线模型预检、准备与导入逻辑
+├── audio/capture.py            # WASAPI 与浏览器音频采集处理
+├── recognition/aliyun.py       # 阿里云 LiveTranslate WebSocket 识别
+├── recognition/minimax.py      # MiniMax VAD 切段与 SSE 增量识别
+├── recognition/llama_asr.py    # Qwen3-ASR GGUF 语音识别服务
+├── recognition/crisp_asr.py   # CrispASR GGUF 语音识别支持
+├── models/crisp_catalog.py    # CrispASR GGUF 权重与 Tokenizer 清单
+├── models/qwen_gguf_catalog.py # Qwen3-ASR llama.cpp GGUF 权重清单
+├── translation/transformers_causal.py # 本地因果模型文本翻译
+├── translation/mymemory.py     # MyMemory 公共 REST 翻译接口
+└── translation/index_translate.py # Index-Translate 官方翻译协议
 browser/
-├── version.json / CHANGELOG.md # 独立扩展版本与发布记录；构建 manifest 与桌面兼容校验共用版本
-├── extension/                 # MV3 扩展、播放器适配、临时 store、Shadow DOM；build.mjs 独立构建到 dist/ 与 dist-firefox/
-├── native_host/               # 标准库 stdio／当前用户命名管道连接程序及帧协议测试
-└── tests/                     # 隔离配置的浏览器冒烟测试（Playwright，可选开发依赖）
-docs/                           # VitePress 站点工程
-├── nola-docs/                   # 配置为 srcDir；默认中文与 en／ja／ko／zh-HK／zh-TW 页面集中存放
-├── .vitepress/                  # 站点配置、主题、六语言首页与设计样式；style/ 为按模块拆分的主题覆盖层；DocLayout.vue 负责文档日期、返回顶部与可选评论插槽，Linkcard.vue 为文档链接卡片
-├── media-src/                   # 文档站与 Toy 共用入口；demoBridge.ts 提供纯内存交互，demoRuntime.ts 复用运行组件清单，Scene.tsx 组合字幕与原创场景
-├── scripts/                     # 构建演示与 Toy 包、生成素材；check-demo 检查子路径部署、页面布局与交互
-└── public/                      # 静态资源；demo 为忽略的构建输出，screenshots 保存六语言海报源图，screenshots/zh-CN/guide 保存中文教程截图及独立 manifest/README，svg 供侧边栏图标使用
-assets/brand/                   # 应用 Logo 与设置“更多”页打包的 GitHub 官方头像；sources.md 记录头像来源
-scripts/                        # PowerShell 构建脚本；build-python-base.ps1 构建不含 Torch 的 Python 3.12，generate-runtime-catalog.py 维护组合清单；fetch-llama*.ps1 按清单准备开发运行时
-```
-
-- 组件文件名 PascalCase，逻辑模块 camelCase，测试 `*.test.ts(x)` 与源文件同目录
-- 组件目录带 `index.ts` barrel，同时导出组件与 `export type { XProps }`
-- 路径别名 `@` / `@renderer` → `src/renderer`（**在 `electron.vite.config.ts` 与 `vitest.config.ts` 中各写一遍**）
+├── version.json / CHANGELOG.md # 扩展版本信息与发布记录
+├── extension/                 # MV3 浏览器扩展核心代码
+├── native_host/               # 标准库 stdio 连接程序及帧协议测试
+└── tests/                     # 浏览器冒烟测试脚本
+docs/                           # VitePress 文档站点工程
+├── nola-docs/                   # 文档源码目录
+├── .vitepress/                  # 站点配置、主题与多语言首页
+├── media-src/                   # 演示环境与 Toy 包共用素材入口
+├── scripts/                     # 构建演示与生成素材脚本
+└── public/                      # 静态资源与截图展示
+assets/brand/                   # 应用 Logo 与 GitHub 官方头像
+scripts/                        # PowerShell 构建与运行时管理脚本
 
 ## 3. 编码规范
 
@@ -85,6 +82,7 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 - 禁止 `any`（全仓 `src/renderer` 零命中）
 - 模块求值期**不得同步抛错**——顶层 throw 会连带 `createRoot` 失败；缺 IPC 时 reject 或降级为 no-op
 - `src/main/session-controller.ts` 是桌面与浏览器单会话的唯一控制入口。浏览器临时会话不得创建记录、传 recordingPath 或打开悬浮窗。
+- 快速同传与悬浮字幕共用桌面服务，两者可同时使用；它们与浏览器字幕服务互斥。浏览器字幕从模型预热到服务关闭并释放模型期间保留占用，无需等待扩展连接；打开的悬浮字幕窗口（含最小化）或桌面会话也阻止浏览器字幕启动。主进程最终校验，渲染器通过 store action 处理拒绝并显示“{running}服务正在运行中，请先关闭{running}服务”的本地化 Toast，不能将冲突显示为模型缺失、浏览器弹窗限制或普通启动失败。
 - `src/shared/browser.ts` 定义受限的扩展契约、固定开发 ID 和 Native Messaging 名称；不得在该接口暴露凭据、文件或模型管理。
 
 **i18n**
@@ -100,48 +98,6 @@ scripts/                        # PowerShell 构建脚本；build-python-base.ps
 - z-index 只用 `.z-*` 类（见 DESIGN.MD 第 8 节），**禁 `z-50` 字面量**
 
 ## 4. 注释规范
-
-- Offline resource workflows use `src/shared/offline.ts`, `main/offline-manager.ts` and main-window-only `offline-ipc.ts`. Model import and manual-download destinations use editable folder-path fields plus native folder pickers. Typed paths must be absolute existing directories validated by the main-window-only IPC, then represented by opaque preview/destination tokens; browsing returns the complete path. Editing a source clears its previous inspection and editing a destination invalidates its old token. Native dialogs or validated typed paths grant access through those tokens; preparation and imports remain background tasks after a dialog closes. Preview workers and installation tasks are cancelled and drained on shutdown. `main/offline-worker.ts` launches base Python's `nola_translator_engine.offline_models` without inference components. Built-in model manifests, including companion templates, are verified before copying and atomically installed. Local model selection uses local_models.py and the shared runtime adapter rules to validate architecture, required files, GGUF headers, safetensors payloads and shard indexes; it accepts compatible revisions beyond the recommendation catalog. It never executes repository scripts or installs arbitrary Python dependencies. Offline bundles retain their pinned portable-package manifests.
-- Local model import uses HeroUI Modal, Tabs, ListBox, Select and Tooltip. Supported model families stay visible; explanatory copy and the exact version list belong in tooltips. Recommended cards expose manual downloads even when installed. `src/shared/model-import-catalog.json` is generated from the engine catalog by `scripts/generate-model-import-catalog.py`; its pinned provider revisions and complete file lists define recommended downloads and identify exact built-in snapshots; compatible local models use the common adapter checks. Run the generator with `--check` after catalog changes. Hy-MT2 7B uses the embedded application template and needs only the catalog GGUF; snapshot templates such as Qwen3's remain required files.
-- Offline bundles are portable directories with `manifest.json` published last, `models.json` plus `models/`, and `runtimes/runtime-resources.json` plus per-recipe resources. The initial format requires the same app version and Windows x64 Python 3.12. `main/offline-runtimes.ts` prepares official pinned primary artifacts and uses the connected target-compatible interpreter to build source-only dependencies into wheels without installing the environment. Complete wheel closure is checked, hashes recorded, direct URL dependencies rejected, and import uses only local binary wheels with no index. Input media is never modified; lock and resolver scratch files live under the managed runtime directory. Package hashes provide integrity rather than publisher authentication. Only main-process installation reservations can stop/restart the engine or replace components, and offline preparation never switches the source computer's configuration.
-
-- Simplified Chinese help follows `docs/nola-docs/contributing/writing-guidelines.md`. Tutorial captures reuse the real React pages with fictional in-memory state; `generate-screenshots.mjs --guide` writes only `docs/public/screenshots/zh-CN/guide/`, with its own provenance manifest recording actual PNG dimensions. Other locales and existing marketing screenshots stay independent. Privacy descriptions must distinguish the relocatable data root from Electron userData logs and distinguish local inference from remote fallback translation.
-
-- Onboarding opens a HeroUI welcome modal before the first automatic tour, with an optional GitHub Star request and repository link. Mark the invitation when its content mounts so Later and Escape do not repeat it next launch. Manual replay bypasses the invitation. The tour uses actual main-window controls with stable data-onboarding anchors and a rounded SVG cutout. HeroUI Card and Button own the tip; the underlying shell is inert during the tour. settingsStore owns presentation actions and AppSettings.onboardingSeen persists through the main settings patch schema. Missing markers in legacy profiles mean unseen, and replay never clears the marker. The tour only navigates and explains: it never installs components, downloads weights, captures audio, or changes inference preferences. Startup notices wait until onboarding ends; the website demo and floating-caption document do not auto-start the tour. All six locales carry plain instructional copy.
-
-- Runtime catalogs record official wheel ABI, SHA-256 and backend combinations. Checks use built-in Python 3.12 without installing; repair ownership requires an app installation record. Development llama downloads use the same catalog URLs, companions and hashes; a source marker identifies reusable vendor directories.
-- Index-Translate presets pin official GGUF revisions, sizes and SHA-256, downloading text weights without the vision projector. Both local and public inference use the official single-user translation prompt with thinking disabled. The public service fixes its endpoint and 35B-A3B model and never consumes a saved cloud credential. Language choices use the 150 distinct names in the official reference website language table; frontend presets, Python prompt names, resource metadata, and protocol validation must stay aligned. Invalid public targets fail before capture starts.
-- The official Hy-MT2 7B preset uses its separately published chat_template.jinja; its role tokens differ from ChatML. Switching to a different GGUF clears this template override.
-- Cloud translation uses a session-scoped HTTP pool and streams Chat Completions / Anthropic text; final captions supersede obsolete network intermediates, while native inference retains its reservation. Timing diagnostics distinguish queue, first text, and request duration.
-- Aliyun cloud recognition bypasses local ASR weights and component checks. LiveTranslate 3.8 uses delta events and auto source detection; 3.5 uses text/stash snapshots. Native translations join their source items; stream completion sends session.finish and awaits session.finished. Reset closes the old connection before opening another. Credentials remain in encrypted main-process slots, outside settings and browser contracts. MyMemory translates confirmed sentences through REST, checks embedded quota errors, and splits q by UTF-8 bytes; it does not provide token streaming.
-- MiniMax speech-to-text accepts one complete audio file per request and has no audio streaming input, so its `stream=true` is response-side only and begins after the upload completes — captions therefore arrive at gate closures rather than mid-utterance. Segments reuse `VolumeGateSegmenter`, which splits on silence and keeps adjacent segments from overlapping, so no text is recognized twice and billing matches the audio. Its 6 s ceiling is a caption-lag budget for speech with no pause to close the gate on, not a service limit; billing follows audio duration, so splitting more often costs the same money. `accept` only hands finished segments to background tasks and returns immediately, because it runs inside the audio capture loop; `flush` drains those uploads so the tail caption lands, cancelling rather than orphaning one that outruns its budget. Deltas are keyed by the server's event `index` rather than arrival order, and a stream cut before its finish event still publishes the partial transcript it already carried. A failure latches on the first error, so one invalid key cannot repeat a billable call for every remaining segment. Its `language` travels as a request header, with app code `tl` rewritten to the provider's `fil`. HTTP 402 and 429 map to separate reason words because they call for opposite user action.
-- Cloud recognition failures carry the cause in the engine's wire `code`, because `supportErrorCodeForCause()` and `errorCopyOf()` both read that field; `details.reason` only reaches the rendered message text and the launch log. Auth failures, a spent balance and a rate limit each emit their own code rather than the generic `modelUnavailable`, whose copy points at installing a local model and cannot help a cloud account problem.
-- VitePress uses `docs/nola-docs/` as `srcDir` for the default Chinese and five regional Markdown routes; a Vue lifecycle container mounts the React/HeroUI homepage. Marketing styles import desktop tokens and regional fonts rather than duplicating them. The isolated iframe app and Bilibili Toy share the same demo entry, actual desktop pages, hash routes and stores; `renderer/application.tsx` owns page registration and navigation for all three hosts. The typed demo bridge simulates settings, sessions, notes, runtime and model actions exclusively in memory, never invoking inference or remote credentials. Runtime choices come from the checked-in catalogs; hardware and installed state are fictional. Interactive demos start idle, while explicit screenshot mode seeds a deterministic running session. Manual onboarding is available without an automatic welcome. Toy builds use relative assets under artifacts/toy, preserve the desktop UI and show a localized demo-data label. Scenario artwork uses the actual OverlayRoot or extension caption styles and captionLines with original surrounding scenery. The demo is built before site dev/build, its output is ignored, and screenshots plus their source provenance are maintained under docs/public/screenshots. Validate website geometry at 1920 x 1080. Website download buttons offer Quark, Baidu and GitHub sources in that order, with bundled provider icons; Windows opens a right-side submenu from the hero platform menu. Provider URLs live in content.ts and temporarily point to official homepages, while GitHub keeps latest Releases. Documentation download lists use Baidu, Quark and Github followed by the supplied support tip; unreleased desktop/CLI entries say downloads are coming soon.
-- Document enhancements use medium-zoom, nprogress-v2, markdown timeline, Mermaid, GitHub-style alerts through markdown-it-github-alerts, and automatically generated sidebars from each locale's Markdown headings and folder index pages while preserving locale category order. Alert source uses `> [!NOTE]`-style blockquotes; `github-alert.css` maps their classes to the project theme, while `::: details` remains the collapsible VitePress container. DocLayout mounts Giscus with the repository-provided public IDs and Ideas category, pathname mapping and bottom input; locale and theme follow the site, and comments: false disables it per document. Busuanzi page views display only on the canonical production hostname. Folder icons depend on child items, since linked groups also have is-link. Document pages take their overrides from `docs/.vitepress/theme/style/`, one concern per file, entered through `index.css` in that order. Brand colour, title gradient and badge layout come from the Logo rather than a generic palette. Every selector stays scoped to `.vp-doc`, `.VPDoc`, a VitePress component class or `:root` tokens, so the hand-built React landing page at `nola-docs/index.md` renders exactly as authored; the landing page, `LandingPage.tsx` and `landing.css` are not theme surfaces. VitePress sets `build.cssCodeSplit` to false, so every module lands in one global stylesheet that the landing page also loads.
-- Website language detection uses navigator.languages in preference order, distinguishes Chinese regions/scripts, and falls back to English. siteLocale.ts owns the shared homepage/document preference; choosing auto resumes detection and displays only the localized auto-detect label. The homepage theme button shares VitePress's persisted isDark state with documentation; the hero palette, live demo and six-locale light/dark posters follow it. Theme messages update the mounted demo through its settings action without resetting navigation or sessions. Screenshot provenance records both themes and preserves README-only illustrations. Pointer traces are decorative, ignore demo interactions, expire while stationary, and stop their animation loop when empty. Reduced-motion preferences disable decorative motion.
-- Settings More follows the existing Card layout and uses bundled GitHub profile avatars with recorded origins. Sponsor silhouettes show a localized vacancy tooltip, never fabricated supporters. About, licenses and feedback live in More; engine diagnostics and factory reset stay in Advanced. All six UI locales must remain complete.
-- Meeting transcripts persist confirmed speech and settled translation changes, not streamed token revisions; segment counts count unique confirmed segments.
-- Floating caption tracks replace revisions only by segment ID. Distinct segments retain their complete source and translated text, including repeated sentences; shared prefixes or suffixes must never trigger display-level merging or trimming.
-- The floating caption toolbar measures its actual row and pill widths, including localized labels. Keep the microphone/pause control and model pill visible, hiding optional pills from right to left as space runs out and restoring them when widened. Hidden pills retain intrinsic measurement width but leave layout, pointer input and keyboard focus. Only an exceptionally long model label may ellipsize. Do not apply toolbar fitting to the native menu document's invisible trigger.
-- Floating caption menus reuse their original HeroUI Dropdown/Popover/Menu tree, styles and selection actions. Desktop `main/overlay-menu.ts` preloads one hidden transparent child surface with the caption document and reuses it without reloading. Each open delivers the owner's current settings/model snapshot plus a presentation id; the menu store skips engine, device and meeting queries. `OverlayMenuRoot` renders the same `OverlayControls` with only the requested dropdown open. Closing hides and clears the surface; owner destruction releases it. Late paint/close callbacks must match the current presentation id. The caption window's native bounds must never change to open or close a menu: moving its transparent HWND can expose the old compositor surface at the new screen origin even when DOM coordinates appear stable. The invisible menu trigger mirrors the original pill; show the child only after its menu paints, and dismiss it on blur, Escape, selection or owner movement/hide. Cap the menu and its scrolling list at min(320 DIP, 45% of the display work area), matching the existing language-list cap. Mouse-opened native menus suppress only the extra focus outline while retaining the selected background/checkmark; keyboard navigation restores the focus indicator. Embedded demos keep local portals. Never rebuild menu rows with different controls.
-- The floating caption's close confirmation uses the same preloaded child surface so short caption bounds cannot clip it. Keep the existing `.nola-confirm-dialog` markup and styles; leave the dimming layer on the caption card and center the separate dialog over the card. Cancel dismisses the child surface, and confirm calls the existing overlay-close bridge action so the main process remains the only owner of session stop and caption hide.
-- The overlay card is a `-webkit-app-region: drag` surface, so Windows can raise the native system menu on right-click. `suppressSystemMenuOnRightClick` in `src/main/windows.ts` prevents Electron's `system-context-menu` event; do not use `hookWindowMessage` for this because it only observes messages and cannot cancel their default handling. If the overlay window is destroyed, the next show request rebuilds it from current settings.
-- `src/main/session-log.ts` records application activity in UTF-8 JSONL under Electron userData/logs, with one unsplit file per app launch and the latest 10 launches retained. The current launch stays as readable `.jsonl`; older launches are individually compressed as `.jsonl.gz`, preserving their original modification time for retention ordering. Entries are capped individually; there is no file rollover within a launch. `logged-ipc.ts` correlates every IPC operation and records sanitized results; engine commands/events and UI/browser activity share the launch trace. Device IDs, names, original exception messages and stacks, error reasons, process output and renderer console diagnostics are retained as readable UTF-8; credentials, raw audio, ASR transcripts, MT output and prompts carrying that content are omitted or redacted. Audio diagnostics distinguish enumeration, device matching, stream opening and stream startup, with request IDs, formats, native error codes and cleanup state. High-frequency audio, caption-update and model-progress events are summarized per second. Pipeline diagnostics travel over stderr to the main logger, which alone owns log retention. `src/shared/error-catalog.ts` owns stable user support codes separately from wire error names; copied feedback includes the support code, request correlation ID and current launch-log path, and is never uploaded automatically.
-- Completed model-download chunks survive failures, cancellation and restarts under the model root's `.downloads` directory; cache identity includes the pinned URL, file size, digest and chunk size, and startup removes entries older than 30 days without following junctions. Install staging files remain temporary, and successful downloads remove their range cache. The download-source dialog offers Hugging Face, HF-Mirror and supported ModelScope repositories per model; the source field must survive both TypeScript schema parsing and the Python protocol. Large files resolve their CDN redirect once and use up to eight parallel ranges, retrying transient failures and incomplete ranges; progress events are capped at five per second. Failed tasks can be dismissed without removing resume chunks. `ModelDownloadNotice` observes terminal installation transitions in the main window and emits one success or failure toast. Pip does not retain an additional user cache.
-- ModelScope presets carry independent full commit revisions, byte sizes and SHA-256 manifests in `engine/nola_translator_engine/models/catalog.py`; never reuse Hugging Face file metadata or skip digest verification. Download progress, resume cache identity and installation verification use the selected source manifest. Startup accepts a complete installed snapshot matching either source's manifest sizes; alternate repositories need not be byte-identical.
-- PyPI mirror settings apply to component installs and repairs. When the selected node is Aliyun, PyTorch wheel URLs are probed under its `pytorch-wheels` mirror and installed by pip with the catalog SHA-256; only missing wheels use their pinned official wheel URL. Dependencies install from the selected PyPI index first and retry official PyPI only when pip reports a missing distribution; the PyTorch wheel index is never used as an extra index.
-- Component DLL paths must match in probes and engine startup; keep Windows DLL-directory handles alive for inference. Older Torch uses MKL in the component's `Library/bin`, and the Python base bundles the VC++ OpenMP runtime.
-- Startup inventories both PyTorch and llama.cpp independently of model choice; missing optional components do not prevent cloud inference. Before service start, validate only the environments required by the selected local models. Explicit component rechecks restart the idle engine only when its import directories change, and reserve component work against session startup.
-- Caption startup reuses validated components and one recent device inventory. Recognition and enabled local translation models load concurrently without trial inference; only the selected configuration stays resident across stops. Native jobs retain their reservation until idle. Service close, model changes and shutdown release weights; dependency imports run in the background after the engine handshake and stage timings reach the launch log.
-- Audio preview reserves capture through the session controller, returns a two-second in-memory WAV of the 16 kHz mono ASR input, and distinguishes silence from successful signal capture. It never loads weights or creates a meeting. Startup failure releases both the stream and PortAudio backend. A missing default loopback does not hide explicit output or microphone endpoints. Browser pause and seek fence old audio requests on both sides of the native pipe; their delayed errors cannot terminate the new epoch. Continuous local speech force-splits at six seconds to bound final-caption and final-only translation latency; volume gating only selects segment boundaries and never applies gain or denoising.
-- Meeting audio prefers int16 capture and falls back to float32 when the device does not support it; it is encoded as constant-bitrate MP3 with up to two channels, resampling capture rates above 48 kHz to the MP3-supported range. Only the recognition path downmixes and resamples to 16 kHz mono. Recording writes run in the async capture consumer, outside PortAudio's realtime callback. Loopback silence is padded at the capture rate so pauses in system playback do not shorten the recording. Existing PCM16 WAV meetings remain playable.
-
-- 模型语言目录、推荐能力与运行引擎限制的注释须注明来源或限制原因；用户配置不代表模型自动获得新能力。
-- 浏览器采集限制注释须注明浏览器 API 原因；`getDisplayMedia` 必须在用户动作的原调用栈发起，Capture Handle 校验后仅处理音频。
-- 浏览器安装状态只读 Preferences／Secure Preferences 或以实际连接确认；不得修改浏览器受保护配置。每浏览器开关仅控制 Nola 连接权限，不能冒充浏览器扩展开关。
-- Extension handshakes report the content bundle version compiled from the same source as the manifest; desktop checks it against browser/version.json before starting recognition. A reloaded background must not overwrite the version of an old page. Installation detection reads cached or registered manifests, while live handshakes take precedence. Missing or incompatible extensions produce deduplicated desktop toasts with a download action. Playback capture disables microphone voice processing; digital silence is a recoverable warning, not proof that sharing failed.
-- 浏览器音频块为单声道 PCM16、约 100 ms，输入与确认各限两秒；epoch／sequence／session 校验与 TS、zod、Python 协议同步维护。视频时间通过 browserTimeline 映射，禁止直接使用会话相对时间。
-- 重置保留加载的模型，隔离旧推理和翻译；停止回执不得等待不可取消的原生推理线程，后台原生任务结束前锁定资源。自然结束用 finishStream 排空尾句。
 
 1. 基本原则
 - 统一使用英文注释
@@ -211,11 +167,10 @@ node scripts/check-installer-paths.mjs [makensis.exe] # Windows NSIS 目录回�
 
 **维护本文件**
 
-- 项目结构变更必须同步更新第 1、2、4 节
+- 未经用户修改，不准修改以上章节，请整理好后放在下面
+- 未经用户同意，不要私自修改/docs/文档站的内容，以及README
+- 所有关于文档的修改必须让用户确认后才能写入
 
-- Firefox uses a Gecko add-on ID, an event-page background and its own allowed_extensions Native Messaging manifest. Mozilla passes the manifest path and add-on ID to the native host. Firefox supports desktop system audio only: MDN documents no Capture Handle API for verifying tab audio. Never bypass capture target verification. Firefox installation caches are not authoritative; live handshakes confirm installation.
+## 章节名
 
-- Local import metadata optionally comes from a user-supplied Hugging Face repo ID or local config/GGUF provenance. Network card failures do not block offline import. Exact built-in bytes retain their resource ID; other snapshots enter the custom registry with no inferred language configuration. Local variants from the same repo have distinct variant IDs/directories and preserve saved capabilities on reimport. The existing ModelCapabilityNotices queue owns post-import configuration prompts. Configuration uses the application language directory, and the engine still enforces implemented loader task/engine/tokenizer limits; a declared capability never creates new runtime support. Compatibility inspection is structural and does not trial-load inference weights or guarantee available memory.
-- GGUF audio detection uses Qwen3-ASR's qwen3vl decoder plus qwen3a projector metadata (source: llama.cpp b11532 multimodal docs and ggml-org official GGUFs). A qwen3vl decoder alone is not evidence of audio support. Local selection accepts one main GGUF and its matching mmproj companion, checks both headers and projector dimensions, and copies/hashes both. ASR and translation own independent loopback-only llama-server instances; neither can switch the other's model. PCM16 WAV audio requests stay in memory and reuse StreamingRecognizer's segmentation and epoch fencing. Component reservations, device planning and teardown use each actual loader, including llama-only ASR without Torch. Causal PyTorch translation uses local-only AutoModelForCausalLM/AutoTokenizer with repository code disabled, saved language capabilities and explicit context/output limits.
-
-- OfflineTaskProgress uses HeroUI v3 ProgressBar and a compact task step list with project tokens. offlineStore retains the workflow when a task continues in the background. Steps reflect the actual import/download/package phases; the bar measures only the current phase, uses indeterminate state when totals are unknown, and never displays 0 / 0 or invents total-time estimates.
+- 分点

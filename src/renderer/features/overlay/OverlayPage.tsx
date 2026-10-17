@@ -8,11 +8,12 @@ import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridg
 import type { AppSettingsPatch } from '@/bridge'
 import { useI18n } from '@/i18n'
 import { useRoute } from '@/routes'
-import { getBridge, sessionStore, stores, updateSettings, useStore } from '@/store'
+import { actions, sessionStore, stores, updateSettings, useStore } from '@/store'
 import { swappedLanguagesOf, targetLanguagePatch } from '@/session-config'
 import { PageHeader } from '@/components/primitives'
 import { SettingSelect } from '../settings/SettingsPage'
 import { SETTINGS_WRITE_FAILURE_KEYS, settingsWriteFailure } from '../settings/settingsWriteError'
+import { captionScrimColor } from './scrimColor'
 
 export function OverlayPage() {
   const { t, language } = useI18n()
@@ -30,7 +31,12 @@ export function OverlayPage() {
   const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch((error: unknown) => toast.danger(t(SETTINGS_WRITE_FAILURE_KEYS[settingsWriteFailure(error)]))) }
   const open = async () => {
     setOpening(true)
-    try { await getBridge()?.overlay.show() } catch { toast.danger(t('shellUi.errorOpening')) }
+    try {
+      const opened = await actions.settings.showOverlay()
+      if (opened === false) {
+        toast.danger(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+      }
+    } catch { toast.danger(t('workspaceUi.overlayFailed')) }
     finally { setOpening(false) }
   }
   const sourceLanguage = settings.recognition.sourceLanguage
@@ -39,6 +45,7 @@ export function OverlayPage() {
   const previewStyle = {
     '--preview-background-color': config.backgroundColor,
     '--preview-background-alpha': `${Math.round(config.backgroundOpacity * 100)}%`,
+    '--preview-scrim-color': captionScrimColor(config.backgroundColor, config.backgroundOpacity, config.colorScheme === 'light' ? 'light' : 'dark'),
     '--preview-source-color': config.sourceColor,
     '--preview-translation-color': config.translationColor,
     '--preview-font-size': `${config.fontSize}px`,

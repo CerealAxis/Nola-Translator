@@ -1,4 +1,4 @@
-import { translationEngine } from '../../../../shared/model-engines'
+import { modelEngines, translationEngine } from '../../../../shared/model-engines'
 import { useState } from 'react'
 import { Alert, Button } from '@heroui/react'
 import { useI18n } from '@/i18n'
@@ -13,10 +13,12 @@ export function PerformanceTab({ settings }: SettingsPanelProps) {
   const compute = settings.compute ?? DEFAULT_COMPUTE_SETTINGS
   const resources = useStore(stores.models, state => state.resources)
   const adapter = resources.find(r => r.resourceId === settings.translation.localModelId)?.provider
+  const recognitionModel = resources.find(r => r.resourceId === settings.recognition.modelId)
+  const recognitionLoader = recognitionModel ? modelEngines(recognitionModel)[0] : undefined
   const localTranslation = settings.translation.provider === 'local'
   const translationUsesTorch = localTranslation && translationEngine(compute, adapter, settings.translation.localModelId) === 'pytorch'
-  const usesTorch = compute.recognitionEngine === 'pytorch' || translationUsesTorch
-  const usesLlama = compute.recognitionEngine === 'llama' || (localTranslation && !translationUsesTorch)
+  const usesTorch = recognitionLoader === 'pytorch' || translationUsesTorch
+  const usesLlama = recognitionLoader === 'llama' || (localTranslation && !translationUsesTorch)
   const [error, setError] = useState('')
   const save = (patch: Partial<ComputeSettings>) => {
     setError('')

@@ -78,8 +78,10 @@ from .protocol import (
     Translation,
 )
 from .recognition.llama_asr import LlamaAsrRuntime
+from .recognition.crisp_asr import CrispAsrRuntime
 from .recognition.streaming import StreamingRecognizer
 from .translation.transformers_causal import CausalTranslationProvider
+from .translation.index_translate import IndexTranslateTransformersProvider
 from .recognition.base import ModelUnavailable, RecognitionUpdate, Recognizer
 from .recognition.aliyun import MODELS as ALIYUN_RECOGNITION_MODELS, AliyunRecognizer, CloudRecognitionError
 from .recognition.minimax import MODELS as MINIMAX_RECOGNITION_MODELS, MiniMaxRecognizer
@@ -92,6 +94,7 @@ from .resources import (
     HYMT2_RESOURCE_IDS,
     HYMT2_7B_RESOURCE_ID,
     INDEX_TRANSLATE_RESOURCE_IDS,
+    INDEX_TRANSLATE_TRANSFORMERS_IDS,
     M2M100_RESOURCE_ID,
     QWEN_RESOURCE_ID,
     ResourceActionError,
@@ -179,7 +182,7 @@ class UnknownTranslationModel(ValueError):
     def __init__(self, model_id: str) -> None:
         super().__init__(
             f"未知的翻译模型 id：{model_id}。可用："
-            + "、".join((*HYMT2_RESOURCE_IDS, M2M100_RESOURCE_ID, *INDEX_TRANSLATE_RESOURCE_IDS))
+            + "、".join((*HYMT2_RESOURCE_IDS, M2M100_RESOURCE_ID, *INDEX_TRANSLATE_RESOURCE_IDS, *INDEX_TRANSLATE_TRANSFORMERS_IDS))
         )
         self.model_id = model_id
 
@@ -810,8 +813,7 @@ class EngineRuntime:
             capability = self.resources.configuration(resource_id)
             is_recognition = not remote and resource_id == model_id
             expected_slot = "recognition" if is_recognition else "translation"
-            engine = config.compute.recognitionEngine if is_recognition else config.compute.translationEngine
-            if capability.slot != expected_slot or engine != "auto" and capability.engine != engine:
+            if capability.slot != expected_slot:
                 raise ResourceActionError("invalidConfiguration", {"resourceId": resource_id, "reason": "modelLoaderMismatch"})
         source = normalize(config.sourceLanguage)
         if not remote:
@@ -891,7 +893,7 @@ class EngineRuntime:
             protocolVersion=1, type="modelsPrewarmed", requestId=command.requestId,
             state="ready", recognitionModelId=model_id, translationModelId=translation_model_id,
             elapsedMs=(monotonic() - started_at) * 1000,
-            device="cloud" if config.recognitionProvider != "local" else (
+            device="cloud" if config.recognitionProvider != "local" else ("vulkan" if self._active_recognition_runtime.using_vulkan else "cpu") if self.resources.adapter_for(model_id) == "crisp-asr" else (
                 self._recognition_device.llamaDevice or "cpu" if self.resources.adapter_for(model_id) == "llama-asr"
                 else self._recognition_device.torchDevice),
             runtime=self._active_recognition_runtime.describe(),
@@ -1053,7 +1055,7 @@ class EngineRuntime:
         runtime = self._active_recognition_runtime
         self._device_plan["recognitionActual"] = runtime.describe() if runtime else "unloaded"
         local_provider = next((provider for provider in (self.translation_provider, self.fallback_translation_provider)
-            if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider))), None)
+            if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider, IndexTranslateTransformersProvider))), None)
         if local_provider is not None:
             self._device_plan["translationActual"] = (local_provider.runtime.device or "unknown") if local_provider.runtime.loaded else "unloaded"
         else:
@@ -1171,8 +1173,9 @@ class EngineRuntime:
         )
         targets = [self._language_code(item) for item in config.targetLanguages]
         adapter = self.resources.adapter_for(model_id)
-        if adapter == "transformers-causal":
-            return CausalTranslationProvider(self.resources.model_path(model_id), device=self._translation_device.torchDevice,
+        if adapter in ("transformers-causal", "index-translate-transformers"):
+            provider = IndexTranslateTransformersProvider if adapter == "index-translate-transformers" else CausalTranslationProvider
+            return provider(self.resources.model_path(model_id), device=self._translation_device.torchDevice,
                 precision="auto" if self._translation_device.id == "cpu" and config.compute.allowCpuFallback else config.compute.precision,
                 threads=self._torch_threads, context_size=config.compute.contextSize)
         if adapter == "m2m100":
@@ -1220,9 +1223,9 @@ class EngineRuntime:
         model_id = self._local_translation_model_id(config)
         if not self.resources.is_installed(model_id):
             raise ModelUnavailable(f"翻译模型不可用：{model_id}")
-        if self.resources.adapter_for(model_id) in ("m2m100", "transformers-causal"):
+        if self.resources.adapter_for(model_id) in ("m2m100", "transformers-causal", "index-translate-transformers"):
             local_providers = [provider for provider in (self.translation_provider, self.fallback_translation_provider)
-                if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider))]
+                if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider, IndexTranslateTransformersProvider))]
             for local_provider in local_providers:
                 try:
                     await asyncio.to_thread(local_provider.runtime.load)
@@ -1233,7 +1236,8 @@ class EngineRuntime:
                     release_failed_load(error)
                     await asyncio.to_thread(local_provider.runtime.unload)
                     self._translation_device = ComputeDevice("cpu", "CPU", "cpu", "cpu", translation=True)
-                    replacement = (CausalTranslationProvider(self.resources.model_path(model_id), context_size=config.compute.contextSize, device="cpu", precision="auto", threads=self._torch_threads)
+                    replacement = (IndexTranslateTransformersProvider(self.resources.model_path(model_id), context_size=config.compute.contextSize, device="cpu", precision="auto", threads=self._torch_threads)
+                        if isinstance(local_provider, IndexTranslateTransformersProvider) else CausalTranslationProvider(self.resources.model_path(model_id), context_size=config.compute.contextSize, device="cpu", precision="auto", threads=self._torch_threads)
                         if isinstance(local_provider, CausalTranslationProvider) else M2M100TranslationProvider(self.resources.model_path(model_id), device="cpu", precision="auto", threads=self._torch_threads))
                     await asyncio.to_thread(replacement.runtime.load)
                     if local_provider is self.translation_provider:
@@ -1266,6 +1270,15 @@ class EngineRuntime:
         # shipped one, and the recognition guard in qwen_runtime.py stays the thing that decides
         # whether the checkpoint layout actually fits.
         compute = command.config.compute
+        if self.resources.adapter_for(model_id) == "crisp-asr":
+            backend = self._crisp_backend(model_id)
+            spec = self.resources._spec(model_id)
+            weight = next(entry for entry in spec.files if entry.path.endswith(".gguf") and "tokenizer" not in entry.path)
+            runtime = CrispAsrRuntime(model_path / weight.path, backend=backend, threads=self._torch_threads,
+                use_vulkan=compute.recognitionDevice != "cpu", allow_cpu_fallback=compute.allowCpuFallback)
+            await asyncio.to_thread(runtime.load)
+            self._active_recognition_runtime = runtime
+            return StreamingRecognizer(runtime, source_language=language, on_update=self._emit_update)
         if self.resources.adapter_for(model_id) == "llama-asr":
             runtime = self._active_recognition_runtime
             if not isinstance(runtime, LlamaAsrRuntime):
@@ -1308,16 +1321,35 @@ class EngineRuntime:
         recognizer.on_update = self._emit_update
         return recognizer
 
-    def _recognition_runtime(self) -> QwenRuntime | SenseVoiceRuntime | LlamaAsrRuntime | RemoteRecognitionRuntime:
+    def _recognition_runtime(self) -> QwenRuntime | SenseVoiceRuntime | LlamaAsrRuntime | CrispAsrRuntime | RemoteRecognitionRuntime:
         """Runtime of the currently selected recognition model."""
         if self._active_recognition_runtime is not None:
             return self._active_recognition_runtime
         model_path = self.resources.model_path(self.active_model_id)
+        if self.resources.adapter_for(self.active_model_id) == "crisp-asr":
+            spec = self.resources._spec(self.active_model_id)
+            weight = next(entry for entry in spec.files if entry.path.endswith(".gguf") and "tokenizer" not in entry.path)
+            backend = self._crisp_backend(self.active_model_id)
+            return CrispAsrRuntime(model_path / weight.path, backend=backend)
         if self.resources.adapter_for(self.active_model_id) == "llama-asr":
             return LlamaAsrRuntime(LlamaServerManager())
         if self.resources.adapter_for(self.active_model_id) == "sensevoice":
             return get_sensevoice_runtime(model_path)
         return get_qwen_runtime(model_path)
+
+    @staticmethod
+    def _crisp_backend(model_id: str) -> str:
+        if model_id.startswith("fun-"):
+            return "funasr"
+        if model_id.startswith("vibevoice-"):
+            return "vibevoice"
+        if model_id.startswith("mimo-"):
+            return "mimo-asr"
+        if model_id.startswith("sensevoice-"):
+            return "sensevoice"
+        if model_id.startswith("qwen3-asr-"):
+            return "qwen3"
+        raise ValueError(f"Unsupported CrispASR model: {model_id}")
 
     @staticmethod
     def _model_id(command: ModelSelectionCommand) -> str:
@@ -1344,7 +1376,7 @@ class EngineRuntime:
         requested = config.translationModelId
         if requested is None:
             return HYMT2_RESOURCE_ID
-        if self.resources.adapter_for(requested) in ("llama.cpp", "m2m100", "transformers-causal"):
+        if self.resources.adapter_for(requested) in ("llama.cpp", "m2m100", "transformers-causal", "index-translate-transformers"):
             return requested
         raise UnknownTranslationModel(requested)
 
@@ -1689,7 +1721,7 @@ class EngineRuntime:
             }, ensure_ascii=False)
         session_id, generation = self.service.session_id, self._stream_generation
         retry_codes = {"URLError", "HTTPError", "translationRateLimited", "translationTimeout", "RuntimeError"}
-        retry_enabled = request.update.is_final and provider_name not in {"hymt2", "index-translate-local", "m2m100", "transformers-causal"}
+        retry_enabled = request.update.is_final and provider_name not in {"hymt2", "index-translate-local", "index-translate-transformers", "m2m100", "transformers-causal"}
         max_attempts = 3 if retry_enabled else 1
         attempt = 0
 
@@ -1721,7 +1753,7 @@ class EngineRuntime:
                 target_errors = {target: "unsupportedLanguagePair" for target in targets if not supports_translation(capability, request.source, target)}
                 if not target_errors and not self.llama_manager.ready:
                     target_errors = dict.fromkeys(targets, "llamaServerUnavailable")
-        elif provider_name == "transformers-causal":
+        elif provider_name in {"transformers-causal", "index-translate-transformers"}:
             model_id = self._local_translation_model_id(self.active_config) if self.active_config else ""
             capability = self.resources.configuration(model_id) if model_id else None
             target_errors = {target: "unsupportedLanguagePair" for target in targets if not supports_translation(capability, request.source, target)}
@@ -1951,6 +1983,8 @@ class EngineRuntime:
         if language == "tl":
             language = "fil"
         model_path = self.resources.model_path(self.active_model_id)
+        if self.resources.adapter_for(self.active_model_id) == "crisp-asr":
+            return StreamingRecognizer(self._recognition_runtime(), source_language=language, on_update=self._emit_update)
         factory = (create_sensevoice_recognizer if self.resources.adapter_for(self.active_model_id) == "sensevoice"
                    else create_qwen_recognizer)
         # Seek changes sentence state, not weights or the capability-validated model selection.
@@ -2256,7 +2290,7 @@ class EngineRuntime:
     async def _settle_session_models(self) -> None:
         runtimes = [self._recognition_runtime(), self.llama_manager]
         for provider in (self.translation_provider, self.fallback_translation_provider):
-            if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider)):
+            if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider, IndexTranslateTransformersProvider)):
                 runtimes.append(provider.runtime)
         waits = [asyncio.to_thread(runtime.wait_idle) for runtime in runtimes if hasattr(runtime, 'wait_idle')]
         if waits:
@@ -2272,7 +2306,7 @@ class EngineRuntime:
         await self.llama_manager.stop()
         runtimes = [self._recognition_runtime()]
         for provider in (self.translation_provider, self.fallback_translation_provider):
-            if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider)):
+            if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider, IndexTranslateTransformersProvider)):
                 runtimes.append(provider.runtime)
         for runtime in runtimes:
             if getattr(runtime, "loaded", False):

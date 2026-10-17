@@ -37,6 +37,34 @@
 .models-tabs .tabs__indicator { background:var(--accent); }
 .models-tabs .tabs__panel { padding:0; min-width:0; }
 .models-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; min-width:0; }
+.models-family-card .card__footer > .button { flex-basis:100%; }
+.models-family-dialog.modal__dialog { width:min(100%, 780px); max-width:780px; border-radius:var(--radius-2xl); }
+.models-family-dialog .modal__header { padding-inline-end:var(--space-6); }
+.models-family-dialog__intro { margin:var(--space-1) 0 0; color:var(--muted); line-height:1.5; }
+.models-family-dialog__body { display:flex; flex-direction:column; gap:var(--space-2); }
+.models-family-dialog__label { margin:0 0 var(--space-1); font:var(--font-label); color:var(--muted); }
+.models-family-dialog__filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-2); }
+.models-family-dialog__choices { display:flex; flex-wrap:wrap; gap:var(--space-1); }
+.models-family-dialog__choices .button, .models-family-dialog__sources .button { border:1px solid var(--border); border-radius:var(--radius-xl); background:var(--surface-secondary); }
+.models-family-dialog__choices .button[aria-pressed="true"], .models-family-dialog__sources .button[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); }
+.models-family-dialog__model-select { min-width:0; }
+.models-family-dialog__model-select .select__trigger { display:flex; align-items:center; height:var(--space-5); min-height:var(--space-5); padding-block:0; }
+.models-family-dialog__model-select .select__value { display:flex; align-items:center; align-self:center; height:100%; min-width:0; }
+.models-family-dialog__selected-model { display:flex; align-items:center; gap:var(--space-1); min-width:0; width:100%; height:100%; font:var(--font-body); }
+.models-family-dialog__selected-model > span:nth-child(2) { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.models-family-dialog__selected-model small { flex:none; color:var(--muted); font:var(--font-caption); }
+.models-family-dialog__publisher { display:grid; place-items:center; flex:none; width:var(--space-4); height:var(--space-4); overflow:hidden; border-radius:var(--radius-lg); background:var(--surface); }
+.models-family-dialog__publisher svg { width:var(--space-3); height:var(--space-3); }
+.models-family-dialog__model-list { max-height:min(calc(var(--space-8) * 5), 45vh); overflow-y:auto; }
+.models-family-dialog__model-list .list-box-item { display:flex; align-items:center; gap:var(--space-1); min-width:0; min-height:var(--space-5); padding-block:0; }
+.models-family-dialog__model-text { display:flex; align-items:center; gap:var(--space-1); min-width:0; flex:1; }
+.models-family-dialog__model-text > span { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.models-family-dialog__model-text small { flex:none; color:var(--muted); font:var(--font-caption); }
+.models-family-dialog__selection { display:flex; flex-direction:column; gap:var(--space-1); }
+.models-family-dialog__selection .models-family-dialog__label { margin:0; }
+.models-family-dialog__selection p { margin:0; font:var(--font-body); color:var(--muted); }
+.models-family-dialog__sources { display:flex; flex-wrap:wrap; gap:var(--space-1); }
+.models-family-dialog__sources .button svg { width:var(--space-3); height:var(--space-3); }
 .models-section-title { font-size:20px; font-weight:650; margin:0; }
 .models-card.card { gap:12px; padding:20px; border:1px solid var(--border); border-radius:16px; background:var(--surface); box-shadow:0 2px 10px color-mix(in oklch,var(--accent) 4%,transparent); min-width:0; }
 .models-card .card__header { display:flex; flex-direction:row; align-items:flex-start; gap:16px; padding:0; }
@@ -65,6 +93,7 @@
 @media (max-width:1180px) { .models-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .models-current.card { flex-wrap:wrap; } .models-current .chip { margin-left:72px; } }
 @media (max-width:800px) {
  .models-grid { grid-template-columns:minmax(0,1fr); }
+ .models-family-dialog__filters { grid-template-columns:minmax(0,1fr); }
  .models-overview__summaries { grid-template-columns:minmax(0,1fr); }
  .models-current.card { flex-wrap:nowrap; }
  .models-current .chip { margin-left:0; }

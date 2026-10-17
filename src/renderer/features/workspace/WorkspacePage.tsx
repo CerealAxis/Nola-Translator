@@ -22,6 +22,7 @@ import { SessionBar } from './SessionBar'
 import { SessionSetupDialog } from './SessionSetupDialog'
 import type { SetupDraft } from './SessionSetupDialog'
 import { errorCodeOfSession, errorCopyOf } from './error-copy'
+import { isSessionAlreadyRunningError } from '../../../shared/ipc-error'
 import { SessionErrorDialog, StopSessionDialog } from './WorkspaceDialogs'
 import { WorkspaceToolbar } from './WorkspaceToolbar'
 import './workspace.css'
@@ -154,7 +155,16 @@ export function WorkspacePage() {
   )
 
   // -- Open the dialog seeded from current settings, not a separate draft ---
-  const openSetup = useCallback(() => {
+  const openSetup = useCallback(async () => {
+    try {
+      if (!await actions.settings.canStartDesktopCaptions()) {
+        toast.danger(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        return
+      }
+    } catch {
+      toast.danger(t('errors.startFailed'))
+      return
+    }
     setDraft({
       title: '',
       audioSource: settings?.recognition.audioSource ?? 'defaultOutput',
@@ -166,7 +176,7 @@ export function WorkspacePage() {
       keepAudio: settings?.recording.keepAudio ?? true,
     })
     setSetupOpen(true)
-  }, [settings])
+  }, [settings, t])
 
   const submitSetup = useCallback((config: Parameters<typeof actions.session.startSession>[0]) => {
     setPendingConfig(config)
@@ -219,9 +229,12 @@ export function WorkspacePage() {
           })
         }
       }
-    } catch {
-      // The error is already on the store as an errorCode, and the dialog
-      //      // below reports it. No second toast: saying it twice reads as two problems.
+    } catch (error) {
+      // SessionController is the final cross-client mutex. Turn its conflict into a
+      // named toast instead of also opening the generic start-failure dialog.
+      if (isSessionAlreadyRunningError(error)) {
+        toast.danger(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+      }
     }
   }, [draft, t])
 
@@ -318,7 +331,13 @@ export function WorkspacePage() {
         audioSource={audioSource}
         devices={devices}
         onAudioSourceChange={(next) => { void actions.settings.updateSettings({ recognition: { audioSource: next } }).catch(() => undefined) }}
-        onOpenOverlay={() => { void getBridge()?.overlay.show().catch(() => toast.danger(t('workspaceUi.overlayFailed'))) }}
+        onOpenOverlay={() => {
+          void actions.settings.showOverlay().then(opened => {
+            if (opened === false) {
+              toast.danger(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+            }
+          }).catch(() => toast.danger(t('workspaceUi.overlayFailed')))
+        }}
         sourceLanguage={sourceLanguage}
         targetLanguage={targetLanguage}
         onSourceLanguageChange={(sourceLanguage) => {

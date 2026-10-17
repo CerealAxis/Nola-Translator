@@ -97,7 +97,8 @@ export interface NolaBridge {
     openMenu?(request: import('../../shared/overlay-menu').OverlayMenuRequest): Promise<void>
     presentMenu?(id: number): Promise<void>
     closeMenu?(id: number): Promise<void>
-    show(): Promise<void>
+    /** False means the browser-caption service is reserved; show a conflict toast. */
+    show(): Promise<boolean>
     hide(): Promise<void>
     close(): Promise<void>
     minimize(): Promise<void>
@@ -117,9 +118,9 @@ export interface NolaBridge {
     setCaptionService(active: boolean): Promise<BrowserConnectionStatus>
   }
   runtimes: {
-    openSettings(component: 'engine' | 'llama'): Promise<void>
+    openSettings(component: 'engine' | 'llama' | 'crisp'): Promise<void>
     list(): Promise<RuntimeSnapshot>
-    prepare(components?: readonly ('engine' | 'llama')[]): Promise<RuntimeSnapshot>
+    prepare(components?: readonly ('engine' | 'llama' | 'crisp')[]): Promise<RuntimeSnapshot>
     install(id: string, repair?: boolean): Promise<void>
     import(): Promise<boolean>
     cancel(): Promise<void>

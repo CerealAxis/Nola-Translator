@@ -39,7 +39,9 @@ export function registerOfflineIpc(manager: OfflineManager, getWindow: () => Bro
     loggedHandle(channel, async (event, ...args: unknown[]) => {
       const parent = getWindow()
       if (!parent || parent.isDestroyed() || event.sender.id !== parent.webContents.id) throw new Error('invalidConfiguration')
-      await whenReady()
+      // Snapshot only reads the manager's in-memory task. It must remain available
+      // when runtime initialization fails, so startup diagnostics are not masked.
+      if (channel !== 'offline:snapshot') await whenReady()
       return listener(parent, ...args)
     })
   }

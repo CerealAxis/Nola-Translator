@@ -257,6 +257,9 @@ if (!hasSingleInstanceLock) {
       // letting the engine fall back to the system temp directory.
       await mkdir(resourceEnvironment.TMP, { recursive: true }).catch((error) => console.error('model storage is unavailable', error))
       try { currentDirectories = JSON.stringify(runtimes.selectedDirectories(launchCompute)) } catch { /* Settings remain accessible for repair. */ }
+    }).catch(error => {
+      logDiagnostic('runtime.initialize.failed', { error })
+      throw error
     })
     const whenRuntimeReady = async (): Promise<void> => {
       await runtimeInitialization
@@ -265,10 +268,10 @@ if (!hasSingleInstanceLock) {
     engine = new EngineProcess({
       resolveLaunchSpec: () => {
         const compute = launchCompute
-        const { engine: engineDirectory, llama: llamaDirectory } = runtimes.selectedDirectories(compute)
+        const { engine: engineDirectory, llama: llamaDirectory, crisp: crispDirectory } = runtimes.selectedDirectories(compute)
         return {
           ...createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
-            managedEngineDirectory: engineDirectory }),
+            managedEngineDirectory: engineDirectory, managedCrispDirectory: crispDirectory }),
           env: { ...resourceEnvironment,
             NOLA_TRANSLATOR_LLAMA_DIR: llamaDirectory ?? '',
             // The main logger receives structured pipeline diagnostics on stderr, keeping one
@@ -322,9 +325,11 @@ if (!hasSingleInstanceLock) {
           const recognitionId = session?.recognitionModelId ?? settings.current().recognition.modelId
           const recognitionModel = resources.resources.find(r => r.resourceId === recognitionId)
           const translationModel = resources.resources.find(r => r.resourceId === modelId)
-          if (usesLocalTranslation && translationModel) {
-            translation = modelEngines(translationModel)[0] === 'pytorch' ? 'torch' : 'llama'
-          }
+          const recognitionLoader = recognitionModel ? modelEngines(recognitionModel)[0] : undefined
+          const translationLoader = translationModel ? modelEngines(translationModel)[0] : undefined
+          if (usesLocalTranslation && translationLoader) translation = translationLoader === 'pytorch' ? 'torch' : 'llama'
+          if (localRecognition && recognitionLoader) compute.recognitionEngine = recognitionLoader
+          if (usesLocalTranslation && translationLoader && translationLoader !== 'crisp') compute.translationEngine = translationLoader
           if (session) {
             if (localRecognition && (!recognitionModel || !supportsSelectedEngine(recognitionModel, compute, recognitionId))) {
               throw new Error('所选识别模型与推理引擎不兼容，请选择匹配的模型格式和引擎')
@@ -349,7 +354,7 @@ if (!hasSingleInstanceLock) {
           const response = await engine!.request({ protocolVersion: 1, type: 'listComputeDevices', requestId: `resolve-${randomUUID()}` }, 'computeDevices', 30_000)
           const hardware = (await runtimes.snapshot()).hardware
           session.compute = { ...compute,
-            recognitionDevice: localRecognition ? resolveDeviceIntent(compute.recognitionDevice, hardware, response.devices, compute.recognitionEngine === 'llama' ? 'llama' : 'torch') : 'auto',
+            recognitionDevice: localRecognition && compute.recognitionEngine !== 'crisp' ? resolveDeviceIntent(compute.recognitionDevice, hardware, response.devices, compute.recognitionEngine === 'llama' ? 'llama' : 'torch') : compute.recognitionDevice === 'cpu' ? 'cpu' : 'auto',
             translationDevice: translation === 'none' ? 'auto' : resolveDeviceIntent(compute.translationDevice, hardware, response.devices, translation),
           }
         } else if (session) {
@@ -384,7 +389,8 @@ if (!hasSingleInstanceLock) {
       }
       return overlayWindow!
     }
-    const sessions = new SessionController({ engine, meetings, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareEnvironment(true, config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => getOverlayWindow().showInactive(), hideOverlay: () => overlayWindow?.hide() })
+    const isOverlayVisible = (): boolean => !!overlayWindow && !overlayWindow.isDestroyed() && (overlayWindow.isVisible() || overlayWindow.isMinimized())
+    const sessions = new SessionController({ engine, meetings, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareEnvironment(true, config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => getOverlayWindow().showInactive(), hideOverlay: () => overlayWindow?.hide(), isBrowserCaptionServiceActive: () => browserConnection?.captionServiceReserved ?? false, isOverlayVisible })
     const offline = new OfflineManager({
       modelRoot: resourceEnvironment.NOLA_TRANSLATOR_MODEL_DIR,
       runtimeRoot: runtimes.directory,
@@ -426,7 +432,7 @@ if (!hasSingleInstanceLock) {
       whenRuntimeReady,
       sessions,
     )
-    browserConnection = new BrowserConnection({ engine, sessions, integrations: new BrowserIntegrations({ localAppData: process.env.LOCALAPPDATA ?? app.getPath('userData'), userData: app.getPath('userData') }), getSettings: () => settings.current(), setEnabled: async enabled => {
+    browserConnection = new BrowserConnection({ engine, sessions, integrations: new BrowserIntegrations({ localAppData: process.env.LOCALAPPDATA ?? app.getPath('userData'), userData: app.getPath('userData') }), isOverlayVisible, getSettings: () => settings.current(), setEnabled: async enabled => {
       const saved = await settings.update({ browserConnection: { enabled } })
       for (const window of BrowserWindow.getAllWindows()) window.webContents.send('settings:changed', saved)
     } })

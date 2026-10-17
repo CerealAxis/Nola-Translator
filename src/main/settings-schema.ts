@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { PYPI_MIRROR_NODES } from '../shared/pypi-mirrors'
 import { INDEX_TRANSLATE_MODEL_IDS } from '../shared/index-translate'
 import { computeSettingsPatchSchema } from '../shared/compute'
+import { RECOGNITION_MODEL_IDS } from '../shared/settings'
 
 /**
  * The runtime half of the settings contract.
@@ -26,7 +27,7 @@ const hubModelId = z
   .refine((value) => value.startsWith('hub:'), '只有 hub: 前缀的自装模型 id 才被接受')
 
 const recognitionModelIdSchema = z.union([
-  z.enum(['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf', 'sensevoice-small']),
+  z.enum(RECOGNITION_MODEL_IDS),
   hubModelId,
 ])
 

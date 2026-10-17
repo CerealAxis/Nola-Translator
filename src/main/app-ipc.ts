@@ -65,7 +65,7 @@ export function resetOverlayLock(): void {
 }
 
 /** Pages the caption overlay is allowed to send the main window to. */
-const OVERLAY_PAGES = new Set(['appearance', 'captions', 'resources', 'translation', 'torch', 'llama'])
+const OVERLAY_PAGES = new Set(['appearance', 'captions', 'resources', 'translation', 'torch', 'llama', 'crisp'])
 
 /** Top-level keys allowed in `credentials.json`. */
 

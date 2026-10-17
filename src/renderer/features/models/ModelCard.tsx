@@ -2,7 +2,7 @@ import { configurationOf } from '../../../shared/model-capabilities'
 import { modelEngines, type InferenceEngine } from '../../../shared/model-engines'
 
 import type { ReactNode } from 'react'
-import { Button, Card, Chip, ProgressBar, Skeleton } from '@heroui/react'
+import { Button, Card, Chip, ProgressBar, Skeleton, Tooltip } from '@heroui/react'
 import { Check, Download, Trash2, X } from 'lucide-react'
 import './models.css'
 
@@ -15,7 +15,7 @@ import { ModelMark } from './modelBrand'
 
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
 
-const BUILTIN_DESCRIPTION_KEYS: Readonly<Record<string, TranslationKey>> = {
+export const BUILTIN_DESCRIPTION_KEYS: Readonly<Record<string, TranslationKey>> = {
   'qwen3-asr-1.7b-hf': 'models.descriptions.qwenAsr17',
   'qwen3-asr-0.6b-hf': 'models.descriptions.qwenAsr06',
   'sensevoice-small': 'models.descriptions.senseVoice',
@@ -25,6 +25,9 @@ const BUILTIN_DESCRIPTION_KEYS: Readonly<Record<string, TranslationKey>> = {
   'hy-mt2-7b-q4-k-m': 'models.descriptions.hyMt2SevenB',
   'm2m100-418m': 'models.descriptions.m2m100',
   'index-translate-2b-q4-k-m': 'models.descriptions.indexTranslate2b',
+  'index-translate-2b-bf16': 'models.descriptions.indexTranslate2bBf16',
+  'index-translate-2b-fp8': 'models.descriptions.indexTranslate2bFp8',
+  'index-translate-2b-fp4': 'models.descriptions.indexTranslate2bFp4',
   'index-translate-9b-q4-k-m': 'models.descriptions.indexTranslate9b',
   'index-translate-35b-a3b-q4-k-m': 'models.descriptions.indexTranslate35b',
 }
@@ -114,8 +117,10 @@ export interface ModelCardProps {
   busy: boolean
   /** Already the default for recognition or translation, which is why no "set default" is offered. */
   isDefault: boolean
-  /** Whether this record can become the default; when not, that button is left out entirely. */
+  /** Whether the selected inference engine can use this ready model as the default. */
   canBeDefault: boolean;
+  /** Shown beside a disabled default action when the selected loader cannot load this model. */
+  defaultDisabledReason?: string;
   /** Hub result: whether it can be installed. False disables the install button. */
   installable?: boolean
   onInstall: () => void
@@ -136,6 +141,7 @@ export function ModelCard({
   busy,
   isDefault,
   canBeDefault,
+  defaultDisabledReason,
   installable = true,
   onInstall,
   onCancel,
@@ -178,7 +184,8 @@ export function ModelCard({
       <div className="models-card__status">
         {isDefault && record.installed ? <Chip size="sm" variant="soft" color="accent">{t('modelsSettingsUi.default')}</Chip> : null}
         {removal ? <StatusPill label={t(state === 'failed' ? 'modelsSettingsUi.removeFailed' : 'modelsSettingsUi.removing')} tone={state === 'failed' ? 'danger' : 'accent'} /> : record.installed && !configurationOf(record) ? <StatusPill label={t('modelConfig.pending')} tone="warning" /> : <StatePill state={state} />}
-        {(supportedEngines ?? modelEngines(record)).map(engine => <Chip key={engine} size="sm" variant="soft">{engine === 'pytorch' ? 'PyTorch' : 'llama.cpp'}</Chip>)}
+        {(supportedEngines ?? modelEngines(record)).map(engine => <Chip key={engine} size="sm" variant="soft">{engine === 'pytorch' ? 'PyTorch' : engine === 'crisp' ? 'CrispASR' : 'llama.cpp'}</Chip>)}
+        {record.resourceId.startsWith('hub:local/') ? <Chip size="sm" variant="soft">{t('modelsSettingsUi.localImport')}</Chip> : null}
       </div>
 
       {inFlight ? <ProgressLine record={record} state={state} /> : null}
@@ -193,6 +200,7 @@ export function ModelCard({
           cancellable={record.cancellable}
           isDefault={isDefault}
           canBeDefault={canBeDefault}
+          defaultDisabledReason={defaultDisabledReason}
           onInstall={onInstall}
           onCancel={onCancel}
           onRemove={onRemove}
@@ -250,6 +258,7 @@ interface ActionsProps {
   cancellable: boolean
   isDefault: boolean
   canBeDefault: boolean
+  defaultDisabledReason?: string
   onInstall: () => void
   onCancel: () => void
   onRemove: () => void
@@ -264,6 +273,7 @@ function Actions({
   cancellable,
   isDefault,
   canBeDefault,
+  defaultDisabledReason,
   onInstall,
   onCancel,
   onRemove,
@@ -320,6 +330,18 @@ function Actions({
           >
             {t('models.setDefault')}
           </Button>
+        ) : null}
+        {!canBeDefault && !isDefault && defaultDisabledReason ? (
+          <Tooltip delay={250}>
+            <Tooltip.Trigger className="block min-w-0 flex-1">
+              <Button variant="outline" size="sm" className="h-10 w-full rounded-xl" isDisabled>
+                {t('models.setDefault')}
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content className="settings-row__tooltip z-overlay max-w-96 whitespace-normal">
+              {defaultDisabledReason}
+            </Tooltip.Content>
+          </Tooltip>
         ) : null}
         {/* Destructive removal stays visibly identifiable through its soft-danger fill. */}
         <Button

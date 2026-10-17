@@ -20,6 +20,8 @@ try {
     & $buildPython -m pip --isolated install --index-url 'https://pypi.org/simple' -r (Join-Path $projectRoot 'engine\requirements-base.txt')
 } finally { $env:PIP_CONFIG_FILE = $previousPipConfig }
 if ($LASTEXITCODE -ne 0) { throw 'Could not install base dependencies' }
+& $buildPython (Join-Path $PSScriptRoot 'install-crispasr-vulkan.py')
+if ($LASTEXITCODE -ne 0) { throw 'Could not install CrispASR Vulkan libraries' }
 & $buildPython (Join-Path $PSScriptRoot 'build-python-runtime.py')
 if ($LASTEXITCODE -ne 0) { throw 'Python runtime build failed' }
 $privatePython = Join-Path $projectRoot 'engine\dist\NolaPythonEngine\python.exe'

@@ -17,6 +17,7 @@ export function createDemoRuntime(): RuntimeSnapshot {
     local: {
       engine: { id: engine.id, path: 'Demo', status: 'ready', backend: engine.backend, version: engine.torchVersion, gpuAvailable: false, reason: '' },
       llama: { id: llama.id, path: 'Demo', status: 'ready', backend: llama.backend, version: llama.version, gpuAvailable: false, reason: '' },
+      crisp: { id: 'bundled', path: 'Demo', status: 'ready', backend: 'cpu', version: '0.8.43', gpuAvailable: false, reason: '' },
     }, operation: null, lastError: null, directory: 'Demo',
   }
 }

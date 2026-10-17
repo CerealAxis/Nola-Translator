@@ -8,7 +8,7 @@ import { useModelOptions } from '@/model-options'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 import { settingsPath, useRoute } from '@/routes'
-import { actions, enableCaptionService, stores, updateSettings, useStore } from '@/store'
+import { actions, enableCaptionService, sessionStore, stores, updateSettings, useStore } from '@/store'
 import { browserConnectionAction, setCaptionServiceActive, stopCaptionSession } from '@/store/settingsStore'
 import { swappedLanguagesOf, targetLanguagePatch } from '@/session-config'
 import { translationLanguages } from '../../../shared/model-capabilities'
@@ -17,6 +17,7 @@ import { PageHeader } from '@/components/primitives'
 import { SettingSelect } from '../settings/SettingsPage'
 import { SETTINGS_WRITE_FAILURE_KEYS, settingsWriteFailure } from '../settings/settingsWriteError'
 import { openDefaultBrowser } from './openDefaultBrowser'
+import { isSessionAlreadyRunningError } from '../../../shared/ipc-error'
 import './video-captions.css'
 
 /**
@@ -96,6 +97,10 @@ export function VideoCaptionsPage() {
   }
   const prewarmFailure = (code?: PrewarmErrorCode) =>
     code ? `${t('videoCaptions.serviceFailed')} · ${t(PREWARM_ERROR_KEYS[code])}` : t('videoCaptions.serviceFailed')
+  const notifyConflict = () => {
+    const desktopBusy = ['starting', 'running', 'paused', 'stopping'].includes(sessionStore.getState().status)
+    toast.danger(t('errors.serviceConflict', { running: t(desktopBusy ? 'nav.workspace' : 'shellUi.overlay') }))
+  }
   /*
    * Opening the gate is prewarm first and the toggle second, so a refusal from the engine
    * leaves the extension shut out rather than let in by a service with no weights in memory.
@@ -103,7 +108,12 @@ export function VideoCaptionsPage() {
   const open = async () => {
     try {
       const result = await enableCaptionService()
-      if (result.state === 'failed') { toast.danger(prewarmFailure(result.code)); return }
+      if (result.state === 'failed') {
+        if (result.code === 'sessionAlreadyRunning') {
+          notifyConflict()
+        } else toast.danger(prewarmFailure(result.code))
+        return
+      }
     } catch (error) {
       const message = String(error)
       if (/RUNTIME_(TORCH|LLAMA)/.test(message)) {
@@ -131,7 +141,11 @@ export function VideoCaptionsPage() {
           actionProps: { children: t('videoCaptions.browserSettings'), onPress: () => navigate(settingsPath('browser')) },
         })
       }
-    } catch { toast.danger(t('errors.captionServiceToggleFailed')) }
+    } catch (error) {
+      if (isSessionAlreadyRunningError(error)) {
+        notifyConflict()
+      } else toast.danger(t('errors.captionServiceToggleFailed'))
+    }
   }
   /*
    * Closing is the toggle first and the stop second, and a failed stop does not put the

@@ -10,12 +10,29 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "engine"))
 
 from nola_translator_engine.models import catalog
+from nola_translator_engine.models.crisp_catalog import CRISP_ASR_SPECS
+from nola_translator_engine.models.qwen_gguf_catalog import QWEN3_ASR_GGUF_SPECS
 from nola_translator_engine.models.manager import ModelSpec
 
 NAMES = {
     "qwen3-asr-1.7b-hf": "Qwen3-ASR 1.7B",
     "qwen3-asr-0.6b-hf": "Qwen3-ASR 0.6B",
+    "qwen3-asr-0.6b-gguf-q4-k-m": "Qwen3-ASR 0.6B Q4_K_M",
+    "qwen3-asr-1.7b-gguf-q4-k-m": "Qwen3-ASR 1.7B Q4_K_M",
+    "qwen3-asr-0.6b-gguf-q8-0": "Qwen3-ASR 0.6B Q8_0",
+    "qwen3-asr-0.6b-gguf-bf16": "Qwen3-ASR 0.6B BF16",
+    "qwen3-asr-1.7b-gguf-q8-0": "Qwen3-ASR 1.7B Q8_0",
+    "qwen3-asr-1.7b-gguf-bf16": "Qwen3-ASR 1.7B BF16",
     "sensevoice-small": "SenseVoiceSmall",
+    "sensevoice-small-crisp-q4-k": "SenseVoiceSmall Q4_K",
+    "sensevoice-small-crisp-q8-0": "SenseVoiceSmall Q8_0",
+    "sensevoice-small-crisp-f16": "SenseVoiceSmall F16",
+    "qwen3-asr-0.6b-crisp-q4-k": "Qwen3-ASR 0.6B Q4_K",
+    "qwen3-asr-0.6b-crisp-q8-0": "Qwen3-ASR 0.6B Q8_0",
+    "qwen3-asr-0.6b-crisp-f16": "Qwen3-ASR 0.6B F16",
+    "qwen3-asr-1.7b-crisp-q4-k": "Qwen3-ASR 1.7B Q4_K",
+    "qwen3-asr-1.7b-crisp-q8-0": "Qwen3-ASR 1.7B Q8_0",
+    "qwen3-asr-1.7b-crisp-f16": "Qwen3-ASR 1.7B F16",
     "hy-mt2-1.8b-q4-k-m": "Hy-MT2 1.8B Q4_K_M",
     "hy-mt2-1.8b-q3-k-m": "Hy-MT2 1.8B Q3_K_M",
     "hy-mt2-1.8b-iq2-m": "Hy-MT2 1.8B UD-IQ2_M",
@@ -24,12 +41,31 @@ NAMES = {
     "index-translate-2b-q4-k-m": "Index-Translate 2B Q4_K_M",
     "index-translate-9b-q4-k-m": "Index-Translate 9B Q4_K_M",
     "index-translate-35b-a3b-q4-k-m": "Index-Translate 35B-A3B preview Q4_K_M",
+    "index-translate-2b-bf16": "Index-Translate 2B BF16",
+    "index-translate-2b-fp8": "Index-Translate 2B FP8",
+    "index-translate-2b-fp4": "Index-Translate 2B FP4",
+    "index-translate-9b-bf16": "Index-Translate 9B BF16",
+    "index-translate-9b-fp8": "Index-Translate 9B FP8",
+    "index-translate-9b-fp4": "Index-Translate 9B FP4",
+    "index-translate-35b-a3b-preview-bf16": "Index-Translate 35B-A3B preview BF16",
+    "index-translate-35b-a3b-preview-fp8": "Index-Translate 35B-A3B preview FP8",
+    "index-translate-35b-a3b-preview-fp4": "Index-Translate 35B-A3B preview FP4",
+    "fun-asr-nano-q4-k": "Fun-ASR Nano Q4_K",
+    "fun-asr-nano-q8-0": "Fun-ASR Nano Q8_0",
+    "fun-asr-nano-f16": "Fun-ASR Nano F16",
+    "vibevoice-asr-q4-k": "VibeVoice-ASR Q4_K",
+    "vibevoice-asr-q8-0": "VibeVoice-ASR Q8_0",
+    "vibevoice-asr-f16": "VibeVoice-ASR F16",
+    "mimo-v2.5-asr-q4-k": "MiMo-V2.5-ASR Q4_K",
+    "mimo-v2.5-asr-f16": "MiMo-V2.5-ASR F16",
 }
-RECOGNITION_IDS = {"qwen3-asr-1.7b-hf", "qwen3-asr-0.6b-hf", "sensevoice-small"}
+RECOGNITION_IDS = {"qwen3-asr-1.7b-hf", "qwen3-asr-0.6b-hf", "sensevoice-small", *(spec.model_id for spec in CRISP_ASR_SPECS), *(spec.model_id for spec in QWEN3_ASR_GGUF_SPECS)}
 
 
 def generate() -> str:
     specs = {spec.model_id: spec for spec in vars(catalog).values() if isinstance(spec, ModelSpec)}
+    specs.update({spec.model_id: spec for spec in CRISP_ASR_SPECS})
+    specs.update({spec.model_id: spec for spec in QWEN3_ASR_GGUF_SPECS})
     if specs.keys() != NAMES.keys():
         raise ValueError("Update manual-download product names for the engine model catalog")
     entries = []

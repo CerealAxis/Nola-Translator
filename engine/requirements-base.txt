@@ -6,5 +6,6 @@ pydantic==2.13.4
 PyAudioWPatch==0.2.12.8
 scipy==1.15.3
 kaldi-native-fbank==1.22.3
+crispasr==0.8.43
 lameenc==1.8.4
 pip

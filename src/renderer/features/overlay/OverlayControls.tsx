@@ -25,7 +25,7 @@ import { useModelOptions } from '@/model-options'
 
 import { useLayoutEffect, useRef, useState } from 'react'
 
-import { Button, Dropdown, Spinner } from '@heroui/react'
+import { Button, Dropdown, Spinner, toast } from '@heroui/react'
 import { Mic, Pause, Play } from 'lucide-react'
 
 import {
@@ -42,6 +42,7 @@ import { useI18n } from '@/i18n'
 import { OverlayDisplayMenu, OverlayLayoutMenu } from './OverlayDisplayMenu'
 import { OverlayDropdown } from './OverlayDropdown'
 import { LANGUAGE_MENU_MAX_HEIGHT, LANGUAGE_MENU_SCREEN_FRACTION } from '../../../shared/overlay-menu'
+import { isSessionAlreadyRunningError } from '../../../shared/ipc-error'
 
 /**
  * Geometry and colour live in `.nola-caption-pill` (`caption-card.css`).
@@ -277,7 +278,9 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
       setLastIntent('start')
       setDismissedFailure(null)
       void actions.session.startSession(startConfigOf(settings, devices)).catch((error: unknown) => {
-        console.warn('[overlay] startSession failed', error)
+        if (isSessionAlreadyRunningError(error)) {
+          toast.danger(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        } else console.warn('[overlay] startSession failed', error)
       })
     }
   }

@@ -16,6 +16,9 @@ from nola_translator_engine.resources import (
     HYMT2_IQ2_RESOURCE_ID,
     HYMT2_7B_RESOURCE_ID,
     INDEX_TRANSLATE_RESOURCE_IDS,
+    INDEX_TRANSLATE_TRANSFORMERS_IDS,
+    CRISP_ASR_SPECS,
+    QWEN3_ASR_GGUF_SPECS,
     INDEX_TRANSLATE_SPECS,
     M2M100_RESOURCE_ID,
     QWEN_06B_RESOURCE_ID,
@@ -103,6 +106,9 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
         HYMT2_IQ2_RESOURCE_ID,
         M2M100_RESOURCE_ID,
         *INDEX_TRANSLATE_RESOURCE_IDS,
+        *INDEX_TRANSLATE_TRANSFORMERS_IDS,
+        *(spec.model_id for spec in QWEN3_ASR_GGUF_SPECS),
+        *(spec.model_id for spec in CRISP_ASR_SPECS),
         HYMT2_7B_RESOURCE_ID,
     ]
     assert QWEN_RESOURCE_ID == "qwen3-asr-1.7b-hf"
@@ -174,6 +180,19 @@ def test_index_translate_presets_download_only_text_weights_and_use_llama(tmp_pa
     from nola_translator_engine.translation.index_translate_languages import LANGUAGE_NAMES
     assert set(capability.targetLanguages) == set(LANGUAGE_NAMES)
     assert manager.translation_gguf_path(spec.model_id).name == spec.files[0].path
+
+
+@pytest.mark.parametrize("spec", resources_module.INDEX_TRANSLATE_TRANSFORMERS_SPECS)
+def test_index_translate_official_transformers_snapshots_use_pytorch(tmp_path, spec):
+    manager = ResourceManager(tmp_path / "models", lambda _event: None)
+    record = next(item for item in manager.list() if item.resourceId == spec.model_id)
+    assert manager.adapter_for(spec.model_id) == "index-translate-transformers"
+    assert record.provider == "index-translate-transformers"
+    assert record.downloadBytes == spec.total_bytes
+    assert all(entry.sha256 or entry.blob_sha1 for entry in spec.files)
+    capability = manager.configuration(spec.model_id)
+    assert capability.engine == "pytorch"
+    assert set(capability.targetLanguages) == set(resources_module.INDEX_TRANSLATE_LANGUAGE_NAMES)
 
 
 def test_hymt2_7b_uses_official_text_weights_and_existing_language_capabilities(tmp_path):

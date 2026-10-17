@@ -132,7 +132,13 @@ html[data-overlay-menu-input='pointer'] .nola-caption-menu .nola-menu-item {
   -webkit-app-region: drag;
 }
 
-/* Let native caption selection start inside a drag window and remain clickable until it is cleared. */
+.nola-caption-card[data-locked='false'],
+.nola-caption-card[data-locked='false'] * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* A locked caption window can select text; selection moves the native region out of drag mode. */
 .nola-caption-card[data-text-selected='true'] {
   -webkit-app-region: no-drag;
 }
@@ -167,7 +173,7 @@ html[data-overlay-menu-input='pointer'] .nola-caption-menu .nola-menu-item {
   overflow: hidden;
 }
 
-/* Fixed backdrop darkening keeps the toolbar readable even when the card fill is transparent. */
+/* Opacity-aware, tinted gradients keep toolbar buttons distinct over busy captions. */
 .nola-caption-scrim {
   position: absolute;
   left: 0;
@@ -176,26 +182,22 @@ html[data-overlay-menu-input='pointer'] .nola-caption-menu .nola-menu-item {
   pointer-events: none;
   opacity: 0;
   transition: opacity 180ms ease;
-  -webkit-backdrop-filter: brightness(0.5);
-  backdrop-filter: brightness(0.5);
 }
 
 .nola-caption-scrim[data-edge='top'] {
   top: 0;
-  height: 62px;
+  height: max(60px, 25%);
+  background: linear-gradient(to bottom, var(--overlay-scrim-color), transparent);
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
-  -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent);
-  mask-image: linear-gradient(to bottom, black 30%, transparent);
 }
 
 .nola-caption-scrim[data-edge='bottom'] {
   bottom: 0;
-  height: 58px;
+  height: max(60px, 25%);
+  background: linear-gradient(to top, var(--overlay-scrim-color), transparent);
   border-bottom-right-radius: inherit;
   border-bottom-left-radius: inherit;
-  -webkit-mask-image: linear-gradient(to top, black 30%, transparent);
-  mask-image: linear-gradient(to top, black 30%, transparent);
 }
 
 .nola-caption-card[data-hover='true'] .nola-caption-scrim,
@@ -254,6 +256,13 @@ html[data-overlay-menu-input='pointer'] .nola-caption-menu .nola-menu-item {
 .nola-caption-track:not(.pointer-events-none) .nola-caption-entry,
 .nola-caption-track-sentence {
   -webkit-app-region: no-drag;
+}
+
+/* Caption text remains part of the draggable surface until the window is locked. */
+.nola-caption-card[data-locked='false'] .nola-caption-track:not(.pointer-events-none) .nola-caption-entry,
+.nola-caption-card[data-locked='false'] .nola-caption-track-sentence,
+.nola-caption-card[data-locked='false'] .nola-caption-segment {
+  -webkit-app-region: drag;
 }
 
 .nola-caption-track-content {
@@ -785,8 +794,6 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   pointer-events: none;
   opacity: 0;
   transition: opacity 180ms ease;
-  -webkit-backdrop-filter: brightness(0.5);
-  backdrop-filter: brightness(0.5);
 }
 
 .nola-caption-preview:hover .nola-caption-preview__scrim {
@@ -795,20 +802,18 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 
 .nola-caption-preview__scrim[data-edge='top'] {
   top: 0;
-  height: 46px;
+  height: max(60px, 25%);
+  background: linear-gradient(to bottom, var(--preview-scrim-color, #45484f), transparent);
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
-  -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent);
-  mask-image: linear-gradient(to bottom, black 30%, transparent);
 }
 
 .nola-caption-preview__scrim[data-edge='bottom'] {
   bottom: 0;
-  height: 40px;
+  height: max(60px, 25%);
+  background: linear-gradient(to top, var(--preview-scrim-color, #45484f), transparent);
   border-bottom-right-radius: inherit;
   border-bottom-left-radius: inherit;
-  -webkit-mask-image: linear-gradient(to top, black 30%, transparent);
-  mask-image: linear-gradient(to top, black 30%, transparent);
 }
 
 /*

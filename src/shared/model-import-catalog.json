@@ -320,6 +320,240 @@
     }
   },
   {
+    "id": "qwen3-asr-0.6b-gguf-q4-k-m",
+    "name": "Qwen3-ASR 0.6B Q4_K_M",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "6cf166e9f1c5bd2521108e3410ee5358de5eabab",
+        "repositoryUrl": "https://huggingface.co/mradermacher/Qwen3-ASR-0.6B-GGUF/tree/6cf166e9f1c5bd2521108e3410ee5358de5eabab",
+        "files": [
+          {
+            "path": "Qwen3-ASR-0.6B.Q4_K_M.gguf",
+            "size": 484216288,
+            "url": "https://huggingface.co/mradermacher/Qwen3-ASR-0.6B-GGUF/resolve/6cf166e9f1c5bd2521108e3410ee5358de5eabab/Qwen3-ASR-0.6B.Q4_K_M.gguf"
+          },
+          {
+            "path": "Qwen3-ASR-0.6B.mmproj-Q8_0.gguf",
+            "size": 214392608,
+            "url": "https://huggingface.co/mradermacher/Qwen3-ASR-0.6B-GGUF/resolve/6cf166e9f1c5bd2521108e3410ee5358de5eabab/Qwen3-ASR-0.6B.mmproj-Q8_0.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "6cf166e9f1c5bd2521108e3410ee5358de5eabab",
+        "repositoryUrl": "https://hf-mirror.com/mradermacher/Qwen3-ASR-0.6B-GGUF/tree/6cf166e9f1c5bd2521108e3410ee5358de5eabab",
+        "files": [
+          {
+            "path": "Qwen3-ASR-0.6B.Q4_K_M.gguf",
+            "size": 484216288,
+            "url": "https://hf-mirror.com/mradermacher/Qwen3-ASR-0.6B-GGUF/resolve/6cf166e9f1c5bd2521108e3410ee5358de5eabab/Qwen3-ASR-0.6B.Q4_K_M.gguf"
+          },
+          {
+            "path": "Qwen3-ASR-0.6B.mmproj-Q8_0.gguf",
+            "size": 214392608,
+            "url": "https://hf-mirror.com/mradermacher/Qwen3-ASR-0.6B-GGUF/resolve/6cf166e9f1c5bd2521108e3410ee5358de5eabab/Qwen3-ASR-0.6B.mmproj-Q8_0.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen3-asr-1.7b-gguf-q4-k-m",
+    "name": "Qwen3-ASR 1.7B Q4_K_M",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "3f45ea4f5f84f3159a561c9ece8063d56e740648",
+        "repositoryUrl": "https://huggingface.co/slyusarev/Qwen3-ASR-1.7B-GGUF/tree/3f45ea4f5f84f3159a561c9ece8063d56e740648",
+        "files": [
+          {
+            "path": "Qwen3-ASR-1.7B-Q4_K_M.gguf",
+            "size": 1282435008,
+            "url": "https://huggingface.co/slyusarev/Qwen3-ASR-1.7B-GGUF/resolve/3f45ea4f5f84f3159a561c9ece8063d56e740648/Qwen3-ASR-1.7B-Q4_K_M.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-1.7B-Q8_0.gguf",
+            "size": 355709344,
+            "url": "https://huggingface.co/slyusarev/Qwen3-ASR-1.7B-GGUF/resolve/3f45ea4f5f84f3159a561c9ece8063d56e740648/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "3f45ea4f5f84f3159a561c9ece8063d56e740648",
+        "repositoryUrl": "https://hf-mirror.com/slyusarev/Qwen3-ASR-1.7B-GGUF/tree/3f45ea4f5f84f3159a561c9ece8063d56e740648",
+        "files": [
+          {
+            "path": "Qwen3-ASR-1.7B-Q4_K_M.gguf",
+            "size": 1282435008,
+            "url": "https://hf-mirror.com/slyusarev/Qwen3-ASR-1.7B-GGUF/resolve/3f45ea4f5f84f3159a561c9ece8063d56e740648/Qwen3-ASR-1.7B-Q4_K_M.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-1.7B-Q8_0.gguf",
+            "size": 355709344,
+            "url": "https://hf-mirror.com/slyusarev/Qwen3-ASR-1.7B-GGUF/resolve/3f45ea4f5f84f3159a561c9ece8063d56e740648/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen3-asr-0.6b-gguf-q8-0",
+    "name": "Qwen3-ASR 0.6B Q8_0",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "928ab958557df9aa2ef1c93e0e83c7ad0933fae2",
+        "repositoryUrl": "https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/tree/928ab958557df9aa2ef1c93e0e83c7ad0933fae2",
+        "files": [
+          {
+            "path": "Qwen3-ASR-0.6B-Q8_0.gguf",
+            "size": 804749248,
+            "url": "https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/928ab958557df9aa2ef1c93e0e83c7ad0933fae2/Qwen3-ASR-0.6B-Q8_0.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-0.6B-Q8_0.gguf",
+            "size": 214392480,
+            "url": "https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/928ab958557df9aa2ef1c93e0e83c7ad0933fae2/mmproj-Qwen3-ASR-0.6B-Q8_0.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "928ab958557df9aa2ef1c93e0e83c7ad0933fae2",
+        "repositoryUrl": "https://hf-mirror.com/ggml-org/Qwen3-ASR-0.6B-GGUF/tree/928ab958557df9aa2ef1c93e0e83c7ad0933fae2",
+        "files": [
+          {
+            "path": "Qwen3-ASR-0.6B-Q8_0.gguf",
+            "size": 804749248,
+            "url": "https://hf-mirror.com/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/928ab958557df9aa2ef1c93e0e83c7ad0933fae2/Qwen3-ASR-0.6B-Q8_0.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-0.6B-Q8_0.gguf",
+            "size": 214392480,
+            "url": "https://hf-mirror.com/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/928ab958557df9aa2ef1c93e0e83c7ad0933fae2/mmproj-Qwen3-ASR-0.6B-Q8_0.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen3-asr-0.6b-gguf-bf16",
+    "name": "Qwen3-ASR 0.6B BF16",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "928ab958557df9aa2ef1c93e0e83c7ad0933fae2",
+        "repositoryUrl": "https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/tree/928ab958557df9aa2ef1c93e0e83c7ad0933fae2",
+        "files": [
+          {
+            "path": "Qwen3-ASR-0.6B-bf16.gguf",
+            "size": 1509343168,
+            "url": "https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/928ab958557df9aa2ef1c93e0e83c7ad0933fae2/Qwen3-ASR-0.6B-bf16.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-0.6B-bf16.gguf",
+            "size": 378575520,
+            "url": "https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/928ab958557df9aa2ef1c93e0e83c7ad0933fae2/mmproj-Qwen3-ASR-0.6B-bf16.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "928ab958557df9aa2ef1c93e0e83c7ad0933fae2",
+        "repositoryUrl": "https://hf-mirror.com/ggml-org/Qwen3-ASR-0.6B-GGUF/tree/928ab958557df9aa2ef1c93e0e83c7ad0933fae2",
+        "files": [
+          {
+            "path": "Qwen3-ASR-0.6B-bf16.gguf",
+            "size": 1509343168,
+            "url": "https://hf-mirror.com/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/928ab958557df9aa2ef1c93e0e83c7ad0933fae2/Qwen3-ASR-0.6B-bf16.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-0.6B-bf16.gguf",
+            "size": 378575520,
+            "url": "https://hf-mirror.com/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/928ab958557df9aa2ef1c93e0e83c7ad0933fae2/mmproj-Qwen3-ASR-0.6B-bf16.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen3-asr-1.7b-gguf-q8-0",
+    "name": "Qwen3-ASR 1.7B Q8_0",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "36a678687ba7d07a74ca70ccb0e36902e005fb80",
+        "repositoryUrl": "https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/tree/36a678687ba7d07a74ca70ccb0e36902e005fb80",
+        "files": [
+          {
+            "path": "Qwen3-ASR-1.7B-Q8_0.gguf",
+            "size": 2165034944,
+            "url": "https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/36a678687ba7d07a74ca70ccb0e36902e005fb80/Qwen3-ASR-1.7B-Q8_0.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-1.7B-Q8_0.gguf",
+            "size": 355709344,
+            "url": "https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/36a678687ba7d07a74ca70ccb0e36902e005fb80/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "36a678687ba7d07a74ca70ccb0e36902e005fb80",
+        "repositoryUrl": "https://hf-mirror.com/ggml-org/Qwen3-ASR-1.7B-GGUF/tree/36a678687ba7d07a74ca70ccb0e36902e005fb80",
+        "files": [
+          {
+            "path": "Qwen3-ASR-1.7B-Q8_0.gguf",
+            "size": 2165034944,
+            "url": "https://hf-mirror.com/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/36a678687ba7d07a74ca70ccb0e36902e005fb80/Qwen3-ASR-1.7B-Q8_0.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-1.7B-Q8_0.gguf",
+            "size": 355709344,
+            "url": "https://hf-mirror.com/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/36a678687ba7d07a74ca70ccb0e36902e005fb80/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen3-asr-1.7b-gguf-bf16",
+    "name": "Qwen3-ASR 1.7B BF16",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "36a678687ba7d07a74ca70ccb0e36902e005fb80",
+        "repositoryUrl": "https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/tree/36a678687ba7d07a74ca70ccb0e36902e005fb80",
+        "files": [
+          {
+            "path": "Qwen3-ASR-1.7B-bf16.gguf",
+            "size": 4069674944,
+            "url": "https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/36a678687ba7d07a74ca70ccb0e36902e005fb80/Qwen3-ASR-1.7B-bf16.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-1.7B-bf16.gguf",
+            "size": 641773984,
+            "url": "https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/36a678687ba7d07a74ca70ccb0e36902e005fb80/mmproj-Qwen3-ASR-1.7B-bf16.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "36a678687ba7d07a74ca70ccb0e36902e005fb80",
+        "repositoryUrl": "https://hf-mirror.com/ggml-org/Qwen3-ASR-1.7B-GGUF/tree/36a678687ba7d07a74ca70ccb0e36902e005fb80",
+        "files": [
+          {
+            "path": "Qwen3-ASR-1.7B-bf16.gguf",
+            "size": 4069674944,
+            "url": "https://hf-mirror.com/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/36a678687ba7d07a74ca70ccb0e36902e005fb80/Qwen3-ASR-1.7B-bf16.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-1.7B-bf16.gguf",
+            "size": 641773984,
+            "url": "https://hf-mirror.com/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/36a678687ba7d07a74ca70ccb0e36902e005fb80/mmproj-Qwen3-ASR-1.7B-bf16.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
     "id": "sensevoice-small",
     "name": "SenseVoiceSmall",
     "family": "recognition",
@@ -429,6 +663,267 @@
             "path": "model.pt",
             "size": 936291369,
             "url": "https://www.modelscope.cn/models/iic/SenseVoiceSmall/resolve/7bf452403abd7353a300cd760f7adae7701c92c1/model.pt"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "sensevoice-small-crisp-q4-k",
+    "name": "SenseVoiceSmall Q4_K",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "e1ad67de9d05137a6a0b02beba1fd66e28df6ae4",
+        "repositoryUrl": "https://huggingface.co/cstr/sensevoice-small-GGUF/tree/e1ad67de9d05137a6a0b02beba1fd66e28df6ae4",
+        "files": [
+          {
+            "path": "sensevoice-small-q4_k.gguf",
+            "size": 135553632,
+            "url": "https://huggingface.co/cstr/sensevoice-small-GGUF/resolve/e1ad67de9d05137a6a0b02beba1fd66e28df6ae4/sensevoice-small-q4_k.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "e1ad67de9d05137a6a0b02beba1fd66e28df6ae4",
+        "repositoryUrl": "https://hf-mirror.com/cstr/sensevoice-small-GGUF/tree/e1ad67de9d05137a6a0b02beba1fd66e28df6ae4",
+        "files": [
+          {
+            "path": "sensevoice-small-q4_k.gguf",
+            "size": 135553632,
+            "url": "https://hf-mirror.com/cstr/sensevoice-small-GGUF/resolve/e1ad67de9d05137a6a0b02beba1fd66e28df6ae4/sensevoice-small-q4_k.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "sensevoice-small-crisp-q8-0",
+    "name": "SenseVoiceSmall Q8_0",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "e1ad67de9d05137a6a0b02beba1fd66e28df6ae4",
+        "repositoryUrl": "https://huggingface.co/cstr/sensevoice-small-GGUF/tree/e1ad67de9d05137a6a0b02beba1fd66e28df6ae4",
+        "files": [
+          {
+            "path": "sensevoice-small-q8_0.gguf",
+            "size": 251674976,
+            "url": "https://huggingface.co/cstr/sensevoice-small-GGUF/resolve/e1ad67de9d05137a6a0b02beba1fd66e28df6ae4/sensevoice-small-q8_0.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "e1ad67de9d05137a6a0b02beba1fd66e28df6ae4",
+        "repositoryUrl": "https://hf-mirror.com/cstr/sensevoice-small-GGUF/tree/e1ad67de9d05137a6a0b02beba1fd66e28df6ae4",
+        "files": [
+          {
+            "path": "sensevoice-small-q8_0.gguf",
+            "size": 251674976,
+            "url": "https://hf-mirror.com/cstr/sensevoice-small-GGUF/resolve/e1ad67de9d05137a6a0b02beba1fd66e28df6ae4/sensevoice-small-q8_0.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "sensevoice-small-crisp-f16",
+    "name": "SenseVoiceSmall F16",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "e1ad67de9d05137a6a0b02beba1fd66e28df6ae4",
+        "repositoryUrl": "https://huggingface.co/cstr/sensevoice-small-GGUF/tree/e1ad67de9d05137a6a0b02beba1fd66e28df6ae4",
+        "files": [
+          {
+            "path": "sensevoice-small-f16.gguf",
+            "size": 469402400,
+            "url": "https://huggingface.co/cstr/sensevoice-small-GGUF/resolve/e1ad67de9d05137a6a0b02beba1fd66e28df6ae4/sensevoice-small-f16.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "e1ad67de9d05137a6a0b02beba1fd66e28df6ae4",
+        "repositoryUrl": "https://hf-mirror.com/cstr/sensevoice-small-GGUF/tree/e1ad67de9d05137a6a0b02beba1fd66e28df6ae4",
+        "files": [
+          {
+            "path": "sensevoice-small-f16.gguf",
+            "size": 469402400,
+            "url": "https://hf-mirror.com/cstr/sensevoice-small-GGUF/resolve/e1ad67de9d05137a6a0b02beba1fd66e28df6ae4/sensevoice-small-f16.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen3-asr-0.6b-crisp-q4-k",
+    "name": "Qwen3-ASR 0.6B Q4_K",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "58bd3202f835f46b24b17142cb503b0860c737a5",
+        "repositoryUrl": "https://huggingface.co/cstr/qwen3-asr-0.6b-GGUF/tree/58bd3202f835f46b24b17142cb503b0860c737a5",
+        "files": [
+          {
+            "path": "qwen3-asr-0.6b-q4_k.gguf",
+            "size": 631026336,
+            "url": "https://huggingface.co/cstr/qwen3-asr-0.6b-GGUF/resolve/58bd3202f835f46b24b17142cb503b0860c737a5/qwen3-asr-0.6b-q4_k.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "58bd3202f835f46b24b17142cb503b0860c737a5",
+        "repositoryUrl": "https://hf-mirror.com/cstr/qwen3-asr-0.6b-GGUF/tree/58bd3202f835f46b24b17142cb503b0860c737a5",
+        "files": [
+          {
+            "path": "qwen3-asr-0.6b-q4_k.gguf",
+            "size": 631026336,
+            "url": "https://hf-mirror.com/cstr/qwen3-asr-0.6b-GGUF/resolve/58bd3202f835f46b24b17142cb503b0860c737a5/qwen3-asr-0.6b-q4_k.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen3-asr-0.6b-crisp-q8-0",
+    "name": "Qwen3-ASR 0.6B Q8_0",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "58bd3202f835f46b24b17142cb503b0860c737a5",
+        "repositoryUrl": "https://huggingface.co/cstr/qwen3-asr-0.6b-GGUF/tree/58bd3202f835f46b24b17142cb503b0860c737a5",
+        "files": [
+          {
+            "path": "qwen3-asr-0.6b-q8_0.gguf",
+            "size": 1006809760,
+            "url": "https://huggingface.co/cstr/qwen3-asr-0.6b-GGUF/resolve/58bd3202f835f46b24b17142cb503b0860c737a5/qwen3-asr-0.6b-q8_0.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "58bd3202f835f46b24b17142cb503b0860c737a5",
+        "repositoryUrl": "https://hf-mirror.com/cstr/qwen3-asr-0.6b-GGUF/tree/58bd3202f835f46b24b17142cb503b0860c737a5",
+        "files": [
+          {
+            "path": "qwen3-asr-0.6b-q8_0.gguf",
+            "size": 1006809760,
+            "url": "https://hf-mirror.com/cstr/qwen3-asr-0.6b-GGUF/resolve/58bd3202f835f46b24b17142cb503b0860c737a5/qwen3-asr-0.6b-q8_0.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen3-asr-0.6b-crisp-f16",
+    "name": "Qwen3-ASR 0.6B F16",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "58bd3202f835f46b24b17142cb503b0860c737a5",
+        "repositoryUrl": "https://huggingface.co/cstr/qwen3-asr-0.6b-GGUF/tree/58bd3202f835f46b24b17142cb503b0860c737a5",
+        "files": [
+          {
+            "path": "qwen3-asr-0.6b.gguf",
+            "size": 1882037824,
+            "url": "https://huggingface.co/cstr/qwen3-asr-0.6b-GGUF/resolve/58bd3202f835f46b24b17142cb503b0860c737a5/qwen3-asr-0.6b.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "58bd3202f835f46b24b17142cb503b0860c737a5",
+        "repositoryUrl": "https://hf-mirror.com/cstr/qwen3-asr-0.6b-GGUF/tree/58bd3202f835f46b24b17142cb503b0860c737a5",
+        "files": [
+          {
+            "path": "qwen3-asr-0.6b.gguf",
+            "size": 1882037824,
+            "url": "https://hf-mirror.com/cstr/qwen3-asr-0.6b-GGUF/resolve/58bd3202f835f46b24b17142cb503b0860c737a5/qwen3-asr-0.6b.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen3-asr-1.7b-crisp-q4-k",
+    "name": "Qwen3-ASR 1.7B Q4_K",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "674df5d44b50a63e7102a18895ed20e3f91de301",
+        "repositoryUrl": "https://huggingface.co/cstr/qwen3-asr-1.7b-GGUF/tree/674df5d44b50a63e7102a18895ed20e3f91de301",
+        "files": [
+          {
+            "path": "qwen3-asr-1.7b-q4_k.gguf",
+            "size": 1490915200,
+            "url": "https://huggingface.co/cstr/qwen3-asr-1.7b-GGUF/resolve/674df5d44b50a63e7102a18895ed20e3f91de301/qwen3-asr-1.7b-q4_k.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "674df5d44b50a63e7102a18895ed20e3f91de301",
+        "repositoryUrl": "https://hf-mirror.com/cstr/qwen3-asr-1.7b-GGUF/tree/674df5d44b50a63e7102a18895ed20e3f91de301",
+        "files": [
+          {
+            "path": "qwen3-asr-1.7b-q4_k.gguf",
+            "size": 1490915200,
+            "url": "https://hf-mirror.com/cstr/qwen3-asr-1.7b-GGUF/resolve/674df5d44b50a63e7102a18895ed20e3f91de301/qwen3-asr-1.7b-q4_k.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen3-asr-1.7b-crisp-q8-0",
+    "name": "Qwen3-ASR 1.7B Q8_0",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "674df5d44b50a63e7102a18895ed20e3f91de301",
+        "repositoryUrl": "https://huggingface.co/cstr/qwen3-asr-1.7b-GGUF/tree/674df5d44b50a63e7102a18895ed20e3f91de301",
+        "files": [
+          {
+            "path": "qwen3-asr-1.7b-q8_0.gguf",
+            "size": 2506723200,
+            "url": "https://huggingface.co/cstr/qwen3-asr-1.7b-GGUF/resolve/674df5d44b50a63e7102a18895ed20e3f91de301/qwen3-asr-1.7b-q8_0.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "674df5d44b50a63e7102a18895ed20e3f91de301",
+        "repositoryUrl": "https://hf-mirror.com/cstr/qwen3-asr-1.7b-GGUF/tree/674df5d44b50a63e7102a18895ed20e3f91de301",
+        "files": [
+          {
+            "path": "qwen3-asr-1.7b-q8_0.gguf",
+            "size": 2506723200,
+            "url": "https://hf-mirror.com/cstr/qwen3-asr-1.7b-GGUF/resolve/674df5d44b50a63e7102a18895ed20e3f91de301/qwen3-asr-1.7b-q8_0.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen3-asr-1.7b-crisp-f16",
+    "name": "Qwen3-ASR 1.7B F16",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "674df5d44b50a63e7102a18895ed20e3f91de301",
+        "repositoryUrl": "https://huggingface.co/cstr/qwen3-asr-1.7b-GGUF/tree/674df5d44b50a63e7102a18895ed20e3f91de301",
+        "files": [
+          {
+            "path": "qwen3-asr-1.7b-f16.gguf",
+            "size": 4704800576,
+            "url": "https://huggingface.co/cstr/qwen3-asr-1.7b-GGUF/resolve/674df5d44b50a63e7102a18895ed20e3f91de301/qwen3-asr-1.7b-f16.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "674df5d44b50a63e7102a18895ed20e3f91de301",
+        "repositoryUrl": "https://hf-mirror.com/cstr/qwen3-asr-1.7b-GGUF/tree/674df5d44b50a63e7102a18895ed20e3f91de301",
+        "files": [
+          {
+            "path": "qwen3-asr-1.7b-f16.gguf",
+            "size": 4704800576,
+            "url": "https://hf-mirror.com/cstr/qwen3-asr-1.7b-GGUF/resolve/674df5d44b50a63e7102a18895ed20e3f91de301/qwen3-asr-1.7b-f16.gguf"
           }
         ]
       }
@@ -858,6 +1353,2073 @@
             "path": "Index-Translate-35B-A3B-preview.Q4_K_M.gguf",
             "size": 21713462400,
             "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-GGUF/resolve/91f6e204309d1808f3779d4a3822f8ce011785bb/Index-Translate-35B-A3B-preview.Q4_K_M.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "index-translate-2b-bf16",
+    "name": "Index-Translate 2B BF16",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "9bc08445315723eb9b77d1b93505915eb03c3f01",
+        "repositoryUrl": "https://huggingface.co/IndexTeam/Index-Translate-2B/tree/9bc08445315723eb9b77d1b93505915eb03c3f01",
+        "files": [
+          {
+            "path": "config.json",
+            "size": 2908,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 100,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/generation_config.json"
+          },
+          {
+            "path": "merges.txt",
+            "size": 3353259,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/merges.txt"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 4548216776,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/model.safetensors"
+          },
+          {
+            "path": "preprocessor_config.json",
+            "size": 390,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/preprocessor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 12807196,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 16712,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/tokenizer_config.json"
+          },
+          {
+            "path": "video_preprocessor_config.json",
+            "size": 386,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/video_preprocessor_config.json"
+          },
+          {
+            "path": "vocab.json",
+            "size": 6722759,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/vocab.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "9bc08445315723eb9b77d1b93505915eb03c3f01",
+        "repositoryUrl": "https://hf-mirror.com/IndexTeam/Index-Translate-2B/tree/9bc08445315723eb9b77d1b93505915eb03c3f01",
+        "files": [
+          {
+            "path": "config.json",
+            "size": 2908,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 100,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/generation_config.json"
+          },
+          {
+            "path": "merges.txt",
+            "size": 3353259,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/merges.txt"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 4548216776,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/model.safetensors"
+          },
+          {
+            "path": "preprocessor_config.json",
+            "size": 390,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/preprocessor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 12807196,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 16712,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/tokenizer_config.json"
+          },
+          {
+            "path": "video_preprocessor_config.json",
+            "size": 386,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/video_preprocessor_config.json"
+          },
+          {
+            "path": "vocab.json",
+            "size": 6722759,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B/resolve/9bc08445315723eb9b77d1b93505915eb03c3f01/vocab.json"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "3473f22736a89e12ece274e2130be2d5898dbda3",
+        "repositoryUrl": "https://modelscope.cn/models/IndexTeam/Index-Translate-2B/files?Revision=3473f22736a89e12ece274e2130be2d5898dbda3",
+        "files": [
+          {
+            "path": "config.json",
+            "size": 2908,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B/resolve/3473f22736a89e12ece274e2130be2d5898dbda3/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 100,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B/resolve/3473f22736a89e12ece274e2130be2d5898dbda3/generation_config.json"
+          },
+          {
+            "path": "merges.txt",
+            "size": 3353259,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B/resolve/3473f22736a89e12ece274e2130be2d5898dbda3/merges.txt"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 4548216776,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B/resolve/3473f22736a89e12ece274e2130be2d5898dbda3/model.safetensors"
+          },
+          {
+            "path": "preprocessor_config.json",
+            "size": 390,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B/resolve/3473f22736a89e12ece274e2130be2d5898dbda3/preprocessor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 12807196,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B/resolve/3473f22736a89e12ece274e2130be2d5898dbda3/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 16712,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B/resolve/3473f22736a89e12ece274e2130be2d5898dbda3/tokenizer_config.json"
+          },
+          {
+            "path": "video_preprocessor_config.json",
+            "size": 386,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B/resolve/3473f22736a89e12ece274e2130be2d5898dbda3/video_preprocessor_config.json"
+          },
+          {
+            "path": "vocab.json",
+            "size": 6722759,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B/resolve/3473f22736a89e12ece274e2130be2d5898dbda3/vocab.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "index-translate-2b-fp8",
+    "name": "Index-Translate 2B FP8",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "e5f35a7f2d58ff91ef395128bebe3efcd01e4f62",
+        "repositoryUrl": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP8/tree/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7755,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 8100,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 3055011640,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/model.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 64136,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 121657904,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/model_mtp.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 1221,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/processor_config.json"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 281,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/tokenizer_config.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "e5f35a7f2d58ff91ef395128bebe3efcd01e4f62",
+        "repositoryUrl": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP8/tree/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7755,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 8100,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 3055011640,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/model.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 64136,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 121657904,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/model_mtp.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 1221,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/processor_config.json"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 281,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP8/resolve/e5f35a7f2d58ff91ef395128bebe3efcd01e4f62/tokenizer_config.json"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "1ef7c09149f60066dfa2276f602b80f885f7d17c",
+        "repositoryUrl": "https://modelscope.cn/models/IndexTeam/Index-Translate-2B-FP8/files?Revision=1ef7c09149f60066dfa2276f602b80f885f7d17c",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7755,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP8/resolve/1ef7c09149f60066dfa2276f602b80f885f7d17c/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 8100,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP8/resolve/1ef7c09149f60066dfa2276f602b80f885f7d17c/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP8/resolve/1ef7c09149f60066dfa2276f602b80f885f7d17c/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 3055011640,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP8/resolve/1ef7c09149f60066dfa2276f602b80f885f7d17c/model.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 64136,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP8/resolve/1ef7c09149f60066dfa2276f602b80f885f7d17c/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 121657904,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP8/resolve/1ef7c09149f60066dfa2276f602b80f885f7d17c/model_mtp.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 1221,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP8/resolve/1ef7c09149f60066dfa2276f602b80f885f7d17c/processor_config.json"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 281,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP8/resolve/1ef7c09149f60066dfa2276f602b80f885f7d17c/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP8/resolve/1ef7c09149f60066dfa2276f602b80f885f7d17c/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP8/resolve/1ef7c09149f60066dfa2276f602b80f885f7d17c/tokenizer_config.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "index-translate-2b-fp4",
+    "name": "Index-Translate 2B FP4",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "bf49b475ce2b75307f4da835a9d2e06758a6f040",
+        "repositoryUrl": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP4/tree/bf49b475ce2b75307f4da835a9d2e06758a6f040",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7755,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 13724,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 2997649248,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/model.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 74102,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 121657904,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/model_mtp.safetensors"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 400,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/tokenizer_config.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "bf49b475ce2b75307f4da835a9d2e06758a6f040",
+        "repositoryUrl": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP4/tree/bf49b475ce2b75307f4da835a9d2e06758a6f040",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7755,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 13724,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 2997649248,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/model.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 74102,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 121657904,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/model_mtp.safetensors"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 400,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-FP4/resolve/bf49b475ce2b75307f4da835a9d2e06758a6f040/tokenizer_config.json"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "9bd0b05046ba66276881aec67e01cf6277919be4",
+        "repositoryUrl": "https://modelscope.cn/models/IndexTeam/Index-Translate-2B-FP4/files?Revision=9bd0b05046ba66276881aec67e01cf6277919be4",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7755,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP4/resolve/9bd0b05046ba66276881aec67e01cf6277919be4/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 13724,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP4/resolve/9bd0b05046ba66276881aec67e01cf6277919be4/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP4/resolve/9bd0b05046ba66276881aec67e01cf6277919be4/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 2997649248,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP4/resolve/9bd0b05046ba66276881aec67e01cf6277919be4/model.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 74102,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP4/resolve/9bd0b05046ba66276881aec67e01cf6277919be4/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 121657904,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP4/resolve/9bd0b05046ba66276881aec67e01cf6277919be4/model_mtp.safetensors"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 400,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP4/resolve/9bd0b05046ba66276881aec67e01cf6277919be4/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP4/resolve/9bd0b05046ba66276881aec67e01cf6277919be4/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-FP4/resolve/9bd0b05046ba66276881aec67e01cf6277919be4/tokenizer_config.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "index-translate-9b-bf16",
+    "name": "Index-Translate 9B BF16",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "4e06279e62352dab96bbeb6fa0579bca5e822d75",
+        "repositoryUrl": "https://huggingface.co/IndexTeam/Index-Translate-9B/tree/4e06279e62352dab96bbeb6fa0579bca5e822d75",
+        "files": [
+          {
+            "path": "config.json",
+            "size": 3126,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 100,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/generation_config.json"
+          },
+          {
+            "path": "merges.txt",
+            "size": 3353259,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/merges.txt"
+          },
+          {
+            "path": "model-00001-of-00004.safetensors",
+            "size": 5278251472,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/model-00001-of-00004.safetensors"
+          },
+          {
+            "path": "model-00002-of-00004.safetensors",
+            "size": 5358071808,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/model-00002-of-00004.safetensors"
+          },
+          {
+            "path": "model-00003-of-00004.safetensors",
+            "size": 5340098264,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/model-00003-of-00004.safetensors"
+          },
+          {
+            "path": "model-00004-of-00004.safetensors",
+            "size": 3329882376,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/model-00004-of-00004.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 70357,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/model.safetensors.index.json"
+          },
+          {
+            "path": "preprocessor_config.json",
+            "size": 390,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/preprocessor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 12807196,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 16713,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/tokenizer_config.json"
+          },
+          {
+            "path": "video_preprocessor_config.json",
+            "size": 386,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/video_preprocessor_config.json"
+          },
+          {
+            "path": "vocab.json",
+            "size": 6722759,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/vocab.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "4e06279e62352dab96bbeb6fa0579bca5e822d75",
+        "repositoryUrl": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/tree/4e06279e62352dab96bbeb6fa0579bca5e822d75",
+        "files": [
+          {
+            "path": "config.json",
+            "size": 3126,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 100,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/generation_config.json"
+          },
+          {
+            "path": "merges.txt",
+            "size": 3353259,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/merges.txt"
+          },
+          {
+            "path": "model-00001-of-00004.safetensors",
+            "size": 5278251472,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/model-00001-of-00004.safetensors"
+          },
+          {
+            "path": "model-00002-of-00004.safetensors",
+            "size": 5358071808,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/model-00002-of-00004.safetensors"
+          },
+          {
+            "path": "model-00003-of-00004.safetensors",
+            "size": 5340098264,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/model-00003-of-00004.safetensors"
+          },
+          {
+            "path": "model-00004-of-00004.safetensors",
+            "size": 3329882376,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/model-00004-of-00004.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 70357,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/model.safetensors.index.json"
+          },
+          {
+            "path": "preprocessor_config.json",
+            "size": 390,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/preprocessor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 12807196,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 16713,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/tokenizer_config.json"
+          },
+          {
+            "path": "video_preprocessor_config.json",
+            "size": 386,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/video_preprocessor_config.json"
+          },
+          {
+            "path": "vocab.json",
+            "size": 6722759,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B/resolve/4e06279e62352dab96bbeb6fa0579bca5e822d75/vocab.json"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "6ae85e9af278d70007d869d21c263d7d00c3d8dc",
+        "repositoryUrl": "https://modelscope.cn/models/IndexTeam/Index-Translate-9B/files?Revision=6ae85e9af278d70007d869d21c263d7d00c3d8dc",
+        "files": [
+          {
+            "path": "config.json",
+            "size": 3126,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B/resolve/6ae85e9af278d70007d869d21c263d7d00c3d8dc/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 100,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B/resolve/6ae85e9af278d70007d869d21c263d7d00c3d8dc/generation_config.json"
+          },
+          {
+            "path": "merges.txt",
+            "size": 3353259,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B/resolve/6ae85e9af278d70007d869d21c263d7d00c3d8dc/merges.txt"
+          },
+          {
+            "path": "model-00001-of-00004.safetensors",
+            "size": 5278251472,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B/resolve/6ae85e9af278d70007d869d21c263d7d00c3d8dc/model-00001-of-00004.safetensors"
+          },
+          {
+            "path": "model-00002-of-00004.safetensors",
+            "size": 5358071808,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B/resolve/6ae85e9af278d70007d869d21c263d7d00c3d8dc/model-00002-of-00004.safetensors"
+          },
+          {
+            "path": "model-00003-of-00004.safetensors",
+            "size": 5340098264,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B/resolve/6ae85e9af278d70007d869d21c263d7d00c3d8dc/model-00003-of-00004.safetensors"
+          },
+          {
+            "path": "model-00004-of-00004.safetensors",
+            "size": 3329882376,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B/resolve/6ae85e9af278d70007d869d21c263d7d00c3d8dc/model-00004-of-00004.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 70357,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B/resolve/6ae85e9af278d70007d869d21c263d7d00c3d8dc/model.safetensors.index.json"
+          },
+          {
+            "path": "preprocessor_config.json",
+            "size": 390,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B/resolve/6ae85e9af278d70007d869d21c263d7d00c3d8dc/preprocessor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 12807196,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B/resolve/6ae85e9af278d70007d869d21c263d7d00c3d8dc/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 16713,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B/resolve/6ae85e9af278d70007d869d21c263d7d00c3d8dc/tokenizer_config.json"
+          },
+          {
+            "path": "video_preprocessor_config.json",
+            "size": 386,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B/resolve/6ae85e9af278d70007d869d21c263d7d00c3d8dc/video_preprocessor_config.json"
+          },
+          {
+            "path": "vocab.json",
+            "size": 6722759,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B/resolve/6ae85e9af278d70007d869d21c263d7d00c3d8dc/vocab.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "index-translate-9b-fp8",
+    "name": "Index-Translate 9B FP8",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "d467e031548df719a665509ce5bfc63c6a62af5c",
+        "repositoryUrl": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP8/tree/d467e031548df719a665509ce5bfc63c6a62af5c",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7756,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 9064,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 11904105456,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/model.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 81058,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 486582848,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/model_mtp.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 1221,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/processor_config.json"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 281,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/tokenizer_config.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "d467e031548df719a665509ce5bfc63c6a62af5c",
+        "repositoryUrl": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP8/tree/d467e031548df719a665509ce5bfc63c6a62af5c",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7756,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 9064,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 11904105456,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/model.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 81058,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 486582848,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/model_mtp.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 1221,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/processor_config.json"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 281,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP8/resolve/d467e031548df719a665509ce5bfc63c6a62af5c/tokenizer_config.json"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "14cee5c88f4391eb05989b7c5b9184f19b32903a",
+        "repositoryUrl": "https://modelscope.cn/models/IndexTeam/Index-Translate-9B-FP8/files?Revision=14cee5c88f4391eb05989b7c5b9184f19b32903a",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7756,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP8/resolve/14cee5c88f4391eb05989b7c5b9184f19b32903a/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 9064,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP8/resolve/14cee5c88f4391eb05989b7c5b9184f19b32903a/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP8/resolve/14cee5c88f4391eb05989b7c5b9184f19b32903a/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 11904105456,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP8/resolve/14cee5c88f4391eb05989b7c5b9184f19b32903a/model.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 81058,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP8/resolve/14cee5c88f4391eb05989b7c5b9184f19b32903a/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 486582848,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP8/resolve/14cee5c88f4391eb05989b7c5b9184f19b32903a/model_mtp.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 1221,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP8/resolve/14cee5c88f4391eb05989b7c5b9184f19b32903a/processor_config.json"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 281,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP8/resolve/14cee5c88f4391eb05989b7c5b9184f19b32903a/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP8/resolve/14cee5c88f4391eb05989b7c5b9184f19b32903a/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP8/resolve/14cee5c88f4391eb05989b7c5b9184f19b32903a/tokenizer_config.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "index-translate-9b-fp4",
+    "name": "Index-Translate 9B FP4",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "8e676876a2db89fa9e81be991b4fb10dd6d9da8c",
+        "repositoryUrl": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP4/tree/8e676876a2db89fa9e81be991b4fb10dd6d9da8c",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7756,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 16554,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 11198720888,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/model.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 94358,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 486582848,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/model_mtp.safetensors"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 400,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/tokenizer_config.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "8e676876a2db89fa9e81be991b4fb10dd6d9da8c",
+        "repositoryUrl": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP4/tree/8e676876a2db89fa9e81be991b4fb10dd6d9da8c",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7756,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 16554,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 11198720888,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/model.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 94358,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 486582848,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/model_mtp.safetensors"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 400,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-FP4/resolve/8e676876a2db89fa9e81be991b4fb10dd6d9da8c/tokenizer_config.json"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "01f4e6d0d1be228312327fa2bcd83a5d3a3e811e",
+        "repositoryUrl": "https://modelscope.cn/models/IndexTeam/Index-Translate-9B-FP4/files?Revision=01f4e6d0d1be228312327fa2bcd83a5d3a3e811e",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7756,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP4/resolve/01f4e6d0d1be228312327fa2bcd83a5d3a3e811e/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 16554,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP4/resolve/01f4e6d0d1be228312327fa2bcd83a5d3a3e811e/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP4/resolve/01f4e6d0d1be228312327fa2bcd83a5d3a3e811e/generation_config.json"
+          },
+          {
+            "path": "model.safetensors",
+            "size": 11198720888,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP4/resolve/01f4e6d0d1be228312327fa2bcd83a5d3a3e811e/model.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 94358,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP4/resolve/01f4e6d0d1be228312327fa2bcd83a5d3a3e811e/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 486582848,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP4/resolve/01f4e6d0d1be228312327fa2bcd83a5d3a3e811e/model_mtp.safetensors"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 400,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP4/resolve/01f4e6d0d1be228312327fa2bcd83a5d3a3e811e/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP4/resolve/01f4e6d0d1be228312327fa2bcd83a5d3a3e811e/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-FP4/resolve/01f4e6d0d1be228312327fa2bcd83a5d3a3e811e/tokenizer_config.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "index-translate-35b-a3b-preview-bf16",
+    "name": "Index-Translate 35B-A3B preview BF16",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "7e4029e0df842502cb009cf493d6467c247043b3",
+        "repositoryUrl": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/tree/7e4029e0df842502cb009cf493d6467c247043b3",
+        "files": [
+          {
+            "path": "config.json",
+            "size": 3544,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 100,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/generation_config.json"
+          },
+          {
+            "path": "merges.txt",
+            "size": 3353259,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/merges.txt"
+          },
+          {
+            "path": "model-00001-of-00015.safetensors",
+            "size": 4323955416,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00001-of-00015.safetensors"
+          },
+          {
+            "path": "model-00002-of-00015.safetensors",
+            "size": 5043302824,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00002-of-00015.safetensors"
+          },
+          {
+            "path": "model-00003-of-00015.safetensors",
+            "size": 4988775072,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00003-of-00015.safetensors"
+          },
+          {
+            "path": "model-00004-of-00015.safetensors",
+            "size": 5110740952,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00004-of-00015.safetensors"
+          },
+          {
+            "path": "model-00005-of-00015.safetensors",
+            "size": 5043302816,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00005-of-00015.safetensors"
+          },
+          {
+            "path": "model-00006-of-00015.safetensors",
+            "size": 4988775072,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00006-of-00015.safetensors"
+          },
+          {
+            "path": "model-00007-of-00015.safetensors",
+            "size": 5110740952,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00007-of-00015.safetensors"
+          },
+          {
+            "path": "model-00008-of-00015.safetensors",
+            "size": 5043302832,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00008-of-00015.safetensors"
+          },
+          {
+            "path": "model-00009-of-00015.safetensors",
+            "size": 4975864704,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00009-of-00015.safetensors"
+          },
+          {
+            "path": "model-00010-of-00015.safetensors",
+            "size": 5110740952,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00010-of-00015.safetensors"
+          },
+          {
+            "path": "model-00011-of-00015.safetensors",
+            "size": 5043302832,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00011-of-00015.safetensors"
+          },
+          {
+            "path": "model-00012-of-00015.safetensors",
+            "size": 5043302824,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00012-of-00015.safetensors"
+          },
+          {
+            "path": "model-00013-of-00015.safetensors",
+            "size": 4988775032,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00013-of-00015.safetensors"
+          },
+          {
+            "path": "model-00014-of-00015.safetensors",
+            "size": 5368414736,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00014-of-00015.safetensors"
+          },
+          {
+            "path": "model-00015-of-00015.safetensors",
+            "size": 1720571296,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00015-of-00015.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 163733,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model.safetensors.index.json"
+          },
+          {
+            "path": "preprocessor_config.json",
+            "size": 390,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/preprocessor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 12807196,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 16713,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/tokenizer_config.json"
+          },
+          {
+            "path": "video_preprocessor_config.json",
+            "size": 387,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/video_preprocessor_config.json"
+          },
+          {
+            "path": "vocab.json",
+            "size": 6722759,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/vocab.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "7e4029e0df842502cb009cf493d6467c247043b3",
+        "repositoryUrl": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/tree/7e4029e0df842502cb009cf493d6467c247043b3",
+        "files": [
+          {
+            "path": "config.json",
+            "size": 3544,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 100,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/generation_config.json"
+          },
+          {
+            "path": "merges.txt",
+            "size": 3353259,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/merges.txt"
+          },
+          {
+            "path": "model-00001-of-00015.safetensors",
+            "size": 4323955416,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00001-of-00015.safetensors"
+          },
+          {
+            "path": "model-00002-of-00015.safetensors",
+            "size": 5043302824,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00002-of-00015.safetensors"
+          },
+          {
+            "path": "model-00003-of-00015.safetensors",
+            "size": 4988775072,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00003-of-00015.safetensors"
+          },
+          {
+            "path": "model-00004-of-00015.safetensors",
+            "size": 5110740952,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00004-of-00015.safetensors"
+          },
+          {
+            "path": "model-00005-of-00015.safetensors",
+            "size": 5043302816,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00005-of-00015.safetensors"
+          },
+          {
+            "path": "model-00006-of-00015.safetensors",
+            "size": 4988775072,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00006-of-00015.safetensors"
+          },
+          {
+            "path": "model-00007-of-00015.safetensors",
+            "size": 5110740952,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00007-of-00015.safetensors"
+          },
+          {
+            "path": "model-00008-of-00015.safetensors",
+            "size": 5043302832,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00008-of-00015.safetensors"
+          },
+          {
+            "path": "model-00009-of-00015.safetensors",
+            "size": 4975864704,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00009-of-00015.safetensors"
+          },
+          {
+            "path": "model-00010-of-00015.safetensors",
+            "size": 5110740952,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00010-of-00015.safetensors"
+          },
+          {
+            "path": "model-00011-of-00015.safetensors",
+            "size": 5043302832,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00011-of-00015.safetensors"
+          },
+          {
+            "path": "model-00012-of-00015.safetensors",
+            "size": 5043302824,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00012-of-00015.safetensors"
+          },
+          {
+            "path": "model-00013-of-00015.safetensors",
+            "size": 4988775032,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00013-of-00015.safetensors"
+          },
+          {
+            "path": "model-00014-of-00015.safetensors",
+            "size": 5368414736,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00014-of-00015.safetensors"
+          },
+          {
+            "path": "model-00015-of-00015.safetensors",
+            "size": 1720571296,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model-00015-of-00015.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 163733,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/model.safetensors.index.json"
+          },
+          {
+            "path": "preprocessor_config.json",
+            "size": 390,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/preprocessor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 12807196,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 16713,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/tokenizer_config.json"
+          },
+          {
+            "path": "video_preprocessor_config.json",
+            "size": 387,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/video_preprocessor_config.json"
+          },
+          {
+            "path": "vocab.json",
+            "size": 6722759,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview/resolve/7e4029e0df842502cb009cf493d6467c247043b3/vocab.json"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "c98635caaf863580a3cd03bb39fca53af8090558",
+        "repositoryUrl": "https://modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/files?Revision=c98635caaf863580a3cd03bb39fca53af8090558",
+        "files": [
+          {
+            "path": "config.json",
+            "size": 3544,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 100,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/generation_config.json"
+          },
+          {
+            "path": "merges.txt",
+            "size": 3353259,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/merges.txt"
+          },
+          {
+            "path": "model-00001-of-00015.safetensors",
+            "size": 4323955416,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00001-of-00015.safetensors"
+          },
+          {
+            "path": "model-00002-of-00015.safetensors",
+            "size": 5043302824,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00002-of-00015.safetensors"
+          },
+          {
+            "path": "model-00003-of-00015.safetensors",
+            "size": 4988775072,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00003-of-00015.safetensors"
+          },
+          {
+            "path": "model-00004-of-00015.safetensors",
+            "size": 5110740952,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00004-of-00015.safetensors"
+          },
+          {
+            "path": "model-00005-of-00015.safetensors",
+            "size": 5043302816,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00005-of-00015.safetensors"
+          },
+          {
+            "path": "model-00006-of-00015.safetensors",
+            "size": 4988775072,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00006-of-00015.safetensors"
+          },
+          {
+            "path": "model-00007-of-00015.safetensors",
+            "size": 5110740952,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00007-of-00015.safetensors"
+          },
+          {
+            "path": "model-00008-of-00015.safetensors",
+            "size": 5043302832,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00008-of-00015.safetensors"
+          },
+          {
+            "path": "model-00009-of-00015.safetensors",
+            "size": 4975864704,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00009-of-00015.safetensors"
+          },
+          {
+            "path": "model-00010-of-00015.safetensors",
+            "size": 5110740952,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00010-of-00015.safetensors"
+          },
+          {
+            "path": "model-00011-of-00015.safetensors",
+            "size": 5043302832,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00011-of-00015.safetensors"
+          },
+          {
+            "path": "model-00012-of-00015.safetensors",
+            "size": 5043302824,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00012-of-00015.safetensors"
+          },
+          {
+            "path": "model-00013-of-00015.safetensors",
+            "size": 4988775032,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00013-of-00015.safetensors"
+          },
+          {
+            "path": "model-00014-of-00015.safetensors",
+            "size": 5368414736,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00014-of-00015.safetensors"
+          },
+          {
+            "path": "model-00015-of-00015.safetensors",
+            "size": 1720571296,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model-00015-of-00015.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 163733,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/model.safetensors.index.json"
+          },
+          {
+            "path": "preprocessor_config.json",
+            "size": 390,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/preprocessor_config.json"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 12807196,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 16713,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/tokenizer_config.json"
+          },
+          {
+            "path": "video_preprocessor_config.json",
+            "size": 387,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/video_preprocessor_config.json"
+          },
+          {
+            "path": "vocab.json",
+            "size": 6722759,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview/resolve/c98635caaf863580a3cd03bb39fca53af8090558/vocab.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "index-translate-35b-a3b-preview-fp8",
+    "name": "Index-Translate 35B-A3B preview FP8",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "61e404249633cb84c0f54667fa138183483530c6",
+        "repositoryUrl": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP8/tree/61e404249633cb84c0f54667fa138183483530c6",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7756,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 11403,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/generation_config.json"
+          },
+          {
+            "path": "model-00001-of-00002.safetensors",
+            "size": 20004320082,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/model-00001-of-00002.safetensors"
+          },
+          {
+            "path": "model-00002-of-00002.safetensors",
+            "size": 16661908558,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/model-00002-of-00002.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 6863568,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 1689376032,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/model_mtp.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 1222,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/processor_config.json"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 281,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/tokenizer_config.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "61e404249633cb84c0f54667fa138183483530c6",
+        "repositoryUrl": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP8/tree/61e404249633cb84c0f54667fa138183483530c6",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7756,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 11403,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/generation_config.json"
+          },
+          {
+            "path": "model-00001-of-00002.safetensors",
+            "size": 20004320082,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/model-00001-of-00002.safetensors"
+          },
+          {
+            "path": "model-00002-of-00002.safetensors",
+            "size": 16661908558,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/model-00002-of-00002.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 6863568,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 1689376032,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/model_mtp.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 1222,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/processor_config.json"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 281,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/61e404249633cb84c0f54667fa138183483530c6/tokenizer_config.json"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "c7590f7dec74513f3a371eb7609ec8269c907c4c",
+        "repositoryUrl": "https://modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP8/files?Revision=c7590f7dec74513f3a371eb7609ec8269c907c4c",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7756,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/c7590f7dec74513f3a371eb7609ec8269c907c4c/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 11403,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/c7590f7dec74513f3a371eb7609ec8269c907c4c/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 113,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/c7590f7dec74513f3a371eb7609ec8269c907c4c/generation_config.json"
+          },
+          {
+            "path": "model-00001-of-00002.safetensors",
+            "size": 20004320082,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/c7590f7dec74513f3a371eb7609ec8269c907c4c/model-00001-of-00002.safetensors"
+          },
+          {
+            "path": "model-00002-of-00002.safetensors",
+            "size": 16661908558,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/c7590f7dec74513f3a371eb7609ec8269c907c4c/model-00002-of-00002.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 6863568,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/c7590f7dec74513f3a371eb7609ec8269c907c4c/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 1689376032,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/c7590f7dec74513f3a371eb7609ec8269c907c4c/model_mtp.safetensors"
+          },
+          {
+            "path": "processor_config.json",
+            "size": 1222,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/c7590f7dec74513f3a371eb7609ec8269c907c4c/processor_config.json"
+          },
+          {
+            "path": "recipe.yaml",
+            "size": 281,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/c7590f7dec74513f3a371eb7609ec8269c907c4c/recipe.yaml"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/c7590f7dec74513f3a371eb7609ec8269c907c4c/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP8/resolve/c7590f7dec74513f3a371eb7609ec8269c907c4c/tokenizer_config.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "index-translate-35b-a3b-preview-fp4",
+    "name": "Index-Translate 35B-A3B preview FP4",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "111ff5e950f75dcccb1e631f65e936781a9c34d7",
+        "repositoryUrl": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP4/tree/111ff5e950f75dcccb1e631f65e936781a9c34d7",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7756,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 9121,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 112,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/generation_config.json"
+          },
+          {
+            "path": "hf_quant_config.json",
+            "size": 4808,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/hf_quant_config.json"
+          },
+          {
+            "path": "model-00001-of-00003.safetensors",
+            "size": 10006294456,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/model-00001-of-00003.safetensors"
+          },
+          {
+            "path": "model-00002-of-00003.safetensors",
+            "size": 10008184144,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/model-00002-of-00003.safetensors"
+          },
+          {
+            "path": "model-00003-of-00003.safetensors",
+            "size": 3338985200,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/model-00003-of-00003.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 13709224,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 1689376032,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/model_mtp.safetensors"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/tokenizer_config.json"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "111ff5e950f75dcccb1e631f65e936781a9c34d7",
+        "repositoryUrl": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP4/tree/111ff5e950f75dcccb1e631f65e936781a9c34d7",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7756,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 9121,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 112,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/generation_config.json"
+          },
+          {
+            "path": "hf_quant_config.json",
+            "size": 4808,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/hf_quant_config.json"
+          },
+          {
+            "path": "model-00001-of-00003.safetensors",
+            "size": 10006294456,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/model-00001-of-00003.safetensors"
+          },
+          {
+            "path": "model-00002-of-00003.safetensors",
+            "size": 10008184144,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/model-00002-of-00003.safetensors"
+          },
+          {
+            "path": "model-00003-of-00003.safetensors",
+            "size": 3338985200,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/model-00003-of-00003.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 13709224,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 1689376032,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/model_mtp.safetensors"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/111ff5e950f75dcccb1e631f65e936781a9c34d7/tokenizer_config.json"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "c7820f7431d788d810d9fc7b3505a79e86399dd4",
+        "repositoryUrl": "https://modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP4/files?Revision=c7820f7431d788d810d9fc7b3505a79e86399dd4",
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "size": 7756,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/c7820f7431d788d810d9fc7b3505a79e86399dd4/chat_template.jinja"
+          },
+          {
+            "path": "config.json",
+            "size": 9121,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/c7820f7431d788d810d9fc7b3505a79e86399dd4/config.json"
+          },
+          {
+            "path": "generation_config.json",
+            "size": 112,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/c7820f7431d788d810d9fc7b3505a79e86399dd4/generation_config.json"
+          },
+          {
+            "path": "hf_quant_config.json",
+            "size": 4808,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/c7820f7431d788d810d9fc7b3505a79e86399dd4/hf_quant_config.json"
+          },
+          {
+            "path": "model-00001-of-00003.safetensors",
+            "size": 10006294456,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/c7820f7431d788d810d9fc7b3505a79e86399dd4/model-00001-of-00003.safetensors"
+          },
+          {
+            "path": "model-00002-of-00003.safetensors",
+            "size": 10008184144,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/c7820f7431d788d810d9fc7b3505a79e86399dd4/model-00002-of-00003.safetensors"
+          },
+          {
+            "path": "model-00003-of-00003.safetensors",
+            "size": 3338985200,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/c7820f7431d788d810d9fc7b3505a79e86399dd4/model-00003-of-00003.safetensors"
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "size": 13709224,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/c7820f7431d788d810d9fc7b3505a79e86399dd4/model.safetensors.index.json"
+          },
+          {
+            "path": "model_mtp.safetensors",
+            "size": 1689376032,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/c7820f7431d788d810d9fc7b3505a79e86399dd4/model_mtp.safetensors"
+          },
+          {
+            "path": "tokenizer.json",
+            "size": 19989325,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/c7820f7431d788d810d9fc7b3505a79e86399dd4/tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json",
+            "size": 1127,
+            "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-FP4/resolve/c7820f7431d788d810d9fc7b3505a79e86399dd4/tokenizer_config.json"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "fun-asr-nano-q4-k",
+    "name": "Fun-ASR Nano Q4_K",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "5d4346e47c268ba91a332a148a1fd39b766408ac",
+        "repositoryUrl": "https://huggingface.co/cstr/funasr-nano-GGUF/tree/5d4346e47c268ba91a332a148a1fd39b766408ac",
+        "files": [
+          {
+            "path": "funasr-nano-2512-q4_k.gguf",
+            "size": 896875328,
+            "url": "https://huggingface.co/cstr/funasr-nano-GGUF/resolve/5d4346e47c268ba91a332a148a1fd39b766408ac/funasr-nano-2512-q4_k.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "5d4346e47c268ba91a332a148a1fd39b766408ac",
+        "repositoryUrl": "https://hf-mirror.com/cstr/funasr-nano-GGUF/tree/5d4346e47c268ba91a332a148a1fd39b766408ac",
+        "files": [
+          {
+            "path": "funasr-nano-2512-q4_k.gguf",
+            "size": 896875328,
+            "url": "https://hf-mirror.com/cstr/funasr-nano-GGUF/resolve/5d4346e47c268ba91a332a148a1fd39b766408ac/funasr-nano-2512-q4_k.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "fun-asr-nano-q8-0",
+    "name": "Fun-ASR Nano Q8_0",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "5d4346e47c268ba91a332a148a1fd39b766408ac",
+        "repositoryUrl": "https://huggingface.co/cstr/funasr-nano-GGUF/tree/5d4346e47c268ba91a332a148a1fd39b766408ac",
+        "files": [
+          {
+            "path": "funasr-nano-2512-q8_0.gguf",
+            "size": 1272658784,
+            "url": "https://huggingface.co/cstr/funasr-nano-GGUF/resolve/5d4346e47c268ba91a332a148a1fd39b766408ac/funasr-nano-2512-q8_0.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "5d4346e47c268ba91a332a148a1fd39b766408ac",
+        "repositoryUrl": "https://hf-mirror.com/cstr/funasr-nano-GGUF/tree/5d4346e47c268ba91a332a148a1fd39b766408ac",
+        "files": [
+          {
+            "path": "funasr-nano-2512-q8_0.gguf",
+            "size": 1272658784,
+            "url": "https://hf-mirror.com/cstr/funasr-nano-GGUF/resolve/5d4346e47c268ba91a332a148a1fd39b766408ac/funasr-nano-2512-q8_0.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "fun-asr-nano-f16",
+    "name": "Fun-ASR Nano F16",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "5d4346e47c268ba91a332a148a1fd39b766408ac",
+        "repositoryUrl": "https://huggingface.co/cstr/funasr-nano-GGUF/tree/5d4346e47c268ba91a332a148a1fd39b766408ac",
+        "files": [
+          {
+            "path": "funasr-nano-2512-f16.gguf",
+            "size": 1977252608,
+            "url": "https://huggingface.co/cstr/funasr-nano-GGUF/resolve/5d4346e47c268ba91a332a148a1fd39b766408ac/funasr-nano-2512-f16.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "5d4346e47c268ba91a332a148a1fd39b766408ac",
+        "repositoryUrl": "https://hf-mirror.com/cstr/funasr-nano-GGUF/tree/5d4346e47c268ba91a332a148a1fd39b766408ac",
+        "files": [
+          {
+            "path": "funasr-nano-2512-f16.gguf",
+            "size": 1977252608,
+            "url": "https://hf-mirror.com/cstr/funasr-nano-GGUF/resolve/5d4346e47c268ba91a332a148a1fd39b766408ac/funasr-nano-2512-f16.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "vibevoice-asr-q4-k",
+    "name": "VibeVoice-ASR Q4_K",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "f316299d4b39b2990d751c55b3dd6daab61677c7",
+        "repositoryUrl": "https://huggingface.co/cstr/vibevoice-asr-GGUF/tree/f316299d4b39b2990d751c55b3dd6daab61677c7",
+        "files": [
+          {
+            "path": "vibevoice-asr-q4_k.gguf",
+            "size": 4811829376,
+            "url": "https://huggingface.co/cstr/vibevoice-asr-GGUF/resolve/f316299d4b39b2990d751c55b3dd6daab61677c7/vibevoice-asr-q4_k.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "f316299d4b39b2990d751c55b3dd6daab61677c7",
+        "repositoryUrl": "https://hf-mirror.com/cstr/vibevoice-asr-GGUF/tree/f316299d4b39b2990d751c55b3dd6daab61677c7",
+        "files": [
+          {
+            "path": "vibevoice-asr-q4_k.gguf",
+            "size": 4811829376,
+            "url": "https://hf-mirror.com/cstr/vibevoice-asr-GGUF/resolve/f316299d4b39b2990d751c55b3dd6daab61677c7/vibevoice-asr-q4_k.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "vibevoice-asr-q8-0",
+    "name": "VibeVoice-ASR Q8_0",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "f316299d4b39b2990d751c55b3dd6daab61677c7",
+        "repositoryUrl": "https://huggingface.co/cstr/vibevoice-asr-GGUF/tree/f316299d4b39b2990d751c55b3dd6daab61677c7",
+        "files": [
+          {
+            "path": "vibevoice-asr-q8_0.gguf",
+            "size": 9445577088,
+            "url": "https://huggingface.co/cstr/vibevoice-asr-GGUF/resolve/f316299d4b39b2990d751c55b3dd6daab61677c7/vibevoice-asr-q8_0.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "f316299d4b39b2990d751c55b3dd6daab61677c7",
+        "repositoryUrl": "https://hf-mirror.com/cstr/vibevoice-asr-GGUF/tree/f316299d4b39b2990d751c55b3dd6daab61677c7",
+        "files": [
+          {
+            "path": "vibevoice-asr-q8_0.gguf",
+            "size": 9445577088,
+            "url": "https://hf-mirror.com/cstr/vibevoice-asr-GGUF/resolve/f316299d4b39b2990d751c55b3dd6daab61677c7/vibevoice-asr-q8_0.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "vibevoice-asr-f16",
+    "name": "VibeVoice-ASR F16",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "f316299d4b39b2990d751c55b3dd6daab61677c7",
+        "repositoryUrl": "https://huggingface.co/cstr/vibevoice-asr-GGUF/tree/f316299d4b39b2990d751c55b3dd6daab61677c7",
+        "files": [
+          {
+            "path": "vibevoice-asr-f16.gguf",
+            "size": 16664915264,
+            "url": "https://huggingface.co/cstr/vibevoice-asr-GGUF/resolve/f316299d4b39b2990d751c55b3dd6daab61677c7/vibevoice-asr-f16.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "f316299d4b39b2990d751c55b3dd6daab61677c7",
+        "repositoryUrl": "https://hf-mirror.com/cstr/vibevoice-asr-GGUF/tree/f316299d4b39b2990d751c55b3dd6daab61677c7",
+        "files": [
+          {
+            "path": "vibevoice-asr-f16.gguf",
+            "size": 16664915264,
+            "url": "https://hf-mirror.com/cstr/vibevoice-asr-GGUF/resolve/f316299d4b39b2990d751c55b3dd6daab61677c7/vibevoice-asr-f16.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "mimo-v2.5-asr-q4-k",
+    "name": "MiMo-V2.5-ASR Q4_K",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "e2d7dfebf0afd8076771903e92958039c5074eab",
+        "repositoryUrl": "https://huggingface.co/cstr/mimo-asr-GGUF/tree/e2d7dfebf0afd8076771903e92958039c5074eab",
+        "files": [
+          {
+            "path": "mimo-asr-q4_k.gguf",
+            "size": 4517988832,
+            "url": "https://huggingface.co/cstr/mimo-asr-GGUF/resolve/e2d7dfebf0afd8076771903e92958039c5074eab/mimo-asr-q4_k.gguf"
+          },
+          {
+            "path": "mimo-tokenizer-q4_k.gguf",
+            "size": 395594656,
+            "url": "https://huggingface.co/cstr/mimo-tokenizer-GGUF/resolve/fa380f4c49a8e8c62c02c00d0da5e263fc5b0dcf/mimo-tokenizer-q4_k.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "e2d7dfebf0afd8076771903e92958039c5074eab",
+        "repositoryUrl": "https://hf-mirror.com/cstr/mimo-asr-GGUF/tree/e2d7dfebf0afd8076771903e92958039c5074eab",
+        "files": [
+          {
+            "path": "mimo-asr-q4_k.gguf",
+            "size": 4517988832,
+            "url": "https://hf-mirror.com/cstr/mimo-asr-GGUF/resolve/e2d7dfebf0afd8076771903e92958039c5074eab/mimo-asr-q4_k.gguf"
+          },
+          {
+            "path": "mimo-tokenizer-q4_k.gguf",
+            "size": 395594656,
+            "url": "https://hf-mirror.com/cstr/mimo-tokenizer-GGUF/resolve/fa380f4c49a8e8c62c02c00d0da5e263fc5b0dcf/mimo-tokenizer-q4_k.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "mimo-v2.5-asr-f16",
+    "name": "MiMo-V2.5-ASR F16",
+    "family": "recognition",
+    "sources": {
+      "huggingface": {
+        "revision": "e2d7dfebf0afd8076771903e92958039c5074eab",
+        "repositoryUrl": "https://huggingface.co/cstr/mimo-asr-GGUF/tree/e2d7dfebf0afd8076771903e92958039c5074eab",
+        "files": [
+          {
+            "path": "mimo-asr-f16.gguf",
+            "size": 16043804896,
+            "url": "https://huggingface.co/cstr/mimo-asr-GGUF/resolve/e2d7dfebf0afd8076771903e92958039c5074eab/mimo-asr-f16.gguf"
+          },
+          {
+            "path": "mimo-tokenizer-q4_k.gguf",
+            "size": 395594656,
+            "url": "https://huggingface.co/cstr/mimo-tokenizer-GGUF/resolve/fa380f4c49a8e8c62c02c00d0da5e263fc5b0dcf/mimo-tokenizer-q4_k.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "e2d7dfebf0afd8076771903e92958039c5074eab",
+        "repositoryUrl": "https://hf-mirror.com/cstr/mimo-asr-GGUF/tree/e2d7dfebf0afd8076771903e92958039c5074eab",
+        "files": [
+          {
+            "path": "mimo-asr-f16.gguf",
+            "size": 16043804896,
+            "url": "https://hf-mirror.com/cstr/mimo-asr-GGUF/resolve/e2d7dfebf0afd8076771903e92958039c5074eab/mimo-asr-f16.gguf"
+          },
+          {
+            "path": "mimo-tokenizer-q4_k.gguf",
+            "size": 395594656,
+            "url": "https://hf-mirror.com/cstr/mimo-tokenizer-GGUF/resolve/fa380f4c49a8e8c62c02c00d0da5e263fc5b0dcf/mimo-tokenizer-q4_k.gguf"
           }
         ]
       }

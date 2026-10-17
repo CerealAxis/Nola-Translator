@@ -6,6 +6,7 @@ import pytest
 from nola_translator_engine.translation.index_translate import (
     IndexTranslateLocalProvider,
     IndexTranslatePublicProvider,
+    IndexTranslateTransformersRuntime,
 )
 
 
@@ -68,3 +69,51 @@ async def test_local_translation_disables_thinking_with_official_prompt():
     assert manager.messages == [{"role": "user", "content": "请将以下文本翻译为中文，直接输出翻译结果，不要进行任何解释。\n\nHello"}]
     assert manager.kwargs["chat_template_kwargs"] == {"enable_thinking": False}
     assert manager.kwargs["max_tokens"] > 0
+
+
+def test_transformers_loader_uses_official_multimodal_auto_classes_and_chat_prompt(tmp_path, monkeypatch):
+    torch = pytest.importorskip("torch")
+    transformers = pytest.importorskip("transformers")
+    from nola_translator_engine.translation.m2m100 import _Bundle
+
+    captured = {}
+
+    class Inputs(dict):
+        def to(self, device):
+            captured["device"] = device
+            return self
+
+    class Processor:
+        chat_template = "official"
+
+        def apply_chat_template(self, messages, **kwargs):
+            captured["messages"] = messages
+            captured["template_kwargs"] = kwargs
+            return Inputs(input_ids=torch.tensor([[1, 2]]))
+
+        def batch_decode(self, tokens, **kwargs):
+            return ["<think>draft</think>你好"]
+
+    class Model:
+        config = type("Config", (), {"max_position_embeddings": 1024})()
+
+        def to(self, device):
+            return self
+
+        def eval(self):
+            return self
+
+        def generate(self, **kwargs):
+            captured["generation"] = kwargs
+            return torch.tensor([[1, 2, 3]])
+
+    monkeypatch.setattr(transformers.AutoProcessor, "from_pretrained", lambda *args, **kwargs: Processor())
+    monkeypatch.setattr(transformers.AutoModelForMultimodalLM, "from_pretrained", lambda *args, **kwargs: Model())
+    runtime = IndexTranslateTransformersRuntime(tmp_path, device="cpu", precision="auto", context_size=512)
+    bundle = runtime._load_bundle()
+    assert bundle.tokenizer.chat_template == "official"
+    assert bundle.model.config.max_position_embeddings == 1024
+    assert runtime._translate_locked("Hello", "en", "zh") == "你好"
+    assert captured["messages"] == [{"role": "user", "content": "请将以下英语文本翻译为中文，直接输出翻译结果，不要进行任何解释。\n\nHello"}]
+    assert captured["template_kwargs"]["enable_thinking"] is False
+    assert captured["template_kwargs"]["return_dict"] is True

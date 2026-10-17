@@ -79,7 +79,7 @@ export function SettingsPage() {
   return (
     <div className="settings-page">
       <header className="settings-page__heading"><h1>{t('settings.title')}</h1><p>{t('modelsSettingsUi.settingsSubtitle')}</p></header>
-      {error ? <Alert status="danger"><Alert.Indicator /><Alert.Content><Alert.Title>{t('errors.storageChanged')}</Alert.Title><Alert.Description>{t('errors.storageChangedAction')}</Alert.Description></Alert.Content></Alert> : null}
+      {error ? <Alert status="danger"><Alert.Indicator /><Alert.Content><Alert.Title>{t('errors.settingsSaveFailed')}</Alert.Title></Alert.Content></Alert> : null}
       <Tabs orientation={compact ? 'horizontal' : 'vertical'} align="start" selectedKey={active}
         onSelectionChange={(key) => navigate(settingsPath(String(key) as SettingsTab))} className="settings-tabs">
         <div className="settings-nav">

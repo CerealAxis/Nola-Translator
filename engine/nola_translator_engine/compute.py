@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 
 class ComputeOptions(BaseModel):
-    recognitionEngine: Literal["pytorch", "llama"] = "pytorch"
+    recognitionEngine: Literal["pytorch", "llama", "crisp"] = "pytorch"
     translationEngine: Literal["auto", "pytorch", "llama"] = "auto"
     recognitionDevice: str = Field(default="auto", min_length=1, max_length=512)
     translationDevice: str = Field(default="auto", min_length=1, max_length=512)
@@ -172,17 +172,15 @@ def choose_devices(devices: list[ComputeDevice], options: ComputeOptions,
     def candidates(choice: str, task: str) -> list[ComputeDevice]:
         def supports(d: ComputeDevice) -> bool:
             if task == "recognition":
-                return d.id == "cpu" or (d.llamaDevice is not None if recognition_adapter == "llama-asr" else d.recognition and d.torchDevice is not None)
+                return d.id == "cpu" if recognition_adapter == "crisp-asr" else d.id == "cpu" or (d.llamaDevice is not None if recognition_adapter == "llama-asr" else d.recognition and d.torchDevice is not None)
             return d.id == "cpu" or (d.translation and
                 (d.llamaDevice is not None if translation_adapter == "llama.cpp" else d.torchDevice is not None))
         if choice != "auto":
             found = by_id.get(choice)
             if found and supports(found):
                 return [found]
-            if options.allowCpuFallback:
-                reasons.append(f"{task} 指定设备不可用，回退 CPU")
-                return [by_id["cpu"]]
-            raise ValueError(f"{task} 指定设备不可用：{choice}")
+            reasons.append(f"{task} 优先设备不可用，改为自动分配")
+            return [d for d in devices if supports(d)]
         return [d for d in devices if supports(d)]
 
     recognition = candidates(options.recognitionDevice, "recognition")
@@ -213,7 +211,14 @@ def choose_devices(devices: list[ComputeDevice], options: ComputeOptions,
             if (a.id == b.id or ambiguous_shared) and a.id != "cpu": score -= min(a.score, b.score) * 0.5
             plans.append((score, a, b))
     if not plans:
-        # A manually selected GPU with insufficient memory is not silently changed to another GPU.
+        if options.recognitionDevice not in ("auto", "cpu") or options.translationDevice not in ("auto", "cpu"):
+            retry = options.model_copy(update={
+                "recognitionDevice": "auto" if options.recognitionDevice != "cpu" else "cpu",
+                "translationDevice": "auto" if options.translationDevice != "cpu" else "cpu",
+            })
+            chosen_recognition, chosen_translation, retry_reasons = choose_devices(
+                devices, retry, recognition_mb, translation_mb, translation_adapter, recognition_adapter)
+            return chosen_recognition, chosen_translation, reasons + ["优先设备显存不足，改为自动分配"] + retry_reasons
         if options.allowCpuFallback:
             reasons.append("所选组合的可用显存不足，回退 CPU")
             return by_id["cpu"], by_id["cpu"], reasons

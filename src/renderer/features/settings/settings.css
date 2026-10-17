@@ -9,7 +9,7 @@
 /* The nav column tracks the widest tab label, so a longer translation stays on one line instead of
    wrapping into a two-line tab. 208px is the floor that the short labels settle at. */
 .settings-page .settings-tabs { display:grid; width:100%; grid-template-columns:minmax(208px,max-content) minmax(0,1fr); gap:16px; align-items:start; }
-.settings-nav { padding:12px; border:1px solid var(--border); border-radius:16px; background:var(--surface); min-width:0; }
+.settings-nav { position:sticky; top:var(--space-1); align-self:start; padding:12px; border:1px solid var(--border); border-radius:16px; background:var(--surface); min-width:0; }
 .settings-nav .tabs__list { display:flex; flex-direction:column; gap:8px; background:transparent; padding:0; width:100%; }
 .settings-nav .tabs__tab { justify-content:flex-start; height:52px; border-radius:12px; padding:0 16px; font-size:14px; gap:14px; opacity:1; color:var(--foreground); white-space:normal; }
 .settings-nav .tabs__tab svg { width:22px; height:22px; flex-shrink:0; }
@@ -25,10 +25,11 @@
 .settings-group .card__header { padding:0; }
 .settings-group .card__title { font-size:20px; font-weight:650; line-height:1.4; }
 .settings-group .card__content { padding:0; min-width:0; }
-.settings-group .fieldset { gap:0; padding:0; border:0; margin:0; min-width:0; }
+.settings-group .fieldset { display:block; gap:0; padding:0; border:0; margin:0; min-width:0; }
 .settings-group__rows { display:flex; flex-direction:column; }
 .settings-row { display:grid; grid-template-columns:minmax(130px,1fr) minmax(0,1.15fr); align-items:center; gap:16px; min-height:48px; padding:7px 0; border-bottom:1px solid var(--separator); min-width:0; }
 .settings-row:last-child { border-bottom:0; }
+.model-configuration-dialog__row { border-bottom:0; }
 .settings-row__label { min-width:0; display:flex; flex-direction:column; gap:3px; }
 .settings-row__label .label { font-size:14px; font-weight:500; color:var(--foreground); }
 .settings-row__label .description { font-size:12px; color:var(--muted); }
@@ -143,18 +144,36 @@
   color: var(--foreground);
 }
 
-.runtime-panels { display: flex; flex-direction: column; gap: var(--space-2); }
-.runtime-panel { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); }
-.runtime-panel-heading { padding: var(--space-2) var(--space-3); width: 100%; scroll-margin-top: var(--space-3); }
-.runtime-panel-heading__title { display: flex; min-width: 0; text-align: left; }
-.runtime-panel-heading strong { font: var(--nola-text-title); }
-.runtime-panel-body { padding: var(--space-2) var(--space-3); border-top: 1px solid var(--separator); display: flex; flex-direction: column; gap: var(--space-2); }
-.runtime-component-status { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; overflow-wrap: anywhere; text-align: right; }
-.runtime-actions, .runtime-progress { display: flex; justify-content: flex-end; align-items: center; gap: var(--space-2); }
-.runtime-progress { justify-content: space-between; }
+/* Runtime components sit inside a SettingGroup, so the block only lays out what the card cannot:
+   the engine picker and the per-engine panel. `.nola-segmented` already avoids `button` so that
+   `.settings-row__control .button` does not shrink the picker's 38px capsule. */
+.runtime-picker { display: flex; justify-content: center; padding-bottom: var(--space-1); container-type: inline-size; }
+.runtime-picker__group { display: flex; width: 100%; max-width: 520px; }
+.runtime-picker .runtime-picker__option { flex: 1 1 0; justify-content: center; gap: var(--space-1); padding: 0 var(--space-2); font-size: 13px; }
+.runtime-picker__state { font: var(--nola-text-micro); color: var(--muted); white-space: nowrap; }
+.runtime-picker .runtime-picker__option[data-selected='true'] .runtime-picker__state { color: var(--accent); }
+.runtime-panel-body { display: flex; flex-direction: column; overflow-wrap: anywhere; }
+.runtime-panel-body .settings-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+.runtime-component-status { min-width: 0; text-align: end; overflow-wrap: anywhere; }
+.runtime-actions { display: flex; justify-content: flex-end; padding-top: var(--space-1); }
+/* The panel body is unhidden on tab change, so the anchor used by `#?component=` needs its own
+   scroll offset from the sticky page header. */
+.runtime-panel-body[id] { scroll-margin-top: var(--space-3); }
+/* Repair targets are pills, not rows: each one names an engine, and the tick says whether this
+   repair run includes it. The unselected pill keeps its outline so the set stays legible
+   without colour alone. `data-on` is local state; `Tag` only renders its own selected styles
+   inside a selection-mode TagGroup. */
+.runtime-repair__list { gap: var(--space-1); }
+.runtime-repair .tag { gap: 6px; padding: 6px 12px; border: 1px solid var(--border); font: var(--nola-text-body-strong); }
+.runtime-repair .tag[data-on='true'] { border-color: transparent; }
+.runtime-repair__check { opacity: 0; transition: opacity 150ms var(--ease-nola); }
+.runtime-repair .tag[data-on='true'] .runtime-repair__check { opacity: 1; }
+.runtime-progress { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); }
 .runtime-progress-copy { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); overflow-wrap: anywhere; }
 .runtime-progress-copy small { font: var(--nola-text-caption); color: var(--muted); }
-.runtime-panel-body .select { min-width: 0; max-width: 100%; }
+@container (max-width: 460px) {
+  .runtime-picker__group { flex-direction: column; max-width: none; }
+}
 
 /* ============================ Developer tab ================================== */
 /* Preview strips live in the row's control column, which is right-aligned and wraps; the

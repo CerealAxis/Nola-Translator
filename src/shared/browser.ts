@@ -110,6 +110,10 @@ export interface BrowserConnectionStatus {
   captionServiceActive: boolean
   /** True while any connected extension owns a live caption session. */
   sessionActive: boolean
+  /** True while a browser-owned session is loading and has reserved the engine. */
+  sessionStarting?: boolean
+  /** True while the floating caption window is open, which also reserves the caption service. */
+  overlayActive?: boolean
   /** The live browser caption session, so the desktop can end it through the existing stopSession path. */
   sessionId?: string
   browsers?: BrowserIntegrationInfo[]

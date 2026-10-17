@@ -65,6 +65,7 @@ export interface BrowserConnectionOptions {
   getSettings(): AppSettings
   setEnabled(enabled: boolean): Promise<void>
   integrations?: BrowserIntegrations
+  isOverlayVisible?(): boolean
 }
 
 /** The desktop's independent browser caption appearance and session audio source. */
@@ -111,6 +112,8 @@ export class BrowserConnection {
    * unable to connect rather than silently accepting captions.
    */
   private captionServiceActive = false
+  private captionServiceClosing: Promise<void> | null = null
+  get captionServiceReserved(): boolean { return this.captionServiceActive || this.captionServiceClosing !== null }
   private disposing = false
   private operation = 0
   private mutation: Promise<void> = Promise.resolve()
@@ -130,14 +133,22 @@ export class BrowserConnection {
      */
     loggedHandle(CAPTION_SERVICE_CHANNEL, async (_event, active: unknown) => {
       if (typeof active !== 'boolean') throw new Error('invalidConfiguration')
+      if (active && (options.sessions.busy || this.captionServiceClosing || options.isOverlayVisible?.())) throw new Error('sessionAlreadyRunning')
       this.setCaptionServiceActive(active)
       if (!active) {
-        await options.sessions.cancelBrowserStart()
-        const sessionId = options.sessions.browserActive ? options.sessions.activeSessionId : null
-        if (sessionId) await options.sessions.stop(sessionId)
-        // Closing the browser service must not release a desktop session's models.
-        if (!options.sessions.busy && options.engine.currentState === 'ready') {
-          await options.engine.request({ protocolVersion: 1, type: 'releaseModels', requestId: `release-${randomUUID()}` }, 'modelsReleased', 60_000)
+        this.captionServiceClosing ??= (async () => {
+          await options.sessions.cancelBrowserStart()
+          const sessionId = options.sessions.browserActive ? options.sessions.activeSessionId : null
+          if (sessionId) await options.sessions.stop(sessionId)
+          // Keep the service reserved until stopping and releasing weights have both finished.
+          if (!options.sessions.busy && options.engine.currentState === 'ready') {
+            await options.engine.request({ protocolVersion: 1, type: 'releaseModels', requestId: `release-${randomUUID()}` }, 'modelsReleased', 60_000)
+          }
+        })()
+        const closing = this.captionServiceClosing
+        try { await closing }
+        finally {
+          if (this.captionServiceClosing === closing) this.captionServiceClosing = null
         }
       }
       return this.status()
@@ -209,7 +220,7 @@ export class BrowserConnection {
       const client = live.find(item => item.extensionVersion !== BROWSER_EXTENSION_VERSION) ?? live[0]
       return { ...row, available: row.available || !!client, connected: connected.some(item => item.browser === row.browser), ...(client ? { extensionStatus: 'installed' as const, extensionVersion: client.extensionVersion, extensionCompatible: client.extensionVersion === BROWSER_EXTENSION_VERSION } : {}) }
     })
-    return { enabled: this.enabled, registered: this.registered, connections: connected.length, captionServiceActive: this.captionServiceActive, sessionActive: sessionId !== undefined, ...(sessionId ? { sessionId } : {}), ...(browsers ? { browsers } : {}), ...(this.error ? { error: this.error } : {}) }
+    return { enabled: this.enabled, registered: this.registered, connections: connected.length, captionServiceActive: this.captionServiceActive, sessionActive: sessionId !== undefined, sessionStarting: this.options.sessions.browserServiceStarting || this.captionServiceClosing !== null, overlayActive: this.options.isOverlayVisible?.() ?? false, ...(sessionId ? { sessionId } : {}), ...(browsers ? { browsers } : {}), ...(this.error ? { error: this.error } : {}) }
   }
   async initialize(enabled: boolean): Promise<void> {
     const operation = this.operation

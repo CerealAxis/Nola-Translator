@@ -2,6 +2,7 @@ import type { AppSettings, AppSettingsPatch, CredentialProvider, EngineChannelEv
 import { initStores, stores } from '@/store'
 import { mergeSettings } from '@/store/settingsStore'
 import type { BrowserConnectionStatus } from '../../src/shared/browser'
+import { CRISP_RUNTIME_ID } from '../../src/shared/compute'
 import { createDemoRuntime, DEMO_COMPUTE } from './demoRuntime'
 
 const noop = () => undefined
@@ -21,6 +22,7 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
   }
   const openOverlay = async () => {
     onOverlay(true)
+    return true
   }
   const closeOverlay = () => {
     onOverlay(false)
@@ -30,7 +32,7 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
     return () => { listeners.delete(listener) }
   }
   const browser: BrowserConnectionStatus = {
-    enabled: true, registered: true, connections: 1, captionServiceActive: true, sessionActive: false,
+    enabled: true, registered: true, connections: 1, captionServiceActive: false, sessionActive: false,
     browsers: ['chrome', 'edge'].map(browser => ({ browser: browser as 'chrome' | 'edge', available: true, extensionStatus: 'installed', connected: true, enabled: true })),
   }
   const runtimes = createDemoRuntime()
@@ -100,6 +102,8 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
         } else if (pkg) {
           pkg.installed = true
           runtimes.local = { ...runtimes.local, llama: { id, path: 'Demo', status: 'ready', backend: pkg.backend, version: pkg.version, gpuAvailable: pkg.backend !== 'cpu', reason: '' } }
+        } else if (id === CRISP_RUNTIME_ID) {
+          runtimes.local = { ...runtimes.local, crisp: { id, path: 'Demo', status: 'ready', backend: 'vulkan', version: '0.8.43', gpuAvailable: true, reason: '', managed: true } }
         }
         stores.settings.setState({ runtimes: { ...runtimes } })
       },

@@ -38,6 +38,7 @@ import { CaptionTrack } from './CaptionTrack'
 import type { TrackLine } from './CaptionTrack'
 import { OverlayControls } from './OverlayControls'
 import { allocateCaptionLines } from './lineBudget'
+import { captionScrimColor } from './scrimColor'
 
 export const CAPTION_SCHEMES = {
   dark: { bg: '#0d0e10', source: '#f7f7f7', target: '#d7dee8', border: 'rgba(255,255,255,0.10)', chrome: '#d7dee8' },
@@ -200,6 +201,11 @@ export function OverlayRoot() {
    */
   const cardRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    if (!locked) {
+      window.getSelection()?.removeAllRanges()
+      setCaptionTextSelected(false)
+      return
+    }
     const updateSelection = (): void => {
       const card = cardRef.current
       const selection = window.getSelection()
@@ -211,7 +217,7 @@ export function OverlayRoot() {
     }
     document.addEventListener('selectionchange', updateSelection)
     return () => document.removeEventListener('selectionchange', updateSelection)
-  }, [])
+  }, [locked])
 
   useEffect(() => {
     const card = cardRef.current
@@ -294,6 +300,7 @@ export function OverlayRoot() {
   const cardStyle = {
     '--overlay-background-color': palette.bg,
     '--overlay-background-alpha': `${Math.round(opacity * 100)}%`,
+    '--overlay-scrim-color': captionScrimColor(palette.bg, opacity, scheme),
     '--overlay-source-color': palette.source,
     '--overlay-translation-color': palette.target,
     '--overlay-font-size': `${config.fontSize}px`,
@@ -313,7 +320,7 @@ export function OverlayRoot() {
         data-locked={locked ? 'true' : 'false'}
         data-confirm-open={closing ? 'true' : 'false'}
         data-hover={hovered || menuOpen ? 'true' : 'false'}
-        data-text-selected={captionTextSelected ? 'true' : 'false'}
+        data-text-selected={locked && captionTextSelected ? 'true' : 'false'}
         data-layout={config.layout}
         data-bilingual={config.showSource && config.showTranslation ? 'true' : 'false'}
         data-transparent={opacity <= 0 ? 'true' : 'false'}
