@@ -41,6 +41,10 @@ function wavFile(dataBytes: number): Buffer {
   return Buffer.concat([wavHeader(dataBytes), Buffer.alloc(dataBytes)])
 }
 
+function mp3Frame(): Buffer {
+  return Buffer.from([0xff, 0xfb, 0x90, 0x64])
+}
+
 describe('MeetingStore', () => {
   let root = ''
   let store: MeetingStore
@@ -138,21 +142,22 @@ describe('MeetingStore', () => {
     fakeNow.mockRestore()
   })
 
-  it('uses WAV duration only when the declared PCM payload exists in the file', async () => {
+  it('exposes only MP3 recordings with a valid audio frame', async () => {
     const meeting = await store.begin({ sourceLanguage: 'auto', targetLanguage: 'zh', recordAudio: true })
     store.attach(meeting.meetingId, 'session-1')
-    await writeFile(join(root, 'meetings', meeting.meetingId, MEETING_AUDIO_FILE), wavFile(32_000 * 43))
+    await writeFile(join(root, 'meetings', meeting.meetingId, MEETING_AUDIO_FILE), mp3Frame())
     const finished = await store.finish('session-1')
-    expect(finished?.audioDurationMs).toBe(43_000)
+    expect(finished?.audioFile).toBe(MEETING_AUDIO_FILE)
+    expect(finished?.audioDurationMs).toBeUndefined()
 
     const crashed = await store.begin({ sourceLanguage: 'auto', targetLanguage: 'zh', recordAudio: true })
     store.attach(crashed.meetingId, 'session-2')
-    await writeFile(join(root, 'meetings', crashed.meetingId, MEETING_AUDIO_FILE), wavHeader(0))
+    await writeFile(join(root, 'meetings', crashed.meetingId, MEETING_AUDIO_FILE), Buffer.alloc(0))
     expect((await store.finish('session-2'))?.audioFile).toBeUndefined()
 
     const truncated = await store.begin({ sourceLanguage: 'auto', targetLanguage: 'zh', recordAudio: true })
     store.attach(truncated.meetingId, 'session-3')
-    await writeFile(join(root, 'meetings', truncated.meetingId, MEETING_AUDIO_FILE), wavHeader(32_000 * 35))
+    await writeFile(join(root, 'meetings', truncated.meetingId, MEETING_AUDIO_FILE), Buffer.from([0xff, 0xfb, 0x90]))
     const truncatedFinished = await store.finish('session-3')
     expect(truncatedFinished?.audioFile).toBeUndefined()
     expect(truncatedFinished?.audioDurationMs).toBeUndefined()
@@ -161,7 +166,7 @@ describe('MeetingStore', () => {
   it('audioPathFor 拒绝任何越界 meetingId', async () => {
     const meeting = await store.begin({ sourceLanguage: 'auto', targetLanguage: 'zh', recordAudio: true })
     store.attach(meeting.meetingId, 'session-1')
-    await writeFile(join(root, 'meetings', meeting.meetingId, MEETING_AUDIO_FILE), wavFile(32_000))
+    await writeFile(join(root, 'meetings', meeting.meetingId, MEETING_AUDIO_FILE), mp3Frame())
     await store.finish('session-1')
     expect(store.audioPathFor(meeting.meetingId)).toContain(MEETING_AUDIO_FILE)
     expect(store.audioPathFor('../../../Windows/System32')).toBeNull()
@@ -171,9 +176,10 @@ describe('MeetingStore', () => {
 
   it('does not expose a legacy recording whose header claims missing audio data', async () => {
     const meeting = await store.begin({ sourceLanguage: 'auto', targetLanguage: 'zh', recordAudio: true })
-    await writeFile(join(root, 'meetings', meeting.meetingId, MEETING_AUDIO_FILE), wavHeader(32_000 * 35))
+    await writeFile(join(root, 'meetings', meeting.meetingId, 'audio.wav'), wavHeader(32_000 * 35))
     await writeFile(join(root, 'meetings', meeting.meetingId, 'meeting.json'), JSON.stringify({
       ...meeting,
+      audioFile: 'audio.wav',
       state: 'completed',
       audioDurationMs: 35_000,
     }))
@@ -183,6 +189,19 @@ describe('MeetingStore', () => {
     expect(reopened.get(meeting.meetingId)?.audioFile).toBeUndefined()
     expect(reopened.get(meeting.meetingId)?.audioDurationMs).toBeUndefined()
     expect(reopened.audioPathFor(meeting.meetingId)).toBeNull()
+  })
+
+  it('retains the duration of a complete legacy WAV recording', async () => {
+    const meeting = await store.begin({ sourceLanguage: 'auto', targetLanguage: 'zh', recordAudio: true })
+    await writeFile(join(root, 'meetings', meeting.meetingId, 'audio.wav'), wavFile(32_000))
+    await writeFile(join(root, 'meetings', meeting.meetingId, 'meeting.json'), JSON.stringify({
+      ...meeting, state: 'completed', audioFile: 'audio.wav',
+    }))
+
+    const reopened = new MeetingStore(join(root, 'meetings'))
+    await reopened.initialize(join(root, 'unused-history.jsonl'))
+    expect(reopened.get(meeting.meetingId)?.audioDurationMs).toBe(1000)
+    expect(reopened.audioPathFor(meeting.meetingId)).toContain('audio.wav')
   })
 
   it('重命名落盘并保留, 删除连目录一起清掉', async () => {

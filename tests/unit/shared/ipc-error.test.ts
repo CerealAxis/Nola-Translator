@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import { stripIpcErrorMessage } from '../../../src/shared/ipc-error'
+import { normalizeThrownError, stripIpcErrorMessage } from '../../../src/shared/ipc-error'
+
+describe('normalizeThrownError', () => {
+  it('preserves distinct runtime failures and support codes', () => {
+    expect(normalizeThrownError(new Error('RUNTIME_TORCH: 尚未安装 PyTorch'))).toMatchObject({
+      code: 'RUNTIME_TORCH', supportCode: 'RNT-001',
+    })
+    expect(normalizeThrownError(new Error('RUNTIME_LLAMA: 尚未安装 llama.cpp'))).toMatchObject({
+      code: 'RUNTIME_LLAMA', supportCode: 'RNT-002',
+    })
+  })
+})
 
 describe('stripIpcErrorMessage', () => {
   it('剥掉 Electron 的通道包装和错误类前缀', () => {

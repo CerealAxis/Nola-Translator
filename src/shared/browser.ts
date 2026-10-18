@@ -52,6 +52,8 @@ export type BrowserWireErrorCode =
   | 'browserSessionNotRunning'
   | 'browserCaptionServiceDisabled'
   | 'browserIntegrationDisabled'
+  | 'torchUnavailable'
+  | 'llamaUnavailable'
   | 'internalError'
   | 'connectionLost'
   | 'appUnavailable'

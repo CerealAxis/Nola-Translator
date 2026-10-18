@@ -211,7 +211,6 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
   const devices = useStore(stores.models, (state) => state.devices)
   const status = useStore(sessionStore, (state) => state.status)
   const errorCode = useStore(sessionStore, (state) => state.errorCode)
-  const diagnostic = useStore(sessionStore, (state) => state.error)
   const runtimeComponent = errorCode === 'RUNTIME_TORCH' ? 'engine' : errorCode === 'RUNTIME_LLAMA' ? 'llama' : null
   const missing = useStore(sessionStore, (state) => state.missing)
 
@@ -252,7 +251,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
       ? null
       : missing
         ? t('preflight.modelMissing', { name: missing.name })
-        : runtimeComponent || errorCode === 'SESSION_ERROR' ? diagnostic : t(errorCopyOf(errorCode, lastIntent).message)
+        : t(errorCopyOf(errorCode, lastIntent).message)
 
   /**
    * The mic starts an idle session; while a session is active it toggles

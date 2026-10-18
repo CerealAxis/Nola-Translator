@@ -285,6 +285,7 @@ export const en: Dictionary = {
     deleteManyBody: 'Their captions, translations and audio are removed for good.',
     deletedMany: '{count} records deleted',
     deletePartialFailed: '{removed} deleted, {failed} failed',
+    deleteFailed: 'Could not delete the record; it is back in the list. Try again. If it keeps failing, check the diagnostic logs.',
     audioUnavailable: 'Audio was not kept for this session',
     playerPlay: 'Play',
     playerPause: 'Pause',

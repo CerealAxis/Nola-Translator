@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deviceCandidates, encodeDeviceIntent, resolveDeviceIntent, selectedLlamaBackend } from '../../../src/shared/device-selection'
+import { deviceCandidates, encodeDeviceIntent, encodeHardwarePreference, resolveDeviceIntent, selectedLlamaBackend } from '../../../src/shared/device-selection'
 import type { ComputeDevice, RuntimeSnapshot } from '../../../src/shared/compute'
 
 const intel = { name: 'Intel(R) UHD Graphics', vendor: 'intel' as const, driver: '1', hardwareId: 'PCI\\VEN_8086&DEV_4688' }
@@ -26,6 +26,11 @@ describe('hardware device intent', () => {
   })
   it('retains CPU, auto and legacy engine device selections', () => {
     for (const choice of ['cpu', 'auto', 'cuda:uuid']) expect(resolveDeviceIntent(choice, hardware, [], 'torch')).toBe(choice)
+  })
+  it('keeps legacy hardware preferences on the automatic fallback path', () => {
+    const legacyPreference = encodeHardwarePreference(intel.hardwareId)
+    expect(resolveDeviceIntent(legacyPreference, hardware, [], 'llama')).toBe('auto')
+    expect(resolveDeviceIntent(encodeHardwarePreference('missing'), hardware, [device], 'llama')).toBe('auto')
   })
   it('matches the requested runtime backend independently of the current CUDA environment', () => {
     expect(selectedLlamaBackend(value)).toBe('vulkan')

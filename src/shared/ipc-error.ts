@@ -48,12 +48,15 @@ export function normalizeThrownError(
   const normalizedMessage = message.toUpperCase().replace(/[^A-Z0-9]+/g, '_')
   const code = rawCode
     ?? (errno ? KNOWN_ERROR_CODES[errno] ?? errno : undefined)
+    ?? (/^RUNTIME_TORCH:/i.test(message) ? 'RUNTIME_TORCH' : undefined)
+    ?? (/^RUNTIME_LLAMA:/i.test(message) ? 'RUNTIME_LLAMA' : undefined)
     ?? (/(TIMEOUT|TIMED_OUT|超时)/i.test(message) ? 'REQUEST_TIMEOUT' : undefined)
     ?? (/(PROTOCOL|INVALID.*(DATA|RESPONSE)|通信数据无效)/i.test(message) ? 'ENGINE_PROTOCOL_ERROR' : undefined)
     ?? (/(ENGINE|PYTHON).*(NOT|尚未|不可用|退出|停止)|引擎.*(不可用|退出|停止)/i.test(message) ? 'ENGINE_UNAVAILABLE' : undefined)
     ?? (normalizedMessage && KNOWN_ERROR_CODES[normalizedMessage])
     ?? 'UNKNOWN_ERROR'
-  const supportCode = supportErrorCodeForCause(rawCode ?? errno ?? message, {
+  const supportCause = code === 'RUNTIME_TORCH' || code === 'RUNTIME_LLAMA' ? code : rawCode ?? errno ?? message
+  const supportCode = supportErrorCodeForCause(supportCause, {
     commandType: context.operation,
   })
   return {

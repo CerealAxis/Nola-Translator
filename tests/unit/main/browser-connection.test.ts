@@ -69,6 +69,23 @@ function send(socket: Socket, value: unknown) { socket.write(`${JSON.stringify(v
 const start = { id: 'start', type: 'start', source: 'tab', streamId: 'stream', sourceLanguage: 'auto', targetLanguage: 'en', epoch: 0, videoTimeMs: 0, playbackRate: 1 }
 
 describe('native pipe boundary', () => {
+  it('sends distinct runtime failures to the extension', async () => {
+    const f = await fixture()
+    const socket = await connect(f.descriptor.pipe); const values = responses(socket)
+    send(socket, f.descriptor)
+    send(socket, { id: 'hello', type: 'hello', extensionVersion: BROWSER_EXTENSION_VERSION })
+    await expect.poll(() => values.some(value => value.type === 'result' && value.id === 'hello')).toBe(true)
+    vi.spyOn(f.sessions, 'start')
+      .mockRejectedValueOnce(new Error('RUNTIME_TORCH: PyTorch unavailable'))
+      .mockRejectedValueOnce(new Error('RUNTIME_LLAMA: llama.cpp unavailable'))
+
+    send(socket, start)
+    await expect.poll(() => values.find(value => value.type === 'error' && value.id === 'start')).toMatchObject({ code: 'torchUnavailable' })
+    send(socket, { ...start, id: 'llama-start' })
+    await expect.poll(() => values.find(value => value.type === 'error' && value.id === 'llama-start')).toMatchObject({ code: 'llamaUnavailable' })
+    socket.destroy()
+  })
+
   it('discards pre-seek audio errors without stopping the new timeline', async () => {
     const f = await fixture()
     const socket = await connect(f.descriptor.pipe); const values = responses(socket)

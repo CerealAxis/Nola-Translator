@@ -46,6 +46,7 @@ Object.defineProperty(window, 'nolaTranslator', {
     startSession: async () => ({ sessionId: 'test-session', meetingId: 'test-meeting' }),
     stopSession: async () => undefined,
     setSessionPaused: async () => undefined,
+    onOverlayMenuChanged: () => () => undefined,
     onEngineEvent: () => () => undefined,
     showOverlay: async () => undefined,
     hideOverlay: async () => undefined,

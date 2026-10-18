@@ -79,11 +79,11 @@ it('navigates through all ten steps and finishes at the replay entry', async () 
   const titles = ['快速同传', '悬浮字幕', '浏览器字幕', '网络与下载加速', '安装 PyTorch', '安装 llama.cpp', '配置语音识别', '配置翻译', '下载模型', '再次查看教程']
   const paths = ['#/', '#/', '#/', '#/settings/general', '#/settings/compute', '#/settings/compute', '#/settings/audio', '#/settings/translation', '#/models', '#/settings/more']
   for (let index = 0; index < titles.length; index++) {
-    const button = await screen.findByRole('button', { name: index === 8 ? '完成' : '下一步' })
+    const button = await screen.findByRole('button', { name: index === titles.length - 1 ? '完成' : '下一步' })
     await waitFor(() => expect(button).toBeEnabled())
     expect(screen.getByRole('dialog', { name: titles[index] })).toBeInTheDocument()
     expect(window.location.hash).toBe(paths[index])
-    expect(screen.getByText(`${index + 1} / 9`)).toBeInTheDocument()
+    expect(screen.getByText(`${index + 1} / 10`)).toBeInTheDocument()
     fireEvent.click(button)
   }
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()

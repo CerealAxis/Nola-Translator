@@ -21,7 +21,7 @@ it('omits unavailable sources and keeps the close action separate', () => {
   const onSelect = vi.fn()
   render(<DownloadSourceDialog record={{ resourceId: 'hub:owner/model', name: 'Custom model' }} onClose={onClose} onSelect={onSelect} />)
   expect(screen.getAllByRole('option')).toHaveLength(2)
-  expect(screen.queryByText('ModelScope 国内源')).not.toBeInTheDocument()
+  expect(screen.queryByText('ModelScope')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '关闭' }))
   expect(onClose).toHaveBeenCalledOnce()
   expect(onSelect).not.toHaveBeenCalled()
@@ -35,7 +35,7 @@ it('renders no overlay without a target', () => {
 it('exposes source descriptions and shows tooltips during keyboard navigation', async () => {
   const user = userEvent.setup()
   render(<DownloadSourceDialog record={{ resourceId: 'index-translate-2b-q4-k-m', name: 'Index-Translate 2B' }} onClose={vi.fn()} onSelect={vi.fn()} />)
-  const official = screen.getByRole('option', { name: 'Hugging Face 官方源' })
+  const official = screen.getByRole('option', { name: 'Hugging Face' })
   const mirror = screen.getByRole('option', { name: 'HF-Mirror 镜像站' })
   expect(official).toHaveAccessibleDescription('直接从 Hugging Face 官方站下载。')
   expect(mirror).toHaveAccessibleDescription('通过 Hugging Face 镜像站下载。')

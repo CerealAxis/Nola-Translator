@@ -14,7 +14,7 @@ afterEach(async () => { for (const path of directories.splice(0)) await rm(path,
 
 it('creates independent launch logs and preserves Windows crash details without credentials', async () => {
   const path = await directory()
-  initializeSessionLog(path, { version: 'test' })
+  await initializeSessionLog(path, { version: 'test' })
   const first = sessionLogPath()
   registerLogSecret('opaque-credential-example')
   logDiagnostic('probe.failed', processFailure(Object.assign(new Error('opaque-credential-example sk-example123'), {
@@ -25,23 +25,23 @@ it('creates independent launch logs and preserves Windows crash details without 
   expect(contents).toContain('stderrBytes')
   expect(contents).toContain('missing.dll')
   for (const privateValue of ['opaque-credential-example', 'sk-example123', 'another-secret']) expect(contents).not.toContain(privateValue)
-  initializeSessionLog(path, { version: 'next' })
+  await initializeSessionLog(path, { version: 'next' })
   expect(sessionLogPath()).not.toBe(first)
   expect(await readdir(path)).toHaveLength(2)
 })
 
-it('retains only twenty launch logs and preserves unrelated files', async () => {
+it('retains only ten launch logs and preserves unrelated files', async () => {
   const path = await directory()
   await writeFile(join(path, 'keep.txt'), 'unrelated')
-  for (let index = 0; index < 25; index++) initializeSessionLog(path, { index })
+  for (let index = 0; index < 25; index++) await initializeSessionLog(path, { index })
   const names = await readdir(path)
-  expect(names.filter(name => name.endsWith('.jsonl'))).toHaveLength(20)
+  expect(names.filter(name => name.endsWith('.jsonl') || name.endsWith('.jsonl.gz'))).toHaveLength(10)
   expect(names).toContain('keep.txt')
 })
 
 it('keeps one unsplit launch log regardless of size and survives an unavailable directory', async () => {
   const path = await directory()
-  initializeSessionLog(path, {})
+  await initializeSessionLog(path, {})
   for (let index = 0; index < 400; index++) logDiagnostic('output', 'x'.repeat(16000))
   expect((await stat(sessionLogPath())).size).toBeGreaterThan(4 * 1024 * 1024)
   logDiagnostic('operation.after-rollover', { finished: true })
@@ -55,7 +55,7 @@ it('keeps one unsplit launch log regardless of size and survives an unavailable 
 
 it('preserves readable diagnostics and device identifiers while omitting speech and translation content', async () => {
   const path = await directory()
-  initializeSessionLog(path, {})
+  await initializeSessionLog(path, {})
   logDiagnostic('engine.event.caption', { sourceText: 'private speech', translatedText: 'private translation',
     pcmBase64: 'private audio', prompt: 'private translation prompt', message: '运行失败', revision: 3,
     deviceId: 'wasapi:systemOutput:example', reason: '原始设备异常', errorDetail: 'native host error',
@@ -75,7 +75,7 @@ it('preserves readable diagnostics and device identifiers while omitting speech 
 
 it('preserves original exceptions, nested causes and process output while redacting credentials', async () => {
   const path = await directory()
-  initializeSessionLog(path, {})
+  await initializeSessionLog(path, {})
   const cause = new Error('原始 WASAPI 错误')
   const error = Object.assign(new Error('采集启动失败', { cause }), {
     stderr: 'PortAudio initialization failed; api_key=private-key', stdout: 'probe output', code: -9999,

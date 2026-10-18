@@ -55,16 +55,16 @@ export function deviceCandidates(hardware: HardwareInventory, task: 'torch' | 'l
 /** Native indices belong to the selected runtime, never to the persisted hardware intent. */
 export function resolveDeviceIntent(value: string, hardware: HardwareInventory, devices: ComputeDevice[], task: 'torch' | 'llama'): string {
   if (value === 'auto' || value === 'cpu') return value
-  const preferredId = preferredHardwareId(value)
-  if (preferredId !== null) {
-    const adapter = hardware.adapters.find(a => a.hardwareId === preferredId)
-    if (!adapter || hardware.adapters.filter(a => sameAdapterName(a.name, adapter.name)).length !== 1) return 'auto'
-    const matches = devices.filter(d => sameAdapterName(d.name, adapter.name) &&
-      (task === 'torch' ? !!d.torchDevice : !!d.llamaDevice))
-    return matches.length === 1 ? matches[0].id : 'auto'
-  }
   const intent = decodeDeviceIntent(value)
   if (!intent) {
+    const preferredId = preferredHardwareId(value)
+    if (preferredId !== null) {
+      const adapter = hardware.adapters.find(a => a.hardwareId === preferredId)
+      if (!adapter || hardware.adapters.filter(a => sameAdapterName(a.name, adapter.name)).length !== 1) return 'auto'
+      const matches = devices.filter(d => sameAdapterName(d.name, adapter.name) &&
+        (task === 'torch' ? !!d.torchDevice : !!d.llamaDevice))
+      return matches.length === 1 ? matches[0].id : 'auto'
+    }
     if (value.startsWith('hardware:')) throw new Error('计算设备选择格式无效，请重新选择')
     return value
   }

@@ -297,6 +297,7 @@ export const zhCN = {
     deleteManyBody: '这些记录的字幕、译文和录音会一起删除，不能恢复。',
     deletedMany: '已删除 {count} 条记录',
     deletePartialFailed: '已删除 {removed} 条，{failed} 条失败',
+    deleteFailed: '未能删除记录，列表已恢复。请重试；若仍失败，请查看诊断日志。',
     audioUnavailable: '这场同传的录音没有保存',
     playerPlay: '播放',
     playerPause: '暂停',

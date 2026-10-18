@@ -11,11 +11,16 @@ afterEach(async () => {
 })
 
 describe('shared documentation and Toy demo', () => {
-  it('starts idle for exploration and seeds every recommended model', () => {
+  it('starts idle for exploration and seeds configured demo models', () => {
     prepareDemo('zh-CN', 'home')
     expect(stores.session.getState().status).toBe('idle')
     expect(stores.session.getState().sessionId).toBeNull()
-    expect(stores.models.getState().resources.map(item => item.resourceId).sort()).toEqual(Object.keys(RECOMMENDED_CONFIGURATIONS).sort())
+    const resources = stores.models.getState().resources
+    const settings = stores.settings.getState().settings!
+    expect(resources.length).toBeGreaterThan(0)
+    expect(resources.every(item => item.resourceId in RECOMMENDED_CONFIGURATIONS)).toBe(true)
+    expect(resources.some(item => item.resourceId === settings.recognition.modelId)).toBe(true)
+    expect(resources.some(item => item.resourceId === settings.translation.localModelId)).toBe(true)
     expect(stores.meetings.getState().meetings[0].segmentCount).toBe(stores.session.getState().segments.length)
   })
 

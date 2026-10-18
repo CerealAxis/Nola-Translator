@@ -21,7 +21,7 @@ describe('physical GPU preference', () => {
     const preferred = encodeHardwarePreference(hardware.adapters[0].hardwareId)
     expect(resolveDeviceIntent(preferred, hardware, devices, 'torch')).toBe('torch-gpu')
     expect(resolveDeviceIntent(preferred, hardware, devices, 'llama')).toBe('llama-gpu')
-    expect(resolveDeviceIntent(encodeDeviceIntent({ backend: 'cuda', hardwareId: hardware.adapters[0].hardwareId }), hardware, devices, 'llama')).toBe('llama-gpu')
+    expect(() => resolveDeviceIntent(encodeDeviceIntent({ backend: 'cuda', hardwareId: hardware.adapters[0].hardwareId }), hardware, devices, 'llama')).toThrow()
   })
 
   it('returns automatic placement when the preferred GPU is unavailable', () => {

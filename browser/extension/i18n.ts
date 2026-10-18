@@ -4,8 +4,7 @@ import { resolveUiLanguage } from '../../src/shared/languages'
 import type { UiLanguage, UiLanguagePreference } from '../../src/shared/languages'
 export type BrowserKey = keyof typeof browserZh
 /**
- * An unrecognised code keeps its own spelling so the user can report it and the
- * dictionary stays a closed set of keys.
+ * An unrecognised code remains in store diagnostics while the UI uses actionable fallback copy.
  */
 export type BrowserTextKey = BrowserKey | `unknown:${string}`
 const UNKNOWN_PREFIX = 'unknown:'
@@ -22,7 +21,7 @@ const ERROR_ALIASES: Record<string, BrowserKey> = {
   browserConnectionUnavailable: 'appUnavailable',
   browserConnectionLost: 'connectionLost',
   browserPermissionDenied: 'permissionFailed',
-  browserExtensionVersionMismatch: 'updateRequired',
+  browserExtensionVersionMismatch: 'extensionVersionMismatch',
   browserProtocolMismatch: 'updateRequired',
   browserCaptureUnsupported: 'captureUnsupported',
   browserCaptureTargetMismatch: 'wrongCapture',
@@ -30,8 +29,8 @@ const ERROR_ALIASES: Record<string, BrowserKey> = {
   browserAudioSilent: 'tabAudioSilent',
   browserAudioBacklog: 'slowAudio',
   browserSessionAlreadyRunning: 'busy',
-  browserSessionNotRunning: 'appUnavailable',
-  browserCaptionServiceDisabled: 'appUnavailable',
+  browserSessionNotRunning: 'sessionNotRunning',
+  browserCaptionServiceDisabled: 'captionServiceOff',
   browserIntegrationDisabled: 'appUnavailable',
 }
 function isDictionaryKey(key: BrowserTextKey): key is BrowserKey {
@@ -53,9 +52,7 @@ export function browserText(language: BrowserUiLanguage = 'en') {
   const dictionary = dictionaries[locale]
   return (key: BrowserTextKey): string => {
     if (isDictionaryKey(key)) return dictionary[key]
-    // A code arrives from the desktop process, so it is capped before it reaches the DOM.
-    const code = (key as string).slice(UNKNOWN_PREFIX.length).slice(0, 64)
-    return dictionary.unknownError.replace('{code}', () => code)
+    return dictionary.unknownError
   }
 }
 export function errorKey(code: string): BrowserTextKey {

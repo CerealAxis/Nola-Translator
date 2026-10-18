@@ -155,7 +155,8 @@ export function logDiagnostic(event: string, data?: unknown): void {
   } catch { /* Diagnostics must remain usable on read-only or full disks. */ }
 }
 
-export function initializeSessionLog(directory: string, metadata: unknown): void {
+/** Creates the current log synchronously; callers may await prior-log compression before cleanup. */
+export function initializeSessionLog(directory: string, metadata: unknown): Promise<void> {
   try {
     mkdirSync(directory, { recursive: true })
     file = ''
@@ -170,8 +171,8 @@ export function initializeSessionLog(directory: string, metadata: unknown): void
     sequence = 0
     activity.clear()
     logDiagnostic('app.start', metadata)
-    void compressPreviousLogs(previousLogs)
-  } catch { file = '' }
+    return compressPreviousLogs(previousLogs)
+  } catch { file = ''; return Promise.resolve() }
 }
 
 export function captureMainConsole(): void {

@@ -158,7 +158,7 @@ describe('设置存储', () => {
       await writeFile(path, JSON.stringify({ version: 1, translation: { allowIntermediate: true } }), 'utf8')
       const pivotDropped = await new SettingsStore(path).load()
       expect(pivotDropped.translation).not.toHaveProperty('allowIntermediate')
-      expect(pivotDropped.translation.translateIntermediate).toBe(false)
+      expect(pivotDropped.translation.translateIntermediate).toBe(DEFAULT_SETTINGS.translation.translateIntermediate)
 
       await writeFile(path, JSON.stringify({ version: 1 }), 'utf8')
       const defaults = await new SettingsStore(path).load()
@@ -167,7 +167,7 @@ describe('设置存储', () => {
       expect(defaults.translation.provider).toBe('local')
       expect(defaults.translation.localModelId).toBe('hy-mt2-1.8b-q3-k-m')
       expect(defaults.translation.targetLanguage).toBe('zh')
-      expect(defaults.translation.translateIntermediate).toBe(false)
+      expect(defaults.translation.translateIntermediate).toBe(DEFAULT_SETTINGS.translation.translateIntermediate)
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

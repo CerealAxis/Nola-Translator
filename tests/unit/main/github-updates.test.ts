@@ -30,7 +30,7 @@ it('returns a newer release and reuses the daily cache', async () => {
     throw new Error('cache should avoid a second request')
   }, 1_000_001)
 
-  expect(first?.latestVersion).toBe('v1.1.0')
+  expect(first?.latestVersion).toBe('1.1.0')
   expect(first?.updateAvailable).toBe(true)
   expect(first?.releaseNotes).toBe('Highlights\n• Faster & better captions')
   expect(second).toEqual(first)
@@ -38,7 +38,7 @@ it('returns a newer release and reuses the daily cache', async () => {
 
   const forced = await checkLatestRelease('1.0.3', cachePath, true,
     async () => new Response(feed('v1.2.0'), { status: 200 }), 1_000_002)
-  expect(forced.latestVersion).toBe('v1.2.0')
+  expect(forced.latestVersion).toBe('1.2.0')
 })
 
 it('does not announce equal, older, or malformed versions', async () => {

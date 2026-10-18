@@ -145,7 +145,11 @@ function errorCodeOf(error: unknown): string {
   if (typeof error === 'object' && error !== null && 'engineCode' in error && typeof error.engineCode === 'string') {
     return error.engineCode.toUpperCase()
   }
+  if (typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string') {
+    return error.code.toUpperCase()
+  }
   const message = errorMessage(error)
+  if (/^[A-Z][A-Z0-9_]{2,63}$/.test(message)) return message
   const match = /([a-zA-Z_]+)[:：]/.exec(message)
   return match ? match[1].toUpperCase() : 'SESSION_ERROR'
 }
@@ -307,7 +311,9 @@ export async function startSession(config: SessionConfig): Promise<void> {
     throw new Error('已有会话在运行')
   }
 
-  const captionStatus = await bridge.settings?.browserConnection?.('status')
+  // This is an advisory preflight; the main process owns the final session mutex.
+  // A temporary browser-status IPC failure must not silently block desktop startup.
+  const captionStatus = await Promise.resolve(bridge.settings?.browserConnection?.('status')).catch(() => undefined)
   if (captionStatus?.captionServiceActive || captionStatus?.sessionStarting) {
     sessionStore.setState({ status: 'idle', error: null, errorCode: null, errorRequestId: null })
     throw new Error('SESSION_ALREADY_RUNNING')

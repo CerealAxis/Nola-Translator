@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '../../../../shared/settings'
 import { settingsStore } from '@/store/settingsStore'
@@ -31,9 +31,9 @@ it('shows MyMemory endpoint and optional email without a key or intermediate swi
 
 it('keeps the local model choice inside the translation service card', () => {
   render(<TranslationTab settings={DEFAULT_SETTINGS} />)
-  expect(screen.getByRole('group', { name: '翻译服务' })).toBeInTheDocument()
-  expect(screen.getByText('模型')).toBeInTheDocument()
-  expect(document.querySelectorAll('.settings-group')).toHaveLength(1)
+  const translationService = screen.getByRole('group', { name: '翻译服务' })
+  expect(within(translationService).getByText('模型')).toBeInTheDocument()
+  expect(screen.getByRole('group', { name: '备用翻译' })).toBeInTheDocument()
 })
 
 it('shows the fixed public Index-Translate model with streaming and no key field', () => {

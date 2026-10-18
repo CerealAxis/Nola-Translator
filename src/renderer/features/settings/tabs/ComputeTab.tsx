@@ -28,11 +28,11 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
       await actions.settings.loadRuntimeComponents()
       await actions.settings.refreshComputeDevices()
       setError('')
-    } catch (failure) { setError(String(failure)) }
-  }, [])
+    } catch { setError(t('compute.deviceCheckFailed')) }
+  }, [t])
   function save(patch: AppSettingsPatch): void {
     pendingSave.current = pendingSave.current.catch(() => undefined).then(() => updateSettings(patch))
-    void pendingSave.current.catch(failure => setError(t('compute.saveError') + ': ' + String(failure)))
+    void pendingSave.current.catch(() => setError(t('compute.saveError')))
   }
   function options(selected: string) {
     const choices = [
@@ -52,7 +52,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
   const plan = snapshot?.activePlan
   const actual = (value: unknown) => value === 'unknown' ? t('compute.planUnknown') : value === 'unloaded' ? t('compute.unloaded') : String(value ?? t('compute.noSession'))
   return <div className="settings-panel">
-    {error || computeError ? <Alert status="danger"><Alert.Content><Alert.Description>{error || computeError}</Alert.Description></Alert.Content></Alert> : null}
+    {error || computeError ? <Alert status="danger"><Alert.Content><Alert.Description>{error || t('compute.deviceCheckFailed')}</Alert.Description></Alert.Content></Alert> : null}
     <SettingGroup legend={t('compute.devices')} actions={<Button variant="secondary" size="sm" isDisabled={loading} onPress={() => void refresh()}>{loading ? <Spinner size="sm" /> : <RefreshCw size={16} aria-hidden="true" />}{t('compute.refresh')}</Button>}>
       <SettingsRow label={t('compute.recognition')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={recognition.normalized} options={recognition.choices} ariaLabel={t('compute.recognition')} onChange={recognitionDevice => save({ compute: { recognitionDevice } })} /></SettingsRow>
       <SettingsRow label={t('compute.translation')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={translation.normalized} options={translation.choices} ariaLabel={t('compute.translation')} onChange={translationDevice => save({ compute: { translationDevice } })} /></SettingsRow>

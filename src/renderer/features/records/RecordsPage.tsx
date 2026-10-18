@@ -75,7 +75,10 @@ export function RecordsPage(): ReactNode {
     if (!pendingDelete) return
     setDeletePending(true)
     if (pendingDelete.kind === 'single') {
-      void actions.meetings.removeMeeting(pendingDelete.meeting.meetingId).catch(() => undefined).finally(() => {
+      const showDeleteFailure = () => toast.danger(t('records.deleteFailed'))
+      void actions.meetings.removeMeeting(pendingDelete.meeting.meetingId).then(removed => {
+        if (!removed) showDeleteFailure()
+      }).catch(showDeleteFailure).finally(() => {
         setDeletePending(false)
         setPendingDelete(null)
       })

@@ -36,7 +36,7 @@ it('passes the chosen source when retrying a task', async () => {
   const install = vi.spyOn(actions.models, 'manageResource').mockResolvedValue(record)
   render(<DownloadsTab />)
   fireEvent.click(screen.getByRole('button', { name: '重试' }))
-  fireEvent.click(await screen.findByRole('option', { name: 'ModelScope 国内源' }))
+  fireEvent.click(await screen.findByRole('option', { name: 'ModelScope' }))
   await waitFor(() => expect(install).toHaveBeenCalledWith(record.resourceId, 'install', 'modelscope'))
 })
 

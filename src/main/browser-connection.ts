@@ -43,6 +43,7 @@ const PUBLIC_ERRORS = new Set<BrowserWireErrorCode>([
   'browserCaptureTargetMismatch', 'browserCaptureCancelled', 'browserAudioSilent',
   'browserAudioBacklog', 'browserSessionAlreadyRunning', 'browserSessionNotRunning',
   'browserCaptionServiceDisabled', 'browserIntegrationDisabled', 'internalError',
+  'torchUnavailable', 'llamaUnavailable',
   'invalidMessage', 'unsupportedProtocol', 'invalidConfiguration', 'audioDeviceUnavailable',
   'modelUnavailable', 'resourceUnavailable', 'resourceBusy', 'lineTooLarge',
 ])
@@ -51,8 +52,8 @@ function publicErrorCode(error: unknown): BrowserWireErrorCode {
   const message = error instanceof Error ? error.message : ''
   const legacy = LEGACY_BROWSER_ERROR_CODES[message]
   if (legacy) return legacy
-  if (message === 'RUNTIME_TORCH:') return 'modelUnavailable'
-  if (message === 'RUNTIME_LLAMA:') return 'resourceUnavailable'
+  if (message.startsWith('RUNTIME_TORCH:')) return 'torchUnavailable'
+  if (message.startsWith('RUNTIME_LLAMA:')) return 'llamaUnavailable'
   if (PUBLIC_ERRORS.has(message as BrowserWireErrorCode)) return message as BrowserWireErrorCode
   console.error('browser request failed with an unmapped error', error)
   return 'internalError'
