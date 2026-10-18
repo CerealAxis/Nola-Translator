@@ -30,36 +30,30 @@ beforeEach(() => {
   offlineStore.setState({ available: true, mode: 'prepare', task: null, preview: null, busy: false, failed: false, downloadModelId: undefined, destination: null })
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
-it('prepares all dependencies using a safe CPU default rather than the first CUDA recipe', () => {
-  const prepare = vi.spyOn(offlineActions, 'prepare').mockResolvedValue()
+it('starts with explicit loader version choices and no hardware or computer selector', () => {
   render(<OfflineDialog scope="runtime" />)
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  expect(screen.getByText('按目标电脑选择。准备电脑不需要安装这些组件。')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  fireEvent.click(screen.getByRole('button', { name: '开始准备' }))
-  expect(prepare).toHaveBeenCalledWith({ modelIds: [DEFAULT_SETTINGS.recognition.modelId], runtimeIds: ['torch-cpu'] })
+  for (const name of ['PyTorch', 'llama.cpp', 'CrispASR']) expect(screen.getByRole('combobox', { name })).toHaveValue('')
+  expect(screen.queryByRole('combobox', { name: '目标电脑' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('combobox', { name: '运算设备' })).not.toBeInTheDocument()
 })
-it('can prepare model files without runtime components', () => {
+it('exports the exact selected loader version without choosing it from local hardware', () => {
   const prepare = vi.spyOn(offlineActions, 'prepare').mockResolvedValue()
   render(<OfflineDialog scope="runtime" />)
-  fireEvent.click(screen.getByRole('checkbox'))
+  fireEvent.change(screen.getByRole('combobox', { name: 'PyTorch' }), { target: { value: 'torch-cuda' } })
   fireEvent.click(screen.getByRole('button', { name: '下一步' }))
   fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  fireEvent.click(screen.getByRole('button', { name: '开始准备' }))
-  expect(prepare).toHaveBeenCalledWith({ modelIds: [DEFAULT_SETTINGS.recognition.modelId], runtimeIds: [] })
+  fireEvent.click(screen.getByRole('button', { name: '导出 ZIP' }))
+  expect(prepare).toHaveBeenCalledWith({ modelIds: [], runtimeIds: ['torch-cuda'] })
 })
-it('uses the explicit other-computer backend and blocks missing supported combinations', () => {
-  const prepare = vi.spyOn(offlineActions, 'prepare').mockResolvedValue()
+it('disables models until their loader is included and displays the loader chip', async () => {
+  const user = userEvent.setup()
   render(<OfflineDialog scope="runtime" />)
   fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  fireEvent.change(screen.getByRole('combobox', { name: '目标电脑' }), { target: { value: 'other' } })
-  fireEvent.change(screen.getByRole('combobox', { name: '运算设备' }), { target: { value: 'xpu' } })
+  await user.click(screen.getByRole('button', { name: /识别模型/ }))
+  expect(await screen.findByRole('option', { name: /Speech model/ })).toHaveAttribute('aria-disabled', 'true')
+  expect(screen.getAllByText('PyTorch').length).toBeGreaterThan(0)
+  await user.keyboard('{Escape}')
   expect(screen.getByRole('button', { name: '下一步' })).toBeDisabled()
-  expect(screen.getByRole('alert')).toHaveTextContent('不兼容')
-  fireEvent.change(screen.getByRole('combobox', { name: '运算设备' }), { target: { value: 'cuda' } })
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  fireEvent.click(screen.getByRole('button', { name: '开始准备' }))
-  expect(prepare).toHaveBeenCalledWith({ modelIds: [DEFAULT_SETTINGS.recognition.modelId], runtimeIds: ['torch-cuda'] })
 })
 it('blocks an invalid import preview and shows available space', () => {
   offlineStore.setState({ mode: 'model', preview: { token: 'opaque', compatible: false, issues: ['checksumMismatch'], items: [], totalBytes: 1024, availableBytes: 4096 } })
@@ -133,35 +127,22 @@ it('shows resource counts rather than gigabytes while packaging', () => {
   expect(screen.queryByText('0.00 GB / 0.00 GB')).not.toBeInTheDocument()
 })
 
-it('prepares Torch CPU plus llama Vulkan for another computer', () => {
-  const runtime = runtimes()
-  runtime.packages.push({ ...runtime.packages[0], id: 'llama-vulkan', name: 'llama Vulkan', backend: 'vulkan' })
-  settingsStore.setState({ runtimes: runtime })
-  modelsStore.setState({ resources: [...modelsStore.getState().resources, { resourceId: DEFAULT_SETTINGS.translation.localModelId, provider: 'hymt2', kind: 'translationModel', name: 'Translation model', description: '', languages: ['en'], installed: false, installedBytes: 0, state: 'idle', cancellable: false }] })
-  const prepare = vi.spyOn(offlineActions, 'prepare').mockResolvedValue()
+it('keeps the export title when reopening a background preparation task', () => {
+  offlineStore.setState({ mode: 'bundle', workflow: 'bundle-prepare', task: { state: 'running', phase: 'pack', current: 1, total: 3 } })
   render(<OfflineDialog scope="runtime" />)
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  fireEvent.change(screen.getByRole('combobox', { name: '目标电脑' }), { target: { value: 'other' } })
-  fireEvent.change(screen.getByRole('combobox', { name: '运算设备' }), { target: { value: 'vulkan' } })
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  expect(screen.getByText('Torch cpu')).toBeInTheDocument()
-  expect(screen.getByText('llama Vulkan')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: '开始准备' }))
-  expect(prepare).toHaveBeenCalledWith({ modelIds: [DEFAULT_SETTINGS.recognition.modelId, DEFAULT_SETTINGS.translation.localModelId], runtimeIds: ['torch-cpu', 'llama-vulkan'] })
+  expect(screen.getByRole('heading', { name: '准备离线包' })).toBeInTheDocument()
 })
 
-it('includes pinned runtime artifacts in the size shown for a runtime-only package', () => {
+it('includes dependency artifacts in the estimate for a runtime-only ZIP', () => {
   const runtime = runtimes()
   const cpu = runtime.recipes.find(item => item.backend === 'cpu')!
   cpu.wheel.bytes = 1024 ** 3
   cpu.companions = [{ ...cpu.wheel, filename: 'companion.whl', bytes: 1024 ** 3 }]
-  runtime.packages.find(item => item.backend === 'cpu')!.bytes = 1024 ** 3
   settingsStore.setState({ runtimes: runtime })
-  modelsStore.setState({ resources: [] })
   render(<OfflineDialog scope="runtime" />)
+  fireEvent.change(screen.getByRole('combobox', { name: 'PyTorch' }), { target: { value: 'torch-cpu' } })
   fireEvent.click(screen.getByRole('button', { name: '下一步' }))
   fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  expect(screen.getByText('3.00 GB')).toBeInTheDocument()
-  expect(screen.getByText('已知文件大小下限')).toBeInTheDocument()
-  expect(screen.getByText('包含模型和已固定的组件文件；额外依赖大小将在准备时确定。')).toBeInTheDocument()
+  expect(screen.getByText('2.00 GB')).toBeInTheDocument()
+  expect(screen.queryByText('包含模型和已固定的组件文件；额外依赖大小将在准备时确定。')).not.toBeInTheDocument()
 })

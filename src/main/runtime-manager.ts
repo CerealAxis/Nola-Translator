@@ -8,7 +8,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { net, session } from 'electron'
 import { z } from 'zod'
-import { CRISP_RUNTIME_ID, runtimePackageSchema, type ComputeSettings, type LocalRuntime, type RuntimePackage, type RuntimeSnapshot, type HardwareInventory } from '../shared/compute'
+import { CRISP_RUNTIME_ID, CRISP_RUNTIME_FILES, runtimePackageSchema, type ComputeSettings, type LocalRuntime, type RuntimePackage, type RuntimeSnapshot, type HardwareInventory } from '../shared/compute'
 import type { NetworkSettings } from '../shared/settings'
 import { probeHardware } from './hardware-inventory'
 import { PythonEnvironments, aliyunTorchWheelUrl } from './python-environments'
@@ -22,12 +22,7 @@ const run = promisify(execFile)
 const catalogSchema = z.object({ version: z.literal(1), packages: z.array(runtimePackageSchema).max(32) })
 const GITHUB_ASSET_HOSTS = new Set(['github.com', 'objects.githubusercontent.com'])
 const CRISP_ID = CRISP_RUNTIME_ID
-const CRISP_FILES = [
-  { url: 'https://files.pythonhosted.org/packages/5c/06/2ed13aeedd45410c0d1ec1fd4e16aa645b4d197ff20243dd0cc893fcb6e5/crispasr-0.8.43-py3-none-win_amd64.whl',
-    name: 'crispasr-0.8.43-py3-none-win_amd64.whl', bytes: 14_522_754, sha256: '546184aa746ec9f46ca568ae98ec5e436edb518a9bb56b445d9cfdbec431db7f' },
-  { url: 'https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.43/crispasr-0.8.43%2Bvulkan-py3-none-win_amd64.whl',
-    name: 'crispasr-0.8.43+vulkan-py3-none-win_amd64.whl', bytes: 28_714_544, sha256: '08854cc005537d925ea3191e63b3dc840191a58a961844dc61403f64e5904678' },
-] as const
+
 type Options = { recipesPath: string; baseDirectory: string; localLlamaDirectory?: string; network?: () => NetworkSettings }
 
 /**
@@ -126,12 +121,15 @@ export class RuntimeManager {
           ? this.pythonState.ready ? await probeLocalEngine(python, path) : { ...missingLocalRuntime(path), status: 'failed' as const, reason: this.pythonState.reason }
           : await probeLocalLlama(path)
         let id: string | undefined
+        let managed = false
         try {
           const marker = JSON.parse(await readFile(join(path, 'runtime-installed.json'), 'utf8'))
           if (typeof marker.id === 'string' && resolve(path).toLowerCase() === this.inside(marker.id).toLowerCase() &&
-            (kind === 'engine' ? this.python?.has(marker.id) && marker.kind === 'python' : this.packages.some(p => p.id === marker.id) && marker.kind === 'llama')) id = marker.id
+            (kind === 'engine' ? this.python?.has(marker.id) && marker.kind === 'python' : this.packages.some(p => p.id === marker.id) && marker.kind === 'llama')) {
+            id = marker.id
+            managed = true
+          }
         } catch { /* External and older installations are reused without repair ownership. */ }
-        const managed = !!id
         if (!id && kind === 'engine' && actual.status === 'ready') {
           id = this.python?.recipes.find(recipe => recipe.backend === actual.backend && recipe.torchVersion === actual.version.split('+')[0] &&
             (recipe.xformersVersion ?? '') === (actual.xformersVersion ?? '') &&
@@ -228,7 +226,8 @@ export class RuntimeManager {
     if (id === CRISP_ID) { await this.installCrisp(repair); return }
     const kind = this.python?.has(id) ? 'engine' : 'llama'
     const current = this.local[kind]
-    if (!repair && current.status === 'ready' && current.id === id) return
+    const previousId = current.managed ? current.id : undefined
+    if (!repair && current.status === 'ready' && current.id === id && current.managed) return
     let actual: LocalRuntime
     if (kind === 'engine') {
       await this.python!.install(id, repair)
@@ -241,27 +240,63 @@ export class RuntimeManager {
     }
     if (actual.status !== 'ready') throw new Error(actual.reason)
     this.local[kind] = { ...actual, id, managed: true }
+    if (previousId && previousId !== id) {
+      try {
+        await this.removeManagedRuntime(kind, previousId)
+        logDiagnostic('runtime.install.removed-previous', { kind, id: previousId })
+      } catch (error) {
+        logDiagnostic('runtime.install.previous-remove-failed', { kind, id: previousId, error: String(error) })
+      }
+    }
     await this.saveSelection()
     logDiagnostic('runtime.install.complete', { id, actual })
   }
-  private async installCrisp(repair: boolean): Promise<void> {
+
+  async uninstall(kind: 'engine' | 'llama' | 'crisp'): Promise<void> {
+    logDiagnostic('runtime.uninstall.request', { kind })
+    if (this.operation || this.python?.operation || this.checking) throw new Error('已有组件检查或安装任务')
+    const current = this.local[kind]
+    if (!current || current.status !== 'ready' || !current.managed || !current.id) throw new Error('只能卸载由软件管理的运行组件')
+    await this.removeManagedRuntime(kind, current.id)
+    await this.recheck([kind])
+    logDiagnostic('runtime.uninstall.complete', { kind })
+  }
+
+  private async removeManagedRuntime(kind: 'engine' | 'llama' | 'crisp', id: string): Promise<void> {
+    if (kind === 'engine') {
+      if (!this.python?.has(id)) throw new Error('PyTorch 组合不在清单中')
+      await this.python.uninstall(id)
+      return
+    }
+    if (kind === 'llama') {
+      if (!this.packages.some(item => item.id === id)) throw new Error('llama.cpp 组件不在清单中')
+      await removeRuntimeArtifact(this.directory, this.inside(id))
+      return
+    }
+    if (id !== CRISP_ID) throw new Error('CrispASR 组件无效')
+    await removeRuntimeArtifact(this.directory, this.inside(CRISP_ID))
+  }
+  private async installCrisp(repair: boolean, offline?: { files: string[]; signal: AbortSignal }): Promise<void> {
     if (!repair && this.local.crisp?.status === 'ready' && this.local.crisp.id === CRISP_ID) return
+    offline?.signal.throwIfAborted()
     const controller = new AbortController()
     this.cancellation = controller
-    const totalBytes = CRISP_FILES.reduce((sum, item) => sum + item.bytes, 0)
+    const abort = (): void => controller.abort()
+    offline?.signal.addEventListener('abort', abort, { once: true })
+    const totalBytes = CRISP_RUNTIME_FILES.reduce((sum, item) => sum + item.bytes, 0)
     this.operation = { id: CRISP_ID, phase: 'download', bytes: 0, totalBytes, startedAt: Date.now() }
     const staging = this.inside(`staging-${CRISP_ID}-${randomUUID()}`)
     const wheelDirectory = this.inside(`staging-${CRISP_ID}-dll-${randomUUID()}`)
     const destination = this.inside(CRISP_ID)
     const backup = this.inside(`backup-${CRISP_ID}-${randomUUID()}`)
-    const wheels = CRISP_FILES.map(item => join(wheelDirectory, item.name))
+    const wheels = offline?.files ?? CRISP_RUNTIME_FILES.map(item => join(wheelDirectory, item.name))
     let backedUp = false
     try {
       await mkdir(staging, { recursive: true })
       await mkdir(wheelDirectory, { recursive: true })
       let completed = 0
-      for (const [index, item] of CRISP_FILES.entries()) {
-        await this.download(item, wheels[index], controller.signal, bytes => {
+      for (const [index, item] of CRISP_RUNTIME_FILES.entries()) {
+        if (!offline) await this.download(item, wheels[index], controller.signal, bytes => {
           if (this.operation) this.operation.bytes = completed + bytes
         })
         this.operation!.phase = 'verify'
@@ -295,6 +330,7 @@ export class RuntimeManager {
       this.lastError = controller.signal.aborted ? '安装已取消' : String(error)
       throw new Error(this.lastError)
     } finally {
+      offline?.signal.removeEventListener('abort', abort)
       for (const artifact of [staging, wheelDirectory]) await removeRuntimeArtifact(this.directory, artifact).catch(() => undefined)
       this.operation = null
       this.cancellation = null
@@ -310,6 +346,7 @@ export class RuntimeManager {
         const url = mirror && await this.probeUrl(mirror, signal) ? mirror : item.url
         await this.download({ ...item, url }, path, signal, progress)
       },
+      installCrisp: (files, signal) => this.installCrisp(true, { files, signal }),
       installPython: async (id, wheelhouse, requirements, signal) => {
         if (!this.python) throw new Error('Runtime manager is not initialized')
         await this.python.install(id, true, { wheelhouse, requirements, signal })
@@ -331,18 +368,20 @@ export class RuntimeManager {
   private async reusableOfflineRuntime(id: string, signal?: AbortSignal): Promise<boolean> {
     const recipe = this.python?.recipes.find(item => item.id === id)
     const pkg = this.packages.find(item => item.id === id)
-    if (!recipe && !pkg) return false
-    const kind = recipe ? 'engine' : 'llama'
+    const crisp = id === CRISP_ID
+    if (!recipe && !pkg && !crisp) return false
+    const kind = crisp ? 'crisp' : recipe ? 'engine' : 'llama'
     const selected = this.local[kind]
     const directory = this.inside(id)
-    if (selected.id !== id || !selected.managed || selected.status !== 'ready' || resolve(selected.path) !== directory) return false
+    if (!selected || selected.id !== id || !selected.managed || selected.status !== 'ready' || resolve(selected.path) !== directory) return false
     try {
       signal?.throwIfAborted()
       const marker = JSON.parse(await readFile(join(directory, 'runtime-installed.json'), 'utf8'))
-      if (marker.id !== id || marker.kind !== (recipe ? 'python' : 'llama')) return false
-      const actual = recipe ? await probeLocalEngine(this.pythonState.path, directory) : await probeLocalLlama(directory)
+      if (marker.id !== id || marker.kind !== (crisp ? 'crisp' : recipe ? 'python' : 'llama')) return false
+      const actual = crisp ? await probeLocalCrisp(this.pythonState.path, directory) : recipe ? await probeLocalEngine(this.pythonState.path, directory) : await probeLocalLlama(directory)
       signal?.throwIfAborted()
       if (actual.status !== 'ready') return false
+      if (crisp) return actual.version === '0.8.43' && actual.backend === 'vulkan'
       return recipe
         ? actual.backend === recipe.backend && actual.version.split('+')[0] === recipe.torchVersion && (!recipe.xformersVersion || actual.xformersVersion === recipe.xformersVersion)
         : actual.backend === pkg!.backend && actual.version === pkg!.version

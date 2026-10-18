@@ -15,6 +15,7 @@ import { disposeStores, initStores, isEngineConnected, stores, useStore } from '
 import { OverlayRoot } from './features/overlay'
 import { OverlayMenuRoot } from './features/overlay/OverlayMenuRoot'
 import { RuntimeNotice } from './features/settings/RuntimeNotice'
+import { RuntimeOperationNotice } from './features/settings/RuntimeOperationNotice'
 import { StartupFailureDialog } from './features/settings/StartupFailureDialog'
 import { AppUpdateNotice } from './features/settings/AppUpdateNotice'
 import { OnboardingTour } from './features/onboarding'
@@ -169,6 +170,7 @@ function Root() {
       <ModelDownloadNotice />
       <ModelCapabilityNotices />
       <RuntimeNotice />
+      <RuntimeOperationNotice />
       <AppUpdateNotice />
       <StartupFailureDialog
         isOpen={!startupDialogDismissed && (engineStatus === 'failed' || (startupTimedOut && engineStatus !== 'ready'))}

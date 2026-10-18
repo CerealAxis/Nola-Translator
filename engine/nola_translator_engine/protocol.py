@@ -126,10 +126,10 @@ class ModelSelection(ProtocolModel):
     # `local` and `cloud` are provider names, not wire formats. `local` dispatches on the adapter
     # the selected model's own metadata resolved to, so a hub GGUF and the bundled transformers
     # model are both "local"; `cloud` dispatches on `translationOptions.apiFormat`.
-    translationProvider: Literal["local", "cloud", "microsoft", "mymemory", "index-translate", "recognition"] = "local"
+    translationProvider: Literal["local", "cloud", "microsoft", "mymemory", "google", "index-translate", "recognition"] = "local"
     translationModelId: str | None = Field(default=None, min_length=1, max_length=256)
     translationOptions: TranslationOptions | None = None
-    fallbackTranslationProvider: Literal["local", "cloud", "microsoft", "mymemory", "index-translate"] | None = None
+    fallbackTranslationProvider: Literal["local", "cloud", "microsoft", "mymemory", "google", "index-translate"] | None = None
     fallbackTranslationOptions: TranslationOptions | None = None
 
 

@@ -343,6 +343,10 @@ export const zhCN = {
     downloadComplete: '{name} 下载完成',
     downloadError: '{name} 下载失败，可重试或更换下载源。',
     installed: '已安装',
+    recommended: '推荐',
+    tryable: '可尝试',
+    notRecommended: '不推荐',
+    engineUnavailable: '请先在设置中安装对应加载器。',
     remove: '卸载',
     setDefault: '设为默认',
     notInstalled: '未安装',
@@ -507,17 +511,18 @@ export const zhCN = {
     deleteKey: '删除密钥',
     testing: '正在测试连接',
     /*
-     * 翻译服务商只剩三个。**「本地模型」「云端模型」是界面概念，不是产品名**：
+     * 「本地模型」「云端模型」是界面概念，不是产品名：
      * Hy-MT2 与 M2M100 合并成前者（真正跑哪个由选中的模型 id 决定），
      * OpenAI 与 Ollama 合并成后者（Ollama 从此只是一种接口协议，不是服务商）。
-     * 所以这两行必须跟着界面语言走；产品名只剩 Microsoft Translator 一个。
+     * 所以这两行必须跟着界面语言走；产品名保留服务商自己的名称。
      */
     providerLocal: '本地模型',
     providerDisabled: '不启用翻译服务',
     providerCloud: '云端模型',
     providerMicrosoft: 'Microsoft Translator',
     providerMyMemory: 'MyMemory 免费翻译',
-    providerIndexTranslate: '哔哩哔哩 免费API',
+    providerGoogle: 'Google 翻译',
+    providerIndexTranslate: 'Index Translate 免费API',
     indexTranslateHint: '使用官方免费 API，支持流式译文；原文会发送给哔哩哔哩。当前语言预设覆盖官方客户端映射的 32 种语言。',
     providerRecognitionTranslation: '阿里云',
     providerAliyun: '阿里云 LiveTranslate',
@@ -533,7 +538,7 @@ export const zhCN = {
      * 价格按音频时长计费，与调用次数无关，所以放在同一句里说清。
      */
     minimaxNotice: '按静音把音频切成不超过 15 秒的片段后逐段上传，字幕在停顿处整句出现，不是逐字实时。支持 20 种语言，没有自带译文，需要翻译请在「翻译服务」里另选。按音频时长计费 2.50 元/小时。',
-    mymemoryHint: '无需 API Key。每句确认后通过 REST 翻译，无逐字流式输出；免费服务有配额和限流，原文会发给 MyMemory。',
+    mymemoryHint: '无需 API Key，每句确认后通过 REST 翻译，无逐字流式输出，免费服务有配额和限流',
     mymemoryEmail: '联系邮箱（可选）',
     nativeTranslationHint: '使用当前阿里云识别连接返回的流式译文，无需额外翻译接口。仅支持阿里云 LiveTranslate。',
     localModelEmpty: '尚未安装本地翻译模型，请先到「模型管理」下载。',

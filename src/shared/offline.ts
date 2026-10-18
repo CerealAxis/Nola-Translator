@@ -31,9 +31,10 @@ export interface OfflinePreview {
 }
 export interface OfflineTask {
   state: 'idle' | 'running' | 'completed' | 'failed' | 'cancelled'
-  phase: 'check' | 'download' | 'copy' | 'install' | 'verify' | 'pack'
+  phase: 'check' | 'download' | 'copy' | 'install' | 'verify' | 'pack' | 'extract'
   current: number
   total: number
+  unit?: 'bytes' | 'items'
   detail?: string
   issue?: OfflineIssue
   reason?: string

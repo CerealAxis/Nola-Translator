@@ -18,6 +18,7 @@ export const offlineStore = createStore<OfflineState>({ available: false, mode: 
 let bridge: NolaBridge | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
 let generation = 0
+let taskRevision = 0
 let completed: (() => void) | undefined
 
 function accept(task: OfflineTask): void {
@@ -30,10 +31,15 @@ function accept(task: OfflineTask): void {
 function schedule(): void {
   if (timer) clearTimeout(timer)
   const current = generation
+  const revision = taskRevision
   timer = setTimeout(() => {
     timer = null
-    void bridge?.offline?.snapshot().then(task => { if (current === generation) accept(task) }).catch(() => {
-      if (current === generation) { offlineStore.setState({ failed: true }); schedule() }
+    void bridge?.offline?.snapshot().then(task => {
+      if (current !== generation || revision !== taskRevision) return
+      if (task.state === 'idle' && offlineStore.getState().busy) schedule()
+      else accept(task)
+    }).catch(() => {
+      if (current === generation && revision === taskRevision) { offlineStore.setState({ failed: true }); schedule() }
     })
   }, 1000)
 }
@@ -69,18 +75,16 @@ export const offlineActions = {
   },
   pickBundle(): Promise<void> {
     return (async () => {
-      if (offlineStore.getState().busy) return
-      offlineStore.setState({ busy: true, failed: false })
+      if (offlineStore.getState().busy || offlineStore.getState().task?.state === 'running') return
+      offlineStore.setState({ busy: true, failed: false, mode: 'bundle', preview: null, workflow: 'bundle-install', task: { state: 'running', phase: 'extract', current: 0, total: 0 } })
+      schedule()
       try {
         const preview = await bridge?.offline?.selectBundle() ?? null
-        if (preview) offlineStore.setState({ preview })
-      } catch { offlineStore.setState({ failed: true }) }
-      finally {
-        // The dialog opens only once the picker resolved: an import already has its preview, a failure has
-        // an alert to show, and a cancelled picker leaves no empty dialog behind.
-        if (offlineStore.getState().preview || offlineStore.getState().failed) offlineStore.setState({ mode: 'bundle' })
-        offlineStore.setState({ busy: false })
-      }
+        taskRevision++
+        if (timer) clearTimeout(timer)
+        offlineStore.setState({ preview, task: null, mode: preview ? 'bundle' : null })
+      } catch { taskRevision++; if (timer) clearTimeout(timer); offlineStore.setState({ failed: true, task: null }) }
+      finally { offlineStore.setState({ busy: false }) }
     })()
   },
   prepare(request: OfflinePrepareRequest): Promise<void> {
@@ -119,7 +123,10 @@ export const offlineActions = {
     })
   },
   clearDestination(): void { offlineStore.setState({ destination: null, failed: false }) },
-  cancel(): Promise<void> { return run(async () => { await bridge?.offline?.cancel(); return bridge?.offline?.snapshot() }, task => { if (task) accept(task) }) },
+  async cancel(): Promise<void> {
+    try { await bridge?.offline?.cancel() }
+    catch { offlineStore.setState({ failed: true }) }
+  },
   openOutput(): Promise<void> { return run(async () => bridge?.offline?.openOutput(), () => undefined) },
   reset(): void { if (offlineStore.getState().task?.state !== 'running') offlineStore.setState({ task: null, preview: null, failed: false, workflow: undefined }) },
 }

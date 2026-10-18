@@ -113,7 +113,7 @@ export const settingsPatchSchema = z.object({
     bottomOffset: z.number().min(0).max(30).optional(),
   }).partial().optional(),
   translation: z.object({
-    provider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'index-translate', 'recognition']).optional(),
+    provider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate', 'recognition']).optional(),
     mymemoryEndpoint: z.string().max(2048).optional(),
     mymemoryEmail: z.string().max(320).optional(),
     localModelId: localModelIdSchema.optional(),
@@ -128,7 +128,7 @@ export const settingsPatchSchema = z.object({
     translateIntermediate: z.boolean().optional(),
     targetLanguage: z.string().min(1).max(32).optional(),
     fallback: z.object({
-      provider: z.enum(['disabled', 'local', 'cloud', 'microsoft', 'mymemory', 'index-translate']).optional(),
+      provider: z.enum(['disabled', 'local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate']).optional(),
       cloudEndpoint: z.string().max(2048).optional(), cloudModel: z.string().max(256).optional(),
       cloudApiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
       cloudContextWindow: z.number().int().min(256).max(10_000_000).optional(),

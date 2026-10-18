@@ -27,10 +27,10 @@ beforeEach(() => {
 })
 afterEach(async () => { vi.clearAllMocks(); for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true }) })
 
-async function createManager(saved = true) {
+async function createManager(saved = true, catalog = '{"version":1,"packages":[]}') {
   const directory = await mkdtemp(join(tmpdir(), 'nola-startup-runtime-'))
   directories.push(directory)
-  await writeFile(join(directory, 'catalog.json'), '{"version":1,"packages":[]}')
+  await writeFile(join(directory, 'catalog.json'), catalog)
   await writeFile(join(directory, 'recipes.json'), '{"version":1,"recipes":[]}')
   const engine = join(directory, 'existing-torch')
   const llama = join(directory, 'existing-llama')
@@ -56,6 +56,19 @@ it('discovers all existing components without a saved selection regardless of cl
   await manager.initialize()
   expect((await manager.snapshot()).local.engine.status).toBe('ready')
   expect((await manager.snapshot()).local.llama.status).toBe('ready')
+})
+
+it('does not treat a matching external llama runtime as app-managed', async () => {
+  const packageId = 'llama-vulkan-test'
+  const catalog = JSON.stringify({ version: 1, packages: [{
+    id: packageId, name: 'llama.cpp b11532 (Vulkan)', kind: 'llama', backend: 'vulkan', architecture: 'x64', version: 'b11532',
+    url: 'https://example.com/llama.zip', sha256: 'a'.repeat(64), bytes: 1,
+  }] })
+  const { manager, directory } = await createManager(false, catalog)
+  const external = join(directory, 'external-llama')
+  mocks.candidates.mockResolvedValue({ torch: [], llama: [external] })
+  await manager.initialize()
+  expect((await manager.snapshot()).local.llama).toMatchObject({ id: packageId, managed: false, status: 'ready' })
 })
 
 it('completes startup normally when neither optional inference component is installed', async () => {

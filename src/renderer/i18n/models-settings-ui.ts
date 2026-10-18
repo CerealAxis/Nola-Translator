@@ -37,7 +37,7 @@ export const modelsSettingsZh = {
   dataFolder: '数据文件夹',
   dataFolderDescription: '设置、会议记录、模型和运行时都放在这个文件夹里',
   storageUsage: '储存占用',
-  storageValueUnavailable: '读不到',
+  storageValueUnavailable: '获取失败',
   dataFolderWillMove: '数据会在重启应用后搬到新文件夹',
   credentialCheck: '检查密钥',
 }

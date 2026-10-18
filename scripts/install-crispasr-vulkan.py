@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 from pathlib import Path
-import site
+import sysconfig
 from tempfile import TemporaryDirectory
 from urllib.request import urlopen
 from zipfile import ZipFile
@@ -21,7 +21,8 @@ LIBRARIES = {
 
 
 def main() -> None:
-    package = Path(site.getsitepackages()[0]) / "crispasr"
+    # On Windows, site.getsitepackages()[0] is the venv root; purelib is the actual package directory.
+    package = Path(sysconfig.get_path("purelib")) / "crispasr"
     if not (package / "__init__.py").is_file():
         raise RuntimeError("Install the pinned CPU CrispASR wheel first")
     destination = package / "vulkan"

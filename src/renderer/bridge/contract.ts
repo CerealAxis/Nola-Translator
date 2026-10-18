@@ -122,6 +122,7 @@ export interface NolaBridge {
     list(): Promise<RuntimeSnapshot>
     prepare(components?: readonly ('engine' | 'llama' | 'crisp')[]): Promise<RuntimeSnapshot>
     install(id: string, repair?: boolean): Promise<void>
+    uninstall(kind: 'engine' | 'llama' | 'crisp'): Promise<void>
     import(): Promise<boolean>
     cancel(): Promise<void>
   }

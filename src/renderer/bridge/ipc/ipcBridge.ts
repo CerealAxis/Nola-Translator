@@ -113,6 +113,7 @@ export function createIpcBridge(): NolaBridge {
       list: () => call('getRuntimes', (injected) => injected.getRuntimes()),
       prepare: (components) => call('prepareRuntimes', (injected) => injected.prepareRuntimes(components)),
       install: (id, repair) => call('installRuntime', (injected) => injected.installRuntime(id, repair)),
+      uninstall: (kind) => call('uninstallRuntime', (injected) => injected.uninstallRuntime(kind)),
       import: () => call('importRuntime', (injected) => injected.importRuntime()),
       cancel: () => call('cancelRuntimeInstall', (injected) => injected.cancelRuntimeInstall()),
     },

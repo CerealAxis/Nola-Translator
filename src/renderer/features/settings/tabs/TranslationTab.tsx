@@ -22,6 +22,7 @@ import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 import { ALIYUN_LANGUAGES, supportsIntermediateTranslation, supportsRecognitionNativeTranslation } from '../../../../shared/cloud-config'
 import { targetLanguagePatch } from '../../../session-config'
 import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_PUBLIC_MODEL } from '../../../../shared/index-translate'
+import { GOOGLE_TRANSLATE_ENDPOINT } from '../../../../shared/google-translate'
 
 export function TranslationTab({ settings }: SettingsPanelProps) {
   const { t } = useI18n()
@@ -35,6 +36,7 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
     cloud: t('settings.providerCloud'),
     microsoft: t('settings.providerMicrosoft'),
     mymemory: t('settings.providerMyMemory'),
+    google: t('settings.providerGoogle'),
     'index-translate': t('settings.providerIndexTranslate'),
     recognition: t('settings.providerRecognitionTranslation'),
   }), [t])
@@ -225,6 +227,10 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
           <TextRow label={t('settings.endpoint')} value={translation.fallback.mymemoryEndpoint} onCommit={(value) => { void updateSettings({ translation: { fallback: { mymemoryEndpoint: value } } }).catch(() => undefined) }} />
           <TextRow label={t('settings.mymemoryEmail')} value={translation.fallback.mymemoryEmail} onCommit={(value) => { void updateSettings({ translation: { fallback: { mymemoryEmail: value } } }).catch(() => undefined) }} />
         </> : null}
+        {translation.fallback?.provider === 'google' ? <>
+          <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{GOOGLE_TRANSLATE_ENDPOINT}</span></SettingsRow>
+          <ApiKeyRow provider="fallback-google" stored={credentials['fallback-google']} />
+        </> : null}
         {translation.fallback?.provider === 'index-translate' ? <SettingsRow label={t('settings.providerIndexTranslate')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_PUBLIC_MODEL}</span></SettingsRow> : null}
       </SettingGroup>
 
@@ -235,9 +241,15 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
         </SettingGroup>
       ) : translation.provider === 'mymemory' ? (
         <SettingGroup legend={t('settings.groupConnection')}>
-          <SettingsRow label={t('settings.providerMyMemory')} desc={t('settings.mymemoryHint')} children={null} />
+          <SettingsRow label={t('settings.providerMyMemory')} desc={t('settings.mymemoryHint')} descriptionTooltip children={null} />
           <TextRow label={t('settings.endpoint')} value={translation.mymemoryEndpoint ?? 'https://api.mymemory.translated.net/get'} onCommit={value => { void updateSettings({ translation: { mymemoryEndpoint: value } }).catch(() => undefined) }} />
           <TextRow label={t('settings.mymemoryEmail')} value={translation.mymemoryEmail ?? ''} onCommit={value => { void updateSettings({ translation: { mymemoryEmail: value } }).catch(() => undefined) }} />
+        </SettingGroup>
+      ) : translation.provider === 'google' ? (
+        <SettingGroup legend={t('settings.groupConnection')}>
+          <SettingsRow label={t('settings.providerGoogle')} children={null} />
+          <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{GOOGLE_TRANSLATE_ENDPOINT}</span></SettingsRow>
+          <ApiKeyRow provider="google" stored={credentials.google} />
         </SettingGroup>
       ) : translation.provider === 'recognition' ? (
         <SettingGroup legend={t('settings.groupConnection')}><SettingsRow label={t('settings.providerRecognitionTranslation')} desc={t('settings.nativeTranslationHint')} children={null} /></SettingGroup>

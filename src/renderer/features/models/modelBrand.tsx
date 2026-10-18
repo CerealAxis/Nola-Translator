@@ -8,11 +8,13 @@ import Alibaba from '@lobehub/icons/es/Alibaba/components/Mono'
 import Bilibili from '@lobehub/icons/es/Bilibili/components/Mono'
 import Hunyuan from '@lobehub/icons/es/Hunyuan/components/Mono'
 import Meta from '@lobehub/icons/es/Meta/components/Mono'
+import Microsoft from '@lobehub/icons/es/Microsoft/components/Mono'
 import Qwen from '@lobehub/icons/es/Qwen/components/Mono'
+import XiaomiMiMo from '@lobehub/icons/es/XiaomiMiMo/components/Mono'
 import { AudioLines, Globe } from 'lucide-react'
 import type { ComponentType, SVGProps } from 'react'
 
-export type ModelBrand = 'qwen' | 'alibaba' | 'hunyuan' | 'bilibili' | 'meta' | 'unknown'
+export type ModelBrand = 'qwen' | 'alibaba' | 'hunyuan' | 'bilibili' | 'meta' | 'microsoft' | 'xiaomi-mimo' | 'unknown'
 type KnownBrand = Exclude<ModelBrand, 'unknown'>
 
 type MarkProps = SVGProps<SVGSVGElement> & { size?: string | number; color?: string; title?: string }
@@ -24,6 +26,8 @@ const MARK_BY_BRAND: Record<KnownBrand, Mark> = {
   hunyuan: Hunyuan,
   bilibili: Bilibili,
   meta: Meta,
+  microsoft: Microsoft,
+  'xiaomi-mimo': XiaomiMiMo,
 }
 
 /** Brand tokens, first match wins. */
@@ -32,6 +36,8 @@ const REPO_TOKENS: ReadonlyArray<readonly [RegExp, KnownBrand]> = [
   [/sensevoice|funaudiollm|fun-asr/i, 'alibaba'],
   [/hy-?mt2|hunyuan/i, 'hunyuan'],
   [/index-translate|indexteam|bilibili/i, 'bilibili'],
+  [/vibevoice|microsoft/i, 'microsoft'],
+  [/mimo-v2|xiaomi/i, 'xiaomi-mimo'],
   [/m2m100|nllb|llama/i, 'meta'],
 ]
 
@@ -41,6 +47,8 @@ const LOCAL_TOKENS: ReadonlyArray<readonly [RegExp, KnownBrand]> = [
   [/sensevoice|fun-asr/i, 'alibaba'],
   [/hy-?mt2|hunyuan/i, 'hunyuan'],
   [/index-translate/i, 'bilibili'],
+  [/vibevoice/i, 'microsoft'],
+  [/mimo-v2|xiaomi/i, 'xiaomi-mimo'],
   [/m2m100/i, 'meta'],
 ]
 
@@ -50,6 +58,8 @@ const BY_PROVIDER: Record<string, KnownBrand> = {
   sensevoice: 'alibaba',
   'hy-mt2': 'hunyuan',
   'index-translate': 'bilibili',
+  'vibevoice-asr': 'microsoft',
+  'mimo-v2.5-asr': 'xiaomi-mimo',
   m2m100: 'meta',
 }
 

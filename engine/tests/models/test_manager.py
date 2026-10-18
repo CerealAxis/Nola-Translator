@@ -140,7 +140,7 @@ def test_catalog_modelscope_manifests_are_independently_pinned() -> None:
 
     specs = [value for value in vars(catalog).values()
              if isinstance(value, ModelSpec) and value.modelscope_repo]
-    assert len(specs) == 10
+    assert len(specs) == 19
     for spec in specs:
         assert len(spec.modelscope_revision) == 40
         assert spec.modelscope_files

@@ -128,6 +128,7 @@ from .translation.network import (
 )
 from .translation.scheduler import TranslationScheduler
 from .translation.mymemory import DEFAULT_MYMEMORY_ENDPOINT, MyMemoryTranslationProvider
+from .translation.google_translate import DEFAULT_GOOGLE_TRANSLATE_ENDPOINT, GoogleTranslateProvider
 from .translation.index_translate import IndexTranslateLocalProvider, IndexTranslatePublicProvider
 
 
@@ -1102,6 +1103,11 @@ class EngineRuntime:
         elif provider_name == "mymemory":
             provider = MyMemoryTranslationProvider(endpoint=resolved(endpoint, DEFAULT_MYMEMORY_ENDPOINT),
                 email=options.email if options else "")
+        elif provider_name == "google":
+            provider = GoogleTranslateProvider(
+                api_key=api_key,
+                endpoint=resolved(endpoint, DEFAULT_GOOGLE_TRANSLATE_ENDPOINT),
+            )
         elif provider_name == "index-translate":
             # Public API configuration is fixed and never consumes a cloud credential.
             provider = IndexTranslatePublicProvider()

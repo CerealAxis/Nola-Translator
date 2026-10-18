@@ -2,10 +2,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { offlineArchive } from '../../../src/main/offline-archive'
 import { OfflineManager, type ModelWorkerRequest } from '../../../src/main/offline-manager'
 
 const roots: string[] = []
-afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }) })
+const managers: OfflineManager[] = []
+afterEach(async () => {
+  for (const manager of managers.splice(0)) await manager.dispose()
+  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
+})
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'nola-offline-test-')); roots.push(root)
   const runtime = { prepareOffline: vi.fn(async () => {}), inspectOffline: vi.fn(async () => []), installOffline: vi.fn(async () => {}) }
@@ -13,10 +18,11 @@ async function fixture() {
   const release = vi.fn(async () => {})
   const reserve = vi.fn(() => release)
   const manager = new OfflineManager({ modelRoot: join(root, 'models'), runtimeRoot: join(root, 'runtimes'), appVersion: '1.0.9', runtimes: runtime, models, reserve, network: () => ({}) })
+  managers.push(manager)
   return { root, runtime, models, release, reserve, manager }
 }
 async function settled(manager: OfflineManager) {
-  for (let i = 0; i < 100 && manager.snapshot().state === 'running'; i++) await new Promise(resolve => setTimeout(resolve, 5))
+  for (let i = 0; i < 400 && manager.snapshot().state === 'running'; i++) await new Promise(resolve => setTimeout(resolve, 5))
   return manager.snapshot()
 }
 describe('offline resources coordinator', () => {
@@ -32,11 +38,14 @@ describe('offline resources coordinator', () => {
   })
   it('writes the completion manifest only after resources finish, without installing on the preparing computer', async () => {
     const { root, manager, runtime, reserve } = await fixture()
+    runtime.inspectOffline.mockResolvedValue([{ id: 'torch-cpu', name: 'Torch', kind: 'runtime', bytes: 4, status: 'ready' }] as never)
     expect(manager.prepare({ modelIds: ['test'], runtimeIds: ['torch-cpu'] }, root).state).toBe('running')
     const task = await settled(manager)
     expect(task.state).toBe('completed')
-    const manifest = JSON.parse(await readFile(join(task.outputPath!, 'manifest.json'), 'utf8'))
-    expect(manifest).toMatchObject({ format: 'nola-offline', version: 1, platform: 'win32-x64', modelIds: ['test'], runtimeIds: ['torch-cpu'] })
+    expect(task.outputPath).toMatch(/\.zip$/)
+    const preview = await manager.inspectBundle(task.outputPath!)
+    expect(preview.compatible).toBe(true)
+    expect(preview.items.map(item => item.id)).toEqual(['test', 'torch-cpu'])
     expect(runtime.installOffline).not.toHaveBeenCalled()
     expect(reserve).not.toHaveBeenCalled()
   })
@@ -82,7 +91,12 @@ describe('offline resources coordinator', () => {
   it('refuses a manifest for another application version before invoking resource code', async () => {
     const { root, manager, models } = await fixture()
     await writeFile(join(root, 'manifest.json'), JSON.stringify({ format: 'nola-offline', version: 1, platform: 'win32-x64', appVersion: '0.0.1', modelIds: ['test'], runtimeIds: [] }))
-    await expect(manager.inspectBundle(join(root, 'manifest.json'))).rejects.toMatchObject({ issue: 'incompatible' })
+    const archive = join(root, 'invalid.zip')
+    const source = join(root, 'package')
+    await mkdir(source)
+    await writeFile(join(source, 'manifest.json'), await readFile(join(root, 'manifest.json')))
+    await offlineArchive('python', 'pack', source, archive, new AbortController().signal, () => {})
+    await expect(manager.inspectBundle(archive)).rejects.toMatchObject({ issue: 'incompatible' })
     expect(models).not.toHaveBeenCalled()
   })
   it('turns cancellation into a terminal state and cannot launch a competing task', async () => {

@@ -382,6 +382,17 @@ if (!hasSingleInstanceLock) {
           catch (error) { console.error('engine restart after component install failed', error) }
           finally { componentInstalling = false }
         }
+      }, async kind => {
+        componentInstalling = true
+        try {
+          await engine!.stop()
+          await runtimes.uninstall(kind)
+        } finally {
+          currentDirectories = JSON.stringify(runtimes.selectedDirectories())
+          try { await engine!.start() }
+          catch (error) { console.error('engine restart after component uninstall failed', error) }
+          finally { componentInstalling = false }
+        }
       })
     const getOverlayWindow = (): BrowserWindow => {
       if (!overlayWindow || overlayWindow.isDestroyed()) {
@@ -392,6 +403,7 @@ if (!hasSingleInstanceLock) {
     const isOverlayVisible = (): boolean => !!overlayWindow && !overlayWindow.isDestroyed() && (overlayWindow.isVisible() || overlayWindow.isMinimized())
     const sessions = new SessionController({ engine, meetings, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareEnvironment(true, config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => getOverlayWindow().showInactive(), hideOverlay: () => overlayWindow?.hide(), isBrowserCaptionServiceActive: () => browserConnection?.captionServiceReserved ?? false, isOverlayVisible })
     const offline = new OfflineManager({
+      python: createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath }).command,
       modelRoot: resourceEnvironment.NOLA_TRANSLATOR_MODEL_DIR,
       runtimeRoot: runtimes.directory,
       appVersion: app.getVersion(), runtimes,

@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS } from './settings'
 import { recognitionFieldsOf, recognitionLabel, remoteSourceLanguages, supportsRecognitionNativeTranslation, translationOptionsOf } from './cloud-config'
 import { sessionConfigSchema } from './schemas'
 import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_PUBLIC_MODEL } from './index-translate'
+import { GOOGLE_TRANSLATE_ENDPOINT } from './google-translate'
 
 it('builds credential-free Aliyun configuration without replacing the saved local model', () => {
   const recognition = { ...DEFAULT_SETTINGS.recognition, provider: 'aliyun' as const, aliyunWorkspaceId: 'workspace-123', aliyunRegion: 'ap-southeast-1' as const }
@@ -15,6 +16,10 @@ it('builds credential-free Aliyun configuration without replacing the saved loca
 it('passes MyMemory public settings while native translation has no separate connection', () => {
   expect(translationOptionsOf({ ...DEFAULT_SETTINGS.translation, provider: 'mymemory', mymemoryEmail: 'test@example.com' })).toEqual({ endpoint: 'https://api.mymemory.translated.net/get', email: 'test@example.com' })
   expect(translationOptionsOf({ ...DEFAULT_SETTINGS.translation, provider: 'recognition' })).toBeUndefined()
+})
+
+it('builds the official Google Translation endpoint without putting the API key in settings', () => {
+  expect(translationOptionsOf({ ...DEFAULT_SETTINGS.translation, provider: 'google' })).toEqual({ endpoint: GOOGLE_TRANSLATE_ENDPOINT })
 })
 
 it('fixes the public Index-Translate connection independently of saved cloud settings', () => {

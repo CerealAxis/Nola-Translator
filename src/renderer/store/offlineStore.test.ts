@@ -85,4 +85,20 @@ describe('offline task lifecycle', () => {
     expect(api.selectBundle).toHaveBeenCalledOnce()
     expect(offlineStore.getState().preview).toEqual(preview)
   })
+  it('shows extraction progress and permits cancellation while bundle inspection is pending', async () => {
+    vi.useFakeTimers()
+    const { api } = setup()
+    await Promise.resolve()
+    let finish: (preview: OfflinePreview | null) => void = () => {}
+    vi.mocked(api.selectBundle).mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const selected = offlineActions.pickBundle()
+    expect(offlineStore.getState()).toMatchObject({ mode: 'bundle', busy: true, task: { phase: 'extract' } })
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(offlineStore.getState().task?.state).toBe('running')
+    await offlineActions.cancel()
+    expect(api.cancel).toHaveBeenCalledOnce()
+    finish(null)
+    await selected
+    expect(offlineStore.getState()).toMatchObject({ mode: null, task: null, busy: false, failed: false })
+  })
 })

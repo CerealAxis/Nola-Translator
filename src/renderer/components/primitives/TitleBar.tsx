@@ -53,7 +53,7 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
     { key: 'more', label: t('more.tabLabel'), onSelect: () => navigate('#/settings/more') },
   ]
   return (
-    <header className={`nola-titlebar nola-drag z-titlebar-drag ${className}`} onDoubleClick={event => {
+    <header className={`nola-titlebar nola-drag z-titlebar-drag${windowsShell ? ' nola-titlebar--windows' : ''} ${className}`} onDoubleClick={event => {
       if (windowsShell && !(event.target instanceof Element && event.target.closest('.nola-no-drag'))) toggleMaximize()
     }}>
       <div className="nola-brand">

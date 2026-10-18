@@ -1,5 +1,5 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import { basename, isAbsolute, normalize } from 'node:path'
+import { dirname, extname, isAbsolute, normalize } from 'node:path'
 import { stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { offlinePrepareSchema } from '../shared/offline'
@@ -28,9 +28,10 @@ async function directoryPath(raw: unknown): Promise<string> {
 export function registerOfflineIpc(manager: OfflineManager, getWindow: () => BrowserWindow | null, whenReady: () => Promise<void>): () => Promise<void> {
   const channels = ['offline:select-model', 'offline:select-bundle', 'offline:prepare', 'offline:install', 'offline:snapshot', 'offline:cancel', 'offline:open-output', 'offline:select-destination']
   const destinations = new Map<string, string>()
-  const inspect = async (action: () => Promise<OfflinePreview>): Promise<OfflinePreview> => {
+  const inspect = async (action: () => Promise<OfflinePreview>): Promise<OfflinePreview | null> => {
     try { return await action() }
     catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return null
       logDiagnostic('offline.preflight.failed', { error: String(error) })
       return { token: '', items: [], totalBytes: 0, issues: [error instanceof OfflineError ? error.issue : 'invalidPackage'], compatible: false }
     }
@@ -56,12 +57,13 @@ export function registerOfflineIpc(manager: OfflineManager, getWindow: () => Bro
       if (result.canceled || !result.filePaths[0]) return null
       selected = result.filePaths[0]
     }
-    return { ...await inspect(() => manager.inspectModel(selected, repository || undefined)), sourcePath: selected }
+    const preview = await inspect(() => manager.inspectModel(selected, repository || undefined))
+    return preview ? { ...preview, sourcePath: selected } : null
   })
   handle(channels[1], async parent => {
-    const result = await dialog.showOpenDialog(parent, { properties: ['openFile'], filters: [{ name: 'Nola offline manifest', extensions: ['json'] }] })
+    const result = await dialog.showOpenDialog(parent, { properties: ['openFile'], filters: [{ name: 'Nola ZIP', extensions: ['zip'] }] })
     if (result.canceled || !result.filePaths[0]) return null
-    if (basename(result.filePaths[0]) !== 'manifest.json') throw new Error('invalidConfiguration')
+    if (extname(result.filePaths[0]).toLowerCase() !== '.zip') throw new Error('invalidConfiguration')
     return inspect(() => manager.inspectBundle(result.filePaths[0]))
   })
   handle('offline:select-destination', async (parent, path) => {
@@ -99,7 +101,7 @@ export function registerOfflineIpc(manager: OfflineManager, getWindow: () => Bro
   handle(channels[5], () => manager.cancel())
   handle(channels[6], async () => {
     const task = manager.snapshot()
-    if (task.state === 'completed' && task.outputPath) await shell.openPath(task.outputPath)
+    if (task.state === 'completed' && task.outputPath) await shell.openPath(extname(task.outputPath).toLowerCase() === '.zip' ? dirname(task.outputPath) : task.outputPath)
   })
   return async () => { for (const channel of channels) ipcMain.removeHandler(channel); await manager.dispose() }
 }

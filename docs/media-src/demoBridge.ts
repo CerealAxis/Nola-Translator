@@ -107,6 +107,11 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
         }
         stores.settings.setState({ runtimes: { ...runtimes } })
       },
+      uninstall: async kind => {
+        const current = runtimes.local[kind]
+        if (current) runtimes.local = { ...runtimes.local, [kind]: { ...current, path: '', status: 'missing', version: '', id: undefined, managed: false, reason: '' } }
+        stores.settings.setState({ runtimes: { ...runtimes } })
+      },
       import: async () => false, cancel: done,
     },
     storage: { get: async () => ({ activePath: '', configuredPath: '', restartRequired: false }), choose: async () => null, restartApp: done },

@@ -41,6 +41,8 @@ export function ModelsPage() {
   const busyIds = useStore(stores.models, (state) => state.busyIds)
   const error = useStore(stores.models, (state) => state.error)
   const settings = useStore(stores.settings, (state) => state.settings)
+  const computeSnapshot = useStore(stores.settings, (state) => state.computeSnapshot)
+  const runtimes = useStore(stores.settings, (state) => state.runtimes)
 
   const installed = useMemo(() => resources.filter((item) => item.installed), [resources])
   const activeCount = useMemo(() => countActive(resources), [resources])
@@ -68,6 +70,7 @@ export function ModelsPage() {
     cloud: t('settings.providerCloud'),
     microsoft: t('settings.providerMicrosoft'),
     mymemory: t('settings.providerMyMemory'),
+    google: t('settings.providerGoogle'),
     'index-translate': t('settings.providerIndexTranslate'),
     recognition: t('settings.providerRecognitionTranslation'),
   }
@@ -146,6 +149,9 @@ export function ModelsPage() {
       {openFamily ? <RecommendedFamilyDialog
         family={openFamily}
         records={resources.filter(record => !record.resourceId.startsWith('hub:') && familyOf(record) === openFamily)}
+        compute={settings?.compute ?? DEFAULT_COMPUTE_SETTINGS}
+        computeSnapshot={computeSnapshot}
+        runtimes={runtimes}
         busyIds={busyIds}
         onClose={() => setOpenFamily(null)}
         onInstall={(record, source) => { void actions.models.manageResource(record.resourceId, 'install', source).catch(() => toast.danger(t('models.downloadError', { name: record.name }))) }}

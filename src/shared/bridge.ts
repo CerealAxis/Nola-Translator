@@ -87,6 +87,7 @@ export type NolaTranslatorApi = {
   getRuntimes(): Promise<RuntimeSnapshot>
   prepareRuntimes(components?: readonly ('engine' | 'llama' | 'crisp')[]): Promise<RuntimeSnapshot>
   installRuntime(id: string, repair?: boolean): Promise<void>
+  uninstallRuntime(kind: 'engine' | 'llama' | 'crisp'): Promise<void>
   importRuntime(): Promise<boolean>
   cancelRuntimeInstall(): Promise<void>
   listResources(): Promise<ResourceSnapshot>

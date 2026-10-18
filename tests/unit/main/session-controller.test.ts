@@ -91,3 +91,14 @@ it('starts the public Index-Translate service without reading or forwarding a cl
   expect(getCredential).not.toHaveBeenCalled()
   expect(request).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ translationProvider: 'index-translate', translationOptions: {} }) }), 'sessionStarted', expect.any(Number))
 })
+
+it('injects a stored Google Translate key and removes caller-supplied credentials', async () => {
+  const request = vi.fn(async () => ({ sessionId: 'google-session' }))
+  const getCredential = vi.fn(async () => 'stored-google-key')
+  const sessions = new SessionController({ engine: { currentState: 'ready', request } as unknown as EngineProcess, meetings: null,
+    getSettings: () => DEFAULT_SETTINGS, getCredential, whenReady: async () => {}, prepare: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+  })
+  await sessions.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: ['zh'], translationProvider: 'google', translationOptions: { apiKey: 'caller-google-key' } }, 'desktop')
+  expect(getCredential).toHaveBeenCalledExactlyOnceWith('google')
+  expect(request).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ translationProvider: 'google', translationOptions: { apiKey: 'stored-google-key' } }) }), 'sessionStarted', expect.any(Number))
+})

@@ -1,3 +1,4 @@
+import { OfflineResources } from '../../offline'
 import { SettingsRow } from '../SettingsRow'
 /**
  * Advanced diagnostics: engine state, versions and paths, factory reset.
@@ -75,6 +76,8 @@ export function AdvancedTab(_props: SettingsPanelProps) {
         <CodeRow label={t('settings.enginePath')} value={storage?.activePath ?? '-'} />
         <CodeRow label={t('settings.protocolVersion')} value={String(PROTOCOL_VERSION)} />
       </SettingGroup>
+
+      <OfflineResources />
 
       <SettingGroup legend={t('settings.resetAll')}>
         <SettingsRow label={t('settings.resetAll')}>

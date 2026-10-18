@@ -111,3 +111,10 @@ export type RuntimeSnapshot = {
 }
 
 export const CRISP_RUNTIME_ID = 'crispasr-0-8-43-vulkan'
+
+export const CRISP_RUNTIME_FILES = [
+  { url: 'https://files.pythonhosted.org/packages/5c/06/2ed13aeedd45410c0d1ec1fd4e16aa645b4d197ff20243dd0cc893fcb6e5/crispasr-0.8.43-py3-none-win_amd64.whl',
+    name: 'crispasr-0.8.43-py3-none-win_amd64.whl', bytes: 14_522_754, sha256: '546184aa746ec9f46ca568ae98ec5e436edb518a9bb56b445d9cfdbec431db7f' },
+  { url: 'https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.43/crispasr-0.8.43%2Bvulkan-py3-none-win_amd64.whl',
+    name: 'crispasr-0.8.43+vulkan-py3-none-win_amd64.whl', bytes: 28_714_544, sha256: '08854cc005537d925ea3191e63b3dc840191a58a961844dc61403f64e5904678' },
+] as const

@@ -80,7 +80,7 @@ export const sessionConfigSchema = z
     sourceLanguage: z.string().min(1).max(32),
     targetLanguages: z.array(z.string().min(1).max(32)).max(8),
     allowIntermediateTranslation: z.boolean().optional(),
-    translationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'index-translate', 'recognition']).optional(),
+    translationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate', 'recognition']).optional(),
     translationModelId: translationModelIdSchema.optional(),
     translationOptions: z.object({
       endpoint: z.string().max(2048).optional(),
@@ -95,7 +95,7 @@ export const sessionConfigSchema = z
       contextWindow: z.number().int().min(256).max(10_000_000).optional(),
       maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
     }).strip().optional(),
-    fallbackTranslationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'index-translate']).optional(),
+    fallbackTranslationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate']).optional(),
     fallbackTranslationOptions: z.object({
       endpoint: z.string().max(2048).optional(), apiKey: z.string().max(4096).optional(),
       email: z.string().max(320).optional(), region: z.string().max(128).optional(), model: z.string().max(256).optional(),
@@ -121,7 +121,7 @@ const prewarmConfigSchema = z.object({
   sourceLanguage: z.string().min(1).max(32),
   targetLanguages: z.array(z.string().min(1).max(32)).max(8),
   allowIntermediateTranslation: z.boolean().optional(),
-  translationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'index-translate', 'recognition']).optional(),
+  translationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate', 'recognition']).optional(),
   translationModelId: translationModelIdSchema.optional(),
   translationOptions: z.object({
     endpoint: z.string().max(2048).optional(),
@@ -133,7 +133,7 @@ const prewarmConfigSchema = z.object({
     contextWindow: z.number().int().min(256).max(10_000_000).optional(),
     maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
   }).strip().optional(),
-  fallbackTranslationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'index-translate']).optional(),
+  fallbackTranslationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate']).optional(),
   fallbackTranslationOptions: z.object({
     endpoint: z.string().max(2048).optional(), apiKey: z.string().max(4096).optional(),
     email: z.string().max(320).optional(), region: z.string().max(128).optional(), model: z.string().max(256).optional(),

@@ -331,6 +331,10 @@ export const en: Dictionary = {
     downloadComplete: '{name} download complete',
     downloadError: '{name} download failed. Retry or choose another source.',
     installed: 'Installed',
+    recommended: 'Recommended',
+    tryable: 'Tryable',
+    notRecommended: 'Not recommended',
+    engineUnavailable: 'Install the corresponding loader in Settings first.',
     remove: 'Uninstall',
     setDefault: 'Set as default',
     notInstalled: 'Not installed',
@@ -495,14 +499,15 @@ export const en: Dictionary = {
      * "Local model" / "Cloud model" are UI concepts, not product names: Hy-MT2 and M2M100
      * collapse into the former (the selected model id decides which one actually runs), and
      * OpenAI and Ollama into the latter (Ollama is an API format from here on, not a provider).
-     * Only "Microsoft Translator" is a product name and stays put.
+     * Provider product names stay in their original form.
      */
     providerLocal: 'Local model',
     providerDisabled: 'Translation disabled',
     providerCloud: 'Cloud model',
     providerMicrosoft: 'Microsoft Translator',
     providerMyMemory: 'MyMemory (free translation)',
-    providerIndexTranslate: 'Bilibili free API',
+    providerGoogle: 'Google Translate',
+    providerIndexTranslate: 'Index Translate Free API',
     indexTranslateHint: 'Free official API with streaming translation. Source text is sent to Bilibili. The current preset covers the 32 languages supported by the official client.',
     providerRecognitionTranslation: 'Aliyun',
     providerAliyun: 'Aliyun LiveTranslate',
@@ -513,7 +518,7 @@ export const en: Dictionary = {
     aliyunWorkspace: 'Model Studio workspace ID',
     aliyunHint: 'Continuous audio input and streaming text. 3.8 detects the source language automatically. The workspace and API key must use the same region. LiveTranslate is billed even when another translation service is selected.',
     minimaxNotice: 'Audio is split at pauses into clips of at most 15 seconds and uploaded one by one, so captions appear as whole sentences at the pauses rather than word by word. 20 languages are supported and there is no built-in translation, so pick another service under Translation. Billed at CNY 2.50 per hour of audio.',
-    mymemoryHint: 'No API key. Confirmed sentences use REST translation with no token streaming. The free service has quotas and rate limits; source text is sent to MyMemory.',
+    mymemoryHint: 'No API key. Confirmed sentences use REST translation with no token streaming. The free service has quotas and rate limits.',
     mymemoryEmail: 'Contact email (optional)',
     nativeTranslationHint: 'Use streamed translations from the active Aliyun recognition connection, with no separate translation API. Requires Aliyun LiveTranslate.',
     localModelEmpty: 'No local translation model is installed yet. Download one in Models first.',

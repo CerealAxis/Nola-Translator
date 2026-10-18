@@ -50,6 +50,7 @@ export interface SettingsState {
   computeChecking: boolean
   computeError: string | null
   runtimeBusy: boolean
+  runtimeAction: 'install' | 'uninstall' | null
   runtimeChecking: boolean
   runtimeError: string | null
   runtimeNoticeDismissed: boolean
@@ -80,7 +81,7 @@ const initialState: SettingsState = {
   captionServiceCode: null,
   captionServiceBusy: false,
   runtimes: null, computeSnapshot: null, computeChecking: false, computeError: null,
-  runtimeBusy: false, runtimeChecking: false, runtimeError: null, runtimeNoticeDismissed: false,
+  runtimeBusy: false, runtimeAction: null, runtimeChecking: false, runtimeError: null, runtimeNoticeDismissed: false,
   appUpdate: null, appUpdateChecking: false, appUpdateError: false,
 }
 
@@ -205,7 +206,7 @@ export function refreshComputeDevices(): Promise<void> {
 export async function installRuntimeComponent(id: string, reinstall = false): Promise<void> {
   if (!bridge) throw new Error('IPC bridge unavailable')
   if (settingsStore.getState().runtimeBusy) return
-  settingsStore.setState({ runtimeBusy: true, runtimeError: null })
+  settingsStore.setState({ runtimeBusy: true, runtimeAction: 'install', runtimeError: null })
   const poll = setInterval(() => { void loadRuntimeComponents().catch(() => undefined) }, 1000)
   try {
     await bridge.runtimes.install(id, reinstall)
@@ -215,6 +216,22 @@ export async function installRuntimeComponent(id: string, reinstall = false): Pr
     settingsStore.setState({ runtimeError: errorMessage(error) })
   } finally {
     clearInterval(poll)
+    settingsStore.setState({ runtimeBusy: false })
+    await loadRuntimeComponents().catch(() => undefined)
+  }
+}
+
+export async function uninstallRuntimeComponent(kind: 'engine' | 'llama' | 'crisp'): Promise<void> {
+  if (!bridge) throw new Error('IPC bridge unavailable')
+  if (settingsStore.getState().runtimeBusy) return
+  settingsStore.setState({ runtimeBusy: true, runtimeAction: 'uninstall', runtimeError: null })
+  try {
+    await bridge.runtimes.uninstall(kind)
+    await loadRuntimeComponents()
+    await refreshComputeDevices()
+  } catch (error) {
+    settingsStore.setState({ runtimeError: errorMessage(error) })
+  } finally {
     settingsStore.setState({ runtimeBusy: false })
     await loadRuntimeComponents().catch(() => undefined)
   }

@@ -21,7 +21,7 @@
       linear-gradient(139deg, transparent 0 32%, color-mix(in oklch, var(--accent) 2.5%, transparent) 32% 40%, transparent 40% 68%, color-mix(in oklch, var(--accent) 2%, transparent) 68% 77%, transparent 77%),
       radial-gradient(ellipse at 40% 0%, color-mix(in oklch, var(--accent) 7%, transparent), transparent 70%), var(--background);
   }
-  .nola-titlebar { display: flex; align-items: center; gap: 20px; height: var(--nola-titlebar-h); flex-shrink: 0; padding: 0 24px; }
+  .nola-titlebar { display: flex; align-items: center; --nola-titlebar-gap: 20px; gap: var(--nola-titlebar-gap); height: var(--nola-titlebar-h); flex-shrink: 0; padding: 0 var(--space-3); }
   .nola-brand { display: flex; align-items: center; }
   /* The brand SVG pads its 512 canvas by 48 units, so the artwork fills 416/512; 25px renders a ~20px mark. */
   .nola-brand__mark { width: 25px; height: 25px; flex-shrink: 0; }
@@ -30,8 +30,15 @@
   .nola-titlebar-icon svg { width: 20px; height: 20px; }
   .nola-titlebar-icon:hover { background: color-mix(in oklch, var(--accent) 8%, transparent); }
   .nola-native-controls { width: 138px; flex-shrink: 0; height: 100%; }
-  .nola-titlebar-tools--windows { gap: 10px; margin-right: -24px; }
-  .nola-window-controls { display: flex; flex-shrink: 0; gap: 6px; }
+  /* Every glyph in the bar sits on a 48px pitch: 36px tool button + 12px gap inside
+     the tools, 48px caption button + no gap inside the caption cluster, and the
+     6px that has to remain between the two for the crossing pair to line up
+     (18 + 6 + 24). The negative margin takes that 6px back out of the bar's gap. */
+  .nola-titlebar-tools--windows { gap: 12px; margin-right: calc(6px - var(--nola-titlebar-gap)); }
+  /* Caption buttons take the bar's full height and sit edge to edge, so the hit
+     area is far larger than the 16px glyph and the close button reaches the
+     window corner. */
+  .nola-window-controls { display: flex; flex-shrink: 0; align-self: stretch; }
   .nola-web-controls { display: flex; gap: 6px; }
   .nola-web-controls .button { width: 42px; height: 40px; padding: 0; border-radius: 8px; }
   .nola-app-body { display: flex; flex: 1; min-height: 0; min-width: 0; }
@@ -81,7 +88,7 @@
   .nola-overlay-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--separator); }
 }
 @layer utilities {
-  .nola-window-control.button { width: 40px; height: 48px; flex-shrink: 0; padding: 0; border: 0; border-radius: 0; color: var(--foreground); }
+  .nola-window-control.button { width: var(--space-6); height: 100%; flex-shrink: 0; padding: 0; border: 0; border-radius: 0; color: var(--foreground); }
   .nola-window-control.button svg { width: 16px; height: 16px; stroke-width: 1.8; }
   .nola-window-control.button:hover { background: color-mix(in oklch, var(--accent) 9%, transparent); }
   .nola-window-control--close.button:hover { color: var(--danger-foreground); background: var(--danger); }
@@ -100,8 +107,10 @@
   .nola-overlay-fields { grid-template-columns: 1fr; }
 }
 @media (max-width: 800px) {
-  .nola-titlebar { gap: 8px; padding: 0 16px; }
+  .nola-titlebar { --nola-titlebar-gap: 8px; padding: 0 var(--space-2); }
   .nola-titlebar-tools { gap: 2px; }
+  /* Keeps the 48px glyph pitch; only the bar's own gap narrowed. */
+  .nola-titlebar-tools--windows { gap: 12px; }
   .nola-setting-row { gap: 12px; grid-template-columns: minmax(110px, .65fr) minmax(0, 1fr); }
   .nola-overlay-stage { min-height: 280px; padding: 20px 16px; }
 }
@@ -163,6 +172,12 @@
 @media (max-width: 760px) {
   .nola-workspace-view-controls .nola-segmented .toggle-button { padding-inline: 9px; font-size: 12px; }
 }
+
+/* The caption cluster is the last thing in the bar, so it runs flush against the
+   window edge rather than leaving the bar's gutter as a strip past the close
+   button. Declared after the narrow-window padding rule, which is otherwise the
+   later of the two declarations. */
+.nola-titlebar--windows { padding-right: 0; }
 
 /* Action buttons use one large corner. Only the title-bar controls opt out. */
 .button:not(.nola-titlebar-icon):not(.nola-window-control):not(.nola-web-controls .button),

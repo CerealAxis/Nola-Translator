@@ -433,6 +433,22 @@
             "url": "https://hf-mirror.com/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/928ab958557df9aa2ef1c93e0e83c7ad0933fae2/mmproj-Qwen3-ASR-0.6B-Q8_0.gguf"
           }
         ]
+      },
+      "modelscope": {
+        "revision": "86222636b790fae434fb24c03c46fc817dfb27b2",
+        "repositoryUrl": "https://modelscope.cn/models/ggml-org/Qwen3-ASR-0.6B-GGUF/files?Revision=86222636b790fae434fb24c03c46fc817dfb27b2",
+        "files": [
+          {
+            "path": "Qwen3-ASR-0.6B-Q8_0.gguf",
+            "size": 804749248,
+            "url": "https://www.modelscope.cn/models/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/86222636b790fae434fb24c03c46fc817dfb27b2/Qwen3-ASR-0.6B-Q8_0.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-0.6B-Q8_0.gguf",
+            "size": 214392480,
+            "url": "https://www.modelscope.cn/models/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/86222636b790fae434fb24c03c46fc817dfb27b2/mmproj-Qwen3-ASR-0.6B-Q8_0.gguf"
+          }
+        ]
       }
     }
   },
@@ -470,6 +486,22 @@
             "path": "mmproj-Qwen3-ASR-0.6B-bf16.gguf",
             "size": 378575520,
             "url": "https://hf-mirror.com/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/928ab958557df9aa2ef1c93e0e83c7ad0933fae2/mmproj-Qwen3-ASR-0.6B-bf16.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "86222636b790fae434fb24c03c46fc817dfb27b2",
+        "repositoryUrl": "https://modelscope.cn/models/ggml-org/Qwen3-ASR-0.6B-GGUF/files?Revision=86222636b790fae434fb24c03c46fc817dfb27b2",
+        "files": [
+          {
+            "path": "Qwen3-ASR-0.6B-bf16.gguf",
+            "size": 1509343168,
+            "url": "https://www.modelscope.cn/models/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/86222636b790fae434fb24c03c46fc817dfb27b2/Qwen3-ASR-0.6B-bf16.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-0.6B-bf16.gguf",
+            "size": 378575520,
+            "url": "https://www.modelscope.cn/models/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/86222636b790fae434fb24c03c46fc817dfb27b2/mmproj-Qwen3-ASR-0.6B-bf16.gguf"
           }
         ]
       }
@@ -511,6 +543,22 @@
             "url": "https://hf-mirror.com/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/36a678687ba7d07a74ca70ccb0e36902e005fb80/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf"
           }
         ]
+      },
+      "modelscope": {
+        "revision": "fd6f16ded582f5b0789ef4aea7401707ce49746b",
+        "repositoryUrl": "https://modelscope.cn/models/ggml-org/Qwen3-ASR-1.7B-GGUF/files?Revision=fd6f16ded582f5b0789ef4aea7401707ce49746b",
+        "files": [
+          {
+            "path": "Qwen3-ASR-1.7B-Q8_0.gguf",
+            "size": 2165034944,
+            "url": "https://www.modelscope.cn/models/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/fd6f16ded582f5b0789ef4aea7401707ce49746b/Qwen3-ASR-1.7B-Q8_0.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-1.7B-Q8_0.gguf",
+            "size": 355709344,
+            "url": "https://www.modelscope.cn/models/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/fd6f16ded582f5b0789ef4aea7401707ce49746b/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf"
+          }
+        ]
       }
     }
   },
@@ -548,6 +596,22 @@
             "path": "mmproj-Qwen3-ASR-1.7B-bf16.gguf",
             "size": 641773984,
             "url": "https://hf-mirror.com/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/36a678687ba7d07a74ca70ccb0e36902e005fb80/mmproj-Qwen3-ASR-1.7B-bf16.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "fd6f16ded582f5b0789ef4aea7401707ce49746b",
+        "repositoryUrl": "https://modelscope.cn/models/ggml-org/Qwen3-ASR-1.7B-GGUF/files?Revision=fd6f16ded582f5b0789ef4aea7401707ce49746b",
+        "files": [
+          {
+            "path": "Qwen3-ASR-1.7B-bf16.gguf",
+            "size": 4069674944,
+            "url": "https://www.modelscope.cn/models/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/fd6f16ded582f5b0789ef4aea7401707ce49746b/Qwen3-ASR-1.7B-bf16.gguf"
+          },
+          {
+            "path": "mmproj-Qwen3-ASR-1.7B-bf16.gguf",
+            "size": 641773984,
+            "url": "https://www.modelscope.cn/models/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/fd6f16ded582f5b0789ef4aea7401707ce49746b/mmproj-Qwen3-ASR-1.7B-bf16.gguf"
           }
         ]
       }

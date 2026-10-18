@@ -19,8 +19,9 @@ export async function recheckRuntimeEnvironment(manager: Pick<RuntimeManager, 'r
 export function registerRuntimeIpc(manager: RuntimeManager, window: () => BrowserWindow | null,
   prepare: (components?: readonly ('engine' | 'llama' | 'crisp')[]) => Promise<void>, isSessionBusy: () => boolean,
   whenRuntimeReady: () => Promise<void> = async () => {},
-  install: (id: string, repair: boolean) => Promise<void> = (id, repair) => manager.install(id, repair)): () => void {
-  const channels = ['runtime:list', 'runtime:install', 'runtime:import', 'runtime:cancel', 'runtime:prepare', 'runtime:settings']
+  install: (id: string, repair: boolean) => Promise<void> = (id, repair) => manager.install(id, repair),
+  uninstall: (kind: 'engine' | 'llama' | 'crisp') => Promise<void> = kind => manager.uninstall(kind)): () => void {
+  const channels = ['runtime:list', 'runtime:install', 'runtime:import', 'runtime:cancel', 'runtime:prepare', 'runtime:settings', 'runtime:uninstall']
   loggedHandle(channels[5], (_event, component: unknown) => {
     if (component !== 'engine' && component !== 'llama' && component !== 'crisp') throw new Error('组件无效')
     const main = window()
@@ -36,6 +37,12 @@ export function registerRuntimeIpc(manager: RuntimeManager, window: () => Browse
     if (typeof id !== 'string' || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(id)) throw new Error('运行包 ID 无效')
     if (repair !== undefined && typeof repair !== 'boolean') throw new Error('修复参数无效')
     return install(id, repair === true)
+  })
+  loggedHandle(channels[6], async (_event, kind: unknown) => {
+    await whenRuntimeReady()
+    if (isSessionBusy()) throw new Error('请先停止同传，再卸载运行组件')
+    if (kind !== 'engine' && kind !== 'llama' && kind !== 'crisp') throw new Error('运行组件类型无效')
+    return uninstall(kind)
   })
   loggedHandle(channels[2], async () => {
     await whenRuntimeReady()

@@ -65,7 +65,7 @@ const initialState: ModelsState = {
   error: null,
   busyIds: [],
   engineVersion: null,
-  credentials: { cloud: false, 'fallback-cloud': false, microsoft: false, 'aliyun-asr': false, 'minimax-asr': false },
+  credentials: { cloud: false, 'fallback-cloud': false, microsoft: false, google: false, 'fallback-google': false, 'aliyun-asr': false, 'minimax-asr': false },
   hub: { query: '', kind: 'asr', results: [], candidates: 0, rateLimited: false, loading: false, failed: false },
 }
 
@@ -178,7 +178,7 @@ async function loadCredentials(target: NolaBridge): Promise<Record<CredentialPro
       flags[provider] = present
       return flags
     },
-    { cloud: false, 'fallback-cloud': false, microsoft: false, 'aliyun-asr': false, 'minimax-asr': false },
+    { cloud: false, 'fallback-cloud': false, microsoft: false, google: false, 'fallback-google': false, 'aliyun-asr': false, 'minimax-asr': false },
   )
 }
 

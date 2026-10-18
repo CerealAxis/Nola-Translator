@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Card, Chip, Label, ListBox, Modal, Select } from '@heroui/react'
+import { Button, Card, Chip, Label, ListBox, Modal, Select, Tooltip } from '@heroui/react'
 import HuggingFace from '@lobehub/icons/es/HuggingFace/components/Color'
 import ModelScope from '@lobehub/icons/es/ModelScope/components/Color'
 import QwenAvatar from '@lobehub/icons/es/Qwen/components/Avatar'
@@ -16,7 +16,10 @@ import { useI18n } from '@/i18n'
 import { modelImportEntry } from '../../../shared/model-import-catalog'
 import { downloadSourcesFor } from '../../../shared/model-download-sources'
 import { modelEngines } from '../../../shared/model-engines'
+import type { ComputeSettings, ComputeSnapshot, RuntimeSnapshot } from '../../../shared/compute'
 import { BUILTIN_DESCRIPTION_KEYS, factsOf, formatBytes, paramsOf } from './ModelCard'
+import { isEngineAvailable } from './engine-availability'
+import { modelFit, type ModelFit } from './model-fit'
 import { ModelMark } from './modelBrand'
 
 export type RecommendedFamily = 'qwen' | 'sensevoice' | 'funasr' | 'vibevoice' | 'mimo' | 'hymt2' | 'index' | 'other'
@@ -75,11 +78,24 @@ export function RecommendedFamilyCard({ family, records, onOpen }: RecommendedFa
 export interface RecommendedFamilyDialogProps {
   family: RecommendedFamily
   records: readonly ResourceRecord[]
+  compute: ComputeSettings
+  computeSnapshot?: ComputeSnapshot | null
+  runtimes: RuntimeSnapshot | null
   busyIds: readonly string[]
   onClose: () => void
   onInstall: (record: ResourceRecord, source: ModelDownloadSource) => void
   onCancel: (record: ResourceRecord) => void
   onManualDownload: (record: ResourceRecord) => void
+}
+
+const FIT_COLORS: Record<ModelFit, 'success' | 'warning' | 'danger'> = {
+  recommended: 'success', tryable: 'warning', notRecommended: 'danger',
+}
+
+function FitChip({ record, engine, compute, computeSnapshot }: { record: ResourceRecord; engine: Parameters<typeof modelFit>[1]; compute: ComputeSettings; computeSnapshot?: ComputeSnapshot | null }) {
+  const { t } = useI18n()
+  const fit = modelFit(record, engine, compute, computeSnapshot)
+  return <Chip size="sm" color={FIT_COLORS[fit]} variant="soft" aria-label={t(`models.${fit}`)}>{t(`models.${fit}`)}</Chip>
 }
 
 function repositoryName(record: ResourceRecord): string {
@@ -106,7 +122,7 @@ function PublisherAvatar({ record }: { record: ResourceRecord }) {
   return <span className="models-family-dialog__publisher" aria-hidden="true">{AvatarIcon ? <AvatarIcon size={26} /> : <ModelMark record={record} kind={record.kind} size={22} />}</span>
 }
 
-export function RecommendedFamilyDialog({ family, records, busyIds, onClose, onInstall, onCancel, onManualDownload }: RecommendedFamilyDialogProps) {
+export function RecommendedFamilyDialog({ family, records, compute, computeSnapshot, runtimes, busyIds, onClose, onInstall, onCancel, onManualDownload }: RecommendedFamilyDialogProps) {
   const { t } = useI18n()
   const [engine, setEngine] = useState(modelEngines(records[0])[0])
   const [parameters, setParameters] = useState(paramsOf(records[0]) ?? '')
@@ -136,14 +152,21 @@ export function RecommendedFamilyDialog({ family, records, busyIds, onClose, onI
         <Modal.Body className="models-family-dialog__body">
           <div className="models-family-dialog__filters">
             <section aria-label={t('modelConfig.engine')}>
-              <h3 className="models-family-dialog__label">{t('modelConfig.engine')}</h3>
-              <div className="models-family-dialog__choices">{engines.map(option => <Button key={option} variant="secondary" aria-pressed={option === engine} onPress={() => {
-                const first = records.find(record => modelEngines(record).includes(option))
-                if (first) { setEngine(option); setParameters(paramsOf(first) ?? ''); setSelectedId(first.resourceId); setSource('huggingface') }
-              }}>{option === 'llama' ? 'llama.cpp' : option === 'crisp' ? 'CrispASR' : 'PyTorch'}</Button>)}</div>
+              <Label className="models-family-dialog__label">{t('modelConfig.engine')}</Label>
+              <div className="models-family-dialog__choices">{engines.map(option => {
+                const available = isEngineAvailable(option, runtimes?.local ?? null)
+                const button = <Button key={option} variant="secondary" isDisabled={!available} aria-pressed={option === engine} onPress={() => {
+                  const first = records.find(record => modelEngines(record).includes(option))
+                  if (first) { setEngine(option); setParameters(paramsOf(first) ?? ''); setSelectedId(first.resourceId); setSource('huggingface') }
+                }}>{option === 'llama' ? 'llama.cpp' : option === 'crisp' ? 'CrispASR' : 'PyTorch'}</Button>
+                return available ? button : <Tooltip key={option} delay={250}>
+                  <Tooltip.Trigger className="inline-flex">{button}</Tooltip.Trigger>
+                  <Tooltip.Content className="settings-row__tooltip z-overlay whitespace-normal">{t('models.engineUnavailable')}</Tooltip.Content>
+                </Tooltip>
+              })}</div>
             </section>
             <section aria-label={t('models.parameterScale')}>
-              <h3 className="models-family-dialog__label">{t('models.parameterScale')}</h3>
+              <Label className="models-family-dialog__label">{t('models.parameterScale')}</Label>
               <div className="models-family-dialog__choices">{parameterOptions.map(option => <Button key={option} variant="secondary" aria-pressed={option === parameters} onPress={() => {
                 const first = engineRecords.find(record => (paramsOf(record) ?? '') === option)
                 if (first) { setParameters(option); setSelectedId(first.resourceId); setSource('huggingface') }
@@ -152,21 +175,21 @@ export function RecommendedFamilyDialog({ family, records, busyIds, onClose, onI
           </div>
           <Select fullWidth value={selected.resourceId} onChange={key => { if (typeof key === 'string') { setSelectedId(key); setSource('huggingface') } }} aria-label={t('offline.modelChoice')} className="models-family-dialog__model-select">
             <Label>{t('offline.modelChoice')}</Label>
-            <Select.Trigger><Select.Value><span className="models-family-dialog__selected-model"><PublisherAvatar record={selected} /><span>{modelDisplayName(selected)}</span><small>{formatBytes(selected.downloadBytes ?? selected.installedBytes)}</small></span></Select.Value><Select.Indicator /></Select.Trigger>
-            <Select.Popover><ListBox className="models-family-dialog__model-list">{filtered.map(record => <ListBox.Item key={record.resourceId} id={record.resourceId} textValue={modelDisplayName(record)}>
+            <Select.Trigger><Select.Value><span className="models-family-dialog__selected-model"><PublisherAvatar record={selected} /><span>{modelDisplayName(selected)}</span><small>{formatBytes(selected.downloadBytes ?? selected.installedBytes)}</small><span className="models-family-dialog__selected-model-badges">{selected.installed ? <Chip size="sm" color="success" variant="soft">{t('models.installed')}</Chip> : null}<FitChip record={selected} engine={engine} compute={compute} computeSnapshot={computeSnapshot} /></span></span></Select.Value><Select.Indicator /></Select.Trigger>
+            <Select.Popover><ListBox className="models-family-dialog__model-list">{filtered.map(record => <ListBox.Item key={record.resourceId} id={record.resourceId} isDisabled={record.installed} textValue={modelDisplayName(record)}>
               <PublisherAvatar record={record} />
               <span className="models-family-dialog__model-text"><span>{modelDisplayName(record)}</span><small>{formatBytes(record.downloadBytes ?? record.installedBytes)}</small></span>
-              {record.installed ? <Chip size="sm" color="success" variant="soft">{t('models.installed')}</Chip> : null}
+              <span className="models-family-dialog__model-badges">{record.installed ? <Chip size="sm" color="success" variant="soft">{t('models.installed')}</Chip> : null}<FitChip record={record} engine={engine} compute={compute} computeSnapshot={computeSnapshot} /></span>
               <ListBox.ItemIndicator />
             </ListBox.Item>)}</ListBox></Select.Popover>
           </Select>
           <section className="models-family-dialog__selection" aria-label={t('models.details')}>
-            <h3 className="models-family-dialog__label">{t('models.details')}</h3>
+            <Label className="models-family-dialog__label">{t('models.details')}</Label>
             <p>{selected.name} · {factsOf(selected).join(' · ')}</p>
             {(family === 'hymt2' || family === 'index') && selectedDescription !== familyDescription ? <p>{selectedDescription}</p> : null}
           </section>
           <section aria-label={t('models.downloadSources.title')}>
-            <h3 className="models-family-dialog__label">{t('models.downloadSources.title')}</h3>
+            <Label className="models-family-dialog__label">{t('models.downloadSources.title')}</Label>
             <div className="models-family-dialog__sources">
               {sources.map(option => <Button key={option.source} variant="secondary" aria-pressed={selectedSource === option.source} onPress={() => setSource(option.source)}>
                 {option.source === 'modelscope' ? <ModelScope aria-hidden="true" /> : <HuggingFace aria-hidden="true" />}{t(option.labelKey)}

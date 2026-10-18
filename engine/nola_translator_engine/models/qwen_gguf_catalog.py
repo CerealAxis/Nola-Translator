@@ -25,11 +25,23 @@ QWEN3_ASR_0_6B_GGUF_Q8_0 = ModelSpec(
         FileEntry("Qwen3-ASR-0.6B-Q8_0.gguf", 804749248, "bca259818b50ca7c4c05e9bdb35a5dc04fa039653a6d6f3f0f331f96f6aa1971"),
         FileEntry("mmproj-Qwen3-ASR-0.6B-Q8_0.gguf", 214392480, "41a342b5e4c514e968cb756de6cd1b7be39eff43c44c57a2ef5fc6522e36603d"),
     ),
+    modelscope_repo="ggml-org/Qwen3-ASR-0.6B-GGUF",
+    modelscope_revision="86222636b790fae434fb24c03c46fc817dfb27b2",
+    modelscope_files=(
+        FileEntry("Qwen3-ASR-0.6B-Q8_0.gguf", 804749248, "bca259818b50ca7c4c05e9bdb35a5dc04fa039653a6d6f3f0f331f96f6aa1971"),
+        FileEntry("mmproj-Qwen3-ASR-0.6B-Q8_0.gguf", 214392480, "41a342b5e4c514e968cb756de6cd1b7be39eff43c44c57a2ef5fc6522e36603d"),
+    ),
 )
 
 QWEN3_ASR_0_6B_GGUF_BF16 = ModelSpec(
     "qwen3-asr-0.6b-gguf-bf16", "qwen3-asr-0.6b-gguf-bf16", "ggml-org/Qwen3-ASR-0.6B-GGUF", "928ab958557df9aa2ef1c93e0e83c7ad0933fae2",
     (
+        FileEntry("Qwen3-ASR-0.6B-bf16.gguf", 1509343168, "12b2894d9a7c98cd8f26670f5a47ab738f42bcc98df21e109be493870c71ba50"),
+        FileEntry("mmproj-Qwen3-ASR-0.6B-bf16.gguf", 378575520, "dae36c855f9a82a8916bea2238b24bda69a39d8da8b2f46dee7c103775656039"),
+    ),
+    modelscope_repo="ggml-org/Qwen3-ASR-0.6B-GGUF",
+    modelscope_revision="86222636b790fae434fb24c03c46fc817dfb27b2",
+    modelscope_files=(
         FileEntry("Qwen3-ASR-0.6B-bf16.gguf", 1509343168, "12b2894d9a7c98cd8f26670f5a47ab738f42bcc98df21e109be493870c71ba50"),
         FileEntry("mmproj-Qwen3-ASR-0.6B-bf16.gguf", 378575520, "dae36c855f9a82a8916bea2238b24bda69a39d8da8b2f46dee7c103775656039"),
     ),
@@ -41,11 +53,23 @@ QWEN3_ASR_1_7B_GGUF_Q8_0 = ModelSpec(
         FileEntry("Qwen3-ASR-1.7B-Q8_0.gguf", 2165034944, "58e22d0532d4eacaf034cfac17a6fed159f37c41390c710186783be439d1fc57"),
         FileEntry("mmproj-Qwen3-ASR-1.7B-Q8_0.gguf", 355709344, "46c1d533af3f354ceb37ce855dbceff7da7fa7cf1e6a523df3b13440bd164c0d"),
     ),
+    modelscope_repo="ggml-org/Qwen3-ASR-1.7B-GGUF",
+    modelscope_revision="fd6f16ded582f5b0789ef4aea7401707ce49746b",
+    modelscope_files=(
+        FileEntry("Qwen3-ASR-1.7B-Q8_0.gguf", 2165034944, "58e22d0532d4eacaf034cfac17a6fed159f37c41390c710186783be439d1fc57"),
+        FileEntry("mmproj-Qwen3-ASR-1.7B-Q8_0.gguf", 355709344, "46c1d533af3f354ceb37ce855dbceff7da7fa7cf1e6a523df3b13440bd164c0d"),
+    ),
 )
 
 QWEN3_ASR_1_7B_GGUF_BF16 = ModelSpec(
     "qwen3-asr-1.7b-gguf-bf16", "qwen3-asr-1.7b-gguf-bf16", "ggml-org/Qwen3-ASR-1.7B-GGUF", "36a678687ba7d07a74ca70ccb0e36902e005fb80",
     (
+        FileEntry("Qwen3-ASR-1.7B-bf16.gguf", 4069674944, "1af18763dfafde2bbf071ef8a0952f7bee66f140c3565e5ccc5afb07dc1f9227"),
+        FileEntry("mmproj-Qwen3-ASR-1.7B-bf16.gguf", 641773984, "8882e9ddab3186f9aa71b1417c847177913e1466655ac944cf86e9b846735d62"),
+    ),
+    modelscope_repo="ggml-org/Qwen3-ASR-1.7B-GGUF",
+    modelscope_revision="fd6f16ded582f5b0789ef4aea7401707ce49746b",
+    modelscope_files=(
         FileEntry("Qwen3-ASR-1.7B-bf16.gguf", 4069674944, "1af18763dfafde2bbf071ef8a0952f7bee66f140c3565e5ccc5afb07dc1f9227"),
         FileEntry("mmproj-Qwen3-ASR-1.7B-bf16.gguf", 641773984, "8882e9ddab3186f9aa71b1417c847177913e1466655ac944cf86e9b846735d62"),
     ),

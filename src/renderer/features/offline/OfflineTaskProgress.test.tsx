@@ -4,6 +4,11 @@ import { OfflineTaskProgress } from './OfflineTaskProgress'
 
 afterEach(cleanup)
 
+it('shows archive bytes while ZIP entries are streamed', () => {
+  render(<OfflineTaskProgress task={{ state: 'running', phase: 'pack', unit: 'bytes', current: 1024 ** 3, total: 2 * 1024 ** 3 }} workflow="bundle-prepare" />)
+  expect(screen.getByText('1.00 GB / 2.00 GB')).toBeInTheDocument()
+})
+
 it('shows indeterminate progress before the file total is known', () => {
   render(<OfflineTaskProgress task={{ state: 'running', phase: 'check', current: 0, total: 0 }} workflow="model-import" />)
   expect(screen.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow')

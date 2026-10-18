@@ -65,7 +65,7 @@ function sanitizeCloudSettings(settings: AppSettings): void {
   if (!supportsRecognitionNativeTranslation(recognition.provider) && settings.translation.provider === 'recognition') settings.translation.provider = 'mymemory'
   settings.translation.fallback ??= structuredClone(DEFAULT_SETTINGS.translation.fallback)
   const fallback = settings.translation.fallback
-  if (!['disabled', 'local', 'cloud', 'microsoft', 'mymemory', 'index-translate'].includes(fallback.provider)) fallback.provider = 'disabled'
+  if (!['disabled', 'local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate'].includes(fallback.provider)) fallback.provider = 'disabled'
   // Fixed services own one connection slot; compatible cloud endpoints can each select a model.
   if (fallback.provider !== 'disabled' && fallback.provider !== 'cloud' && fallback.provider === settings.translation.provider) fallback.provider = 'disabled'
   fallback.mymemoryEndpoint = bounded(fallback.mymemoryEndpoint, DEFAULT_SETTINGS.translation.fallback.mymemoryEndpoint, 2048)

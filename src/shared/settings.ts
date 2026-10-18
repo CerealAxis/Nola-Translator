@@ -162,7 +162,7 @@ export const MINIMAX_RECOGNITION_MODELS: readonly MinimaxRecognitionModel[] = ['
 export const RECOGNITION_PROVIDERS: readonly RecognitionProvider[] = ['local', 'aliyun', 'minimax']
 
 /** Native recognition translation reuses the Aliyun socket; other providers run separately. */
-export type TranslationProvider = 'local' | 'cloud' | 'microsoft' | 'mymemory' | 'index-translate' | 'recognition'
+export type TranslationProvider = 'local' | 'cloud' | 'microsoft' | 'mymemory' | 'google' | 'index-translate' | 'recognition'
 /** Native recognition translation is not an independent service that can be retried as a backup. */
 export type FallbackTranslationProvider = Exclude<TranslationProvider, 'recognition'>
 
@@ -174,11 +174,11 @@ export type CloudApiFormat = 'chat-completions' | 'chat-responses' | 'anthropic'
 /**
  * The providers that need an API key — the top-level keys of `credentials.json`. `local` has no
  * key slot at all, and `cloud` may hold none either: the OpenAI-shaped and Ollama endpoints omit
- * the Authorization header when the key is empty, while the Anthropic and Microsoft shapes
- * refuse without one.
+ * the Authorization header when the key is empty, while the Anthropic, Microsoft, and Google
+ * shapes refuse without one.
  */
-export type CredentialProvider = 'cloud' | 'fallback-cloud' | 'microsoft' | 'aliyun-asr' | 'minimax-asr'
-export const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'fallback-cloud', 'microsoft', 'aliyun-asr', 'minimax-asr']
+export type CredentialProvider = 'cloud' | 'fallback-cloud' | 'microsoft' | 'google' | 'fallback-google' | 'aliyun-asr' | 'minimax-asr'
+export const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'fallback-cloud', 'microsoft', 'google', 'fallback-google', 'aliyun-asr', 'minimax-asr']
 
 /**
  * Recommended Hy-MT2 sizes and quantizations, or a hub id for an installed GGUF.
@@ -261,7 +261,7 @@ export const RECOGNITION_MODEL_LABELS: Record<RecognitionModelId, string> = {
   ...Object.fromEntries(RECOGNITION_MODEL_IDS.filter(id => !['qwen3-asr-1.7b-hf', 'qwen3-asr-0.6b-hf', 'sensevoice-small'].includes(id)).map(id => [id, id])),
 }
 
-export const TRANSLATION_PROVIDERS: readonly TranslationProvider[] = ['local', 'cloud', 'microsoft', 'mymemory', 'index-translate', 'recognition']
+export const TRANSLATION_PROVIDERS: readonly TranslationProvider[] = ['local', 'cloud', 'index-translate', 'microsoft', 'mymemory', 'google', 'recognition']
 
 export const CLOUD_API_FORMATS: readonly CloudApiFormat[] = ['chat-completions', 'chat-responses', 'anthropic', 'ollama']
 

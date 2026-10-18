@@ -6,14 +6,14 @@ import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative } from 'node:path'
 import { z } from 'zod'
-import type { RuntimePackage, RuntimeRecipe } from '../shared/compute'
+import { CRISP_RUNTIME_ID, CRISP_RUNTIME_FILES, type RuntimePackage, type RuntimeRecipe } from '../shared/compute'
 import type { NetworkSettings } from '../shared/settings'
 import type { OfflineItem, OfflineTask } from '../shared/offline'
 
 const run = promisify(execFile)
 export type OfflineRuntimeProgress = (phase: OfflineTask['phase'], current: number, total: number, detail?: string) => void
 const fileSchema = z.object({ name: z.string().max(256), bytes: z.number().int().positive(), sha256: z.string().regex(/^[a-f0-9]{64}$/) })
-const manifestSchema = z.object({ version: z.literal(1), platform: z.literal('win32-x64-cp312'), resources: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,79}$/), kind: z.enum(['python', 'llama']), files: z.array(fileSchema).min(1).max(512) })).max(32) }).refine(value => new Set(value.resources.map(item => item.id)).size === value.resources.length)
+const manifestSchema = z.object({ version: z.literal(1), platform: z.literal('win32-x64-cp312'), resources: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,79}$/), kind: z.enum(['python', 'llama', 'crisp']), files: z.array(fileSchema).min(1).max(512) })).max(32) }).refine(value => new Set(value.resources.map(item => item.id)).size === value.resources.length)
 type Resource = z.infer<typeof manifestSchema>['resources'][number]
 type Artifact = Pick<RuntimePackage, 'url' | 'bytes' | 'sha256'>
 type NamedArtifact = Artifact & { name: string }
@@ -23,7 +23,8 @@ function archiveName(artifact: Artifact, index: number): string {
   return safeResourceName(`${String(index).padStart(2, '0')}-${leaf}`, 'archive')
 }
 
-function pinnedFiles(recipe: RuntimeRecipe | undefined, pkg: RuntimePackage | undefined): NamedArtifact[] {
+function pinnedFiles(recipe: RuntimeRecipe | undefined, pkg: RuntimePackage | undefined, crisp = false): NamedArtifact[] {
+  if (crisp) return [...CRISP_RUNTIME_FILES]
   if (recipe) return [recipe.wheel, ...recipe.companions].map(item => ({ ...item, name: item.filename }))
   if (!pkg) throw new Error('Unsupported runtime combination')
   return [pkg, ...(pkg.companions ?? [])].map((item, index) => ({ ...item, name: archiveName(item, index) }))
@@ -36,6 +37,7 @@ interface Options {
   network?: () => NetworkSettings
   download: (artifact: Artifact, path: string, signal: AbortSignal, progress: (bytes: number) => void) => Promise<void>
   installPython: (id: string, wheelhouse: string, requirements: string, signal: AbortSignal) => Promise<void>
+  installCrisp?: (files: string[], signal: AbortSignal) => Promise<void>
   installLlama: (id: string, files: string[], signal: AbortSignal) => Promise<void>
 }
 
@@ -109,15 +111,16 @@ export class OfflineRuntimes {
   private async validate(root: string, resource: Resource, signal: AbortSignal): Promise<string | undefined> {
     const recipe = this.options.recipes.find(item => item.id === resource.id)
     const pkg = this.options.packages.find(item => item.id === resource.id)
-    if (resource.kind === 'python' ? !recipe : !pkg) throw new Error('Unsupported runtime combination')
+    const crisp = resource.id === CRISP_RUNTIME_ID && resource.kind === 'crisp'
+    if (!crisp && (resource.kind === 'python' ? !recipe : !pkg)) throw new Error('Unsupported runtime combination')
     const folder = join(root, resource.id)
     if (new Set(resource.files.map(file => file.name)).size !== resource.files.length) throw new Error('Duplicate runtime files')
     for (const file of resource.files) {
-      const path = join(folder, safeResourceName(file.name, resource.kind === 'python' ? 'wheel' : 'archive'))
+      const path = join(folder, safeResourceName(file.name, resource.kind !== 'llama' ? 'wheel' : 'archive'))
       await containedFile(root, path)
       if ((await stat(path)).size !== file.bytes || await digest(path, signal) !== file.sha256) throw new Error('Runtime checksum mismatch')
     }
-    const pinned = pinnedFiles(recipe, pkg)
+    const pinned = pinnedFiles(recipe, pkg, crisp)
     for (const item of pinned) if (!resource.files.some(file => file.name === item.name && file.sha256 === item.sha256 && file.bytes === item.bytes)) throw new Error('Pinned runtime resource missing')
     if (!recipe && resource.files.length !== pinned.length) throw new Error('Unexpected runtime archive')
     if (recipe) {
@@ -133,7 +136,7 @@ export class OfflineRuntimes {
     try { manifest = await this.manifest(root) }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []; throw error }
     return Promise.all(manifest.resources.map(async resource => {
-      const name = this.options.recipes.find(item => item.id === resource.id)?.name ?? this.options.packages.find(item => item.id === resource.id)?.name ?? resource.id
+      const name = this.options.recipes.find(item => item.id === resource.id)?.name ?? this.options.packages.find(item => item.id === resource.id)?.name ?? (resource.id === CRISP_RUNTIME_ID ? 'CrispASR 0.8.43 · Vulkan' : resource.id)
       try {
         const lock = await this.validate(root, resource, signal)
         if (lock) await this.verifyClosure(join(root, resource.id), lock, signal, this.options.recipes.find(item => item.id === resource.id))
@@ -156,10 +159,11 @@ export class OfflineRuntimes {
       signal.throwIfAborted()
       const recipe = this.options.recipes.find(item => item.id === id)
       const pkg = this.options.packages.find(item => item.id === id)
-      if (!recipe && !pkg) throw new Error('Unknown runtime combination')
+      const crisp = id === CRISP_RUNTIME_ID
+      if (!recipe && !pkg && !crisp) throw new Error('Unknown runtime combination')
       const folder = join(root, id)
       await mkdir(folder, { recursive: true })
-      const parts = pinnedFiles(recipe, pkg)
+      const parts = pinnedFiles(recipe, pkg, crisp)
       for (const part of parts) {
         const path = join(folder, part.name)
         await this.options.download(part, path, signal, bytes => progress('download', bytes, part.bytes, id))
@@ -184,9 +188,9 @@ export class OfflineRuntimes {
           }
         }
       }
-      const names = (await readdir(folder)).filter(name => name.endsWith(recipe ? '.whl' : '.zip')).sort()
+      const names = (await readdir(folder)).filter(name => name.endsWith(recipe || crisp ? '.whl' : '.zip')).sort()
       const files = await Promise.all(names.map(async name => ({ name, bytes: (await stat(join(folder, name))).size, sha256: await digest(join(folder, name), signal) })))
-      const resource: Resource = { id, kind: recipe ? 'python' : 'llama', files }
+      const resource: Resource = { id, kind: crisp ? 'crisp' : recipe ? 'python' : 'llama', files }
       const lock = await this.validate(root, resource, signal)
       if (lock) await this.verifyClosure(folder, lock, signal, recipe)
       resources.push(resource)
@@ -232,6 +236,9 @@ export class OfflineRuntimes {
           await writeFile(requirements, lock, 'utf8')
           await this.options.installPython(id, folder, requirements, signal)
         } finally { await rm(temporary, { recursive: true, force: true }) }
+      } else if (resource.kind === 'crisp') {
+        if (!this.options.installCrisp) throw new Error('CrispASR installer unavailable')
+        await this.options.installCrisp(CRISP_RUNTIME_FILES.map(file => join(folder, file.name)), signal)
       } else await this.options.installLlama(id, resource.files.map(file => join(folder, file.name)), signal)
       progress('install', position + 1, ids.length, id)
     }

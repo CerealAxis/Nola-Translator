@@ -63,6 +63,11 @@ export class PythonEnvironments {
   }
   has(id: string): boolean { return this.recipes.some(r => r.id === id) }
   directoryFor(id: string): string { return this.inside(id) }
+  async uninstall(id: string): Promise<void> {
+    if (!this.has(id)) throw new Error('安装组合不存在')
+    await removeRuntimeArtifact(this.directory, this.inside(id))
+    this.installedIds.delete(id)
+  }
   cancel(): void { this.controller?.abort() }
   async install(id: string, repair: boolean, offline?: { wheelhouse: string; requirements: string; signal: AbortSignal }): Promise<void> {
     if (this.operation) throw new Error('已有组件安装任务')

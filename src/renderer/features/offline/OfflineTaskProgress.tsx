@@ -1,6 +1,7 @@
 import { ProgressBar, Spinner } from '@heroui/react'
 import { Check, Minus, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { ImportHelp } from './ModelImportPanel'
 import type { OfflineTask, OfflineWorkflow } from '../../../shared/offline'
 
 export interface OfflineTaskProgressProps {
@@ -12,7 +13,7 @@ const workflows = {
   'model-import': ['check', 'copy'],
   'model-download': ['check', 'download', 'pack'],
   'bundle-prepare': ['check', 'download', 'pack'],
-  'bundle-install': ['check', 'install'],
+  'bundle-install': ['extract', 'check', 'copy', 'verify', 'install'],
 } as const
 
 export function OfflineTaskProgress({ task, workflow }: OfflineTaskProgressProps) {
@@ -27,7 +28,7 @@ export function OfflineTaskProgress({ task, workflow }: OfflineTaskProgressProps
   const fraction = measurable ? Math.max(0, Math.min(1, task.current / task.total)) : 0
   const number = new Intl.NumberFormat(language, { maximumFractionDigits: 0 })
   const bytes = (value: number) => `${new Intl.NumberFormat(language, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value / 1024 ** 3)} GB`
-  const amount = measurable && running ? task.phase === 'copy' || task.phase === 'download'
+  const amount = measurable && running ? task.unit === 'bytes' || task.phase === 'copy' || task.phase === 'download' || task.phase === 'extract'
     ? `${bytes(task.current)} / ${bytes(task.total)}` : `${number.format(task.current)} / ${number.format(task.total)}` : null
   const summary = t('offline.stepsComplete').replace('{done}', number.format(done)).replace('{total}', number.format(steps.length))
   const detail = task.detail && !task.detail.startsWith('hub:') ? task.detail : null
@@ -56,7 +57,6 @@ export function OfflineTaskProgress({ task, workflow }: OfflineTaskProgressProps
         </li>
       })}
     </ol>
-    {task.issue ? <p role="alert" className="offline-task-progress__error">{t(`offline.${task.issue}`)}</p> : null}
-    {task.reason ? <p className="offline-task-progress__reason">{task.reason}</p> : null}
+    {task.issue ? <div className="model-import-section-heading"><p role="alert" className="offline-task-progress__error">{t(`offline.${task.issue}`)}</p>{task.reason ? <ImportHelp label={t('offline.importInfo')}>{task.reason}</ImportHelp> : null}</div> : null}
   </section>
 }

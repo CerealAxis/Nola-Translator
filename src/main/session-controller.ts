@@ -125,14 +125,16 @@ export class SessionController {
       }
       const provider = parsed.translationProvider ?? 'local'
       if (provider === 'local' || provider === 'recognition') delete parsed.translationOptions
-      if (provider === 'cloud' || provider === 'microsoft') {
+      if (provider === 'cloud' || provider === 'microsoft' || provider === 'google') {
         const apiKey = await this.options.getCredential(provider)
         checkCancelled()
         if (apiKey) parsed.translationOptions = { ...parsed.translationOptions, apiKey }
       }
       const fallbackProvider = parsed.fallbackTranslationProvider
-      if (fallbackProvider === 'cloud' || fallbackProvider === 'microsoft') {
-        const slot: CredentialProvider = fallbackProvider === 'cloud' ? 'fallback-cloud' : 'microsoft'
+      if (fallbackProvider === 'cloud' || fallbackProvider === 'microsoft' || fallbackProvider === 'google') {
+        const slot: CredentialProvider = fallbackProvider === 'cloud'
+          ? 'fallback-cloud'
+          : fallbackProvider === 'google' ? 'fallback-google' : 'microsoft'
         const apiKey = await this.options.getCredential(slot)
         checkCancelled()
         if (apiKey) parsed.fallbackTranslationOptions = { ...parsed.fallbackTranslationOptions, apiKey }

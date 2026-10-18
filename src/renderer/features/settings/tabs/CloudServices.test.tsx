@@ -18,15 +18,25 @@ it('shows regional workspace and a dedicated key field for Aliyun recognition', 
   expect(screen.queryByText('SenseVoiceSmall')).not.toBeInTheDocument()
 })
 
-it('shows MyMemory endpoint and optional email without a key or intermediate switch', () => {
+it('shows MyMemory endpoint and moves its explanation into a tooltip', () => {
   const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'mymemory' as const, mymemoryEmail: 'test@example.com', translateIntermediate: true } }
   settingsStore.setState({ settings })
   render(<TranslationTab settings={settings} />)
   expect(screen.getByDisplayValue('https://api.mymemory.translated.net/get')).toBeInTheDocument()
   expect(screen.getByDisplayValue('test@example.com')).toBeInTheDocument()
-  expect(screen.getByText(/每句确认后通过 REST 翻译/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'MyMemory 免费翻译 — Info' })).toBeInTheDocument()
+  expect(screen.queryByText(/每句确认后通过 REST 翻译/)).not.toBeInTheDocument()
   expect(screen.queryByLabelText('API 密钥')).not.toBeInTheDocument()
   expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+})
+
+it('shows Google Translate endpoint and a dedicated key field', () => {
+  const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'google' as const } }
+  settingsStore.setState({ settings })
+  render(<TranslationTab settings={settings} />)
+  expect(screen.getByText('https://translation.googleapis.com/language/translate/v2')).toBeInTheDocument()
+  expect(screen.getByLabelText('API 密钥')).toHaveAttribute('type', 'password')
+  expect(screen.getByRole('switch')).toBeInTheDocument()
 })
 
 it('keeps the local model choice inside the translation service card', () => {

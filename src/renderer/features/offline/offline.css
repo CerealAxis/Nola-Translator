@@ -64,3 +64,29 @@
 .offline-task-steps__amount { color: var(--muted); font: var(--font-caption); font-variant-numeric: tabular-nums; text-align: end; }
 .offline-task-progress__error { color: var(--danger); font: var(--font-caption); margin: 0; }
 .offline-task-progress__reason { color: var(--muted); font: var(--font-caption); overflow-wrap: anywhere; margin: 0; }
+
+.offline-dialog { border-radius: var(--radius-xl); }
+.offline-dialog .modal__header { gap: var(--space-3); }
+.offline-dialog .modal__body { margin-top: 0; gap: var(--space-2); }
+.offline-dialog .modal__footer { gap: var(--space-1); }
+.offline-wizard-steps { display: flex; gap: var(--space-2); padding: 0; margin: 0; list-style: none; }
+.offline-wizard-steps li { display: flex; align-items: center; gap: var(--space-1); flex: 1; min-width: 0; color: var(--muted); font: var(--font-caption); }
+.offline-wizard-steps li > span { display: grid; place-items: center; width: var(--space-3); height: var(--space-3); flex-shrink: 0; background: var(--surface-secondary); border-radius: var(--radius-full); font: var(--font-label); }
+.offline-wizard-steps li[data-active='true'] { color: var(--accent); }
+.offline-wizard-steps li[data-active='true'] > span { background: var(--accent); color: var(--accent-foreground); }
+.offline-wizard-steps li[data-completed='true'] > span { background: var(--accent-soft); color: var(--accent); }
+.offline-loader-fields { min-width: 0; }
+.offline-loader-fields .settings-row { gap: var(--space-2); }
+.offline-loader-fields .settings-row__label { flex: 0 0 auto; }
+.offline-loader-fields .settings-row__control { flex: 1; min-width: 0; }
+.offline-loader-fields .select { width: 100%; min-width: 0; }
+.offline-loader-fields .select__trigger { min-width: 0; }
+.offline-loader-fields .select__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.offline-model-fields { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.offline-model-option { display: flex; align-items: center; gap: var(--space-1); min-width: 0; width: 100%; }
+.offline-model-option > span:first-child, .offline-model-option > .label { min-width: 0; overflow-wrap: anywhere; }
+.offline-model-option .chip { flex-shrink: 0; margin-inline-start: auto; font: var(--font-label); }
+.offline-model-popover { max-width: calc(100vw - var(--space-4)); }
+.offline-dialog .offline-items { gap: 0; margin: 0; }
+.offline-dialog .offline-items strong { font: var(--font-body-strong); }
+.offline-dialog .offline-items > li > span { font: var(--font-caption); color: var(--muted); flex-shrink: 0; }
