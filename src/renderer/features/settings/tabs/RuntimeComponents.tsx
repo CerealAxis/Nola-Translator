@@ -9,6 +9,16 @@ import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 
 type RuntimeKind = 'engine' | 'llama' | 'crisp'
 const KINDS = ['engine', 'llama', 'crisp'] as const
+const SPEED_UNITS = ['B/s', 'KB/s', 'MB/s', 'GB/s'] as const
+
+/** Average throughput since the operation began, or an empty string while it cannot be measured yet. */
+function downloadSpeed(bytes: number, startedAt: number | undefined): string {
+  const elapsedSeconds = startedAt === undefined ? 0 : (Date.now() - startedAt) / 1000
+  const speed = elapsedSeconds > 0 ? bytes / elapsedSeconds : Number.NaN
+  if (!Number.isFinite(speed) || speed <= 0) return ''
+  const step = Math.max(0, Math.floor(Math.log(speed) / Math.log(1024)))
+  return `${(speed / 1024 ** step).toFixed(1)} ${SPEED_UNITS[Math.min(step, SPEED_UNITS.length - 1)]}`
+}
 
 export interface RuntimeVersionRow {
   kind: RuntimeKind
@@ -88,6 +98,7 @@ export function RuntimeComponents() {
   }
   const elapsedSeconds = operation?.startedAt ? Math.max(0, Math.floor((now - operation.startedAt) / 1000)) : null
   const elapsed = elapsedSeconds === null ? '' : `${Math.floor(elapsedSeconds / 60)}:${String(elapsedSeconds % 60).padStart(2, '0')}`
+  const speed = operation?.phase === 'download' ? downloadSpeed(operation.bytes, operation.startedAt) : ''
   const versions = runtimeVersionRows(local)
   return <>
     <SettingGroup legend={t('runtime.components')} actions={<Button variant="secondary" size="sm" isDisabled={busy} isPending={state.runtimeChecking}
@@ -170,7 +181,8 @@ export function RuntimeComponents() {
     {operation ? <div role="status" className="runtime-progress">
       <div className="runtime-progress-copy">
         <strong>{operation.id === CRISP_RUNTIME_ID ? 'CrispASR 0.8.43 · Vulkan + CPU' : [...runtimes.recipes, ...runtimes.packages].find(component => component.id === operation.id)?.name}</strong>
-        <span>{t(`compute.${operation.phase}`)}{operation.phase === 'download' ? ` · ${Math.round(operation.bytes / operation.totalBytes * 100)}%` : ''}
+        <span>{t(`compute.${operation.phase}`)}{operation.phase === 'download' ? ` · ${operation.totalBytes > 0 ? Math.round(operation.bytes / operation.totalBytes * 100) : 0}%` : ''}
+          {speed ? ` · ${t('runtime.speed', { speed })}` : ''}
           {elapsed ? ` · ${t('runtime.elapsed', { time: elapsed })}` : ''}</span>
         {operation.phase === 'prepare' && operation.detail ? <small>{operation.detail}</small> : null}
       </div>

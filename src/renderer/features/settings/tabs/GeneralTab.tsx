@@ -19,7 +19,7 @@ import { useI18n } from '@/i18n'
 import type { UiLanguagePreference } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PROXY_NODES, findGithubProxyNode } from '../../../../shared/github-proxies'
-import { findPypiMirrorNode, PYPI_MIRROR_DEFAULT, PYPI_MIRROR_NODES } from '../../../../shared/pypi-mirrors'
+import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_DEFAULT, PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_OFFICIAL, PYTORCH_WHEEL_MIRRORS } from '../../../../shared/pypi-mirrors'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 
@@ -158,6 +158,12 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
     { value: PYPI_MIRROR_NODES[2], label: t('settings.pypiHuawei') },
     { value: PYPI_MIRROR_NODES[3], label: t('settings.pypiTencent') },
   ], [t])
+  const pytorchWheelOptions = useMemo<PickerOption[]>(() => [
+    { value: PYTORCH_WHEEL_MIRROR_AUTO, label: t('settings.pytorchWheelMirrorAuto') },
+    { value: PYTORCH_WHEEL_MIRRORS[0], label: t('settings.pytorchWheelMirrorSjtu') },
+    { value: PYTORCH_WHEEL_MIRRORS[1], label: t('settings.pytorchWheelMirrorAliyun') },
+    { value: PYTORCH_WHEEL_MIRROR_OFFICIAL, label: t('settings.pytorchWheelMirrorOfficial') },
+  ], [t])
 
   return (
     <SettingGroup onboardingTarget="network-settings" legend={t('settings.groupNetwork')}>
@@ -216,6 +222,17 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
           ariaLabel={t('settings.pypiMirrorNode')}
           onChange={(pypiMirrorUrl) => {
             void updateSettings({ network: { pypiMirrorUrl, usePypiMirror: true } }).catch(() => undefined)
+          }}
+        />
+      </SettingsRow>
+      <SettingsRow label={t('settings.pytorchWheelMirrorNode')} desc={t('settings.pytorchWheelMirrorHint')} descriptionTooltip>
+        <SettingSelect
+          value={findPytorchWheelMirrorNode(network.pytorchWheelMirrorUrl) ?? PYTORCH_WHEEL_MIRROR_AUTO}
+          options={pytorchWheelOptions}
+          isDisabled={!network.usePypiMirror}
+          ariaLabel={t('settings.pytorchWheelMirrorNode')}
+          onChange={(pytorchWheelMirrorUrl) => {
+            void updateSettings({ network: { pytorchWheelMirrorUrl, usePypiMirror: true } }).catch(() => undefined)
           }}
         />
       </SettingsRow>

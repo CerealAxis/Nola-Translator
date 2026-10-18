@@ -1,6 +1,6 @@
 import { modelConfigurationSchema } from './model-capabilities'
 import { z } from 'zod'
-import { PYPI_MIRROR_NODES } from './pypi-mirrors'
+import { PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_NODES } from './pypi-mirrors'
 import { INDEX_TRANSLATE_MODEL_IDS } from './index-translate'
 import { computeSettingsSchema, computeSnapshotSchema } from './compute'
 import { SUPPORT_ERROR_CODES } from './error-catalog'
@@ -61,6 +61,7 @@ const networkSettingsSchema = z.object({
   useHuggingFaceMirror: z.boolean().optional(),
   usePypiMirror: z.boolean().optional(),
   pypiMirrorUrl: z.enum(PYPI_MIRROR_NODES).optional(),
+  pytorchWheelMirrorUrl: z.enum(PYTORCH_WHEEL_MIRROR_NODES).optional(),
   useGithubAccelerate: z.boolean().optional(),
   githubAccelerateUrl: z.string().max(2048).optional(),
   proxyUrl: z.string().max(2048).optional(),

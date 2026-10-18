@@ -64,9 +64,10 @@ export function translate(key: string, language: UiLanguage, values: Translation
   const dictionary = dictionaries[language]
   const template = lookup(dictionary, key)
   if (template === undefined) {
-    if (language !== 'zh-CN') console.warn(`[i18n] missing key "${key}" for locale "${language}"`)
-    // 中文表缺键时把键原样返回：它至少是个可搜索的标识，比 `missing:` 之类占位符有用。
-    return interpolate(key, values)
+    // 缺词条时回退英文表，英文也缺时返回键名，两层都保证界面拿到可显示的字符串。
+    const fallback = language === 'en' ? undefined : lookup(dictionaries.en, key)
+    console.warn(`[i18n] missing key "${key}" for locale "${language}"`)
+    return interpolate(fallback ?? key, values)
   }
   const message = interpolate(template, values)
   const supportCode = supportErrorCodeForMessage(key)

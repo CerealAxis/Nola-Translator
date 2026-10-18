@@ -9,15 +9,18 @@ import { execFile } from 'node:child_process'
 import { z } from 'zod'
 import { runtimeRecipeSchema, type RuntimeRecipe, type RuntimeRecipeState, type RuntimeSnapshot } from '../shared/compute'
 import type { NetworkSettings } from '../shared/settings'
-import { PYPI_MIRROR_DEFAULT } from '../shared/pypi-mirrors'
+import { pytorchWheelUrls } from '../shared/pypi-mirrors'
 import { probeLocalEngine } from './local-runtimes'
 import { offlinePipArguments } from './offline-runtimes'
 
 const PYPI_INDEX = 'https://pypi.org/simple/'
+const WHEEL_DOWNLOAD_ATTEMPTS = 3
 const recipesSchema = z.object({ version: z.literal(1), recipes: z.array(runtimeRecipeSchema).max(256) })
 type Download = (wheel: RuntimeRecipe['wheel'], path: string, signal: AbortSignal, progress: (bytes: number) => void) => Promise<void>
 type Verify = (path: string, signal: AbortSignal) => Promise<string>
-type Probe = (url: string, signal: AbortSignal) => Promise<boolean>
+type Wheel = RuntimeRecipe['wheel']
+/** `bytes` is the size the manifest declares, so a mirror answering with an HTML portal page is rejected. */
+type Probe = (url: string, bytes: number, signal: AbortSignal) => Promise<boolean>
 
 /** Install only libraries; every combination shares the app's Python 3.12 interpreter. */
 export class PythonEnvironments {
@@ -87,20 +90,12 @@ export class PythonEnvironments {
     const staging = this.inside(`staging-${id}-${randomUUID()}`)
     const backup = this.inside(`backup-${id}-${randomUUID()}`)
     let movedOld = false
+    let partialWheel = false
     try {
       const network = this.network?.()
-      const useMirror = network?.usePypiMirror === true
       let artifacts: string[]
       if (offline) {
         artifacts = []
-      } else if (useMirror) {
-        if (this.operation) this.operation.phase = 'prepare'
-        artifacts = []
-        for (const item of wheels) {
-          const mirrorUrl = network.pypiMirrorUrl === PYPI_MIRROR_DEFAULT ? aliyunTorchWheelUrl(item.url) : null
-          const url = mirrorUrl && this.probe && await this.probe(mirrorUrl, controller.signal) ? mirrorUrl : item.url
-          artifacts.push(`${url}#sha256=${item.sha256}`)
-        }
       } else {
         await mkdir(cache, { recursive: true })
         artifacts = []
@@ -110,7 +105,20 @@ export class PythonEnvironments {
           const folder = join(cache, item.sha256)
           await mkdir(folder, { recursive: true })
           const wheel = join(folder, item.filename)
-          await this.download(item, wheel, controller.signal, bytes => { if (this.operation) this.operation.bytes = completed + bytes })
+          // Resolved once so every retry resumes the same partial file instead of restarting on another source.
+          const url = await this.resolveWheelUrl(item, network, controller.signal)
+          for (let attempt = 1; ; attempt++) {
+            try {
+              await this.download({ ...item, url }, wheel, controller.signal, bytes => { if (this.operation) this.operation.bytes = completed + bytes })
+              break
+            } catch (error) {
+              // A cancelled download leaves a fragment nobody asked to resume; an exhausted one is
+              // worth keeping so the next install continues from the bytes already on disk.
+              if (!controller.signal.aborted && attempt >= WHEEL_DOWNLOAD_ATTEMPTS) partialWheel = true
+              if (controller.signal.aborted || attempt >= WHEEL_DOWNLOAD_ATTEMPTS) throw error
+              logDiagnostic('runtime.python-wheel-download.retry', { url, attempt, ...processFailure(error) })
+            }
+          }
           this.operation.phase = 'verify'
           if (await this.digest(wheel, controller.signal) !== item.sha256) {
             await rm(wheel, { force: true })
@@ -155,7 +163,10 @@ export class PythonEnvironments {
       this.lastError = controller.signal.aborted ? '安装已取消' : String(error)
       throw new Error(this.lastError)
     } finally {
-      for (const artifact of [staging, cache, this.inside('pip-temp')]) {
+      // Startup removes wheel-cache through cleanupRuntimeArtifacts, so a retained fragment never
+      // outlives the session that produced it.
+      const temporary = partialWheel ? [staging, this.inside('pip-temp')] : [staging, cache, this.inside('pip-temp')]
+      for (const artifact of temporary) {
         await removeRuntimeArtifact(this.directory, artifact).catch(error => {
           this.lastError = `${this.lastError ? `${this.lastError}；` : ''}安装临时文件清理失败：${String(error)}`
         })
@@ -218,14 +229,16 @@ export class PythonEnvironments {
       if (error instanceof Error) throw error
     }
   }
-}
 
-export function aliyunTorchWheelUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url)
-    if (parsed.hostname !== 'download-r2.pytorch.org' || !parsed.pathname.startsWith('/whl/')) return null
-    return `https://mirrors.aliyun.com/pytorch-wheels/${parsed.pathname.slice('/whl/'.length)}${parsed.search}`
-  } catch { return null }
+  /** Picks the first mirror that answers for this wheel's declared size, keeping the official address last. */
+  private async resolveWheelUrl(item: Wheel, network: NetworkSettings | undefined, signal: AbortSignal): Promise<string> {
+    if (network?.usePypiMirror !== true || !this.probe) return item.url
+    const candidates = pytorchWheelUrls(item.url, network.pytorchWheelMirrorUrl)
+    for (const candidate of candidates.slice(0, -1)) {
+      if (await this.probe(candidate, item.bytes, signal)) return candidate
+    }
+    return candidates.at(-1) ?? item.url
+  }
 }
 
 function isMissingPackageError(error: unknown): boolean {

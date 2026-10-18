@@ -1,7 +1,7 @@
 import { LANGUAGE_CODES } from './languages'
 import { DEFAULT_COMPUTE_SETTINGS, type ComputeSettings } from './compute'
 import { GITHUB_PROXY_DEFAULT } from './github-proxies'
-import { PYPI_MIRROR_DEFAULT } from './pypi-mirrors'
+import { PYPI_MIRROR_DEFAULT, PYTORCH_WHEEL_MIRROR_AUTO } from './pypi-mirrors'
 
 export type OverlaySettings = {
   mode: 'free' | 'top' | 'bottom'
@@ -83,6 +83,12 @@ export type NetworkSettings = {
   usePypiMirror: boolean
   /** Selected pip index; missing dependencies can fall back to official PyPI. */
   pypiMirrorUrl: string
+  /**
+   * Wheel host for component packages such as torch. Holds a `PYTORCH_WHEEL_MIRROR_NODES` entry:
+   * `PYTORCH_WHEEL_MIRROR_AUTO` tries the catalog in order, one mirror base URL restricts the
+   * candidates to it, and `PYTORCH_WHEEL_MIRROR_OFFICIAL` skips mirroring entirely.
+   */
+  pytorchWheelMirrorUrl: string
   /** Whether `githubAccelerateUrl` is applied to GitHub asset URLs at all. */
   useGithubAccelerate: boolean
   /**
@@ -292,6 +298,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     useHuggingFaceMirror: false,
     usePypiMirror: false,
     pypiMirrorUrl: PYPI_MIRROR_DEFAULT,
+    pytorchWheelMirrorUrl: PYTORCH_WHEEL_MIRROR_AUTO,
     useGithubAccelerate: false,
     githubAccelerateUrl: GITHUB_PROXY_DEFAULT,
     proxyUrl: '',

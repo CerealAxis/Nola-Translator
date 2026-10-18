@@ -4,7 +4,7 @@ import { computeSettingsSchema, DEFAULT_COMPUTE_SETTINGS } from '../shared/compu
 
 import { DEFAULT_SETTINGS, RECOGNITION_MODEL_IDS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
 import { findGithubProxyNode, GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT } from '../shared/github-proxies'
-import { findPypiMirrorNode, PYPI_MIRROR_DEFAULT } from '../shared/pypi-mirrors'
+import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_DEFAULT, PYTORCH_WHEEL_MIRROR_AUTO } from '../shared/pypi-mirrors'
 import { ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS } from '../shared/settings'
 import { remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../shared/cloud-config'
 import { settingsPatchSchema } from './settings-schema'
@@ -225,6 +225,9 @@ export class SettingsStore {
           pypiMirrorUrl: typeof raw.network?.pypiMirrorUrl === 'string'
             ? findPypiMirrorNode(raw.network.pypiMirrorUrl) ?? PYPI_MIRROR_DEFAULT
             : PYPI_MIRROR_DEFAULT,
+          pytorchWheelMirrorUrl: typeof raw.network?.pytorchWheelMirrorUrl === 'string'
+            ? findPytorchWheelMirrorNode(raw.network.pytorchWheelMirrorUrl) ?? PYTORCH_WHEEL_MIRROR_AUTO
+            : PYTORCH_WHEEL_MIRROR_AUTO,
           // A build from before the group kept the mirror toggle at the top level; reading it here
           // is the one place that value is honoured, so a user who turned it off does not get it
           // back from the default above.

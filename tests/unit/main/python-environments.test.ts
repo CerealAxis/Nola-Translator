@@ -46,22 +46,38 @@ it('exposes pip progress while running and keeps the failure log without applyin
   } finally { await rm(root, { recursive: true, force: true }); vi.clearAllMocks() }
 })
 
-it.each(['failure', 'cancel'])('cleans partially downloaded wheels on %s', async mode => {
+it('keeps a partially downloaded wheel when the download fails so the next install resumes it', async () => {
   const root = await mkdtemp(join(tmpdir(), 'nola-install-cleanup-'))
   const recipe = JSON.parse(await readFile(resolve('build/runtime-recipes.json'), 'utf8')).recipes[0]
   await writeFile(join(root, 'recipes.json'), JSON.stringify({ version: 1, recipes: [recipe] }))
   let manager: PythonEnvironments
   manager = new PythonEnvironments(root, root, join(root, 'recipes.json'), async (_item, path, signal) => {
     await writeFile(path, 'partial wheel')
-    if (mode === 'cancel') manager.cancel()
     signal.throwIfAborted()
     throw new Error('network failed')
   }, async () => recipe.wheel.sha256)
   try {
     await manager.initialize()
-    await expect(manager.install(recipe.id, false)).rejects.toThrow(mode === 'cancel' ? '取消' : 'network failed')
+    await expect(manager.install(recipe.id, false)).rejects.toThrow('network failed')
+    expect(await readdir(root)).toContain('wheel-cache')
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+it('cleans partially downloaded wheels when the user cancels', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'nola-install-cleanup-'))
+  const recipe = JSON.parse(await readFile(resolve('build/runtime-recipes.json'), 'utf8')).recipes[0]
+  await writeFile(join(root, 'recipes.json'), JSON.stringify({ version: 1, recipes: [recipe] }))
+  let manager: PythonEnvironments
+  manager = new PythonEnvironments(root, root, join(root, 'recipes.json'), async (_item, path, signal) => {
+    await writeFile(path, 'partial wheel')
+    manager.cancel()
+    signal.throwIfAborted()
+    throw new Error('network failed')
+  }, async () => recipe.wheel.sha256)
+  try {
+    await manager.initialize()
+    await expect(manager.install(recipe.id, false)).rejects.toThrow('取消')
     expect(await readdir(root)).toEqual(['recipes.json'])
-    expect(manager.lastError).not.toContain('保留')
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 

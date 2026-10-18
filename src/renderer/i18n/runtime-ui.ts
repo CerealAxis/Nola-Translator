@@ -10,7 +10,7 @@ export const runtimeZh = {
   torchMissing: '尚未安装 PyTorch，语音识别功能无法启动。', llamaMissing: '尚未安装 llama.cpp，GGUF 本地翻译功能无法启动。',
   goTorch: '前往设置安装 PyTorch', goLlama: '前往设置安装 llama.cpp', later: '稍后', busy: '请先结束同传，再安装或修复组件。',
   engines: '推理引擎', enginesHint: '安装该组件后即可启用适配此引擎的模型。建议安装 llama.cpp 和 CrispASR。', recognitionEngine: '语音识别引擎', translationEngine: '本地翻译引擎', checking: '检查运行组件',
-  elapsed: '已用 {time}', operationStarted: '运行组件{action}已开始', operationProgress: '操作进行中，可下滑查看进度。', operationComplete: '运行组件{action}完成', operationFailed: '运行组件{action}失败',
+  elapsed: '已用 {time}', speed: '速度 {speed}', operationStarted: '运行组件{action}已开始', operationProgress: '操作进行中，可下滑查看进度。', operationComplete: '运行组件{action}完成', operationFailed: '运行组件{action}失败',
 }
 export const runtimeEn: typeof runtimeZh = {
   components: 'Runtime components', python: 'Python', pytorch: 'PyTorch', llama: 'llama.cpp', crisp: 'CrispASR', builtInPython: 'Built-in Python 3.12', installed: 'Installed', external: 'External environment', externalHint: 'This runtime was found outside the app-managed directory, usually from another installation on your computer or from PATH. It is not managed by the app, so the app cannot uninstall it. To change versions, install a version provided by the app or install another version manually.', missing: 'Not installed',
@@ -24,5 +24,5 @@ export const runtimeEn: typeof runtimeZh = {
   torchMissing: 'PyTorch is not installed. Speech recognition cannot start.', llamaMissing: 'llama.cpp is not installed. Local GGUF translation cannot start.',
   goTorch: 'Install PyTorch in settings', goLlama: 'Install llama.cpp in settings', later: 'Later', busy: 'End the caption session before installing or repairing components.',
   engines: 'Inference engines', enginesHint: 'Install a component to enable the models that match its engine. Installing llama.cpp and CrispASR is recommended.', recognitionEngine: 'Speech recognition engine', translationEngine: 'Local translation engine', checking: 'Check runtime components',
-  elapsed: 'Elapsed {time}', operationStarted: 'Runtime {action} started', operationProgress: 'The operation is in progress. Scroll down to view its progress.', operationComplete: 'Runtime {action} completed', operationFailed: 'Runtime {action} failed',
+  elapsed: 'Elapsed {time}', speed: 'Speed {speed}', operationStarted: 'Runtime {action} started', operationProgress: 'The operation is in progress. Scroll down to view its progress.', operationComplete: 'Runtime {action} completed', operationFailed: 'Runtime {action} failed',
 }

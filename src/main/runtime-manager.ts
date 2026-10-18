@@ -11,8 +11,8 @@ import { z } from 'zod'
 import { CRISP_RUNTIME_ID, CRISP_RUNTIME_FILES, runtimePackageSchema, type ComputeSettings, type LocalRuntime, type RuntimePackage, type RuntimeSnapshot, type HardwareInventory } from '../shared/compute'
 import type { NetworkSettings } from '../shared/settings'
 import { probeHardware } from './hardware-inventory'
-import { PythonEnvironments, aliyunTorchWheelUrl } from './python-environments'
-import { PYPI_MIRROR_DEFAULT } from '../shared/pypi-mirrors'
+import { PythonEnvironments } from './python-environments'
+import { pytorchWheelUrls } from '../shared/pypi-mirrors'
 import { localCandidates, missingLocalRuntime, probeLocalCrisp, probeLocalEngine, probeLocalLlama } from './local-runtimes'
 import { resolveGithubProxyNode } from './github-proxy-probe'
 import { OfflineRuntimes, type OfflineRuntimeProgress } from './offline-runtimes'
@@ -21,6 +21,7 @@ import type { OfflineItem } from '../shared/offline'
 const run = promisify(execFile)
 const catalogSchema = z.object({ version: z.literal(1), packages: z.array(runtimePackageSchema).max(32) })
 const GITHUB_ASSET_HOSTS = new Set(['github.com', 'objects.githubusercontent.com'])
+const PROBE_TIMEOUT_MS = 10_000
 const CRISP_ID = CRISP_RUNTIME_ID
 
 type Options = { recipesPath: string; baseDirectory: string; localLlamaDirectory?: string; network?: () => NetworkSettings }
@@ -56,7 +57,7 @@ export class RuntimeManager {
     this.packages = catalogSchema.parse(JSON.parse((await readFile(this.catalogPath, 'utf8')).replace(/^\uFEFF/, ''))).packages
     this.python = new PythonEnvironments(this.directory, this.options.baseDirectory, this.options.recipesPath,
       (item, path, signal, progress) => this.download(item, path, signal, progress), (path, signal) => this.digest(path, signal),
-      this.options.network, (url, signal) => this.probeUrl(url, signal))
+      this.options.network, (url, bytes, signal) => this.probeUrl(url, bytes, signal))
     await this.python.initialize()
     const names = await readdir(this.directory).catch(() => [] as string[])
     for (const item of this.packages) {
@@ -341,10 +342,7 @@ export class RuntimeManager {
     return new OfflineRuntimes({ python: join(this.options.baseDirectory, 'python.exe'), temporaryDirectory: this.directory, recipes: this.python?.recipes ?? [], packages: this.packages,
       network: this.options.network,
       download: async (item, path, signal, progress) => {
-        const network = this.options.network?.()
-        const mirror = network?.usePypiMirror && network.pypiMirrorUrl === PYPI_MIRROR_DEFAULT ? aliyunTorchWheelUrl(item.url) : null
-        const url = mirror && await this.probeUrl(mirror, signal) ? mirror : item.url
-        await this.download({ ...item, url }, path, signal, progress)
+        await this.download({ ...item, url: await this.resolveWheelUrl(item, signal) }, path, signal, progress)
       },
       installCrisp: (files, signal) => this.installCrisp(true, { files, signal }),
       installPython: async (id, wheelhouse, requirements, signal) => {
@@ -526,23 +524,32 @@ export class RuntimeManager {
     const network = this.options.network?.()
     return network?.proxyForRuntimeDownload ? network.proxyUrl.trim() : ''
   }
-  private async probeUrl(url: string, signal: AbortSignal): Promise<boolean> {
-    const proxy = this.pipProxy()
-    const timeout = AbortSignal.timeout(10_000)
+  private async probeUrl(url: string, bytes: number, signal: AbortSignal): Promise<boolean> {
+    const timeout = AbortSignal.timeout(PROBE_TIMEOUT_MS)
     const requestSignal = AbortSignal.any([signal, timeout])
     try {
-      const response = await withSessionProxy(proxy, () => net.fetch(url, { method: 'HEAD', signal: requestSignal }))
+      const response = await withSessionProxy(this.runtimeProxy(), () => net.fetch(url, { method: 'HEAD', signal: requestSignal }))
       await response.body?.cancel().catch(() => undefined)
-      return response.ok
+      if (!response.ok) return false
+      // Some mirrors answer 200 with an HTML portal page for a missing path, so a declared length
+      // that disagrees with the wheel size rules the mirror out.
+      const length = response.headers.get('content-length')
+      return !length || Number(length) === bytes
     } catch (error) {
       signal.throwIfAborted()
       logDiagnostic('runtime.python-mirror-probe.failed', { url, ...processFailure(error) })
       return false
     }
   }
-  private pipProxy(): string {
+  /** Picks the first mirror that answers for this artifact's declared size, keeping the official address last. */
+  private async resolveWheelUrl(item: { url: string; bytes: number }, signal: AbortSignal): Promise<string> {
     const network = this.options.network?.()
-    return network?.proxyForPip ? network.proxyUrl.trim() : ''
+    if (network?.usePypiMirror !== true) return item.url
+    const candidates = pytorchWheelUrls(item.url, network.pytorchWheelMirrorUrl)
+    for (const candidate of candidates.slice(0, -1)) {
+      if (await this.probeUrl(candidate, item.bytes, signal)) return candidate
+    }
+    return candidates.at(-1) ?? item.url
   }
   private async accelerated(url: string): Promise<string> {
     let host: string

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { PYPI_MIRROR_NODES } from '../shared/pypi-mirrors'
+import { PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_NODES } from '../shared/pypi-mirrors'
 import { INDEX_TRANSLATE_MODEL_IDS } from '../shared/index-translate'
 import { computeSettingsPatchSchema } from '../shared/compute'
 import { RECOGNITION_MODEL_IDS } from '../shared/settings'
@@ -49,6 +49,7 @@ export const settingsPatchSchema = z.object({
     useHuggingFaceMirror: z.boolean().optional(),
     usePypiMirror: z.boolean().optional(),
     pypiMirrorUrl: z.enum(PYPI_MIRROR_NODES).optional(),
+    pytorchWheelMirrorUrl: z.enum(PYTORCH_WHEEL_MIRROR_NODES).optional(),
     useGithubAccelerate: z.boolean().optional(),
     // A node from the picker catalog or its `auto` sentinel; the catalog is not enforced here, so the
     // bound is what keeps a hand-built request from riding an oversized value onto every engine call.

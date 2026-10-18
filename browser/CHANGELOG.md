@@ -2,10 +2,12 @@
 
 The extension has its own release version in `browser/version.json`. The extension build and desktop compatibility check both read that file. Every extension release must update the version and this log together. Desktop app versions remain independent.
 
-## 1.1.2 — 2026-10-16
+## 1.1.3 — 2026-10-18
 
 - Add a Firefox MV3 build, native host registration and desktop connection controls.
 - Firefox uses desktop system audio; verified tab audio remains Chromium-only.
+
+## 1.1.2 — 2026-10-13
 
 - Cancel queued video-end cleanup when a seek or metadata change opens a new timeline, preserving the shared tab audio track.
 - Pair with the desktop engine fix that keeps one audio consumer across paused resets and resumes, preventing old consumers from discarding post-seek audio.

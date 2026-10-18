@@ -88,7 +88,8 @@ scripts/                        # PowerShell 构建与运行时管理脚本
 **i18n**
 - 界面字符串走 `t()`；界面语言偏好为 `auto`、`zh-CN`、`zh-TW`、`zh-HK`、`ko`、`ja` 或 `en`，`auto` 按系统区域解析；`src/renderer/i18n/` 每个区域语言必须各有完整 `Dictionary` 文件
 - `en.ts` 与 `zh-TW`／`zh-HK`／`ko`／`ja` 都必须填满 `Dictionary`；`t()` 收 `Leaves<Dictionary>`，写错 key 是**编译错误**
-- 新增 key 只改 `zh-CN.ts`，`en.ts` 会因类型不匹配而报错
+- 新增 key 要补齐全部 6 个区域语言；key 加在 `zh-CN.ts` 或任一 `*-ui.ts` 子字典里都可以，因为 `zh-CN.ts` 只是 `import` 各子字典，在子字典新增同样能让 `zh-CN`／`en` 通过类型检查
+- TS2741 每个对象只报第一个缺失属性，补完一个可能还剩下一个；提交前用「全语言 key 全量比对」自查，别只跑 `tsc`
 
 **样式**
 - 颜色/间距/圆角/字号一律用 token（见 `renderer/theme/`），**不写字面值**
