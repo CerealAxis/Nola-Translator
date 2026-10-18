@@ -198,6 +198,7 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
                 if (!isEngineAvailable(engine, runtimes?.local ?? null)) {
                   toast.warning(t('models.engineUnavailable', { engine: engineLabel(engine) }))
                 }
+                onClose()
                 onInstall(selected, selectedSource)
               }}><Download aria-hidden="true" className="size-4" />{t(state === 'failed' ? 'models.retry' : 'models.install')}</Button>}
         </Modal.Footer>

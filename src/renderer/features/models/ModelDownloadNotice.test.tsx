@@ -14,18 +14,20 @@ const record: ResourceRecord = {
   installedBytes: 0, downloadBytes: 1312164352, state: 'running', phase: 'download', cancellable: true,
 }
 
-it('notifies once on completion and failure, but never on acceptance or cancellation', () => {
+it('notifies on completion, failure with a reason, and cancellation', () => {
   const success = vi.spyOn(toast, 'success').mockImplementation(() => '')
   const danger = vi.spyOn(toast, 'danger').mockImplementation(() => '')
+  const warning = vi.spyOn(toast, 'warning').mockImplementation(() => '')
   stores.models.setState({ resources: [] })
   render(<ModelDownloadNotice />)
   const publish = (resource: ResourceRecord) => act(() => { stores.models.setState({ resources: [resource] }) })
   publish(record)
   expect(success).not.toHaveBeenCalled()
-  publish({ ...record, state: 'failed', cancellable: false })
-  publish({ ...record, state: 'failed', cancellable: false })
+  publish({ ...record, state: 'failed', errorCode: 'networkUnavailable', cancellable: false })
+  publish({ ...record, state: 'failed', errorCode: 'networkUnavailable', cancellable: false })
   expect(danger).toHaveBeenCalledTimes(1)
   expect(danger).toHaveBeenCalledWith(expect.stringContaining(record.name), expect.objectContaining({
+    description: expect.stringContaining('网络连接失败'),
     actionProps: expect.objectContaining({ children: '重试下载', onPress: expect.any(Function) }),
   }))
   const retry = danger.mock.calls[0]?.[1]?.actionProps?.onPress
@@ -40,7 +42,7 @@ it('notifies once on completion and failure, but never on acceptance or cancella
   publish(record)
   publish({ ...record, state: 'cancelling', phase: 'cleanup' })
   publish({ ...record, state: 'idle', cancellable: false })
-  expect(success).toHaveBeenCalledTimes(1)
+  expect(warning).toHaveBeenCalledOnce()
   expect(danger).toHaveBeenCalledTimes(1)
 })
 

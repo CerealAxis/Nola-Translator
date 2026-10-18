@@ -17,6 +17,48 @@ export function sameAdapterName(left: string, right: string): boolean {
   return a === b || (a.endsWith('uhd graphics') && b.startsWith(`${a} `)) ||
     (b.endsWith('uhd graphics') && a.startsWith(`${b} `))
 }
+
+function commonAdapterCharacters(left: string, right: string): number {
+  const normalize = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const normalizedLeft = normalize(left)
+  const normalizedRight = normalize(right)
+  const leftNumbers: string[] = normalizedLeft.match(/\d{3,}/g) ?? []
+  const rightNumbers: string[] = normalizedRight.match(/\d{3,}/g) ?? []
+  if (leftNumbers.length && rightNumbers.length && !leftNumbers.every(number => rightNumbers.includes(number))) return 0
+
+  const counts = new Map<string, number>()
+  for (const character of normalizedLeft) {
+    counts.set(character, (counts.get(character) ?? 0) + 1)
+  }
+  let shared = 0
+  for (const character of normalizedRight) {
+    const remaining = counts.get(character) ?? 0
+    if (remaining > 0) {
+      shared++
+      counts.set(character, remaining - 1)
+    }
+  }
+  return shared
+}
+
+function bestDeviceMatch(
+  name: string,
+  devices: ComputeDevice[],
+  supports: (device: ComputeDevice) => boolean,
+): ComputeDevice | undefined {
+  let best: ComputeDevice | undefined
+  let bestScore = 4
+  for (const device of devices) {
+    if (!supports(device)) continue
+    const score = commonAdapterCharacters(name, device.name)
+    // Keep the first result when common-character counts tie; enumeration order is backend order.
+    if (score > bestScore) {
+      best = device
+      bestScore = score
+    }
+  }
+  return best
+}
 export function encodeDeviceIntent(intent: DeviceIntent): string {
   return `hardware:${intent.backend}:${encodeURIComponent(intent.hardwareId)}`
 }
@@ -60,21 +102,16 @@ export function resolveDeviceIntent(value: string, hardware: HardwareInventory, 
     const preferredId = preferredHardwareId(value)
     if (preferredId !== null) {
       const adapter = hardware.adapters.find(a => a.hardwareId === preferredId)
-      if (!adapter || hardware.adapters.filter(a => sameAdapterName(a.name, adapter.name)).length !== 1) return 'auto'
-      const matches = devices.filter(d => sameAdapterName(d.name, adapter.name) &&
-        (task === 'torch' ? !!d.torchDevice : !!d.llamaDevice))
-      return matches.length === 1 ? matches[0].id : 'auto'
+      if (!adapter) return 'auto'
+      return bestDeviceMatch(adapter.name, devices, d => task === 'torch' ? !!d.torchDevice : !!d.llamaDevice)?.id ?? 'auto'
     }
-    if (value.startsWith('hardware:')) throw new Error('计算设备选择格式无效，请重新选择')
+    if (value.startsWith('hardware:')) return 'auto'
     return value
   }
   const adapter = hardware.adapters.find(a => a.hardwareId === intent.hardwareId)
-  if (!adapter) throw new Error('指定显卡已断开，请重新选择计算设备')
-  // Names alone cannot distinguish two identical physical adapters.
-  if (hardware.adapters.filter(a => sameAdapterName(a.name, adapter.name)).length !== 1) throw new Error('存在同名显卡，无法可靠匹配指定设备，请使用后端枚举的设备选项')
-  const matches = devices.filter(d => sameAdapterName(d.name, adapter.name) &&
-    (task === 'torch' ? !!d.torchDevice && d.backend === intent.backend && d.recognition
-      : !!d.llamaDevice && d.translation && d.llamaDevice.toLowerCase().startsWith(intent.backend === 'rocm' ? 'hip' : intent.backend)))
-  if (matches.length !== 1) throw new Error(`${adapter.name} 未被 ${intent.backend.toUpperCase()} 后端唯一识别；请检查驱动或重新选择设备`)
-  return matches[0].id
+  if (!adapter) return 'auto'
+  const match = bestDeviceMatch(adapter.name, devices, d => task === 'torch'
+    ? !!d.torchDevice
+    : !!d.llamaDevice)
+  return match?.id ?? 'auto'
 }

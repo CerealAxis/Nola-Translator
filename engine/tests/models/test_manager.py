@@ -273,6 +273,27 @@ def test_automatic_hugging_face_mirror_falls_back_to_official(tmp_path: Path) ->
         assert (target / entry.path).read_bytes() == payloads[spec.url_for(entry)]
 
 
+@pytest.mark.parametrize("source", ["huggingface", "hf-mirror"])
+def test_explicit_model_card_source_overrides_automatic_mirror(tmp_path: Path, source: str) -> None:
+    spec, official_payloads = _snapshot_spec()
+    network = NetworkSettings(useHuggingFaceMirror=True)
+    payloads = {spec.url_for(entry, network, source): official_payloads[spec.url_for(entry)] for entry in spec.files}
+    requests: list[str] = []
+
+    def fetch(url: str, destination: Path, progress) -> None:
+        requests.append(url)
+        destination.write_bytes(payloads[url])
+        progress(len(payloads[url]), len(payloads[url]))
+
+    manager = ModelManager(tmp_path / "models", fetcher=fetch)
+    manager.ensure(spec, network=network, source=source)
+
+    expected = [spec.url_for(entry, network, source) for entry in spec.files]
+    assert requests == expected
+    expected_host = "huggingface.co" if source == "huggingface" else "hf-mirror.com"
+    assert all(expected_host in url for url in requests)
+
+
 def test_incomplete_existing_model_is_not_installed(tmp_path: Path) -> None:
     spec, payloads = _snapshot_spec()
     target = tmp_path / "models" / spec.directory

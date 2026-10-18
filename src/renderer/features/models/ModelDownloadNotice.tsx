@@ -29,21 +29,33 @@ export function ModelDownloadNotice() {
       previous = current
       for (const record of current) {
         const prior = before.get(record.resourceId)
-        const wasInstalling = prior?.state === 'running' &&
-          (prior.phase === 'download' || prior.phase === 'verify' || prior.phase === 'install')
+        const startedNow = prior?.state !== 'running' && prior?.state !== 'cancelling' &&
+          record.state === 'running' && (record.phase === 'resolve' || record.phase === 'download')
+        if (startedNow) {
+          toast(t('models.downloadStarted', { name: record.name }), { variant: 'accent' })
+          continue
+        }
+        const wasInstalling = (prior?.state === 'running' &&
+          (prior.phase === 'download' || prior.phase === 'verify' || prior.phase === 'install')) || prior?.state === 'cancelling'
         if (!wasInstalling) continue
         if (record.state === 'failed') notifyFailure(record, t)
         if (record.state === 'idle' && record.installed) toast.success(t('models.downloadComplete', { name: record.name }))
+        if (record.state === 'idle' && !record.installed) toast.warning(t('models.downloadCancelled', { name: record.name }))
       }
     })
   }, [t])
   return null
 }
 
-function notifyFailure(record: Pick<ResourceRecord, 'resourceId' | 'name'>, t: ReturnType<typeof useI18n>['t']) {
+function notifyFailure(record: Pick<ResourceRecord, 'resourceId' | 'name' | 'errorCode'>, t: ReturnType<typeof useI18n>['t']) {
+  const reasonKey = record.errorCode === 'networkUnavailable' ? 'models.downloadReasonNetwork'
+    : record.errorCode === 'resourceNotFound' ? 'models.downloadReasonNotFound'
+      : record.errorCode === 'resourceUnavailable' ? 'models.downloadReasonUnavailable'
+        : record.errorCode === 'integrityCheckFailed' ? 'models.downloadReasonIntegrity'
+          : record.errorCode === 'installFailed' ? 'models.downloadReasonInstall' : null
   notifyModelDownloadFailure(
     t('models.downloadError', { name: record.name }),
-    t('errors.downloadFailed'),
+    reasonKey ? t(reasonKey) : t('models.downloadReasonWithCode', { code: record.errorCode ?? 'unknown' }),
     t('errors.downloadFailedAction'),
     () => { void actions.models.manageResource(record.resourceId, 'install').catch(() => undefined) },
   )
