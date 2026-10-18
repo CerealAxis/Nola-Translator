@@ -8,6 +8,7 @@ import { actions, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
 import { formatBytes } from './ModelCard'
 import { DownloadSourceDialog } from './DownloadSourceDialog'
+import { notifyModelDownloadFailure } from './ModelDownloadNotice'
 
 export function DownloadsTab() {
   const { t } = useI18n()
@@ -34,7 +35,12 @@ export function DownloadsTab() {
         const target = downloadTarget
         setDownloadTarget(null)
         if (target) void actions.models.manageResource(target.resourceId, 'install', source).catch(() => {
-          toast.danger(t('models.downloadError', { name: target.name }))
+          notifyModelDownloadFailure(
+            t('models.downloadError', { name: target.name }),
+            t('errors.downloadFailed'),
+            t('errors.downloadFailedAction'),
+            () => { void actions.models.manageResource(target.resourceId, 'install', source).catch(() => undefined) },
+          )
         })
       }} />
 

@@ -1,7 +1,7 @@
 {
   "name": "nola-translator",
   "productName": "Nola Translator",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "license": "GPL-3.0-only",
   "description": "Real-time Captions and Translation",
   "author": "CerealAxis",
@@ -89,7 +89,10 @@
       "package.json"
     ],
     "extraResources": [
-      { "from": "release/Nola-Firefox-Extension.zip", "to": "browser/Nola-Firefox-Extension.zip" },
+      {
+        "from": "release/Nola-Firefox-Extension.zip",
+        "to": "browser/Nola-Firefox-Extension.zip"
+      },
       {
         "from": "src/renderer/assets/fonts/OFL-Noto-CJK.txt",
         "to": "licenses/OFL-Noto-CJK.txt"

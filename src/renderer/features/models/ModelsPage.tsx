@@ -9,7 +9,7 @@ import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Alert, Button, Card, Chip, EmptyState, Tabs, toast } from '@heroui/react'
+import { Button, Card, Chip, EmptyState, Tabs, toast } from '@heroui/react'
 import { Box } from 'lucide-react'
 
 import { useI18n } from '@/i18n'
@@ -23,6 +23,7 @@ import { ModelMark } from './modelBrand'
 import { RecommendedFamilyCard, RecommendedFamilyDialog } from './RecommendedFamilies'
 import { familyOf, isQwen3TtsRecord, type RecommendedFamily } from './modelFamily'
 import { isEngineAvailable } from './engine-availability'
+import { notifyModelDownloadFailure } from './ModelDownloadNotice'
 import './models.css'
 
 export type ModelsTab = 'recommended' | 'installed' | 'search' | 'downloads'
@@ -155,7 +156,12 @@ export function ModelsPage() {
         const target = downloadTarget
         setDownloadTarget(null)
         if (target) void actions.models.manageResource(target.resourceId, 'install', source).catch(() => {
-          toast.danger(t('models.downloadError', { name: target.name }))
+          notifyModelDownloadFailure(
+            t('models.downloadError', { name: target.name }),
+            t('errors.downloadFailed'),
+            t('errors.downloadFailedAction'),
+            () => { void actions.models.manageResource(target.resourceId, 'install', source).catch(() => undefined) },
+          )
         })
       }} />
       {openFamily ? <RecommendedFamilyDialog
@@ -167,7 +173,14 @@ export function ModelsPage() {
         runtimes={runtimes}
         busyIds={busyIds}
         onClose={() => setOpenFamily(null)}
-        onInstall={(record, source) => { void actions.models.manageResource(record.resourceId, 'install', source).catch(() => toast.danger(t('models.downloadError', { name: record.name }))) }}
+        onInstall={(record, source) => { void actions.models.manageResource(record.resourceId, 'install', source).catch(() => {
+          notifyModelDownloadFailure(
+            t('models.downloadError', { name: record.name }),
+            t('errors.downloadFailed'),
+            t('errors.downloadFailedAction'),
+            () => { void actions.models.manageResource(record.resourceId, 'install', source).catch(() => undefined) },
+          )
+        }) }}
         onCancel={record => { void actions.models.manageResource(record.resourceId, 'cancel').catch(() => undefined) }}
         onManualDownload={record => { setOpenFamily(null); offlineActions.openDownloads(record.resourceId) }}
       /> : null}
@@ -181,18 +194,6 @@ export function ModelsPage() {
           <CurrentModel label={t('modelsSettingsUi.currentTranslation')} name={currentTranslation} record={localTranslation ? translation ?? null : null} installed={localTranslation ? translation?.installed ?? false : null} kind="translationModel" />
         </div>
       </section>
-
-      {error ? (
-        <Alert status="danger">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title className="nola-body-strong">{t('errors.downloadFailed')}</Alert.Title>
-            <Alert.Description className="nola-caption">
-              {t('errors.downloadFailedAction')}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
-      ) : null}
 
       <Tabs
         variant="secondary"

@@ -18,6 +18,7 @@ import heroAvatarUrl from '../../../../../assets/brand/heroui.png'
 import './more.css'
 
 const AUTHOR_URL = 'https://github.com/CerealAxis'
+const SPONSORS_URL = 'https://github.com/sponsors/CerealAxis'
 const REPOSITORY_URL = 'https://github.com/CerealAxis/Nola-Translator'
 const HEROUI_URL = 'https://heroui.com/'
 const COPIED_HOLD_MS = 1500
@@ -73,7 +74,10 @@ export function MoreTab() {
       </SettingGroup>
       <SettingGroup legend={t('settings.groupAbout')}>
         <IdentityRow name={packageInfo.author} description={t('more.authorDescription')} image={authorAvatarUrl}
-          action={<ExternalAction href={AUTHOR_URL} label={t('more.githubProfile')} icon={<Github aria-hidden="true" />} />} />
+          action={<div className="settings-more__identity-actions">
+            <ExternalAction href={AUTHOR_URL} label={t('more.githubProfile')} icon={<Github aria-hidden="true" />} />
+            <ExternalAction href={SPONSORS_URL} label={t('more.sponsor')} icon={<Heart aria-hidden="true" />} />
+          </div>} />
         <IdentityRow name={packageInfo.productName} description={t('more.appVersion', { version: packageInfo.version })} image={nolaLogoUrl} isLogo
           action={<div className="settings-more__identity-actions">
             <ExternalAction href={REPOSITORY_URL} label={t('more.sourceCode')} icon={<Github aria-hidden="true" />} />

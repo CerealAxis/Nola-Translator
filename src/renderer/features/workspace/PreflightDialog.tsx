@@ -18,15 +18,17 @@ import { CircleAlert } from 'lucide-react'
 import type { MissingResource } from '@/store'
 import type { DiagnosticCopyContext } from '@/bridge'
 import type { SessionConfig } from '../../../shared/contracts'
+import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 import { actions, sessionStore, stores } from '@/store'
 import { useI18n } from '@/i18n'
-import { translationEngine } from '../../../shared/model-engines'
+import { modelEngines, translationEngine as fallbackTranslationEngine } from '../../../shared/model-engines'
 import { NO_TRANSLATION_LANGUAGE } from '../../../shared/settings'
 import { DownloadSourceDialog } from '../models/DownloadSourceDialog'
 
 /** `engineFailed` is not "a step failed" but "this dialog cannot reach a verdict". */
 type Stage = 'environment' | 'environmentFailed' | 'devices' | 'models' | 'missing' | 'ready' | 'engineFailed' | 'modelCheckFailed'
 type PreflightFailure = DiagnosticCopyContext & { supportCode: NonNullable<DiagnosticCopyContext['supportCode']> }
+type RuntimeComponent = 'engine' | 'llama' | 'crisp'
 
 function correlationIdOf(error: unknown): string | undefined {
   return typeof error === 'object' && error !== null && 'requestId' in error && typeof error.requestId === 'string'
@@ -65,6 +67,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
   const [deviceOk, setDeviceOk] = useState(false)
   const [deviceFailure, setDeviceFailure] = useState<'enumeration' | 'operation' | 'empty' | null>(null)
   const [failureContext, setFailureContext] = useState<PreflightFailure | null>(null)
+  const [missingRuntime, setMissingRuntime] = useState<RuntimeComponent | null>(null)
   const [installing, setInstalling] = useState(false)
   const [downloadTarget, setDownloadTarget] = useState<MissingResource | null>(null)
   const openedRef = useRef(false)
@@ -78,6 +81,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
     setDeviceOk(false)
     setDeviceFailure(null)
     setFailureContext(null)
+    setMissingRuntime(null)
     setInstalling(false)
     const previousErrorRequestId = sessionStore.getState().errorRequestId
 
@@ -89,21 +93,47 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
         const translationProvider = config?.translationProvider ?? settings?.translation.provider ?? 'local'
         const targetLanguages = config?.targetLanguages ?? (settings?.translation.targetLanguage && settings.translation.targetLanguage !== NO_TRANSLATION_LANGUAGE ? [settings.translation.targetLanguage] : [])
         const modelId = config?.translationModelId ?? settings?.translation.localModelId
+        const recognitionModelId = config?.recognitionModelId ?? settings?.recognition.modelId
         const compute = config?.compute ?? settings?.compute
-        const resource = stores.models.getState().resources.find(r => r.resourceId === modelId)
+        const resources = stores.models.getState().resources
+        const resource = resources.find(r => r.resourceId === modelId)
+        const recognitionResource = resources.find(r => r.resourceId === recognitionModelId)
         const usesLocalTranslation = (translationProvider === 'local' || config?.fallbackTranslationProvider === 'local') && targetLanguages.length > 0
-        const selectedEngine = compute ? translationEngine(compute, resource?.provider, modelId) : 'llama'
-        const needsTorch = recognitionProvider === 'local' || (usesLocalTranslation && selectedEngine === 'pytorch')
-        const needsLlama = usesLocalTranslation && selectedEngine === 'llama'
-        const requiredComponents = [...(needsTorch ? ['engine' as const] : []), ...(needsLlama ? ['llama' as const] : [])]
-        const runtime = await actions.settings.loadRuntimeComponents(true, requiredComponents)
-        if (needsTorch && runtime.local.engine.status !== 'ready') {
-          environmentSupportCode = 'RNT-001'
-          throw new Error(t('errors.torchRuntimeUnavailable'))
+        const recognitionLoader = recognitionResource
+          ? modelEngines(recognitionResource)[0] ?? compute?.recognitionEngine
+          : compute?.recognitionEngine
+        const selectedEngine = (resource ? modelEngines(resource)[0] : undefined)
+          ?? fallbackTranslationEngine(compute ?? DEFAULT_COMPUTE_SETTINGS, undefined, modelId)
+        const requiredComponents = new Set<RuntimeComponent>()
+        if (recognitionProvider === 'local' && recognitionLoader) {
+          requiredComponents.add(recognitionLoader === 'pytorch' ? 'engine' : recognitionLoader === 'llama' ? 'llama' : 'crisp')
         }
-        if (needsLlama && runtime.local.llama.status !== 'ready') {
-          environmentSupportCode = 'RNT-002'
-          throw new Error(t('errors.llamaRuntimeUnavailable'))
+        if (usesLocalTranslation && selectedEngine) {
+          requiredComponents.add(selectedEngine === 'pytorch' ? 'engine' : selectedEngine === 'llama' ? 'llama' : 'crisp')
+        }
+        const components = [...requiredComponents]
+        const runtime = await actions.settings.loadRuntimeComponents(true, components)
+        const missing = components.find(component => runtime.local[component]?.status !== 'ready')
+        if (missing) {
+          environmentSupportCode = missing === 'engine' ? 'RNT-001' : missing === 'llama' ? 'RNT-002' : 'ERR-999'
+          if (alive()) {
+            setMissingRuntime(missing)
+            setFailureContext({ supportCode: environmentSupportCode })
+            setStage('environmentFailed')
+            const title = missing === 'engine' ? t('errors.torchRuntimeUnavailable')
+              : missing === 'llama' ? t('errors.llamaRuntimeUnavailable')
+                : `${t('runtime.crisp')} · ${t('runtime.missing')}`
+            const action = missing === 'engine' ? t('runtime.goTorch')
+              : missing === 'llama' ? t('runtime.goLlama') : t('runtime.installCrisp')
+            toast.warning(title, {
+              description: t('runtime.noticeBody'),
+              actionProps: {
+                children: action,
+                onPress: () => { close(false); void actions.settings.openRuntimeSettings(missing) },
+              },
+            })
+          }
+          return
         }
       } catch {
         if (alive()) {
@@ -252,14 +282,14 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
               <ChecklistRow done={!environmentPending && !environmentFailed} failed={environmentFailed}
                 pending={environmentPending} label={t('runtime.checking')} failedLabel={t('runtime.noticeTitle')} />
               {environmentFailed ? <Alert status="danger"><Alert.Content><Alert.Description>{
-                failureContext?.supportCode === 'RNT-001'
+                missingRuntime === 'crisp'
+                  ? `${t('runtime.crisp')} · ${t('runtime.missing')}`
+                  : failureContext?.supportCode === 'RNT-001'
                   ? t('errors.torchRuntimeUnavailable')
                   : failureContext?.supportCode === 'RNT-002'
                     ? t('errors.llamaRuntimeUnavailable')
                     : t('errors.unknownFailure')
               }</Alert.Description>
-                {failureContext?.supportCode === 'RNT-001' ? <Button variant="tertiary" size="sm" onPress={() => { close(false); void actions.settings.openRuntimeSettings('engine') }}>{t('runtime.goTorch')}</Button> : null}
-                {failureContext?.supportCode === 'RNT-002' ? <Button variant="tertiary" size="sm" onPress={() => { close(false); void actions.settings.openRuntimeSettings('llama') }}>{t('runtime.goLlama')}</Button> : null}
                 <Button variant="tertiary" size="sm" onPress={runCheck}>{t('runtime.recheck')}</Button>
               </Alert.Content></Alert> : null}
               {!environmentPending && !environmentFailed ? <>

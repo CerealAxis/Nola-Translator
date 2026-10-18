@@ -2,7 +2,7 @@ import { act, cleanup, render } from '@testing-library/react'
 import { toast } from '@heroui/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { ResourceRecord } from '@/bridge'
-import { stores } from '@/store'
+import { actions, stores } from '@/store'
 import { ModelDownloadNotice } from './ModelDownloadNotice'
 
 const initial = stores.models.getState()
@@ -25,7 +25,13 @@ it('notifies once on completion and failure, but never on acceptance or cancella
   publish({ ...record, state: 'failed', cancellable: false })
   publish({ ...record, state: 'failed', cancellable: false })
   expect(danger).toHaveBeenCalledTimes(1)
-  expect(danger).toHaveBeenCalledWith(expect.stringContaining(record.name))
+  expect(danger).toHaveBeenCalledWith(expect.stringContaining(record.name), expect.objectContaining({
+    actionProps: expect.objectContaining({ children: '重试下载', onPress: expect.any(Function) }),
+  }))
+  const retry = danger.mock.calls[0]?.[1]?.actionProps?.onPress
+  const manageResource = vi.spyOn(actions.models, 'manageResource').mockResolvedValue(record)
+  act(() => retry?.({} as never))
+  expect(manageResource).toHaveBeenCalledWith(record.resourceId, 'install')
   publish(record)
   publish({ ...record, state: 'idle', installed: true, cancellable: false })
   publish({ ...record, state: 'idle', installed: true, cancellable: false })

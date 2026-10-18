@@ -15,6 +15,7 @@ const jaMessages: Record<DictionaryKey, string> = {
   'more.authorDescription': "Nola Translator の開発者",
   'more.appVersion': "現在のバージョン：{version}",
   'more.githubProfile': "GitHub プロフィール",
+  'more.sponsor': "スポンサーになる",
   'more.sourceCode': "ソースコードを見る",
   'more.specialThanks': "謝辞",
   'more.heroThanks': "Nola の美しく使いやすい UI を支える、HeroUI のオープンソースコンポーネントライブラリに感謝します。",

@@ -29,6 +29,7 @@ export const en: Dictionary = {
     "authorDescription": "Developer of Nola Translator",
     "appVersion": "Current version: {version}",
     "githubProfile": "GitHub profile",
+    "sponsor": "Sponsor",
     "sourceCode": "View source code",
     "specialThanks": "Special thanks",
     "heroThanks": "Thanks to HeroUI for its open source component library, making Nola more beautiful and easier to use.",

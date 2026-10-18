@@ -15,6 +15,7 @@ const koMessages: Record<DictionaryKey, string> = {
   'more.authorDescription': "Nola Translator 개발자",
   'more.appVersion': "현재 버전: {version}",
   'more.githubProfile': "GitHub 프로필",
+  'more.sponsor': "후원하기",
   'more.sourceCode': "소스 코드 보기",
   'more.specialThanks': "특별히 감사한 분들",
   'more.heroThanks': "Nola의 인터페이스를 아름답고 편리하게 만들어 주는 HeroUI 오픈 소스 컴포넌트 라이브러리에 감사드립니다.",

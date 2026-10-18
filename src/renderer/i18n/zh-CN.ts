@@ -33,6 +33,7 @@ export const zhCN = {
     "authorDescription": "Nola Translator 的开发者",
     "appVersion": "当前版本：{version}",
     "githubProfile": "GitHub 主页",
+    "sponsor": "赞助",
     "sourceCode": "查看源代码",
     "specialThanks": "特别鸣谢",
     "heroThanks": "感谢 HeroUI 开源的组件库，让 Nola 的界面更美观、易用。",

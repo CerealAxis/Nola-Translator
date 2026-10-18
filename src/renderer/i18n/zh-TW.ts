@@ -15,6 +15,7 @@ export const zhTW: Dictionary = {
     "authorDescription": "Nola Translator 的開發者",
     "appVersion": "目前版本：{version}",
     "githubProfile": "GitHub 個人頁面",
+    "sponsor": "贊助",
     "sourceCode": "檢視原始碼",
     "specialThanks": "特別鳴謝",
     "heroThanks": "感謝 HeroUI 的開源元件庫，讓 Nola 的介面更美觀、易用。",
