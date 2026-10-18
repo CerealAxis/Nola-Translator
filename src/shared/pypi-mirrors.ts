@@ -1,7 +1,9 @@
 /** PyPI simple-index URLs offered by the network settings picker. */
 export const PYPI_MIRROR_DEFAULT = 'https://mirrors.aliyun.com/pypi/simple/'
+export const PYPI_MIRROR_AUTO = 'auto'
 
 export const PYPI_MIRROR_NODES = [
+  PYPI_MIRROR_AUTO,
   PYPI_MIRROR_DEFAULT,
   'https://pypi.tuna.tsinghua.edu.cn/simple/',
   'https://repo.huaweicloud.com/repository/pypi/simple/',
@@ -46,9 +48,17 @@ export function pytorchWheelUrls(url: string, selection: string = PYTORCH_WHEEL_
 export function findPypiMirrorNode(value: string): string | null {
   const trimmed = value.trim()
   if (!trimmed) return null
+  if (trimmed === PYPI_MIRROR_AUTO) return trimmed
   if (NODE_SET.has(trimmed)) return trimmed
   const withSlash = trimmed.endsWith('/') ? trimmed : `${trimmed}/`
   return NODE_SET.has(withSlash) ? withSlash : null
+}
+
+/** Mirror choices in automatic mode, with the official index last for a reliable fallback. */
+export function pypiIndexUrls(selection: string = PYPI_MIRROR_AUTO): string[] {
+  if (selection === PYPI_MIRROR_AUTO) return [...PYPI_MIRROR_NODES.slice(1), 'https://pypi.org/simple/']
+  const node = findPypiMirrorNode(selection)
+  return node ? [node, 'https://pypi.org/simple/'] : ['https://pypi.org/simple/']
 }
 
 /** Normalize a saved wheel-mirror selection to a picker entry, or return null for an unknown value. */

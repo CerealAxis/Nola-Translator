@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { offlinePrepareSchema, type OfflineItem, type OfflineIssue, type OfflinePrepareRequest, type OfflinePreview, type OfflineTask } from '../shared/offline'
 import { modelImportEntry } from '../shared/model-import-catalog'
 import type { NetworkSettings } from '../shared/settings'
+import { resolveModelNetwork } from './network-region'
 
 const prepareDestinationSchema = z.object({ kind: z.enum(['package', 'model']).default('package'), token: z.string().min(1).max(128).optional() }).strict()
 const manifestSchema = z.object({
@@ -87,7 +88,7 @@ export class OfflineManager {
     this.task.unit = 'bytes'
   }
   private async inspectModels(source: string, signal: AbortSignal, localImport = false, repo?: string): Promise<ModelInspection> {
-    return modelInspectionSchema.parse(await this.options.models({ operation: 'inspect', source, modelRoot: this.options.modelRoot, localImport, repo, network: this.options.network() }, signal, () => {}))
+    return modelInspectionSchema.parse(await this.options.models({ operation: 'inspect', source, modelRoot: this.options.modelRoot, localImport, repo, network: await resolveModelNetwork(this.options.network()) }, signal, () => {}))
   }
   async inspectModel(source: string, repo?: string): Promise<OfflinePreview> {
     return this.inspect(async signal => {
@@ -198,7 +199,7 @@ export class OfflineManager {
       await mkdir(staging, { recursive: false })
       try {
         if (request.modelIds.length) await this.options.models({ operation: 'prepare', destination: staging,
-          modelIds: request.modelIds, modelRoot: this.options.modelRoot, network: this.options.network(),
+          modelIds: request.modelIds, modelRoot: this.options.modelRoot, network: await resolveModelNetwork(this.options.network()),
           modelSource: request.modelSource, exportModel: destination === 'model' }, signal, this.progress)
         signal.throwIfAborted()
         if (request.runtimeIds.length) await this.options.runtimes.prepareOffline(request.runtimeIds, staging, signal, this.progress)
@@ -245,7 +246,7 @@ export class OfflineManager {
         if (selected.kind === 'model') {
           const inspected = await this.inspectModels(selected.source, signal, true, selected.repo)
           if (!inspected.compatible || inspected.issues.length) throw new OfflineError(inspected.issues[0] ?? 'invalidPackage', inspected.items.find(item => item.reason)?.reason)
-          await this.options.models({ operation: 'install', source: selected.source, modelRoot: this.options.modelRoot, localImport: true, repo: selected.repo, network: this.options.network() }, signal, this.progress)
+          await this.options.models({ operation: 'install', source: selected.source, modelRoot: this.options.modelRoot, localImport: true, repo: selected.repo, network: await resolveModelNetwork(this.options.network()) }, signal, this.progress)
         } else {
           const checked = await this.checkBundle(selected.source, signal)
           if (checked.problems.length) throw new OfflineError(checked.problems[0])

@@ -253,7 +253,6 @@ class EngineRuntime:
         self.session_request_id = ""
         self.session_started_at_ms = 0.0
         self.session_paused = False
-        self.paused_at_ms = 0.0
         self.active_config = None
         self.llama_manager = LlamaServerManager(gguf_path=self.resources.hymt2_gguf_path)
         self.translation_provider = HyMt2TranslationProvider(self.llama_manager)
@@ -765,7 +764,6 @@ class EngineRuntime:
         self.session_request_id = command.requestId
         self.session_started_at_ms = monotonic() * 1000
         self.session_paused = False
-        self.paused_at_ms = 0.0
         self.active_config = command.config
         self._stream_generation += 1
         self._timeline = command.config.browserTimeline
@@ -2131,11 +2129,10 @@ class EngineRuntime:
 
         Pausing stops the PortAudio stream itself, so the microphone is genuinely
         released, nothing is written to the recorder, and the recognizer keeps the
-        in-flight sentence it was building. Resuming shifts ``session_started_at_ms``
-        forward by the paused duration: caption timestamps are derived as
-        ``frame.started_at_ms - session_started_at_ms`` (see ``_emit_update``), so
-        absorbing the gap here is what keeps the exported SRT timeline continuous
-        instead of leaving a hole the length of the pause.
+        in-flight sentence it was building. The normalizer timestamps frames from
+        delivered audio samples, so paused wall-clock time is already absent from
+        the capture timeline. Keeping ``session_started_at_ms`` fixed makes caption
+        timestamps continuous without creating a negative offset after resume.
         """
         if self.service.session_id is None or command.sessionId != self.service.session_id:
             return [
@@ -2163,13 +2160,10 @@ class EngineRuntime:
             # double-tap cannot leave the UI believing the engine is somewhere else.
             return [self._listening_status(command.requestId)]
         if command.paused:
-            self.paused_at_ms = monotonic() * 1000
             self.capture.pause()
             self.session_paused = True
         else:
             self.capture.resume()
-            self.session_started_at_ms += monotonic() * 1000 - self.paused_at_ms
-            self.paused_at_ms = 0.0
             self.session_paused = False
         return [self._listening_status(command.requestId)]
 
@@ -2235,7 +2229,6 @@ class EngineRuntime:
         self.session_task = None
         self.active_config = None
         self.session_paused = False
-        self.paused_at_ms = 0.0
         self._timeline = None
         self._stream_epoch = None
         self._stream_anchored = False

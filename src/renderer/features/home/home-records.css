@@ -110,6 +110,14 @@
 .nola-dual__cell[data-current='true'] { background: color-mix(in oklab, var(--accent) 6%, var(--surface)); }
 .nola-record-audio { display: flex; align-items: center; min-height: 68px; gap: 16px; padding: 12px 20px; flex-wrap: wrap; background: var(--surface-secondary); }
 .nola-record-audio .slider { min-width: 120px; }
+@media (max-width: 680px) {
+  .nola-record-audio { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2) var(--space-3); }
+  .nola-record-audio > button { grid-column: 1; grid-row: 1; }
+  .nola-record-audio > span:first-of-type { grid-column: 2; grid-row: 1; }
+  .nola-record-audio > .slider { grid-column: 3; grid-row: 1; width: 100%; min-width: 0; }
+  .nola-record-audio > span:nth-of-type(2) { grid-column: 4; grid-row: 1; }
+  .nola-record-audio > .nola-segmented { grid-column: 1 / -1; grid-row: 2; justify-self: end; }
+}
 @container (min-width: 1000px) { .nola-home__entries { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @container (max-width: 999px) { .nola-home-hero { min-height: 238px; padding: 28px; } .nola-home-hero__features { gap: 12px; } .nola-records-table__time { display: none; } .nola-records-table__name { width: 34%; } .nola-records-table__language { width: 24%; } .nola-records-table__actions { width: 16%; } }
 @container (max-width: 680px) { .nola-home-hero { min-height: 240px; padding: 24px; } .nola-home-hero__copy { width: 100%; } .nola-home-hero__art { opacity: .13; width: 60%; } .nola-home-hero__copy h1 { font-size: 32px; } .nola-home-hero__features { max-width: 360px; gap: 10px; } .nola-home-hero__features > span { font-size: 12px; } .nola-home-hero__features i { width: 30px; height: 30px; } .nola-records-table__language { display: none; } .nola-records-table__name { width: 47%; } .nola-records-table__duration { width: 18%; } .nola-records-table__status { width: 21%; } .nola-records-table__actions { width: 14%; } .nola-records-table__view { display: none; } .nola-records-table th, .nola-records-table td { padding-inline: 8px; } .nola-records-table__title { gap: 8px; } .nola-record-page__header { flex-wrap: wrap; } .nola-record-page__header h1 { font-size: 28px; } .nola-home__recent-header { flex-wrap: wrap; } .nola-entry { padding: 20px; } .nola-dual__headers { grid-template-columns: 1fr 1fr; } .nola-dual__pair { grid-template-columns: 1fr; } .nola-dual__cell + .nola-dual__cell { border-left: none; padding-top: 0; } .nola-dual > [role='separator'] { display: none; } }

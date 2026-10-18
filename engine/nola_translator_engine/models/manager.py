@@ -605,11 +605,26 @@ class ModelManager:
                     progress(base + current, total)
 
                 url = spec.url_for(entry, network, source)
-                if downloader is not None:
-                    downloader.download(url, part, entry, file_progress)
-                else:
-                    assert fetcher is not None
-                    fetcher(url, part, file_progress)
+                urls = [url]
+                if source is None and network is not None and network.useHuggingFaceMirror:
+                    official_url = spec.url_for(entry, None, source)
+                    if official_url != url:
+                        urls.append(official_url)
+                for attempt, download_url in enumerate(urls):
+                    try:
+                        if downloader is not None:
+                            downloader.download(download_url, part, entry, file_progress)
+                        else:
+                            assert fetcher is not None
+                            fetcher(download_url, part, file_progress)
+                        break
+                    except Exception:
+                        if attempt + 1 == len(urls):
+                            raise
+                        # A failed mirror should not strand an automatic download; restart this file
+                        # from the official host while keeping the already verified completed files.
+                        part.unlink(missing_ok=True)
+                        progress(base, total)
                 done += entry.size
 
             phase("verify")

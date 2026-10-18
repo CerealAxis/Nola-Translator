@@ -32,6 +32,15 @@ export const BUILTIN_DESCRIPTION_KEYS: Readonly<Record<string, TranslationKey>> 
   'index-translate-35b-a3b-q4-k-m': 'models.descriptions.indexTranslate35b',
 }
 
+export function descriptionKeyOf(record: ResourceRecord): TranslationKey | undefined {
+  const builtIn = BUILTIN_DESCRIPTION_KEYS[record.resourceId]
+  if (builtIn) return builtIn
+  if (record.kind !== 'ttsModel') return undefined
+  if (record.resourceId.includes('customvoice')) return 'models.descriptions.qwenTtsCustomVoice'
+  if (record.resourceId.includes('voicedesign')) return 'models.descriptions.qwenTtsVoiceDesign'
+  return 'models.descriptions.qwenTtsBase'
+}
+
 /**
  * Byte counts for humans. A space between number and unit keeps the two readable as
  * separate tokens.
@@ -64,9 +73,13 @@ export function paramsOf(record: ResourceRecord): string | null {
 export function quantizationOf(record: ResourceRecord): string | null {
   const id = record.resourceId.toLowerCase()
   if (id.includes('q4-k-m')) return 'Q4_K_M'
+  if (id.includes('q4-k')) return 'Q4_K'
   if (id.includes('q3-k-m')) return 'Q3_K_M'
   if (id.includes('iq2-m')) return 'UD-IQ2_M'
+  if (id.includes('q8-0')) return 'Q8_0'
   if (id.includes('nf4')) return 'NF4'
+  if (id.includes('bf16')) return 'BF16'
+  if (id.includes('f16')) return 'F16'
   if (id.includes('qwen3-asr') && record.provider === 'qwen3-asr') return 'NF4'
   return null
 }
@@ -121,6 +134,8 @@ export interface ModelCardProps {
   canBeDefault: boolean;
   /** Shown beside a disabled default action when the selected loader cannot load this model. */
   defaultDisabledReason?: string;
+  /** A confirmed missing loader prevents this installed model from being enabled. */
+  loaderUnavailableReason?: string;
   /** Hub result: whether it can be installed. False disables the install button. */
   installable?: boolean
   onInstall: () => void
@@ -142,6 +157,7 @@ export function ModelCard({
   isDefault,
   canBeDefault,
   defaultDisabledReason,
+  loaderUnavailableReason,
   installable = true,
   onInstall,
   onCancel,
@@ -158,17 +174,16 @@ export function ModelCard({
   const state: ResourceState = resourceStateOf(record)
   const removal = record.phase === 'remove' && (state === 'removing' || state === 'failed')
   const inFlight = state === 'queued' || state === 'downloading' || state === 'verifying'
-  const descriptionKey = BUILTIN_DESCRIPTION_KEYS[record.resourceId]
+  const descriptionKey = descriptionKeyOf(record)
   const description = descriptionKey ? t(descriptionKey) : record.description || descriptionFallback
 
-  return (
-    <Card className={`models-card h-full ${className}`}>
+  const card = <Card data-loader-unavailable={loaderUnavailableReason ? 'true' : undefined} className={`models-card h-full ${className}`}>
       {/*
        * The status pills get a row of their own rather than sharing the title's width: the model
        * name is the first thing on the card to be read, and state is the secondary fact.
        */}
       <Card.Header>
-        <span className={`models-card__icon models-card__icon--${record.kind === 'recognitionModel' ? 'recognition' : 'translation'}`}>
+        <span className={`models-card__icon models-card__icon--${record.kind === 'translationModel' ? 'translation' : 'recognition'}`}>
           <ModelMark record={record} kind={record.kind} />
         </span>
         <div className="models-card__identity">
@@ -183,7 +198,7 @@ export function ModelCard({
       <Card.Content>
       <div className="models-card__status">
         {isDefault && record.installed ? <Chip size="sm" variant="soft" color="accent">{t('modelsSettingsUi.default')}</Chip> : null}
-        {removal ? <StatusPill label={t(state === 'failed' ? 'modelsSettingsUi.removeFailed' : 'modelsSettingsUi.removing')} tone={state === 'failed' ? 'danger' : 'accent'} /> : record.installed && !configurationOf(record) ? <StatusPill label={t('modelConfig.pending')} tone="warning" /> : <StatePill state={state} />}
+        {removal ? <StatusPill label={t(state === 'failed' ? 'modelsSettingsUi.removeFailed' : 'modelsSettingsUi.removing')} tone={state === 'failed' ? 'danger' : 'accent'} /> : record.kind !== 'ttsModel' && record.installed && !configurationOf(record) ? <StatusPill label={t('modelConfig.pending')} tone="warning" /> : <StatePill state={state} />}
         {(supportedEngines ?? modelEngines(record)).map(engine => <Chip key={engine} size="sm" variant="soft">{engine === 'pytorch' ? 'PyTorch' : engine === 'crisp' ? 'CrispASR' : 'llama.cpp'}</Chip>)}
         {record.resourceId.startsWith('hub:local/') ? <Chip size="sm" variant="soft">{t('modelsSettingsUi.localImport')}</Chip> : null}
       </div>
@@ -209,7 +224,16 @@ export function ModelCard({
         {footer && !removal ? <div className="models-card__details">{footer}</div> : null}
       </Card.Footer>
     </Card>
-  )
+
+  if (!loaderUnavailableReason) return card
+  return <Tooltip delay={250}>
+    <Tooltip.Trigger role="group" tabIndex={0} aria-label={record.name} className="h-full min-w-0">
+      {card}
+    </Tooltip.Trigger>
+    <Tooltip.Content className="settings-row__tooltip z-overlay max-w-96 whitespace-normal">
+      {loaderUnavailableReason}
+    </Tooltip.Content>
+  </Tooltip>
 }
 
 function StatePill({ state }: { state: ResourceState }) {

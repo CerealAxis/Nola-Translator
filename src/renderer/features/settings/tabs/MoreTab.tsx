@@ -27,6 +27,7 @@ export function MoreTab() {
   const updateChecking = useStore(stores.settings, state => state.appUpdateChecking)
   const sessionBusy = useStore(stores.session, state => ['starting', 'running', 'paused', 'stopping'].includes(state.status))
   const runtimeBusy = useStore(stores.settings, state => state.runtimeBusy)
+  const browserBusy = useStore(stores.settings, state => state.browser?.captionServiceActive === true || state.captionService === 'loading' || state.captionService === 'ready')
   const [announcement, setAnnouncement] = useState<AppUpdateCheckResult | null>(null)
   const [announcementOpen, setAnnouncementOpen] = useState(false)
   const [announcementOpening, setAnnouncementOpening] = useState(false)
@@ -66,7 +67,7 @@ export function MoreTab() {
     <div className="settings-panel settings-more">
       <SettingGroup legend={t('onboarding.title')}>
         <SettingsRow label={t('onboarding.title')} desc={t('onboarding.replayHint')}>
-          <Button variant="secondary" size="sm" data-onboarding="replay" isDisabled={sessionBusy || runtimeBusy}
+          <Button variant="secondary" size="sm" data-onboarding="replay" isDisabled={sessionBusy || runtimeBusy || browserBusy}
             onPress={() => { actions.settings.startOnboarding('welcome') }}>{t('onboarding.replay')}</Button>
         </SettingsRow>
       </SettingGroup>

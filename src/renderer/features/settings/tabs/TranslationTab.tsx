@@ -158,8 +158,9 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
 
   return (
     <div className="settings-panel" data-onboarding="translation-settings">
-      <SettingGroup legend={t('settings.groupProvider')}>
+      <SettingGroup onboardingTarget="translation-service" legend={t('settings.groupProvider')}>
         <SettingsRow
+          onboardingTarget="translation-provider"
           label={t('settings.provider')}
           desc={t('settings.aliyunTranslationHint')}
           descriptionTooltip
@@ -172,11 +173,11 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
           />
         </SettingsRow>
         {translation.provider === 'local' && translation.targetLanguage !== NO_TRANSLATION_LANGUAGE ? (localModelOptions.length === 0 ? (
-          <SettingsRow label={t('settings.model')}>
+          <SettingsRow onboardingTarget="translation-model" label={t('settings.model')}>
             <span className="nola-caption text-muted">{t('settings.localModelEmpty')}</span>
           </SettingsRow>
         ) : (
-          <SettingsRow label={t('settings.model')}>
+          <SettingsRow onboardingTarget="translation-model" label={t('settings.model')}>
             <SettingSelect
               value={translation.localModelId}
               options={localModelOptions}
@@ -207,7 +208,7 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
             onChange={(value) => { void updateSettings({ translation: { fallback: { provider: value as TranslationSettings['fallback']['provider'] } } }).catch(() => undefined) }}
           />
         </SettingsRow>
-        {translation.fallback?.provider === 'local' ? <SettingsRow label={t('settings.model')} desc={t('settings.fallbackLocalModelHint')} descriptionTooltip>
+        {translation.fallback?.provider === 'local' ? <SettingsRow onboardingTarget="translation-model" label={t('settings.model')} desc={t('settings.fallbackLocalModelHint')} descriptionTooltip>
           <span className="nola-caption text-muted">{localModelOptions.find((option) => option.value === translation.localModelId)?.label ?? translation.localModelId}</span>
         </SettingsRow> : null}
         {translation.fallback?.provider === 'cloud' ? <>
@@ -236,7 +237,7 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
 
       {translation.provider === 'index-translate' ? (
         <SettingGroup legend={t('settings.groupConnection')}>
-          <SettingsRow label={t('settings.model')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_PUBLIC_MODEL}</span></SettingsRow>
+          <SettingsRow onboardingTarget="translation-model" label={t('settings.model')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_PUBLIC_MODEL}</span></SettingsRow>
           <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_ENDPOINT}</span></SettingsRow>
         </SettingGroup>
       ) : translation.provider === 'mymemory' ? (

@@ -9,6 +9,8 @@ import { z } from 'zod'
 import { CRISP_RUNTIME_ID, CRISP_RUNTIME_FILES, type RuntimePackage, type RuntimeRecipe } from '../shared/compute'
 import type { NetworkSettings } from '../shared/settings'
 import type { OfflineItem, OfflineTask } from '../shared/offline'
+import { pypiIndexUrls } from '../shared/pypi-mirrors'
+import { isMainlandChina } from './network-region'
 
 const run = promisify(execFile)
 export type OfflineRuntimeProgress = (phase: OfflineTask['phase'], current: number, total: number, detail?: string) => void
@@ -171,21 +173,25 @@ export class OfflineRuntimes {
       }
       if (recipe) {
         const network = this.options.network?.()
+        const useMirrors = network?.usePypiMirror === true
+          && (network.pypiMirrorUrl !== 'auto' || await isMainlandChina())
+        const indexes = useMirrors ? pypiIndexUrls(network.pypiMirrorUrl) : ['https://pypi.org/simple/']
         // FunASR includes source-only packages such as jieba; build their wheels here, never on the offline computer.
         const args = ['-I', '-u', '-m', 'pip', '--isolated', 'wheel', '--disable-pip-version-check', '--no-cache-dir', '--prefer-binary', '--wheel-dir', folder, '--find-links', folder,
-          '--index-url', network?.usePypiMirror ? network.pypiMirrorUrl : 'https://pypi.org/simple/', ...(network?.proxyForPip ? ['--proxy', network.proxyUrl.trim()] : []), ...parts.map(part => join(folder, part.name)), ...recipe.requirements]
-        try { await this.pip(args, signal) }
-        catch (error) {
-          const stderr = error && typeof error === 'object' && 'stderr' in error ? String(error.stderr) : String(error)
-          signal.throwIfAborted()
-          if (!network?.usePypiMirror || !/No matching distribution found|Could not find a version that satisfies the requirement/i.test(stderr)) throw new Error(`Runtime dependency wheel preparation failed: ${stderr.slice(-4096)}`, { cause: error })
-          args[args.indexOf('--index-url') + 1] = 'https://pypi.org/simple/'
-          try { await this.pip(args, signal) }
-          catch (fallbackError) {
+          '--index-url', indexes[0], ...(network?.proxyForPip ? ['--proxy', network.proxyUrl.trim()] : []), ...parts.map(part => join(folder, part.name)), ...recipe.requirements]
+        let failure: unknown
+        for (const [index, url] of indexes.entries()) {
+          args[args.indexOf('--index-url') + 1] = url
+          try { await this.pip(args, signal); failure = undefined; break }
+          catch (error) {
+            failure = error
             signal.throwIfAborted()
-            const detail = fallbackError && typeof fallbackError === 'object' && 'stderr' in fallbackError ? String(fallbackError.stderr) : String(fallbackError)
-            throw new Error(`Runtime dependency wheel preparation failed: ${detail.slice(-4096)}`, { cause: fallbackError })
+            if (index === indexes.length - 1) break
           }
+        }
+        if (failure !== undefined) {
+          const detail = failure && typeof failure === 'object' && 'stderr' in failure ? String(failure.stderr) : String(failure)
+          throw new Error(`Runtime dependency wheel preparation failed: ${detail.slice(-4096)}`, { cause: failure })
         }
       }
       const names = (await readdir(folder)).filter(name => name.endsWith(recipe || crisp ? '.whl' : '.zip')).sort()

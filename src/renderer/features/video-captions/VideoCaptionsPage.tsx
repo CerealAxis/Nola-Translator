@@ -106,6 +106,30 @@ export function VideoCaptionsPage() {
    * leaves the extension shut out rather than let in by a service with no weights in memory.
    */
   const open = async () => {
+    let browsers: NonNullable<BrowserConnectionStatus['browsers']> = []
+    try {
+      await browserConnectionAction('inspect')
+      browsers = stores.settings.getState().browser?.browsers ?? []
+    } catch {
+      toast.danger(t('errors.captionServiceToggleFailed'))
+      return
+    }
+    const availableBrowsers = browsers.filter(browser => browser.available)
+    const detectedExtensions = availableBrowsers.filter(browser => browser.extensionStatus === 'installed' || browser.extensionStatus === 'disabled')
+    if (availableBrowsers.length > 0 && detectedExtensions.length === 0 && availableBrowsers.every(browser => browser.extensionStatus === 'notInstalled')) {
+      toast.warning(t('videoCaptions.extensionSetupNotice'), {
+        timeout: 10000,
+        actionProps: { children: t('videoCaptions.browserSettings'), onPress: () => navigate(settingsPath('browser')) },
+      })
+      return
+    }
+    if (detectedExtensions.length > 0 && detectedExtensions.every(browser => browser.extensionCompatible === false)) {
+      toast.warning(t('videoCaptions.extensionVersionMismatchNotice'), {
+        timeout: 10000,
+        actionProps: { children: t('videoCaptions.browserSettings'), onPress: () => navigate(settingsPath('browser')) },
+      })
+      return
+    }
     try {
       const result = await enableCaptionService()
       if (result.state === 'failed') {
@@ -128,19 +152,7 @@ export function VideoCaptionsPage() {
       return
     }
     try {
-      await browserConnectionAction('inspect')
-      const status = await setCaptionServiceActive(true)
-      const browsers = status.browsers ?? []
-      const availableBrowsers = browsers.filter(browser => browser.available)
-      const extensionMissing = !browsers.some(browser => browser.extensionStatus === 'installed' || browser.extensionStatus === 'disabled')
-        && availableBrowsers.length > 0
-        && availableBrowsers.every(browser => browser.extensionStatus === 'notInstalled')
-      if (extensionMissing) {
-        toast.warning(t('videoCaptions.extensionSetupNotice'), {
-          timeout: 10000,
-          actionProps: { children: t('videoCaptions.browserSettings'), onPress: () => navigate(settingsPath('browser')) },
-        })
-      }
+      await setCaptionServiceActive(true)
     } catch (error) {
       if (isSessionAlreadyRunningError(error)) {
         notifyConflict()

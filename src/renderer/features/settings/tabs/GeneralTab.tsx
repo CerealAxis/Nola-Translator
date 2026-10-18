@@ -19,7 +19,7 @@ import { useI18n } from '@/i18n'
 import type { UiLanguagePreference } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PROXY_NODES, findGithubProxyNode } from '../../../../shared/github-proxies'
-import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_DEFAULT, PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_OFFICIAL, PYTORCH_WHEEL_MIRRORS } from '../../../../shared/pypi-mirrors'
+import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_OFFICIAL, PYTORCH_WHEEL_MIRRORS } from '../../../../shared/pypi-mirrors'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 
@@ -153,10 +153,11 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
     ...GITHUB_PROXY_NODES.map((node) => ({ value: node, label: githubNodeLabel(node) })),
   ], [t])
   const pypiNodeOptions = useMemo<PickerOption[]>(() => [
-    { value: PYPI_MIRROR_NODES[0], label: t('settings.pypiAliyun') },
-    { value: PYPI_MIRROR_NODES[1], label: t('settings.pypiTsinghua') },
-    { value: PYPI_MIRROR_NODES[2], label: t('settings.pypiHuawei') },
-    { value: PYPI_MIRROR_NODES[3], label: t('settings.pypiTencent') },
+    { value: PYPI_MIRROR_AUTO, label: t('settings.pytorchWheelMirrorAuto') },
+    ...PYPI_MIRROR_NODES.slice(1).map((node, index) => ({
+      value: node,
+      label: [t('settings.pypiAliyun'), t('settings.pypiTsinghua'), t('settings.pypiHuawei'), t('settings.pypiTencent')][index] ?? node,
+    })),
   ], [t])
   const pytorchWheelOptions = useMemo<PickerOption[]>(() => [
     { value: PYTORCH_WHEEL_MIRROR_AUTO, label: t('settings.pytorchWheelMirrorAuto') },
@@ -216,7 +217,7 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
       </SettingsRow>
       <SettingsRow label={t('settings.pypiMirrorNode')}>
         <SettingSelect
-          value={findPypiMirrorNode(network.pypiMirrorUrl) ?? PYPI_MIRROR_DEFAULT}
+          value={findPypiMirrorNode(network.pypiMirrorUrl) ?? PYPI_MIRROR_AUTO}
           options={pypiNodeOptions}
           isDisabled={!network.usePypiMirror}
           ariaLabel={t('settings.pypiMirrorNode')}

@@ -4,6 +4,8 @@ import { join } from 'node:path'
 
 import { SettingsStore } from '../../../src/main/settings-store'
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
+import { GITHUB_PROXY_AUTO } from '../../../src/shared/github-proxies'
+import { PYPI_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_AUTO } from '../../../src/shared/pypi-mirrors'
 
 describe('设置存储', () => {
   it('persists regional cloud configuration and keeps credentials outside settings', async () => {
@@ -50,7 +52,7 @@ describe('设置存储', () => {
       expect((await store.load()).overlay.mode).toBe('bottom')
       const updated = await store.update({ uiLanguage: 'en' })
       expect(updated.uiLanguage).toBe('en')
-      expect(JSON.parse(await readFile(path, 'utf8')).version).toBe(1)
+      expect(JSON.parse(await readFile(path, 'utf8')).version).toBe(2)
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
@@ -70,6 +72,49 @@ describe('设置存储', () => {
       const garbage = await new SettingsStore(path).load()
       expect(garbage.uiLanguage).toBe('auto')
       expect(garbage.modelStoragePath).toBe('')
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('将现有用户的镜像和加速节点迁移为启用及自动选择，并只执行一次', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-translator-settings-'))
+    const path = join(directory, 'settings.json')
+    try {
+      await writeFile(path, JSON.stringify({
+        version: 1,
+        network: {
+          usePypiMirror: false,
+          pypiMirrorUrl: 'https://mirrors.aliyun.com/pypi/simple/',
+          pytorchWheelMirrorUrl: 'https://mirror.sjtu.edu.cn/pytorch-wheels/',
+          useHuggingFaceMirror: false,
+          useGithubAccelerate: false,
+          githubAccelerateUrl: 'https://gh-proxy.org/',
+        },
+      }), 'utf8')
+
+      const migrated = await new SettingsStore(path).load()
+      expect(migrated.version).toBe(2)
+      expect(migrated.network).toMatchObject({
+        usePypiMirror: true,
+        pypiMirrorUrl: PYPI_MIRROR_AUTO,
+        pytorchWheelMirrorUrl: PYTORCH_WHEEL_MIRROR_AUTO,
+        useHuggingFaceMirror: true,
+        useGithubAccelerate: true,
+        githubAccelerateUrl: GITHUB_PROXY_AUTO,
+      })
+
+      const store = new SettingsStore(path)
+      await store.load()
+      await store.update({ network: {
+        usePypiMirror: false,
+        pypiMirrorUrl: 'https://mirrors.aliyun.com/pypi/simple/',
+        githubAccelerateUrl: 'https://gh-proxy.org/',
+      } })
+      const reloaded = await new SettingsStore(path).load()
+      expect(reloaded.network.usePypiMirror).toBe(false)
+      expect(reloaded.network.pypiMirrorUrl).toBe('https://mirrors.aliyun.com/pypi/simple/')
+      expect(reloaded.network.githubAccelerateUrl).toBe('https://gh-proxy.org/')
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

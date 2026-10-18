@@ -344,7 +344,7 @@ export function OverlayRoot() {
                */}
               {config.showSource ? (
                 <CaptionTrack
-                  key={`source-${session.sessionId ?? 'idle'}`}
+                  key={`source-${session.sessionId ?? 'idle'}-${config.layout}`}
                   kind="source"
                   lines={sourceTrackLines}
                   maxLines={sourceLines}
@@ -355,7 +355,7 @@ export function OverlayRoot() {
               {config.showTranslation ? (
                 <div className="nola-caption-translations">
                   <CaptionTrack
-                    key={`translation-${session.sessionId ?? 'idle'}`}
+                    key={`translation-${session.sessionId ?? 'idle'}-${config.layout}`}
                     kind="translation"
                     lines={effectiveTranslationTrackLines}
                     maxLines={translationLines}

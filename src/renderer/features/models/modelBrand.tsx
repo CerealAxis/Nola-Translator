@@ -89,7 +89,7 @@ export interface ModelMarkProps {
   /** `null` when the slot holds no local model, which falls back to the generic per-kind icon. */
   record: { resourceId: string; provider: string } | null
   /** Only used when no brand matches: falls back to the generic icon for `kind`. */
-  kind: 'recognitionModel' | 'translationModel'
+  kind: 'recognitionModel' | 'translationModel' | 'ttsModel'
   size?: number
 }
 
@@ -98,7 +98,7 @@ export function ModelMark({ record, kind, size = 30 }: ModelMarkProps) {
   const Mark = brand === 'unknown' ? null : MARK_BY_BRAND[brand]
 
   if (!Mark) {
-    return kind === 'recognitionModel' ? <AudioLines aria-hidden="true" /> : <Globe aria-hidden="true" />
+    return kind === 'translationModel' ? <Globe aria-hidden="true" /> : <AudioLines aria-hidden="true" />
   }
 
   return (

@@ -12,6 +12,7 @@ import type { MeetingStore } from './meeting-store'
 import { computeOverlayBounds } from './windows'
 import { openOverlayMenu, presentOverlayMenu, closeOverlayMenu } from './overlay-menu'
 import { readHubModelCard } from './hub-model-card'
+import { resolveModelNetwork } from './network-region'
 import { SessionController } from './session-controller'
 import { openDefaultBrowser as launchDefaultBrowser } from './open-default-browser'
 
@@ -132,7 +133,7 @@ export function registerEngineIpc(
           resourceId,
           action: action as 'install' | 'remove' | 'cancel',
           downloadSource: downloadSource as 'huggingface' | 'hf-mirror' | 'modelscope' | undefined,
-          network: getSettings().network,
+          network: await resolveModelNetwork(getSettings().network),
         },
         'resourceActionResult'
       )
@@ -172,7 +173,7 @@ export function registerEngineIpc(
           ...(kind === 'quant' ? { weightFormat: 'gguf' as const } : {}),
           ...(typeof cursor === 'string' ? { cursor } : {}),
           limit: 20,
-          network: getSettings().network,
+          network: await resolveModelNetwork(getSettings().network),
         },
         'hubModels',
         // Search reads metadata once; model cards and install checks use separate requests.
@@ -189,7 +190,7 @@ export function registerEngineIpc(
   )
 
   loggedHandle(IPC_CHANNELS.getHuggingFaceModelCard, (_event, repo: unknown, revision: unknown) =>
-    readHubModelCard(repo, revision, net.fetch, () => getSettings().network))
+    readHubModelCard(repo, revision, net.fetch, async () => resolveModelNetwork(getSettings().network)))
 
   loggedHandle(IPC_CHANNELS.configureModel, async (_event, resourceId: unknown, configuration: unknown) => {
     if (controller.busy) throw new Error('字幕会话运行中，不能修改模型配置')
@@ -206,7 +207,7 @@ export function registerEngineIpc(
     }
     await ensureReady()
     const response = await engine.request(
-      { protocolVersion: 1, type: 'inspectHubRepo', requestId: `hub-inspect-${randomUUID()}`, repo, network: getSettings().network },
+      { protocolVersion: 1, type: 'inspectHubRepo', requestId: `hub-inspect-${randomUUID()}`, repo, network: await resolveModelNetwork(getSettings().network) },
       'hubInspect',
       30 * 1000
     )
@@ -246,7 +247,7 @@ export function registerEngineIpc(
           repo,
           ...(slot ? { slot } : {}),
           downloadSource: downloadSource as 'huggingface' | 'hf-mirror' | undefined,
-          network: getSettings().network,
+          network: await resolveModelNetwork(getSettings().network),
         },
         'resourceActionResult',
         60 * 1000

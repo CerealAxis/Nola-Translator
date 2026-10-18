@@ -57,6 +57,12 @@ describe('事实格式化（只写事实，不写形容词）', () => {
 
     const plain = record({ resourceId: 'm2m100-418m', kind: 'translationModel', name: 'M2M100 418M' })
     expect(quantizationOf(plain)).toBeNull()
+
+    expect(paramsOf(record({
+      resourceId: 'tts-qwen3-tts-crisp-0.6b-base-q8-0',
+      kind: 'ttsModel',
+      name: 'Qwen3-TTS 0.6B Base Q8_0 · CrispASR',
+    }))).toBe('0.6B')
   })
 })
 

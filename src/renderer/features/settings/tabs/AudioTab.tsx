@@ -12,7 +12,7 @@ import { useModelOptions } from '@/model-options'
  * volume, so a moving `Meter` could only invent its numbers.
  */
 
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, toast } from '@heroui/react'
 
 import { languageName } from '@/bridge'
@@ -81,7 +81,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
   return (
     <div className="settings-panel" data-onboarding="recognition-settings">
       <SettingGroup legend={t('settings.groupInput')}>
-        <SettingsRow label={t('settings.audioSource')}>
+        <SettingsRow onboardingTarget="audio-source" label={t('settings.audioSource')}>
           <SettingSelect
             value={settings.recognition.audioSource}
             options={deviceOptions}
@@ -96,8 +96,8 @@ export function AudioTab({ settings }: SettingsPanelProps) {
         </SettingsRow>
       </SettingGroup>
 
-      <SettingGroup legend={t('settings.groupRecognition')}>
-        <SettingsRow label={t('settings.provider')}>
+      <SettingGroup onboardingTarget="recognition-service" legend={t('settings.groupRecognition')}>
+        <SettingsRow onboardingTarget="recognition-provider" label={t('settings.provider')}>
           <SettingSelect value={provider} ariaLabel={t('settings.provider')} options={providerOptions} onChange={value => {
             const next = value as RecognitionProvider
             // Only Aliyun's socket returns a translation of its own, so leaving it retires the
@@ -108,11 +108,11 @@ export function AudioTab({ settings }: SettingsPanelProps) {
           }} />
         </SettingsRow>
         {provider === 'local' ? (modelOptions.length === 0 ? (
-          <SettingsRow label={t('settings.recognitionModel')}>
+          <SettingsRow onboardingTarget="recognition-model" label={t('settings.recognitionModel')}>
             <span className="nola-caption text-muted">{t('settings.recognitionModelEmpty')}</span>
           </SettingsRow>
         ) : (
-        <SettingsRow label={t('settings.recognitionModel')}>
+        <SettingsRow onboardingTarget="recognition-model" label={t('settings.recognitionModel')}>
           <SettingSelect
             value={settings.recognition.modelId}
             options={modelOptions}
@@ -159,7 +159,7 @@ interface CloudConnectionProps { recognition: RecognitionSettings; stored: boole
 function AliyunConnection({ recognition, stored }: CloudConnectionProps) {
   const { t } = useI18n()
   return <>
-    <SettingsRow label={t('settings.recognitionModel')} desc={t('settings.aliyunHint')} descriptionTooltip>
+    <SettingsRow onboardingTarget="recognition-model" label={t('settings.recognitionModel')} desc={t('settings.aliyunHint')} descriptionTooltip>
       <SettingSelect value={recognition.aliyunModel ?? ALIYUN_RECOGNITION_MODELS[0]} ariaLabel={t('settings.recognitionModel')} options={ALIYUN_RECOGNITION_MODELS.map(value => ({ value, label: value }))} onChange={value => {
         void updateSettings({ recognition: { aliyunModel: value as AliyunRecognitionModel, sourceLanguage: 'auto' } }).catch(() => undefined)
       }} />
@@ -184,7 +184,7 @@ function AliyunConnection({ recognition, stored }: CloudConnectionProps) {
 function MiniMaxConnection({ recognition, stored }: CloudConnectionProps) {
   const { t } = useI18n()
   return <>
-    <SettingsRow label={t('settings.recognitionModel')}>
+    <SettingsRow onboardingTarget="recognition-model" label={t('settings.recognitionModel')}>
       <SettingSelect value={recognition.minimaxModel ?? MINIMAX_RECOGNITION_MODELS[0]} ariaLabel={t('settings.recognitionModel')} options={MINIMAX_RECOGNITION_MODELS.map(value => ({ value, label: value }))} onChange={value => {
         void updateSettings({ recognition: { minimaxModel: value as MinimaxRecognitionModel } }).catch(() => undefined)
       }} />
@@ -198,15 +198,20 @@ function MiniMaxConnection({ recognition, stored }: CloudConnectionProps) {
 /** Preview the selected ASR input through the same capture path as a caption session. */
 function DeviceTest({ expect }: { expect: string }) {
   const { t } = useI18n()
+  const [result, setResult] = useState<'pending' | 'signal' | 'silent' | 'failed' | null>(null)
   const state = useStore(stores.settings, value => value.audioTestState)
   const busy = state === 'capturing' || state === 'playing'
+  useEffect(() => { setResult(null) }, [expect])
   useEffect(() => () => actions.settings.cancelAudioTest(), [expect])
   const runTest = async () => {
+    setResult('pending')
     try {
       const hasSignal = await actions.settings.testAudio(expect)
+      setResult(hasSignal ? 'signal' : 'silent')
       if (hasSignal) toast.success(t('settings.audioTestSuccess'), { description: t('settings.audioTestReady') })
       else toast.warning(t('settings.audioTestSilent'))
     } catch (error) {
+      setResult('failed')
       const code = typeof error === 'object' && error !== null && 'engineCode' in error && typeof error.engineCode === 'string'
         ? error.engineCode
         : error instanceof Error ? /([a-zA-Z_]+)[:：]/.exec(error.message)?.[1] ?? error.message : null

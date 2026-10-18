@@ -1,36 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Button, Card, Link, Modal, Spinner, toast } from '@heroui/react'
-import { BookOpen, Github } from 'lucide-react'
+import { Button, Card, Chip, Link, Modal, ProgressBar, Spinner, toast } from '@heroui/react'
+import { ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2, Github, MousePointer2, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import type { DictionaryKey } from '@/i18n/zh-CN'
 import { useRoute } from '@/routes'
 import { actions, stores, useStore } from '@/store'
 import { placeTourCard, spotlightPath } from './tourLayout'
 import type { TourRect, TourSize } from './tourLayout'
 import nolaLogoUrl from '../../../../assets/brand/nola-logo.svg'
+import { TOUR_CHAPTERS, TOUR_STEPS, tourTarget } from './tourSteps'
 import './onboarding.css'
-
-interface TourStep {
-  path: string
-  target: string
-  title: DictionaryKey
-  body: DictionaryKey
-}
-
-const STEPS: readonly TourStep[] = [
-  { path: '#/', target: '[data-onboarding="home-quick"]', title: 'onboarding.quickTitle', body: 'onboarding.quickBody' },
-  { path: '#/', target: '[data-onboarding="home-overlay"]', title: 'onboarding.overlayTitle', body: 'onboarding.overlayBody' },
-  { path: '#/', target: '[data-onboarding="nav-video-captions"]', title: 'onboarding.browserTitle', body: 'onboarding.browserBody' },
-  { path: '#/settings/general', target: '[data-onboarding="network-settings"]', title: 'onboarding.networkTitle', body: 'onboarding.networkBody' },
-  { path: '#/settings/compute', target: '[data-onboarding="runtime-engine"] .settings-row:nth-child(2)', title: 'onboarding.torchTitle', body: 'onboarding.torchBody' },
-  { path: '#/settings/compute', target: '[data-onboarding="runtime-llama"] .settings-row:nth-child(2)', title: 'onboarding.llamaTitle', body: 'onboarding.llamaBody' },
-  { path: '#/settings/audio', target: '[data-onboarding="recognition-settings"] .settings-group:nth-child(2) .settings-row', title: 'onboarding.recognitionTitle', body: 'onboarding.recognitionBody' },
-  { path: '#/settings/translation', target: '[data-onboarding="translation-settings"] .settings-group .settings-row', title: 'onboarding.translationTitle', body: 'onboarding.translationBody' },
-  { path: '#/models', target: '[data-onboarding="model-downloads"] [data-onboarding="download-model"], [data-onboarding="model-downloads"] .models-card', title: 'onboarding.modelsTitle', body: 'onboarding.modelsBody' },
-  { path: '#/settings/more', target: '[data-onboarding="replay"]', title: 'onboarding.replayTitle', body: 'onboarding.replayBody' },
-]
 
 export interface OnboardingTourProps {
   /** Website demos can opt into manual presentation without writing a first-run marker. */
@@ -40,7 +19,12 @@ export interface OnboardingTourProps {
 export function OnboardingTour({ autoStart = true }: OnboardingTourProps) {
   const { settings, loaded, onboardingActive, onboardingWelcome, onboardingRun, runtimeBusy } = useStore(stores.settings, state => state)
   const { status, engineStatus } = useStore(stores.session, state => state)
-  const busy = ['starting', 'running', 'paused', 'stopping'].includes(status) || runtimeBusy
+  const browserBusy = useStore(stores.settings, state => state.browser?.captionServiceActive === true || state.captionService === 'loading' || state.captionService === 'ready')
+  const { navigate } = useRoute()
+  const busy = ['starting', 'running', 'paused', 'stopping'].includes(status) || runtimeBusy || browserBusy
+  useLayoutEffect(() => {
+    if (onboardingActive) navigate('#/')
+  }, [onboardingActive, onboardingWelcome, onboardingRun, navigate])
   useEffect(() => {
     if (autoStart && loaded && settings && !busy && (engineStatus === 'ready' || engineStatus === 'failed')) {
       actions.settings.startOnboarding('automatic')
@@ -59,7 +43,9 @@ function WelcomeDialog() {
     // Remember the invitation itself, including when the user chooses to skip the tour.
     if (!dialog || !dialog.isConnected || marked.current) return
     marked.current = true
-    void actions.settings.markOnboardingSeen().catch(() => toast.warning(t('onboarding.saveFailed')))
+    if (!stores.settings.getState().settings?.onboardingSeen) {
+      void actions.settings.markOnboardingSeen().catch(() => toast.warning(t('onboarding.saveFailed')))
+    }
   }, [t])
 
   return <Modal.Backdrop isOpen onOpenChange={open => { if (!open) actions.settings.stopOnboarding() }} className="z-overlay" isDismissable={false}>
@@ -71,10 +57,8 @@ function WelcomeDialog() {
           </Modal.Header>
           <Modal.Body>
             <p>{t('onboarding.welcomeIntro')}</p>
-            <p>{t('onboarding.welcomeHint')}</p>
             <div className="onboarding-welcome__support">
               <p>{t('onboarding.starRequest')}</p>
-              <p>{t('onboarding.starImportance')}</p>
             </div>
           </Modal.Body>
           <Modal.Footer>
@@ -97,59 +81,129 @@ interface TourGeometry {
   tip: { x: number; y: number }
   viewport: TourSize
   radius: number
+  maxHeight?: number
+}
+
+/** Ignore hidden tab panels and choose the first real, visible catalog entry. */
+function findTarget(selectors: string): HTMLElement | null {
+  for (const selector of selectors.split(',')) {
+    const visible = [...document.querySelectorAll<HTMLElement>(selector.trim())].find(element => {
+      const rect = element.getBoundingClientRect()
+      return !element.closest('[hidden]') && rect.width > 0 && rect.height > 0
+    })
+    if (visible) return visible
+  }
+  return null
 }
 
 function TourSteps() {
   const { t } = useI18n()
-  const alreadySeen = useStore(stores.settings, state => state.settings?.onboardingSeen === true)
   const { navigate, path } = useRoute()
+  const settingsState = useStore(stores.settings, state => state)
   const [index, setIndex] = useState(0)
   const [geometry, setGeometry] = useState<TourGeometry | null>(null)
   const [unavailable, setUnavailable] = useState(false)
+  const [inspecting, setInspecting] = useState(false)
+  const [feedback, setFeedback] = useState(false)
+  const [retry, setRetry] = useState(0)
   const cardRef = useRef<HTMLDivElement>(null)
-  const primaryRef = useRef<HTMLButtonElement>(null)
-  const marked = useRef(false)
-  const step = STEPS[index]!
+  const step = TOUR_STEPS[index]
+  const finished = !step
+  const chapter = step?.chapter ?? TOUR_CHAPTERS.length - 1
+  const chapterSteps = TOUR_STEPS.filter(item => item.chapter === chapter)
+  const chapterIndex = step ? chapterSteps.indexOf(step) + 1 : chapterSteps.length
+  const away = !!step && path !== step.path && path !== step.destination
+  const runtime = step?.runtime ? settingsState.runtimes?.local[step.runtime] : null
 
-  useLayoutEffect(() => { navigate(step.path) }, [navigate, step.path])
+  const moveTo = useCallback((nextIndex: number, completed = false) => {
+    let next = TOUR_STEPS[nextIndex]
+    // Going back into a closed detail starts at its real opener, rather than simulating a click.
+    if (next?.model && !document.querySelector(tourTarget('model-detail'))) {
+      nextIndex = nextIndex > index
+        ? TOUR_STEPS.findIndex((item, position) => position >= nextIndex && !item.model)
+        : TOUR_STEPS.findIndex(item => item.id === `${next!.model}-model`)
+      next = TOUR_STEPS[nextIndex]
+    }
+    if (!next?.model || next.id === 'translation-model') document.querySelector<HTMLButtonElement>(tourTarget('model-detail-close'))?.click()
+    setGeometry(null)
+    setFeedback(completed)
+    setIndex(nextIndex)
+    if (next) navigate(next.path)
+  }, [navigate, index])
 
   useLayoutEffect(() => {
-    setGeometry(null)
+    if (!step || away) return
+    // Back/retry restores the local tab only; installers and service actions are never simulated.
+    if (step.runtime) document.querySelector<HTMLButtonElement>(tourTarget(`runtime-${step.runtime}`))?.click()
+  }, [step, retry, away])
+
+  useEffect(() => {
+    if (!feedback) return
+    const timer = window.setTimeout(() => setFeedback(false), 1600)
+    return () => window.clearTimeout(timer)
+  }, [feedback, index])
+
+  useLayoutEffect(() => {
     setUnavailable(false)
-    if (path !== step.path) return
+    setInspecting(false)
+    if (!step || away) {
+      setGeometry(null)
+      return
+    }
     let frame = 0
+    let settleFrame = 0
     let target: HTMLElement | null = null
     let alignmentKey = ''
+    let focused = false
+    let acted = false
+    let opened = false
+    let advancing = false
     let alive = true
-    const rootStyle = getComputedStyle(document.documentElement)
-    const space = parseFloat(rootStyle.getPropertyValue('--space-1')) || 8
+    const style = getComputedStyle(document.documentElement)
+    const space = parseFloat(style.getPropertyValue('--space-1')) || 8
     const gap = space * 2
-    const radius = parseFloat(rootStyle.getPropertyValue('--radius-xl')) || space * 2
+    const radius = parseFloat(style.getPropertyValue('--radius-xl')) || space * 2
+    const reduced = document.documentElement.dataset.reduceMotion === 'true' || window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const advance = () => {
+      if (advancing || !alive) return
+      advancing = true
+      // React and HeroUI must finish their route/tab/dialog update before the next lesson measures it.
+      settleFrame = requestAnimationFrame(() => { if (alive) moveTo(index + 1, true) })
+    }
     const measure = () => {
       if (!alive || !cardRef.current) return
+      const found = findTarget(step.target)
+      if (found !== target && target) resize.unobserve(target)
       const viewport = { width: window.innerWidth, height: window.innerHeight }
-      // Selectors are ordered fallbacks, so installed catalogs can still explain downloads.
-      const found = step.target.split(',').map(selector => document.querySelector<HTMLElement>(selector.trim())).find(element => element !== null)
       if (found) {
-        const cardWidth = cardRef.current.getBoundingClientRect().width
-        const alignTop = found.getBoundingClientRect().width + cardWidth + gap * 3 > viewport.width
-        const nextAlignment = `${viewport.width}:${viewport.height}:${alignTop}`
-        if (target !== found || alignmentKey !== nextAlignment) {
+        const card = cardRef.current.getBoundingClientRect()
+        const alignTop = found.getBoundingClientRect().width + card.width + gap * 3 > viewport.width
+        const alignment = `${viewport.width}:${viewport.height}:${alignTop}`
+        if (found !== target || alignmentKey !== alignment) {
           target = found
-          alignmentKey = nextAlignment
-          // Wide controls need room below them for the tip on the minimum window size.
-          target.scrollIntoView({ block: alignTop ? 'start' : 'center', inline: 'nearest', behavior: 'instant' })
-          if (alignTop) {
-            const scroller = target.closest<HTMLElement>('.nola-main')
-            if (scroller) scroller.scrollTop = Math.max(0, scroller.scrollTop - gap)
-          }
+          alignmentKey = alignment
+          const behavior = reduced ? 'instant' : 'smooth'
+          const navigationScroller = target.closest('.settings-nav') ? target.closest<HTMLElement>('.nola-main') : null
+          // Centering a sticky settings tab can leave it underneath the following panel on a narrow window.
+          if (navigationScroller) navigationScroller.scrollTo({ top: 0, behavior })
+          else target.scrollIntoView({ block: alignTop ? 'start' : 'center', inline: 'nearest', behavior })
           resize.observe(target)
         }
-      }
+      } else target = null
       const topInset = document.querySelector('.nola-app-body')?.getBoundingClientRect().top ?? gap * 4
-      const rect = target?.getBoundingClientRect()
+      const targetRect = target?.getBoundingClientRect()
+      const included = step.include ? findTarget(step.include) : null
+      if (included) resize.observe(included)
+      const includedRect = included?.getBoundingClientRect()
+      // Related actions belong to the same protected area, even when rendered in a separate modal footer.
+      const rect = targetRect && includedRect ? {
+        left: Math.min(targetRect.left, includedRect.left),
+        top: Math.min(targetRect.top, includedRect.top),
+        right: Math.max(targetRect.right, includedRect.right),
+        bottom: Math.max(targetRect.bottom, includedRect.bottom),
+      } : targetRect
       let spotlight: TourRect | null = null
-      if (rect && rect.width > 0 && rect.height > 0) {
+      if (rect) {
         const x = Math.max(space, rect.left - space)
         const y = Math.max(topInset + space, rect.top - space)
         const right = Math.min(viewport.width - space, rect.right + space)
@@ -157,18 +211,46 @@ function TourSteps() {
         if (right > x && bottom > y) spotlight = { x, y, width: right - x, height: bottom - y }
       }
       const card = cardRef.current.getBoundingClientRect()
-      const next: TourGeometry = { target: spotlight, viewport, radius, tip: placeTourCard(spotlight, card, viewport, gap, topInset) }
+      const sideRoom = spotlight ? Math.max(spotlight.x - gap * 2, viewport.width - spotlight.x - spotlight.width - gap * 2) : viewport.width
+      const verticalRoom = spotlight ? Math.max(spotlight.y - topInset - gap * 2, viewport.height - spotlight.y - spotlight.height - gap * 2) : viewport.height
+      const maxHeight = sideRoom < card.width && verticalRoom > space * 8 ? verticalRoom : undefined
+      const size = { width: card.width, height: maxHeight ? Math.min(card.height, maxHeight) : card.height }
+      const next: TourGeometry = { target: spotlight, viewport, radius, maxHeight, tip: placeTourCard(spotlight, size, viewport, gap, topInset) }
       setGeometry(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next)
+      if (!focused && target) {
+        focused = true
+        const control = target.matches('button, [role="tab"]') ? target : target.querySelector<HTMLElement>('[aria-haspopup="listbox"], button:not(:disabled)')
+        // Do not take focus away from a dropdown or dialog that the user just opened.
+        if (!document.querySelector('[role="listbox"]')) (control ?? cardRef.current).focus({ preventScroll: true })
+      }
+      const expanded = target?.matches('[aria-expanded="true"]') || !!target?.querySelector('[aria-expanded="true"]')
+      if (step.action === 'inspect') {
+        if (expanded) opened = true
+        setInspecting(!!expanded)
+        if (opened && !expanded && target) advance()
+      }
+      if (step.action === 'press' && acted && (!step.result || findTarget(step.result))) advance()
     }
     const refresh = () => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(measure)
     }
+    const click = (event: MouseEvent) => {
+      if (!(event.target instanceof Element) || event.target.closest('.onboarding-tour')) return
+      const clicked = event.target.closest(step.control && step.control !== 'button' ? step.control : step.target)
+      const control = event.target.closest('button, [role="tab"], [role="button"]')
+      if (step.action === 'press' && clicked && control && !control.matches(':disabled, [aria-disabled="true"]')) {
+        acted = true
+        refresh()
+      }
+    }
     const resize = new ResizeObserver(refresh)
     resize.observe(cardRef.current!)
-    const mutation = new MutationObserver(refresh)
-    const shell = document.querySelector('.nola-app-shell')
-    if (shell) mutation.observe(shell, { childList: true, subtree: true })
+    const mutation = new MutationObserver(records => {
+      if (records.some(record => !(record.target instanceof Element) || !record.target.closest('.onboarding-tour'))) refresh()
+    })
+    mutation.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-expanded', 'aria-pressed', 'hidden', 'data-onboarding-result'] })
+    document.addEventListener('click', click, true)
     window.addEventListener('resize', refresh)
     window.addEventListener('scroll', refresh, true)
     const timeout = window.setTimeout(() => { setUnavailable(true); refresh() }, 2500)
@@ -177,78 +259,109 @@ function TourSteps() {
       alive = false
       clearTimeout(timeout)
       cancelAnimationFrame(frame)
+      cancelAnimationFrame(settleFrame)
       resize.disconnect()
       mutation.disconnect()
+      document.removeEventListener('click', click, true)
       window.removeEventListener('resize', refresh)
       window.removeEventListener('scroll', refresh, true)
     }
-  }, [step, path])
+  }, [step, index, away, retry, moveTo])
 
-  const ready = !!geometry?.target || unavailable
+  // Route changes are evidence of actual navigation, including keyboard activation.
   useEffect(() => {
-    if (!geometry) return
-    if (ready) primaryRef.current?.focus({ preventScroll: true })
-    else cardRef.current?.focus({ preventScroll: true })
-    if (!marked.current && geometry?.target) {
-      marked.current = true
-      if (!alreadySeen) void actions.settings.markOnboardingSeen().catch(() => toast.warning(t('onboarding.saveFailed')))
+    if (step?.destination === path) moveTo(index + 1, true)
+  }, [step, path, index, moveTo])
+
+  useEffect(() => {
+    const previous = document.activeElement
+    const keyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (document.querySelector('[role="listbox"], [data-onboarding="model-detail"]')) return
+      actions.settings.stopOnboarding()
     }
-  }, [ready, geometry, alreadySeen, t])
-
-  useEffect(() => {
-    const previousFocus = document.activeElement
-    const shell = document.querySelector<HTMLElement>('.nola-app-shell')
-    const previousInert = shell?.inert ?? false
-    // The spotlight is informational: background controls must not start installs or sessions.
-    if (shell) shell.inert = true
+    document.addEventListener('keydown', keyDown)
     return () => {
-      if (shell) shell.inert = previousInert
-      const restoreFocus = previousFocus instanceof HTMLElement && previousFocus !== document.body && previousFocus.isConnected
-        ? previousFocus : document.querySelector<HTMLElement>('[data-onboarding="replay"]') ?? document.querySelector<HTMLElement>('.nola-nav-button[aria-current="page"]')
-      restoreFocus?.focus({ preventScroll: true })
+      document.removeEventListener('keydown', keyDown)
+      const restore = previous instanceof HTMLElement && previous.isConnected ? previous : document.querySelector<HTMLElement>('.nola-nav-button[aria-current="page"]')
+      restore?.focus({ preventScroll: true })
     }
   }, [])
 
-  const keyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      actions.settings.stopOnboarding()
-    }
-    if (event.key !== 'Tab') return
-    const buttons = [...(cardRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])]
-    const first = buttons[0]
-    const last = buttons.at(-1)
-    if (document.activeElement === cardRef.current || (event.shiftKey && document.activeElement === first) || (!event.shiftKey && document.activeElement === last)) {
-      event.preventDefault()
-      const destination = event.shiftKey ? last : first
-      destination?.focus()
+  const resume = () => {
+    if (step?.model && !document.querySelector(tourTarget('model-detail'))) {
+      moveTo(TOUR_STEPS.findIndex(item => item.id === `${step.model}-model`))
+    } else if (step) {
+      navigate(step.path)
+      setRetry(value => value + 1)
     }
   }
+  const missing = !geometry?.target
+  const skipChapter = () => moveTo(TOUR_STEPS.findIndex(item => item.chapter > chapter) < 0 ? TOUR_STEPS.length : TOUR_STEPS.findIndex(item => item.chapter > chapter))
 
-  const last = index === STEPS.length - 1
   return createPortal(
-    <div className="onboarding-tour z-overlay" onKeyDown={keyDown}>
-      <svg className="onboarding-tour__mask" width="100%" height="100%" aria-hidden="true">
+    <div className="onboarding-tour z-onboarding" data-react-aria-top-layer="true" data-step={step?.id ?? 'complete'} data-inspecting={inspecting}>
+      {!away && !finished ? <svg className="onboarding-tour__mask" width="100%" height="100%" aria-hidden="true">
         <path className="onboarding-tour__scrim" fillRule="evenodd" d={spotlightPath(geometry?.viewport ?? { width: window.innerWidth, height: window.innerHeight }, geometry?.target ?? null, geometry?.radius ?? 0)} />
         {geometry?.target ? <rect className="onboarding-tour__outline" x={geometry.target.x} y={geometry.target.y} width={geometry.target.width} height={geometry.target.height} rx={geometry.radius} /> : null}
-      </svg>
-      <Card ref={cardRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="onboarding-heading" aria-describedby="onboarding-body"
-        className="onboarding-tour__card" data-ready={geometry !== null}
-        style={geometry ? { left: geometry.tip.x, top: geometry.tip.y } : undefined}>
-        <Card.Header><Card.Title id="onboarding-heading">{t(step.title)}</Card.Title></Card.Header>
-        <Card.Content>
-          <p id="onboarding-body">{t(step.body)}</p>
-          {!ready ? <p className="onboarding-tour__status" role="status"><Spinner size="sm" />{t('onboarding.loading')}</p> : !geometry?.target ? <p className="onboarding-tour__status" role="status">{t('onboarding.unavailable')}</p> : null}
-        </Card.Content>
-        <Card.Footer>
-          <div className="onboarding-tour__progress" aria-live="polite">{t('onboarding.progress', { current: index + 1, total: STEPS.length })}</div>
-          <div className="onboarding-tour__actions">
-            <Button variant="tertiary" size="sm" onPress={() => actions.settings.stopOnboarding()}>{t('onboarding.skip')}</Button>
-            <Button ref={primaryRef} variant="primary" size="sm" isDisabled={!ready}
-              onPress={() => { if (last) actions.settings.stopOnboarding(); else setIndex(index + 1) }}>{t(last ? 'onboarding.done' : 'onboarding.next')}</Button>
+      </svg> : null}
+      <Card ref={cardRef} tabIndex={-1} role="dialog" aria-modal="false" aria-labelledby="onboarding-heading" aria-describedby="onboarding-body"
+        className={['onboarding-tour__card', (step?.model || (geometry?.viewport.height ?? window.innerHeight) < 640) && 'onboarding-tour__card--compact', (finished || away) && 'onboarding-tour__card--center'].filter(Boolean).join(' ')}
+        data-ready={finished || away || geometry !== null}
+        style={geometry && !away && !finished ? { left: geometry.tip.x, top: geometry.tip.y, maxHeight: geometry.maxHeight } : undefined}>
+        <div className="onboarding-tour__topline">
+          <span aria-hidden={finished}>{finished ? null : t('onboarding.chapterProgress', { current: chapter + 1, total: TOUR_CHAPTERS.length })}</span>
+          <Button isIconOnly variant="secondary" size="sm" aria-label={t('onboarding.exit')} onPress={() => actions.settings.stopOnboarding()}><X aria-hidden="true" /></Button>
+        </div>
+        {!finished ? <>
+          <ol className="onboarding-tour__chapters" aria-label={t('onboarding.title')}>
+            {TOUR_CHAPTERS.map((key, item) => <li key={key} aria-current={item === chapter ? 'step' : undefined} data-state={item < chapter ? 'complete' : item === chapter ? 'current' : 'upcoming'}>
+              <span aria-hidden="true">{item < chapter ? <Check /> : item + 1}</span><span>{t(key)}</span>
+            </li>)}
+          </ol>
+          <ProgressBar size="sm" aria-label={t('onboarding.title')} value={(index / TOUR_STEPS.length) * 100}>
+            <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
+          </ProgressBar>
+        </> : null}
+        {finished ? <TourCompletion onExit={() => { actions.settings.stopOnboarding(); navigate('#/') }} /> : <>
+          <Card.Header><Card.Title id="onboarding-heading">{t(step.title)}</Card.Title></Card.Header>
+          <Card.Content key={step.id} className="onboarding-tour__lesson">
+            <p id="onboarding-body">{away ? t('onboarding.paused') : t(step.body)}</p>
+            {runtime ? <Chip size="sm" variant="soft" color={runtime.status === 'ready' ? 'success' : 'default'}>{t(runtime.status === 'ready' ? 'runtime.installed' : 'runtime.missing')}{runtime.status === 'ready' && runtime.version ? ` · ${runtime.version}` : ''}</Chip> : null}
+            {!away && missing ? <p className="onboarding-tour__status" role="status">{unavailable ? t('onboarding.targetMissing') : <><Spinner size="sm" />{t('onboarding.loading')}</>}</p> : null}
+            {!away && !missing && step.action ? <p className="onboarding-tour__instruction"><MousePointer2 aria-hidden="true" />{t(step.action === 'inspect' ? 'onboarding.inspectHint' : 'onboarding.actHint')}</p> : null}
+          </Card.Content>
+          <div className="onboarding-tour__feedback" role="status" aria-live="polite">{feedback ? <><CheckCircle2 aria-hidden="true" />{t('onboarding.feedback')}</> : null}</div>
+          <Card.Footer>
+            <span className="onboarding-tour__progress">{t('onboarding.progress', { current: chapterIndex, total: chapterSteps.length })}</span>
+            <div className="onboarding-tour__actions">
+              <Button variant="secondary" size="sm" isDisabled={index === 0} onPress={() => moveTo(index - 1)}><ArrowLeft aria-hidden="true" />{t('onboarding.back')}</Button>
+              {away || (missing && unavailable) ? <Button variant="primary" size="sm" onPress={resume}>{t(away ? 'onboarding.resume' : 'onboarding.retry')}</Button>
+                : !step.action ? <Button variant="primary" size="sm" isDisabled={missing} onPress={() => moveTo(index + 1)}>{t('onboarding.next')}<ArrowRight aria-hidden="true" /></Button> : null}
+            </div>
+          </Card.Footer>
+          <div className="onboarding-tour__secondary">
+            <Button variant="tertiary" size="sm" onPress={() => moveTo(index + 1)}>{t('onboarding.skipStep')}</Button>
+            <Button variant="tertiary" size="sm" onPress={skipChapter}>{t('onboarding.skipChapter')}</Button>
           </div>
-        </Card.Footer>
+        </>}
       </Card>
     </div>, document.body,
   )
+}
+
+export interface TourCompletionProps { onExit: () => void }
+
+function TourCompletion({ onExit }: TourCompletionProps) {
+  const { t } = useI18n()
+  return <>
+    <Card.Header><Card.Title id="onboarding-heading">{t('onboarding.finishTitle')}</Card.Title></Card.Header>
+    <Card.Content><p id="onboarding-body">{t('onboarding.finishBody')}</p></Card.Content>
+    <Card.Footer>
+      <Link className="onboarding-welcome__link button button--sm button--secondary" href="https://github.com/CerealAxis/Nola-Translator" target="_blank" rel="noreferrer">
+        <Github aria-hidden="true" />{t('onboarding.githubHome')}
+      </Link>
+      <Button variant="primary" size="sm" onPress={onExit}>{t('onboarding.finishExit')}</Button>
+    </Card.Footer>
+  </>
 }

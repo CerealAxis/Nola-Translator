@@ -1,5 +1,5 @@
 import { net } from 'electron'
-import { GITHUB_PROXY_AUTO, GITHUB_PROXY_FALLBACK, GITHUB_PROXY_NODES } from '../shared/github-proxies'
+import { GITHUB_PROXY_AUTO, GITHUB_PROXY_NODES } from '../shared/github-proxies'
 import { logDiagnostic, processFailure } from './session-log'
 
 /**
@@ -15,8 +15,8 @@ const PROBE_TIMEOUT_MS = 3000
 const PROBE_ASSET_URL = 'https://github.com/ggml-org/llama.cpp/releases/download/b11532/llama-b11532-bin-win-cpu-x64.zip'
 const PROBE_ASSET_FILENAME = 'llama-b11532-bin-win-cpu-x64.zip'
 
-let cached: { node: string; at: number } | null = null
-let inFlight: Promise<string> | null = null
+let cached: { node: string | null; at: number } | null = null
+let inFlight: Promise<string | null> | null = null
 
 /**
  * Asks every catalog node at the same time and takes the first one to serve the runtime archive.
@@ -54,11 +54,10 @@ function probeFastestNode(): Promise<string> {
 /**
  * Turns the stored setting into the prefix a GitHub asset URL is built with.
  *
- * An explicit node is returned as typed; `auto` resolves to a node the catalog already contains. The
- * settings are read per call, so a node measured while an earlier download was still running applies
- * from the next request on without an app restart.
+ * An explicit node is returned as typed; `auto` resolves to a reachable catalog node or null so the
+ * caller can keep the official URL. Settings are read per call, so node changes apply immediately.
  */
-export async function resolveGithubProxyNode(selected: string): Promise<string> {
+export async function resolveGithubProxyNode(selected: string): Promise<string | null> {
   const value = selected.trim()
   if (value !== GITHUB_PROXY_AUTO) return value
   if (cached && Date.now() - cached.at < PROBE_TTL_MS) return cached.node
@@ -70,10 +69,10 @@ export async function resolveGithubProxyNode(selected: string): Promise<string> 
         logDiagnostic('github-proxy.probe.resolved', { node, candidates: GITHUB_PROXY_NODES.length })
         return node
       }, error => {
-        // Losing every node is an ordinary outcome on a machine with no route to any of them and the
-        // answer still names a node, so this is recorded for support instead of raised as an error.
-        logDiagnostic('github-proxy.probe.fallback', { fallback: GITHUB_PROXY_FALLBACK, ...processFailure(error) })
-        return GITHUB_PROXY_FALLBACK
+        // Losing every node is an ordinary outcome. Returning null lets the caller keep the direct URL.
+        cached = { node: null, at: Date.now() }
+        logDiagnostic('github-proxy.probe.direct-fallback', processFailure(error))
+        return null
       })
       .finally(() => { inFlight = null })
   }

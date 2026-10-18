@@ -1,7 +1,7 @@
 import { LANGUAGE_CODES } from './languages'
 import { DEFAULT_COMPUTE_SETTINGS, type ComputeSettings } from './compute'
-import { GITHUB_PROXY_DEFAULT } from './github-proxies'
-import { PYPI_MIRROR_DEFAULT, PYTORCH_WHEEL_MIRROR_AUTO } from './pypi-mirrors'
+import { GITHUB_PROXY_AUTO } from './github-proxies'
+import { PYPI_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_AUTO } from './pypi-mirrors'
 
 export type OverlaySettings = {
   mode: 'free' | 'top' | 'bottom'
@@ -77,24 +77,24 @@ export type BrowserCaptionStyleSettings = {
 
 /** Network sources and proxying for every outbound download the app makes. */
 export type NetworkSettings = {
-  /** Weight files go to hf-mirror.com instead of huggingface.co when enabled. */
+  /** Weight files use the mirror when enabled and the detected network egress is in mainland China. */
   useHuggingFaceMirror: boolean
   /** Prefer the selected PyPI mirror for component requirements and supported PyTorch wheels. */
   usePypiMirror: boolean
-  /** Selected pip index; missing dependencies can fall back to official PyPI. */
+  /** Automatic or manually selected pip index; automatic mode uses mirrors in mainland China only. */
   pypiMirrorUrl: string
   /**
    * Wheel host for component packages such as torch. Holds a `PYTORCH_WHEEL_MIRROR_NODES` entry:
-   * `PYTORCH_WHEEL_MIRROR_AUTO` tries the catalog in order, one mirror base URL restricts the
-   * candidates to it, and `PYTORCH_WHEEL_MIRROR_OFFICIAL` skips mirroring entirely.
+   * Automatic mode probes mirror candidates in mainland China and uses the official source elsewhere;
+   * one mirror base URL restricts candidates to it, and the official sentinel skips mirroring.
    */
   pytorchWheelMirrorUrl: string
   /** Whether `githubAccelerateUrl` is applied to GitHub asset URLs at all. */
   useGithubAccelerate: boolean
   /**
    * Prefixed onto a GitHub release asset URL (`prefix + url`). Holds a `GITHUB_PROXY_NODES` entry or
-   * `GITHUB_PROXY_AUTO`, which probes the catalog and uses the lowest-latency node that serves the
-   * pinned runtime archive. New settings default to the verified `GITHUB_PROXY_DEFAULT` node.
+   * `GITHUB_PROXY_AUTO`, which probes the catalog in mainland China and uses direct downloads elsewhere.
+   * A manually selected node is used regardless of region.
    */
   githubAccelerateUrl: string
   /** Empty disables proxying whatever the three scope switches below say. */
@@ -105,7 +105,7 @@ export type NetworkSettings = {
 }
 
 export type AppSettings = {
-  version: 1
+  version: 2
   /** Presentation is profile-scoped, so upgrades do not repeat the first-run tour. */
   onboardingSeen: boolean
   theme: 'system' | 'light' | 'dark'
@@ -290,17 +290,17 @@ export const DEFAULT_SETTINGS: AppSettings = {
   onboardingSeen: false,
   compute: { ...DEFAULT_COMPUTE_SETTINGS },
   browserConnection: { enabled: true },
-  version: 1,
+  version: 2,
   theme: 'system',
   uiLanguage: 'auto',
   modelStoragePath: '',
   network: {
-    useHuggingFaceMirror: false,
-    usePypiMirror: false,
-    pypiMirrorUrl: PYPI_MIRROR_DEFAULT,
+    useHuggingFaceMirror: true,
+    usePypiMirror: true,
+    pypiMirrorUrl: PYPI_MIRROR_AUTO,
     pytorchWheelMirrorUrl: PYTORCH_WHEEL_MIRROR_AUTO,
-    useGithubAccelerate: false,
-    githubAccelerateUrl: GITHUB_PROXY_DEFAULT,
+    useGithubAccelerate: true,
+    githubAccelerateUrl: GITHUB_PROXY_AUTO,
     proxyUrl: '',
     proxyForPip: false,
     proxyForModelDownload: false,

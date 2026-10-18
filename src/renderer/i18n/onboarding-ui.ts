@@ -1,9 +1,10 @@
+import { lessonsZh, lessonsEn, lessonsTW, lessonsHK, lessonsJa, lessonsKo } from './onboarding-lessons'
+
 export const onboardingZh = {
-  welcomeTitle: '欢迎使用 Nola Translator',
-  welcomeIntro: '接下来带你看看各个功能入口，以及运行环境和模型在哪里配置。',
-  welcomeHint: '可以随时跳过，以后也能在设置里再次查看。',
-  starRequest: '如果您觉得软件还不错，恳请在 GitHub 给一个 Star。',
-  starImportance: '这对我们十分重要。',
+  ...lessonsZh,
+  welcomeTitle: 'Nola Translator 新手指引',
+  welcomeIntro: '欢迎使用 Nola Translator。本指引会带您快速上手软件。',
+  starRequest: '若您觉得软件还不错，可以在 Github 给本项目点一个 Star 嘛，谢谢😊',
   later: '稍后再看', begin: '开始指引', helpDocs: '帮助文档', github: 'GitHub',
   title: '新手教程', replay: '再次查看', replayHint: '重新查看各个功能入口和配置方法。',
   next: '下一步', skip: '跳过指引', done: '完成', progress: '{current} / {total}',
@@ -28,11 +29,10 @@ export function onboardingEntries(messages: OnboardingMessages): { [K in keyof O
 }
 
 export const onboardingEn: OnboardingMessages = {
-  welcomeTitle: 'Welcome to Nola Translator',
-  welcomeIntro: 'We’ll show you where to find key features and configure runtimes and models.',
-  welcomeHint: 'You can skip at any time and view the tour again in Settings.',
-  starRequest: 'If you like the app, please give us a Star on GitHub.',
-  starImportance: 'Your support means a lot to us.',
+  ...lessonsEn,
+  welcomeTitle: 'Nola Translator Getting Started',
+  welcomeIntro: 'Welcome to Nola Translator. This guide will help you get started.',
+  starRequest: 'If you enjoy the app, please give this project a Star on GitHub. Thank you! 😊',
   later: 'Not now', begin: 'Start tour', helpDocs: 'Help docs', github: 'GitHub',
   title: 'Getting started', replay: 'View again', replayHint: 'Review the main features and where to configure them.',
   next: 'Next', skip: 'Skip tour', done: 'Done', progress: '{current} / {total}',
@@ -51,11 +51,10 @@ export const onboardingEn: OnboardingMessages = {
 }
 
 export const onboardingTW: OnboardingMessages = {
-  welcomeTitle: '歡迎使用 Nola Translator',
-  welcomeIntro: '接下來帶你看看各個功能入口，以及執行環境和模型在哪裡設定。',
-  welcomeHint: '可以隨時略過，以後也能在設定裡再次查看。',
-  starRequest: '如果您覺得軟體還不錯，懇請在 GitHub 給一個 Star。',
-  starImportance: '這對我們十分重要。',
+  ...lessonsTW,
+  welcomeTitle: 'Nola Translator 新手指引',
+  welcomeIntro: '歡迎使用 Nola Translator。本指引會帶您快速上手軟體。',
+  starRequest: '若您覺得軟體還不錯，可以在 Github 為本專案點一個 Star，謝謝😊',
   later: '稍後再看', begin: '開始教學', helpDocs: '說明文件', github: 'GitHub',
   title: '新手教學', replay: '再次查看', replayHint: '重新查看各個功能入口和設定方法。',
   next: '下一步', skip: '略過教學', done: '完成', progress: '{current} / {total}',
@@ -74,10 +73,11 @@ export const onboardingTW: OnboardingMessages = {
 }
 
 export const onboardingHK: OnboardingMessages = {
+  ...lessonsHK,
   ...onboardingTW,
-  welcomeIntro: '接下來帶你看看各個功能入口，以及執行環境和模型在哪裏設定。',
-  welcomeHint: '可以隨時略過，以後也能在設定裏再次查看。',
-  starRequest: '如果您覺得軟件還不錯，懇請在 GitHub 給一個 Star。',
+  welcomeTitle: 'Nola Translator 新手指引',
+  welcomeIntro: '歡迎使用 Nola Translator。本指引會帶您快速上手軟件。',
+  starRequest: '若您覺得軟件還不錯，可以在 Github 為本項目點一個 Star，謝謝😊',
   title: '新手教學', replayHint: '重新查看各個功能入口和設定方法。',
   quickBody: '這裏是快速同傳的入口。可以辨識咪高峰或電腦播放的聲音，查看原文和譯文，也可以記筆記。',
   overlayBody: '這裏是懸浮字幕的入口。字幕可以顯示在其他視窗上方，位置、字體大小和顏色都能調整。',
@@ -91,11 +91,10 @@ export const onboardingHK: OnboardingMessages = {
 }
 
 export const onboardingJa: OnboardingMessages = {
-  welcomeTitle: 'Nola Translator へようこそ',
-  welcomeIntro: '機能の入口と、実行環境やモデルの設定場所をご案内します。',
-  welcomeHint: 'いつでもスキップでき、設定からもう一度見ることもできます。',
-  starRequest: 'このアプリを気に入っていただけたら、GitHub で Star をお願いします。',
-  starImportance: '皆さまの応援が私たちの大きな支えになります。',
+  ...lessonsJa,
+  welcomeTitle: 'Nola Translator はじめてガイド',
+  welcomeIntro: 'Nola Translator へようこそ。このガイドで基本的な使い方をご案内します。',
+  starRequest: 'このアプリを気に入っていただけたら、GitHub で Star をお願いします。ありがとうございます😊',
   later: '後で見る', begin: 'ガイドを開始', helpDocs: 'ヘルプ', github: 'GitHub',
   title: '使い方ガイド', replay: 'もう一度見る', replayHint: '機能の入口と設定方法を確認します。',
   next: '次へ', skip: 'ガイドをスキップ', done: '完了', progress: '{current} / {total}',
@@ -114,11 +113,10 @@ export const onboardingJa: OnboardingMessages = {
 }
 
 export const onboardingKo: OnboardingMessages = {
-  welcomeTitle: 'Nola Translator에 오신 것을 환영합니다',
-  welcomeIntro: '기능 위치와 실행 환경, 모델을 설정하는 곳을 안내해 드립니다.',
-  welcomeHint: '언제든 건너뛸 수 있으며 설정에서 다시 볼 수 있습니다.',
-  starRequest: '앱이 마음에 드신다면 GitHub에서 Star를 눌러 주세요.',
-  starImportance: '여러분의 응원은 저희에게 큰 힘이 됩니다.',
+  ...lessonsKo,
+  welcomeTitle: 'Nola Translator 시작 안내',
+  welcomeIntro: 'Nola Translator에 오신 것을 환영합니다. 이 안내에서 기본 사용법을 알려드립니다.',
+  starRequest: '앱이 마음에 드신다면 GitHub에서 Star를 눌러 주세요. 감사합니다😊',
   later: '나중에 보기', begin: '안내 시작', helpDocs: '도움말 문서', github: 'GitHub',
   title: '시작 안내', replay: '다시 보기', replayHint: '기능 위치와 설정 방법을 다시 확인합니다.',
   next: '다음', skip: '안내 건너뛰기', done: '완료', progress: '{current} / {total}',

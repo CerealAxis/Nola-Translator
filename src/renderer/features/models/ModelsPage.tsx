@@ -3,7 +3,7 @@ import { offlineActions } from '@/store/offlineStore'
 import { modelImportEntry } from '../../../shared/model-import-catalog'
 import { configurationOf, isModelReady } from '../../../shared/model-capabilities'
 import { ModelConfigurationDialog } from './ModelConfigurationDialog'
-import { supportsSelectedEngine } from '../../../shared/model-engines'
+import { modelEngines, supportsSelectedEngine } from '../../../shared/model-engines'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 /** Model catalog and download manager. The router owns the page padding. */
 
@@ -20,7 +20,9 @@ import { HubSearchTab } from './HubSearchTab'
 import { ModelCard, ModelCardSkeleton, defaultTargetOf, isDefaultOf } from './ModelCard'
 import { DownloadSourceDialog } from './DownloadSourceDialog'
 import { ModelMark } from './modelBrand'
-import { RecommendedFamilyCard, RecommendedFamilyDialog, familyOf, type RecommendedFamily } from './RecommendedFamilies'
+import { RecommendedFamilyCard, RecommendedFamilyDialog } from './RecommendedFamilies'
+import { familyOf, isQwen3TtsRecord, type RecommendedFamily } from './modelFamily'
+import { isEngineAvailable } from './engine-availability'
 import './models.css'
 
 export type ModelsTab = 'recommended' | 'installed' | 'search' | 'downloads'
@@ -88,6 +90,11 @@ export function ModelsPage() {
       ? cloudModel || providerNames.cloud
       : providerNames[settings?.translation.provider ?? 'microsoft']
 
+  const openFamilyRecords = openFamily
+    ? resources.filter(record => !record.resourceId.startsWith('hub:') && familyOf(record) === openFamily)
+    : []
+  const openFamilyKey = openFamily ? `${openFamily}:${openFamilyRecords.map(record => record.resourceId).join('|')}` : ''
+
   // error 是诊断串，不进界面（store 约定）：只送 console，界面走 errors.* 的错误码文案。
   useEffect(() => {
     if (error) console.error('[models]', error)
@@ -118,16 +125,21 @@ export function ModelsPage() {
     const compute = settings?.compute ?? DEFAULT_COMPUTE_SETTINGS
     const ready = isModelReady(record) && defaultTargetOf(record) !== null
     const compatible = supportsSelectedEngine(record, compute, record.resourceId)
-    const defaultDisabledReason = record.installed && !configurationOf(record)
-      ? t('modelsSettingsUi.configureBeforeDefault')
+    const engine = modelEngines(record)[0]
+    const loaderUnavailableReason = engine && runtimes?.local && !isEngineAvailable(engine, runtimes.local)
+      ? t('models.engineUnavailable', { engine: engine === 'llama' ? 'llama.cpp' : engine === 'crisp' ? 'CrispASR' : 'PyTorch' })
       : undefined
+    const defaultDisabledReason = record.kind !== 'ttsModel' && record.installed && !configurationOf(record)
+      ? t('modelsSettingsUi.configureBeforeDefault')
+      : loaderUnavailableReason
     return <ModelCard
       key={record.resourceId}
       record={record}
       busy={busyIds.includes(record.resourceId)}
       isDefault={isDefaultOf(record, settings)}
-      canBeDefault={ready && compatible}
+      canBeDefault={ready && compatible && !loaderUnavailableReason}
       defaultDisabledReason={defaultDisabledReason}
+      loaderUnavailableReason={loaderUnavailableReason}
       onInstall={run(record, 'install')}
       onCancel={run(record, 'cancel')}
       onRemove={run(record, 'remove')}
@@ -147,8 +159,9 @@ export function ModelsPage() {
         })
       }} />
       {openFamily ? <RecommendedFamilyDialog
+        key={openFamilyKey}
         family={openFamily}
-        records={resources.filter(record => !record.resourceId.startsWith('hub:') && familyOf(record) === openFamily)}
+        records={openFamilyRecords}
         compute={settings?.compute ?? DEFAULT_COMPUTE_SETTINGS}
         computeSnapshot={computeSnapshot}
         runtimes={runtimes}
@@ -286,12 +299,14 @@ function RecommendedCatalog({ records, loading, onOpen, emptyAction }: Pick<Cata
   if (records.length === 0) return <EmptyState className="flex flex-col items-start gap-4 py-8"><p className="nola-title text-foreground">{t('models.notInstalled')}</p>{emptyAction}</EmptyState>
   const groups = new Map<RecommendedFamily, ResourceRecord[]>()
   for (const record of records) {
+    if (record.kind === 'ttsModel' && !isQwen3TtsRecord(record)) continue
     const family = familyOf(record)
     groups.set(family, [...(groups.get(family) ?? []), record])
   }
   const sections: { title: string; families: RecommendedFamily[] }[] = [
     { title: t('models.asrModels'), families: ['qwen', 'sensevoice', 'funasr', 'vibevoice', 'mimo'] },
     { title: t('models.mtModels'), families: ['hymt2', 'index', 'other'] },
+    { title: t('models.ttsModels'), families: ['tts'] },
   ]
   return <div className="flex flex-col gap-6">{sections.map(section => <section key={section.title} className="flex flex-col gap-3">
     <h2 className="models-section-title">{section.title}</h2>
@@ -329,25 +344,12 @@ function Catalog({ records, loading, card, emptyAction, compute }: CatalogProps)
   )
   const recognition = ordered.filter((item) => item.kind === 'recognitionModel')
   const translation = ordered.filter((item) => item.kind === 'translationModel')
-  const hunyuan = translation.filter((item) => item.resourceId.startsWith('hy-mt2-'))
-  const bilibili = translation.filter((item) => item.resourceId.startsWith('index-translate-'))
-  const otherTranslation = translation.filter(
-    (item) => !item.resourceId.startsWith('hy-mt2-') && !item.resourceId.startsWith('index-translate-'),
-  )
-
-  const translationSections = [
-    { title: t('models.hunyuanModels'), records: hunyuan },
-    { title: t('models.bilibiliModels'), records: bilibili },
-    { title: t('models.otherMtModels'), records: otherTranslation },
-  ].sort((left, right) => {
-    const available = (section: typeof left) => section.records.some(record => supportsSelectedEngine(record, compute, record.resourceId))
-    return Number(available(right)) - Number(available(left))
-  })
 
   return (
     <div className="flex flex-col gap-6">
       <Section title={t('models.asrModels')} records={recognition} card={card} />
-      {translationSections.map(section => <Section key={section.title} title={section.title} records={section.records} card={card} />)}
+      <Section title={t('models.mtModels')} records={translation} card={card} />
+      <Section title={t('models.ttsModels')} records={ordered.filter(isQwen3TtsRecord)} card={card} />
     </div>
   )
 }

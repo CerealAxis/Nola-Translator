@@ -18,6 +18,7 @@ from nola_translator_engine.models.manager import (
     ModelManager,
     ModelSpec,
 )
+from nola_translator_engine.protocol import NetworkSettings
 
 
 class _Cancelled(RuntimeError):
@@ -248,6 +249,28 @@ def test_snapshot_install_success(tmp_path: Path) -> None:
     assert phases == ["download", "verify", "install"]
     assert [p.name for p in _leftovers(tmp_path / "models")] == ["qwen3-asr-1.7b-hf"]
     assert not any(p.name.endswith(".part") for p in target.rglob("*"))
+
+
+def test_automatic_hugging_face_mirror_falls_back_to_official(tmp_path: Path) -> None:
+    spec, payloads = _snapshot_spec()
+    requests: list[str] = []
+
+    def fetch(url: str, destination: Path, progress) -> None:
+        requests.append(url)
+        if "hf-mirror.com" in url:
+            raise OSError("mirror unavailable")
+        data = payloads[url]
+        destination.write_bytes(data)
+        progress(len(data), len(data))
+
+    manager = ModelManager(tmp_path / "models", fetcher=fetch)
+    target = manager.ensure(spec, network=NetworkSettings(useHuggingFaceMirror=True))
+
+    assert manager.is_installed(spec)
+    for entry in spec.files:
+        assert requests.count(spec.url_for(entry)) == 1
+        assert requests.count(spec.url_for(entry, NetworkSettings(useHuggingFaceMirror=True))) == 1
+        assert (target / entry.path).read_bytes() == payloads[spec.url_for(entry)]
 
 
 def test_incomplete_existing_model_is_not_installed(tmp_path: Path) -> None:

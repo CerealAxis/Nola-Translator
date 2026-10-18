@@ -15,6 +15,7 @@ import { PythonEnvironments } from './python-environments'
 import { pytorchWheelUrls } from '../shared/pypi-mirrors'
 import { localCandidates, missingLocalRuntime, probeLocalCrisp, probeLocalEngine, probeLocalLlama } from './local-runtimes'
 import { resolveGithubProxyNode } from './github-proxy-probe'
+import { isMainlandChina } from './network-region'
 import { OfflineRuntimes, type OfflineRuntimeProgress } from './offline-runtimes'
 import type { OfflineItem } from '../shared/offline'
 
@@ -545,6 +546,7 @@ export class RuntimeManager {
   private async resolveWheelUrl(item: { url: string; bytes: number }, signal: AbortSignal): Promise<string> {
     const network = this.options.network?.()
     if (network?.usePypiMirror !== true) return item.url
+    if (network.pytorchWheelMirrorUrl === 'auto' && !await isMainlandChina()) return item.url
     const candidates = pytorchWheelUrls(item.url, network.pytorchWheelMirrorUrl)
     for (const candidate of candidates.slice(0, -1)) {
       if (await this.probeUrl(candidate, item.bytes, signal)) return candidate
@@ -562,6 +564,7 @@ export class RuntimeManager {
     // the next download without a restart.
     const network = this.options.network?.()
     if (!network?.useGithubAccelerate) return url
+    if (network.githubAccelerateUrl === 'auto' && !await isMainlandChina()) return url
     const prefix = await resolveGithubProxyNode(network.githubAccelerateUrl)
     if (!prefix) return url
     return prefix + url

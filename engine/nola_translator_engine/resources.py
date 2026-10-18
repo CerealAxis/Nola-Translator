@@ -39,7 +39,7 @@ from .models.catalog import (
     SENSEVOICE_SMALL,
 )
 from .models.manager import ModelManager, ModelSpec
-from .models.crisp_catalog import CRISP_ASR_SPECS
+from .models.crisp_catalog import CRISP_ASR_SPECS, QWEN3_TTS_NAMES, QWEN3_TTS_SPECS
 from .models.qwen_gguf_catalog import QWEN3_ASR_GGUF_SPECS
 from .models.registry import CustomFile, CustomModelEntry, CustomModelRegistry
 from .local_models import declared_languages_from_snapshot
@@ -101,7 +101,7 @@ class ResourceOperationCancelled(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class ResourceDefinition:
     resource_id: str
-    kind: Literal["recognitionModel", "translationModel"]
+    kind: Literal["recognitionModel", "translationModel", "ttsModel"]
     # Free-form, because a hub-installed model passes its adapter id straight through: the
     # built-ins below write `qwen3-asr`/`sensevoice`/`hymt2`/`m2m100`, and `llama.cpp` joins them
     # for a GGUF installed from the hub.
@@ -219,7 +219,17 @@ RESOURCE_DEFINITIONS = _definitions() + tuple(
     for spec in CRISP_ASR_SPECS
 ) + (ResourceDefinition(HYMT2_7B_RESOURCE_ID, "translationModel", "hymt2",
     "Hy-MT2 7B Q4_K_M", "腾讯官方 7B Q4_K_M 多语言翻译模型。",
-    tuple(HYMT2_LANGUAGES), HYMT2_7B_Q4_K_M.total_bytes),)
+    tuple(HYMT2_LANGUAGES), HYMT2_7B_Q4_K_M.total_bytes),) + tuple(
+    ResourceDefinition(
+        spec.model_id, "ttsModel",
+        "crisp-asr" if "-crisp-" in spec.model_id else "llama.cpp" if "-llama-" in spec.model_id else "transformers-causal",
+        QWEN3_TTS_NAMES[spec.model_id],
+        "Qwen3-TTS 多语言语音合成模型。",
+        ("zh", "en", "ja", "ko", "de", "fr", "ru", "pt", "es", "it"),
+        spec.total_bytes,
+    )
+    for spec in QWEN3_TTS_SPECS
+)
 RESOURCE_BY_ID = {item.resource_id: item for item in RESOURCE_DEFINITIONS}
 
 
@@ -602,6 +612,8 @@ class ResourceManager:
         languages = list(definition.languages)
         if definition.kind == "recognitionModel":
             return recognition_configuration(languages, "crisp" if definition.provider == "crisp-asr" else "llama" if definition.provider == "llama-asr" else "pytorch")
+        if definition.kind == "ttsModel":
+            return None
         return translation_configuration(languages, "pytorch" if definition.provider in ("m2m100", "index-translate-transformers") else "llama")
 
     def configure(self, resource_id: str, configuration: ModelConfiguration) -> ResourceRecord:
@@ -676,6 +688,7 @@ class ResourceManager:
             **{spec.model_id: spec for spec in INDEX_TRANSLATE_SPECS},
             **{spec.model_id: spec for spec in INDEX_TRANSLATE_TRANSFORMERS_SPECS},
             **{spec.model_id: spec for spec in CRISP_ASR_SPECS},
+            **{spec.model_id: spec for spec in QWEN3_TTS_SPECS},
             **{spec.model_id: spec for spec in QWEN3_ASR_GGUF_SPECS},
         }.get(resource_id)
         if builtin is not None:

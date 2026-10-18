@@ -9,7 +9,8 @@ import { execFile } from 'node:child_process'
 import { z } from 'zod'
 import { runtimeRecipeSchema, type RuntimeRecipe, type RuntimeRecipeState, type RuntimeSnapshot } from '../shared/compute'
 import type { NetworkSettings } from '../shared/settings'
-import { pytorchWheelUrls } from '../shared/pypi-mirrors'
+import { pypiIndexUrls, pytorchWheelUrls } from '../shared/pypi-mirrors'
+import { isMainlandChina } from './network-region'
 import { probeLocalEngine } from './local-runtimes'
 import { offlinePipArguments } from './offline-runtimes'
 
@@ -185,7 +186,9 @@ export class PythonEnvironments {
     // `--isolated` together with PIP_CONFIG_FILE=nul discards whatever pip.conf the machine
     // carries, so the flag below is the only route a configured proxy can take into pip.
     const network = this.network?.()
-    const index = network?.usePypiMirror ? network.pypiMirrorUrl : PYPI_INDEX
+    const useMirrors = network?.usePypiMirror === true
+      && (network.pypiMirrorUrl !== 'auto' || await isMainlandChina())
+    const indexes = useMirrors ? pypiIndexUrls(network.pypiMirrorUrl) : [PYPI_INDEX]
     const proxy = network?.proxyForPip ? network.proxyUrl.trim() : ''
     let childClosed: Promise<void> | undefined
     const runPip = (pipIndex: string): Promise<void> => new Promise((resolveInstall, reject) => {
@@ -211,16 +214,22 @@ export class PythonEnvironments {
         }
       })
     try {
-      try {
-        await runPip(index)
-      } catch (error) {
-        if (!network?.usePypiMirror || !isMissingPackageError(error)) throw error
-        await childClosed
-        signal.throwIfAborted()
-        await rm(staging, { recursive: true, force: true })
-        await mkdir(staging, { recursive: true })
-        await runPip(PYPI_INDEX)
+      let lastError: unknown
+      for (const [indexPosition, index] of indexes.entries()) {
+        try {
+          await runPip(index)
+          lastError = undefined
+          break
+        } catch (error) {
+          lastError = error
+          if (indexPosition === indexes.length - 1) break
+          await childClosed
+          signal.throwIfAborted()
+          await rm(staging, { recursive: true, force: true })
+          await mkdir(staging, { recursive: true })
+        }
       }
+      if (lastError !== undefined) throw lastError
     } finally {
       // Abort callbacks can run before close; cleanup must wait until pip releases its files.
       if (signal.aborted) await childClosed
@@ -233,17 +242,11 @@ export class PythonEnvironments {
   /** Picks the first mirror that answers for this wheel's declared size, keeping the official address last. */
   private async resolveWheelUrl(item: Wheel, network: NetworkSettings | undefined, signal: AbortSignal): Promise<string> {
     if (network?.usePypiMirror !== true || !this.probe) return item.url
+    if (network.pytorchWheelMirrorUrl === 'auto' && !await isMainlandChina()) return item.url
     const candidates = pytorchWheelUrls(item.url, network.pytorchWheelMirrorUrl)
     for (const candidate of candidates.slice(0, -1)) {
       if (await this.probe(candidate, item.bytes, signal)) return candidate
     }
     return candidates.at(-1) ?? item.url
   }
-}
-
-function isMissingPackageError(error: unknown): boolean {
-  const detail = error && typeof error === 'object' && 'stderr' in error && typeof error.stderr === 'string'
-    ? `${String(error)}\n${error.stderr}`
-    : String(error)
-  return /No matching distribution found|Could not find a version that satisfies the requirement/i.test(detail)
 }

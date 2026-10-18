@@ -89,8 +89,8 @@ export function SettingsPage() {
               const hint = NAV_HINTS[item]
               const content = <><Icon aria-hidden="true" />{labels[item]}{hint ? <span className="tabs__hint" aria-hidden="true"><CircleHelp aria-hidden="true" /></span> : null}<Tabs.Indicator /></>
               return hint
-                ? <Tooltip key={item} delay={300}><Tabs.Tab id={item}>{content}</Tabs.Tab><Tooltip.Content className="settings-nav__tooltip">{hint}</Tooltip.Content></Tooltip>
-                : <Tabs.Tab key={item} id={item}>{content}</Tabs.Tab>
+                ? <Tooltip key={item} delay={300}><Tabs.Tab id={item} data-onboarding={`settings-${item}`}>{content}</Tabs.Tab><Tooltip.Content className="settings-nav__tooltip">{hint}</Tooltip.Content></Tooltip>
+                : <Tabs.Tab key={item} id={item} data-onboarding={`settings-${item}`}>{content}</Tabs.Tab>
             })}
           </Tabs.List>
         </div>

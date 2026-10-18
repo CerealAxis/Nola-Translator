@@ -4,13 +4,13 @@ import { computeSettingsSchema, DEFAULT_COMPUTE_SETTINGS } from '../shared/compu
 
 import { DEFAULT_SETTINGS, RECOGNITION_MODEL_IDS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
 import { findGithubProxyNode, GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT } from '../shared/github-proxies'
-import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_DEFAULT, PYTORCH_WHEEL_MIRROR_AUTO } from '../shared/pypi-mirrors'
+import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_AUTO } from '../shared/pypi-mirrors'
 import { ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS } from '../shared/settings'
 import { remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../shared/cloud-config'
 import { settingsPatchSchema } from './settings-schema'
 
 // Store-internal patches may also touch fields the IPC schema exposes only through their own channels.
-export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 1; browserConnection?: { enabled: boolean } }
+export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 2; browserConnection?: { enabled: boolean } }
 
 /** Must be a dropdown entry; anything else falls back to auto-detect. */
 function sanitizeSourceLanguage(value: unknown): string {
@@ -146,25 +146,24 @@ function sanitizeTargetLanguage(value: unknown): string {
 }
 
 /**
- * Moves the GitHub accelerator off the old free-text box, where a filled address meant acceleration
- * was on and an empty one meant it was off, onto a node picker that has no room for a custom address.
- * A value outside the catalog therefore has no entry to land on and becomes the verified default node.
+ * Moves the GitHub accelerator off the old free-text box and normalizes saved nodes to the picker.
+ * The former default node becomes automatic mode so upgrades receive the same region-aware default.
  *
- * An empty value normalizes to the default node without changing the accelerator toggle, so a user's
+ * An empty value normalizes to automatic mode without changing the accelerator toggle, so a user's
  * disabled setting stays disabled while every stored node value remains a valid catalog value.
  *
  * A file that already carries the toggle is not one of these older files, and its boolean is the
  * newer answer: deriving the switch from the address alone would turn a user back on who had turned
  * acceleration off while leaving a node selected.
  */
-function migrateGithubAccelerate(raw: Partial<AppSettings['network']> | undefined): Partial<Pick<AppSettings['network'], 'useGithubAccelerate' | 'githubAccelerateUrl'>> {
+function migrateGithubAccelerate(raw: Partial<AppSettings['network']> | undefined, migrateFormerDefault: boolean): Partial<Pick<AppSettings['network'], 'useGithubAccelerate' | 'githubAccelerateUrl'>> {
   const value = raw?.githubAccelerateUrl
   if (typeof value !== 'string') return {}
   const trimmed = value.trim()
   // Normalizing here as well as in the older branch below keeps the stored address and the node the
   // picker highlights the same one: the picker resolves anything outside the catalog to `auto`, so a
   // value left unnormalized would sit behind a row that is not the address actually in use.
-  const node = trimmed === GITHUB_PROXY_AUTO
+  const node = !trimmed || trimmed === GITHUB_PROXY_AUTO || (migrateFormerDefault && trimmed === GITHUB_PROXY_DEFAULT)
     ? GITHUB_PROXY_AUTO
     : trimmed ? findGithubProxyNode(trimmed) ?? GITHUB_PROXY_DEFAULT : GITHUB_PROXY_DEFAULT
   if (typeof raw?.useGithubAccelerate === 'boolean') return { githubAccelerateUrl: node }
@@ -213,7 +212,7 @@ export class SettingsStore {
       this.settings = {
         ...structuredClone(DEFAULT_SETTINGS),
         ...raw,
-        version: 1,
+        version: 2,
         onboardingSeen: raw.onboardingSeen === true,
         uiLanguage: typeof raw.uiLanguage === 'string' && ['auto', 'zh-CN', 'zh-TW', 'zh-HK', 'ko', 'ja', 'en'].includes(raw.uiLanguage)
           ? raw.uiLanguage as AppSettings['uiLanguage']
@@ -223,8 +222,8 @@ export class SettingsStore {
           ...DEFAULT_SETTINGS.network,
           ...(raw.network ?? {}),
           pypiMirrorUrl: typeof raw.network?.pypiMirrorUrl === 'string'
-            ? findPypiMirrorNode(raw.network.pypiMirrorUrl) ?? PYPI_MIRROR_DEFAULT
-            : PYPI_MIRROR_DEFAULT,
+            ? findPypiMirrorNode(raw.network.pypiMirrorUrl) ?? PYPI_MIRROR_AUTO
+            : PYPI_MIRROR_AUTO,
           pytorchWheelMirrorUrl: typeof raw.network?.pytorchWheelMirrorUrl === 'string'
             ? findPytorchWheelMirrorNode(raw.network.pytorchWheelMirrorUrl) ?? PYTORCH_WHEEL_MIRROR_AUTO
             : PYTORCH_WHEEL_MIRROR_AUTO,
@@ -236,7 +235,17 @@ export class SettingsStore {
             : {}),
           // A legacy file with a non-empty address predates the explicit switch, so preserve its
           // implied enabled state; files without the address use the current default.
-          ...migrateGithubAccelerate(raw.network),
+          ...migrateGithubAccelerate(raw.network, raw.version !== 2),
+          // Version 2 makes automatic mirror routing the default for every existing installation.
+          // This migration runs once; subsequent user-selected nodes and disabled switches persist.
+          ...(raw.version !== 2 ? {
+            usePypiMirror: true,
+            pypiMirrorUrl: PYPI_MIRROR_AUTO,
+            pytorchWheelMirrorUrl: PYTORCH_WHEEL_MIRROR_AUTO,
+            useHuggingFaceMirror: true,
+            useGithubAccelerate: true,
+            githubAccelerateUrl: GITHUB_PROXY_AUTO,
+          } : {}),
         },
         recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}) },
         recording: { ...DEFAULT_SETTINGS.recording, ...(raw.recording ?? {}) },
@@ -335,7 +344,7 @@ export class SettingsStore {
     const next: AppSettings = {
       ...this.settings,
       ...patch,
-      version: 1,
+      version: 2,
       recognition: { ...this.settings.recognition, ...(patch.recognition ?? {}) },
       recording: { ...this.settings.recording, ...(patch.recording ?? {}) },
       appearance: { ...this.settings.appearance, ...(patch.appearance ?? {}) },

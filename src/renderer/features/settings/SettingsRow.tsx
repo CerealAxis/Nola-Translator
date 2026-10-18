@@ -8,15 +8,18 @@ import { CircleHelp } from 'lucide-react'
  * Near-identical names, not interchangeable: this one is `.settings-row` (wider label column,
  * `var(--separator)` rule between rows, `settings.css`); the primitive is `.nola-setting-row`.
  */
-export function SettingsRow({ label, desc, children, className = '', descriptionTooltip = false }: {
+export interface SettingsRowProps {
   label: ReactNode
   desc?: ReactNode
   children: ReactNode
   className?: string
   descriptionTooltip?: boolean
-}) {
+  onboardingTarget?: string
+}
+
+export function SettingsRow({ label, desc, children, className = '', descriptionTooltip = false, onboardingTarget }: SettingsRowProps) {
   return (
-    <div className={`settings-row ${className}`}>
+    <div className={['settings-row', className].filter(Boolean).join(' ')} data-onboarding={onboardingTarget}>
       <div className="settings-row__label">
         <div className="settings-row__title">
           <Label>{label}</Label>

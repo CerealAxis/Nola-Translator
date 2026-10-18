@@ -136,7 +136,7 @@ export function RuntimeComponents() {
           : (kind === 'engine' ? runtimes?.recipes : runtimes?.packages)?.some(p => p.id === selected[kind] && p.installed))
         return <div key={kind} role="tabpanel" id={kind === active ? `runtime-${kind}` : undefined} hidden={kind !== active} className="runtime-panel-body">
           <SettingsRow label={t('runtime.current')} desc={sourceHint(component)} descriptionTooltip={!!sourceHint(component)}><span className="runtime-component-status">{component ? description(kind, component) : t('runtime.missing')}</span></SettingsRow>
-          <SettingsRow label={t('runtime.select')} desc={kind === 'engine' ? <>
+          <SettingsRow onboardingTarget={`runtime-version-${kind}`} label={t('runtime.select')} desc={kind === 'engine' ? <>
             {t('runtime.versionHelpPrefix')} <a className="text-accent underline" href="https://licyk.github.io/SDNote/sd_launcher/advance/env/#pytorch" target="_blank" rel="noreferrer">{t('runtime.versionHelpLink')}</a><br />
             {t('runtime.versionHelpSuffix')}
           </> : undefined} descriptionTooltip={kind === 'engine'}><SettingSelect value={selected[kind]} options={choices} ariaLabel={t(kind === 'engine' ? 'runtime.installTorch' : kind === 'llama' ? 'runtime.installLlama' : 'runtime.installCrisp')} isDisabled={busy}

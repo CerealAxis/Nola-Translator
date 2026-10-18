@@ -81,6 +81,7 @@
 .models-card .card__footer > .models-card__remove { flex:0 0 40px; width:40px; min-width:40px; min-height:40px; height:40px; padding:0; border-radius:var(--radius-full); }
 .models-card__details { flex-basis:100%; }
 .models-card__details .button { width:100%; min-height:40px; height:40px; }
+.models-card[data-loader-unavailable='true'] > .card__header, .models-card[data-loader-unavailable='true'] > .card__content { opacity:var(--disabled-opacity); }
 .models-downloads .table__scroll-container { overflow-x:hidden; }
 .models-downloads table { width:100%; table-layout:fixed; }
 .models-downloads .table__cell { overflow-wrap:anywhere; white-space:normal; }

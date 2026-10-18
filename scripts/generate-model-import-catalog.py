@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "engine"))
 
 from nola_translator_engine.models import catalog
-from nola_translator_engine.models.crisp_catalog import CRISP_ASR_SPECS
+from nola_translator_engine.models.crisp_catalog import CRISP_ASR_SPECS, QWEN3_TTS_NAMES, QWEN3_TTS_SPECS
 from nola_translator_engine.models.qwen_gguf_catalog import QWEN3_ASR_GGUF_SPECS
 from nola_translator_engine.models.manager import ModelSpec
 
@@ -59,12 +59,15 @@ NAMES = {
     "mimo-v2.5-asr-q4-k": "MiMo-V2.5-ASR Q4_K",
     "mimo-v2.5-asr-f16": "MiMo-V2.5-ASR F16",
 }
+NAMES.update(QWEN3_TTS_NAMES)
 RECOGNITION_IDS = {"qwen3-asr-1.7b-hf", "qwen3-asr-0.6b-hf", "sensevoice-small", *(spec.model_id for spec in CRISP_ASR_SPECS), *(spec.model_id for spec in QWEN3_ASR_GGUF_SPECS)}
+TTS_IDS = {spec.model_id for spec in QWEN3_TTS_SPECS}
 
 
 def generate() -> str:
     specs = {spec.model_id: spec for spec in vars(catalog).values() if isinstance(spec, ModelSpec)}
     specs.update({spec.model_id: spec for spec in CRISP_ASR_SPECS})
+    specs.update({spec.model_id: spec for spec in QWEN3_TTS_SPECS})
     specs.update({spec.model_id: spec for spec in QWEN3_ASR_GGUF_SPECS})
     if specs.keys() != NAMES.keys():
         raise ValueError("Update manual-download product names for the engine model catalog")
@@ -88,7 +91,7 @@ def generate() -> str:
                           for file in spec.files_for(source)],
             }
         entries.append({"id": model_id, "name": name,
-                        "family": "recognition" if model_id in RECOGNITION_IDS else "translation",
+                        "family": "recognition" if model_id in RECOGNITION_IDS else "tts" if model_id in TTS_IDS else "translation",
                         "sources": sources})
     return json.dumps(entries, ensure_ascii=False, indent=2) + "\n"
 

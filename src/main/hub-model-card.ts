@@ -33,7 +33,7 @@ export async function readHubModelCard(
   repo: unknown,
   revision: unknown,
   fetcher: (url: string, init?: RequestInit) => Promise<Response> = fetch,
-  network?: () => NetworkSettings,
+  network?: () => NetworkSettings | Promise<NetworkSettings>,
 ): Promise<string> {
   if (typeof repo !== 'string' || repo.length > 256
       || !/^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(repo)) {
@@ -49,7 +49,7 @@ export async function readHubModelCard(
   const request = (async () => {
     if (activeRequests >= 4) await new Promise<void>((resolve) => waiting.push(resolve))
     else activeRequests += 1
-    const settings = network?.()
+    const settings = await network?.()
     const host = settings?.useHuggingFaceMirror ? CARD_MIRROR_HOST : CARD_HOST
     const proxy = settings?.proxyForModelDownload ? settings.proxyUrl.trim() : ''
     try {

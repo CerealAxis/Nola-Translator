@@ -3,7 +3,7 @@
  * Availability can still vary by time and network, so automatic selection probes the asset too.
  */
 
-/** Sentinel stored by the picker meaning "probe the catalog and use the fastest reachable node". */
+/** Sentinel meaning region-aware automatic routing: probe nodes in mainland China, otherwise connect directly. */
 export const GITHUB_PROXY_AUTO = 'auto'
 
 /** Default selected prefix. This node returned the pinned runtime archive in a HEAD and Range check. */
