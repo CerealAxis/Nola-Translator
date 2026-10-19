@@ -1,5 +1,5 @@
 import { modelEngines, supportsSelectedEngine } from '../shared/model-engines'
-import { captureMainConsole, initializeSessionLog, logActivityTotals, logDiagnostic } from './session-log'
+import { captureMainConsole, initializeSessionLog, logActivityTotals, logDiagnostic, relocateSessionLogs } from './session-log'
 import { resolveDeviceIntent } from '../shared/device-selection'
 import { join } from 'node:path'
 import { mkdir } from 'node:fs/promises'
@@ -14,9 +14,9 @@ import { randomUUID } from 'node:crypto'
 import { handleMeetingAudio, MEETING_AUDIO_SCHEME, registerMeetingAudioScheme } from './audio-protocol'
 import { registerAppIpc, resetOverlayLock } from './app-ipc'
 import { createEngineLaunchSpec, EngineProcess } from './engine-process'
-import { clearDataRootPointer, clearPendingDataMigration, fallbackDataRoot, readPendingDataMigration, resolveDataRoot, writeDataRootPointer } from './data-root'
+import { clearDataRootPointer, clearPendingDataMigration, defaultDataRoot, fallbackDataRoot, legacyDefaultDataRoot, readDataRootPointer, readPendingDataMigration, resolveDataRoot, writeDataRootPointer, writePendingDataMigration } from './data-root'
 import { freeBytesForDirectory } from './disk-usage'
-import { migrateDataRoot, planDataRootMigration } from './data-migration'
+import { dataRootEntries, migrateDataRoot, planDataRootMigration } from './data-migration'
 import { migrateLegacyUserData } from './legacy-migration'
 import { MeetingStore } from './meeting-store'
 import { modelStorageEnvironment } from './model-storage'
@@ -124,7 +124,7 @@ if (!hasSingleInstanceLock) {
   })
 
   void app.whenReady().then(async () => {
-    initializeSessionLog(join(app.getPath('userData'), 'logs'), {
+    await initializeSessionLog(join(app.getPath('userData'), 'logs'), {
       version: app.getVersion(), electron: process.versions.electron, node: process.versions.node,
       platform: process.platform, architecture: process.arch, systemVersion: process.getSystemVersion(), packaged: app.isPackaged,
     })
@@ -166,16 +166,33 @@ if (!hasSingleInstanceLock) {
     logDiagnostic('app.data-root', { dataRoot })
     // A data-root change runs here, before any store is constructed: this is the one moment the
     // tree has no open handles — the meeting store has not mapped an audio file and
-    // `credentials.json` is untouched. The settings handler wrote the marker and moved nothing.
+    // `credentials.json` is untouched. A marker names the move; it never carries data itself.
     //
     // Nothing in this step may abort startup. A rejection here would abort the `whenReady`
     // chain before `createMainWindow`, and an app that never opens is a far worse outcome than
     // a data root that did not finish moving — the same trade `migrateLegacyUserData` makes.
-    const pending = readPendingDataMigration()
+    //
     // Both sides come out of `normalize` in `data-root.ts`; this only folds case and a trailing
     // separator, so the same folder written two ways cannot look like a move onto itself.
     const sameDirectory = (left: string, right: string): boolean =>
       left.replace(/[\\/]+$/, '').toLowerCase() === right.replace(/[\\/]+$/, '').toLowerCase()
+    // An install that predates the per-user data root kept its data beside the program, and a
+    // machine-wide install puts that program in a directory the user cannot write to. The move
+    // below carries that data over; this step only records where it is.
+    try {
+      const legacyRoot = legacyDefaultDataRoot()
+      const currentRoot = defaultDataRoot()
+      const legacyEntries = legacyRoot === null ? [] : dataRootEntries(legacyRoot)
+      const currentEntries = dataRootEntries(currentRoot)
+      const alreadyCarriedOver = legacyEntries.some((name) => currentEntries.includes(name))
+      const rootIsDefault = readDataRootPointer() === null && sameDirectory(dataRoot, currentRoot)
+      if (legacyRoot !== null && legacyEntries.length > 0 && !alreadyCarriedOver && rootIsDefault) {
+        writePendingDataMigration(legacyRoot, [])
+      }
+    } catch (error) {
+      console.error('the data root of an older install could not be inspected; the app starts on the current data root', error)
+    }
+    const pending = readPendingDataMigration()
     if (pending && sameDirectory(pending.from, dataRoot)) {
       // Logged, marker untouched: it is the record of the user's choice, and clearing it here would
       // silently drop a folder the settings page is still showing as the pending destination.
@@ -189,6 +206,13 @@ if (!hasSingleInstanceLock) {
        * re-picks after freeing space. Planning is read-only, so the extra pass is cheap.
        */
       try {
+        // The carry-over of the root the app used to derive from the executable copies its files
+        // and leaves them in place: that root usually sits in a directory the user cannot write
+        // to, and a removal that fails would keep the marker alive and repeat the copy on every
+        // launch.
+        const legacyRoot = legacyDefaultDataRoot()
+        const carryOver = legacyRoot !== null && sameDirectory(pending.from, legacyRoot)
+          && sameDirectory(dataRoot, defaultDataRoot())
         const plan = await planDataRootMigration(pending.from, dataRoot, pending.extra)
         const required = plan.requiredBytes ?? 0
         const available = freeBytesForDirectory(dataRoot)
@@ -197,19 +221,32 @@ if (!hasSingleInstanceLock) {
           // data, so the pointer may only be deleted when the app would resolve back to the old
           // root by itself. A root the pointer used to point at has to be written back instead,
           // or the next launch resolves to an empty directory and the data is orphaned.
-          if (sameDirectory(fallbackDataRoot(), pending.from)) clearDataRootPointer()
-          else writeDataRootPointer(pending.from)
-          clearPendingDataMigration()
-          console.error(
-            `the data migration was cancelled: ${Math.round(required / 1_048_576)} MB are needed on the new drive but only `
-            + `${Math.round(available / 1_048_576)} MB are free. The app stays on ${pending.from}.`,
-          )
+          //
+          // The carry-over is the one case where the old root cannot be written back: it is a
+          // directory the user has no access to, so pointing at it would land the app on a root
+          // it cannot write to. The data stays where it is and the app stays on the writable root.
+          if (carryOver) {
+            clearPendingDataMigration()
+            console.error(
+              `the carry-over of the data from ${pending.from} was cancelled: `
+              + `${Math.round(required / 1_048_576)} MB are needed on the new drive but only `
+              + `${Math.round(available / 1_048_576)} MB are free. The app stays on ${dataRoot}.`,
+            )
+          } else {
+            if (sameDirectory(fallbackDataRoot(), pending.from)) clearDataRootPointer()
+            else writeDataRootPointer(pending.from)
+            clearPendingDataMigration()
+            console.error(
+              `the data migration was cancelled: ${Math.round(required / 1_048_576)} MB are needed on the new drive but only `
+              + `${Math.round(available / 1_048_576)} MB are free. The app stays on ${pending.from}.`,
+            )
+          }
         } else {
           // Expect this to take a while — the runtimes in `build/runtime-catalog.json` total
           // roughly 680 MB. There is no progress UI because it runs before the window exists,
           // and one line is the whole report a user can act on.
           console.log('moving app data to the chosen data root before the window opens', pending.from, '->', dataRoot)
-          const report = await migrateDataRoot(pending.from, dataRoot, pending.extra)
+          const report = await migrateDataRoot(pending.from, dataRoot, pending.extra, !carryOver)
           const bytes = report.requiredBytes ?? 0
           console.log('data root migration finished', {
             copied: report.copied.length, skipped: report.skipped.length,
@@ -226,6 +263,7 @@ if (!hasSingleInstanceLock) {
         console.error('the data root migration could not run; the app starts on the current data root', error)
       }
     }
+    relocateSessionLogs(join(dataRoot, 'logs'))
     const settings = new SettingsStore(join(dataRoot, 'settings.json'))
     const initialSettings = await settings.load()
     const meetings = new MeetingStore(join(dataRoot, 'meetings'))
@@ -239,7 +277,8 @@ if (!hasSingleInstanceLock) {
     const pythonBaseDirectory = app.isPackaged ? join(process.resourcesPath, 'engine')
       : join(app.getAppPath(), 'engine', 'dist', 'NolaPythonEngine')
     const bundledLlamaDirectory = app.isPackaged ? join(process.resourcesPath, 'llama')
-      : join(app.getAppPath(), 'vendor', existsSync(join(app.getAppPath(), 'vendor', 'llama', 'llama-server.exe')) ? 'llama' : 'llama-cpu')
+      : join(app.getAppPath(), 'vendor', existsSync(join(app.getAppPath(), 'vendor', 'llama', 'llama-server.exe')) ? 'llama'
+        : existsSync(join(app.getAppPath(), 'vendor', 'llama-vulkan', 'llama-server.exe')) ? 'llama-vulkan' : 'llama-cpu')
     const runtimes = new RuntimeManager(join(initialSettings.modelStoragePath || dataRoot, 'runtimes'),
       app.isPackaged ? join(process.resourcesPath, 'runtime-catalog.json') : join(app.getAppPath(), 'build', 'runtime-catalog.json'),
       app.isPackaged ? join(process.resourcesPath, 'runtime', 'extract-runtime.ps1') : join(app.getAppPath(), 'scripts', 'extract-runtime.ps1'),
@@ -409,10 +448,17 @@ if (!hasSingleInstanceLock) {
       appVersion: app.getVersion(), runtimes,
       network: () => settings.current().network,
       diagnostic: logDiagnostic,
-      models: (request, signal, progress) => runOfflineModelWorker(createEngineLaunchSpec({
-        isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
-        module: 'nola_translator_engine.offline_models',
-      }), request, signal, progress),
+      models: (request, signal, progress) => {
+        const directories = runtimes.selectedDirectories(settings.current().compute)
+        const spec = createEngineLaunchSpec({
+          isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
+          managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp,
+          module: 'nola_translator_engine.offline_models',
+        })
+        return runOfflineModelWorker({ ...spec, env: { ...resourceEnvironment,
+          NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? bundledLlamaDirectory,
+        } }, request, signal, progress)
+      },
       reserve: () => {
         if (sessions.busy || componentInstalling || preparation) throw new Error('sessionAlreadyRunning')
         componentInstalling = true

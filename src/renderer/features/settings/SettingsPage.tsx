@@ -43,16 +43,18 @@ export function SettingsPage() {
 
   useEffect(() => { if (error) console.error('[settings]', error) }, [error])
 
-  if (!settings && (error || !isEngineConnected())) return (
+  if (!settings && error) return (
     <Alert status="danger">
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Title>{t('settings.loadFailed')}</Alert.Title>
-        <Alert.Description>{error || t('errors.engineNotConnected')}</Alert.Description>
+        <Alert.Description>{error}</Alert.Description>
         <Button variant="secondary" size="sm" onPress={() => void actions.settings.loadSettings().catch(() => undefined)}>{t('models.retry')}</Button>
       </Alert.Content>
     </Alert>
   )
+
+  if (!settings && !isEngineConnected()) return null
 
   if (!settings) return (
     <Card className="settings-group">
@@ -79,7 +81,6 @@ export function SettingsPage() {
   return (
     <div className="settings-page">
       <header className="settings-page__heading"><h1>{t('settings.title')}</h1><p>{t('modelsSettingsUi.settingsSubtitle')}</p></header>
-      {error ? <Alert status="danger"><Alert.Indicator /><Alert.Content><Alert.Title>{t('errors.settingsSaveFailed')}</Alert.Title></Alert.Content></Alert> : null}
       <Tabs orientation={compact ? 'horizontal' : 'vertical'} align="start" selectedKey={active}
         onSelectionChange={(key) => navigate(settingsPath(String(key) as SettingsTab))} className="settings-tabs">
         <div className="settings-nav">
@@ -117,7 +118,7 @@ export interface SettingGroupProps { legend: string; legendHint?: ReactNode; act
 export function SettingGroup({ legend, legendHint, actions, children, onboardingTarget }: SettingGroupProps) {
   return (
     <Card className="settings-group" data-onboarding={onboardingTarget}>
-      <Card.Header><Card.Title>{legend}{legendHint ? <span className="settings-group__hint">{legendHint}</span> : null}</Card.Title></Card.Header>
+      <Card.Header><Card.Title className={legendHint ? 'settings-group__title-with-hint' : undefined}>{legend}{legendHint ? <span className="settings-group__hint">{legendHint}</span> : null}</Card.Title></Card.Header>
       <Card.Content><Fieldset aria-label={legend}><div className="settings-group__rows">{children}</div></Fieldset></Card.Content>
       {actions ? <Card.Footer className="flex justify-end gap-2">{actions}</Card.Footer> : null}
     </Card>

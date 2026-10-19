@@ -19,6 +19,7 @@ import { AudioPlayerBar, DualColumnView } from '@/components/reading'
 import type { DualColumnSegment } from '@/components/reading'
 import { ErrorBoundary, PageHeader, StatusPill } from '@/components/primitives'
 import { useI18n } from '@/i18n'
+import { formatChineseCaption } from '@/chinese-script'
 import { pathOf, useRoute } from '@/routes'
 import { actions, stores, useStore } from '@/store'
 import { ExportDialog } from './ExportDialog'
@@ -40,6 +41,7 @@ export function RecordDetailPage(): ReactNode {
 
   const detail = useStore(stores.meetings, (state) => state.detail)
   const detailLoading = useStore(stores.meetings, (state) => state.detailLoading)
+  const sourceLanguage = useStore(stores.settings, state => state.settings?.recognition.sourceLanguage ?? 'auto')
 
   const [fontScale, setFontScale] = useState(1)
   const [currentIndex, setCurrentIndex] = useState<number | undefined>(undefined)
@@ -77,12 +79,12 @@ export function RecordDetailPage(): ReactNode {
         segment.translations[0]
       return {
         id: segment.segmentId,
-        source: segment.sourceText,
+        source: formatChineseCaption(segment.sourceText, sourceLanguage),
         target: target?.text ?? '',
         interim: !segment.isFinal,
       }
     })
-  }, [detail])
+  }, [detail, sourceLanguage])
 
   const back = useCallback(() => navigate(pathOf('records')), [navigate])
 

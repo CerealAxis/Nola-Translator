@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { actions, getBridge, stores, useStore } from '@/store'
-import { Button } from '@heroui/react'
+import { Button, toast } from '@heroui/react'
 import { OverlayControls } from './OverlayControls'
 import { useI18n } from '@/i18n'
 
@@ -67,19 +67,17 @@ export function OverlayMenuRoot() {
 function OverlayCloseConfirmation({ id }: { id: number }) {
   const { t } = useI18n()
   const [pending, setPending] = useState(false)
-  const [failed, setFailed] = useState(false)
 
   const close = async (): Promise<void> => {
     if (pending) return
     setPending(true)
-    setFailed(false)
     try {
       const bridge = getBridge()
       if (!bridge) throw new Error('Overlay bridge unavailable')
       await bridge.overlay.close()
     } catch (error) {
       console.error('[overlay] close failed', error)
-      setFailed(true)
+      toast.danger(t('overlay.closeFailed'))
     } finally {
       setPending(false)
     }
@@ -90,7 +88,6 @@ function OverlayCloseConfirmation({ id }: { id: number }) {
       <div className="nola-confirm-dialog" role="dialog" aria-modal="true" aria-label={t('overlay.closeTitle')}>
         <p className="nola-confirm-title">{t('overlay.closeTitle')}</p>
         <p className="nola-confirm-text">{t('overlay.closeBody')}</p>
-        {failed ? <p className="nola-confirm-text" role="alert">{t('overlay.closeFailed')}</p> : null}
         <div className="nola-confirm-actions">
           <Button variant="secondary" size="sm" isDisabled={pending}
             onPress={() => void actions.settings.closeOverlayMenu(id)}>

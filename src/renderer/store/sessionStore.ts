@@ -18,6 +18,8 @@ import type {
 } from '@/bridge'
 import { createStore } from './createStore'
 import { isSessionAlreadyRunningError } from '../../shared/ipc-error'
+import { configurationOf, recognitionLanguages } from '../../shared/model-capabilities'
+import { normalizeLanguage } from '../../shared/languages'
 
 /** Cap on finalized segments. Two to three hours of speech fits, and memory stays bounded. */
 export const MAX_FINALIZED_SEGMENTS = 2048
@@ -29,6 +31,15 @@ export interface MissingResource {
   resourceId: string
   name: string
   kind: 'recognition' | 'translation'
+}
+
+export class UnsupportedRecognitionLanguageError extends Error {
+  readonly code = 'UNSUPPORTED_RECOGNITION_LANGUAGE'
+  constructor(readonly language: string) { super(`不支持此语言：${language}`) }
+}
+
+export function unsupportedRecognitionLanguageOf(error: unknown): string | null {
+  return error instanceof UnsupportedRecognitionLanguageError ? error.language : null
 }
 
 /**
@@ -326,8 +337,30 @@ export async function startSession(config: SessionConfig): Promise<void> {
   // Preflight stays outside the try: its failure means no session started, not an engine fault.
   let missing: MissingResource | null
   try {
-    missing = findMissingResource(await bridge.engine.listResources(), config)
+    const snapshot = await bridge.engine.listResources()
+    let effectiveConfig = config
+    if ((config.recognitionProvider ?? 'local') === 'local') {
+      const model = snapshot.resources.find(item => item.resourceId === config.recognitionModelId)
+      const capability = configurationOf(model)
+      if (capability?.slot === 'recognition') {
+        const supported = recognitionLanguages(model)
+        const selected = normalizeLanguage(config.sourceLanguage)
+        if (!supported.map(normalizeLanguage).includes(selected)) {
+          if (capability.supportsAutoDetection) effectiveConfig = { ...config, sourceLanguage: 'auto' }
+          else {
+            sessionStore.setState({ status: 'idle', error: null, errorCode: null, errorRequestId: null })
+            throw new UnsupportedRecognitionLanguageError(config.sourceLanguage)
+          }
+        }
+      }
+    }
+    missing = findMissingResource(snapshot, effectiveConfig)
+    config = effectiveConfig
   } catch (error) {
+    if (error instanceof UnsupportedRecognitionLanguageError) {
+      sessionStore.setState({ status: 'idle', error: null, errorCode: null, errorRequestId: null })
+      throw error
+    }
     /*
      * Not even the resource list. The main process sets `failed` and forwards
      * `engineStateChanged` before it throws, so any engine verdict has already

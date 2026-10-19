@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { Alert, Button, Card, EmptyState, toast } from '@heroui/react'
+import { Button, Card, EmptyState, toast } from '@heroui/react'
 import { Captions } from 'lucide-react'
 
 import { findMissingResource } from '@/store'
 import type { MissingResource, SessionState } from '@/store'
 import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
+import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
 import { CaptionStage } from '@/components/caption'
 import type { CaptionDisplayMode, CaptionLayout } from '@/components/caption'
 import { NotesPanel } from '@/components/notes'
@@ -213,7 +214,6 @@ export function WorkspacePage() {
       try {
         await actions.settings.updateSettings({ recording: { keepAudio: draft.keepAudio } })
       } catch {
-        toast.danger(t('workspaceUi.recordingPreferenceFailed'))
         return
       }
     }
@@ -234,6 +234,8 @@ export function WorkspacePage() {
       // named toast instead of also opening the generic start-failure dialog.
       if (isSessionAlreadyRunningError(error)) {
         toast.danger(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+      } else if (unsupportedRecognitionLanguageOf(error)) {
+        toast.danger(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
       }
     }
   }, [draft, t])
@@ -394,6 +396,7 @@ export function WorkspacePage() {
                 fontSize={FONT_STEPS[fontStep]}
                 paused={status === 'paused'}
                 showTimestamps
+                sourceLanguage={settings?.recognition.sourceLanguage ?? 'auto'}
                 emptyState={<EmptyState className="nola-workspace-empty"><p>{t('workspace.nothingYet')}</p><p className="text-muted">{t('workspace.nothingYetHint')}</p></EmptyState>}
               />
             </>
@@ -473,6 +476,19 @@ function IdleGuide({
   onStart: () => void
 }) {
   const { t } = useI18n()
+  const failureToastShown = useRef(false)
+  useEffect(() => {
+    if (engineStatus !== 'failed') {
+      failureToastShown.current = false
+      return
+    }
+    if (failureToastShown.current) return
+    failureToastShown.current = true
+    toast.danger(t('errors.engineNotReady'), {
+      timeout: 0,
+      actionProps: { children: t('errors.engineNotReadyAction'), onPress: onStart },
+    })
+  }, [engineStatus, onStart, t])
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center px-6 py-8">
       <div className="flex max-w-96 flex-col items-start gap-3">
@@ -482,7 +498,7 @@ function IdleGuide({
         <h2 className="nola-display text-foreground">{t('workspaceUi.idleTitle')}</h2>
         <p className="nola-body text-muted">{t('workspace.nothingYetHint')}</p>
         {/*
-         * The red Alert is only for an engine that cannot start.
+         * A persistent Toast is only for an engine that cannot start.
          *
          * `engineStatus` is observed in the main process (`engine-process.ts`
          * emits `state`, `src/main/ipc.ts` forwards it as `engineStateChanged`,
@@ -499,8 +515,7 @@ function IdleGuide({
          *     only action that could resolve it.
          *   · `recovering` gets one grey line: the process just crashed but the
          *     main process still has retries (250ms / 1s / 4s) and the engine will
-         *     return by itself. A red alert would also offer a "retry" the user
-         *     does not need.
+         *     return by itself. A retry action is unnecessary while that runs.
          *   · `failed` is the real fault: the main process exhausted its retries
          *     and it will not heal. Reuses the existing copy pair
          *     (`engineNotReady` carries ENG-001, plus `engineNotReadyAction`).
@@ -509,24 +524,6 @@ function IdleGuide({
          * in flight, and the store sets `status: 'starting'` before any await,
          * so that covers the engine handshake too.
          */}
-        {engineStatus === 'failed' ? (
-          <Alert status="danger">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title className="nola-body-strong">{t('errors.engineNotReady')}</Alert.Title>
-              <Alert.Description className="nola-caption">
-                <Button
-                  variant="tertiary"
-                  size="sm"
-                  className="rounded-[6px]"
-                  onPress={onStart}
-                >
-                  {t('errors.engineNotReadyAction')}
-                </Button>
-              </Alert.Description>
-            </Alert.Content>
-          </Alert>
-        ) : null}
         {engineStatus === 'recovering' ? (
           <p className="nola-caption flex items-center gap-2 text-muted">
             <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden="true" />

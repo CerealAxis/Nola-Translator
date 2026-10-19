@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, ColorArea, ColorField, ColorPicker, ColorSlider, ColorSwatch, ColorSwatchPicker, NumberField, Slider, Switch, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
+import { Button, Card, ColorArea, ColorField, ColorPicker, ColorSlider, ColorSwatch, ColorSwatchPicker, NumberField, Slider, Switch, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
 import { ArrowLeft, CheckSquare, CircleAlert, ExternalLink } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { DEFAULT_SETTINGS } from '@/bridge'
@@ -29,6 +29,7 @@ export function BrowserTab() {
   useEffect(() => {
     void browserConnectionAction('inspect')
   }, [])
+  useEffect(() => { if (browserError) toast.danger(browserError) }, [browserError])
   const browserName = (kind: BrowserKind) => t(kind === 'firefox' ? 'browser.firefox' : kind === 'chrome' ? 'browser.chrome' : 'browser.edge')
   const getBrowser = (kind: BrowserKind): BrowserIntegrationInfo => browser?.browsers?.find(info => info.browser === kind)
     ?? { browser: kind, available: true, extensionStatus: 'unknown', connected: false, enabled: false }
@@ -52,7 +53,7 @@ export function BrowserTab() {
   const patchAppearance = (patch: Partial<typeof appearance>) => { void updateSettings({ browserCaptions: patch }).catch(() => undefined) }
   const restoreAppearance = () => {
     void updateSettings({ browserCaptions: DEFAULT_SETTINGS.browserCaptions })
-      .catch(() => toast.danger(t('modelsSettingsUi.restoreFailed')))
+      .catch(() => undefined)
   }
   const previewFrameStyle = {
     '--video-caption-top': `${100 - appearance.bottomOffset}%`,
@@ -184,7 +185,6 @@ export function BrowserTab() {
         </span>
         <Button variant="outline" isPending={pending} onPress={restoreAppearance}>{t('modelsSettingsUi.resetAppearance')}</Button>
       </div>
-      {browserError ? <Alert status="danger"><Alert.Indicator /><Alert.Content><Alert.Description>{browserError}</Alert.Description></Alert.Content></Alert> : null}
     </div>
   )
 }

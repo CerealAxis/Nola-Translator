@@ -21,7 +21,7 @@ import { ModelCard, ModelCardSkeleton, defaultTargetOf, isDefaultOf } from './Mo
 import { DownloadSourceDialog } from './DownloadSourceDialog'
 import { ModelMark } from './modelBrand'
 import { RecommendedFamilyCard, RecommendedFamilyDialog } from './RecommendedFamilies'
-import { familyOf, isQwen3TtsRecord, type RecommendedFamily } from './modelFamily'
+import { familyOf, type RecommendedFamily } from './modelFamily'
 import { isEngineAvailable } from './engine-availability'
 import { notifyModelDownloadFailure } from './ModelDownloadNotice'
 import './models.css'
@@ -119,7 +119,7 @@ export function ModelsPage() {
   const setDefault = (record: ResourceRecord) => {
     const patch = defaultTargetOf(record)
     if (!isModelReady(record) || !patch || !supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)) return
-    void updateSettings(patch).catch(() => toast.danger(t('modelsSettingsUi.defaultSaveFailed')))
+    void updateSettings(patch).catch(() => undefined)
   }
 
   const card = (record: ResourceRecord) => {
@@ -145,7 +145,7 @@ export function ModelsPage() {
       onCancel={run(record, 'cancel')}
       onRemove={run(record, 'remove')}
       onSetDefault={() => setDefault(record)}
-      footer={record.resourceId.startsWith('hub:') && record.installed ? <Button variant="secondary" onPress={() => setConfiguring(record)}>{t(configurationOf(record) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : modelImportEntry(record.resourceId) ? <Button variant="secondary" size="sm" onPress={() => offlineActions.openDownloads(record.resourceId)}>{t('offline.manualDownload')}</Button> : undefined}
+      footer={record.resourceId.startsWith('hub:') && record.installed && record.kind !== 'ttsModel' ? <Button variant="secondary" onPress={() => setConfiguring(record)}>{t(configurationOf(record) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : modelImportEntry(record.resourceId) ? <Button variant="secondary" size="sm" onPress={() => offlineActions.openDownloads(record.resourceId)}>{t('offline.manualDownload')}</Button> : undefined}
     />
   }
 
@@ -300,7 +300,6 @@ function RecommendedCatalog({ records, loading, onOpen, emptyAction }: Pick<Cata
   if (records.length === 0) return <EmptyState className="flex flex-col items-start gap-4 py-8"><p className="nola-title text-foreground">{t('models.notInstalled')}</p>{emptyAction}</EmptyState>
   const groups = new Map<RecommendedFamily, ResourceRecord[]>()
   for (const record of records) {
-    if (record.kind === 'ttsModel' && !isQwen3TtsRecord(record)) continue
     const family = familyOf(record)
     groups.set(family, [...(groups.get(family) ?? []), record])
   }
@@ -350,7 +349,7 @@ function Catalog({ records, loading, card, emptyAction, compute }: CatalogProps)
     <div className="flex flex-col gap-6">
       <Section title={t('models.asrModels')} records={recognition} card={card} />
       <Section title={t('models.mtModels')} records={translation} card={card} />
-      <Section title={t('models.ttsModels')} records={ordered.filter(isQwen3TtsRecord)} card={card} />
+      <Section title={t('models.ttsModels')} records={ordered.filter(record => record.kind === 'ttsModel')} card={card} />
     </div>
   )
 }

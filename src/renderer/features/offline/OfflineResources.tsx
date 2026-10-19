@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Button, Chip, Label, ListBox, Modal, Select, toast } from '@heroui/react'
+import { Button, Chip, Label, ListBox, Modal, Select, toast } from '@heroui/react'
 import { FolderInput, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { stores, useStore } from '@/store'
@@ -33,12 +33,13 @@ export function OfflineDialog({ scope }: OfflineDialogProps) {
   const state = useStore(offlineStore, value => value)
   const notice = useRef<unknown>(null)
   useEffect(() => {
-    if (scope !== 'model') return
     const preview = state.preview
     const task = state.task
-    const failure = preview && !preview.compatible ? preview : task?.state === 'failed' ? task : null
-    if (!failure || notice.current === failure) return
+    const failure = preview && !preview.compatible ? preview : task?.state === 'failed' ? task : state.failed ? 'failed' : null
+    if (!failure) { notice.current = null; return }
+    if (notice.current === failure) return
     notice.current = failure
+    if (failure === 'failed') { toast.danger(t('offline.failed')); return }
     const issue = preview && failure === preview ? preview.issues[0] : task?.issue
     toast.danger(t(`offline.${issue ?? 'failed'}`), { description: task?.reason ?? preview?.items.find(item => item.reason)?.reason })
   }, [scope, state.preview, state.task, t])
@@ -113,7 +114,6 @@ export function OfflineDialog({ scope }: OfflineDialogProps) {
       {state.preview.availableBytes !== undefined ? <div><dt>{t('offline.availableSpace')}</dt><dd>{bytes(state.preview.availableBytes)}</dd></div> : null}
     </dl>
     {state.preview.items.some(item => { const record = resources.find(resource => resource.resourceId === item.id); return record && modelEngines(record).some(engine => runtimes?.local[engine === 'pytorch' ? 'engine' : engine === 'crisp' ? 'crisp' : 'llama']?.status !== 'ready') }) ? <p role="status">{t('offline.missingRuntime')}</p> : null}
-    {state.preview.issues.map(issue => <p key={issue} role="alert">{t(`offline.${issue}`)}</p>)}
   </section> : null
   return <Modal.Backdrop isOpen={visible} onOpenChange={open => { if (!open) offlineActions.close() }} className="z-overlay"><Modal.Container size="lg" placement="center" scroll="inside"><Modal.Dialog className={state.mode === 'model' ? 'model-import-dialog' : 'offline-dialog'}>
     <Modal.CloseTrigger aria-label={t('offline.close')}><X aria-hidden="true" /></Modal.CloseTrigger>
@@ -142,9 +142,8 @@ export function OfflineDialog({ scope }: OfflineDialogProps) {
         </> : null}
       </> : <>
         {state.mode === 'model' ? <ModelImportPanel>{modelPreview}</ModelImportPanel> : <><div className="offline-actions"><Button variant="secondary" isPending={state.busy} onPress={() => void offlineActions.pickBundle()}>{t('offline.selectBundle')}</Button></div></>}
-        {state.mode !== 'model' ? state.preview ? <><ul className="offline-items">{state.preview.items.map(item => <li key={item.id}><div><strong>{resources.find(resource => resource.resourceId === item.id)?.name ?? item.name}</strong><p className="nola-caption text-muted">{t(`offline.${item.status}`)} · {bytes(item.bytes)}</p>{item.issue ? <p>{t(`offline.${item.issue}`)}</p> : null}{item.reason || item.files?.length ? <ImportHelp label={t('offline.importInfo')}>{item.reason}{item.files?.length ? <ul>{item.files.map(file => <li key={file}>{file}</li>)}</ul> : null}</ImportHelp> : null}</div></li>)}</ul><SettingsRow label={t('offline.requiredSpace')}><span>{bytes(state.preview.totalBytes)}</span></SettingsRow>{state.preview.availableBytes !== undefined ? <SettingsRow label={t('offline.availableSpace')}><span>{bytes(state.preview.availableBytes)}</span></SettingsRow> : null}{state.preview.issues.map(issue => <p key={issue} role="alert">{t(`offline.${issue}`)}</p>)}</> : null : null}
+        {state.mode !== 'model' ? state.preview ? <><ul className="offline-items">{state.preview.items.map(item => <li key={item.id}><div><strong>{resources.find(resource => resource.resourceId === item.id)?.name ?? item.name}</strong><p className="nola-caption text-muted">{t(`offline.${item.status}`)} · {bytes(item.bytes)}</p>{item.reason || item.files?.length ? <ImportHelp label={t('offline.importInfo')}>{item.reason}{item.files?.length ? <ul>{item.files.map(file => <li key={file}>{file}</li>)}</ul> : null}</ImportHelp> : null}</div></li>)}</ul><SettingsRow label={t('offline.requiredSpace')}><span>{bytes(state.preview.totalBytes)}</span></SettingsRow>{state.preview.availableBytes !== undefined ? <SettingsRow label={t('offline.availableSpace')}><span>{bytes(state.preview.availableBytes)}</span></SettingsRow> : null}</> : null : null}
       </>}
-      {state.failed ? <Alert status="danger"><Alert.Content><Alert.Description>{t('offline.failed')}</Alert.Description></Alert.Content></Alert> : null}
     </Modal.Body>{!completedModelImport && (state.mode !== 'model' || task || state.preview) ? <Modal.Footer>
       {state.mode === 'model' && state.preview && !task ? <Button variant="secondary" isDisabled={state.busy} onPress={() => offlineActions.clearPreview()}>{t('offline.retry')}</Button> : <Button variant="secondary" onPress={() => offlineActions.close()}>{t(running ? 'offline.background' : 'offline.close')}</Button>}
       {running ? <Button variant="secondary" onPress={() => void offlineActions.cancel()}>{t('offline.cancel')}</Button> : task && task.state !== 'idle' ? <Button variant="secondary" onPress={() => offlineActions.reset()}>{t('offline.retry')}</Button> : state.available && state.mode === 'prepare' ? <>{step > 0 ? <Button variant="secondary" onPress={() => setStep(step - 1)}>{t('offline.back')}</Button> : null}<Button variant="primary" isPending={state.busy} isDisabled={step > 0 && !valid} onPress={() => step < 2 ? setStep(step + 1) : void offlineActions.prepare({ modelIds, runtimeIds })}>{t(step === 2 ? 'offline.start' : 'offline.next')}</Button></> : state.available && state.preview ? <Button variant="primary" isPending={state.busy} isDisabled={!state.preview.compatible || !!state.preview.issues.length} onPress={() => void offlineActions.install()}>{t('offline.install')}</Button> : null}

@@ -13,7 +13,7 @@ export function familyOf(record: ResourceRecord): RecommendedFamily {
   if (id.startsWith('fun-asr-')) return 'funasr'
   if (id.startsWith('vibevoice-asr-')) return 'vibevoice'
   if (id.startsWith('mimo-v2.5-asr-')) return 'mimo'
-  if (isQwen3TtsRecord(record)) return 'tts'
+  if (record.kind === 'ttsModel') return 'tts'
   if (id.startsWith('hy-mt2-')) return 'hymt2'
   if (id.startsWith('index-translate-')) return 'index'
   return 'other'

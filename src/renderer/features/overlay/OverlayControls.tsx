@@ -36,6 +36,7 @@ import type { AppSettings, AudioDevice, AudioSourceOption, RecognitionModelId, S
 import { audioSourceFrom } from '@/features/workspace/SessionSetupDialog'
 import { errorCopyOf } from '@/features/workspace/WorkspacePage'
 import { actions, sessionStore, stores, useStore } from '@/store'
+import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
 import { targetLanguagePatch, translationFieldsOf } from '@/session-config'
 import { useI18n } from '@/i18n'
 
@@ -279,6 +280,8 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
       void actions.session.startSession(startConfigOf(settings, devices)).catch((error: unknown) => {
         if (isSessionAlreadyRunningError(error)) {
           toast.danger(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        } else if (unsupportedRecognitionLanguageOf(error)) {
+          toast.danger(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
         } else console.warn('[overlay] startSession failed', error)
       })
     }

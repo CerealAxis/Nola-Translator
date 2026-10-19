@@ -37,11 +37,18 @@ describe('model language capabilities', () => {
     expect(modelEngines({ provider: 'index-translate-transformers' })).toEqual(['pytorch'])
   })
   it('migrates recommended capabilities with their full language lists', () => {
-    expect(recognitionLanguages(record('sensevoice-small'))).toEqual(['auto', 'zh', 'en', 'yue', 'ja', 'ko'])
+    expect(recognitionLanguages(record('sensevoice-small'))).toEqual(['auto', 'zh', 'en', 'yue', 'ja', 'ko', 'zh-Hant'])
     expect(configurationOf(record('qwen3-asr-1.7b-hf'))?.languages).toHaveLength(30)
     expect(configurationOf(record('m2m100-418m'))?.sourceLanguages).toHaveLength(100)
     expect(translationLanguages(record('hy-mt2-1.8b-q4-k-m'), 'en')).toContain('zh-Hant')
     expect(translationLanguages(record('hy-mt2-7b-q4-k-m'), 'en')).toContain('yue')
+  })
+  it('advertises Cantonese only for the ASR weights that support it', () => {
+    expect(recognitionLanguages(record('fun-asr-nano-q4-k'))).toContain('yue')
+    expect(recognitionLanguages(record('mimo-v2.5-asr-q4-k'))).toContain('yue')
+    expect(recognitionLanguages(record('vibevoice-asr-q4-k'))).not.toContain('yue')
+    expect(configurationOf(record('vibevoice-asr-q4-k'))?.languages).toHaveLength(48)
+    expect(recognitionLanguages(record('fun-asr-nano-q4-k'))).toContain('zh-Hant')
   })
   it('retains custom downloads but refuses to enable them without a configuration', () => {
     const pending = record('hub:test/custom')

@@ -8,34 +8,90 @@ import { app } from 'electron'
  * "where does this app store things" has a single answer and relocating it is one setting.
  */
 
-/** Pointer file, written next to the executable and only when the user overrides the root. */
+/**
+ * The product name, and the name electron-builder gives the per-user install folder it creates
+ * from `build.productName` in package.json. The data root is a sibling of that folder, so the
+ * folder name and the product name are one and the same string.
+ */
+const PRODUCT_NAME = 'Nola Translator'
+
+/** Pointer file, written under the data root and only when the user overrides the root. */
 const POINTER_FILE = 'data-location.json'
 
 /** Shape version of the pointer file. See `writeDataRootPointer`. */
 const POINTER_VERSION = 1
 
 /**
- * The install root: the folder holding `App\` (the program) and `Data\` (user data).
+ * The root of a per-user install: `%LOCALAPPDATA%\Programs\Nola Translator`. The installer
+ * places the program in its `App\` subfolder.
  *
- * Packaged, `dirname(app.getPath('exe'))` is `...\App`, so the root is one level up. In dev the exe
- * is the Electron binary inside `node_modules\electron\dist`, where that parent is meaningless —
- * there the app root is the repository and the two subfolders do not exist.
+ * `LOCALAPPDATA` is the variable the shell itself resolves, so it names the folder a per-user
+ * install lands in. When it is missing, `appData` is the roaming `%APPDATA%`, whose `..\Local`
+ * sibling is `%LOCALAPPDATA%` on Windows.
+ */
+function perUserInstallRoot(): string {
+  const localAppData = process.env.LOCALAPPDATA ?? join(app.getPath('appData'), '..', 'Local')
+  return join(localAppData, 'Programs', PRODUCT_NAME)
+}
+
+/**
+ * The root every app-owned file lives under.
+ *
+ * Packaged, this is `%LOCALAPPDATA%\Programs\Nola Translator`, the per-user install root, where
+ * the program itself sits in `App\`. The data cannot live beside the
+ * program inside `C:\Program Files`, where a machine-wide install puts it, because a normal user
+ * has no write access there and the engine's runtime folders are created under the data root. The
+ * per-user folder belongs to the account that runs the app, and a per-user install already keeps
+ * its data in exactly this folder.
+ *
+ * The root is not derived from the executable: that path can be a location the user cannot write
+ * to, and an MSI install has no `App\` subfolder, so the `..\Data` of the executable would name
+ * the parent of the install directory.
+ *
+ * In dev the executable is the Electron binary inside `node_modules\electron\dist`, where the
+ * per-user folder does not exist and the repository is the app root.
  */
 export function defaultDataRoot(): string {
   if (app.isPackaged) {
     try {
-      return join(dirname(app.getPath('exe')), '..', 'Data')
+      return perUserInstallRoot()
     } catch (error) {
       // A path lookup must never take startup down; `getAppPath()` is absolute and writable even
       // though it is the wrong directory for a packaged build, and a warning beats a dead launch.
-      console.warn('the exe path is unavailable; falling back to the app path for the data root', error)
+      console.warn('the per-user install root is unavailable; falling back to the app path for the data root', error)
     }
   }
   return app.getAppPath()
 }
 
+/**
+ * The root an older build used: the `Data` folder beside the program's install root.
+ *
+ * A per-user NSIS install put the program in `<root>\App`, so the old root was `<root>\Data`.
+ * A machine-wide install put it under
+ * `C:\Program Files`, and an MSI install has no `App\` subfolder, so the old root landed in the
+ * parent of the install directory. `null` in dev, where no such root exists.
+ */
+export function legacyDefaultDataRoot(): string | null {
+  if (!app.isPackaged) return null
+  try {
+    return join(dirname(app.getPath('exe')), '..', 'Data')
+  } catch (error) {
+    console.warn('the exe path is unavailable; there is no legacy data root to look for', error)
+    return null
+  }
+}
+
 function dataLocationFile(): string {
   return join(defaultDataRoot(), POINTER_FILE)
+}
+
+/** The pointer location used before the data root moved out of the install directory. */
+function legacyDataLocationFile(): string | null {
+  const root = legacyDefaultDataRoot()
+  if (root === null) return null
+  const file = join(root, POINTER_FILE)
+  return file === dataLocationFile() ? null : file
 }
 
 /**
@@ -45,9 +101,10 @@ function dataLocationFile(): string {
  * would resolve against whatever the process cwd happens to be.
  */
 export function readDataRootPointer(): string | null {
-  const file = dataLocationFile()
+  const currentFile = dataLocationFile()
+  const file = existsSync(currentFile) ? currentFile : legacyDataLocationFile()
   // Absent is the normal state, not a fault: the pointer is written only when the user overrides the root.
-  if (!existsSync(file)) return null
+  if (file === null || !existsSync(file)) return null
   let parsed: unknown
   try {
     parsed = JSON.parse(readFileSync(file, 'utf8'))
@@ -92,7 +149,7 @@ export function fallbackDataRoot(): string {
  * The one data root. Synchronous and safe to call before `app.whenReady()`.
  *
  * Three tiers, in order: an explicit pointer the user wrote, the directory an existing install
- * already uses, and finally the install directory for a fresh install.
+ * already uses, and finally the per-user data folder for a fresh install.
  */
 export function resolveDataRoot(): string {
   return readDataRootPointer() ?? fallbackDataRoot()
@@ -153,8 +210,11 @@ export function writePendingDataMigration(from: string, extraSources: readonly s
  * good.
  */
 export function readPendingDataMigration(): PendingDataMigration | null {
-  const file = join(defaultDataRoot(), PENDING_MIGRATION_FILE)
-  if (!existsSync(file)) return null
+  const currentFile = join(defaultDataRoot(), PENDING_MIGRATION_FILE)
+  const legacyRoot = legacyDefaultDataRoot()
+  const legacyFile = legacyRoot === null ? null : join(legacyRoot, PENDING_MIGRATION_FILE)
+  const file = existsSync(currentFile) ? currentFile : legacyFile
+  if (file === null || !existsSync(file)) return null
   let parsed: unknown
   try {
     parsed = JSON.parse(readFileSync(file, 'utf8'))
@@ -186,6 +246,8 @@ export function readPendingDataMigration(): PendingDataMigration | null {
  */
 export function clearPendingDataMigration(): void {
   rmSync(join(defaultDataRoot(), PENDING_MIGRATION_FILE), { force: true })
+  const legacyRoot = legacyDefaultDataRoot()
+  if (legacyRoot !== null) rmSync(join(legacyRoot, PENDING_MIGRATION_FILE), { force: true })
 }
 
 /**

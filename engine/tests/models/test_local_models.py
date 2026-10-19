@@ -1,11 +1,21 @@
 import json
 import struct
+from dataclasses import replace
 
 import pytest
 
-from nola_translator_engine.local_models import LocalModelError, import_local, inspect_local
+from nola_translator_engine.local_models import LocalModelError, import_local, inspect_local, probe_local, _transformers_adapter
 from nola_translator_engine.models.registry import CustomModelRegistry
 from nola_translator_engine.protocol import ModelConfiguration
+
+
+@pytest.fixture(autouse=True)
+def fake_runtime_probe(monkeypatch):
+    # The snapshot fixtures contain one dummy tensor; transaction tests stub inference explicitly.
+    def probe(root, entry):
+        assert (root / entry.files[0].path).is_file()
+        return replace(entry, adapter_id='llama.cpp') if entry.adapter_id == 'gguf-auto' else entry
+    monkeypatch.setattr('nola_translator_engine.local_models.probe_local', probe)
 
 
 def tensor():
@@ -44,8 +54,7 @@ def gguf(path, architecture='llama', metadata=None):
 def test_asr_gguf_imports_audio_companion_and_retains_llama_configuration(tmp_path):
     from nola_translator_engine.resources import ResourceManager
     source = gguf(tmp_path / 'Qwen3-ASR-0.6B-Q8_0.gguf', 'qwen3vl')
-    with pytest.raises(LocalModelError, match='mmproj'):
-        inspect_local(source)
+    assert inspect_local(source)[1].adapter_id == 'gguf-auto'
     projector = gguf(tmp_path / ('mmproj-' + source.name), 'clip', {
         'clip.has_audio_encoder': True, 'clip.audio.projector_type': 'qwen3a',
     })
@@ -121,14 +130,12 @@ def test_truncated_weights_and_missing_shards_are_rejected(tmp_path):
         inspect_local(source)
 
 
-def test_gguf_uses_translation_loader_and_rejects_unsupported_architecture(tmp_path):
+def test_gguf_architecture_is_deferred_to_the_installed_loaders(tmp_path):
     source = gguf(tmp_path / 'custom.gguf')
     _, entry = inspect_local(source)
-    assert (entry.adapter_id, entry.slot) == ('llama.cpp', 'translation')
+    assert (entry.adapter_id, entry.slot) == ('gguf-auto', 'translation')
     source = gguf(source, 'whisper')
-    with pytest.raises(LocalModelError) as error:
-        inspect_local(source)
-    assert error.value.issue == 'unsupportedModel'
+    assert inspect_local(source)[1].adapter_id == 'gguf-auto'
 
 
 def test_huggingface_description_is_persisted_without_executing_model_code(tmp_path, monkeypatch):
@@ -179,10 +186,10 @@ def test_worker_exposes_custom_import_and_specific_failure_reason(tmp_path):
         assert result.returncode == 0, result.stderr
         return [json.loads(line) for line in result.stdout.splitlines()][-1]['result']
     assert run()['compatible']
-    (source / 'tokenizer.json').unlink()
+    (source / 'model.safetensors').unlink()
     result = run()
     assert not result['compatible']
-    assert result['items'][0]['reason'] == 'tokenizer.json'
+    assert result['items'][0]['reason'] == 'Model weights'
 
 
 def test_language_directory_matches_renderer_contract():
@@ -267,3 +274,220 @@ def test_gguf_publisher_name_takes_priority_over_filename(tmp_path):
     source = gguf(tmp_path / 'renamed.gguf', metadata={'general.name': 'Actual publisher model'})
     _, entry = inspect_local(source)
     assert entry.name == 'Actual publisher model'
+
+
+def test_failed_trial_leaves_registry_and_existing_model_untouched(tmp_path, monkeypatch):
+    root = tmp_path / 'installed'
+    source = gguf(tmp_path / 'model.gguf')
+    existing = import_local(source, root)
+    registry_path = CustomModelRegistry(root).path
+    before = registry_path.read_bytes()
+    installed = root / existing.resolved_directory / 'model.gguf'
+    original = installed.read_bytes()
+
+    def reject(staging, entry):
+        assert staging.name.startswith('.local-import-')
+        assert (staging / 'model.gguf').read_bytes() == original
+        raise LocalModelError('incompatible', 'native loader rejected the tensor layout')
+
+    monkeypatch.setattr('nola_translator_engine.local_models.probe_local', reject)
+    with pytest.raises(LocalModelError, match='tensor layout'):
+        import_local(source, root)
+    assert registry_path.read_bytes() == before
+    assert installed.read_bytes() == original
+    assert not list(root.glob('.local-*'))
+
+
+def test_successful_trial_persists_the_actual_loader_and_task(tmp_path, monkeypatch):
+    root = tmp_path / 'installed'
+    source = gguf(tmp_path / 'speech.gguf', 'unlisted-speech-architecture')
+    monkeypatch.setattr('nola_translator_engine.local_models.probe_local',
+        lambda _, entry: replace(entry, adapter_id='crisp-asr', slot='recognition'))
+    entry = import_local(source, root)
+    assert (entry.adapter_id, entry.slot) == ('crisp-asr', 'recognition')
+    config = ModelConfiguration(slot='recognition', engine='crisp', languages=['en'],
+        supportsAutoDetection=True, sourceLanguages=[], targetLanguages=[])
+    from nola_translator_engine.resources import ResourceManager
+    ResourceManager(root, lambda _: None).configure(entry.resource_id, config)
+    assert CustomModelRegistry(root).get(entry.resource_id).configuration == config
+
+
+def test_synthesis_trial_is_listed_as_a_tts_model(tmp_path, monkeypatch):
+    from nola_translator_engine.resources import ResourceManager
+    source = gguf(tmp_path / 'speech.gguf', 'unlisted-synthesis-architecture')
+    monkeypatch.setattr('nola_translator_engine.local_models.probe_local',
+        lambda _, entry: replace(entry, adapter_id='crisp-tts', slot='synthesis'))
+    root = tmp_path / 'installed'
+    entry = import_local(source, root)
+    assert CustomModelRegistry(root).get(entry.resource_id).slot == 'synthesis'
+    assert ResourceManager(root, lambda _: None).record(entry.resource_id).kind == 'ttsModel'
+
+
+def test_transformers_support_comes_from_the_installed_auto_mapping(tmp_path, monkeypatch):
+    import sys
+    from types import SimpleNamespace
+    class NewSpeechConfig:
+        pass
+    config = NewSpeechConfig()
+    config.model_type = 'new-speech-architecture'
+    calls = []
+    def read_config(path, **options):
+        calls.append(options)
+        return config
+    monkeypatch.setitem(sys.modules, 'transformers', SimpleNamespace(
+        AutoConfig=SimpleNamespace(from_pretrained=read_config),
+        AutoModelForSpeechSeq2Seq=SimpleNamespace(_model_mapping={NewSpeechConfig: object()})))
+    assert _transformers_adapter(tmp_path, 'transformers-auto') == 'transformers-asr'
+    assert calls == [{'local_files_only': True, 'trust_remote_code': False}]
+
+
+def test_repository_requirements_do_not_block_builtin_funasr_import(tmp_path):
+    source = tmp_path / 'speech'
+    source.mkdir()
+    (source / 'model.pt').write_bytes(b'weights')
+    (source / 'config.yaml').write_text('model: RegisteredSpeechModel')
+    (source / 'requirements.txt').write_text('numpy==0.0.0')
+    _, entry = inspect_local(source)
+    assert entry.adapter_id == 'funasr'
+    assert 'requirements.txt' not in {item.path for item in entry.files}
+
+
+def test_trial_reports_absent_loaders_without_registering_anything(tmp_path):
+    import subprocess
+    source = gguf(tmp_path / 'model.gguf')
+    _, entry = inspect_local(source)
+    from unittest.mock import patch
+    failure = subprocess.CompletedProcess([], 0, json.dumps({'ok': False, 'reason': 'Runtime component missing'}), '')
+    with patch('nola_translator_engine.local_models._probe_process', return_value=failure) as run:
+        with pytest.raises(LocalModelError, match='Runtime component missing'):
+            probe_local(source.parent, entry)
+    assert run.call_count == 2
+    assert not CustomModelRegistry(tmp_path).all()
+
+
+def test_native_crash_does_not_prevent_another_loader_from_accepting_the_model(tmp_path, monkeypatch):
+    import subprocess
+    source = gguf(tmp_path / 'speech.gguf', 'new-speech-format')
+    _, entry = inspect_local(source)
+    calls = []
+    def run(_, request):
+        calls.append(request['adapter'])
+        if request['adapter'] == 'llama.cpp':
+            return subprocess.CompletedProcess([], 1, '', 'native loader crashed')
+        return subprocess.CompletedProcess([], 0, json.dumps({'ok': True, 'adapter': 'crisp-asr', 'slot': 'recognition'}), '')
+    monkeypatch.setattr('nola_translator_engine.local_models._probe_process', run)
+    assert probe_local(source.parent, entry).adapter_id == 'crisp-asr'
+    assert calls == ['llama.cpp', 'crisp-auto']
+
+
+def test_multifile_native_package_retains_the_primary_accepted_by_the_loader(tmp_path, monkeypatch):
+    import subprocess
+    source = tmp_path / 'package'
+    source.mkdir()
+    gguf(source / 'audio-tower.gguf', 'new-audio-architecture')
+    gguf(source / 'decoder.gguf', 'new-decoder-architecture')
+    _, entry = inspect_local(source)
+    def run(_, request):
+        primary = request['entry']['files'][0]['path']
+        output = {'ok': primary == 'decoder.gguf', 'adapter': 'crisp-asr', 'slot': 'recognition', 'reason': 'not a primary weight'}
+        return subprocess.CompletedProcess([], 0, json.dumps(output), '')
+    monkeypatch.setattr('nola_translator_engine.local_models._probe_process', run)
+    tested = probe_local(source, entry)
+    assert tested.files[0].path == 'decoder.gguf'
+    assert {item.path for item in tested.files} == {'decoder.gguf', 'audio-tower.gguf'}
+
+
+def test_legacy_native_weights_are_deferred_to_crispasr(tmp_path):
+    source = tmp_path / 'speech.bin'
+    source.write_bytes(b'lmgg' + bytes(32))
+    assert inspect_local(source)[1].adapter_id == 'crisp-auto'
+
+
+def test_missing_gguf_shards_are_reported_before_trial(tmp_path):
+    source = gguf(tmp_path / 'model-00001-of-00003.gguf')
+    gguf(tmp_path / 'model-00003-of-00003.gguf')
+    with pytest.raises(LocalModelError, match='Incomplete GGUF shards'):
+        inspect_local(source)
+
+
+def test_imported_audio_runtime_uses_the_tested_primary_and_its_projector(tmp_path):
+    from nola_translator_engine.resources import ResourceManager
+    source = tmp_path / 'speech'
+    source.mkdir()
+    gguf(source / 'model.gguf', 'qwen3vl')
+    for name in ('mmproj-model.gguf', 'mmproj-other-quant.gguf'):
+        gguf(source / name, 'clip', {'clip.has_audio_encoder': True, 'clip.audio.projector_type': 'qwen3a'})
+    root = tmp_path / 'installed'
+    entry = import_local(source, root)
+    resources = ResourceManager(root, lambda _: None)
+    assert resources.translation_gguf_path(entry.resource_id).name == 'model.gguf'
+    assert resources.audio_projector_path(entry.resource_id).name == 'mmproj-model.gguf'
+
+
+def test_multilingual_tokenizer_uses_its_native_language_tags():
+    from types import SimpleNamespace
+    from nola_translator_engine.translation.transformers_causal import tokenizer_language
+    tokenizer = SimpleNamespace(additional_special_tokens=['eng_Latn', 'fra_Latn', 'zho_Hans', 'zho_Hant'])
+    assert tokenizer_language(tokenizer, 'en') == 'eng_Latn'
+    assert tokenizer_language(tokenizer, 'fr') == 'fra_Latn'
+    assert tokenizer_language(tokenizer, 'zh-CN') == 'zho_Hans'
+    assert tokenizer_language(tokenizer, 'zh-TW') == 'zho_Hant'
+
+
+def test_missing_parameters_are_not_validated_by_randomly_initialized_inference(tmp_path):
+    from types import SimpleNamespace
+    from nola_translator_engine.translation.transformers_causal import load_verified_model
+    loader = SimpleNamespace(from_pretrained=lambda *args, **options: (object(), {'missing_keys': ['encoder.weight']}))
+    with pytest.raises(ValueError, match='missing parameters'):
+        load_verified_model(loader, tmp_path)
+
+
+@pytest.mark.parametrize('modern_pipeline', [False, True])
+def test_asr_pipeline_accepts_preloaded_local_components_across_transformers_versions(tmp_path, monkeypatch, modern_pipeline):
+    import sys
+    from types import SimpleNamespace
+    import numpy as np
+    from nola_translator_engine.recognition.qwen_runtime import TransformersAsrRuntime
+    model, tokenizer, extractor = object(), object(), object()
+    observed = []
+    def pipeline(task, model, tokenizer, feature_extractor, device, trust_remote_code, dtype):
+        observed.append((task, model, tokenizer, feature_extractor, dtype))
+        return lambda audio: {'text': 'Decoded audio'}
+    def legacy_pipeline(task, model, tokenizer, feature_extractor, device, trust_remote_code, torch_dtype):
+        return pipeline(task, model, tokenizer, feature_extractor, device, trust_remote_code, torch_dtype)
+    def component(value):
+        def load(path, *, local_files_only, trust_remote_code):
+            assert path == str(tmp_path) and local_files_only and not trust_remote_code
+            return value
+        return SimpleNamespace(from_pretrained=load)
+    monkeypatch.setitem(sys.modules, 'torch', SimpleNamespace(set_num_threads=lambda _: None, float32='float32'))
+    monkeypatch.setitem(sys.modules, 'transformers', SimpleNamespace(
+        AutoConfig=component(SimpleNamespace()), AutoFeatureExtractor=component(extractor),
+        AutoTokenizer=component(tokenizer), AutoModelForSpeechSeq2Seq=SimpleNamespace(_model_mapping={}),
+        AutoModelForCTC=SimpleNamespace(from_pretrained=lambda *args, **options: (model, {})),
+        pipeline=pipeline if modern_pipeline else legacy_pipeline))
+    runtime = TransformersAsrRuntime(tmp_path)
+    assert runtime.transcribe(np.zeros(1600, dtype=np.float32), language='en') == ('Decoded audio', 'en')
+    assert observed == [('automatic-speech-recognition', model, tokenizer, extractor, 'float32')]
+    runtime.unload()
+
+
+def test_crisp_model_with_asr_and_tts_capabilities_keeps_working_recognition(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from nola_translator_engine.local_models import _probe_runtime
+    source = gguf(tmp_path / 'speech.gguf')
+    _, entry = inspect_local(source)
+    closed = []
+    class Runtime:
+        def __init__(self, *args, **options):
+            self._session = SimpleNamespace()
+        def load(self):
+            pass
+        def transcribe(self, samples):
+            return 'Recognized speech', 'en'
+        def unload(self):
+            closed.append(True)
+    monkeypatch.setattr('nola_translator_engine.recognition.crisp_asr.CrispAsrRuntime', Runtime)
+    monkeypatch.setattr('nola_translator_engine.recognition.crisp_asr.crisp_capabilities', lambda _: {'tts', 'translate'})
+    assert _probe_runtime(tmp_path, entry, 'crisp-auto') == ('crisp-asr', 'recognition')
+    assert closed == [True]

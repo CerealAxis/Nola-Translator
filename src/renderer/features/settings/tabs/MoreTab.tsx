@@ -107,7 +107,7 @@ export function MoreTab() {
                 ))}
               </AvatarGroup>
             </Tooltip.Trigger>
-            <Tooltip.Content>{t('more.sponsorVacancies')}</Tooltip.Content>
+            <Tooltip.Content>{t('more.sponsorInfo')}</Tooltip.Content>
           </Tooltip>
           <Heart className="settings-more__heart" aria-hidden="true" />
         </div>

@@ -23,6 +23,9 @@ export const modelConfigurationSchema = z.object({
 })
 export type ModelConfiguration = z.infer<typeof modelConfigurationSchema>
 export const QWEN_LANGUAGES: readonly string[] = ["zh", "en", "yue", "ar", "de", "fr", "es", "pt", "id", "it", "ko", "ru", "th", "vi", "ja", "tr", "hi", "ms", "nl", "sv", "da", "fi", "pl", "cs", "tl", "fa", "el", "hu", "mk", "ro"]
+export const FUN_ASR_NANO_LANGUAGES: readonly string[] = ['zh', 'en', 'ja', 'yue']
+export const VIBEVOICE_ASR_LANGUAGES: readonly string[] = ['en', 'zh', 'es', 'pt', 'de', 'ja', 'ko', 'fr', 'ru', 'id', 'sv', 'it', 'he', 'nl', 'pl', 'no', 'tr', 'th', 'ar', 'hu', 'ca', 'cs', 'da', 'fa', 'af', 'hi', 'fi', 'et', 'el', 'ro', 'vi', 'bg', 'is', 'sl', 'sk', 'lt', 'sw', 'uk', 'lv', 'hr', 'ne', 'sr', 'tl', 'ms', 'ur', 'mn', 'hy', 'jv']
+export const MIMO_ASR_LANGUAGES: readonly string[] = ['zh', 'en', 'yue']
 export const HYMT2_LANGUAGES: readonly string[] = ["zh", "en", "fr", "pt", "es", "ja", "tr", "ru", "ar", "ko", "th", "it", "de", "vi", "ms", "id", "tl", "hi", "zh-Hant", "pl", "cs", "nl", "km", "my", "fa", "gu", "ur", "te", "mr", "he", "bn", "ta", "uk", "bo", "kk", "mn", "ug", "yue"]
 export const M2M100_LANGUAGES: readonly string[] = ["af", "am", "ar", "ast", "az", "ba", "be", "bg", "bn", "br", "bs", "ca", "ceb", "cs", "cy", "da", "de", "el", "en", "es", "et", "fa", "ff", "fi", "fr", "fy", "ga", "gd", "gl", "gu", "ha", "he", "hi", "hr", "ht", "hu", "hy", "id", "ig", "ilo", "is", "it", "ja", "jv", "ka", "kk", "km", "kn", "ko", "lb", "lg", "ln", "lo", "lt", "lv", "mg", "mk", "ml", "mn", "mr", "ms", "my", "ne", "nl", "no", "ns", "oc", "or", "pa", "pl", "ps", "pt", "ro", "ru", "sd", "si", "sk", "sl", "so", "sq", "sr", "ss", "su", "sv", "sw", "ta", "th", "tl", "tn", "tr", "uk", "ur", "uz", "vi", "wo", "xh", "yi", "yo", "zh", "zu"]
 const recognition = (codes: readonly string[], engine: 'pytorch' | 'llama' | 'crisp' = 'pytorch'): ModelConfiguration => ({ slot: 'recognition', engine, languages: [...codes], supportsAutoDetection: true, sourceLanguages: [], targetLanguages: [] })
@@ -34,7 +37,10 @@ export const RECOMMENDED_CONFIGURATIONS: Record<string, ModelConfiguration> = {
   'sensevoice-small': recognition(['zh', 'en', 'yue', 'ja', 'ko']),
   ...Object.fromEntries(['q4-k', 'q8-0', 'f16'].map(variant => [`sensevoice-small-crisp-${variant}`, recognition(['zh', 'en', 'yue', 'ja', 'ko'], 'crisp')])),
   ...Object.fromEntries(['0.6b', '1.7b'].flatMap(size => ['q4-k', 'q8-0', 'f16'].map(variant => `qwen3-asr-${size}-crisp-${variant}`)).map(id => [id, recognition(QWEN_LANGUAGES, 'crisp')])),
-  ...Object.fromEntries(['fun-asr-nano', 'vibevoice-asr', 'mimo-v2.5-asr'].flatMap(family => ['q4-k', 'q8-0', 'f16'].map(variant => `${family}-${variant}`)).map(id => [id, recognition(['zh', 'en'], 'crisp')])),
+  ...Object.fromEntries(['fun-asr-nano', 'vibevoice-asr', 'mimo-v2.5-asr'].flatMap(family => {
+    const supportedLanguages = family === 'fun-asr-nano' ? FUN_ASR_NANO_LANGUAGES : family === 'vibevoice-asr' ? VIBEVOICE_ASR_LANGUAGES : MIMO_ASR_LANGUAGES
+    return ['q4-k', 'q8-0', 'f16'].map(variant => [`${family}-${variant}`, recognition(supportedLanguages, 'crisp')])
+  })),
   'hy-mt2-1.8b-q4-k-m': translation(HYMT2_LANGUAGES, 'llama'),
   'hy-mt2-1.8b-q3-k-m': translation(HYMT2_LANGUAGES, 'llama'),
   'hy-mt2-1.8b-iq2-m': translation(HYMT2_LANGUAGES, 'llama'),
@@ -50,7 +56,9 @@ export function isModelReady(model: ResourceRecord): boolean { return model.inst
 export function recognitionLanguages(model: ResourceRecord | undefined): string[] {
   const config = configurationOf(model)
   if (config?.slot !== 'recognition') return []
-  return [...(config.supportsAutoDetection ? ['auto'] : []), ...new Set(config.languages.map(normalizeLanguage))]
+  const codes = new Set(config.languages.map(normalizeLanguage))
+  if (codes.has('zh')) codes.add('zh-Hant')
+  return [...(config.supportsAutoDetection ? ['auto'] : []), ...codes]
 }
 export function supportsTranslation(model: ResourceRecord | undefined, source: string, target: string): boolean {
   if (target === 'none') return true

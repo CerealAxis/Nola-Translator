@@ -1,6 +1,6 @@
 import { modelEngines, translationEngine } from '../../../../shared/model-engines'
 import { useState } from 'react'
-import { Alert, Button } from '@heroui/react'
+import { Button } from '@heroui/react'
 import { useI18n } from '@/i18n'
 import { updateSettings, stores, useStore } from '@/store'
 import { DEFAULT_COMPUTE_SETTINGS, type ComputeSettings } from '../../../../shared/compute'
@@ -19,15 +19,12 @@ export function PerformanceTab({ settings }: SettingsPanelProps) {
   const translationUsesTorch = localTranslation && translationEngine(compute, adapter, settings.translation.localModelId) === 'pytorch'
   const usesTorch = recognitionLoader === 'pytorch' || translationUsesTorch
   const usesLlama = recognitionLoader === 'llama' || (localTranslation && !translationUsesTorch)
-  const [error, setError] = useState('')
   const save = (patch: Partial<ComputeSettings>) => {
-    setError('')
-    void updateSettings({ compute: patch }).catch(e => setError(`${c.saveError}: ${String(e)}`))
+    void updateSettings({ compute: patch }).catch(() => undefined)
   }
   const numeric = (field: 'reservedVramMb' | 'cpuThreads' | 'gpuLayers' | 'contextSize', label: string, desc: string, min: number, max: number) =>
     <SettingsRow descriptionTooltip label={label} desc={desc}><NumberSetting value={compute[field]} min={min} max={max} label={label} onSave={value => save({ [field]: value })} /></SettingsRow>
   return <div className="settings-panel">
-    {error ? <Alert status="danger"><Alert.Content><Alert.Description>{error}</Alert.Description></Alert.Content></Alert> : null}
     {usesTorch ? <SettingGroup legend="PyTorch">
       <SettingsRow descriptionTooltip label={c.precision} desc={c.precisionHint}><SettingSelect ariaLabel={c.precision} value={compute.precision} options={[{ value: 'auto', label: c.automatic }, ...['fp32', 'fp16', 'bf16'].map(value => ({ value, label: value.toUpperCase() }))]} onChange={value => save({ precision: value as ComputeSettings['precision'] })} /></SettingsRow>
       <SettingsRow descriptionTooltip label={c.quantization} desc={c.quantHint}><SettingSelect ariaLabel={c.quantization} value={compute.quantization} options={[{ value: 'auto', label: c.automatic }, { value: 'none', label: c.none }, { value: 'nf4', label: 'NF4' }, { value: '8bit', label: '8bit' }]} onChange={value => save({ quantization: value as ComputeSettings['quantization'] })} /></SettingsRow>

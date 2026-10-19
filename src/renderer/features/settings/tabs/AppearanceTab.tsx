@@ -35,7 +35,7 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
     // Only appearance preferences are reset; the window pin is an independent control.
     const { alwaysOnTop, ...appearance } = DEFAULT_SETTINGS.overlay
     void alwaysOnTop
-    void updateSettings({ overlay: appearance }).catch(() => toast.danger(t('modelsSettingsUi.restoreFailed')))
+    void updateSettings({ overlay: appearance }).catch(() => undefined)
   }
 
   return (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { runtimeVersionRows } from './RuntimeComponents'
+import { isExternalRuntime, runtimeVersionRows } from './RuntimeComponents'
 
 const ready = (version: string) => ({
   path: '', status: 'ready' as const, backend: 'cpu', version, gpuAvailable: false, reason: '',
@@ -19,5 +19,15 @@ describe('runtimeVersionRows', () => {
 
   it('returns no rows when runtime versions are unavailable', () => {
     expect(runtimeVersionRows({ engine: missing(), llama: missing() })).toEqual([])
+  })
+})
+
+describe('isExternalRuntime', () => {
+  it('does not label bundled runtimes as external environments', () => {
+    expect(isExternalRuntime({ ...ready('0.8.43'), bundled: true })).toBe(false)
+  })
+
+  it('labels unmanaged runtimes from outside the app as external', () => {
+    expect(isExternalRuntime({ ...ready('0.8.43'), managed: false })).toBe(true)
   })
 })

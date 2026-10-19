@@ -1,11 +1,11 @@
-import { appendFileSync, createReadStream, createWriteStream, lstatSync, mkdirSync, readdirSync, renameSync, unlinkSync, utimesSync } from 'node:fs'
-import { join } from 'node:path'
+import { appendFileSync, copyFileSync, createReadStream, createWriteStream, lstatSync, mkdirSync, readdirSync, renameSync, rmdirSync, unlinkSync, utimesSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { pipeline } from 'node:stream/promises'
 import { createGzip } from 'node:zlib'
 import { supportErrorCodeForCause } from '../shared/error-catalog'
 
-const KEEP_LAUNCHES = 10
+const KEEP_LAUNCHES = 5
 const MAX_ENTRY_BYTES = 256 * 1024
 const secrets = new Set<string>()
 let file = ''
@@ -139,6 +139,66 @@ export function redactLog(value: string): string {
 
 export function sessionLogPath(): string { return file }
 
+function finalizeLogDirectory(directory: string): void {
+  try {
+    const previousLogs = pruneLogs(directory, KEEP_LAUNCHES)
+      .filter(path => path !== file)
+    void compressPreviousLogs(previousLogs)
+  } catch (error) {
+    logDiagnostic('session-log.retention.failed', { directory, error })
+  }
+}
+
+/** Move app-owned launch logs to the configured data root, keeping the active logger attached. */
+export function relocateSessionLogs(directory: string): void {
+  if (!file) return
+  const sourceDirectory = dirname(file)
+  if (sourceDirectory.replace(/[\\/]+$/, '').toLowerCase() === directory.replace(/[\\/]+$/, '').toLowerCase()) {
+    finalizeLogDirectory(directory)
+    return
+  }
+
+  try {
+    mkdirSync(directory, { recursive: true })
+    const entries = logFiles(sourceDirectory).filter(entry => entry.regularFile)
+      .sort((left, right) => Number(right.name === basename(file)) - Number(left.name === basename(file)))
+    for (const entry of entries) {
+      const source = join(sourceDirectory, entry.name)
+      const destination = join(directory, entry.name)
+      const temporary = `${destination}.${randomUUID()}.partial`
+      try {
+        const sourceStat = lstatSync(source)
+        let destinationStat: ReturnType<typeof lstatSync> | null = null
+        try { destinationStat = lstatSync(destination) } catch { /* First migration attempt. */ }
+        if (destinationStat) {
+          throw new Error('The destination log already exists; the source copy was preserved')
+        } else {
+          copyFileSync(source, temporary)
+          const copied = lstatSync(temporary)
+          if (!copied.isFile() || copied.isSymbolicLink() || copied.size !== sourceStat.size) {
+            throw new Error('The copied log did not pass its size check')
+          }
+          renameSync(temporary, destination)
+        }
+        const finalStat = lstatSync(destination)
+        if (!finalStat.isFile() || finalStat.isSymbolicLink() || finalStat.size !== sourceStat.size) {
+          throw new Error('The destination log did not pass its size check')
+        }
+        unlinkSync(source)
+        if (source === file) file = destination
+      } catch (error) {
+        try { unlinkSync(temporary) } catch { /* A partial copy is best-effort cleanup. */ }
+        logDiagnostic('session-log.migration.failed', { fileName: entry.name, error })
+      }
+    }
+    try { rmdirSync(sourceDirectory) } catch { /* Keep the old folder if it still contains unrelated files. */ }
+    logDiagnostic('session-log.relocated', { directory, currentLog: basename(file) })
+    finalizeLogDirectory(directory)
+  } catch (error) {
+    logDiagnostic('session-log.migration.failed', { directory, error })
+  }
+}
+
 // Synchronous appends preserve crash diagnostics; per-entry limits keep malformed payloads bounded.
 export function logDiagnostic(event: string, data?: unknown): void {
   if (!file) return
@@ -166,12 +226,12 @@ export function initializeSessionLog(directory: string, metadata: unknown): Prom
         if (partial.isFile() && !partial.isSymbolicLink()) unlinkSync(join(directory, name))
       } catch { /* A stale partial is best-effort cleanup. */ }
     }
-    const previousLogs = pruneLogs(directory, KEEP_LAUNCHES - 1)
+    pruneLogs(directory, KEEP_LAUNCHES - 1)
     file = join(directory, `startup-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID()}.jsonl`)
     sequence = 0
     activity.clear()
     logDiagnostic('app.start', metadata)
-    return compressPreviousLogs(previousLogs)
+    return Promise.resolve()
   } catch { file = ''; return Promise.resolve() }
 }
 

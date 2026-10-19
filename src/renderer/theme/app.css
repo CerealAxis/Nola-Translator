@@ -68,6 +68,7 @@
   .nola-setting-control > * { max-width: 100%; }
   .nola-setting-control .select { width: 100%; min-width: 0; max-width: 280px; }
   .nola-setting-control .select__trigger { width: 100%; }
+  .list-box-item:is([data-selected="true"], [aria-selected="true"], [data-hovered="true"], [data-focused="true"], :hover) { background: var(--selection-neutral); color: var(--foreground); }
   .nola-page-heading { padding: 12px 4px; }
   .nola-overlay-page { display: flex; flex-direction: column; gap: 20px; }
   .nola-overlay-preview { padding: 20px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface); }
@@ -89,6 +90,8 @@
 }
 @layer utilities {
   .toast { align-items: center; }
+  .toast__action { margin-inline-start: auto; }
+  .toast__content > .toast__action { align-self: flex-end; }
   .nola-window-control.button { width: var(--space-6); height: 100%; flex-shrink: 0; padding: 0; border: 0; border-radius: 0; color: var(--foreground); }
   .nola-window-control.button svg { width: 16px; height: 16px; stroke-width: 1.8; }
   .nola-window-control.button:hover { background: color-mix(in oklch, var(--accent) 9%, transparent); }

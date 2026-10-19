@@ -26,10 +26,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 
-import { Button } from '@heroui/react'
+import { Button, toast } from '@heroui/react'
 import { Lock, Minus, Monitor, Pin, PinOff, SlidersHorizontal, Unlock, X } from 'lucide-react'
 
 import { DEFAULT_SETTINGS } from '@/bridge'
+import { formatChineseCaption } from '@/chinese-script'
 import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
 import { translationErrorSummary } from '@/translation-status'
@@ -51,6 +52,7 @@ export function OverlayRoot() {
   const menuOpen = useStore(stores.settings, state => state.overlayMenuOpen)
   const { t } = useI18n()
   const overlay = useStore(stores.settings, (state) => state.settings?.overlay)
+  const sourceLanguage = useStore(stores.settings, state => state.settings?.recognition.sourceLanguage ?? DEFAULT_SETTINGS.recognition.sourceLanguage)
   const session = useStore(sessionStore, (state) => state)
   const [hovered, setHovered] = useState(false)
   /*
@@ -63,7 +65,6 @@ export function OverlayRoot() {
   const [captionTextSelected, setCaptionTextSelected] = useState(false)
   const [closing, setClosing] = useState(false)
   const [closePending, setClosePending] = useState(false)
-  const [closeFailed, setCloseFailed] = useState(false)
   const [detachedConfirmation, setDetachedConfirmation] = useState(false)
   const closeRequest = useRef(false)
 
@@ -84,7 +85,6 @@ export function OverlayRoot() {
     if (closeRequest.current) return
     closeRequest.current = true
     setClosePending(true)
-    setCloseFailed(false)
     try {
       const bridge = getBridge()
       if (!bridge) throw new Error('Overlay bridge unavailable')
@@ -92,7 +92,7 @@ export function OverlayRoot() {
       setClosing(false)
     } catch (error) {
       console.error('[overlay] close failed', error)
-      setCloseFailed(true)
+      toast.danger(t('overlay.closeFailed'))
     } finally {
       closeRequest.current = false
       setClosePending(false)
@@ -114,7 +114,6 @@ export function OverlayRoot() {
   }
 
   const requestCloseConfirmation = (): void => {
-    setCloseFailed(false)
     setClosing(true)
     const card = cardRef.current
     const openMenu = getBridge()?.overlay.openMenu
@@ -171,7 +170,7 @@ export function OverlayRoot() {
       || (segment.translations.length > 0 && segment.translations.every((entry) => entry.state === 'failed')))
   const translated = translationCurrent?.translations.find((entry) => entry.state !== 'failed' && entry.text)
   const sourceTrackLines = orderedSegments.flatMap((segment): TrackLine[] =>
-    segment.sourceText ? [{ key: segment.segmentId, text: segment.sourceText }] : [])
+    segment.sourceText ? [{ key: segment.segmentId, text: formatChineseCaption(segment.sourceText, sourceLanguage) }] : [])
   const translatedTrackLines = orderedSegments.map((segment): TrackLine => {
     const entry = segment.translations.find((item) => item.state !== 'failed' && item.text)
     if (entry?.text) return { key: segment.segmentId, text: entry.text }
@@ -474,7 +473,6 @@ export function OverlayRoot() {
             {detachedConfirmation ? null : <div className="nola-confirm-dialog">
               <p className="nola-confirm-title">{t('overlay.closeTitle')}</p>
               <p className="nola-confirm-text">{t('overlay.closeBody')}</p>
-              {closeFailed ? <p className="nola-confirm-text" role="alert">{t('overlay.closeFailed')}</p> : null}
               <div className="nola-confirm-actions">
                 <Button variant="secondary" size="sm" isDisabled={closePending} onPress={() => setClosing(false)}>
                   {t('common.cancel')}

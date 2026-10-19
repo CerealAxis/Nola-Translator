@@ -79,7 +79,7 @@ async function start() {
 
 async function skipSection() {
   fireEvent.click(screen.getByRole('button', { name: '跳过本节' }))
-  await waitFor(() => expect(document.querySelector('.onboarding-tour__card')).toHaveAttribute('data-ready', 'true'))
+  await waitFor(() => expect(document.querySelector('.onboarding-tour__card[data-ready="true"], [data-onboarding="complete"]')).toBeInTheDocument())
 }
 
 it('preserves the original welcome content, starts at home, and saves the invitation once', async () => {
@@ -135,8 +135,10 @@ it('teaches real model details and allows skipping downloads without pretending 
   await skipSection()
   await expectStep('quick-nav')
   await skipSection()
-  await expectStep('complete')
-  expect(screen.getByText('恭喜你完成新手指引')).toBeInTheDocument()
+  const completion = await screen.findByRole('dialog', { name: '恭喜你完成新手指引' })
+  expect(completion.closest('.modal__backdrop')).toBeInTheDocument()
+  expect(document.querySelector('.onboarding-tour__card')).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'GitHub 主页' })).toHaveAttribute('href', 'https://github.com/CerealAxis/Nola-Translator')
   expect(screen.queryByText('本地模型或加载器待准备')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '退出' }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()

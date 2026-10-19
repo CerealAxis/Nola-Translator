@@ -2,16 +2,16 @@ import { ModelCapabilityNotices } from './features/models/ModelCapabilityNotices
 import { ModelDownloadNotice } from './features/models/ModelDownloadNotice'
 import './index.css'
 import './theme/cjk-fonts.css'
-import { StrictMode, useEffect, useState } from 'react'
+import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
-import { Alert, Button, Toast } from '@heroui/react'
+import { Toast, toast } from '@heroui/react'
 import { APPLICATION_PAGES, useApplicationNavigation } from './application'
 import { createIpcBridge, isIpcBridgeAvailable } from './bridge/ipc/ipcBridge'
 import { I18nProvider, useI18n } from './i18n'
 import { AppShell, ErrorBoundary } from './components/primitives'
 import { Routes, useRoute } from './routes'
-import { disposeStores, initStores, isEngineConnected, stores, useStore } from './store'
+import { actions, disposeStores, initStores, isEngineConnected, stores, useStore } from './store'
 import { OverlayRoot } from './features/overlay'
 import { OverlayMenuRoot } from './features/overlay/OverlayMenuRoot'
 import { RuntimeNotice } from './features/settings/RuntimeNotice'
@@ -28,7 +28,7 @@ import { OnboardingTour } from './features/onboarding'
  * 组件永远不 import `bridge/ipc/*`，只 import `@/bridge` 与 `@/store`。
  *
  * "背后到底有没有引擎"这个判断也只在这里做一次（`isIpcBridgeAvailable()`），结果同时喂给
- * `initStores`（决定要不要发首屏拉取）和下面那条横幅。分两处判断过一次，迟早会有一次忘了同步：
+ * `initStores`（决定要不要发首屏拉取）和下面的连接错误 Toast。分两处判断过一次，迟早会有一次忘了同步：
  * 一边开始拉数据、另一边安静如常，比一直坏着更难查。
  */
 
@@ -58,39 +58,49 @@ function useOverlayNavigation(): void {
 }
 
 /**
- * 没连上引擎时的横幅。
+ * 没连上引擎时的持久 Toast。
  *
  * 这个状态在正式版不存在（总有 preload），它真实存在的地方是 e2e 截图脚本、浏览器里开
  * `out/renderer/index.html`、以及打包漏掉 preload 的那一次。**正因为少见，它才必须自己会说话**：
  * 以前这个状态下界面停在启动画面，"正在加载"骗了四秒钟，然后 `test:ui` 截到一张只有 logo 的图
- * 还退出码 0。现在界面照常渲染（各页显示自己的空态），顶上这一条讲清楚"不是加载中，是没连上"。
+ * 还退出码 0。现在界面照常渲染（各页显示自己的空态），Toast 讲清楚"不是加载中，是没连上"。
  *
  * 动作复用 `errors.pageCrashedAction`：preload 每次导航都会重新注入，"重新载入界面"就是正解，
  * 不另造一条意思相同的 key 让两份文案各自漂移。
  */
 function EngineDisconnectedNotice() {
   const { t } = useI18n()
-  return (
-    // 贴着 `.nola-route-content` 的居中与内边距，两者上下相邻才不会错位。
-    <div className="mx-auto w-full min-w-0 max-w-[var(--nola-content-max)] px-[var(--nola-page-padding)] pt-[var(--nola-page-padding)]">
-      <Alert status="danger">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title className="nola-body-strong">{t('errors.engineNotConnected')}</Alert.Title>
-          <Alert.Description className="nola-caption">
-            <Button
-              variant="tertiary"
-              size="sm"
-              className="rounded-[6px]"
-              onPress={() => window.location.reload()}
-            >
-              {t('errors.pageCrashedAction')}
-            </Button>
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
-    </div>
-  )
+  const notified = useRef(false)
+  useEffect(() => {
+    if (isEngineConnected() || notified.current) return
+    notified.current = true
+    toast.danger(t('errors.engineNotConnected'), {
+      timeout: 0,
+      actionProps: { children: t('errors.pageCrashedAction'), onPress: () => window.location.reload() },
+    })
+  }, [t])
+  return null
+}
+
+function SettingsErrorNotice() {
+  const { t } = useI18n()
+  const notifiedError = useRef<string | null>(null)
+  useEffect(() => {
+    const notify = (): void => {
+      const state = stores.settings.getState()
+      if (!state.error) { notifiedError.current = null; return }
+      if (notifiedError.current === state.error) return
+      notifiedError.current = state.error
+      if (state.settings) toast.danger(t('errors.settingsSaveFailed'), { description: state.error })
+      else toast.danger(t('settings.loadFailed'), {
+        description: state.error,
+        actionProps: { children: t('models.retry'), onPress: () => void actions.settings.loadSettings().catch(() => undefined) },
+      })
+    }
+    notify()
+    return stores.settings.subscribe(notify)
+  }, [t])
+  return null
 }
 
 /** 侧边栏导航 + 路由联动 */
@@ -101,6 +111,7 @@ function Shell() {
   return (
     <AppShell navigation={navigation}>
       {isEngineConnected() ? null : <EngineDisconnectedNotice />}
+      <SettingsErrorNotice />
       <Routes pages={APPLICATION_PAGES} />
       <OnboardingTour />
     </AppShell>

@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { Alert, Button, Modal, Spinner, toast } from '@heroui/react'
+import { Button, Modal, Spinner, toast } from '@heroui/react'
 import { CircleAlert } from 'lucide-react'
 
 import type { MissingResource } from '@/store'
@@ -72,6 +72,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
   const [downloadTarget, setDownloadTarget] = useState<MissingResource | null>(null)
   const openedRef = useRef(false)
   const runRef = useRef(0)
+  const failureToastStageRef = useRef<Stage | null>(null)
 
   const runCheck = useCallback(() => {
     const run = (runRef.current += 1)
@@ -139,6 +140,10 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
         if (alive()) {
           setFailureContext({ supportCode: environmentSupportCode })
           setStage('environmentFailed')
+          toast.danger(t('errors.unknownFailure'), {
+            timeout: 0,
+            actionProps: { children: t('runtime.recheck'), onPress: runCheck },
+          })
         }
         return
       }
@@ -253,6 +258,25 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
   const engineFailed = stage === 'engineFailed'
   const environmentPending = stage === 'environment'
   const environmentFailed = stage === 'environmentFailed'
+  useEffect(() => {
+    if (!isOpen) {
+      failureToastStageRef.current = null
+      return
+    }
+    if (stage !== 'engineFailed' && stage !== 'modelCheckFailed') {
+      failureToastStageRef.current = null
+      return
+    }
+    if (failureToastStageRef.current === stage) return
+    failureToastStageRef.current = stage
+    toast.danger(stage === 'engineFailed' ? t('errors.engineNotReady') : t('errors.engineOperationFailed'), {
+      timeout: 0,
+      actionProps: {
+        children: t(stage === 'engineFailed' ? 'errors.engineNotReadyAction' : 'runtime.recheck'),
+        onPress: runCheck,
+      },
+    })
+  }, [isOpen, runCheck, stage, t])
   const close = (open: boolean) => {
     if (!open) {
       runRef.current += 1
@@ -281,17 +305,6 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
             <Modal.Body className="flex flex-col gap-3">
               <ChecklistRow done={!environmentPending && !environmentFailed} failed={environmentFailed}
                 pending={environmentPending} label={t('runtime.checking')} failedLabel={t('runtime.noticeTitle')} />
-              {environmentFailed ? <Alert status="danger"><Alert.Content><Alert.Description>{
-                missingRuntime === 'crisp'
-                  ? `${t('runtime.crisp')} · ${t('runtime.missing')}`
-                  : failureContext?.supportCode === 'RNT-001'
-                  ? t('errors.torchRuntimeUnavailable')
-                  : failureContext?.supportCode === 'RNT-002'
-                    ? t('errors.llamaRuntimeUnavailable')
-                    : t('errors.unknownFailure')
-              }</Alert.Description>
-                <Button variant="tertiary" size="sm" onPress={runCheck}>{t('runtime.recheck')}</Button>
-              </Alert.Content></Alert> : null}
               {!environmentPending && !environmentFailed ? <>
               <ChecklistRow
                 done={stage !== 'devices' && deviceOk}
@@ -319,38 +332,6 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
                 />
               )}
               </> : null}
-              {/*
-               * The engine is down: state the cause and offer the way out, reusing
-               * the `errors.engineNotReady` copy pair (ENG-001 plus its action).
-               *
-               * "Retry" reruns this device check, whose first step is
-               * `ensureReady()`, so it literally retries the engine start. Same
-               * Alert+Button shape as `IdleGuide` and the `main.tsx` banner.
-               */}
-              {engineFailed ? (
-                <Alert status="danger">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title className="nola-body-strong">{t('errors.engineNotReady')}</Alert.Title>
-                    <Alert.Description className="nola-caption">
-                      <Button
-                        variant="tertiary"
-                        size="sm"
-                        className="rounded-[6px]"
-                        onPress={runCheck}
-                      >
-                        {t('errors.engineNotReadyAction')}
-                      </Button>
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert>
-              ) : null}
-              {stage === 'modelCheckFailed' ? (
-                <Alert status="danger">
-                  <Alert.Indicator />
-                  <Alert.Content><Alert.Title className="nola-body-strong">{t('errors.engineOperationFailed')}</Alert.Title></Alert.Content>
-                </Alert>
-              ) : null}
               {stage === 'ready' ? (
                 deviceOk ? (
                   <p className="nola-caption flex items-center gap-2 text-success">

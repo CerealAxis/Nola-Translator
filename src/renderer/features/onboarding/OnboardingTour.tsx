@@ -274,6 +274,7 @@ function TourSteps() {
   }, [step, path, index, moveTo])
 
   useEffect(() => {
+    if (finished) return
     const previous = document.activeElement
     const keyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
@@ -286,7 +287,7 @@ function TourSteps() {
       const restore = previous instanceof HTMLElement && previous.isConnected ? previous : document.querySelector<HTMLElement>('.nola-nav-button[aria-current="page"]')
       restore?.focus({ preventScroll: true })
     }
-  }, [])
+  }, [finished])
 
   const resume = () => {
     if (step?.model && !document.querySelector(tourTarget('model-detail'))) {
@@ -299,21 +300,22 @@ function TourSteps() {
   const missing = !geometry?.target
   const skipChapter = () => moveTo(TOUR_STEPS.findIndex(item => item.chapter > chapter) < 0 ? TOUR_STEPS.length : TOUR_STEPS.findIndex(item => item.chapter > chapter))
 
+  if (finished) return <TourCompletion onExit={() => { actions.settings.stopOnboarding(); navigate('#/') }} />
+
   return createPortal(
     <div className="onboarding-tour z-onboarding" data-react-aria-top-layer="true" data-step={step?.id ?? 'complete'} data-inspecting={inspecting}>
-      {!away && !finished ? <svg className="onboarding-tour__mask" width="100%" height="100%" aria-hidden="true">
+      {!away ? <svg className="onboarding-tour__mask" width="100%" height="100%" aria-hidden="true">
         <path className="onboarding-tour__scrim" fillRule="evenodd" d={spotlightPath(geometry?.viewport ?? { width: window.innerWidth, height: window.innerHeight }, geometry?.target ?? null, geometry?.radius ?? 0)} />
         {geometry?.target ? <rect className="onboarding-tour__outline" x={geometry.target.x} y={geometry.target.y} width={geometry.target.width} height={geometry.target.height} rx={geometry.radius} /> : null}
       </svg> : null}
       <Card ref={cardRef} tabIndex={-1} role="dialog" aria-modal="false" aria-labelledby="onboarding-heading" aria-describedby="onboarding-body"
-        className={['onboarding-tour__card', (step?.model || (geometry?.viewport.height ?? window.innerHeight) < 640) && 'onboarding-tour__card--compact', (finished || away) && 'onboarding-tour__card--center'].filter(Boolean).join(' ')}
-        data-ready={finished || away || geometry !== null}
-        style={geometry && !away && !finished ? { left: geometry.tip.x, top: geometry.tip.y, maxHeight: geometry.maxHeight } : undefined}>
+        className={['onboarding-tour__card', (step?.model || (geometry?.viewport.height ?? window.innerHeight) < 640) && 'onboarding-tour__card--compact', away && 'onboarding-tour__card--center'].filter(Boolean).join(' ')}
+        data-ready={away || geometry !== null}
+        style={geometry && !away ? { left: geometry.tip.x, top: geometry.tip.y, maxHeight: geometry.maxHeight } : undefined}>
         <div className="onboarding-tour__topline">
-          <span aria-hidden={finished}>{finished ? null : t('onboarding.chapterProgress', { current: chapter + 1, total: TOUR_CHAPTERS.length })}</span>
+          <span>{t('onboarding.chapterProgress', { current: chapter + 1, total: TOUR_CHAPTERS.length })}</span>
           <Button isIconOnly variant="secondary" size="sm" aria-label={t('onboarding.exit')} onPress={() => actions.settings.stopOnboarding()}><X aria-hidden="true" /></Button>
         </div>
-        {!finished ? <>
           <ol className="onboarding-tour__chapters" aria-label={t('onboarding.title')}>
             {TOUR_CHAPTERS.map((key, item) => <li key={key} aria-current={item === chapter ? 'step' : undefined} data-state={item < chapter ? 'complete' : item === chapter ? 'current' : 'upcoming'}>
               <span aria-hidden="true">{item < chapter ? <Check /> : item + 1}</span><span>{t(key)}</span>
@@ -322,8 +324,6 @@ function TourSteps() {
           <ProgressBar size="sm" aria-label={t('onboarding.title')} value={(index / TOUR_STEPS.length) * 100}>
             <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
           </ProgressBar>
-        </> : null}
-        {finished ? <TourCompletion onExit={() => { actions.settings.stopOnboarding(); navigate('#/') }} /> : <>
           <Card.Header><Card.Title id="onboarding-heading">{t(step.title)}</Card.Title></Card.Header>
           <Card.Content key={step.id} className="onboarding-tour__lesson">
             <p id="onboarding-body">{away ? t('onboarding.paused') : t(step.body)}</p>
@@ -344,7 +344,6 @@ function TourSteps() {
             <Button variant="tertiary" size="sm" onPress={() => moveTo(index + 1)}>{t('onboarding.skipStep')}</Button>
             <Button variant="tertiary" size="sm" onPress={skipChapter}>{t('onboarding.skipChapter')}</Button>
           </div>
-        </>}
       </Card>
     </div>, document.body,
   )
@@ -354,14 +353,19 @@ export interface TourCompletionProps { onExit: () => void }
 
 function TourCompletion({ onExit }: TourCompletionProps) {
   const { t } = useI18n()
-  return <>
-    <Card.Header><Card.Title id="onboarding-heading">{t('onboarding.finishTitle')}</Card.Title></Card.Header>
-    <Card.Content><p id="onboarding-body">{t('onboarding.finishBody')}</p></Card.Content>
-    <Card.Footer>
+  return <Modal.Backdrop isOpen onOpenChange={open => { if (!open) actions.settings.stopOnboarding() }} className="z-overlay" isDismissable={false}>
+    <Modal.Container size="md" placement="center">
+      <Modal.Dialog data-onboarding="complete">
+        <Modal.CloseTrigger aria-label={t('onboarding.exit')}><X aria-hidden="true" /></Modal.CloseTrigger>
+        <Modal.Header><Modal.Heading>{t('onboarding.finishTitle')}</Modal.Heading></Modal.Header>
+        <Modal.Body><p>{t('onboarding.finishBody')}</p></Modal.Body>
+        <Modal.Footer>
       <Link className="onboarding-welcome__link button button--sm button--secondary" href="https://github.com/CerealAxis/Nola-Translator" target="_blank" rel="noreferrer">
         <Github aria-hidden="true" />{t('onboarding.githubHome')}
       </Link>
       <Button variant="primary" size="sm" onPress={onExit}>{t('onboarding.finishExit')}</Button>
-    </Card.Footer>
-  </>
+        </Modal.Footer>
+      </Modal.Dialog>
+    </Modal.Container>
+  </Modal.Backdrop>
 }

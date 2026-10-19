@@ -1,20 +1,49 @@
 .app-update-dialog.modal__dialog--lg {
-  width: min(56rem, calc(100vw - var(--space-6) - var(--space-6)));
+  width: min(48rem, calc(100vw - var(--space-3) - var(--space-3)));
   max-width: none;
+  max-height: calc(100dvh - var(--space-3) - var(--space-3));
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--foreground);
 }
 
-.app-update-dialog-body {
-  scrollbar-width: none;
+.app-update-dialog .app-update-dialog-header {
+  flex-shrink: 0;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--separator);
 }
 
-.app-update-dialog-body::-webkit-scrollbar {
-  display: none;
+.app-update-dialog-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  color: var(--muted);
+  font: var(--font-caption);
+}
+
+.app-update-dialog .app-update-dialog-body {
+  min-height: 0;
+  padding: var(--space-3);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.app-update-dialog .app-update-dialog-footer {
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--separator);
+  background: var(--surface-secondary);
 }
 
 .app-update-markdown {
   min-width: 0;
-  color: var(--muted);
-  font: var(--nola-text-body);
+  color: var(--foreground);
+  font: var(--font-body);
   overflow-wrap: anywhere;
 }
 
@@ -30,10 +59,39 @@
   border-radius: var(--radius-md);
 }
 
+.app-update-markdown a img {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.app-update-image-fallback {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  margin-block: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
+  color: var(--muted);
+  font: var(--font-caption);
+}
+
+.app-update-image-fallback svg {
+  flex-shrink: 0;
+  width: var(--space-2);
+  height: var(--space-2);
+}
+
 .app-update-markdown :is(h1, h2, h3, h4) {
-  margin: var(--space-2) 0 var(--space-1);
+  margin: var(--space-3) 0 var(--space-2);
   color: var(--foreground);
-  font: var(--nola-text-subtitle);
+  font: var(--font-title);
+}
+
+.app-update-markdown h1 {
+  font: var(--font-h2);
 }
 
 .app-update-markdown :is(p, ul, ol, blockquote, pre, table) {
@@ -42,6 +100,14 @@
 
 .app-update-markdown :is(ul, ol) {
   padding-inline-start: var(--space-3);
+}
+
+.app-update-markdown ul {
+  list-style-type: disc;
+}
+
+.app-update-markdown ol {
+  list-style-type: decimal;
 }
 
 .app-update-markdown li + li {
@@ -63,12 +129,13 @@
 }
 
 .app-update-markdown .markdown-alert {
-  --app-update-alert-accent: var(--info);
+  --app-update-alert-accent: var(--accent);
   margin-block: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-inline-start: 3px solid var(--app-update-alert-accent);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklch, var(--app-update-alert-accent) 8%, var(--surface));
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-inline-start: 2px solid var(--app-update-alert-accent);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
 }
 
 .app-update-markdown .markdown-alert-tip {
@@ -83,6 +150,16 @@
   margin-block: 0 var(--space-1);
   color: var(--app-update-alert-accent);
   font-weight: 600;
+}
+
+.app-update-markdown .markdown-alert > :last-child {
+  margin-bottom: 0;
+}
+
+.app-update-markdown hr {
+  margin-block: var(--space-3);
+  border: 0;
+  border-top: 1px solid var(--separator);
 }
 
 .app-update-markdown :not(pre) > code {

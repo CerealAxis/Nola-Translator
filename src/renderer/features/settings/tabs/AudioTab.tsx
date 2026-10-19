@@ -1,4 +1,5 @@
 import { useModelOptions } from '@/model-options'
+import { recognitionLanguages } from '../../../../shared/model-capabilities'
 /**
  * Audio and recognition: source device, recognition model, source language, audio retention.
  *
@@ -32,6 +33,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
   const { t, language } = useI18n()
   const modelChoices = useModelOptions()
   const devices = useStore(stores.models, (state) => state.devices)
+  const resources = useStore(stores.models, state => state.resources)
   const credentials = useStore(stores.models, state => state.credentials)
   const provider = settings.recognition.provider ?? 'local'
   // Retention is on by default: with it off nothing can be replayed or exported, and
@@ -118,8 +120,15 @@ export function AudioTab({ settings }: SettingsPanelProps) {
             options={modelOptions}
             ariaLabel={t('settings.recognitionModel')}
             onChange={(value) => {
+              const supported = recognitionLanguages(resources.find(model => model.resourceId === value))
+              const sourceLanguage = supported.includes(settings.recognition.sourceLanguage)
+                ? settings.recognition.sourceLanguage
+                : supported.includes('auto') ? 'auto' : settings.recognition.sourceLanguage
+              if (sourceLanguage === settings.recognition.sourceLanguage && !supported.includes(sourceLanguage)) {
+                toast.danger(t('errors.unsupportedRecognitionLanguage', { language: languageName(sourceLanguage, language) }))
+              }
               void updateSettings({
-                recognition: { modelId: value },
+                recognition: { modelId: value, sourceLanguage },
               }).catch(() => undefined)
             }}
           />

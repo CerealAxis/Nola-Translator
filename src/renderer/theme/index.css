@@ -27,6 +27,7 @@
 
 @layer base {
   :root {
+    --selection-neutral: color-mix(in oklch, var(--surface) 90%, var(--foreground));
     /* --- Font families -------------------------------------------------------
        typography.css selects bundled CJK faces from the document language. Cascadia
        Mono and the generic families below it carry no CJK glyphs, so the region face

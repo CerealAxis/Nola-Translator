@@ -80,6 +80,8 @@ export function quantizationOf(record: ResourceRecord): string | null {
   if (id.includes('nf4')) return 'NF4'
   if (id.includes('bf16')) return 'BF16'
   if (id.includes('f16')) return 'F16'
+  if (id.includes('fp8')) return 'FP8'
+  if (id.includes('fp4')) return 'FP4'
   if (id.includes('qwen3-asr') && record.provider === 'qwen3-asr') return 'NF4'
   return null
 }

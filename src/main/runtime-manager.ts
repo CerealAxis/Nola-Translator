@@ -3,7 +3,7 @@ import { logDiagnostic, processFailure } from './session-log'
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { access, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { net, session } from 'electron'
@@ -119,7 +119,7 @@ export class RuntimeManager {
       const previous = this.local[kind]
       const unique = [...new Set([previous.path, ...paths].filter(Boolean))]
       for (const path of unique) {
-        const actual = kind === 'engine'
+        let actual = kind === 'engine'
           ? this.pythonState.ready ? await probeLocalEngine(python, path) : { ...missingLocalRuntime(path), status: 'failed' as const, reason: this.pythonState.reason }
           : await probeLocalLlama(path)
         let id: string | undefined
@@ -137,11 +137,15 @@ export class RuntimeManager {
             (recipe.xformersVersion ?? '') === (actual.xformersVersion ?? '') &&
             (recipe.backend !== 'cuda' || recipe.wheel.filename.includes(`+${actual.version.split('+')[1]}-`)))?.id
         }
+        const bundledLlama = kind === 'llama' && actual.status === 'ready' && actual.backend === 'vulkan'
+          && this.options.localLlamaDirectory !== undefined
+          && resolve(path).toLowerCase() === resolve(this.options.localLlamaDirectory).toLowerCase()
         if (!id && kind === 'llama' && actual.status === 'ready') {
           id = this.packages.find(item => item.backend === actual.backend && item.version === actual.version &&
             (item.backend !== 'cuda' || !!actual.cudaVersion && item.name.includes(`CUDA ${actual.cudaVersion}`)))?.id
         }
-        const found = { ...actual, id, managed }
+        if (bundledLlama && id && await this.bundledRuntimeDisabled(id)) actual = missingLocalRuntime(path)
+        const found = { ...actual, id, managed, bundled: bundledLlama }
         if (actual.status === 'ready') return found
         if (actual.status !== 'missing' && !failure) failure = found
       }
@@ -157,12 +161,13 @@ export class RuntimeManager {
       const base = join(this.options.baseDirectory, 'Lib', 'site-packages')
       const managedProbe = this.pythonState.ready ? await probeLocalCrisp(python, managed) : missingLocalRuntime(managed)
       const baseProbe = this.pythonState.ready ? await probeLocalCrisp(python, base) : missingLocalRuntime(base)
+      const bundledDisabled = await this.bundledRuntimeDisabled(CRISP_ID)
       const managedMarker = await readFile(join(managed, 'runtime-installed.json'), 'utf8')
         .then(value => { try { return JSON.parse(value) as { id?: string; kind?: string } } catch { return null } }, () => null)
       crisp = managedProbe.status === 'ready' && managedMarker?.id === CRISP_ID && managedMarker.kind === 'crisp' ? { ...managedProbe, id: CRISP_ID, managed: true }
-        : baseProbe.status === 'ready' ? { ...baseProbe, id: 'bundled', managed: false }
+        : baseProbe.status === 'ready' && !bundledDisabled ? { ...baseProbe, id: CRISP_ID, managed: false, bundled: true }
           : managedProbe.status === 'ready' ? { ...managedProbe, status: 'incompatible', reason: 'CrispASR 目录缺少安装记录' }
-            : managedProbe.status !== 'missing' ? managedProbe : baseProbe
+            : managedProbe.status !== 'missing' ? managedProbe : bundledDisabled ? missingLocalRuntime(base) : baseProbe
     }
     this.local = { engine, llama, crisp }
     logDiagnostic('runtime.components.checked', { components, python: this.pythonState, local: this.local })
@@ -205,6 +210,31 @@ export class RuntimeManager {
     if (!path || path.startsWith('..') || isAbsolute(path)) throw new Error('组件路径无效')
     return target
   }
+  private bundledRuntimeMarker(id: string): string { return join(this.directory, `bundled-${id}.disabled`) }
+  private async bundledRuntimeDisabled(id: string): Promise<boolean> {
+    return access(this.bundledRuntimeMarker(id)).then(() => true, () => false)
+  }
+  private async setBundledRuntimeEnabled(id: string, enabled: boolean): Promise<void> {
+    const marker = this.bundledRuntimeMarker(id)
+    if (enabled) await rm(marker, { force: true })
+    else {
+      await mkdir(this.directory, { recursive: true })
+      await writeFile(marker, 'disabled', 'utf8')
+    }
+  }
+  private async isBundledRuntime(kind: 'engine' | 'llama' | 'crisp', id: string): Promise<boolean> {
+    if (kind === 'crisp') {
+      if (id !== CRISP_ID || !this.pythonState.ready) return false
+      const base = join(dirname(this.pythonState.path), 'Lib', 'site-packages')
+      const actual = await probeLocalCrisp(this.pythonState.path, base)
+      return actual.status === 'ready' && actual.version === '0.8.43' && actual.backend === 'vulkan'
+    }
+    if (kind !== 'llama' || !this.options.localLlamaDirectory) return false
+    const item = this.packages.find(packageItem => packageItem.id === id)
+    if (!item) return false
+    const actual = await probeLocalLlama(this.options.localLlamaDirectory)
+    return actual.status === 'ready' && actual.backend === 'vulkan' && actual.backend === item.backend && actual.version === item.version
+  }
   private async installed(item: RuntimePackage): Promise<boolean> {
     try {
       const marker = JSON.parse(await readFile(join(this.inside(item.id), 'runtime-installed.json'), 'utf8'))
@@ -237,6 +267,11 @@ export class RuntimeManager {
     } else {
       const item = this.packages.find(p => p.id === id)
       if (!item) throw new Error('安装组合不在清单中')
+      if (await this.isBundledRuntime('llama', id)) {
+        await this.setBundledRuntimeEnabled(id, true)
+        await this.recheck(['llama'])
+        return
+      }
       if (repair || !await this.installed(item)) await this.perform(item)
       actual = await probeLocalLlama(this.inside(id))
     }
@@ -258,8 +293,13 @@ export class RuntimeManager {
     logDiagnostic('runtime.uninstall.request', { kind })
     if (this.operation || this.python?.operation || this.checking) throw new Error('已有组件检查或安装任务')
     const current = this.local[kind]
-    if (!current || current.status !== 'ready' || !current.managed || !current.id) throw new Error('只能卸载由软件管理的运行组件')
-    await this.removeManagedRuntime(kind, current.id)
+    if (!current || current.status !== 'ready' || !current.id || (!current.managed && !current.bundled)) {
+      throw new Error('只能卸载由软件管理或随包提供的运行组件')
+    }
+    if (current.bundled || await this.isBundledRuntime(kind, current.id)) {
+      await this.setBundledRuntimeEnabled(current.id, false)
+    }
+    if (current.managed) await this.removeManagedRuntime(kind, current.id)
     await this.recheck([kind])
     logDiagnostic('runtime.uninstall.complete', { kind })
   }
@@ -279,8 +319,17 @@ export class RuntimeManager {
     await removeRuntimeArtifact(this.directory, this.inside(CRISP_ID))
   }
   private async installCrisp(repair: boolean, offline?: { files: string[]; signal: AbortSignal }): Promise<void> {
-    if (!repair && this.local.crisp?.status === 'ready' && this.local.crisp.id === CRISP_ID) return
+    if (!repair && this.local.crisp?.status === 'ready' && this.local.crisp.id === CRISP_ID
+      && (this.local.crisp.managed || this.local.crisp.bundled)) return
     offline?.signal.throwIfAborted()
+    const base = join(dirname(this.pythonState.path), 'Lib', 'site-packages')
+    const bundled = this.pythonState.ready ? await probeLocalCrisp(this.pythonState.path, base) : missingLocalRuntime(base)
+    if (bundled.status === 'ready' && bundled.version === '0.8.43' && bundled.backend === 'vulkan'
+      && (!this.local.crisp?.managed || !repair)) {
+      await this.setBundledRuntimeEnabled(CRISP_ID, true)
+      await this.recheck(['crisp'])
+      return
+    }
     const controller = new AbortController()
     this.cancellation = controller
     const abort = (): void => controller.abort()

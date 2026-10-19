@@ -13,8 +13,9 @@ from ..translation.llama_server import LlamaServerManager
 
 
 class LlamaAsrRuntime:
-    def __init__(self, manager: LlamaServerManager):
+    def __init__(self, manager: LlamaServerManager, *, qwen_format: bool = True):
         self.manager = manager
+        self.qwen_format = qwen_format
 
     @property
     def loaded(self) -> bool:
@@ -42,8 +43,13 @@ class LlamaAsrRuntime:
         messages = [{"role": "system", "content": ""}, {"role": "user", "content": [
             {"type": "input_audio", "input_audio": {"data": base64.b64encode(buffer.getvalue()).decode('ascii'), "format": "wav"}},
         ]}]
+        if not self.qwen_format:
+            prompt = 'Transcribe this audio. Return only the transcript.'
+            if language:
+                prompt += f' The spoken language is {language}.'
+            messages[1]['content'].insert(0, {'type': 'text', 'text': prompt})
         # The official Qwen3-ASR format supports language-prefilled assistant output.
-        hint = CODE_TO_NAME.get(language or "")
+        hint = CODE_TO_NAME.get(language or "") if self.qwen_format else None
         prefill = f"language {hint}<asr_text>" if hint else ""
         if prefill:
             messages.append({"role": "assistant", "content": prefill})

@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { toast } from '@heroui/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as store from '@/store'
 import type { NolaBridge } from '@/bridge'
@@ -45,10 +46,11 @@ it('keeps a pending confirmation visible and prevents repeated close requests', 
 
 it('reports a failed close and allows retrying instead of silently dismissing confirmation', async () => {
   const close = vi.fn().mockRejectedValueOnce(new Error('IPC unavailable')).mockResolvedValueOnce(undefined)
+  const failureToast = vi.spyOn(toast, 'danger').mockImplementation(() => 'toast')
   vi.spyOn(console, 'error').mockImplementation(() => {})
   const { confirm } = setup(close)
   fireEvent.click(confirm)
-  expect(await screen.findByRole('alert')).toHaveTextContent('关闭失败')
+  await waitFor(() => expect(failureToast).toHaveBeenCalledWith('关闭失败，请重试。'))
   fireEvent.click(screen.getByRole('button', { name: '关闭并停止' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   expect(close).toHaveBeenCalledTimes(2)

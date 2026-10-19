@@ -3,6 +3,9 @@ from .protocol import ModelConfiguration
 from .translation.index_translate_languages import LANGUAGE_NAMES as INDEX_TRANSLATE_LANGUAGE_NAMES
 
 QWEN_LANGUAGES = ['zh', 'en', 'yue', 'ar', 'de', 'fr', 'es', 'pt', 'id', 'it', 'ko', 'ru', 'th', 'vi', 'ja', 'tr', 'hi', 'ms', 'nl', 'sv', 'da', 'fi', 'pl', 'cs', 'fil', 'fa', 'el', 'hu', 'mk', 'ro']
+FUN_ASR_NANO_LANGUAGES = ['zh', 'en', 'ja', 'yue']
+VIBEVOICE_ASR_LANGUAGES = ['en', 'zh', 'es', 'pt', 'de', 'ja', 'ko', 'fr', 'ru', 'id', 'sv', 'it', 'he', 'nl', 'pl', 'no', 'tr', 'th', 'ar', 'hu', 'ca', 'cs', 'da', 'fa', 'af', 'hi', 'fi', 'et', 'el', 'ro', 'vi', 'bg', 'is', 'sl', 'sk', 'lt', 'sw', 'uk', 'lv', 'hr', 'ne', 'sr', 'tl', 'ms', 'ur', 'mn', 'hy', 'jv']
+MIMO_ASR_LANGUAGES = ['zh', 'en', 'yue']
 
 def normalize(code: str) -> str:
     key = code.strip().lower()

@@ -88,7 +88,7 @@ class SenseVoiceRuntime:
                 started_at = monotonic()
                 model = AutoModel(
                     model=str(self.model_dir), device=device, disable_update=True,
-                    ncpu=cpu_threads(self.threads),
+                    ncpu=cpu_threads(self.threads), trust_remote_code=False,
                 )
                 write_debug('engine', 'model.weights.timing', {'adapter': 'sensevoice', 'elapsedMs': round((monotonic() - started_at) * 1000)})
             except Exception as error:
@@ -164,6 +164,23 @@ def _parse_text(raw: str) -> tuple[str, str | None]:
         return "", None
     detected = language.group(1).lower() if language else ""
     return body, detected if detected in SUPPORTED_LANGUAGES else None
+
+
+class FunAsrRuntime(SenseVoiceRuntime):
+    """Run built-in FunASR models without assuming SenseVoice output tags or languages."""
+
+    def _transcribe_locked(self, samples, *, language):
+        audio = np.asarray(samples, dtype=np.float32).reshape(-1)
+        if not audio.size:
+            return '', language
+        self.load()
+        results = self._model.generate(input=np.ascontiguousarray(audio), cache={})
+        if not isinstance(results, list) or any(not isinstance(item, dict) or 'text' not in item for item in results):
+            raise SenseVoiceModelUnavailable('FunASR returned invalid transcription results')
+        raw = ' '.join(str(item['text']).strip() for item in results)
+        if _TAG_PREFIX.match(raw):
+            return _parse_text(raw)
+        return raw.strip(), language
 
 
 _runtimes: dict[tuple, SenseVoiceRuntime] = {}

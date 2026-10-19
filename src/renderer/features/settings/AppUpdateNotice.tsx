@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button, Link, Modal, toast } from '@heroui/react'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, ImageOff } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { rehypeGithubAlerts } from 'rehype-github-alerts'
 import rehypeRaw from 'rehype-raw'
@@ -64,6 +64,15 @@ function normalizeReleaseNotesCallouts(markdown: string): string {
   )
 }
 
+function ReleaseImage({ alt, src, width, height }: React.ImgHTMLAttributes<HTMLImageElement>): ReactNode {
+  const { t } = useI18n()
+  const [failed, setFailed] = useState(false)
+  if (!src) return null
+  return failed
+    ? <span className="app-update-image-fallback"><ImageOff aria-hidden="true" />{alt || t('appUpdate.notesUnavailable')}</span>
+    : <img src={src} alt={alt ?? ''} width={width} height={height} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
+}
+
 export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, isOpening, isCurrentVersion = false }: AppUpdateDialogProps): ReactNode {
   const { t } = useI18n()
   // A result without these renders nothing in the wrapper, so the fallbacks never show.
@@ -74,14 +83,14 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
       <Modal.Backdrop className="z-overlay">
         <Modal.Container size="lg" placement="center">
           <Modal.Dialog className="app-update-dialog rounded-2xl border border-border">
-            <Modal.Header>
+            <Modal.Header className="app-update-dialog-header">
               <Modal.Heading className="nola-title text-foreground">{t(isCurrentVersion ? 'appUpdate.currentReleaseTitle' : 'appUpdate.title')}</Modal.Heading>
+              <div className="app-update-dialog-meta">
+                <span>{t('appUpdate.version', { version: latestVersion })}</span>
+                {!isCurrentVersion && <span>{t('appUpdate.currentVersion', { version: displayVersion(result.currentVersion) })}</span>}
+              </div>
             </Modal.Header>
-            <Modal.Body className="app-update-dialog-body flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
-              <div className="nola-body-strong">{displayReleaseName(result.releaseName)}</div>
-              <div className="nola-caption text-muted">{t('appUpdate.version', { version: latestVersion })}</div>
-              <div className="nola-caption text-muted">{t('appUpdate.currentVersion', { version: displayVersion(result.currentVersion) })}</div>
-              <h3 className="nola-body-strong mt-2">{t('appUpdate.notes')}</h3>
+            <Modal.Body className="app-update-dialog-body nola-scrollbar">
               {result.releaseNotes.trim()
                 ? (
                   <div className="app-update-markdown">
@@ -92,18 +101,16 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
                         a: ({ href, children }) => href
                           ? <Link href={href} target="_blank" rel="noreferrer" className="app-update-markdown__link">{children}</Link>
                           : <>{children}</>,
-                        img: ({ alt, src, width, height }) => src
-                          ? <img src={src} alt={alt ?? ''} width={width} height={height} />
-                          : null,
+                        img: ReleaseImage,
                       }}
                     >
                       {normalizeReleaseNotesCallouts(result.releaseNotes)}
                     </ReactMarkdown>
                   </div>
                 )
-                : <div className="nola-caption text-muted">{t('appUpdate.notesUnavailable')}</div>}
+                : <div className="nola-caption text-muted">{displayReleaseName(result.releaseName)}<p>{t('appUpdate.notesUnavailable')}</p></div>}
             </Modal.Body>
-            <Modal.Footer>
+            <Modal.Footer className="app-update-dialog-footer">
               <Button variant="tertiary" onPress={() => onOpenChange(false)}>{t(isCurrentVersion ? 'common.close' : 'appUpdate.later')}</Button>
               <Button onPress={() => void onOpenRelease(releaseUrl)} isPending={isOpening}>
                 <ArrowUpRight aria-hidden="true" />{t(isCurrentVersion ? 'appUpdate.viewAnnouncement' : 'appUpdate.openRelease')}

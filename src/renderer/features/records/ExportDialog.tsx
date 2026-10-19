@@ -2,13 +2,12 @@
  * Export dialog, opened by the primary action on the record detail page.
  *
  * Every outcome says something — success closes and leaves the path to the engine's
- * save dialog, while a thrown channel stays in the dialog on `t('errors.exportFailed')`,
- * which carries EXP-009.
+ * save dialog, while a thrown channel reports EXP-009 through the shared Toast style.
  */
 
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Alert, Button, Modal, ToggleButton, ToggleButtonGroup } from '@heroui/react'
+import { Button, Modal, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
 import type { Selection } from '@react-types/shared'
 
 import { useI18n } from '@/i18n'
@@ -34,7 +33,6 @@ export function ExportDialog({
 }: ExportDialogProps): ReactNode {
   const { t } = useI18n()
   const exporting = useStore(stores.meetings, (state) => state.exporting)
-  const error = useStore(stores.meetings, (state) => state.error)
 
   const [format, setFormat] = useState<ExportFormat>('txt')
 
@@ -56,10 +54,8 @@ export function ExportDialog({
         onExported?.(format)
         onOpenChange(false)
       })
-      .catch(() => {
-        // The error is already in store.error; the UI looks it up by errorCode.
-      })
-  }, [meetingId, format, onExported, onOpenChange])
+      .catch(() => toast.danger(t('errors.exportFailed')))
+  }, [meetingId, format, onExported, onOpenChange, t])
 
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
@@ -109,17 +105,6 @@ export function ExportDialog({
                 */}
                 <p className="nola-caption text-muted">{t('legal.aiGeneratedExport')}</p>
 
-                {/* state.error only decides whether to show the bar; its text is never rendered. */}
-                {error !== null ? (
-                  <Alert role="alert" status="danger" className="rounded-[8px]">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Description className="text-[13px] leading-[1.5]">
-                        {t('errors.exportFailed')}
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                ) : null}
               </div>
             </Modal.Body>
 

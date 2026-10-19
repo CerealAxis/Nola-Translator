@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Alert, AlertDialog, Button, Tag, TagGroup, ToggleButton, ToggleButtonGroup, Tooltip } from '@heroui/react'
+import { AlertDialog, Button, Tag, TagGroup, ToggleButton, ToggleButtonGroup, Tooltip } from '@heroui/react'
 import { Check, CircleHelp } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
@@ -23,6 +23,10 @@ function downloadSpeed(bytes: number, startedAt: number | undefined): string {
 export interface RuntimeVersionRow {
   kind: RuntimeKind
   version: string
+}
+
+export function isExternalRuntime(component: LocalRuntime | undefined): boolean {
+  return component?.status === 'ready' && !component.managed && !component.bundled
 }
 
 /** Only components with a real version belong in the compact summary. */
@@ -70,16 +74,15 @@ export function RuntimeComponents() {
     if (!local) return
     setSelected({ engine: local.engine.status === 'ready' ? local.engine.id ?? 'current' : '',
       llama: local.llama.status === 'ready' ? local.llama.id ?? 'current' : '',
-      crisp: local.crisp?.status === 'ready' ? local.crisp.managed ? local.crisp.id ?? 'current' : 'current' : '' })
+      crisp: local.crisp?.status === 'ready' ? local.crisp.id ?? 'current' : '' })
     setForce({ engine: false, llama: false, crisp: false })
     setRepairs({ engine: !!local.engine.managed && local.engine.status !== 'ready', llama: !!local.llama.managed && local.llama.status !== 'ready', crisp: !!local.crisp?.managed && local.crisp.status !== 'ready' })
   }, [local?.engine.path, local?.engine.id, local?.engine.status, local?.llama.path, local?.llama.id, local?.llama.status, local?.crisp?.path, local?.crisp?.id, local?.crisp?.status])
   const brand = (kind: RuntimeKind) => kind === 'engine' ? 'PyTorch' : kind === 'llama' ? 'llama.cpp' : 'CrispASR'
-  const external = (component: LocalRuntime | undefined) => component?.status === 'ready' && !component.managed
-  const status = (component: LocalRuntime) => external(component)
+  const status = (component: LocalRuntime) => isExternalRuntime(component)
     ? t('runtime.external')
     : t(`runtime.${component.status === 'ready' ? 'installed' : component.status === 'failed' ? 'failed' : 'missing'}`)
-  const sourceHint = (component: LocalRuntime | undefined) => external(component) ? t('runtime.externalHint') : undefined
+  const sourceHint = (component: LocalRuntime | undefined) => isExternalRuntime(component) ? t('runtime.externalHint') : undefined
   const description = (kind: RuntimeKind, component: LocalRuntime) => {
     if (component.status !== 'ready') return status(component)
     if (kind === 'crisp') return `CrispASR ${component.version} · Windows x64 (${component.backend === 'vulkan' ? 'Vulkan + CPU' : 'CPU'})`
@@ -108,11 +111,10 @@ export function RuntimeComponents() {
         label={t(kind === 'engine' ? 'runtime.pytorch' : kind === 'llama' ? 'runtime.llama' : 'runtime.crisp')}
         desc={sourceHint(local?.[kind])} descriptionTooltip={!!sourceHint(local?.[kind])}><span>{version}</span></SettingsRow>)}
     </SettingGroup>
-    {state.runtimeError ? <Alert status="danger"><Alert.Content><Alert.Description>{state.runtimeError}</Alert.Description></Alert.Content></Alert> : null}
     {sessionBusy ? <p className="compute-hint">{t('runtime.busy')}</p> : null}
     <SettingGroup legend={t('runtime.engines')} legendHint={<Tooltip delay={300}>
       <Button variant="secondary" size="sm" isIconOnly aria-label={`${t('runtime.engines')} — Info`} className="settings-row__help"><CircleHelp size={15} aria-hidden="true" /></Button>
-      <Tooltip.Content className="settings-row__tooltip">{t('runtime.enginesHint')}</Tooltip.Content>
+      <Tooltip.Content placement="top" crossOffset={0} className="settings-row__tooltip">{t('runtime.enginesHint')}</Tooltip.Content>
     </Tooltip>}>
       <div className="runtime-picker">
         <ToggleButtonGroup className="nola-segmented runtime-picker__group" selectionMode="single" disallowEmptySelection
@@ -130,16 +132,17 @@ export function RuntimeComponents() {
           : (kind === 'engine' ? runtimes?.recipes : runtimes?.packages)?.map(p => ({ value: p.id, label: p.name })) ?? []
         if (component?.status === 'ready' && !choices.some(p => p.value === component.id)) choices.unshift({ value: 'current', label: description(kind, component) })
         choices.unshift({ value: '', label: t('runtime.choose') })
-        const same = component?.status === 'ready' && component.managed && (selected[kind] === component.id || selected[kind] === 'current')
-        const uninstallable = component?.status === 'ready' && component.managed && !!component.id && selected[kind] === component.id
-        const owned = selected[kind] !== 'current' && (kind === 'crisp' ? component?.managed && selected[kind] === CRISP_RUNTIME_ID
-          : (kind === 'engine' ? runtimes?.recipes : runtimes?.packages)?.some(p => p.id === selected[kind] && p.installed))
+        const same = component?.status === 'ready' && (component.managed || component.bundled)
+          && (selected[kind] === component.id || selected[kind] === 'current')
+        const uninstallable = component?.status === 'ready' && (component.managed || component.bundled)
+          && !!component.id && selected[kind] === component.id
+        const owned = selected[kind] !== 'current' && (kind === 'crisp'
+          ? (component?.managed || component?.bundled) && selected[kind] === CRISP_RUNTIME_ID
+          : (component?.managed || component?.bundled) && selected[kind] === component?.id
+            || (kind === 'engine' ? runtimes?.recipes : runtimes?.packages)?.some(p => p.id === selected[kind] && p.installed))
         return <div key={kind} role="tabpanel" id={kind === active ? `runtime-${kind}` : undefined} hidden={kind !== active} className="runtime-panel-body">
           <SettingsRow label={t('runtime.current')} desc={sourceHint(component)} descriptionTooltip={!!sourceHint(component)}><span className="runtime-component-status">{component ? description(kind, component) : t('runtime.missing')}</span></SettingsRow>
-          <SettingsRow onboardingTarget={`runtime-version-${kind}`} label={t('runtime.select')} desc={kind === 'engine' ? <>
-            {t('runtime.versionHelpPrefix')} <a className="text-accent underline" href="https://licyk.github.io/SDNote/sd_launcher/advance/env/#pytorch" target="_blank" rel="noreferrer">{t('runtime.versionHelpLink')}</a><br />
-            {t('runtime.versionHelpSuffix')}
-          </> : undefined} descriptionTooltip={kind === 'engine'}><SettingSelect value={selected[kind]} options={choices} ariaLabel={t(kind === 'engine' ? 'runtime.installTorch' : kind === 'llama' ? 'runtime.installLlama' : 'runtime.installCrisp')} isDisabled={busy}
+          <SettingsRow onboardingTarget={`runtime-version-${kind}`} label={t('runtime.select')} desc={<a className="text-accent underline" href="https://nola.xaviermc.top/zh-CN/getting-started/environment" target="_blank" rel="noreferrer">{t('runtime.versionHelpLink')}</a>} descriptionTooltip><SettingSelect value={selected[kind]} options={choices} ariaLabel={t(kind === 'engine' ? 'runtime.installTorch' : kind === 'llama' ? 'runtime.installLlama' : 'runtime.installCrisp')} isDisabled={busy}
             onChange={value => { setSelected(previous => ({ ...previous, [kind]: value })); setForce(previous => ({ ...previous, [kind]: false })) }} /></SettingsRow>
           <SettingsRow label={t('runtime.force')}><SettingSwitch isSelected={force[kind]} isDisabled={busy || !owned} ariaLabel={t('runtime.force')}
             onChange={value => setForce(previous => ({ ...previous, [kind]: value }))} /></SettingsRow>

@@ -15,7 +15,6 @@ import { translationLanguages } from '../../../shared/model-capabilities'
 import type { BrowserConnectionStatus } from '../../../shared/browser'
 import { PageHeader } from '@/components/primitives'
 import { SettingSelect } from '../settings/SettingsPage'
-import { SETTINGS_WRITE_FAILURE_KEYS, settingsWriteFailure } from '../settings/settingsWriteError'
 import { openDefaultBrowser } from './openDefaultBrowser'
 import { isSessionAlreadyRunningError } from '../../../shared/ipc-error'
 import './video-captions.css'
@@ -78,7 +77,7 @@ export function VideoCaptionsPage() {
   const translationDisabled = targetLanguage === NO_TRANSLATION_LANGUAGE
   const display = translationDisabled ? 'source' : config.showSource && config.showTranslation ? 'both' : config.showSource ? 'source' : 'translation'
   const label = (code: string) => languageName(code, language)
-  const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch((error: unknown) => toast.danger(t(SETTINGS_WRITE_FAILURE_KEYS[settingsWriteFailure(error)]))) }
+  const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch(() => undefined) }
   /*
    * The picker is one flat list of strings while the setting is a source kind plus a device, so the
    * two are translated here rather than storing a sentinel inside the device id. Choosing a device

@@ -57,6 +57,9 @@ export function OfflineTaskProgress({ task, workflow }: OfflineTaskProgressProps
         </li>
       })}
     </ol>
-    {task.issue ? <div className="model-import-section-heading"><p role="alert" className="offline-task-progress__error">{t(`offline.${task.issue}`)}</p>{task.reason ? <ImportHelp label={t('offline.importInfo')}>{task.reason}</ImportHelp> : null}</div> : null}
+    {task.issue ? <div className="model-import-section-heading">
+      <p role="alert" className="offline-task-progress__error">{t(`offline.${task.issue}`)}</p>
+      {task.reason ? <ImportHelp label={t('offline.importInfo')}>{task.reason}</ImportHelp> : null}
+    </div> : null}
   </section>
 }

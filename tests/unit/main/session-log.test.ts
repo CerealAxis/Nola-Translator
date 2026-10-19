@@ -30,12 +30,12 @@ it('creates independent launch logs and preserves Windows crash details without 
   expect(await readdir(path)).toHaveLength(2)
 })
 
-it('retains only ten launch logs and preserves unrelated files', async () => {
+it('retains only five launch logs and preserves unrelated files', async () => {
   const path = await directory()
   await writeFile(join(path, 'keep.txt'), 'unrelated')
   for (let index = 0; index < 25; index++) await initializeSessionLog(path, { index })
   const names = await readdir(path)
-  expect(names.filter(name => name.endsWith('.jsonl') || name.endsWith('.jsonl.gz'))).toHaveLength(10)
+  expect(names.filter(name => name.endsWith('.jsonl') || name.endsWith('.jsonl.gz'))).toHaveLength(5)
   expect(names).toContain('keep.txt')
 })
 

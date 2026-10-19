@@ -44,7 +44,16 @@ from .models.qwen_gguf_catalog import QWEN3_ASR_GGUF_SPECS
 from .models.registry import CustomFile, CustomModelEntry, CustomModelRegistry
 from .local_models import declared_languages_from_snapshot
 from .protocol import ResourceChangedEvent, ResourceRecord, ModelConfiguration, NetworkSettings
-from .model_capabilities import QWEN_LANGUAGES, normalize, recognition_configuration, translation_configuration, supports_translation
+from .model_capabilities import (
+    FUN_ASR_NANO_LANGUAGES,
+    MIMO_ASR_LANGUAGES,
+    QWEN_LANGUAGES,
+    VIBEVOICE_ASR_LANGUAGES,
+    normalize,
+    recognition_configuration,
+    translation_configuration,
+    supports_translation,
+)
 from .hub import HYMT2_LANGUAGES
 from .translation.m2m100 import FLORES_LANGUAGES
 from .translation.index_translate import LANGUAGE_NAMES as INDEX_TRANSLATE_LANGUAGE_NAMES
@@ -215,7 +224,8 @@ RESOURCE_DEFINITIONS = _definitions() + tuple(
 ) + tuple(
     ResourceDefinition(spec.model_id, "recognitionModel", "crisp-asr",
         ("Fun-ASR Nano" if spec.model_id.startswith("fun-") else "VibeVoice-ASR" if spec.model_id.startswith("vibevoice-") else "MiMo-V2.5-ASR" if spec.model_id.startswith("mimo-") else "SenseVoiceSmall" if spec.model_id.startswith("sensevoice-") else f"Qwen3-ASR {'0.6B' if '-0.6b-' in spec.model_id else '1.7B'}") + " " + ("Q4_K" if spec.model_id.endswith("q4-k") else "Q8_0" if spec.model_id.endswith("q8-0") else "F16"),
-        "CrispASR GGUF 语音识别模型。", tuple(normalize(code) for code in QWEN_LANGUAGES) if spec.model_id.startswith("qwen3-") else ("zh", "en", "yue", "ja", "ko") if spec.model_id.startswith("sensevoice-") else ("zh", "en"), spec.total_bytes)
+        ("Fun-ASR Nano 支持中文、英语、日语及中文方言。" if spec.model_id.startswith("fun-") else "VibeVoice-ASR 支持 48 种语言并可自动检测。" if spec.model_id.startswith("vibevoice-") else "MiMo-V2.5-ASR 支持中文（含多种方言）、英语及中英混说，可自动检测。" if spec.model_id.startswith("mimo-") else "CrispASR GGUF 语音识别模型。"),
+        tuple(normalize(code) for code in QWEN_LANGUAGES) if spec.model_id.startswith("qwen3-") else ("zh", "en", "yue", "ja", "ko") if spec.model_id.startswith("sensevoice-") else tuple(FUN_ASR_NANO_LANGUAGES) if spec.model_id.startswith("fun-") else tuple(VIBEVOICE_ASR_LANGUAGES) if spec.model_id.startswith("vibevoice-") else tuple(MIMO_ASR_LANGUAGES), spec.total_bytes)
     for spec in CRISP_ASR_SPECS
 ) + (ResourceDefinition(HYMT2_7B_RESOURCE_ID, "translationModel", "hymt2",
     "Hy-MT2 7B Q4_K_M", "腾讯官方 7B Q4_K_M 多语言翻译模型。",
@@ -290,6 +300,8 @@ class ResourceManager:
         """Absolute path of the single GGUF a llama.cpp translation resource loads.
         """
         spec = self._spec(resource_id)
+        if self.registry.get(resource_id) and spec.files[0].path.lower().endswith('.gguf'):
+            return self.model_root / spec.directory / spec.files[0].path
         ggufs = [entry for entry in spec.files if entry.path.casefold().endswith(".gguf") and "mmproj-" not in Path(entry.path).name.casefold()]
         if not ggufs:
             raise ResourceActionError("invalidConfiguration", {"reason": "翻译模型资源里没有 GGUF 权重"})
@@ -298,9 +310,23 @@ class ResourceManager:
     def audio_projector_path(self, resource_id: str) -> Path:
         spec = self._spec(resource_id)
         projectors = [entry for entry in spec.files if "mmproj-" in Path(entry.path).name.casefold() and entry.path.casefold().endswith(".gguf")]
+        primary = Path(self.translation_gguf_path(resource_id)).name
+        matching = next((entry for entry in projectors if Path(entry.path).name.casefold() == ('mmproj-' + primary).casefold()), None)
+        if matching is not None:
+            return self.model_root / spec.directory / matching.path
         if len(projectors) != 1:
             raise ResourceActionError("invalidConfiguration", {"reason": "需要唯一的配套 mmproj 音频编码器"})
         return self.model_root / spec.directory / projectors[0].path
+
+    def recognition_weight_path(self, resource_id: str) -> Path:
+        spec = self._spec(resource_id)
+        if self.registry.get(resource_id):
+            return self.model_root / spec.directory / spec.files[0].path
+        weight = next((entry for entry in spec.files if entry.path.lower().endswith(('.gguf', '.bin', '.ggml', '.ggmf'))
+                       and not any(part in Path(entry.path).name.lower() for part in ('tokenizer', 'codec', 'voice-', 'mmproj'))), None)
+        if weight is None:
+            raise ResourceActionError('invalidConfiguration', {'reason': 'Missing native recognition weight'})
+        return self.model_root / spec.directory / weight.path
 
     def translation_chat_template(self, resource_id: str) -> str | None:
         entry = self.registry.get(resource_id)
@@ -584,8 +610,8 @@ class ResourceManager:
         """
         adapter = adapter_by_id(entry.adapter_id)
         label = adapter.label if adapter is not None else entry.adapter_id
-        kind: Literal["recognitionModel", "translationModel"] = (
-            "recognitionModel" if entry.slot == "recognition" else "translationModel"
+        kind: Literal["recognitionModel", "translationModel", "ttsModel"] = (
+            "recognitionModel" if entry.slot == "recognition" else "ttsModel" if entry.slot == "synthesis" else "translationModel"
         )
         if entry.adapter_id == "llama.cpp":
             description = (
@@ -620,7 +646,7 @@ class ResourceManager:
         entry = self.registry.get(resource_id)
         if entry is None:
             raise ResourceActionError("invalidConfiguration", {"reason": "recommendedConfigurationIsFixed"})
-        expected_engine = "llama" if entry.adapter_id in ("llama.cpp", "llama-asr") else "pytorch"
+        expected_engine = "llama" if entry.adapter_id in ("llama.cpp", "llama-asr") else "crisp" if entry.adapter_id.startswith('crisp-') else "pytorch"
         if configuration.slot != entry.slot or configuration.engine != expected_engine:
             raise ResourceActionError("invalidConfiguration", {"reason": "modelLoaderMismatch"})
         required = [configuration.languages] if entry.slot == "recognition" else [configuration.sourceLanguages, configuration.targetLanguages]

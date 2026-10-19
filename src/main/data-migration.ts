@@ -1,5 +1,5 @@
 import { copyFile, lstat, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
-import { createReadStream } from 'node:fs'
+import { createReadStream, existsSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { dirname, join, resolve, sep } from 'node:path'
 
@@ -19,6 +19,16 @@ export const DATA_ROOT_ENTRIES: readonly string[] = [
   'cache',
   'runtimes',
 ]
+
+/**
+ * The allowlisted entries a root actually holds.
+ *
+ * A root that holds none of them is an empty folder rather than a data root, which is what tells
+ * an install with data from one without.
+ */
+export function dataRootEntries(root: string): string[] {
+  return DATA_ROOT_ENTRIES.filter((name) => existsSync(join(root, name)))
+}
 
 /**
  * The one allowlisted file that is rewritten rather than byte-copied, and the only field in it that
@@ -45,7 +55,7 @@ export type DataRootMigrationReport = {
   skipped: string[]
   /** Read, copy or removal failed, so the entry stays where it is and is never deleted. */
   failed: string[]
-  /** Entries removed from the source afterwards. */
+  /** Entries removed from the source afterwards; a plan names the entries the move would remove. */
   removed: string[]
   /** Bytes that had to be copied, for the destination's free-space precheck. Undefined when the roots were refused. */
   requiredBytes?: number
@@ -76,6 +86,16 @@ type Survey = {
 
 function emptyReport(): DataRootMigrationReport {
   return { copied: [], skipped: [], failed: [], removed: [] }
+}
+
+/**
+ * The entries a move settles: everything it writes at the destination, plus what the destination
+ * already holds. Only these may be removed from the source afterwards.
+ */
+function settledEntries(report: DataRootMigrationReport, plans: Map<string, EntryPlan>): string[] {
+  const settled = new Set<string>(report.copied)
+  for (const [name, plan] of plans) if (plan.identical) settled.add(name)
+  return [...settled]
 }
 
 function errorCode(error: unknown): string | undefined {
@@ -309,7 +329,11 @@ function refusedReport(from: string, to: string): DataRootMigrationReport {
  *
  * The caller prechecks free space against `requiredBytes`, and `build/runtime-catalog.json` declares roughly 687 MB of downloadable runtimes, so a destination that cannot hold them is refused before anything is written. `extraSources` are the legacy folders the pending marker recorded (`data-root.ts`), measured on the same terms.
  */
-export async function planDataRootMigration(from: string, to: string, extraSources: readonly string[] = []): Promise<DataRootMigrationReport> {
+export async function planDataRootMigration(
+  from: string,
+  to: string,
+  extraSources: readonly string[] = [],
+): Promise<DataRootMigrationReport> {
   if (isSameOrInside(from, to) || isSameOrInside(to, from)) return refusedReport(from, to)
   return (await survey(from, to, extraSources)).report
 }
@@ -319,8 +343,18 @@ export async function planDataRootMigration(from: string, to: string, extraSourc
  *
  * Per-entry failures are reported rather than thrown: one unreadable entry must not cost the user the
  * other six, and the caller reads `failed` and `removed` to tell the user what moved and what did not.
+ *
+ * `removeSource` decides whether the source entries are deleted afterwards. The carry-over of a root
+ * the app used to derive from the executable passes `false`: that root usually sits in a directory
+ * the user cannot write to, so its files can only be copied, and a removal that fails would keep
+ * the pending marker alive and repeat the copy on every launch.
  */
-export async function migrateDataRoot(from: string, to: string, extraSources: readonly string[] = []): Promise<DataRootMigrationReport> {
+export async function migrateDataRoot(
+  from: string,
+  to: string,
+  extraSources: readonly string[] = [],
+  removeSource = true,
+): Promise<DataRootMigrationReport> {
   if (isSameOrInside(from, to) || isSameOrInside(to, from)) return refusedReport(from, to)
   const { report, plans } = await survey(from, to, extraSources)
 
@@ -348,25 +382,28 @@ export async function migrateDataRoot(from: string, to: string, extraSources: re
   // dropped every folder overlapping either root. The old root's shell stays behind: it may hold files that
   // are not ours. An entry merely absent at the source is in neither `copied` nor identical, so it is never
   // reported as removed.
-  const settled = new Set<string>(report.copied)
-  for (const [name, plan] of plans) if (plan.identical) settled.add(name)
-  for (const name of DATA_ROOT_ENTRIES) {
-    const plan = plans.get(name)
-    if (!plan || !settled.has(name)) continue
-    try {
-      await rm(join(plan.source, name), { recursive: true, force: true })
-      report.removed.push(name)
-    } catch (error) {
-      // A locked file (a runtime still mapped by a running engine) leaves a duplicate behind rather than losing data, so this is reported, not thrown.
-      report.failed.push(name)
-      console.error('data root entry was copied but could not be removed from its old location', join(plan.source, name), error)
+  if (removeSource) {
+    const settled = new Set<string>(settledEntries(report, plans))
+    for (const name of DATA_ROOT_ENTRIES) {
+      const plan = plans.get(name)
+      if (!plan || !settled.has(name)) continue
+      try {
+        await rm(join(plan.source, name), { recursive: true, force: true })
+        report.removed.push(name)
+      } catch (error) {
+        // A locked file (a runtime still mapped by a running engine) leaves a duplicate behind rather than losing data, so this is reported, not thrown.
+        report.failed.push(name)
+        console.error('data root entry was copied but could not be removed from its old location', join(plan.source, name), error)
+      }
     }
   }
   // There is no migration UI: this runs before the window exists, so the console is the only place a user can learn that several GB left a folder the app no longer references.
   const fromLegacy = [...plans.values()].filter((plan) => plan.source !== from)
   if (fromLegacy.length > 0) {
     console.log(
-      'entries were moved out of a legacy folder; the folder itself is left in place',
+      removeSource
+        ? 'entries were moved out of a legacy folder; the folder itself is left in place'
+        : 'entries were copied out of a legacy folder; the folder itself is left in place',
       fromLegacy.map((plan) => ({
         entry: plan.name, legacyFolder: plan.source, bytes: plan.bytes, removed: report.removed.includes(plan.name),
       })),

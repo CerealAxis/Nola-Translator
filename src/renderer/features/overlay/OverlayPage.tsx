@@ -12,7 +12,6 @@ import { actions, sessionStore, stores, updateSettings, useStore } from '@/store
 import { swappedLanguagesOf, targetLanguagePatch } from '@/session-config'
 import { PageHeader } from '@/components/primitives'
 import { SettingSelect } from '../settings/SettingsPage'
-import { SETTINGS_WRITE_FAILURE_KEYS, settingsWriteFailure } from '../settings/settingsWriteError'
 import { captionScrimColor } from './scrimColor'
 
 export function OverlayPage() {
@@ -28,7 +27,7 @@ export function OverlayPage() {
   const translationDisabled = settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE
   const display = translationDisabled ? 'source' : config.showSource && config.showTranslation ? 'both' : config.showSource ? 'source' : 'translation'
   const label = (code: string) => languageName(code, language)
-  const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch((error: unknown) => toast.danger(t(SETTINGS_WRITE_FAILURE_KEYS[settingsWriteFailure(error)]))) }
+  const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch(() => undefined) }
   const open = async () => {
     setOpening(true)
     try {

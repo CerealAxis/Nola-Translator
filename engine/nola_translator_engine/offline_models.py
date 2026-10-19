@@ -1,7 +1,7 @@
 """Isolated JSONL worker for local model compatibility and portable resource packages."""
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
 from pathlib import Path
 import sys
@@ -305,7 +305,7 @@ def main() -> None:
         root = Path(request["modelRoot"])
         operation = request["operation"]
         if request.get("localImport") and operation in ("inspect", "install"):
-            from .local_models import inspect_local, import_local, LocalModelError
+            from .local_models import inspect_local, import_local, probe_local, LocalModelError
             source = Path(request["source"])
             network = NetworkSettings.model_validate(request["network"]) if request.get("network") else None
             try:
@@ -321,10 +321,15 @@ def main() -> None:
                 if known and not entry.repo.startswith("local/"):
                     known = [item for item in known if entry.repo in (item[0].repo, item[0].modelscope_repo)]
                 if known:
+                    if operation == "install":
+                        for spec, variant, known_directory in known:
+                            expected = {item.path for item in spec.files_for('modelscope' if variant == 'modelscope' else 'huggingface')}
+                            selected = replace(entry, files=tuple(item for item in entry.files if item.path in expected))
+                            probe_local(known_directory, selected)
                     result = install(source, root, progress=emit) if operation == "install" else inspect(source, root, emit)
                 else:
                     if operation == "install":
-                        entry = import_local(local_source, root, request.get("repo"), network, emit)
+                        entry = import_local(local_source, root, request.get("repo"), network, emit, inspection=(directory, entry))
                     result = {"items": [{"id": entry.resource_id, "name": entry.name, "kind": "model",
                         "bytes": entry.total_bytes, "status": "ready"}], "totalBytes": entry.total_bytes,
                         "issues": [], "compatible": True}

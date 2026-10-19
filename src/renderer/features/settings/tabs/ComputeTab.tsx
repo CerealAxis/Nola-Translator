@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react'
-import { Alert, Button, Spinner } from '@heroui/react'
+import { useCallback, useEffect, useRef } from 'react'
+import { Button, Spinner, toast } from '@heroui/react'
 import { RefreshCw } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
@@ -16,7 +16,6 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
   const runtimes = useStore(stores.settings, state => state.runtimes)
   const loading = useStore(stores.settings, state => state.computeChecking)
   const computeError = useStore(stores.settings, state => state.computeError)
-  const [error, setError] = useState('')
   const pendingSave = useRef<Promise<unknown>>(Promise.resolve())
   const compute = settings.compute ?? DEFAULT_COMPUTE_SETTINGS
   const hardware = runtimes?.hardware.adapters ?? []
@@ -27,12 +26,11 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
     try {
       await actions.settings.loadRuntimeComponents()
       await actions.settings.refreshComputeDevices()
-      setError('')
-    } catch { setError(t('compute.deviceCheckFailed')) }
+    } catch { /* store subscribers report the runtime and device errors as Toasts */ }
   }, [t])
   function save(patch: AppSettingsPatch): void {
     pendingSave.current = pendingSave.current.catch(() => undefined).then(() => updateSettings(patch))
-    void pendingSave.current.catch(() => setError(t('compute.saveError')))
+    void pendingSave.current.catch(() => undefined)
   }
   function options(selected: string) {
     const choices = [
@@ -51,8 +49,8 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
   const translation = options(compute.translationDevice)
   const plan = snapshot?.activePlan
   const actual = (value: unknown) => value === 'unknown' ? t('compute.planUnknown') : value === 'unloaded' ? t('compute.unloaded') : String(value ?? t('compute.noSession'))
+  useEffect(() => { if (computeError) toast.danger(t('compute.deviceCheckFailed'), { description: computeError }) }, [computeError, t])
   return <div className="settings-panel">
-    {error || computeError ? <Alert status="danger"><Alert.Content><Alert.Description>{error || t('compute.deviceCheckFailed')}</Alert.Description></Alert.Content></Alert> : null}
     <SettingGroup legend={t('compute.devices')} actions={<Button variant="secondary" size="sm" isDisabled={loading} onPress={() => void refresh()}>{loading ? <Spinner size="sm" /> : <RefreshCw size={16} aria-hidden="true" />}{t('compute.refresh')}</Button>}>
       <SettingsRow label={t('compute.recognition')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={recognition.normalized} options={recognition.choices} ariaLabel={t('compute.recognition')} onChange={recognitionDevice => save({ compute: { recognitionDevice } })} /></SettingsRow>
       <SettingsRow label={t('compute.translation')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={translation.normalized} options={translation.choices} ariaLabel={t('compute.translation')} onChange={translationDevice => save({ compute: { translationDevice } })} /></SettingsRow>

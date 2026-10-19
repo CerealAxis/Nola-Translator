@@ -55,7 +55,7 @@ export function StorageTab(_props: SettingsPanelProps) {
                   // A cancel in the system dialog comes back as null; that is not an error.
                   if (chosen?.restartRequired) toast.warning(t('modelsSettingsUi.dataFolderWillMove'))
                 })
-                .catch(() => toast.danger(t('errors.storageChanged')))
+                .catch(() => undefined)
             }}
           >
             {t('settings.browse')}
@@ -89,7 +89,7 @@ export function StorageTab(_props: SettingsPanelProps) {
                   void actions.settings
                     .restartAppForStorage()
                     .then(() => toast.success(t('common.done')))
-                    .catch(() => toast.danger(t('errors.storageChanged')))
+                    .catch(() => undefined)
                 }}
               >
                 {t('settings.restartNow')}

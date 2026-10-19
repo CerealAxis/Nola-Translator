@@ -36,6 +36,7 @@ import {
   Switch,
   TextField,
   Tooltip,
+  toast,
 } from '@heroui/react'
 import { CircleHelp } from 'lucide-react'
 
@@ -319,7 +320,11 @@ export function SessionSetupDialog({
                 onChange={(key) => {
                   if (typeof key === 'string') {
                     const codes = (settings.recognition.provider ?? 'local') === 'local' ? recognitionLanguages(resources.find(model => model.resourceId === key)) : modelOptions.sourceLanguages
-                    patch({ recognitionModelId: key as RecognitionModelId, sourceLanguage: codes.includes(draft.sourceLanguage) ? draft.sourceLanguage : codes[0] ?? draft.sourceLanguage })
+                    const sourceLanguage = codes.includes(draft.sourceLanguage) ? draft.sourceLanguage : codes.includes('auto') ? 'auto' : draft.sourceLanguage
+                    if (sourceLanguage === draft.sourceLanguage && !codes.includes(sourceLanguage)) {
+                      toast.danger(t('errors.unsupportedRecognitionLanguage', { language: languageName(sourceLanguage, language) }))
+                    }
+                    patch({ recognitionModelId: key as RecognitionModelId, sourceLanguage })
                   }
                 }}
               >

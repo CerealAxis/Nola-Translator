@@ -18,9 +18,9 @@ import { downloadSourcesFor } from '../../../shared/model-download-sources'
 import { modelEngines } from '../../../shared/model-engines'
 import type { InferenceEngine } from '../../../shared/model-engines'
 import type { ComputeSettings, ComputeSnapshot, RuntimeSnapshot } from '../../../shared/compute'
-import { descriptionKeyOf, factsOf, formatBytes, paramsOf } from './ModelCard'
+import { descriptionKeyOf, factsOf, formatBytes, paramsOf, quantizationOf } from './ModelCard'
 import { isEngineAvailable } from './engine-availability'
-import { modelFit, type ModelFit } from './model-fit'
+import { estimatedVramMb, modelFit, type ModelFit } from './model-fit'
 import { type RecommendedFamily } from './modelFamily'
 import { ModelMark } from './modelBrand'
 
@@ -133,6 +133,15 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
   const inFlight = state === 'queued' || state === 'downloading' || state === 'verifying'
   const familyDescription = t(`models.familyDescriptions.${family}`)
   const selectedDescription = t(descriptionKeyOf(selected) ?? 'models.noDescription')
+  const estimatedVram = estimatedVramMb(selected, engine, compute)
+  const estimatedVramGb = estimatedVram === null ? null : estimatedVram / 1024
+  const quantization = quantizationOf(selected)
+    ?? (selected.provider === 'qwen3-asr' && engine === 'pytorch'
+      ? compute.quantization === 'none' ? 'BF16' : compute.quantization === '8bit' ? 'INT8' : 'NF4'
+      : engine === 'pytorch' ? 'BF16' : null)
+  const deviceTier = estimatedVramGb === null ? 'unknown'
+    : estimatedVramGb <= 2 ? 'integrated'
+      : estimatedVramGb <= 8 ? 'discrete' : 'flagship'
 
   return <Modal.Backdrop isOpen onOpenChange={open => { if (!open) onClose() }} className="z-overlay">
     <Modal.Container size="lg" scroll="inside" placement="center">
@@ -179,6 +188,12 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
           <section className="models-family-dialog__selection" aria-label={t('models.details')}>
             <Label className="models-family-dialog__label">{t('models.details')}</Label>
             <p>{selected.name} · {factsOf(selected).join(' · ')}</p>
+            <p>{t('models.variantOverview', {
+              loader: engineLabel(engine),
+              quantization: quantization ?? t('models.quantizationUnknown'),
+              vram: estimatedVramGb === null ? t('models.vramUnknown') : `${estimatedVramGb.toFixed(estimatedVramGb >= 10 ? 0 : 1)} GB`,
+              device: t(`models.deviceTier.${deviceTier}`),
+            })}</p>
             {(family === 'hymt2' || family === 'index' || family === 'tts') && selectedDescription !== familyDescription ? <p>{selectedDescription}</p> : null}
           </section>
           <section data-onboarding="model-sources" aria-label={t('models.downloadSources.title')}>

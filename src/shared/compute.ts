@@ -95,6 +95,7 @@ export type LocalRuntime = {
   reason: string
   id?: string
   managed?: boolean
+  bundled?: boolean
   xformersVersion?: string
   cudaVersion?: string
 }

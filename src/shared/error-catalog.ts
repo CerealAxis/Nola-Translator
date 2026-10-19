@@ -64,6 +64,7 @@ export type SupportErrorOperation = { commandType?: string; action?: string }
 export const SUPPORT_ERROR_CODES = Object.keys(SUPPORT_ERROR_CATALOG) as [SupportErrorCode, ...SupportErrorCode[]]
 
 const SUPPORT_ERROR_MESSAGE_ALIASES = {
+  'errors.unsupportedRecognitionLanguage': 'MDL-014',
   'preflight.deviceCheckBlocked': 'ENG-001',
   'shellUi.error.translationUnavailable': 'MT-007',
   'shellUi.error.TimeoutError': 'MT-011',

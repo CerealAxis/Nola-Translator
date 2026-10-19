@@ -56,6 +56,62 @@ CODE_TO_NAME: dict[str, str] = {
 NAME_TO_CODE = {name: code for code, name in CODE_TO_NAME.items()}
 
 
+class TransformersAsrRuntime:
+    """Use the installed Transformers ASR pipeline for its registered speech architectures."""
+
+    def __init__(self, model_dir: Path, *, device: str = "cpu", threads: int = 0, precision: str = "auto"):
+        self.model_dir = Path(model_dir)
+        self.device, self.threads, self.precision = device, threads, precision
+        self._pipeline = None
+        self._lock = threading.RLock()
+
+    @property
+    def loaded(self) -> bool:
+        return self._pipeline is not None
+
+    def describe(self) -> str:
+        return f"Transformers/{self.device}" if self.loaded else "unloaded"
+
+    def load(self) -> None:
+        with self._lock:
+            if self.loaded:
+                return
+            import torch
+            from transformers import AutoConfig, AutoFeatureExtractor, AutoModelForCTC, AutoModelForSpeechSeq2Seq, AutoTokenizer, pipeline
+            from inspect import signature
+            from ..translation.transformers_causal import load_verified_model
+
+            torch.set_num_threads(cpu_threads(self.threads))
+            config = AutoConfig.from_pretrained(str(self.model_dir), local_files_only=True, trust_remote_code=False)
+            loader = AutoModelForSpeechSeq2Seq if type(config) in AutoModelForSpeechSeq2Seq._model_mapping else AutoModelForCTC
+            model = load_verified_model(loader, self.model_dir, torch_dtype=resolve_dtype(self.device, self.precision))
+            tokenizer = AutoTokenizer.from_pretrained(str(self.model_dir), local_files_only=True, trust_remote_code=False)
+            extractor = AutoFeatureExtractor.from_pretrained(str(self.model_dir), local_files_only=True, trust_remote_code=False)
+            self._pipeline = pipeline('automatic-speech-recognition', model=model,
+                tokenizer=tokenizer, feature_extractor=extractor,
+                device=self.device, trust_remote_code=False,
+                **{'dtype' if 'dtype' in signature(pipeline).parameters else 'torch_dtype': resolve_dtype(self.device, self.precision)})
+
+    def transcribe(self, samples, *, prefix=None, language=None):
+        with self._lock:
+            self.load()
+            audio = np.asarray(samples, dtype=np.float32).reshape(-1)
+            result = self._pipeline({'raw': audio, 'sampling_rate': SAMPLE_RATE})
+            if not isinstance(result, dict) or not isinstance(result.get('text'), str):
+                raise ModelUnavailable('Transformers ASR returned no text field')
+            return result['text'].strip(), language
+
+    def wait_idle(self) -> None:
+        with self._lock:
+            pass
+
+    def unload(self) -> None:
+        with self._lock:
+            self._pipeline = None
+            gc.collect()
+            release_device_cache(self.device)
+
+
 class QwenModelUnavailable(ModelUnavailable):
     """Qwen3-ASR unavailable: directory missing, or both the NF4 and 8bit loads failed."""
 

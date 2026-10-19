@@ -78,7 +78,15 @@ async def test_supported_detected_language_still_schedules_translation(tmp_path,
 def test_script_variants_survive_runtime_normalization():
     assert EngineRuntime._language_code("zh-Hant") == "zh-Hant"
     assert EngineRuntime._language_code("zh-TW") == "zh-Hant"
+    assert EngineRuntime._recognition_language_code("zh-Hant") == "zh"
     assert EngineRuntime._language_code("fil") == "tl"
+
+
+def test_invalid_recognition_language_falls_back_to_auto_when_supported(tmp_path):
+    runtime = EngineRuntime(tmp_path, lambda event: None)
+    config = start_config(sourceLanguage="ky", targetLanguages=[])
+    runtime._validate_model_selection(config)
+    assert config.sourceLanguage == "auto"
 
 
 @pytest.mark.asyncio

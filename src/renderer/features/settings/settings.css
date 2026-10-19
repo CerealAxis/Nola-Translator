@@ -90,7 +90,8 @@
 }
 
 .settings-row__title { display: flex; align-items: center; gap: 0.35rem; }
-.settings-group__hint { display: inline-flex; align-items: center; margin-left: var(--space-1); vertical-align: middle; }
+.settings-group__title-with-hint { display: flex; align-items: center; gap: var(--space-1); }
+.settings-group__hint { display: inline-flex; align-items: center; }
 .settings-row__help { min-width: 1.5rem; width: 1.5rem; height: 1.5rem; padding: 0; border-color: transparent; color: var(--muted); background: transparent; box-shadow: none; }
 .settings-row__help:hover { background: transparent; }
 .settings-row__tooltip { max-width: min(24rem, calc(100vw - 2rem)); white-space: normal; }

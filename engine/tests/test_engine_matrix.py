@@ -61,6 +61,7 @@ async def test_asr_and_translation_have_independent_llama_servers(tmp_path, monk
     runtime._recognition_device = runtime._translation_device = ComputeDevice('cpu', 'CPU', 'cpu', torchDevice='cpu')
     runtime._device_plan = {'recognitionEstimateMb': 0, 'translationEstimateMb': 0}
     monkeypatch.setattr(LlamaServerManager, 'start', AsyncMock(return_value='cpu'))
+    monkeypatch.setattr('nola_translator_engine.local_models._gguf', lambda _: {'clip.audio.projector_type': 'qwen3a'})
     recognizer = await runtime._create_recognizer(PrewarmModelsCommand(protocolVersion=1, type='prewarmModels', requestId='test', config={**config.model_dump(), 'recognitionMode': 'realtime'}))
     provider = runtime._local_translation_provider(config)
     assert isinstance(recognizer.runtime, LlamaAsrRuntime)
@@ -71,7 +72,7 @@ async def test_asr_and_translation_have_independent_llama_servers(tmp_path, monk
     await runtime.close()
 
 
-def test_causal_translation_uses_torch_and_rejects_wrong_engine_before_loading(tmp_path, monkeypatch):
+def test_causal_translation_uses_its_loader_despite_legacy_engine_preferences(tmp_path, monkeypatch):
     runtime = EngineRuntime(tmp_path, lambda event: None)
     translator = register(runtime, 'transformers-causal', 'translation', ['model.safetensors'])
     monkeypatch.setattr(runtime.resources, 'is_installed', lambda _: True)
@@ -79,8 +80,7 @@ def test_causal_translation_uses_torch_and_rejects_wrong_engine_before_loading(t
         translationModelId=translator, compute={'translationEngine': 'pytorch'})
     assert runtime._validate_model_selection(config)[1] == []
     assert isinstance(runtime._local_translation_provider(config), CausalTranslationProvider)
-    with pytest.raises(Exception, match='invalidConfiguration'):
-        runtime._validate_model_selection(config.model_copy(update={'compute': ComputeOptions(translationEngine='llama')}))
+    assert runtime._validate_model_selection(config.model_copy(update={'compute': ComputeOptions(translationEngine='llama')}))[1] == []
 
 
 def test_audio_request_is_memory_wav_and_qwen_output_is_parsed():

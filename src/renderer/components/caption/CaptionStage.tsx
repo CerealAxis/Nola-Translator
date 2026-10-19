@@ -13,6 +13,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import type { CaptionSegment } from '@/bridge'
 import { useI18n } from '@/i18n'
 import { translationErrorSummary } from '@/translation-status'
+import { formatChineseCaption } from '@/chinese-script'
 
 import { CaptionLine } from './CaptionLine'
 
@@ -33,6 +34,7 @@ export interface CaptionStageProps {
   className?: string
   /** The workspace shows timestamps; the floating window keeps the compact caption. */
   showTimestamps?: boolean
+  sourceLanguage?: string
 }
 
 /** Pixels from the bottom that still count as "at the bottom", about one line of body text. */
@@ -76,6 +78,7 @@ export function CaptionStage({
   emptyState,
   className,
   showTimestamps = false,
+  sourceLanguage = 'auto',
 }: CaptionStageProps) {
   const { t } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -137,6 +140,7 @@ export function CaptionStage({
               <Block
                 key={`${row.segment.segmentId}-${row.interim ? 'interim' : 'final'}`}
                 segment={row.segment}
+                sourceLanguage={sourceLanguage}
                 distance={row.distance}
                 interim={row.interim}
                 layout={layout}
@@ -166,6 +170,7 @@ export function CaptionStage({
  */
 function Block({
   segment,
+  sourceLanguage,
   distance,
   interim,
   layout,
@@ -179,6 +184,7 @@ function Block({
   translate,
 }: {
   segment: CaptionSegment
+  sourceLanguage: string
   distance: number
   interim: boolean
   layout: CaptionLayout
@@ -202,7 +208,7 @@ function Block({
         {showSource ? (
           <CaptionLine
             kind="source"
-            text={segment.sourceText}
+            text={formatChineseCaption(segment.sourceText, sourceLanguage)}
             distance={distance}
             interim={interim}
             fontSize={fontSize}
@@ -233,7 +239,7 @@ function Block({
       {showSource ? (
         <CaptionLine
           kind="source"
-          text={segment.sourceText}
+          text={formatChineseCaption(segment.sourceText, sourceLanguage)}
           distance={distance}
           interim={interim}
           fontSize={fontSize}

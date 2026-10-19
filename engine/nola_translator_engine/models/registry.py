@@ -38,7 +38,7 @@ CUSTOM_REGISTRY_FILENAME = ".custom-models.json"
 CUSTOM_RESOURCE_PREFIX = "hub:"
 REGISTRY_VERSION = 1
 
-Slot = Literal["recognition", "translation"]
+Slot = Literal["recognition", "translation", "synthesis"]
 
 #: Long enough to stay readable, short enough that the whole directory name still fits inside
 #: Windows' path budget once the models root and a long repo name are prepended.
@@ -178,7 +178,7 @@ class CustomModelEntry:
             raise RegistryError(f"自定义模型 {repo} 没有固定 revision")
         if not isinstance(adapter_id, str) or not adapter_id:
             raise RegistryError(f"自定义模型 {repo} 没有记录适配器")
-        if slot not in ("recognition", "translation"):
+        if slot not in ("recognition", "translation", "synthesis"):
             raise RegistryError(f"自定义模型 {repo} 的 slot 非法：{slot!r}")
         if not isinstance(files, list) or not files:
             raise RegistryError(f"自定义模型 {repo} 没有文件清单")
@@ -192,7 +192,7 @@ class CustomModelEntry:
                 required = [candidate.languages] if slot == "recognition" else [candidate.sourceLanguages, candidate.targetLanguages]
                 codes = candidate.languages + candidate.sourceLanguages + candidate.targetLanguages
                 valid_pairs = candidate.translationPairs is None or bool(candidate.translationPairs) and all(supports_translation(candidate, pair.source, pair.target) for pair in candidate.translationPairs)
-                if candidate.slot == slot and candidate.engine == ("llama" if adapter_id in ("llama.cpp", "llama-asr") else "pytorch") and all(required) and all(normalize(code) in LANGUAGE_CODES for code in codes) and valid_pairs:
+                if candidate.slot == slot and candidate.engine == ("llama" if adapter_id in ("llama.cpp", "llama-asr") else "crisp" if adapter_id.startswith('crisp-') else "pytorch") and all(required) and all(normalize(code) in LANGUAGE_CODES for code in codes) and valid_pairs:
                     configuration = candidate
             except ValueError:
                 pass

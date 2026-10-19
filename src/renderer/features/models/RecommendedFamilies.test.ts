@@ -40,13 +40,14 @@ describe('Qwen3-TTS family membership', () => {
     cancellable: false,
   })
 
-  it('excludes legacy non-Qwen TTS entries from the Qwen3-TTS family', () => {
+  it('groups all synthesis models while keeping Qwen-specific identification separate', () => {
     const qwen = ttsRecord('tts-qwen3-tts-crisp-0.6b-base-q8-0')
     const legacy = ttsRecord('tts-piper-en-us-lessac-medium-82m')
 
     expect(isQwen3TtsRecord(qwen)).toBe(true)
     expect(familyOf(qwen)).toBe('tts')
     expect(isQwen3TtsRecord(legacy)).toBe(false)
-    expect(familyOf(legacy)).toBe('other')
+    expect(familyOf(legacy)).toBe('tts')
+    expect(familyOf(ttsRecord('hub:owner/custom-voice'))).toBe('tts')
   })
 })
