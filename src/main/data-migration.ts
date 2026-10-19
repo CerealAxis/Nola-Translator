@@ -1,4 +1,6 @@
 import { copyFile, lstat, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { dirname, join, resolve, sep } from 'node:path'
 
 /**
@@ -114,25 +116,35 @@ async function walkFiles(root: string, prefix: string, depth: number): Promise<W
   return files
 }
 
-/** Byte equality, for the entries small enough to hold in memory. */
-async function sameBytes(left: string, right: string): Promise<boolean> {
-  const [first, second] = await Promise.all([readFile(left), readFile(right)])
-  return first.equals(second)
+/** Stream a file into a fixed-size digest so large runtime files never need to fit in memory. */
+async function fileDigest(path: string): Promise<string> {
+  const hash = createHash('sha256')
+  for await (const chunk of createReadStream(path)) hash.update(chunk)
+  return hash.digest('hex')
+}
+
+async function sameFileContent(left: string, right: string): Promise<boolean> {
+  const [first, second] = await Promise.all([fileDigest(left), fileDigest(right)])
+  return first === second
 }
 
 /**
  * Whether the destination already holds this entry's content.
  *
- * A single file is compared byte for byte, never by size: `secure-store.ts`'s `get()` deletes the ciphertext before it throws, so a size-equal but different `credentials.json` is keys already lost, and only matching bytes make deleting the source copy safe.
+ * Every file is compared by a streamed SHA-256 digest, never by size alone: `secure-store.ts`'s `get()` deletes the ciphertext before it throws, so a size-equal but different `credentials.json` is keys already lost, and only matching content makes deleting the source copy safe. Streaming keeps large runtime files out of memory.
  *
- * A directory is compared by member name and size; the residual is a member that differs and has the same length, and ruling that out byte-wise would mean reading `runtimes/` (roughly 687 MB) a second time to save a case a later run self-heals.
+ * Directories must match member names, sizes and content before they can be treated as already migrated.
  */
 async function destinationHolds(source: string, destination: string, files: WalkedFile[], isSingleFile: boolean): Promise<boolean> {
-  if (isSingleFile) return sameBytes(join(source, files[0]?.relative ?? ''), join(destination, files[0]?.relative ?? '')).catch(() => false)
+  if (isSingleFile) return sameFileContent(join(source, files[0]?.relative ?? ''), join(destination, files[0]?.relative ?? '')).catch(() => false)
   const existing = await walkFiles(destination, '', 0).catch(() => null)
   if (!existing || existing.length !== files.length) return false
   const sizes = new Map(existing.map((file) => [file.relative, file.bytes]))
-  return files.every((file) => sizes.get(file.relative) === file.bytes)
+  if (!files.every((file) => sizes.get(file.relative) === file.bytes)) return false
+  for (const file of files) {
+    if (!await sameFileContent(join(source, file.relative), join(destination, file.relative))) return false
+  }
+  return true
 }
 
 /** What reading one allowlisted entry at one root produced. The error is kept so it can be logged where it matters. */

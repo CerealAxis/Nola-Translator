@@ -44,6 +44,7 @@ const PUBLIC_ERRORS = new Set<BrowserWireErrorCode>([
   'browserAudioBacklog', 'browserSessionAlreadyRunning', 'browserSessionNotRunning',
   'browserCaptionServiceDisabled', 'browserIntegrationDisabled', 'internalError',
   'torchUnavailable', 'llamaUnavailable',
+  'modelOutOfMemory', 'modelDependencyMissing', 'modelWeightsInvalid',
   'invalidMessage', 'unsupportedProtocol', 'invalidConfiguration', 'audioDeviceUnavailable',
   'modelUnavailable', 'resourceUnavailable', 'resourceBusy', 'lineTooLarge',
 ])

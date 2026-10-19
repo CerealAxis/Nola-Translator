@@ -41,9 +41,9 @@ describe('Python 引擎进程', () => {
       await writeFile(join(source, 'nola_translator_engine', '__main__.py'), '')
       const launch = createEngineLaunchSpec({ isPackaged, appPath: root, resourcesPath: resources, managedEngineDirectory: managed })
       expect(launch.command).toBe(isPackaged ? join(resources, 'engine', 'python.exe') : join(root, 'engine', 'dist', 'NolaPythonEngine', 'python.exe'))
-      expect(launch.args.slice(0, 2)).toEqual(['-I', '-c'])
-      expect(launch.args[2]).toContain(`sys.path[:0] = ${JSON.stringify([source, managed])}`)
-      expect(launch.args[2]).toContain('runpy.run_module("nola_translator_engine", run_name="__main__")')
+      expect(launch.args.slice(0, 4)).toEqual(['-I', '-X', 'utf8', '-c'])
+      expect(launch.args[4]).toContain(`sys.path[:0] = ${JSON.stringify([source, managed])}`)
+      expect(launch.args[4]).toContain('runpy.run_module("nola_translator_engine", run_name="__main__")')
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -52,7 +52,7 @@ describe('Python 引擎进程', () => {
   it('uses built-in Python 3.12 in development and packaged releases', () => {
     const development = createEngineLaunchSpec({ isPackaged: false, appPath: 'G:/app', resourcesPath: 'G:/resources' })
     expect(development.command).toBe(join('G:/app', 'engine', 'dist', 'NolaPythonEngine', 'python.exe'))
-    expect(development.args[2]).toContain('sys.version_info[:2] == (3,12)')
+    expect(development.args[4]).toContain('sys.version_info[:2] == (3,12)')
     expect(createEngineLaunchSpec({ isPackaged: true, appPath: 'G:/app', resourcesPath: 'G:/resources' }).command)
       .toBe(join('G:/resources', 'engine', 'python.exe'))
   })

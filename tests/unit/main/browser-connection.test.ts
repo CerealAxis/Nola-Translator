@@ -86,6 +86,24 @@ describe('native pipe boundary', () => {
     socket.destroy()
   })
 
+  it('preserves actionable engine model-load errors during browser session startup', async () => {
+    const f = await fixture()
+    const socket = await connect(f.descriptor.pipe); const values = responses(socket)
+    send(socket, f.descriptor)
+    send(socket, { id: 'hello', type: 'hello', extensionVersion: BROWSER_EXTENSION_VERSION })
+    await expect.poll(() => values.some(value => value.type === 'result' && value.id === 'hello')).toBe(true)
+    vi.spyOn(f.sessions, 'start')
+      .mockRejectedValueOnce(Object.assign(new Error('modelOutOfMemory'), { engineCode: 'modelOutOfMemory' }))
+      .mockRejectedValueOnce(Object.assign(new Error('modelDependencyMissing'), { engineCode: 'modelDependencyMissing' }))
+      .mockRejectedValueOnce(Object.assign(new Error('modelWeightsInvalid'), { engineCode: 'modelWeightsInvalid' }))
+
+    for (const code of ['modelOutOfMemory', 'modelDependencyMissing', 'modelWeightsInvalid']) {
+      send(socket, { ...start, id: code })
+      await expect.poll(() => values.find(value => value.type === 'error' && value.id === code)).toMatchObject({ code })
+    }
+    socket.destroy()
+  })
+
   it('discards pre-seek audio errors without stopping the new timeline', async () => {
     const f = await fixture()
     const socket = await connect(f.descriptor.pipe); const values = responses(socket)
