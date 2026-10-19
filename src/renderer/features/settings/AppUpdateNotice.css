@@ -22,6 +22,14 @@
   margin-top: 0;
 }
 
+.app-update-markdown img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-block: var(--space-2);
+  border-radius: var(--radius-md);
+}
+
 .app-update-markdown :is(h1, h2, h3, h4) {
   margin: var(--space-2) 0 var(--space-1);
   color: var(--foreground);
@@ -52,6 +60,29 @@
 .app-update-markdown blockquote {
   padding-inline-start: var(--space-2);
   border-inline-start: 2px solid var(--separator);
+}
+
+.app-update-markdown .markdown-alert {
+  --app-update-alert-accent: var(--info);
+  margin-block: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 3px solid var(--app-update-alert-accent);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--app-update-alert-accent) 8%, var(--surface));
+}
+
+.app-update-markdown .markdown-alert-tip {
+  --app-update-alert-accent: var(--success);
+}
+
+.app-update-markdown :is(.markdown-alert-warning, .markdown-alert-caution) {
+  --app-update-alert-accent: var(--warning);
+}
+
+.app-update-markdown .markdown-alert-title {
+  margin-block: 0 var(--space-1);
+  color: var(--app-update-alert-accent);
+  font-weight: 600;
 }
 
 .app-update-markdown :not(pre) > code {

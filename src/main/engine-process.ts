@@ -80,7 +80,8 @@ export function createEngineLaunchSpec(options: {
   const paths = [options.managedCrispDirectory, sourceDirectory, options.managedEngineDirectory].filter((path): path is string => !!path)
   // Python is fixed; only component search paths change. App code always comes from this release.
   const bootstrap = `${pythonRuntimePaths(paths, pythonDirectory, options.managedEngineDirectory)}; _nola_dll_handles += [os.add_dll_directory(p) for p in ${JSON.stringify(options.managedCrispDirectory ? [options.managedCrispDirectory, join(options.managedCrispDirectory, 'crispasr', 'vulkan')] : [])} if os.path.isdir(p)]; import runpy; assert sys.version_info[:2] == (3,12), "Python 3.12 required"; runpy.run_module(${JSON.stringify(options.module ?? 'nola_translator_engine')}, run_name="__main__")`
-  return { command: join(pythonDirectory, 'python.exe'), args: ['-I', '-c', bootstrap], cwd: pythonDirectory }
+  // `-I` ignores PYTHON* environment variables, so select UTF-8 on the command line for pipes.
+  return { command: join(pythonDirectory, 'python.exe'), args: ['-I', '-X', 'utf8', '-c', bootstrap], cwd: pythonDirectory }
 }
 
 export class CaptionEventCoalescer {

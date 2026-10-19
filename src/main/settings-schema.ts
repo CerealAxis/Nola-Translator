@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_NODES } from '../shared/pypi-mirrors'
-import { INDEX_TRANSLATE_MODEL_IDS } from '../shared/index-translate'
+import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { computeSettingsPatchSchema } from '../shared/compute'
 import { RECOGNITION_MODEL_IDS } from '../shared/settings'
 
@@ -36,7 +36,7 @@ const recognitionModelIdSchema = z.union([
  * A closed union for the same reason as `recognitionModelIdSchema`.
  */
 const localModelIdSchema = z.union([
-  z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m', 'hy-mt2-7b-q4-k-m', 'm2m100-418m', ...INDEX_TRANSLATE_MODEL_IDS]),
+  z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m', 'hy-mt2-7b-q4-k-m', 'm2m100-418m', ...INDEX_TRANSLATE_MODEL_IDS, ...INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS]),
   hubModelId,
 ])
 

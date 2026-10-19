@@ -3,12 +3,36 @@ import type { ReactNode } from 'react'
 import { Button, Link, Modal, toast } from '@heroui/react'
 import { ArrowUpRight } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import { rehypeGithubAlerts } from 'rehype-github-alerts'
+import rehypeRaw from 'rehype-raw'
+import rehypeSanitize, { defaultSchema, type Schema } from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
 
 import type { AppUpdateCheckResult } from '@/bridge'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
 import './AppUpdateNotice.css'
+
+const releaseNotesSchema: Schema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    div: [
+      ...(defaultSchema.attributes?.div ?? []),
+      ['className', /^markdown-alert(?:-(?:note|tip|important|warning|caution))?$/],
+    ],
+    img: [
+      ...(defaultSchema.attributes?.img ?? []),
+      'alt',
+      'width',
+      'height',
+    ],
+    p: [
+      ...(defaultSchema.attributes?.p ?? []),
+      ['className', 'markdown-alert-title'],
+    ],
+  },
+}
 
 export interface AppUpdateDialogProps {
   /** An update the caller has already checked for a version and a release page. */
@@ -31,6 +55,13 @@ function displayReleaseName(value: string | null): string | null {
   return /^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/i.test(value.trim())
     ? displayVersion(value)
     : value
+}
+
+function normalizeReleaseNotesCallouts(markdown: string): string {
+  return markdown.replace(
+    /^([ \t]*>[ \t]*\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\])[ \t]+(?=\S)/gim,
+    '$1\n> ',
+  )
 }
 
 export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, isOpening, isCurrentVersion = false }: AppUpdateDialogProps): ReactNode {
@@ -56,13 +87,17 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
                   <div className="app-update-markdown">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw, rehypeGithubAlerts, [rehypeSanitize, releaseNotesSchema]]}
                       components={{
                         a: ({ href, children }) => href
                           ? <Link href={href} target="_blank" rel="noreferrer" className="app-update-markdown__link">{children}</Link>
                           : <>{children}</>,
+                        img: ({ alt, src, width, height }) => src
+                          ? <img src={src} alt={alt ?? ''} width={width} height={height} />
+                          : null,
                       }}
                     >
-                      {result.releaseNotes}
+                      {normalizeReleaseNotesCallouts(result.releaseNotes)}
                     </ReactMarkdown>
                   </div>
                 )
