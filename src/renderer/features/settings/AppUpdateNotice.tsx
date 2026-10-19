@@ -5,7 +5,7 @@ import { ArrowUpRight } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { rehypeGithubAlerts } from 'rehype-github-alerts'
 import rehypeRaw from 'rehype-raw'
-import rehypeSanitize, { defaultSchema, type Schema } from 'rehype-sanitize'
+import rehypeSanitize, { defaultSchema, type Options as Schema } from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
 
 import type { AppUpdateCheckResult } from '@/bridge'
