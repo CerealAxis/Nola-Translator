@@ -175,3 +175,8 @@ node scripts/check-installer-paths.mjs [makensis.exe] # Windows NSIS 目录回�
 ## 章节名
 
 - 分点
+
+## 文档目录补充
+
+- 简体中文帮助文档位于 `docs/nola-docs/zh-CN/`，页面 URL 使用 `/zh-CN/` 前缀；`docs/nola-docs/index.md` 保留产品首页。
+- 文档配图按 `docs/public/docs-image/{语言代码}/{文档分类}/{文章名}/` 存放，使用有意义的文件名，并从 `/docs-image/` 引用；不同语言分别保存图片副本。

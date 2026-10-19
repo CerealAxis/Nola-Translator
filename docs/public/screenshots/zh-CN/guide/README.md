@@ -8,7 +8,7 @@
 node docs/scripts/generate-screenshots.mjs --guide
 ```
 
-此选项仅更新本目录及其 `manifest.json`，不覆盖其他语言和既有海报。生成器等待字体和页面完成渲染，再由 Electron 捕获视口。`compute-components` 在计算设备页面滚动到底部，展示运行组件区域。
+此选项仅更新本目录及其 `manifest.json`，不覆盖其他语言和既有海报。生成器等待字体和页面完成渲染，再由 Electron 捕获视口。`compute-components` 在计算设备页面滚动到底部，展示运行组件区域；三个加载器截图会打开对应版本选择菜单。
 
 | 文件 | 页面路由 | 演示参数 page |
 | --- | --- | --- |
@@ -20,6 +20,9 @@ node docs/scripts/generate-screenshots.mjs --guide
 | `download-source.png` | `#/models` | `download-source` |
 | `compute.png` | `#/settings/compute` | `compute-environment` |
 | `compute-components.png` | `#/settings/compute` | `compute-components` |
+| `crispasr-loader-settings.png` | `#/settings/compute` | `crisp-loader` |
+| `llama-cpp-cuda-version-selection.png` | `#/settings/compute` | `llama-cuda` |
+| `llama-cpp-vulkan-version-selection.png` | `#/settings/compute` | `llama-vulkan` |
 | `translation.png` | `#/settings/translation` | `llm-configuration` |
 | `audio.png` | `#/settings/audio` | `audio` |
 | `browser.png` | `#/settings/browser` | `browser` |
@@ -28,4 +31,4 @@ node docs/scripts/generate-screenshots.mjs --guide
 
 新建同传、开始前检查和下载源截图通过点击真实页面按钮打开相应窗口，等待内容和有限动画完成后捕获。所有动作留在内存演示中，不发起真实下载、采集或模型加载。
 
-正文另行引用的 `../overlay-scene.png` 和 `../browser-scene.png` 是既有原创场景合成图，其来源保留在 `docs/public/screenshots/manifest.json`，本次未重建。
+`../overlay-scene.png` 和 `../browser-scene.png` 已改用 Blender Foundation 开放影片 *Tears of Steel* 的画面作为视频播放器背景。场景截图生成的素材、作者、CC BY 3.0 授权和裁切说明记录在 `docs/public/screenshots/manifest.json`。

@@ -12,7 +12,7 @@
       "path": "screenshots/zh-CN/guide/home.png",
       "width": 1920,
       "height": 1032,
-      "bytes": 487294,
+      "bytes": 487271,
       "sourceComponents": [
         "src/renderer/features/home/HomePage.tsx",
         "src/renderer/features/home/RecentMeetings.tsx",
@@ -28,7 +28,7 @@
       "path": "screenshots/zh-CN/guide/workspace.png",
       "width": 1920,
       "height": 1032,
-      "bytes": 297885,
+      "bytes": 297886,
       "sourceComponents": [
         "src/renderer/features/workspace/WorkspacePage.tsx",
         "src/renderer/components/caption/CaptionStage.tsx",
@@ -44,7 +44,7 @@
       "path": "screenshots/zh-CN/guide/session-setup.png",
       "width": 1920,
       "height": 1032,
-      "bytes": 188793,
+      "bytes": 189016,
       "sourceComponents": [
         "src/renderer/features/workspace/SessionSetupDialog.tsx",
         "src/renderer/features/workspace/WorkspacePage.tsx"
@@ -58,7 +58,7 @@
       "path": "screenshots/zh-CN/guide/session-check.png",
       "width": 1920,
       "height": 1032,
-      "bytes": 184462,
+      "bytes": 184459,
       "sourceComponents": [
         "src/renderer/features/workspace/PreflightDialog.tsx",
         "src/renderer/features/workspace/WorkspacePage.tsx"
@@ -72,7 +72,7 @@
       "path": "screenshots/zh-CN/guide/models.png",
       "width": 1920,
       "height": 1032,
-      "bytes": 422045,
+      "bytes": 364993,
       "sourceComponents": [
         "src/renderer/features/models/ModelsPage.tsx",
         "src/renderer/features/models/ModelCard.tsx",
@@ -88,9 +88,9 @@
       "path": "screenshots/zh-CN/guide/download-source.png",
       "width": 1920,
       "height": 1032,
-      "bytes": 402553,
+      "bytes": 343987,
       "sourceComponents": [
-        "src/renderer/features/models/DownloadSourceDialog.tsx",
+        "src/renderer/features/models/RecommendedFamilies.tsx",
         "src/renderer/features/models/ModelsPage.tsx"
       ],
       "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
@@ -102,7 +102,7 @@
       "path": "screenshots/zh-CN/guide/compute.png",
       "width": 1920,
       "height": 1032,
-      "bytes": 223756,
+      "bytes": 218924,
       "sourceComponents": [
         "src/renderer/features/settings/tabs/ComputeTab.tsx",
         "src/renderer/features/settings/SettingsPage.tsx"
@@ -116,7 +116,49 @@
       "path": "screenshots/zh-CN/guide/compute-components.png",
       "width": 1920,
       "height": 1032,
-      "bytes": 191483,
+      "bytes": 204580,
+      "sourceComponents": [
+        "src/renderer/features/settings/tabs/RuntimeComponents.tsx",
+        "src/renderer/features/settings/tabs/ComputeTab.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "crisp-loader",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/crispasr-loader-settings.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 223162,
+      "sourceComponents": [
+        "src/renderer/features/settings/tabs/RuntimeComponents.tsx",
+        "src/renderer/features/settings/tabs/ComputeTab.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "llama-cuda",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/llama-cpp-cuda-version-selection.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 241275,
+      "sourceComponents": [
+        "src/renderer/features/settings/tabs/RuntimeComponents.tsx",
+        "src/renderer/features/settings/tabs/ComputeTab.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "llama-vulkan",
+      "theme": "light",
+      "path": "screenshots/zh-CN/guide/llama-cpp-vulkan-version-selection.png",
+      "width": 1920,
+      "height": 1032,
+      "bytes": 241053,
       "sourceComponents": [
         "src/renderer/features/settings/tabs/RuntimeComponents.tsx",
         "src/renderer/features/settings/tabs/ComputeTab.tsx"
@@ -130,7 +172,7 @@
       "path": "screenshots/zh-CN/guide/translation.png",
       "width": 1920,
       "height": 1032,
-      "bytes": 221077,
+      "bytes": 221068,
       "sourceComponents": [
         "src/renderer/features/settings/tabs/TranslationTab.tsx",
         "src/renderer/features/settings/SettingsPage.tsx"
@@ -144,7 +186,7 @@
       "path": "screenshots/zh-CN/guide/audio.png",
       "width": 1920,
       "height": 1032,
-      "bytes": 205278,
+      "bytes": 205280,
       "sourceComponents": [
         "src/renderer/features/settings/tabs/AudioTab.tsx",
         "src/renderer/features/settings/SettingsPage.tsx"
@@ -158,7 +200,7 @@
       "path": "screenshots/zh-CN/guide/browser.png",
       "width": 1920,
       "height": 1032,
-      "bytes": 266182,
+      "bytes": 272470,
       "sourceComponents": [
         "src/renderer/features/settings/tabs/BrowserTab.tsx",
         "src/renderer/features/settings/SettingsPage.tsx"
@@ -166,5 +208,5 @@
       "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
     }
   ],
-  "generatedAt": "2026-10-15T12:14:34.744Z"
+  "generatedAt": "2026-10-19T03:53:00.785Z"
 }

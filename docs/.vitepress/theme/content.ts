@@ -11,7 +11,7 @@ export const siteUrl = 'https://nola.xaviermc.top'
 export const license = 'GPL-3.0'
 export const localeNames = { 'zh-CN': '简体中文', 'zh-TW': '繁體中文（台灣）', 'zh-HK': '繁體中文（香港）', en: 'English', ja: '日本語', ko: '한국어' }
 export type Locale = keyof typeof localeNames
-export function localePath(locale: Locale) { return locale === 'zh-CN' ? '/' : `/${locale}/` }
+export function localePath(locale: Locale) { return `/${locale}/` }
 
 export interface LandingCopy {
   nav: { home: string; product: string; scenarios: string; download: string; docs: string; language: string; menu: string; skip: string; themeToLight: string; themeToDark: string }

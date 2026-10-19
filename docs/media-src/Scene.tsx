@@ -9,29 +9,34 @@ import { useI18n } from '@/i18n'
 import { stores } from '@/store'
 import { captionLines } from '../../browser/extension/captionPresentation'
 import extensionStyles from '../../browser/extension/styles.css?inline'
+import videoFrame from './scene-video-frame.jpg'
 
 export interface SceneProps { browser?: boolean }
 
-/** Original scenery surrounds the real overlay component or the extension's exact caption styles. */
+/** A licensed film frame places the real caption surfaces in a familiar viewing scene. */
 export function Scene({ browser = false }: SceneProps) {
   useNolaTheme()
   const { t } = useI18n()
   const [playing, setPlaying] = useState(true)
   return <div className={['docs-scene', browser && 'docs-scene--browser'].filter(Boolean).join(' ')}>
     {browser ? <div className="docs-browser-chrome">
-      <div className="docs-browser-tab"><span className="docs-browser-tab-dot" />{t('videoCaptions.title')}<span>×</span></div>
-      <div className="docs-browser-address"><ArrowLeft aria-hidden="true" /><ArrowRight aria-hidden="true" /><RotateCw aria-hidden="true" /><div><LockKeyhole aria-hidden="true" />nola.example / watch / a-world-to-understand</div></div>
+      <div className="docs-browser-tab"><span className="docs-browser-tab-dot" />Tears of Steel · {t('videoCaptions.title')}<span>×</span></div>
+      <div className="docs-browser-address"><ArrowLeft aria-hidden="true" /><ArrowRight aria-hidden="true" /><RotateCw aria-hidden="true" /><div><LockKeyhole aria-hidden="true" />video.example / watch / tears-of-steel</div></div>
     </div> : null}
-    <div className="docs-scene-landscape" aria-hidden="true">
-      <span className="docs-scene-sun" /><span className="docs-scene-mountain docs-scene-mountain--back" /><span className="docs-scene-mountain docs-scene-mountain--front" />
-      <div className="docs-scene-type"><span>A WORLD TO</span><strong>understand.</strong><span>Every voice. Every perspective.</span></div>
-      <span className="docs-scene-orbit" /><span className="docs-scene-orbit docs-scene-orbit--second" />
-    </div>
+    <div className="docs-scene-video" aria-hidden="true"><img src={videoFrame} alt="" /></div>
     {browser ? <>
       <BrowserCaption />
-      <div className="docs-player-controls"><Button isIconOnly variant="secondary" aria-label={playing ? t('workspace.pause') : t('workspace.resume')} onPress={() => setPlaying(!playing)}>{playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}</Button><Volume2 aria-hidden="true" /><span>02:48 / 18:36</span><div className="docs-player-progress"><i /></div><Captions aria-hidden="true" /><Maximize aria-hidden="true" /></div>
-    </> : <div className="docs-scene-overlay"><OverlayRoot /></div>}
+      <PlayerControls playing={playing} setPlaying={setPlaying} />
+    </> : <>
+      <div className="docs-scene-overlay"><OverlayRoot /></div>
+      <PlayerControls playing={playing} setPlaying={setPlaying} />
+    </>}
   </div>
+}
+
+function PlayerControls({ playing, setPlaying }: { playing: boolean; setPlaying: (playing: boolean) => void }) {
+  const { t } = useI18n()
+  return <div className="docs-player-controls"><Button isIconOnly variant="secondary" aria-label={playing ? t('workspace.pause') : t('workspace.resume')} onPress={() => setPlaying(!playing)}>{playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}</Button><Volume2 aria-hidden="true" /><span>00:23 / 12:14</span><div className="docs-player-progress"><i /></div><Captions aria-hidden="true" /><Maximize aria-hidden="true" /></div>
 }
 
 function BrowserCaption() {

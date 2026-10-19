@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/ko/home.png" alt="Nola Translator 인터페이스 미리보기" width="1000">
+  <img src="/docs-image/ko/getting-started/introduction/home-screen.png" alt="홈 화면" width="1000">
 </p>
 
 ## 개요
@@ -41,11 +41,13 @@ Nola Translator는 로컬 모델과 클라우드 모델을 모두 지원하는 �
 
 | 홈 | 플로팅 자막 | 동영상 자막 |
 |---|---|---|
-| ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/ko/home.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/ko/overlay-scene.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/ko/browser-scene.png) |
+| ![홈 화면](/docs-image/ko/getting-started/introduction/home-screen.png) | ![플로팅 자막](/docs-image/ko/getting-started/introduction/floating-captions.png) | ![브라우저 자막](/docs-image/ko/getting-started/introduction/browser-captions.png) |
 
 | 로컬 모델 설치 | 추론 환경 설정 | 다크 모드 |
 |---|---|---|
-| ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/ko/models.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-CN/compute-environment.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-CN/dark-mode.png) |
+| ![모델 관리](/docs-image/ko/getting-started/introduction/model-management.png) | ![컴퓨팅 환경 설정](/docs-image/ko/getting-started/introduction/compute-environment.png) | ![다크 모드](/docs-image/ko/getting-started/introduction/dark-mode.png) |
+
+플로팅 자막과 브라우저 자막 장면은 [Blender Foundation의 *Tears of Steel*](https://commons.wikimedia.org/wiki/File:Tears_of_Steel_frame_05_6a.jpg) 일부를 잘라 사용했으며, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)에 따라 제공됩니다.
 
 ## 설치
 
@@ -113,7 +115,7 @@ Windows x64를 지원하며 EXE 또는 MSI 설치 프로그램을 선택할 수 
 
 ### 설정 방법
 
-![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-CN/llm-configuration.png)
+![클라우드 번역 연결 설정](/docs-image/ko/getting-started/introduction/cloud-translation-settings.png)
 
 1. 번역 설정에서 **클라우드 번역**을 선택합니다.
 2. 제공업체에서 지원하는 **API 형식**을 선택합니다.

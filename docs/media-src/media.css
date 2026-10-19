@@ -1,5 +1,4 @@
 /* The provenance badge belongs to documentation media, outside the application's UI. */
-:root { --docs-scene-display-size: 110px; }
 .docs-demo-label {
   position: fixed;
   inset-block-start: var(--space-2);
@@ -23,16 +22,10 @@
 .docs-live-overlay .nola-overlay-window { height: 100%; }
 
 .docs-scene { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--surface); }
-.docs-scene-landscape { position: absolute; inset: 0; overflow: hidden; background: linear-gradient(155deg, var(--foreground), color-mix(in oklch, var(--color-emerald) 22%, var(--foreground))); }
-.docs-scene-sun { position: absolute; width: 450px; height: 450px; top: 105px; right: 160px; border-radius: var(--radius-full); background: linear-gradient(130deg, var(--surface), var(--color-emerald)); box-shadow: 0 0 150px color-mix(in oklch, var(--color-emerald) 30%, transparent); }
-.docs-scene-mountain { position: absolute; left: -10%; right: -10%; bottom: -15%; height: 70%; border-radius: 50% 50% 0 0; transform: rotate(-12deg); background: linear-gradient(155deg, color-mix(in oklch, var(--color-emerald) 50%, var(--foreground)), var(--foreground)); }
-.docs-scene-mountain--back { bottom: -5%; transform: rotate(12deg); opacity: .65; }
-.docs-scene-type { position: absolute; top: 18%; left: 8%; color: var(--surface); display: grid; gap: var(--space-3); }
-.docs-scene-type > span { font: var(--font-h2); letter-spacing: .12em; }
-.docs-scene-type > strong { font-size: var(--docs-scene-display-size); font-weight: 500; line-height: 1; }
-.docs-scene-type > span:last-child { font: var(--font-body); opacity: .6; }
-.docs-scene-orbit { position: absolute; right: -2%; top: 10%; width: 62%; height: 65%; border: 1px solid color-mix(in oklch, var(--surface) 30%, transparent); border-radius: 50%; transform: rotate(-28deg); }
-.docs-scene-orbit--second { transform: rotate(28deg); }
+.docs-scene-video { position: absolute; inset: 0; overflow: hidden; background: #17242e; }
+.docs-scene-video img { width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.docs-scene-video::after { position: absolute; inset: 0; content: ''; background: linear-gradient(180deg, rgb(8 18 27 / 8%) 15%, rgb(8 18 27 / 30%) 65%, rgb(8 18 27 / 52%)); }
+.docs-scene--browser .docs-scene-video { inset-block-start: 135px; inset-block-end: 55px; }
 .docs-scene-overlay { position: absolute; left: 14%; bottom: 12%; width: 72%; height: 230px; }
 .docs-scene-overlay .nola-overlay-root { height: 100%; }
 .docs-browser-chrome { position: relative; padding: var(--space-2) var(--space-3); background: var(--surface-secondary); }
@@ -43,10 +36,9 @@
 .docs-browser-address > svg { width: var(--space-2); color: var(--muted); }
 .docs-browser-address > div { flex: 1; padding: var(--space-1) var(--space-2); border-radius: var(--radius-xl); background: var(--surface); display: flex; align-items: center; gap: var(--space-1); color: var(--muted); }
 .docs-browser-address > div svg { width: var(--space-2); }
-.docs-scene--browser .docs-scene-landscape { top: 135px; }
-.docs-browser-caption { position: absolute; bottom: 115px; left: 12%; width: 76%; height: 110px; }
-.docs-player-controls { position: absolute; bottom: 0; padding: var(--space-2) var(--space-3); width: 100%; display: flex; align-items: center; gap: var(--space-2); color: var(--surface); background: color-mix(in oklch, var(--foreground) 80%, transparent); }
+.docs-browser-caption { position: absolute; bottom: 105px; left: 12%; width: 76%; height: 110px; }
+.docs-player-controls { position: absolute; bottom: 0; padding: var(--space-2) var(--space-3); width: 100%; display: flex; align-items: center; gap: var(--space-2); color: var(--primary-foreground); background: rgb(8 18 27 / 78%); }
 .docs-player-controls > svg { width: var(--space-3); }
-.docs-player-controls .button { background: transparent; color: var(--surface); }
+.docs-player-controls .button { background: transparent; color: var(--primary-foreground); }
 .docs-player-progress { flex: 1; height: 3px; background: color-mix(in oklch, var(--surface) 30%, transparent); }
 .docs-player-progress i { display: block; width: 20%; height: 100%; background: var(--accent); }

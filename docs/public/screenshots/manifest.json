@@ -7,11 +7,54 @@
   "images": [
     {
       "locale": "zh-CN",
+      "page": "compute-environment",
+      "theme": "light",
+      "path": "screenshots/zh-CN/compute-environment.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 199749,
+      "sourceComponents": [
+        "src/renderer/features/settings/tabs/ComputeTab.tsx",
+        "src/renderer/features/settings/SettingsPage.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "dark-mode",
+      "theme": "dark",
+      "path": "screenshots/zh-CN/dark-mode.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 497532,
+      "sourceComponents": [
+        "src/renderer/features/home/HomePage.tsx",
+        "src/renderer/components/primitives/AppShell.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
+      "page": "llm-configuration",
+      "theme": "light",
+      "path": "screenshots/zh-CN/llm-configuration.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 210879,
+      "sourceComponents": [
+        "src/renderer/features/settings/tabs/TranslationTab.tsx",
+        "src/renderer/features/settings/SettingsPage.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-CN",
       "page": "home",
+      "theme": "light",
       "path": "screenshots/zh-CN/home.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 424571,
+      "bytes": 424502,
       "sourceComponents": [
         "src/renderer/features/home/HomePage.tsx",
         "src/renderer/features/home/RecentMeetings.tsx",
@@ -23,10 +66,11 @@
     {
       "locale": "zh-CN",
       "page": "workspace",
+      "theme": "light",
       "path": "screenshots/zh-CN/workspace.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 283954,
+      "bytes": 283894,
       "sourceComponents": [
         "src/renderer/features/workspace/WorkspacePage.tsx",
         "src/renderer/components/caption/CaptionStage.tsx",
@@ -38,10 +82,11 @@
     {
       "locale": "zh-CN",
       "page": "models",
+      "theme": "light",
       "path": "screenshots/zh-CN/models.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 371129,
+      "bytes": 325721,
       "sourceComponents": [
         "src/renderer/features/models/ModelsPage.tsx",
         "src/renderer/features/models/ModelCard.tsx",
@@ -53,395 +98,32 @@
     {
       "locale": "zh-CN",
       "page": "overlay-scene",
+      "theme": "light",
       "path": "screenshots/zh-CN/overlay-scene.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 405793,
+      "bytes": 1664076,
       "sourceComponents": [
         "src/renderer/features/overlay/OverlayRoot.tsx",
         "src/renderer/features/overlay/CaptionTrack.tsx",
         "docs/media-src/Scene.tsx"
       ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     },
     {
       "locale": "zh-CN",
       "page": "browser-scene",
+      "theme": "light",
       "path": "screenshots/zh-CN/browser-scene.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 390789,
+      "bytes": 1625761,
       "sourceComponents": [
         "browser/extension/styles.css",
         "browser/extension/captionPresentation.ts",
         "docs/media-src/Scene.tsx"
       ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "zh-TW",
-      "page": "home",
-      "path": "screenshots/zh-TW/home.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 429420,
-      "sourceComponents": [
-        "src/renderer/features/home/HomePage.tsx",
-        "src/renderer/features/home/RecentMeetings.tsx",
-        "src/renderer/components/home/HeroSection.tsx",
-        "src/renderer/components/primitives/AppShell.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "zh-TW",
-      "page": "workspace",
-      "path": "screenshots/zh-TW/workspace.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 289542,
-      "sourceComponents": [
-        "src/renderer/features/workspace/WorkspacePage.tsx",
-        "src/renderer/components/caption/CaptionStage.tsx",
-        "src/renderer/components/notes/NotesPanel.tsx",
-        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "zh-TW",
-      "page": "models",
-      "path": "screenshots/zh-TW/models.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 375299,
-      "sourceComponents": [
-        "src/renderer/features/models/ModelsPage.tsx",
-        "src/renderer/features/models/ModelCard.tsx",
-        "src/shared/model-capabilities.ts",
-        "engine/nola_translator_engine/resources.py"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "zh-TW",
-      "page": "overlay-scene",
-      "path": "screenshots/zh-TW/overlay-scene.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 406534,
-      "sourceComponents": [
-        "src/renderer/features/overlay/OverlayRoot.tsx",
-        "src/renderer/features/overlay/CaptionTrack.tsx",
-        "docs/media-src/Scene.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "zh-TW",
-      "page": "browser-scene",
-      "path": "screenshots/zh-TW/browser-scene.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 391434,
-      "sourceComponents": [
-        "browser/extension/styles.css",
-        "browser/extension/captionPresentation.ts",
-        "docs/media-src/Scene.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "zh-HK",
-      "page": "home",
-      "path": "screenshots/zh-HK/home.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 431812,
-      "sourceComponents": [
-        "src/renderer/features/home/HomePage.tsx",
-        "src/renderer/features/home/RecentMeetings.tsx",
-        "src/renderer/components/home/HeroSection.tsx",
-        "src/renderer/components/primitives/AppShell.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "zh-HK",
-      "page": "workspace",
-      "path": "screenshots/zh-HK/workspace.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 288322,
-      "sourceComponents": [
-        "src/renderer/features/workspace/WorkspacePage.tsx",
-        "src/renderer/components/caption/CaptionStage.tsx",
-        "src/renderer/components/notes/NotesPanel.tsx",
-        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "zh-HK",
-      "page": "models",
-      "path": "screenshots/zh-HK/models.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 375932,
-      "sourceComponents": [
-        "src/renderer/features/models/ModelsPage.tsx",
-        "src/renderer/features/models/ModelCard.tsx",
-        "src/shared/model-capabilities.ts",
-        "engine/nola_translator_engine/resources.py"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "zh-HK",
-      "page": "overlay-scene",
-      "path": "screenshots/zh-HK/overlay-scene.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 404646,
-      "sourceComponents": [
-        "src/renderer/features/overlay/OverlayRoot.tsx",
-        "src/renderer/features/overlay/CaptionTrack.tsx",
-        "docs/media-src/Scene.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "zh-HK",
-      "page": "browser-scene",
-      "path": "screenshots/zh-HK/browser-scene.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 389501,
-      "sourceComponents": [
-        "browser/extension/styles.css",
-        "browser/extension/captionPresentation.ts",
-        "docs/media-src/Scene.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "en",
-      "page": "home",
-      "path": "screenshots/en/home.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 424568,
-      "sourceComponents": [
-        "src/renderer/features/home/HomePage.tsx",
-        "src/renderer/features/home/RecentMeetings.tsx",
-        "src/renderer/components/home/HeroSection.tsx",
-        "src/renderer/components/primitives/AppShell.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "en",
-      "page": "workspace",
-      "path": "screenshots/en/workspace.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 254336,
-      "sourceComponents": [
-        "src/renderer/features/workspace/WorkspacePage.tsx",
-        "src/renderer/components/caption/CaptionStage.tsx",
-        "src/renderer/components/notes/NotesPanel.tsx",
-        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "en",
-      "page": "models",
-      "path": "screenshots/en/models.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 351948,
-      "sourceComponents": [
-        "src/renderer/features/models/ModelsPage.tsx",
-        "src/renderer/features/models/ModelCard.tsx",
-        "src/shared/model-capabilities.ts",
-        "engine/nola_translator_engine/resources.py"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "en",
-      "page": "overlay-scene",
-      "path": "screenshots/en/overlay-scene.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 402761,
-      "sourceComponents": [
-        "src/renderer/features/overlay/OverlayRoot.tsx",
-        "src/renderer/features/overlay/CaptionTrack.tsx",
-        "docs/media-src/Scene.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "en",
-      "page": "browser-scene",
-      "path": "screenshots/en/browser-scene.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 383084,
-      "sourceComponents": [
-        "browser/extension/styles.css",
-        "browser/extension/captionPresentation.ts",
-        "docs/media-src/Scene.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "ja",
-      "page": "home",
-      "path": "screenshots/ja/home.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 444380,
-      "sourceComponents": [
-        "src/renderer/features/home/HomePage.tsx",
-        "src/renderer/features/home/RecentMeetings.tsx",
-        "src/renderer/components/home/HeroSection.tsx",
-        "src/renderer/components/primitives/AppShell.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "ja",
-      "page": "workspace",
-      "path": "screenshots/ja/workspace.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 305624,
-      "sourceComponents": [
-        "src/renderer/features/workspace/WorkspacePage.tsx",
-        "src/renderer/components/caption/CaptionStage.tsx",
-        "src/renderer/components/notes/NotesPanel.tsx",
-        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "ja",
-      "page": "models",
-      "path": "screenshots/ja/models.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 392696,
-      "sourceComponents": [
-        "src/renderer/features/models/ModelsPage.tsx",
-        "src/renderer/features/models/ModelCard.tsx",
-        "src/shared/model-capabilities.ts",
-        "engine/nola_translator_engine/resources.py"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "ja",
-      "page": "overlay-scene",
-      "path": "screenshots/ja/overlay-scene.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 408836,
-      "sourceComponents": [
-        "src/renderer/features/overlay/OverlayRoot.tsx",
-        "src/renderer/features/overlay/CaptionTrack.tsx",
-        "docs/media-src/Scene.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "ja",
-      "page": "browser-scene",
-      "path": "screenshots/ja/browser-scene.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 394869,
-      "sourceComponents": [
-        "browser/extension/styles.css",
-        "browser/extension/captionPresentation.ts",
-        "docs/media-src/Scene.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "ko",
-      "page": "home",
-      "path": "screenshots/ko/home.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 407376,
-      "sourceComponents": [
-        "src/renderer/features/home/HomePage.tsx",
-        "src/renderer/features/home/RecentMeetings.tsx",
-        "src/renderer/components/home/HeroSection.tsx",
-        "src/renderer/components/primitives/AppShell.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "ko",
-      "page": "workspace",
-      "path": "screenshots/ko/workspace.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 269734,
-      "sourceComponents": [
-        "src/renderer/features/workspace/WorkspacePage.tsx",
-        "src/renderer/components/caption/CaptionStage.tsx",
-        "src/renderer/components/notes/NotesPanel.tsx",
-        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "ko",
-      "page": "models",
-      "path": "screenshots/ko/models.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 358428,
-      "sourceComponents": [
-        "src/renderer/features/models/ModelsPage.tsx",
-        "src/renderer/features/models/ModelCard.tsx",
-        "src/shared/model-capabilities.ts",
-        "engine/nola_translator_engine/resources.py"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "ko",
-      "page": "overlay-scene",
-      "path": "screenshots/ko/overlay-scene.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 404582,
-      "sourceComponents": [
-        "src/renderer/features/overlay/OverlayRoot.tsx",
-        "src/renderer/features/overlay/CaptionTrack.tsx",
-        "docs/media-src/Scene.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
-    },
-    {
-      "locale": "ko",
-      "page": "browser-scene",
-      "path": "screenshots/ko/browser-scene.png",
-      "width": 1440,
-      "height": 1000,
-      "bytes": 390659,
-      "sourceComponents": [
-        "browser/extension/styles.css",
-        "browser/extension/captionPresentation.ts",
-        "docs/media-src/Scene.tsx"
-      ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     },
     {
       "locale": "zh-CN",
@@ -450,7 +132,7 @@
       "path": "screenshots/zh-CN/home-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 497576,
+      "bytes": 497532,
       "sourceComponents": [
         "src/renderer/features/home/HomePage.tsx",
         "src/renderer/features/home/RecentMeetings.tsx",
@@ -466,7 +148,7 @@
       "path": "screenshots/zh-CN/workspace-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 320772,
+      "bytes": 320743,
       "sourceComponents": [
         "src/renderer/features/workspace/WorkspacePage.tsx",
         "src/renderer/components/caption/CaptionStage.tsx",
@@ -482,7 +164,7 @@
       "path": "screenshots/zh-CN/models-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 407968,
+      "bytes": 365651,
       "sourceComponents": [
         "src/renderer/features/models/ModelsPage.tsx",
         "src/renderer/features/models/ModelCard.tsx",
@@ -498,13 +180,13 @@
       "path": "screenshots/zh-CN/overlay-scene-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 412067,
+      "bytes": 1664115,
       "sourceComponents": [
         "src/renderer/features/overlay/OverlayRoot.tsx",
         "src/renderer/features/overlay/CaptionTrack.tsx",
         "docs/media-src/Scene.tsx"
       ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     },
     {
       "locale": "zh-CN",
@@ -513,13 +195,91 @@
       "path": "screenshots/zh-CN/browser-scene-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 393684,
+      "bytes": 1626460,
       "sourceComponents": [
         "browser/extension/styles.css",
         "browser/extension/captionPresentation.ts",
         "docs/media-src/Scene.tsx"
       ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
+    },
+    {
+      "locale": "zh-TW",
+      "page": "home",
+      "theme": "light",
+      "path": "screenshots/zh-TW/home.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 429746,
+      "sourceComponents": [
+        "src/renderer/features/home/HomePage.tsx",
+        "src/renderer/features/home/RecentMeetings.tsx",
+        "src/renderer/components/home/HeroSection.tsx",
+        "src/renderer/components/primitives/AppShell.tsx"
+      ],
       "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-TW",
+      "page": "workspace",
+      "theme": "light",
+      "path": "screenshots/zh-TW/workspace.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 289606,
+      "sourceComponents": [
+        "src/renderer/features/workspace/WorkspacePage.tsx",
+        "src/renderer/components/caption/CaptionStage.tsx",
+        "src/renderer/components/notes/NotesPanel.tsx",
+        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-TW",
+      "page": "models",
+      "theme": "light",
+      "path": "screenshots/zh-TW/models.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 330485,
+      "sourceComponents": [
+        "src/renderer/features/models/ModelsPage.tsx",
+        "src/renderer/features/models/ModelCard.tsx",
+        "src/shared/model-capabilities.ts",
+        "engine/nola_translator_engine/resources.py"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-TW",
+      "page": "overlay-scene",
+      "theme": "light",
+      "path": "screenshots/zh-TW/overlay-scene.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 1664129,
+      "sourceComponents": [
+        "src/renderer/features/overlay/OverlayRoot.tsx",
+        "src/renderer/features/overlay/CaptionTrack.tsx",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
+    },
+    {
+      "locale": "zh-TW",
+      "page": "browser-scene",
+      "theme": "light",
+      "path": "screenshots/zh-TW/browser-scene.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 1625652,
+      "sourceComponents": [
+        "browser/extension/styles.css",
+        "browser/extension/captionPresentation.ts",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     },
     {
       "locale": "zh-TW",
@@ -528,7 +288,7 @@
       "path": "screenshots/zh-TW/home-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 500002,
+      "bytes": 500366,
       "sourceComponents": [
         "src/renderer/features/home/HomePage.tsx",
         "src/renderer/features/home/RecentMeetings.tsx",
@@ -544,7 +304,7 @@
       "path": "screenshots/zh-TW/workspace-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 325590,
+      "bytes": 325693,
       "sourceComponents": [
         "src/renderer/features/workspace/WorkspacePage.tsx",
         "src/renderer/components/caption/CaptionStage.tsx",
@@ -560,7 +320,7 @@
       "path": "screenshots/zh-TW/models-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 411651,
+      "bytes": 370994,
       "sourceComponents": [
         "src/renderer/features/models/ModelsPage.tsx",
         "src/renderer/features/models/ModelCard.tsx",
@@ -576,13 +336,13 @@
       "path": "screenshots/zh-TW/overlay-scene-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 412774,
+      "bytes": 1664165,
       "sourceComponents": [
         "src/renderer/features/overlay/OverlayRoot.tsx",
         "src/renderer/features/overlay/CaptionTrack.tsx",
         "docs/media-src/Scene.tsx"
       ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     },
     {
       "locale": "zh-TW",
@@ -591,13 +351,91 @@
       "path": "screenshots/zh-TW/browser-scene-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 394422,
+      "bytes": 1626373,
       "sourceComponents": [
         "browser/extension/styles.css",
         "browser/extension/captionPresentation.ts",
         "docs/media-src/Scene.tsx"
       ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
+    },
+    {
+      "locale": "zh-HK",
+      "page": "home",
+      "theme": "light",
+      "path": "screenshots/zh-HK/home.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 432485,
+      "sourceComponents": [
+        "src/renderer/features/home/HomePage.tsx",
+        "src/renderer/features/home/RecentMeetings.tsx",
+        "src/renderer/components/home/HeroSection.tsx",
+        "src/renderer/components/primitives/AppShell.tsx"
+      ],
       "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-HK",
+      "page": "workspace",
+      "theme": "light",
+      "path": "screenshots/zh-HK/workspace.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 287836,
+      "sourceComponents": [
+        "src/renderer/features/workspace/WorkspacePage.tsx",
+        "src/renderer/components/caption/CaptionStage.tsx",
+        "src/renderer/components/notes/NotesPanel.tsx",
+        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-HK",
+      "page": "models",
+      "theme": "light",
+      "path": "screenshots/zh-HK/models.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 330909,
+      "sourceComponents": [
+        "src/renderer/features/models/ModelsPage.tsx",
+        "src/renderer/features/models/ModelCard.tsx",
+        "src/shared/model-capabilities.ts",
+        "engine/nola_translator_engine/resources.py"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "zh-HK",
+      "page": "overlay-scene",
+      "theme": "light",
+      "path": "screenshots/zh-HK/overlay-scene.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 1664377,
+      "sourceComponents": [
+        "src/renderer/features/overlay/OverlayRoot.tsx",
+        "src/renderer/features/overlay/CaptionTrack.tsx",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
+    },
+    {
+      "locale": "zh-HK",
+      "page": "browser-scene",
+      "theme": "light",
+      "path": "screenshots/zh-HK/browser-scene.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 1626046,
+      "sourceComponents": [
+        "browser/extension/styles.css",
+        "browser/extension/captionPresentation.ts",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     },
     {
       "locale": "zh-HK",
@@ -606,7 +444,7 @@
       "path": "screenshots/zh-HK/home-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 504103,
+      "bytes": 505099,
       "sourceComponents": [
         "src/renderer/features/home/HomePage.tsx",
         "src/renderer/features/home/RecentMeetings.tsx",
@@ -622,7 +460,7 @@
       "path": "screenshots/zh-HK/workspace-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 324215,
+      "bytes": 323794,
       "sourceComponents": [
         "src/renderer/features/workspace/WorkspacePage.tsx",
         "src/renderer/components/caption/CaptionStage.tsx",
@@ -638,7 +476,7 @@
       "path": "screenshots/zh-HK/models-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 412069,
+      "bytes": 371329,
       "sourceComponents": [
         "src/renderer/features/models/ModelsPage.tsx",
         "src/renderer/features/models/ModelCard.tsx",
@@ -654,13 +492,13 @@
       "path": "screenshots/zh-HK/overlay-scene-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 410962,
+      "bytes": 1664416,
       "sourceComponents": [
         "src/renderer/features/overlay/OverlayRoot.tsx",
         "src/renderer/features/overlay/CaptionTrack.tsx",
         "docs/media-src/Scene.tsx"
       ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     },
     {
       "locale": "zh-HK",
@@ -669,13 +507,91 @@
       "path": "screenshots/zh-HK/browser-scene-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 392517,
+      "bytes": 1626764,
       "sourceComponents": [
         "browser/extension/styles.css",
         "browser/extension/captionPresentation.ts",
         "docs/media-src/Scene.tsx"
       ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
+    },
+    {
+      "locale": "en",
+      "page": "home",
+      "theme": "light",
+      "path": "screenshots/en/home.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 423849,
+      "sourceComponents": [
+        "src/renderer/features/home/HomePage.tsx",
+        "src/renderer/features/home/RecentMeetings.tsx",
+        "src/renderer/components/home/HeroSection.tsx",
+        "src/renderer/components/primitives/AppShell.tsx"
+      ],
       "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "en",
+      "page": "workspace",
+      "theme": "light",
+      "path": "screenshots/en/workspace.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 254276,
+      "sourceComponents": [
+        "src/renderer/features/workspace/WorkspacePage.tsx",
+        "src/renderer/components/caption/CaptionStage.tsx",
+        "src/renderer/components/notes/NotesPanel.tsx",
+        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "en",
+      "page": "models",
+      "theme": "light",
+      "path": "screenshots/en/models.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 306669,
+      "sourceComponents": [
+        "src/renderer/features/models/ModelsPage.tsx",
+        "src/renderer/features/models/ModelCard.tsx",
+        "src/shared/model-capabilities.ts",
+        "engine/nola_translator_engine/resources.py"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "en",
+      "page": "overlay-scene",
+      "theme": "light",
+      "path": "screenshots/en/overlay-scene.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 1663287,
+      "sourceComponents": [
+        "src/renderer/features/overlay/OverlayRoot.tsx",
+        "src/renderer/features/overlay/CaptionTrack.tsx",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
+    },
+    {
+      "locale": "en",
+      "page": "browser-scene",
+      "theme": "light",
+      "path": "screenshots/en/browser-scene.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 1622121,
+      "sourceComponents": [
+        "browser/extension/styles.css",
+        "browser/extension/captionPresentation.ts",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     },
     {
       "locale": "en",
@@ -684,7 +600,7 @@
       "path": "screenshots/en/home-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 496603,
+      "bytes": 495887,
       "sourceComponents": [
         "src/renderer/features/home/HomePage.tsx",
         "src/renderer/features/home/RecentMeetings.tsx",
@@ -700,7 +616,7 @@
       "path": "screenshots/en/workspace-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 290915,
+      "bytes": 290872,
       "sourceComponents": [
         "src/renderer/features/workspace/WorkspacePage.tsx",
         "src/renderer/components/caption/CaptionStage.tsx",
@@ -716,7 +632,7 @@
       "path": "screenshots/en/models-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 389210,
+      "bytes": 346637,
       "sourceComponents": [
         "src/renderer/features/models/ModelsPage.tsx",
         "src/renderer/features/models/ModelCard.tsx",
@@ -732,13 +648,13 @@
       "path": "screenshots/en/overlay-scene-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 410123,
+      "bytes": 1663343,
       "sourceComponents": [
         "src/renderer/features/overlay/OverlayRoot.tsx",
         "src/renderer/features/overlay/CaptionTrack.tsx",
         "docs/media-src/Scene.tsx"
       ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     },
     {
       "locale": "en",
@@ -747,13 +663,91 @@
       "path": "screenshots/en/browser-scene-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 386068,
+      "bytes": 1622233,
       "sourceComponents": [
         "browser/extension/styles.css",
         "browser/extension/captionPresentation.ts",
         "docs/media-src/Scene.tsx"
       ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
+    },
+    {
+      "locale": "ja",
+      "page": "home",
+      "theme": "light",
+      "path": "screenshots/ja/home.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 444080,
+      "sourceComponents": [
+        "src/renderer/features/home/HomePage.tsx",
+        "src/renderer/features/home/RecentMeetings.tsx",
+        "src/renderer/components/home/HeroSection.tsx",
+        "src/renderer/components/primitives/AppShell.tsx"
+      ],
       "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ja",
+      "page": "workspace",
+      "theme": "light",
+      "path": "screenshots/ja/workspace.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 305612,
+      "sourceComponents": [
+        "src/renderer/features/workspace/WorkspacePage.tsx",
+        "src/renderer/components/caption/CaptionStage.tsx",
+        "src/renderer/components/notes/NotesPanel.tsx",
+        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ja",
+      "page": "models",
+      "theme": "light",
+      "path": "screenshots/ja/models.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 332318,
+      "sourceComponents": [
+        "src/renderer/features/models/ModelsPage.tsx",
+        "src/renderer/features/models/ModelCard.tsx",
+        "src/shared/model-capabilities.ts",
+        "engine/nola_translator_engine/resources.py"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ja",
+      "page": "overlay-scene",
+      "theme": "light",
+      "path": "screenshots/ja/overlay-scene.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 1664182,
+      "sourceComponents": [
+        "src/renderer/features/overlay/OverlayRoot.tsx",
+        "src/renderer/features/overlay/CaptionTrack.tsx",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
+    },
+    {
+      "locale": "ja",
+      "page": "browser-scene",
+      "theme": "light",
+      "path": "screenshots/ja/browser-scene.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 1625759,
+      "sourceComponents": [
+        "browser/extension/styles.css",
+        "browser/extension/captionPresentation.ts",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     },
     {
       "locale": "ja",
@@ -762,7 +756,7 @@
       "path": "screenshots/ja/home-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 517361,
+      "bytes": 517712,
       "sourceComponents": [
         "src/renderer/features/home/HomePage.tsx",
         "src/renderer/features/home/RecentMeetings.tsx",
@@ -778,7 +772,7 @@
       "path": "screenshots/ja/workspace-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 342581,
+      "bytes": 342530,
       "sourceComponents": [
         "src/renderer/features/workspace/WorkspacePage.tsx",
         "src/renderer/components/caption/CaptionStage.tsx",
@@ -794,7 +788,7 @@
       "path": "screenshots/ja/models-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 427633,
+      "bytes": 373214,
       "sourceComponents": [
         "src/renderer/features/models/ModelsPage.tsx",
         "src/renderer/features/models/ModelCard.tsx",
@@ -810,13 +804,13 @@
       "path": "screenshots/ja/overlay-scene-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 414727,
+      "bytes": 1664218,
       "sourceComponents": [
         "src/renderer/features/overlay/OverlayRoot.tsx",
         "src/renderer/features/overlay/CaptionTrack.tsx",
         "docs/media-src/Scene.tsx"
       ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     },
     {
       "locale": "ja",
@@ -825,13 +819,91 @@
       "path": "screenshots/ja/browser-scene-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 397101,
+      "bytes": 1626413,
       "sourceComponents": [
         "browser/extension/styles.css",
         "browser/extension/captionPresentation.ts",
         "docs/media-src/Scene.tsx"
       ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
+    },
+    {
+      "locale": "ko",
+      "page": "home",
+      "theme": "light",
+      "path": "screenshots/ko/home.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 409382,
+      "sourceComponents": [
+        "src/renderer/features/home/HomePage.tsx",
+        "src/renderer/features/home/RecentMeetings.tsx",
+        "src/renderer/components/home/HeroSection.tsx",
+        "src/renderer/components/primitives/AppShell.tsx"
+      ],
       "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ko",
+      "page": "workspace",
+      "theme": "light",
+      "path": "screenshots/ko/workspace.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 269665,
+      "sourceComponents": [
+        "src/renderer/features/workspace/WorkspacePage.tsx",
+        "src/renderer/components/caption/CaptionStage.tsx",
+        "src/renderer/components/notes/NotesPanel.tsx",
+        "src/renderer/features/workspace/WorkspaceToolbar.tsx"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ko",
+      "page": "models",
+      "theme": "light",
+      "path": "screenshots/ko/models.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 310040,
+      "sourceComponents": [
+        "src/renderer/features/models/ModelsPage.tsx",
+        "src/renderer/features/models/ModelCard.tsx",
+        "src/shared/model-capabilities.ts",
+        "engine/nola_translator_engine/resources.py"
+      ],
+      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+    },
+    {
+      "locale": "ko",
+      "page": "overlay-scene",
+      "theme": "light",
+      "path": "screenshots/ko/overlay-scene.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 1663245,
+      "sourceComponents": [
+        "src/renderer/features/overlay/OverlayRoot.tsx",
+        "src/renderer/features/overlay/CaptionTrack.tsx",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
+    },
+    {
+      "locale": "ko",
+      "page": "browser-scene",
+      "theme": "light",
+      "path": "screenshots/ko/browser-scene.png",
+      "width": 1440,
+      "height": 1000,
+      "bytes": 1624444,
+      "sourceComponents": [
+        "browser/extension/styles.css",
+        "browser/extension/captionPresentation.ts",
+        "docs/media-src/Scene.tsx"
+      ],
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     },
     {
       "locale": "ko",
@@ -840,7 +912,7 @@
       "path": "screenshots/ko/home-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 481683,
+      "bytes": 479774,
       "sourceComponents": [
         "src/renderer/features/home/HomePage.tsx",
         "src/renderer/features/home/RecentMeetings.tsx",
@@ -856,7 +928,7 @@
       "path": "screenshots/ko/workspace-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 305457,
+      "bytes": 305431,
       "sourceComponents": [
         "src/renderer/features/workspace/WorkspacePage.tsx",
         "src/renderer/components/caption/CaptionStage.tsx",
@@ -872,7 +944,7 @@
       "path": "screenshots/ko/models-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 395231,
+      "bytes": 349881,
       "sourceComponents": [
         "src/renderer/features/models/ModelsPage.tsx",
         "src/renderer/features/models/ModelCard.tsx",
@@ -888,13 +960,13 @@
       "path": "screenshots/ko/overlay-scene-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 411672,
+      "bytes": 1663289,
       "sourceComponents": [
         "src/renderer/features/overlay/OverlayRoot.tsx",
         "src/renderer/features/overlay/CaptionTrack.tsx",
         "docs/media-src/Scene.tsx"
       ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     },
     {
       "locale": "ko",
@@ -903,14 +975,25 @@
       "path": "screenshots/ko/browser-scene-dark.png",
       "width": 1440,
       "height": 1000,
-      "bytes": 393174,
+      "bytes": 1625097,
       "sourceComponents": [
         "browser/extension/styles.css",
         "browser/extension/captionPresentation.ts",
         "docs/media-src/Scene.tsx"
       ],
-      "demoDescription": "真实 React 页面与 theme 渲染；内容由 docs/media-src/demo.ts 注入的虚构演示数据提供，不读取凭据、真实记录、音频或模型。"
+      "demoDescription": "真实字幕组件和扩展样式渲染于《Tears of Steel》视频场景；英文原文取自 00:00:23 的影片字幕，译文为演示译文。"
     }
   ],
-  "generatedAt": "2026-10-15T06:55:15.004Z"
+  "generatedAt": "2026-10-19T03:56:08.662Z",
+  "sceneBackground": {
+    "asset": "media-src/scene-video-frame.jpg",
+    "source": "Tears of Steel frame 05 6a.jpg",
+    "author": "(CC) Blender Foundation",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Tears_of_Steel_frame_05_6a.jpg",
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+    "modification": "Resized and cropped to fit the caption scene.",
+    "subtitleSourceUrl": "https://commons.wikimedia.org/wiki/TimedText:Tears_of_Steel_in_4k_-_Official_Blender_Foundation_release.webm.en.srt",
+    "subtitleTime": "00:00:23"
+  }
 }

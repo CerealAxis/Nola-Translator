@@ -45,5 +45,5 @@ export function localizedSitePath(pathname: string, locale: Locale, base: string
   const relative = pathname.slice(base.length)
   const first = relative.split('/')[0]
   const rest = Object.hasOwn(localeNames, first) ? relative.slice(first.length).replace(/^\//, '') : relative
-  return `${base}${locale === 'zh-CN' ? '' : `${locale}/`}${rest}`
+  return `${base}${locale}/${rest}`
 }

@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-HK/home.png" alt="Nola Translator 介面預覽" width="1000">
+  <img src="/docs-image/zh-HK/getting-started/introduction/home-screen.png" alt="主頁介面" width="1000">
 </p>
 
 ## 產品簡介
@@ -41,11 +41,13 @@ Nola Translator 是一款即時字幕與翻譯軟件，支援本機及雲端模�
 
 | 首頁 | 懸浮字幕 | 影片字幕 |
 |---|---|---|
-| ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-HK/home.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-HK/overlay-scene.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-HK/browser-scene.png) |
+| ![主頁介面](/docs-image/zh-HK/getting-started/introduction/home-screen.png) | ![懸浮字幕介面](/docs-image/zh-HK/getting-started/introduction/floating-captions.png) | ![瀏覽器字幕介面](/docs-image/zh-HK/getting-started/introduction/browser-captions.png) |
 
 | 本機模型安裝 | 推論環境設定 | 深色模式 |
 |---|---|---|
-| ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-HK/models.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-CN/compute-environment.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-CN/dark-mode.png) |
+| ![模型管理介面](/docs-image/zh-HK/getting-started/introduction/model-management.png) | ![運算環境設定](/docs-image/zh-HK/getting-started/introduction/compute-environment.png) | ![深色模式介面](/docs-image/zh-HK/getting-started/introduction/dark-mode.png) |
+
+懸浮字幕和影片字幕場景使用 [Blender Foundation《Tears of Steel》](https://commons.wikimedia.org/wiki/File:Tears_of_Steel_frame_05_6a.jpg) 的裁切畫面，依 [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) 授權使用。
 
 ## 安裝
 
@@ -113,7 +115,7 @@ Nola Translator 是一款即時字幕與翻譯軟件，支援本機及雲端模�
 
 ### 設定步驟
 
-![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-CN/llm-configuration.png)
+![雲端翻譯連線設定](/docs-image/zh-HK/getting-started/introduction/cloud-translation-settings.png)
 
 1. 在翻譯設定中選擇 **雲端翻譯**。
 2. 選擇服務供應商支援的 **API 格式**。

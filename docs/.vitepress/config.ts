@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitepress'
+import { defineConfig, type DefaultTheme } from 'vitepress'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { groupIconMdPlugin, groupIconVitePlugin } from 'vitepress-plugin-group-icons'
@@ -15,11 +15,10 @@ import { normalizeEmptyIsCss } from '../scripts/normalize-empty-is-css.mjs'
 const base = process.env.DOCS_BASE ?? '/'
 
 // Search engines and social previews need a per-page URL, which the static head array cannot provide.
-const localeSegments: Record<Locale, string> = { 'zh-CN': '', 'zh-TW': 'zh-TW', 'zh-HK': 'zh-HK', en: 'en', ja: 'ja', ko: 'ko' }
+const localeSegments: Record<Locale, string> = { 'zh-CN': 'zh-CN', 'zh-TW': 'zh-TW', 'zh-HK': 'zh-HK', en: 'en', ja: 'ja', ko: 'ko' }
 const socialLocales: Record<Locale, string> = { 'zh-CN': 'zh_CN', 'zh-TW': 'zh_TW', 'zh-HK': 'zh_HK', en: 'en_US', ja: 'ja_JP', ko: 'ko_KR' }
 
-// Only localized pages carry a locale folder; the default locale's first segment is real content and must survive.
-const dropLocaleSegment = (relativePath: string, locale: Locale) => locale === 'zh-CN' ? relativePath : relativePath.replace(/^[^/]+\/(?=[^/])/, '')
+const dropLocaleSegment = (relativePath: string, locale: Locale) => relativePath.startsWith(`${locale}/`) ? relativePath.slice(locale.length + 1) : relativePath
 
 const routeFor = (locale: Locale, rest: string) => {
   const segment = localeSegments[locale]
@@ -29,9 +28,9 @@ const routeFor = (locale: Locale, rest: string) => {
 
 function transformHead({ pageData }: { pageData: { relativePath: string; title?: string; description?: string } }) {
   const leading = pageData.relativePath.split('/')[0]
-  const locale = (Object.keys(localeSegments) as Locale[]).find(name => name !== 'zh-CN' && localeSegments[name] === leading) ?? 'zh-CN'
+  const locale = (Object.keys(localeSegments) as Locale[]).find(name => localeSegments[name] === leading) ?? 'zh-CN'
   const rest = dropLocaleSegment(pageData.relativePath, locale)
-  const canonical = `${siteUrl}${routeFor(locale, rest)}`
+  const canonical = pageData.relativePath === 'index.md' ? `${siteUrl}${base}` : `${siteUrl}${routeFor(locale, rest)}`
   const title = pageData.title ? `${pageData.title} | Nola Translator` : 'Nola Translator'
   const description = pageData.description || copy[locale].hero.subtitle
   const image = `${siteUrl}${base}screenshots/${locale === 'zh-CN' ? 'zh-CN' : locale}/home.png`
@@ -69,9 +68,9 @@ const searchTranslations = {
 
 const sidebarForLocale = (locale: Locale) => {
   const path = localePath(locale)
-  const localeFolder = locale === 'zh-CN' ? '' : locale
+  const localeFolder = locale
   const label = docsNav[locale].root
-  return generateSidebar({
+  const sidebar = generateSidebar({
     documentRootPath: './nola-docs',
     ...(localeFolder ? { scanStartPath: localeFolder } : {}),
     resolvePath: path,
@@ -98,6 +97,16 @@ const sidebarForLocale = (locale: Locale) => {
       'user-agreement.md', 'privacy-policy.md',
     ],
   })
+  const prefixLinks = (items: DefaultTheme.SidebarItem[]): DefaultTheme.SidebarItem[] => items.map(item => ({
+    ...item,
+    ...(item.link && !item.link.startsWith('/') ? { link: `${path}${item.link}` } : {}),
+    ...(item.items ? { items: prefixLinks(item.items) } : {}),
+  }))
+
+  if (Array.isArray(sidebar)) return prefixLinks(sidebar)
+  return Object.fromEntries(Object.entries(sidebar).map(([key, value]) => Array.isArray(value)
+    ? [key, prefixLinks(value)]
+    : [key, { ...value, items: prefixLinks(value.items) }]))
 }
 
 const locales = Object.fromEntries((Object.keys(localeNames) as Locale[]).map(locale => {
@@ -114,7 +123,7 @@ const locales = Object.fromEntries((Object.keys(localeNames) as Locale[]).map(lo
         { text: text.nav.download, link: downloadUrl },
       ],
       sidebar: sidebarForLocale(locale),
-      outline: { label: text.documentation.outline },
+      outline: { level: [2, 3], label: text.documentation.outline },
       docFooter: { prev: text.documentation.previous, next: text.documentation.next },
       editLink: { pattern: `${repositoryUrl}/edit/main/docs/nola-docs/:path`, text: text.documentation.editPage },
       lastUpdated: { text: text.documentation.lastUpdated, formatOptions: { dateStyle: 'medium', timeStyle: 'short' } },

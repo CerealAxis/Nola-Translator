@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/en/home.png" alt="Nola Translator interface preview" width="1000">
+  <img src="/docs-image/en/getting-started/introduction/home-screen.png" alt="Home screen" width="1000">
 </p>
 
 ## Overview
@@ -41,11 +41,13 @@ Nola Translator turns speech into real-time captions and translations. Run speec
 
 | Home | Floating Captions | Video Captions |
 |---|---|---|
-| ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/en/home.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/en/overlay-scene.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/en/browser-scene.png) |
+| ![Home screen](/docs-image/en/getting-started/introduction/home-screen.png) | ![Floating captions](/docs-image/en/getting-started/introduction/floating-captions.png) | ![Browser captions](/docs-image/en/getting-started/introduction/browser-captions.png) |
 
 | Local Model Installation | Inference Environment Settings | Dark Mode Support |
 |---|---|---|
-| ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/en/models.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-CN/compute-environment.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-CN/dark-mode.png) |
+| ![Model management](/docs-image/en/getting-started/introduction/model-management.png) | ![Compute environment settings](/docs-image/en/getting-started/introduction/compute-environment.png) | ![Dark mode](/docs-image/en/getting-started/introduction/dark-mode.png) |
+
+The floating and browser caption scenes use a cropped frame from [*Tears of Steel*](https://commons.wikimedia.org/wiki/File:Tears_of_Steel_frame_05_6a.jpg), © Blender Foundation, under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).
 
 ## Installation
 
@@ -113,7 +115,7 @@ The app supports the following API protocols:
 
 ### Configuration Steps
 
-![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-CN/llm-configuration.png)
+![Cloud translation connection settings](/docs-image/en/getting-started/introduction/cloud-translation-settings.png)
 
 1. Select **Cloud Translation** in the translation settings.
 2. Choose the **API format** supported by your provider.

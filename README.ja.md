@@ -45,6 +45,8 @@ Nola Translator は、ローカルモデルとクラウドモデルを使える�
 |---|---|---|
 | ![ローカルモデルのインストール](docs/public/screenshots/ja/models.png) | ![推論環境の設定](docs/public/screenshots/zh-CN/compute-environment.png) | ![ダークモード](docs/public/screenshots/zh-CN/dark-mode.png) |
 
+字幕オーバーレイとブラウザー字幕の背景には、[Blender Foundation の *Tears of Steel*](https://commons.wikimedia.org/wiki/File:Tears_of_Steel_frame_05_6a.jpg) の映像を切り抜いて使用しています。[CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) に基づいています。
+
 ## インストール
 
 - [最新リリースをダウンロード](https://github.com/CerealAxis/Nola-Translator/releases/latest)

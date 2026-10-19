@@ -39,6 +39,14 @@ export const demoCopy: Record<UiLanguage, { label: string; title: string; notes:
 
 const english = demoCopy.en.translations
 const chinese = demoCopy['zh-CN'].translations
+const sceneTranslations: Record<UiLanguage, string> = {
+  'zh-CN': '你真是个混蛋，Thom。',
+  'zh-TW': '你真是個混蛋，Thom。',
+  'zh-HK': '你真係個混蛋，Thom。',
+  en: '你真是个混蛋，Thom。',
+  ja: 'トム、あなたって最低。',
+  ko: '톰, 정말 나쁜 사람이야.',
+}
 const models = [
   ['qwen3-asr-1.7b-hf', 'Qwen3-ASR 1.7B', 'qwen3-asr', 4087646324],
   ['qwen3-asr-0.6b-hf', 'Qwen3-ASR 0.6B', 'qwen3-asr', 1576381331],
@@ -55,8 +63,9 @@ const models = [
 
 export function prepareDemo(locale: UiLanguage, page: string, snapshot = false, theme?: 'light' | 'dark'): AppSettings {
   const copy = demoCopy[locale]
-  const targetLanguage = locale === 'en' ? 'en' : locale === 'ja' ? 'ja' : locale === 'ko' ? 'ko' : locale === 'zh-CN' ? 'zh' : 'zh-Hant'
-  const sourceLanguage = locale === 'en' ? 'zh' : 'en'
+  const videoScene = page === 'overlay-scene' || page === 'browser-scene'
+  const targetLanguage = videoScene && locale === 'en' ? 'zh' : locale === 'en' ? 'en' : locale === 'ja' ? 'ja' : locale === 'ko' ? 'ko' : locale === 'zh-CN' ? 'zh' : 'zh-Hant'
+  const sourceLanguage = videoScene ? 'en' : locale === 'en' ? 'zh' : 'en'
   const settings: AppSettings = structuredClone(DEFAULT_SETTINGS)
   settings.onboardingSeen = true
   settings.theme = theme ?? (page === 'dark-mode' ? 'dark' : 'light')
@@ -96,13 +105,14 @@ export function prepareDemo(locale: UiLanguage, page: string, snapshot = false, 
     startedAtMs, endedAtMs: startedAtMs + 840000, durationMs: 840000,
     daySequence: 1, segmentCount: english.length, sourceLanguage, targetLanguage, state: 'completed',
   }] })
-  const segments: CaptionSegment[] = english.map((text, index) => ({
-    segmentId: `demo-${index}`, revision: 1, startedAtMs: index * 11000,
-    endedAtMs: index * 11000 + 9000, sourceLanguage,
-    sourceText: locale === 'en' ? chinese[index] : text, isFinal: true,
-    translations: [{ targetLanguage, text: copy.translations[index], provider: 'demo', state: 'complete' }],
+  const segmentTexts = videoScene ? [english[0]] : english
+  const segments: CaptionSegment[] = segmentTexts.map((text, index) => ({
+    segmentId: `demo-${index}`, revision: 1, startedAtMs: videoScene ? 23000 : index * 11000,
+    endedAtMs: videoScene ? 24500 : index * 11000 + 9000, sourceLanguage,
+    sourceText: videoScene ? "You're a jerk, Thom." : locale === 'en' ? chinese[index] : text, isFinal: true,
+    translations: [{ targetLanguage, text: videoScene ? sceneTranslations[locale] : copy.translations[index], provider: 'demo', state: 'complete' }],
   }))
-  const running = snapshot && ['home', 'workspace', 'overlay', 'browser-scene'].includes(page)
+  const running = snapshot && ['home', 'workspace', 'overlay', 'overlay-scene', 'browser-scene'].includes(page)
   stores.session.setState({
     engineStatus: 'ready', status: running ? 'running' : 'idle',
     sessionId: running ? 'docs-demo' : null, meetingId: running ? 'docs-demo' : null,

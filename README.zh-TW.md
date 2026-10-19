@@ -45,6 +45,8 @@ Nola Translator 是一套即時字幕與翻譯軟體，支援本機模型和雲�
 |---|---|---|
 | ![本機模型安裝](docs/public/screenshots/zh-TW/models.png) | ![推論環境設定](docs/public/screenshots/zh-CN/compute-environment.png) | ![深色模式](docs/public/screenshots/zh-CN/dark-mode.png) |
 
+浮動字幕和影片字幕場景使用 [Blender Foundation《Tears of Steel》](https://commons.wikimedia.org/wiki/File:Tears_of_Steel_frame_05_6a.jpg) 的裁切畫面，依 [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) 授權使用。
+
 ## 安裝
 
 - [下載最新版本](https://github.com/CerealAxis/Nola-Translator/releases/latest)

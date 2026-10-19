@@ -45,6 +45,8 @@ Nola Translator turns speech into real-time captions and translations. Run speec
 |---|---|---|
 | ![Local model installation](docs/public/screenshots/en/models.png) | ![Inference environment settings](docs/public/screenshots/zh-CN/compute-environment.png) | ![Dark mode support](docs/public/screenshots/zh-CN/dark-mode.png) |
 
+The floating and browser caption scenes use a cropped frame from [*Tears of Steel*](https://commons.wikimedia.org/wiki/File:Tears_of_Steel_frame_05_6a.jpg), © Blender Foundation, under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).
+
 ## Installation
 
 - [Download the latest release](https://github.com/CerealAxis/Nola-Translator/releases/latest)

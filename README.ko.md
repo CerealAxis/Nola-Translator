@@ -45,6 +45,8 @@ Nola Translator는 로컬 모델과 클라우드 모델을 모두 지원하는 �
 |---|---|---|
 | ![로컬 모델 설치](docs/public/screenshots/ko/models.png) | ![추론 환경 설정](docs/public/screenshots/zh-CN/compute-environment.png) | ![다크 모드](docs/public/screenshots/zh-CN/dark-mode.png) |
 
+플로팅 자막과 브라우저 자막 장면은 [Blender Foundation의 *Tears of Steel*](https://commons.wikimedia.org/wiki/File:Tears_of_Steel_frame_05_6a.jpg) 일부를 잘라 사용했으며, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)에 따라 제공됩니다.
+
 ## 설치
 
 - [최신 릴리스 다운로드](https://github.com/CerealAxis/Nola-Translator/releases/latest)

@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/ja/home.png" alt="Nola Translator の画面プレビュー" width="1000">
+  <img src="/docs-image/ja/getting-started/introduction/home-screen.png" alt="ホーム画面" width="1000">
 </p>
 
 ## 概要
@@ -41,11 +41,13 @@ Nola Translator は、ローカルモデルとクラウドモデルを使える�
 
 | ホーム | 字幕オーバーレイ | 動画字幕 |
 |---|---|---|
-| ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/ja/home.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/ja/overlay-scene.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/ja/browser-scene.png) |
+| ![ホーム画面](/docs-image/ja/getting-started/introduction/home-screen.png) | ![フローティング字幕](/docs-image/ja/getting-started/introduction/floating-captions.png) | ![ブラウザー字幕](/docs-image/ja/getting-started/introduction/browser-captions.png) |
 
 | ローカルモデルのインストール | 推論環境の設定 | ダークモード |
 |---|---|---|
-| ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/ja/models.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-CN/compute-environment.png) | ![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-CN/dark-mode.png) |
+| ![モデル管理](/docs-image/ja/getting-started/introduction/model-management.png) | ![計算環境の設定](/docs-image/ja/getting-started/introduction/compute-environment.png) | ![ダークモード](/docs-image/ja/getting-started/introduction/dark-mode.png) |
+
+字幕オーバーレイとブラウザー字幕の背景には、[Blender Foundation の *Tears of Steel*](https://commons.wikimedia.org/wiki/File:Tears_of_Steel_frame_05_6a.jpg) の映像を切り抜いて使用しています。[CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) に基づいています。
 
 ## インストール
 
@@ -113,7 +115,7 @@ Nola Translator は、ローカルモデルとクラウドモデルを使える�
 
 ### 設定手順
 
-![](https://raw.githubusercontent.com/CerealAxis/Nola-Translator/main/docs/public/screenshots/zh-CN/llm-configuration.png)
+![クラウド翻訳の接続設定](/docs-image/ja/getting-started/introduction/cloud-translation-settings.png)
 
 1. 翻訳設定で **クラウド翻訳** を選びます。
 2. プロバイダーが対応する **API 形式** を選択します。
