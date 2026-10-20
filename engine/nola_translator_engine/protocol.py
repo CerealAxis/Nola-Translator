@@ -602,6 +602,8 @@ ErrorCode = Literal[
     "recognitionNetworkUnavailable",
     "recognitionTimeout",
     "recognitionInvalidResponse",
+    "recognitionClosed",
+    "recognitionBufferOverflow",
     "translationProviderUnavailable",
     "translationNetworkUnavailable",
     "translationInvalidResponse",

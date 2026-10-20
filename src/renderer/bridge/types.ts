@@ -122,23 +122,3 @@ export type { ModelConfiguration } from '../../shared/model-capabilities'
  * (`audio.defaultOutput`); only the three protocol fields live here.
  */
 export const DEFAULT_OUTPUT_VALUE = 'defaultOutput'
-
-/**
- * Fallback vocabulary for engine-reported failures, mostly
- * `type(error).__name__` plus a few fixed semantic codes. Not UI copy: the UI
- * goes through the i18n dictionary (`shellUi.error.*`), and this only keeps a
- * code the dictionary has never heard of from rendering as a blank.
- */
-export const TRANSLATION_ERROR_LABELS: Record<string, string> = {
-  URLError: '网络不可达',
-  HTTPError: '接口返回错误',
-  TimeoutError: '请求超时',
-  translationTimeout: '翻译超时',
-  resourceUnavailable: '翻译模型未安装',
-  llamaServerUnavailable: '本地翻译服务未就绪',
-  unsupportedLanguagePair: '不支持该语言组合',
-  translationUnavailable: '翻译暂不可用',
-  RuntimeError: '翻译服务返回异常',
-  ValueError: '翻译参数无效',
-  ConnectionError: '网络连接失败',
-}

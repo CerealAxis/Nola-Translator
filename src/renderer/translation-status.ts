@@ -6,18 +6,21 @@
  * can do nothing about it either way.
  *
  * The dictionary lives at `shellUi.error.*` in `i18n/shell-ui.ts`; this is the
- * error-code-to-key map. Both paths matter — dictionary text on a hit, the
- * `TRANSLATION_ERROR_LABELS` fallback on a miss, and the raw code as a last
- * resort. Blank is the worst outcome.
+ * error-code-to-key map. A code the map does not know falls back to the
+ * generic unknown reason rather than rendering as a blank.
  */
 
 import type { CaptionSegment, Translation } from '@/bridge'
-import { TRANSLATION_ERROR_LABELS } from '@/bridge'
 import type { TranslationKey } from '@/i18n'
 
 type Translate = (key: TranslationKey, vars?: Record<string, string | number>) => string
 
-/** Engine error code → dictionary key, falling back to `TRANSLATION_ERROR_LABELS` on a miss. */
+/**
+ * Engine error code → dictionary key.
+ *
+ * The engine names every translation failure it produces, so a code that is missing here would
+ * reach the user as a bare identifier.
+ */
 const ERROR_KEYS: Record<string, TranslationKey> = {
   URLError: 'shellUi.error.URLError',
   HTTPError: 'shellUi.error.HTTPError',
@@ -26,11 +29,21 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   translationRateLimited: 'shellUi.error.translationRateLimited',
   resourceUnavailable: 'shellUi.error.resourceUnavailable',
   llamaServerUnavailable: 'shellUi.error.llamaServerUnavailable',
+  LlamaServerError: 'shellUi.error.llamaServerUnavailable',
   unsupportedLanguagePair: 'shellUi.error.unsupportedLanguagePair',
   translationUnavailable: 'shellUi.error.translationUnavailable',
   RuntimeError: 'shellUi.error.RuntimeError',
   ValueError: 'shellUi.error.ValueError',
   ConnectionError: 'shellUi.error.ConnectionError',
+  translationProviderUnavailable: 'errors.translationProviderUnavailable',
+  translationNetworkUnavailable: 'errors.translationNetworkUnavailable',
+  translationInvalidResponse: 'errors.translationInvalidResponse',
+  translationUnsupportedLanguagePair: 'errors.translationUnsupportedLanguagePair',
+  translationInputTooLong: 'errors.translationInputTooLong',
+  translationOutputTooLong: 'errors.translationOutputTooLong',
+  translationSourceLanguageRequired: 'errors.translationSourceLanguageRequired',
+  translationRejected: 'errors.translationRejected',
+  translationCancelled: 'errors.translationCancelled',
 }
 
 export function failedTranslations(caption?: CaptionSegment | null): Translation[] {
@@ -41,11 +54,7 @@ export function failedTranslations(caption?: CaptionSegment | null): Translation
 export function translationErrorLabel(t: Translate, translation: Translation): string {
   const code = translation.errorCode ?? ''
   const key = ERROR_KEYS[code]
-  const reason = key
-    ? t(key)
-    : code
-      ? (TRANSLATION_ERROR_LABELS[code] ?? code)
-      : t('shellUi.unknownReason')
+  const reason = key ? t(key) : t('shellUi.unknownReason')
   return t('shellUi.translationFailed', { reason })
 }
 
