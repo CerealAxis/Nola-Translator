@@ -3,12 +3,14 @@ import { toast } from '@heroui/react'
 /**
  * How long each kind of notification stays on screen.
  *
- * A failure stays until the user deals with it: a toast that disappears while the message is
- * still being read is a failure the user never learns about. Everything else is a courtesy and
- * leaves on its own.
+ * A failure the user has to act on stays until they do: a toast that disappears while the
+ * message is still being read is a failure the user never learns about. A failure the user can
+ * repeat from the page needs no such attention, and everything else is a courtesy. Both leave
+ * on their own.
  */
 export const NOTIFY_DURATION = {
   error: 0,
+  retryable: 12000,
   success: 4000,
   info: 6000,
   warning: 8000,
@@ -58,6 +60,18 @@ export function notifyError(message: string, options: NotifyOptions = {}): strin
     description: detail(options),
     actionProps: actionProps(options.action),
     timeout: options.duration ?? NOTIFY_DURATION.error,
+  })
+}
+
+/**
+ * A failure the user can repeat from the page. It reads as a failure, but unlike notifyError
+ * it does not hold the screen: the page itself is the way out, so the notice can leave.
+ */
+export function notifyRetryableFailure(message: string, options: NotifyOptions = {}): string {
+  return toast.danger(message, {
+    description: detail(options),
+    actionProps: actionProps(options.action),
+    timeout: options.duration ?? NOTIFY_DURATION.retryable,
   })
 }
 

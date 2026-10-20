@@ -2,14 +2,14 @@ import { useEffect } from 'react'
 import type { ResourceRecord } from '@/bridge'
 import { actions, stores } from '@/store'
 import { useI18n } from '@/i18n'
-import { notifyError, notifyInfo, notifySuccess, notifyWarning } from '@/components/primitives/notify'
+import { notifyInfo, notifyRetryableFailure, notifySuccess, notifyWarning } from '@/components/primitives/notify'
 
 /**
- * A download that stopped. The notice stays until it is dealt with: it carries the
- * way out, and a retry button that vanishes before the user reads it is no way out.
+ * A download that stopped. The user can start it again from the page, so the notice only has
+ * to say what went wrong and leaves on its own.
  */
 export function notifyModelDownloadFailure(title: string, description: string, actionLabel: string, retry: () => void) {
-  notifyError(title, {
+  notifyRetryableFailure(title, {
     description,
     action: { label: actionLabel, onPress: retry },
   })
@@ -41,7 +41,7 @@ export function ModelDownloadNotice() {
         const wasRemoving = prior?.state === 'running' && prior.phase === 'remove'
         if (wasRemoving) {
           if (record.state === 'failed') {
-            notifyError(t('modelsSettingsUi.removeFailed'), { description: record.errorCode ?? undefined })
+            notifyRetryableFailure(t('modelsSettingsUi.removeFailed'), { description: record.errorCode ?? undefined })
           }
           continue
         }
@@ -71,7 +71,7 @@ function notifyFailure(record: Pick<ResourceRecord, 'resourceId' | 'name' | 'err
       // The retry reports its own failure: a record that stays in the failed state is
       // not announced again, so a silent retry would leave the user with nothing.
       void actions.models.manageResource(record.resourceId, 'install').catch((cause: unknown) => {
-        notifyError(t('models.installFailed'), { cause })
+        notifyRetryableFailure(t('models.installFailed'), { cause })
       })
     },
   )

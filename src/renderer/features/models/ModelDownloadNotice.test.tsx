@@ -30,6 +30,7 @@ it('notifies on completion, failure with a reason, and cancellation', () => {
   expect(danger).toHaveBeenCalledWith(expect.stringContaining(record.name), expect.objectContaining({
     description: expect.stringContaining('网络连接失败'),
     actionProps: expect.objectContaining({ children: '重试下载', onPress: expect.any(Function) }),
+    timeout: NOTIFY_DURATION.retryable,
   }))
   const retry = danger.mock.calls[0]?.[1]?.actionProps?.onPress
   const manageResource = vi.spyOn(actions.models, 'manageResource').mockResolvedValue(record)
