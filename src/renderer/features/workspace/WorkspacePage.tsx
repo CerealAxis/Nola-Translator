@@ -123,6 +123,13 @@ export function WorkspacePage() {
   useEffect(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = null
+    const pendingValue = pendingNotes.current
+    const pendingId = pendingMeetingId.current
+    pendingNotes.current = null
+    pendingMeetingId.current = null
+    if (pendingValue !== null && pendingId !== null && pendingValue !== savedNotes.current) {
+      void actions.meetings.setMeetingNotes(pendingId, pendingValue).then(clearNotesFailure, reportNotesFailure)
+    }
     savedNotes.current = ''
     if (!meetingId) {
       setNotes('')
@@ -272,7 +279,7 @@ export function WorkspacePage() {
     setStopConfirmOpen(false)
     try {
       await actions.session.stopSession()
-      if (meetingId) navigate(recordPath(meetingId))
+      if (meetingId && new URLSearchParams(window.location.search).get('workspace') !== '1') navigate(recordPath(meetingId))
     } catch (error) {
       notifyError(sessionErrorMessage(t, errorCodeOfSession(sessionStore.getState())))
     } finally {
@@ -329,13 +336,11 @@ export function WorkspacePage() {
   return (
     <div
       data-slot="workspace"
+      role="region"
+      aria-label={t('home.quickStart')}
       className="nola-workspace"
     >
-      <header className="nola-workspace-heading">
-        <h1>{t('home.quickStart')}</h1>
-      </header>
-
-      <WorkspaceToolbar
+      <WorkspaceToolbar readerOnly
         modelId={pendingConfig?.recognitionModelId ?? settings?.recognition.modelId ?? 'qwen3-asr-1.7b-hf'} onModelChange={(modelId) => {
           void actions.settings.updateSettings({ recognition: { modelId } }).catch(() => undefined)
         }}
@@ -439,10 +444,10 @@ export function WorkspacePage() {
         </Card>
 
         {notesOpen && !notesCollapsed ? (
-          <NotesPanel value={notes} onChange={editNotes} />
+          <NotesPanel key={meetingId ?? 'draft'} value={notes} onChange={editNotes} />
         ) : null}
         {notesOpen && notesCollapsed ? (
-          <NotesPanel value={notes} onChange={editNotes} collapsed onToggleCollapsed={() => setNotesCollapsed(false)} />
+          <NotesPanel key={meetingId ?? 'draft'} value={notes} onChange={editNotes} collapsed onToggleCollapsed={() => setNotesCollapsed(false)} />
         ) : null}
       </div>
 

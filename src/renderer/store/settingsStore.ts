@@ -652,6 +652,16 @@ export function clearSettingsError(): void {
 }
 
 /** False means browser captions reserve the service; no window was opened. */
+export async function openMainPage(path: string): Promise<void> {
+  if (!bridge?.app.openMainPage) throw new Error('Main window unavailable')
+  await bridge.app.openMainPage(path)
+}
+
+export async function showWorkspace(): Promise<void> {
+  if (!bridge?.app.showWorkspace) throw new Error('Workspace window unavailable')
+  await bridge.app.showWorkspace()
+}
+
 export async function showOverlay(): Promise<boolean> {
   if (!bridge) throw new Error('Bridge unavailable')
   if (!await canStartDesktopCaptions()) return false

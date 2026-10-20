@@ -187,9 +187,6 @@ export const en: Dictionary = {
 
   videoCaptions: {
     title: 'Video captions',
-    experimentalTitle: 'Experimental feature',
-    experimentalBody: 'Video captions are still under development. If something goes wrong, please report it on GitHub.',
-    experimentalAction: 'Report an issue',
     captionPreview: 'Caption preview',
     settings: 'Video caption settings',
     openBrowser: 'Open browser',
@@ -328,7 +325,7 @@ export const en: Dictionary = {
     tabSearch: 'Search',
     tabDownloads: 'Downloads',
     asrModels: 'Speech models',
-    ttsModels: 'Text-to-speech (TTS)',
+    ttsModels: 'Text-to-speech',
     mtModels: 'Translation models',
     install: 'Install',
     cancel: 'Cancel download',
@@ -373,12 +370,12 @@ export const en: Dictionary = {
     familyDescriptions: {
       qwen: 'By Alibaba Qwen: 30 languages and 22 Chinese dialects. 0.6B suits integrated graphics; 1.7B suits a discrete GPU.',
       sensevoice: 'By Alibaba FunAudioLLM: 5 languages (Mandarin, Cantonese, English, Japanese, Korean). Integrated graphics recommended.',
-      funasr: 'By Alibaba Tongyi Lab: Chinese, English and Japanese, with 7 Chinese dialects including Cantonese. Lightweight GGUF; integrated graphics recommended.',
+      funasr: 'By Alibaba Qwen: Chinese, English and Japanese, with 7 Chinese dialects including Cantonese. Lightweight GGUF; integrated graphics recommended.',
       vibevoice: 'By Microsoft: supports 51 languages, including Chinese and English. A discrete GPU is recommended.',
       mimo: 'By Xiaomi MiMo: Chinese and English recognition with several Chinese dialects, including Wu, Cantonese, Hokkien and Sichuanese. Discrete GPU recommended.',
       hymt2: 'By Tencent Hunyuan: 33 languages plus 5 minority-language or dialect varieties. 1.8B suits integrated graphics; 7B suits a discrete GPU.',
       index: 'By Bilibili Index Team: translation across 150 languages. 2B/9B suit discrete GPUs; 35B suits a flagship GPU.',
-      other: 'By Meta AI: translates among 100 languages. Lightweight 418M model; integrated graphics recommended.',
+      other: 'By Meta AI: machine translation across 100 languages, including Chinese and English. Use only when necessary; a discrete GPU is recommended.',
       tts: 'By Alibaba Qwen: 10 languages, including Chinese and English. 0.6B suits integrated graphics; 1.7B suits a discrete GPU.',
     },
     openDetails: 'View details',

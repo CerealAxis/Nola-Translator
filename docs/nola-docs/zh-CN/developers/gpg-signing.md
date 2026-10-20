@@ -1,13 +1,12 @@
 # GPG 签名配置
 
->[!TIP]
-> AI攥写，待完善
+> [!WARNING]  
+> 本文档仍在持续完善中，部分内容可能不完整、未验证或暂未覆盖最新实现。  
+> 如果你有兴趣，欢迎提交 Pull Request 来完善本文档
 
-GPG 可以为 Git 提交添加数字签名，帮助验证提交由对应密钥持有者签署。GitHub 在满足公钥和身份关联等条件后显示 `Verified`，但签名不证明代码没有缺陷，也不替代审核。
+GPG 可以为 Git 提交添加数字签名，帮助验证提交由对应密钥持有者签署。GitHub 在满足公钥和身份关联等条件后显示 `Verified`。
 
-本页按安装、生成、登记公钥、配置 Git、验证和维护展开。签名是本项目可使用的身份验证方式，不在此增加所有贡献必须签名的规定。
-
-## 一、理解三种不同的信息
+## 一、背景
 
 | 信息 | 用途 | 是否可公开 |
 | --- | --- | --- |
@@ -39,7 +38,7 @@ gpg --list-secret-keys --keyid-format=long
 
 这里列出有私钥的身份。只有公钥不能签名。已有未过期、可用于签名且属于本人控制的密钥时，可以复用，不必每次贡献都生成一套。
 
-输出中的 `sec` 表示主密钥，`ssb` 表示子密钥；`[S]` 代表签名能力。不同 GnuPG 版本显示形式可能不同，应核对指纹和用途，而不只看短 ID。
+输出中的 `sec` 表示主密钥，`ssb` 表示子密钥；`[S]` 代表签名能力。
 
 ## 四、生成新密钥
 
@@ -161,5 +160,3 @@ git verify-commit HEAD
 记录密钥的用途和到期时间，定期确认备份可恢复。换电脑时只在可信环境导入私钥；仓库复制不应包含私钥备份。
 
 准备改用 SSH 提交签名时，应显式调整 `gpg.format` 和签名键，不能把公钥文件路径直接放进仍使用 OpenPGP 的配置中。
-
-参考：[PCLC Docs GPG 签名指南](https://docs.pclc.cc/ce/developers/gpg-signing)、[GitHub 生成 GPG 密钥](https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key)。交互编号以本机工具为准，项目没有沿用参考站的强制签名门槛。

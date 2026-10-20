@@ -60,23 +60,36 @@
   .nola-workspace-notes-heading .card__title { font-size: 18px; font-weight: 650; }
   .nola-workspace-notes-state { color: var(--muted); font-size: 12px; white-space: nowrap; }
   .nola-workspace-notes-tools { display: flex; flex: none; gap: 8px; padding: 14px 0 12px; border-bottom: 1px solid var(--separator); }
-  .nola-workspace-notes-tools .button { border-radius: 8px; }
-  .nola-workspace-notes-tools .button:first-child { color: var(--accent); }
+  .nola-workspace-notes-tools :is(.button, .toggle-button) { border-radius: var(--radius-xl); }
+  .nola-workspace-notes-tools .toggle-button { background: var(--surface-secondary); color: var(--foreground); }
+  .nola-workspace-notes-tools .toggle-button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
   .nola-workspace-notes-content { display: flex; flex: 1; min-height: 0; padding: 16px 0 8px; }
-  .nola-workspace-notes-area { flex: 1; width: 100%; min-width: 0; min-height: 0; padding: 0; resize: none; background: transparent; border: none; border-radius: 0; box-shadow: none; font-size: 14px; line-height: 1.7; }
-  .nola-workspace-notes-mode { margin-inline-start: auto; }
-  .nola-workspace-notes-mode svg { width: 14px; height: 14px; }
-  .nola-workspace-notes-preview { flex: 1; min-width: 0; overflow-y: auto; overflow-wrap: anywhere; color: var(--foreground); font-size: 14px; line-height: 1.7; }
-  .nola-workspace-notes-preview > :first-child { margin-top: 0; }
-  .nola-workspace-notes-preview > :last-child { margin-bottom: 0; }
-  .nola-workspace-notes-preview :is(p, ul, ol, blockquote, pre, table) { margin-block: 0 12px; }
-  .nola-workspace-notes-preview :is(ul, ol) { padding-inline-start: 22px; }
-  .nola-workspace-notes-preview blockquote { padding-inline-start: 12px; border-inline-start: 2px solid var(--border); color: var(--muted); }
-  .nola-workspace-notes-preview :not(pre) > code { padding: 1px 4px; border-radius: var(--radius-sm); background: var(--surface-secondary); }
-  .nola-workspace-notes-preview pre { overflow-x: auto; padding: 10px; border-radius: var(--radius-md); background: var(--surface-secondary); }
-  .nola-workspace-notes-preview table { width: 100%; border-collapse: collapse; }
-  .nola-workspace-notes-preview :is(th, td) { padding: 5px 7px; border: 1px solid var(--border); text-align: start; }
-  .nola-workspace-notes-empty { color: var(--muted); }
+  .nola-workspace-notes-editor { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; color: var(--foreground); font: var(--font-body); }
+  .nola-workspace-notes-editor .tiptap { min-height: 100%; padding: var(--space-1); overflow-wrap: anywhere; outline: none; caret-color: var(--accent); }
+  .nola-workspace-notes-editor .tiptap:focus-visible { box-shadow: inset 0 0 0 1px var(--field-border-focus); border-radius: var(--radius-sm); }
+  .nola-workspace-notes-editor[data-empty="true"] .tiptap::before { content: attr(data-placeholder); float: left; height: 0; color: var(--muted); pointer-events: none; }
+  .nola-workspace-notes-editor .tiptap > :first-child { margin-top: 0; }
+  .nola-workspace-notes-editor .tiptap > :last-child { margin-bottom: 0; }
+  .nola-workspace-notes-editor :is(p, ul, ol, blockquote, pre, table) { margin-block: 0 var(--space-1); }
+  .nola-workspace-notes-editor :is(h1, h2, h3, h4, h5, h6) { margin-block: var(--space-2) var(--space-1); }
+  .nola-workspace-notes-editor h1 { font: var(--font-h1); }
+  .nola-workspace-notes-editor h2 { font: var(--font-h2); }
+  .nola-workspace-notes-editor h3 { font: var(--font-title); }
+  .nola-workspace-notes-editor :is(h4, h5, h6) { font: var(--font-body-strong); }
+  .nola-workspace-notes-editor ul { list-style: disc; padding-inline-start: var(--space-3); }
+  .nola-workspace-notes-editor ol { list-style: decimal; padding-inline-start: var(--space-3); }
+  .nola-workspace-notes-editor ul[data-type="taskList"] { list-style: none; padding-inline-start: 0; }
+  .nola-workspace-notes-editor li[data-type="taskItem"] { display: flex; align-items: baseline; gap: var(--space-1); }
+  .nola-workspace-notes-editor li[data-type="taskItem"] > div { flex: 1; min-width: 0; }
+  .nola-workspace-notes-editor input[type="checkbox"] { accent-color: var(--accent); }
+  .nola-workspace-notes-editor blockquote { padding-inline-start: var(--space-2); border-inline-start: 2px solid var(--border); color: var(--muted); }
+  .nola-workspace-notes-editor :not(pre) > code { padding-inline: var(--space-1); border-radius: var(--radius-sm); background: var(--surface-secondary); }
+  .nola-workspace-notes-editor pre { overflow-x: auto; padding: var(--space-1); border-radius: var(--radius-md); background: var(--surface-secondary); }
+  .nola-workspace-notes-editor table { width: 100%; border-collapse: collapse; }
+  .nola-workspace-notes-editor :is(th, td) { min-width: var(--space-4); padding: var(--space-1); border: 1px solid var(--border); text-align: start; }
+  .nola-workspace-notes-editor a { color: var(--accent); text-decoration: underline; }
+  .nola-workspace-notes-editor hr { margin-block: var(--space-2); border-top: 1px solid var(--border); }
+  .nola-workspace-notes-editor img { max-width: 100%; height: auto; }
   .nola-workspace-notes-handle { align-self: start; width: 36px; min-width: 36px; height: 36px; border-radius: 10px; color: var(--accent); }
   .nola-workspace-session-bar { display: flex; flex: none; flex-wrap: wrap; min-width: 0; min-height: 72px; gap: 14px; align-items: center; padding: 14px 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
   .nola-workspace-audio-status { display: flex; min-width: 0; align-items: center; gap: 10px; font-size: 13px; }
@@ -117,4 +130,10 @@
 
 @layer utilities {
   .nola-workspace-audio.select { border: 0; background: transparent; box-shadow: none; }
+}
+
+@layer components {
+  .nola-reader-window { flex: 1; min-height: 0; padding: var(--space-2); overflow: auto; background: var(--background); }
+  .nola-reader-window .nola-workspace { height: 100%; min-height: 0; }
+  .nola-reader-window .nola-workspace-view-controls { border: 0; padding: 0; }
 }

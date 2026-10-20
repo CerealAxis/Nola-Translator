@@ -43,6 +43,8 @@ const channels = {
   setSessionPaused: 'engine:set-session-paused',
   event: 'engine:event',
   getEngineState: 'engine:get-state',
+  showWorkspace: 'app:show-workspace',
+  openMainPage: 'app:open-main-page', mainPageRequested: 'app:main-page-requested',
   showOverlay: 'overlay:show',
   hideOverlay: 'overlay:hide',
   closeOverlay: 'overlay:close',
@@ -143,6 +145,13 @@ const api: NolaTranslatorApi = {
     return () => ipcRenderer.off(channels.event, wrapped)
   },
   getEngineState: () => invoke<EngineProcessState>(channels.getEngineState),
+  showWorkspace: () => invoke(channels.showWorkspace),
+  openMainPage: path => invoke(channels.openMainPage, path),
+  onMainPageRequested: listener => {
+    const wrapped = (_event: Electron.IpcRendererEvent, path: string): void => listener(path)
+    ipcRenderer.on(channels.mainPageRequested, wrapped)
+    return () => ipcRenderer.off(channels.mainPageRequested, wrapped)
+  },
   showOverlay: () => invoke(channels.showOverlay),
   hideOverlay: () => invoke(channels.hideOverlay),
   closeOverlay: () => invoke(channels.closeOverlay),

@@ -137,6 +137,9 @@ export type NolaTranslatorApi = {
    */
   getEngineState(): Promise<EngineProcessState>
   /** False is a browser-caption service conflict; the window was not shown. */
+  showWorkspace(): Promise<void>
+  openMainPage(path: string): Promise<void>
+  onMainPageRequested?(listener: (path: string) => void): () => void
   showOverlay(): Promise<boolean>
   hideOverlay(): Promise<void>
   /** Stops recognition and then hides the window. Distinct from hideOverlay, which only hides. */

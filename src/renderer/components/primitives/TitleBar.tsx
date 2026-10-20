@@ -84,10 +84,10 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
           <Button isIconOnly variant="ghost" className="nola-titlebar-icon" aria-label={dark ? t('titleBar.themeToLight') : t('titleBar.themeToDark')} onPress={() => setTheme(dark ? 'light' : 'dark')}>{dark ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}</Button>
           <Tooltip.Content>{dark ? t('titleBar.themeToLight') : t('titleBar.themeToDark')}</Tooltip.Content>
         </Tooltip>
-        <Dropdown>
+        {help.length > 0 && <Dropdown>
           <Dropdown.Trigger className="nola-titlebar-icon" aria-label={t('titleBar.helpMenu')}><CircleHelp aria-hidden="true" /></Dropdown.Trigger>
           <Dropdown.Popover><Dropdown.Menu>{help.map(item => <Dropdown.Item key={item.key} id={item.key} onAction={item.onSelect}>{item.label}</Dropdown.Item>)}</Dropdown.Menu></Dropdown.Popover>
-        </Dropdown>
+        </Dropdown>}
       </div>
       {windowsShell ? <div className="nola-window-controls nola-no-drag">
         <Button variant="ghost" isIconOnly className="nola-window-control" aria-label={t('titleBar.minimizeWindow')} onPress={() => { void window.nolaTranslator?.minimizeMainWindow() }}><Minus aria-hidden="true" /></Button>

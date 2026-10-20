@@ -256,7 +256,11 @@ export function registerEngineIpc(
     }
   )
 
-  loggedHandle(IPC_CHANNELS.startSession, (_event, config: unknown) => controller.start(config, 'desktop'))
+  loggedHandle(IPC_CHANNELS.startSession, async (_event, config: unknown) => {
+    const started = await controller.start(config, 'desktop')
+    broadcast({ protocolVersion: 1, type: 'sessionStarted', requestId: `attached-${randomUUID()}`, ...started })
+    return started
+  })
   loggedHandle(IPC_CHANNELS.stopSession, async (_event, sessionId: unknown) => {
     if (typeof sessionId !== 'string') throw new Error('字幕会话 ID 无效')
     controller.assertOwner(sessionId, 'desktop')

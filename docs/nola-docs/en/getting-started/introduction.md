@@ -30,7 +30,7 @@ Nola Translator turns speech into real-time captions and translations. Run speec
 ## Features
 
 - **Local models:** Run recognition models such as Qwen3-ASR and SenseVoiceSmall, and translation models such as HY-MT2 locally. The app can also search for and install other models from Hugging Face.
-- **Cloud models:** Use speech recognition from Aliyun, MiniMax, and other providers; connect translation models through OpenAI-compatible, Anthropic, or Ollama APIs; or use the free MyMemory translation service.
+- **Cloud models:** Use speech recognition from Aliyun, MiniMax, and other providers; connect translation models through LLM protocols such as OpenAI-compatible APIs, Anthropic, or Ollama; or use the free MyMemory translation service.
 - **GPU acceleration:** Detects available compute devices and lets you configure separate devices for recognition and translation.
 - **Browser extension:** Includes a browser extension for Chrome and Edge that displays bilingual captions on video pages. You can also configure desktop system audio as an input source.
 - **Real-time caption overlay:** Supports system output, a selected audio device, or a microphone. Captions appear in a separate overlay, where you can adjust its position, font size, colors, opacity, and original/translated text layout.

@@ -362,7 +362,7 @@ export type EngineEvent =
   | (Envelope<'resources'> & ResourceSnapshot)
   | (Envelope<'resourceActionResult'> & { resource: ResourceRecord })
   | (Envelope<'resourceChanged'> & { resource: ResourceRecord })
-  | (Envelope<'sessionStarted'> & { sessionId: string })
+  | (Envelope<'sessionStarted'> & { sessionId: string; meetingId?: string | null })
   | (Envelope<'modelsPrewarmed'> & {
       /**
        * How far the prewarm got. `loading` is written before the weights are read, because a cold

@@ -14,6 +14,8 @@ import { Breadcrumbs, Button, Card, EmptyState, Skeleton } from '@heroui/react'
 import { Download, Minus, Plus } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 
 import { AudioPlayerBar, DualColumnView } from '@/components/reading'
 import type { DualColumnSegment } from '@/components/reading'
@@ -249,7 +251,7 @@ export function RecordDetailPage(): ReactNode {
               <div className="flex flex-col gap-3">
                 <h2 className="nola-subtitle text-foreground">{t('homeRecordsUi.notes')}</h2>
                 <div className="nola-record-notes-markdown nola-body max-h-64 overflow-y-auto break-words text-foreground">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{notes}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, [rehypeSanitize, { ...defaultSchema, tagNames: [...defaultSchema.tagNames ?? [], 'u'] }]]}>{notes}</ReactMarkdown>
                 </div>
               </div>
             </Card.Content>

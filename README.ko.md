@@ -147,7 +147,17 @@ npm run dist:win
 
 ## 기여하기
 
-저장소를 Fork하고 브랜치를 만든 뒤 변경 사항을 제출하고 Pull Request를 열어 주세요. 변경 내용과 실행한 검사를 간단히 설명해 주세요. 디자인 및 코드 규칙은 [DESIGN.md](DESIGN.md)와 [AGENTS.md](AGENTS.md)를 참조하세요.
+저장소를 Fork하고 브랜치를 만든 뒤 변경 사항을 제출하고 Pull Request를 열어 주세요. 변경 내용과 실행한 검사를 간단히 설명해 주세요. 디자인 및 코드 규칙은 [DESIGN.md](DESIGN.md)와 [기여 가이드](https://nola.xaviermc.top/ko/contributing/)를 참조하세요.
+
+## 후원
+
+아래 방법으로 프로젝트를 후원할 수 있습니다. 후원자에게는 이슈 우선 답변, 일대일 안내, 후원자 명단 및 앱 내 영구 표기, 기능 맞춤 제작 등의 혜택을 제공합니다.
+
+**1. 중국 본토**
+- [Afdian](https://afdian.com/a/CerealAxis)
+
+**2. 기타 지역**
+- [GitHub Sponsors](https://github.com/sponsors/CerealAxis/)
 
 ## 라이선스
 

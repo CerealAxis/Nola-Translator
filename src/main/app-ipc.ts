@@ -27,6 +27,8 @@ const channels = {
   minimizeMainWindow: 'app:window:minimize', toggleMainWindowMaximize: 'app:window:toggle-maximize',
   getMainWindowMaximized: 'app:window:is-maximized', mainWindowMaximizedChanged: 'app:window:maximized-changed',
   closeMainWindow: 'app:window:close',
+  showWorkspace: 'app:show-workspace',
+  openMainPage: 'app:open-main-page',
   openAppearance: 'app:open-appearance',
   checkLatestRelease: 'app:check-latest-release', openReleasePage: 'app:open-release-page',
   getModelStorage: 'storage:get', chooseModelStorageDirectory: 'storage:choose', restartApp: 'app:restart',
@@ -105,7 +107,19 @@ export function registerAppIpc(options: {
   engine: EngineProcess
   getOverlayWindow: () => BrowserWindow | null
   getMainWindow: () => BrowserWindow | null
+  getWorkspaceWindow?: () => BrowserWindow | null
+  showWorkspace?: () => Promise<void>
 }): () => void {
+  loggedHandle(channels.showWorkspace, () => options.showWorkspace?.())
+  loggedHandle(channels.openMainPage, (_event, path: unknown) => {
+    if (typeof path !== 'string' || !/^#\/(?:models|settings\/[a-z-]+|records\/[a-zA-Z0-9-]+)$/.test(path)) throw new Error('Invalid main page')
+    const window = options.getMainWindow()
+    if (!window || window.isDestroyed()) throw new Error('Main window unavailable')
+    window.webContents.send('app:main-page-requested', path)
+    if (window.isMinimized()) window.restore()
+    window.show()
+    window.focus()
+  })
   let current = options.initialSettings
   const mainWindow = options.getMainWindow()
   const publishMaximizedState = (): void => {
@@ -241,23 +255,27 @@ export function registerAppIpc(options: {
     app.relaunch()
     app.quit()
   })
+  const controlledWindow = (sender: Electron.WebContents): BrowserWindow | null => {
+    const window = BrowserWindow.fromWebContents(sender)
+    return window === options.getMainWindow() || window === options.getWorkspaceWindow?.() ? window : null
+  }
   loggedHandle(channels.minimizeMainWindow, (event) => {
-    const window = options.getMainWindow()
+    const window = controlledWindow(event.sender)
     if (window && !window.isDestroyed() && event.sender === window.webContents) window.minimize()
   })
   loggedHandle(channels.toggleMainWindowMaximize, (event) => {
-    const window = options.getMainWindow()
+    const window = controlledWindow(event.sender)
     if (!window || window.isDestroyed() || event.sender !== window.webContents) return false
     if (window.isMaximized()) window.unmaximize()
     else window.maximize()
     return window.isMaximized()
   })
   loggedHandle(channels.getMainWindowMaximized, (event) => {
-    const window = options.getMainWindow()
+    const window = controlledWindow(event.sender)
     return Boolean(window && !window.isDestroyed() && event.sender === window.webContents && window.isMaximized())
   })
   loggedHandle(channels.closeMainWindow, (event) => {
-    const window = options.getMainWindow()
+    const window = controlledWindow(event.sender)
     if (window && !window.isDestroyed() && event.sender === window.webContents) window.close()
   })
   loggedHandle(channels.updateSettings, async (_event, raw: unknown) => {

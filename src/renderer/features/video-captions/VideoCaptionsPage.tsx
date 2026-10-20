@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Card, Label, Link, ListBox, Popover, Select, ToggleButton, ToggleButtonGroup } from '@heroui/react'
+import { Button, Card, Label, ListBox, Popover, Select, ToggleButton, ToggleButtonGroup } from '@heroui/react'
 import { AppWindow, ArrowRight, ArrowRightLeft, ChevronDown, Languages, Settings } from 'lucide-react'
 import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { AppSettingsPatch, PrewarmErrorCode } from '@/bridge'
@@ -46,12 +46,6 @@ const TAB_AUDIO_VALUE = 'tab'
 
 /** How often the gate is re-read. The extension starts and stops captions on its own, from a web page. */
 const GATE_POLL_MS = 2000
-
-/**
- * The main process `setWindowOpenHandler` hands `https:` targets to the shell and denies the
- * window, so the notice's action renders as an anchor instead of navigating the renderer.
- */
-const ISSUES_URL = 'https://github.com/CerealAxis/Nola-Translator/issues'
 
 export function VideoCaptionsPage() {
   const { t, language } = useI18n()
@@ -234,19 +228,6 @@ export function VideoCaptionsPage() {
     <div className="nola-overlay-page">
       <PageHeader className="nola-page-heading" title={t('videoCaptions.title')}
         actions={<Button onPress={() => void openBrowser()} isPending={opening}><AppWindow aria-hidden="true" />{t('videoCaptions.openBrowser')}</Button>} />
-      <Alert status="warning">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title className="nola-body-strong">{t('videoCaptions.experimentalTitle')}</Alert.Title>
-          <Alert.Description className="nola-caption">
-            {t('videoCaptions.experimentalBody')}
-            <Link href={ISSUES_URL} target="_blank" rel="noreferrer" className="button button--sm button--tertiary rounded-[6px]">
-              {t('videoCaptions.experimentalAction')}
-              <Link.Icon />
-            </Link>
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
       <Card className="nola-overlay-preview">
         <Card.Header>
           <Card.Title className="text-lg font-semibold">{t('videoCaptions.captionPreview')}</Card.Title>

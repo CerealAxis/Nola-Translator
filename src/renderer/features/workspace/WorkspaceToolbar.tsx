@@ -11,6 +11,7 @@ import { swappedLanguagesOf } from '@/session-config'
 import type { UiLanguage } from '@/i18n'
 
 export interface WorkspaceToolbarProps {
+  readerOnly?: boolean
   modelId: RecognitionModelId
   onModelChange: (modelId: RecognitionModelId) => void
   translationModelId: string
@@ -55,7 +56,7 @@ export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
   return (
     <Card data-slot="workspace-toolbar" className="nola-workspace-toolbar">
       <Card.Content className="nola-workspace-toolbar-content">
-        <div className="nola-workspace-config">
+        {!props.readerOnly && <div className="nola-workspace-config">
           <Select className="nola-workspace-audio" value={props.audioSource} isDisabled={props.sessionLocked} aria-label={t('workspaceUi.input')} onChange={(key) => { if (typeof key === 'string') props.onAudioSourceChange(key) }}>
             <Label>{t('workspaceUi.input')}</Label>
             <Select.Trigger><Volume2 aria-hidden="true" /><Select.Value /><Select.Indicator /></Select.Trigger>
@@ -101,7 +102,7 @@ export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
             </Popover>
           </div>
           <Button variant="outline" className="nola-workspace-overlay" onPress={props.onOpenOverlay}><Captions aria-hidden="true" />{t('workspaceUi.openOverlay')}</Button>
-        </div>
+        </div>}
         <div className="nola-workspace-view-controls">
           <ToggleButtonGroup className="nola-segmented" size="sm" selectionMode="single" disallowEmptySelection aria-label={t('workspace.displayMode')} selectedKeys={new Set([props.displayMode])} onSelectionChange={(keys) => { const next = [...keys][0]; if (typeof next === 'string') props.onDisplayModeChange(next as CaptionDisplayMode) }}>
             {modes.filter(mode => props.targetLanguage !== NO_TRANSLATION_LANGUAGE || mode.id === 'source').map((mode) => <ToggleButton key={mode.id} id={mode.id} aria-label={mode.label}>{mode.label}</ToggleButton>)}

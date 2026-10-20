@@ -28,7 +28,7 @@ Nola Translator turns speech into real-time captions and translations. Run speec
 ## Features
 
 - **Local models:** Run recognition models such as Qwen3-ASR and SenseVoiceSmall, and translation models such as HY-MT2 locally. The app can also search for and install other models from Hugging Face.
-- **Cloud models:** Use speech recognition from Aliyun, MiniMax, and other providers; connect translation models through OpenAI-compatible, Anthropic, or Ollama APIs; or use the free MyMemory translation service.
+- **Cloud models:** Use speech recognition from Aliyun, MiniMax, and other providers; connect translation models through LLM protocols such as OpenAI-compatible APIs, Anthropic, or Ollama; or use the free MyMemory translation service.
 - **GPU acceleration:** Detects available compute devices and lets you configure separate devices for recognition and translation.
 - **Browser extension:** Includes a browser extension for Chrome and Edge that displays bilingual captions on video pages. You can also configure desktop system audio as an input source.
 - **Real-time caption overlay:** Supports system output, a selected audio device, or a microphone. Captions appear in a separate overlay, where you can adjust its position, font size, colors, opacity, and original/translated text layout.
@@ -147,7 +147,17 @@ npm run dist:win
 
 ## Contributing
 
-Fork the repository, create a branch, make your changes, and open a pull request. Briefly describe your changes and the checks you ran. For design and code conventions, see [DESIGN.md](DESIGN.md) and [AGENTS.md](AGENTS.md).
+Fork the repository, create a branch, make your changes, and open a pull request. Briefly describe your changes and the checks you ran. For design and code conventions, see [DESIGN.md](DESIGN.md) and the [contribution guide](https://nola.xaviermc.top/en/contributing/).
+
+## Sponsorship
+
+You can support this project through the channels below. Sponsors receive benefits including priority help with issues, one-on-one guidance, permanent recognition in the sponsor list and in the app, and custom features.
+
+**1. Mainland China**
+- [Afdian](https://afdian.com/a/CerealAxis)
+
+**2. Other regions**
+- [GitHub Sponsors](https://github.com/sponsors/CerealAxis/)
 
 ## License
 

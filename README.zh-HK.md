@@ -147,7 +147,17 @@ npm run dist:win
 
 ## 參與貢獻
 
-Fork 專案、建立分支、提交變更並發起 Pull Request。請簡單說明改動內容及已執行的檢查。設計和程式碼規範請參閱 [DESIGN.md](DESIGN.md) 及 [AGENTS.md](AGENTS.md)。
+Fork 專案、建立分支、提交變更並發起 Pull Request。請簡單說明改動內容及已執行的檢查。設計和程式碼規範請參閱 [DESIGN.md](DESIGN.md) 及[參與貢獻指南](https://nola.xaviermc.top/zh-HK/contributing/)。
+
+## 贊助
+
+您可以透過以下方式贊助本專案。贊助者可獲得相關權益，包括問題優先答覆、一對一指導、永久列入贊助者名單並在軟件等渠道展示，以及功能訂製等。
+
+**1. 中國大陸**
+- [愛發電](https://afdian.com/a/CerealAxis)
+
+**2. 其他地區**
+- [GitHub Sponsors](https://github.com/sponsors/CerealAxis/)
 
 ## 授權
 

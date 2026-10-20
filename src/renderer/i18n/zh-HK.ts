@@ -397,6 +397,7 @@ export const zhHK: Dictionary = {
     "durationHours": "{hours}小時"
   },
   "workspaceUi": {
+    "windowFailed": "無法開啟快速同傳視窗，請重試。",
     "idleTitle": "開啟一場即時傳譯",
     "input": "輸入來源",
     "systemAudio": "系統音訊",
@@ -582,9 +583,6 @@ export const zhHK: Dictionary = {
   },
   "videoCaptions": {
     "title": "影片字幕",
-    "experimentalTitle": "實驗性功能",
-    "experimentalBody": "影片字幕功能仍在開發中。如遇到問題，歡迎在 GitHub issue 提交意見。",
-    "experimentalAction": "提供意見",
     "captionPreview": "字幕預覽",
     "settings": "影片字幕設定",
     "openBrowser": "開啟瀏覽器",
@@ -711,7 +709,7 @@ export const zhHK: Dictionary = {
     "tabSearch": "搜尋",
     "tabDownloads": "下載中",
     "asrModels": "語音模型",
-    "ttsModels": "語音合成（TTS）",
+    "ttsModels": "語音合成",
     "mtModels": "翻譯模型",
     "install": "安裝",
     "cancel": "取消下載",
@@ -754,14 +752,14 @@ export const zhHK: Dictionary = {
     "vramUnknown": "暫無估算",
     "deviceTier": { "integrated": "內顯", "discrete": "獨立顯卡", "flagship": "旗艦顯卡", "unknown": "裝置" },
     "familyDescriptions": {
-      "qwen": "阿里巴巴通義千問團隊開發，支援中文、英文等 30 種語言及 22 種中文方言。0.6B 推薦核顯，1.7B 推薦獨顯。",
+      "qwen": "阿里巴巴 Qwen 團隊開發，支援中文、英文等 30 種語言及 22 種中文方言。0.6B 推薦核顯，1.7B 推薦獨顯。",
       "sensevoice": "阿里巴巴 FunAudioLLM 團隊開發，支援普通話、廣東話等 5 種語言。推薦核顯。",
-      "funasr": "阿里巴巴通義實驗室開發，支援中文、英文和日文，並涵蓋含廣東話在內的 7 類中文方言。輕量 GGUF 推薦核顯。",
+      "funasr": "阿里巴巴 Qwen 團隊開發，支援中文、英文和日文，並涵蓋含廣東話在內的 7 類中文方言。輕量 GGUF 推薦核顯。",
       "vibevoice": "微軟開發，模型支援中文、英文等 51 種語言。推薦獨顯。",
       "mimo": "小米 MiMo 團隊開發，支援中文和英文辨識，以及吳語、廣東話、閩南語、四川話等中文方言。推薦獨顯。",
       "hymt2": "騰訊混元開發，支援 33 種語言及 5 種少數民族語言或方言。1.8B 推薦核顯，7B 推薦獨顯。",
       "index": "嗶哩嗶哩 Index 團隊開發，支援 150 種語言翻譯。2B/9B 推薦獨顯，35B 推薦旗艦顯卡。",
-      "other": "Meta AI 開發，支援中文、英文等 100 種語言互譯。418M 輕量模型推薦核顯。",
+      "other": "Meta AI 開發，支援中文、英文等 100 種語言機器翻譯，非必要不使用，推薦獨立顯卡使用。",
       "tts": "阿里巴巴 Qwen 團隊開發，支援中文、英文等 10 種語言。0.6B 推薦核顯，1.7B 推薦獨顯。"
     },
     "openDetails": "查看詳情",

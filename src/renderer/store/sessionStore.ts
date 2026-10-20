@@ -523,6 +523,10 @@ export function attachSessionStore(next: NolaBridge): void {
        * is held, so a late event cannot replace a live session.
        */
       case 'sessionStarted': {
+        if (event.meetingId !== undefined) {
+          const currentId = sessionStore.getState().sessionId
+          if (currentId === null || currentId === event.sessionId) sessionStore.setState({ meetingId: event.meetingId })
+        }
         let adopted = false
         sessionStore.setState((state) => {
           if (state.sessionId !== null) return state

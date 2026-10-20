@@ -9,7 +9,7 @@ import type { AppSettingsPatch } from '@/bridge'
 import { useI18n } from '@/i18n'
 import { useRoute } from '@/routes'
 import { actions, sessionStore, stores, updateSettings, useStore } from '@/store'
-import { swappedLanguagesOf, targetLanguagePatch } from '@/session-config'
+import { swappedLanguagesOf, targetLanguagePatch, translationModelPatch } from '@/session-config'
 import { PageHeader } from '@/components/primitives'
 import { notifyError } from '@/components/primitives/notify'
 import { SettingSelect } from '../settings/SettingsPage'
@@ -60,8 +60,13 @@ export function OverlayPage() {
   } as CSSProperties
   return (
     <div className="nola-overlay-page">
-      <PageHeader className="nola-page-heading" title={t('shellUi.overlay')}
-        actions={<Button onPress={() => void open()} isPending={opening}><ExternalLink aria-hidden="true" />{t('shellUi.openOverlay')}</Button>} />
+      <PageHeader className="nola-page-heading" title={t('home.quickStart')}
+        actions={<div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onPress={() => {
+            void actions.settings.showWorkspace().catch(error => notifyError(t('workspaceUi.windowFailed'), { cause: error }))
+          }}><ExternalLink aria-hidden="true" />{t('home.quickStart')}</Button>
+          <Button onPress={() => void open()} isPending={opening}><ExternalLink aria-hidden="true" />{t('shellUi.openOverlay')}</Button>
+        </div>} />
       <Card className="nola-overlay-preview">
         <Card.Header>
           <Card.Title className="text-lg font-semibold">{t('shellUi.captionPreview')}</Card.Title>
@@ -108,8 +113,30 @@ export function OverlayPage() {
         </Card.Content>
       </Card>
       <Card className="nola-section-card p-5">
-        <Card.Header className="mb-5"><Card.Title>{t('shellUi.overlaySettings')}</Card.Title></Card.Header>
+        <Card.Header className="mb-5"><Card.Title>{t('settings.title')}</Card.Title></Card.Header>
         <Card.Content className="nola-overlay-fields">
+          <div className="nola-overlay-field">
+            <span className="text-sm text-muted">{t('session.recognitionModel')}</span>
+            <SettingSelect value={settings.recognition.modelId} ariaLabel={t('session.recognitionModel')} isDisabled={sessionActive}
+              options={modelOptions.recognitionModels.length ? modelOptions.recognitionModels : [{ value: settings.recognition.modelId, label: settings.recognition.modelId, isDisabled: true }]} onChange={modelId => patch({ recognition: { modelId } })} />
+          </div>
+          <div className="nola-overlay-field">
+            <span className="text-sm text-muted">{t('session.translationModel')}</span>
+            <SettingSelect value={settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? NO_TRANSLATION_LANGUAGE : settings.translation.provider === 'local' ? settings.translation.localModelId : settings.translation.provider}
+              ariaLabel={t('session.translationModel')} isDisabled={sessionActive}
+              options={[{ value: NO_TRANSLATION_LANGUAGE, label: t('workspaceUi.translationOff') }, ...modelOptions.translationModels,
+                ...(settings.translation.provider === 'local' && settings.translation.localModelId && !modelOptions.translationModels.some(model => model.value === settings.translation.localModelId) ? [{ value: settings.translation.localModelId, label: modelOptions.translation?.name ?? settings.translation.localModelId, isDisabled: true }] : []),
+                ...(settings.translation.provider !== 'local' ? [{ value: settings.translation.provider, label: t(settings.translation.provider === 'index-translate' ? 'settings.providerIndexTranslate' : settings.translation.provider === 'mymemory' ? 'settings.providerMyMemory' : settings.translation.provider === 'google' ? 'settings.providerGoogle' : settings.translation.provider === 'recognition' ? 'settings.providerRecognitionTranslation' : settings.translation.provider === 'cloud' ? 'settings.providerCloud' : 'settings.providerMicrosoft') }] : [])]}
+              onChange={value => {
+                if (value === NO_TRANSLATION_LANGUAGE) patch(targetLanguagePatch(value, targetLanguage))
+                else {
+                  const model = stores.models.getState().resources.find(item => item.resourceId === value)
+                  const next = model && translationModelPatch(settings, model)
+                  if (next) patch(next)
+                  else if (value === settings.translation.provider && translationDisabled) patch(targetLanguagePatch(sourceLanguage === 'zh' ? 'en' : 'zh', targetLanguage))
+                }
+              }} />
+          </div>
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('shellUi.audioSource')}</span>
             <SettingSelect value={settings.recognition.audioSource} ariaLabel={t('shellUi.audioSource')} isDisabled={sessionActive}

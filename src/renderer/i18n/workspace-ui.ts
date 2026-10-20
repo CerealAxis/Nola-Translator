@@ -1,4 +1,5 @@
 export const workspaceZh = {
+  windowFailed: '无法打开快速同传窗口，请重试。',
   idleTitle: '开启一场实时同传',
   input: '输入来源',
   systemAudio: '系统音频',
@@ -37,6 +38,7 @@ export const workspaceZh = {
 } as const
 
 export const workspaceEn: { [K in keyof typeof workspaceZh]: string } = {
+  windowFailed: 'Could not open the interpreting window. Please try again.',
   idleTitle: 'Start live translation',
   input: 'Audio source',
   systemAudio: 'System audio',

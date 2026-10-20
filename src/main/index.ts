@@ -37,6 +37,8 @@ import { prepareOverlayMenu } from './overlay-menu'
 
 let mainWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
+let workspaceWindow: BrowserWindow | null = null
+let workspaceReady: Promise<void> = Promise.resolve()
 let engine: EngineProcess | null = null
 let disposeIpc: (() => void) | null = null
 let disposeAppIpc: (() => void) | null = null
@@ -71,6 +73,41 @@ function createMainWindow(theme: AppSettings['theme']): void {
     // so the pre-paint boot script would fall back to prefers-color-scheme and flash white.
     void window.loadFile(join(__dirname, '../renderer/index.html'), { query: { theme } })
   }
+}
+
+// Keep the reader mounted while hidden so captions, notes and view preferences survive closing.
+function createWorkspaceWindow(theme: AppSettings['theme']): void {
+  const window = new BrowserWindow({
+    ...createMainWindowOptions(resolvePreloadPath(__dirname), theme, __dirname),
+    title: 'Nola Translator',
+    webPreferences: {
+      preload: resolvePreloadPath(__dirname), contextIsolation: true, sandbox: true,
+      nodeIntegration: false, backgroundThrottling: false,
+    },
+  })
+  workspaceWindow = window
+  const publishMaximized = () => window.webContents.send('app:window:maximized-changed', window.isMaximized())
+  window.on('maximize', publishMaximized)
+  window.on('unmaximize', publishMaximized)
+  window.on('close', event => {
+    if (quitting) return
+    event.preventDefault()
+    window.hide()
+  })
+  window.on('closed', () => { if (workspaceWindow === window) workspaceWindow = null })
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://')) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  if (process.env.ELECTRON_RENDERER_URL) {
+    const url = new URL(process.env.ELECTRON_RENDERER_URL)
+    url.searchParams.set('workspace', '1')
+    url.searchParams.set('theme', theme)
+    workspaceReady = window.loadURL(url.toString())
+  } else {
+    workspaceReady = window.loadFile(join(__dirname, '../renderer/index.html'), { query: { workspace: '1', theme } })
+  }
+  void workspaceReady.catch(error => console.error('workspace load failed', error))
 }
 
 function createOverlayWindow(theme: AppSettings['theme'], overlay: OverlaySettings): void {
@@ -504,6 +541,14 @@ if (!hasSingleInstanceLock) {
       engine,
       getOverlayWindow,
       getMainWindow: () => mainWindow,
+      getWorkspaceWindow: () => workspaceWindow,
+      showWorkspace: async () => {
+        if (!workspaceWindow || workspaceWindow.isDestroyed()) createWorkspaceWindow(settings.current().theme)
+        await workspaceReady
+        if (workspaceWindow?.isMinimized()) workspaceWindow.restore()
+        workspaceWindow?.show()
+        workspaceWindow?.focus()
+      },
     })
     engine.on('event', (event) => {
       if (event.type === 'sessionStarted') sessionActive = true
@@ -515,6 +560,8 @@ if (!hasSingleInstanceLock) {
       }
     })
     engine.on('state', state => { if (state === 'failed' || state === 'recovering') sessionActive = false })
+    createWorkspaceWindow(initialSettings.theme)
+    await workspaceReady
     createMainWindow(initialSettings.theme)
     createOverlayWindow(initialSettings.theme, initialSettings.overlay)
     void whenRuntimeReady().then(() => engine!.start()).catch((error) => {

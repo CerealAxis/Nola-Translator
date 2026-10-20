@@ -12,11 +12,12 @@ import { dismissNotice, notifyError } from './components/primitives/notify'
 import { createIpcBridge, isIpcBridgeAvailable } from './bridge/ipc/ipcBridge'
 import { I18nProvider, useI18n } from './i18n'
 import type { TranslationKey } from './i18n'
-import { AppShell, ErrorBoundary } from './components/primitives'
+import { AppShell, ErrorBoundary, TitleBar } from './components/primitives'
 import { Routes, useRoute } from './routes'
 import { actions, disposeStores, initStores, isEngineConnected, stores, useStore } from './store'
 import type { SettingsCommand } from './store/settingsStore'
 import { OverlayRoot } from './features/overlay'
+import { WorkspacePage } from './features/workspace'
 import { OverlayMenuRoot } from './features/overlay/OverlayMenuRoot'
 import { RuntimeNotice } from './features/settings/RuntimeNotice'
 import { RuntimeOperationNotice } from './features/settings/RuntimeOperationNotice'
@@ -39,10 +40,11 @@ import { OnboardingTour } from './features/onboarding'
  */
 
 /** `?overlay=1` 走悬浮字幕的独立文档分叉，对齐主仓旧 `main.tsx` 的做法。 */
+const isWorkspaceDocument = new URLSearchParams(window.location.search).get('workspace') === '1'
 const isOverlayDocument = new URLSearchParams(window.location.search).get('overlay') === '1'
 const isOverlayMenuDocument = new URLSearchParams(window.location.search).get('overlayMenu') === '1'
 const bridge = createIpcBridge()
-initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument, overlayMenu: isOverlayMenuDocument, offline: !isOverlayDocument })
+initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument && !isWorkspaceDocument, overlayMenu: isOverlayMenuDocument, offline: !isOverlayDocument && !isWorkspaceDocument })
 
 /**
  * 浮窗点「字幕外观」→ 主窗跳到对应设置页。
@@ -59,7 +61,9 @@ function useOverlayNavigation(): void {
   const { navigate } = useRoute()
   useEffect(() => {
     if (isOverlayDocument) return
-    return bridge.events.onOverlayRequest((_route, path) => navigate(path))
+    const stopOverlay = bridge.events.onOverlayRequest((_route, path) => navigate(path))
+    const stopMain = bridge.events.onMainPageRequested?.(navigate)
+    return () => { stopOverlay(); stopMain?.() }
   }, [navigate])
 }
 
@@ -216,6 +220,26 @@ function useSplashUntilEngineSettles(settled: boolean): void {
   }, [settled])
 }
 
+function WorkspaceWindow() {
+  const { t } = useI18n()
+  useEffect(() => {
+    const forward = () => {
+      const path = window.location.hash
+      if (!/^#\/(?:settings|models|records)(?:\/|$)/.test(path)) return
+      void actions.settings.openMainPage(path).catch(error => notifyError(t('errors.unknownFailure'), { cause: error }))
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+    }
+    window.addEventListener('hashchange', forward)
+    return () => window.removeEventListener('hashchange', forward)
+  }, [t])
+  return (
+    <div className="nola-app-shell">
+      <TitleBar helpItems={[]} />
+      <main className="nola-reader-window"><WorkspacePage /></main>
+    </div>
+  )
+}
+
 function Root() {
   const engineStatus = useStore(stores.session, state => state.engineStatus)
   const [startupTimedOut, setStartupTimedOut] = useState(false)
@@ -234,6 +258,10 @@ function Root() {
     window.addEventListener('beforeunload', teardown)
     return () => window.removeEventListener('beforeunload', teardown)
   }, [])
+
+  if (isWorkspaceDocument) {
+    return <ErrorBoundary><WorkspaceWindow /><SettingsErrorNotice /><ModelCapabilityNotices /></ErrorBoundary>
+  }
 
   if (isOverlayDocument) {
     if (isOverlayMenuDocument) return <ErrorBoundary><OverlayMenuRoot /></ErrorBoundary>

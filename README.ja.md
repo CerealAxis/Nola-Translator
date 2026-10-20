@@ -147,7 +147,17 @@ npm run dist:win
 
 ## コントリビューション
 
-リポジトリを Fork し、ブランチを作成して変更を加え、Pull Request を送ってください。変更内容と実行したチェックを簡潔に記載してください。デザインとコードの規約は [DESIGN.md](DESIGN.md) と [AGENTS.md](AGENTS.md) を参照してください。
+リポジトリを Fork し、ブランチを作成して変更を加え、Pull Request を送ってください。変更内容と実行したチェックを簡潔に記載してください。デザインとコードの規約は [DESIGN.md](DESIGN.md) と[コントリビューションガイド](https://nola.xaviermc.top/ja/contributing/)を参照してください。
+
+## スポンサー
+
+以下の方法でプロジェクトを支援できます。スポンサーには、質問への優先回答、個別サポート、スポンサー一覧やアプリ内での恒久的な紹介、機能のカスタマイズなどの特典があります。
+
+**1. 中国本土**
+- [愛発電（Afdian）](https://afdian.com/a/CerealAxis)
+
+**2. その他の地域**
+- [GitHub Sponsors](https://github.com/sponsors/CerealAxis/)
 
 ## ライセンス
 

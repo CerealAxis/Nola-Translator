@@ -20,7 +20,7 @@
 <p align="center">
   <img src="docs/public/screenshots/zh-CN/home.png" alt="Nola Translator 界面概念图" width="1000">
 </p>
-
+  
 ## 项目简介
 
 Nola Translator 是一款实时字幕与翻译软件，支持本地模型和云端模型，可以根据需求使用本地算力进行字幕识别与翻译，或是选择接入云端模型进行识别和翻译。
@@ -28,7 +28,7 @@ Nola Translator 是一款实时字幕与翻译软件，支持本地模型和云�
 ## 功能特性
 
 - 本地模型支持：可本地运行 Qwen3-ASR、SenseVoiceSmall 等识别模型，以及 Hy-MT2 等翻译模型；软件也支持搜索安装Hugging Face上的其他模型。
-- 云端模型支持：支持阿里云、MiniMax等云端ASR模型；支持 OpenAI 兼容接口、Anthropic、Ollama 等大模型协议；也支持调用免费的MyMemory翻译服务。
+- 云端模型支持：支持阿里云、MiniMax等云端ASR模型；支持 OpenAI 兼容接口、Anthropic、Ollama 等LLM协议；支持调用免费的MyMemory翻译服务。
 - GPU 加速：可检测可用的计算设备，并为识别和翻译分别配置设备。
 - 浏览器扩展：内置浏览器拓展插件，支持 Chrome 和 Edge，并在视频页面显示双语字幕；也可配置桌面系统音频作为输入。
 - 实时字幕浮层：支持系统输出设备、指定音频设备或麦克风；字幕可独立显示，支持调整位置、字号、颜色、透明度和原文译文布局。
@@ -148,7 +148,17 @@ npm run dist:win
 
 ## 参与贡献
 
-Fork 仓库、创建分支、提交修改并发起 Pull Request。请简要描述修改内容及已运行的检查。设计和代码约定可参考[界面规范](DESIGN.md)与[项目规范](AGENTS.md)。
+Fork 仓库、创建分支、提交修改并发起 Pull Request。请简要描述修改内容及已运行的检查。设计和代码约定可参考[界面规范](DESIGN.md)与[参与贡献](https://nola.xaviermc.top/zh-CN/contributing/)。
+
+## 赞助
+
+您可通过如下渠道对本项目进行赞助，本项目会对赞助者提供对应的权益，包括但不限于问题优先答疑、一对一指导、永久放入赞助名单中并在软件等渠道展示、功能定制等。
+
+**1. 中国大陆**
+- [爱发电](https://afdian.com/a/CerealAxis)
+
+**2. 其他地区**
+- [Github Sponsor](ttps://github.com/sponsors/CerealAxis/)
 
 ## 许可证
 

@@ -65,3 +65,18 @@ it('keeps a runtime failure code after the IPC layer sends it as a plain message
   await expect(startSession(remoteConfig)).rejects.toThrow('RUNTIME_TORCH')
   expect(sessionStore.getState()).toMatchObject({ status: 'error', errorCode: 'RUNTIME_TORCH' })
 })
+
+it('attaches a recording to an adopted session without resetting its transcript', () => {
+  const bridge = createIpcBridge()
+  let receive: Parameters<typeof bridge.events.onEngineEvent>[0] = () => undefined
+  vi.spyOn(bridge.events, 'onEngineEvent').mockImplementation(callback => { receive = callback; return () => undefined })
+  vi.spyOn(bridge.engine, 'getEngineState').mockResolvedValue('ready')
+  attachSessionStore(bridge)
+  receive({ protocolVersion: 1, type: 'sessionStarted', requestId: 'start', sessionId: 'shared' })
+  const segment = { segmentId: 'line', revision: 1, startedAtMs: 0, sourceLanguage: 'en', sourceText: 'Hello', isFinal: true, translations: [] }
+  receive({ protocolVersion: 1, type: 'caption', requestId: 'caption', sessionId: 'shared', segment })
+  receive({ protocolVersion: 1, type: 'sessionStarted', requestId: 'attached', sessionId: 'shared', meetingId: 'meeting-shared' })
+  expect(sessionStore.getState()).toMatchObject({ status: 'running', sessionId: 'shared', meetingId: 'meeting-shared', segments: [segment] })
+  receive({ protocolVersion: 1, type: 'sessionStarted', requestId: 'late', sessionId: 'old', meetingId: 'old-meeting' })
+  expect(sessionStore.getState().meetingId).toBe('meeting-shared')
+})

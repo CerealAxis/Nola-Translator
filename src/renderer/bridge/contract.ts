@@ -145,12 +145,15 @@ export interface NolaBridge {
    * button, which must not invent a start page to satisfy `shell.openExternal`.
    */
   app: {
+    showWorkspace?(): Promise<void>
+    openMainPage?(path: string): Promise<void>
     openDefaultBrowser(): Promise<void>
     checkLatestRelease(force?: boolean): Promise<AppUpdateCheckResult>
     openReleasePage(url: string): Promise<void>
   }
   translation: { hasCredential(p: CredentialProvider): Promise<boolean>; setCredential(p: CredentialProvider, v: string): Promise<void> }
   events: {
+    onMainPageRequested?(cb: (path: string) => void): () => void
     onOverlayMenuChanged?(cb: (menu: import('../../shared/overlay-menu').OverlayMenuPresentation | null) => void): () => void
     /**
      * Engine events. The payload is `EngineChannelEvent` = the engine's
@@ -230,6 +233,9 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'diagnostics.get': 'ipc',
   'diagnostics.copy': 'ipc',
   'diagnostics.openLogs': 'ipc',
+  'app.showWorkspace': 'ipc',
+  'app.openMainPage': 'ipc',
+  'events.onMainPageRequested': 'ipc',
   'app.openDefaultBrowser': 'ipc',
   'app.checkLatestRelease': 'ipc',
   'app.openReleasePage': 'ipc',

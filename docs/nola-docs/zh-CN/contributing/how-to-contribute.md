@@ -1,5 +1,9 @@
 # 如何贡献
 
+> [!WARNING]  
+> 本文档仍在持续完善中，部分内容可能不完整、未验证或暂未覆盖最新实现。  
+> 如果你有兴趣，欢迎提交 Pull Request 来完善本文档
+
 本页面向希望修正文档、补充截图、验证模型、修复问题或开发功能的贡献者。流程按“确定任务、准备环境、Fork、修改、验证、提交、审核”展开，首次参与也可以从一个明确的小问题开始。
 
 文档贡献先阅读[编写规范](./writing-guidelines)，代码贡献还需遵守根目录 `AGENTS.md` 和 `DESIGN.MD`。
@@ -85,7 +89,7 @@ npm run docs:dev
 
 ### 1. 确定文件位置
 
-简体中文页面位于 `docs/nola-docs/` 根级分类中。`en/`、`ja/`、`ko/`、`zh-HK/`、`zh-TW/` 是其他语言，除非任务要求，不自动改写。
+简体中文页面位于 `docs/nola-docs/` 根级分类中。`en/`、`ja/`、`ko/`、`zh-HK/`、`zh-TW/` 是其他语言文档。
 
 | 内容 | 位置 |
 | --- | --- |
@@ -100,11 +104,7 @@ npm run docs:dev
 
 ### 2. 截图与来源
 
-需要图时先复用真实页面。中文教程原始截图由脚本生成到 `docs/public/screenshots/zh-CN/guide/`；写入文档前，将图片复制到 `docs/public/docs-image/zh-CN/{文档分类}/{文章名}/`，使用描述性文件名，并从 `/docs-image/` 引用。可在仓库根目录运行：
-
-```powershell
-node docs/scripts/generate-screenshots.mjs --guide
-```
+写入文档前，将图片复制到 `docs/public/docs-image/zh-CN/{文档分类}/{文章名}/`，使用描述性文件名，并从 `/docs-image/` 引用。
 
 ### 3. 检查导航
 
@@ -132,8 +132,6 @@ docs(zh-CN): document audio setup and verification
 
 可用类型包括 `feat`、`fix`、`docs`、`style`、`refactor`、`perf`、`test`、`build`、`ci`、`chore`。破坏性变更使用 `!` 并解释影响。
 
-使用 AI 助手执行提交时，必须先展示英文提交信息并取得用户确认，这是本项目规范的明确要求。不要因为工具有写入权限就跳过这一步。人工提交按正常 Git 流程进行。
-
 ## 七、推送并创建 Pull Request
 
 确认提交内容后，把当前工作分支推送到自己的 Fork，例如：
@@ -142,9 +140,7 @@ docs(zh-CN): document audio setup and verification
 git push -u origin codex/docs-audio-setup
 ```
 
-在 GitHub 创建 Pull Request，base 选择原项目目标分支，compare 选择自己 Fork 的工作分支。描述应包括问题、最终改动、验证及尚未验证的范围；界面变化附图，协议变化说明兼容性和迁移影响。
-
-GPG 签名配置见[对应指南](../developers/gpg-signing)。项目现有规范并未在这里设立“所有 PR 必须签名”的额外门槛，不应把参考站的规定直接移植过来。
+GPG 签名配置见[对应指南](../developers/gpg-signing)，原则上所有的 Pull Request 都需要 GPG 签名，否则不予接受。
 
 ## 八、回应审核与保持分支可用
 

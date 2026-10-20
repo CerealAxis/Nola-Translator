@@ -30,7 +30,7 @@ Nola Translator 是一款实时字幕与翻译软件，支持本地模型和云�
 ## 功能特性
 
 - 本地模型支持：可本地运行 Qwen3-ASR、SenseVoiceSmall 等识别模型，以及 Hy-MT2 等翻译模型；软件也支持搜索安装Hugging Face上的其他模型。
-- 云端模型支持：支持阿里云、MiniMax等云端ASR模型；支持 OpenAI 兼容接口、Anthropic、Ollama 等大模型协议；也支持调用免费的MyMemory翻译服务。
+- 云端模型支持：支持阿里云、MiniMax等云端ASR模型；支持 OpenAI 兼容接口、Anthropic、Ollama 等 LLM 协议；也支持调用免费的MyMemory翻译服务。
 - GPU 加速：可检测可用的计算设备，并为识别和翻译分别配置设备。
 - 浏览器扩展：内置浏览器拓展插件，支持 Chrome 和 Edge，并在视频页面显示双语字幕；也可配置桌面系统音频作为输入。
 - 实时字幕浮层：支持系统输出设备、指定音频设备或麦克风；字幕可独立显示，支持调整位置、字号、颜色、透明度和原文译文布局。
