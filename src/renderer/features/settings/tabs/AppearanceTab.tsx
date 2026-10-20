@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, ColorArea, ColorField, ColorPicker, ColorSlider, ColorSwatch, ColorSwatchPicker, NumberField, Slider, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
+import { Button, ColorArea, ColorField, ColorPicker, ColorSlider, ColorSwatch, ColorSwatchPicker, NumberField, Slider, ToggleButton, ToggleButtonGroup } from '@heroui/react'
 import { CheckSquare, ChevronDown, CircleAlert, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Square, X } from 'lucide-react'
 
 import { useModelOptions } from '@/model-options'
@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS, LANGUAGE_LABELS, languageName } from '@/bridge'
 import { CAPTION_SCHEMES } from '@/features/overlay'
 import { useI18n } from '@/i18n'
 import { sessionStore, stores, updateSettings, useStore } from '@/store'
+import { reportSettingsFailure } from '../settingsErrorChannel'
 import { SettingsRow } from '../SettingsRow'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
@@ -22,9 +23,18 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
   const session = useStore(sessionStore, (state) => state)
   const sessionActive = !['idle', 'error'].includes(session.status)
   const pending = useStore(stores.settings, (state) => state.pending)
-  const error = useStore(stores.settings, (state) => state.error)
+  /*
+   * The store keeps one error field for every command it runs, so a failure from another
+   * page (a storage read, a caption session) would light this tab's save indicator even
+   * though nothing written here failed. The indicator follows this tab's own writes.
+   */
+  const [saveError, setSaveError] = useState(false)
   const fontOptions = useMemo<PickerOption[]>(() => FONT_FAMILIES.map((family) => ({ value: family, label: family })), [])
-  const write = (patch: Partial<typeof overlay>) => { void updateSettings({ overlay: patch }).catch(() => undefined) }
+  const write = (patch: Partial<typeof overlay>) => {
+    void updateSettings({ overlay: patch })
+      .then(() => setSaveError(false))
+      .catch(() => setSaveError(true))
+  }
   const label = (code: string) => {
     const entry = LANGUAGE_LABELS[code]
     return entry ? languageName(code, language) : code
@@ -35,7 +45,12 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
     // Only appearance preferences are reset; the window pin is an independent control.
     const { alwaysOnTop, ...appearance } = DEFAULT_SETTINGS.overlay
     void alwaysOnTop
-    void updateSettings({ overlay: appearance }).catch(() => undefined)
+    void updateSettings({ overlay: appearance })
+      .then(() => setSaveError(false))
+      .catch((error: unknown) => {
+        setSaveError(true)
+        reportSettingsFailure(t('settings.resetAppearanceFailed'), error)
+      })
   }
 
   return (
@@ -121,9 +136,9 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
       </SettingGroup>
 
       <div className="settings-save">
-        <span className="settings-save__state" role="status" data-error={Boolean(error)}>
-          {error ? <CircleAlert aria-hidden="true" /> : <CheckSquare aria-hidden="true" />}
-          {error ? t('modelsSettingsUi.saveError') : pending ? t('modelsSettingsUi.saving') : t('modelsSettingsUi.automaticSave')}
+        <span className="settings-save__state" role="status" data-error={saveError}>
+          {saveError ? <CircleAlert aria-hidden="true" /> : <CheckSquare aria-hidden="true" />}
+          {saveError ? t('modelsSettingsUi.saveError') : pending ? t('modelsSettingsUi.saving') : t('modelsSettingsUi.automaticSave')}
         </span>
         <Button variant="outline" isPending={pending} onPress={restore}>{t('modelsSettingsUi.resetAppearance')}</Button>
       </div>

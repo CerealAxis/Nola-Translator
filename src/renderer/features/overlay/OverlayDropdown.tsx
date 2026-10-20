@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Dropdown } from '@heroui/react'
 import { actions, stores, useStore } from '@/store'
+import { useI18n } from '@/i18n'
+import { notifyError } from '@/components/primitives/notify'
 import type { OverlayMenuKind } from '../../../shared/overlay-menu'
 
 export interface OverlayDropdownProps {
@@ -11,6 +13,7 @@ export interface OverlayDropdownProps {
 
 /** Reuse the exact trigger, Popover and Menu tree in either the demo or a native menu surface. */
 export function OverlayDropdown({ kind, children }: OverlayDropdownProps) {
+  const { t } = useI18n()
   const anchor = useRef<HTMLSpanElement>(null)
   const [localOpen, setLocalOpen] = useState(false)
   const presentation = useStore(stores.settings, state => state.overlayMenu)
@@ -31,7 +34,10 @@ export function OverlayDropdown({ kind, children }: OverlayDropdownProps) {
         setPopupOpen(false)
         // Keep HeroUI's exit animation and let the item's settings IPC leave before hiding the surface.
         closing.current = setTimeout(() => {
-          void actions.settings.closeOverlayMenu(id).catch((error: unknown) => console.warn('[overlay] menu close failed', error))
+          void actions.settings.closeOverlayMenu(id).catch((error: unknown) => {
+            console.warn('[overlay] menu close failed', error)
+            notifyError(t('overlay.menuFailed'), { cause: error })
+          })
         }, 120)
       }
       return
@@ -46,7 +52,10 @@ export function OverlayDropdown({ kind, children }: OverlayDropdownProps) {
       kind, modality: modality.current, anchor: { x: box.x, y: box.y, width: box.width, height: box.height },
     }).then(handled => {
       if (!handled) setLocalOpen(true)
-    }).catch((error: unknown) => console.warn('[overlay] menu failed', error))
+    }).catch((error: unknown) => {
+      console.warn('[overlay] menu failed', error)
+      notifyError(t('overlay.menuFailed'), { cause: error })
+    })
   }
 
   return (

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { toast } from '@heroui/react'
+import { notifyError, notifyInfo, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { stores } from '@/store'
 
@@ -16,16 +16,16 @@ export function RuntimeOperationNotice() {
       previous = current
       const action = current.runtimeAction === 'uninstall' ? t('runtime.uninstall') : t('runtime.install')
       if (!wasBusy && current.runtimeBusy) {
-        toast(t('runtime.operationStarted', { action }), { description: t('runtime.operationProgress') })
+        notifyInfo(t('runtime.operationStarted', { action }), { description: t('runtime.operationProgress') })
         return
       }
       if (wasBusy && !current.runtimeBusy) {
-        if (current.runtimeError) toast.danger(t('runtime.operationFailed', { action }), { description: current.runtimeError })
-        else toast.success(t('runtime.operationComplete', { action }))
+        if (current.runtimeError) notifyError(t('runtime.operationFailed', { action }), { cause: current.runtimeError })
+        else notifySuccess(t('runtime.operationComplete', { action }))
         return
       }
       if (!current.runtimeBusy && current.runtimeError && current.runtimeError !== previousError) {
-        toast.danger(t('runtime.operationFailed', { action: t('runtime.recheck') }), { description: current.runtimeError })
+        notifyError(t('runtime.operationFailed', { action: t('runtime.recheck') }), { cause: current.runtimeError })
       }
     })
   }, [t])

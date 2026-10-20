@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Button, Chip, Label, ListBox, Modal, Select, toast } from '@heroui/react'
+import { useEffect, useState } from 'react'
+import { Button, Chip, Label, ListBox, Modal, Select } from '@heroui/react'
 import { FolderInput, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { stores, useStore } from '@/store'
@@ -10,6 +10,7 @@ import { SettingGroup } from '../settings/SettingsPage'
 import { CRISP_RUNTIME_ID, CRISP_RUNTIME_FILES } from '../../../shared/compute'
 import type { ResourceRecord } from '../../../shared/contracts'
 import { modelEngines } from '../../../shared/model-engines'
+import { dismissNotice, notifyError } from '@/components/primitives/notify'
 import { ImportHelp, ModelImportPanel } from './ModelImportPanel'
 import { OfflineTaskProgress } from './OfflineTaskProgress'
 import './offline.css'
@@ -28,21 +29,61 @@ export function OfflineResources() {
   </SettingsRow>{task ? <SettingsRow label={t('offline.task')}><Button variant="secondary" onPress={() => offlineActions.open('bundle')}>{t(`offline.${task.state === 'running' ? task.phase : task.state === 'idle' ? 'ready' : task.state}`)}</Button></SettingsRow> : null}</SettingGroup><OfflineDialog scope="runtime" /></>
 }
 export interface OfflineDialogProps { scope: 'model' | 'runtime' }
+
+/**
+ * The failure that was announced, and the notice that announced it.
+ *
+ * They live outside the dialog: the dialog belongs to the page that opened it, and a
+ * failure that is still in the store would be announced a second time by the next
+ * dialog that mounts.
+ */
+let announcedFailure: unknown = null
+let announcedNotice: string | null = null
+
 export function OfflineDialog({ scope }: OfflineDialogProps) {
   const { t } = useI18n()
   const state = useStore(offlineStore, value => value)
-  const notice = useRef<unknown>(null)
   useEffect(() => {
     const preview = state.preview
     const task = state.task
     const failure = preview && !preview.compatible ? preview : task?.state === 'failed' ? task : state.failed ? 'failed' : null
-    if (!failure) { notice.current = null; return }
-    if (notice.current === failure) return
-    notice.current = failure
-    if (failure === 'failed') { toast.danger(t('offline.failed')); return }
+    if (!failure) {
+      announcedFailure = null
+      /*
+       * An error notice never leaves on its own, so a failure that is dealt with would
+       * keep crying on the screen. The retry that cleared it takes the notice down.
+       */
+      if (announcedNotice) { dismissNotice(announcedNotice); announcedNotice = null }
+      return
+    }
+    if (announcedFailure === failure) return
+    announcedFailure = failure
+    /*
+     * A failure here has no way out of its own: the modal's footer offers a
+     * fresh start, and the notice says so too, so a user who only sees the
+     * notice can still recover.
+     */
+    const retry = {
+      label: t('offline.retry'),
+      onPress: () => {
+        offlineActions.reset()
+        if (announcedNotice) { dismissNotice(announcedNotice); announcedNotice = null }
+      },
+    }
+    // One failure at a time: the notice that is on screen is replaced, not stacked on.
+    if (announcedNotice) dismissNotice(announcedNotice)
+    if (failure === 'failed') { announcedNotice = notifyError(t('offline.failed'), { action: retry }); return }
     const issue = preview && failure === preview ? preview.issues[0] : task?.issue
-    toast.danger(t(`offline.${issue ?? 'failed'}`), { description: task?.reason ?? preview?.items.find(item => item.reason)?.reason })
-  }, [scope, state.preview, state.task, t])
+    announcedNotice = notifyError(t(`offline.${issue ?? 'failed'}`), {
+      description: task?.reason ?? preview?.items.find(item => item.reason)?.reason,
+      action: retry,
+    })
+    /*
+     * `state.failed` is one of the three sources of a failure, so it belongs to the
+     * dependencies: without it the effect would not run when only that flag turned,
+     * and the failure would go unreported.
+     */
+  }, [scope, state.preview, state.task, state.failed, t])
   const resources = useStore(stores.models, value => value.resources)
   const runtimes = useStore(stores.settings, value => value.runtimes)
   const [step, setStep] = useState(0)

@@ -1,7 +1,6 @@
 import { ProgressBar, Spinner } from '@heroui/react'
 import { Check, Minus, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { ImportHelp } from './ModelImportPanel'
 import type { OfflineTask, OfflineWorkflow } from '../../../shared/offline'
 
 export interface OfflineTaskProgressProps {
@@ -57,9 +56,5 @@ export function OfflineTaskProgress({ task, workflow }: OfflineTaskProgressProps
         </li>
       })}
     </ol>
-    {task.issue ? <div className="model-import-section-heading">
-      <p role="alert" className="offline-task-progress__error">{t(`offline.${task.issue}`)}</p>
-      {task.reason ? <ImportHelp label={t('offline.importInfo')}>{task.reason}</ImportHelp> : null}
-    </div> : null}
   </section>
 }

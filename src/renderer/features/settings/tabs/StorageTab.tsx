@@ -12,11 +12,13 @@
  */
 
 import { useEffect } from 'react'
-import { Alert, Button, InputGroup, toast } from '@heroui/react'
+import { Alert, Button, InputGroup } from '@heroui/react'
 
 import { SettingsRow } from '../SettingsRow'
+import { notifySuccess, notifyWarning } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
+import { reportSettingsFailure } from '../settingsErrorChannel'
 import { formatBytes } from '../../models/ModelCard'
 import { SettingGroup } from '../SettingsPage'
 import type { SettingsPanelProps } from '../SettingsPage'
@@ -29,8 +31,14 @@ export function StorageTab(_props: SettingsPanelProps) {
   const path = storage?.configuredPath || storage?.activePath || ''
 
   useEffect(() => {
-    void actions.settings.refreshStorage().catch(() => {})
-  }, [])
+    // A failed refresh is recorded in the store's error field rather than rejected, and a
+    // successful one clears that field.
+    void actions.settings.refreshStorage().then(() => {
+      const failure = stores.settings.getState().error
+      if (failure === null) return
+      reportSettingsFailure(t('settings.storageRefreshFailed'), failure)
+    })
+  }, [t])
 
   // Undefined is "the folder could not be listed", which is a different statement from an empty
   // folder; the main process keeps the two apart for exactly this reason.
@@ -53,7 +61,7 @@ export function StorageTab(_props: SettingsPanelProps) {
                 .chooseStorageDirectory()
                 .then((chosen) => {
                   // A cancel in the system dialog comes back as null; that is not an error.
-                  if (chosen?.restartRequired) toast.warning(t('modelsSettingsUi.dataFolderWillMove'))
+                  if (chosen?.restartRequired) notifyWarning(t('modelsSettingsUi.dataFolderWillMove'))
                 })
                 .catch(() => undefined)
             }}
@@ -88,7 +96,7 @@ export function StorageTab(_props: SettingsPanelProps) {
                 onPress={() => {
                   void actions.settings
                     .restartAppForStorage()
-                    .then(() => toast.success(t('common.done')))
+                    .then(() => notifySuccess(t('common.done')))
                     .catch(() => undefined)
                 }}
               >

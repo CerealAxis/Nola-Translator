@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Card, Label, Link, ListBox, Popover, Select, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
+import { Alert, Button, Card, Label, Link, ListBox, Popover, Select, ToggleButton, ToggleButtonGroup } from '@heroui/react'
 import { AppWindow, ArrowRight, ArrowRightLeft, ChevronDown, Languages, Settings } from 'lucide-react'
 import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { AppSettingsPatch, PrewarmErrorCode } from '@/bridge'
@@ -8,12 +8,14 @@ import { useModelOptions } from '@/model-options'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 import { settingsPath, useRoute } from '@/routes'
-import { actions, enableCaptionService, sessionStore, stores, updateSettings, useStore } from '@/store'
+import { actions, enableCaptionService, isEngineConnected, sessionStore, stores, updateSettings, useStore } from '@/store'
 import { browserConnectionAction, setCaptionServiceActive, stopCaptionSession } from '@/store/settingsStore'
 import { swappedLanguagesOf, targetLanguagePatch } from '@/session-config'
 import { translationLanguages } from '../../../shared/model-capabilities'
 import type { BrowserConnectionStatus } from '../../../shared/browser'
 import { PageHeader } from '@/components/primitives'
+import { notifyError, notifyWarning } from '@/components/primitives/notify'
+import { reportSettingsFailure } from '@/features/settings/settingsErrorChannel'
 import { SettingSelect } from '../settings/SettingsPage'
 import { openDefaultBrowser } from './openDefaultBrowser'
 import { isSessionAlreadyRunningError } from '../../../shared/ipc-error'
@@ -91,15 +93,38 @@ export function VideoCaptionsPage() {
       : { videoCaptions: { audioSource: 'system', audioDeviceId: value } }
   const openBrowser = async () => {
     setOpening(true)
-    try { await openDefaultBrowser() } catch { toast.danger(t('videoCaptions.errorOpeningBrowser')) }
+    try { await openDefaultBrowser() } catch (error) { notifyError(t('videoCaptions.errorOpeningBrowser'), { cause: error }) }
     finally { setOpening(false) }
   }
-  const prewarmFailure = (code?: PrewarmErrorCode) =>
-    code ? `${t('videoCaptions.serviceFailed')} · ${t(PREWARM_ERROR_KEYS[code])}` : t('videoCaptions.serviceFailed')
-  const notifyConflict = () => {
+  const prewarmDetail = (code?: PrewarmErrorCode) =>
+    code ? t(PREWARM_ERROR_KEYS[code]) : undefined
+  const notifyConflict = (cause?: unknown) => {
     const desktopBusy = ['starting', 'running', 'paused', 'stopping'].includes(sessionStore.getState().status)
-    toast.danger(t('errors.serviceConflict', { running: t(desktopBusy ? 'nav.workspace' : 'shellUi.overlay') }))
+    reportSettingsFailure(t('errors.serviceConflict', { running: t(desktopBusy ? 'nav.workspace' : 'shellUi.overlay') }), cause)
   }
+  /*
+   * The browser connection failure is reported by the store, not by a thrown
+   * error: `browserConnectionAction` records the reason in `browserError` and
+   * resolves, so a `catch` around it never runs. The page therefore watches
+   * the store value, and the same notice covers a failure that happened
+   * outside this page.
+   */
+  const browserError = useStore(stores.settings, state => state.browserError)
+  const reportedBrowserError = useRef<string | null>(null)
+  const reportBrowserError = useCallback((reason: string | null): void => {
+    if (reason === null) { reportedBrowserError.current = null; return }
+    if (reportedBrowserError.current === reason) return
+    reportedBrowserError.current = reason
+    notifyError(t('errors.browserServiceUnavailable'), { description: reason })
+  }, [t])
+  useEffect(() => {
+    /*
+     * Without the engine bridge there is no browser service to reach either,
+     * and the app already tells the user that the whole connection is missing.
+     */
+    if (!isEngineConnected()) return
+    reportBrowserError(browserError)
+  }, [browserError, reportBrowserError])
   /*
    * Opening the gate is prewarm first and the toggle second, so a refusal from the engine
    * leaves the extension shut out rather than let in by a service with no weights in memory.
@@ -109,23 +134,26 @@ export function VideoCaptionsPage() {
     try {
       await browserConnectionAction('inspect')
       browsers = stores.settings.getState().browser?.browsers ?? []
-    } catch {
-      toast.danger(t('errors.captionServiceToggleFailed'))
+    } catch (error) {
+      notifyError(t('errors.browserServiceUnavailable'), { cause: error })
+      return
+    }
+    const inspectFailure = stores.settings.getState().browserError
+    if (inspectFailure) {
+      reportBrowserError(inspectFailure)
       return
     }
     const availableBrowsers = browsers.filter(browser => browser.available)
     const detectedExtensions = availableBrowsers.filter(browser => browser.extensionStatus === 'installed' || browser.extensionStatus === 'disabled')
     if (availableBrowsers.length > 0 && detectedExtensions.length === 0 && availableBrowsers.every(browser => browser.extensionStatus === 'notInstalled')) {
-      toast.warning(t('videoCaptions.extensionSetupNotice'), {
-        timeout: 10000,
-        actionProps: { children: t('videoCaptions.browserSettings'), onPress: () => navigate(settingsPath('browser')) },
+      notifyWarning(t('videoCaptions.extensionSetupNotice'), {
+        action: { label: t('videoCaptions.browserSettings'), onPress: () => navigate(settingsPath('browser')) },
       })
       return
     }
     if (detectedExtensions.length > 0 && detectedExtensions.every(browser => browser.extensionCompatible === false)) {
-      toast.warning(t('videoCaptions.extensionVersionMismatchNotice'), {
-        timeout: 10000,
-        actionProps: { children: t('videoCaptions.browserSettings'), onPress: () => navigate(settingsPath('browser')) },
+      notifyWarning(t('videoCaptions.extensionVersionMismatchNotice'), {
+        action: { label: t('videoCaptions.browserSettings'), onPress: () => navigate(settingsPath('browser')) },
       })
       return
     }
@@ -134,28 +162,37 @@ export function VideoCaptionsPage() {
       if (result.state === 'failed') {
         if (result.code === 'sessionAlreadyRunning') {
           notifyConflict()
-        } else toast.danger(prewarmFailure(result.code))
+        } else notifyError(t('videoCaptions.serviceFailed'), { description: prewarmDetail(result.code) })
         return
       }
     } catch (error) {
       const message = String(error)
-      if (/RUNTIME_(TORCH|LLAMA)/.test(message)) {
-        const isTorch = message.includes('RUNTIME_TORCH')
-        const mismatch = message.includes('_DEVICE_MISMATCH')
-        const key = isTorch
+      const torch = /RUNTIME_TORCH/.test(message)
+      const llama = /RUNTIME_LLAMA/.test(message)
+      const crisp = /RUNTIME_CRISP/.test(message)
+      const mismatch = message.includes('_DEVICE_MISMATCH')
+      if (torch || llama) {
+        const key = torch
           ? mismatch ? 'videoCaptions.torchDeviceMismatch' : 'videoCaptions.torchEnvironmentFailed'
           : mismatch ? 'videoCaptions.llamaDeviceMismatch' : 'videoCaptions.llamaEnvironmentFailed'
-        toast.danger(t(key))
-        await actions.settings.openRuntimeSettings(isTorch ? 'engine' : 'llama')
-      } else toast.danger(t('videoCaptions.serviceFailed'))
+        reportSettingsFailure(t(key), error)
+        await actions.settings.openRuntimeSettings(torch ? 'engine' : 'llama').catch((openError: unknown) => {
+          notifyError(t('errors.runtimeSettingsFailed'), { cause: openError })
+        })
+      } else if (crisp) {
+        reportSettingsFailure(t('errors.crispRuntimeUnavailable'), error)
+        await actions.settings.openRuntimeSettings('crisp').catch((openError: unknown) => {
+          notifyError(t('errors.runtimeSettingsFailed'), { cause: openError })
+        })
+      } else reportSettingsFailure(t('videoCaptions.serviceFailed'), error)
       return
     }
     try {
       await setCaptionServiceActive(true)
     } catch (error) {
       if (isSessionAlreadyRunningError(error)) {
-        notifyConflict()
-      } else toast.danger(t('errors.captionServiceToggleFailed'))
+        notifyConflict(error)
+      } else reportSettingsFailure(t('errors.captionServiceToggleFailed'), error)
     }
   }
   /*
@@ -167,9 +204,9 @@ export function VideoCaptionsPage() {
   const close = async () => {
     let status: BrowserConnectionStatus
     try { status = await setCaptionServiceActive(false) }
-    catch { toast.danger(t('errors.captionServiceToggleFailed')); return }
+    catch (error) { reportSettingsFailure(t('errors.captionServiceToggleFailed'), error); return }
     if (!status.sessionActive || !status.sessionId) return
-    try { await stopCaptionSession(status.sessionId) } catch { toast.danger(t('errors.captionServiceStopFailed')) }
+    try { await stopCaptionSession(status.sessionId) } catch (error) { reportSettingsFailure(t('errors.captionServiceStopFailed'), error) }
   }
   const swappedLanguages = swappedLanguagesOf(sourceLanguage, targetLanguage, modelOptions.sourceLanguages, modelOptions.translation ? translationLanguages(modelOptions.translation, targetLanguage) : modelOptions.targetLanguages)
   /*

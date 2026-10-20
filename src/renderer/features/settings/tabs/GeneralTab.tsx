@@ -12,9 +12,10 @@ import { SettingsRow } from '../SettingsRow'
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Input, TextField, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
+import { Button, Input, TextField, ToggleButton, ToggleButtonGroup } from '@heroui/react'
 
 import { useNolaTheme } from '@/components/primitives'
+import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import type { UiLanguagePreference } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
@@ -69,7 +70,9 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
               // `setLanguage` already updates optimistically and rolls back a failed write,
               // so calling `updateSettings` here too would let the second rollback undo the
               // first write's success.
-              void setLanguage(next as UiLanguagePreference).catch(() => undefined)
+              void setLanguage(next as UiLanguagePreference).catch((error: unknown) => {
+                notifyError(t('errors.languageChangeFailed'), { cause: error })
+              })
             }}
           />
         </SettingsRow>
@@ -84,10 +87,10 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
             onPress={() => {
               void actions.settings.checkForAppUpdate(true).then((result) => {
                 if (!result || result.latestVersion === null) {
-                  toast.danger(t('appUpdate.checkFailed'))
+                  notifyError(t('appUpdate.checkFailed'))
                   return
                 }
-                toast.success(t(result.updateAvailable ? 'appUpdate.availableStatus' : 'appUpdate.upToDateStatus', {
+                notifySuccess(t(result.updateAvailable ? 'appUpdate.availableStatus' : 'appUpdate.upToDateStatus', {
                   version: result.latestVersion,
                 }))
               })

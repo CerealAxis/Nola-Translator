@@ -2,16 +2,25 @@ import { configurationOf } from '../../../shared/model-capabilities'
 import { ModelConfigurationDialog } from './ModelConfigurationDialog'
 import { DownloadSourceDialog } from './DownloadSourceDialog'
 /** Hub metadata hits arrive before the README card or any runtime inspection finishes. */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Card, Drawer, EmptyState, SearchField, Tag, TagGroup, toast } from '@heroui/react'
-import type { HubModelSummary, HubSearchResult, ResourceRecord } from '@/bridge'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Button, Drawer, EmptyState, SearchField, Tag, TagGroup } from '@heroui/react'
+import type { HubModelSummary, HubSearchResult, ModelDownloadSource, ResourceRecord } from '@/bridge'
 import { actions, stores, useStore } from '@/store'
 import type { HubKind } from '@/store'
 import { useI18n } from '@/i18n'
+import { dismissNotice, notifyError } from '@/components/primitives/notify'
+import type { NotifyAction } from '@/components/primitives/notify'
 import { ModelCard, ModelCardSkeleton, formatBytes } from './ModelCard'
+import { notifyModelDownloadFailure } from './ModelDownloadNotice'
 
 const SEARCH_DEBOUNCE_MS = 250
 const searchCache = new Map<string, { expires: number; request: Promise<HubSearchResult> }>()
+/**
+ * The notice that is on screen. It lives outside the tab: every search that fails raises
+ * a notice, and an error notice never leaves on its own, so the one that is on screen is
+ * taken down first and a hub that stays unreachable leaves one notice instead of a stack.
+ */
+let searchNotice: string | null = null
 type Filter = 'all' | 'asr' | 'mt' | 'quant'
 export interface HubHit { summary: HubModelSummary; kind: HubKind }
 
@@ -125,6 +134,25 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
   const resources = useStore(stores.models, (state) => state.resources)
   const busyIds = useStore(stores.models, (state) => state.busyIds)
   const kind: HubKind = filter === 'quant' ? 'quant' : filter
+  /*
+   * The translator changes with the interface language, and a search that is running
+   * again because of it would replace the results the user is reading. The notice a
+   * failure raises is written in the language of that moment, so the translator is
+   * read through a ref instead.
+   */
+  const translate = useRef(t)
+  useLayoutEffect(() => {
+    translate.current = t
+  }, [t])
+  /*
+   * Every search that fails raises a notice, and an error notice never leaves on its
+   * own. The one that is on screen is taken down first, so a hub that stays unreachable
+   * leaves one notice instead of a stack of them.
+   */
+  const reportFailure = useCallback((message: string, cause: unknown, action: NotifyAction) => {
+    if (searchNotice) dismissNotice(searchNotice)
+    searchNotice = notifyError(message, { cause, action })
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -141,13 +169,22 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
           setHits(mergeHubResults([{ kind, result }]).hits)
           setNextCursor(result.nextCursor)
         }
-      }).catch(() => {
-        if (!cancelled) { setHits([]); setFailed(true) }
+      }).catch((cause: unknown) => {
+        if (cancelled) return
+        setHits([])
+        setFailed(true)
+        reportFailure(translate.current('errors.searchFailed'), cause, {
+          label: translate.current('errors.searchFailedAction'),
+          onPress: () => setRefresh((value) => value + 1),
+        })
       }).finally(() => { if (!cancelled) setAwaiting(false) })
     }, SEARCH_DEBOUNCE_MS)
     return () => { cancelled = true; generation.current += 1; clearTimeout(timer) }
-  }, [query, kind, refresh])
+  }, [query, kind, refresh, reportFailure])
 
+  // The notice that offers another page reaches the loader through a ref, so it always
+  // asks for the page the list is on now.
+  const loadMoreRef = useRef<() => void>(() => undefined)
   const loadMore = useCallback(() => {
     if (awaiting || failed || !nextCursor || pagingRequest.current !== null) return
     const currentGeneration = generation.current
@@ -165,14 +202,20 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
         }).map((summary) => ({ summary, kind }))]
       })
       setNextCursor(result.nextCursor === nextCursor ? undefined : result.nextCursor)
-    }).catch(() => {
-      if (generation.current === currentGeneration) setMoreFailed(true)
+    }).catch((cause: unknown) => {
+      if (generation.current !== currentGeneration) return
+      setMoreFailed(true)
+      reportFailure(translate.current('models.loadMoreFailed'), cause, {
+        label: translate.current('models.retry'),
+        onPress: () => loadMoreRef.current(),
+      })
     }).finally(() => {
       if (generation.current !== currentGeneration) return
       pagingRequest.current = null
       setLoadingMore(false)
     })
-  }, [awaiting, failed, query, kind, nextCursor])
+  }, [awaiting, failed, query, kind, nextCursor, reportFailure])
+  useEffect(() => { loadMoreRef.current = loadMore }, [loadMore])
 
   useEffect(() => {
     const element = bottom.current
@@ -217,6 +260,21 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
   const install = (hit: HubHit) => {
     setDownloadTarget(hit)
   }
+  /*
+   * A failed install keeps its own way out: the retry in the notice starts the very
+   * same download again, and a retry that fails reports itself the same way.
+   */
+  const installHub = (target: HubHit, source: ModelDownloadSource) => {
+    void actions.models.installHubModel(target.summary.repo, installSlotOf(target), source).catch((cause: unknown) => {
+      console.error('[models] hub install failed', cause)
+      notifyModelDownloadFailure(
+        t('models.downloadError', { name: target.summary.repo }),
+        t('errors.downloadFailed'),
+        t('errors.downloadFailedAction'),
+        () => installHub(target, source),
+      )
+    })
+  }
   const descriptionOf = (summary: HubModelSummary) => summary.description
     ?? descriptions[summary.repo] ?? ''
 
@@ -227,10 +285,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
     } : null} onClose={() => setDownloadTarget(null)} onSelect={source => {
       const target = downloadTarget
       setDownloadTarget(null)
-      if (target) void actions.models.installHubModel(target.summary.repo, installSlotOf(target), source).catch((error: unknown) => {
-        console.error('[models] hub install failed', error)
-        toast.danger(t('models.installFailed'))
-      })
+      if (target) installHub(target, source)
     }} />
     {configuring ? <ModelConfigurationDialog key={configuring.resourceId} record={configuring} onClose={() => setConfiguring(null)} /> : null}
     <SearchField value={query} onChange={setQuery} fullWidth aria-label={t('models.searchPlaceholder')}>
@@ -260,15 +315,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
         {(item) => <Tag id={item.id} textValue={item.label}>{item.label}</Tag>}
       </TagGroup.List>
     </TagGroup>
-    {failed && !awaiting ? <Card className="flex flex-row items-center gap-3 border border-border p-4">
-      <p className="nola-caption text-muted">{t('errors.searchFailed')}</p>
-      <Button variant="tertiary" size="sm" onPress={() => {
-        searchCache.delete(searchKey(query, kind))
-        setRefresh((value) => value + 1)
-      }}>
-        {t('errors.searchFailedAction')}
-      </Button>
-    </Card> : null}
+    {failed && !awaiting ? <p className="nola-caption text-muted">{t('errors.searchFailed')}</p> : null}
     {awaiting ? <SearchSkeletons /> : null}
     {!awaiting && !failed && !nextCursor && visible.length === 0 ? <EmptyState>
       <h3>{t('models.noResults')}</h3>
@@ -288,8 +335,12 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
           metadata={`${summary.author ?? summary.repo.split('/')[0]} · ${summary.formats?.includes('gguf') || summary.hasGguf ? 'GGUF' : 'PyTorch'}`}
           busy={busyIds.includes(liveId) || busyIds.includes(summary.repo)}
           isDefault={false} canBeDefault={false} onInstall={() => install(hit)}
-          onCancel={() => { void actions.models.manageResource(liveId, 'cancel').catch(() => undefined) }}
-          onRemove={() => { void actions.models.manageResource(liveId, 'remove').catch(() => undefined) }}
+          onCancel={() => { void actions.models.manageResource(liveId, 'cancel').catch((cause: unknown) => {
+            notifyError(t('errors.engineOperationFailed'), { cause })
+          }) }}
+          onRemove={() => { void actions.models.manageResource(liveId, 'remove').catch((cause: unknown) => {
+            notifyError(t('modelsSettingsUi.removeFailed'), { cause })
+          }) }}
           onSetDefault={() => undefined}
           footer={<div className="flex flex-wrap gap-[var(--space-1)]">{live?.installed ? <Button variant="secondary" onPress={() => setConfiguring(live)}>{t(configurationOf(live) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : null}<Button variant="tertiary" size="sm" onPress={() => setDetail(hit)}>
             {t('models.openDetails')}
@@ -297,7 +348,6 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
       })}
     </div> : null}
     {!awaiting && !failed ? <div ref={bottom} className="models-search__pagination" aria-live="polite">
-      {moreFailed ? <p className="nola-caption text-muted">{t('models.loadMoreFailed')}</p> : null}
       {nextCursor ? <Button variant="tertiary" isPending={loadingMore} onPress={loadMore}>
         {loadingMore ? t('common.loading') : moreFailed ? t('models.retry') : t('models.loadMore')}
       </Button> : visible.length > 0 ? <p className="nola-caption text-muted">{t('models.noMoreResults')}</p> : null}

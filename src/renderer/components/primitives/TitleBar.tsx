@@ -6,6 +6,7 @@ import { CircleHelp, Languages, Moon, Sun, Minus, Square, Copy, X } from 'lucide
 import { useI18n } from '@/i18n'
 import { useRoute } from '@/routes'
 import { settingsStore, updateSettings, useStore } from '@/store'
+import { notifyError } from '@/components/primitives/notify'
 import nolaLogoUrl from '../../../../assets/brand/nola-logo.svg'
 
 export type TitleBarVariant = 'brand' | 'session'
@@ -32,9 +33,11 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
     const bridge = window.nolaTranslator
     if (!bridge?.isWindows) return
     const unsubscribe = bridge.onMainWindowMaximizedChanged(setMaximized)
-    void bridge.isMainWindowMaximized().then(setMaximized).catch(() => undefined)
+    void bridge.isMainWindowMaximized()
+      .then(setMaximized)
+      .catch((error: unknown) => { notifyError(t('errors.windowStateFailed'), { cause: error }) })
     return unsubscribe
-  }, [])
+  }, [t])
   const toggleMaximize = () => {
     void window.nolaTranslator?.toggleMainWindowMaximize().then(setMaximized).catch(() => undefined)
   }
@@ -66,7 +69,11 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
           <Dropdown.Trigger className="nola-titlebar-icon" aria-label={t('titleBar.language')}><Languages aria-hidden="true" /></Dropdown.Trigger>
           <Dropdown.Popover>
             <Dropdown.Menu selectionMode="single" selectedKeys={new Set([uiLanguage])}>
-              {options.map(option => <Dropdown.Item key={option.id} id={option.id} textValue={option.label} onAction={() => setLanguage(option.id)}>{option.label}<Dropdown.ItemIndicator type="checkmark" /></Dropdown.Item>)}
+              {options.map(option => <Dropdown.Item key={option.id} id={option.id} textValue={option.label} onAction={() => {
+                void setLanguage(option.id).catch((error: unknown) => {
+                  notifyError(t('errors.languageChangeFailed'), { cause: error })
+                })
+              }}>{option.label}<Dropdown.ItemIndicator type="checkmark" /></Dropdown.Item>)}
             </Dropdown.Menu>
           </Dropdown.Popover>
         </Dropdown>

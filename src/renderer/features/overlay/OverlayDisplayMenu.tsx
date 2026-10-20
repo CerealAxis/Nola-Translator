@@ -9,6 +9,7 @@ import { OverlayDropdown } from './OverlayDropdown'
 import { actions, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
+import { notifyError } from '@/components/primitives/notify'
 
 type DisplayKey = 'both' | 'source' | 'translation'
 type LayoutKey = 'rolling' | 'sentence'
@@ -77,6 +78,7 @@ export function OverlayLayoutMenu({ isDisabled = false }: { isDisabled?: boolean
  * the whole Menu and can only be derived from which option is active.
  */
 function OverlayPill({ kind, label, value, options, isDisabled = false }: { kind: 'display' | 'layout'; label: string; value: string; options: readonly OptionSpec[]; isDisabled?: boolean }) {
+  const { t } = useI18n()
   const maxHeight = useMenuMaxHeight()
   return (
     <OverlayDropdown kind={kind}>
@@ -111,7 +113,14 @@ function OverlayPill({ kind, label, value, options, isDisabled = false }: { kind
                 patch. Selection state still comes from `selectedKeys`.
               */
               onAction={() => {
-                void actions.settings.updateSettings({ overlay: option.patch }).catch(() => undefined)
+                /*
+                 * This window renders no settings-error notice, so a write the
+                 * main process refused has to be reported here or the pill
+                 * silently reverts.
+                 */
+                void actions.settings.updateSettings({ overlay: option.patch }).catch((error: unknown) => {
+                  notifyError(t('errors.settingsSaveFailed'), { cause: error })
+                })
               }}
             >
               {/* The checkmark goes after the label: its slot is already

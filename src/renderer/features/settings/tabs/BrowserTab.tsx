@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Button, Card, ColorArea, ColorField, ColorPicker, ColorSlider, ColorSwatch, ColorSwatchPicker, NumberField, Slider, Switch, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
+import { useEffect, useRef, useState } from 'react'
+import { Button, Card, ColorArea, ColorField, ColorPicker, ColorSlider, ColorSwatch, ColorSwatchPicker, NumberField, Slider, Switch, ToggleButton, ToggleButtonGroup } from '@heroui/react'
 import { ArrowLeft, CheckSquare, CircleAlert, ExternalLink } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { DEFAULT_SETTINGS } from '@/bridge'
@@ -7,9 +7,11 @@ import { BROWSER_EXTENSION_VERSION, type BrowserIntegrationInfo, type BrowserKin
 import chromeIcon from '@/assets/browsers/chrome.png'
 import edgeIcon from '@/assets/browsers/edge.png'
 import firefoxIcon from '@/assets/browsers/firefox.svg'
+import { notifyError } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { stores, updateSettings, useStore } from '@/store'
 import { browserConnectionAction } from '@/store/settingsStore'
+import { reportSettingsFailure } from '../settingsErrorChannel'
 import { SettingsRow } from '../SettingsRow'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import '../../video-captions/video-captions.css'
@@ -22,14 +24,34 @@ const PRESET_COLORS = ['#F7F7F7', '#D7DEE8', '#87D5FF', '#0D0E10', '#FFFFFF', '#
 
 export function BrowserTab() {
   const { t } = useI18n()
-  const { browser, browserBusy, browserError, settings: savedSettings, pending, error: settingsError } = useStore(stores.settings, state => state)
+  const { browser, browserBusy, browserError, settings: savedSettings, pending } = useStore(stores.settings, state => state)
+  /*
+   * The store keeps one error field for every command it runs, so a failure from another
+   * page (a storage read, a caption session) would light this tab's save indicator even
+   * though nothing written here failed. The indicator follows this tab's own writes.
+   */
+  const [saveError, setSaveError] = useState(false)
   const settings = savedSettings ?? DEFAULT_SETTINGS
   const appearance = settings.browserCaptions
   const [selectedBrowser, setSelectedBrowser] = useState<BrowserKind | null>(null)
+  const reportedBrowserError = useRef<string | null>(null)
   useEffect(() => {
     void browserConnectionAction('inspect')
   }, [])
-  useEffect(() => { if (browserError) toast.danger(browserError) }, [browserError])
+  useEffect(() => {
+    // The effect reads `t`, which changes with the interface language. Without the guard the
+    // same failure would be announced a second time, in the language the user just picked.
+    if (!browserError) {
+      reportedBrowserError.current = null
+      return
+    }
+    if (reportedBrowserError.current === browserError) return
+    reportedBrowserError.current = browserError
+    notifyError(t('browser.connectionFailed'), {
+      cause: browserError,
+      action: { label: t('models.retry'), onPress: () => void browserConnectionAction('inspect') },
+    })
+  }, [browserError, t])
   const browserName = (kind: BrowserKind) => t(kind === 'firefox' ? 'browser.firefox' : kind === 'chrome' ? 'browser.chrome' : 'browser.edge')
   const getBrowser = (kind: BrowserKind): BrowserIntegrationInfo => browser?.browsers?.find(info => info.browser === kind)
     ?? { browser: kind, available: true, extensionStatus: 'unknown', connected: false, enabled: false }
@@ -50,10 +72,18 @@ export function BrowserTab() {
     </Switch>
   )
   const selected = selectedBrowser ? getBrowser(selectedBrowser) : null
-  const patchAppearance = (patch: Partial<typeof appearance>) => { void updateSettings({ browserCaptions: patch }).catch(() => undefined) }
+  const patchAppearance = (patch: Partial<typeof appearance>) => {
+    void updateSettings({ browserCaptions: patch })
+      .then(() => setSaveError(false))
+      .catch(() => setSaveError(true))
+  }
   const restoreAppearance = () => {
     void updateSettings({ browserCaptions: DEFAULT_SETTINGS.browserCaptions })
-      .catch(() => undefined)
+      .then(() => setSaveError(false))
+      .catch((error: unknown) => {
+        setSaveError(true)
+        reportSettingsFailure(t('settings.resetAppearanceFailed'), error)
+      })
   }
   const previewFrameStyle = {
     '--video-caption-top': `${100 - appearance.bottomOffset}%`,
@@ -179,9 +209,9 @@ export function BrowserTab() {
         </div>
       </SettingGroup>
       <div className="settings-save">
-        <span className="settings-save__state" role="status" data-error={Boolean(settingsError)}>
-          {settingsError ? <CircleAlert aria-hidden="true" /> : <CheckSquare aria-hidden="true" />}
-          {settingsError ? t('modelsSettingsUi.saveError') : pending ? t('modelsSettingsUi.saving') : t('modelsSettingsUi.automaticSave')}
+        <span className="settings-save__state" role="status" data-error={saveError}>
+          {saveError ? <CircleAlert aria-hidden="true" /> : <CheckSquare aria-hidden="true" />}
+          {saveError ? t('modelsSettingsUi.saveError') : pending ? t('modelsSettingsUi.saving') : t('modelsSettingsUi.automaticSave')}
         </span>
         <Button variant="outline" isPending={pending} onPress={restoreAppearance}>{t('modelsSettingsUi.resetAppearance')}</Button>
       </div>

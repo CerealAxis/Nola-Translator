@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Card, EmptyState, ListBox, ListBoxItem, Pagination, SearchField, Select, Skeleton, toast } from '@heroui/react'
+import { Button, Card, EmptyState, ListBox, ListBoxItem, Pagination, SearchField, Select, Skeleton } from '@heroui/react'
 import type { Selection } from '@react-types/shared'
 import { Mic } from 'lucide-react'
 import { ErrorBoundary } from '@/components/primitives'
+import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { pathOf, recordPath, useRoute } from '@/routes'
 import { actions, stores, useStore } from '@/store'
@@ -28,6 +29,7 @@ export function RecordsPage(): ReactNode {
   const meetings = useStore(stores.meetings, (state) => state.meetings)
   const loaded = useStore(stores.meetings, (state) => state.loaded)
   const loading = useStore(stores.meetings, (state) => state.loading)
+  const loadError = useStore(stores.meetings, (state) => state.error)
   const pendingIds = useStore(stores.meetings, (state) => state.pendingIds)
   const [filterText, setFilterText] = useState('')
   const [page, setPage] = useState(1)
@@ -40,8 +42,36 @@ export function RecordsPage(): ReactNode {
   const [deletePending, setDeletePending] = useState(false)
 
   useEffect(() => {
+    // The store keeps the failure and the effect below reports it; this call only asks again.
     if (!loaded) void actions.meetings.loadMeetings().catch(() => undefined)
   }, [loaded])
+
+  /*
+   * A list that never arrived and a list that is empty are different states, and the
+   * empty state claims the user has no records. The store keeps the reason; the notice
+   * tells the user, and the retry button lets them ask again.
+   */
+  const loadFailed = !loaded && !loading && loadError !== null
+  const reportedFailure = useRef<string | null>(null)
+  useEffect(() => {
+    /*
+     * The state is read again here instead of taken from the render: the effect above starts
+     * another attempt, and that attempt clears the error before it succeeds or fails. The
+     * snapshot this effect was scheduled with still holds the failure of the previous attempt,
+     * and reporting it would announce a failure the user never had.
+     */
+    const state = stores.meetings.getState()
+    if (state.loaded || state.loading || state.error === null) {
+      reportedFailure.current = null
+      return
+    }
+    if (reportedFailure.current === state.error) return
+    reportedFailure.current = state.error
+    notifyError(t('errors.meetingsLoadFailed'), { cause: state.error })
+  }, [loadFailed, loadError, t])
+  const retryLoad = useCallback(() => {
+    void actions.meetings.loadMeetings().catch(() => undefined)
+  }, [])
   const filtered = useMemo(() => {
     const text = filterText.trim().toLowerCase()
     const languageLabel = (code: string) => {
@@ -75,10 +105,12 @@ export function RecordsPage(): ReactNode {
     if (!pendingDelete) return
     setDeletePending(true)
     if (pendingDelete.kind === 'single') {
-      const showDeleteFailure = () => toast.danger(t('records.deleteFailed'))
-      void actions.meetings.removeMeeting(pendingDelete.meeting.meetingId).then(removed => {
-        if (!removed) showDeleteFailure()
-      }).catch(showDeleteFailure).finally(() => {
+      void actions.meetings.removeMeeting(pendingDelete.meeting.meetingId).then((removed) => {
+        if (!removed) notifyError(t('records.deleteFailed'))
+        else notifySuccess(t('records.deletedMany', { count: 1 }))
+      }).catch((cause: unknown) => {
+        notifyError(t('records.deleteFailed'), { cause })
+      }).finally(() => {
         setDeletePending(false)
         setPendingDelete(null)
       })
@@ -90,9 +122,11 @@ export function RecordsPage(): ReactNode {
       // user already has half-made rather than a hunt for which rows survived.
       const removed = new Set(result.removed)
       setSelection(new Set(targets.filter((id) => !removed.has(id))))
-      if (result.failed.length === 0) toast.success(t('records.deletedMany', { count: result.removed.length }))
-      else toast.danger(t('records.deletePartialFailed', { removed: result.removed.length, failed: result.failed.length }))
-    }).catch(() => toast.danger(t('errors.storageChangedAction'))).finally(() => {
+      if (result.failed.length === 0) notifySuccess(t('records.deletedMany', { count: result.removed.length }))
+      else notifyError(t('records.deletePartialFailed', { removed: result.removed.length, failed: result.failed.length }))
+    }).catch((cause: unknown) => {
+      notifyError(t('records.deleteFailed'), { cause })
+    }).finally(() => {
       setDeletePending(false)
       setPendingDelete(null)
     })
@@ -114,7 +148,7 @@ export function RecordsPage(): ReactNode {
         </div>
         <Card className="nola-record-card">
           <Card.Content>
-            {loading && !loaded ? <div className="nola-record-loading">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} data-testid="skeleton-row" className="h-12 w-full rounded-lg" />)}</div> : filtered.length === 0 ? <EmptyState className="nola-record-empty"><h2>{isSearching ? t('records.noResults') : t('records.noRecords')}</h2><p>{isSearching ? t('records.noResultsHint') : t('records.noRecordsHint')}</p><Button variant="primary" onPress={isSearching ? () => setFilterText('') : startSession}>{isSearching ? t('records.clearSearch') : t('records.startFirst')}</Button></EmptyState> : <>
+            {loading && !loaded ? <div className="nola-record-loading">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} data-testid="skeleton-row" className="h-12 w-full rounded-lg" />)}</div> : loadFailed ? <div className="nola-record-empty"><Button variant="primary" onPress={retryLoad}>{t('common.retry')}</Button></div> : filtered.length === 0 ? <EmptyState className="nola-record-empty"><h2>{isSearching ? t('records.noResults') : t('records.noRecords')}</h2><p>{isSearching ? t('records.noResultsHint') : t('records.noRecordsHint')}</p><Button variant="primary" onPress={isSearching ? () => setFilterText('') : startSession}>{isSearching ? t('records.clearSearch') : t('records.startFirst')}</Button></EmptyState> : <>
               {selectedCount > 0 ? <div className="nola-record-page__bulk">
                 <span className="nola-record-page__bulk-count">{t('records.selectedCount', { count: selectedCount })}</span>
                 <Button variant="secondary" size="sm" onPress={() => setSelection(new Set())} className="nola-record-page__bulk-dismiss">{t('records.clearSelection')}</Button>

@@ -5,17 +5,22 @@ import './theme/cjk-fonts.css'
 import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
-import { Toast, toast } from '@heroui/react'
+import { Toast } from '@heroui/react'
 import { APPLICATION_PAGES, useApplicationNavigation } from './application'
+import { dismissNotice, notifyError } from './components/primitives/notify'
 import { createIpcBridge, isIpcBridgeAvailable } from './bridge/ipc/ipcBridge'
 import { I18nProvider, useI18n } from './i18n'
+import type { TranslationKey } from './i18n'
 import { AppShell, ErrorBoundary } from './components/primitives'
 import { Routes, useRoute } from './routes'
 import { actions, disposeStores, initStores, isEngineConnected, stores, useStore } from './store'
+import type { SettingsCommand } from './store/settingsStore'
 import { OverlayRoot } from './features/overlay'
 import { OverlayMenuRoot } from './features/overlay/OverlayMenuRoot'
 import { RuntimeNotice } from './features/settings/RuntimeNotice'
 import { RuntimeOperationNotice } from './features/settings/RuntimeOperationNotice'
+import { isSettingsErrorClaimed } from './features/settings/settingsErrorChannel'
+import { SETTINGS_WRITE_FAILURE_KEYS, settingsWriteFailure } from './features/settings/settingsWriteError'
 import { StartupFailureDialog } from './features/settings/StartupFailureDialog'
 import { AppUpdateNotice } from './features/settings/AppUpdateNotice'
 import { OnboardingTour } from './features/onboarding'
@@ -74,31 +79,95 @@ function EngineDisconnectedNotice() {
   useEffect(() => {
     if (isEngineConnected() || notified.current) return
     notified.current = true
-    toast.danger(t('errors.engineNotConnected'), {
-      timeout: 0,
-      actionProps: { children: t('errors.pageCrashedAction'), onPress: () => window.location.reload() },
+    notifyError(t('errors.engineNotConnected'), {
+      action: { label: t('errors.pageCrashedAction'), onPress: () => window.location.reload() },
     })
   }, [t])
   return null
 }
 
+/**
+ * The copy a failed command gets. Every command names its own action, so a failure to
+ * open the log folder is never announced as a change that was not saved.
+ */
+function settingsFailureMessageKey(operation: SettingsCommand | null, error: string): TranslationKey {
+  switch (operation) {
+    case 'update':
+      // The errno in the failure text says why the write was refused, and each reason has its
+      // own copy and its own support code. The locale layer appends that code to the message.
+      return SETTINGS_WRITE_FAILURE_KEYS[settingsWriteFailure(error)]
+    case 'storage': return 'settings.storageRefreshFailed'
+    case 'chooseStorage': return 'errors.settingsStoragePickFailed'
+    case 'restartStorage': return 'errors.settingsStorageRestartFailed'
+    case 'stopCaption': return 'errors.settingsCaptionStopFailed'
+    case 'openLogs': return 'settings.openLogsFailed'
+    case 'captionService': return 'errors.captionServiceToggleFailed'
+    case 'prewarm': return 'videoCaptions.serviceFailed'
+    case 'load': return 'settings.loadFailed'
+    default: return 'errors.settingsSaveFailed'
+  }
+}
+
 function SettingsErrorNotice() {
   const { t } = useI18n()
-  const notifiedError = useRef<string | null>(null)
+  /** The command failure this notice has already reported. */
+  const handledFailure = useRef<string | null>(null)
+  /** The load failure this notice has already reported. */
+  const handledLoad = useRef<string | null>(null)
+  /** The notice carrying the load failure, taken off the screen once the settings arrive. */
+  const loadNoticeId = useRef<string | null>(null)
+  const reportTimer = useRef<number | null>(null)
   useEffect(() => {
     const notify = (): void => {
       const state = stores.settings.getState()
-      if (!state.error) { notifiedError.current = null; return }
-      if (notifiedError.current === state.error) return
-      notifiedError.current = state.error
-      if (state.settings) toast.danger(t('errors.settingsSaveFailed'), { description: state.error })
-      else toast.danger(t('settings.loadFailed'), {
-        description: state.error,
-        actionProps: { children: t('models.retry'), onPress: () => void actions.settings.loadSettings().catch(() => undefined) },
-      })
+      /*
+       * The settings never arrived. This is reported wherever the user is: the settings
+       * page shows a neutral state with a retry, and the notice says the same thing in
+       * every other place, where nothing would say that the app is running on defaults
+       * the engine never confirmed.
+       */
+      if (state.loadError) {
+        if (handledLoad.current !== state.loadError) {
+          handledLoad.current = state.loadError
+          // A retry that fails again replaces the notice instead of stacking a second one.
+          if (loadNoticeId.current !== null) dismissNotice(loadNoticeId.current)
+          loadNoticeId.current = notifyError(t('settings.loadFailed'), {
+            cause: state.loadError,
+            action: { label: t('models.retry'), onPress: () => void actions.settings.loadSettings().catch(() => undefined) },
+          })
+        }
+      } else handledLoad.current = null
+      if (state.settings && loadNoticeId.current !== null) {
+        // The settings arrived, so the notice about a failure that no longer holds would
+        // stay on screen forever: an error notice never times out.
+        dismissNotice(loadNoticeId.current)
+        loadNoticeId.current = null
+      }
+      const failure = state.error
+      if (!failure) { handledFailure.current = null; return }
+      const operation = state.errorOperation
+      const key = `${operation ?? ''}\u0000${failure}`
+      if (handledFailure.current === key) return
+      handledFailure.current = key
+      /*
+       * A settings feature that reports the failure on its own channel claims it right
+       * after the call it made resolves. Reporting one task later gives that claim the
+       * chance to land, so the user reads the message that names their action instead
+       * of this generic one as well.
+       */
+      if (reportTimer.current !== null) window.clearTimeout(reportTimer.current)
+      reportTimer.current = window.setTimeout(() => {
+        reportTimer.current = null
+        if (isSettingsErrorClaimed(failure, operation)) return
+        notifyError(t(settingsFailureMessageKey(operation, failure)), { cause: failure })
+      }, 0)
     }
     notify()
-    return stores.settings.subscribe(notify)
+    const unsubscribe = stores.settings.subscribe(notify)
+    return () => {
+      unsubscribe()
+      if (reportTimer.current !== null) window.clearTimeout(reportTimer.current)
+    }
   }, [t])
   return null
 }

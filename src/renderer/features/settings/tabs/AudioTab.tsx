@@ -14,10 +14,11 @@ import { recognitionLanguages } from '../../../../shared/model-capabilities'
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, toast } from '@heroui/react'
+import { Button } from '@heroui/react'
 
 import { languageName } from '@/bridge'
 import { SettingsRow } from '../SettingsRow'
+import { notifyError, notifySuccess, notifyWarning } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { errorCopyOf } from '@/features/workspace/error-copy'
 import { actions, stores, updateSettings, useStore } from '@/store'
@@ -125,7 +126,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
                 ? settings.recognition.sourceLanguage
                 : supported.includes('auto') ? 'auto' : settings.recognition.sourceLanguage
               if (sourceLanguage === settings.recognition.sourceLanguage && !supported.includes(sourceLanguage)) {
-                toast.danger(t('errors.unsupportedRecognitionLanguage', { language: languageName(sourceLanguage, language) }))
+                notifyError(t('errors.unsupportedRecognitionLanguage', { language: languageName(sourceLanguage, language) }))
               }
               void updateSettings({
                 recognition: { modelId: value, sourceLanguage },
@@ -217,14 +218,14 @@ function DeviceTest({ expect }: { expect: string }) {
     try {
       const hasSignal = await actions.settings.testAudio(expect)
       setResult(hasSignal ? 'signal' : 'silent')
-      if (hasSignal) toast.success(t('settings.audioTestSuccess'), { description: t('settings.audioTestReady') })
-      else toast.warning(t('settings.audioTestSilent'))
+      if (hasSignal) notifySuccess(t('settings.audioTestSuccess'), { description: t('settings.audioTestReady') })
+      else notifyWarning(t('settings.audioTestSilent'))
     } catch (error) {
       setResult('failed')
       const code = typeof error === 'object' && error !== null && 'engineCode' in error && typeof error.engineCode === 'string'
         ? error.engineCode
         : error instanceof Error ? /([a-zA-Z_]+)[:：]/.exec(error.message)?.[1] ?? error.message : null
-      toast.danger(t('settings.audioTestFailed'), {
+      notifyError(t('settings.audioTestFailed'), {
         description: t(errorCopyOf(code, 'stop').message),
       })
     }

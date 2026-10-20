@@ -5,6 +5,7 @@ import { settingsStore } from '@/store/settingsStore'
 import { RuntimeOperationNotice } from './RuntimeOperationNotice'
 
 const toastMock = vi.hoisted(() => Object.assign(vi.fn(() => 'toast'), {
+  info: vi.fn(() => 'info'),
   success: vi.fn(() => 'success'),
   danger: vi.fn(() => 'danger'),
 }))
@@ -22,9 +23,9 @@ it('announces runtime progress and completion', () => {
   render(<RuntimeOperationNotice />)
 
   act(() => settingsStore.setState({ runtimeBusy: true, runtimeAction: 'install', runtimeError: null }))
-  expect(toast).toHaveBeenCalledWith('运行组件安装已开始', { description: '操作进行中，可下滑查看进度。' })
+  expect(toast.info).toHaveBeenCalledWith('运行组件安装已开始', expect.objectContaining({ description: '操作进行中，可下滑查看进度。' }))
   act(() => settingsStore.setState({ runtimeBusy: false }))
-  expect(toast.success).toHaveBeenCalledWith('运行组件安装完成')
+  expect(toast.success).toHaveBeenCalledWith('运行组件安装完成', expect.objectContaining({ timeout: 4000 }))
 })
 
 it('announces runtime failures with the diagnostic reason', () => {
@@ -33,5 +34,5 @@ it('announces runtime failures with the diagnostic reason', () => {
   act(() => settingsStore.setState({ runtimeBusy: true, runtimeAction: 'uninstall', runtimeError: null }))
   act(() => settingsStore.setState({ runtimeBusy: false, runtimeError: '组件不存在' }))
 
-  expect(toast.danger).toHaveBeenCalledWith('运行组件卸载失败', { description: '组件不存在' })
+  expect(toast.danger).toHaveBeenCalledWith('运行组件卸载失败', expect.objectContaining({ description: '组件不存在' }))
 })

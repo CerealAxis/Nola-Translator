@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Button, Card, Chip, Link, Modal, ProgressBar, Spinner, toast } from '@heroui/react'
+import { Button, Card, Chip, Link, Modal, ProgressBar, Spinner } from '@heroui/react'
 import { ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2, Github, MousePointer2, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { useRoute } from '@/routes'
 import { actions, stores, useStore } from '@/store'
+import { notifyWarning } from '@/components/primitives/notify'
 import { placeTourCard, spotlightPath } from './tourLayout'
 import type { TourRect, TourSize } from './tourLayout'
 import nolaLogoUrl from '../../../../assets/brand/nola-logo.svg'
@@ -44,7 +45,9 @@ function WelcomeDialog() {
     if (!dialog || !dialog.isConnected || marked.current) return
     marked.current = true
     if (!stores.settings.getState().settings?.onboardingSeen) {
-      void actions.settings.markOnboardingSeen().catch(() => toast.warning(t('onboarding.saveFailed')))
+      void actions.settings.markOnboardingSeen().catch((error: unknown) => {
+        notifyWarning(t('onboarding.saveFailed'), { cause: error })
+      })
     }
   }, [t])
 

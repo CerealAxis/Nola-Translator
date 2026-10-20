@@ -37,5 +37,6 @@ it('preserves the failed stage without marking future steps complete', () => {
   render(<OfflineTaskProgress task={{ state: 'failed', phase: 'download', current: 0, total: 0, issue: 'missingFiles' }} workflow="model-download" />)
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
   expect(screen.getAllByRole('listitem').map(item => item.dataset.state)).toEqual(['completed', 'failed', 'pending'])
-  expect(screen.getByRole('alert')).toHaveTextContent('缺少必要文件')
+  // The failure is reported by a notice, not by a paragraph inside the progress.
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 })

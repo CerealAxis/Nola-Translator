@@ -7,14 +7,15 @@ import { modelEngines, supportsSelectedEngine } from '../../../shared/model-engi
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 /** Model catalog and download manager. The router owns the page padding. */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Card, Chip, EmptyState, Tabs, toast } from '@heroui/react'
+import { Button, Card, Chip, EmptyState, Tabs } from '@heroui/react'
 import { Box } from 'lucide-react'
 
 import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
-import type { ResourceRecord, ResourceRecordWithRate } from '@/bridge'
+import { notifyError } from '@/components/primitives/notify'
+import type { ModelDownloadSource, ResourceRecord, ResourceRecordWithRate } from '@/bridge'
 import { DownloadsTab } from './DownloadsTab'
 import { HubSearchTab } from './HubSearchTab'
 import { ModelCard, ModelCardSkeleton, defaultTargetOf, isDefaultOf } from './ModelCard'
@@ -96,18 +97,54 @@ export function ModelsPage() {
     : []
   const openFamilyKey = openFamily ? `${openFamily}:${openFamilyRecords.map(record => record.resourceId).join('|')}` : ''
 
-  // error 是诊断串，不进界面（store 约定）：只送 console，界面走 errors.* 的错误码文案。
+  // store.error is a diagnostic string, not interface copy: it goes to the log, and the
+  // failure itself reaches the user as a translated notice.
   useEffect(() => {
     if (error) console.error('[models]', error)
   }, [error])
+
+  /*
+   * A catalog that never arrived and a catalog with nothing in it are different states, and
+   * the empty state claims the user has no models. The store keeps the reason; the notice
+   * tells the user, and the retry button lets them ask again.
+   */
+  const loadFailed = !loaded && !loading && error !== null
+  const reportedFailure = useRef<string | null>(null)
+  useEffect(() => {
+    if (!loadFailed) {
+      reportedFailure.current = null
+      return
+    }
+    if (reportedFailure.current === error) return
+    reportedFailure.current = error
+    notifyError(t('errors.modelsLoadFailed'), { cause: error })
+  }, [loadFailed, error, t])
+  const retryLoad = useCallback(() => {
+    void actions.models.loadModels().catch(() => undefined)
+  }, [])
 
   const run = (record: ResourceRecord, action: 'install' | 'remove' | 'cancel') => () => {
     if (action === 'install') {
       setDownloadTarget(record)
       return
     }
-    void actions.models.manageResource(record.resourceId, action).catch(() => {
-      // 失败已经写进 store.error，界面上由下面的 Alert 呈现。
+    void actions.models.manageResource(record.resourceId, action).catch((cause: unknown) => {
+      notifyError(action === 'remove' ? t('modelsSettingsUi.removeFailed') : t('errors.engineOperationFailed'), { cause })
+    })
+  }
+
+  /*
+   * A failed install keeps its own way out: the retry in the notice starts the very
+   * same download again, and a retry that fails reports itself the same way.
+   */
+  const install = (target: ResourceRecord, source: ModelDownloadSource) => {
+    void actions.models.manageResource(target.resourceId, 'install', source).catch(() => {
+      notifyModelDownloadFailure(
+        t('models.downloadError', { name: target.name }),
+        t('errors.downloadFailed'),
+        t('errors.downloadFailedAction'),
+        () => install(target, source),
+      )
     })
   }
 
@@ -155,14 +192,7 @@ export function ModelsPage() {
       <DownloadSourceDialog record={downloadTarget} onClose={() => setDownloadTarget(null)} onSelect={source => {
         const target = downloadTarget
         setDownloadTarget(null)
-        if (target) void actions.models.manageResource(target.resourceId, 'install', source).catch(() => {
-          notifyModelDownloadFailure(
-            t('models.downloadError', { name: target.name }),
-            t('errors.downloadFailed'),
-            t('errors.downloadFailedAction'),
-            () => { void actions.models.manageResource(target.resourceId, 'install', source).catch(() => undefined) },
-          )
-        })
+        if (target) install(target, source)
       }} />
       {openFamily ? <RecommendedFamilyDialog
         key={openFamilyKey}
@@ -173,15 +203,10 @@ export function ModelsPage() {
         runtimes={runtimes}
         busyIds={busyIds}
         onClose={() => setOpenFamily(null)}
-        onInstall={(record, source) => { void actions.models.manageResource(record.resourceId, 'install', source).catch(() => {
-          notifyModelDownloadFailure(
-            t('models.downloadError', { name: record.name }),
-            t('errors.downloadFailed'),
-            t('errors.downloadFailedAction'),
-            () => { void actions.models.manageResource(record.resourceId, 'install', source).catch(() => undefined) },
-          )
+        onInstall={(record, source) => install(record, source)}
+        onCancel={record => { void actions.models.manageResource(record.resourceId, 'cancel').catch((cause: unknown) => {
+          notifyError(t('errors.engineOperationFailed'), { cause })
         }) }}
-        onCancel={record => { void actions.models.manageResource(record.resourceId, 'cancel').catch(() => undefined) }}
         onManualDownload={record => { setOpenFamily(null); offlineActions.openDownloads(record.resourceId) }}
       /> : null}
       <section className="models-overview">
@@ -214,6 +239,8 @@ export function ModelsPage() {
           <RecommendedCatalog
             records={resources.filter(record => !record.resourceId.startsWith('hub:'))}
             loading={loading && !loaded}
+            failed={loadFailed}
+            onRetry={retryLoad}
             onOpen={setOpenFamily}
             emptyAction={
               <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={() => setTab('search')}>
@@ -227,6 +254,8 @@ export function ModelsPage() {
           <Catalog
             records={installed}
             loading={loading && !loaded}
+            failed={loadFailed}
+            onRetry={retryLoad}
             card={card}
             compute={settings?.compute ?? DEFAULT_COMPUTE_SETTINGS}
             emptyAction={
@@ -289,14 +318,18 @@ function CountTab({ id, label, count }: CountTabProps) {
 interface CatalogProps {
   records: readonly ResourceRecordWithRate[]
   loading: boolean
+  /** The catalog could not be read, so the list it would show is unknown rather than empty. */
+  failed: boolean
+  onRetry: () => void
   card: (record: ResourceRecord) => ReactNode
   compute: typeof DEFAULT_COMPUTE_SETTINGS
   emptyAction: ReactNode
 }
 
-function RecommendedCatalog({ records, loading, onOpen, emptyAction }: Pick<CatalogProps, 'records' | 'loading' | 'emptyAction'> & { onOpen: (family: RecommendedFamily) => void }) {
+function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAction }: Pick<CatalogProps, 'records' | 'loading' | 'failed' | 'onRetry' | 'emptyAction'> & { onOpen: (family: RecommendedFamily) => void }) {
   const { t } = useI18n()
   if (loading) return <div className={GRID}>{[0, 1, 2, 3].map(index => <ModelCardSkeleton key={index} />)}</div>
+  if (failed) return <FailedCatalog onRetry={onRetry} />
   if (records.length === 0) return <EmptyState className="flex flex-col items-start gap-4 py-8"><p className="nola-title text-foreground">{t('models.notInstalled')}</p>{emptyAction}</EmptyState>
   const groups = new Map<RecommendedFamily, ResourceRecord[]>()
   for (const record of records) {
@@ -317,7 +350,22 @@ function RecommendedCatalog({ records, loading, onOpen, emptyAction }: Pick<Cata
   </section>)}</div>
 }
 
-function Catalog({ records, loading, card, emptyAction, compute }: CatalogProps) {
+/**
+ * A catalog that could not be read. The list it would show is unknown rather than empty, so
+ * the way out is asking for it again. The failure is also raised as a notice, which is what
+ * carries the reason; the line here says which state the page is in.
+ */
+function FailedCatalog({ onRetry }: { onRetry: () => void }) {
+  const { t } = useI18n()
+  return (
+    <EmptyState className="flex flex-col items-start gap-4 py-8">
+      <p className="nola-caption text-muted">{t('errors.modelsLoadFailed')}</p>
+      <Button variant="primary" onPress={onRetry}>{t('common.retry')}</Button>
+    </EmptyState>
+  )
+}
+
+function Catalog({ records, loading, failed, onRetry, card, emptyAction, compute }: CatalogProps) {
   const { t } = useI18n()
 
   if (loading) {
@@ -329,6 +377,8 @@ function Catalog({ records, loading, card, emptyAction, compute }: CatalogProps)
       </div>
     )
   }
+
+  if (failed) return <FailedCatalog onRetry={onRetry} />
 
   if (records.length === 0) {
     return (

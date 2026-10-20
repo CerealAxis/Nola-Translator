@@ -3,6 +3,7 @@ import { toast } from '@heroui/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { ResourceRecord } from '@/bridge'
 import { actions, stores } from '@/store'
+import { NOTIFY_DURATION } from '@/components/primitives/notify'
 import { ModelDownloadNotice } from './ModelDownloadNotice'
 
 const initial = stores.models.getState()
@@ -38,7 +39,7 @@ it('notifies on completion, failure with a reason, and cancellation', () => {
   publish({ ...record, state: 'idle', installed: true, cancellable: false })
   publish({ ...record, state: 'idle', installed: true, cancellable: false })
   expect(success).toHaveBeenCalledTimes(1)
-  expect(success).toHaveBeenCalledWith(expect.stringContaining(record.name))
+  expect(success).toHaveBeenCalledWith(expect.stringContaining(record.name), expect.objectContaining({ timeout: NOTIFY_DURATION.success }))
   publish(record)
   publish({ ...record, state: 'cancelling', phase: 'cleanup' })
   publish({ ...record, state: 'idle', cancellable: false })

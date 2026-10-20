@@ -1,9 +1,10 @@
-import { Button, Card, EmptyState, ProgressBar, Table, toast } from '@heroui/react'
+import { Button, Card, EmptyState, ProgressBar, Table } from '@heroui/react'
 import { useState } from 'react'
 
 import { resourceStateOf } from '@/bridge'
 import type { ResourceRecord, ResourceRecordWithRate } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
+import { notifyError } from '@/components/primitives/notify'
 import { actions, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
 import { formatBytes } from './ModelCard'
@@ -80,10 +81,15 @@ function Row({ record, busy, onRetry }: { record: ResourceRecordWithRate; busy: 
   const raw = record.progress ?? 0
   const value = Math.min(1, Math.max(0, raw > 1 ? raw / 100 : raw))
   const done = Math.round(total * value)
-  const label = cancelling ? t('models.cancelling')
-    : failed ? t('models.downloadFailed')
+  /*
+   * A failed download is reported by the notice that says what went wrong, so the row
+   * says what is true about the model instead of repeating the failure in a pill.
+   */
+  const label = failed ? t('models.notInstalled')
+    : cancelling ? t('models.cancelling')
     : state === 'verifying' ? t('models.verifying')
     : state === 'queued' ? t('models.queued') : t('status.downloading')
+  const tone = failed ? 'neutral' : cancelling ? 'warning' : 'accent'
 
   return (
     <Table.Row>
@@ -93,7 +99,7 @@ function Row({ record, busy, onRetry }: { record: ResourceRecordWithRate; busy: 
       <Table.Cell><span className="nola-caption tabular whitespace-nowrap">{formatBytes(total)}</span></Table.Cell>
       <Table.Cell>
         <div className="flex min-w-0 flex-col items-start gap-[var(--space-1)]">
-          <StatusPill label={label} tone={failed ? 'danger' : cancelling ? 'warning' : 'accent'} live={!failed && !cancelling} />
+          <StatusPill label={label} tone={tone} live={!failed && !cancelling} />
           {!failed && !cancelling ? <div className="flex w-full min-w-0 flex-col gap-[var(--space-1)]">
             <ProgressBar value={value} maxValue={1} className="w-full" aria-label={t('models.stateLabel')}>
               <ProgressBar.Track>
@@ -129,8 +135,8 @@ function Row({ record, busy, onRetry }: { record: ResourceRecordWithRate; busy: 
               isDisabled={busy || cancelling || (!failed && !record.cancellable)}
               isPending={cancelling}
               onPress={() => {
-                void actions.models.manageResource(record.resourceId, 'cancel').catch(() => {
-                  toast.danger(t('errors.engineOperationFailed'))
+                void actions.models.manageResource(record.resourceId, 'cancel').catch((cause: unknown) => {
+                  notifyError(t('errors.engineOperationFailed'), { cause })
                 })
               }}
             >

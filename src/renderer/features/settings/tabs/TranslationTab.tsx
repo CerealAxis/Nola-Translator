@@ -10,11 +10,12 @@ import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Input, TextField, toast } from '@heroui/react'
+import { Button, Input, TextField } from '@heroui/react'
 
 import { CLOUD_API_FORMATS, CLOUD_FORMAT_DEFAULTS, NO_TRANSLATION_LANGUAGE, TRANSLATION_PROVIDERS } from '@/bridge'
 import type { CloudApiFormat, CredentialProvider, TranslationProvider, TranslationSettings } from '@/bridge'
 import { SettingsRow } from '../SettingsRow'
+import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
@@ -440,11 +441,11 @@ export function ApiKeyRow({ provider, stored }: ApiKeyRowProps) {
     const task = actions.models.setTranslationCredential(provider, key)
       .then(() => {
         setDraft('')
-        toast.success(t('common.saved'))
+        notifySuccess(t('common.saved'))
         return true
       })
       .catch(() => {
-        toast.danger(t('errors.translateFailed'))
+        notifyError(t('errors.translateFailed'))
         return false
       })
       .finally(() => {
@@ -460,10 +461,10 @@ export function ApiKeyRow({ provider, stored }: ApiKeyRowProps) {
     setState('testing')
     try {
       const ok = await actions.models.checkCredential(provider)
-      if (ok) toast.success(t('status.ok'))
-      else toast.danger(t('errors.translateFailed'))
+      if (ok) notifySuccess(t('status.ok'))
+      else notifyError(t('errors.translateFailed'))
     } catch {
-      toast.danger(t('errors.translateFailed'))
+      notifyError(t('errors.translateFailed'))
     } finally {
       setState('idle')
     }
@@ -475,9 +476,9 @@ export function ApiKeyRow({ provider, stored }: ApiKeyRowProps) {
     try {
       await actions.models.setTranslationCredential(provider, '')
       setDraft('')
-      toast.success(t('common.done'))
+      notifySuccess(t('common.done'))
     } catch {
-      toast.danger(t('errors.translateFailed'))
+      notifyError(t('errors.translateFailed'))
     } finally {
       setState('idle')
     }

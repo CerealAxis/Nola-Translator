@@ -214,7 +214,7 @@ it('retries removal rather than downloading after a removal failure', () => {
     busy={false} isDefault={false} canBeDefault={false}
     onInstall={install} onCancel={noop} onRemove={remove} onSetDefault={noop}
   />)
-  expect(screen.getByText('移除失败')).toBeInTheDocument()
+  expect(screen.queryByText('移除失败')).not.toBeInTheDocument()
   expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '卸载' }))
   expect(remove).toHaveBeenCalledOnce()

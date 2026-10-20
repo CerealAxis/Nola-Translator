@@ -200,7 +200,7 @@ export function ModelCard({
       <Card.Content>
       <div className="models-card__status">
         {isDefault && record.installed ? <Chip size="sm" variant="soft" color="accent">{t('modelsSettingsUi.default')}</Chip> : null}
-        {removal ? <StatusPill label={t(state === 'failed' ? 'modelsSettingsUi.removeFailed' : 'modelsSettingsUi.removing')} tone={state === 'failed' ? 'danger' : 'accent'} /> : record.kind !== 'ttsModel' && record.installed && !configurationOf(record) ? <StatusPill label={t('modelConfig.pending')} tone="warning" /> : <StatePill state={state} />}
+        {removal && state === 'removing' ? <StatusPill label={t('modelsSettingsUi.removing')} tone="accent" /> : record.kind !== 'ttsModel' && record.installed && !configurationOf(record) ? <StatusPill label={t('modelConfig.pending')} tone="warning" /> : <StatePill state={state} installed={record.installed} />}
         {(supportedEngines ?? modelEngines(record)).map(engine => <Chip key={engine} size="sm" variant="soft">{engine === 'pytorch' ? 'PyTorch' : engine === 'crisp' ? 'CrispASR' : 'llama.cpp'}</Chip>)}
         {record.resourceId.startsWith('hub:local/') ? <Chip size="sm" variant="soft">{t('modelsSettingsUi.localImport')}</Chip> : null}
       </div>
@@ -238,10 +238,17 @@ export function ModelCard({
   </Tooltip>
 }
 
-function StatePill({ state }: { state: ResourceState }) {
+/**
+ * The state the card shows. A failure is not one of them: the notice tells the user what
+ * went wrong, and the card keeps saying what is true about the model. A removal that
+ * failed leaves the model in place, so it still counts as installed.
+ */
+function StatePill({ state, installed }: { state: ResourceState; installed: boolean }) {
   const { t } = useI18n()
   if (state === 'installed') return <StatusPill label={t('models.installed')} tone="success" />
-  if (state === 'failed') return <StatusPill label={t('models.downloadFailed')} tone="danger" />
+  if (state === 'failed') return installed
+    ? <StatusPill label={t('models.installed')} tone="success" />
+    : <StatusPill label={t('models.notInstalled')} />
   if (state === 'verifying') return <StatusPill label={t('models.verifying')} tone="accent" live />
   if (state === 'queued') return <StatusPill label={t('models.queued')} tone="warning" />
   if (state === 'downloading') return <StatusPill label={t('status.downloading')} tone="accent" live />

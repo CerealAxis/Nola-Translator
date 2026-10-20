@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { Button, Modal, Spinner, toast } from '@heroui/react'
+import { Button, Modal, Spinner } from '@heroui/react'
 import { CircleAlert } from 'lucide-react'
 
 import type { MissingResource } from '@/store'
@@ -21,6 +21,7 @@ import type { SessionConfig } from '../../../shared/contracts'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 import { actions, sessionStore, stores } from '@/store'
 import { useI18n } from '@/i18n'
+import { notifyError, notifyWarning } from '@/components/primitives/notify'
 import { modelEngines, translationEngine as fallbackTranslationEngine } from '../../../shared/model-engines'
 import { NO_TRANSLATION_LANGUAGE } from '../../../shared/settings'
 import { DownloadSourceDialog } from '../models/DownloadSourceDialog'
@@ -72,7 +73,6 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
   const [downloadTarget, setDownloadTarget] = useState<MissingResource | null>(null)
   const openedRef = useRef(false)
   const runRef = useRef(0)
-  const failureToastStageRef = useRef<Stage | null>(null)
 
   const runCheck = useCallback(() => {
     const run = (runRef.current += 1)
@@ -126,11 +126,16 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
                 : `${t('runtime.crisp')} · ${t('runtime.missing')}`
             const action = missing === 'engine' ? t('runtime.goTorch')
               : missing === 'llama' ? t('runtime.goLlama') : t('runtime.installCrisp')
-            toast.warning(title, {
+            notifyWarning(title, {
               description: t('runtime.noticeBody'),
-              actionProps: {
-                children: action,
-                onPress: () => { close(false); void actions.settings.openRuntimeSettings(missing) },
+              action: {
+                label: action,
+                onPress: () => {
+                  close(false)
+                  void actions.settings.openRuntimeSettings(missing).catch((error: unknown) => {
+                    notifyError(t('errors.runtimeSettingsFailed'), { cause: error })
+                  })
+                },
               },
             })
           }
@@ -140,9 +145,8 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
         if (alive()) {
           setFailureContext({ supportCode: environmentSupportCode })
           setStage('environmentFailed')
-          toast.danger(t('errors.unknownFailure'), {
-            timeout: 0,
-            actionProps: { children: t('runtime.recheck'), onPress: runCheck },
+          notifyError(t('errors.unknownFailure'), {
+            action: { label: t('runtime.recheck'), onPress: runCheck },
           })
         }
         return
@@ -237,8 +241,8 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
     try {
       await actions.models.manageResource(missing.resourceId, 'install', source)
       await actions.models.loadModels({ includeDevices: false })
-    } catch {
-      toast.danger(t('errors.downloadFailed'))
+    } catch (error) {
+      notifyError(t('errors.downloadFailed'), { cause: error })
     } finally {
       setInstalling(false)
     }
@@ -258,25 +262,13 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
   const engineFailed = stage === 'engineFailed'
   const environmentPending = stage === 'environment'
   const environmentFailed = stage === 'environmentFailed'
-  useEffect(() => {
-    if (!isOpen) {
-      failureToastStageRef.current = null
-      return
-    }
-    if (stage !== 'engineFailed' && stage !== 'modelCheckFailed') {
-      failureToastStageRef.current = null
-      return
-    }
-    if (failureToastStageRef.current === stage) return
-    failureToastStageRef.current = stage
-    toast.danger(stage === 'engineFailed' ? t('errors.engineNotReady') : t('errors.engineOperationFailed'), {
-      timeout: 0,
-      actionProps: {
-        children: t(stage === 'engineFailed' ? 'errors.engineNotReadyAction' : 'runtime.recheck'),
-        onPress: runCheck,
-      },
-    })
-  }, [isOpen, runCheck, stage, t])
+  /*
+   * The engine and model-check failures stay inside this dialog: the checklist
+   * rows already name them, and a toast on top of the dialog repeats what the
+   * row says while hiding it. The way out is the dialog's own recheck button,
+   * which every failure stage offers.
+   */
+  const failedStage = stage === 'engineFailed' || stage === 'modelCheckFailed' || stage === 'environmentFailed'
   const close = (open: boolean) => {
     if (!open) {
       runRef.current += 1
@@ -346,6 +338,11 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
               {failureContext && onCopyDiagnostics ? (
                 <Button variant="tertiary" size="sm" className="rounded-xl" onPress={() => onCopyDiagnostics(failureContext)}>
                   {t('errors.copyDiagnosticsAction')}
+                </Button>
+              ) : null}
+              {failedStage ? (
+                <Button variant="secondary" size="sm" className="rounded-xl" onPress={runCheck}>
+                  {t('runtime.recheck')}
                 </Button>
               ) : null}
               <Button variant="tertiary" size="sm" className="rounded-xl" onPress={() => close(false)}>

@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Autocomplete, Button, Label, ListBox, Modal, SearchField, Select, Switch, Tag, TagGroup, Tooltip, toast, useFilter } from '@heroui/react'
+import { Autocomplete, Button, Label, ListBox, Modal, SearchField, Select, Switch, Tag, TagGroup, Tooltip, useFilter } from '@heroui/react'
 import type { ResourceRecord } from '@/bridge'
 import { languageName } from '@/bridge'
 import { actions } from '@/store'
+import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { SettingsRow } from '../settings/SettingsRow'
 import '../settings/settings.css'
 import './models.css'
@@ -97,9 +98,11 @@ export function ModelConfigurationDialog({ record, onClose }: ModelConfiguration
     setSaving(true)
     try {
       await actions.models.configureModel(record.resourceId, draft)
-      toast.success(t('modelConfig.saved'))
+      notifySuccess(t('modelConfig.saved'))
       onClose()
-    } catch { toast.danger(t('modelConfig.saveFailed')) }
+    } catch (cause) {
+      notifyError(t('modelConfig.saveFailed'), { cause })
+    }
     finally { setSaving(false) }
   }
   return <Modal isOpen onOpenChange={open => { if (!open && !saving) onClose() }}>

@@ -2,7 +2,7 @@ import { useModelOptions } from '@/model-options'
 import { translationLanguages } from '../../../shared/model-capabilities'
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, Label, ListBox, Popover, Select, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
+import { Button, Card, Label, ListBox, Popover, Select, ToggleButton, ToggleButtonGroup } from '@heroui/react'
 import { ArrowRight, ArrowRightLeft, ChevronDown, ExternalLink, Languages, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Settings, Square, X } from 'lucide-react'
 import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { AppSettingsPatch } from '@/bridge'
@@ -11,6 +11,7 @@ import { useRoute } from '@/routes'
 import { actions, sessionStore, stores, updateSettings, useStore } from '@/store'
 import { swappedLanguagesOf, targetLanguagePatch } from '@/session-config'
 import { PageHeader } from '@/components/primitives'
+import { notifyError } from '@/components/primitives/notify'
 import { SettingSelect } from '../settings/SettingsPage'
 import { captionScrimColor } from './scrimColor'
 
@@ -33,9 +34,11 @@ export function OverlayPage() {
     try {
       const opened = await actions.settings.showOverlay()
       if (opened === false) {
-        toast.danger(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
       }
-    } catch { toast.danger(t('workspaceUi.overlayFailed')) }
+    } catch (error) {
+      notifyError(t('workspaceUi.overlayFailed'), { cause: error })
+    }
     finally { setOpening(false) }
   }
   const sourceLanguage = settings.recognition.sourceLanguage

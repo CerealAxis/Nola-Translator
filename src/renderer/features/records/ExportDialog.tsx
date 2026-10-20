@@ -7,10 +7,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Modal, ToggleButton, ToggleButtonGroup, toast } from '@heroui/react'
+import { Button, Modal, ToggleButton, ToggleButtonGroup } from '@heroui/react'
 import type { Selection } from '@react-types/shared'
 
 import { useI18n } from '@/i18n'
+import { notifyError } from '@/components/primitives/notify'
 import { actions, stores, useStore } from '@/store'
 import type { ExportFormat } from '@/bridge'
 
@@ -54,7 +55,7 @@ export function ExportDialog({
         onExported?.(format)
         onOpenChange(false)
       })
-      .catch(() => toast.danger(t('errors.exportFailed')))
+      .catch((cause: unknown) => { notifyError(t('errors.exportFailed'), { cause }) })
   }, [meetingId, format, onExported, onOpenChange, t])
 
   return (

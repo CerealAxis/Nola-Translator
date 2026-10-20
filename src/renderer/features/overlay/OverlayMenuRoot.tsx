@@ -1,13 +1,15 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { actions, getBridge, stores, useStore } from '@/store'
-import { Button, toast } from '@heroui/react'
+import { Button } from '@heroui/react'
 import { OverlayControls } from './OverlayControls'
 import { useI18n } from '@/i18n'
+import { notifyError } from '@/components/primitives/notify'
 
 /** The preloaded document only receives snapshots; it performs no engine, device or meeting queries. */
 export function OverlayMenuRoot() {
   const menu = useStore(stores.settings, state => state.overlayMenu)
+  const { t } = useI18n()
   useLayoutEffect(() => {
     if (!menu) return
     // The mouse press happened in the caption document, so React Aria here has not seen that input modality.
@@ -38,7 +40,10 @@ export function OverlayMenuRoot() {
       const content = document.querySelector(menu.kind === 'confirm' ? '.nola-confirm-dialog' : '.nola-caption-menu')
       if (content && content.getBoundingClientRect().height > 0) {
         if (painted) {
-          void actions.settings.presentOverlayMenu(id).catch((error: unknown) => console.warn('[overlay] menu show failed', error))
+          void actions.settings.presentOverlayMenu(id).catch((error: unknown) => {
+            console.warn('[overlay] menu show failed', error)
+            notifyError(t('overlay.menuFailed'), { cause: error })
+          })
           return
         }
         painted = true
@@ -77,7 +82,7 @@ function OverlayCloseConfirmation({ id }: { id: number }) {
       await bridge.overlay.close()
     } catch (error) {
       console.error('[overlay] close failed', error)
-      toast.danger(t('overlay.closeFailed'))
+      notifyError(t('overlay.closeFailed'), { cause: error })
     } finally {
       setPending(false)
     }
@@ -90,7 +95,11 @@ function OverlayCloseConfirmation({ id }: { id: number }) {
         <p className="nola-confirm-text">{t('overlay.closeBody')}</p>
         <div className="nola-confirm-actions">
           <Button variant="secondary" size="sm" isDisabled={pending}
-            onPress={() => void actions.settings.closeOverlayMenu(id)}>
+            onPress={() => {
+              void actions.settings.closeOverlayMenu(id).catch((error: unknown) => {
+                notifyError(t('overlay.menuFailed'), { cause: error })
+              })
+            }}>
             {t('common.cancel')}
           </Button>
           <Button variant="danger" size="sm" isPending={pending} onPress={() => void close()}>

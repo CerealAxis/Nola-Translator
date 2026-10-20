@@ -50,7 +50,7 @@ it('reports a failed close and allows retrying instead of silently dismissing co
   vi.spyOn(console, 'error').mockImplementation(() => {})
   const { confirm } = setup(close)
   fireEvent.click(confirm)
-  await waitFor(() => expect(failureToast).toHaveBeenCalledWith('关闭失败，请重试。'))
+  await waitFor(() => expect(failureToast).toHaveBeenCalledWith('关闭失败，请重试。', expect.objectContaining({ description: 'IPC unavailable' })))
   fireEvent.click(screen.getByRole('button', { name: '关闭并停止' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   expect(close).toHaveBeenCalledTimes(2)

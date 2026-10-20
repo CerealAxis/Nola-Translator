@@ -22,6 +22,15 @@ import type { ComputeSnapshot, RuntimeSnapshot } from '../../shared/compute'
  */
 export type CaptionServiceState = 'idle' | 'loading' | 'ready' | 'failed'
 
+/**
+ * The commands that share the settings failure channel. The name travels with the
+ * failure so the notice can say which action failed instead of calling every failure
+ * a change that was not saved. A load failure is reported through `loadError` and
+ * never reaches this channel.
+ */
+export type SettingsCommand =
+  | 'load' | 'update' | 'storage' | 'chooseStorage' | 'restartStorage' | 'stopCaption' | 'openLogs' | 'captionService' | 'prewarm'
+
 export interface SettingsState {
   overlayMenuOpen: boolean
   overlayMenu: OverlayMenuPresentation | null
@@ -35,7 +44,12 @@ export interface SettingsState {
   loading: boolean
   /** At least one write in flight; buttons read it for their pending state. */
   pending: boolean
+  /** The failure of the command named in `errorOperation`. */
   error: string | null
+  /** The command that failed, so the notice can name the action the user took. */
+  errorOperation: SettingsCommand | null
+  /** The settings could not be read. Separate from `error`, so a background refresh cannot erase it. */
+  loadError: string | null
   storage: ModelStorageInfo | null
   storageBusy: boolean
   browser: BrowserConnectionStatus | null
@@ -72,6 +86,8 @@ const initialState: SettingsState = {
   loading: false,
   pending: false,
   error: null,
+  errorOperation: null,
+  loadError: null,
   storage: null,
   storageBusy: false,
   browser: null,
@@ -413,6 +429,29 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+/**
+ * A command clears the shared failure when it starts: a new action replaces the
+ * failure of the last one. The extra fields ride along, so a command that also raises
+ * a busy flag changes the state in one step.
+ */
+function clearCommandFailure(extra?: Partial<SettingsState>): void {
+  settingsStore.setState({ ...extra, error: null, errorOperation: null })
+}
+
+/**
+ * A command that succeeds clears only the failure it owns. Another command's failure
+ * is still true, and erasing it would hide a problem the user has not read yet.
+ */
+function clearOwnFailure(operation: SettingsCommand): void {
+  if (settingsStore.getState().errorOperation !== operation) return
+  settingsStore.setState({ error: null, errorOperation: null })
+}
+
+/** Records which command failed, so the notice can name the action the user took. */
+function recordCommandFailure(operation: SettingsCommand, error: unknown): void {
+  settingsStore.setState({ error: errorMessage(error), errorOperation: operation })
+}
+
 const enqueue = createWriteQueue()
 
 /** Writes still waiting to land. `pending` is derived from this, so the UI need not count. */
@@ -457,14 +496,18 @@ async function bridgeWrite(patch: AppSettingsPatch): Promise<AppSettings> {
 /** First load, and the entry point for external changes (onSettingsChanged). */
 export async function loadSettings(): Promise<void> {
   if (!bridge) return
-  if (settingsStore.getState().loaded && !settingsStore.getState().error) return
-  settingsStore.setState({ loading: true, error: null })
+  // Settings that were read once are not read again; settings that never arrived are,
+  // because that is the one failure a retry can still fix.
+  if (settingsStore.getState().loaded && !settingsStore.getState().loadError) return
+  settingsStore.setState({ loading: true, loadError: null })
   try {
     confirmed = await bridge.settings.get()
     publish(confirmed)
     settingsStore.setState({ loaded: true, loading: false })
   } catch (error) {
-    settingsStore.setState({ loading: false, error: errorMessage(error) })
+    // The load failure has its own channel: a background refresh that succeeds must not
+    // erase the fact that the settings were never read.
+    settingsStore.setState({ loading: false, loadError: errorMessage(error) })
     throw error
   }
 }
@@ -494,11 +537,11 @@ export async function updateSettings(patch: AppSettingsPatch): Promise<void> {
   const record: PendingWrite = { patch, debounced: false }
   inFlight = [...inFlight, record]
   publish(confirmed)
-  settingsStore.setState({ error: null })
+  clearCommandFailure()
   try {
     await write(record)
   } catch (error) {
-    settingsStore.setState({ error: errorMessage(error) })
+    recordCommandFailure('update', error)
     throw error
   }
 }
@@ -507,7 +550,7 @@ export async function updateSettings(patch: AppSettingsPatch): Promise<void> {
 function enqueueDebounced(patch: AppSettingsPatch): Promise<void> {
   debouncePatch = debouncePatch ? mergePatches(debouncePatch, patch) : patch
   // Render the new value now without writing it; publish folds debouncePatch in.
-  settingsStore.setState({ error: null })
+  clearCommandFailure()
   publish(confirmed)
 
   const settled = new Promise<void>((resolve, reject) => {
@@ -536,7 +579,7 @@ async function flushDebounced(): Promise<void> {
     await write(record)
     for (const waiter of waiters) waiter.resolve()
   } catch (error) {
-    settingsStore.setState({ error: errorMessage(error) })
+    recordCommandFailure('update', error)
     for (const waiter of waiters) waiter.reject(error)
   }
 }
@@ -557,45 +600,55 @@ export async function flushPendingSettings(): Promise<void> {
  */
 export async function refreshStorage(): Promise<void> {
   if (!bridge) return
+  clearCommandFailure()
   try {
     const storage = await bridge.storage.get()
-    settingsStore.setState({ storage, error: null })
+    settingsStore.setState({ storage })
+    // The refresh worked; a failure another command recorded is still true.
+    clearOwnFailure('storage')
   } catch (error) {
-    settingsStore.setState({ error: errorMessage(error) })
+    recordCommandFailure('storage', error)
   }
 }
 
 export async function chooseStorageDirectory(): Promise<ModelStorageInfo | null> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
-  settingsStore.setState({ storageBusy: true, error: null })
+  clearCommandFailure({ storageBusy: true })
   try {
     const chosen = await bridge.storage.choose()
-    // Cancelled in the system dialog: null is not an error, so leave the state as it was.
-    if (!chosen) return null
+    // Cancelled in the system dialog: null is not an error, so the state goes back to what
+    // it was before the dialog opened.
+    if (!chosen) { settingsStore.setState({ storageBusy: false }); return null }
     const storage = await bridge.storage.get()
     settingsStore.setState({ storage, storageBusy: false })
+    clearOwnFailure('chooseStorage')
     return storage
   } catch (error) {
-    settingsStore.setState({ storageBusy: false, error: errorMessage(error) })
+    settingsStore.setState({ storageBusy: false, error: errorMessage(error), errorOperation: 'chooseStorage' })
     throw error
   }
 }
 
 export async function restartAppForStorage(): Promise<void> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
-  settingsStore.setState({ storageBusy: true, error: null })
+  clearCommandFailure({ storageBusy: true })
   try {
     await bridge.storage.restartApp()
     const storage = await bridge.storage.get()
     settingsStore.setState({ storage, storageBusy: false })
+    clearOwnFailure('restartStorage')
   } catch (error) {
-    settingsStore.setState({ storageBusy: false, error: errorMessage(error) })
+    settingsStore.setState({ storageBusy: false, error: errorMessage(error), errorOperation: 'restartStorage' })
     throw error
   }
 }
 
+/**
+ * Clears the failure of a settings command. The load failure stays: it describes settings
+ * that were never read, and only a successful read takes that away.
+ */
 export function clearSettingsError(): void {
-  settingsStore.setState({ error: null })
+  settingsStore.setState({ error: null, errorOperation: null })
 }
 
 /** False means browser captions reserve the service; no window was opened. */
@@ -640,7 +693,10 @@ export async function enableCaptionService(): Promise<PrewarmResult> {
     })
     return result
   } catch (error) {
-    settingsStore.setState({ captionService: 'failed', runtimeError: errorMessage(error) })
+    // The page names the reason — a missing runtime, a device that does not match — so the
+    // failure belongs to the command channel. The runtime components panel would announce
+    // it as a failed install, which is not what happened.
+    settingsStore.setState({ captionService: 'failed', error: errorMessage(error), errorOperation: 'prewarm' })
     throw error
   } finally {
     settingsStore.setState({ captionServiceBusy: false })
@@ -659,11 +715,16 @@ export function resetCaptionService(): void {
  */
 export async function setCaptionServiceActive(active: boolean): Promise<BrowserConnectionStatus> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
-  settingsStore.setState({ captionServiceBusy: true, error: null })
+  // The switch reports its own failure, with copy that names the switch, so the store
+  // records it on the command channel and the page claims it.
+  clearCommandFailure({ captionServiceBusy: true })
   try {
     const status = await bridge.settings.setCaptionService(active)
     settingsStore.setState({ browser: status })
     return status
+  } catch (error) {
+    recordCommandFailure('captionService', error)
+    throw error
   } finally {
     settingsStore.setState({ captionServiceBusy: false })
   }
@@ -675,10 +736,11 @@ export async function setCaptionServiceActive(active: boolean): Promise<BrowserC
  */
 export async function stopCaptionSession(sessionId: string): Promise<void> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
+  clearCommandFailure()
   try {
     await bridge.engine.stopSession(sessionId)
   } catch (error) {
-    settingsStore.setState({ error: errorMessage(error) })
+    recordCommandFailure('stopCaption', error)
     throw error
   }
 }
@@ -745,10 +807,11 @@ export async function copyDiagnostics(): Promise<void> {
 }
 
 export async function openLogs(): Promise<void> {
+  clearCommandFailure()
   try {
     if (!bridge?.diagnostics.openLogs) throw new Error('diagnosticsUnavailable')
     await bridge.diagnostics.openLogs()
-  } catch (error) { settingsStore.setState({ error: errorMessage(error) }) }
+  } catch (error) { recordCommandFailure('openLogs', error) }
 }
 
 export function detachSettingsStore(): void {

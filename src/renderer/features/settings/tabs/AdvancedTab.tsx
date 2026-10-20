@@ -19,10 +19,12 @@ import {
 import { DEFAULT_SETTINGS, PROTOCOL_VERSION } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
 import type { StatusPillTone } from '@/components/primitives'
+import { notifyError } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import type { EngineStatus } from '@/store'
+import { reportSettingsFailure } from '../settingsErrorChannel'
 import { SettingGroup } from '../SettingsPage'
 import type { SettingsPanelProps } from '../SettingsPage'
 
@@ -88,8 +90,8 @@ export function AdvancedTab(_props: SettingsPanelProps) {
       {/*
         The individual diagnostics rows. Copying alone hands the user JSON they have to open
         somewhere else to read, while what they need during a failure is to be told now.
-        A failed load states the reason instead of showing an empty list, which would read
-        as "everything is fine".
+        A failed load is reported as a notice and the row says the report is unavailable,
+        which an empty list would not.
       */}
       <SettingGroup legend={t('settings.groupDiagnostics')}>
         <DiagnosticsReport />
@@ -107,24 +109,26 @@ export function AdvancedTab(_props: SettingsPanelProps) {
 function DiagnosticsReport() {
   const { t } = useI18n()
   const [rows, setRows] = useState<Array<[string, string]> | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [unavailable, setUnavailable] = useState(false)
 
   useEffect(() => {
     let active = true
     actions.settings.readDiagnostics()
       .then((payload) => {
         if (!active) return
+        setUnavailable(false)
         setRows(Object.entries(payload).map(([key, value]) => [key, String(value)]))
       })
       .catch((cause: unknown) => {
         if (!active) return
-        setError(cause instanceof Error ? cause.message : t('settings.diagnosticsUnavailable'))
+        setUnavailable(true)
+        notifyError(t('settings.diagnosticsFailed'), { cause })
       })
     return () => { active = false }
   }, [t])
 
-  if (error !== null) {
-    return <SettingsRow label={t('settings.diagnosticsFailed')}><span className="nola-caption text-muted">{error}</span></SettingsRow>
+  if (unavailable) {
+    return <SettingsRow label={t('settings.diagnosticsUnavailable')}><span className="nola-caption text-muted">-</span></SettingsRow>
   }
   if (rows === null) {
     return <SettingsRow label={t('settings.diagnosticsLoading')}><Spinner size="sm" /></SettingsRow>
@@ -181,10 +185,11 @@ function ResetAll({ pending }: { pending: boolean }) {
       setOpen(false)
     } catch (error) {
       console.error('[settings.reset]', error)
+      reportSettingsFailure(t('settings.resetAllFailed'), error)
     } finally {
       setState('idle')
     }
-  }, [])
+  }, [t])
 
   return (
     <>

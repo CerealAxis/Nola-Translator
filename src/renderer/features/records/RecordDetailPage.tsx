@@ -8,7 +8,7 @@
  * columns eat the remaining height.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Breadcrumbs, Button, Card, EmptyState, Skeleton } from '@heroui/react'
 import { Download, Minus, Plus } from 'lucide-react'
@@ -18,6 +18,7 @@ import remarkGfm from 'remark-gfm'
 import { AudioPlayerBar, DualColumnView } from '@/components/reading'
 import type { DualColumnSegment } from '@/components/reading'
 import { ErrorBoundary, PageHeader, StatusPill } from '@/components/primitives'
+import { notifyError } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { formatChineseCaption } from '@/chinese-script'
 import { pathOf, useRoute } from '@/routes'
@@ -38,6 +39,19 @@ const SKELETON_PAIRS = 4
 export function RecordDetailPage(): ReactNode {
   const { t } = useI18n()
   const { id, navigate, path } = useRoute()
+  /*
+   * The translator changes with the interface language, and a load callback that depends on it
+   * would read the record again on every language switch: the reading pane falls back to a
+   * skeleton, the audio URL is fetched a second time and the playhead is lost. The callback
+   * reads the current language through a ref instead.
+   *
+   * The ref is filled in a layout effect rather than during the render: a render that React
+   * discards must not leave the ref holding a translator the committed tree never had.
+   */
+  const translate = useRef(t)
+  useLayoutEffect(() => {
+    translate.current = t
+  }, [t])
 
   const detail = useStore(stores.meetings, (state) => state.detail)
   const detailLoading = useStore(stores.meetings, (state) => state.detailLoading)
@@ -47,13 +61,25 @@ export function RecordDetailPage(): ReactNode {
   const [currentIndex, setCurrentIndex] = useState<number | undefined>(undefined)
   const [exportOpen, setExportOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
+  const [detailFailed, setDetailFailed] = useState(false)
 
-  useEffect(() => {
+  /*
+   * A record that could not be read is not a record without captions. The empty state
+   * says the second thing, so the failure gets its own state and the notice tells the
+   * user why the reading pane is blank.
+   */
+  const load = useCallback(() => {
     if (!id) return
-    void actions.meetings.loadMeetingDetail(id).catch(() => {
-        // The failure lands in store.error; the UI shows it by errorCode, not as a diagnostic dump.
+    setDetailFailed(false)
+    void actions.meetings.loadMeetingDetail(id).catch((cause: unknown) => {
+      setDetailFailed(true)
+      notifyError(translate.current('errors.meetingsLoadFailed'), { cause })
     })
   }, [id])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   // Switching records resets the type scale and the playhead: a reading position should not carry over.
   useEffect(() => {
@@ -167,6 +193,10 @@ export function RecordDetailPage(): ReactNode {
         <Card className="nola-record-card nola-record-detail__reading"><Card.Content>
           {detailLoading && !detail ? (
             <DualSkeleton t={t} />
+          ) : detailFailed ? (
+            <div className="flex justify-center p-6">
+              <Button variant="primary" size="sm" onPress={load}>{t('common.retry')}</Button>
+            </div>
           ) : segments.length === 0 ? (
             <EmptyState className="flex flex-col items-start gap-4 p-6">
               <h2 className="nola-body-strong text-foreground">{t('workspace.nothingYet')}</h2>

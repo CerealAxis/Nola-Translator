@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { Button, Card, EmptyState, toast } from '@heroui/react'
+import { Button, Card, EmptyState } from '@heroui/react'
 import { Captions } from 'lucide-react'
 
 import { findMissingResource } from '@/store'
@@ -12,6 +12,7 @@ import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
 import { CaptionStage } from '@/components/caption'
 import type { CaptionDisplayMode, CaptionLayout } from '@/components/caption'
 import { NotesPanel } from '@/components/notes'
+import { notifyError, notifySuccess, notifyWarning, describeError } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { recordPath, useRoute } from '@/routes'
 import { NO_TRANSLATION_LANGUAGE } from '@/bridge'
@@ -103,6 +104,19 @@ export function WorkspacePage() {
   // A write still in flight, so unmount can land it without waiting out the 800ms.
   const pendingNotes = useRef<string | null>(null)
   const pendingMeetingId = useRef<string | null>(null)
+  /*
+   * The save runs after every pause in typing, so a write that keeps failing
+   * would otherwise stack one notice per pause. The text of the last reported
+   * failure is enough to tell them apart.
+   */
+  const notesFailure = useRef<string | null>(null)
+  const reportNotesFailure = useCallback((error: unknown): void => {
+    const text = describeError(error) ?? 'unknown'
+    if (notesFailure.current === text) return
+    notesFailure.current = text
+    notifyError(t('errors.notesSaveFailed'), { cause: error })
+  }, [t])
+  const clearNotesFailure = useCallback((): void => { notesFailure.current = null }, [])
 
   // Flush a pending write first when the meeting changes, or it lands on
   // the next meeting.
@@ -132,12 +146,14 @@ export function WorkspacePage() {
         pendingMeetingId.current = null
         if (value === savedNotes.current) return
         savedNotes.current = value
-        // A failed save is not worth interrupting for: losing a passage of notes
-        // should not outlast a red error in memory.
-        void actions.meetings.setMeetingNotes(meetingId, value).catch(() => undefined)
+        /*
+         * A lost note is the user's own writing, so it is worth interrupting
+         * for: nothing else tells them the sentence they just typed is gone.
+         */
+        void actions.meetings.setMeetingNotes(meetingId, value).then(clearNotesFailure, reportNotesFailure)
       }, 800)
     },
-    [meetingId],
+    [clearNotesFailure, meetingId, reportNotesFailure],
   )
 
   // Land a pending write on unmount, or closing the window right after typing
@@ -149,21 +165,21 @@ export function WorkspacePage() {
       const id = pendingMeetingId.current
       if (value !== null && id !== null && value !== savedNotes.current) {
         savedNotes.current = value
-        void actions.meetings.setMeetingNotes(id, value).catch(() => undefined)
+        void actions.meetings.setMeetingNotes(id, value).then(clearNotesFailure, reportNotesFailure)
       }
     },
-    [],
+    [clearNotesFailure, reportNotesFailure],
   )
 
   // -- Open the dialog seeded from current settings, not a separate draft ---
   const openSetup = useCallback(async () => {
     try {
       if (!await actions.settings.canStartDesktopCaptions()) {
-        toast.danger(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
         return
       }
-    } catch {
-      toast.danger(t('errors.startFailed'))
+    } catch (error) {
+      notifyError(t('errors.startFailed'), { cause: error })
       return
     }
     setDraft({
@@ -213,7 +229,8 @@ export function WorkspacePage() {
        */
       try {
         await actions.settings.updateSettings({ recording: { keepAudio: draft.keepAudio } })
-      } catch {
+      } catch (error) {
+        notifyError(t('workspaceUi.recordingPreferenceFailed'), { cause: error })
         return
       }
     }
@@ -222,10 +239,12 @@ export function WorkspacePage() {
       setNotes('')
       const meetingId = sessionStore.getState().meetingId
       if (meetingId) {
-        await actions.meetings.loadMeetings().catch(() => undefined)
+        await actions.meetings.loadMeetings().catch((error: unknown) => {
+          notifyError(t('errors.meetingsLoadFailed'), { cause: error })
+        })
         if (draft?.title.trim()) {
-          await actions.meetings.renameMeeting(meetingId, draft.title.trim()).catch(() => {
-            toast.warning(t('workspaceUi.titleFailed'))
+          await actions.meetings.renameMeeting(meetingId, draft.title.trim()).catch((error: unknown) => {
+            notifyWarning(t('workspaceUi.titleFailed'), { cause: error })
           })
         }
       }
@@ -233,9 +252,9 @@ export function WorkspacePage() {
       // SessionController is the final cross-client mutex. Turn its conflict into a
       // named toast instead of also opening the generic start-failure dialog.
       if (isSessionAlreadyRunningError(error)) {
-        toast.danger(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
       } else if (unsupportedRecognitionLanguageOf(error)) {
-        toast.danger(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
+        notifyError(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
       }
     }
   }, [draft, t])
@@ -248,7 +267,7 @@ export function WorkspacePage() {
       await actions.session.stopSession()
       if (meetingId) navigate(recordPath(meetingId))
     } catch (error) {
-      toast.danger(describeError(t, errorCodeOfSession(sessionStore.getState())))
+      notifyError(sessionErrorMessage(t, errorCodeOfSession(sessionStore.getState())))
     } finally {
       // Back to the idle entry either way: the store cleared the session id in
       // its `finally`, and leaving a "running" shell here would suggest the
@@ -260,9 +279,9 @@ export function WorkspacePage() {
   const copyDiagnostics = useCallback(async (context?: DiagnosticCopyContext) => {
     try {
       await getBridge()?.diagnostics.copy(context)
-      toast.success(t('common.copied'))
-    } catch {
-      toast.danger(t('errors.copyDiagnosticsAction'))
+      notifySuccess(t('common.copied'))
+    } catch (error) {
+      notifyError(t('errors.copyDiagnosticsFailed'), { cause: error })
     }
   }, [t])
 
@@ -336,9 +355,9 @@ export function WorkspacePage() {
         onOpenOverlay={() => {
           void actions.settings.showOverlay().then(opened => {
             if (opened === false) {
-              toast.danger(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+              notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
             }
-          }).catch(() => toast.danger(t('workspaceUi.overlayFailed')))
+          }).catch((error: unknown) => { notifyError(t('workspaceUi.overlayFailed'), { cause: error }) })
         }}
         sourceLanguage={sourceLanguage}
         targetLanguage={targetLanguage}
@@ -484,9 +503,8 @@ function IdleGuide({
     }
     if (failureToastShown.current) return
     failureToastShown.current = true
-    toast.danger(t('errors.engineNotReady'), {
-      timeout: 0,
-      actionProps: { children: t('errors.engineNotReadyAction'), onPress: onStart },
+    notifyError(t('errors.engineNotReady'), {
+      action: { label: t('errors.engineNotReadyAction'), onPress: onStart },
     })
   }, [engineStatus, onStart, t])
   return (
@@ -546,7 +564,7 @@ function IdleGuide({
 }
 
 /** A ready-made line for a toast, from the same table. */
-function describeError(t: ReturnType<typeof useI18n>['t'], code: string | null): string {
+function sessionErrorMessage(t: ReturnType<typeof useI18n>['t'], code: string | null): string {
   const copy = errorCopyOf(code, 'stop')
   return `${t(copy.message)} ${t(copy.action)}`
 }

@@ -4,6 +4,7 @@ import { Button } from '@heroui/react'
 import { useI18n } from '@/i18n'
 import { updateSettings, stores, useStore } from '@/store'
 import { DEFAULT_COMPUTE_SETTINGS, type ComputeSettings } from '../../../../shared/compute'
+import { reportSettingsFailure } from '../settingsErrorChannel'
 import { SettingsRow } from '../SettingsRow'
 import { SettingGroup, SettingSelect, type SettingsPanelProps } from '../SettingsPage'
 
@@ -22,6 +23,12 @@ export function PerformanceTab({ settings }: SettingsPanelProps) {
   const save = (patch: Partial<ComputeSettings>) => {
     void updateSettings({ compute: patch }).catch(() => undefined)
   }
+  const restore = () => {
+    void updateSettings({ compute: { precision: 'auto', quantization: 'auto', reservedVramMb: 1024, cpuThreads: 0, gpuLayers: -1, contextSize: 2048, flashAttention: 'auto' } })
+      .catch((error: unknown) => {
+        reportSettingsFailure(t('settings.restoreDefaultsFailed'), error)
+      })
+  }
   const numeric = (field: 'reservedVramMb' | 'cpuThreads' | 'gpuLayers' | 'contextSize', label: string, desc: string, min: number, max: number) =>
     <SettingsRow descriptionTooltip label={label} desc={desc}><NumberSetting value={compute[field]} min={min} max={max} label={label} onSave={value => save({ [field]: value })} /></SettingsRow>
   return <div className="settings-panel">
@@ -29,7 +36,7 @@ export function PerformanceTab({ settings }: SettingsPanelProps) {
       <SettingsRow descriptionTooltip label={c.precision} desc={c.precisionHint}><SettingSelect ariaLabel={c.precision} value={compute.precision} options={[{ value: 'auto', label: c.automatic }, ...['fp32', 'fp16', 'bf16'].map(value => ({ value, label: value.toUpperCase() }))]} onChange={value => save({ precision: value as ComputeSettings['precision'] })} /></SettingsRow>
       <SettingsRow descriptionTooltip label={c.quantization} desc={c.quantHint}><SettingSelect ariaLabel={c.quantization} value={compute.quantization} options={[{ value: 'auto', label: c.automatic }, { value: 'none', label: c.none }, { value: 'nf4', label: 'NF4' }, { value: '8bit', label: '8bit' }]} onChange={value => save({ quantization: value as ComputeSettings['quantization'] })} /></SettingsRow>
     </SettingGroup> : null}
-    <SettingGroup legend={t('compute.memoryCpu')} actions={<Button variant="secondary" size="sm" onPress={() => save({ precision: 'auto', quantization: 'auto', reservedVramMb: 1024, cpuThreads: 0, gpuLayers: -1, contextSize: 2048, flashAttention: 'auto' })}>{c.restore}</Button>}>
+    <SettingGroup legend={t('compute.memoryCpu')} actions={<Button variant="secondary" size="sm" onPress={restore}>{c.restore}</Button>}>
       {numeric('reservedVramMb', c.reserve, c.reserveHint, 256, 65536)}
       {numeric('cpuThreads', c.threads, c.threadsHint, 0, 256)}
     </SettingGroup>

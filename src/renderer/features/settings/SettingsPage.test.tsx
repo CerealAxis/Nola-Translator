@@ -27,7 +27,7 @@ it('reuses device results when the compute tab is opened again', () => {
 })
 
 it('shows a retry action instead of a spinner when saved settings cannot be read', () => {
-  settingsStore.setState({ settings: null, loading: false, error: 'settings read failed' })
+  settingsStore.setState({ settings: null, loading: false, loadError: 'settings read failed' })
   render(<SettingsPage />)
   expect(screen.queryByText('加载中')).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument()

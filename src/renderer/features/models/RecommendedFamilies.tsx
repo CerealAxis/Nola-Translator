@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Card, Chip, Label, ListBox, Modal, Select, Tooltip, toast } from '@heroui/react'
+import { Button, Card, Chip, Label, ListBox, Modal, Select, Tooltip } from '@heroui/react'
 import HuggingFace from '@lobehub/icons/es/HuggingFace/components/Color'
 import ModelScope from '@lobehub/icons/es/ModelScope/components/Color'
 import QwenAvatar from '@lobehub/icons/es/Qwen/components/Avatar'
@@ -13,6 +13,7 @@ import { Check, Download, X } from 'lucide-react'
 import { resourceStateOf } from '@/bridge'
 import type { ModelDownloadSource, ResourceRecord } from '@/bridge'
 import { useI18n } from '@/i18n'
+import { notifyWarning } from '@/components/primitives/notify'
 import { modelImportEntry } from '../../../shared/model-import-catalog'
 import { downloadSourcesFor } from '../../../shared/model-download-sources'
 import { modelEngines } from '../../../shared/model-engines'
@@ -211,7 +212,9 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
             : selected.installed ? <Button variant="secondary" isDisabled><Check aria-hidden="true" className="size-4" />{t('models.installed')}</Button>
               : <Button isDisabled={sources.length === 0} isPending={busyIds.includes(selected.resourceId)} onPress={() => {
                 if (!isEngineAvailable(engine, runtimes?.local ?? null)) {
-                  toast.warning(t('models.engineUnavailable', { engine: engineLabel(engine) }))
+                  // The loader is missing, so the download would only end in a second failure.
+                  notifyWarning(t('models.engineUnavailable', { engine: engineLabel(engine) }))
+                  return
                 }
                 onClose()
                 onInstall(selected, selectedSource)

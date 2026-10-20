@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react'
+import { useEffect, useRef } from 'react'
 import { Mic, Captions, Clock, SlidersHorizontal } from 'lucide-react'
 import { ErrorBoundary } from '@/components/primitives'
+import { notifyError } from '@/components/primitives/notify'
 import { HeroSection, FeatureCard } from '@/components/home'
 import { useI18n } from '@/i18n'
 import { pathOf, recordPath, useRoute } from '@/routes'
-import { stores, useStore } from '@/store'
+import { actions, stores, useStore } from '@/store'
 import { RecentMeetings } from './RecentMeetings'
 import './home-records.css'
 
@@ -13,6 +15,28 @@ export function HomePage(): ReactNode {
   const { navigate, path } = useRoute()
   const meetings = useStore(stores.meetings, (state) => state.meetings)
   const loading = useStore(stores.meetings, (state) => state.loading)
+  const loaded = useStore(stores.meetings, (state) => state.loaded)
+  const loadError = useStore(stores.meetings, (state) => state.error)
+  /*
+   * No sessions yet and a list that could not be read are different states, and the
+   * empty state claims the first one. The store keeps the reason; the notice tells
+   * the user, and the retry button lets them ask again.
+   */
+  const loadFailed = !loaded && !loading && loadError !== null
+  const reportedFailure = useRef<string | null>(null)
+  useEffect(() => {
+    if (!loadFailed) {
+      reportedFailure.current = null
+      return
+    }
+    if (reportedFailure.current === loadError) return
+    reportedFailure.current = loadError
+    notifyError(t('errors.meetingsLoadFailed'), { cause: loadError })
+  }, [loadFailed, loadError, t])
+  const retryLoad = () => {
+    // The store keeps the failure and the effect above reports it; this call only asks again.
+    void actions.meetings.loadMeetings().catch(() => undefined)
+  }
   const goWorkspace = () => navigate(pathOf('workspace'))
   const goRecords = () => navigate(pathOf('records'))
   return (
@@ -25,7 +49,7 @@ export function HomePage(): ReactNode {
           <FeatureCard variant="tertiary" icon={<Clock aria-hidden="true" />} title={t('home.records')} description={t('homeRecordsUi.recordsDescription')} buttonText={t('homeRecordsUi.openRecords')} onButtonClick={goRecords} />
           <FeatureCard variant="quaternary" icon={<SlidersHorizontal aria-hidden="true" />} title={t('home.models')} description={t('homeRecordsUi.modelsDescription')} buttonText={t('homeRecordsUi.openModels')} onButtonClick={() => navigate(pathOf('models'))} />
         </div>
-        <RecentMeetings meetings={meetings} loading={loading} onOpen={(id) => navigate(recordPath(id))} onStart={goWorkspace} onOpenAll={goRecords} />
+        <RecentMeetings meetings={meetings} loading={loading} failed={loadFailed} onRetry={retryLoad} onOpen={(id) => navigate(recordPath(id))} onStart={goWorkspace} onOpenAll={goRecords} />
       </div>
     </ErrorBoundary>
   )

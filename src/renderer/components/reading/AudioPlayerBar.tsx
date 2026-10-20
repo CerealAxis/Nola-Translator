@@ -8,10 +8,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Slider, ToggleButton, ToggleButtonGroup, Typography, toast } from '@heroui/react'
+import { Button, Slider, ToggleButton, ToggleButtonGroup, Typography } from '@heroui/react'
 import type { Selection } from '@react-types/shared'
 import { Pause, Play } from 'lucide-react'
 
+import { notifyError } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 
 /** Playback speed steps, in the order they appear. */
@@ -51,7 +52,19 @@ export function AudioPlayerBar({
   const reportPlaybackError = useCallback(() => {
     if (playbackErrorReportedRef.current) return
     playbackErrorReportedRef.current = true
-    toast.danger(t('records.playerError'))
+    notifyError(t('records.playerError'), {
+      action: {
+        label: t('common.retry'),
+        onPress: () => {
+          const audio = audioRef.current
+          if (!audio) return
+          void audio.play().then(
+            () => { playbackErrorReportedRef.current = false; setPlaying(true) },
+            () => setPlaying(false),
+          )
+        },
+      },
+    })
   }, [t])
 
   // A new URL resets the bar, or the previous meeting's position carries over.
@@ -103,7 +116,7 @@ export function AudioPlayerBar({
     if (!audio || !audioUrl) return
     if (audio.paused) {
       void audio.play().then(
-        () => setPlaying(true),
+        () => { playbackErrorReportedRef.current = false; setPlaying(true) },
         () => {
           setPlaying(false)
           reportPlaybackError()

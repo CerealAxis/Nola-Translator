@@ -4,10 +4,12 @@ import { useMemo } from 'react'
 
 import { AlertDialog, Button } from '@heroui/react'
 
-import { ENGINE_LOST_CODE, actions } from '@/store'
+import { actions } from '@/store'
 import type { SessionState } from '@/store'
 import type { DiagnosticCopyContext } from '@/bridge'
 import { useI18n } from '@/i18n'
+import { pathOf, settingsPath, useRoute } from '@/routes'
+import { notifyError } from '@/components/primitives/notify'
 import { supportErrorCodeForCause, supportErrorCodeForMessage } from '../../../shared/error-catalog'
 
 import { errorCopyOf } from './error-copy'
@@ -63,33 +65,27 @@ export interface SessionErrorDialogProps {
 /**
  * Session failure dialog.
  *
- * The three actions follow what is left of the session, because the ways out
- * differ:
- * - `ENGINE_LOST`: the engine process is gone and the session is over
- *   (`abandonSessionOnEngineLoss` cleared the `sessionId`). The way out is the
- *   record: captions are on disk per line and the main process has stamped the
- *   end time, so the user wants "how do I get the half-finished meeting", not a
- *   retry.
- * - `sessionId === null`: the session never started. Retry, or install the model.
- * - `sessionId !== null`: still running, just erroring. End the session, which
- *   saves the captions so far.
- *
- * The first two go through `errorCopyOf(code, 'start')`. Only `ENGINE_LOST`
- * matches a table row, so the primary button becomes "view this record". That
- * is the only behavioural exception, so it tests the code once here rather than
- * changing the `errorCopyOf` signature, which the overlay's `StartFailureNotice`
- * also calls.
+ * The primary button does what its own label says: the copy carries the target
+ * next to the label, and this dialog dispatches on the target alone. Deciding
+ * the behaviour from the error code instead would let the two drift apart, and
+ * a button that says "install the model" and then restarts the session leaves
+ * the user believing something happened that did not.
  *
  * Raw error details stay out of the UI because provider errors can contain private request data.
  */
 export function SessionErrorDialog({ state, onCopyDiagnostics, onReset, onViewRecord }: SessionErrorDialogProps) {
   const { t } = useI18n()
+  const { navigate } = useRoute()
   const isOpen = state.status === 'error'
   const alive = state.sessionId !== null
-  const engineLost = state.errorCode === ENGINE_LOST_CODE
-  const runtimeComponent = state.errorCode === 'RUNTIME_TORCH' ? 'engine' : state.errorCode === 'RUNTIME_LLAMA' ? 'llama' : null
 
   const handle = useMemo(() => errorCopyOf(state.errorCode, alive ? 'stop' : 'start'), [state.errorCode, alive])
+  // The code the user copies is the code of what happened, not the code of the sentence on
+  // screen: the sentence is chosen from the cause anyway, and a cause nobody claims has no
+  // message to look up.
+  const supportCode = state.errorCode
+    ? supportErrorCodeForCause(state.errorCode)
+    : supportErrorCodeForMessage(handle.message) ?? 'ERR-999'
 
   return (
     <AlertDialog
@@ -116,7 +112,7 @@ export function SessionErrorDialog({ state, onCopyDiagnostics, onReset, onViewRe
             ) : null}
             <AlertDialog.Footer>
               <Button variant="tertiary" size="sm" className="rounded-xl" onPress={() => onCopyDiagnostics({
-                supportCode: supportErrorCodeForMessage(handle.message) ?? supportErrorCodeForCause(state.errorCode),
+                supportCode,
                 correlationId: state.errorRequestId ?? undefined,
               })}>
                 {t('errors.copyDiagnosticsAction')}
@@ -126,11 +122,20 @@ export function SessionErrorDialog({ state, onCopyDiagnostics, onReset, onViewRe
                 size="sm"
                 className="rounded-xl"
                 onPress={() => {
-                  if (runtimeComponent) {
+                  const target = handle.target
+                  if (target.kind === 'runtime') {
                     onReset()
-                    void actions.settings.openRuntimeSettings(runtimeComponent)
-                  } else if (engineLost) onViewRecord()
-                  else if (alive) void actions.session.stopSession().catch(() => onReset())
+                    void actions.settings.openRuntimeSettings(target.component).catch((error: unknown) => {
+                      notifyError(t('errors.runtimeSettingsFailed'), { cause: error })
+                    })
+                  } else if (target.kind === 'record') onViewRecord()
+                  else if (target.kind === 'settings') {
+                    onReset()
+                    navigate(settingsPath(target.tab))
+                  } else if (target.kind === 'models') {
+                    onReset()
+                    navigate(pathOf('models'))
+                  } else if (target.kind === 'stop') void actions.session.stopSession().catch(() => onReset())
                   else onReset()
                 }}
               >

@@ -25,7 +25,7 @@ import { useModelOptions } from '@/model-options'
 
 import { useLayoutEffect, useRef, useState } from 'react'
 
-import { Button, Dropdown, Spinner, toast } from '@heroui/react'
+import { Button, Dropdown, Spinner } from '@heroui/react'
 import { Mic, Pause, Play } from 'lucide-react'
 
 import {
@@ -39,6 +39,7 @@ import { actions, sessionStore, stores, useStore } from '@/store'
 import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
 import { targetLanguagePatch, translationFieldsOf } from '@/session-config'
 import { useI18n } from '@/i18n'
+import { notifyError } from '@/components/primitives/notify'
 
 import { OverlayDisplayMenu, OverlayLayoutMenu } from './OverlayDisplayMenu'
 import { OverlayDropdown } from './OverlayDropdown'
@@ -222,8 +223,14 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
 
   const label = (code: string): string => languageName(code, language)
 
+  /*
+   * This window renders no settings-error notice, so a write the main process
+   * refused has to be reported here or the pill silently reverts.
+   */
   const patch = (next: Parameters<typeof actions.settings.updateSettings>[0]): void => {
-    void actions.settings.updateSettings(next).catch(() => undefined)
+    void actions.settings.updateSettings(next).catch((error: unknown) => {
+      notifyError(t('errors.settingsSaveFailed'), { cause: error })
+    })
   }
 
   /*
@@ -279,9 +286,9 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
       setDismissedFailure(null)
       void actions.session.startSession(startConfigOf(settings, devices)).catch((error: unknown) => {
         if (isSessionAlreadyRunningError(error)) {
-          toast.danger(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+          notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
         } else if (unsupportedRecognitionLanguageOf(error)) {
-          toast.danger(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
+          notifyError(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
         } else console.warn('[overlay] startSession failed', error)
       })
     }
@@ -403,7 +410,11 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
       )}
 
       <StartFailureNotice message={failureMessage} action={runtimeComponent ? t(runtimeComponent === 'engine' ? 'runtime.goTorch' : 'runtime.goLlama') : undefined}
-        onAction={runtimeComponent ? () => void actions.settings.openRuntimeSettings(runtimeComponent) : undefined} />
+        onAction={runtimeComponent ? () => {
+          void actions.settings.openRuntimeSettings(runtimeComponent).catch((error: unknown) => {
+            notifyError(t('errors.runtimeSettingsFailed'), { cause: error })
+          })
+        } : undefined} />
     </>
   )
 }

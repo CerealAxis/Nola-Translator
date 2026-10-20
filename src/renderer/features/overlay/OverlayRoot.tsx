@@ -26,13 +26,14 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 
-import { Button, toast } from '@heroui/react'
+import { Button } from '@heroui/react'
 import { Lock, Minus, Monitor, Pin, PinOff, SlidersHorizontal, Unlock, X } from 'lucide-react'
 
 import { DEFAULT_SETTINGS } from '@/bridge'
 import { formatChineseCaption } from '@/chinese-script'
 import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
+import { notifyError } from '@/components/primitives/notify'
 import { translationErrorSummary } from '@/translation-status'
 
 import { CaptionTrack } from './CaptionTrack'
@@ -92,7 +93,7 @@ export function OverlayRoot() {
       setClosing(false)
     } catch (error) {
       console.error('[overlay] close failed', error)
-      toast.danger(t('overlay.closeFailed'))
+      notifyError(t('overlay.closeFailed'), { cause: error })
     } finally {
       closeRequest.current = false
       setClosePending(false)
@@ -108,9 +109,14 @@ export function OverlayRoot() {
    * Appearance is a request to the main window, not a local navigation: this
    * window owns no settings page, so the main window's route listener receives
    * the push and changes its own hash.
+   *
+   * This window has no settings-error notice of its own, so a failed request
+   * has to say so here.
    */
   const openAppearanceSettings = (): void => {
-    void window.nolaTranslator?.openAppearance('appearance').catch(() => undefined)
+    void window.nolaTranslator?.openAppearance('appearance').catch((error: unknown) => {
+      notifyError(t('overlay.appearanceFailed'), { cause: error })
+    })
   }
 
   const requestCloseConfirmation = (): void => {
@@ -132,6 +138,7 @@ export function OverlayRoot() {
       else setDetachedConfirmation(false)
     }).catch((error: unknown) => {
       console.warn('[overlay] close confirmation failed', error)
+      notifyError(t('overlay.menuFailed'), { cause: error })
       setDetachedConfirmation(false)
     })
   }
@@ -151,6 +158,7 @@ export function OverlayRoot() {
     if (!bridge) return
     void bridge.overlay.setLocked(!locked).then(setLocked, (error: unknown) => {
       console.warn('[overlay] lock failed', error)
+      notifyError(t('overlay.lockFailed'), { cause: error })
     })
   }
 
@@ -288,9 +296,15 @@ export function OverlayRoot() {
     stageBox.gap,
   )
 
+  /*
+   * This window renders no settings-error notice, so a write that the main
+   * process refused has to be reported here or the control silently reverts.
+   */
   const patchOverlay = useCallback((patch: Partial<typeof DEFAULT_SETTINGS.overlay>) => {
-    void actions.settings.updateSettings({ overlay: patch }).catch(() => undefined)
-  }, [])
+    void actions.settings.updateSettings({ overlay: patch }).catch((error: unknown) => {
+      notifyError(t('errors.settingsSaveFailed'), { cause: error })
+    })
+  }, [t])
 
   /**
    * CSS custom properties. The glass's whole palette and typography enters
@@ -442,7 +456,13 @@ export function OverlayRoot() {
           </GhostButton>
           <GhostButton
             label={t('overlay.minimize')}
-            onPress={() => void getBridge()?.overlay.minimize()}
+            onPress={() => {
+              const bridge = getBridge()
+              if (!bridge) return
+              void bridge.overlay.minimize().catch((error: unknown) => {
+                notifyError(t('overlay.minimizeFailed'), { cause: error })
+              })
+            }}
             color={palette.chrome}
           >
             <Minus aria-hidden="true" />

@@ -62,7 +62,6 @@
 .offline-task-steps > li[data-state='failed'] .offline-task-steps__marker { color: var(--danger); border-color: var(--danger); }
 .offline-task-steps__detail { color: var(--muted); font: var(--font-caption); overflow-wrap: anywhere; }
 .offline-task-steps__amount { color: var(--muted); font: var(--font-caption); font-variant-numeric: tabular-nums; text-align: end; }
-.offline-task-progress__error { color: var(--danger); font: var(--font-caption); margin: 0; }
 .offline-task-progress__reason { color: var(--muted); font: var(--font-caption); overflow-wrap: anywhere; margin: 0; }
 
 .offline-dialog { border-radius: var(--radius-xl); }

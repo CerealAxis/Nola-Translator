@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Avatar, AvatarGroup, Button, Link, Surface, Tooltip, Typography, toast } from '@heroui/react'
+import { Avatar, AvatarGroup, Button, Link, Surface, Tooltip, Typography } from '@heroui/react'
 import { Check, ExternalLink, Github, Heart, RefreshCw, UserRound } from 'lucide-react'
 
 import type { AppUpdateCheckResult } from '@/bridge'
+import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions } from '@/store'
 import { stores, useStore } from '@/store'
+import { reportSettingsFailure } from '../settingsErrorChannel'
 import { SettingGroup } from '../SettingsPage'
 import { SettingsRow } from '../SettingsRow'
 import { ThirdPartyNotices } from '../ThirdPartyNotices'
@@ -36,16 +38,16 @@ export function MoreTab() {
   async function checkUpdates() {
     const result = await actions.settings.checkForAppUpdate(true)
     if (!result || result.latestVersion === null) {
-      toast.danger(t('appUpdate.checkFailed'))
+      notifyError(t('appUpdate.checkFailed'))
       return
     }
     if (result.updateAvailable) {
-      toast.success(t('appUpdate.availableStatus', { version: result.latestVersion }))
+      notifySuccess(t('appUpdate.availableStatus', { version: result.latestVersion }))
       return
     }
-    toast.success(t('appUpdate.upToDateStatus', { version: result.latestVersion }))
+    notifySuccess(t('appUpdate.upToDateStatus', { version: result.latestVersion }))
     if (!result.releaseUrl) {
-      toast.danger(t('appUpdate.checkFailed'))
+      notifyError(t('appUpdate.checkFailed'))
       return
     }
     setAnnouncement(result)
@@ -57,11 +59,23 @@ export function MoreTab() {
     try {
       await actions.settings.openAppReleasePage(url)
       setAnnouncementOpen(false)
-    } catch {
-      toast.danger(t('appUpdate.openFailed'))
+    } catch (error) {
+      notifyError(t('appUpdate.openFailed'), { cause: error })
     } finally {
       setAnnouncementOpening(false)
     }
+  }
+
+  /**
+   * The store records a failed command in its error field instead of rejecting, so the
+   * field is cleared first and read afterwards: whatever it holds then is this failure.
+   */
+  async function openLogsDirectory() {
+    actions.settings.clearSettingsError()
+    await actions.settings.openLogs()
+    const failure = stores.settings.getState().error
+    if (failure === null) return
+    reportSettingsFailure(t('settings.openLogsFailed'), failure)
   }
 
   return (
@@ -116,7 +130,7 @@ export function MoreTab() {
       <SettingGroup legend={t('settings.groupReport')}>
         <SettingsRow label={t('settings.copyDiagnostics')}><CopyDiagnostics /></SettingsRow>
         <SettingsRow label={t('settings.openLogs')} desc={t('settings.openLogsHint')} descriptionTooltip>
-          <Button variant="tertiary" size="sm" onPress={() => { void actions.settings.openLogs() }}>{t('settings.openLogs')}</Button>
+          <Button variant="tertiary" size="sm" onPress={() => { void openLogsDirectory() }}>{t('settings.openLogs')}</Button>
         </SettingsRow>
         <SettingsRow label={t('settings.githubIssue')} desc={t('settings.githubIssueHint')} descriptionTooltip>
           <ExternalAction href={`${REPOSITORY_URL}/issues`} label={t('settings.openInBrowser')} />
@@ -185,7 +199,7 @@ function CopyDiagnostics() {
       setCopied(true)
     } catch (error) {
       console.error('[diagnostics]', error)
-      toast.danger(t('settings.diagnosticsFailed'))
+      notifyError(t('errors.copyDiagnosticsFailed'), { cause: error })
     } finally { setPending(false) }
   }
 

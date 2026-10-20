@@ -4,6 +4,7 @@ import { Check, CircleHelp } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
 import { CRISP_RUNTIME_ID, type LocalRuntime, type RuntimeSnapshot } from '../../../../shared/compute'
+import { reportSettingsFailure } from '../settingsErrorChannel'
 import { SettingsRow } from '../SettingsRow'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 
@@ -99,6 +100,13 @@ export function RuntimeComponents() {
     setConfirmKind(null)
     await actions.settings.uninstallRuntimeComponent(kind)
   }
+  const cancelInstallation = async () => {
+    try {
+      await actions.settings.cancelRuntimeInstallation()
+    } catch (error) {
+      reportSettingsFailure(t('runtime.cancelFailed'), error)
+    }
+  }
   const elapsedSeconds = operation?.startedAt ? Math.max(0, Math.floor((now - operation.startedAt) / 1000)) : null
   const elapsed = elapsedSeconds === null ? '' : `${Math.floor(elapsedSeconds / 60)}:${String(elapsedSeconds % 60).padStart(2, '0')}`
   const speed = operation?.phase === 'download' ? downloadSpeed(operation.bytes, operation.startedAt) : ''
@@ -189,7 +197,7 @@ export function RuntimeComponents() {
           {elapsed ? ` · ${t('runtime.elapsed', { time: elapsed })}` : ''}</span>
         {operation.phase === 'prepare' && operation.detail ? <small>{operation.detail}</small> : null}
       </div>
-      <Button variant="secondary" size="sm" onPress={() => void actions.settings.cancelRuntimeInstallation()}>{t('runtime.cancel')}</Button>
+      <Button variant="secondary" size="sm" onPress={() => { void cancelInstallation() }}>{t('runtime.cancel')}</Button>
     </div> : null}
   </>
 }

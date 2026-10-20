@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Alert, Button, Card, Fieldset, ListBox, Spinner, Switch, Tabs, Tooltip } from '@heroui/react'
+import { Button, Card, Fieldset, ListBox, Spinner, Switch, Tabs, Tooltip } from '@heroui/react'
 import { Captions, Cpu, CircleHelp, Gauge, Database, FlaskConical, Grid2X2, Languages, Mic, Monitor, Settings, SlidersHorizontal } from 'lucide-react'
 
 import type { AppSettings } from '@/bridge'
@@ -30,6 +30,7 @@ export function SettingsPage() {
   const { t, dictionary } = useI18n()
   const { tab, navigate } = useRoute()
   const settings = useStore(stores.settings, (state) => state.settings)
+  const loadError = useStore(stores.settings, (state) => state.loadError)
   const error = useStore(stores.settings, (state) => state.error)
   const [compact, setCompact] = useState(() => window.matchMedia('(max-width:850px)').matches)
   const active: SettingsTab = SETTINGS_TABS.find((item) => item === tab) ?? DEFAULT_SETTINGS_TAB
@@ -41,17 +42,20 @@ export function SettingsPage() {
     return () => media.removeEventListener('change', update)
   }, [])
 
+  useEffect(() => { if (loadError) console.error('[settings.load]', loadError) }, [loadError])
   useEffect(() => { if (error) console.error('[settings]', error) }, [error])
 
-  if (!settings && error) return (
-    <Alert status="danger">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>{t('settings.loadFailed')}</Alert.Title>
-        <Alert.Description>{error}</Alert.Description>
+  /*
+   * The settings never arrived. The page says so and offers the way out, and the failure
+   * itself is a notice: a page-sized alert is a state, not a reminder.
+   */
+  if (!settings && loadError) return (
+    <Card className="settings-group">
+      <Card.Content className="flex flex-col items-start gap-3">
+        <p className="nola-body-strong">{t('settings.loadFailed')}</p>
         <Button variant="secondary" size="sm" onPress={() => void actions.settings.loadSettings().catch(() => undefined)}>{t('models.retry')}</Button>
-      </Alert.Content>
-    </Alert>
+      </Card.Content>
+    </Card>
   )
 
   if (!settings && !isEngineConnected()) return null

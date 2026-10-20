@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Link, Modal, toast } from '@heroui/react'
+import { Button, Link, Modal } from '@heroui/react'
 import { ArrowUpRight, ImageOff } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { rehypeGithubAlerts } from 'rehype-github-alerts'
@@ -9,6 +9,7 @@ import rehypeSanitize, { defaultSchema, type Options as Schema } from 'rehype-sa
 import remarkGfm from 'remark-gfm'
 
 import type { AppUpdateCheckResult } from '@/bridge'
+import { notifyError } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
 import './AppUpdateNotice.css'
@@ -143,8 +144,8 @@ export function AppUpdateNotice(): React.JSX.Element | null {
     try {
       await actions.settings.openAppReleasePage(releaseUrl)
       setIsOpen(false)
-    } catch {
-      toast.danger(t('appUpdate.openFailed'))
+    } catch (error) {
+      notifyError(t('appUpdate.openFailed'), { cause: error })
     } finally {
       setOpening(false)
     }

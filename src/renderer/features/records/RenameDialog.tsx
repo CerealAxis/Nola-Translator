@@ -8,6 +8,7 @@ import { AlertDialog, Button, Input, TextField } from '@heroui/react'
 
 import { useI18n } from '@/i18n'
 import { actions } from '@/store'
+import { notifyError } from '@/components/primitives/notify'
 
 /** Meeting name cap. The main process truncates to the same length on write. */
 export const TITLE_MAX_LENGTH = 120
@@ -38,14 +39,17 @@ export function RenameDialog({ meetingId, initialTitle = '', onClose }: RenameDi
     setPending(true)
     void actions.meetings
       .renameMeeting(meetingId, title)
-      .catch(() => {
-        // The failure lands in store.error; the UI shows it by errorCode, not as a diagnostic dump.
+      .then(() => {
+        onClose()
+      })
+      .catch((cause: unknown) => {
+        // The dialog stays open on a failure, so the name the user typed is still there to retry with.
+        notifyError(t('records.renameFailed'), { cause })
       })
       .finally(() => {
         setPending(false)
-        onClose()
       })
-  }, [meetingId, title, empty, onClose])
+  }, [meetingId, title, empty, onClose, t])
 
   return (
     <AlertDialog

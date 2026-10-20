@@ -36,7 +36,6 @@ import {
   Switch,
   TextField,
   Tooltip,
-  toast,
 } from '@heroui/react'
 import { CircleHelp } from 'lucide-react'
 
@@ -47,6 +46,7 @@ import {
 } from '@/bridge'
 import type { AudioDevice, AudioSourceOption, RecognitionModelId, SessionConfig } from '@/bridge'
 import { SettingRow } from '@/components/primitives'
+import { notifyError } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import type { UiLanguage } from '@/i18n'
 import { autoMeetingTitle, nextDaySequence } from '@/meeting-format'
@@ -322,7 +322,7 @@ export function SessionSetupDialog({
                     const codes = (settings.recognition.provider ?? 'local') === 'local' ? recognitionLanguages(resources.find(model => model.resourceId === key)) : modelOptions.sourceLanguages
                     const sourceLanguage = codes.includes(draft.sourceLanguage) ? draft.sourceLanguage : codes.includes('auto') ? 'auto' : draft.sourceLanguage
                     if (sourceLanguage === draft.sourceLanguage && !codes.includes(sourceLanguage)) {
-                      toast.danger(t('errors.unsupportedRecognitionLanguage', { language: languageName(sourceLanguage, language) }))
+                      notifyError(t('errors.unsupportedRecognitionLanguage', { language: languageName(sourceLanguage, language) }))
                     }
                     patch({ recognitionModelId: key as RecognitionModelId, sourceLanguage })
                   }
