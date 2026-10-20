@@ -35,7 +35,7 @@ const GRID = 'models-grid'
 export function ModelsPage() {
   const { t } = useI18n()
   const [tab, setTab] = useState<ModelsTab>('recommended')
-  const [configuring, setConfiguring] = useState<ResourceRecord | null>(null)
+  const [configuring, setConfiguring] = useState<{ record: ResourceRecord; readOnly: boolean } | null>(null)
   const [downloadTarget, setDownloadTarget] = useState<ResourceRecord | null>(null)
   const [openFamily, setOpenFamily] = useState<RecommendedFamily | null>(null)
 
@@ -165,6 +165,22 @@ export function ModelsPage() {
     void updateSettings(patch).catch(() => undefined)
   }
 
+  /*
+   * 卡片底部的第二个动作分两种：
+   *   · Hub 装来的（含本地导入）模型，配置是用户自己存下来的，可以改，弹窗可编辑；
+   *   · 推荐列表里下下来的模型用的是内置配置，只给一个「查看配置」的只读弹窗。
+   */
+  const footerOf = (record: ResourceRecord) => {
+    if (record.resourceId.startsWith('hub:') && record.installed && record.kind !== 'ttsModel') {
+      return <Button variant="secondary" onPress={() => setConfiguring({ record, readOnly: false })}>{t(configurationOf(record) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button>
+    }
+    if (!modelImportEntry(record.resourceId)) return undefined
+    if (record.installed && record.kind !== 'ttsModel') {
+      return <Button variant="secondary" size="sm" onPress={() => setConfiguring({ record, readOnly: true })}>{t('modelConfig.view')}</Button>
+    }
+    return <Button variant="secondary" size="sm" onPress={() => offlineActions.openDownloads(record.resourceId)}>{t('offline.manualDownload')}</Button>
+  }
+
   const card = (record: ResourceRecord) => {
     const compute = settings?.compute ?? DEFAULT_COMPUTE_SETTINGS
     const ready = isModelReady(record) && defaultTargetOf(record) !== null
@@ -188,13 +204,13 @@ export function ModelsPage() {
       onCancel={run(record, 'cancel')}
       onRemove={run(record, 'remove')}
       onSetDefault={() => setDefault(record)}
-      footer={record.resourceId.startsWith('hub:') && record.installed && record.kind !== 'ttsModel' ? <Button variant="secondary" onPress={() => setConfiguring(record)}>{t(configurationOf(record) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : modelImportEntry(record.resourceId) ? <Button variant="secondary" size="sm" onPress={() => offlineActions.openDownloads(record.resourceId)}>{t('offline.manualDownload')}</Button> : undefined}
+      footer={footerOf(record)}
     />
   }
 
   return (
     <div className="models-page">
-      {configuring ? <ModelConfigurationDialog key={configuring.resourceId} record={configuring} onClose={() => setConfiguring(null)} /> : null}
+      {configuring ? <ModelConfigurationDialog key={configuring.record.resourceId} record={configuring.record} readOnly={configuring.readOnly} onClose={() => setConfiguring(null)} /> : null}
       <DownloadSourceDialog record={downloadTarget} onClose={() => setDownloadTarget(null)} onSelect={source => {
         const target = downloadTarget
         setDownloadTarget(null)

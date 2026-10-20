@@ -1,5 +1,9 @@
 .models-page { display:flex; flex-direction:column; gap:20px; min-width:0; }
-.model-configuration-dialog.modal__dialog--lg { width:min(100%, calc(var(--space-8) * 11)); max-width:calc(var(--space-8) * 11); }
+.model-configuration-dialog.modal__dialog--lg { width:min(100%, calc(var(--space-8) * 11)); max-width:calc(var(--space-8) * 11); max-height:80vh; }
+/* The body is a flex column inside a height-capped dialog. Its rows keep their natural height:
+ * a language field holding dozens of tags would otherwise be squeezed down to the body height
+ * and spill over the row below it, instead of the body scrolling. */
+.model-configuration-dialog__body > * { flex-shrink:0; }
 /* The dialog body gap already spaces the rows, so rows inside it carry no divider, padding or minimum height. */
 .model-configuration-dialog .settings-row { border-bottom:0; padding-block:0; min-height:0; }
 .model-configuration-dialog .model-configuration-dialog__language { grid-template-columns:minmax(0,1fr); align-items:stretch; gap:var(--space-1); padding-block:0; }

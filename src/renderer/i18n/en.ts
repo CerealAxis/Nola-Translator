@@ -43,6 +43,7 @@ export const en: Dictionary = {
   compute: computeUi.en,
   modelConfig: {
     title: 'Configure model', pending: 'Needs configuration', edit: 'Edit configuration', configure: 'Configure and enable',
+    view: 'View configuration', viewTitle: 'View model configuration', viewDescription: 'Shows the current model configuration. It cannot be changed here.',
     description: 'Confirm the model task, inference engine and language capabilities before using it in a session.',
     slot: 'Model task', recognition: 'Speech recognition', translation: 'Translation', synthesis: 'Speech synthesis', removeLanguage: 'Remove language', engine: 'Inference engine',
     languages: 'Recognition languages', autoDetection: 'Supports automatic language detection', sourceLanguages: 'Supported source languages', targetLanguages: 'Supported target languages',

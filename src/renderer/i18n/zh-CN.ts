@@ -47,6 +47,7 @@ export const zhCN = {
   compute: computeUi.zh,
   modelConfig: {
     title: '配置模型', pending: '待配置', edit: '编辑配置', configure: '配置并启用',
+    view: '查看配置', viewTitle: '查看模型配置', viewDescription: '这里只显示模型当前的配置，不能修改。',
     description: '确认模型用途、运行引擎及语言能力。保存完整配置后，才能在同传中选择这个模型。',
     slot: '模型用途', recognition: '语音识别', translation: '翻译', synthesis: '语音合成', removeLanguage: '移除语言', engine: '运行引擎',
     languages: '支持的识别语言', autoDetection: '支持自动检测语言', sourceLanguages: '支持的源语言', targetLanguages: '支持的目标语言',
