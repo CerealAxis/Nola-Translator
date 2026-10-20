@@ -655,6 +655,8 @@ const koMessages: Record<DictionaryKey, string> = {
   'common.loading': '불러오는 중',
   'common.saved': '저장됨',
   'common.done': '완료',
+  'common.refreshed': '새로 고침',
+  'common.refreshFailed': '새로 고침에 실패했습니다. 다시 시도하세요.',
   'status.running': '실행 중',
   'status.error': '오류',
   'status.downloading': '다운로드 중',

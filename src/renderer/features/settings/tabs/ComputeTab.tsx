@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Spinner } from '@heroui/react'
 import { RefreshCw } from 'lucide-react'
-import { notifyError } from '@/components/primitives/notify'
+import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { encodeHardwarePreference, preferredHardwareId, sameAdapterName } from '../../../../shared/device-selection'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
 import type { AppSettingsPatch } from '../../../../shared/settings'
+import { claimRuntimeFailure, releaseRuntimeFailure } from '../settingsErrorChannel'
 import { SettingsRow } from '../SettingsRow'
 import { SettingGroup, SettingSelect, SettingSwitch, type SettingsPanelProps } from '../SettingsPage'
 import { RuntimeComponents } from './RuntimeComponents'
@@ -17,18 +18,46 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
   const runtimes = useStore(stores.settings, state => state.runtimes)
   const loading = useStore(stores.settings, state => state.computeChecking)
   const computeError = useStore(stores.settings, state => state.computeError)
+  const [refreshing, setRefreshing] = useState(false)
   const pendingSave = useRef<Promise<unknown>>(Promise.resolve())
   const compute = settings.compute ?? DEFAULT_COMPUTE_SETTINGS
   const hardware = runtimes?.hardware.adapters ?? []
   const hardwareLabel = (adapter: (typeof hardware)[number]) =>
     hardware.filter(item => item.name === adapter.name).length > 1
       ? adapter.name + ' · ' + adapter.hardwareId.slice(-8) : adapter.name
-  const refresh = useCallback(async () => {
+  /**
+   * Reads the runtime list for the refresh button.
+   *
+   * The runtime notice names the check button in its failure message, so the failure is
+   * claimed before the read and reported here in the words of this button instead.
+   */
+  const loadRuntimes = useCallback(async (): Promise<boolean> => {
+    claimRuntimeFailure()
     try {
       await actions.settings.loadRuntimeComponents()
-      await actions.settings.refreshComputeDevices()
-    } catch { /* the compute error notice below and the runtime operation notice report these */ }
-  }, [])
+      return true
+    } catch (error) {
+      notifyError(t('common.refreshFailed'), { cause: error })
+      return false
+    } finally {
+      releaseRuntimeFailure()
+    }
+  }, [t])
+  const refresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      if (!await loadRuntimes()) return
+      try {
+        await actions.settings.refreshComputeDevices()
+      } catch {
+        // The device failure is reported by the compute notice below.
+        return
+      }
+      notifySuccess(t('common.refreshed'))
+    } finally {
+      setRefreshing(false)
+    }
+  }, [loadRuntimes])
   function save(patch: AppSettingsPatch): void {
     pendingSave.current = pendingSave.current.catch(() => undefined).then(() => updateSettings(patch))
     void pendingSave.current.catch(() => undefined)
@@ -66,7 +95,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
     })
   }, [computeError, refresh, t])
   return <div className="settings-panel">
-    <SettingGroup legend={t('compute.devices')} actions={<Button variant="secondary" size="sm" isDisabled={loading} onPress={() => void refresh()}>{loading ? <Spinner size="sm" /> : <RefreshCw size={16} aria-hidden="true" />}{t('compute.refresh')}</Button>}>
+    <SettingGroup legend={t('compute.devices')} actions={<Button variant="secondary" size="sm" isDisabled={loading || refreshing} onPress={() => void refresh()}>{loading || refreshing ? <Spinner size="sm" /> : <RefreshCw size={16} aria-hidden="true" />}{t('compute.refresh')}</Button>}>
       <SettingsRow label={t('compute.recognition')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={recognition.normalized} options={recognition.choices} ariaLabel={t('compute.recognition')} onChange={recognitionDevice => save({ compute: { recognitionDevice } })} /></SettingsRow>
       <SettingsRow label={t('compute.translation')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={translation.normalized} options={translation.choices} ariaLabel={t('compute.translation')} onChange={translationDevice => save({ compute: { translationDevice } })} /></SettingsRow>
       <SettingsRow label={t('compute.fallback')} descriptionTooltip desc={t('compute.fallbackHint')}><SettingSwitch isSelected={compute.allowCpuFallback} ariaLabel={t('compute.fallback')} onChange={allowCpuFallback => save({ compute: { allowCpuFallback } })} /></SettingsRow>

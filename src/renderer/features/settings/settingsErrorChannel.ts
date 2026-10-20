@@ -42,3 +42,28 @@ export function reportSettingsFailure(message: string, cause: unknown): void {
   if (text !== undefined && state.error === text) claimSettingsError(text, state.errorOperation)
   notifyError(message, { cause })
 }
+
+/**
+ * How many pages are reporting a runtime failure themselves.
+ *
+ * The runtime operation notice reads a failure the moment the store records it, which is
+ * before the call that caused it comes back to the page. A page that reports the failure
+ * in the words of the button the user pressed claims it before that call, and the notice
+ * leaves a claimed failure alone.
+ */
+let runtimeFailureClaims = 0
+
+/** Records that the runtime failure belongs to the page that asked for it. */
+export function claimRuntimeFailure(): void {
+  runtimeFailureClaims += 1
+}
+
+/** Gives the claim back when the call it was made for did not fail that way. */
+export function releaseRuntimeFailure(): void {
+  runtimeFailureClaims = Math.max(0, runtimeFailureClaims - 1)
+}
+
+/** Whether the runtime operation notice should stay quiet about the failure it is reading. */
+export function isRuntimeFailureClaimed(): boolean {
+  return runtimeFailureClaims > 0
+}

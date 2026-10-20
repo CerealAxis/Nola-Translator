@@ -255,6 +255,13 @@ export function WorkspacePage() {
         notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
       } else if (unsupportedRecognitionLanguageOf(error)) {
         notifyError(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
+      } else if (sessionStore.getState().status !== 'error') {
+        /*
+         * The store leaves the status at 'idle' for the failures it does not own,
+         * a missing model or a session that has not wound down, so the error
+         * dialog never opens and nothing else says the session did not start.
+         */
+        notifyError(t('errors.startFailed'), { cause: error })
       }
     }
   }, [draft, t])

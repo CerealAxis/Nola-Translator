@@ -650,6 +650,8 @@ export const en: Dictionary = {
     loading: 'Loading',
     saved: 'Saved',
     done: 'Done',
+    refreshed: 'Refreshed',
+    refreshFailed: 'The refresh failed. Please try again.',
   },
 
   status: {

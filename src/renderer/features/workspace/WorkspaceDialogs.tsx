@@ -135,8 +135,16 @@ export function SessionErrorDialog({ state, onCopyDiagnostics, onReset, onViewRe
                   } else if (target.kind === 'models') {
                     onReset()
                     navigate(pathOf('models'))
-                  } else if (target.kind === 'stop') void actions.session.stopSession().catch(() => onReset())
-                  else onReset()
+                  } else if (target.kind === 'stop') {
+                    /*
+                     * The reset closes this dialog, so a session that refuses to
+                     * end would leave the screen without a word about it.
+                     */
+                    void actions.session.stopSession().catch((error: unknown) => {
+                      onReset()
+                      notifyError(t('errors.engineOperationFailed'), { cause: error })
+                    })
+                  } else onReset()
                 }}
               >
                 {t(handle.action)}

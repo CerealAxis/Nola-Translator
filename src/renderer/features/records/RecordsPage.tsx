@@ -70,8 +70,14 @@ export function RecordsPage(): ReactNode {
     notifyError(t('errors.meetingsLoadFailed'), { cause: state.error })
   }, [loadFailed, loadError, t])
   const retryLoad = useCallback(() => {
-    void actions.meetings.loadMeetings().catch(() => undefined)
-  }, [])
+    // The failure is the one the effect above reports: it watches the store's error field.
+    // A load that is already running resolves without reading anything, so the notice
+    // would announce a list that was never fetched.
+    if (stores.meetings.getState().loading) return
+    void actions.meetings.loadMeetings().then(() => {
+      notifySuccess(t('common.refreshed'))
+    }).catch(() => undefined)
+  }, [t])
   const filtered = useMemo(() => {
     const text = filterText.trim().toLowerCase()
     const languageLabel = (code: string) => {

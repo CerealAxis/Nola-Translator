@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AlertDialog, Button, Tag, TagGroup, ToggleButton, ToggleButtonGroup, Tooltip } from '@heroui/react'
 import { Check, CircleHelp } from 'lucide-react'
+import { notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
 import { CRISP_RUNTIME_ID, type LocalRuntime, type RuntimeSnapshot } from '../../../../shared/compute'
@@ -107,13 +108,28 @@ export function RuntimeComponents() {
       reportSettingsFailure(t('runtime.cancelFailed'), error)
     }
   }
+  /**
+   * Checks the runtime environment and the devices again.
+   *
+   * A failure of either half is reported by the notice that owns it: the runtime notice
+   * for the environment, the compute notice in the compute tab for the devices.
+   */
+  const recheck = async () => {
+    try {
+      await actions.settings.loadRuntimeComponents(true)
+      await actions.settings.refreshComputeDevices()
+      notifySuccess(t('common.refreshed'))
+    } catch {
+      // The runtime notice and the compute notice report these failures.
+    }
+  }
   const elapsedSeconds = operation?.startedAt ? Math.max(0, Math.floor((now - operation.startedAt) / 1000)) : null
   const elapsed = elapsedSeconds === null ? '' : `${Math.floor(elapsedSeconds / 60)}:${String(elapsedSeconds % 60).padStart(2, '0')}`
   const speed = operation?.phase === 'download' ? downloadSpeed(operation.bytes, operation.startedAt) : ''
   const versions = runtimeVersionRows(local)
   return <>
     <SettingGroup legend={t('runtime.components')} actions={<Button variant="secondary" size="sm" isDisabled={busy} isPending={state.runtimeChecking}
-      onPress={() => void actions.settings.loadRuntimeComponents(true).then(() => actions.settings.refreshComputeDevices()).catch(() => undefined)}>{t('runtime.recheck')}</Button>}>
+      onPress={() => void recheck()}>{t('runtime.recheck')}</Button>}>
       <SettingsRow label={t('runtime.python')} desc={runtimes?.python?.reason || undefined}><span>{t('runtime.builtInPython')}</span></SettingsRow>
       {versions.map(({ kind, version }) => <SettingsRow key={kind}
         label={t(kind === 'engine' ? 'runtime.pytorch' : kind === 'llama' ? 'runtime.llama' : 'runtime.crisp')}

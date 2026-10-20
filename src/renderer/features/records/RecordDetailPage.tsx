@@ -18,7 +18,7 @@ import remarkGfm from 'remark-gfm'
 import { AudioPlayerBar, DualColumnView } from '@/components/reading'
 import type { DualColumnSegment } from '@/components/reading'
 import { ErrorBoundary, PageHeader, StatusPill } from '@/components/primitives'
-import { notifyError } from '@/components/primitives/notify'
+import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { formatChineseCaption } from '@/chinese-script'
 import { pathOf, useRoute } from '@/routes'
@@ -67,11 +67,16 @@ export function RecordDetailPage(): ReactNode {
    * A record that could not be read is not a record without captions. The empty state
    * says the second thing, so the failure gets its own state and the notice tells the
    * user why the reading pane is blank.
+   *
+   * `announce` is set when the user pressed the retry: the load that runs because the
+   * page opened puts the record in plain sight, so it stays quiet.
    */
-  const load = useCallback(() => {
+  const load = useCallback((announce = false) => {
     if (!id) return
     setDetailFailed(false)
-    void actions.meetings.loadMeetingDetail(id).catch((cause: unknown) => {
+    void actions.meetings.loadMeetingDetail(id).then((detail) => {
+      if (announce && detail) notifySuccess(translate.current('common.refreshed'))
+    }).catch((cause: unknown) => {
       setDetailFailed(true)
       notifyError(translate.current('errors.meetingsLoadFailed'), { cause })
     })
@@ -195,7 +200,7 @@ export function RecordDetailPage(): ReactNode {
             <DualSkeleton t={t} />
           ) : detailFailed ? (
             <div className="flex justify-center p-6">
-              <Button variant="primary" size="sm" onPress={load}>{t('common.retry')}</Button>
+              <Button variant="primary" size="sm" onPress={() => load(true)}>{t('common.retry')}</Button>
             </div>
           ) : segments.length === 0 ? (
             <EmptyState className="flex flex-col items-start gap-4 p-6">

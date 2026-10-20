@@ -21,7 +21,7 @@ import type { SessionConfig } from '../../../shared/contracts'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 import { actions, sessionStore, stores } from '@/store'
 import { useI18n } from '@/i18n'
-import { notifyError, notifyWarning } from '@/components/primitives/notify'
+import { notifyError, notifySuccess, notifyWarning } from '@/components/primitives/notify'
 import { modelEngines, translationEngine as fallbackTranslationEngine } from '../../../shared/model-engines'
 import { NO_TRANSLATION_LANGUAGE } from '../../../shared/settings'
 import { DownloadSourceDialog } from '../models/DownloadSourceDialog'
@@ -74,7 +74,13 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
   const openedRef = useRef(false)
   const runRef = useRef(0)
 
-  const runCheck = useCallback(() => {
+  /*
+   * `manual` marks the run the user asked for with the recheck button. The run
+   * that opens the dialog is not announced: the dialog itself shows every step
+   * of it, and a notice for it would greet the user with a toast every time a
+   * session starts.
+   */
+  const runCheck = useCallback((manual = false) => {
     const run = (runRef.current += 1)
     const alive = (): boolean => runRef.current === run
 
@@ -141,12 +147,13 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
           }
           return
         }
-      } catch {
+      } catch (error) {
         if (alive()) {
           setFailureContext({ supportCode: environmentSupportCode })
           setStage('environmentFailed')
           notifyError(t('errors.unknownFailure'), {
-            action: { label: t('runtime.recheck'), onPress: runCheck },
+            cause: error,
+            action: { label: t('runtime.recheck'), onPress: () => runCheck(true) },
           })
         }
         return
@@ -157,6 +164,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
       // the run: the model check still owes an answer — unless the failure is the
       // engine not answering, which makes a model conclusion false too.
       let engineIsCause = false
+      let deviceFailureError: unknown = null
       try {
         const devices = await actions.models.probeAudioDevices()
         if (alive()) {
@@ -174,6 +182,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
          * A timed-out request while the process still appears ready is an operation
          * failure (ENG-003), not proof that audio enumeration itself failed.
          */
+        deviceFailureError = error
         const latestSession = sessionStore.getState()
         const engineRepliedWithError = engineErrorCodeOf(error) !== null
           || (latestSession.errorRequestId !== null && latestSession.errorRequestId !== previousErrorRequestId)
@@ -197,6 +206,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
          * `ensureReady()`.
          */
         setStage('engineFailed')
+        if (manual) notifyError(t('common.refreshFailed'), { cause: deviceFailureError })
         return
       }
       setStage('models')
@@ -206,6 +216,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
           const engineUnavailable = sessionStore.getState().engineStatus !== 'ready'
           setFailureContext({ supportCode: engineUnavailable ? 'ENG-001' : 'ENG-003', correlationId: correlationIdOf(error) })
           setStage(engineUnavailable ? 'engineFailed' : 'modelCheckFailed')
+          if (manual) notifyError(t('common.refreshFailed'), { cause: error })
         }
         return
       }
@@ -214,6 +225,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
       await new Promise((resolve) => setTimeout(resolve, 260))
       if (!alive()) return
       setStage(missingRef.current ? 'missing' : 'ready')
+      if (manual && !missingRef.current) notifySuccess(t('common.refreshed'))
     })()
   }, [config, t])
 
@@ -264,9 +276,9 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
   const environmentFailed = stage === 'environmentFailed'
   /*
    * The engine and model-check failures stay inside this dialog: the checklist
-   * rows already name them, and a toast on top of the dialog repeats what the
-   * row says while hiding it. The way out is the dialog's own recheck button,
-   * which every failure stage offers.
+   * rows already name them, and the way out is the dialog's own recheck button,
+   * which every failure stage offers. A recheck the user asked for also raises
+   * a notice, so the result of that run is never only a row in the dialog.
    */
   const failedStage = stage === 'engineFailed' || stage === 'modelCheckFailed' || stage === 'environmentFailed'
   const close = (open: boolean) => {
@@ -341,7 +353,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
                 </Button>
               ) : null}
               {failedStage ? (
-                <Button variant="secondary" size="sm" className="rounded-xl" onPress={runCheck}>
+                <Button variant="secondary" size="sm" className="rounded-xl" onPress={() => runCheck(true)}>
                   {t('runtime.recheck')}
                 </Button>
               ) : null}

@@ -655,6 +655,8 @@ const jaMessages: Record<DictionaryKey, string> = {
   'common.loading': '読み込み中',
   'common.saved': '保存済み',
   'common.done': '完了',
+  'common.refreshed': '更新しました',
+  'common.refreshFailed': '更新に失敗しました。もう一度お試しください。',
   'status.running': '実行中',
   'status.error': 'エラー',
   'status.downloading': 'ダウンロード中',

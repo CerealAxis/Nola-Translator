@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2, Github, MousePoin
 import { useI18n } from '@/i18n'
 import { useRoute } from '@/routes'
 import { actions, stores, useStore } from '@/store'
-import { notifyWarning } from '@/components/primitives/notify'
+import { reportSettingsFailure } from '@/features/settings/settingsErrorChannel'
 import { placeTourCard, spotlightPath } from './tourLayout'
 import type { TourRect, TourSize } from './tourLayout'
 import nolaLogoUrl from '../../../../assets/brand/nola-logo.svg'
@@ -46,7 +46,7 @@ function WelcomeDialog() {
     marked.current = true
     if (!stores.settings.getState().settings?.onboardingSeen) {
       void actions.settings.markOnboardingSeen().catch((error: unknown) => {
-        notifyWarning(t('onboarding.saveFailed'), { cause: error })
+        reportSettingsFailure(t('onboarding.saveFailed'), error)
       })
     }
   }, [t])

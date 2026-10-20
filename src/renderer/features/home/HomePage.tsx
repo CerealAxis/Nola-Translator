@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useRef } from 'react'
 import { Mic, Captions, Clock, SlidersHorizontal } from 'lucide-react'
 import { ErrorBoundary } from '@/components/primitives'
-import { notifyError } from '@/components/primitives/notify'
+import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { HeroSection, FeatureCard } from '@/components/home'
 import { useI18n } from '@/i18n'
 import { pathOf, recordPath, useRoute } from '@/routes'
@@ -34,8 +34,18 @@ export function HomePage(): ReactNode {
     notifyError(t('errors.meetingsLoadFailed'), { cause: loadError })
   }, [loadFailed, loadError, t])
   const retryLoad = () => {
-    // The store keeps the failure and the effect above reports it; this call only asks again.
-    void actions.meetings.loadMeetings().catch(() => undefined)
+    /*
+     * The store keeps the failure and the effect above reports it, so this call
+     * only asks again and announces the list it got back. A load that is already
+     * running resolves without reading anything, so the notice would announce a
+     * list that was never fetched.
+     */
+    if (stores.meetings.getState().loading) return
+    void actions.meetings.loadMeetings()
+      .then(() => {
+        notifySuccess(t('common.refreshed'))
+      })
+      .catch(() => undefined)
   }
   const goWorkspace = () => navigate(pathOf('workspace'))
   const goRecords = () => navigate(pathOf('records'))

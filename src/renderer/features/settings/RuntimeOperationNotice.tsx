@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { notifyError, notifyInfo, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { stores } from '@/store'
+import { isRuntimeFailureClaimed } from './settingsErrorChannel'
 
 /** Keep runtime operation feedback visible even when the user navigates away from settings. */
 export function RuntimeOperationNotice() {
@@ -25,6 +26,9 @@ export function RuntimeOperationNotice() {
         return
       }
       if (!current.runtimeBusy && current.runtimeError && current.runtimeError !== previousError) {
+        // A page that reported this failure in its own words claimed it before the call
+        // that caused it, so the message here would be a second one for the same failure.
+        if (isRuntimeFailureClaimed()) return
         notifyError(t('runtime.operationFailed', { action: t('runtime.recheck') }), { cause: current.runtimeError })
       }
     })

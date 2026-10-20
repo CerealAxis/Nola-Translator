@@ -14,7 +14,7 @@ import { Box } from 'lucide-react'
 
 import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
-import { notifyError } from '@/components/primitives/notify'
+import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import type { ModelDownloadSource, ResourceRecord, ResourceRecordWithRate } from '@/bridge'
 import { DownloadsTab } from './DownloadsTab'
 import { HubSearchTab } from './HubSearchTab'
@@ -120,8 +120,14 @@ export function ModelsPage() {
     notifyError(t('errors.modelsLoadFailed'), { cause: error })
   }, [loadFailed, error, t])
   const retryLoad = useCallback(() => {
-    void actions.models.loadModels().catch(() => undefined)
-  }, [])
+    // The failure is the one the effect above reports: it watches the store's error field.
+    // A load that is already running resolves without reading anything, so the notice
+    // would announce a list that was never fetched.
+    if (stores.models.getState().loading) return
+    void actions.models.loadModels().then(() => {
+      notifySuccess(t('common.refreshed'))
+    }).catch(() => undefined)
+  }, [t])
 
   const run = (record: ResourceRecord, action: 'install' | 'remove' | 'cancel') => () => {
     if (action === 'install') {

@@ -671,6 +671,8 @@ export const zhCN = {
     loading: '加载中',
     saved: '已保存',
     done: '完成',
+    refreshed: '已刷新',
+    refreshFailed: '刷新失败，请重试。',
   },
 
   status: {

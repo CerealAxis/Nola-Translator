@@ -269,8 +269,9 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
    * unloading weights, so another press could neither stop nor switch anything
    * and would only suggest the button is broken.
    *
-   * The `.catch` only logs. `sessionStore` already holds `error` / `errorCode` /
-   * `missing`, and `StartFailureNotice` renders them here.
+   * A failure the session store recorded is rendered in place by
+   * `StartFailureNotice`, so the catch reports only what the store could not
+   * record: a window with no session bridge fails before the record exists.
    */
   const toggleMic = (): void => {
     if (status === 'running') {
@@ -289,6 +290,13 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
           notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
         } else if (unsupportedRecognitionLanguageOf(error)) {
           notifyError(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
+        } else if (sessionStore.getState().errorCode === null) {
+          /*
+           * The native menu surface renders this bar but has no session bridge, so
+           * the start fails before the store records anything and the in-place
+           * notice has nothing to show. A press that does nothing has to say so.
+           */
+          notifyError(t('errors.startFailed'), { cause: error })
         } else console.warn('[overlay] startSession failed', error)
       })
     }

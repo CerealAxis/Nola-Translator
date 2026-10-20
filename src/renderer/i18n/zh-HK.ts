@@ -1005,7 +1005,9 @@ export const zhHK: Dictionary = {
     "copied": "已複製",
     "loading": "載入中",
     "saved": "已儲存",
-    "done": "完成"
+    "done": "完成",
+    "refreshed": "已重新整理",
+    "refreshFailed": "重新整理失敗，請重試。"
   },
   "status": {
     "running": "進行中",

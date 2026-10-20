@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { resourceStateOf } from '@/bridge'
 import type { ResourceRecord, ResourceRecordWithRate } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
-import { notifyError } from '@/components/primitives/notify'
+import { notifyError, notifyRetryableFailure } from '@/components/primitives/notify'
 import { actions, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
 import { formatBytes } from './ModelCard'
@@ -40,7 +40,11 @@ export function DownloadsTab() {
             t('models.downloadError', { name: target.name }),
             t('errors.downloadFailed'),
             t('errors.downloadFailedAction'),
-            () => { void actions.models.manageResource(target.resourceId, 'install', source).catch(() => undefined) },
+            // The retry reports its own failure: a task that stays failed is not announced
+            // again, so a silent retry would leave the user with nothing.
+            () => { void actions.models.manageResource(target.resourceId, 'install', source).catch((cause: unknown) => {
+              notifyRetryableFailure(t('models.installFailed'), { cause })
+            }) },
           )
         })
       }} />

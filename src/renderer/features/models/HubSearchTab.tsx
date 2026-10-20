@@ -8,7 +8,7 @@ import type { HubModelSummary, HubSearchResult, ModelDownloadSource, ResourceRec
 import { actions, stores, useStore } from '@/store'
 import type { HubKind } from '@/store'
 import { useI18n } from '@/i18n'
-import { dismissNotice, notifyError } from '@/components/primitives/notify'
+import { dismissNotice, notifyError, notifySuccess } from '@/components/primitives/notify'
 import type { NotifyAction } from '@/components/primitives/notify'
 import { ModelCard, ModelCardSkeleton, formatBytes } from './ModelCard'
 import { notifyModelDownloadFailure } from './ModelDownloadNotice'
@@ -23,6 +23,17 @@ const searchCache = new Map<string, { expires: number; request: Promise<HubSearc
 let searchNotice: string | null = null
 type Filter = 'all' | 'asr' | 'mt' | 'quant'
 export interface HubHit { summary: HubModelSummary; kind: HubKind }
+
+/**
+ * Takes the failure notice off the screen. A search the user asked for again has either
+ * replaced the results or failed again, and a notice that never leaves would then describe
+ * a screen that no longer shows the failure.
+ */
+function clearFailureNotice() {
+  if (!searchNotice) return
+  dismissNotice(searchNotice)
+  searchNotice = null
+}
 
 export function mergeHubResults(entries: readonly { kind: HubKind; result: HubSearchResult }[]) {
   const hits: HubHit[] = []
@@ -154,8 +165,21 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
     searchNotice = notifyError(message, { cause, action })
   }, [])
 
+  /*
+   * A search the user asked for by hand — the retry in the failure notice. The search that
+   * runs because the page opened or because the text changed puts its result in plain
+   * sight, so only the one the user pressed a button for is announced.
+   */
+  const requested = useRef(false)
+  const announceSuccess = useCallback(() => {
+    clearFailureNotice()
+    notifySuccess(t('common.refreshed'))
+  }, [t])
+
   useEffect(() => {
     let cancelled = false
+    const asked = requested.current
+    requested.current = false
     generation.current += 1
     pagingRequest.current = null
     setAwaiting(true)
@@ -168,6 +192,10 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
         if (!cancelled) {
           setHits(mergeHubResults([{ kind, result }]).hits)
           setNextCursor(result.nextCursor)
+          if (asked) {
+            clearFailureNotice()
+            notifySuccess(translate.current('common.refreshed'))
+          }
         }
       }).catch((cause: unknown) => {
         if (cancelled) return
@@ -175,7 +203,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
         setFailed(true)
         reportFailure(translate.current('errors.searchFailed'), cause, {
           label: translate.current('errors.searchFailedAction'),
-          onPress: () => setRefresh((value) => value + 1),
+          onPress: () => { requested.current = true; setRefresh((value) => value + 1) },
         })
       }).finally(() => { if (!cancelled) setAwaiting(false) })
     }, SEARCH_DEBOUNCE_MS)
@@ -185,7 +213,11 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
   // The notice that offers another page reaches the loader through a ref, so it always
   // asks for the page the list is on now.
   const loadMoreRef = useRef<() => void>(() => undefined)
-  const loadMore = useCallback(() => {
+  /*
+   * `announce` is passed by the callers the user drives by hand: the button and the retry
+   * in the failure notice. The pages the observer pulls in pass nothing and stay quiet.
+   */
+  const loadMore = useCallback((announce?: () => void) => {
     if (awaiting || failed || !nextCursor || pagingRequest.current !== null) return
     const currentGeneration = generation.current
     pagingRequest.current = currentGeneration
@@ -202,6 +234,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
         }).map((summary) => ({ summary, kind }))]
       })
       setNextCursor(result.nextCursor === nextCursor ? undefined : result.nextCursor)
+      announce?.()
     }).catch((cause: unknown) => {
       if (generation.current !== currentGeneration) return
       setMoreFailed(true)
@@ -215,7 +248,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
       setLoadingMore(false)
     })
   }, [awaiting, failed, query, kind, nextCursor, reportFailure])
-  useEffect(() => { loadMoreRef.current = loadMore }, [loadMore])
+  useEffect(() => { loadMoreRef.current = () => loadMore(announceSuccess) }, [loadMore, announceSuccess])
 
   useEffect(() => {
     const element = bottom.current
@@ -348,7 +381,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
       })}
     </div> : null}
     {!awaiting && !failed ? <div ref={bottom} className="models-search__pagination" aria-live="polite">
-      {nextCursor ? <Button variant="tertiary" isPending={loadingMore} onPress={loadMore}>
+      {nextCursor ? <Button variant="tertiary" isPending={loadingMore} onPress={() => loadMore(announceSuccess)}>
         {loadingMore ? t('common.loading') : moreFailed ? t('models.retry') : t('models.loadMore')}
       </Button> : visible.length > 0 ? <p className="nola-caption text-muted">{t('models.noMoreResults')}</p> : null}
     </div> : null}
