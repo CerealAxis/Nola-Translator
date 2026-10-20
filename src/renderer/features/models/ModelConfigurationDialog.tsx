@@ -113,7 +113,7 @@ export function ModelConfigurationDialog({ record, onClose }: ModelConfiguration
           <ModelLanguageSelect label={t('modelConfig.sourceLanguages')} value={draft.sourceLanguages} codes={codes} onChange={sourceLanguages => patch({ sourceLanguages, translationPairs: draft.translationPairs?.filter(pair => sourceLanguages.includes(pair.source)) })} />
           <ModelLanguageSelect label={t('modelConfig.targetLanguages')} value={draft.targetLanguages} codes={codes} onChange={targetLanguages => patch({ targetLanguages, translationPairs: draft.translationPairs?.filter(pair => targetLanguages.includes(pair.target)) })} />
         </>}
-        <SettingsRow className="model-configuration-dialog__row" label={t('modelConfig.slot')} desc={loaderHelp} descriptionTooltip>
+        <SettingsRow label={t('modelConfig.slot')} desc={loaderHelp} descriptionTooltip>
         <Select aria-label={t('modelConfig.slot')} fullWidth value={draft.slot} onChange={key => { if (key === 'recognition' || key === 'translation') patch({ slot: key }) }}>
           <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
           <Select.Popover><ListBox>
@@ -123,7 +123,7 @@ export function ModelConfigurationDialog({ record, onClose }: ModelConfiguration
           </ListBox></Select.Popover>
         </Select>
         </SettingsRow>
-        <SettingsRow className="model-configuration-dialog__row" label={t('modelConfig.engine')} desc={loaderHelp} descriptionTooltip>
+        <SettingsRow label={t('modelConfig.engine')} desc={loaderHelp} descriptionTooltip>
         <Select aria-label={t('modelConfig.engine')} fullWidth value={draft.engine} onChange={key => { if (key === 'pytorch' || key === 'llama' || key === 'crisp') patch({ engine: key }) }}>
           <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
           <Select.Popover><ListBox>{engines.map(engine => <ListBox.Item key={engine} id={engine} textValue={engineLabel(engine)}>{engineLabel(engine)}</ListBox.Item>)}</ListBox></Select.Popover>

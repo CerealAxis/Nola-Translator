@@ -1,6 +1,8 @@
 .models-page { display:flex; flex-direction:column; gap:20px; min-width:0; }
 .model-configuration-dialog.modal__dialog--lg { width:min(100%, calc(var(--space-8) * 11)); max-width:calc(var(--space-8) * 11); }
-.model-configuration-dialog .model-configuration-dialog__language { grid-template-columns:minmax(0,1fr); align-items:stretch; gap:var(--space-1); padding-block:var(--space-1); }
+/* The dialog body gap already spaces the rows, so rows inside it carry no divider, padding or minimum height. */
+.model-configuration-dialog .settings-row { border-bottom:0; padding-block:0; min-height:0; }
+.model-configuration-dialog .model-configuration-dialog__language { grid-template-columns:minmax(0,1fr); align-items:stretch; gap:var(--space-1); padding-block:0; }
 .model-configuration-dialog__language .settings-row__control { display:block; }
 .model-configuration-dialog__language [data-slot='autocomplete'] { width:100%; }
 .model-configuration-dialog .autocomplete__trigger { display:flex; align-items:center; gap:var(--space-1); width:100%; min-height:var(--field-control-height); padding:var(--space-1) var(--space-2); border:1px solid var(--field-border); border-radius:var(--radius-xl); background:var(--surface); color:var(--foreground); }
