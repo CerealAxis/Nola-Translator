@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, statfs, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, rmdir, statfs, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { offlineArchive } from './offline-archive'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { z } from 'zod'
 import { offlinePrepareSchema, type OfflineItem, type OfflineIssue, type OfflinePrepareRequest, type OfflinePreview, type OfflineTask } from '../shared/offline'
 import { modelImportEntry } from '../shared/model-import-catalog'
@@ -64,6 +64,11 @@ interface Selection {
   repo?: string
 }
 const idle = (): OfflineTask => ({ state: 'idle', phase: 'check', current: 0, total: 0 })
+/** Marker file that proves a staging directory was created by this manager. */
+const stagingMarkerName = '.nola-staging'
+const stagingMarkerContent = 'nola-offline-staging-v1'
+/** Numbered alternatives tried when the preferred staging name is taken by a foreign directory. */
+const stagingNameAttempts = 16
 
 /** Native paths stay behind short-lived selection tokens; package metadata never grants file access. */
 export class OfflineManager {
@@ -123,7 +128,8 @@ export class OfflineManager {
     })
   }
   private async removeTemporary(path: string): Promise<void> {
-    // Only directories allocated by this manager are eligible for recursive removal.
+    // mkdtemp names are unique and this set records the paths this process allocated, so the
+    // removal stays limited to directories this manager created.
     if (this.temporary.has(path) && dirname(path) === tmpdir() && path.startsWith(join(tmpdir(), 'nola-offline-bundle-'))) {
       await rm(path, { recursive: true, force: true })
       this.temporary.delete(path)
@@ -189,16 +195,78 @@ export class OfflineManager {
   /**
    * A model export stages into a directory whose name is derived from the model id, so a
    * directory left behind by a crashed export would make every later export of that model fail
-   * with EEXIST. A stale one is removed and the directory is created again.
+   * with EEXIST. Only a directory carrying our marker is such a leftover: a directory the user
+   * created keeps its content and the export continues under a numbered name.
    */
-  private async createStaging(staging: string, parent: string): Promise<void> {
+  private async createStaging(staging: string, parent: string): Promise<string> {
+    for (let attempt = 0; attempt < stagingNameAttempts; attempt++) {
+      const candidate = this.stagedName(staging, attempt)
+      try {
+        await mkdir(candidate, { recursive: false })
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || dirname(candidate) !== resolve(parent)) throw error
+        if (await this.ownsStaging(candidate, parent)) {
+          this.options.diagnostic?.('offline.staleStagingRemoved', { path: candidate })
+          await rm(candidate, { recursive: true, force: true })
+          await mkdir(candidate, { recursive: false })
+        } else {
+          // The name belongs to a directory this manager did not create, so it stays untouched.
+          continue
+        }
+      }
+      try {
+        await this.writeStagingMarker(candidate)
+      } catch (error) {
+        await rmdir(candidate).catch(() => {})
+        throw error
+      }
+      if (candidate !== staging) this.options.diagnostic?.('offline.stagingPathTaken', { path: staging, used: candidate })
+      return candidate
+    }
+    throw new OfflineError('failed', 'Unable to reserve a staging directory')
+  }
+  /** Numbered variants keep the temporary suffix so a taken name stays recognisable as a staging directory. */
+  private stagedName(staging: string, attempt: number): string {
+    if (attempt === 0) return staging
+    const base = basename(staging)
+    const dot = base.lastIndexOf('.')
+    const stem = dot > 0 ? base.slice(0, dot) : base
+    const extension = dot > 0 ? base.slice(dot) : ''
+    return join(dirname(staging), `${stem}.${attempt + 1}${extension}`)
+  }
+  /** Ownership proof: the directory sits in the folder the user picked and carries our marker. */
+  private async ownsStaging(staging: string, parent: string): Promise<boolean> {
+    if (dirname(staging) !== resolve(parent)) return false
+    // lstat keeps a symlinked directory out of the removal path.
+    const info = await lstat(staging).catch(() => null)
+    if (!info?.isDirectory()) return false
+    return this.hasStagingMarker(staging)
+  }
+  private async hasStagingMarker(staging: string): Promise<boolean> {
+    const marker = join(staging, stagingMarkerName)
+    const info = await lstat(marker).catch(() => null)
+    if (!info?.isFile() || info.size > 64) return false
+    return (await readFile(marker, 'utf8').catch(() => '')).trim() === stagingMarkerContent
+  }
+  private async writeStagingMarker(staging: string): Promise<void> {
+    await writeFile(join(staging, stagingMarkerName), stagingMarkerContent)
+  }
+  private async removeStaging(staging: string, parent: string): Promise<void> {
+    if (!staging || !await this.ownsStaging(staging, parent)) return
+    await rm(staging, { recursive: true, force: true })
+  }
+  /**
+   * The marker proves ownership of the staging directory but must not travel into the published
+   * artifact, so it is lifted while the artifact is produced and restored afterwards to keep the
+   * directory removable during cleanup.
+   */
+  private async publishStaging(staging: string, publish: () => Promise<void>): Promise<void> {
+    await rm(join(staging, stagingMarkerName), { force: true })
     try {
-      await mkdir(staging, { recursive: false })
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || dirname(staging) !== resolve(parent)) throw error
-      this.options.diagnostic?.('offline.staleStagingRemoved', { path: staging })
-      await rm(staging, { recursive: true, force: true })
-      await mkdir(staging, { recursive: false })
+      await publish()
+    } finally {
+      const info = await lstat(staging).catch(() => null)
+      if (info) await this.writeStagingMarker(staging).catch(() => { this.options.diagnostic?.('offline.stagingMarkerRestoreFailed', { path: staging }) })
     }
   }
   prepare(raw: OfflinePrepareRequest, parent: string, destination: 'package' | 'model' = 'package'): OfflineTask {
@@ -207,12 +275,13 @@ export class OfflineManager {
     const modelId = destination === 'model' ? request.modelIds[0] : undefined
     if (destination === 'model' && (request.modelIds.length !== 1 || request.runtimeIds.length !== 0 || !modelId || !modelImportEntry(modelId))) throw new OfflineError('unsupportedModel')
     const name = destination === 'model' ? modelId! : `Nola-offline-${new Date().toISOString().slice(0, 10)}-${randomUUID().slice(0, 8)}`
-    const staging = join(resolve(parent), destination === 'model' ? `.${name}.partial` : `${name}.partial`)
+    const stagingName = join(resolve(parent), destination === 'model' ? `.${name}.partial` : `${name}.partial`)
     const output = join(resolve(parent), destination === 'model' ? name : `${name}.zip`)
     const archive = `${output}.partial`
     return this.start(async signal => {
+      let staging = ''
       try {
-        await this.createStaging(staging, parent)
+        staging = await this.createStaging(stagingName, parent)
         if (request.modelIds.length) await this.options.models({ operation: 'prepare', destination: staging,
           modelIds: request.modelIds, modelRoot: this.options.modelRoot, network: await resolveModelNetwork(this.options.network()),
           modelSource: request.modelSource, exportModel: destination === 'model' }, signal, this.progress)
@@ -226,15 +295,15 @@ export class OfflineManager {
           if (entries.length !== 1) throw new OfflineError('invalidPackage')
           const [modelEntry] = entries
           await rename(join(modelDirectory, modelEntry), join(staging, modelEntry))
-          await rm(modelDirectory, { recursive: true, force: true })
+          await rmdir(modelDirectory)
           this.task.detail = modelEntry
         }
         if (destination !== 'model') await writeFile(join(staging, 'manifest.json'), JSON.stringify({ format: 'nola-offline', version: 1,
           platform: 'win32-x64', appVersion: this.options.appVersion, modelIds: request.modelIds, runtimeIds: request.runtimeIds }, null, 2), { flag: 'wx' })
         signal.throwIfAborted()
-        if (destination === 'model') await rename(staging, output)
+        if (destination === 'model') await this.publishStaging(staging, async () => { await rename(staging, output) })
         else {
-          await offlineArchive(this.options.python ?? 'python', 'pack', staging, archive, signal, this.archiveProgress)
+          await this.publishStaging(staging, async () => { await offlineArchive(this.options.python ?? 'python', 'pack', staging, archive, signal, this.archiveProgress) })
           signal.throwIfAborted()
           await rename(archive, output)
         }
@@ -242,10 +311,7 @@ export class OfflineManager {
         else this.task.outputPath = join(output, this.task.detail ?? modelId!)
       } finally {
         if (destination !== 'model' && dirname(archive) === resolve(parent)) await rm(archive, { force: true })
-        // The staging name is built here from the model id and sits directly in the folder the
-        // user chose, so those two conditions are what bound this removal.
-        if (dirname(staging) === resolve(parent) && (await lstat(staging).catch(() => null))?.isDirectory())
-          await rm(staging, { recursive: true, force: true })
+        await this.removeStaging(staging, parent)
       }
     })
   }
