@@ -1,303 +1,279 @@
-# Nola Translator 设计系统
+---
+name: Nola Translator
+description: 面向实时双语阅读的桌面翻译工具；冰蓝底色、清晰层级、紧凑控件与克制的彩色入口。
+colors:
+  primary: "oklch(60% 0.22 257)"
+  on-primary: "oklch(99% 0.002 255)"
+  background: "oklch(97.8% 0.014 255)"
+  surface: "oklch(99.6% 0.004 255)"
+  surface-secondary: "oklch(97.4% 0.012 255)"
+  surface-tertiary: "oklch(94.4% 0.024 255)"
+  text: "oklch(22.5% 0.047 261)"
+  text-muted: "oklch(57.5% 0.046 259)"
+  border: "oklch(92.3% 0.026 255)"
+  separator: "oklch(95.2% 0.013 255)"
+  success: "oklch(71% 0.19 155)"
+  warning: "oklch(73% 0.16 65)"
+  danger: "oklch(64% 0.21 23)"
+  feature-purple: "oklch(60% 0.24 298)"
+  feature-orange: "oklch(67% 0.19 48)"
+  feature-emerald: "oklch(76% 0.15 170)"
+  dark-primary: "oklch(70% 0.16 257)"
+  dark-background: "oklch(21% 0.039 259)"
+  dark-surface: "oklch(27% 0.044 258)"
+  dark-surface-secondary: "oklch(31% 0.048 258)"
+  dark-surface-tertiary: "oklch(36% 0.051 258)"
+  dark-text: "oklch(96% 0.014 255)"
+  dark-text-muted: "oklch(74% 0.04 258)"
+  dark-border: "oklch(37% 0.05 258)"
+  dark-separator: "oklch(32% 0.044 258)"
+  dark-success: "oklch(76% 0.16 157)"
+  dark-warning: "oklch(80% 0.15 75)"
+  dark-danger: "oklch(72% 0.18 22)"
+  dark-feature-purple: "oklch(74% 0.17 298)"
+  dark-feature-orange: "oklch(78% 0.14 48)"
+  dark-feature-emerald: "oklch(80% 0.12 170)"
+typography:
+  display:
+    fontFamily: "Segoe UI Variable Text, Noto Sans SC, system-ui, sans-serif"
+    fontSize: 48px
+    fontWeight: 600
+    lineHeight: 1.2
+  h1:
+    fontFamily: "Segoe UI Variable Text, Noto Sans SC, system-ui, sans-serif"
+    fontSize: 32px
+    fontWeight: 600
+    lineHeight: 1.25
+  h2:
+    fontFamily: "Segoe UI Variable Text, Noto Sans SC, system-ui, sans-serif"
+    fontSize: 24px
+    fontWeight: 600
+    lineHeight: 1.3
+  title:
+    fontFamily: "Segoe UI Variable Text, Noto Sans SC, system-ui, sans-serif"
+    fontSize: 15px
+    fontWeight: 600
+    lineHeight: 1.4
+  body:
+    fontFamily: "Segoe UI Variable Text, Noto Sans SC, system-ui, sans-serif"
+    fontSize: 14px
+    fontWeight: 400
+    lineHeight: 1.65
+  body-strong:
+    fontFamily: "Segoe UI Variable Text, Noto Sans SC, system-ui, sans-serif"
+    fontSize: 14px
+    fontWeight: 600
+    lineHeight: 1.45
+  caption:
+    fontFamily: "Segoe UI Variable Text, Noto Sans SC, system-ui, sans-serif"
+    fontSize: 13px
+    fontWeight: 400
+    lineHeight: 1.5
+  label:
+    fontFamily: "Segoe UI Variable Text, Noto Sans SC, system-ui, sans-serif"
+    fontSize: 12px
+    fontWeight: 500
+    lineHeight: 1.4
+rounded:
+  sm: 6px
+  md: 8px
+  lg: 12px
+  xl: 16px
+  2xl: 24px
+  full: 9999px
+spacing:
+  sm: 8px
+  md: 16px
+  lg: 24px
+  xl: 32px
+  2xl: 40px
+  3xl: 48px
+  4xl: 64px
+  5xl: 80px
+components:
+  button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.body-strong}"
+    rounded: "{rounded.xl}"
+  button-primary-dark:
+    backgroundColor: "{colors.dark-primary}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.body-strong}"
+    rounded: "{rounded.xl}"
+  card:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.xl}"
+    padding: "{spacing.lg}"
+  card-dark:
+    backgroundColor: "{colors.dark-surface}"
+    textColor: "{colors.dark-text}"
+    rounded: "{rounded.xl}"
+    padding: "{spacing.lg}"
+  panel:
+    backgroundColor: "{colors.surface-secondary}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.md}"
+  panel-dark:
+    backgroundColor: "{colors.dark-surface-secondary}"
+    textColor: "{colors.dark-text}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.md}"
+---
 
-> 视觉规范。代码规范见 [AGENTS.MD](./AGENTS.MD)。
-> Token 事实源在 `src/renderer/theme/`
-> 两边不一致时以 CSS 为准，并回来改本文件。
-> 更新：2026-10-05
-> 项目 logo：`assets/brand/nola-logo.svg`
+# DESIGN.MD
 
-## 1. 视觉与功能基准
+## Colors
 
-单 Logo 顶栏、紧凑侧栏、蓝白背景、四色功能卡与最近记录表。
-设计稿决定视觉层级，现有 store/bridge 决定交互。不可用静态截图替代界面，也不可把稿内示例数据替代真实数据。
+主色用于主要操作、链接、焦点和选中状态。文字、表面、边框与状态色按语义引用，深色模式保持相同布局，仅切换调色板。
 
-浏览器字幕界面使用同一 i18n 与主题 token。浏览器专用 token 位于 `src/renderer/theme/browser.css`；面板、按钮和字幕样式进入 Shadow DOM，并将根 token 选择器改为 `:host`。HeroUI 选择项在面板内展开，避免 portal 到网站 body。播放器坐标由实际视频尺寸计算。
+| YAML token | 运行时 CSS token | 用途 |
+| --- | --- | --- |
+| primary / on-primary | `--accent` / `--accent-foreground`（亦有 `--primary` 别名） | 主操作及其文字 |
+| background | `--background` | 页面底色 |
+| surface / surface-secondary / surface-tertiary | 同名 `--surface*` | 卡片、次级面、悬停面 |
+| text / text-muted | `--foreground` / `--muted` | 正文、说明与元信息 |
+| border / separator | `--border` / `--separator` | 容器边界、行分隔 |
+| success / warning / danger | 同名 CSS token | 成功、警告、危险 |
+| feature-purple / feature-orange / feature-emerald | `--color-purple` / `--color-orange` / `--color-emerald` | 悬浮字幕、记录、模型入口 |
 
-桌面浏览器连接页采用 Chrome／Edge 两行列表，展示官方图标、实际扩展状态和对应下载按钮；已安装扩展提供管理入口。下载按钮直接保存内置扩展 ZIP，不展示安装教程或文件夹路径。安装状态与 Nola 连接权限分别显示，管理页打开对应浏览器的扩展管理页面。
+dark-* 是同一语义的深色值，on-primary 两套主题共用。调色板分别对应 [nola-light.css](src/renderer/theme/nola-light.css) 和 [nola-dark.css](src/renderer/theme/nola-dark.css)。
 
-播放器按钮标记为 Nola 字幕，仅显示 Logo，无圆形底色，垂直居中于播放器控制栏；悬停与按下保持透明底色，保留键盘焦点反馈。面板只保留开始、刷新、关闭与简短连接状态；标签页音源额外提供采集声音。关闭会停止识别、释放共享并收起面板；刷新会重连并重置当前视频时间锚点。音源、设备、语言和字幕外观均在软件端设置，不在扩展重复展示。自动选择正在播放且面积最大的可见视频。控件字号、尺寸使用固定主题 token，避免网站 rem 字号影响。桌面检测扩展未安装或版本不匹配时，通过去重 Toast 提供安装／重装入口。字幕位置按视频高度比例保存，避开底部控制栏；字幕内容只保留当前句。启用原文时先显示已识别内容，翻译完成后补充译文，翻译等待或失败不隐藏原文；仅译文模式不以原文替代。运行状态使用文字，不持续显示旋转动画。直接 video 全屏用临时文字轨道，退出恢复独立字幕层及原轨道状态。
+快速同传入口使用 `--color-blue`（即主色）；紫、橙、薄荷绿只用于相应入口及装饰，不替代状态色。中性色与彩色背景混合使用 oklab，避免色相插值导致橙色和薄荷绿偏成紫蓝。现有主色柔底沿用 `--color-accent-soft`。
 
-## 2. HeroUI v3 组件标准
+主按钮与侧栏选中项实际使用 `--nola-primary-gradient`，YAML 的 primary 表示主色基准。浅色渐变从主色至 oklch(71% 0.16 257)，深色至 oklch(76% 0.12 257)，方向为 105deg。背景只允许低对比光晕与宽斜带。
 
-使用项目当前 React 19、HeroUI React v3、Tailwind v4 与 Lucide 图标。
-所有交互元素使用 HeroUI；布局可使用语义 HTML/CSS，插画可使用独立图片或 SVG。
+字段使用 `--field-background` / `--field-foreground` / `--field-border` / `--field-border-focus`；弹层使用 `--overlay` / `--overlay-foreground`。浮窗配色由用户独立选择，字幕自定义颜色属于设置数据。
+
+## Typography
+
+YAML 八级字阶对应 [index.css](src/renderer/theme/index.css) 的 `--font-display/h1/h2/title/body/body-strong/caption/label`。正文默认 14px/1.65，说明 13px，元信息 12px；时间与数值使用等宽数字。
+
+字体随区域选择打包的 Noto Sans SC / TC / HK / KR / JP，并保留系统回退。YAML 展示默认栈的核心字体，完整区域栈以 [typography.css](src/renderer/theme/typography.css) 为准。字幕选用系统字体后仍追加当前区域字体，避免缺字。
+
+通用 `--font-*` 与页面语义字阶分别维护：[app.css](src/renderer/theme/app.css) 将 `--nola-text-display` 设为 700 32px/1.25，将 `--nola-text-title` 设为 650 20px/1.4。页面标题、小节沿用既有语义类，不把通用 h2 的 24px 套到所有小节。
+
+字幕字号由用户设置，预览应反映设置。覆盖 HeroUI 原子字阶时使用 utilities 层字号/行高类；这是任意值类的特定例外，不能据此硬编码其他视觉值。
+
+## Layout
+
+以 8px 为通用间距基准：spacing.sm 至 spacing.5xl 对应 `--space-1` 至 `--space-8`。壳层已有 12px / 20px 等局部尺寸是布局规格，不新增一套通用间距。
+
+| 区域 | 布局规格 |
+| --- | --- |
+| 顶栏 | 高 64px，固定在主滚动区外 |
+| 侧栏 | 宽 200px；导航 padding 12px、gap 8px；不重复品牌区 |
+| 导航按钮 | 高 56px、圆角 16px、图文间距 16px；图标约 24px |
+| 主内容 | 路由提供一层 padding，常规 24px、最大宽 1600px；AppShell 不重复包边 |
+| 区块与卡片 | 区块 gap 20px，紧凑处 16px；卡片常规 padding 20px，重点 24px（YAML card） |
+| 设置行与字段 | 行高 44–52px，标签/控件对齐；通用字段高度 token 为 38px，业务字段沿用现有 36–40px 规格 |
+
+窗口自身不滚动，main 与阅读区各自管理纵向滚动。flex/grid 内容保持 min-width:0，需要垂直收缩的区域保持 min-height:0。功能页不得通过 viewport 宽度、负 margin 或 fixed 越过壳层。
+
+宽度不超过 1024px 时侧栏收至 76px 图标导航，保留 Tooltip 与可访问名称，页面 padding 为 20px；高度不超过 700px 时 padding 为 16px。首页四卡在内容足够宽时单行，否则两列或一列。工作台窄窗折叠笔记、双语可上下阅读；模型网格改为一列；设置次导航转为横向；表格隐藏次要列，不以横向溢出容纳内容。
+
+### 页面构成
+
+| 页面 | 视觉结构与主要交互 |
+| --- | --- |
+| 首页 | 紧凑横向 Hero、右侧插画；四色等高入口卡；最近记录 Table Card，最多三条及查看全部入口 |
+| 快速同传 | 标题/会话名/状态/计时；配置工具栏；双语逐句对齐、最新句淡蓝高亮；可折叠笔记；底部音源和会话控制 |
+| 悬浮字幕 | 主窗口提供动作、预览与配置；预览只呈现字幕玻璃；独立浮窗提供音源、模型、语言、显示模式与窗口操作 |
+| 同传记录 | 标题、搜索、数量、Table Card；排序、分页、查看、重命名、导出、删除确认；详情沿用 PageHeader/Card |
+| 模型管理 | 当前模型摘要；推荐、已安装、Hugging Face 搜索、下载任务四个 Tabs；推荐分识别/翻译两组，卡片操作对齐 |
+| 设置 | 次导航与分组 Card；标签左控件右；字幕外观先预览，后布局、字体和颜色；窄窗人物行操作移至文字下方 |
+| 浏览器连接 | 官方图标、安装状态、连接权限、下载/管理操作；下载直接保存内置 ZIP，不展示文件夹路径 |
+
+语言对按钮使用邻近弹层，原文、译文独立选择，长列表内部滚动。不兼容方向说明原因，提供换模型、换识别语言或关闭翻译。模型、语言与状态来自真实配置，不虚构能力。
+
+## Elevation & Depth
+
+卡片依靠表面色和细边框建立层次，投影只辅助区分，不为每行添加阴影。
+
+| CSS token | 浅色 | 深色 |
+| --- | --- | --- |
+| `--surface-shadow` | 0 2px 10px rgba(35,72,125,.04) | 0 2px 10px rgba(15,25,45,.12) |
+| `--overlay-shadow` | 0 12px 36px rgba(35,72,125,.14) | 0 12px 36px rgba(10,20,40,.32) |
+
+通用 `--shadow-sm/md/lg` 由 index.css 提供，深色降低透明度；不要与语义投影混为一套值。当前 YAML schema 无独立 elevation 导出类别，投影保留为 CSS 映射，不伪造可导出的 shadows 字段。
+
+浮窗允许玻璃感和用户配置的不透明度，可读性优先。禁止纯黑重投影和卡片 hover 大幅抬升。动效使用 [motion.css](src/renderer/theme/motion.css) 的既有 token，常规约 120–180ms，尊重减少动效偏好。
+
+## Shapes
+
+rounded.sm/md/lg/xl/2xl/full 对应 `--radius-sm/md/lg/xl/2xl/full`。常规按钮统一 16px（rounded.xl），标题栏控件保留系统式样。图标按钮须有区别于底层的可见底色，禁止 ghost 变体。
+
+业务 Card 使用 16px；基础 .nola-card / .nola-panel 使用 `--radius-lg`（12px）。输入框使用 `--field-radius`；弹层和对话框专用几何由 app.css 管理，不将其误写成通用圆角档位。主题中没有 rounded-pill。
+
+## Components
+
+使用 HeroUI v3 语义组件和 Lucide 图标。YAML 列出主按钮、业务卡片与次级面板的浅/深色基准；渐变、边框、状态和布局由既有样式补齐。
 
 | 用途 | 组件 |
 | --- | --- |
-| 操作与侧栏 | Button，事件 onPress |
-| 卡片 | Card / Card.Header / Card.Title / Card.Content / Card.Footer |
-| 标签 | Tabs.List / Tabs.Tab / Tabs.Panel |
-| 单选与分段 | Select + ListBox；ToggleButtonGroup + ToggleButton |
-| 文本与搜索 | TextField / Input / SearchField / TextArea |
-| 开关/数值/颜色 | Switch / Slider / NumberField / ColorPicker / ColorSwatchPicker |
-| 数据列表 | Table 复合组件 / Pagination |
-| 菜单/反馈 | Dropdown / Tooltip / Chip / Alert / Toast |
-| 对话框 | Modal / AlertDialog |
+| 操作、导航 | Button，事件 onPress |
+| 卡片、数据 | Card 复合组件；Table / Pagination |
+| 面板切换、设置选择 | Tabs.List / Tabs.Tab / Tabs.Panel；Select + ListBox；ToggleButtonGroup + ToggleButton |
+| 输入、调节 | TextField / Input / SearchField / TextArea；Switch / Slider / NumberField / ColorPicker / ColorSwatchPicker |
+| 菜单、反馈、对话框 | Dropdown / Tooltip / Chip / Alert / Toast；Modal / AlertDialog |
 
-禁止 HeroUIProvider、v2 API、Tabs.Content、framer-motion、ScrollShadow、裸 button/select、原生 range/color、window.confirm/alert。
-新组件先读取官方 v3 文档。CSS 导入顺序必须是 Tailwind → HeroUI styles → 产品 theme，Tailwind 仅扫描 src。
-index.html 必须在任何样式之前注册 @layer properties, theme, base, components, utilities，避免页面局部样式提前注册 components 导致全局 reset 反过来覆盖布局。
-Select 使用 value/onChange；ToggleButtonGroup 与 Dropdown.Menu 的选择值为 Set。
-Switch 必须包含 Switch.Content，再在其中放 Control/Thumb；仅绘制 Control/Thumb 会产生没有 input 的装饰图形。
+先选语义匹配的 HeroUI 原子，再尝试 className/variant、扩展 variants，最后才考虑自创。基础封装为 AppShell、TitleBar（含 useNolaTheme）、PageHeader、StatusPill、SectionCard、SettingRow、ErrorBoundary、NavigationItem；新增前先维护清单。旧版第 11.1/11.2 节合并于此。
 
-## 3. 全局几何
+ModelCard、DualColumnView、CaptionLine、NotesPanel、AudioPlayerBar 属于 feature 层。Switch 必须含 Switch.Content 及有效输入控件；菜单选中沿用 HeroUI 指示，不重复绘制。
 
-| 项目 | 规范 |
-| --- | --- |
-| 参考画布 | 1540×1024，实际检查 1440×960 / 1180×780 / 760×560 |
-| 顶栏 | 64px；固定在主滚动区之外 |
-| 侧栏 | 200px；首项距顶栏底部12px；内边距12px |
-| 导航按钮 | 高56px、圆角16px、图标24px、图文间距16px |
-| 导航行距 | 8px；六项连续排列，不插 spacer |
-| 主内容 | 路由唯一提供24px padding；最大1600px；受 main 宽度约束 |
-| 区块间距 | 20px，紧凑处16px |
-| 卡片 | padding20px（重点24px），圆角16px |
-| 字段 | 高40px（工具栏36px），圆角10–12px |
-| 按钮 | 非标题栏按钮统一圆角16px；禁止 ghost 变体，图标按钮必须有区别于底层的可见底色。标题栏控件保留系统式样 |
-| 设置行 | 44–52px；标签和控件保持同一基线 |
+### 特殊场景
 
-只有顶栏出现 Nola Logo 与应用名；侧栏不重复 Logo、不留品牌空白。
-AppShell 不包第二层 padding/max-width。整窗 overflow:hidden，main 可纵向滚动。
-所有 flex/grid 内容使用 min-width:0，需垂直收缩的区域 min-height:0。
-禁止功能页用 w-screen、100vw、负 margin 或 fixed 逃出主内容，禁止水平滚动或内容藏到侧栏后。
-<=1024px 侧栏缩至76px图标导航并保留 Tooltip/aria-label；首页内容>=1000px四卡一行，否则两列，极窄可一列。
-工作台窄窗折叠笔记，双语可上下阅读；模型卡两列/一列；设置次级导航窄窗变横向。
-表格窄窗隐藏次要时间/语言列，不能以水平溢出容纳全部列。
+- **下载源弹窗**：Modal + 可执行 ListBox；当前模型、渠道图标及右箭头，仅 hover/focus 高亮，点击直接下载。只显示可用渠道，源站/镜像说明放 Tooltip。
+- **新手引导**：先欢迎弹窗，再镂空高亮真实控件。九步依次为首页快速同传、悬浮字幕、侧栏浏览器字幕、PyTorch、llama.cpp、语音识别、翻译、模型下载、更多页再次查看；底栏只放进度、跳过和下一步/完成。焦点留在说明卡，Esc 退出，运行时不可开始教程。欢迎展示后持久化 onboardingSeen，稍后、跳过、完成和 Esc 不清除标记；再次查看重开欢迎页。
+- **浏览器播放器**：Logo 按钮垂直居中，无圆形底色，hover/press 透明并保留焦点反馈。面板仅开始、刷新、关闭及文字状态，标签页音源增加采集动作；其余配置留在桌面。Shadow DOM 使用 browser.css、:host 与固定尺寸 token；选择项在面板内展开，避免宿主网站字号和 portal 干扰。
+- **字幕阅读**：位置相对视频高度保存并避开控制栏，仅保留当前句。双语模式先原文后译文，失败不隐藏原文；仅译文模式不以原文替代。调整尺寸后重新计算行数并露出最新内容；直接 video 全屏保留文字轨道回退。
+- **更多与许可证**：关于、鸣谢使用 Avatar，赞助占位 Tooltip 明示“虚位以待”。许可证采用左对齐纸张式阅读区、常规字重等宽字体、内部滚动、可达的关闭操作，不改写措辞。
+- **文档站与演示**：主题和语言持久化，深浅首屏和下载入口均清晰；演示切主题不重载会话。模拟字幕、波形、暂存笔记准确标示范围，不混淆桌面真实数据。
 
-## 4. 颜色、字体与投影
+## Do's and Don'ts
 
-颜色由语义 CSS token 定义（优先 oklch），组件引用 token。
+### 应当遵守
 
-| 用途 | 浅色目标 | 深色目标 |
+- 使用语义 token 和现有封装，界面文案走六区域语言词典；工程规则遵循 AGENTS.MD。
+- 呈现真实状态，错误提供恢复动作；删除和结束会话保留确认交互。
+- 控件提供可访问名称，装饰图标 aria-hidden="true"；保留焦点、Esc、Toast 反馈。
+- Electron 拖拽仅顶栏/浮窗壳，交互控件 no-drag；原生窗口控制与网页回退二选一。
+
+### 层级与样式边界（第 8 节）
+
+本节是第八个标准章节，保留 AGENTS.MD 的层级规则引用。事实源为 [z-index.css](src/renderer/theme/z-index.css)，只使用对应类：
+
+| 类 | token 值 | 用途 |
 | --- | --- | --- |
-| background | 冰蓝 #F2F7FF | #101A2D |
-| surface | 近白 #FDFEFF | #18253B |
-| surface-secondary/字段 | #F4F7FC | #21304A |
-| foreground | 深蓝 #101A30 | #EFF4FF |
-| muted | #6B7D9E | #A5B5CE |
-| border/separator | #DBE8FC / #EAF0F8 | #2E415F |
-| accent/primary | #087BFF | #529DFF |
-| success | #12C776 | #38D596 |
-| warning | #EC9628 | #F4B34A |
-| danger | #F04452 | #FF6C78 |
+| `.z-base` | 0 | 普通内容 |
+| `.z-caption-scrim` | 10 | 字幕渐隐遮罩 |
+| `.z-sticky` | 20 | 工具栏、表头 |
+| `.z-caption-actions` | 30 | 字幕操作行 |
+| `.z-dropdown` | 40 | 选择器、菜单、Popover |
+| `.z-overlay` | 60 | Modal、AlertDialog |
+| `.z-onboarding` | 70 | 引导蒙层与说明卡 |
+| `.z-toast` | 80 | Toast |
+| `.z-titlebar-drag` | 100 | Electron 拖拽区 |
 
-侧栏选中与主按钮采用柔和蓝色水平渐变；次选用淡蓝底。背景允许非常淡的光晕和宽斜带，不能压过文本。
-四色入口：蓝=快速同传、紫=悬浮字幕、橙=记录、薄荷绿=模型，仅用于对应入口卡/装饰。
-中性色与彩色的背景混合使用 oklab，避免 oklch 的色相插值把橙色/薄荷绿混成紫蓝色。
-深色模式几何不变，表面/边框/文字随 token 切换；独立浮窗配色由用户单独选择。
-文档站首页首屏使用对应深浅主题的渐变与光晕，下载按钮在两套主题下保持清晰对比。语言入口在自动模式下仅显示“自动检测”，旁边提供可访问的主题图标按钮；主题与 VitePress 文档页共享并持久化。交互软件演示和六语言示意图跟随站点主题，切换不重载演示或清空会话。
-字体：按界面区域加载随软件打包的 Noto Sans SC / TC / HK / KR / JP 可变字体，系统 UI 字体作为后备；字幕自选字体后仍追加当前区域字体，避免缺少可选系统语言包时出现方框字。字体许可证随第三方声明发布。
-Hero标题44–52px/700（窄窗32px）；页面标题32px/700；小节20px/650；卡片22px/650；正文14px；说明13px；元信息12px。
-字幕阅读默认16px，实际字幕字号由用户设置。时间与数值 tabular-nums。
-卡片允许轻投影 0 2px 10px rgba(35,72,125,.04)，菜单/弹窗 0 12px 36px rgba(35,72,125,.14)。
-禁止纯黑投影、逐行投影和卡片 hover 大幅抬升。
+新增层级先在事实源定义 `--z-*`、对应类和原因，不直接写 z-50 或重排档位。
 
-## 5. 页面规范
+导入顺序为 Tailwind → HeroUI → theme/index.css → theme/app.css。index.html 在任何样式前注册 properties, theme, base, components, utilities。token/字阶/动效位于 base，语义类位于 components，原子覆写和层级类位于 utilities；caption-card.css 的无层覆写是既有特例。
 
-### 首页
+### 避免
 
-紧凑横向 Hero：Nola 蓝色 + Translator 深色、一句副标题、四个图标说明，右侧立体地球/麦克风/字幕插画。
-紧接四张等宽等高入口 Card，图标/标题/两行说明/明确 Button；取消旧的侧置模型状态大卡。
-最近记录采用一张 Card 与 Table，最多三条，右上查看全部记录。浮字幕入口进入预览页；所有入口可用。
+- 组件中新写字面色值或内联主题色；字幕颜色设置、启动页独立样式、Logo 品牌锁定色是既有例外，动态计算值按需使用。
+- 截图替代交互、示例替代真实状态，或虚构模型评分、统计、已保存笔记与赞助记录。
+- 使用 HeroUI v2 API、HeroUIProvider、Tabs.Content、framer-motion、ScrollShadow、裸 button/select、原生 range/color 或 window.confirm/alert。
+- 添加无支持依据的账户、VIP、云同步或在线共享入口；破坏 CSS 导入顺序、Tailwind source(none) 或 CSP 边界。
 
-### 快速同传
+### 验证与维护
 
-标题、会话名、真实状态与计时器；声源/识别模型/翻译模型/语言集中在工具栏 Card。翻译模型选择器包含“不启用”，选择后只识别原文，可正常开始；重新选择模型时恢复其支持的译文语言，待配置或不兼容的模型置灰。会话开始后锁定模型选择。
-第二行显示模式/排版/字号/笔记开关，各项在 main 宽度内折行。
-同一双栏阅读区域中原文与译文按句对齐，时间弱化，最新句轻蓝高亮；右侧窄 Card 笔记可折叠。
-未开始时提供居中开始入口；进行时读真实模拟字幕，保留状态机、预检、错误恢复。
-底部条包含音源、音频视觉、计时器、暂停/继续、结束；结束仍使用 AlertDialog。
-工作台内部滚动，不允许逃出壳层。
+格式检查使用官方 CLI：
 
-### 悬浮字幕
+    npx `--yes` `--package`=@google/design.md@0.4.0 designmd lint DESIGN.md
 
-主窗口页提供打开浮窗动作、预览、声源/语言/显示内容/排版。
-语言方向沿用快速同传的语言对按钮，弹层贴近按钮，内含原文语言、译文语言两个独立选择器与交换动作；语言代码与名称来自共享目录，可选项由当前模型配置决定，长列表在弹层内滚动。两页交换逻辑一致，交换后必须满足识别与翻译能力，两个语言值一次保存；译文支持不翻译，启动会话时不请求翻译。手动选择不兼容的语言时，弹窗说明不支持的语言或方向，提供更换翻译模型、更换识别语言、关闭翻译；不兼容的翻译模型置灰。自动检测遇到不支持的语言时静默保留原文，不请求该句翻译。
-预览是一块字幕玻璃，不再重复主应用壳；独立窗口保留 mic、模型、语言对、显示模式、置顶/锁定/隐藏/关闭。
-打开/隐藏通过既有 bridge/Electron 通道，保留跨窗口设置同步；不意外清空会话。
-主窗口持有演示会话，字幕文档通过窗口通信读取状态与发起操作，不独立创建第二个模拟引擎会话。浮窗调整尺寸时重新计算双语行数，阅读区自动露出最新字幕。
-显示可拖动/可置顶说明，外观设置跳到 settings/appearance。
+CLI 通过仅表示格式检查通过，不代表组件对比度、CSS cascade 或页面均已验收；警告按真实主题解释，不为消除警告擅改配色。omitted 只用于真正省略的类别。
 
-### 同传记录
-
-标题说明、开始同传、搜索、数量，一张 Table Card。
-名称/时间/时长/语言方向/状态/操作；保留排序与分页。
-查看、重命名、TXT/SRT/VTT 导出、删除确认；列表导出可复用 ExportDialog。
-详情同一 PageHeader/Card 规范，保留双语、导出与现有播放占位。现有 bridge 没有笔记持久化字段，不虚构已保存笔记。
-日期、时长和状态从 store 读取。
-
-### 模型管理
-
-页首小模型图标、标题说明、当前识别/翻译摘要。
-四个 Tabs：推荐模型、我的模型、Hugging Face 搜索、下载任务，蓝色下划线选中。
-推荐分语音识别与翻译两组，自适应 Card 网格，统一名称/说明/状态/操作位置。
-模型沿用代码目录；安装/取消/删除/设为默认保留。进度来自 store；HF 兼容性判断保留。
-下载源弹窗使用 HeroUI Modal 与可直接执行的 ListBox：标题下显示当前模型名称，右上角关闭；渠道使用中性色列表行、品牌图标与右侧箭头，悬停和键盘聚焦才高亮。仅显示可用渠道，名称 Tooltip 说明源站／镜像站／国内源，点击即下载，不增加确认步骤。
-推荐模型按对应版本官方资料预设用途、引擎与完整语言能力。搜索下载的模型下载完成后进入待配置，必须保存用途、引擎、识别语言或翻译源/目标语言与可选方向限制后才能启用；允许重新编辑配置。表单不能绕过架构与加载方式兼容性检查。不提供本地文件或文件夹导入。旧推荐模型自动补齐配置，旧自定义模型保留文件并进入待配置。
-禁止虚构在线统计/性能评分/新适配模型。存储入口跳 settings/storage。
-
-### 设置
-
-次级导航：常规、音频与识别、翻译、计算设备、性能与显存、悬浮字幕、浏览器字幕、存储、高级、更多；选中淡蓝底，区别于全局深蓝选中。
-右侧 Card 分组，标签左、控件右，不保留大面积无目的空白。
-“更多”位于“高级”之后：关于使用 HeroUI Avatar 展示作者与应用 Logo，提供 GitHub 主页、源代码及许可证入口；特别鸣谢展示 HeroUI 官方头像与官网；赞助者使用 AvatarGroup 轮廓头像占位，Tooltip 仅显示本地化的“虚位以待”，不虚构赞助记录；问题反馈保留复制诊断、打开日志、GitHub issue 与 QQ 群。GitHub 头像打包于 assets/brand，离线可见；高级保留引擎信息、恢复出厂设置及诊断明细。窄窗人物行的操作移至文字下方，全部沿用设置卡片、主题 token 与六语言词典。
-字幕外观顶部实时预览；分组布局与显示/字体与颜色；保留位置、排版、深浅浮层、字体、两种字号、行高、不透明度、三种颜色、两轨显示开关。
-自动保存与恢复默认使用真实 updateSettings；乐观更新/防抖/回滚保留。
-常规主题与浮窗配色保持独立，其他设置页功能完整。
-第三方许可证弹窗采用纸张式阅读区，标题、正文与关闭操作全部靠左；仅显示时移除原文行首缩进，保留许可证措辞、换行与源文件。阅读区与底部同用 overlay 底色，正文用 foreground，常规字重等宽字体；遮罩局部减淡，长文只在阅读区滚动，窄窗保留关闭操作。
-
-## 6. 交互与无障碍
-
-### 新手教程
-
-主窗口首次启动使用跨页面镂空蒙层；真实控件保留原位与原样，不复制界面。按首页快速同传、悬浮字幕、侧栏浏览器字幕、PyTorch、llama.cpp、语音识别、翻译、模型下载、“更多”页再次查看的顺序，共九步。说明卡使用 HeroUI Card／Button 与现有主题 token，口语说明入口及用途。底部固定一行，左侧显示进度，右侧只有“跳过指引”和“下一步”；最后一步将“下一步”替换为“完成”，不提供“上一步”。
-
-首次引导前先显示居中的 HeroUI 欢迎弹窗，放置 Logo、教程说明、可跳过和再次查看的提示，以及 GitHub Star 请求。底部“稍后再看”“开始指引”和 GitHub 仓库链接保持同一行。欢迎内容展示后保存 onboardingSeen，新安装及缺此字段的旧版本升级都会自动展示一次；稍后、Esc 关闭、完成与跳过均不清除标记。“开始指引”进入首页第一步；设置中的手动“再次查看”重新打开欢迎页，再由用户选择开始或稍后。
-
-切页后等待真实锚点并滚动到可见位置，缩放与滚动时重新定位，说明卡尽量避开高亮区域并限制在窗口内。教程期间背景不可操作，焦点留在说明卡，Esc 退出。运行中不能发起教程；启动通知延后展示。引导不执行安装、下载或音频采集，缺失页面允许继续和退出。六语言、深浅主题和三个主窗口尺寸均需验证。
-
-所有界面字符串走中英 i18n；模型专名和记录为数据。控件必须接入真实 store action/bridge。
-当前原型不接真实音频/翻译引擎，模型安装和字幕为本地模拟。笔记明确标为本页暂存，录音开关保存偏好但不生成真实录音，波形只作静态示意。
-图标按钮、Tabs、ToggleButtonGroup、Select、Slider 必须有可访问名称。
-菜单选中由 HeroUI 指示；禁自绘重复指示条。焦点、Esc、Toast、确认交互保留。
-动画120–180ms，颜色/opacity/少量transform，支持减少动效。
-层级使用现有 --z-* token，禁字面量 z-index。
-Electron 拖拽仅顶栏/浮窗壳，交互元素 no-drag。原生窗口控制与网页回退二选一。
-不新增原型未支持的在线共享、云同步、账户/企业/VIP功能。
-
-## 7. 实施与验收
-
-先更新本规范，再分工实现。共享主题/main/routes/基础壳层/聚合i18n由主代理维护；页面代理只写分配模块与独立locale文件。
-完成后运行 `npm run typecheck` 与 `npm test`（已有测试），并 `npm run build` 后检查三个窗口尺寸、深浅主题、各页与弹层。
-> 本仓**没有 lint 脚本**（`package.json` 无 `lint`），不要向 AI 承诺 lint 结果。
-验收：单Logo、导航从顶部连续排列、首页四卡合理折行、工具栏无遮挡、无横向滚动、控件不截断、所有操作可执行。
-生成PNG用于设计比对，不能作为整页交互背景。
-
-## 8. Design Token 台账
-
-> 组件只引用 token，不写字面值。台账来源：`src/renderer/theme/index.css`、
-> `nola-light.css`、`nola-dark.css`、`z-index.css`。
-
-### 8.1 颜色（语义 token，OKLCH）
-
-| token | 浅色 | 深色 | 用途 |
-| --- | --- | --- | --- |
-| `--background` | `oklch(97.8% 0.014 255)` | `oklch(21% 0.039 259)` | 页面底色 |
-| `--surface` | `oklch(99.6% 0.004 255)` | `oklch(27% 0.044 258)` | 卡片/面板 |
-| `--surface-secondary` | `oklch(97.4% 0.012 255)` | `oklch(31% 0.048 258)` | 次级面、字段 |
-| `--surface-tertiary` | `oklch(94.4% 0.024 255)` | — | 三级面、hover |
-| `--foreground` | `oklch(22.5% 0.047 261)` | `oklch(96% 0.014 255)` | 主文字 |
-| `--muted` | `oklch(57.5% 0.046 259)` | `oklch(74% 0.04 258)` | 次要文字 |
-| `--border` | `oklch(92.3% 0.026 255)` | `oklch(37% 0.05 258)` | 边框 |
-| `--separator` | `oklch(95.2% 0.013 255)` | `oklch(32% 0.044 258)` | 分隔线 |
-| `--accent` | `oklch(60% 0.22 257)` | `oklch(70% 0.16 257)` | 主色 |
-| `--success` | `oklch(71% 0.19 155)` | `oklch(76% 0.16 157)` | 成功 |
-| `--warning` | `oklch(73% 0.16 65)` | `oklch(80% 0.15 75)` | 警告 |
-| `--danger` | `oklch(64% 0.21 23)` | `oklch(72% 0.18 22)` | 危险 |
-
-四色入口：`--color-blue`（=accent）/ `--color-purple` / `--color-orange` / `--color-emerald`，
-**仅用于对应入口卡与装饰**，不得挪作语义色。柔色底用
-`--color-accent-soft: color-mix(in oklch, var(--accent) 12%, var(--surface))`。
-
-> 中性色与彩色背景混合用 `oklab`。用 `oklch` 会让橙色/薄荷绿的色相被插值混成紫蓝。
-
-### 8.2 字阶（`--font-*`）
-
-| token | 值 | 用途 |
-| --- | --- | --- |
-| `--font-display` | `600 48px/1.2` | Hero 标题 |
-| `--font-h1` | `600 32px/1.25` | 页面标题 |
-| `--font-h2` | `600 24px/1.3` | 小节标题 |
-| `--font-title` | `600 15px/1.4` | 卡片标题 |
-| `--font-body` | `400 14px/1.65` | 正文 |
-| `--font-body-strong` | `600 14px/1.45` | 强调正文 |
-| `--font-caption` | `400 13px/1.5` | 说明文字 |
-| `--font-label` | `500 12px/1.4` | 元信息 |
-
-字体族 `--font-ui`: Segoe UI Variable Text / Microsoft YaHei UI / PingFang SC / system-ui。
-`--font-mono`: Cascadia Mono / SF Mono / Consolas。
-
-> **压 HeroUI 原子组件的字阶必须用 utilities 层任意值类**（`text-[11px] leading-[1.45]`），
-> 不能靠 `.nola-*`——那些在 `@layer base`，而 `.chip`/`.button` 在 `@layer components`，
-> 层序是 `theme < base < components < utilities`，后写的 components 会赢。
-
-### 8.3 间距、圆角、投影
-
-- 间距 `--space-1…8`：8 / 16 / 24 / 32 / 40 / 48 / 64 / 80px
-- 圆角 `--radius-sm/md/lg/xl/2xl/full`：6 / 8 / 12 / 16 / 24 / 9999px
-  → 按钮统一使用 `--radius-xl`；其他形状仅用于非按钮元素。**theme 里没有 `--radius-pill`**，写 `rounded-pill` 不生成任何样式
-- 投影 `--shadow-sm/md/lg`，深色模式只降不透明度（`index.css:116-121`），几何不变
-
-### 8.4 Z-index 阶梯（唯一事实源）
-
-`--z-caption-scrim:10` → `--z-sticky:20` → `--z-caption-actions:30` → `--z-dropdown:40`
-→ `--z-overlay:60` → `--z-toast:80` → `--z-titlebar-drag:100`
-
-配套类：`.z-base` `.z-caption-scrim` `.z-sticky` `.z-caption-actions` `.z-dropdown`
-`.z-overlay` `.z-toast` `.z-titlebar-drag`
-
-> **禁止 `z-50` 这类字面量。** 新增层级必须先在 `z-index.css` 加 `--z-*` 并写明理由。
-> 档位之间的空隙是留给未来嵌套 portal 的，不要为了「排整齐」去重排。
-
-### 8.5 语义类（`@layer components`）
-
-`.nola-card` `.nola-panel` `.nola-list` `.nola-scrollbar` `.nola-drag` `.nola-no-drag`
-`.nola-measure` `.nola-baseline-pair` `.nola-baseline-row`
-
-`caption-card.css` **故意不进任何 layer**，靠无层声明压过 HeroUI 的 `.button`。
-
-### 8.6 Layer 顺序（改动即静默失效）
-
-`@layer theme, base, components, utilities` 在 `theme/index.css:28` 声明，
-并必须在 `index.html:63` **任何样式之前**重复注册一次，否则页面局部样式抢先注册
-`components` 会让全局 reset 反过来覆盖布局。
-
-- 颜色/字阶/动效 → `base`（必须与 HeroUI 同层且源码在后，否则 HeroUI 赢）
-- 语义类 → `components`
-- HeroUI 原子覆写、z-index → `utilities`
-
-## 9. Never 规则（视觉）
-
-- **Never 写字面色值**，用 8.1 的语义 token。（现存例外：字幕卡颜色为设置项数据、
-  启动页 `index.html` splash 自带一套、Logo 内 `#97F0DA` 为品牌锁定色）
-- **Never 写 `z-50` 类字面量**
-- **Never 在组件里写用户可见字面量**，由调用方传 `t(...)` 的结果
-- **Never 新增第 9 个 primitive**（见第 11 节）
-- **Never 给功能页用 `w-screen` / `100vw` / 负 margin / `fixed` 逃出主内容**
-- **Never 用内联 `style={{}}` 承载主题色**；动态计算值除外
-- **Never 用纯黑投影、逐行投影、卡片 hover 大幅抬升**
-- **Never 移除或改乱 `renderer/index.css` 的导入顺序与 `source(none)`**
-- **Never 往 `index.html` 加内联 `<script>`**（CSP `script-src 'self'`）
-
-## 10. 验收清单
-
-改完 UI 必须逐项确认：
-
-- 1440×960 / 1180×780 / 760×560 三个尺寸无横向滚动、无内容藏到侧栏后
-- 深浅两套主题下对比度可读，且几何尺寸不变
-- 三个窗口（主窗口 / 悬浮字幕 / 设置）各自独立滚动，不逃出壳层
-- 所有交互元素有可访问名称；图标 `aria-hidden`
-- `npm run typecheck` 与 `npm test` 通过
-
-## 11. 组件台账
-
-> 本节是 `src/renderer/components/primitives/index.ts:2,8` 引用的「DESIGN 第 11.1 / 11.2 节」，
-### 11.1 四步决策阶梯
-
-新建 UI 组件前必须依次尝试，任一步成功即停：
-
-1. HeroUI 有没有语义匹配的原子组件？
-2. 它的 `className` + `variant` 能不能达到？
-3. `extend xxxVariants` 能不能加出来？
-4. 都不行才自创
-
-### 11.2 自创组件封闭清单
-
-`AppShell` `TitleBar`(+`useNolaTheme`) `PageHeader` `StatusPill` `SectionCard`
-`SettingRow` `ErrorBoundary` `NavigationItem`
-
-- 以上每个都过了 11.1 的四步决策
-- 其余 5 个台账组件归 feature 层所有，不是「缺了」：
-  `ModelCard` `DualColumnView` `CaptionLine` `NotesPanel` `AudioPlayerBar`
-- 新增任何 UI 一律用 HeroUI 原子组合；确需新增自创件，先改本节再改代码
-
+UI 改动按影响范围检查 1440×960 / 1180×780 / 760×560、深浅主题、六区域语言与相关窗口：无横向滚动、无遮挡、阅读区可滚动、操作可达。工程检查按 AGENTS.MD 选择，仅整理本文件无需打包。主题 token 更改后同步 YAML 与 CSS 映射。

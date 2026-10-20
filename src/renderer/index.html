@@ -171,6 +171,11 @@
         50%      { opacity: 1;    transform: scale(1.035); }
       }
 
+      /* Keep the elevated title bar hidden and unfocusable until the splash is removed. */
+      body:has(#splash) .nola-titlebar {
+        visibility: hidden;
+      }
+
       /* ── 让位给 vite 报错浮层 ──────────────────────────────────────────────
          splash 是 fixed + z-index:1，会盖住 vite-error-overlay。改了一行代码导致
          transform 失败时，用户看到的会是一片"Logo 一直在呼吸"，而不是真正的

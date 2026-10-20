@@ -1,182 +1,184 @@
 # AGENTS.md
 
-> 写给 AI 编程助手的项目规范。视觉规范见 [DESIGN.MD](./DESIGN.MD)。
-> 改项目结构的那一刀必须同步改本文件。
+本文件约束 Nola Translator 仓库中的 AI 编程助手。优先完成用户当前任务，遵守项目既有架构与明确的操作边界。视觉规范见 [DESIGN.MD](./DESIGN.MD)。
 
-## 1. 技术栈
+## 1. 工作原则
 
-- 桌面应用：Electron + React + TypeScript
-- 音频测试：内存采集两秒 PCM，仅做格式转换，无模型加载
-- 引擎：内置 Python 3.12；PyTorch/llama.cpp/CrispASR 按需安装或复用本地组件
-- 识别后端：PyTorch、llama.cpp 或 CrispASR，根据安装的加载器自动选择
-- 翻译后端：PyTorch 或 llama.cpp，支持 Index-Translate 官方权重与独立免费 API
-- 云端识别：Aliyun WebSocket 流式输入；MiniMax VAD 切段上传 WAV
-- 云端翻译：MyMemory REST 或阿里云流式译文
-- UI：Tailwind CSS + HeroUI；悬浮字幕为独立透明子窗口
-- 新手教程：HeroUI 欢迎弹窗引导，状态持久化保存
-- 构建：electron-vite
-- 产品与文档站：VitePress 多语言站点，Vue 容器挂载 React，共享主题与演示入口
-- 中文帮助：沿用既定大纲，截图由脚本自动生成
-- 测试：Vitest + Testing Library
-- 诊断：JSONL 格式日志，自动脱敏并限制大小
-- 浏览器：Chrome/Edge/Firefox MV3 扩展，Python Native Messaging 连接程序
+- **以任务为中心**：先定位相关代码与约束，再修改；按需阅读本文列出的入口，不必在每次任务开始时遍历全仓或阅读所有文档。
+- **完成闭环**：对于已明确授权的任务，自主完成实现、必要验证和由本次改动引起的修复；不要只给方案或完成一半便停下来。信息不足但不影响正确性时，基于现有代码作合理判断；关键产品决策、破坏性操作和受保护文件修改按下文确认。
+- **控制范围**：优先做最小且完整的改动，沿用现有抽象；不借机重构无关模块、增加依赖或改变用户未要求的行为。保留工作区已有修改，不覆盖其他人或 Agent 的成果。
+- **按风险验证**：运行与改动有关的检查；失败则定位并修复本次改动引入的问题。通过后无需无理由重复全套测试。可能下载模型、使用云服务、覆盖用户数据或产生高成本的操作，先核实影响。
+- **说明结果**：结束时简述变更内容、验证结果及未验证事项，不把未执行的检查描述为已通过。
 
-## 2. 目录结构
+## 2. 技术栈与代码入口
 
+| 领域 | 技术或入口 |
+| --- | --- |
+| 桌面端 | Electron + React + TypeScript；`electron-vite` 构建 |
+| UI | Tailwind CSS + HeroUI v3；独立透明子窗口承载悬浮字幕 |
+| 状态与通信 | `NolaBridge`、5 个领域 Store、`useSyncExternalStore`、IPC |
+| 引擎 | 内置 Python 3.12；PyTorch / llama.cpp / CrispASR 组件按需安装或复用 |
+| 本地识别 | PyTorch、llama.cpp 或 CrispASR；根据已安装加载器选择 |
+| 本地翻译 | PyTorch 或 llama.cpp；支持 Index-Translate 官方权重及独立免费 API |
+| 云端能力 | 阿里云 WebSocket 流式识别与译文；MiniMax VAD 分段上传 WAV；MyMemory REST 翻译 |
+| 浏览器扩展 | Chrome / Edge / Firefox MV3；Python Native Messaging 连接桌面程序 |
+| 文档与演示 | VitePress 多语言站；Vue 容器挂载 React，复用桌面 UI、主题及演示入口 |
+| 质量保障 | Vitest + Testing Library；JSONL 诊断日志（自动脱敏、限制大小） |
+
+按任务定位以下目录；结构调整后必须同步更新本节索引。
+
+```
 src/
-├── main/        # Electron 主进程：IPC、窗口、设置及引擎管理
-├── preload/     # 单文件，contextBridge 暴露 window.nolaTranslator
-├── shared/      # 跨进程契约：类型定义、Zod 校验与默认值
-└── renderer/    # React 应用前端代码
-    ├── application.tsx # 桌面、文档站与 Toy 共用的页面及导航注册
-    ├── bridge/  # 渲染进程唯一的数据出口（NolaBridge）
-    ├── assets/browsers/ # Chrome／Edge／Firefox 图标资源
-    ├── assets/fonts/    # 随桌面应用打包的 Noto CJK 区域可变字体
-    ├── store/   # 5 个域 store 及自研 useSyncExternalStore 实现
-    ├── components/  # 基础组件 primitives 及业务功能组件
-    ├── features/    # 各功能模块如 home, workspace, overlay 等
-    ├── i18n/         # 多语言字典定义与组装逻辑
-    └── theme/        # 设计 token 唯一来源及 CJK 字体样式
-engine/nola_translator_engine/  # Python 翻译引擎核心代码
-├── local_models.py             # 本地模型兼容性与自定义注册表导入
-├── offline_models.py           # 离线模型预检、准备与导入逻辑
-├── audio/capture.py            # WASAPI 与浏览器音频采集处理
-├── recognition/aliyun.py       # 阿里云 LiveTranslate WebSocket 识别
-├── recognition/minimax.py      # MiniMax VAD 切段与 SSE 增量识别
-├── recognition/llama_asr.py    # Qwen3-ASR GGUF 语音识别服务
-├── recognition/crisp_asr.py   # CrispASR GGUF 语音识别支持
-├── models/crisp_catalog.py    # CrispASR GGUF 权重与 Tokenizer 清单
-├── models/qwen_gguf_catalog.py # Qwen3-ASR llama.cpp GGUF 权重清单
-├── translation/transformers_causal.py # 本地因果模型文本翻译
-├── translation/mymemory.py     # MyMemory 公共 REST 翻译接口
-└── translation/index_translate.py # Index-Translate 官方翻译协议
+  main/                   Electron 主进程：IPC、窗口、设置、引擎与会话
+  preload/                单文件 contextBridge → window.nolaTranslator
+  shared/                 跨进程类型、Zod 校验、默认值和浏览器契约
+  renderer/
+    application.tsx       桌面、文档站、Toy 共用的页面及导航注册
+    bridge/               渲染进程唯一数据出口（NolaBridge）
+    store/                5 个领域 Store 与 useSyncExternalStore 实现
+    components/           基础 primitives 与业务组件
+    features/             home、workspace、overlay 等功能模块
+    i18n/                 完整语言字典及组装逻辑
+    theme/                设计 token 唯一来源及 CJK 字体样式
+    assets/browsers/      Chrome / Edge / Firefox 图标
+    assets/fonts/         随应用打包的 Noto CJK 区域可变字体
+engine/nola_translator_engine/   Python 翻译引擎
 browser/
-├── version.json / CHANGELOG.md # 扩展版本信息与发布记录
-├── extension/                 # MV3 浏览器扩展核心代码
-├── native_host/               # 标准库 stdio 连接程序及帧协议测试
-└── tests/                     # 浏览器冒烟测试脚本
-docs/                           # VitePress 文档站点工程
-├── nola-docs/                   # 文档源码目录
-├── .vitepress/                  # 站点配置、主题与多语言首页
-├── media-src/                   # 演示环境与 Toy 包共用素材入口
-├── scripts/                     # 构建演示与生成素材脚本
-└── public/                      # 静态资源与截图展示
-assets/brand/                   # 应用 Logo 与 GitHub 官方头像
-scripts/                        # PowerShell 构建与运行时管理脚本
-
-## 3. 编码规范
-
-**事件名**
-- HeroUI v3 用 `onPress`，**全仓不用 `onClick`**（唯一例外是自建 `FeatureCard` 自己的 prop）
-- 图标加 `aria-hidden="true"`
-
-**组件**
-- 只用具名导出，不用 default export
-- Props 对象用 `export interface XProps`；变体联合用 `export type`
-- 组件内不写用户可见字面量：`label: ReactNode` 由调用方传 `t(...)` 的结果
-- 多 className 拼接用 `[...].filter(Boolean).join(' ')`
-
-**状态**
-- 组件**只**调 store action，**不直接调 `bridge.*`**（`settingsStore.ts:4-5`）
-- store **不在模块顶层**触碰 bridge，bridge 由 `initStores()` 注入
-- 禁止 `any`（全仓 `src/renderer` 零命中）
-- 模块求值期**不得同步抛错**——顶层 throw 会连带 `createRoot` 失败；缺 IPC 时 reject 或降级为 no-op
-- `src/main/session-controller.ts` 是桌面与浏览器单会话的唯一控制入口。浏览器临时会话不得创建记录、传 recordingPath 或打开悬浮窗。
-- 快速同传与悬浮字幕共用桌面服务，两者可同时使用；它们与浏览器字幕服务互斥。浏览器字幕从模型预热到服务关闭并释放模型期间保留占用，无需等待扩展连接；打开的悬浮字幕窗口（含最小化）或桌面会话也阻止浏览器字幕启动。主进程最终校验，渲染器通过 store action 处理拒绝并显示“{running}服务正在运行中，请先关闭{running}服务”的本地化 Toast，不能将冲突显示为模型缺失、浏览器弹窗限制或普通启动失败。
-- `src/shared/browser.ts` 定义受限的扩展契约、固定开发 ID 和 Native Messaging 名称；不得在该接口暴露凭据、文件或模型管理。
-
-**i18n**
-- 界面字符串走 `t()`；界面语言偏好为 `auto`、`zh-CN`、`zh-TW`、`zh-HK`、`ko`、`ja` 或 `en`，`auto` 按系统区域解析；`src/renderer/i18n/` 每个区域语言必须各有完整 `Dictionary` 文件
-- `en.ts` 与 `zh-TW`／`zh-HK`／`ko`／`ja` 都必须填满 `Dictionary`；`t()` 收 `Leaves<Dictionary>`，写错 key 是**编译错误**
-- 新增 key 要补齐全部 6 个区域语言；key 加在 `zh-CN.ts` 或任一 `*-ui.ts` 子字典里都可以，因为 `zh-CN.ts` 只是 `import` 各子字典，在子字典新增同样能让 `zh-CN`／`en` 通过类型检查
-- TS2741 每个对象只报第一个缺失属性，补完一个可能还剩下一个；提交前用「全语言 key 全量比对」自查，别只跑 `tsc`
-
-**样式**
-- 颜色/间距/圆角/字号一律用 token（见 `renderer/theme/`），**不写字面值**
-- 按钮统一使用 `--radius-xl` 大圆角，禁止 ghost 变体；图标按钮必须有区别于底层的可见底色，标题栏控件是唯一例外
-- 非按钮圆角按语义使用 token，theme 里**没有** `rounded-pill` 这个档位
-- 字阶压 HeroUI 原子组件时用 utilities 层任意值类（`text-[11px]`），`.nola-*` 在 base 层会被 components 层覆盖
-- z-index 只用 `.z-*` 类（见 DESIGN.MD 第 8 节），**禁 `z-50` 字面量**
-
-## 4. 注释规范
-
-1. 基本原则
-- 统一使用英文注释
-- 注释说明“为什么”，代码本身说明“做什么”。
-- 优先写清楚的代码，避免重复描述代码行为。
-- 注释应准确、简洁，并与代码保持同步。
-
-2. 行内注释
-- 放在相关代码上方，说明特殊原因、限制或不明显的逻辑。
-- 不为简单语句添加注释。
-- 避免在行尾堆叠注释。
-
-3. 函数与组件注释
-- 对用途不明显、规则复杂或有副作用的函数添加说明。
-- 说明重要参数、返回值、副作用和调用限制。
-- 简单函数不必重复写注释。
-
-4. 类型与常量注释
-- 为不明显的类型约束、枚举含义和常量来源补充说明。
-- 注明单位、范围或特殊取值规则。
-- 不重复类型名称或变量名称已经表达的信息。
-
-5. TODO 与 FIXME
-- TODO：尚未完成的工作。
-- FIXME：已知问题或需要修复的行为。
-- 简要说明原因或后续方向；处理完成后删除注释。
-
-6. 禁止事项
-- 不保留过时、错误或与代码矛盾的注释。
-- 不用注释大段复述实现过程。
-- 不用注释代替变量名、函数名或必要的文档。
-- 不添加无明确用途的作者、日期或变更历史。
-
-## 5. 构建命令
-
+  version.json            扩展版本信息
+  CHANGELOG.md            扩展发布记录
+  extension/              MV3 扩展
+  native_host/            stdio Native Messaging 主机与帧协议测试
+  tests/                  浏览器冒烟测试
+docs/
+  nola-docs/              终端用户文档及多语言首页
+  .vitepress/             站点配置、主题和语言入口
+  media-src/              演示环境与 Toy 共用素材
+  scripts/                构建演示、生成素材及截图的脚本
+  public/                 静态资源与文档配图
+  PRD/                    内部需求与架构文档，不参与站点构建
+assets/brand/             App Logo 与 GitHub 官方头像
+scripts/                  PowerShell 构建与运行时管理脚本
 ```
-npm run dev            # 开发（electron-vite）
-npm run typecheck      # tsc --noEmit
-npm test               # vitest run
-npm run build          # typecheck && electron-vite build
-npm run build:toy      # 与文档站共用真实 UI，产物 artifacts/toy
-npm run test:demo      # 构建 Toy 后检查子路径部署、17 页面／三种尺寸、会话与六语言深色 UI
-npm run test:onboarding # 构建后检查首次引导、再次查看及六语言／深浅主题／三种窗口尺寸
-npm run build:browser  # 构建可手动加载的 MV3 扩展
-npm run package:browser # release/Nola-Browser-Extension.zip
+
+引擎细分入口（仅在相应任务中深入阅读）：
+
+| 修改范围 | 入口 |
+| --- | --- |
+| 本地模型注册、离线模型准备 | `engine/nola_translator_engine/local_models.py`、`offline_models.py` |
+| 音频采集 | `engine/nola_translator_engine/audio/capture.py`（WASAPI、浏览器音频） |
+| 云端识别 | `engine/nola_translator_engine/recognition/aliyun.py`、`minimax.py` |
+| GGUF 识别 | `engine/nola_translator_engine/recognition/llama_asr.py`、`crisp_asr.py` |
+| GGUF 权重与 Tokenizer 清单 | `engine/nola_translator_engine/models/qwen_gguf_catalog.py`、`crisp_catalog.py` |
+| 本地及云端翻译 | `engine/nola_translator_engine/translation/transformers_causal.py`、`index_translate.py`、`mymemory.py` |
+| 服务占用与互斥 | `src/main/session-controller.ts` |
+| 浏览器跨进程契约 | `src/shared/browser.ts` |
+
+## 3. 架构与运行时约束
+
+### 渲染进程与 Store
+
+- 组件只调用 **Store Action**，不直接调用 `bridge.*`；渲染进程通过 `src/renderer/bridge/` 的 `NolaBridge` 访问数据与能力（参考 `settingsStore.ts`）。
+- Store 不得在模块顶层访问 Bridge；由 `initStores()` 注入。
+- `src/renderer/` 禁用 `any`，保持 TypeScript 类型约束。
+- 模块求值阶段不得同步抛错，以免阻止 React `createRoot`；IPC 不可用时使用异步 reject 或可控的 no-op 降级。
+
+### 会话与服务互斥
+
+- `src/main/session-controller.ts` 是桌面和浏览器服务**唯一**的会话控制入口；由主进程负责最终并发校验。
+- **快速同传与悬浮字幕共享桌面服务，可以同时使用**；桌面服务与浏览器字幕服务互斥。
+- 浏览器字幕从**模型预热开始到服务关闭并释放模型结束**持续占用，即使扩展尚未连接也不释放占用。
+- 桌面会话或已打开的悬浮字幕窗口（包含最小化）都阻止浏览器字幕启动。
+- 浏览器临时会话不得创建同传记录、传入 `recordingPath` 或打开悬浮字幕窗口。
+- 冲突时渲染器经 Store Action 处理主进程拒绝，显示本地化 Toast：`{running}服务正在运行中，请先关闭{running}服务`；不可误报为模型缺失、浏览器弹窗限制或普通启动失败。
+
+### 其他边界
+
+- `src/shared/browser.ts` 仅暴露受限扩展契约、固定开发 ID 与 Native Messaging 名称；不得向扩展接口暴露凭据、文件或模型管理能力。
+- 音频测试只在内存中采集 **2 秒 PCM** 并进行格式转换；不得为此加载模型。
+- 新手教程采用 HeroUI 欢迎弹窗；完成与再次查看相关状态必须持久化保存。
+- 诊断日志使用 JSONL，保持脱敏与大小限制，禁止泄露密钥或敏感内容。
+
+## 4. React、i18n 与视觉规范
+
+### 组件和事件
+
+- 统一使用具名导出，禁止 `default export`；组件 Props 用 `export interface XProps`，变体联合用 `export type`。
+- HeroUI v3 事件使用 `onPress`；**全仓不得使用 `onClick`**，唯一例外是自建 `FeatureCard` 的同名 Prop。
+- 装饰性图标添加 `aria-hidden="true"`。
+- 可复用组件内不写用户可见文本字面量；由调用方通过 `t(...)` 生成后以 `label: ReactNode` 等 Prop 传入。
+- 拼接多个 `className` 使用 `[...].filter(Boolean).join(' ')`。
+
+### 国际化
+
+- 所有界面字符串使用 `t()`；语言偏好可取 `auto`、`zh-CN`、`zh-TW`、`zh-HK`、`ko`、`ja`、`en`，`auto` 根据系统区域解析。
+- 六个具体区域语言必须各有完整 `Dictionary`。`t()` 的 key 类型为 `Leaves<Dictionary>`，错误 key 应触发编译错误。
+- 新增或修改 key 时同步更新六个区域语言。`zh-CN.ts` 从各 `*-ui.ts` 子字典组装，因此可在相应子字典定义新 key。
+- TS2741 对单个对象可能只报告第一个缺失字段；改动字典时应执行**全语言 key 全量比对**，不能只依靠 `tsc`。
+
+### 样式
+
+- 需要变更 UI 时阅读 [DESIGN.MD](./DESIGN.MD)；颜色、间距、圆角和字号以 `src/renderer/theme/` 的 token 为准，不引入任意字面值。
+- 按钮统一使用 `--radius-xl`，禁止 `ghost` 变体；图标按钮必须有区别于背景的可见底色，标题栏控件除外。
+- 非按钮圆角按语义选 token；主题中没有 `rounded-pill` 档位。
+- HeroUI 原子组件覆盖字阶时，可以使用 utilities 层任意值类（例如 `text-[11px]`）；`.nola-*` 位于 base 层，可能被 components 层覆盖。这是字号规则的**特定例外**，并非允许随意硬编码样式。
+- z-index 只使用 `DESIGN.MD` 第 8 节规定的 `.z-*` 类，禁止写 `z-50` 等字面层级。
+
+## 5. 注释规范
+
+- 代码注释统一使用**英文**。注释解释原因、边界、特殊取值和不明显的副作用，而非重复代码已经表达的行为。
+- 仅对复杂函数、组件、类型或常量添加有价值的注释；需要时写明参数限制、返回值、副作用及单位或范围。行内注释放在对应代码上方，避免行尾堆叠。
+- `TODO` 标记待完成事项，`FIXME` 标记已知问题；说明原因或下一步，解决后删除。
+- 不保留过期、错误、与实现矛盾的注释；不写无用途的作者、日期、修改历史，也不机械要求每个函数或变量都有注释。
+
+## 6. 构建与验证
+
+按改动范围选择相关命令，无需每次全部执行：
+
+```bash
+npm run dev              # Electron 开发环境
+npm run typecheck        # tsc --noEmit
+npm test                 # vitest run
+npm run build            # typecheck + electron-vite build
+npm run build:toy        # 真实 UI 的 Toy 演示构建 → artifacts/toy
+npm run test:demo        # Toy 子路径、17 页面、三种尺寸、会话、六语言深色 UI
+npm run test:onboarding  # 首次引导、再次查看、六语言、双主题、三种尺寸
+npm run build:browser    # MV3 浏览器扩展
+npm run package:browser  # release/Nola-Browser-Extension.zip
 npm run build:browser-host # PyInstaller Native Messaging EXE
-npm run build:python   # 内置 Python 3.12 基础组件，不包含 Torch／llama
-npm run dist:win       # 完整发布：build → build:python → electron-builder（EXE + MSI）
-node scripts/check-installer-paths.mjs [makensis.exe] # Windows NSIS 目录回归检查；可指定编译器路径
+npm run build:python     # Python 3.12 基础组件，不含 Torch / llama
+npm run dist:win         # build → build:python → electron-builder（EXE + MSI）
+node scripts/check-installer-paths.mjs [makensis.exe] # NSIS 安装目录回归检查
 ```
 
-## 6. 约定与协作
+- 普通代码更改：先做相关单测及类型检查；跨进程、安装器、模型运行时或发布链路变更，再执行对应专项检查。
+- UI 或 i18n 更改：按影响范围检查相应页面、语言、主题与窗口尺寸；改动引导流程时使用 `test:onboarding`，改动演示环境时使用 `test:demo`。
+- 不因纯文案或低风险局部调整机械执行完整打包。若环境缺失导致无法验证，应明确说明限制。
 
-**Commit 规范**
+## 7. 协作、提交与文件权限
 
-- 格式：`<type>[optional scope][!]: <description>`
-- 类型：`feat` / `fix` / `docs` / `style` / `refactor` / `perf` / `test` / `build` / `ci` / `chore`
-- 破坏性变更：前缀加 `!`
-- 描述用**英文**、祈使语气、小写开头、不加句号
-- 提交前先主动发给用户确认写好的提交信息（写在一个代码块中），**提交信息请使用英文**
+### Git 与多 Agent
 
-**多 Agent 并发**
+- 修改前检查相关文件及工作区状态；进行并行任务时先运行 `git status --porcelain -uall`，识别现有修改与未跟踪文件，避免覆盖或路径冲突。
+- 多 Agent 并行须明确**文件所有权边界**，同一文件不得交由两个 Worker 同时修改。
+- 审计与修复分离：Verifier 只报告问题与证据，Worker 负责修复。任务足够独立且并行有收益时再拆分，无需为简单改动强制启动子 Agent。
 
-- 派活必须写清文件所有权边界，避免两个 worker 改同一个文件
-- 并行前先 `git status --porcelain -uall` 确认目标文件不存在
-- 审计与修复分开：Verifier 只出结论，修复派 Worker
+### Commit
 
-**维护本文件**
+- 格式：`<type>[optional scope][!]: <description>`；类型为 `feat` / `fix` / `docs` / `style` / `refactor` / `perf` / `test` / `build` / `ci` / `chore`。
+- 破坏性变更使用 `!`；描述使用**英文祈使语气**，首字母小写，不以句号结尾。
+- **不得自行提交。** 需要提交时先完成改动及验证，再把拟议提交信息放在**单独代码块**中发给用户，收到确认后才执行 Git Commit。
 
-- 未经用户修改，不准修改以上章节，请整理好后放在下面
-- 未经用户同意，不要私自修改/docs/文档站的内容，以及README
-- 所有关于文档的修改必须让用户确认后才能写入
+### 文档与规则维护
 
-## 章节名
+- 未经用户明确授权，不修改 `docs/`（含文档站与内部 PRD）、`README*` 或其他文档；先提出可审阅的修改内容。用户在当前任务中明确批准具体文件与改动时，不必重复确认。
+- `AGENTS.md` 的既有规范不得因无关任务被擅自改写。项目结构变化时，**必须同步维护第 2 节的目录和入口索引，修改前提醒用户校对**；其他规范仅在用户要求或明确批准时更改。
+- 简体中文帮助文档位于 `docs/nola-docs/zh-CN/`，使用 `/zh-CN/` URL 前缀；`docs/nola-docs/index.md` 保留产品首页。帮助内容沿用既定大纲，截图由脚本生成。
+- 文档配图放在 `docs/public/docs-image/{语言代码}/{文档分类}/{文章名}/`，采用有意义文件名，以 `/docs-image/` 引用；不同语言分别保存图片副本。
+- `docs/PRD/` 仅保存内部需求和架构文档；`docs/nola-docs/` 只放终端用户指引，不混放。
+
+未经用户同意，不准修改以上章节的内容，如果却有需要记录的，请分点记录在下面。
+```
+### 章节名
 
 - 分点
-
-## 文档目录补充
-
-- 简体中文帮助文档位于 `docs/nola-docs/zh-CN/`，页面 URL 使用 `/zh-CN/` 前缀；`docs/nola-docs/index.md` 保留产品首页。
-- 文档配图按 `docs/public/docs-image/{语言代码}/{文档分类}/{文章名}/` 存放，使用有意义的文件名，并从 `/docs-image/` 引用；不同语言分别保存图片副本。
+```

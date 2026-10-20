@@ -25,7 +25,7 @@ Thumbs.db
 /docs/.vitepress/cache/
 /docs/.vitepress/.temp/
 /docs/.media-dist/
-/docs/docs备份.zip
+/docs/PRD
 engine/build/
 engine/dist/
 browser/extension/dist-firefox/
