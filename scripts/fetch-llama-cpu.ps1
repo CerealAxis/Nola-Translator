@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'sha256.ps1')
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $target = [IO.Path]::GetFullPath((Join-Path $projectRoot 'vendor\llama-cpu'))
 $cacheRoot = Join-Path $projectRoot 'vendor\llama-zips'
@@ -28,13 +29,13 @@ New-Item -ItemType Directory -Path $cacheRoot -Force | Out-Null
 foreach ($asset in $assets) {
     $archive = $asset.Archive
     $expectedHash = $asset.Sha256
-    if ((Test-Path -LiteralPath $archive) -and (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expectedHash) {
+    if ((Test-Path -LiteralPath $archive) -and (Get-Sha256Hex $archive) -ne $expectedHash) {
         Remove-Item -LiteralPath $archive -Force
     }
     if (-not (Test-Path -LiteralPath $archive)) {
         $part = "$archive.part"
         Invoke-WebRequest -Uri $asset.Url -OutFile $part
-        if ((Get-FileHash -LiteralPath $part -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expectedHash) { throw 'CPU llama 下载校验失败' }
+        if ((Get-Sha256Hex $part) -ne $expectedHash) { throw 'CPU llama 下载校验失败' }
         Move-Item -LiteralPath $part -Destination $archive
     }
 }

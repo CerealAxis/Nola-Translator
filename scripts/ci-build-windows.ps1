@@ -1,6 +1,19 @@
 param()
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path -Parent $PSScriptRoot)
+. (Join-Path $PSScriptRoot 'sha256.ps1')
+
+# PowerShell 7 puts its own module directories at the front of PSModulePath and passes that
+# environment on to the processes it starts. A child Windows PowerShell then looks for the
+# modules it knows in the PowerShell 7 directory first, cannot load them there and never
+# falls back to its own copy, so cmdlets such as Get-FileHash disappear from the child.
+# The Windows PowerShell module directory is put in front of the inherited path so every
+# `powershell` script this build starts resolves its modules the way it expects.
+$windowsPowerShellModules = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Modules'
+if (Test-Path -LiteralPath $windowsPowerShellModules) {
+    $env:PSModulePath = "$windowsPowerShellModules;$env:PSModulePath"
+}
+
 function Assert-NativeSuccess([string]$Task) {
     if ($LASTEXITCODE -ne 0) { throw "$Task failed (exit $LASTEXITCODE)" }
 }
@@ -67,7 +80,7 @@ foreach ($browser in @('Chrome', 'Edge')) {
 }
 $checksum = foreach ($name in $assets) {
     $file = Get-Item -LiteralPath "release/$name"
-    "$((Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($file.Name)"
+    "$(Get-Sha256Hex $file.FullName)  $($file.Name)"
 }
 Set-Content -LiteralPath 'release/SHA256SUMS.txt' -Value $checksum -Encoding ascii
 if ($env:GITHUB_OUTPUT) {

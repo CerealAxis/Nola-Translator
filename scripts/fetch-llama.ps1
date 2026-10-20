@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'sha256.ps1')
 
 # The companion assets supply cudart and cuBLAS for the CUDA backend.
 
@@ -50,7 +51,7 @@ foreach ($asset in $assets) {
 
     $verified = $false
     if (Test-Path $zipPath) {
-        $hash = (Get-FileHash -Algorithm SHA256 -Path $zipPath).Hash.ToLowerInvariant()
+        $hash = Get-Sha256Hex $zipPath
         $verified = $hash -eq $asset.Sha256
         if (-not $verified) {
             Remove-Item -Force $zipPath
@@ -63,7 +64,7 @@ foreach ($asset in $assets) {
         Write-Host "下载 $($asset.Name) ..."
         Invoke-WebRequest -Uri $asset.Url -OutFile $partPath
 
-        $hash = (Get-FileHash -Algorithm SHA256 -Path $partPath).Hash.ToLowerInvariant()
+        $hash = Get-Sha256Hex $partPath
         if ($hash -ne $asset.Sha256) {
             Remove-Item -Force $partPath
             throw "$($asset.Name) sha256 校验失败：期望 $($asset.Sha256)，实际 $hash"

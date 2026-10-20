@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'sha256.ps1')
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $vendorRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'vendor'))
 $target = [IO.Path]::GetFullPath((Join-Path $vendorRoot 'llama-vulkan'))
@@ -14,9 +15,16 @@ $archiveName = [IO.Path]::GetFileName(([Uri]$package.url).AbsolutePath)
 $archive = Join-Path $cacheRoot $archiveName
 $expectedSource = $package.sha256.ToLowerInvariant()
 $marker = Join-Path $target 'nola-runtime-source.txt'
-$requiredFiles = @('llama-server.exe', 'llama-server-impl.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu.dll', 'ggml-vulkan.dll')
+# The server entry point and the libraries it loads. The list follows the imports of
+# llama-server.exe and llama-server-impl.dll; the full dependency closure is verified
+# against the extracted files, so a library this list does not name is still caught.
+$requiredFiles = @('llama-server.exe', 'llama-server-impl.dll', 'llama-common.dll', 'llama.dll', 'mtmd.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-vulkan.dll')
+# The CPU backend is one library per microarchitecture and the loader picks the one the
+# running CPU supports, so the archive has to carry the family rather than a fixed name.
+$cpuBackendPattern = 'ggml-cpu*.dll'
 
-$present = ($requiredFiles | Where-Object { -not (Test-Path -LiteralPath (Join-Path $target $_)) }).Count -eq 0
+$present = ($requiredFiles | Where-Object { -not (Test-Path -LiteralPath (Join-Path $target $_)) }).Count -eq 0 `
+    -and [bool](Get-ChildItem -LiteralPath $target -Filter $cpuBackendPattern -File -ErrorAction SilentlyContinue)
 if ($present -and (Test-Path -LiteralPath $marker) -and (Get-Content -LiteralPath $marker -Raw).Trim() -eq $expectedSource) {
     Write-Host "vendor/llama-vulkan already contains the catalog Vulkan runtime; skipping download."
     exit 0
@@ -26,14 +34,14 @@ if (Test-Path -LiteralPath $target) {
 }
 
 New-Item -ItemType Directory -Force -Path $vendorRoot, $cacheRoot | Out-Null
-if ((Test-Path -LiteralPath $archive) -and (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expectedSource) {
+if ((Test-Path -LiteralPath $archive) -and (Get-Sha256Hex $archive) -ne $expectedSource) {
     Remove-Item -LiteralPath $archive -Force
 }
 if (-not (Test-Path -LiteralPath $archive)) {
     $part = "$archive.part"
     Write-Host "Downloading $archiveName ..."
     Invoke-WebRequest -Uri $package.url -OutFile $part
-    if ((Get-FileHash -LiteralPath $part -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expectedSource) {
+    if ((Get-Sha256Hex $part) -ne $expectedSource) {
         Remove-Item -LiteralPath $part -Force
         throw 'Vulkan llama runtime SHA-256 verification failed.'
     }
@@ -50,6 +58,9 @@ try {
     foreach ($file in $requiredFiles) {
         if (-not (Test-Path -LiteralPath (Join-Path $staging $file))) { throw "Vulkan runtime archive is missing $file." }
     }
+    if (-not (Get-ChildItem -LiteralPath $staging -Filter $cpuBackendPattern -File)) { throw 'Vulkan runtime archive has no CPU backend library.' }
+    & node (Join-Path $PSScriptRoot 'verify-llama-runtime.mjs') $staging
+    if ($LASTEXITCODE -ne 0) { throw 'Vulkan llama runtime does not resolve its dependencies.' }
     Set-Content -LiteralPath (Join-Path $staging 'nola-runtime-source.txt') -Value $expectedSource -Encoding ASCII
     Move-Item -LiteralPath $staging -Destination $target
 } finally {
