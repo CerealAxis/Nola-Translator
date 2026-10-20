@@ -59,6 +59,19 @@ async def connect_websocket(url: str, headers: dict[str, str]) -> WebSocketTrans
                          max_size=256 * 1024, max_queue=16, write_limit=32 * 1024, proxy=proxy)
 
 
+def _closed_by_peer(error: Exception) -> bool:
+    """Whether the server ended the connection, as opposed to the network dropping it.
+
+    The transport raises the same exception for both, but only a close frame sent by
+    the server is recorded in ``rcvd``; a lost connection never receives one.
+    """
+    if getattr(error, "rcvd", None) is None:
+        return False
+    # Resolved on demand so a session that never opens a socket does not load the transport.
+    from websockets.exceptions import ConnectionClosed
+    return isinstance(error, ConnectionClosed)
+
+
 def resolve_aliyun(config: ModelSelection) -> tuple[str, str, str, str]:
     options = config.recognitionOptions
     model = (options.model if options else "") or MODELS[0]
@@ -164,14 +177,21 @@ class AliyunRecognizer:
                 await self._disconnect()
                 raise self._sanitize(error) from None
 
-    @staticmethod
-    def _sanitize(error: Exception) -> CloudRecognitionError:
+    def _sanitize(self, error: Exception) -> CloudRecognitionError:
         if isinstance(error, CloudRecognitionError):
             return error
         status = getattr(getattr(error, "response", None), "status_code", None)
-        return CloudRecognitionError("recognitionUnauthorized" if status in (401, 403) else
-            "recognitionRateLimited" if status == 429 else "recognitionTimeout" if isinstance(error, TimeoutError)
-            else "recognitionNetworkError")
+        if status in (401, 403):
+            return CloudRecognitionError("recognitionUnauthorized")
+        if status == 429:
+            return CloudRecognitionError("recognitionRateLimited")
+        if isinstance(error, TimeoutError):
+            return CloudRecognitionError("recognitionTimeout")
+        # A close frame from the server ends the conversation; a dropped connection does
+        # not, and the two need opposite user action.
+        if not self._closed and _closed_by_peer(error):
+            return CloudRecognitionError("recognitionClosed")
+        return CloudRecognitionError("recognitionNetworkError")
 
     async def _expect(self, kind: str) -> None:
         assert self._ws is not None
@@ -281,7 +301,9 @@ class AliyunRecognizer:
         except asyncio.CancelledError:
             raise
         except Exception as error:
-            self._failure = self._sanitize(error)
+            # The first failure is the one the session hears, so the instance the audio
+            # loop re-raises is the same one the error channel already reported.
+            self._failure = self._failure or self._sanitize(error)
             self._finished.set()
             if self.on_error is not None:
                 self.on_error(self._failure)

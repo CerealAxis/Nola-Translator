@@ -121,10 +121,12 @@ def main() -> int:
                             payload, _, rest = buffer.partition(b"\n")
                             buffer = bytearray(rest)
                             write_message(sys.stdout.buffer, payload)
-                        if len(buffer) > MAX_MESSAGE_BYTES:
-                            break
-                except (OSError, ValueError):
-                    pass
+                except (OSError, ValueError) as error:
+                    # The browser collects the host's stderr, so a failure is named there instead
+                    # of ending the process as if it had closed normally.
+                    print(f"Nola native host stopped: {error}", file=sys.stderr)
+                    sys.stderr.flush()
+                    os._exit(1)
                 # Browser stdin may remain open after the desktop exits.
                 os._exit(0)
 

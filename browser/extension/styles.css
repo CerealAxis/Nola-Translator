@@ -26,6 +26,10 @@
   .nola-row .button { width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   /* Keep an invisible hit area while leaving only the brand mark painted in every pointer state. */
   .nola-trigger .button { --button-bg: transparent; --button-bg-hover: transparent; --button-bg-pressed: transparent; width: var(--space-4); min-width: var(--space-4); height: var(--space-4); padding: 0; background: transparent; }
+  /* A failed session clears the caption block, so the trigger itself has to show that something
+     went wrong while it carries the reason in its accessible name. The base rule pins the
+     background to transparent, so the tint has to be painted here to reach the button. */
+  .nola-trigger .button.nola-trigger-error { background: color-mix(in oklab, var(--danger) 18%, transparent); box-shadow: inset 0 0 0 1px var(--danger); }
   .nola-value { color: var(--muted); text-align: end; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nola-status { font: var(--font-caption); margin: 0; color: var(--muted); }
   .nola-status[data-state='ready'] { color: var(--accent); }

@@ -300,6 +300,8 @@ export class MeetingStore {
     const meetingId = this.open.get(sessionId)
     if (!meetingId) return
     await this.serialize(meetingId, async () => {
+      // A meeting whose record is already final takes no more segments.
+      if (this.cache.get(meetingId)?.state === 'completed') return
       const ledger = this.recorded.get(meetingId) ?? new Map<string, { revision: number; signature: string }>()
       this.recorded.set(meetingId, ledger)
       const previous = ledger.get(segment.segmentId)
@@ -339,10 +341,17 @@ export class MeetingStore {
   async finish(sessionId: string): Promise<MeetingMeta | null> {
     const meetingId = this.open.get(sessionId)
     if (!meetingId) return null
-    this.open.delete(sessionId)
     return this.serialize(meetingId, async () => {
       const meta = this.cache.get(meetingId)
-      if (!meta) return null
+      if (!meta) {
+        this.open.delete(sessionId)
+        return null
+      }
+      // A second finalize for the same session reuses the record that is already written.
+      if (meta.state === 'completed') {
+        this.open.delete(sessionId)
+        return meta
+      }
       const audio = await this.resolveAudio(meta)
       /*
        * Both the end instant and the duration come from the content span, never from the wall
@@ -369,6 +378,9 @@ export class MeetingStore {
       await writeMeta(this.directory(meetingId), next)
       this.cache.set(meetingId, next)
       this.recorded.delete(meetingId)
+      // The session stays attached to its meeting until the record is on disk, so a failed write
+      // leaves the meeting open for another finalize instead of stranding it in the running state.
+      this.open.delete(sessionId)
       return next
     })
   }

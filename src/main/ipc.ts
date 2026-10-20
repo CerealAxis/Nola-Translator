@@ -393,33 +393,9 @@ export function registerEngineIpc(
     // A listener left on the long-lived EngineProcess is a real leak: every later state change
     // would still broadcast into windows whose IPC has already been torn down.
     engine.off('state', forwardState)
-    for (const channel of [
-      IPC_CHANNELS.listDevices,
-      IPC_CHANNELS.getEngineState,
-      IPC_CHANNELS.listResources,
-      IPC_CHANNELS.manageResource,
-      IPC_CHANNELS.searchHuggingFace,
-      IPC_CHANNELS.inspectHuggingFace,
-      IPC_CHANNELS.getHuggingFaceModelCard,
-      IPC_CHANNELS.installHuggingFaceModel,
-      IPC_CHANNELS.configureModel,
-      IPC_CHANNELS.startSession,
-      IPC_CHANNELS.prewarmModels,
-      IPC_CHANNELS.ensureEngineReady,
-      IPC_CHANNELS.stopSession,
-      IPC_CHANNELS.setSessionPaused,
-      IPC_CHANNELS.showOverlay,
-      IPC_CHANNELS.hideOverlay,
-      IPC_CHANNELS.closeOverlay,
-      IPC_CHANNELS.minimizeOverlay,
-      IPC_CHANNELS.resizeOverlay,
-      IPC_CHANNELS.openOverlayMenu,
-      IPC_CHANNELS.presentOverlayMenu,
-      IPC_CHANNELS.closeOverlayMenu,
-      IPC_CHANNELS.openDefaultBrowser,
-    ]) {
-      ipcMain.removeHandler(channel)
-    }
+    // Every channel this module registers, so a second registration cannot inherit a handler
+    // that still points at the previous engine instance.
+    Object.values(IPC_CHANNELS).forEach((channel) => ipcMain.removeHandler(channel))
   }
 }
 import { fallbackTranslationFieldsOf, recognitionFieldsOf, supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'

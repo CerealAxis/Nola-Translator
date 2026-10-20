@@ -18,6 +18,10 @@ Assert-NativeSuccess 'Application build'
 Assert-NativeSuccess 'Browser extension build'
 & npm run package:browser
 Assert-NativeSuccess 'Browser extension archive'
+# The Vulkan llama runtime is not in the repository, so a clean checkout has no vendor directory
+# and the packaged application would ship without the local translation runtime.
+& npm run fetch:llama-vulkan
+Assert-NativeSuccess 'Vulkan llama runtime'
 $basePython = (& python -c 'import sys; print(sys.executable)').Trim()
 Assert-NativeSuccess 'Locate Python'
 $hostEnvironment = Join-Path (Get-Location).Path 'artifacts/browser-host-environment'

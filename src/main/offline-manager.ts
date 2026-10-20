@@ -186,6 +186,21 @@ export class OfflineManager {
       catch { const parent = dirname(target); if (target === parent) return undefined; target = parent }
     }
   }
+  /**
+   * A model export stages into a directory whose name is derived from the model id, so a
+   * directory left behind by a crashed export would make every later export of that model fail
+   * with EEXIST. A stale one is removed and the directory is created again.
+   */
+  private async createStaging(staging: string, parent: string): Promise<void> {
+    try {
+      await mkdir(staging, { recursive: false })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || dirname(staging) !== resolve(parent)) throw error
+      this.options.diagnostic?.('offline.staleStagingRemoved', { path: staging })
+      await rm(staging, { recursive: true, force: true })
+      await mkdir(staging, { recursive: false })
+    }
+  }
   prepare(raw: OfflinePrepareRequest, parent: string, destination: 'package' | 'model' = 'package'): OfflineTask {
     this.assertIdle()
     const request = offlinePrepareSchema.parse(raw)
@@ -196,8 +211,8 @@ export class OfflineManager {
     const output = join(resolve(parent), destination === 'model' ? name : `${name}.zip`)
     const archive = `${output}.partial`
     return this.start(async signal => {
-      await mkdir(staging, { recursive: false })
       try {
+        await this.createStaging(staging, parent)
         if (request.modelIds.length) await this.options.models({ operation: 'prepare', destination: staging,
           modelIds: request.modelIds, modelRoot: this.options.modelRoot, network: await resolveModelNetwork(this.options.network()),
           modelSource: request.modelSource, exportModel: destination === 'model' }, signal, this.progress)
@@ -227,7 +242,8 @@ export class OfflineManager {
         else this.task.outputPath = join(output, this.task.detail ?? modelId!)
       } finally {
         if (destination !== 'model' && dirname(archive) === resolve(parent)) await rm(archive, { force: true })
-        // Only the exact fresh sibling created above is eligible for cleanup.
+        // The staging name is built here from the model id and sits directly in the folder the
+        // user chose, so those two conditions are what bound this removal.
         if (dirname(staging) === resolve(parent) && (await lstat(staging).catch(() => null))?.isDirectory())
           await rm(staging, { recursive: true, force: true })
       }

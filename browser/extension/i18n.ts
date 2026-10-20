@@ -51,12 +51,16 @@ export function browserText(language: BrowserUiLanguage = 'en') {
   const locale = resolveUiLanguage(language, navigator.language)
   const dictionary = dictionaries[locale]
   return (key: BrowserTextKey): string => {
-    if (isDictionaryKey(key)) return dictionary[key]
+    if (isDictionaryKey(key) && Object.hasOwn(dictionary, key)) return dictionary[key]
     return dictionary.unknownError
   }
 }
+/**
+ * An error code is read as an own property: a code such as `toString` would otherwise reach the
+ * prototype chain and resolve to a function instead of a message.
+ */
 export function errorKey(code: string): BrowserTextKey {
-  const alias = ERROR_ALIASES[code]
+  const alias = Object.hasOwn(ERROR_ALIASES, code) ? ERROR_ALIASES[code] : undefined
   if (alias) return alias
-  return code in browserZh ? code as BrowserKey : `${UNKNOWN_PREFIX}${code}`
+  return Object.hasOwn(browserZh, code) ? code as BrowserKey : `${UNKNOWN_PREFIX}${code}`
 }

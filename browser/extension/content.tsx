@@ -4,7 +4,7 @@ import { enableShadowDOM } from 'react-stately/private/flags/flags'
 import { createBridge } from './bridge'
 import { createExtensionStore } from './store'
 import { alignPlayerTrigger, detectVideos, playerAdapter } from './adapters'
-import { browserText } from './i18n'
+import { browserText, errorKey } from './i18n'
 import { resolveUiLanguage } from '../../src/shared/languages'
 import { Panel } from './components'
 import { NolaLogo } from './logo'
@@ -168,9 +168,13 @@ function install(): void {
     const panelWidth = Math.min(token('--browser-panel-width'), innerWidth - token('--space-3'))
     if (!adapter.controls) { trigger.host.style.left = `${Math.max(0, rect.right - trigger.host.getBoundingClientRect().width - token('--space-2'))}px`; trigger.host.style.top = `${rect.top + spacing}px` }
     trigger.host.hidden = fullscreen === video || rect.width < 160
+    // A failed session clears the caption block, so the trigger is the only place left that can
+    // say why the screen is empty.
+    const failure = state.error ? t(errorKey(state.error)) : ''
+    const triggerLabel = failure ? `${t('button')} — ${failure}` : t('button')
     // HeroUI's Button props carry no `title`, so the native hover tooltip rides on the trigger host.
-    trigger.host.title = t('button')
-    triggerRoot.render(<Button isIconOnly size="sm" variant="secondary" aria-label={t('button')} aria-expanded={state.panelOpen} onPress={store.togglePanel}><NolaLogo /></Button>)
+    trigger.host.title = triggerLabel
+    triggerRoot.render(<Button isIconOnly size="sm" variant="secondary" className={failure ? 'nola-trigger-error' : undefined} aria-label={triggerLabel} aria-expanded={state.panelOpen} onPress={store.togglePanel}><NolaLogo /></Button>)
     const controls = adapter.controls
     if (controls) requestAnimationFrame(() => {
       if (!trigger.host.hidden && trigger.host.parentElement === controls) alignPlayerTrigger(controls, trigger.host)

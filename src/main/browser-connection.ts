@@ -19,6 +19,8 @@ const run = promisify(execFile)
 const CHANNEL = 'browser:connection'
 const CAPTION_SERVICE_CHANNEL = 'browser:caption-service'
 const MAX_MESSAGE = 160 * 1024
+/** The extension stops waiting for a start after three minutes; the desktop gives the request up with it. */
+const START_REQUEST_BUDGET_MS = 170_000
 /** How often the desktop summarizes the audio it received; 10 chunks/second would be unreadable. */
 const AUDIO_LOG_INTERVAL_MS = 1000
 const LEGACY_BROWSER_ERROR_CODES: Readonly<Record<string, BrowserWireErrorCode>> = {
@@ -376,7 +378,18 @@ export class BrowserConnection {
   private send(client: Client, response: BrowserResponse): void {
     if (client.closed) return
     if (client.socket.writableLength > 2 * 1024 * 1024) { client.socket.destroy(); return }
-    client.socket.write(`${JSON.stringify(response)}\n`)
+    const payload = JSON.stringify(response)
+    // A frame past the protocol limit would be cut off mid-message on the other side, so the
+    // request it answers is failed with a code that names the reason. The connection stays up:
+    // only this frame was too large, and the framing itself is still intact.
+    if (Buffer.byteLength(payload) > MAX_MESSAGE) {
+      this.debugLog('sendRejected', { reason: 'frameTooLarge', bytes: Buffer.byteLength(payload) })
+      if (response.type === 'result' || response.type === 'error') {
+        client.socket.write(`${JSON.stringify({ type: 'error', id: response.id, code: 'lineTooLarge', message: 'lineTooLarge' })}\n`)
+      }
+      return
+    }
+    client.socket.write(`${payload}\n`)
   }
   private async handle(client: Client, request: BrowserRequest): Promise<void> {
     const audioGeneration = client.audioGeneration
@@ -421,7 +434,12 @@ export class BrowserConnection {
         return
       }
       if (request.type === 'hello') {
-        await sessions.ensureReady()
+        /*
+         * The engine is only woken for a gate that admits a caption session: a page that merely
+         * loads the extension would otherwise leave a Python process behind on a desktop whose
+         * caption service is off.
+         */
+        if (this.captionServiceActive) await sessions.ensureReady()
         const settings = this.options.getSettings()
         this.send(client, { type: 'result', id: request.id, value: { protocolVersion: 1, extensionVersion: BROWSER_EXTENSION_VERSION, extensionCompatible: client.extensionVersion === BROWSER_EXTENSION_VERSION, uiLanguage: settings.uiLanguage, sourceLanguage: settings.recognition.sourceLanguage, targetLanguage: settings.translation.targetLanguage, devices: this.devices, browserAudio: engine.supports('browserAudio'), captionServiceActive: this.captionServiceActive, config: browserCaptionConfig(settings) } })
         return
@@ -437,8 +455,22 @@ export class BrowserConnection {
         if (client.starting || client.sessionId) throw new Error('sessionAlreadyRunning')
         client.starting = true
         this.debugLog('start', { source: request.source, streamId: request.streamId, epoch: request.epoch })
+        /*
+         * The extension stops waiting for a start after three minutes, so the desktop gives the
+         * request up with it: a session that lands afterwards has no client left to own it and
+         * would keep the models loaded for a session the user already sees as ended.
+         */
+        let abandoned = false
+        const budget = setTimeout(() => {
+          abandoned = true
+          void this.options.sessions.cancelBrowserStart().catch(() => undefined)
+        }, START_REQUEST_BUDGET_MS)
         try {
           const started = await sessions.start(browserSessionConfig(this.options.getSettings(), request), 'browser')
+          if (abandoned) {
+            await sessions.stop(started.sessionId).catch(() => undefined)
+            return
+          }
           client.sessionId = started.sessionId
           client.audioGeneration++
           client.epoch = request.epoch
@@ -448,7 +480,7 @@ export class BrowserConnection {
           // drop the id too — otherwise status() advertises a session that no longer exists.
           if (client.closed || !this.enabled || this.options.integrations?.allows(client.browser) === false) { client.sessionId = null; await sessions.stop(started.sessionId); return }
           this.send(client, { type: 'result', id: request.id, value: { sessionId: started.sessionId } })
-        } finally { client.starting = false }
+        } finally { clearTimeout(budget); client.starting = false }
         return
       }
       if (client.sessionId !== request.sessionId) throw new Error('sessionNotRunning')

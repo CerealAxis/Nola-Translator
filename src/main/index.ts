@@ -440,7 +440,7 @@ if (!hasSingleInstanceLock) {
       return overlayWindow!
     }
     const isOverlayVisible = (): boolean => !!overlayWindow && !overlayWindow.isDestroyed() && (overlayWindow.isVisible() || overlayWindow.isMinimized())
-    const sessions = new SessionController({ engine, meetings, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareEnvironment(true, config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => getOverlayWindow().showInactive(), hideOverlay: () => overlayWindow?.hide(), isBrowserCaptionServiceActive: () => browserConnection?.captionServiceReserved ?? false, isOverlayVisible })
+    const sessions = new SessionController({ engine, meetings, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareEnvironment(true, config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => getOverlayWindow().showInactive(), hideOverlay: () => { if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide() }, isBrowserCaptionServiceActive: () => browserConnection?.captionServiceReserved ?? false, isOverlayVisible })
     const offline = new OfflineManager({
       python: createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath }).command,
       modelRoot: resourceEnvironment.NOLA_TRANSLATOR_MODEL_DIR,
@@ -541,5 +541,9 @@ app.on('before-quit', (event) => {
   disposeIpc?.()
   disposeAppIpc?.()
   disposeRuntimeIpc?.()
-  void Promise.allSettled([browserConnection?.dispose(), disposeOfflineIpc?.()]).finally(() => engine!.stop().finally(() => app.quit()))
+  void Promise.allSettled([browserConnection?.dispose(), disposeOfflineIpc?.()])
+    .finally(() => engine!.stop())
+    .catch((error) => console.error('engine shutdown failed', error))
+    .finally(() => app.quit())
+    .catch((error) => console.error('application quit failed', error))
 })

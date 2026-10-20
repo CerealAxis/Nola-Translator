@@ -152,6 +152,8 @@ CLOUD_RECOGNITION_ERROR_CODES: dict[str, str] = {
     "recognitionInvalidResponse": "recognitionInvalidResponse",
     "recognitionInvalidHandshake": "recognitionInvalidResponse",
     "recognitionRejected": "recognitionInvalidResponse",
+    "recognitionClosed": "recognitionClosed",
+    "recognitionBufferOverflow": "recognitionBufferOverflow",
 }
 
 
@@ -291,6 +293,9 @@ class EngineRuntime:
         self._finish_stream_task: asyncio.Task[None] | None = None
         self._stream_finishing = False
         self._last_frame_end_ms = 0.0
+        # Cloud failures the session was already told about, so one failure is not
+        # reported twice no matter which path reaches the engine first.
+        self._reported_cloud_failures: set[CloudRecognitionError] = set()
         self._model_cleanup_task: asyncio.Task[None] | None = None
         self.model_cleanup_timeout = 2.0
         self._loaded_model_key: tuple[str, str | None, str] | None = None
@@ -767,6 +772,8 @@ class EngineRuntime:
         self._first_translation_timing_logged = False
         self.session_paused = False
         self.active_config = command.config
+        # The previous session's failures belong to a recognizer that is gone.
+        self._reported_cloud_failures.clear()
         self._stream_generation += 1
         self._timeline = command.config.browserTimeline
         self._stream_epoch = self._timeline.epoch if self._timeline is not None else None
@@ -1444,6 +1451,11 @@ class EngineRuntime:
                 )
             )
         except ModelUnavailable as error:
+            # A cloud recognizer reports its failure on the error channel and re-raises
+            # the same instance here, so the instance tells whether the session has
+            # already heard about it.
+            if isinstance(error, CloudRecognitionError) and not self._claim_cloud_failure(error):
+                return
             # stop the capture loop after a load failure, otherwise every frame re-reports it.
             self.emit(
                 ErrorEvent(
@@ -1470,6 +1482,18 @@ class EngineRuntime:
                 )
             )
 
+    def _claim_cloud_failure(self, error: CloudRecognitionError) -> bool:
+        """Whether the session still has to hear about this cloud failure.
+
+        A remote recognizer reports a failure on its error channel and re-raises the
+        same instance from the audio loop, so whichever path arrives first owns the
+        report and the other one stays quiet.
+        """
+        if error in self._reported_cloud_failures:
+            return False
+        self._reported_cloud_failures.add(error)
+        return True
+
     def _bind_recognizer(self, recognizer: Recognizer) -> None:
         session_id, generation = self.service.session_id, self._stream_generation
 
@@ -1483,6 +1507,10 @@ class EngineRuntime:
         if hasattr(recognizer, "on_error"):
             def on_error(error: CloudRecognitionError) -> None:
                 if session_id == self.service.session_id and generation == self._stream_generation:
+                    # The recognizer re-raises this instance from its audio loop, so the
+                    # instance itself records that the session has already been told.
+                    if not self._claim_cloud_failure(error):
+                        return
                     # `details.reason` stays the launch-log diagnostic, but it is the code the
                     # session reads to pick user-facing copy, so the meaning rides on the code.
                     self.emit(self._resource_error(
@@ -2044,8 +2072,18 @@ class EngineRuntime:
         if self._stream_epoch is not None and (command.epoch < self._stream_epoch
                 or command.epoch == self._stream_epoch and self._epoch_initialized):
             return [self._resource_error(command.requestId, "sessionStaleEpoch", {"reason": "staleEpoch"})]
-        self._stream_generation += 1
+        # The epoch and the timeline are the identity a browser replays its audio against,
+        # so a reset that cannot start its recognizer hands the previous ones back: an
+        # epoch that was written but never anchored cannot be requested again.
+        previous_epoch = self._stream_epoch
+        previous_epoch_initialized = self._epoch_initialized
+        previous_timeline = self._timeline
+        previous_timeline_origin_ms = self._timeline_origin_ms
+        previous_last_frame_end_ms = self._last_frame_end_ms
+        previous_last_audio_sequence = self._last_audio_sequence
+        previous_last_audio_end_ms = self._last_audio_end_ms
         capture = self.capture
+        self._stream_generation += 1
         if capture is not None:
             capture.pause()
         await self._cancel_stream_tasks()
@@ -2070,9 +2108,23 @@ class EngineRuntime:
                 await self.recognizer.start()
             except Exception as error:
                 await self.recognizer.close()
+                # The recognizer never ran, so the stream is not anchored; the epoch and
+                # the timeline go back to the ones the browser still knows.
+                self._stream_epoch = previous_epoch
+                self._epoch_initialized = previous_epoch_initialized
+                self._timeline = previous_timeline
+                self._timeline_origin_ms = previous_timeline_origin_ms
+                self._last_frame_end_ms = previous_last_frame_end_ms
+                self._last_audio_sequence = previous_last_audio_sequence
+                self._last_audio_end_ms = previous_last_audio_end_ms
                 self._stream_anchored = False
+                # The finish drain was cancelled with the other stream tasks, so nothing is
+                # finishing any more and the session must not stay locked in that state.
+                self._stream_finishing = False
+                # The capture stays paused: the consumer that drained it is gone, and a
+                # running capture would record into a queue nobody reads.
                 return [self._resource_error(command.requestId, CLOUD_RECOGNITION_ERROR_CODES.get(
-                    error.reason, "recognitionNetworkUnavailable"), {"reason": str(error)[:256]})]
+                    getattr(error, "reason", ""), "recognitionNetworkUnavailable"), {"reason": str(error)[:256]})]
         else:
             self.recognizer = self._fresh_recognizer()
         self._bind_recognizer(self.recognizer)
@@ -2115,7 +2167,9 @@ class EngineRuntime:
                     except asyncio.CancelledError:
                         raise
                     except Exception as error:
-                        if generation == self._stream_generation and session_id == self.service.session_id:
+                        if (generation == self._stream_generation and session_id == self.service.session_id
+                                and (not isinstance(error, CloudRecognitionError)
+                                     or self._claim_cloud_failure(error))):
                             self.emit(self._resource_error(command.requestId, CLOUD_RECOGNITION_ERROR_CODES.get(
                                 getattr(error, "reason", ""), "recognitionNetworkUnavailable"),
                                 {"reason": type(error).__name__}))

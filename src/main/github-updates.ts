@@ -25,10 +25,46 @@ function withoutVersionPrefix(value: string): string {
   return value.trim().replace(/^v(?=\d)/i, '')
 }
 
-function parseVersion(value: string): { parts: number[]; prerelease: boolean } | null {
+function parseVersion(value: string): { parts: number[]; prerelease: string | null } | null {
   const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(withoutVersionPrefix(value))
   if (!match) return null
-  return { parts: [Number(match[1]), Number(match[2]), Number(match[3])], prerelease: Boolean(match[4]) }
+  return { parts: [Number(match[1]), Number(match[2]), Number(match[3])], prerelease: match[4] ?? null }
+}
+
+/**
+ * Orders two prerelease suffixes the way semver does: identifiers are compared one by one, a
+ * numeric identifier counts as a number and ranks below an alphanumeric one, and a version
+ * without a suffix outranks every suffix of the same core version.
+ */
+function comparePrerelease(left: string | null, right: string | null): number {
+  if (!left && !right) return 0
+  if (!left) return 1
+  if (!right) return -1
+  const leftParts = left.split('.')
+  const rightParts = right.split('.')
+  for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index += 1) {
+    const leftPart = leftParts[index]
+    const rightPart = rightParts[index]
+    if (leftPart === undefined) return -1
+    if (rightPart === undefined) return 1
+    const leftIsNumber = /^\d+$/.test(leftPart)
+    const rightIsNumber = /^\d+$/.test(rightPart)
+    if (leftIsNumber && rightIsNumber) {
+      // The digit strings are compared instead of the parsed values, so an identifier longer than
+      // a float holds keeps its order.
+      const leftDigits = leftPart.replace(/^0+(?=\d)/, '')
+      const rightDigits = rightPart.replace(/^0+(?=\d)/, '')
+      if (leftDigits !== rightDigits) {
+        if (leftDigits.length !== rightDigits.length) return leftDigits.length > rightDigits.length ? 1 : -1
+        return leftDigits > rightDigits ? 1 : -1
+      }
+      continue
+    }
+    // A numeric identifier ranks below an alphanumeric one: `alpha.1` comes before `alpha.beta`.
+    if (leftIsNumber !== rightIsNumber) return leftIsNumber ? -1 : 1
+    if (leftPart !== rightPart) return leftPart > rightPart ? 1 : -1
+  }
+  return 0
 }
 
 function isNewer(candidate: string, current: string): boolean {
@@ -38,7 +74,7 @@ function isNewer(candidate: string, current: string): boolean {
   for (let index = 0; index < next.parts.length; index += 1) {
     if (next.parts[index] !== installed.parts[index]) return next.parts[index]! > installed.parts[index]!
   }
-  return installed.prerelease && !next.prerelease
+  return comparePrerelease(next.prerelease, installed.prerelease) > 0
 }
 
 function releaseMetadata(value: unknown): ReleaseMetadata | null {

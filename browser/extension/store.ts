@@ -46,6 +46,11 @@ export interface StoreDependencies {
 }
 /** How often an open panel re-reads the desktop's caption-service gate, which the desktop never pushes. */
 const GATE_REFRESH_MS = 2000
+/**
+ * The errors a summary that answers resolves: they describe the connection to the desktop or the
+ * summary itself. The errors of a running session are left to the session.
+ */
+const SUMMARY_ERRORS = new Set(['extensionVersionMismatch', 'updateRequired', 'appUnavailable', 'browserConnectionLost', 'connectionLost'])
 /** Per-event floor on diagnostic traffic; one line a second is enough to localize a stall. */
 const DEBUG_THROTTLE_MS = 1000
 /** Marks the instrumented build so a log proves which extension copy produced it. */
@@ -413,24 +418,34 @@ export function createExtensionStore(dependencies: StoreDependencies) {
   debug('ext.build', { marker: DEBUG_BUILD_MARKER, builtAt: new Date().toISOString(), version: manifestVersion() })
   /**
    * The desktop owns the caption-service gate and never pushes it, so an open panel re-reads the
-   * summary on a timer. A refresh only replaces what the desktop already owns, and only while
-   * connected: a missed or rejected refresh leaves the current state untouched, because ending a live
-   * session over a transient miss would cost the user their captions. The pipe-level disconnect
-   * delivered through the bridge subscription is the only thing that stops a running session.
+   * summary on a timer. A refresh only replaces what the desktop already owns, and a missed or
+   * rejected refresh leaves the current state untouched, because ending a live session over a
+   * transient miss would cost the user their captions. The pipe-level disconnect delivered
+   * through the bridge subscription is the only thing that stops a running session.
    */
   const refreshSummary = async (): Promise<void> => {
-    if (!state.connected || refreshingSummary) return
+    if (refreshingSummary) return
     refreshingSummary = true
     try {
       const summary = readSummary(await dependencies.bridge.request({ type: 'hello' }))
       if (!summary) return
-      set({ summary, captionServiceActive: summary.captionServiceActive, config: mergeDesktopConfig(state.config, summary.config), ...(summary.extensionCompatible === false ? { error: 'extensionVersionMismatch' } : {}) })
+      // The errors the summary owns: a mismatched extension release and an engine that is too old
+      // for browser audio. A summary that no longer reports one clears the error it reported
+      // before, while the errors of a running session are left to the session.
+      const derived = summary.extensionCompatible === false ? 'extensionVersionMismatch'
+        : summary.captionServiceActive && !summary.browserAudio ? 'updateRequired' : undefined
+      set({ summary, connected: true, captionServiceActive: summary.captionServiceActive, config: mergeDesktopConfig(state.config, summary.config), ...(derived ? { error: derived } : SUMMARY_ERRORS.has(state.error ?? '') ? { error: undefined } : {}) })
     } catch { /* A hello that times out or loses a race with a disconnect says nothing about the session. */ }
     finally { refreshingSummary = false }
   }
   const scheduleSummaryRefresh = (): void => {
     if (gateTimer !== null) clearInterval(gateTimer)
     gateTimer = setInterval(() => { void refreshSummary() }, GATE_REFRESH_MS)
+  }
+  const stopSummaryRefresh = (): void => {
+    if (gateTimer === null) return
+    clearInterval(gateTimer)
+    gateTimer = null
   }
   return {
     getSnapshot: () => state,
@@ -439,16 +454,23 @@ export function createExtensionStore(dependencies: StoreDependencies) {
       try {
         const summary = readSummary(await dependencies.bridge.request({ type: 'hello' }))
         if (!summary) throw new BrowserFailure('updateRequired')
-        set({ summary, connected: true, captionServiceActive: summary.captionServiceActive, config: mergeDesktopConfig(state.config, summary.config), error: summary.extensionCompatible === false ? 'extensionVersionMismatch' : summary.browserAudio ? undefined : 'updateRequired' })
+        // A desktop that is not serving captions yet has no engine running, and a missing
+        // browser-audio capability only means the engine is too old once the gate is open.
+        set({ summary, connected: true, captionServiceActive: summary.captionServiceActive, config: mergeDesktopConfig(state.config, summary.config), error: summary.extensionCompatible === false ? 'extensionVersionMismatch' : summary.captionServiceActive && !summary.browserAudio ? 'updateRequired' : undefined })
       } catch (error) { set({ connected: false, error: failCode(error) }) }
-      scheduleSummaryRefresh()
+      if (state.panelOpen) scheduleSummaryRefresh()
     },
     async openRuntimeSettings() {
       await dependencies.bridge.request({ type: 'runtimeSettings', component: state.error === 'llamaUnavailable' ? 'llama' : 'engine' })
     },
-    togglePanel() { set({ panelOpen: !state.panelOpen }) },
-    closePanel() { set({ panelOpen: false }) },
-    async close() { set({ panelOpen: false }); await stop() },
+    togglePanel() {
+      const open = !state.panelOpen
+      set({ panelOpen: open })
+      if (open) { void refreshSummary(); scheduleSummaryRefresh() }
+      else stopSummaryRefresh()
+    },
+    closePanel() { set({ panelOpen: false }); stopSummaryRefresh() },
+    async close() { set({ panelOpen: false }); stopSummaryRefresh(); await stop() },
     async refresh() { await this.init(); if (state.status === 'active') reset() },
     pressCapture() {
       if (state.status !== 'idle' || state.capturePending || captionAudioSource(state.config) !== 'tab') return
@@ -505,7 +527,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
       void start(capturePromise, ++generation)
     },
     stop,
-    async destroy() { if (gateTimer !== null) { clearInterval(gateTimer); gateTimer = null } await stop(); unsubscribe(); dependencies.bridge.close(); listeners.clear() },
+    async destroy() { stopSummaryRefresh(); await stop(); unsubscribe(); dependencies.bridge.close(); listeners.clear() },
   }
 }
 export type ExtensionStore = ReturnType<typeof createExtensionStore>
