@@ -1,5 +1,6 @@
 import { ModelCapabilityNotices } from './features/models/ModelCapabilityNotices'
 import { ModelDownloadNotice } from './features/models/ModelDownloadNotice'
+import { OfflineFailureNotice } from './features/offline/OfflineFailureNotice'
 import './index.css'
 import './theme/cjk-fonts.css'
 import { StrictMode, useEffect, useRef, useState } from 'react'
@@ -248,6 +249,7 @@ function Root() {
     <ErrorBoundary>
       <Shell />
       <ModelDownloadNotice />
+      <OfflineFailureNotice />
       <ModelCapabilityNotices />
       <RuntimeNotice />
       <RuntimeOperationNotice />
