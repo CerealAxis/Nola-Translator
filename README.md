@@ -55,32 +55,50 @@ Windows x64 is supported. You can choose the EXE or MSI installer. Support for o
 
 - [Online documentation](https://nola.xaviermc.top/en/)
 
-## Language Support
+## Local Recognition Models
 
 > [!TIP]
-> The languages available for recognition and translation depend on the selected model's capabilities. The tables below show the capabilities of the recommended models included in the app. If you have a model to recommend, submit it as an issue; we will evaluate it for possible inclusion. For first-time users, we recommend **SenseVoiceSmall** for recognition and **HY-MT2 1.8B** for translation.
-
-### Recognition Models
+> The languages available for recognition and translation depend on the selected model's capabilities. The tables below show the capabilities of the recommended models included in the app. If you have a model to recommend, submit it as an issue; we will evaluate it for possible inclusion. For first-time users, we recommend **SenseVoiceSmall** for recognition and **HY-MT2** for translation.
 
 | Model | Number of Languages | Details |
 |---|---:|---|
-| Qwen3-ASR 1.7B | 30 | Supports automatic detection; Chinese, English, Cantonese, Arabic, German, French, Spanish, Portuguese, Indonesian, Italian, Korean, Russian, Thai, Vietnamese, Japanese, Turkish, Hindi, Malay, Dutch, Swedish, Danish, Finnish, Polish, Czech, Filipino, Persian, Greek, Hungarian, Macedonian, and Romanian |
-| Qwen3-ASR 0.6B | 30 | Supports automatic detection; Chinese, English, Cantonese, Arabic, German, French, Spanish, Portuguese, Indonesian, Italian, Korean, Russian, Thai, Vietnamese, Japanese, Turkish, Hindi, Malay, Dutch, Swedish, Danish, Finnish, Polish, Czech, Filipino, Persian, Greek, Hungarian, Macedonian, and Romanian |
+| Qwen3-ASR | 30 | Chinese, English, Cantonese, Arabic, German, French, Spanish, Portuguese, Indonesian, Italian, Korean, Russian, Thai, Vietnamese, Japanese, Turkish, Hindi, Malay, Dutch, Swedish, Danish, Finnish, Polish, Czech, Filipino, Persian, Greek, Hungarian, Macedonian, and Romanian |
 | SenseVoiceSmall | 5 | Chinese, English, Cantonese, Japanese, and Korean |
+| Fun-ASR Nano | 4 | Chinese, English, Japanese, and Cantonese |
+| VibeVoice-ASR | 48 | English, Chinese, Spanish, Portuguese, German, Japanese, Korean, French, Russian, Indonesian, Swedish, Italian, Hebrew, Dutch, Polish, Norwegian, Turkish, Thai, Arabic, Hungarian, Catalan, Czech, Danish, Persian, Afrikaans, Hindi, Finnish, Estonian, Greek, Romanian, Vietnamese, Bulgarian, Icelandic, Slovenian, Slovak, Lithuanian, Swahili, Ukrainian, Latvian, Croatian, Nepali, Serbian, Filipino, Malay, Urdu, Mongolian, Armenian, and Javanese |
+| MiMo-V2.5-ASR | 3 | Chinese, English, and Cantonese |
 
-### Translation Models
+## Local Translation Models
 
 | Model | Number of Languages | Details |
 |---|---:|---|
-| HY-MT2 1.8B | 37 | Simplified Chinese, Traditional Chinese, English, French, Portuguese, Spanish, Japanese, Turkish, Russian, Arabic, Korean, Thai, Italian, German, Vietnamese, Malay, Indonesian, Filipino, Hindi, Polish, Czech, Dutch, Khmer, Burmese, Persian, Gujarati, Urdu, Telugu, Marathi, Hebrew, Bengali, Tamil, Ukrainian, Tibetan, Kazakh, Mongolian, and Uyghur |
+| HY-MT2 | 38 | Simplified Chinese, Traditional Chinese, English, French, Portuguese, Spanish, Japanese, Turkish, Russian, Arabic, Korean, Thai, Italian, German, Vietnamese, Malay, Indonesian, Filipino, Hindi, Polish, Czech, Dutch, Khmer, Burmese, Persian, Gujarati, Urdu, Telugu, Marathi, Hebrew, Bengali, Tamil, Ukrainian, Tibetan, Kazakh, Mongolian, Uyghur, and Cantonese |
 | M2M100 418M | 100 | Afrikaans, Amharic, Arabic, Asturian, Azerbaijani, Bashkir, Belarusian, Bulgarian, Bengali, Breton, Bosnian, Catalan, Cebuano, Czech, Welsh, Danish, German, Greek, English, Spanish, Estonian, Persian, Fula, Finnish, French, Western Frisian, Irish, Scottish Gaelic, Galician, Gujarati, Hausa, Hebrew, Hindi, Croatian, Haitian Creole, Hungarian, Armenian, Indonesian, Igbo, Ilocano, Icelandic, Italian, Japanese, Javanese, Georgian, Kazakh, Khmer, Kannada, Korean, Luxembourgish, Ganda (Luganda), Lingala, Lao, Lithuanian, Latvian, Malagasy, Macedonian, Malayalam, Mongolian, Marathi, Malay, Burmese, Nepali, Dutch, Norwegian, Northern Sotho, Occitan, Odia, Punjabi, Polish, Pashto, Portuguese, Romanian, Russian, Sindhi, Sinhala, Slovak, Slovenian, Somali, Albanian, Serbian, Swati, Sundanese, Swedish, Swahili, Tamil, Thai, Filipino, Tswana, Turkish, Ukrainian, Urdu, Uzbek, Vietnamese, Wolof, Xhosa, Yiddish, Yoruba, Chinese, and Zulu |
+| Index-Translate | 150 | English, Chinese, German, French, Spanish, Japanese, Korean, Portuguese, Russian, Arabic, Italian, Dutch, Polish, Romanian, Swedish, Turkish, Hindi, Vietnamese, Thai, Indonesian, Malay, Filipino, Ukrainian, Persian, Czech, Greek, Danish, Hungarian, Finnish, Norwegian (written), Slovak, Bulgarian, Bosnian, Catalan, Bengali, Hebrew, Lithuanian, Slovenian, Estonian, Albanian, Latvian, Azerbaijani, Croatian, Tamil, Nepali, Urdu, Macedonian, Serbian (Cyrillic), Marathi, Georgian, Malayalam, Kazakh, Icelandic, Galician, Kannada, Moroccan Arabic, Gujarati, Belarusian, Afrikaans, Armenian, Mongolian, Khmer, Basque, Burmese, Latin, Uzbek (Cyrillic), Telugu, Odia, Norwegian Nynorsk, Uzbek, Swahili, Sinhala, Kyrgyz, Somali, Punjabi, Egyptian Arabic, Welsh, Norman, Pashto, Irish, Serbian (Latin), Hausa, Kurdish (Sorani), Maltese, Cantonese, Tajik, Kurdish (Kurmanji), Betawi, Amharic, Lao, Luxembourgish, Frisian, Divehi, Esperanto, Kinyarwanda, Najdi Arabic, Faroese, Malagasy, Assamese, Sindhi, Xhosa, Turkmen, Haitian Creole, Scottish Gaelic, Cebuano, Yiddish, Javanese, Bashkir, Papiamento, Maori, Uyghur, Tatar, Tibetan, Hmong, Western Armenian, Yoruba, Zulu, Southern Kurdish, Samoan, Corsican, Fiji Hindi, Sundanese, Chichewa, Igbo, Hawaiian, Sesotho, Mizo, Shona, Chuvash, South Azerbaijani, Romansh, Rundi, Hindi (Latin), Sakha, Tigrinya, Asturian, Occitan, Hakha Chin, Northern Sami, Low German, Ossetian, Urdu (Latin), Swiss German, Angika, Levantine Arabic, Oromo, Neapolitan, Upper Sorbian, Hiligaynon, and Greenlandic |
 
-## Cloud Models
+## Local Text-to-Speech
+
+| Model | Number of Languages | Details |
+|---|---:|---|
+| Qwen3-TTS | 10 | Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian |
+
+## Cloud Recognition Models
 
 | Provider | Model | Supported languages | Details |
 |---|---|---|---|
 | Aliyun | Qwen3.5 / Qwen3.8 LiveTranslate | 60 | Chinese, English, Arabic, German, French, Spanish, Portuguese, Indonesian, Italian, Korean, Russian, Thai, Vietnamese, Japanese, Turkish, Hindi, Malay, Dutch, Urdu, Norwegian Bokmål, Swedish, Danish, Hebrew, Finnish, Polish, Icelandic, Czech, Filipino, Persian, Cantonese, Greek, Afrikaans, Asturian, Belarusian, Bulgarian, Bengali, Bosnian, Catalan, Cebuano, Estonian, Galician, Gujarati, Croatian, Hungarian, Javanese, Kazakh, Kannada, Kyrgyz, Latvian, Macedonian, Malayalam, Marathi, Punjabi, Romanian, Slovak, Slovenian, Swahili, Tajik, Azerbaijani, and Ukrainian. Version 3.8 detects the source language automatically; version 3.5 allows you to specify the source language. |
 | MiniMax | Speech-to-Text `asr-1.0` | 20 | Arabic, Cantonese, Chinese, English, Filipino, French, German, Indonesian, Italian, Japanese, Korean, Malay, Polish, Portuguese, Russian, Spanish, Thai, Turkish, Ukrainian, and Vietnamese. |
+
+## Cloud Translation Models
+
+| Model | Number of Languages | Details |
+|---|---:|---|
+| Aliyun LiveTranslate | 60 | Automatic source-language detection |
+| Index-Translate-35B-A3B | 150 | English, Chinese, German, French, Spanish, Japanese, Korean, Portuguese, Russian, Arabic, Italian, Dutch, Polish, Romanian, Swedish, Turkish, Hindi, Vietnamese, Thai, Indonesian, Malay, Filipino, Ukrainian, Persian, Czech, Greek, Danish, Hungarian, Finnish, Norwegian (written), Slovak, Bulgarian, Bosnian, Catalan, Bengali, Hebrew, Lithuanian, Slovenian, Estonian, Albanian, Latvian, Azerbaijani, Croatian, Tamil, Nepali, Urdu, Macedonian, Serbian (Cyrillic), Marathi, Georgian, Malayalam, Kazakh, Icelandic, Galician, Kannada, Moroccan Arabic, Gujarati, Belarusian, Afrikaans, Armenian, Mongolian, Khmer, Basque, Burmese, Latin, Uzbek (Cyrillic), Telugu, Odia, Norwegian Nynorsk, Uzbek, Swahili, Sinhala, Kyrgyz, Somali, Punjabi, Egyptian Arabic, Welsh, Norman, Pashto, Irish, Serbian (Latin), Hausa, Kurdish (Sorani), Maltese, Cantonese, Tajik, Kurdish (Kurmanji), Betawi, Amharic, Lao, Luxembourgish, Frisian, Divehi, Esperanto, Kinyarwanda, Najdi Arabic, Faroese, Malagasy, Assamese, Sindhi, Xhosa, Turkmen, Haitian Creole, Scottish Gaelic, Cebuano, Yiddish, Javanese, Bashkir, Papiamento, Maori, Uyghur, Tatar, Tibetan, Hmong, Western Armenian, Yoruba, Zulu, Southern Kurdish, Samoan, Corsican, Fiji Hindi, Sundanese, Chichewa, Igbo, Hawaiian, Sesotho, Mizo, Shona, Chuvash, South Azerbaijani, Romansh, Rundi, Hindi (Latin), Sakha, Tigrinya, Asturian, Occitan, Hakha Chin, Northern Sami, Low German, Ossetian, Urdu (Latin), Swiss German, Angika, Levantine Arabic, Oromo, Neapolitan, Upper Sorbian, Hiligaynon, and Greenlandic |
+| Microsoft Translator | 100+ | Per the official language table |
+| Google Translate | 100+ | Per the official language table |
+| MyMemory (free translation) | 100+ | Per the official language table |
+| LLM API (OpenAI-compatible, Anthropic, Ollama) | Depends on the chosen model | — |
 
 ## LLM API Configuration
 
