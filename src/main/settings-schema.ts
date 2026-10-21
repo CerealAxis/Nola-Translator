@@ -60,6 +60,8 @@ export const settingsPatchSchema = z.object({
     proxyForRuntimeDownload: z.boolean().optional(),
   }).partial().optional(),
   recognition: z.object({
+    max_segment_ms: z.number().int().min(3000).max(30000).optional(),
+    silence_end_ms: z.number().int().min(300).max(2000).optional(),
     provider: z.enum(['local', 'aliyun', 'minimax']).optional(),
     aliyunWorkspaceId: z.string().max(128).optional(),
     aliyunRegion: z.enum(['cn-beijing', 'ap-southeast-1']).optional(),

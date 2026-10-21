@@ -1,4 +1,5 @@
 # The engine can manage models and settings without importing inference libraries.
+onnxruntime==1.23.2
 httpx==0.28.1
 websockets==15.0.1
 numpy==1.26.4

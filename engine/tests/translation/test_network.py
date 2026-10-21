@@ -207,3 +207,44 @@ async def test_network_requests_reuse_real_keepalive_connection(monkeypatch):
         server.close()
         await server.wait_closed()
         await asyncio.gather(*workers)
+
+
+def test_oversized_revision_context_falls_back_to_source_without_splitting_json():
+    import json
+    provider = OpenAICompatibleProvider(model='model', context_window=1024, max_output_tokens=128)
+    envelope = json.dumps({'previousSource': 'old ' * 1200, 'previousTranslation': '旧' * 1200, 'currentSource': 'Hello world'}, ensure_ascii=False)
+    assert provider._plan_chunks(envelope, provider._system_prompt('en', 'zh')) == ['Hello world']
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('provider_name', ['openai', 'responses', 'anthropic', 'ollama'])
+async def test_llm_wire_request_uses_previous_translation_as_draft(provider_name):
+    import json
+    from nola_translator_engine.translation.network import OpenAIResponsesProvider
+    captured = {}
+    def request(url, payload, headers):
+        captured.update(payload)
+        return {
+            'choices': [{'message': {'content': '我们分析问题。这很重要。'}}],
+            'output': [{'content': [{'type': 'output_text', 'text': '我们分析问题。这很重要。'}]}],
+            'content': [{'type': 'text', 'text': '我们分析问题。这很重要。'}],
+            'message': {'content': '我们分析问题。这很重要。'},
+        }
+    providers = {
+        'openai': OpenAICompatibleProvider, 'responses': OpenAIResponsesProvider,
+        'anthropic': AnthropicMessagesProvider, 'ollama': OllamaTranslationProvider,
+    }
+    provider = providers[provider_name](model='model', api_key='test', requester=request)
+    envelope = json.dumps({'previousSource': 'We analyze problems.', 'previousTranslation': '我们分析问题。', 'currentSource': 'We analyze problems. This matters.'}, ensure_ascii=False)
+    assert (await provider.translate(envelope, 'en', 'zh')).text == '我们分析问题。这很重要。'
+    if provider_name == 'responses':
+        system, text = captured['instructions'], captured['input']
+    elif provider_name == 'anthropic':
+        system, text = captured['system'], captured['messages'][0]['content']
+    else:
+        system, text = [message['content'] for message in captured['messages']]
+    assert 'wording verbatim' in system
+    assert 'prefer appending' in system
+    assert 'COMPLETE translation' in system
+    assert 'never keep errors' in system
+    assert json.loads(text)['previousTranslation'] == '我们分析问题。'

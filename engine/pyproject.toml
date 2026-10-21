@@ -15,6 +15,7 @@ dependencies = [
   "kaldi-native-fbank==1.22.3",
   "lameenc==1.8.4",
   "numpy==1.26.4",
+  "onnxruntime==1.23.2",
   "pydantic==2.13.4",
   "PyAudioWPatch==0.2.12.8",
   "scipy==1.15.3",
@@ -38,3 +39,6 @@ addopts = "-q"
 asyncio_mode = "auto"
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+nola_translator_engine = ["recognition/*.onnx", "recognition/*.LICENSE"]

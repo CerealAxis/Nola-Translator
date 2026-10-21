@@ -28,6 +28,8 @@ export interface AudioTestResult {
 }
 
 export type SessionConfig = {
+  max_segment_ms?: number
+  silence_end_ms?: number
   recognitionProvider?: RecognitionProvider
   /**
    * Cloud connection options, credential-free. Each provider reads only its own fields: Aliyun
@@ -83,6 +85,8 @@ export type SessionConfig = {
  * no local weights, so there is nothing to prewarm and no reason to hand over an API key.
  */
 export type PrewarmConfig = {
+  max_segment_ms?: number
+  silence_end_ms?: number
   recognitionProvider?: RecognitionProvider
   recognitionOptions?: SessionConfig['recognitionOptions']
   compute: ComputeSettings

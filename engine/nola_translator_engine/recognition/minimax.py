@@ -1,4 +1,4 @@
-"""MiniMax speech-to-text: volume-gated segments uploaded as WAV, transcribed through a
+"""MiniMax speech-to-text: Silero VAD segments uploaded as WAV, transcribed through a
 server-sent event stream.
 
 The API takes one complete audio file per request, so Nola's streaming captions come from
@@ -28,7 +28,7 @@ from ..audio.resample import AudioFrame, TARGET_SAMPLE_RATE
 from ..protocol import ModelSelection
 from .aliyun import CloudRecognitionError
 from .base import RecognitionUpdate
-from .volume_gate import VolumeGateSegment, VolumeGateSegmenter
+from .volume_gate import VolumeGateSegment, SileroVadSegmenter
 
 
 MODELS = ("asr-1.0",)
@@ -38,12 +38,6 @@ DEFAULT_ENDPOINT = "https://api.minimax.cn/v1/speech_to_text"
 # https://platform.minimax.io/docs/api-reference/speech-to-text
 MINIMAX_LANGUAGES = frozenset("zh yue en fr de es it pt pl ru uk ja ko th vi id ms tl ar tr".split())
 LANGUAGE_ALIASES = {"tl": "fil"}
-#: The service's 500 s / 50 MB limits are nowhere near this; what the ceiling actually bounds
-#: is caption lag during speech with no 600 ms pause to close the gate on. 6 s matches the
-#: local Qwen streaming segmenter, so an uninterrupted run costs about the same wait on either
-#: path, and billing follows audio duration rather than segment length, so more splits cost the
-#: same money.
-MAX_SEGMENT_MS = 6_000
 CONNECT_TIMEOUT_SECONDS = 10
 #: Covers the upload of a full segment plus a stalled event stream; the drain in `flush` would
 #: otherwise wait on a request that is never going to answer.
@@ -109,7 +103,7 @@ class MiniMaxRecognizer:
         self.max_inflight = max_inflight
         self.on_update: UpdateSink | None = None
         self.on_error: Callable[[CloudRecognitionError], None] | None = None
-        self._segmenter = VolumeGateSegmenter(max_segment_ms=MAX_SEGMENT_MS)
+        self._segmenter = SileroVadSegmenter(max_segment_ms=config.max_segment_ms, silence_end_ms=config.silence_end_ms)
         self._prefix = uuid4().hex[:12]
         self._serial = 0
         self._tasks: set[asyncio.Task[None]] = set()
@@ -134,6 +128,10 @@ class MiniMaxRecognizer:
             raise CloudRecognitionError("recognitionClosed")
         self.validate_credentials()
         self._client()
+
+    def prepare(self) -> None:
+        """Validate local segmentation without opening a billable recognition request."""
+        self._segmenter.load()
 
     def stats(self) -> dict[str, int]:
         return {

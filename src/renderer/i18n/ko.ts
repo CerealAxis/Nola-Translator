@@ -4,6 +4,12 @@ import { onboardingEntries, onboardingKo } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const koMessages: Record<DictionaryKey, string> = {
+  "settings.restoreVadDefaults": "기본값 복원",
+  "settings.vadGroup": "음성 분할",
+  "settings.maxSegmentMs": "최대 구간 길이 (밀리초)",
+  "settings.maxSegmentMsHint": "3000 ~ 30000밀리초. 길수록 강제 분할이 줄지만 최종 번역 지연과 추론 비용이 늘어납니다. 다음 세션부터 적용됩니다.",
+  "settings.silenceEndMs": "발화 종료 무음 길이 (밀리초)",
+  "settings.silenceEndMsHint": "300 ~ 2000밀리초. 길수록 발화 중 쉼을 유지하지만 자막 확정이 늦어집니다. 로컬 인식과 MiniMax에 적용됩니다. Aliyun은 서버 VAD를 사용합니다.",
   ...offlineEntries(offlineKo),
   ...onboardingEntries(onboardingKo),
   'workspaceUi.windowFailed': '동시통역 창을 열 수 없습니다. 다시 시도해 주세요.',

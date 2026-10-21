@@ -15,6 +15,7 @@
 
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { CaptionRevisionText } from './CaptionRevisionText'
 
 export type TrackLine = { key: string; text: string }
 
@@ -115,7 +116,9 @@ export function CaptionTrack({
       >
         <div className="nola-caption-track-flow nola-caption-track-sentence" ref={viewport}>
           <div className="nola-caption-track-content" ref={content}>
-            {entries.map((entry) => <p className="nola-caption-entry" key={entry.key}>{entry.text}</p>)}
+            {entries.map((entry) => <p className="nola-caption-entry" key={entry.key}>
+              {kind === 'translation' ? <CaptionRevisionText text={entry.text} /> : entry.text}
+            </p>)}
           </div>
         </div>
       </div>
@@ -145,7 +148,9 @@ export function CaptionTrack({
           <p className="nola-caption-entry" aria-live="polite" aria-atomic="false">
             {entries.flatMap((entry, index) => [
               index > 0 && seamNeedsSpace(entries[index - 1].text, entry.text) ? ' ' : null,
-              <span className="nola-caption-segment" key={entry.key}>{entry.text}</span>,
+              <span className="nola-caption-segment" key={entry.key}>
+                {kind === 'translation' ? <CaptionRevisionText text={entry.text} /> : entry.text}
+              </span>,
             ])}
           </p>
         </div>

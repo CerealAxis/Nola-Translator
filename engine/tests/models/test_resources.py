@@ -29,6 +29,12 @@ from nola_translator_engine.resources import (
 )
 
 
+@pytest.mark.parametrize('spec', CRISP_ASR_SPECS, ids=lambda spec: spec.model_id)
+def test_native_recognition_catalog_resolves_primary_weight(tmp_path, spec):
+    manager = ResourceManager(tmp_path, lambda _: None)
+    assert manager.recognition_weight_path(spec.model_id) == tmp_path / spec.directory / spec.files[0].path
+
+
 def _tiny_qwen() -> tuple[ModelSpec, dict[str, bytes]]:
     payloads = {
         "config.json": b'{"tiny": true}',

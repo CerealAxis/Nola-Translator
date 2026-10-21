@@ -47,6 +47,10 @@ type LegacyTranslation = Record<string, unknown>
 function sanitizeCloudSettings(settings: AppSettings): void {
   const recognition = settings.recognition
   recognition.provider = RECOGNITION_PROVIDERS.includes(recognition.provider ?? 'local') ? recognition.provider ?? 'local' : 'local'
+  for (const [key, fallback, min, max] of [['max_segment_ms', 10000, 3000, 30000], ['silence_end_ms', 800, 300, 2000]] as const) {
+    const value = recognition[key]
+    recognition[key] = typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : fallback
+  }
   recognition.aliyunRegion = recognition.aliyunRegion === 'ap-southeast-1' ? 'ap-southeast-1' : 'cn-beijing'
   recognition.aliyunModel = ALIYUN_RECOGNITION_MODELS.includes(recognition.aliyunModel ?? ALIYUN_RECOGNITION_MODELS[0]) ? recognition.aliyunModel ?? ALIYUN_RECOGNITION_MODELS[0] : ALIYUN_RECOGNITION_MODELS[0]
   const bounded = (value: unknown, fallback: string, max: number) => typeof value === 'string' && value.length <= max ? value : fallback

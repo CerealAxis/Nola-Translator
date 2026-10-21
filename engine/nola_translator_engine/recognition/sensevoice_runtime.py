@@ -34,7 +34,7 @@ SUPPORTED_LANGUAGES = frozenset({"zh", "en", "yue", "ja", "ko"})
 _TAG_PREFIX = re.compile(r"^(?:<\|[^|]*\|>)+")
 _TAG = re.compile(r"<\|([^|]*)\|>")
 
-# Voice activity detection belongs to our own volume gate, so funasr's extra fsmn-vad model
+# Voice activity detection belongs to Silero VAD, so funasr's extra fsmn-vad model
 # is deliberately not pulled in. disable_update turns off funasr's startup version check so
 # the offline path never reaches out to the network.
 

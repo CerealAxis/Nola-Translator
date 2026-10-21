@@ -5,12 +5,20 @@ import { sessionConfigSchema } from './schemas'
 import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_PUBLIC_MODEL } from './index-translate'
 import { GOOGLE_TRANSLATE_ENDPOINT } from './google-translate'
 
+it('preserves custom VAD timing through the session schema', () => {
+  const fields = recognitionFieldsOf({ ...DEFAULT_SETTINGS.recognition, max_segment_ms: 15000, silence_end_ms: 1200 })
+  const config = { ...fields, audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: [] }
+  expect(sessionConfigSchema.parse(config)).toMatchObject({ max_segment_ms: 15000, silence_end_ms: 1200 })
+  expect(sessionConfigSchema.safeParse({ ...config, max_segment_ms: 0 }).success).toBe(false)
+  expect(sessionConfigSchema.safeParse({ ...config, silence_end_ms: 100 }).success).toBe(false)
+})
+
 it('builds credential-free Aliyun configuration without replacing the saved local model', () => {
   const recognition = { ...DEFAULT_SETTINGS.recognition, provider: 'aliyun' as const, aliyunWorkspaceId: 'workspace-123', aliyunRegion: 'ap-southeast-1' as const }
-  expect(recognitionFieldsOf(recognition)).toEqual({ recognitionProvider: 'aliyun', recognitionOptions: { workspaceId: 'workspace-123', region: 'ap-southeast-1', model: 'qwen3.8-livetranslate-flash-realtime' } })
+  expect(recognitionFieldsOf(recognition)).toEqual({ max_segment_ms: 10000, silence_end_ms: 800, recognitionProvider: 'aliyun', recognitionOptions: { workspaceId: 'workspace-123', region: 'ap-southeast-1', model: 'qwen3.8-livetranslate-flash-realtime' } })
   expect(remoteSourceLanguages(recognition)).toEqual(['auto'])
   expect(remoteSourceLanguages({ ...recognition, aliyunModel: 'qwen3.5-livetranslate-flash-realtime' })).toContain('ja')
-  expect(recognitionFieldsOf(DEFAULT_SETTINGS.recognition)).toEqual({ recognitionProvider: 'local' })
+  expect(recognitionFieldsOf(DEFAULT_SETTINGS.recognition)).toEqual({ max_segment_ms: 10000, silence_end_ms: 800, recognitionProvider: 'local' })
 })
 
 it('passes MyMemory public settings while native translation has no separate connection', () => {
@@ -37,7 +45,7 @@ it('preserves remote fields across the session IPC boundary and rejects deferred
 
 it('builds a MiniMax file-upload configuration and narrows its source languages to the 20 it accepts', () => {
   const recognition = { ...DEFAULT_SETTINGS.recognition, provider: 'minimax' as const, minimaxEndpoint: 'https://api.minimax.io/v1/speech_to_text' }
-  expect(recognitionFieldsOf(recognition)).toEqual({ recognitionProvider: 'minimax', recognitionOptions: { endpoint: 'https://api.minimax.io/v1/speech_to_text', model: 'asr-1.0' } })
+  expect(recognitionFieldsOf(recognition)).toEqual({ max_segment_ms: 10000, silence_end_ms: 800, recognitionProvider: 'minimax', recognitionOptions: { endpoint: 'https://api.minimax.io/v1/speech_to_text', model: 'asr-1.0' } })
   expect(recognitionLabel(recognition)).toBe('asr-1.0')
   // A language outside MiniMax's list must not stay selectable just because Aliyun accepts it.
   expect(remoteSourceLanguages(recognition)).toContain('yue')

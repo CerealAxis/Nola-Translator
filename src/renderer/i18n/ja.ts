@@ -4,6 +4,12 @@ import { onboardingEntries, onboardingJa } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const jaMessages: Record<DictionaryKey, string> = {
+  "settings.restoreVadDefaults": "既定値に戻す",
+  "settings.vadGroup": "音声区間",
+  "settings.maxSegmentMs": "最大区間長（ミリ秒）",
+  "settings.maxSegmentMsHint": "3000～30000 ミリ秒。長くすると強制分割が減りますが、確定翻訳の遅延と推論負荷が増えます。次のセッションから適用されます。",
+  "settings.silenceEndMs": "発話終了までの無音（ミリ秒）",
+  "settings.silenceEndMsHint": "300～2000 ミリ秒。長くすると発話中の間を保持できますが、字幕の確定が遅くなります。ローカル認識と MiniMax に適用。Aliyun はサーバー側 VAD を使用します。",
   ...offlineEntries(offlineJa),
   ...onboardingEntries(onboardingJa),
   'workspaceUi.windowFailed': '同時通訳ウィンドウを開けませんでした。もう一度お試しください。',

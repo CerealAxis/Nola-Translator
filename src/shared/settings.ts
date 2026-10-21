@@ -141,6 +141,8 @@ export type AppearancePrefs = {
 export type RecognitionModelId = 'qwen3-asr-1.7b-hf' | 'qwen3-asr-0.6b-hf' | 'sensevoice-small' | (string & {})
 
 export type RecognitionSettings = {
+  max_segment_ms?: number
+  silence_end_ms?: number
   provider?: RecognitionProvider
   aliyunWorkspaceId?: string
   aliyunRegion?: 'cn-beijing' | 'ap-southeast-1'
@@ -307,6 +309,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     proxyForRuntimeDownload: false,
   },
   recognition: {
+    max_segment_ms: 10000,
+    silence_end_ms: 800,
     provider: 'local',
     aliyunWorkspaceId: '',
     aliyunRegion: 'cn-beijing',

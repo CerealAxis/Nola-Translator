@@ -323,7 +323,8 @@ class ResourceManager:
         if self.registry.get(resource_id):
             return self.model_root / spec.directory / spec.files[0].path
         weight = next((entry for entry in spec.files if entry.path.lower().endswith(('.gguf', '.bin', '.ggml', '.ggmf'))
-                       and not any(part in Path(entry.path).name.lower() for part in ('tokenizer', 'codec', 'voice-', 'mmproj'))), None)
+                       and not Path(entry.path).name.lower().startswith('voice-')
+                       and not any(part in Path(entry.path).name.lower() for part in ('tokenizer', 'codec', 'mmproj'))), None)
         if weight is None:
             raise ResourceActionError('invalidConfiguration', {'reason': 'Missing native recognition weight'})
         return self.model_root / spec.directory / weight.path

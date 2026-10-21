@@ -77,6 +77,8 @@ export const sessionConfigSchema = z
     recognitionMode: z.enum(['realtime', 'accurate']),
     recognitionProvider: z.enum(['local', 'aliyun', 'minimax']).optional(),
     recognitionOptions: recognitionOptionsSchema.optional(),
+    max_segment_ms: z.number().int().min(3000).max(30000).optional(),
+    silence_end_ms: z.number().int().min(300).max(2000).optional(),
     recognitionModelId: recognitionModelIdSchema.optional(),
     sourceLanguage: z.string().min(1).max(32),
     targetLanguages: z.array(z.string().min(1).max(32)).max(8),
@@ -117,6 +119,8 @@ export const sessionConfigSchema = z
 const prewarmConfigSchema = z.object({
   recognitionProvider: z.enum(['local', 'aliyun', 'minimax']).optional(),
   recognitionOptions: recognitionOptionsSchema.optional(),
+    max_segment_ms: z.number().int().min(3000).max(30000).optional(),
+    silence_end_ms: z.number().int().min(300).max(2000).optional(),
   compute: computeSettingsSchema,
   recognitionModelId: z.string().min(1).max(256).optional(),
   sourceLanguage: z.string().min(1).max(32),

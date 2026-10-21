@@ -24,6 +24,44 @@ from nola_translator_engine.resources import (
 from nola_translator_engine.runtime import EngineRuntime
 
 
+def test_status_does_not_construct_an_unloaded_recognition_model(tmp_path, monkeypatch):
+    runtime = EngineRuntime(tmp_path, lambda _: None)
+    runtime.active_model_id = 'sensevoice-small-crisp-q4-k'
+    monkeypatch.setattr(runtime, '_recognition_runtime', lambda: pytest.fail('Status must not construct a model'))
+    assert runtime._engine_status_payload()['recognition'] == {
+        'modelId': 'sensevoice-small-crisp-q4-k', 'loaded': False, 'runtime': 'unloaded',
+    }
+
+
+async def test_cleanup_does_not_construct_a_failed_recognition_model(tmp_path, monkeypatch):
+    runtime = EngineRuntime(tmp_path, lambda _: None)
+    runtime.active_model_id = 'sensevoice-small-crisp-q4-k'
+    monkeypatch.setattr(runtime, '_recognition_runtime', lambda: pytest.fail('Cleanup must not construct a model'))
+    await runtime._unload_session_models()
+    assert runtime._active_recognition_runtime is None
+
+
+@pytest.mark.parametrize('operation', ['startSession', 'prewarmModels'])
+async def test_prepare_preserves_resource_errors_and_allows_retry(tmp_path, monkeypatch, operation):
+    from unittest.mock import AsyncMock
+    from nola_translator_engine.resources import ResourceActionError
+
+    runtime = EngineRuntime(tmp_path, lambda _: None)
+    monkeypatch.setattr(runtime.resources, 'is_installed', lambda _: True)
+    error = ResourceActionError('invalidConfiguration', {'reason': 'Missing native recognition weight'})
+    monkeypatch.setattr(runtime, '_prepare_models', AsyncMock(side_effect=error))
+    config = {'recognitionModelId': 'sensevoice-small-crisp-q4-k', 'sourceLanguage': 'auto', 'targetLanguages': []}
+    if operation == 'startSession':
+        config.update(audioSource={'kind': 'defaultOutput'}, recognitionMode='realtime')
+    command = parse_command_line(json.dumps({'protocolVersion': 1, 'type': operation, 'requestId': 'bad-weight', 'config': config}))
+    for _ in range(2):
+        events = await runtime.handle(command)
+        error_event = next(event for event in events if event.type == 'error')
+        assert error_event.code == 'invalidConfiguration'
+        assert error_event.details == {'reason': 'Missing native recognition weight'}
+        assert runtime.service.session_id is None
+
+
 _DEVICE = AudioDeviceRecord(
     device_id="test-device",
     backend_index=0,
@@ -297,7 +335,7 @@ def test_selected_recognition_model_gates_and_loads_that_directory(
 
     monkeypatch.setattr(runtime_module, "get_qwen_runtime", lambda _path, **_options: LoadedRuntime())
 
-    def fake_create(model_dir, *, source_language=None, runtime=None):
+    def fake_create(model_dir, *, source_language=None, runtime=None, max_segment_ms=10000, silence_end_ms=800):
         seen.append(Path(model_dir))
         raise RuntimeError("stop here")
 
@@ -331,7 +369,7 @@ def test_sensevoice_selection_loads_its_own_runtime(tmp_path, monkeypatch) -> No
         lambda _path: pytest.fail("选择 SenseVoice 时不应加载 Qwen 运行时"),
     )
 
-    def fake_create(model_dir, *, source_language=None, runtime=None):
+    def fake_create(model_dir, *, source_language=None, runtime=None, max_segment_ms=10000, silence_end_ms=800):
         seen.append(Path(model_dir))
         raise RuntimeError("stop here")
 
@@ -352,9 +390,7 @@ def test_status_payload_reports_active_recognition_model(tmp_path, monkeypatch) 
         def describe(self) -> str:
             return "cuda:0"
 
-    monkeypatch.setattr(
-        runtime_module, "get_sensevoice_runtime", lambda _path: SenseVoiceStub()
-    )
+    runtime._active_recognition_runtime = SenseVoiceStub()
     runtime._status_cache = ""
 
     assert runtime._engine_status_payload()["recognition"] == {
@@ -435,7 +471,7 @@ def test_session_cleanup_unloads_both_local_models(tmp_path, monkeypatch) -> Non
     provider = M2M100TranslationProvider.__new__(M2M100TranslationProvider)
     provider.runtime = FakeRuntime("m2m100")  # type: ignore[assignment]
     runtime.translation_provider = provider
-    monkeypatch.setattr(runtime_module, "get_qwen_runtime", lambda _path: qwen)
+    runtime._active_recognition_runtime = qwen
 
     asyncio.run(runtime._unload_session_models())
 

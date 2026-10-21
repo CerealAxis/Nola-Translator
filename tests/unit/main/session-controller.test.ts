@@ -5,6 +5,17 @@ import type { PrewarmConfig, PrewarmResult } from '../../../src/shared/contracts
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 import type { SessionConfig } from '../../../src/shared/contracts'
 
+it('uses persisted VAD timing when a session starts', async () => {
+  const request = vi.fn(async () => ({ sessionId: 'vad-session' }))
+  const settings = { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, max_segment_ms: 15000, silence_end_ms: 1200 } }
+  const sessions = new SessionController({ engine: { currentState: 'ready', start: vi.fn(), request } as unknown as EngineProcess, meetings: null,
+    getSettings: () => settings, getCredential: async () => '', whenReady: async () => {}, prepare: async () => {},
+    startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+  })
+  await sessions.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: [], max_segment_ms: 6000, silence_end_ms: 600 }, 'desktop')
+  expect(request).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ max_segment_ms: 15000, silence_end_ms: 1200 }) }), 'sessionStarted', expect.any(Number))
+})
+
 it('reserves a two-second audio preview without preparing models, recording or opening the overlay', async () => {
   let finish!: (value: { audioBase64: string; durationMs: 2000; hasSignal: boolean }) => void
   const engine = { currentState: 'ready', start: vi.fn(), supports: () => true,

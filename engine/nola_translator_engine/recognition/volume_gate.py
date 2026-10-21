@@ -1,12 +1,11 @@
-"""Volume-gate segmenter: splits speech on RMS energy, an adaptive noise baseline, and
-silence hysteresis, with no third-party VAD model.
-"""
+"""Silero VAD segmentation; the historical module name preserves internal imports."""
 
 from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
 from math import log10
+from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
@@ -35,27 +34,16 @@ class _Frame:
     voiced: bool
 
 
-class VolumeGateSegmenter:
-    """Gate opens and closes on 20 ms frame energy: ~200 ms pre-roll, 600 ms of silence ends
-    a segment, 6 s force-splits, and anything under MIN_VOICED_MS is dropped.
-    """
+class SileroVadSegmenter:
+    """Silero speech probabilities with pre-roll, silence hysteresis and bounded segments."""
 
     PRE_ROLL_MS = 200
-    SILENCE_END_MS = 600
+    SILENCE_END_MS = 800
     # A caption latency budget, not a model limit: final-only translation must progress during uninterrupted speech.
-    MAX_SEGMENT_MS = 6_000
+    MAX_SEGMENT_MS = 10_000
     MIN_VOICED_MS = 250
     FRAME_MS = 20
 
-    ABSOLUTE_FLOOR_DB = -60.0
-    MARGIN_ON_DB = 12.0
-    HYSTERESIS_DB = 6.0
-    INITIAL_NOISE_FLOOR_DB = -60.0
-    # noise floor EMA: floor += α·(db − floor). α=0.25 drops fast when the level is
-    # quieter, α=0.02 climbs slowly when it's louder, so a transient bang can't raise
-    # the threshold high enough to miss the speech after it.
-    NOISE_ALPHA_FAST = 0.25
-    NOISE_ALPHA_SLOW = 0.02
     DB_FLOOR = -120.0
 
     def __init__(
@@ -66,23 +54,23 @@ class VolumeGateSegmenter:
         max_segment_ms: int = MAX_SEGMENT_MS,
         min_voiced_ms: int = MIN_VOICED_MS,
         frame_ms: int = FRAME_MS,
-        absolute_floor_db: float = ABSOLUTE_FLOOR_DB,
-        margin_on_db: float = MARGIN_ON_DB,
-        hysteresis_db: float = HYSTERESIS_DB,
     ) -> None:
+        if max_segment_ms <= 0 or silence_end_ms <= 0:
+            raise ValueError("Segment and silence durations must be positive")
         self.pre_roll_ms = pre_roll_ms
         self.silence_end_ms = silence_end_ms
         self.max_segment_ms = max_segment_ms
         self.min_voiced_ms = min_voiced_ms
         self.frame_ms = frame_ms
-        self.absolute_floor_db = absolute_floor_db
-        self.margin_on_db = margin_on_db
-        self.hysteresis_db = hysteresis_db
         self.pre_roll_samples = TARGET_SAMPLE_RATE * pre_roll_ms // 1000
         self.silence_end_samples = TARGET_SAMPLE_RATE * silence_end_ms // 1000
         self.max_segment_samples = TARGET_SAMPLE_RATE * max_segment_ms // 1000
         self.min_voiced_samples = TARGET_SAMPLE_RATE * min_voiced_ms // 1000
-        self._noise_floor_db = self.INITIAL_NOISE_FLOOR_DB
+        self._vad_session = None
+        self._vad_state = np.zeros((2, 1, 128), dtype=np.float32)
+        self._vad_context = np.zeros((1, 64), dtype=np.float32)
+        self._vad_pending = np.empty(0, dtype=np.float32)
+        self._vad_probability = 0.0
         self._pre_roll: deque[_Frame] = deque()
         self._pre_roll_count = 0
         self._active: list[_Frame] = []
@@ -108,36 +96,68 @@ class VolumeGateSegmenter:
             "segmentsStarted": self.segments_started,
             "segmentsEmitted": self.segments_emitted,
             "segmentsDroppedShort": self.segments_dropped_short,
-            "noiseFloorDb": round(self._noise_floor_db, 2),
-            "onThresholdDb": round(self._on_threshold_db(), 2),
+            "speechProbability": round(self._vad_probability, 4),
             "highestFrameDb": round(self.highest_frame_db, 2),
             "voicedMs": round(self._voiced_samples * 1000.0 / TARGET_SAMPLE_RATE, 1),
             "activeMs": round(self._active_samples * 1000.0 / TARGET_SAMPLE_RATE, 1),
         }
 
-    @property
-    def noise_floor_db(self) -> float:
-        return self._noise_floor_db
+    def load(self) -> None:
+        """Validate the CPU model and native runtime before a session starts capturing."""
+        if self._vad_session is None:
+            import onnxruntime as ort
+
+            # Silero v6.2.3 (5cd7945676eb32225748052e2e6a0580e4686a08).
+            # Bundled upstream model and MIT license; no Torch import or runtime download.
+            options = ort.SessionOptions()
+            options.inter_op_num_threads = 1
+            options.intra_op_num_threads = 1
+            session = ort.InferenceSession(
+                str(Path(__file__).with_name("silero_vad.onnx")),
+                sess_options=options, providers=["CPUExecutionProvider"])
+            # Warm up without advancing this stream's recurrent state or audio clock.
+            session.run(None, {
+                "input": np.zeros((1, 576), dtype=np.float32),
+                "state": np.zeros((2, 1, 128), dtype=np.float32),
+                "sr": np.array(TARGET_SAMPLE_RATE, dtype=np.int64),
+            })
+            self._vad_session = session
+
+    def _speech_probability(self, samples: NDArray[np.float32]) -> float:
+        self.load()
+        # Capture supplies 320 samples; Silero requires 512 at 16 kHz. Carry the
+        # remainder and the latest decision (at most 20 ms old), never pad each frame.
+        self._vad_pending = np.concatenate((self._vad_pending, samples))
+        while self._vad_pending.size >= 512:
+            window = self._vad_pending[:512].reshape(1, 512)
+            inputs = np.concatenate((self._vad_context, window), axis=1)
+            probability, self._vad_state = self._vad_session.run(None, {
+                "input": inputs, "state": self._vad_state,
+                "sr": np.array(TARGET_SAMPLE_RATE, dtype=np.int64),
+            })
+            self._vad_context = window[:, -64:].copy()
+            self._vad_pending = self._vad_pending[512:]
+            self._vad_probability = float(probability.item())
+        return self._vad_probability
 
     def accept(self, frame: AudioFrame) -> list[VolumeGateSegment]:
         db = self._rms_dbfs(frame.samples)
+        probability = self._speech_probability(frame.samples)
         completed: list[VolumeGateSegment] = []
         self.frames_in += 1
         self.highest_frame_db = max(self.highest_frame_db, db)
         if not self._active:
-            self._update_noise_floor(db)
-            if db > self._on_threshold_db():
+            if probability >= 0.5:
+                self.frames_voiced += 1
                 self._start_segment(frame)
             else:
                 self._push_pre_roll(_Frame(frame.samples, frame.started_at_ms, False))
             return completed
 
-        on_db = self._on_threshold_db()
-        off_db = on_db - self.hysteresis_db
         if self._gate_open:
-            self._gate_open = db >= off_db
+            self._gate_open = probability >= 0.35
         else:
-            self._gate_open = db > on_db
+            self._gate_open = probability >= 0.5
         voiced = self._gate_open
         if voiced:
             self.frames_voiced += 1
@@ -163,8 +183,14 @@ class VolumeGateSegmenter:
         return completed
 
     def flush(self) -> list[VolumeGateSegment]:
+        self._vad_state.fill(0)
+        self._vad_context.fill(0)
+        self._vad_pending = np.empty(0, dtype=np.float32)
+        self._vad_probability = 0.0
         if not self._active or self._voiced_samples == 0:
             self._clear_active()
+            self._pre_roll.clear()
+            self._pre_roll_count = 0
             return []
         last = self._active[-1]
         end_ms = last.start_ms + last.samples.size * 1000.0 / TARGET_SAMPLE_RATE
@@ -300,16 +326,9 @@ class VolumeGateSegmenter:
             dropped = self._pre_roll.popleft()
             self._pre_roll_count -= dropped.samples.size
 
-    def _update_noise_floor(self, db: float) -> None:
-        alpha = self.NOISE_ALPHA_FAST if db < self._noise_floor_db else self.NOISE_ALPHA_SLOW
-        self._noise_floor_db += alpha * (db - self._noise_floor_db)
-
-    def _on_threshold_db(self) -> float:
-        return max(self.absolute_floor_db, self._noise_floor_db + self.margin_on_db)
-
     @staticmethod
     def _rms_dbfs(samples: NDArray[np.float32]) -> float:
         rms = float(np.sqrt(np.mean(np.square(samples.astype(np.float64)))))
         if rms <= 0.0:
-            return VolumeGateSegmenter.DB_FLOOR
-        return max(20.0 * log10(rms), VolumeGateSegmenter.DB_FLOOR)
+            return SileroVadSegmenter.DB_FLOOR
+        return max(20.0 * log10(rms), SileroVadSegmenter.DB_FLOOR)

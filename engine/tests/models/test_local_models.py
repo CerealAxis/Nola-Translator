@@ -51,6 +51,12 @@ def gguf(path, architecture='llama', metadata=None):
     return path
 
 
+@pytest.mark.parametrize('name', ['sensevoice-small-q4_k.gguf', 'vibevoice-asr-q4_k.gguf'])
+def test_voice_in_primary_model_name_is_not_a_companion(tmp_path, name):
+    _, entry = inspect_local(gguf(tmp_path / name))
+    assert entry.files[0].path == name
+
+
 def test_asr_gguf_imports_audio_companion_and_retains_llama_configuration(tmp_path):
     from nola_translator_engine.resources import ResourceManager
     source = gguf(tmp_path / 'Qwen3-ASR-0.6B-Q8_0.gguf', 'qwen3vl')

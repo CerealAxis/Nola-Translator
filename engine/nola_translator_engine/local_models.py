@@ -214,7 +214,8 @@ def _gguf_metadata(path: Path) -> dict:
 
 def _companion(path: Path) -> bool:
     name = path.stem.casefold()
-    return name.startswith('mmproj') or any(part in name for part in ('tokenizer', 'codec', 'voice-', 'vocoder'))
+    # Voice presets have a prefix; SenseVoice and VibeVoice are primary ASR weights.
+    return name.startswith(('mmproj', 'voice-')) or any(part in name for part in ('tokenizer', 'codec', 'vocoder'))
 
 
 def _local_adapter(config: dict, metadata: dict, names: set[str]) -> tuple[str, str]:

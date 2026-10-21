@@ -4,10 +4,12 @@ import { GOOGLE_TRANSLATE_ENDPOINT } from './google-translate'
 import { DEFAULT_SETTINGS, MINIMAX_RECOGNITION_MODELS, type RecognitionProvider, type RecognitionSettings, type TranslationProvider, type TranslationSettings } from './settings'
 
 /** Connection options are public configuration; credentials are injected only by the main process. */
-export function recognitionFieldsOf(settings: RecognitionSettings): Pick<SessionConfig, 'recognitionProvider' | 'recognitionOptions'> {
+export function recognitionFieldsOf(settings: RecognitionSettings): Pick<SessionConfig, 'recognitionProvider' | 'recognitionOptions' | 'max_segment_ms' | 'silence_end_ms'> {
   const provider = settings.provider ?? 'local'
   return {
     recognitionProvider: provider,
+    max_segment_ms: settings.max_segment_ms ?? 10000,
+    silence_end_ms: settings.silence_end_ms ?? 800,
     ...(provider === 'aliyun' ? { recognitionOptions: {
       workspaceId: settings.aliyunWorkspaceId ?? '',
       region: settings.aliyunRegion ?? 'cn-beijing',

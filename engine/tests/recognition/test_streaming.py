@@ -1,4 +1,4 @@
-"""StreamingRecognizer unit tests: synthetic 20 ms frames plus a real VolumeGateSegmenter at fast settings."""
+"""StreamingRecognizer unit tests: synthetic 20 ms frames plus a real SileroVadSegmenter at fast settings."""
 
 from __future__ import annotations
 
@@ -20,7 +20,14 @@ from nola_translator_engine.recognition.qwen_streaming import (
 )
 from nola_translator_engine.recognition.streaming import StreamingRecognizer
 from nola_translator_engine.recognition.sensevoice_streaming import create_sensevoice_recognizer
-from nola_translator_engine.recognition.volume_gate import VolumeGateSegmenter
+from nola_translator_engine.recognition.volume_gate import SileroVadSegmenter
+
+@pytest.fixture(autouse=True)
+def speech_decisions(monkeypatch):
+    # These tests exercise segmentation/scheduling, independently of the neural classifier.
+    monkeypatch.setattr(SileroVadSegmenter, "_speech_probability",
+                        lambda self, samples: float(np.max(np.abs(samples)) > 0.01))
+
 
 FRAME_SAMPLES = 320
 FRAME_MS = 20
@@ -34,10 +41,10 @@ def make_frame(index: int, amplitude: float) -> AudioFrame:
     return AudioFrame(samples=samples, started_at_ms=float(index * FRAME_MS))
 
 
-def fast_segmenter(**overrides) -> VolumeGateSegmenter:
+def fast_segmenter(**overrides) -> SileroVadSegmenter:
     params: dict = dict(pre_roll_ms=20, silence_end_ms=60, min_voiced_ms=40)
     params.update(overrides)
-    return VolumeGateSegmenter(**params)
+    return SileroVadSegmenter(**params)
 
 
 @dataclass
@@ -79,7 +86,7 @@ def make_recognizer(
     *,
     block_ms: int = 100,
     source_language: str | None = None,
-    segmenter: VolumeGateSegmenter | None = None,
+    segmenter: SileroVadSegmenter | None = None,
     run_transcribe=None,
 ) -> StreamingRecognizer:
     return StreamingRecognizer(
@@ -400,7 +407,7 @@ def test_create_qwen_recognizer_wires_defaults(tmp_path) -> None:
 
     assert isinstance(rec, StreamingRecognizer)
     assert rec.runtime is get_qwen_runtime(tmp_path / "qwen")
-    assert isinstance(rec.segmenter, VolumeGateSegmenter)
+    assert isinstance(rec.segmenter, SileroVadSegmenter)
     assert rec.block_ms == 2000
     assert rec._forced_language == "en"
 
@@ -409,4 +416,4 @@ def test_06b_realtime_profile_limits_repeated_inference(tmp_path) -> None:
     rec = create_qwen_recognizer(tmp_path / "qwen3-asr-0.6b-hf")
 
     assert rec.block_ms == 3000
-    assert rec.segmenter.max_segment_ms == 6000
+    assert rec.segmenter.max_segment_ms == 10000

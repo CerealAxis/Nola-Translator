@@ -311,14 +311,25 @@ html[data-overlay-menu-input='pointer'] .nola-caption-menu .nola-menu-item {
 }
 
 /*
- * Only sentence mode plays the enter animation. In rolling mode the whole text
- * is one keyless block, so the animation would fire once on mount and never
- * again, while the upward scroll is already the animation — a fade on top of it
- * would fight it.
+ * Source sentences enter as blocks. Translation revisions animate their changed
+ * spans independently, keeping already displayed text at its settled opacity.
  */
 .nola-caption-track-sentence .nola-caption-entry {
   margin-bottom: 6px;
   animation: nola-caption-entry-in 220ms cubic-bezier(0.22, 0.7, 0.2, 1) both;
+}
+
+.nola-caption-track[data-kind='translation'] .nola-caption-track-sentence .nola-caption-entry {
+  animation: none;
+}
+
+.nola-caption-change[data-entering='true'] {
+  animation: nola-caption-change-in var(--dur-enter) var(--ease-nola) both;
+}
+
+@keyframes nola-caption-change-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes nola-caption-entry-in {

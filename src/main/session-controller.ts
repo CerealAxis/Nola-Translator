@@ -82,7 +82,10 @@ export class SessionController {
       const session: SessionConfig = { ...config, audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime' }
       await this.options.prepare(session)
       await this.ensureReady()
-      return await this.options.engine.prewarmModels({ ...config, compute: session.compute ?? config.compute })
+      return await this.options.engine.prewarmModels({ ...config, compute: session.compute ?? config.compute,
+        max_segment_ms: this.options.getSettings().recognition.max_segment_ms ?? 10000,
+        silence_end_ms: this.options.getSettings().recognition.silence_end_ms ?? 800,
+      })
     } finally {
       this.browserPreparing = false
       this.starting = false
@@ -100,6 +103,8 @@ export class SessionController {
     if (owner === 'desktop' && (parsed.audioSource.kind === 'browserTab' || parsed.browserTimeline)) throw new Error('invalidConfiguration')
     if (owner === 'browser' && (!parsed.browserTimeline || parsed.audioSource.kind === 'microphone')) throw new Error('invalidConfiguration')
     parsed.compute = { ...this.options.getSettings().compute }
+    parsed.max_segment_ms = this.options.getSettings().recognition.max_segment_ms ?? 10000
+    parsed.silence_end_ms = this.options.getSettings().recognition.silence_end_ms ?? 800
     delete parsed.recordingPath
     this.starting = true
     const operation = ++this.operation

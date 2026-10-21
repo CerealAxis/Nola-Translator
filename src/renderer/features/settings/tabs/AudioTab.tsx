@@ -14,7 +14,7 @@ import { recognitionLanguages } from '../../../../shared/model-capabilities'
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button } from '@heroui/react'
+import { Button, Slider } from '@heroui/react'
 
 import { languageName } from '@/bridge'
 import { SettingsRow } from '../SettingsRow'
@@ -24,7 +24,7 @@ import { errorCopyOf } from '@/features/workspace/error-copy'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
-import { ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS, type AliyunRecognitionModel, type MinimaxRecognitionModel, type RecognitionProvider, type RecognitionSettings } from '../../../../shared/settings'
+import { DEFAULT_SETTINGS, ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS, type AliyunRecognitionModel, type MinimaxRecognitionModel, type RecognitionProvider, type RecognitionSettings } from '../../../../shared/settings'
 import { ApiKeyRow, TextRow } from './TranslationTab'
 import { supportsRecognitionNativeTranslation } from '../../../../shared/cloud-config'
 
@@ -146,6 +146,36 @@ export function AudioTab({ settings }: SettingsPanelProps) {
           />
         </SettingsRow>
       </SettingGroup>
+
+      {provider !== 'aliyun' ? <SettingGroup legend={t('settings.vadGroup')} actions={
+        <Button variant="secondary" size="sm" onPress={() => {
+          void updateSettings({ recognition: {
+            max_segment_ms: DEFAULT_SETTINGS.recognition.max_segment_ms,
+            silence_end_ms: DEFAULT_SETTINGS.recognition.silence_end_ms,
+          } }).catch(() => undefined)
+        }}>{t('settings.restoreVadDefaults')}</Button>
+      }>
+        {([
+          ['max_segment_ms', 'settings.maxSegmentMs', 'settings.maxSegmentMsHint', 10000, 3000, 30000, 500],
+          ['silence_end_ms', 'settings.silenceEndMs', 'settings.silenceEndMsHint', 800, 300, 2000, 100],
+        ] as const).map(([field, label, hint, fallback, min, max, step]) => (
+          <SettingsRow key={field} label={t(label)} desc={t(hint)} descriptionTooltip>
+            <div className="settings-slider">
+              <Slider aria-label={t(label)} value={settings.recognition[field] ?? fallback}
+                minValue={min} maxValue={max} step={step} onChange={next => {
+                  const value = Array.isArray(next) ? next[0] : next
+                  if (value !== undefined && Number.isInteger(value) && value >= min && value <= max) {
+                    void updateSettings({ recognition: { [field]: value } }).catch(() => undefined)
+                  }
+                }}>
+                <Slider.Track><Slider.Fill /><Slider.Thumb /></Slider.Track>
+              </Slider>
+              <output className="nola-caption tabular text-right">{(settings.recognition[field] ?? fallback).toLocaleString(language)}</output>
+              <span className="settings-slider__unit" aria-hidden="true" />
+            </div>
+          </SettingsRow>
+        ))}
+      </SettingGroup> : null}
 
       <SettingGroup legend={t('settings.groupRecording')}>
         <SettingsRow label={t('settings.keepAudio')} descriptionTooltip desc={t('settings.keepAudioHint')}>

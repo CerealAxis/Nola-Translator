@@ -9,7 +9,7 @@ from time import monotonic
 import unicodedata
 import httpx
 
-from .base import ProviderTranslation, ScheduledTranslation, TranslationProvider
+from .base import ProviderTranslation, ScheduledTranslation, TranslationProvider, revision_context
 from ..debug_log import write as write_debug
 
 
@@ -70,7 +70,8 @@ class TranslationScheduler:
     async def _translate_one(
         self, text: str, source: str, target: str, notify: Callable[[ScheduledTranslation], None]
     ) -> ScheduledTranslation:
-        normalized = unicodedata.normalize("NFKC", text).strip()
+        # A revision draft must preserve displayed punctuation and compatibility characters.
+        normalized = text.strip() if revision_context(text) else unicodedata.normalize("NFKC", text).strip()
         key = (self.provider.name, source, target, normalized)
         cached = self.cache.get(key)
         if cached is not None:

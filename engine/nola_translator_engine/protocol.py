@@ -120,6 +120,8 @@ class ModelSelection(ProtocolModel):
     recognitionModelId: str | None = Field(default=None, min_length=1, max_length=256)
     recognitionProvider: Literal["local", "aliyun", "minimax"] = "local"
     recognitionOptions: RecognitionOptions | None = None
+    max_segment_ms: int = Field(default=10000, ge=3000, le=30000)
+    silence_end_ms: int = Field(default=800, ge=300, le=2000)
     sourceLanguage: str = Field(min_length=1, max_length=32)
     targetLanguages: list[str] = Field(max_length=8)
     allowIntermediateTranslation: bool = False

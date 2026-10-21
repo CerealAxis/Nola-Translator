@@ -8,6 +8,20 @@ import { GITHUB_PROXY_AUTO } from '../../../src/shared/github-proxies'
 import { PYPI_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_AUTO } from '../../../src/shared/pypi-mirrors'
 
 describe('设置存储', () => {
+  it('restores VAD defaults for old settings and persists custom timing', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-vad-settings-'))
+    const path = join(directory, 'settings.json')
+    try {
+      await writeFile(path, JSON.stringify({ version: 2, recognition: { modelId: 'sensevoice-small' } }))
+      const store = new SettingsStore(path)
+      expect((await store.load()).recognition).toMatchObject({ max_segment_ms: 10000, silence_end_ms: 800 })
+      await store.update({ recognition: { max_segment_ms: 15000, silence_end_ms: 1200 } })
+      expect((await new SettingsStore(path).load()).recognition).toMatchObject({ max_segment_ms: 15000, silence_end_ms: 1200 })
+      await writeFile(path, JSON.stringify({ version: 2, recognition: { max_segment_ms: -1, silence_end_ms: 'bad' } }))
+      expect((await new SettingsStore(path).load()).recognition).toMatchObject({ max_segment_ms: 10000, silence_end_ms: 800 })
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+
   it('persists regional cloud configuration and keeps credentials outside settings', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-cloud-settings-'))
     const path = join(directory, 'settings.json')

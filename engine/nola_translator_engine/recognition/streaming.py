@@ -19,7 +19,7 @@ from numpy.typing import NDArray
 
 from ..audio.resample import AudioFrame
 from .base import RecognitionUpdate, Transcriber
-from .volume_gate import SegmentSnapshot, VolumeGateSegment, VolumeGateSegmenter
+from .volume_gate import SegmentSnapshot, VolumeGateSegment, SileroVadSegmenter
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +51,7 @@ class _SegmentState:
 
 
 class StreamingRecognizer:
-    """Volume-gated segmentation plus cumulative block transcription.
+    """Silero VAD segmentation plus cumulative block transcription.
 
     All inference runs on one background asyncio worker: FINAL outranks INTERMEDIATE,
     and INTERMEDIATE jobs for a segment collapse to the newest snapshot per segment_id.
@@ -70,7 +70,9 @@ class StreamingRecognizer:
         runtime: Transcriber,
         *,
         source_language: str | None = None,
-        segmenter: VolumeGateSegmenter | None = None,
+        segmenter: SileroVadSegmenter | None = None,
+        max_segment_ms: int = 10000,
+        silence_end_ms: int = 800,
         block_ms: int = 2000,
         first_block_ms: int | None = None,
         prefix_builder: Callable[[str], str | None] | None = None,
@@ -79,7 +81,7 @@ class StreamingRecognizer:
         on_update: Callable[[RecognitionUpdate], Awaitable[None]] | None = None,
     ) -> None:
         self.runtime = runtime
-        self.segmenter = segmenter if segmenter is not None else VolumeGateSegmenter()
+        self.segmenter = segmenter if segmenter is not None else SileroVadSegmenter(max_segment_ms=max_segment_ms, silence_end_ms=silence_end_ms)
         self.block_ms = block_ms
         self.first_block_ms = first_block_ms if first_block_ms is not None else block_ms
         self._prefix_builder = prefix_builder
@@ -106,6 +108,10 @@ class StreamingRecognizer:
         self.blocks_dispatched = 0
         self.updates_produced = 0
         self.empty_updates = 0
+
+    def prepare(self) -> None:
+        """Validate VAD independently of ASR weights, before audio capture can start."""
+        self.segmenter.load()
 
     def stats(self) -> dict[str, int]:
         stats: dict[str, int] = {

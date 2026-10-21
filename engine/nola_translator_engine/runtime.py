@@ -196,7 +196,6 @@ class TranslationRequest:
     source: str
     targets: tuple[str, ...]
     allow_intermediate: bool
-    previous_context: tuple[str, str] | None = None
 
 
 def _compatibility(verdict: RuntimeVerdict, *, languages: bool = True) -> HubCompatibility:
@@ -265,6 +264,7 @@ class EngineRuntime:
         self.translation_tasks: dict[str, asyncio.Task[None]] = {}
         self.translation_jobs: dict[str, set[asyncio.Task[list[Translation]]]] = {}
         self.translation_display_revision: dict[tuple[str, str], int] = {}
+        self.translation_context: dict[tuple[str, str], tuple[str, str, str, str]] = {}
         self.translation_requests: dict[str, TranslationRequest] = {}
         self.latest_updates: dict[str, RecognitionUpdate] = {}
         self.latest_translations: dict[str, list[Translation]] = {}
@@ -693,6 +693,10 @@ class EngineRuntime:
         try:
             recognizer = await self._prepare_models(command)
             self._update_compute_plan(self.llama_manager.fallback_reason)
+        except ResourceActionError as error:
+            write_debug("engine", "model.prepare.failed", {"requestId": command.requestId, "operation": "startSession", **exception_fields(error), "details": error.details})
+            await self._unload_session_models()
+            return [self._resource_error(command.requestId, error.code, error.details)]
         except ValueError as error:
             write_debug("engine", "model.prepare.failed", {"requestId": command.requestId, "operation": "startSession", **exception_fields(error)})
             await self._unload_session_models()
@@ -887,6 +891,10 @@ class EngineRuntime:
         try:
             recognizer = await self._prepare_models(command)
             await recognizer.close()
+        except ResourceActionError as error:
+            write_debug("engine", "model.prepare.failed", {"requestId": command.requestId, "operation": "prewarmModels", **exception_fields(error), "details": error.details})
+            await self._unload_session_models()
+            return [self._resource_error(command.requestId, error.code, error.details)]
         except ValueError as error:
             write_debug("engine", "model.prepare.failed", {"requestId": command.requestId, "operation": "prewarmModels", **exception_fields(error)})
             await self._unload_session_models()
@@ -916,6 +924,16 @@ class EngineRuntime:
         )]
 
     async def _prepare_models(self, command: ModelSelectionCommand) -> Recognizer:
+        recognizer = await self._load_selected_models(command)
+        try:
+            if isinstance(recognizer, (StreamingRecognizer, MiniMaxRecognizer)):
+                await asyncio.to_thread(recognizer.prepare)
+        except BaseException:
+            await recognizer.close()
+            raise
+        return recognizer
+
+    async def _load_selected_models(self, command: ModelSelectionCommand) -> Recognizer:
         config = command.config
         if config.recognitionProvider != "local":
             return await self._prepare_remote_models(command)
@@ -1284,6 +1302,7 @@ class EngineRuntime:
         )
         if language == "tl":
             language = "fil"
+        vad_options = {"max_segment_ms": command.config.max_segment_ms, "silence_end_ms": command.config.silence_end_ms}
         model_id = self._model_id(command)
         self.active_model_id = model_id
         model_path = self.resources.model_path(model_id)
@@ -1298,7 +1317,7 @@ class EngineRuntime:
                 use_vulkan=compute.recognitionDevice != "cpu", allow_cpu_fallback=compute.allowCpuFallback)
             await asyncio.to_thread(runtime.load)
             self._active_recognition_runtime = runtime
-            return StreamingRecognizer(runtime, source_language=language, on_update=self._emit_update)
+            return StreamingRecognizer(runtime, **vad_options, source_language=language, on_update=self._emit_update)
         if self.resources.adapter_for(model_id) == "llama-asr":
             runtime = self._active_recognition_runtime
             if not isinstance(runtime, LlamaAsrRuntime):
@@ -1316,7 +1335,7 @@ class EngineRuntime:
             manager.configure_compute(self._recognition_device, compute.model_copy(update={"cpuThreads": self._llama_threads, "reservedVramMb": reserved}))
             self._active_recognition_runtime = runtime
             await manager.start(timeout_s=120)
-            return StreamingRecognizer(runtime, source_language=language, on_update=self._emit_update)
+            return StreamingRecognizer(runtime, **vad_options, source_language=language, on_update=self._emit_update)
         if self._recognition_device.id == "cpu" and compute.recognitionDevice != "cpu" and compute.allowCpuFallback:
             compute = compute.model_copy(update={"precision": "auto", "quantization": "none"})
         for attempt in range(2):
@@ -1336,8 +1355,8 @@ class EngineRuntime:
             self._active_recognition_runtime = runtime
             try:
                 await asyncio.to_thread(runtime.load)
-                recognizer = (factory(model_path, source_language=language, runtime=runtime) if factory
-                    else StreamingRecognizer(runtime, source_language=language))
+                recognizer = (factory(model_path, **vad_options, source_language=language, runtime=runtime) if factory
+                    else StreamingRecognizer(runtime, **vad_options, source_language=language))
                 break
             except Exception as error:
                 release_failed_load(error)
@@ -1471,6 +1490,9 @@ class EngineRuntime:
         except asyncio.CancelledError:
             raise
         except Exception as error:
+            write_debug("engine", "audio.pipeline.failed", {
+                "requestId": self.session_request_id, **exception_fields(error),
+            })
             self.emit(
                 ErrorEvent(
                     protocolVersion=1,
@@ -1478,7 +1500,8 @@ class EngineRuntime:
                     requestId=self.session_request_id,
                     code="internalError",
                     recoverable=True,
-                    details={"reason": type(error).__name__},
+                    details={"reason": type(error).__name__,
+                             **({"missingModule": error.name} if isinstance(error, ModuleNotFoundError) else {})},
                 )
             )
 
@@ -1549,7 +1572,6 @@ class EngineRuntime:
             capability = self.resources.configuration(self._local_translation_model_id(config))
             # Automatic language detection is allowed to retain untranslated speech silently.
             targets = [target for target in targets if supports_translation(capability, source, target)]
-        previous_update = self.latest_updates.get(update.segment_id)
         self.latest_updates[update.segment_id] = update
         if provider == "recognition":
             native = update.native_translation
@@ -1589,14 +1611,6 @@ class EngineRuntime:
             item.targetLanguage: item
             for item in self.latest_translations.get(update.segment_id, [])
         }
-        previous_context = None
-        if (provider == "cloud" and len(targets) == 1 and previous_update is not None
-                and previous_update.source_text
-                and update.source_text.startswith(previous_update.source_text)):
-            draft = previous.get(targets[0])
-            if (draft is not None and draft.state == "complete" and draft.text
-                    and len(previous_update.source_text) <= 1200 and len(draft.text) <= 1200):
-                previous_context = (previous_update.source_text, draft.text)
         visible = [
             (previous.get(target) if previous.get(target) is not None
              and previous[target].text else None)
@@ -1616,7 +1630,6 @@ class EngineRuntime:
             allow_intermediate=bool(
                 getattr(config, "allowIntermediateTranslation", False)
             ),
-            previous_context=previous_context,
         )
         self.translation_wake.setdefault(update.segment_id, asyncio.Event()).set()
         task = self.translation_tasks.get(update.segment_id)
@@ -1762,9 +1775,25 @@ class EngineRuntime:
             return
         if result.state != "pending" or result.text:
             self.translation_display_revision[display_key] = request.update.revision
+        if result.state == "complete" and result.text:
+            if len(request.update.source_text) <= 1200 and len(result.text) <= 1200:
+                # Keep the exact source/translation pair, even if recognition has advanced.
+                self.translation_context[display_key] = (
+                    request.update.source_text, result.text, request.source, result.provider,
+                )
+            else:
+                self.translation_context.pop(display_key, None)
+        previous = next((item for item in self.latest_translations.get(request.update.segment_id, [])
+                         if item.targetLanguage == result.target_language), None)
+        text = result.text
+        if (result.state == "pending" and previous is not None and previous.text
+                and (not text or previous.text.startswith(text))):
+            # A new stream replays its opening before reaching the revised tail. Keep the
+            # displayed text until it catches up or diverges; a complete result may shorten it.
+            text = previous.text
         replacement = Translation(
             targetLanguage=result.target_language, state=result.state,
-            provider=result.provider, text=result.text, errorCode=result.error_code,
+            provider=result.provider, text=text, errorCode=result.error_code,
         )
         visible = [
             replacement if item.targetLanguage == result.target_language else item
@@ -1779,14 +1808,25 @@ class EngineRuntime:
         targets = list(request.targets)
         provider_name = self.translation_scheduler.provider.name
         text = request.update.source_text
-        cloud_providers = {"openai", "openai-responses", "anthropic", "ollama"}
-        if provider_name in cloud_providers and request.previous_context:
-            previous_source, previous_translation = request.previous_context
-            text = json.dumps({
-                "previousSource": previous_source,
-                "previousTranslation": previous_translation,
+        revision_providers = {
+            "openai", "openai-responses", "anthropic", "ollama",
+            "index-translate", "index-translate-local", "index-translate-transformers",
+        }
+        texts = {}
+        unchanged: dict[str, ScheduledTranslation] = {}
+        for target in targets:
+            context = self.translation_context.get((request.update.segment_id, target))
+            if context and (context[2] != request.source or context[3] != provider_name
+                    or not text.startswith(context[0])):
+                context = None
+            if context and text == context[0]:
+                unchanged[target] = ScheduledTranslation(
+                    target, "complete", provider_name, text=context[1],
+                )
+            texts[target] = json.dumps({
+                "previousSource": context[0], "previousTranslation": context[1],
                 "currentSource": text,
-            }, ensure_ascii=False)
+            }, ensure_ascii=False) if context and provider_name in revision_providers else text
         session_id, generation = self.service.session_id, self._stream_generation
         retry_codes = {"URLError", "HTTPError", "translationRateLimited", "translationTimeout", "RuntimeError"}
         retry_enabled = request.update.is_final and provider_name not in {"hymt2", "index-translate-local", "index-translate-transformers", "m2m100", "transformers-causal", "transformers-seq2seq"}
@@ -1838,21 +1878,31 @@ class EngineRuntime:
                     if not m2m100_is_supported(target):
                         target_errors[target] = "unsupportedLanguagePair"
 
-        retry_targets = [target for target in targets if target not in target_errors]
-        completed_by_target: dict[str, ScheduledTranslation] = {}
+        completed_by_target = {
+            target: result for target, result in unchanged.items() if target not in target_errors
+        }
+        for result in completed_by_target.values():
+            publish(result)
+        retry_targets = [target for target in targets
+                         if target not in target_errors and target not in completed_by_target]
         while retry_targets and attempt < max_attempts:
             if (self.service.session_id != session_id
                     or self._stream_generation != generation):
                 return []
             attempt += 1
-            scheduled = await self.translation_scheduler.translate(
-                request.update.segment_id,
-                request.update.revision,
-                text,
-                request.source,
-                retry_targets,
-                on_result=publish,
-            )
+            if any(texts[target] != text for target in retry_targets):
+                batches = await asyncio.gather(*(
+                    self.translation_scheduler.translate(
+                        request.update.segment_id, request.update.revision,
+                        texts[target], request.source, [target], on_result=publish,
+                    ) for target in retry_targets
+                ))
+                scheduled = [item for batch in batches for item in batch]
+            else:
+                scheduled = await self.translation_scheduler.translate(
+                    request.update.segment_id, request.update.revision,
+                    text, request.source, retry_targets, on_result=publish,
+                )
             failed_targets: list[str] = []
             for result in scheduled:
                 completed_by_target[result.target_language] = result
@@ -1916,6 +1966,7 @@ class EngineRuntime:
                 mapping.pop(segment_id, None)
             for key in [key for key in self.translation_display_revision if key[0] == segment_id]:
                 self.translation_display_revision.pop(key, None)
+                self.translation_context.pop(key, None)
 
     def _caption_event(
         self,
@@ -2044,6 +2095,7 @@ class EngineRuntime:
         self.translation_tasks.clear()
         self.translation_jobs.clear()
         self.translation_display_revision.clear()
+        self.translation_context.clear()
         for mapping in (self.translation_last_started, self.translation_wake,
                         self.completed_segments,
                         self.latest_updates, self.latest_translations, self.caption_revisions):
@@ -2055,13 +2107,14 @@ class EngineRuntime:
         language = None if config.sourceLanguage == "auto" else self._recognition_language_code(config.sourceLanguage)
         if language == "tl":
             language = "fil"
+        vad_options = {"max_segment_ms": config.max_segment_ms, "silence_end_ms": config.silence_end_ms}
         model_path = self.resources.model_path(self.active_model_id)
         if self.resources.adapter_for(self.active_model_id) in ("crisp-asr", "llama-asr", "transformers-asr", "funasr"):
-            return StreamingRecognizer(self._recognition_runtime(), source_language=language, on_update=self._emit_update)
+            return StreamingRecognizer(self._recognition_runtime(), **vad_options, source_language=language, on_update=self._emit_update)
         factory = (create_sensevoice_recognizer if self.resources.adapter_for(self.active_model_id) == "sensevoice"
                    else create_qwen_recognizer)
         # Seek changes sentence state, not weights or the capability-validated model selection.
-        return factory(model_path, source_language=language, runtime=self._recognition_runtime())
+        return factory(model_path, **vad_options, source_language=language, runtime=self._recognition_runtime())
 
     async def _reset_stream(self, command: ResetStreamCommand) -> list[EngineEvent]:
         if command.sessionId != self.service.session_id:
@@ -2310,6 +2363,7 @@ class EngineRuntime:
         self.translation_tasks.clear()
         self.translation_jobs.clear()
         self.translation_display_revision.clear()
+        self.translation_context.clear()
         self.translation_last_started.clear()
         self.translation_wake.clear()
         self.completed_segments.clear()
@@ -2382,7 +2436,7 @@ class EngineRuntime:
                     {"reason": "modelCleanupFailed", "error": type(error).__name__}))
 
     async def _settle_session_models(self) -> None:
-        runtimes = [self._recognition_runtime(), self.llama_manager]
+        runtimes = [self._active_recognition_runtime, self.llama_manager]
         for provider in (self.translation_provider, self.fallback_translation_provider):
             if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider, IndexTranslateTransformersProvider)):
                 runtimes.append(provider.runtime)
@@ -2398,7 +2452,9 @@ class EngineRuntime:
         self._loaded_model_key = None
         self._loaded_translation_model_id = None
         await self.llama_manager.stop()
-        runtimes = [self._recognition_runtime()]
+        # A failed loader may never publish a runtime. Cleanup must only release
+        # existing instances, otherwise it can rethrow and hide the original failure.
+        runtimes = [self._active_recognition_runtime]
         for provider in (self.translation_provider, self.fallback_translation_provider):
             if isinstance(provider, (M2M100TranslationProvider, CausalTranslationProvider, IndexTranslateTransformersProvider)):
                 runtimes.append(provider.runtime)
@@ -2512,7 +2568,7 @@ class EngineRuntime:
             task.cancel()
 
     def _engine_status_payload(self) -> dict[str, object]:
-        recognition = self._recognition_runtime()
+        recognition = self._active_recognition_runtime
         device = self.llama_manager.device
         dropped = (
             self.capture.dropped_chunks
@@ -2524,8 +2580,8 @@ class EngineRuntime:
             "compute": self._device_plan,
             "recognition": {
                 "modelId": self.active_model_id,
-                "loaded": bool(recognition.loaded),
-                "runtime": recognition.describe(),
+                "loaded": bool(recognition is not None and recognition.loaded),
+                "runtime": recognition.describe() if recognition is not None else "unloaded",
             },
             "hymt2": {
                 "device": device or "unknown",

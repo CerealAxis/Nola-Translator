@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .qwen_runtime import QwenRuntime, get_qwen_runtime
 from .streaming import StreamingRecognizer
-from .volume_gate import VolumeGateSegmenter
+from .volume_gate import SileroVadSegmenter
 
 # The official streaming example lets the first blocks start free, then continues from a
 # 5-token rollback on every later block.
@@ -22,7 +22,8 @@ def _prefix_builder(runtime: QwenRuntime):
 
 
 def create_qwen_recognizer(
-    model_dir: Path, *, source_language: str | None = None, runtime: QwenRuntime | None = None
+    model_dir: Path, *, source_language: str | None = None, runtime: QwenRuntime | None = None,
+    max_segment_ms: int = 10000, silence_end_ms: int = 800
 ) -> StreamingRecognizer:
     """Build the Qwen streaming recognizer; the model loads lazily on the first job's thread.
 
@@ -34,7 +35,7 @@ def create_qwen_recognizer(
         return StreamingRecognizer(
             runtime,
             source_language=source_language,
-            segmenter=VolumeGateSegmenter(max_segment_ms=6000),
+            segmenter=SileroVadSegmenter(max_segment_ms=max_segment_ms, silence_end_ms=silence_end_ms),
             block_ms=3000,
             prefix_builder=_prefix_builder(runtime),
             prefix_after_blocks=UNFIXED_CHUNK_NUM,
@@ -42,6 +43,7 @@ def create_qwen_recognizer(
     return StreamingRecognizer(
         runtime,
         source_language=source_language,
+        segmenter=SileroVadSegmenter(max_segment_ms=max_segment_ms, silence_end_ms=silence_end_ms),
         prefix_builder=_prefix_builder(runtime),
         prefix_after_blocks=UNFIXED_CHUNK_NUM,
     )

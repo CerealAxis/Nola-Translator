@@ -1,6 +1,13 @@
 import { expect, it } from 'vitest'
 
 import { settingsPatchSchema } from '../../../src/main/settings-schema'
+
+it('validates VAD duration bounds and integer values', () => {
+  expect(settingsPatchSchema.safeParse({ recognition: { max_segment_ms: 15000, silence_end_ms: 1200 } }).success).toBe(true)
+  for (const recognition of [{ max_segment_ms: 2999 }, { max_segment_ms: 30001 }, { silence_end_ms: 299 }, { silence_end_ms: 2001 }, { silence_end_ms: 800.5 }]) {
+    expect(settingsPatchSchema.safeParse({ recognition }).success).toBe(false)
+  }
+})
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 import { INDEX_TRANSLATE_MODEL_IDS } from '../../../src/shared/index-translate'
 

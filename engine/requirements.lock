@@ -10,12 +10,15 @@ click==8.4.2
 compressed-tensors==0.19.0
 crispasr==0.8.43
 colorama==0.4.6
+coloredlogs==15.0.1
 filelock==3.31.0
+flatbuffers==25.12.19
 fsspec==2026.6.0
 h11==0.16.0
 hf-xet==1.5.2
 httpcore==1.0.9
 httpx==0.28.1
+humanfriendly==10.0
 huggingface_hub==1.24.0
 idna==3.18
 iniconfig==2.3.0
@@ -28,6 +31,7 @@ mpmath==1.3.0
 networkx==3.6.1
 loguru==0.7.3
 numpy==2.5.1
+onnxruntime==1.23.2
 packaging==26.2
 pefile==2024.8.26
 pluggy==1.6.0
@@ -41,6 +45,7 @@ pyinstaller==6.21.0
 pyinstaller-hooks-contrib==2026.6
 pytest==9.1.1
 pytest-asyncio==1.4.0
+pyreadline3==3.5.6
 pywin32-ctypes==0.2.3
 PyYAML==6.0.3
 regex==2026.7.19
