@@ -80,3 +80,24 @@ it('attaches a recording to an adopted session without resetting its transcript'
   receive({ protocolVersion: 1, type: 'sessionStarted', requestId: 'late', sessionId: 'old', meetingId: 'old-meeting' })
   expect(sessionStore.getState().meetingId).toBe('meeting-shared')
 })
+
+it('clears the interim revision of a segment when a stale final for it arrives', async () => {
+  const bridge = createIpcBridge()
+  let receive: Parameters<typeof bridge.events.onEngineEvent>[0] = () => undefined
+  vi.spyOn(bridge.events, 'onEngineEvent').mockImplementation(callback => { receive = callback; return () => undefined })
+  vi.spyOn(bridge.engine, 'getEngineState').mockResolvedValue('ready')
+  sessionStore.setState({ status: 'idle', sessionId: null, segments: [], interim: null })
+  attachSessionStore(bridge)
+  receive({ protocolVersion: 1, type: 'sessionStarted', requestId: 'start', sessionId: 'shared' })
+
+  const final = { segmentId: 'line', revision: 2, startedAtMs: 0, sourceLanguage: 'en', sourceText: 'Hello', isFinal: true, translations: [] }
+  receive({ protocolVersion: 1, type: 'caption', requestId: 'caption', sessionId: 'shared', segment: final })
+  receive({ protocolVersion: 1, type: 'caption', requestId: 'caption', sessionId: 'shared', segment: { ...final, revision: 3, isFinal: false } })
+  // Interim revisions are batched before they reach the store.
+  await new Promise(resolve => setTimeout(resolve, 120))
+  expect(sessionStore.getState().interim?.segmentId).toBe('line')
+
+  receive({ protocolVersion: 1, type: 'caption', requestId: 'caption', sessionId: 'shared', segment: { ...final, revision: 1 } })
+  expect(sessionStore.getState().interim).toBeNull()
+  expect(sessionStore.getState().segments).toHaveLength(1)
+})

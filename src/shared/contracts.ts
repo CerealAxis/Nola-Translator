@@ -122,6 +122,12 @@ export type PrewarmResult = {
 export type Translation = {
   targetLanguage: string
   text?: string
+  /**
+   * The prefix of `text` the engine has confirmed. It only grows and is never
+   * rewritten, so a renderer can keep that part of a caption on screen while the
+   * model is still changing the rest. Absent means nothing is confirmed yet.
+   */
+  stableText?: string
   state: 'pending' | 'complete' | 'failed'
   provider: string
   /** Compatibility boundary for engine/provider-defined codes; migrate to EngineErrorCode after wire codes stabilize. */

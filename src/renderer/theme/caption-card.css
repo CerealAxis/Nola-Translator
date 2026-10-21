@@ -125,6 +125,13 @@ html[data-overlay-menu-input='pointer'] .nola-caption-menu .nola-menu-item {
   background: color-mix(in srgb, var(--overlay-background-color) var(--overlay-background-alpha), transparent);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
   color: #f5f5f5;
+  /*
+   * The unconfirmed tail of a translation is muted against the overlay's own
+   * palette. The app theme's `--muted` follows the workspace's light/dark
+   * setting, which this window does not follow, so on a light card it would
+   * leave the tail lighter than the text around it.
+   */
+  --muted: color-mix(in oklab, var(--overlay-translation-color, #eceff4) 62%, transparent);
 }
 
 /* Unlocked is the drag region; locking is exactly "let me not move this". */

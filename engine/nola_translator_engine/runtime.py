@@ -101,7 +101,7 @@ from .resources import (
     ResourceManager,
 )
 from .service import EngineService
-from .translation.base import ScheduledTranslation, TranslationProvider
+from .translation.base import ScheduledTranslation, TranslationProvider, join_text, split_common_prefix
 from .translation.hymt2 import (
     HyMt2TranslationProvider,
     is_supported,
@@ -133,6 +133,10 @@ from .translation.index_translate import IndexTranslateLocalProvider, IndexTrans
 
 
 EventSink = Callable[[EngineEvent], None]
+
+#: The confirmed prefix is bounded by the protocol limit of `Translation.text`, so a long
+#: segment cannot grow the per-segment state without an end.
+MAX_STABLE_TEXT_CHARS = 16_384
 
 #: Both commands name their models through a ``config`` and reach the same runtime resolution,
 #: so the load path is shared rather than typed twice.
@@ -196,6 +200,23 @@ class TranslationRequest:
     source: str
     targets: tuple[str, ...]
     allow_intermediate: bool
+
+
+@dataclass(frozen=True, slots=True)
+class TranslationCommit:
+    """The confirmed prefix of one segment translation and the increment that is not confirmed yet.
+
+    `stable` only grows while the segment lives: it holds the part the model reproduced
+    verbatim in two consecutive rounds. `pending` is the increment relative to `stable`,
+    never a full translation, so the next round can compare two increments directly.
+    """
+    stable: str
+    pending: str
+    provider: str
+    source: str
+    conflicts: int
+    revision: int
+    full: str
 
 
 def _compatibility(verdict: RuntimeVerdict, *, languages: bool = True) -> HubCompatibility:
@@ -265,6 +286,10 @@ class EngineRuntime:
         self.translation_jobs: dict[str, set[asyncio.Task[list[Translation]]]] = {}
         self.translation_display_revision: dict[tuple[str, str], int] = {}
         self.translation_context: dict[tuple[str, str], tuple[str, str, str, str]] = {}
+        # The confirmed prefix of every segment translation, keyed by segment and target
+        # language. It lives next to `translation_context` but serves another purpose:
+        # this one is never handed back to the model and never shrinks.
+        self.translation_stable: dict[tuple[str, str], TranslationCommit] = {}
         self.translation_requests: dict[str, TranslationRequest] = {}
         self.latest_updates: dict[str, RecognitionUpdate] = {}
         self.latest_translations: dict[str, list[Translation]] = {}
@@ -1045,11 +1070,21 @@ class EngineRuntime:
             return None
 
     def _close_recorder(self) -> int:
-        """Finalize the MP3 stream and return its recorded duration in ms (0 when never opened)."""
+        """Finalize the MP3 stream and return its recorded duration in ms (0 when never opened).
+
+        A recorder that cannot be finalized must not cost the session its teardown, so the
+        failure is reported and swallowed. The recording is a by-product of the captions, and
+        the captions are what the user came for.
+        """
         recorder, self.recorder = self.recorder, None
         if recorder is None:
             return 0
-        recorder.close()
+        try:
+            recorder.close()
+        except Exception as error:
+            write_debug('engine', 'audio.recording.close.failed', {
+                **exception_fields(error),
+            })
         return recorder.duration_ms
 
     async def _configure_device_plan(self, command: ModelSelectionCommand) -> None:
@@ -1775,25 +1810,11 @@ class EngineRuntime:
             return
         if result.state != "pending" or result.text:
             self.translation_display_revision[display_key] = request.update.revision
-        if result.state == "complete" and result.text:
-            if len(request.update.source_text) <= 1200 and len(result.text) <= 1200:
-                # Keep the exact source/translation pair, even if recognition has advanced.
-                self.translation_context[display_key] = (
-                    request.update.source_text, result.text, request.source, result.provider,
-                )
-            else:
-                self.translation_context.pop(display_key, None)
-        previous = next((item for item in self.latest_translations.get(request.update.segment_id, [])
-                         if item.targetLanguage == result.target_language), None)
-        text = result.text
-        if (result.state == "pending" and previous is not None and previous.text
-                and (not text or previous.text.startswith(text))):
-            # A new stream replays its opening before reaching the revised tail. Keep the
-            # displayed text until it catches up or diverges; a complete result may shorten it.
-            text = previous.text
+        text, stable_text = self._commit_translation(display_key, request, result)
         replacement = Translation(
             targetLanguage=result.target_language, state=result.state,
-            provider=result.provider, text=text, errorCode=result.error_code,
+            provider=result.provider, text=text, stableText=stable_text,
+            errorCode=result.error_code,
         )
         visible = [
             replacement if item.targetLanguage == result.target_language else item
@@ -1801,6 +1822,151 @@ class EngineRuntime:
         ]
         self.latest_translations[request.update.segment_id] = visible
         self.emit(self._caption_event(latest, visible))
+
+    def _commit_translation(
+        self, key: tuple[str, str], request: TranslationRequest, result: ScheduledTranslation,
+    ) -> tuple[str | None, str | None]:
+        """Advance the confirmed prefix of one translation and return (text, stableText).
+
+        The model answers with a complete translation every time a recognition revision
+        arrives. Only the part it repeats verbatim from the previous round is confirmed,
+        so the displayed text can grow but never loses what the reader already saw. The
+        commit is decided here rather than by asking the model to behave: a translation
+        that contradicts the confirmed prefix is dropped instead of being shown.
+
+        The confirmed prefix is returned as an empty string when nothing is confirmed yet,
+        and as `None` only when the translation failed. The difference is what tells a
+        renderer that the text is still provisional apart from a translation that carries
+        no layering at all, such as the one the recognition provider produces on its own.
+        """
+        language = result.target_language
+        state = self.translation_stable.get(key)
+        if state is not None and (state.provider != result.provider
+                                  or state.source != request.source):
+            # Another provider or source language words the sentence differently, so the
+            # confirmed prefix no longer describes the translation that is being produced.
+            state = None
+        stable = state.stable if state is not None else ""
+        pending = state.pending if state is not None else ""
+        conflicts = state.conflicts if state is not None else 0
+        is_final = request.update.is_final
+
+        def settle_final(text: str | None) -> tuple[str | None, str | None]:
+            """The confirmed prefix of a closed segment, which is the whole of its text.
+
+            A segment that is final is never revised again, so a tail left unconfirmed
+            would stay marked as provisional for the rest of the session. The text that
+            is on screen at this point is therefore confirmed as a whole, whichever round
+            produced it.
+            """
+            settled = text or None
+            if settled is not None and len(settled) > MAX_STABLE_TEXT_CHARS:
+                # The confirmed part does not fit the protocol limit, so the tail stays
+                # unconfirmed rather than being dropped from the caption.
+                return settled, None
+            return settled, settled
+
+        if result.state == "failed":
+            return None, None
+        if result.state == "complete" and not result.text:
+            # An empty translation keeps what was already translated. Dropping the tail
+            # here would make the displayed caption shorter for no reason at all.
+            displayed = join_text(stable, pending, language) or None
+            return settle_final(displayed) if is_final else (displayed, stable)
+        if result.state != "complete":
+            # A streaming fragment is not a translation yet: it is displayed, but it
+            # confirms nothing and it never hides the confirmed prefix.
+            text = result.text if result.text and (not stable or result.text.startswith(stable)) else stable
+            return settle_final(text or None) if is_final else (text or None, stable)
+        if (state is not None and state.revision == request.update.revision
+                and state.full == result.text):
+            # The same result was published twice for one revision. Committing it again
+            # would confirm the tail that this very round produced.
+            displayed = join_text(stable, pending, language) or None
+            return settle_final(displayed) if is_final else (displayed, stable)
+        conflict = False
+        _, remainder, rewritten = split_common_prefix(result.text, stable, language)
+        if rewritten:
+            # The model rewrote confirmed text, so this round is dropped and the previous
+            # translation stays on screen. Repeated conflicts mean the confirmed prefix
+            # stopped describing this translation, so the segment starts over.
+            conflict = True
+            conflicts += 1
+            if conflicts < 3:
+                if is_final:
+                    # The segment is closed, so the text that stays on screen is confirmed
+                    # as a whole even though this round was dropped. A tail left unconfirmed
+                    # here would stay marked as provisional for the rest of the session.
+                    stable, pending = join_text(stable, pending, language), ""
+                self.translation_stable[key] = TranslationCommit(
+                    stable, pending, result.provider, request.source, conflicts,
+                    request.update.revision, result.text,
+                )
+                # The rejected translation must not become the next draft: the model would
+                # reproduce its own rewrite and conflict again. The confirmed prefix is
+                # what the next round has to keep.
+                self._store_translation_context(key, request, result, stable)
+                self._log_commit(key, request, result, stable, pending, 0, conflict, conflicts)
+                return (join_text(stable, pending, language) or None), (stable)
+            conflicts = 0
+            stable, pending = "", ""
+            remainder = result.text
+        else:
+            conflicts = 0
+        confirmed, _, rest = split_common_prefix(pending, remainder, language)
+        confirmed_chars = len(confirmed)
+        grown = join_text(stable, confirmed, language)
+        if len(grown) <= MAX_STABLE_TEXT_CHARS:
+            stable = grown
+            pending = rest
+        else:
+            # The confirmed part does not fit the protocol limit, so nothing is confirmed
+            # and the whole increment stays unconfirmed instead of being dropped.
+            confirmed_chars = 0
+            pending = remainder
+        if request.update.is_final:
+            settled = join_text(stable, pending, language)
+            if len(settled) <= MAX_STABLE_TEXT_CHARS:
+                # The segment is closed, so the tail that is still unconfirmed becomes
+                # confirmed text instead of staying marked as provisional.
+                stable, pending = settled, ""
+        self.translation_stable[key] = TranslationCommit(
+            stable, pending, result.provider, request.source, conflicts,
+            request.update.revision, result.text,
+        )
+        self._store_translation_context(key, request, result, result.text)
+        self._log_commit(key, request, result, stable, pending, confirmed_chars, conflict, conflicts)
+        return (join_text(stable, pending, language) or None), (stable)
+
+    def _store_translation_context(
+        self, key: tuple[str, str], request: TranslationRequest, result: ScheduledTranslation,
+        draft: str,
+    ) -> None:
+        """Keep the source/translation pair the next revision request is built from.
+
+        The draft is what the model is asked to extend. A round that contradicted the
+        confirmed prefix stores the confirmed prefix instead, so the model is asked to
+        keep text that is already on screen rather than text it just had rejected.
+        """
+        if draft and len(request.update.source_text) <= 1200 and len(draft) <= 1200:
+            # Keep the exact source/translation pair, even if recognition has advanced.
+            self.translation_context[key] = (
+                request.update.source_text, draft, request.source, result.provider,
+            )
+        else:
+            self.translation_context.pop(key, None)
+
+    def _log_commit(
+        self, key: tuple[str, str], request: TranslationRequest, result: ScheduledTranslation,
+        stable: str, pending: str, confirmed_chars: int, conflict: bool, conflicts: int,
+    ) -> None:
+        # Lengths and state codes only: the translation itself never reaches the log.
+        write_debug("engine", "translation.commit", {
+            "segmentId": key[0], "target": result.target_language, "provider": result.provider,
+            "stableChars": len(stable), "pendingChars": len(pending),
+            "confirmedChars": confirmed_chars, "conflict": conflict, "conflicts": conflicts,
+            "isFinal": request.update.is_final,
+        })
 
     async def _translate_request(
         self, request: TranslationRequest
@@ -1967,6 +2133,8 @@ class EngineRuntime:
             for key in [key for key in self.translation_display_revision if key[0] == segment_id]:
                 self.translation_display_revision.pop(key, None)
                 self.translation_context.pop(key, None)
+            for key in [key for key in self.translation_stable if key[0] == segment_id]:
+                self.translation_stable.pop(key, None)
 
     def _caption_event(
         self,
@@ -2096,6 +2264,7 @@ class EngineRuntime:
         self.translation_jobs.clear()
         self.translation_display_revision.clear()
         self.translation_context.clear()
+        self.translation_stable.clear()
         for mapping in (self.translation_last_started, self.translation_wake,
                         self.completed_segments,
                         self.latest_updates, self.latest_translations, self.caption_revisions):
@@ -2364,27 +2533,36 @@ class EngineRuntime:
         self.translation_jobs.clear()
         self.translation_display_revision.clear()
         self.translation_context.clear()
+        self.translation_stable.clear()
         self.translation_last_started.clear()
         self.translation_wake.clear()
         self.completed_segments.clear()
         self.latest_updates.clear()
         self.latest_translations.clear()
         self.caption_revisions.clear()
-        self._close_recorder()
-        if self.capture is not None:
-            self._dropped_chunks = self.capture.dropped_chunks
-        self.capture = None
-        self.recognizer = None
-        self.session_task = None
-        self.active_config = None
-        self.session_paused = False
-        self._timeline = None
-        self._stream_epoch = None
-        self._stream_anchored = False
-        self._epoch_initialized = False
-        self._stream_finishing = False
-        self._stop_pipeline_heartbeat()
-        self._write_engine_status()
+        # The teardown below must reach `service.handle` even when a step fails. A failure used to
+        # skip every reset and the `sessionStopped` event, which left the engine believing a
+        # session was still running and refused the next start with a generic failure.
+        try:
+            self._close_recorder()
+            if self.capture is not None:
+                self._dropped_chunks = self.capture.dropped_chunks
+            self.capture = None
+            self.recognizer = None
+            self.session_task = None
+            self.active_config = None
+            self.session_paused = False
+            self._timeline = None
+            self._stream_epoch = None
+            self._stream_anchored = False
+            self._epoch_initialized = False
+            self._stream_finishing = False
+            self._stop_pipeline_heartbeat()
+            self._write_engine_status()
+        except Exception as error:
+            write_debug('engine', 'session.teardown.failed', {
+                **exception_fields(error),
+            })
         return self.service.handle(command)
 
     def _finalize_browser_partials(self) -> None:

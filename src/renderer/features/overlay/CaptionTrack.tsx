@@ -17,7 +17,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { CaptionRevisionText } from './CaptionRevisionText'
 
-export type TrackLine = { key: string; text: string }
+export type TrackLine = { key: string; text: string; stableText?: string }
 
 /** Sentences that have scrolled far out of view; dropped in bulk so the DOM cannot grow without bound. */
 const MAX_ENTRIES = 40
@@ -49,7 +49,7 @@ export function CaptionTrack({
   const [entries, setEntries] = useState<TrackLine[]>([])
   const [offset, setOffset] = useState(0)
   const stream = useRef<TrackLine[]>([])
-  const knownLines = useRef(new Map<string, string>())
+  const knownLines = useRef(new Map<string, TrackLine>())
   const viewport = useRef<HTMLDivElement | null>(null)
   const content = useRef<HTMLDivElement | null>(null)
 
@@ -61,9 +61,11 @@ export function CaptionTrack({
   /*
    * Keep the latest snapshot for every segment. A translation can arrive after
    * later segments, and its final revision must replace its own earlier text.
+   * The whole line is kept, because the confirmed prefix of a translation is
+   * part of it and the renderer needs it to tell confirmed text from the tail.
    */
   for (const line of lines) {
-    if (!knownLines.current.has(line.key) || line.text) knownLines.current.set(line.key, line.text)
+    if (!knownLines.current.has(line.key) || line.text) knownLines.current.set(line.key, line)
   }
   const lineOrder = [...new Set(lines.map((line) => line.key))].slice(-MAX_ENTRIES)
   const visibleKeys = new Set(lineOrder)
@@ -71,11 +73,13 @@ export function CaptionTrack({
     if (!visibleKeys.has(key)) knownLines.current.delete(key)
   }
   const next = lineOrder.flatMap<TrackLine>((key) => {
-    const text = knownLines.current.get(key)
-    return text ? [{ key, text }] : []
+    const line = knownLines.current.get(key)
+    return line?.text ? [line] : []
   })
   if (next.length !== stream.current.length || next.some((line, index) =>
-    line.key !== stream.current[index]?.key || line.text !== stream.current[index]?.text)) {
+    line.key !== stream.current[index]?.key
+    || line.text !== stream.current[index]?.text
+    || line.stableText !== stream.current[index]?.stableText)) {
     commit(next)
   }
 
@@ -117,7 +121,7 @@ export function CaptionTrack({
         <div className="nola-caption-track-flow nola-caption-track-sentence" ref={viewport}>
           <div className="nola-caption-track-content" ref={content}>
             {entries.map((entry) => <p className="nola-caption-entry" key={entry.key}>
-              {kind === 'translation' ? <CaptionRevisionText text={entry.text} /> : entry.text}
+              {kind === 'translation' ? <CaptionRevisionText text={entry.text} stableText={entry.stableText} /> : entry.text}
             </p>)}
           </div>
         </div>
@@ -149,7 +153,7 @@ export function CaptionTrack({
             {entries.flatMap((entry, index) => [
               index > 0 && seamNeedsSpace(entries[index - 1].text, entry.text) ? ' ' : null,
               <span className="nola-caption-segment" key={entry.key}>
-                {kind === 'translation' ? <CaptionRevisionText text={entry.text} /> : entry.text}
+                {kind === 'translation' ? <CaptionRevisionText text={entry.text} stableText={entry.stableText} /> : entry.text}
               </span>,
             ])}
           </p>

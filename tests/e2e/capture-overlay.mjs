@@ -65,6 +65,9 @@ let windowRef = null
 
 app.disableHardwareAcceleration()
 void app.whenReady().then(async () => {
+  // The screenshots are written before the run ends, so the folder has to exist
+  // before the first capture rather than at the end.
+  await mkdir(out, { recursive: true })
   // Settings are the only channel this script drives. Close, minimise and session control
   // only fire from user actions, so their handlers stay unregistered.
   ipcMain.handle('app:get-settings', () => settings)
@@ -111,7 +114,7 @@ void app.whenReady().then(async () => {
   await caption({
     segmentId: 'preview-segment',
     sourceText: 'We will discuss why society makes us feel bad for resting.',
-    translations: [{ targetLanguage: 'zh', state: 'complete', provider: 'example', text: '我们将讨论为什么社会让我们为休息而感到难过。' }],
+    translations: [{ targetLanguage: 'zh', state: 'complete', provider: 'example', text: '我们将讨论为什么社会让我们为休息而感到难过。', stableText: '我们将讨论为什么社会让我们' }],
   })
   await delay(600)
   const first = await window.webContents.executeJavaScript(`(() => ({
@@ -121,11 +124,17 @@ void app.whenReady().then(async () => {
     targetLines: document.querySelector('.nola-caption-track[data-kind="translation"]')?.style.getPropertyValue('--nola-overlay-visible-lines'),
     sourceSegments: document.querySelectorAll('.nola-caption-track[data-kind="source"] .nola-caption-segment').length,
     targetSegments: document.querySelectorAll('.nola-caption-track[data-kind="translation"] .nola-caption-segment').length,
+    // The confirmed prefix and the tail the model may still change are separate nodes.
+    confirmed: document.querySelectorAll('.nola-caption-track[data-kind="translation"] .nola-caption-confirmed').length,
+    tail: document.querySelectorAll('.nola-caption-track[data-kind="translation"] .nola-caption-tail').length,
+    sourceConfirmed: document.querySelectorAll('.nola-caption-track[data-kind="source"] .nola-caption-confirmed').length,
   }))()`)
   expectFound('first source segment', first.sourceSegments)
   expectFound('first target segment', first.targetSegments)
   expectTrue('first sentence rendered on both tracks',
     first.source.includes('society makes us feel bad') && first.target.includes('让我们为休息而感到难过'), first)
+  expectTrue('translation split into a confirmed part and a tail',
+    first.confirmed === 1 && first.tail === 1 && first.sourceConfirmed === 0, first)
   // A track budgeted zero lines has nowhere to render, so both must get at least one.
   expectTrue('line budget', Number.parseInt(first.sourceLines, 10) >= 1 && Number.parseInt(first.targetLines, 10) >= 1,
     { sourceLines: first.sourceLines, targetLines: first.targetLines })

@@ -291,7 +291,12 @@ function appendFinal(segment: CaptionSegment): void {
   sessionStore.setState((state) => {
     const previous = state.segments.find((item) => item.segmentId === segment.segmentId)
     // The engine sometimes resends a segment; a lower revision must not roll back a finalized one.
-    if (previous && previous.revision > segment.revision) return state
+    if (previous && previous.revision > segment.revision) {
+      // The finalized revision still supersedes the interim revision of the same
+      // segment, so that one goes too. Leaving it behind would draw the segment
+      // twice: the final line and the longer interim accumulation of it.
+      return state.interim?.segmentId === segment.segmentId ? { ...state, interim: null } : state
+    }
 
     const next = [...state.segments.filter((item) => item.segmentId !== segment.segmentId), segment]
       .sort((left, right) => left.startedAtMs - right.startedAtMs)

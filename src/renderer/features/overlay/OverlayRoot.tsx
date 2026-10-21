@@ -181,7 +181,7 @@ export function OverlayRoot() {
     segment.sourceText ? [{ key: segment.segmentId, text: formatChineseCaption(segment.sourceText, sourceLanguage) }] : [])
   const translatedTrackLines = orderedSegments.map((segment): TrackLine => {
     const entry = segment.translations.find((item) => item.state !== 'failed' && item.text)
-    if (entry?.text) return { key: segment.segmentId, text: entry.text }
+    if (entry?.text) return { key: segment.segmentId, text: entry.text, stableText: entry.stableText }
     if (segment.segmentId === translationCurrent?.segmentId && !translated?.text) {
       const reason = translationErrorSummary(t, segment)
       return { key: segment.segmentId, text: reason ?? '' }

@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
 import { CaptionTrack } from './CaptionTrack'
+import type { TrackLine } from './CaptionTrack'
 
 afterEach(cleanup)
 
@@ -12,54 +13,124 @@ function finishChanges(container: HTMLElement) {
   }
 }
 
-it.each(['rolling', 'sentence'] as const)('animates only appended translation text in %s layout', layout => {
-  const first = '因为我们想在实施解决方案之前仔细分析问题。'
-  const appended = '这在项目管理中非常重要。'
-  const { container, rerender } = render(<CaptionTrack kind="translation" maxLines={4} layout={layout} lines={[{ key: 'segment', text: first }]} />)
-  finishChanges(container)
-  const prefix = container.querySelector('.nola-caption-change')
-  expect(prefix).not.toBeNull()
-  rerender(<CaptionTrack kind="translation" maxLines={4} layout={layout} lines={[{ key: 'segment', text: first + appended }]} />)
-  expect(container.querySelector('.nola-caption-change')).toBe(prefix)
-  expect(prefix).toHaveTextContent(first)
-  expect(prefix).toHaveAttribute('data-entering', 'false')
-  expect([...container.querySelectorAll('[data-entering="true"]')].map(node => node.textContent)).toEqual([appended])
+function confirmedOf(container: HTMLElement): HTMLElement | null {
+  return container.querySelector('.nola-caption-confirmed')
+}
+
+function tailOf(container: HTMLElement): HTMLElement | null {
+  return container.querySelector('.nola-caption-tail')
+}
+
+function enteringTexts(container: HTMLElement): (string | null)[] {
+  return [...container.querySelectorAll('[data-entering="true"]')].map(node => node.textContent)
+}
+
+function track(kind: 'source' | 'translation', line: TrackLine, layout: 'rolling' | 'sentence' = 'rolling') {
+  return <CaptionTrack kind={kind} maxLines={4} layout={layout} lines={[line]} />
+}
+
+it.each(['rolling', 'sentence'] as const)('keeps the confirmed node and its text while the tail is rewritten in %s layout', layout => {
+  const { container, rerender } = render(track('translation', { key: 's', text: '我们需要仔细地分析问题', stableText: '我们需要' }, layout))
+  const confirmed = confirmedOf(container)
+  expect(confirmed?.textContent).toBe('我们需要')
+  expect(tailOf(container)?.textContent).toBe('仔细地分析问题')
+
+  rerender(track('translation', { key: 's', text: '我们需要更加仔细地分析问题', stableText: '我们需要' }, layout))
+  expect(confirmedOf(container)).toBe(confirmed)
+  expect(confirmed?.textContent).toBe('我们需要')
+  expect(tailOf(container)?.textContent).toBe('更加仔细地分析问题')
 })
 
-it('animates everything from the first changed grapheme, including a shared ending', () => {
-  const { container, rerender } = render(<CaptionTrack kind="translation" maxLines={4} layout="rolling" lines={[{ key: 's', text: 'We need a fast solution today.' }]} />)
-  finishChanges(container)
-  rerender(<CaptionTrack kind="translation" maxLines={4} layout="rolling" lines={[{ key: 's', text: 'We need a careful solution today.' }]} />)
-  expect(container).toHaveTextContent('We need a careful solution today.')
-  expect([...container.querySelectorAll('[data-entering="true"]')].map(node => node.textContent)).toEqual(['careful solution today.'])
-  finishChanges(container)
-  rerender(<CaptionTrack kind="translation" maxLines={4} layout="rolling" lines={[{ key: 's', text: 'We need a careful solution today.' }]} />)
-  expect(container.querySelector('[data-entering="true"]')).toBeNull()
+it('muted the unconfirmed tail and leaves the confirmed text in the foreground colour', () => {
+  const { container } = render(track('translation', { key: 's', text: '我们需要仔细地分析问题', stableText: '我们需要' }))
+  const confirmed = confirmedOf(container)
+  const tail = tailOf(container)
+  expect(tail?.style.color).toBe('var(--muted)')
+  // The confirmed part carries no colour of its own: it inherits the track's foreground.
+  expect(confirmed?.style.color).toBe('')
+  // Only the tail animates, so the confirmed text never fades in again.
+  expect(confirmed?.className).not.toContain('nola-caption-change')
 })
 
-it('animates a full replacement and keeps Unicode graphemes intact', () => {
-  const { container, rerender } = render(<CaptionTrack kind="translation" maxLines={4} layout="rolling" lines={[{ key: 's', text: '先分析需求。' }]} />)
+it('animates only the tail the model has just added', () => {
+  const { container, rerender } = render(track('translation', { key: 's', text: 'First part', stableText: 'First' }))
   finishChanges(container)
-  rerender(<CaptionTrack kind="translation" maxLines={4} layout="rolling" lines={[{ key: 's', text: '明天部署系统！' }]} />)
-  expect(container.querySelector('[data-entering="true"]')).toHaveTextContent('明天部署系统！')
-  rerender(<CaptionTrack kind="translation" maxLines={4} layout="rolling" lines={[{ key: 's', text: '👩‍💻 is ready' }]} />)
+  rerender(track('translation', { key: 's', text: 'First part and more', stableText: 'First' }))
+  expect(enteringTexts(container)).toEqual([' and more'])
+  expect(confirmedOf(container)?.textContent).toBe('First')
+})
+
+it('moves newly confirmed text out of the tail and into the confirmed node', () => {
+  const { container, rerender } = render(track('translation', { key: 's', text: 'First part', stableText: 'First' }))
+  const confirmed = confirmedOf(container)
+  rerender(track('translation', { key: 's', text: 'First part', stableText: 'First part' }))
+  expect(confirmedOf(container)).toBe(confirmed)
+  expect(confirmed?.textContent).toBe('First part')
+  expect(tailOf(container)).toBeNull()
+})
+
+it('keeps settled tail runs in one node without merging them into the confirmed text', () => {
+  const { container, rerender } = render(track('translation', { key: 's', text: 'AB', stableText: 'A' }))
   finishChanges(container)
-  rerender(<CaptionTrack kind="translation" maxLines={4} layout="rolling" lines={[{ key: 's', text: '👩‍🔬 is ready' }]} />)
+  rerender(track('translation', { key: 's', text: 'ABC', stableText: 'A' }))
+  finishChanges(container)
+  expect(container.querySelectorAll('.nola-caption-tail')).toHaveLength(1)
+  expect(tailOf(container)?.textContent).toBe('BC')
+  expect(confirmedOf(container)?.textContent).toBe('A')
+  expect(confirmedOf(container)).not.toBe(tailOf(container))
+})
+
+it('falls back to the shared word prefix when the text no longer starts with the confirmed text', () => {
+  const { container } = render(track('translation', {
+    key: 's',
+    text: 'We need a calm solution today.',
+    stableText: 'We need a careful solution today.',
+  }))
+  expect(confirmedOf(container)?.textContent).toBe('We need a careful solution today.')
+  expect(tailOf(container)?.textContent).toBe('calm solution today.')
+})
+
+it('keeps the confirmed text when a Chinese translation was rewritten, whatever the word boundary is', () => {
+  // Chinese is cut on the runtime's ICU dictionary, so only the confirmed part
+  // and the muted tail are asserted here; the boundary itself is not portable.
+  const { container } = render(track('translation', {
+    key: 's',
+    text: '我们需要更加仔细地分析问题',
+    stableText: '我们需要更仔细',
+  }))
+  expect(confirmedOf(container)?.textContent).toBe('我们需要更仔细')
+  expect(tailOf(container)?.textContent).toBeTruthy()
+  expect(tailOf(container)?.style.color).toBe('var(--muted)')
+})
+
+it('replaces the whole tail when the model rewrites it, keeping graphemes intact', () => {
+  const { container, rerender } = render(track('translation', { key: 's', text: '👩‍💻 is ready', stableText: '' }))
+  finishChanges(container)
+  rerender(track('translation', { key: 's', text: '👩‍🔬 is ready', stableText: '' }))
   expect(container.querySelector('[data-entering="true"]')).toHaveTextContent('👩‍🔬 is ready')
 })
 
-it('settles retained text during rapid appends and does not animate deletions', () => {
-  const { container, rerender } = render(<CaptionTrack kind="translation" maxLines={4} layout="rolling" lines={[{ key: 's', text: 'First.' }]} />)
-  const first = container.querySelector('.nola-caption-change')
-  expect(first).not.toBeNull()
-  rerender(<CaptionTrack kind="translation" maxLines={4} layout="rolling" lines={[{ key: 's', text: 'First.Second.' }]} />)
-  expect(container.querySelector('.nola-caption-change')).toBe(first)
-  expect(first).toHaveAttribute('data-entering', 'false')
-  expect([...container.querySelectorAll('[data-entering="true"]')].map(node => node.textContent)).toEqual(['Second.'])
-  finishChanges(container)
-  rerender(<CaptionTrack kind="translation" maxLines={4} layout="rolling" lines={[{ key: 's', text: 'First.' }]} />)
-  expect(container).toHaveTextContent('First.')
-  expect(container.querySelector('[data-entering="true"]')).toBeNull()
+it('draws a translation the engine did not layer as plain text', () => {
+  const { container, rerender } = render(track('translation', { key: 's', text: 'We need a calm solution today.' }))
+  // No confirmed prefix means there is nothing to tell apart, so the caption is one
+  // plain run instead of a muted tail.
+  expect(confirmedOf(container)).toBeNull()
+  expect(tailOf(container)).toBeNull()
+  expect(container.querySelector('.nola-caption-segment')?.textContent).toBe('We need a calm solution today.')
+  rerender(track('translation', { key: 's', text: 'We need a careful solution today.' }))
+  expect(container.querySelector('.nola-caption-segment')?.textContent).toBe('We need a careful solution today.')
+})
+
+it('draws the source track as plain text, without a confirmed split', () => {
+  const { container } = render(track('source', { key: 's', text: 'We need a careful solution today.' }))
+  expect(confirmedOf(container)).toBeNull()
+  expect(tailOf(container)).toBeNull()
+  expect(container.querySelector('.nola-caption-segment')?.textContent).toBe('We need a careful solution today.')
+})
+
+it('skips a line without text', () => {
+  const { container } = render(track('translation', { key: 's', text: '' }))
+  expect(container.querySelectorAll('.nola-caption-segment')).toHaveLength(0)
 })
 
 it.each(['source', 'translation'] as const)('preserves complete words between independent %s segments', kind => {
@@ -97,20 +168,25 @@ it('updates an older translation without removing a later sentence', () => {
   expect([...container.querySelectorAll('.nola-caption-segment')].map(node => node.textContent)).toEqual(['completed translation', 'later sentence'])
 })
 
+it.each(['rolling', 'sentence'] as const)('settles the confirmed text during rapid revisions in %s layout', layout => {
+  const view = (text: string, stableText: string) => (
+    <CaptionTrack kind="translation" maxLines={4} layout={layout} lines={[{ key: 's', text, stableText }]} />
+  )
+  const { container, rerender } = render(view('We need a fast solution today.', 'We need a '))
+  const confirmed = confirmedOf(container)
+  expect(confirmed?.textContent).toBe('We need a ')
 
-it.each(['rolling', 'sentence'] as const)('settles every retained prefix during rapid revisions in %s layout', layout => {
-  const view = (text: string) => <CaptionTrack kind="translation" maxLines={4} layout={layout} lines={[{ key: 's', text }]} />
-  const { container, rerender } = render(view('We need a fast solution today.'))
-  rerender(view('We need a careful solution today.'))
-  const prefix = container.querySelector('.nola-caption-change')
-  expect(prefix?.textContent).toBe('We need a ')
-  expect(prefix).toHaveAttribute('data-entering', 'false')
-  expect([...container.querySelectorAll('[data-entering="true"]')].map(node => node.textContent)).toEqual(['careful solution today.'])
-  rerender(view('We need a careful solution today. Next.'))
-  expect(container.querySelector('.nola-caption-change')).toBe(prefix)
-  expect([...container.querySelectorAll('[data-entering="false"]')].map(node => node.textContent).join('')).toBe('We need a careful solution today.')
-  expect([...container.querySelectorAll('[data-entering="true"]')].map(node => node.textContent)).toEqual([' Next.'])
+  rerender(view('We need a careful solution today.', 'We need a '))
+  expect(confirmedOf(container)).toBe(confirmed)
+  expect(confirmed?.textContent).toBe('We need a ')
+  expect(enteringTexts(container)).toEqual(['careful solution today.'])
+
+  rerender(view('We need a careful solution today. Next.', 'We need a careful solution today.'))
+  expect(confirmedOf(container)).toBe(confirmed)
+  expect(confirmed?.textContent).toBe('We need a careful solution today.')
+  expect(enteringTexts(container)).toEqual([' Next.'])
+
   finishChanges(container)
-  rerender(view('We need a careful solution today. Next.'))
+  rerender(view('We need a careful solution today. Next.', 'We need a careful solution today.'))
   expect(container.querySelector('[data-entering="true"]')).toBeNull()
 })

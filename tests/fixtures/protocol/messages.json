@@ -59,6 +59,7 @@
           {
             "targetLanguage": "zh-CN",
             "text": "你好，世界",
+            "stableText": "你好，",
             "state": "complete",
             "provider": "hymt2"
           }

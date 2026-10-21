@@ -36,6 +36,13 @@ describe('JSONL 协议校验', () => {
     }
   })
 
+  it('保留译文里的已确认前缀，不被 zod 剥掉', () => {
+    // The schema strips unknown keys, so a field missing from it disappears in the
+    // main process: the renderer then never sees it, with no error anywhere.
+    const parsed = parseEventLine(JSON.stringify(messages.events[1]))
+    expect(parsed).toMatchObject({ segment: { translations: [{ stableText: '你好，' }] } })
+  })
+
   it('拒绝未知类型、缺少 requestId 和负数 revision', () => {
     expect(() =>
       parseCommandLine(JSON.stringify({ protocolVersion: 1, type: 'unknown', requestId: 'req-1' }))

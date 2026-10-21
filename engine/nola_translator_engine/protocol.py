@@ -363,6 +363,9 @@ EngineCommand = Annotated[
 class Translation(ProtocolModel):
     targetLanguage: str = Field(min_length=1, max_length=32)
     text: str | None = Field(default=None, max_length=16_384)
+    # The confirmed prefix of `text`. It only grows while the segment lives, and the
+    # renderer keeps it untouched while only the tail after it changes.
+    stableText: str | None = Field(default=None, max_length=16_384)
     state: Literal["pending", "complete", "failed"]
     provider: str = Field(min_length=1, max_length=64)
     errorCode: str | None = Field(default=None, min_length=1, max_length=128)

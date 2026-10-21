@@ -485,7 +485,7 @@ async function main() {
     segmentId: 'current', revision: 1, startedAtMs: 0, isFinal: true,
     sourceText: 'We might realize that doing nothing is not only okay, but also important for a healthy, balanced life.',
     translations: [
-      { targetLanguage: 'zh', text: '我们可能会意识到，适当放松不仅没有问题，也对健康、平衡的生活十分重要。', state: 'complete', provider: 'hymt2' },
+      { targetLanguage: 'zh', text: '我们可能会意识到，适当放松不仅没有问题，也对健康、平衡的生活十分重要。', stableText: '我们可能会意识到，', state: 'complete', provider: 'hymt2' },
       { targetLanguage: 'ja', text: '何もしないことも問題ではないし、健康でバランスの取れた生活に重要だと気づくかもしれません。', state: 'complete', provider: 'hymt2' },
     ],
   }
@@ -527,11 +527,16 @@ async function main() {
       // 译文轨道只画一条：OverlayRoot 取的是 translations 里第一条 complete 的译文，
       // 与旧浮窗「每个目标语言各画一条」不同。设置里 targetLanguage 也是单数。
       translationSegments: document.querySelectorAll('.nola-caption-track[data-kind="translation"] .nola-caption-segment').length,
+      // 已确认前缀与仍未定稿的尾巴是两个节点，源文轨没有这个分层。
+      confirmed: document.querySelectorAll('.nola-caption-track[data-kind="translation"] .nola-caption-confirmed').length,
+      tail: document.querySelectorAll('.nola-caption-track[data-kind="translation"] .nola-caption-tail').length,
+      sourceConfirmed: document.querySelectorAll('.nola-caption-track[data-kind="source"] .nola-caption-confirmed').length,
       cardOverflowX: Boolean(card) && card.scrollWidth > card.clientWidth + 2,
       stageOverflowX: Boolean(stage) && stage.scrollWidth > stage.clientWidth + 2,
     }
   })()`)
-  if (!bilingual.hasZh || bilingual.translationSegments !== 1 || bilingual.cardOverflowX || bilingual.stageOverflowX) {
+  if (!bilingual.hasZh || bilingual.translationSegments !== 1 || bilingual.confirmed !== 1 || bilingual.tail !== 1
+    || bilingual.sourceConfirmed !== 0 || bilingual.cardOverflowX || bilingual.stageOverflowX) {
     fail({ language: 'overlay', page: 'multitarget' }, 'overlay lost the configured target language or overflowed', { bilingual })
   }
 

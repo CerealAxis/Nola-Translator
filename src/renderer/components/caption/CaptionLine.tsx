@@ -34,6 +34,14 @@ export interface CaptionLineProps {
   interim?: boolean
   kind?: CaptionLineKind
   text: string
+  /**
+   * The unconfirmed tail of `text`. It is rendered in the muted colour while the
+   * rest of the line keeps the foreground colour, so a reader can see which
+   * words the model may still change. It is the tail of the line, not of the
+   * segment: `interim` says the whole line is unconfirmed, this says which part
+   * of it is.
+   */
+  tail?: string
   /** Type size in px, default 14 (the reading-first body step). */
   fontSize?: number
   /** Line height as a ratio, held at 1.65 so rows stay even as the type size changes. */
@@ -61,6 +69,7 @@ export function CaptionLine({
   interim = false,
   kind = 'source',
   text,
+  tail,
   fontSize = 14,
   lineHeight = 1.65,
   entering = false,
@@ -78,6 +87,11 @@ export function CaptionLine({
     // Interim is the only state that switches text colour; the two final levels ride the ramp.
     color: interim ? 'var(--muted)' : kind === 'translation' ? TRANSLATION_COLOR : 'var(--foreground)',
   }
+
+  // The tail has to be the end of the line, otherwise the split would put the
+  // confirmed text in the wrong place.
+  const unconfirmed = tail && text.endsWith(tail) ? tail : ''
+  const confirmed = unconfirmed ? text.slice(0, text.length - unconfirmed.length) : text
 
   return (
     <p
@@ -99,7 +113,12 @@ export function CaptionLine({
       style={style}
     >
       {current ? <span className="absolute inset-y-1 left-0 w-[2px] rounded-full bg-accent" aria-hidden="true" /> : null}
-      {text}
+      {unconfirmed
+        ? <>
+          {confirmed ? <span className="nola-caption-confirmed" data-part="confirmed">{confirmed}</span> : null}
+          <span className="nola-caption-tail" data-part="tail" style={{ color: 'var(--muted)' }}>{unconfirmed}</span>
+        </>
+        : confirmed}
     </p>
   )
 }

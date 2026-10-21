@@ -152,6 +152,9 @@ const translationSchema = z
   .object({
     targetLanguage: z.string().min(1).max(32),
     text: z.string().max(16_384).optional(),
+    // The schema strips unknown keys, so a field missing here is dropped in the
+    // main process before the renderer ever sees it.
+    stableText: z.string().max(16_384).optional(),
     state: z.enum(['pending', 'complete', 'failed']),
     provider: z.string().min(1).max(64),
     errorCode: z.string().min(1).max(128).optional(),

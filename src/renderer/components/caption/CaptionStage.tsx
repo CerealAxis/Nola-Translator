@@ -10,12 +10,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 
-import type { CaptionSegment } from '@/bridge'
+import type { CaptionSegment, Translation } from '@/bridge'
 import { useI18n } from '@/i18n'
 import { translationErrorSummary } from '@/translation-status'
 import { formatChineseCaption } from '@/chinese-script'
 
 import { CaptionLine } from './CaptionLine'
+import { splitTranslationText } from './translationText'
+import type { TranslationTextParts } from './translationText'
 
 export type CaptionLayout = 'split' | 'sentence'
 export type CaptionDisplayMode = 'both' | 'source' | 'translation'
@@ -50,9 +52,24 @@ export function isStuckToBottom(scrollTop: number, scrollHeight: number, clientH
   return distance <= slack
 }
 
+/** The translation a segment shows: the first one that is not a failure and has text. */
+function usableTranslation(segment: CaptionSegment): Translation | undefined {
+  return segment.translations.find((item) => item.state !== 'failed' && item.text)
+}
+
 /** Streamed text is usable before completion; failed requests never expose partial output. */
 export function translationOf(segment: CaptionSegment): string {
-  return segment.translations.find((item) => item.state !== 'failed' && item.text)?.text ?? ''
+  return usableTranslation(segment)?.text ?? ''
+}
+
+/**
+ * The confirmed part of a segment's translation and the tail the model may
+ * still change. Null when the segment has no usable translation.
+ */
+export function translationPartsOf(segment: CaptionSegment): TranslationTextParts | null {
+  const entry = usableTranslation(segment)
+  if (!entry?.text) return null
+  return splitTranslationText(entry.text, entry.stableText)
 }
 
 /**
@@ -111,13 +128,21 @@ export function CaptionStage({
     stickRef.current = isStuckToBottom(element.scrollTop, element.scrollHeight, element.clientHeight)
   }
 
-  // These rows are where the eye belongs: the segments plus the interim one. Interim sits
-  // last, so its distance is 0, but it renders statically and gets no indicator bar.
-  const rows: Array<{ segment: CaptionSegment; distance: number; interim: boolean }> = []
-  segments.forEach((segment, index) => {
-    rows.push({ segment, distance: segments.length - 1 - index + (interim ? 1 : 0), interim: false })
-  })
-  if (interim) rows.push({ segment: interim, distance: 0, interim: true })
+  /*
+   * These rows are where the eye belongs: the segments plus the interim one. Interim sits
+   * last, so its distance is 0, but it renders statically and gets no indicator bar.
+   *
+   * An interim revision of a segment that already has a final row replaces that row
+   * instead of joining it: the interim text is the longer accumulation of the two, so
+   * showing both would print the same sentence twice.
+   */
+  const entries: Array<{ segment: CaptionSegment; interim: boolean }> = segments.map(segment => ({ segment, interim: false }))
+  if (interim) {
+    const index = entries.findIndex(entry => entry.segment.segmentId === interim.segmentId)
+    if (index >= 0) entries.splice(index, 1)
+    entries.push({ segment: interim, interim: true })
+  }
+  const rows = entries.map((entry, index) => ({ ...entry, distance: entries.length - 1 - index }))
 
   const hasRows = rows.length > 0
   // The shared baseline must follow the type size, or the grid desyncs from the line height above A+.
@@ -138,7 +163,7 @@ export function CaptionStage({
           <div className="mx-auto flex w-full max-w-[68em] flex-col pb-5">
             {rows.map((row) => (
               <Block
-                key={`${row.segment.segmentId}-${row.interim ? 'interim' : 'final'}`}
+                key={row.segment.segmentId}
                 segment={row.segment}
                 sourceLanguage={sourceLanguage}
                 distance={row.distance}
@@ -198,6 +223,14 @@ function Block({
   translate: (segment: CaptionSegment) => string
 }) {
   const translation = translationTextOf(segment, translate)
+  const parts = translationPartsOf(segment)
+  /*
+   * A translation the engine did not layer is shown whole, in the foreground colour.
+   * A layered one shows its confirmed part in the foreground and the tail in the muted
+   * colour, so a reader can see which words the model may still change.
+   */
+  const layered = parts?.confirmed !== undefined
+  const translationText = layered ? `${parts?.confirmed ?? ''}${parts?.tail ?? ''}` : translation
   const untranslated = segment.translations.length === 0
   if (untranslated && showTranslation) { showSource = true; showTranslation = false }
 
@@ -220,7 +253,8 @@ function Block({
         {showTranslation ? (
           <CaptionLine
             kind="translation"
-            text={translation}
+            text={translationText}
+            tail={parts?.tail}
             distance={distance}
             interim={interim}
             fontSize={fontSize}
@@ -252,7 +286,8 @@ function Block({
       {showTranslation ? (
         <CaptionLine
           kind="translation"
-          text={translation}
+          text={translationText}
+          tail={parts?.tail}
           distance={distance}
           interim={interim}
           fontSize={fontSize}
