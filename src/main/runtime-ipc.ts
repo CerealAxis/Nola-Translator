@@ -33,20 +33,20 @@ export function registerRuntimeIpc(manager: RuntimeManager, window: () => Browse
   loggedHandle(channels[0], async () => { await whenRuntimeReady(); return manager.snapshot() })
   loggedHandle(channels[1], async (_event, id: unknown, repair: unknown) => {
     await whenRuntimeReady()
-    if (isSessionBusy()) throw new Error('请先停止同传，再准备或修复环境')
+    if (isSessionBusy()) throw new Error('sessionAlreadyRunning')
     if (typeof id !== 'string' || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(id)) throw new Error('运行包 ID 无效')
     if (repair !== undefined && typeof repair !== 'boolean') throw new Error('修复参数无效')
     return install(id, repair === true)
   })
   loggedHandle(channels[6], async (_event, kind: unknown) => {
     await whenRuntimeReady()
-    if (isSessionBusy()) throw new Error('请先停止同传，再卸载运行组件')
+    if (isSessionBusy()) throw new Error('sessionAlreadyRunning')
     if (kind !== 'engine' && kind !== 'llama' && kind !== 'crisp') throw new Error('运行组件类型无效')
     return uninstall(kind)
   })
   loggedHandle(channels[2], async () => {
     await whenRuntimeReady()
-    if (isSessionBusy()) throw new Error('请先停止同传，再导入环境')
+    if (isSessionBusy()) throw new Error('sessionAlreadyRunning')
     const parent = window()
     if (!parent) return false
     const result = await dialog.showOpenDialog(parent, {

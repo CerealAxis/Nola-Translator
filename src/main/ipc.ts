@@ -76,6 +76,7 @@ export function registerEngineIpc(
   prepareEnvironment: (config: SessionConfig) => Promise<void> = async () => {},
   onStartingChanged: (starting: boolean) => void = () => {},
   whenRuntimeReady: () => Promise<void> = async () => {},
+  onSessionStopped: () => void = () => {},
   sharedController?: SessionController
 ): () => void {
   const controller = sharedController ?? new SessionController({ engine, meetings, getSettings, getCredential: getTranslationCredential, prepare: prepareEnvironment, whenReady: whenRuntimeReady, startingChanged: onStartingChanged, showOverlay: () => getOverlayWindow()?.showInactive(), hideOverlay: () => getOverlayWindow()?.hide() })
@@ -193,7 +194,7 @@ export function registerEngineIpc(
     readHubModelCard(repo, revision, net.fetch, async () => resolveModelNetwork(getSettings().network)))
 
   loggedHandle(IPC_CHANNELS.configureModel, async (_event, resourceId: unknown, configuration: unknown) => {
-    if (controller.busy) throw new Error('字幕会话运行中，不能修改模型配置')
+    if (controller.busy) throw new Error('sessionAlreadyRunning')
     if (typeof resourceId !== 'string' || resourceId.length > 256) throw new Error('模型 ID 无效')
     const validated = modelConfigurationSchema.parse(configuration)
     await ensureReady()
@@ -235,7 +236,7 @@ export function registerEngineIpc(
       if (slot !== undefined && controller.busy) {
         // An install rewrites files a live session has already loaded, and forcing a
         // mid-meeting weight unload to swap models is not this channel's call to make.
-        throw new Error('字幕会话运行中，不能更换模型')
+        throw new Error('sessionAlreadyRunning')
       }
       await ensureReady()
       // Returns once the download is under way; progress arrives as `resourceChanged` events.
@@ -311,6 +312,10 @@ export function registerEngineIpc(
           console.error('[overlay] session stop failed; stopping engine process', error)
           // Release audio capture even if teardown or transport failed, then notify both windows.
           await engine.stop()
+          // The engine never confirmed the stop, so the session is over from the app's point of
+          // view. The main process tracks that separately and has to be told, or it keeps
+          // refusing the next start.
+          onSessionStopped()
           forwardEvent({ protocolVersion: 1, type: 'sessionStopped', requestId: `close-${randomUUID()}`, sessionId })
         }
       }

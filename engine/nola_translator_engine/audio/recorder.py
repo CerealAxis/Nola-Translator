@@ -172,6 +172,7 @@ class Mp3Recorder:
         self._encoder.set_in_sample_rate(self.encoder_sample_rate)
         self._encoder.set_channels(channels)
         self._encoder.set_quality(5)
+        self._encoder_started = False
         self._file: BinaryIO | None = open(self.path, "wb", buffering=1 << 20)
 
     @property
@@ -216,6 +217,7 @@ class Mp3Recorder:
                     encoded_input = b""
             if encoded_input:
                 self._file.write(self._encoder.encode(encoded_input))
+                self._encoder_started = True
             self.samples_written += source_samples
 
     def write_silence(self, duration_ms: float) -> None:
@@ -233,10 +235,16 @@ class Mp3Recorder:
             file, self._file = self._file, None
             if file is None:
                 return
-            file.write(self._encoder.flush())
-            file.flush()
-            os.fsync(file.fileno())
-            file.close()
+            try:
+                # The LAME encoder initialises itself on the first encoded frame, so a recorder
+                # that never received audio has nothing to flush and the encoder rejects the
+                # call. An empty recording is a valid outcome, not a failure.
+                if self._encoder_started:
+                    file.write(self._encoder.flush())
+                file.flush()
+                os.fsync(file.fileno())
+            finally:
+                file.close()
 
     def __enter__(self) -> "Mp3Recorder":
         return self

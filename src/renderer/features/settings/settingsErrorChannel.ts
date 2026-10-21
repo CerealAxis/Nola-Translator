@@ -1,6 +1,18 @@
 import { describeError, notifyError } from '@/components/primitives/notify'
 import { stores } from '@/store'
+import { isSessionAlreadyRunningError } from '../../../shared/ipc-error'
 import type { SettingsCommand } from '@/store/settingsStore'
+
+/**
+ * Whether a failure is the session mutex refusing a second owner.
+ *
+ * The main process names this refusal `sessionAlreadyRunning`, so the token survives the IPC
+ * boundary even though the sentence behind it does not. A feature that meets this failure has
+ * to say what the user has to close, not read a code back to them.
+ */
+export function isSessionConflictFailure(cause: unknown): boolean {
+  return isSessionAlreadyRunningError(cause)
+}
 
 /**
  * The settings store keeps one failure field for the commands it runs, so a failure that a

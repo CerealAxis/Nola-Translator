@@ -379,7 +379,10 @@ if (!hasSingleInstanceLock) {
       const checkCancelled = () => { if (quitting || cancelled()) throw new Error('sessionStartCancelled') }
       try { checkCancelled() } catch (error) { return Promise.reject(error) }
       if (componentInstalling) return Promise.reject(new Error('组件安装中，请等待完成'))
-      if (sessionActive || (sessionStarting && !forStart)) return Promise.reject(new Error('请先停止同传，再应用计算环境'))
+      // The catalog classifies a cause by its spelling, so this refusal has to name itself the
+      // way the catalog spells it. A Chinese sentence normalises to nothing and reads as an
+      // unknown failure instead of the session conflict it is.
+      if (sessionActive || (sessionStarting && !forStart)) return Promise.reject(new Error('sessionAlreadyRunning'))
       if (preparation) return preparation.catch(() => undefined).then(() => prepareEnvironment(forStart, session, cancelled))
       const compute = { ...(session?.compute ?? settings.current().compute) }
       preparation = (async () => {
@@ -441,7 +444,7 @@ if (!hasSingleInstanceLock) {
       return preparation
     }
     disposeRuntimeIpc = registerRuntimeIpc(runtimes, () => mainWindow, async components => {
-      if (sessionActive || sessionStarting || componentInstalling) throw new Error('请先停止同传，再检查运行组件')
+      if (sessionActive || sessionStarting || componentInstalling) throw new Error('sessionAlreadyRunning')
       componentInstalling = true
       try {
         currentDirectories = JSON.stringify(await recheckRuntimeEnvironment(runtimes, engine!, components))
@@ -525,6 +528,7 @@ if (!hasSingleInstanceLock) {
       config => prepareEnvironment(true, config),
       starting => { sessionStarting = starting },
       whenRuntimeReady,
+      () => { sessionActive = false },
       sessions,
     )
     browserConnection = new BrowserConnection({ engine, sessions, integrations: new BrowserIntegrations({ localAppData: process.env.LOCALAPPDATA ?? app.getPath('userData'), userData: app.getPath('userData') }), isOverlayVisible, getSettings: () => settings.current(), setEnabled: async enabled => {
@@ -559,7 +563,9 @@ if (!hasSingleInstanceLock) {
         )
       }
     })
-    engine.on('state', state => { if (state === 'failed' || state === 'recovering') sessionActive = false })
+    // A stopped engine owns no session, so the flag has to clear with it. Without this a
+    // session that failed to stop leaves the flag set, and every later start is refused.
+    engine.on('state', state => { if (state === 'failed' || state === 'recovering' || state === 'stopped') sessionActive = false })
     createWorkspaceWindow(initialSettings.theme)
     await workspaceReady
     createMainWindow(initialSettings.theme)

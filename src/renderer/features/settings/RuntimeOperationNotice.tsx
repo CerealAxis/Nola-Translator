@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { notifyError, notifyInfo, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { stores } from '@/store'
-import { isRuntimeFailureClaimed } from './settingsErrorChannel'
+import { isRuntimeFailureClaimed, isSessionConflictFailure } from './settingsErrorChannel'
 
 /** Keep runtime operation feedback visible even when the user navigates away from settings. */
 export function RuntimeOperationNotice() {
@@ -16,12 +16,17 @@ export function RuntimeOperationNotice() {
       const previousError = previous.runtimeError
       previous = current
       const action = current.runtimeAction === 'uninstall' ? t('runtime.uninstall') : t('runtime.install')
+      // The session mutex refuses a runtime change while a session is running. That refusal
+      // carries a code rather than a sentence, so the notice names what the user has to close
+      // instead of reading the code back.
+      const conflict = current.runtimeError !== null && isSessionConflictFailure(current.runtimeError)
       if (!wasBusy && current.runtimeBusy) {
         notifyInfo(t('runtime.operationStarted', { action }), { description: t('runtime.operationProgress') })
         return
       }
       if (wasBusy && !current.runtimeBusy) {
-        if (current.runtimeError) notifyError(t('runtime.operationFailed', { action }), { cause: current.runtimeError })
+        if (conflict) notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        else if (current.runtimeError) notifyError(t('runtime.operationFailed', { action }), { cause: current.runtimeError })
         else notifySuccess(t('runtime.operationComplete', { action }))
         return
       }
@@ -29,7 +34,8 @@ export function RuntimeOperationNotice() {
         // A page that reported this failure in its own words claimed it before the call
         // that caused it, so the message here would be a second one for the same failure.
         if (isRuntimeFailureClaimed()) return
-        notifyError(t('runtime.operationFailed', { action: t('runtime.recheck') }), { cause: current.runtimeError })
+        if (conflict) notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        else notifyError(t('runtime.operationFailed', { action: t('runtime.recheck') }), { cause: current.runtimeError })
       }
     })
   }, [t])
