@@ -162,8 +162,8 @@ export type RecognitionSettings = {
 
 /** Cloud recognition selects its remote model independently of the saved local model id. */
 export type RecognitionProvider = 'local' | 'aliyun' | 'minimax'
-export type AliyunRecognitionModel = 'qwen3.8-livetranslate-flash-realtime' | 'qwen3.5-livetranslate-flash-realtime'
-export const ALIYUN_RECOGNITION_MODELS: readonly AliyunRecognitionModel[] = ['qwen3.8-livetranslate-flash-realtime', 'qwen3.5-livetranslate-flash-realtime']
+export type AliyunRecognitionModel = 'qwen3.8-livetranslate-flash-realtime' | 'qwen3.5-livetranslate-flash-realtime' | 'qwen3-asr-flash-realtime' | 'fun-asr-realtime' | 'qwen-audio-3.1-asr-flash-streaming'
+export const ALIYUN_RECOGNITION_MODELS: readonly AliyunRecognitionModel[] = ['qwen3.8-livetranslate-flash-realtime', 'qwen3.5-livetranslate-flash-realtime', 'qwen3-asr-flash-realtime', 'fun-asr-realtime', 'qwen-audio-3.1-asr-flash-streaming']
 /** `asr-1.0` is the only model the endpoint enumerates. */
 export type MinimaxRecognitionModel = 'asr-1.0'
 export const MINIMAX_RECOGNITION_MODELS: readonly MinimaxRecognitionModel[] = ['asr-1.0']

@@ -558,13 +558,13 @@ export const zhCN = {
     providerIndexTranslate: 'Index Translate 免费API',
     indexTranslateHint: '使用官方免费 API，支持流式译文；原文会发送给哔哩哔哩。当前语言预设覆盖官方客户端映射的 32 种语言。',
     providerRecognitionTranslation: '阿里云',
-    providerAliyun: '阿里云 LiveTranslate',
+    providerAliyun: '阿里云',
     providerMiniMax: 'MiniMax 语音识别',
-    aliyunTranslationHint: '若启用阿里云服务，请先启用阿里云语音识别服务。',
+    aliyunTranslationHint: '仅在语音识别选择阿里云 Qwen3.5 或 Qwen3.8 LiveTranslate 时可用。',
     aliyunBeijing: '华北 2（北京）',
     aliyunSingapore: '新加坡',
     aliyunWorkspace: '百炼业务空间 ID',
-    aliyunHint: '持续音频输入与流式文字输出。3.8 自动识别源语言；业务空间和 API Key 须属于同一地域。LiveTranslate 按量计费，改用其他翻译服务也会产生阿里云调用费用。',
+    aliyunHint: '持续音频输入与流式文字输出。业务空间和 API Key 须属于同一地域。',
     /*
      * MiniMax 的三条限制都是「用户会以为坏了」而不是「功能缺失」：音频不是流式上传而是切段后
      * 逐段提交，字幕因此在停顿处成句出现；语种只有 20 个，比阿里云少；没有自带译文。

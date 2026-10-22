@@ -66,7 +66,7 @@ function sanitizeCloudSettings(settings: AppSettings): void {
   // `translation.provider: 'recognition'` reuses one provider's socket; for the others it would
   // leave the target language untranslated, so it falls back rather than silently producing
   // source-only captions.
-  if (!supportsRecognitionNativeTranslation(recognition.provider) && settings.translation.provider === 'recognition') settings.translation.provider = 'mymemory'
+  if (!supportsRecognitionNativeTranslation(recognition) && settings.translation.provider === 'recognition') settings.translation.provider = 'mymemory'
   settings.translation.fallback ??= structuredClone(DEFAULT_SETTINGS.translation.fallback)
   const fallback = settings.translation.fallback
   if (!['disabled', 'local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate'].includes(fallback.provider)) fallback.provider = 'disabled'

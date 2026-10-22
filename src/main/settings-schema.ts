@@ -65,7 +65,7 @@ export const settingsPatchSchema = z.object({
     provider: z.enum(['local', 'aliyun', 'minimax']).optional(),
     aliyunWorkspaceId: z.string().max(128).optional(),
     aliyunRegion: z.enum(['cn-beijing', 'ap-southeast-1']).optional(),
-    aliyunModel: z.enum(['qwen3.8-livetranslate-flash-realtime', 'qwen3.5-livetranslate-flash-realtime']).optional(),
+    aliyunModel: z.enum(['qwen3.8-livetranslate-flash-realtime', 'qwen3.5-livetranslate-flash-realtime', 'qwen3-asr-flash-realtime', 'fun-asr-realtime', 'qwen-audio-3.1-asr-flash-streaming']).optional(),
     // `api.minimax.cn` and `api.minimax.io` serve different accounts, so the address is stored
     // rather than fixed; the bound only keeps a hand-built request from riding it to the engine.
     minimaxEndpoint: z.string().max(2048).optional(),

@@ -45,12 +45,11 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
   const providerOptions = useMemo<PickerOption[]>(
     () => [
       { value: 'disabled', label: t('settings.providerDisabled') },
-      // Only Aliyun's recognition connection carries its own translation; the other providers would
-      // leave the chosen target language untranslated, so the option is unavailable rather than
-      // selectable and then reverted.
-      ...TRANSLATION_PROVIDERS.map((id) => ({ value: id, label: providerLabels[id], isDisabled: id === 'recognition' && !supportsRecognitionNativeTranslation(settings.recognition.provider) })),
+      // Only Aliyun LiveTranslate recognition carries its own translation; other models return
+      // recognized text only, so the option is unavailable rather than selectable and reverted.
+      ...TRANSLATION_PROVIDERS.map((id) => ({ value: id, label: providerLabels[id], isDisabled: id === 'recognition' && !supportsRecognitionNativeTranslation(settings.recognition) })),
     ],
-    [providerLabels, settings.recognition.provider, t],
+    [providerLabels, settings.recognition, t],
   )
 
   const apiFormatLabels = useMemo<Record<CloudApiFormat, string>>(() => ({

@@ -1,4 +1,4 @@
-"""Text-only Aliyun LiveTranslate WebSocket recognition and optional native translation."""
+"""Aliyun real-time speech recognition over the LiveTranslate and inference WebSocket APIs."""
 
 from __future__ import annotations
 
@@ -22,8 +22,15 @@ from .base import ModelUnavailable, NativeTranslation, RecognitionUpdate
 
 
 MODELS = ("qwen3.8-livetranslate-flash-realtime", "qwen3.5-livetranslate-flash-realtime")
+REALTIME_ASR_MODELS = ("qwen3-asr-flash-realtime",)
+INFERENCE_ASR_MODELS = ("fun-asr-realtime", "qwen-audio-3.1-asr-flash-streaming")
+ALL_MODELS = MODELS + REALTIME_ASR_MODELS + INFERENCE_ASR_MODELS
+NATIVE_TRANSLATION_MODELS = frozenset(MODELS)
+ASR_LANGUAGE_ALIASES = {"tl": "fil"}
+QWEN_REALTIME_LANGUAGES = frozenset("zh yue en ja de ko ru fr pt ar it es hi id th tr uk vi cs da fil fi is ms no pl sv".split())
+STREAMING_ASR_LANGUAGES = frozenset("zh en ja ko vi th id ms tl hi ar fr de es pt ru it nl sv da fi no el pl cs hu ro bg hr sk".split())
 REGIONS = ("cn-beijing", "ap-southeast-1")
-# The official LiveTranslate language table applies to ASR hints and the single target.
+# The official LiveTranslate language table applies to its ASR hints and the single target.
 # https://help.aliyun.com/zh/model-studio/qwen3-5-livetranslate-flash-realtime
 ALIYUN_LANGUAGES = frozenset("zh en ar de fr es pt id it ko ru th vi ja tr hi ms nl ur nb sv da he fi pl is cs fil fa yue el af ast be bg bn bs ca ceb et gl gu hr hu jv kk kn ky lv mk ml mr pa ro sk sl sw tg az uk".split())
 MAX_ITEMS = 128
@@ -39,7 +46,7 @@ class CloudRecognitionError(ModelUnavailable):
 
 
 class WebSocketTransport(Protocol):
-    async def send(self, message: str) -> None: ...
+    async def send(self, message: str | bytes) -> None: ...
     async def recv(self) -> str | bytes: ...
     async def close(self) -> None: ...
 
@@ -77,7 +84,7 @@ def resolve_aliyun(config: ModelSelection) -> tuple[str, str, str, str]:
     model = (options.model if options else "") or MODELS[0]
     region = (options.region if options else "") or REGIONS[0]
     workspace = options.workspaceId if options else ""
-    if model not in MODELS or region not in REGIONS:
+    if model not in ALL_MODELS or region not in REGIONS:
         raise ValueError("Unsupported Aliyun recognition model or region")
     if not re.fullmatch(r"[A-Za-z0-9-]{1,128}", workspace):
         raise ValueError("Aliyun workspace ID is required")
@@ -85,14 +92,20 @@ def resolve_aliyun(config: ModelSelection) -> tuple[str, str, str, str]:
         raise ValueError("Aliyun recognition uses the workspace's official WebSocket endpoint")
     if model == MODELS[0] and config.sourceLanguage != "auto":
         raise ValueError("Qwen3.8 LiveTranslate supports automatic source-language detection only")
-    aliases = {"tl": "fil", "no": "nb"}
-    if config.sourceLanguage != "auto" and aliases.get(config.sourceLanguage, config.sourceLanguage) not in ALIYUN_LANGUAGES:
+    aliases = ({"tl": "fil", "no": "nb"} if model in MODELS else
+               ASR_LANGUAGE_ALIASES if model in REALTIME_ASR_MODELS else {})
+    supported_languages = (ALIYUN_LANGUAGES if model in MODELS else
+                           QWEN_REALTIME_LANGUAGES if model in REALTIME_ASR_MODELS else STREAMING_ASR_LANGUAGES)
+    if config.sourceLanguage != "auto" and aliases.get(config.sourceLanguage, config.sourceLanguage) not in supported_languages:
         raise ValueError("Unsupported Aliyun recognition source language")
+    if config.translationProvider == "recognition" and model not in NATIVE_TRANSLATION_MODELS:
+        raise ValueError("Aliyun ASR models do not provide native translation")
     if config.translationProvider == "recognition" and any(aliases.get(target, target) not in ALIYUN_LANGUAGES for target in config.targetLanguages):
         raise ValueError("Unsupported Aliyun recognition target language")
     if config.translationProvider == "recognition" and len(config.targetLanguages) > 1:
         raise ValueError("Aliyun native translation supports at most one target language")
-    url = f"wss://{workspace}.{region}.maas.aliyuncs.com/api-ws/v1/realtime?{urlencode({'model': model})}"
+    api_path = "/api-ws/v1/inference" if model in INFERENCE_ASR_MODELS else f"/api-ws/v1/realtime?{urlencode({'model': model})}"
+    url = f"wss://{workspace}.{region}.maas.aliyuncs.com{api_path}"
     target = config.targetLanguages[0] if config.translationProvider == "recognition" and config.targetLanguages else "en"
     return url, model, (options.apiKey if options else ""), aliases.get(target, target)
 
@@ -146,6 +159,13 @@ class AliyunRecognizer:
         # https://help.aliyun.com/zh/model-studio/live-translator-client-events
         if self.model == MODELS[0]:
             return {"output_modalities": ["text"], "translation": {"language": self.target}}
+        if self.model in REALTIME_ASR_MODELS:
+            transcription = {}
+            if self.language != "auto":
+                transcription["language"] = ASR_LANGUAGE_ALIASES.get(self.language, self.language)
+            return {"input_audio_format": "pcm", "sample_rate": 16000,
+                    "input_audio_transcription": transcription,
+                    "turn_detection": {"type": "server_vad", "threshold": 0.2, "silence_duration_ms": 800}}
         transcription = {"model": "qwen3-asr-flash-realtime"}
         if self.language != "auto":
             transcription["language"] = {"tl": "fil", "no": "nb"}.get(self.language, self.language)
@@ -469,3 +489,234 @@ class AliyunRecognizer:
             for assistant_id in associated - settled:
                 await self._translated(assistant_id, self._translations.get(assistant_id, ("", "pending"))[0],
                     False, failed=True)
+
+
+class AliyunInferenceRecognizer:
+    """Streaming Aliyun ASR models that use the task-based inference WebSocket protocol."""
+
+    def __init__(self, config: ModelSelection, *, connector: Connector = connect_websocket,
+                 timeout: float = 10, finish_timeout: float = 15) -> None:
+        self.url, self.model, self.api_key, _ = resolve_aliyun(config)
+        if self.model not in INFERENCE_ASR_MODELS:
+            raise ValueError("Unsupported Aliyun inference ASR model")
+        self.language = config.sourceLanguage
+        self.connector = connector
+        self.timeout = timeout
+        self.finish_timeout = finish_timeout
+        self.on_update: UpdateSink | None = None
+        self.on_error: Callable[[CloudRecognitionError], None] | None = None
+        self._ws: WebSocketTransport | None = None
+        self._receiver: asyncio.Task[None] | None = None
+        self._finished = asyncio.Event()
+        self._closed = False
+        self._failure: CloudRecognitionError | None = None
+        self._origin: float | None = None
+        self._sent_ms = 0.0
+        self._anchors: list[tuple[float, float]] = []
+        self._items: OrderedDict[str, _Item] = OrderedDict()
+        self._prefix = uuid4().hex[:12]
+        self._task_id = str(uuid4())
+
+    def validate_credentials(self) -> None:
+        if not self.api_key:
+            raise ValueError("Aliyun recognition API key is required")
+
+    async def start(self) -> None:
+        if self._closed:
+            raise CloudRecognitionError("recognitionClosed")
+        if self._failure is not None:
+            raise self._failure
+        if self._ws is not None:
+            return
+        self.validate_credentials()
+        try:
+            self._ws = await asyncio.wait_for(self.connector(self.url, {"Authorization": f"Bearer {self.api_key}"}), self.timeout)
+            await self._send({"header": {"action": "run-task", "task_id": self._task_id, "streaming": "duplex"},
+                "payload": {"task_group": "audio", "task": "asr", "function": "recognition", "model": self.model,
+                    "parameters": self._parameters(), "input": {}}})
+            event = await self._recv_event()
+            if self._event_kind(event) != "task-started":
+                raise self._event_error(event) if self._event_kind(event) == "task-failed" else CloudRecognitionError("recognitionInvalidHandshake")
+            self._finished.clear()
+            self._receiver = asyncio.create_task(self._receive())
+        except asyncio.CancelledError:
+            await self._disconnect()
+            raise
+        except Exception as error:
+            await self._disconnect()
+            raise self._sanitize(error) from None
+
+    def _parameters(self) -> dict[str, object]:
+        parameters: dict[str, object] = {"format": "pcm", "sample_rate": 16000, "heartbeat": True}
+        if self.model == "qwen-audio-3.1-asr-flash-streaming":
+            parameters["vad_model"] = "far_field_meeting_16k"
+        if self.language != "auto":
+            parameters["language_hints"] = [self.language]
+        return parameters
+
+    @staticmethod
+    def _event_kind(event: dict) -> str:
+        header = event.get("header", {})
+        return header.get("event", "") if isinstance(header, dict) else ""
+
+    async def _send(self, event: dict[str, object] | bytes) -> None:
+        assert self._ws is not None
+        await asyncio.wait_for(self._ws.send(event if isinstance(event, bytes) else json.dumps(event)), 2)
+
+    async def _recv_event(self) -> dict:
+        assert self._ws is not None
+        value = json.loads(await asyncio.wait_for(self._ws.recv(), self.timeout))
+        if not isinstance(value, dict):
+            raise CloudRecognitionError("recognitionInvalidResponse")
+        return value
+
+    async def accept(self, frame: AudioFrame) -> list[RecognitionUpdate]:
+        await self.start()
+        if self._origin is None:
+            self._origin = frame.started_at_ms
+        if not self._anchors or abs(frame.started_at_ms - self._timestamp(self._sent_ms)) > 2:
+            if len(self._anchors) >= 512:
+                self._failure = CloudRecognitionError("recognitionBufferOverflow")
+                await self._disconnect()
+                raise self._failure
+            self._anchors.append((self._sent_ms, frame.started_at_ms))
+        self._sent_ms += frame.samples.size / 16
+        pcm = np.rint(np.clip(frame.samples, -1.0, 32767 / 32768) * 32768).astype("<i2").tobytes()
+        try:
+            await self._send(pcm)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            self._failure = self._failure or self._sanitize(error)
+            await self._disconnect()
+            raise self._failure from None
+        return []
+
+    async def flush(self, ended_at_ms: float) -> list[RecognitionUpdate]:
+        if self._ws is None:
+            if self._failure is not None:
+                raise self._failure
+            return []
+        try:
+            await self._send({"header": {"action": "finish-task", "task_id": self._task_id, "streaming": "duplex"}, "payload": {"input": {}}})
+            await asyncio.wait_for(self._finished.wait(), self.finish_timeout)
+            if self._failure is not None:
+                raise self._failure
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            self._failure = self._failure or self._sanitize(error)
+            raise self._failure from None
+        finally:
+            await self._disconnect()
+            self._origin, self._sent_ms = None, 0.0
+            self._anchors.clear()
+            self._items.clear()
+            self._task_id = str(uuid4())
+        return []
+
+    async def close(self) -> None:
+        self._closed = True
+        await self._disconnect()
+        self._items.clear()
+        self.on_update = None
+        self.on_error = None
+
+    async def _disconnect(self) -> None:
+        receiver, self._receiver = self._receiver, None
+        if receiver is not None and receiver is not asyncio.current_task():
+            receiver.cancel()
+            await asyncio.gather(receiver, return_exceptions=True)
+        ws, self._ws = self._ws, None
+        if ws is not None:
+            try:
+                await asyncio.wait_for(ws.close(), 1)
+            except Exception:
+                pass
+
+    @staticmethod
+    def _event_error(event: dict) -> CloudRecognitionError:
+        code = str(event.get("header", {}).get("error_code", "")).lower()
+        reason = "recognitionUnauthorized" if any(item in code for item in ("auth", "api_key", "permission")) else (
+            "recognitionRateLimited" if any(item in code for item in ("rate", "quota", "limit")) else "recognitionRejected")
+        return CloudRecognitionError(reason)
+
+    def _sanitize(self, error: Exception) -> CloudRecognitionError:
+        if isinstance(error, CloudRecognitionError):
+            return error
+        status = getattr(getattr(error, "response", None), "status_code", None)
+        if status in (401, 403):
+            return CloudRecognitionError("recognitionUnauthorized")
+        if status == 429:
+            return CloudRecognitionError("recognitionRateLimited")
+        if isinstance(error, TimeoutError):
+            return CloudRecognitionError("recognitionTimeout")
+        if not self._closed and _closed_by_peer(error):
+            return CloudRecognitionError("recognitionClosed")
+        return CloudRecognitionError("recognitionNetworkError")
+
+    def _timestamp(self, offset: float) -> float:
+        for sent, captured in reversed(self._anchors):
+            if offset >= sent:
+                return captured + offset - sent
+        return (self._origin or 0.0) + offset
+
+    async def _receive(self) -> None:
+        try:
+            while self._ws is not None:
+                event = await self._recv_event()
+                kind = self._event_kind(event)
+                if kind == "task-finished":
+                    self._finished.set()
+                    return
+                if kind == "task-failed":
+                    raise self._event_error(event)
+                if kind != "result-generated":
+                    continue
+                payload = event.get("payload", {})
+                output = payload.get("output", {}) if isinstance(payload, dict) else {}
+                sentence = output.get("sentence", {}) if isinstance(output, dict) else {}
+                if not isinstance(sentence, dict) or sentence.get("heartbeat") is True:
+                    continue
+                sentence_id = sentence.get("sentence_id")
+                text = sentence.get("text", "")
+                if not isinstance(sentence_id, int) or not isinstance(text, str) or len(text) > MAX_TEXT:
+                    raise CloudRecognitionError("recognitionInvalidResponse")
+                item_id = str(sentence_id)
+                item = self._items.get(item_id)
+                if item is None:
+                    while len(self._items) >= MAX_ITEMS:
+                        old_id, old = next(iter(self._items.items()))
+                        if not old.final:
+                            raise CloudRecognitionError("recognitionBufferOverflow")
+                        self._items.pop(old_id)
+                    start = sentence.get("begin_time")
+                    if not isinstance(start, (int, float)) or start < 0:
+                        raise CloudRecognitionError("recognitionInvalidResponse")
+                    item = _Item(started=float(start))
+                    self._items[item_id] = item
+                item.text = text
+                item.final = sentence.get("sentence_end") is True
+                end = sentence.get("end_time")
+                if isinstance(end, (int, float)):
+                    item.ended = max(item.started, float(end))
+                if item.final and item.ended is None:
+                    item.ended = max(item.started, self._sent_ms)
+                await self._publish(item_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            self._failure = self._failure or self._sanitize(error)
+            self._finished.set()
+            if self.on_error is not None:
+                self.on_error(self._failure)
+            await self._disconnect()
+
+    async def _publish(self, item_id: str) -> None:
+        item = self._items[item_id]
+        if not item.text or self._origin is None or self.on_update is None:
+            return
+        item.revision += 1
+        await self.on_update(RecognitionUpdate(f"{self._prefix}-{self._task_id[:8]}-{item_id}"[:128], item.revision,
+            self._timestamp(item.started), self._timestamp(item.ended) if item.ended is not None else None,
+            item.text, None, item.final))

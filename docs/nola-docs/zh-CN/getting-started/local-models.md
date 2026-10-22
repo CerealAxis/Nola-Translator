@@ -31,8 +31,8 @@ Nola Translator 支持三种大模型推理框架，分别是 Pytorch、llama.cp
 |类别|语音模型|翻译模型|
 |-|-|-|
 |核心显卡|SenseVoiceSmall (CrispASR) | Index Translator 免费API|
-|独立显卡|Qwen3 ASR 0.6B (llama.cpp) | HY-MT2-1.8B-IQ2 (llama.cpp) 
-|旗舰显卡|Qwen3 ASR 1.7B (llama.cpp) | HY-MT2-1.8B-Q4 (llama.cpp) |
+|独立显卡|Qwen3 ASR 0.6B (CrispASR) | HY-MT2-1.8B-IQ2 (llama.cpp) 
+|旗舰显卡|Qwen3 ASR 1.7B (CrispASR) | HY-MT2-1.8B-Q4 (llama.cpp) |
 
 
 ## 三、本地导入

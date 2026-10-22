@@ -83,7 +83,7 @@ from .recognition.streaming import StreamingRecognizer
 from .translation.transformers_causal import CausalTranslationProvider, Seq2SeqTranslationProvider
 from .translation.index_translate import IndexTranslateTransformersProvider
 from .recognition.base import ModelUnavailable, RecognitionUpdate, Recognizer
-from .recognition.aliyun import MODELS as ALIYUN_RECOGNITION_MODELS, AliyunRecognizer, CloudRecognitionError
+from .recognition.aliyun import ALL_MODELS as ALIYUN_RECOGNITION_MODELS, INFERENCE_ASR_MODELS, AliyunInferenceRecognizer, AliyunRecognizer, CloudRecognitionError
 from .recognition.minimax import MODELS as MINIMAX_RECOGNITION_MODELS, MiniMaxRecognizer
 from .recognition.qwen_runtime import QwenRuntime, TransformersAsrRuntime, get_qwen_runtime
 from .recognition.qwen_streaming import create_qwen_recognizer
@@ -1001,9 +1001,11 @@ class EngineRuntime:
         return results[0]
 
     @staticmethod
-    def _remote_recognizer(config: ModelSelection) -> AliyunRecognizer | MiniMaxRecognizer:
+    def _remote_recognizer(config: ModelSelection) -> AliyunRecognizer | AliyunInferenceRecognizer | MiniMaxRecognizer:
         if config.recognitionProvider == "minimax":
             return MiniMaxRecognizer(config)
+        if config.recognitionOptions and config.recognitionOptions.model in INFERENCE_ASR_MODELS:
+            return AliyunInferenceRecognizer(config)
         return AliyunRecognizer(config)
 
     async def _prepare_remote_models(self, command: ModelSelectionCommand) -> Recognizer:

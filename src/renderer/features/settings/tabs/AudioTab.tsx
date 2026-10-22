@@ -103,10 +103,10 @@ export function AudioTab({ settings }: SettingsPanelProps) {
         <SettingsRow onboardingTarget="recognition-provider" label={t('settings.provider')}>
           <SettingSelect value={provider} ariaLabel={t('settings.provider')} options={providerOptions} onChange={value => {
             const next = value as RecognitionProvider
-            // Only Aliyun's socket returns a translation of its own, so leaving it retires the
-            // native-translation provider rather than leaving a target language untranslated.
+            // Only Aliyun LiveTranslate models return a translation of their own, so leaving them
+            // retires the native-translation provider rather than leaving a target untranslated.
             void updateSettings({ recognition: { provider: next, sourceLanguage: 'auto' },
-              ...(!supportsRecognitionNativeTranslation(next) && settings.translation.provider === 'recognition' ? { translation: { provider: 'mymemory' as const } } : {}),
+              ...(!supportsRecognitionNativeTranslation({ ...settings.recognition, provider: next }) && settings.translation.provider === 'recognition' ? { translation: { provider: 'mymemory' as const } } : {}),
             }).catch(() => undefined)
           }} />
         </SettingsRow>
@@ -134,7 +134,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
             }}
           />
         </SettingsRow>
-        )) : provider === 'minimax' ? <MiniMaxConnection recognition={settings.recognition} stored={credentials['minimax-asr']} /> : <AliyunConnection recognition={settings.recognition} stored={credentials['aliyun-asr']} />}
+        )) : provider === 'minimax' ? <MiniMaxConnection recognition={settings.recognition} stored={credentials['minimax-asr']} /> : <AliyunConnection recognition={settings.recognition} stored={credentials['aliyun-asr']} nativeTranslationSelected={settings.translation.provider === 'recognition'} />}
         <SettingsRow label={t('settings.sourceLanguage')}>
           <SettingSelect
             value={settings.recognition.sourceLanguage}
@@ -196,12 +196,15 @@ interface CloudConnectionProps { recognition: RecognitionSettings; stored: boole
  * Aliyun streams over a persistent WebSocket, so it carries the region and workspace its socket
  * is opened against in addition to the model.
  */
-function AliyunConnection({ recognition, stored }: CloudConnectionProps) {
+function AliyunConnection({ recognition, stored, nativeTranslationSelected }: CloudConnectionProps & { nativeTranslationSelected: boolean }) {
   const { t } = useI18n()
   return <>
     <SettingsRow onboardingTarget="recognition-model" label={t('settings.recognitionModel')} desc={t('settings.aliyunHint')} descriptionTooltip>
       <SettingSelect value={recognition.aliyunModel ?? ALIYUN_RECOGNITION_MODELS[0]} ariaLabel={t('settings.recognitionModel')} options={ALIYUN_RECOGNITION_MODELS.map(value => ({ value, label: value }))} onChange={value => {
-        void updateSettings({ recognition: { aliyunModel: value as AliyunRecognitionModel, sourceLanguage: 'auto' } }).catch(() => undefined)
+        const aliyunModel = value as AliyunRecognitionModel
+        void updateSettings({ recognition: { aliyunModel, sourceLanguage: 'auto' },
+          ...(!supportsRecognitionNativeTranslation({ ...recognition, provider: 'aliyun', aliyunModel }) && nativeTranslationSelected ? { translation: { provider: 'mymemory' as const } } : {}),
+        }).catch(() => undefined)
       }} />
     </SettingsRow>
     <SettingsRow label={t('settings.region')}>

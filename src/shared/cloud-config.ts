@@ -69,12 +69,13 @@ export const MINIMAX_LANGUAGES = ['zh', 'yue', 'en', 'fr', 'de', 'es', 'it', 'pt
 /**
  * Whether the recognition provider can return a translation alongside the transcript.
  *
- * Only Aliyun LiveTranslate answers with one, so `translationProvider: 'recognition'` is valid
- * there alone; MiniMax's endpoint takes an audio file and returns text only, and asking it for a
- * translation is a configuration the API cannot express.
+ * Only the two Aliyun LiveTranslate models answer with a native translation; Aliyun's dedicated
+ * ASR models and MiniMax return recognized text only.
  */
-export function supportsRecognitionNativeTranslation(provider: RecognitionProvider | undefined): boolean {
-  return provider === 'aliyun'
+export function supportsRecognitionNativeTranslation(settings: RecognitionSettings | RecognitionProvider | undefined): boolean {
+  if (typeof settings === 'string' || settings === undefined) return settings === 'aliyun'
+  return settings.provider === 'aliyun' &&
+    (settings.aliyunModel === 'qwen3.8-livetranslate-flash-realtime' || settings.aliyunModel === 'qwen3.5-livetranslate-flash-realtime' || settings.aliyunModel === undefined)
 }
 
 /**
