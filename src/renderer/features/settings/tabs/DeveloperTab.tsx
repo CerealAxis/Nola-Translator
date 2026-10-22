@@ -9,23 +9,21 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import {
-  Alert,
-  AlertDialog,
-  Button,
-  EmptyState,
-  Modal,
-  ProgressBar,
-  Skeleton,
-  ToggleButton,
-  ToggleButtonGroup,
-  Typography,
-  toast,
-} from '@heroui/react'
-import { ArrowRight, Check, Trash2 } from 'lucide-react'
+import { AlertDialog } from '@base-ui/react/alert-dialog'
+import { Progress } from '@base-ui/react/progress'
+
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { ArrowRight, Check, CircleAlert, CircleCheck, Info, LoaderCircle, Trash2, TriangleAlert } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 import { StatusPill } from '@/components/primitives'
 import type { StatusPillTone } from '@/components/primitives'
+import { Button } from '@/components/ui/button'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { closeToast, createToast, updateToast } from '@/components/ui/toast'
+import type { ToastOptions } from '@/components/ui/toast'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
@@ -81,6 +79,12 @@ const FLOOD_VARIANTS: ReadonlyArray<'default' | 'accent' | 'success' | 'warning'
   'accent',
 ]
 
+/**
+ * The soft-danger fill has no shadcn button variant of its own, so it rides on the secondary
+ * button and repaints the fill and the label with the danger-soft tokens.
+ */
+const DANGER_SOFT_CLASS = 'bg-danger-soft text-danger-soft-foreground hover:bg-danger-soft-hover'
+
 const PILL_TONES: ReadonlyArray<{ tone: StatusPillTone; label: TranslationKey }> = [
   { tone: 'neutral', label: 'titleBar.engineIdle' },
   { tone: 'accent', label: 'titleBar.language' },
@@ -89,7 +93,17 @@ const PILL_TONES: ReadonlyArray<{ tone: StatusPillTone; label: TranslationKey }>
   { tone: 'danger', label: 'titleBar.engineFailed' },
 ]
 
-const ALERT_STATUSES = ['default', 'accent', 'success', 'warning', 'danger'] as const
+type AlertStatus = 'default' | 'accent' | 'success' | 'warning' | 'danger'
+
+const ALERT_STATUSES: readonly AlertStatus[] = ['default', 'accent', 'success', 'warning', 'danger']
+
+const ALERT_ICON: Record<AlertStatus, LucideIcon> = {
+  default: Info,
+  accent: Info,
+  success: CircleCheck,
+  warning: TriangleAlert,
+  danger: CircleAlert,
+}
 
 export function DeveloperTab() {
   const { t } = useI18n()
@@ -119,42 +133,45 @@ function ButtonGroup() {
     <SettingGroup legend={t('dev.sectionButtons')}>
       <SettingsRow label={t('dev.buttonVariants')} desc={t('dev.buttonVariantsDesc')}>
         <div className="dev-strip">
-          <Button variant="primary">{t('dev.buttonPrimary')}</Button>
+          <Button variant="default">{t('dev.buttonPrimary')}</Button>
           <Button variant="secondary">{t('dev.buttonSecondary')}</Button>
           <Button variant="tertiary">{t('dev.buttonTertiary')}</Button>
           <Button variant="outline">{t('dev.buttonOutline')}</Button>
           <Button variant="danger">{t('dev.buttonDanger')}</Button>
-          <Button variant="danger-soft">{t('dev.buttonDangerSoft')}</Button>
+          <Button variant="secondary" className={DANGER_SOFT_CLASS}>{t('dev.buttonDangerSoft')}</Button>
         </div>
       </SettingsRow>
 
       <SettingsRow label={t('dev.buttonSizes')} desc={t('dev.buttonSizesDesc')}>
         <div className="dev-strip">
-          <Button variant="primary" size="sm">{t('dev.buttonSmall')}</Button>
-          <Button variant="primary">{t('dev.buttonDefault')}</Button>
+          <Button variant="default" size="sm">{t('dev.buttonSmall')}</Button>
+          <Button variant="default">{t('dev.buttonDefault')}</Button>
         </div>
       </SettingsRow>
 
       <SettingsRow label={t('dev.buttonStates')} desc={t('dev.buttonStatesDesc')}>
         <div className="dev-strip">
-          <Button variant="secondary" isDisabled>{t('dev.buttonDisabled')}</Button>
-          <Button variant="primary" isPending>{t('dev.buttonPending')}</Button>
-          <Button variant="secondary" isDisabled><Check aria-hidden="true" />{t('dev.buttonCurrent')}</Button>
+          <Button variant="secondary" disabled>{t('dev.buttonDisabled')}</Button>
+          <Button variant="default" disabled>
+            <LoaderCircle className="animate-spin" aria-hidden="true" />
+            {t('dev.buttonPending')}
+          </Button>
+          <Button variant="secondary" disabled><Check aria-hidden="true" />{t('dev.buttonCurrent')}</Button>
         </div>
       </SettingsRow>
 
       <SettingsRow label={t('dev.buttonIconOnly')} desc={t('dev.buttonIconOnlyDesc')}>
         <div className="dev-strip">
-          <Button variant="secondary" isIconOnly aria-label={t('dev.buttonIconOnly')}><ArrowRight aria-hidden="true" /></Button>
-          <Button variant="danger-soft" isIconOnly aria-label={t('dev.buttonDelete')}><Trash2 aria-hidden="true" /></Button>
+          <Button variant="secondary" size="icon" aria-label={t('dev.buttonIconOnly')}><ArrowRight aria-hidden="true" /></Button>
+          <Button variant="secondary" size="icon" className={DANGER_SOFT_CLASS} aria-label={t('dev.buttonDelete')}><Trash2 aria-hidden="true" /></Button>
         </div>
       </SettingsRow>
 
       <SettingsRow label={t('dev.buttonSegmented')} desc={t('dev.buttonSegmentedDesc')}>
-        <ToggleButtonGroup className="nola-segmented" selectionMode="single" selectedKeys={new Set(['selected'])} aria-label={t('dev.buttonSegmented')}>
-          <ToggleButton id="selected">{t('dev.buttonSelected')}</ToggleButton>
-          <ToggleButton id="unselected">{t('dev.buttonUnselected')}</ToggleButton>
-        </ToggleButtonGroup>
+        <ToggleGroup className="nola-segmented" value={['selected']} aria-label={t('dev.buttonSegmented')}>
+          <ToggleGroupItem value="selected" className="toggle-button" data-selected="true">{t('dev.buttonSelected')}</ToggleGroupItem>
+          <ToggleGroupItem value="unselected" className="toggle-button">{t('dev.buttonUnselected')}</ToggleGroupItem>
+        </ToggleGroup>
       </SettingsRow>
 
     </SettingGroup>
@@ -166,7 +183,7 @@ function ToastTrigger({ label, desc, run }: { label: string; desc: string; run: 
   const { t } = useI18n()
   return (
     <SettingsRow label={label} desc={desc} descriptionTooltip>
-      <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={run}>
+      <Button variant="tertiary" size="sm" onClick={run}>
         {t('dev.run')}
       </Button>
     </SettingsRow>
@@ -176,6 +193,18 @@ function ToastTrigger({ label, desc, run }: { label: string; desc: string; run: 
 function ToastGroup() {
   const { t } = useI18n()
   const updateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const raised = useRef<Set<string>>(new Set())
+
+  /**
+   * Every toast this tab raises is remembered, so the clear row can take the whole queue down
+   * in one go: the toast manager is shared with the rest of the app and only hands out the id
+   * of a toast it has just created.
+   */
+  const raise = useCallback((message: string, options: ToastOptions = {}): string => {
+    const id = createToast(message, options)
+    raised.current.add(id)
+    return id
+  }, [])
 
   // A rewrite scheduled after the tab closes would fire into an unmounted tree.
   useEffect(() => () => {
@@ -183,83 +212,86 @@ function ToastGroup() {
   }, [])
 
   const rewrite = useCallback(() => {
-    const id = toast(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody') })
+    const id = raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody') })
     if (updateTimer.current !== null) clearTimeout(updateTimer.current)
     updateTimer.current = setTimeout(() => {
       updateTimer.current = null
-      toast.update(id, t('dev.toastActionDone'), { description: t('dev.toastSampleBody') })
+      updateToast(id, t('dev.toastActionDone'), { description: t('dev.toastSampleBody'), variant: 'default' })
     }, TOAST_UPDATE_MS)
-  }, [t])
+  }, [raise, t])
 
   const flood = useCallback(() => {
     for (let index = 0; index < TOAST_FLOOD; index += 1) {
-      toast(t('dev.toastSampleTitle'), {
+      raise(t('dev.toastSampleTitle'), {
         variant: FLOOD_VARIANTS[index % FLOOD_VARIANTS.length],
         description: t('dev.toastSampleBody'),
       })
     }
-  }, [t])
+  }, [raise, t])
+
+  const clear = useCallback(() => {
+    for (const id of raised.current) closeToast(id)
+    raised.current.clear()
+  }, [])
 
   return (
     <SettingGroup legend={t('dev.sectionToast')}>
       <ToastTrigger
         label={t('dev.toastDefault')}
         desc={t('dev.toastDefaultDesc')}
-        run={() => toast(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody') })}
+        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody') }) }}
       />
       <ToastTrigger
         label={t('dev.toastAccent')}
         desc={t('dev.toastAccentDesc')}
-        run={() => toast(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), variant: 'accent' })}
+        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), variant: 'accent' }) }}
       />
       <ToastTrigger
         label={t('dev.toastSuccess')}
         desc={t('dev.toastSuccessDesc')}
-        run={() => toast.success(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody') })}
+        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), variant: 'success' }) }}
       />
       <ToastTrigger
         label={t('dev.toastWarning')}
         desc={t('dev.toastWarningDesc')}
-        run={() => toast.warning(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody') })}
+        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), variant: 'warning' }) }}
       />
       <ToastTrigger
         label={t('dev.toastDanger')}
         desc={t('dev.toastDangerDesc')}
-        run={() => toast.danger(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody') })}
+        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), variant: 'danger' }) }}
       />
       <ToastTrigger
         label={t('dev.toastSticky')}
         desc={t('dev.toastStickyDesc')}
-        run={() => toast(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), timeout: 0 })}
+        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), timeout: 0 }) }}
       />
       <ToastTrigger
         label={t('dev.toastLoading')}
         desc={t('dev.toastLoadingDesc')}
         run={() => {
-          toast(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), isLoading: true })
-          // The promise demo rides on this row rather than getting its own: its loading card is the
-          // same `isLoading` render, and it exists to check the loading -> success hand-off. The
-          // promise is already resolved, so the success card appears one frame later.
-          toast.promise(Promise.resolve(), {
-            loading: t('dev.toastSampleTitle'),
-            success: t('dev.toastLoadingDone'),
-            error: t('dev.toastSampleBody'),
+          // The promise demo rides on this row rather than getting its own: its loading card is
+          // the same render, and it exists to check the loading -> success hand-off. The promise
+          // is already resolved, so the success card appears one frame later.
+          const id = raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), variant: 'accent' })
+          void Promise.resolve().then(() => {
+            updateToast(id, t('dev.toastLoadingDone'), { description: t('dev.toastSampleBody'), variant: 'success' })
           })
         }}
       />
       <ToastTrigger
         label={t('dev.toastAction')}
         desc={t('dev.toastActionDesc')}
-        run={() => toast(t('dev.toastSampleTitle'), {
-          description: t('dev.toastSampleBody'),
-          actionProps: {
-            children: t('dev.toastActionLabel'),
-            variant: 'tertiary',
-            size: 'sm',
-            className: 'rounded-[6px]',
-            onPress: () => { toast.success(t('dev.toastActionDone')) },
-          },
-        })}
+        run={() => {
+          raise(t('dev.toastSampleTitle'), {
+            description: t('dev.toastSampleBody'),
+            actionProps: {
+              children: t('dev.toastActionLabel'),
+              variant: 'tertiary',
+              onPress: () => { raise(t('dev.toastActionDone'), { variant: 'success' }) },
+            },
+          })
+        }}
       />
       <ToastTrigger
         label={t('dev.toastUpdate')}
@@ -274,7 +306,7 @@ function ToastGroup() {
       <ToastTrigger
         label={t('dev.toastClear')}
         desc={t('dev.toastClearDesc')}
-        run={() => toast.clear()}
+        run={clear}
       />
     </SettingGroup>
   )
@@ -283,9 +315,9 @@ function ToastGroup() {
 /**
  * One trigger button plus the dialog it opens.
  *
- * The body renders unconditionally inside the closed dialog: HeroUI only mounts the dialog while it
- * is open, so keeping the markup in a shared shape keeps the four rows identical apart from the
- * tone and the footer.
+ * The body renders unconditionally inside the closed dialog: the dialog only mounts its popup
+ * while it is open, so keeping the markup in a shared shape keeps the four rows identical apart
+ * from the tone and the footer.
  */
 function DialogTrigger({ label, desc, tone, pending, open, onOpenChange, title, body, confirm, footer }: {
   label: string
@@ -303,40 +335,40 @@ function DialogTrigger({ label, desc, tone, pending, open, onOpenChange, title, 
   return (
     <>
       <SettingsRow label={label} desc={desc} descriptionTooltip>
-        <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={() => onOpenChange(true)}>
+        <Button variant="tertiary" size="sm" onClick={() => onOpenChange(true)}>
           {t('dev.run')}
         </Button>
       </SettingsRow>
 
-      <AlertDialog isOpen={open} onOpenChange={onOpenChange}>
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container>
-            <AlertDialog.Dialog>
-              <AlertDialog.Header>
-                <AlertDialog.Heading className="nola-title text-foreground">{title}</AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>
-                <p className="nola-body text-muted">{body}</p>
-              </AlertDialog.Body>
-              <AlertDialog.Footer className="flex justify-end gap-2">
-                <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={() => onOpenChange(false)}>
-                  {t('common.cancel')}
-                </Button>
-                {footer}
-                <Button
-                  variant={tone === 'danger' ? 'danger-soft' : 'primary'}
-                  size="sm"
-                  className="rounded-[6px]"
-                  isPending={pending}
-                  onPress={() => onOpenChange(false)}
-                >
-                  {confirm}
-                </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+      <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
+        <AlertDialog.Portal>
+          <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
+          <AlertDialog.Popup className="nola-dialog-content max-w-md">
+            <DialogHeader>
+              <AlertDialog.Title className="nola-title text-foreground">{title}</AlertDialog.Title>
+            </DialogHeader>
+            <div className="flex flex-col gap-3">
+              <p className="nola-body text-muted">{body}</p>
+            </div>
+            <DialogFooter>
+              <AlertDialog.Close render={<Button variant="tertiary" size="sm" />}>
+                {t('common.cancel')}
+              </AlertDialog.Close>
+              {footer}
+              <Button
+                variant={tone === 'danger' ? 'secondary' : 'default'}
+                className={tone === 'danger' ? DANGER_SOFT_CLASS : undefined}
+                size="sm"
+                disabled={pending}
+                onClick={() => onOpenChange(false)}
+              >
+                {pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
+                {confirm}
+              </Button>
+            </DialogFooter>
+          </AlertDialog.Popup>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
     </>
   )
 }
@@ -413,9 +445,8 @@ function DialogGroup() {
             <Button
               variant="secondary"
               size="sm"
-              className="rounded-[6px]"
-              onPress={() => {
-                toast.success(t('dev.dialogPendingDone'))
+              onClick={() => {
+                createToast(t('dev.dialogPendingDone'), { variant: 'success' })
               }}
             >
               {t('dev.run')}
@@ -423,31 +454,27 @@ function DialogGroup() {
           )}
         />
         <SettingsRow label={t('dev.dialogModal')} desc={t('dev.dialogModalDesc')} descriptionTooltip>
-          <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={() => setModalOpen(true)}>
+          <Button variant="tertiary" size="sm" onClick={() => setModalOpen(true)}>
             {t('dev.run')}
           </Button>
         </SettingsRow>
       </SettingGroup>
 
-      <Modal isOpen={modalOpen} onOpenChange={setModalOpen}>
-        <Modal.Backdrop className="z-overlay">
-          <Modal.Container size="md" placement="center">
-            <Modal.Dialog className="rounded-2xl border border-border">
-              <Modal.Header>
-                <Modal.Heading className="nola-title text-foreground">{t('dev.dialogModalTitle')}</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body className="flex flex-col gap-3">
-                <p className="nola-body text-muted">{t('dev.dialogModalBody')}</p>
-              </Modal.Body>
-              <Modal.Footer className="flex justify-end gap-2">
-                <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={() => setModalOpen(false)}>
-                  {t('dev.dialogModalClose')}
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="nola-title text-foreground">{t('dev.dialogModalTitle')}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <p className="nola-body text-muted">{t('dev.dialogModalBody')}</p>
+          </div>
+          <DialogFooter>
+            <Button variant="tertiary" size="sm" onClick={() => setModalOpen(false)}>
+              {t('dev.dialogModalClose')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
@@ -495,10 +522,11 @@ function GalleryRow({ label, desc, children }: { label: string; desc: string; ch
   )
 }
 
-function RunButton({ onPress, isPending = false }: { onPress: () => void; isPending?: boolean }) {
+function RunButton({ onClick, isPending = false }: { onClick: () => void; isPending?: boolean }) {
   const { t } = useI18n()
   return (
-    <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={onPress} isPending={isPending}>
+    <Button variant="tertiary" size="sm" onClick={onClick} disabled={isPending}>
+      {isPending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
       {t('dev.run')}
     </Button>
   )
@@ -533,13 +561,13 @@ function DialogGalleryGroup() {
     try {
       const result = await actions.settings.fetchLatestRelease(true)
       if (!result?.latestVersion || !result.releaseName) {
-        toast.danger(t('appUpdate.checkFailed'))
+        createToast(t('appUpdate.checkFailed'), { variant: 'danger' })
         return
       }
       setAppUpdateResult(result)
       show('appUpdate')
     } catch {
-      toast.danger(t('appUpdate.checkFailed'))
+      createToast(t('appUpdate.checkFailed'), { variant: 'danger' })
     } finally {
       setAppUpdateChecking(false)
     }
@@ -551,7 +579,7 @@ function DialogGalleryGroup() {
       await actions.settings.openAppReleasePage(url)
       hide('appUpdate')
     } catch {
-      toast.danger(t('appUpdate.openFailed'))
+      createToast(t('appUpdate.openFailed'), { variant: 'danger' })
     } finally {
       setAppUpdateOpening(false)
     }
@@ -561,46 +589,46 @@ function DialogGalleryGroup() {
     <>
       <SettingGroup legend={t('dev.sectionAppDialogs')}>
         <GalleryRow label={t('dev.dialogSessionSetup')} desc={t('dev.dialogSessionSetupDesc')}>
-          <RunButton onPress={() => show('sessionSetup')} />
+          <RunButton onClick={() => show('sessionSetup')} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogPreflight')} desc={t('dev.dialogPreflightDesc')}>
-          <RunButton onPress={() => show('preflight')} />
+          <RunButton onClick={() => show('preflight')} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogRename')} desc={t('dev.dialogRenameDesc')}>
-          <RunButton onPress={() => setRenameId(DEMO_MEETING_ID)} />
+          <RunButton onClick={() => setRenameId(DEMO_MEETING_ID)} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogExport')} desc={t('dev.dialogExportDesc')}>
-          <RunButton onPress={() => show('export')} />
+          <RunButton onClick={() => show('export')} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogModelConfig')} desc={t('dev.dialogModelConfigDesc')}>
-          <RunButton onPress={() => show('modelConfig')} />
+          <RunButton onClick={() => show('modelConfig')} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogCompat')} desc={t('dev.dialogCompatDesc')}>
-          <RunButton onPress={() => show('compat')} />
+          <RunButton onClick={() => show('compat')} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogNotices')} desc={t('dev.dialogNoticesDesc')}>
           <ThirdPartyNotices />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogStopSession')} desc={t('dev.dialogStopSessionDesc')}>
-          <RunButton onPress={() => show('stopSession')} />
+          <RunButton onClick={() => show('stopSession')} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogSessionError')} desc={t('dev.dialogSessionErrorDesc')}>
-          <RunButton onPress={() => setErrorSession(DEMO_ERROR_SESSION)} />
+          <RunButton onClick={() => setErrorSession(DEMO_ERROR_SESSION)} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogBulkDelete')} desc={t('dev.dialogBulkDeleteDesc')}>
-          <RunButton onPress={() => show('bulkDelete')} />
+          <RunButton onClick={() => show('bulkDelete')} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogRuntimeMissing')} desc={t('dev.dialogRuntimeMissingDesc')}>
-          <RunButton onPress={() => show('runtimeMissing')} />
+          <RunButton onClick={() => show('runtimeMissing')} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogAppUpdate')} desc={t('dev.dialogAppUpdateDesc')}>
-          <RunButton onPress={() => { void showLatestRelease() }} isPending={appUpdateChecking} />
+          <RunButton onClick={() => { void showLatestRelease() }} isPending={appUpdateChecking} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogModelDetail')} desc={t('dev.dialogModelDetailDesc')}>
-          <RunButton onPress={() => show('modelDetail')} />
+          <RunButton onClick={() => show('modelDetail')} />
         </GalleryRow>
         <GalleryRow label={t('dev.dialogStartupFailure')} desc={t('dev.dialogStartupFailureDesc')}>
-          <RunButton onPress={() => show('startupFailure')} />
+          <RunButton onClick={() => show('startupFailure')} />
         </GalleryRow>
       </SettingGroup>
 
@@ -710,33 +738,38 @@ function StatusGroup() {
 
       <StatusRow label={t('dev.statusAlert')} desc={t('dev.statusAlertDesc')}>
         <div className="dev-stack">
-          {ALERT_STATUSES.map((status) => (
-            <Alert key={status} status={status}>
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title className="nola-body-strong">{t('dev.statusAlertTitle')}</Alert.Title>
-                <Alert.Description className="nola-caption">{t('dev.statusAlertBody')}</Alert.Description>
-              </Alert.Content>
-            </Alert>
-          ))}
+          {ALERT_STATUSES.map((status) => {
+            const Icon = ALERT_ICON[status]
+            return (
+              <Alert key={status} variant={status}>
+                <Icon aria-hidden="true" />
+                <AlertTitle>{t('dev.statusAlertTitle')}</AlertTitle>
+                <AlertDescription>{t('dev.statusAlertBody')}</AlertDescription>
+              </Alert>
+            )
+          })}
         </div>
       </StatusRow>
 
       <StatusRow label={t('dev.statusEmpty')} desc={t('dev.statusEmptyDesc')}>
-        <EmptyState className="dev-empty">
-          <p className="nola-body-strong text-foreground">{t('dev.statusEmptyTitle')}</p>
-          <p className="nola-caption">{t('dev.statusEmptyBody')}</p>
-          <Button variant="secondary" size="sm" className="rounded-[6px]">
-            {t('dev.statusEmptyAction')}
-          </Button>
-        </EmptyState>
+        <Empty className="items-start p-0 py-2 text-left">
+          <EmptyHeader className="items-start">
+            <EmptyTitle>{t('dev.statusEmptyTitle')}</EmptyTitle>
+            <EmptyDescription>{t('dev.statusEmptyBody')}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent className="items-start">
+            <Button variant="secondary" size="sm">
+              {t('dev.statusEmptyAction')}
+            </Button>
+          </EmptyContent>
+        </Empty>
       </StatusRow>
 
       <StatusRow label={t('dev.statusSkeleton')} desc={t('dev.statusSkeletonDesc')}>
         <div className="dev-stack">
-          <Skeleton className="dev-skeleton-line" />
-          <Skeleton className="dev-skeleton-line" />
-          <Skeleton className="dev-skeleton-line dev-skeleton-line--short" />
+          <div className="dev-skeleton-line animate-pulse bg-surface-tertiary/70 motion-reduce:animate-none" aria-hidden="true" />
+          <div className="dev-skeleton-line animate-pulse bg-surface-tertiary/70 motion-reduce:animate-none" aria-hidden="true" />
+          <div className="dev-skeleton-line dev-skeleton-line--short animate-pulse bg-surface-tertiary/70 motion-reduce:animate-none" aria-hidden="true" />
         </div>
       </StatusRow>
 
@@ -744,15 +777,19 @@ function StatusGroup() {
         <div className="dev-stack">
           <div className="dev-progress">
             <span className="nola-micro text-muted">{t('dev.statusProgressPending')}</span>
-            <ProgressBar value={0.35} maxValue={1} className="w-full" aria-label={t('dev.statusProgressPending')}>
-              <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
-            </ProgressBar>
+            <Progress.Root value={0.35} min={0} max={1} className="w-full" aria-label={t('dev.statusProgressPending')}>
+              <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm bg-surface-secondary">
+                <Progress.Indicator className="h-full rounded-sm bg-accent" />
+              </Progress.Track>
+            </Progress.Root>
           </div>
           <div className="dev-progress">
             <span className="nola-micro text-muted">{t('dev.statusProgressDone')}</span>
-            <ProgressBar value={0.85} maxValue={1} className="w-full" aria-label={t('dev.statusProgressDone')}>
-              <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
-            </ProgressBar>
+            <Progress.Root value={0.85} min={0} max={1} className="w-full" aria-label={t('dev.statusProgressDone')}>
+              <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm bg-surface-secondary">
+                <Progress.Indicator className="h-full rounded-sm bg-accent" />
+              </Progress.Track>
+            </Progress.Root>
           </div>
         </div>
       </StatusRow>
@@ -815,8 +852,8 @@ function useTokenValues(tokens: readonly string[]): Record<string, string> {
 function TokenCaption({ token, value }: { token: string; value: string | undefined }) {
   return (
     <span className="dev-token__caption">
-      <Typography.Code className="nola-mono text-foreground">{token}</Typography.Code>
-      <Typography.Code className="nola-mono text-muted">{value || '-'}</Typography.Code>
+      <code className="nola-mono text-foreground">{token}</code>
+      <code className="nola-mono text-muted">{value || '-'}</code>
     </span>
   )
 }

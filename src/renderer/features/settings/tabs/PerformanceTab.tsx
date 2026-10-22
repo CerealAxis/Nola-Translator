@@ -1,6 +1,7 @@
 import { modelEngines, translationEngine } from '../../../../shared/model-engines'
 import { useState } from 'react'
-import { Button } from '@heroui/react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
 import { updateSettings, stores, useStore } from '@/store'
 import { DEFAULT_COMPUTE_SETTINGS, type ComputeSettings } from '../../../../shared/compute'
@@ -36,7 +37,7 @@ export function PerformanceTab({ settings }: SettingsPanelProps) {
       <SettingsRow descriptionTooltip label={c.precision} desc={c.precisionHint}><SettingSelect ariaLabel={c.precision} value={compute.precision} options={[{ value: 'auto', label: c.automatic }, ...['fp32', 'fp16', 'bf16'].map(value => ({ value, label: value.toUpperCase() }))]} onChange={value => save({ precision: value as ComputeSettings['precision'] })} /></SettingsRow>
       <SettingsRow descriptionTooltip label={c.quantization} desc={c.quantHint}><SettingSelect ariaLabel={c.quantization} value={compute.quantization} options={[{ value: 'auto', label: c.automatic }, { value: 'none', label: c.none }, { value: 'nf4', label: 'NF4' }, { value: '8bit', label: '8bit' }]} onChange={value => save({ quantization: value as ComputeSettings['quantization'] })} /></SettingsRow>
     </SettingGroup> : null}
-    <SettingGroup legend={t('compute.memoryCpu')} actions={<Button variant="secondary" size="sm" onPress={restore}>{c.restore}</Button>}>
+    <SettingGroup legend={t('compute.memoryCpu')} actions={<Button variant="secondary" size="sm" onClick={restore}>{c.restore}</Button>}>
       {numeric('reservedVramMb', c.reserve, c.reserveHint, 256, 65536)}
       {numeric('cpuThreads', c.threads, c.threadsHint, 0, 256)}
     </SettingGroup>
@@ -50,7 +51,7 @@ export function PerformanceTab({ settings }: SettingsPanelProps) {
 
 function NumberSetting({ value, min, max, label, onSave }: { value: number; min: number; max: number; label: string; onSave: (value: number) => void }) {
   const [draft, setDraft] = useState<string | null>(null)
-  return <input className="compute-number" type="number" aria-label={label} min={min} max={max} step={1} value={draft ?? String(value)}
+  return <Input className="compute-number" type="number" aria-label={label} min={min} max={max} step={1} value={draft ?? String(value)}
     onChange={e => setDraft(e.target.value)} onBlur={() => {
       const next = Number(draft)
       if (draft !== null && draft !== '' && Number.isInteger(next) && next >= min && next <= max) onSave(next)

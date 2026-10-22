@@ -1,6 +1,6 @@
 @import 'tailwindcss' source(none);
 @source './LandingPage.tsx';
-@import '@heroui/styles';
+@source '../../../src/renderer/components/ui';
 @import '../../../src/renderer/theme/index.css';
 @import '../../../src/renderer/theme/cjk-fonts.css';
 
@@ -78,15 +78,15 @@ html { scroll-behavior: smooth; }
 .site-nav-links a { opacity: .85; transition: opacity 180ms; }
 .site-nav-links a:hover { opacity: 1; }
 .site-nav-end { display: flex; align-items: center; gap: var(--space-1); }
-/* VitePress's unlayered button reset overrides HeroUI's layered padding and border defaults. */
+/* Keep marketing controls aligned with VitePress's unlayered button reset. */
 .site-nav .button { min-width: 0; flex-shrink: 0; gap: var(--space-1); padding-inline: var(--space-2); border: 0; box-shadow: none; background: color-mix(in oklch, var(--primary-foreground) 15%, transparent); color: inherit; font-size: var(--site-small-size); }
 .site-nav--scrolled .button { background: var(--surface-secondary); }
 .site-nav .site-locale { background: transparent; }
 .site-nav .site-theme { padding: var(--space-1); }
 .site-locale svg { width: var(--space-2); height: var(--space-2); }
 .site-locale-menu { min-width: calc(var(--space-8) * 3); padding: var(--space-1); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); color: var(--foreground); box-shadow: var(--overlay-shadow); }
-.site-locale-menu [role='menuitem'] { min-height: var(--space-5); padding-inline: var(--space-2); border-radius: var(--radius-md); font: var(--font-body); }
-/* HeroUI portals the menu outside .nola-site; its icons need their own scoped dimensions. */
+.site-locale-menu [role='menuitemradio'] { min-height: var(--space-5); padding-inline: var(--space-2); border-radius: var(--radius-md); font: var(--font-body); }
+/* Portaled menus sit outside .nola-site and need scoped icon dimensions. */
 .site-download-menu { width: calc(var(--space-8) + var(--space-7) * 2); padding: var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); color: var(--foreground); font: var(--font-body); box-shadow: var(--overlay-shadow); }
 .site-download-menu [role='menu'] { width: 100%; min-width: 0; padding: 0; }
 .site-download-menu [role='menuitem'] { display: flex; align-items: center; gap: var(--space-1); min-width: 0; min-height: var(--space-5); padding-inline: var(--space-1); border-radius: var(--radius-md); font: var(--font-body); }
@@ -126,7 +126,7 @@ html { scroll-behavior: smooth; }
 .site-scenario-tabs > .tabs__list { display: flex; width: fit-content; min-width: 0; flex: none; align-self: center; margin: 0 auto var(--space-5); border: 0; background: var(--surface-secondary); padding: 6px; border-radius: var(--radius-xl); }
 .site-scenario-tabs .tabs__tab { min-width: 160px; border-radius: var(--radius-xl); padding: var(--space-1) var(--space-3); font-size: var(--site-body-compact-size); }
 .site-scenario-tabs .tabs__tab svg { width: 18px; height: 18px; }
-.site-scenario-tabs .tabs__tab[data-selected='true'] { background: var(--surface); color: var(--accent); box-shadow: var(--surface-shadow); }
+.site-scenario-tabs .tabs__tab[data-active] { background: var(--surface); color: var(--accent); box-shadow: var(--surface-shadow); }
 .site-scenario-tabs .tabs__indicator { display: none; }
 .site-scenario-panel { display: grid; grid-template-columns: .65fr 1.35fr; gap: var(--space-6); padding: var(--space-5); background: var(--surface-secondary); border-radius: var(--radius-2xl); align-items: center; animation: site-panel-in 350ms ease-out; }
 .site-scenario-copy > span { font: var(--site-kicker-font); letter-spacing: .08em; color: var(--muted); }
@@ -254,3 +254,17 @@ html { scroll-behavior: smooth; }
 .site-download-source-icon { width: var(--space-2); height: var(--space-2); object-fit: contain; flex: 0 0 var(--space-2); }
 .site-download-menu { max-width: calc(100vw - var(--space-4)); }
 .site-download-menu [role='menuitem'] > [data-slot='submenu-indicator'] { margin-left: auto; }
+
+/* Base UI supplies interaction and accessibility; the landing page owns marketing geometry. */
+.site-locale-menu [role='menuitemradio'] { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.site-locale-menu svg { width: var(--space-2); height: var(--space-2); }
+.site-locale-menu [data-highlighted], .site-download-menu [data-highlighted] { background: var(--surface-secondary); outline: none; }
+.site-download-menu [data-disabled] { opacity: .65; }
+.site-download-menu a { color: inherit; text-decoration: none; }
+.site-download-menu .site-submenu-indicator { margin-left: auto; transform: rotate(-90deg); }
+.site-scenario-tabs .tabs__tab { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); color: var(--muted); }
+.site-scenario-tabs .tabs__tab:focus-visible, .site-faq-list .accordion__trigger:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.site-faq-list .accordion__item { border-bottom: 1px solid var(--separator); }
+.site-faq-list .accordion__trigger { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: var(--space-2); text-align: start; color: var(--foreground); }
+.site-faq-list .accordion__indicator { transition: transform 180ms; }
+.site-faq-list .accordion__trigger[data-panel-open] .accordion__indicator { transform: rotate(180deg); }

@@ -23,7 +23,7 @@
 .nola-entry .card__title { color: var(--foreground); font-size: 22px; line-height: 1.35; font-weight: 650; }
 .nola-entry .card__description { white-space: pre-line; color: var(--muted); line-height: 1.7; font-size: 14px; }
 .nola-entry .card__footer { margin-top: auto; position: relative; }
-.nola-entry__action { min-height: 40px; min-width: min(180px, 100%); max-width: 100%; border-radius: 999px; background: color-mix(in oklab, var(--entry-tone) 22%, var(--surface)); color: var(--foreground); gap: 10px; padding-inline: 18px; }
+.nola-entry__action { min-height: 40px; min-width: min(180px, 100%); max-width: 100%; border-radius: var(--radius-xl); background: color-mix(in oklab, var(--entry-tone) 22%, var(--surface)); color: var(--foreground); gap: 10px; padding-inline: 18px; }
 .nola-entry--primary .nola-entry__action { background: linear-gradient(100deg, var(--accent), color-mix(in oklab, var(--accent) 85%, var(--surface))); color: var(--accent-foreground); }
 .nola-entry__decoration { position: absolute; pointer-events: none; right: -12px; bottom: 47px; transform: rotate(-10deg); opacity: .09; color: var(--entry-tone); }
 .nola-entry__decoration svg { width: 118px; height: 118px; stroke-width: 1; }
@@ -86,6 +86,8 @@
 .nola-record-page__start { flex-shrink: 0; border-radius: 12px; min-height: 44px; padding-inline: 20px; }
 .nola-record-page__search { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .nola-record-page__search > .search-field { width: min(380px, 100%); }
+.nola-record-page__search-field { position: relative; width: min(380px, 100%); }
+.nola-record-page__search-field > svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .nola-record-page__search .search-field__group { border: 1px solid var(--border); border-radius: 12px; min-height: 44px; background: var(--surface); }
 .nola-record-page__search > span, .nola-record-page__footer > span { font-size: 13px; color: var(--muted); }
 .nola-record-page__footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--separator); padding-top: 16px; gap: 12px; }

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Card } from '@heroui/react'
+import { Card, CardContent } from '../ui/card'
 import { Zap, Globe, Users, Video } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
@@ -13,7 +13,11 @@ export function HeroSection(): ReactNode {
   ]
   return (
     <Card className="nola-home-hero">
-      <Card.Content className="nola-home-hero__copy">
+      {/*
+       * The copy column states its own box: it fills the hero row and stacks its
+       * children, which the card surface itself no longer provides.
+       */}
+      <CardContent className="nola-home-hero__copy flex flex-1 flex-col gap-1">
         <h1><span>Nola</span> Translator</h1>
         <p>{t('homeRecordsUi.tagline')}</p>
         <div className="nola-home-hero__features">
@@ -21,7 +25,7 @@ export function HeroSection(): ReactNode {
             <span key={label}><i><Icon aria-hidden="true" /></i>{label}</span>
           ))}
         </div>
-      </Card.Content>
+      </CardContent>
       <img className="nola-home-hero__art" src={import.meta.env.BASE_URL + 'hero-globe.png'} alt="" aria-hidden="true" />
     </Card>
   )

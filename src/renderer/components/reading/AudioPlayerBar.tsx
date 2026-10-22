@@ -8,11 +8,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Slider, ToggleButton, ToggleButtonGroup, Typography } from '@heroui/react'
-import type { Selection } from '@react-types/shared'
-import { Pause, Play } from 'lucide-react'
+import { LoaderCircle, Pause, Play } from 'lucide-react'
 
 import { notifyError } from '@/components/primitives/notify'
+import { Button } from '@/components/ui/button'
+import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useI18n } from '@/i18n'
 
 /** Playback speed steps, in the order they appear. */
@@ -145,9 +146,9 @@ export function AudioPlayerBar({
       <div
         className={['nola-record-audio', className ?? ''].filter(Boolean).join(' ')}
       >
-        <Typography className="nola-caption text-muted">
+        <p className="nola-caption text-muted">
           {unavailableLabel ?? t('records.audioUnavailable')}
-        </Typography>
+        </p>
       </div>
     )
   }
@@ -160,65 +161,68 @@ export function AudioPlayerBar({
       <audio ref={audioRef} src={audioUrl} preload="metadata" className="hidden" />
 
       <Button
-        variant="primary"
-        isIconOnly
-        isPending={isPending}
-        isDisabled={isPending}
-        onPress={toggle}
+        variant="default"
+        size="icon"
+        disabled={isPending}
+        onClick={toggle}
         aria-label={playing ? t('records.playerPause') : t('records.playerPlay')}
         className="size-10 shrink-0 rounded-full"
       >
-        {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+        {isPending
+          ? <LoaderCircle className="animate-spin" aria-hidden="true" />
+          : playing
+            ? <Pause aria-hidden="true" />
+            : <Play aria-hidden="true" />}
       </Button>
 
       <span className="nola-mono shrink-0 text-foreground">{formatClock(positionMs)}</span>
 
-      <Slider
+      <SliderRoot
+        className="slider min-w-0 flex-1"
         value={totalMs === 0 ? 0 : Math.min(positionMs, totalMs)}
-        minValue={0}
-        maxValue={Math.max(totalMs, 1)}
+        min={0}
+        max={Math.max(totalMs, 1)}
         step={100}
-        isDisabled={isPending || totalMs === 0}
-        // react-aria's onChange takes `number | number[]`; a single-value Slider sends a
-        // number, and taking the first entry also covers a range Slider.
-        onChange={(next: number | number[]) => seek(Array.isArray(next) ? (next[0] ?? 0) : next)}
-        aria-label={t('records.columnDuration')}
-        className="min-w-0 flex-1"
+        disabled={isPending || totalMs === 0}
+        // Base UI reports the value in the unit the slider was given, which is the
+        // millisecond the engine handed over.
+        onValueChange={(next: number | readonly number[]) => seek(typeof next === 'number' ? next : (next[0] ?? 0))}
       >
-        <Slider.Track className="h-1 rounded-full bg-surface-tertiary">
-          <Slider.Fill className="rounded-full bg-accent" />
-        </Slider.Track>
-        <Slider.Thumb className="size-3 rounded-full bg-accent" />
-      </Slider>
+        <SliderControl>
+          <SliderTrack className="h-1 w-full rounded-full bg-surface-tertiary">
+            <SliderIndicator className="rounded-full bg-accent" />
+            <SliderThumb aria-label={t('records.columnDuration')} className="size-3 rounded-full bg-accent" />
+          </SliderTrack>
+        </SliderControl>
+      </SliderRoot>
 
       <span className="nola-mono shrink-0 text-muted">{formatClock(totalMs)}</span>
 
-      <ToggleButtonGroup
-        selectionMode="single"
-        disallowEmptySelection
-        selectedKeys={new Set([String(rate)])}
-        // A react-aria segmented control reports selection, not change.
-        onSelectionChange={(keys: Selection) => {
-          const first = keys === 'all' ? null : Array.from(keys)[0] ?? null
-          if (first === null) return
+      <ToggleGroup
+        value={[String(rate)]}
+        // A segmented control reports the pressed values, not a change event. Clicking the
+        // pressed rate clears the selection, and an empty selection is ignored so the rate
+        // is never unset.
+        onValueChange={(values: string[]) => {
+          const first = values[0]
+          if (first === undefined) return
           const next = Number(first)
           if (RATES.includes(next as Rate)) changeRate(next as Rate)
         }}
-        size="sm"
-        aria-label={t('homeRecordsUi.playbackRate')}
         className="nola-segmented shrink-0"
+        aria-label={t('homeRecordsUi.playbackRate')}
       >
         {RATES.map((value) => (
-          <ToggleButton
+          <ToggleGroupItem
             key={value}
-            // In a segmented control the `id` is the key it is selected by.
-            id={String(value)}
-            className="tabular-nums"
+            value={String(value)}
+            className="toggle-button tabular-nums"
+            data-selected={rate === value ? 'true' : undefined}
           >
             {value}x
-          </ToggleButton>
+          </ToggleGroupItem>
         ))}
-      </ToggleButtonGroup>
+      </ToggleGroup>
     </div>
   )
 }

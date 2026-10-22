@@ -1,6 +1,5 @@
 import { createRoot } from 'react-dom/client'
-import { Button } from '@heroui/react'
-import { enableShadowDOM } from 'react-stately/private/flags/flags'
+import { Button } from '@base-ui/react/button'
 import { createBridge } from './bridge'
 import { createExtensionStore } from './store'
 import { alignPlayerTrigger, detectVideos, playerAdapter } from './adapters'
@@ -24,8 +23,6 @@ interface PendingCaption { key: string; lines: string[] }
 function install(): void {
   if (window !== window.top || location.protocol !== 'https:' || document.documentElement.dataset.nolaInstalled) return
   document.documentElement.dataset.nolaInstalled = 'true'
-  // React Aria's document-level press handlers need composed targets; the pinned flags module enables its shipped shadow support.
-  enableShadowDOM()
   const store = createExtensionStore({ bridge: createBridge() })
   const shadowCss = css.replaceAll(':root', ':host').replace(/(^|[,\s])html(?=[,\s{])/g, '$1:host').replace(/(^|[,\s])body(?=[,\s{])/g, '$1:host')
   const hosts: HTMLElement[] = []
@@ -172,9 +169,9 @@ function install(): void {
     // say why the screen is empty.
     const failure = state.error ? t(errorKey(state.error)) : ''
     const triggerLabel = failure ? `${t('button')} — ${failure}` : t('button')
-    // HeroUI's Button props carry no `title`, so the native hover tooltip rides on the trigger host.
+    // The native hover tooltip rides on the trigger host.
     trigger.host.title = triggerLabel
-    triggerRoot.render(<Button isIconOnly size="sm" variant="secondary" className={failure ? 'nola-trigger-error' : undefined} aria-label={triggerLabel} aria-expanded={state.panelOpen} onPress={store.togglePanel}><NolaLogo /></Button>)
+    triggerRoot.render(<Button data-slot="button" className={['button', 'button--sm', 'button--secondary', failure ? 'nola-trigger-error' : undefined].filter(Boolean).join(' ')} aria-label={triggerLabel} aria-expanded={state.panelOpen} onClick={store.togglePanel}><NolaLogo /></Button>)
     const controls = adapter.controls
     if (controls) requestAnimationFrame(() => {
       if (!trigger.host.hidden && trigger.host.parentElement === controls) alignPlayerTrigger(controls, trigger.host)

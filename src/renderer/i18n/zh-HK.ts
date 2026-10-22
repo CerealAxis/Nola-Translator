@@ -18,8 +18,8 @@ export const zhHK: Dictionary = {
     "sponsor": "贊助",
     "sourceCode": "查看原始碼",
     "specialThanks": "特別鳴謝",
-    "heroThanks": "感謝 HeroUI 的開源元件庫，讓 Nola 的介面更美觀、易用。",
-    "heroWebsite": "HeroUI 官網",
+    "uiThanks": "感謝 shadcn/ui 的開源元件庫，讓 Nola 的介面更美觀、易用。",
+    "uiWebsite": "shadcn/ui 官網",
     "sponsors": "贊助者",
     "sponsorVacancies": "虛位以待",
     "sponsorInfo": "有意贊助？歡迎聯絡開發者。贊助者可獲得專屬權益，包括在 Nola 中公開展示、專屬功能等。",
@@ -1014,7 +1014,8 @@ export const zhHK: Dictionary = {
     "saved": "已儲存",
     "done": "完成",
     "refreshed": "已重新整理",
-    "refreshFailed": "重新整理失敗，請重試。"
+    "refreshFailed": "重新整理失敗，請重試。",
+    "info": "說明"
   },
   "status": {
     "running": "進行中",

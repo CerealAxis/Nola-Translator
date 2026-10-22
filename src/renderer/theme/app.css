@@ -1,4 +1,4 @@
-/* Shared v3 geometry and HeroUI refinements. Feature styles build on these tokens. */
+/* Shared application geometry and component refinements. */
 @layer base {
   :root {
     --nola-titlebar-h: 64px;
@@ -79,7 +79,7 @@
    */
   .nola-overlay-stage { min-height: 260px; display: grid; place-items: end center; padding: clamp(16px, 3vw, 30px); border: 1px solid var(--border); border-radius: 12px; background: linear-gradient(135deg, color-mix(in oklch, var(--accent) 13%, transparent), transparent 58%), var(--surface-secondary); overflow: hidden; }
   .nola-overlay-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; }
-  .nola-overlay-field { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 12px; }
+  .nola-overlay-field { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 12px; min-height: 40px; }
   .nola-overlay-field .select, .nola-overlay-field .select__trigger { width: 100%; }
   .nola-overlay-language-trigger.button { display: flex; width: 100%; min-width: 0; height: var(--space-5); gap: var(--space-1); padding: 0 var(--space-2); border: 1px solid var(--field-border); border-radius: var(--field-radius); background: var(--surface-secondary); font: var(--font-body); }
   .nola-overlay-language-trigger > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
@@ -96,11 +96,7 @@
   .nola-window-control.button svg { width: 16px; height: 16px; stroke-width: 1.8; }
   .nola-window-control.button:hover { background: color-mix(in oklch, var(--accent) 9%, transparent); }
   .nola-window-control--close.button:hover { color: var(--danger-foreground); background: var(--danger); }
-  .button--primary { background: var(--nola-primary-gradient); color: var(--accent-foreground); }
-  .card { border-radius: 16px; }
-  .modal__dialog, .alert-dialog__dialog { border-radius: 20px; }
-  .popover, .dropdown__popover, .select__popover { border-radius: 14px; box-shadow: var(--overlay-shadow); }
-  .input, .input-group, .textarea, .search-field__group, .select__trigger { border-color: var(--field-border); border-radius: 10px; }
+
 }
 @media (max-width: 1024px) {
   :root { --nola-sidebar-w: 76px; --nola-page-padding: 20px; }
@@ -122,51 +118,6 @@
   :root { --nola-page-padding: 16px; }
   .nola-overlay-stage { min-height: 240px; padding: 16px; }
 }
-
-/* Segmented control: HeroUI's Tabs visual language, applied to ToggleButtonGroup.
- *
- * Not `<Tabs>`: these pick a setting value rather than switching a panel, so
- * there is no Tabs.Panel to hang them on, and a tablist without one is ARIA
- * misuse. DESIGN.md §2 assigns "single select and segmented" to
- * ToggleButtonGroup. */
-.nola-segmented {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-  padding: 4px;
-  border: 0;
-  border-radius: calc(var(--radius) * 2.5);
-  background: var(--default);
-}
-.nola-segmented .toggle-button {
-  min-width: 0;
-  height: 32px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: var(--radius-xl);
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  color: var(--muted);
-  background: transparent;
-  box-shadow: none;
-  transition: background-color 150ms var(--ease-nola), color 150ms var(--ease-nola), box-shadow 150ms var(--ease-nola);
-}
-/* HeroUI's attached mode, which is the default, squares off every button and
-   then re-applies `rounded-s-3xl` / `rounded-e-3xl` to the ends only. Without
-   this the first and last buttons sit flush against the track. */
-.nola-segmented .toggle-button:first-child,
-.nola-segmented .toggle-button:last-child { border-radius: var(--radius-xl); }
-.nola-segmented .toggle-button:hover { background: color-mix(in oklch, var(--foreground) 7%, transparent); }
-.nola-segmented .toggle-button[data-selected="true"] {
-  color: var(--segment-foreground);
-  background: var(--segment);
-  box-shadow: var(--shadow-surface);
-}
-/* Hovering the selected button keeps its own background; the generic :hover above
-   would otherwise mix 7% foreground into it. */
-.nola-segmented .toggle-button[data-selected="true"]:hover { background: var(--segment); }
 
 /* The font-size group is three A- / A / A+ icon buttons, so its labels are
    narrower than the default. */

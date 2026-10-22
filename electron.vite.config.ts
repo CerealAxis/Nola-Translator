@@ -30,8 +30,7 @@ export default defineConfig({
         '@': resolve('src/renderer')
       }
     },
-    // 注意：不要往这里加任何 HeroUI 专用插件。
-    // HeroUI v3 只需要 Tailwind v4 + `@import '@heroui/styles'` 的 CSS import 顺序。
+    // Base UI components use the existing Tailwind pipeline and product theme cascade.
     //
     // 也不要给 renderer 加 `build.rollupOptions.input`：主窗与浮窗**共享同一份
     // index.html**，靠 `?overlay=1` 在 main.tsx 里分流（见 src/renderer/main.tsx）。

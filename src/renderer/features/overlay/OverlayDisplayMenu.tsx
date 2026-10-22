@@ -1,5 +1,5 @@
-import { Dropdown } from '@heroui/react'
-import { ChevronDown } from 'lucide-react'
+import { Menu } from '@base-ui/react/menu'
+import { Check, ChevronDown } from 'lucide-react'
 
 import type { OverlaySettings } from '@/bridge'
 import { NO_TRANSLATION_LANGUAGE } from '@/bridge'
@@ -82,56 +82,38 @@ function OverlayPill({ kind, label, value, options, isDisabled = false }: { kind
   const maxHeight = useMenuMaxHeight()
   return (
     <OverlayDropdown kind={kind}>
-      <Dropdown.Trigger isDisabled={isDisabled} className="nola-caption-pill" aria-label={label}>
+      <Menu.Trigger disabled={isDisabled} className="nola-caption-pill" aria-label={label}>
         {/* The pill shows the active option, not a group heading: a heading
             reads as navigation, and then pressing it appears to do nothing. */}
         <span className="max-w-24 truncate">{value}</span>
         <ChevronDown aria-hidden="true" />
-      </Dropdown.Trigger>
-      {/*
-        `selectedKeys` must be a Set: a string type-checks but selection
-        silently fails and every item reports aria-checked="false".
-
-        Desktop and embedded menus share this same HeroUI portal and menu tree.
-      */}
-      <Dropdown.Popover className="nola-caption-menu" maxHeight={maxHeight}>
-        <Dropdown.Menu
-          className="nola-caption-menu-list"
-          style={{ maxHeight }}
-          selectionMode="single"
-          selectedKeys={new Set(options.filter(option => option.active).map(option => option.id))}
-        >
-          {options.map(option => (
-            <Dropdown.Item
-              key={option.id}
-              id={option.id}
-              className="nola-menu-item"
-              textValue={option.label}
-              /*
-                `onAction` rather than the Menu's `onSelectionChange`: the
-                latter only yields a key, while each option already carries its
-                patch. Selection state still comes from `selectedKeys`.
-              */
-              onAction={() => {
-                /*
-                 * This window renders no settings-error notice, so a write the
-                 * main process refused has to be reported here or the pill
-                 * silently reverts.
-                 */
-                void actions.settings.updateSettings({ overlay: option.patch }).catch((error: unknown) => {
-                  notifyError(t('errors.settingsSaveFailed'), { cause: error })
-                })
-              }}
-            >
-              {/* The checkmark goes after the label: its slot is already
-                absolutely positioned on the inline-start edge, so putting it
-                first would shift the selected row and not its siblings. */}
-            {option.label}
-            <Dropdown.ItemIndicator type="checkmark" />
-            </Dropdown.Item>
-          ))}
-        </Dropdown.Menu>
-      </Dropdown.Popover>
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner className="z-dropdown" style={{ maxHeight }}>
+          <Menu.Popup className="nola-caption-menu">
+            <Menu.List className="nola-caption-menu-list" style={{ maxHeight }}>
+              {options.map(option => (
+                <Menu.Item
+                  key={option.id}
+                  id={option.id}
+                  label={option.label}
+                  className="nola-menu-item"
+                  aria-checked={option.active}
+                  data-selected={option.active ? 'true' : undefined}
+                  onClick={() => {
+                    void actions.settings.updateSettings({ overlay: option.patch }).catch((error: unknown) => {
+                      notifyError(t('errors.settingsSaveFailed'), { cause: error })
+                    })
+                  }}
+                >
+                  {option.label}
+                  {option.active ? <Check aria-hidden="true" /> : null}
+                </Menu.Item>
+              ))}
+            </Menu.List>
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
     </OverlayDropdown>
   )
 }

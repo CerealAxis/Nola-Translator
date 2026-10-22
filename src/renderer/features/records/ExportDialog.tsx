@@ -7,11 +7,14 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Modal, ToggleButton, ToggleButtonGroup } from '@heroui/react'
-import type { Selection } from '@react-types/shared'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+
+import { LoaderCircle } from 'lucide-react'
 
 import { useI18n } from '@/i18n'
 import { notifyError } from '@/components/primitives/notify'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { actions, stores, useStore } from '@/store'
 import type { ExportFormat } from '@/bridge'
 
@@ -59,80 +62,62 @@ export function ExportDialog({
   }, [meetingId, format, onExported, onOpenChange, t])
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Modal.Backdrop>
-        <Modal.Container size="sm">
-          <Modal.Dialog>
-            <Modal.Header>
-              <Modal.Heading className="nola-title text-foreground">
-                {t('records.exportTitle')}
-              </Modal.Heading>
-            </Modal.Header>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle data-slot="dialog-title">
+            {t('records.exportTitle')}
+          </DialogTitle>
+        </DialogHeader>
 
-            <Modal.Body>
-              <div className="flex flex-col gap-3">
-                <span className="nola-body-strong text-[14px] leading-[1.45] font-semibold text-foreground">
-                  {t('records.export')}
-                </span>
+        <div className="flex flex-col gap-3">
+          <span className="nola-body-strong text-[14px] leading-[1.45] font-semibold text-foreground">
+            {t('records.export')}
+          </span>
 
-                <ToggleButtonGroup
-                  selectionMode="single"
-                  disallowEmptySelection
-                  selectedKeys={[format]}
-                  onSelectionChange={(keys: Selection) => {
-                    const first = keys === 'all' ? null : Array.from(keys)[0] ?? null
-                    if (first === null) return
-                    const next = String(first) as ExportFormat
-                    if (FORMATS.includes(next)) setFormat(next)
-                  }}
-                  isDisabled={exporting}
-                  size="sm"
-                  aria-label={t('records.export')}
-                >
-                  {FORMATS.map((value) => (
-                    <ToggleButton
-                      key={value}
-                      id={value}
-                      className="rounded-[10px] text-[13px] leading-[1.5] font-normal uppercase"
-                    >
-                      {value}
-                    </ToggleButton>
-                  ))}
-                </ToggleButtonGroup>
-
-                {/*
-                 * The file holds model-generated translation, so the AI notice has to
-                 * travel with the file and is repeated here.
-                */}
-                <p className="nola-caption text-muted">{t('legal.aiGeneratedExport')}</p>
-
-              </div>
-            </Modal.Body>
-
-            <Modal.Footer>
-              <Button
-                variant="tertiary"
-                size="sm"
-                className="rounded-[10px]"
-                onPress={() => onOpenChange(false)}
+          <ToggleGroup
+            value={[format]}
+            onValueChange={(values: ExportFormat[]) => {
+              // A single-select group reports an empty list when the pressed format is
+              // clicked again, so the export format never clears.
+              if (values.length === 0) return
+              const next = values[0]
+              if (FORMATS.includes(next)) setFormat(next)
+            }}
+            disabled={exporting}
+            className="nola-segmented"
+            aria-label={t('records.export')}
+          >
+            {FORMATS.map((value) => (
+              <ToggleGroupItem
+                key={value}
+                value={value}
+                className="toggle-button leading-[1.5] uppercase"
+                data-selected={format === value ? 'true' : undefined}
               >
-                {t('common.cancel')}
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                isPending={exporting}
-                isDisabled={exporting || meetingId === null}
-                className="rounded-[10px]"
-                onPress={submit}
-              >
-                {t('records.exportConfirm')}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+                {value}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+
+          {/*
+           * The file holds model-generated translation, so the AI notice has to
+           * travel with the file and is repeated here.
+          */}
+          <p className="nola-caption text-muted">{t('legal.aiGeneratedExport')}</p>
+        </div>
+
+        <DialogFooter>
+          <Button variant="tertiary" size="sm" onClick={() => onOpenChange(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button size="sm" disabled={exporting || meetingId === null} onClick={submit}>
+            {exporting ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
+            {t('records.exportConfirm')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

@@ -1,4 +1,4 @@
-.settings-page { --settings-control-max-width:450px; display:flex; flex-direction:column; gap:20px; min-width:0; }
+.settings-page { --settings-control-max-width:450px; --settings-control-radius:10px; display:flex; flex-direction:column; gap:20px; min-width:0; }
 .compute-hint { margin:0; color:var(--muted); font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
 .compute-device-info { font-size:13px; overflow-wrap:anywhere; text-align:end; }
 .compute-number { width:140px; max-width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:10px; color:var(--foreground); background:var(--surface); }
@@ -10,8 +10,8 @@
    wrapping into a two-line tab. 208px is the floor that the short labels settle at. */
 .settings-page .settings-tabs { display:grid; width:100%; grid-template-columns:minmax(208px,max-content) minmax(0,1fr); gap:16px; align-items:start; }
 .settings-nav { position:sticky; top:var(--space-1); align-self:start; padding:12px; border:1px solid var(--border); border-radius:16px; background:var(--surface); min-width:0; }
-.settings-nav .tabs__list { display:flex; flex-direction:column; gap:8px; background:transparent; padding:0; width:100%; }
-.settings-nav .tabs__tab { justify-content:flex-start; height:52px; border-radius:12px; padding:0 16px; font-size:14px; gap:14px; opacity:1; color:var(--foreground); white-space:normal; }
+.settings-nav .tabs__list { display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; height:auto; gap:8px; background:transparent; padding:0; width:100%; }
+.settings-nav .tabs__tab { flex:none; width:100%; justify-content:flex-start; height:52px; border-radius:12px; padding:0 16px; font-size:14px; gap:14px; opacity:1; color:var(--foreground); white-space:normal; }
 .settings-nav .tabs__tab svg { width:22px; height:22px; flex-shrink:0; }
 .settings-nav .tabs__tab .tabs__hint { display:flex; align-items:center; margin-left:auto; color:var(--muted); flex-shrink:0; }
 .settings-nav .tabs__tab .tabs__hint svg { width:15px; height:15px; }
@@ -30,18 +30,18 @@
 .settings-row { display:grid; grid-template-columns:minmax(130px,1fr) minmax(0,1.15fr); align-items:center; gap:16px; min-height:48px; padding:7px 0; border-bottom:1px solid var(--separator); min-width:0; }
 .settings-row:last-child { border-bottom:0; }
 .settings-row__label { min-width:0; display:flex; flex-direction:column; gap:3px; }
-.settings-row__label .label { font-size:14px; font-weight:500; color:var(--foreground); }
-.settings-row__label .description { font-size:12px; color:var(--muted); }
 .settings-row__control { display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px; min-width:0; }
 .settings-row__control > .settings-control-field, .settings-row__control > .number-field { width:100%; min-width:0; max-width:var(--settings-control-max-width); flex:0 1 var(--settings-control-max-width); }
 .settings-row__control > .meter { width:100%; min-width:0; }
 /* Keep the folder path readable at normal widths while letting its row wrap around the browse action. */
 .settings-row__control > .settings-path-input { width:100%; min-width:0; max-width:var(--settings-control-max-width); flex:0 1 var(--settings-control-max-width); }
-.settings-row__control .select__trigger { width:100%; border-radius:10px; min-width:0; height:var(--field-control-height); min-height:var(--field-control-height); }
-.select__popover.settings-select-popover { max-height:250px !important; overflow-y:auto !important; }
-.settings-row__control .button { border-radius:10px; }
+.settings-row__control .settings-control-field[data-slot='input'],
+.settings-row__control .settings-select-trigger { width:100%; min-width:0; height:var(--field-control-height); min-height:var(--field-control-height); border-radius:var(--settings-control-radius); }
+.settings-select-content { max-height:min(var(--available-height), 250px); overflow-y:auto; padding:4px; border-radius:var(--radius-lg); }
+.settings-select-item { min-height:36px; padding:8px 12px; white-space:normal; }
+.settings-row__control .button { border-radius:var(--radius-xl); }
 /* Colour, radius and height come from .nola-segmented in theme/app.css; this only controls width. */
-.settings-row__control .nola-segmented { width:100%; }
+.settings-row__control .nola-segmented { width:100%; min-height:40px; }
 .settings-row__control .toggle-button { flex:1; }
 /* Three fixed columns so every track is the same length: the optional unit ("px" is wider than
    "%", and line height carries none) otherwise leaves each row a different amount of slack, which
@@ -92,19 +92,11 @@
 .settings-row__title { display: flex; align-items: center; gap: 0.35rem; }
 .settings-group__title-with-hint { display: flex; align-items: center; gap: var(--space-1); }
 .settings-group__hint { display: inline-flex; align-items: center; }
-.settings-row__help { min-width: 1.5rem; width: 1.5rem; height: 1.5rem; padding: 0; border-color: transparent; color: var(--muted); background: transparent; box-shadow: none; }
-.settings-row__help:hover { background: transparent; }
+.settings-row__help { min-width: 1.5rem; width: 1.5rem; height: 1.5rem; padding: 0; color: var(--muted); background: var(--surface-secondary); }
+.settings-row__help:hover { background: var(--surface-tertiary); }
 .settings-row__tooltip { max-width: min(24rem, calc(100vw - 2rem)); white-space: normal; }
 
-.settings-notices-backdrop.modal__backdrop {
-  background: color-mix(in oklab, var(--backdrop) 40%, transparent);
-}
-.settings-notices-container.modal__container {
-  width: 100%;
-  max-width: calc(var(--space-8) * 11);
-  padding: var(--space-7) var(--space-3) var(--space-3);
-}
-.settings-notices-dialog.modal__dialog {
+.settings-notices-dialog {
   max-width: none;
   padding: var(--space-3);
   border-radius: var(--radius-xl);
@@ -112,7 +104,7 @@
   color: var(--foreground);
   text-align: left;
 }
-.settings-notices-heading.modal__heading {
+.settings-notices-heading {
   font: var(--nola-text-title);
   color: var(--foreground);
 }
@@ -133,19 +125,6 @@
   overflow-wrap: anywhere;
   text-align: left;
 }
-.settings-notices-footer.modal__footer {
-  justify-content: flex-start;
-  margin-top: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--separator);
-  background: var(--overlay);
-}
-.settings-notices-close.button {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--foreground);
-}
-
 /* Runtime components sit inside a SettingGroup, so the block only lays out what the card cannot:
    the engine picker and the per-engine panel. `.nola-segmented` already avoids `button` so that
    `.settings-row__control .button` does not shrink the picker's 38px capsule. */
@@ -161,13 +140,8 @@
 /* The panel body is unhidden on tab change, so the anchor used by `#?component=` needs its own
    scroll offset from the sticky page header. */
 .runtime-panel-body[id] { scroll-margin-top: var(--space-3); }
-/* Repair targets are pills, not rows: each one names an engine, and its fill says whether this
-   repair run includes it. `variant="surface"` keeps the unselected pill on the card background so
-   the three read as one set instead of three tinted chips, and HeroUI's own selected fill supplies
-   the accent. `gap: 0` is explicit because the pill holds a label and nothing else. */
+/* Repair targets share the segmented control selected-state styling. */
 .runtime-repair__list { gap: var(--space-1); }
-.runtime-repair .tag { gap: 0; padding: 6px 14px; border: 1px solid var(--border); font: var(--nola-text-body-strong); }
-.runtime-repair .tag[data-selected='true'] { border-color: transparent; }
 .runtime-progress { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); }
 .runtime-progress-copy { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); overflow-wrap: anywhere; }
 .runtime-progress-copy small { font: var(--nola-text-caption); color: var(--muted); }

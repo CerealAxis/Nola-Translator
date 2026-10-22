@@ -403,11 +403,6 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
  * glass and as frost over light glass — a button in both cases, not a hole.
  */
 .nola-caption-card .nola-caption-action {
-  /* `.button` computes its own colour from these, so they move with the literals above. */
-  --button-fg: rgba(255, 255, 255, 0.78);
-  --button-bg: rgba(255, 255, 255, 0.12);
-  --button-bg-hover: rgba(255, 255, 255, 0.24);
-  --button-bg-pressed: rgba(255, 255, 255, 0.24);
   display: grid;
   place-items: center;
   width: 26px;
@@ -423,9 +418,6 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 
 .nola-caption-card .nola-caption-action:hover,
 .nola-caption-card .nola-caption-action:focus-visible {
-  --button-fg: #fff;
-  --button-bg: rgba(255, 255, 255, 0.24);
-  --button-bg-hover: rgba(255, 255, 255, 0.24);
   background: rgba(255, 255, 255, 0.24);
   color: #fff;
 }
@@ -437,8 +429,6 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 
 /* An active action (pin / lock / position) is marked with a bright blue rather than a fill, because the fill already means "clickable". */
 .nola-caption-card .nola-caption-action[data-active='true'] {
-  --button-fg: #7fb0ff;
-  --button-bg: rgba(255, 255, 255, 0.12);
   color: #7fb0ff;
 }
 
@@ -453,11 +443,6 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 
 /* The microphone uses a visible filled control that inverts while recording. */
 .nola-caption-card .nola-caption-mic {
-  /* `.button` computes its own colour from these, so they move with the literals above. */
-  --button-fg: rgba(255, 255, 255, 0.8);
-  --button-bg: rgba(255, 255, 255, 0.12);
-  --button-bg-hover: rgba(255, 255, 255, 0.24);
-  --button-bg-pressed: rgba(255, 255, 255, 0.24);
   display: grid;
   place-items: center;
   width: 26px;
@@ -526,10 +511,6 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 }
 
 .nola-caption-card .nola-caption-mic[data-active='true'] {
-  --button-fg: #17181a;
-  --button-bg: #fff;
-  --button-bg-hover: #fff;
-  --button-bg-pressed: #fff;
   background: #fff;
   color: #17181a;
 }
@@ -644,13 +625,7 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   gap: 8px;
   margin-top: 4px;
 }
-
-/* `.button` computes its own colour from these, so they move with the literals above. */
 .nola-caption-card .nola-caption-pill {
-  --button-fg: rgba(255, 255, 255, 0.92);
-  --button-bg: rgba(255, 255, 255, 0.13);
-  --button-bg-hover: rgba(255, 255, 255, 0.24);
-  --button-bg-pressed: rgba(255, 255, 255, 0.24);
   display: inline-flex;
   height: 26px;
   flex-shrink: 0;
@@ -1005,12 +980,6 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 .nola-caption-card[data-scheme='light'] .nola-caption-action,
 .nola-caption-card[data-scheme='light'] .nola-caption-pill,
 .nola-caption-card[data-scheme='light'] .nola-caption-mic {
-  /* The light scheme has to move the variables too, or HeroUI's own colour rule
-     would press dark text back onto the dark glass. */
-  --button-fg: #33363b;
-  --button-bg: rgba(0, 0, 0, 0.08);
-  --button-bg-hover: rgba(0, 0, 0, 0.16);
-  --button-bg-pressed: rgba(0, 0, 0, 0.16);
   color: #33363b;
   background: rgba(0, 0, 0, 0.08);
 }
@@ -1018,17 +987,10 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 .nola-caption-card[data-scheme='light'] .nola-caption-action:hover,
 .nola-caption-card[data-scheme='light'] .nola-caption-pill:hover,
 .nola-caption-card[data-scheme='light'] .nola-caption-mic:hover {
-  --button-fg: #33363b;
-  --button-bg: rgba(0, 0, 0, 0.16);
-  --button-bg-hover: rgba(0, 0, 0, 0.16);
   background: rgba(0, 0, 0, 0.16);
 }
 
 .nola-caption-card[data-scheme='light'] .nola-caption-mic[data-active='true'] {
-  --button-fg: #fff;
-  --button-bg: #1b1b1b;
-  --button-bg-hover: #1b1b1b;
-  --button-bg-pressed: #1b1b1b;
   color: #fff;
   background: #1b1b1b;
 }
@@ -1036,6 +998,5 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
 /* The same hue as the dark scheme's active blue, one step darker: the dark
    scheme's value does not hold its contrast on light glass. */
 .nola-caption-card[data-scheme='light'] .nola-caption-action[data-active='true'] {
-  --button-fg: #1d5fa8;
   color: #1d5fa8;
 }

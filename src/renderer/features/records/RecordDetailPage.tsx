@@ -10,8 +10,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Breadcrumbs, Button, Card, EmptyState, Skeleton } from '@heroui/react'
-import { Download, Minus, Plus } from 'lucide-react'
+import { ChevronRight, Download, Minus, Plus } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -21,6 +20,8 @@ import { AudioPlayerBar, DualColumnView } from '@/components/reading'
 import type { DualColumnSegment } from '@/components/reading'
 import { ErrorBoundary, PageHeader, StatusPill } from '@/components/primitives'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { useI18n } from '@/i18n'
 import { formatChineseCaption } from '@/chinese-script'
 import { pathOf, useRoute } from '@/routes'
@@ -34,7 +35,7 @@ import '../home/home-records.css'
 const SCALE_MIN = 0.7
 const SCALE_MAX = 2
 const SCALE_STEP = 0.1
-const HEADER_ACTION_CLASS = 'w-24 justify-center rounded-[10px]'
+const HEADER_ACTION_CLASS = 'w-24 justify-center'
 /** Skeleton rows per column. */
 const SKELETON_PAIRS = 4
 
@@ -131,10 +132,27 @@ export function RecordDetailPage(): ReactNode {
   return (
     <ErrorBoundary resetKey={path}>
       <div className="nola-record-detail">
-        <Breadcrumbs className="self-start" aria-label={t('nav.records')}>
-          <Breadcrumbs.Item href={pathOf('records')}>{t('nav.records')}</Breadcrumbs.Item>
-          <Breadcrumbs.Item>{title}</Breadcrumbs.Item>
-        </Breadcrumbs>
+        {/*
+         * A breadcrumb is a trail of places, not a row of links: the list says which
+         * page is current, so the trail is a nav wrapping an ordered list and the
+         * last entry carries the current marker.
+         */}
+        <nav aria-label={t('nav.records')} className="self-start">
+          <ol className="flex items-center gap-1.5">
+            <li className="flex shrink-0 items-center gap-1">
+              <a
+                href={pathOf('records')}
+                className="text-sm leading-5 font-medium text-muted no-underline hover:underline"
+              >
+                {t('nav.records')}
+              </a>
+              <ChevronRight className="size-3 text-muted" aria-hidden="true" />
+            </li>
+            <li aria-current="page" className="flex shrink-0 items-center gap-1">
+              <span className="text-sm leading-5 font-medium text-muted">{title}</span>
+            </li>
+          </ol>
+        </nav>
         <PageHeader
           title={title}
           className="nola-record-detail__header"
@@ -143,23 +161,19 @@ export function RecordDetailPage(): ReactNode {
             <>
               <Button
                 variant="secondary"
-                size="sm"
-                isIconOnly
-                onPress={() => changeScale(-SCALE_STEP)}
-                isDisabled={fontScale <= SCALE_MIN}
+                size="icon"
+                onClick={() => changeScale(-SCALE_STEP)}
+                disabled={fontScale <= SCALE_MIN}
                 aria-label={t('workspace.fontSmaller')}
-                className="rounded-[10px]"
               >
                 <Minus aria-hidden="true" />
               </Button>
               <Button
                 variant="secondary"
-                size="sm"
-                isIconOnly
-                onPress={() => changeScale(SCALE_STEP)}
-                isDisabled={fontScale >= SCALE_MAX}
+                size="icon"
+                onClick={() => changeScale(SCALE_STEP)}
+                disabled={fontScale >= SCALE_MAX}
                 aria-label={t('workspace.fontLarger')}
-                className="rounded-[10px]"
               >
                 <Plus aria-hidden="true" />
               </Button>
@@ -167,17 +181,16 @@ export function RecordDetailPage(): ReactNode {
                 variant="tertiary"
                 size="sm"
                 className={HEADER_ACTION_CLASS}
-                onPress={() => setRenameOpen(true)}
+                onClick={() => setRenameOpen(true)}
               >
                 {t('records.rename')}
               </Button>
               {/* The only primary action on this screen. */}
               <Button
-                variant="primary"
                 size="sm"
                 className={HEADER_ACTION_CLASS}
-                onPress={() => setExportOpen(true)}
-                isDisabled={!detail}
+                onClick={() => setExportOpen(true)}
+                disabled={!detail}
               >
                 <Download aria-hidden="true" />
                 {t('records.export')}
@@ -197,21 +210,21 @@ export function RecordDetailPage(): ReactNode {
           <StatusPill label={t('legal.aiGeneratedRecord')} tone="neutral" size="sm" dot={false} />
         </div>
 
-        <Card className="nola-record-card nola-record-detail__reading"><Card.Content>
+        <Card className="nola-record-card nola-record-detail__reading"><CardContent className="card__content">
           {detailLoading && !detail ? (
             <DualSkeleton t={t} />
           ) : detailFailed ? (
             <div className="flex justify-center p-6">
-              <Button variant="primary" size="sm" onPress={() => load(true)}>{t('common.retry')}</Button>
+              <Button size="sm" onClick={() => load(true)}>{t('common.retry')}</Button>
             </div>
           ) : segments.length === 0 ? (
-            <EmptyState className="flex flex-col items-start gap-4 p-6">
+            <div className="flex flex-col items-start gap-4 p-6">
               <h2 className="nola-body-strong text-foreground">{t('workspace.nothingYet')}</h2>
               <p className="nola-caption text-muted">{t('workspace.nothingYetHint')}</p>
-              <Button variant="primary" size="sm" className="rounded-[10px]" onPress={back}>
+              <Button size="sm" onClick={back}>
                 {t('nav.records')}
               </Button>
-            </EmptyState>
+            </div>
           ) : (
             <DualColumnView
               segments={segments}
@@ -242,19 +255,19 @@ export function RecordDetailPage(): ReactNode {
               }}
             />
           </div>
-        </Card.Content></Card>
+        </CardContent></Card>
 
         {/* Notes are stored as Markdown and rendered read-only in the meeting detail. */}
         {notes ? (
           <Card className="nola-record-card">
-            <Card.Content>
+            <CardContent className="card__content">
               <div className="flex flex-col gap-3">
                 <h2 className="nola-subtitle text-foreground">{t('homeRecordsUi.notes')}</h2>
                 <div className="nola-record-notes-markdown nola-body max-h-64 overflow-y-auto break-words text-foreground">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, [rehypeSanitize, { ...defaultSchema, tagNames: [...defaultSchema.tagNames ?? [], 'u'] }]]}>{notes}</ReactMarkdown>
                 </div>
               </div>
-            </Card.Content>
+            </CardContent>
           </Card>
         ) : null}
       </div>
@@ -292,14 +305,14 @@ function DualSkeleton({ t }: { t: TFn }): ReactNode {
       <div className="flex flex-col gap-2 pr-3">
         <span className="nola-subtitle text-foreground">{t('records.detailSource')}</span>
         {Array.from({ length: SKELETON_PAIRS }, (_, index) => (
-          <Skeleton key={index} className="h-4 w-full rounded-[10px]" />
+          <div key={index} className="h-4 w-full animate-pulse rounded-lg bg-surface-tertiary/70" />
         ))}
       </div>
       <div aria-hidden="true" className="self-stretch bg-separator" />
       <div className="flex flex-col gap-2 pl-3">
         <span className="nola-subtitle text-foreground">{t('records.detailTranslation')}</span>
         {Array.from({ length: SKELETON_PAIRS }, (_, index) => (
-          <Skeleton key={index} className="h-4 w-full rounded-[10px]" />
+          <div key={index} className="h-4 w-full animate-pulse rounded-lg bg-surface-tertiary/70" />
         ))}
       </div>
     </div>

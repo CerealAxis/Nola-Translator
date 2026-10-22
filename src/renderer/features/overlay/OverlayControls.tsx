@@ -25,8 +25,10 @@ import { useModelOptions } from '@/model-options'
 
 import { useLayoutEffect, useRef, useState } from 'react'
 
-import { Button, Dropdown, Spinner } from '@heroui/react'
-import { Mic, Pause, Play } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
+import { Menu } from '@base-ui/react/menu'
+import { Check, Mic, Pause, Play } from 'lucide-react'
 
 import {
   DEFAULT_SETTINGS,
@@ -328,10 +330,9 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
              */}
             <Button
               variant="secondary"
-              size="sm"
-              isIconOnly
-              onPress={toggleMic}
-              isDisabled={status === 'starting' || status === 'stopping'}
+              size="icon"
+              onClick={toggleMic}
+              disabled={status === 'starting' || status === 'stopping'}
               aria-label={micLabel}
               aria-busy={starting || undefined}
               // Point the button at the notice below so a screen reader announces
@@ -344,50 +345,36 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
               data-active={running ? 'true' : 'false'}
               data-loading={starting ? 'true' : 'false'}
             >
-              {starting ? <Spinner size="sm" color="current" /> : running ? <Pause aria-hidden="true" /> : status === 'paused' ? <Play aria-hidden="true" /> : <Mic aria-hidden="true" />}
+              {starting ? <Spinner /> : running ? <Pause aria-hidden="true" /> : status === 'paused' ? <Play aria-hidden="true" /> : <Mic aria-hidden="true" />}
             </Button>
 
             <OverlayDropdown kind="model">
-              <Dropdown.Trigger isDisabled={active} className={`${CAPSULE} nola-caption-pill--mode`}>
+              <Menu.Trigger disabled={active} className={[CAPSULE, 'nola-caption-pill--mode'].filter(Boolean).join(' ')}>
                 <span className="nola-caption-mode-dot" aria-hidden="true" />
                 <span className="nola-caption-model-label">{modelOptions.recognitionModels.find(model => model.value === modelId)?.label ?? modelId}</span>
-              </Dropdown.Trigger>
-              {/*
-                Selection is computed by the Menu, not set per item: `Dropdown.Item`
-                has no `isSelected` prop. The chain is `selectionMode` plus
-                `selectedKeys` on the Menu, and `id` on each item.
-
-                `selectedKeys` must be a Set. A string type-checks, but selection
-                silently fails and every item reports aria-checked="false".
-
-                The checkmark goes after the label because its slot is already
-                absolutely positioned on the inline-start edge.
-              */}
-              <Dropdown.Popover className="nola-caption-menu" maxHeight={menuMaxHeight}>
-                <Dropdown.Menu
-                  className="nola-caption-menu-list"
-                  style={{ maxHeight: menuMaxHeight }}
-                  selectionMode="single"
-                  selectedKeys={new Set([modelId])}
-                  onSelectionChange={(key) => {
-                    if (typeof key === 'string') patch({ recognition: { modelId: key as RecognitionModelId } })
-                  }}
-                >
-                  {modelOptions.recognitionModels.map(model => (
-                    <Dropdown.Item
-                      key={model.value}
-                      id={model.value}
-                      isDisabled={model.isDisabled}
-                      className="nola-menu-item"
-                      textValue={model.label}
-                      onAction={() => patch({ recognition: { modelId: model.value as RecognitionModelId } })}
-                    >
-                      {model.label}
-                      <Dropdown.ItemIndicator type="checkmark" />
-                    </Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown.Popover>
+              </Menu.Trigger>
+              <Menu.Portal>
+                <Menu.Positioner className="z-dropdown" style={{ maxHeight: menuMaxHeight }}>
+                  <Menu.Popup className="nola-caption-menu">
+                    <Menu.List className="nola-caption-menu-list" style={{ maxHeight: menuMaxHeight }}>
+                      <Menu.RadioGroup value={modelId} onValueChange={value => patch({ recognition: { modelId: value as RecognitionModelId } })}>
+                        {modelOptions.recognitionModels.map(model => (
+                          <Menu.RadioItem
+                            key={model.value}
+                            value={model.value}
+                            disabled={model.isDisabled}
+                            className="nola-menu-item"
+                            data-selected={model.value === modelId ? 'true' : undefined}
+                          >
+                            {model.label}
+                            <Menu.RadioItemIndicator><Check aria-hidden="true" /></Menu.RadioItemIndicator>
+                          </Menu.RadioItem>
+                        ))}
+                      </Menu.RadioGroup>
+                    </Menu.List>
+                  </Menu.Popup>
+                </Menu.Positioner>
+              </Menu.Portal>
             </OverlayDropdown>
 
             <LanguagePill
@@ -446,7 +433,7 @@ function StartFailureNotice({ message, action, onAction }: { message: string | n
       className="nola-caption-notice"
     >
       <p className="nola-caption-notice__text">{message}</p>
-      {action ? <Button size="sm" variant="secondary" onPress={onAction}>{action}</Button> : null}
+      {action ? <Button size="sm" variant="secondary" onClick={onAction}>{action}</Button> : null}
     </div>
   )
 }
@@ -483,25 +470,31 @@ function LanguagePill({
 }) {
   return (
     <OverlayDropdown kind={kind}>
-      <Dropdown.Trigger isDisabled={isDisabled} className={CAPSULE} aria-label={caption}>
+      <Menu.Trigger disabled={isDisabled} className={CAPSULE} aria-label={caption}>
         <span>{labelOf(value)}</span>
-      </Dropdown.Trigger>
-      <Dropdown.Popover className="nola-caption-menu" maxHeight={maxHeight}>
-        <Dropdown.Menu
-          className="nola-caption-menu-list"
-          style={{ maxHeight }}
-          selectionMode="single"
-          selectedKeys={new Set([value])}
-          onSelectionChange={key => { if (typeof key === 'string') onChange(key) }}
-        >
-          {options.map(code => (
-            <Dropdown.Item key={code} id={code} className="nola-menu-item" textValue={labelOf(code)} onAction={() => onChange(code)}>
-              {labelOf(code)}
-              <Dropdown.ItemIndicator type="checkmark" />
-            </Dropdown.Item>
-          ))}
-        </Dropdown.Menu>
-      </Dropdown.Popover>
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner className="z-dropdown" style={{ maxHeight }}>
+          <Menu.Popup className="nola-caption-menu">
+            <Menu.List className="nola-caption-menu-list" style={{ maxHeight }}>
+              {options.map(code => (
+                <Menu.Item
+                  key={code}
+                  id={code}
+                  label={labelOf(code)}
+                  className="nola-menu-item"
+                  aria-checked={code === value}
+                  data-selected={code === value ? 'true' : undefined}
+                  onClick={() => onChange(code)}
+                >
+                  {labelOf(code)}
+                  {code === value ? <Check aria-hidden="true" /> : null}
+                </Menu.Item>
+              ))}
+            </Menu.List>
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
     </OverlayDropdown>
   )
 }

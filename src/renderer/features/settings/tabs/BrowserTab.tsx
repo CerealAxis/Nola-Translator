@@ -1,13 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, Card, ColorArea, ColorField, ColorPicker, ColorSlider, ColorSwatch, ColorSwatchPicker, NumberField, Slider, Switch, ToggleButton, ToggleButtonGroup } from '@heroui/react'
-import { ArrowLeft, CheckSquare, CircleAlert, ExternalLink } from 'lucide-react'
 import type { CSSProperties } from 'react'
+import { NumberField } from '@base-ui/react/number-field'
+import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
+import { Switch, SwitchThumb } from '@/components/ui/switch'
+
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { ArrowLeft, CheckSquare, CircleAlert, ExternalLink, LoaderCircle } from 'lucide-react'
+
 import { DEFAULT_SETTINGS } from '@/bridge'
 import { BROWSER_EXTENSION_VERSION, type BrowserIntegrationInfo, type BrowserKind } from '../../../../shared/browser'
 import chromeIcon from '@/assets/browsers/chrome.png'
 import edgeIcon from '@/assets/browsers/edge.png'
 import firefoxIcon from '@/assets/browsers/firefox.svg'
 import { notifyError } from '@/components/primitives/notify'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ColorPicker } from '@/components/ui/color-picker'
 import { useI18n } from '@/i18n'
 import { stores, updateSettings, useStore } from '@/store'
 import { browserConnectionAction } from '@/store/settingsStore'
@@ -66,10 +74,8 @@ export function BrowserTab() {
   }
   const enableLabel = (kind: BrowserKind) => t('browser.allowBrowserConnection', { browser: browserName(kind) })
   const extensionSwitch = (info: BrowserIntegrationInfo) => (
-    <Switch isSelected={info.enabled} isDisabled={browserBusy || !info.available || !hasExtension(info)}
-      onChange={enabled => { void browserConnectionAction('browserEnable', enabled, info.browser) }} aria-label={enableLabel(info.browser)}>
-      <Switch.Content aria-label={enableLabel(info.browser)}><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content>
-    </Switch>
+    <BrowserSwitch isSelected={info.enabled} isDisabled={browserBusy || !info.available || !hasExtension(info)}
+      onChange={enabled => { void browserConnectionAction('browserEnable', enabled, info.browser) }} ariaLabel={enableLabel(info.browser)} />
   )
   const selected = selectedBrowser ? getBrowser(selectedBrowser) : null
   const patchAppearance = (patch: Partial<typeof appearance>) => {
@@ -98,11 +104,11 @@ export function BrowserTab() {
     <div className="settings-panel browser-settings">
       {selected ? (
         <>
-          <Button variant="secondary" className="browser-settings__back" onPress={() => setSelectedBrowser(null)}>
+          <Button variant="secondary" className="browser-settings__back" onClick={() => setSelectedBrowser(null)}>
             <ArrowLeft aria-hidden="true" />{t('browser.backToBrowsers')}
           </Button>
           <Card className="browser-settings__card">
-            <Card.Content>
+            <CardContent className="card__content">
               <header className="browser-settings__detail-heading">
                 <img className="browser-settings__icon" src={BROWSER_ICONS[selected.browser]} alt="" aria-hidden="true" />
                 <div className="browser-settings__identity">
@@ -111,10 +117,10 @@ export function BrowserTab() {
                 </div>
               </header>
               <div className="browser-settings__detail-actions">
-                <Button variant="secondary" isDisabled={browserBusy}
-                  onPress={() => { void browserConnectionAction('download', undefined, selected.browser) }}>{t('browser.downloadExtension')}</Button>
-                <Button variant="secondary" isDisabled={browserBusy || !selected.available}
-                  onPress={() => { void browserConnectionAction('manage', undefined, selected.browser) }}>
+                <Button variant="secondary" disabled={browserBusy}
+                  onClick={() => { void browserConnectionAction('download', undefined, selected.browser) }}>{t('browser.downloadExtension')}</Button>
+                <Button variant="secondary" disabled={browserBusy || !selected.available}
+                  onClick={() => { void browserConnectionAction('manage', undefined, selected.browser) }}>
                   {t('browser.manageExtension')}<ExternalLink aria-hidden="true" />
                 </Button>
               </div>
@@ -132,19 +138,17 @@ export function BrowserTab() {
                   {selected.connected ? t('browser.connected') : t('browser.connectionWaiting')}
                 </span>
               </div>
-            </Card.Content>
+            </CardContent>
           </Card>
         </>
       ) : (
         <Card className="browser-settings__card">
-          <Card.Header className="browser-settings__heading">
-            <div className="browser-settings__identity"><Card.Title>{t('browser.title')}</Card.Title><p>{t('browser.settingsDescription')}</p></div>
-            <Switch isSelected={browser?.enabled ?? false} isDisabled={browserBusy || !browser}
-              onChange={enabled => { void browserConnectionAction('enable', enabled) }} aria-label={t('browser.enable')}>
-              <Switch.Content aria-label={t('browser.enable')}><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content>
-            </Switch>
-          </Card.Header>
-          <Card.Content>
+          <CardHeader className="card__header browser-settings__heading">
+            <div className="browser-settings__identity"><CardTitle className="card__title">{t('browser.title')}</CardTitle><p>{t('browser.settingsDescription')}</p></div>
+            <BrowserSwitch isSelected={browser?.enabled ?? false} isDisabled={browserBusy || !browser}
+              onChange={enabled => { void browserConnectionAction('enable', enabled) }} ariaLabel={t('browser.enable')} />
+          </CardHeader>
+          <CardContent className="card__content">
             <ul className="browser-settings__list" aria-label={t('browser.browserList')}>
               {BROWSERS.map(kind => {
                 const info = getBrowser(kind)
@@ -156,41 +160,46 @@ export function BrowserTab() {
                       <p className="browser-settings__status" data-status={info.extensionStatus} role="status">{extensionStatus(info)}</p>
                     </div>
                     <div className="browser-settings__row-actions">
-                      <Button variant="secondary" isDisabled={browserBusy}
+                      <Button variant="secondary" disabled={browserBusy}
                         aria-label={t('browser.downloadBrowserExtension', { browser: browserName(kind) })}
-                        onPress={() => { void browserConnectionAction('download', undefined, kind) }}>{t('browser.downloadExtension')}</Button>
-                      {hasExtension(info) ? <Button variant="secondary" isDisabled={browserBusy || !info.available}
+                        onClick={() => { void browserConnectionAction('download', undefined, kind) }}>{t('browser.downloadExtension')}</Button>
+                      {hasExtension(info) ? <Button variant="secondary" disabled={browserBusy || !info.available}
                         aria-label={t('browser.manageBrowserExtension', { browser: browserName(kind) })}
-                        onPress={() => setSelectedBrowser(kind)}>{t('browser.manage')}</Button> : null}
+                        onClick={() => setSelectedBrowser(kind)}>{t('browser.manage')}</Button> : null}
                       {hasExtension(info) ? extensionSwitch(info) : null}
                     </div>
                   </li>
                 )
               })}
             </ul>
-          </Card.Content>
+          </CardContent>
         </Card>
       )}
       <Card className="nola-overlay-preview">
-        <Card.Header><Card.Title className="text-lg font-semibold">{t('browser.preview')}</Card.Title></Card.Header>
-        <Card.Content className="nola-overlay-stage nola-video-stage">
+        <CardHeader><CardTitle className="card__title text-lg font-semibold">{t('browser.preview')}</CardTitle></CardHeader>
+        <CardContent className="card__content nola-overlay-stage nola-video-stage">
           <div className="nola-video-frame" style={previewFrameStyle} aria-hidden="true">
             {appearance.showSource ? <p className="nola-video-caption-line" style={previewSourceStyle}>{t('videoCaptions.previewSource')}</p> : null}
             {appearance.showTranslation ? <p className="nola-video-caption-line" data-role="translation" style={previewTranslationStyle}>{t('videoCaptions.previewTranslation')}</p> : null}
           </div>
-        </Card.Content>
+        </CardContent>
       </Card>
       <SettingGroup legend={t('modelsSettingsUi.layoutDisplay')}>
         <SettingsRow label={t('browser.colorScheme')}>
-          <ToggleButtonGroup className="nola-segmented" selectionMode="single" disallowEmptySelection selectedKeys={new Set([appearance.colorScheme])} aria-label={t('browser.colorScheme')} onSelectionChange={keys => {
-            const next = [...keys][0]
+          <ToggleGroup className="nola-segmented" value={[appearance.colorScheme]} aria-label={t('browser.colorScheme')} onValueChange={values => {
+            // A single-select group reports an empty list when the pressed scheme is clicked
+            // again, so the scheme is never left with nothing selected.
+            const next = values[0]
             if (next === 'dark' || next === 'light') {
               const palette = next === 'dark'
                 ? { backgroundColor: '#0D0E10', sourceColor: '#F7F7F7', translationColor: '#D7DEE8' }
                 : { backgroundColor: '#F7F7F7', sourceColor: '#1A1C22', translationColor: '#4A5160' }
               patchAppearance({ colorScheme: next, ...palette })
             }
-          }}><ToggleButton id="dark">{t('settings.schemeDark')}</ToggleButton><ToggleButton id="light">{t('settings.schemeLight')}</ToggleButton></ToggleButtonGroup>
+          }}>
+            <ToggleGroupItem value="dark" className="toggle-button" data-selected={appearance.colorScheme === 'dark' ? 'true' : undefined}>{t('settings.schemeDark')}</ToggleGroupItem>
+            <ToggleGroupItem value="light" className="toggle-button" data-selected={appearance.colorScheme === 'light' ? 'true' : undefined}>{t('settings.schemeLight')}</ToggleGroupItem>
+          </ToggleGroup>
         </SettingsRow>
         <SettingsRow label={t('settings.showSource')}><SettingSwitch isSelected={appearance.showSource} ariaLabel={t('settings.showSource')} onChange={showSource => patchAppearance({ showSource })} /></SettingsRow>
         <SettingsRow label={t('settings.showTranslation')}><SettingSwitch isSelected={appearance.showTranslation} ariaLabel={t('settings.showTranslation')} onChange={showTranslation => patchAppearance({ showTranslation })} /></SettingsRow>
@@ -213,9 +222,32 @@ export function BrowserTab() {
           {saveError ? <CircleAlert aria-hidden="true" /> : <CheckSquare aria-hidden="true" />}
           {saveError ? t('modelsSettingsUi.saveError') : pending ? t('modelsSettingsUi.saving') : t('modelsSettingsUi.automaticSave')}
         </span>
-        <Button variant="outline" isPending={pending} onPress={restoreAppearance}>{t('modelsSettingsUi.resetAppearance')}</Button>
+        <Button variant="outline" disabled={pending} onClick={restoreAppearance}>
+          {pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
+          {t('modelsSettingsUi.resetAppearance')}
+        </Button>
       </div>
     </div>
+  )
+}
+
+export interface BrowserSwitchProps {
+  isSelected: boolean
+  isDisabled: boolean
+  ariaLabel: string
+  onChange: (next: boolean) => void
+}
+
+/**
+ * The connection switches keep the native button they had before: a disabled switch is then
+ * out of reach of the pointer and of the keyboard, the way the rows around it expect.
+ */
+function BrowserSwitch({ isSelected, isDisabled, ariaLabel, onChange }: BrowserSwitchProps) {
+  return (
+    <Switch nativeButton render={<button type="button" />} className="switch"
+      checked={isSelected} onCheckedChange={onChange} disabled={isDisabled} aria-label={ariaLabel}>
+      <span className="switch__control"><SwitchThumb className="switch__thumb" /></span>
+    </Switch>
   )
 }
 
@@ -230,21 +262,25 @@ export interface StyleSliderRowProps {
 }
 
 export function StyleSliderRow({ label, value, min, max, step, unit, onChange }: StyleSliderRowProps) {
-  const scalar = (next: number | number[]) => {
-    const number = Array.isArray(next) ? next[0] : next
-    if (number !== undefined && Number.isFinite(number)) onChange(number)
+  const scalar = (next: number | null) => {
+    if (next !== null && Number.isFinite(next)) onChange(next)
   }
   return <div className="settings-slider">
-    <Slider value={value} minValue={min} maxValue={max} step={step} onChange={scalar} aria-label={label}><Slider.Track><Slider.Fill /><Slider.Thumb /></Slider.Track></Slider>
-    <NumberField value={value} minValue={min} maxValue={max} step={step} onChange={scalar} aria-label={label}><NumberField.Group><NumberField.Input className="tabular" /></NumberField.Group></NumberField>
+    <SliderRoot className="slider" min={min} max={max} step={step} value={value} onValueChange={scalar}>
+      <SliderControl className="flex w-full touch-none items-center py-2 select-none">
+        <SliderTrack className="slider__track relative h-1 w-full rounded-full bg-surface-tertiary">
+          <SliderIndicator className="slider__fill rounded-full bg-accent" />
+          <SliderThumb className="slider__thumb size-3 rounded-full bg-accent focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus" aria-label={label} />
+        </SliderTrack>
+      </SliderControl>
+    </SliderRoot>
+    <NumberField.Root className="number-field" min={min} max={max} step={step} value={value} onValueChange={scalar}>
+      <NumberField.Group className="number-field__group">
+        <NumberField.Input className="number-field__input tabular" aria-label={label} />
+      </NumberField.Group>
+    </NumberField.Root>
     <span className="settings-slider__unit">{unit}</span>
   </div>
-}
-
-function toHex(value: unknown): string {
-  if (typeof value === 'string') return value
-  if (value !== null && typeof value === 'object' && 'toString' in value) return (value as { toString: (format?: string) => string }).toString('hex')
-  return '#000000'
 }
 
 export interface StyleColorControlProps {
@@ -254,16 +290,5 @@ export interface StyleColorControlProps {
 }
 
 export function StyleColorControl({ label, value, onChange }: StyleColorControlProps) {
-  const changed = (next: unknown) => onChange(toHex(next))
-  return <div className="settings-color"><span>{label}</span>
-    <ColorPicker value={value} onChange={changed}>
-      <ColorPicker.Trigger aria-label={label}><ColorSwatch color={value} className="size-7 rounded-md" /></ColorPicker.Trigger>
-      <ColorPicker.Popover aria-label={label}><div className="flex w-60 max-w-full flex-col gap-3 p-3">
-        <ColorArea value={value} onChange={changed} colorSpace="hsb" xChannel="saturation" yChannel="brightness" aria-label={label} className="h-32"><ColorArea.Thumb /></ColorArea>
-        <ColorSlider value={value} onChange={changed} channel="hue" colorSpace="hsb" aria-label={label}><ColorSlider.Track><ColorSlider.Thumb /></ColorSlider.Track></ColorSlider>
-        <ColorSwatchPicker value={value} onChange={changed} aria-label={label}>{PRESET_COLORS.map(color => <ColorSwatchPicker.Item key={color} color={color}><ColorSwatch /><ColorSwatchPicker.Indicator /></ColorSwatchPicker.Item>)}</ColorSwatchPicker>
-        <ColorField value={value} onChange={changed} aria-label={label}><ColorField.Input /></ColorField>
-      </div></ColorPicker.Popover>
-    </ColorPicker>
-  </div>
+  return <div className="settings-color"><span>{label}</span><ColorPicker label={label} value={value} presets={PRESET_COLORS} onChange={onChange} /></div>
 }

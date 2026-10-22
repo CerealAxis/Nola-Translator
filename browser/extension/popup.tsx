@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Button } from '@heroui/react'
+import { Button } from '@base-ui/react/button'
 import { createPopupStore } from './popupStore'
 import { browserText, errorKey } from './i18n'
 import { resolveUiLanguage } from '../../src/shared/languages'
@@ -13,7 +13,7 @@ export function Popup({ store }: PopupProps) {
   const language = resolveUiLanguage(state.language, navigator.language)
   useEffect(() => { document.documentElement.lang = language }, [language])
   return <main className="nola-popup"><h1 className="nola-heading">{t('button')}</h1><p className="nola-muted">{state.origin ?? t('guideThree')}</p>
-    <Button variant="primary" isDisabled={!state.origin || state.pending} onPress={store.enable}>{state.enabled ? t('siteEnabled') : t('enableSite')}</Button>
+    <Button data-slot="button" className="button button--primary" disabled={!state.origin || state.pending} onClick={store.enable}>{state.enabled ? t('siteEnabled') : t('enableSite')}</Button>
     {state.error && <p role="alert" className="nola-error">{t(errorKey(state.error))}</p>}
   </main>
 }

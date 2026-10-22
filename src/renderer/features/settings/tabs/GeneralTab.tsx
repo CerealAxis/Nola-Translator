@@ -12,10 +12,13 @@ import { SettingsRow } from '../SettingsRow'
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Input, TextField, ToggleButton, ToggleButtonGroup } from '@heroui/react'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { LoaderCircle } from 'lucide-react'
 
 import { useNolaTheme } from '@/components/primitives'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
 import type { UiLanguagePreference } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
@@ -83,8 +86,8 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
           <Button
             variant="tertiary"
             size="sm"
-            isPending={appUpdateChecking}
-            onPress={() => {
+            disabled={appUpdateChecking}
+            onClick={() => {
               void actions.settings.checkForAppUpdate(true).then((result) => {
                 if (!result || result.latestVersion === null) {
                   notifyError(t('appUpdate.checkFailed'))
@@ -96,6 +99,7 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
               })
             }}
           >
+            {appUpdateChecking ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
             {t('appUpdate.checkNow')}
           </Button>
         </SettingsRow>
@@ -118,24 +122,29 @@ function ThemeRow() {
 
   return (
     <SettingsRow label={t('settings.theme')}>
-      <ToggleButtonGroup
+      <ToggleGroup
         className="nola-segmented"
-        selectionMode="single"
-        disallowEmptySelection
+        value={[theme]}
         aria-label={t('settings.theme')}
-        selectedKeys={new Set([theme])}
-        onSelectionChange={(keys) => {
-          const next = [...keys][0]
-          if (typeof next === 'string') setTheme(next as 'system' | 'light' | 'dark')
+        onValueChange={(values) => {
+          // A single-select group reports an empty list when the pressed theme is clicked
+          // again, so the theme is never left with nothing selected.
+          const next = values[0]
+          if (next === undefined) return
+          setTheme(next as typeof theme)
         }}
-        size="sm"
       >
         {options.map((option) => (
-          <ToggleButton key={option.id} id={option.id}>
+          <ToggleGroupItem
+            key={option.id}
+            value={option.id}
+            className="toggle-button"
+            data-selected={theme === option.id ? 'true' : undefined}
+          >
             {option.label}
-          </ToggleButton>
+          </ToggleGroupItem>
         ))}
-      </ToggleButtonGroup>
+      </ToggleGroup>
     </SettingsRow>
   )
 }
@@ -314,15 +323,14 @@ function NetworkTextRow({ label, desc, value, onCommit }: {
 
   return (
     <SettingsRow label={label} desc={desc} descriptionTooltip>
-      <TextField
+      <Input
         value={shown}
-        onChange={setDraft}
+        onValueChange={setDraft}
         onFocus={() => { setDraft(value); setFocused(true) }}
         onBlur={commit}
         className="settings-control-field"
-      >
-        <Input className="rounded-[8px]" aria-label={label} />
-      </TextField>
+        aria-label={label}
+      />
     </SettingsRow>
   )
 }

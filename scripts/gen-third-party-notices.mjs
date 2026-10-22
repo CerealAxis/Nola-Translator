@@ -1082,6 +1082,29 @@ limitations under the License.`
  * 再退化到 License 字段的标识符。
  */
 const UPSTREAM_LICENSES = new Map([
+  ['loguru', {
+    url: 'https://raw.githubusercontent.com/Delgan/loguru/0.7.3/LICENSE',
+    text: `MIT License
+
+Copyright (c) 2017
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+`,
+  }],
   ['sentencepiece', {
     url: 'https://raw.githubusercontent.com/google/sentencepiece/master/LICENSE',
     text: APACHE_2_0,
@@ -1127,17 +1150,6 @@ function addEntry(name, version, licenseText, origin) {
   }
   entries.set(key, { name, version, licenseText: alignLeft(licenseText), origin, merged: [] })
 }
-
-/**
- * @heroui/react 与 @heroui/styles 的 package.json 都还写着 "license": "MIT"，
- * 那是 v2 时代的过时元数据；随包的 LICENSE 是 Apache-2.0 全文。
- * 解析顺序把文件排在 manifest 字段之前，正是为了拿到这里的真实条款。
- * 下面这行是断言，不是注释：万一解析顺序被改坏，生成器会直接失败而不是静默写出错误的许可证。
- */
-const HERUI_EXPECTATIONS = new Map([
-  ['@heroui/react', 'Apache License'],
-  ['@heroui/styles', 'Apache License'],
-])
 
 function collectRendererTree() {
   const roots = Object.keys(manifest.dependencies ?? {})
@@ -1190,14 +1202,6 @@ function collectRendererTree() {
     if (licenseText === null) {
       report('unresolved', name, '既没有许可证文件，package.json 也没有 license 字段')
       continue
-    }
-
-    const expected = HERUI_EXPECTATIONS.get(name)
-    if (expected && !licenseText.includes(expected)) {
-      throw new Error(
-        `${name} 的许可证正文不含 "${expected}"，解析顺序可能退化到了过时的 manifest license 字段。\n`
-        + `实际取到：${licenseText.slice(0, 120)}`,
-      )
     }
 
     addEntry(name, pkg.version ?? '(未知版本)', licenseText, 'renderer')
@@ -1470,7 +1474,7 @@ function collectPythonTree() {
       report('manifest', declaredName, `包内没有可用的许可证文件，退化到 METADATA 的 License 字段 "${licenseField || '(缺失)'}"`)
       licenseText = licenseField
     }
-    if (licenseText === null) {
+    if (!licenseText?.trim()) {
       report('unresolved', declaredName, '既没有许可证文件，METADATA 也没有 License / License-Expression 字段')
       continue
     }
@@ -1582,6 +1586,16 @@ const reportSections = [
   ...(excluded.length > 0 ? excluded.map((line) => `  - ${line}`) : ['  (none)']),
   '',
 ]
+
+// Missing runtime metadata must never turn a partial collection into a valid notice.
+if (unresolved.length > 0) {
+  process.stderr.write([
+    'INCOMPLETE: dependency licenses could not be fully collected; the existing notice was not changed.',
+    'Restore the release Python environment and dependency metadata before regenerating notices.',
+    ...reportSections,
+  ].join('\n'))
+  process.exit(1)
+}
 
 if (CHECK_ONLY) {
   const current = readText(OUTPUT)

@@ -1,13 +1,12 @@
 /**
  * Status pill: pill radius plus the micro type step.
  *
- * HeroUI `Chip` keeps its colour-token mechanism but ships the wrong geometry —
- * `rounded-2xl` (24px) and `text-xs font-medium` — so the utilities-layer
- * arbitrary values in `className` pin radius and type to the spec.
+ * A plain inline-flex span carries the geometry — `rounded-full`, a 20/24px
+ * height and the 12px type step — while the tone supplies the fill and the
+ * text colour.
  */
 
 import type { ReactNode } from 'react'
-import { Chip } from '@heroui/react'
 
 /**
  * `neutral` is "no state" (not started, engine not connected): a transparent fill
@@ -32,20 +31,12 @@ export interface StatusPillProps {
   className?: string
 }
 
-const CHIP_COLOR: Record<StatusPillTone, 'default' | 'accent' | 'success' | 'warning' | 'danger'> = {
-  neutral: 'default',
-  accent: 'accent',
-  success: 'success',
-  warning: 'warning',
-  danger: 'danger',
-}
-
-const CHIP_VARIANT: Record<StatusPillTone, 'tertiary' | 'soft'> = {
-  neutral: 'tertiary',
-  accent: 'soft',
-  success: 'soft',
-  warning: 'soft',
-  danger: 'soft',
+const TONE_CLASS: Record<StatusPillTone, string> = {
+  neutral: 'border border-border text-foreground',
+  accent: 'bg-accent-soft text-accent-soft-foreground',
+  success: 'bg-success-soft text-success-soft-foreground',
+  warning: 'bg-warning-soft text-warning-soft-foreground',
+  danger: 'bg-danger-soft text-danger-soft-foreground',
 }
 
 const DOT_COLOR: Record<StatusPillTone, string> = {
@@ -70,16 +61,12 @@ export function StatusPill({
   className,
 }: StatusPillProps) {
   return (
-    <Chip
-      color={CHIP_COLOR[tone]}
-      variant={CHIP_VARIANT[tone]}
-      // `rounded-full` and the arbitrary type values below override Chip's own
-      // `rounded-2xl` and `text-xs font-medium`, which live in @layer components.
+    <span
       className={[
-        'shrink-0 items-center gap-1 rounded-full',
+        'inline-flex w-fit shrink-0 items-center gap-1 rounded-full',
         SIZE_CLASS[size],
         'text-[12px] leading-[1.45] font-normal',
-        tone === 'neutral' ? 'border border-border' : '',
+        TONE_CLASS[tone],
         className ?? '',
       ]
         .filter(Boolean)
@@ -94,6 +81,6 @@ export function StatusPill({
         />
       ) : null}
       <span className="whitespace-nowrap">{label}</span>
-    </Chip>
+    </span>
   )
 }

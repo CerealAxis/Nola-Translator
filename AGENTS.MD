@@ -15,7 +15,7 @@
 | 领域 | 技术或入口 |
 | --- | --- |
 | 桌面端 | Electron + React + TypeScript；`electron-vite` 构建 |
-| UI | Tailwind CSS + HeroUI v3；独立透明子窗口承载悬浮字幕 |
+| UI | Tailwind CSS v4 + shadcn/ui（Base UI）；`src/renderer/components/ui/` 为基础组件源码入口，独立透明子窗口承载悬浮字幕 |
 | 状态与通信 | `NolaBridge`、5 个领域 Store、`useSyncExternalStore`、IPC |
 | 引擎 | 内置 Python 3.12；PyTorch / llama.cpp / CrispASR 组件按需安装或复用 |
 | 本地识别 | PyTorch、llama.cpp 或 CrispASR；根据已安装加载器选择 |
@@ -36,7 +36,12 @@ src/
     application.tsx       桌面、文档站、Toy 共用的页面及导航注册
     bridge/               渲染进程唯一数据出口（NolaBridge）
     store/                5 个领域 Store 与 useSyncExternalStore 实现
-    components/           基础 primitives 与业务组件
+    components/
+      ui/                 shadcn/ui Base UI 基础组件源码
+      primitives/         Nola 产品级 primitives 与通知适配
+      reading/            阅读与播放器组件
+      notes/              笔记组件
+      home/               首页展示组件
     features/             home、workspace、overlay 等功能模块
     i18n/                 完整语言字典及组装逻辑
     theme/                设计 token 唯一来源及 CJK 字体样式
@@ -95,7 +100,7 @@ scripts/                  PowerShell 构建与运行时管理脚本
 
 - `src/shared/browser.ts` 仅暴露受限扩展契约、固定开发 ID 与 Native Messaging 名称；不得向扩展接口暴露凭据、文件或模型管理能力。
 - 音频测试只在内存中采集 **2 秒 PCM** 并进行格式转换；不得为此加载模型。
-- 新手教程采用 HeroUI 欢迎弹窗；完成与再次查看相关状态必须持久化保存。
+- 新手教程采用可访问的欢迎弹窗；完成与再次查看相关状态必须持久化保存。
 - 诊断日志使用 JSONL，保持脱敏与大小限制，禁止泄露密钥或敏感内容。
 
 ## 4. React、i18n 与视觉规范
@@ -103,7 +108,7 @@ scripts/                  PowerShell 构建与运行时管理脚本
 ### 组件和事件
 
 - 统一使用具名导出，禁止 `default export`；组件 Props 用 `export interface XProps`，变体联合用 `export type`。
-- HeroUI v3 事件使用 `onPress`；**全仓不得使用 `onClick`**，唯一例外是自建 `FeatureCard` 的同名 Prop。
+- shadcn/ui（Base UI）原生按钮使用 `onClick`；复合控件按其实际 `onValueChange` 等接口处理。不要把旧 `onPress`、`selectedKeys`、`isPending` 机械替换；逐项映射禁用、键盘与异步状态。
 - 装饰性图标添加 `aria-hidden="true"`。
 - 可复用组件内不写用户可见文本字面量；由调用方通过 `t(...)` 生成后以 `label: ReactNode` 等 Prop 传入。
 - 拼接多个 `className` 使用 `[...].filter(Boolean).join(' ')`。
@@ -120,7 +125,7 @@ scripts/                  PowerShell 构建与运行时管理脚本
 - 需要变更 UI 时阅读 [DESIGN.MD](./DESIGN.MD)；颜色、间距、圆角和字号以 `src/renderer/theme/` 的 token 为准，不引入任意字面值。
 - 按钮统一使用 `--radius-xl`，禁止 `ghost` 变体；图标按钮必须有区别于背景的可见底色，标题栏控件除外。
 - 非按钮圆角按语义选 token；主题中没有 `rounded-pill` 档位。
-- HeroUI 原子组件覆盖字阶时，可以使用 utilities 层任意值类（例如 `text-[11px]`）；`.nola-*` 位于 base 层，可能被 components 层覆盖。这是字号规则的**特定例外**，并非允许随意硬编码样式。
+- shadcn/ui 组件使用 Nola 语义 token，不使用默认黑白主题；同名语义变量须经独立映射，避免与既有全局 token 冲突。原子组件覆盖字阶时可在 utilities 层使用任意值类（例如 `text-[11px]`）；这仅是字号规则的特定例外。
 - z-index 只使用 `DESIGN.MD` 第 8 节规定的 `.z-*` 类，禁止写 `z-50` 等字面层级。
 
 ## 5. 注释规范

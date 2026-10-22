@@ -1,42 +1,16 @@
 import { useModelOptions } from '@/model-options'
 import { configurationOf, isModelReady, recognitionLanguages, supportsTranslation } from '../../../shared/model-capabilities'
 import { TranslationCompatibilityDialog } from '../models/TranslationCompatibilityDialog'
-/**
- * The session setup dialog. Six fields: meeting name, input source,
- * recognition language, recognition model, translation (with its language
- * and model), and audio retention.
- *
- * Notes that shape the markup:
- * 1. `Label` stays inside the `Select` / `TextField`. HeroUI's `Label` is a
- *    react-aria label and picks the field id up through context, so the DOM
- *    nesting depth does not matter and a wrapper div is safe.
- * 2. Explanations go in a Tooltip, not inline. The question mark must be a
- *    focusable button: a `<label>` trigger opens on hover but is invisible
- *    to the keyboard. See `features/settings/SettingsRow.tsx`.
- * 3. "Translation model" appears only for a local provider. Cloud and
- *    Microsoft have no local model id: a cloud model name travels in
- *    `translationOptions.model` and Microsoft has endpoint + region only.
- *    See `@/session-config`.
- * 4. The name field shows the name the system will generate, not a
- *    placeholder. See `previewName` below.
- */
-
 import { supportsSelectedEngine } from '../../../shared/model-engines'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 import { useCallback, useMemo, useState } from 'react'
 
-import {
-  Button,
-  Input,
-  Label,
-  ListBox,
-  ListBoxItem,
-  Modal,
-  Select,
-  Switch,
-  TextField,
-  Tooltip,
-} from '@heroui/react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { SettingSelect, SettingSwitch } from '../settings/SettingsPage'
 import { CircleHelp } from 'lucide-react'
 
 import {
@@ -223,227 +197,47 @@ export function SessionSetupDialog({
     <TranslationCompatibilityDialog key={signature} isOpen={isOpen && incompatible && dismissedPair !== signature} onClose={() => setDismissedPair(signature)} source={draft.sourceLanguage} target={draft.targetLanguage} recognition={modelOptions.recognition} translation={modelOptions.translation} resources={resources} compute={settings.compute ?? DEFAULT_COMPUTE_SETTINGS}
       onChangeSource={sourceLanguage => patch({ sourceLanguage })} onChangeModel={translationModelId => patch({ translationModelId })}
       onDisableTranslation={() => patch({ translate: false, targetLanguage: NO_TRANSLATION_LANGUAGE })} />
-    <Modal isOpen={isOpen && !(incompatible && dismissedPair !== signature)} onOpenChange={onOpenChange}>
-      <Modal.Backdrop className="z-overlay">
-        <Modal.Container size="lg" placement="center">
-          <Modal.Dialog className="rounded-2xl border border-border">
-            <Modal.Header>
-              {/* Same type scale as the field labels below: it names the set of fields to fill, not a page title. */}
-              <Modal.Heading className="text-[14px] leading-[1.45] font-semibold text-foreground">
-                {t('session.title')}
-              </Modal.Heading>
-            </Modal.Header>
-
-            <Modal.Body className="flex flex-col gap-4">
-              {/* 1 Meeting name: the field shows the name the system will generate, so no placeholder is needed to explain it. */}
-              <TextField value={draft.title || previewName} onChange={(value: string) => patch({ title: value })}>
-                {/*
-                 * The label and the question mark sit in a div rather than as the
-                 * `TextField`'s first child: HeroUI's `Label` takes the field id
-                 * from react-aria context, so nesting depth is irrelevant.
-                 *
-                 * The question mark is a button, not the label itself, because a
-                 * `<label>` is not focusable: it opens on hover and never for the
-                 * keyboard. Same pattern as `features/settings/SettingsRow.tsx`.
-                 */}
-                <div className="flex items-center gap-1">
-                  <Label className="text-[14px] leading-[1.45] font-semibold text-foreground">{t('session.name')}</Label>
-                  <Tooltip delay={300}>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      isIconOnly
-                      aria-label={t('session.nameHelpAria')}
-                      className="size-6 shrink-0 rounded-full text-muted"
-                    >
-                      <CircleHelp size={14} aria-hidden="true" />
-                    </Button>
-                    <Tooltip.Content className="max-w-96 whitespace-normal">{t('session.nameHint')}</Tooltip.Content>
-                  </Tooltip>
-                </div>
-                <Input className="rounded-xl" />
-              </TextField>
-
-              {/* 2 Input source. Preflight owns device availability, so no probe here. */}
-              <Select
-                value={draft.audioSource}
-                onChange={(key) => {
-                  if (typeof key === 'string') patch({ audioSource: key })
-                }}
-              >
-                <Label className="text-[14px] leading-[1.45] font-semibold text-foreground">
-                  {t('session.audioSource')}
-                </Label>
-                <Select.Trigger className="rounded-xl">
-                  <Select.Value />
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover className="rounded-2xl">
-                  <ListBox>
-                    {audioOptions.map((option) => (
-                      <ListBoxItem key={option.value} id={option.value} textValue={option.name}>
-                        {option.name}
-                      </ListBoxItem>
-                    ))}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
-
-              {/* 3 Recognition language */}
-              <Select
-                value={draft.sourceLanguage}
-                onChange={(key) => {
-                  if (typeof key === 'string') patch({ sourceLanguage: key })
-                }}
-              >
-                <Label className="text-[14px] leading-[1.45] font-semibold text-foreground">
-                  {t('session.sourceLanguage')}
-                </Label>
-                <Select.Trigger className="rounded-xl">
-                  <Select.Value />
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover className="rounded-2xl">
-                  <ListBox>
-                    {modelOptions.sourceLanguages.map((code) => (
-                      <ListBoxItem key={code} id={code} textValue={languageLabel(code)}>
-                        {languageLabel(code)}
-                      </ListBoxItem>
-                    ))}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
-
-              {/* 4 Recognition model */}
-              <Select
-                value={draft.recognitionModelId}
-                onChange={(key) => {
-                  if (typeof key === 'string') {
-                    const codes = (settings.recognition.provider ?? 'local') === 'local' ? recognitionLanguages(resources.find(model => model.resourceId === key)) : modelOptions.sourceLanguages
-                    const sourceLanguage = codes.includes(draft.sourceLanguage) ? draft.sourceLanguage : codes.includes('auto') ? 'auto' : draft.sourceLanguage
-                    if (sourceLanguage === draft.sourceLanguage && !codes.includes(sourceLanguage)) {
-                      notifyError(t('errors.unsupportedRecognitionLanguage', { language: languageName(sourceLanguage, language) }))
-                    }
-                    patch({ recognitionModelId: key as RecognitionModelId, sourceLanguage })
-                  }
-                }}
-              >
-                <Label className="text-[14px] leading-[1.45] font-semibold text-foreground">
-                  {t('session.recognitionModel')}
-                </Label>
-                <Select.Trigger className="rounded-xl">
-                  <Select.Value />
-                  <Select.Indicator />
-                </Select.Trigger>
-                <Select.Popover className="rounded-2xl">
-                  <ListBox>
-                    {modelOptions.recognitionModels.map(model => (
-                      <ListBoxItem key={model.value} id={model.value} textValue={model.label} isDisabled={model.isDisabled}>
-                        {model.label}
-                      </ListBoxItem>
-                    ))}
-                  </ListBox>
-                </Select.Popover>
-              </Select>
-
-              {/* 5 Translation, its language and its model (the last two only for a local provider) */}
-              <div className="flex flex-col gap-2 rounded-2xl border border-border">
-                <SettingRow label={t('session.translation')} className="hover:bg-transparent">
-                  <Switch
-                    isSelected={draft.translate}
-                    onChange={(next: boolean) => patch({ translate: next, ...(next && draft.targetLanguage === NO_TRANSLATION_LANGUAGE ? { targetLanguage: DEFAULT_SETTINGS.translation.targetLanguage } : {}) })}
-                  ><Switch.Content aria-label={t('session.translation')}><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content></Switch>
-                </SettingRow>
-
-                {draft.translate ? (
-                  <div className="flex flex-col gap-4 px-4 pb-4">
-                    <Select
-                      value={draft.targetLanguage}
-                      onChange={(key) => {
-                        if (typeof key === 'string') patch({ targetLanguage: key, translate: key !== NO_TRANSLATION_LANGUAGE })
-                      }}
-                    >
-                      <Label className="text-[14px] leading-[1.45] font-semibold text-foreground">
-                        {t('session.translationLanguage')}
-                      </Label>
-                      <Select.Trigger className="rounded-xl">
-                        <Select.Value />
-                        <Select.Indicator />
-                      </Select.Trigger>
-                      <Select.Popover className="rounded-2xl">
-                        <ListBox>
-                          {modelOptions.targetLanguages.map((lang) => (
-                            <ListBoxItem key={lang} id={lang} textValue={languageLabel(lang)}>
-                              {languageLabel(lang)}
-                            </ListBoxItem>
-                          ))}
-                        </ListBox>
-                      </Select.Popover>
-                    </Select>
-
-                    {translation.provider === 'local' ? (
-                      <Select
-                        value={draft.translationModelId}
-                        onChange={(key) => {
-                          if (typeof key === 'string') patch({ translationModelId: key })
-                        }}
-                      >
-                        <Label className="text-[14px] leading-[1.45] font-semibold text-foreground">
-                          {t('session.translationModel')}
-                        </Label>
-                        <Select.Trigger className="rounded-xl">
-                          <Select.Value />
-                          <Select.Indicator />
-                        </Select.Trigger>
-                        <Select.Popover className="rounded-2xl">
-                          <ListBox>
-                            {localModelOptions.map((option) => (
-                              <ListBoxItem
-                                key={option.value}
-                                id={option.value}
-                                textValue={option.label}
-                                isDisabled={option.isDisabled}
-                              >
-                                {option.label}
-                              </ListBoxItem>
-                            ))}
-                          </ListBox>
-                        </Select.Popover>
-                      </Select>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-
-              {/* 6 Audio retention */}
-              <div className="rounded-2xl border border-border">
-                <SettingRow
-                  label={t('session.keepAudio')}
-                  desc={t('session.keepAudioHint')}
-                  descriptionTooltip
-                  className="hover:bg-transparent"
-                >
-                  <Switch
-                    isSelected={draft.keepAudio}
-                    onChange={(next: boolean) => patch({ keepAudio: next })}
-                  ><Switch.Content aria-label={t('session.keepAudio')}><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content></Switch>
-                </SettingRow>
-              </div>
-            </Modal.Body>
-
-            {!modelsConfigured ? <p className="nola-caption text-warning">{t('modelConfig.needsConfiguration')}</p> : !recognitionValid ? <p className="nola-caption text-warning">{t('modelConfig.sourceUnsupported')}</p> : null}
-            <Modal.Footer>
-              <Button variant="tertiary" size="sm" className="rounded-xl" onPress={() => onOpenChange(false)}>
-                {t('session.cancel')}
-              </Button>
-              <Button variant="primary" size="sm" className="rounded-full px-5" isDisabled={!modelsConfigured || !recognitionValid} onPress={submit}>
-                {t('session.start')}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+    <Dialog open={isOpen && !(incompatible && dismissedPair !== signature)} onOpenChange={onOpenChange}>
+      <DialogContent className="rounded-2xl border border-border">
+        <DialogHeader><DialogTitle>{t('session.title')}</DialogTitle></DialogHeader>
+        <div className="nola-dialog-body flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1">
+              <Label htmlFor="session-name">{t('session.name')}</Label>
+              <Tooltip><TooltipTrigger render={<Button variant="secondary" size="icon" aria-label={t('session.nameHelpAria')} className="size-6 shrink-0 text-muted" />}><CircleHelp aria-hidden="true" /></TooltipTrigger><TooltipContent className="max-w-96 whitespace-normal">{t('session.nameHint')}</TooltipContent></Tooltip>
+            </div>
+            <Input id="session-name" value={draft.title || previewName} onChange={event => patch({ title: event.target.value })} />
+          </div>
+          <SetupSelect label={t('session.audioSource')} value={draft.audioSource} options={audioOptions.map(option => ({ value: option.value, label: option.name }))} onChange={audioSource => patch({ audioSource })} />
+          <SetupSelect label={t('session.sourceLanguage')} value={draft.sourceLanguage} options={modelOptions.sourceLanguages.map(code => ({ value: code, label: languageLabel(code) }))} onChange={sourceLanguage => patch({ sourceLanguage })} />
+          <SetupSelect label={t('session.recognitionModel')} value={draft.recognitionModelId} options={modelOptions.recognitionModels} onChange={key => {
+            const codes = (settings.recognition.provider ?? 'local') === 'local' ? recognitionLanguages(resources.find(model => model.resourceId === key)) : modelOptions.sourceLanguages
+            const sourceLanguage = codes.includes(draft.sourceLanguage) ? draft.sourceLanguage : codes.includes('auto') ? 'auto' : draft.sourceLanguage
+            if (sourceLanguage === draft.sourceLanguage && !codes.includes(sourceLanguage)) notifyError(t('errors.unsupportedRecognitionLanguage', { language: languageName(sourceLanguage, language) }))
+            patch({ recognitionModelId: key as RecognitionModelId, sourceLanguage })
+          }} />
+          <div className="flex flex-col gap-2 rounded-2xl border border-border">
+            <SettingRow label={t('session.translation')} className="hover:bg-transparent">
+              <SettingSwitch isSelected={draft.translate} ariaLabel={t('session.translation')} onChange={next => patch({ translate: next, ...(next && draft.targetLanguage === NO_TRANSLATION_LANGUAGE ? { targetLanguage: DEFAULT_SETTINGS.translation.targetLanguage } : {}) })} />
+            </SettingRow>
+            {draft.translate ? <div className="flex flex-col gap-4 px-4 pb-4">
+              <SetupSelect label={t('session.translationLanguage')} value={draft.targetLanguage} options={modelOptions.targetLanguages.map(code => ({ value: code, label: languageLabel(code) }))} onChange={targetLanguage => patch({ targetLanguage, translate: targetLanguage !== NO_TRANSLATION_LANGUAGE })} />
+              {translation.provider === 'local' ? <SetupSelect label={t('session.translationModel')} value={draft.translationModelId} options={localModelOptions} onChange={translationModelId => patch({ translationModelId })} /> : null}
+            </div> : null}
+          </div>
+          <div className="rounded-2xl border border-border">
+            <SettingRow label={t('session.keepAudio')} desc={t('session.keepAudioHint')} descriptionTooltip className="hover:bg-transparent">
+              <SettingSwitch isSelected={draft.keepAudio} ariaLabel={t('session.keepAudio')} onChange={keepAudio => patch({ keepAudio })} />
+            </SettingRow>
+          </div>
+          {!modelsConfigured ? <p className="nola-caption text-warning">{t('modelConfig.needsConfiguration')}</p> : !recognitionValid ? <p className="nola-caption text-warning">{t('modelConfig.sourceUnsupported')}</p> : null}
+        </div>
+        <DialogFooter>
+          <Button variant="tertiary" size="sm" onClick={() => onOpenChange(false)}>{t('session.cancel')}</Button>
+          <Button size="sm" disabled={!modelsConfigured || !recognitionValid} onClick={submit}>{t('session.start')}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   )
 }
@@ -456,3 +250,14 @@ export function audioSourceFrom(option: AudioSourceOption | undefined, fallbackV
     : { kind: 'systemOutput', deviceId: option.deviceId || fallbackValue }
 }
 import { recognitionFieldsOf } from '../../../shared/cloud-config'
+
+interface SetupSelectProps {
+  label: string
+  value: string
+  options: readonly { value: string; label: string; isDisabled?: boolean }[]
+  onChange: (value: string) => void
+}
+
+function SetupSelect({ label, value, options, onChange }: SetupSelectProps) {
+  return <div className="flex flex-col gap-2"><span className="label">{label}</span><SettingSelect value={value} ariaLabel={label} options={[...options]} onChange={onChange} /></div>
+}

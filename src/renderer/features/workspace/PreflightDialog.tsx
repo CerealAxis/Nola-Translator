@@ -12,8 +12,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { Button, Modal, Spinner } from '@heroui/react'
-import { CircleAlert } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { CircleAlert, LoaderCircle } from 'lucide-react'
 
 import type { MissingResource } from '@/store'
 import type { DiagnosticCopyContext } from '@/bridge'
@@ -295,18 +296,16 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
       setDownloadTarget(null)
       void install(source)
     }} />
-    <Modal isOpen={isOpen} onOpenChange={close}>
-      <Modal.Backdrop className="z-overlay">
-        <Modal.Container size="sm" placement="center">
-          <Modal.Dialog className="rounded-2xl border border-border">
-            <Modal.Header>
-              <Modal.Heading className="nola-title text-foreground">{t('preflight.title')}</Modal.Heading>
-              <span className="nola-micro text-[12px] leading-[1.45] font-normal text-muted">
-                {t('session.stepPreflight')}
-              </span>
-            </Modal.Header>
+    <Dialog open={isOpen} onOpenChange={close}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{t('preflight.title')}</DialogTitle>
+          <span className="nola-micro text-[12px] leading-[1.45] font-normal text-muted">
+            {t('session.stepPreflight')}
+          </span>
+        </DialogHeader>
 
-            <Modal.Body className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3">
               <ChecklistRow done={!environmentPending && !environmentFailed} failed={environmentFailed}
                 pending={environmentPending} label={t('runtime.checking')} failedLabel={t('runtime.noticeTitle')} />
               {!environmentPending && !environmentFailed ? <>
@@ -344,45 +343,43 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
                   </p>
                 ) : <p className="nola-caption text-warning">{t('preflight.deviceCheckWarning')}</p>
               ) : null}
-            </Modal.Body>
+        </div>
 
-            <Modal.Footer>
-              {failureContext && onCopyDiagnostics ? (
-                <Button variant="tertiary" size="sm" className="rounded-xl" onPress={() => onCopyDiagnostics(failureContext)}>
-                  {t('errors.copyDiagnosticsAction')}
-                </Button>
-              ) : null}
-              {failedStage ? (
-                <Button variant="secondary" size="sm" className="rounded-xl" onPress={() => runCheck(true)}>
-                  {t('runtime.recheck')}
-                </Button>
-              ) : null}
-              <Button variant="tertiary" size="sm" className="rounded-xl" onPress={() => close(false)}>
-                {stage === 'missing' ? t('preflight.later') : t('session.cancel')}
-              </Button>
-              {stage === 'missing' ? (
-                <Button variant="primary" size="sm" className="rounded-full px-5" onPress={requestInstall} isPending={installing}>
-                  <CircleAlert aria-hidden="true" />
-                  {t('preflight.installNow')}
-                </Button>
-              ) : (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  className="rounded-full px-5"
-                  onPress={onStart}
-                  // Device enumeration is advisory: the selected source is resolved again
-                  // by startSession, so a transient list failure must not block a usable source.
-                  isDisabled={stage !== 'ready'}
-                >
-                  {t('preflight.start')}
-                </Button>
-              )}
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+        <DialogFooter>
+          {failureContext && onCopyDiagnostics ? (
+            <Button variant="tertiary" size="sm" className="rounded-xl" onClick={() => onCopyDiagnostics(failureContext)}>
+              {t('errors.copyDiagnosticsAction')}
+            </Button>
+          ) : null}
+          {failedStage ? (
+            <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => runCheck(true)}>
+              {t('runtime.recheck')}
+            </Button>
+          ) : null}
+          <Button variant="tertiary" size="sm" className="rounded-xl" onClick={() => close(false)}>
+            {stage === 'missing' ? t('preflight.later') : t('session.cancel')}
+          </Button>
+          {stage === 'missing' ? (
+            <Button variant="default" size="sm" className="rounded-full px-5" onClick={requestInstall} disabled={installing}>
+              {installing ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <CircleAlert aria-hidden="true" />}
+              {t('preflight.installNow')}
+            </Button>
+          ) : (
+            <Button
+              variant="default"
+              size="sm"
+              className="rounded-full px-5"
+              onClick={onStart}
+              // Device enumeration is advisory: the selected source is resolved again
+              // by startSession, so a transient list failure must not block a usable source.
+              disabled={stage !== 'ready'}
+            >
+              {t('preflight.start')}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   )
 }
@@ -404,7 +401,7 @@ function ChecklistRow({
   const { t } = useI18n()
   return (
     <div className="flex items-center gap-2">
-      {pending ? <Spinner size="sm" /> : null}
+      {pending ? <LoaderCircle className="size-4 animate-spin text-accent" aria-label={t('common.loading')} /> : null}
       {!pending && done ? <span className="size-1.5 shrink-0 rounded-full bg-success" aria-label={t('preflight.allReady')} /> : null}
       {!pending && !done && failed ? (
         <CircleAlert className="size-4 shrink-0 text-danger" aria-hidden="true" />

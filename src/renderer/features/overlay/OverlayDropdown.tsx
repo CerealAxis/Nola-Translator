@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Dropdown } from '@heroui/react'
+import { Menu } from '@base-ui/react/menu'
 import { actions, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
 import { notifyError } from '@/components/primitives/notify'
@@ -21,24 +21,16 @@ export function OverlayDropdown({ kind, children }: OverlayDropdownProps) {
   const popupKind = isPopup ? presentation?.kind : null
   const modality = useRef<'pointer' | 'keyboard'>('pointer')
   const [popupOpen, setPopupOpen] = useState(true)
-  const closing = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => () => {
-    if (closing.current !== null) clearTimeout(closing.current)
-  }, [])
+  const closeRequested = useRef(false)
+  const closeId = useRef<number | null>(null)
   if (popupKind && popupKind !== kind) return null
 
   const onOpenChange = (open: boolean): void => {
     if (popupKind) {
-      if (!open && closing.current === null) {
-        const id = presentation!.id
+      if (!open) {
+        closeRequested.current = true
+        closeId.current = presentation?.id ?? null
         setPopupOpen(false)
-        // Keep HeroUI's exit animation and let the item's settings IPC leave before hiding the surface.
-        closing.current = setTimeout(() => {
-          void actions.settings.closeOverlayMenu(id).catch((error: unknown) => {
-            console.warn('[overlay] menu close failed', error)
-            notifyError(t('overlay.menuFailed'), { cause: error })
-          })
-        }, 120)
       }
       return
     }
@@ -58,13 +50,30 @@ export function OverlayDropdown({ kind, children }: OverlayDropdownProps) {
     })
   }
 
+  const onOpenChangeComplete = (open: boolean): void => {
+    if (open || !popupKind || !closeRequested.current) return
+    closeRequested.current = false
+    const id = closeId.current
+    closeId.current = null
+    if (!id) return
+    void actions.settings.closeOverlayMenu(id).catch((error: unknown) => {
+      console.warn('[overlay] menu close failed', error)
+      notifyError(t('overlay.menuFailed'), { cause: error })
+    })
+  }
+
   return (
     <span ref={anchor} className="nola-caption-menu-trigger" data-menu-kind={kind}
       onPointerDownCapture={() => { modality.current = 'pointer' }}
       onKeyDownCapture={() => { modality.current = 'keyboard' }}>
-      <Dropdown isOpen={isPopup ? popupOpen : localOpen} onOpenChange={onOpenChange}>
+      <Menu.Root
+        open={isPopup ? popupOpen : localOpen}
+        onOpenChange={onOpenChange}
+        onOpenChangeComplete={onOpenChangeComplete}
+        modal={false}
+      >
         {children}
-      </Dropdown>
+      </Menu.Root>
     </span>
   )
 }

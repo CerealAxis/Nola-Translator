@@ -1,7 +1,8 @@
 /** Inline Markdown editing; persisted notes remain portable Markdown strings. */
 import { useEffect, useRef } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Button, Card, ToggleButton } from '@heroui/react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Bold, Italic, StickyNote, Strikethrough, Underline as UnderlineIcon } from 'lucide-react'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -84,22 +85,22 @@ export function NotesPanel({ value, onChange, collapsed = false, onToggleCollaps
   }, [editor, t])
 
   if (collapsed) {
-    return <Button variant="secondary" isIconOnly onPress={onToggleCollapsed} aria-label={t('workspaceUi.notesExpand')} data-slot="notes-handle" className="nola-workspace-notes-handle"><StickyNote aria-hidden="true" /></Button>
+    return <Button variant="secondary" size="icon" onClick={onToggleCollapsed} aria-label={t('workspaceUi.notesExpand')} className="nola-workspace-notes-handle"><StickyNote aria-hidden="true" /></Button>
   }
   return (
-    <Card role="complementary" data-slot="notes-panel" aria-label={t('notes.title')} className={['nola-workspace-notes', className].filter(Boolean).join(' ')}>
-      <Card.Header className="nola-workspace-notes-heading">
-        <Card.Title>{t('notes.title')}</Card.Title>
+    <Card role="complementary" aria-label={t('notes.title')} className={['nola-workspace-notes', className].filter(Boolean).join(' ')}>
+      <CardHeader className="nola-workspace-notes-heading p-0">
+        <CardTitle className="card__title">{t('notes.title')}</CardTitle>
         <span className="nola-workspace-notes-state" title={t('workspaceUi.notesLocalHint')}>{t('workspaceUi.notesLocal')}</span>
-      </Card.Header>
+      </CardHeader>
       <div className="nola-workspace-notes-tools" role="toolbar" aria-label={t('notes.title')}>
         {MARKS.map(({ key, icon: Icon, labelKey }) => (
-          <ToggleButton key={key} isIconOnly size="sm" aria-label={t(labelKey)}
-            isSelected={state?.[key] ?? false} isDisabled={!editor}
-            onPress={() => editor?.chain().focus().toggleMark(key).run()}><Icon aria-hidden="true" /></ToggleButton>
+          <Button key={key} variant="secondary" size="icon" aria-label={t(labelKey)}
+            aria-pressed={state?.[key] ?? false} disabled={!editor}
+            onClick={() => editor?.chain().focus().toggleMark(key).run()}><Icon aria-hidden="true" /></Button>
         ))}
       </div>
-      <Card.Content className="nola-workspace-notes-content">
+      <CardContent className="nola-workspace-notes-content flex-col">
         <EditorContent editor={editor} className="nola-workspace-notes-editor nola-scrollbar" data-empty={state?.empty ?? true}
           onPasteCapture={event => {
             if (!editor || editor.isActive('codeBlock') || event.clipboardData.types.includes('text/html')) return
@@ -108,7 +109,7 @@ export function NotesPanel({ value, onChange, collapsed = false, onToggleCollaps
             event.preventDefault()
             editor.commands.insertContent(text, { contentType: 'markdown' })
           }} />
-      </Card.Content>
+      </CardContent>
     </Card>
   )
 }

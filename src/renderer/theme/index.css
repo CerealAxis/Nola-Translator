@@ -1,19 +1,15 @@
 /* =============================================================================
-   The only stylesheet features import. Consumed as the third import of
-   `src/renderer/index.css`, after `tailwindcss` and `@heroui/styles`.
+   The only stylesheet features import. Consumed after Tailwind in each renderer.
 
-   Everything here goes in `@layer base`, not `theme`: HeroUI declares its own
-   colour primitives (`--accent`, `--radius`, ...) inside `base`, so values of
-   ours imported into `theme` would sit below them and be silently dropped. The
-   same layer plus a later source position is what makes ours win. Semantic
-   component classes go in `components` and the stacking classes in `utilities`,
-   so Tailwind utilities can still override them.
+   Product tokens and semantic component classes use explicit cascade layers so
+   utilities can override component styling without replacing product defaults.
    ========================================================================== */
 
 @layer theme, base, components, utilities;
 
 @import './nola-light.css' layer(base);
 @import './nola-dark.css' layer(base);
+@import './base-ui.css';
 @import './typography.css' layer(base);
 @import './motion.css' layer(base);
 @import './caption-card.css';
@@ -67,6 +63,15 @@
     --radius-xl: 16px;
     --radius-2xl: 24px;
     --radius-full: 9999px;
+    --radius: var(--radius-md);
+    --field-radius: var(--radius-md);
+    --surface-foreground: var(--foreground);
+    --surface-secondary-foreground: var(--foreground);
+    --surface-tertiary-foreground: var(--foreground);
+    --shadow-surface: var(--surface-shadow);
+    --accent-soft: color-mix(in oklab, var(--accent) 15%, transparent);
+    --success-soft: color-mix(in oklab, var(--success) 15%, transparent);
+    --success-soft-foreground: color-mix(in oklab, var(--success) 80%, var(--foreground) 60%);
 
     /* --- Shadow scale --------------------------------------------------------
        Per DESIGN.md §8.3. Light mode is based on slate-900 (15, 23, 42). */
@@ -74,8 +79,7 @@
     --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.1), 0 2px 4px -1px rgba(15, 23, 42, 0.06);
     --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -2px rgba(15, 23, 42, 0.05);
 
-    /* HeroUI radius and the v3 shell geometry are defined in app.css, which is
-       imported after this file. */
+    /* Product geometry stays independent of the component library. */
 
     /* Legacy spacing names, kept as aliases of the scale above. */
     --nola-space-1: var(--space-1);
@@ -97,6 +101,9 @@
   /* Dark mode halves the shadow alpha and keeps the geometry. */
   .dark,
   [data-theme='dark'] {
+    --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+    --success-soft: color-mix(in oklab, var(--success) 12%, transparent);
+    --success-soft-foreground: color-mix(in oklab, var(--success) 80%, var(--foreground) 30%);
     --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.025);
     --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -1px rgba(15, 23, 42, 0.03);
     --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.05), 0 4px 6px -2px rgba(15, 23, 42, 0.025);
@@ -218,67 +225,6 @@
 }
 
 @layer utilities {
-  /* HeroUI types `.dropdown__trigger` as `display: inline-block`, which is fine
-     until the trigger holds more than text: a multi-child trigger then lays out
-     as inline boxes, where `max-w-*` does not apply and `truncate` cannot work, so
-     the capsule overflows its container and pushes the icon and arrow onto other
-     lines. `inline-flex` fixes all three at once and leaves a text-only trigger
-     rendering identically. */
-  .dropdown__trigger {
-    display: inline-flex;
-  }
-
-  /*
-   * Every field box gets `border-width: var(--border-width-field)`, and HeroUI
-   * resolves that to `--field-border-width`, whose default is 0px — so the
-   * hairline has to be stated explicitly rather than inherited.
-   *
-   * `.search-field__group`, not `.search-field`, is the bordered box: the root is
-   * only the `flex flex-col` shell, and `SearchField.Group` has to be written out
-   * or the icon and the input land in the shell and wrap.
-   *
-   * Focus is the 1px border alone. HeroUI also applies `status-focused-field`, a
-   * 2px box-shadow ring, so that is cleared; its offset is zeroed by
-   * `--ring-offset-width` and the border colour comes from
-   * `--field-border-focus`, both set in nola-light/nola-dark.css.
-   *
-   * `:not([data-invalid='true'])` is load-bearing: HeroUI's `invalid-field-ring`
-   * is an `outline-1 outline-danger` when unfocused and a `ring-2` box-shadow
-   * when focused, and clearing both would leave an invalid field with no
-   * indication at all.
-   *
-   * Covers the five field classes actually in use: Input / TextArea /
-   * SearchField.Group / InputGroup / Select. */
-  .input,
-  .textarea,
-  .search-field__group,
-  .input-group,
-  .select__trigger {
-    border-width: 1px;
-  }
-
-  /* HeroUI's `.select__value` is `flex: 1` with the default `min-width: auto`, so
-     a long device name sizes the item itself instead of shrinking, and
-     `wrap-break-word` folds it onto a second line inside the trigger. `min-width: 0`
-     lets the item shrink; the rest ellipsises whatever no longer fits. */
-  .select__value {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .input:not([data-invalid='true']):focus,
-  .input:not([data-invalid='true'])[data-focused='true'],
-  .textarea:not([data-invalid='true']):focus,
-  .textarea:not([data-invalid='true'])[data-focused='true'],
-  .search-field__group:not([data-invalid='true']):focus-within,
-  .search-field__group:not([data-invalid='true'])[data-focus-within='true'],
-  .input-group:not([data-invalid='true']):focus-within,
-  .input-group:not([data-invalid='true'])[data-focus-within='true'],
-  .select__trigger:not([data-invalid='true']):focus-visible:not([data-focused]),
-  .select__trigger:not([data-invalid='true'])[data-focus-visible='true'] {
-    box-shadow: none;
-    outline: none;
-  }
+  .dropdown__trigger { display: inline-flex; }
+  .select__value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { actions, getBridge, stores, useStore } from '@/store'
-import { Button } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { OverlayControls } from './OverlayControls'
 import { useI18n } from '@/i18n'
 import { notifyError } from '@/components/primitives/notify'
@@ -12,7 +12,7 @@ export function OverlayMenuRoot() {
   const { t } = useI18n()
   useLayoutEffect(() => {
     if (!menu) return
-    // The mouse press happened in the caption document, so React Aria here has not seen that input modality.
+    // The mouse press happened in the caption document, so the menu document here has not seen that input modality.
     document.documentElement.dataset.overlayMenuInput = menu.modality
     const dark = menu.settings.theme === 'dark'
       || menu.settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -94,15 +94,15 @@ function OverlayCloseConfirmation({ id }: { id: number }) {
         <p className="nola-confirm-title">{t('overlay.closeTitle')}</p>
         <p className="nola-confirm-text">{t('overlay.closeBody')}</p>
         <div className="nola-confirm-actions">
-          <Button variant="secondary" size="sm" isDisabled={pending}
-            onPress={() => {
+          <Button variant="secondary" size="sm" disabled={pending}
+            onClick={() => {
               void actions.settings.closeOverlayMenu(id).catch((error: unknown) => {
                 notifyError(t('overlay.menuFailed'), { cause: error })
               })
             }}>
             {t('common.cancel')}
           </Button>
-          <Button variant="danger" size="sm" isPending={pending} onPress={() => void close()}>
+          <Button variant="danger" size="sm" disabled={pending} aria-busy={pending} onClick={() => void close()}>
             {t(pending ? 'overlay.closing' : 'overlay.closeConfirm')}
           </Button>
         </div>

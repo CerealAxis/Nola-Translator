@@ -1,21 +1,6 @@
-﻿/* Renderer entry stylesheet.
- *
- * Import order is load-bearing:
- *   1. tailwindcss     — Tailwind v4 has to come first
- *   2. @heroui/styles  — HeroUI v3 needs the tailwind variables registered above
- *   3. ./theme/index.css — this product's tokens, typography, motion, layers
- *
- * `@source` paths resolve relative to this CSS file itself, not to the vite root
- * and not to the cwd, so `'./'` has to cover every directory that holds Tailwind
- * classes.
- *
- * `source(none)` turns off Tailwind's automatic source detection, which would
- * otherwise start from the repo root and walk `out/`, `node_modules/`,
- * `engine/dist/` and `vendor/` on every build.
- */
+/* Shared renderer entry: Tailwind, product theme and shadcn/Base UI controls. */
 @import 'tailwindcss' source(none);
 @source './';
-@import '@heroui/styles';
 @import './theme/index.css';
 @import './theme/app.css';
 

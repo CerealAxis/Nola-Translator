@@ -13,6 +13,7 @@
   --z-caption-actions: 30; /* overlay card's hover action + control rows */
   --z-dropdown: 40; /* Dropdown / Select / Popover / Combobox */
   --z-overlay: 60; /* Modal / AlertDialog / Drawer */
+  --z-popup: 65; /* Portalled field popups must remain above their parent dialog. */
   --z-onboarding: 70; /* Interactive lessons must remain above the real modal they explain. */
   --z-toast: 80; /* Toast */
   --z-titlebar-drag: 100; /* Electron titlebar drag region */
@@ -45,6 +46,9 @@
 
   .z-overlay {
     z-index: var(--z-overlay);
+  }
+  .z-popup {
+    z-index: var(--z-popup);
   }
 
   .z-onboarding {

@@ -14,11 +14,13 @@ import { recognitionLanguages } from '../../../../shared/model-capabilities'
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Slider } from '@heroui/react'
+import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
+import { LoaderCircle } from 'lucide-react'
 
 import { languageName } from '@/bridge'
 import { SettingsRow } from '../SettingsRow'
 import { notifyError, notifySuccess, notifyWarning } from '@/components/primitives/notify'
+import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { errorCopyOf } from '@/features/workspace/error-copy'
 import { actions, stores, updateSettings, useStore } from '@/store'
@@ -148,7 +150,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
       </SettingGroup>
 
       {provider !== 'aliyun' ? <SettingGroup legend={t('settings.vadGroup')} actions={
-        <Button variant="secondary" size="sm" onPress={() => {
+        <Button variant="secondary" size="sm" onClick={() => {
           void updateSettings({ recognition: {
             max_segment_ms: DEFAULT_SETTINGS.recognition.max_segment_ms,
             silence_end_ms: DEFAULT_SETTINGS.recognition.silence_end_ms,
@@ -161,15 +163,21 @@ export function AudioTab({ settings }: SettingsPanelProps) {
         ] as const).map(([field, label, hint, fallback, min, max, step]) => (
           <SettingsRow key={field} label={t(label)} desc={t(hint)} descriptionTooltip>
             <div className="settings-slider">
-              <Slider aria-label={t(label)} value={settings.recognition[field] ?? fallback}
-                minValue={min} maxValue={max} step={step} onChange={next => {
-                  const value = Array.isArray(next) ? next[0] : next
-                  if (value !== undefined && Number.isInteger(value) && value >= min && value <= max) {
-                    void updateSettings({ recognition: { [field]: value } }).catch(() => undefined)
+              <SliderRoot className="slider" min={min} max={max} step={step}
+                value={settings.recognition[field] ?? fallback}
+                onValueChange={(value: number | readonly number[]) => {
+                  const next = typeof value === 'number' ? value : (value[0] ?? fallback)
+                  if (Number.isInteger(next) && next >= min && next <= max) {
+                    void updateSettings({ recognition: { [field]: next } }).catch(() => undefined)
                   }
                 }}>
-                <Slider.Track><Slider.Fill /><Slider.Thumb /></Slider.Track>
-              </Slider>
+                <SliderControl>
+                  <SliderTrack className="relative h-1 w-full rounded-full bg-surface-tertiary">
+                    <SliderIndicator className="rounded-full bg-accent" />
+                    <SliderThumb className="size-3 rounded-full bg-accent focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus" aria-label={t(label)} />
+                  </SliderTrack>
+                </SliderControl>
+              </SliderRoot>
               <output className="nola-caption tabular text-right">{(settings.recognition[field] ?? fallback).toLocaleString(language)}</output>
               <span className="settings-slider__unit" aria-hidden="true" />
             </div>
@@ -264,9 +272,9 @@ function DeviceTest({ expect }: { expect: string }) {
     }
   }
   return (
-    <Button variant="tertiary" size="sm" className="rounded-[var(--radius-xl)]"
-      isPending={state === 'capturing'} isDisabled={busy}
-      onPress={() => { void runTest() }}>
+    <Button variant="tertiary" size="sm" disabled={busy}
+      onClick={() => { void runTest() }}>
+      {state === 'capturing' ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
       {t('settings.testAudio')}
     </Button>
   )

@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Button, Card, Chip, Link, Modal, ProgressBar, Spinner } from '@heroui/react'
+import { Button } from '@/components/ui/button'
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
+import { Dialog, DialogCloseButton, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Progress } from '@base-ui/react/progress'
+import { Spinner } from '@/components/ui/spinner'
+import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2, Github, MousePointer2, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { useRoute } from '@/routes'
@@ -51,32 +56,32 @@ function WelcomeDialog() {
     }
   }, [t])
 
-  return <Modal.Backdrop isOpen onOpenChange={open => { if (!open) actions.settings.stopOnboarding() }} className="z-overlay" isDismissable={false}>
-      <Modal.Container size="md" placement="center">
-        <Modal.Dialog className="onboarding-welcome">
-          <Modal.Header>
+  return <Dialog open onOpenChange={(open, details) => { if (details.reason === 'outside-press') { details.cancel(); return } if (!open) actions.settings.stopOnboarding() }}>
+
+        <DialogContent className="onboarding-welcome">
+          <DialogHeader>
             <img ref={markPresented} className="onboarding-welcome__logo" src={nolaLogoUrl} alt="" aria-hidden="true" />
-            <Modal.Heading>{t('onboarding.welcomeTitle')}</Modal.Heading>
-          </Modal.Header>
-          <Modal.Body>
+            <DialogTitle>{t('onboarding.welcomeTitle')}</DialogTitle>
+          </DialogHeader>
+          <div className="nola-dialog-body">
             <p>{t('onboarding.welcomeIntro')}</p>
             <div className="onboarding-welcome__support">
               <p>{t('onboarding.starRequest')}</p>
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="primary" size="sm" autoFocus onPress={() => actions.settings.beginOnboarding()}>{t('onboarding.begin')}</Button>
-            <Button variant="secondary" size="sm" onPress={() => actions.settings.stopOnboarding()}>{t('onboarding.later')}</Button>
-            <Link className="onboarding-welcome__link button button--sm button--secondary" href="https://nola.xaviermc.top" target="_blank" rel="noreferrer">
+          </div>
+          <DialogFooter>
+            <Button variant="default" size="sm" autoFocus onClick={() => actions.settings.beginOnboarding()}>{t('onboarding.begin')}</Button>
+            <Button variant="secondary" size="sm" onClick={() => actions.settings.stopOnboarding()}>{t('onboarding.later')}</Button>
+            <a className="onboarding-welcome__link button button--sm button--secondary" href="https://nola.xaviermc.top" target="_blank" rel="noreferrer">
               <BookOpen aria-hidden="true" />{t('onboarding.helpDocs')}
-            </Link>
-            <Link className="onboarding-welcome__link button button--sm button--secondary" href="https://github.com/CerealAxis/Nola-Translator" target="_blank" rel="noreferrer">
+            </a>
+            <a className="onboarding-welcome__link button button--sm button--secondary" href="https://github.com/CerealAxis/Nola-Translator" target="_blank" rel="noreferrer">
               <Github aria-hidden="true" />{t('onboarding.github')}
-            </Link>
-          </Modal.Footer>
-        </Modal.Dialog>
-      </Modal.Container>
-  </Modal.Backdrop>
+            </a>
+          </DialogFooter>
+        </DialogContent>
+
+  </Dialog>
 }
 
 interface TourGeometry {
@@ -170,7 +175,7 @@ function TourSteps() {
     const advance = () => {
       if (advancing || !alive) return
       advancing = true
-      // React and HeroUI must finish their route/tab/dialog update before the next lesson measures it.
+      // React and the controls must finish their route/tab/dialog update before the next lesson measures it.
       settleFrame = requestAnimationFrame(() => { if (alive) moveTo(index + 1, true) })
     }
     const measure = () => {
@@ -317,35 +322,35 @@ function TourSteps() {
         style={geometry && !away ? { left: geometry.tip.x, top: geometry.tip.y, maxHeight: geometry.maxHeight } : undefined}>
         <div className="onboarding-tour__topline">
           <span>{t('onboarding.chapterProgress', { current: chapter + 1, total: TOUR_CHAPTERS.length })}</span>
-          <Button isIconOnly variant="secondary" size="sm" aria-label={t('onboarding.exit')} onPress={() => actions.settings.stopOnboarding()}><X aria-hidden="true" /></Button>
+          <Button variant="secondary" size="icon" aria-label={t('onboarding.exit')} onClick={() => actions.settings.stopOnboarding()}><X aria-hidden="true" /></Button>
         </div>
           <ol className="onboarding-tour__chapters" aria-label={t('onboarding.title')}>
             {TOUR_CHAPTERS.map((key, item) => <li key={key} aria-current={item === chapter ? 'step' : undefined} data-state={item < chapter ? 'complete' : item === chapter ? 'current' : 'upcoming'}>
               <span aria-hidden="true">{item < chapter ? <Check /> : item + 1}</span><span>{t(key)}</span>
             </li>)}
           </ol>
-          <ProgressBar size="sm" aria-label={t('onboarding.title')} value={(index / TOUR_STEPS.length) * 100}>
-            <ProgressBar.Track><ProgressBar.Fill /></ProgressBar.Track>
-          </ProgressBar>
-          <Card.Header><Card.Title id="onboarding-heading">{t(step.title)}</Card.Title></Card.Header>
-          <Card.Content key={step.id} className="onboarding-tour__lesson">
+          <Progress.Root className="onboarding-tour__meter" aria-label={t('onboarding.title')} value={(index / TOUR_STEPS.length) * 100}>
+            <Progress.Track className="onboarding-tour__meter-track"><Progress.Indicator className="onboarding-tour__meter-fill" /></Progress.Track>
+          </Progress.Root>
+          <CardHeader><CardTitle id="onboarding-heading">{t(step.title)}</CardTitle></CardHeader>
+          <CardContent key={step.id} className="onboarding-tour__lesson">
             <p id="onboarding-body">{away ? t('onboarding.paused') : t(step.body)}</p>
-            {runtime ? <Chip size="sm" variant="soft" color={runtime.status === 'ready' ? 'success' : 'default'}>{t(runtime.status === 'ready' ? 'runtime.installed' : 'runtime.missing')}{runtime.status === 'ready' && runtime.version ? ` · ${runtime.version}` : ''}</Chip> : null}
-            {!away && missing ? <p className="onboarding-tour__status" role="status">{unavailable ? t('onboarding.targetMissing') : <><Spinner size="sm" />{t('onboarding.loading')}</>}</p> : null}
+            {runtime ? <Badge variant={runtime.status === 'ready' ? 'success' : 'secondary'}>{t(runtime.status === 'ready' ? 'runtime.installed' : 'runtime.missing')}{runtime.status === 'ready' && runtime.version ? ` · ${runtime.version}` : ''}</Badge> : null}
+            {!away && missing ? <p className="onboarding-tour__status" role="status">{unavailable ? t('onboarding.targetMissing') : <><Spinner />{t('onboarding.loading')}</>}</p> : null}
             {!away && !missing && step.action ? <p className="onboarding-tour__instruction"><MousePointer2 aria-hidden="true" />{t(step.action === 'inspect' ? 'onboarding.inspectHint' : 'onboarding.actHint')}</p> : null}
-          </Card.Content>
+          </CardContent>
           <div className="onboarding-tour__feedback" role="status" aria-live="polite">{feedback ? <><CheckCircle2 aria-hidden="true" />{t('onboarding.feedback')}</> : null}</div>
-          <Card.Footer>
+          <CardFooter>
             <span className="onboarding-tour__progress">{t('onboarding.progress', { current: chapterIndex, total: chapterSteps.length })}</span>
             <div className="onboarding-tour__actions">
-              <Button variant="secondary" size="sm" isDisabled={index === 0} onPress={() => moveTo(index - 1)}><ArrowLeft aria-hidden="true" />{t('onboarding.back')}</Button>
-              {away || (missing && unavailable) ? <Button variant="primary" size="sm" onPress={resume}>{t(away ? 'onboarding.resume' : 'onboarding.retry')}</Button>
-                : !step.action ? <Button variant="primary" size="sm" isDisabled={missing} onPress={() => moveTo(index + 1)}>{t('onboarding.next')}<ArrowRight aria-hidden="true" /></Button> : null}
+              <Button variant="secondary" size="sm" disabled={index === 0} onClick={() => moveTo(index - 1)}><ArrowLeft aria-hidden="true" />{t('onboarding.back')}</Button>
+              {away || (missing && unavailable) ? <Button variant="default" size="sm" onClick={resume}>{t(away ? 'onboarding.resume' : 'onboarding.retry')}</Button>
+                : !step.action ? <Button variant="default" size="sm" disabled={missing} onClick={() => moveTo(index + 1)}>{t('onboarding.next')}<ArrowRight aria-hidden="true" /></Button> : null}
             </div>
-          </Card.Footer>
+          </CardFooter>
           <div className="onboarding-tour__secondary">
-            <Button variant="tertiary" size="sm" onPress={() => moveTo(index + 1)}>{t('onboarding.skipStep')}</Button>
-            <Button variant="tertiary" size="sm" onPress={skipChapter}>{t('onboarding.skipChapter')}</Button>
+            <Button variant="tertiary" size="sm" onClick={() => moveTo(index + 1)}>{t('onboarding.skipStep')}</Button>
+            <Button variant="tertiary" size="sm" onClick={skipChapter}>{t('onboarding.skipChapter')}</Button>
           </div>
       </Card>
     </div>, document.body,
@@ -356,19 +361,19 @@ export interface TourCompletionProps { onExit: () => void }
 
 function TourCompletion({ onExit }: TourCompletionProps) {
   const { t } = useI18n()
-  return <Modal.Backdrop isOpen onOpenChange={open => { if (!open) actions.settings.stopOnboarding() }} className="z-overlay" isDismissable={false}>
-    <Modal.Container size="md" placement="center">
-      <Modal.Dialog data-onboarding="complete">
-        <Modal.CloseTrigger aria-label={t('onboarding.exit')}><X aria-hidden="true" /></Modal.CloseTrigger>
-        <Modal.Header><Modal.Heading>{t('onboarding.finishTitle')}</Modal.Heading></Modal.Header>
-        <Modal.Body><p>{t('onboarding.finishBody')}</p></Modal.Body>
-        <Modal.Footer>
-      <Link className="onboarding-welcome__link button button--sm button--secondary" href="https://github.com/CerealAxis/Nola-Translator" target="_blank" rel="noreferrer">
+  return <Dialog open onOpenChange={(open, details) => { if (details.reason === 'outside-press') { details.cancel(); return } if (!open) actions.settings.stopOnboarding() }}>
+
+      <DialogContent data-onboarding="complete">
+        <DialogCloseButton aria-label={t('onboarding.exit')} />
+        <DialogHeader><DialogTitle>{t('onboarding.finishTitle')}</DialogTitle></DialogHeader>
+        <div className="nola-dialog-body"><p>{t('onboarding.finishBody')}</p></div>
+        <DialogFooter>
+      <a className="onboarding-welcome__link button button--sm button--secondary" href="https://github.com/CerealAxis/Nola-Translator" target="_blank" rel="noreferrer">
         <Github aria-hidden="true" />{t('onboarding.githubHome')}
-      </Link>
-      <Button variant="primary" size="sm" onPress={onExit}>{t('onboarding.finishExit')}</Button>
-        </Modal.Footer>
-      </Modal.Dialog>
-    </Modal.Container>
-  </Modal.Backdrop>
+      </a>
+      <Button variant="default" size="sm" onClick={onExit}>{t('onboarding.finishExit')}</Button>
+        </DialogFooter>
+      </DialogContent>
+
+  </Dialog>
 }

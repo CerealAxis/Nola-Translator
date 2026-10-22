@@ -1,6 +1,15 @@
+import { Spinner } from '@/components/ui/spinner'
+import { Combobox } from '@base-ui/react/combobox'
+import { SettingSwitch } from '../settings/SettingsPage'
+import { Badge } from '@/components/ui/badge'
+import { ChevronDown, Check, X } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Autocomplete, Button, Label, ListBox, Modal, SearchField, Select, Switch, Tag, TagGroup, Tooltip, useFilter } from '@heroui/react'
 import type { ResourceRecord } from '@/bridge'
 import { languageName } from '@/bridge'
 import { actions } from '@/store'
@@ -19,7 +28,7 @@ import type { ModelConfiguration } from '../../../shared/model-capabilities'
 export interface ModelConfigurationDialogProps {
   record: ResourceRecord
   onClose: () => void
-  /** 只读查看：控件不可用，也不提供保存入口。 */
+  /** Read-only mode disables edits and omits the save action. */
   readOnly?: boolean
 }
 
@@ -29,44 +38,33 @@ export interface ModelLanguageSelectProps {
   codes: readonly string[]
   onChange: (value: string[]) => void
   multiple?: boolean
-  /** 只读展示：选择器禁用，标签上没有移除按钮。 */
+  /** Read-only mode disables the picker and omits tag removal. */
   readOnly?: boolean
 }
 
 export function ModelLanguageSelect({ label, value, codes, onChange, multiple = true, readOnly = false }: ModelLanguageSelectProps) {
   const { language, t } = useI18n()
-  const { contains } = useFilter({ sensitivity: 'base' })
   const name = (code: string) => languageName(code, language)
+  const ariaLabel = typeof label === 'string' ? label : undefined
   const options = <>
-    <Autocomplete.Trigger>
-      <Autocomplete.Value>
-        {value.length ? <TagGroup aria-label={typeof label === 'string' ? label : undefined} size="sm" variant="surface" onRemove={keys => { if (!readOnly) onChange(value.filter(code => !keys.has(code))) }}>
-          <TagGroup.List>
-            {value.map(code => <Tag key={code} id={code} textValue={name(code)}>{name(code)}{readOnly ? null : <Tag.RemoveButton aria-label={`${t('modelConfig.removeLanguage')} ${name(code)}`} />}</Tag>)}
-          </TagGroup.List>
-        </TagGroup> : t('modelConfig.selectLanguages')}
-      </Autocomplete.Value>
-      <Autocomplete.Indicator />
-    </Autocomplete.Trigger>
-    <Autocomplete.Popover>
-      <Autocomplete.Filter filter={contains}>
-        <SearchField>
-          <SearchField.Group>
-            <SearchField.SearchIcon />
-            <SearchField.Input aria-label={typeof label === 'string' ? label : undefined} placeholder={t('modelConfig.selectLanguages')} />
-            <SearchField.ClearButton />
-          </SearchField.Group>
-        </SearchField>
-        <ListBox className="nola-language-options">
-          {codes.map(code => <ListBox.Item key={code} id={code} textValue={name(code)}>{name(code)}<ListBox.ItemIndicator /></ListBox.Item>)}
-        </ListBox>
-      </Autocomplete.Filter>
-    </Autocomplete.Popover>
+    <Combobox.Trigger className="autocomplete__trigger" aria-label={ariaLabel}>
+      <span className="autocomplete__value">{value.length ? value.map(name).join(', ') : t('modelConfig.selectLanguages')}</span>
+      <ChevronDown aria-hidden="true" className="size-4 shrink-0" />
+    </Combobox.Trigger>
+    <Combobox.Portal><Combobox.Positioner className="z-popup" sideOffset={4}>
+      <Combobox.Popup className="model-language-popup select__popover rounded-xl border border-border bg-overlay p-1 shadow-overlay">
+        <Combobox.Input className="input w-full" aria-label={ariaLabel} placeholder={t('modelConfig.selectLanguages')} />
+        <Combobox.List className="nola-language-options">
+          {(code: string) => <Combobox.Item key={code} value={code} className="list-box-item">{name(code)}<Combobox.ItemIndicator><Check aria-hidden="true" className="size-4" /></Combobox.ItemIndicator></Combobox.Item>}
+        </Combobox.List>
+      </Combobox.Popup>
+    </Combobox.Positioner></Combobox.Portal>
   </>
   return <SettingsRow className="model-configuration-dialog__language" label={label}>
     {multiple
-      ? <Autocomplete<object, 'multiple'> aria-label={typeof label === 'string' ? label : undefined} fullWidth selectionMode="multiple" isDisabled={readOnly} value={value} onChange={keys => { if (readOnly) return; if (Array.isArray(keys)) onChange(keys.map(String)) }}>{options}</Autocomplete>
-      : <Autocomplete<object, 'single'> aria-label={typeof label === 'string' ? label : undefined} fullWidth selectionMode="single" isDisabled={readOnly} value={value[0] ?? null} onChange={key => { if (readOnly) return; onChange(key === null ? [] : [String(key)]) }}>{options}</Autocomplete>}
+      ? <Combobox.Root<string, true> items={codes} itemToStringLabel={name} multiple disabled={readOnly} value={value} onValueChange={keys => { if (!readOnly) onChange(keys) }}>{options}</Combobox.Root>
+      : <Combobox.Root<string> items={codes} itemToStringLabel={name} disabled={readOnly} value={value[0] ?? null} onValueChange={key => { if (!readOnly) onChange(key === null ? [] : [key]) }}>{options}</Combobox.Root>}
+    {value.length ? <div className="model-language-tags" aria-label={ariaLabel}>{value.map(code => <Badge key={code} variant="secondary">{name(code)}{readOnly ? null : <Button size="icon" variant="secondary" className="model-language-remove" aria-label={`${t('modelConfig.removeLanguage')} ${name(code)}`} onClick={() => onChange(value.filter(item => item !== code))}><X aria-hidden="true" /></Button>}</Badge>)}</div> : null}
   </SettingsRow>
 }
 
@@ -109,54 +107,52 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false }: 
     }
     finally { setSaving(false) }
   }
-  return <Modal isOpen onOpenChange={open => { if (!open && !saving) onClose() }}>
-    <Modal.Backdrop className="z-overlay"><Modal.Container size="lg" scroll="inside"><Modal.Dialog className="model-configuration-dialog">
-      <Modal.Header><div className="settings-row__title"><Modal.Heading>{t(readOnly ? 'modelConfig.viewTitle' : 'modelConfig.title')}</Modal.Heading><Tooltip delay={300}><Button variant="secondary" size="sm" isIconOnly className="settings-row__help" aria-label={t(readOnly ? 'modelConfig.viewTitle' : 'modelConfig.title')}><CircleHelp aria-hidden="true" /></Button><Tooltip.Content className="settings-row__tooltip z-overlay">{t(readOnly ? 'modelConfig.viewDescription' : 'modelConfig.description')}</Tooltip.Content></Tooltip></div></Modal.Header>
-      <Modal.Body className="model-configuration-dialog__body flex flex-col gap-[var(--space-2)]">
+  return <Dialog open onOpenChange={open => { if (!open && !saving) onClose() }}>
+    <DialogContent className="model-configuration-dialog modal__dialog modal__dialog--lg">
+      <DialogHeader><div className="settings-row__title"><DialogTitle>{t(readOnly ? 'modelConfig.viewTitle' : 'modelConfig.title')}</DialogTitle><Tooltip><TooltipTrigger delay={300} render={<Button variant="secondary" size="sm" className="settings-row__help" aria-label={t(readOnly ? 'modelConfig.viewTitle' : 'modelConfig.title')}><CircleHelp aria-hidden="true" /></Button>} /><TooltipContent  role="tooltip" className="settings-row__tooltip z-popup">{t(readOnly ? 'modelConfig.viewDescription' : 'modelConfig.description')}</TooltipContent></Tooltip></div></DialogHeader>
+      <div className="model-configuration-dialog__body flex flex-col gap-[var(--space-2)]">
         {readOnly ? <p className="nola-caption text-muted">{t('modelConfig.viewDescription')}</p> : null}
         {draft.slot === 'recognition' ? <ModelLanguageSelect label={t('modelConfig.languages')} value={draft.languages} codes={codes} onChange={languages => patch({ languages })} readOnly={readOnly} /> : <>
           <ModelLanguageSelect label={t('modelConfig.sourceLanguages')} value={draft.sourceLanguages} codes={codes} onChange={sourceLanguages => patch({ sourceLanguages, translationPairs: draft.translationPairs?.filter(pair => sourceLanguages.includes(pair.source)) })} readOnly={readOnly} />
           <ModelLanguageSelect label={t('modelConfig.targetLanguages')} value={draft.targetLanguages} codes={codes} onChange={targetLanguages => patch({ targetLanguages, translationPairs: draft.translationPairs?.filter(pair => targetLanguages.includes(pair.target)) })} readOnly={readOnly} />
         </>}
         <SettingsRow label={t('modelConfig.slot')} desc={loaderHelp} descriptionTooltip>
-        <Select aria-label={t('modelConfig.slot')} fullWidth isDisabled={readOnly} value={draft.slot} onChange={key => { if (readOnly) return; if (key === 'recognition' || key === 'translation') patch({ slot: key }) }}>
-          <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
-          <Select.Popover><ListBox>
-            <ListBox.Item id="recognition" textValue={t('modelConfig.recognition')}>{t('modelConfig.recognition')}</ListBox.Item>
-            <ListBox.Item id="translation" textValue={t('modelConfig.translation')}>{t('modelConfig.translation')}</ListBox.Item>
-            <ListBox.Item id="synthesis" textValue={t('modelConfig.synthesis')} isDisabled>{t('modelConfig.synthesis')}</ListBox.Item>
-          </ListBox></Select.Popover>
-        </Select>
+        <div className="select"><Select disabled={readOnly} value={draft.slot} onValueChange={key => { if (readOnly) return; if (key === 'recognition' || key === 'translation') patch({ slot: key }) }}><SelectTrigger className="select__trigger w-full" aria-label={t('modelConfig.slot')}><SelectValue className="select__value">{value => t(value === 'recognition' ? 'modelConfig.recognition' : value === 'translation' ? 'modelConfig.translation' : 'modelConfig.synthesis')}</SelectValue></SelectTrigger>
+          <SelectContent><SelectGroup>
+            <SelectItem value="recognition" label={t('modelConfig.recognition')}>{t('modelConfig.recognition')}</SelectItem>
+            <SelectItem value="translation" label={t('modelConfig.translation')}>{t('modelConfig.translation')}</SelectItem>
+            <SelectItem value="synthesis" label={t('modelConfig.synthesis')} disabled>{t('modelConfig.synthesis')}</SelectItem>
+          </SelectGroup></SelectContent>
+        </Select></div>
         </SettingsRow>
         <SettingsRow label={t('modelConfig.engine')} desc={loaderHelp} descriptionTooltip>
-        <Select aria-label={t('modelConfig.engine')} fullWidth isDisabled={readOnly} value={draft.engine} onChange={key => { if (readOnly) return; if (key === 'pytorch' || key === 'llama' || key === 'crisp') patch({ engine: key }) }}>
-          <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
-          <Select.Popover><ListBox>{engines.map(engine => <ListBox.Item key={engine} id={engine} textValue={engineLabel(engine)}>{engineLabel(engine)}</ListBox.Item>)}</ListBox></Select.Popover>
-        </Select>
+        <div className="select"><Select disabled={readOnly} value={draft.engine} onValueChange={key => { if (readOnly) return; if (key === 'pytorch' || key === 'llama' || key === 'crisp') patch({ engine: key }) }}><SelectTrigger className="select__trigger w-full" aria-label={t('modelConfig.engine')}><SelectValue className="select__value">{value => engines.includes(value) ? engineLabel(value) : ''}</SelectValue></SelectTrigger>
+          <SelectContent><SelectGroup>{engines.map(engine => <SelectItem key={engine} value={engine} label={engineLabel(engine)}>{engineLabel(engine)}</SelectItem>)}</SelectGroup></SelectContent>
+        </Select></div>
         </SettingsRow>
         {draft.slot === 'recognition' ? <>
-          <Switch isDisabled={readOnly} isSelected={draft.supportsAutoDetection} onChange={supportsAutoDetection => { if (!readOnly) patch({ supportsAutoDetection }) }}><Switch.Content><Label>{t('modelConfig.autoDetection')}</Label><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content></Switch>
+          <SettingsRow label={t('modelConfig.autoDetection')}><SettingSwitch ariaLabel={t('modelConfig.autoDetection')} isDisabled={readOnly} isSelected={draft.supportsAutoDetection} onChange={supportsAutoDetection => { if (!readOnly) patch({ supportsAutoDetection }) }} /></SettingsRow>
         </> : <>
           <SettingsRow label={t('modelConfig.restrictPairs')} desc={t('modelConfig.pairsHint')} descriptionTooltip>
-          <Switch aria-label={t('modelConfig.restrictPairs')} isDisabled={readOnly} isSelected={draft.translationPairs !== undefined} onChange={enabled => { if (!readOnly) patch({ translationPairs: enabled ? [] : undefined }) }}><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content></Switch>
+          <SettingSwitch ariaLabel={t('modelConfig.restrictPairs')} isDisabled={readOnly} isSelected={draft.translationPairs !== undefined} onChange={enabled => { if (!readOnly) patch({ translationPairs: enabled ? [] : undefined }) }} />
           </SettingsRow>
           {draft.translationPairs !== undefined ? <>
             {readOnly ? null : <>
               <ModelLanguageSelect multiple={false} label={t('session.sourceLanguage')} value={pairSource ? [pairSource] : []} codes={draft.sourceLanguages} onChange={values => setPairSource(values[0] ?? '')} />
               <ModelLanguageSelect multiple={false} label={t('session.targetLanguage')} value={pairTarget ? [pairTarget] : []} codes={draft.targetLanguages} onChange={values => setPairTarget(values[0] ?? '')} />
-              <Button variant="secondary" isDisabled={!draft.sourceLanguages.includes(pairSource) || !draft.targetLanguages.includes(pairTarget) || draft.translationPairs.length >= 512} onPress={() => {
+              <Button variant="secondary" disabled={!draft.sourceLanguages.includes(pairSource) || !draft.targetLanguages.includes(pairTarget) || draft.translationPairs.length >= 512} onClick={() => {
                 if (!draft.translationPairs?.some(pair => pair.source === pairSource && pair.target === pairTarget)) patch({ translationPairs: [...draft.translationPairs ?? [], { source: pairSource, target: pairTarget }] })
               }}>{t('modelConfig.addPair')}</Button>
             </>}
             {draft.translationPairs.map(pair => <div className="flex items-center justify-between gap-[var(--space-1)]" key={`${pair.source}:${pair.target}`}>
-              <span>{name(pair.source)} → {name(pair.target)}</span>{readOnly ? null : <Button variant="tertiary" onPress={() => patch({ translationPairs: draft.translationPairs?.filter(item => item !== pair) })} aria-label={`${t('modelConfig.removePair')}: ${name(pair.source)} → ${name(pair.target)}`}>{t('modelConfig.removePair')}</Button>}
+              <span>{name(pair.source)} → {name(pair.target)}</span>{readOnly ? null : <Button variant="tertiary" onClick={() => patch({ translationPairs: draft.translationPairs?.filter(item => item !== pair) })} aria-label={`${t('modelConfig.removePair')}: ${name(pair.source)} → ${name(pair.target)}`}>{t('modelConfig.removePair')}</Button>}
             </div>)}
           </> : null}
         </>}
-      </Modal.Body>
-      <Modal.Footer>{readOnly
-        ? <Button onPress={onClose}>{t('common.close')}</Button>
-        : <><Button variant="tertiary" isDisabled={saving} onPress={onClose}>{t('session.cancel')}</Button><Button isDisabled={!valid} isPending={saving} onPress={() => void save()}>{t('modelConfig.save')}</Button></>}</Modal.Footer>
-    </Modal.Dialog></Modal.Container></Modal.Backdrop>
-  </Modal>
+      </div>
+      <DialogFooter>{readOnly
+        ? <Button onClick={onClose}>{t('common.close')}</Button>
+        : <><Button variant="tertiary" disabled={saving} onClick={onClose}>{t('session.cancel')}</Button><Button disabled={(!valid) || (saving)} aria-busy={saving}  onClick={() => void save()}>{saving ? <Spinner /> : null}{t('modelConfig.save')}</Button></>}</DialogFooter>
+    </DialogContent>
+  </Dialog>
 }

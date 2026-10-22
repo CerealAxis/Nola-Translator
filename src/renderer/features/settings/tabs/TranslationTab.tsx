@@ -10,7 +10,10 @@ import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Input, TextField } from '@heroui/react'
+import { LoaderCircle } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 import { CLOUD_API_FORMATS, CLOUD_FORMAT_DEFAULTS, NO_TRANSLATION_LANGUAGE, TRANSLATION_PROVIDERS } from '@/bridge'
 import type { CloudApiFormat, CredentialProvider, TranslationProvider, TranslationSettings } from '@/bridge'
@@ -363,16 +366,15 @@ export function TextRow({
 
   return (
     <SettingsRow label={label} desc={desc} descriptionTooltip>
-      <TextField
+      <Input
         aria-label={label}
         value={shown}
-        onChange={setDraft}
+        onValueChange={setDraft}
         onFocus={() => { setDraft(value); setFocused(true) }}
         onBlur={commit}
         className="settings-control-field"
-      >
-        <Input className="rounded-[8px]" aria-label={label} placeholder={placeholder} />
-      </TextField>
+        placeholder={placeholder}
+      />
     </SettingsRow>
   )
 }
@@ -409,15 +411,17 @@ function NumberRow({
 
   return (
     <SettingsRow label={label}>
-      <TextField
+      <Input
+        type="number"
+        min={1}
+        step={1}
         value={shown}
-        onChange={setDraft}
+        onValueChange={setDraft}
         onFocus={() => { setDraft(String(value)); setFocused(true) }}
         onBlur={commit}
         className="settings-control-field"
-      >
-        <Input type="number" min={1} step={1} className="rounded-[8px]" aria-label={label} />
-      </TextField>
+        aria-label={label}
+      />
     </SettingsRow>
   )
 }
@@ -485,44 +489,34 @@ export function ApiKeyRow({ provider, stored }: ApiKeyRowProps) {
 
   return (
     <SettingsRow label={t('settings.apiKey')} desc={t('settings.apiKeyHint')} descriptionTooltip>
-      <TextField aria-label={t('settings.apiKey')} value={masked ? `sk-${'*'.repeat(80)}` : draft} onChange={setDraft}
-        onFocus={() => setEditing(true)} onBlur={() => { setEditing(false); void save(draft) }} className="settings-control-field">
-        {/*
-          `type` and the placeholder belong on `Input`: the `TextField` root takes only value
-          and onChange, so the native change event is `Input`'s to handle. The saved credential
-          is represented by a mask; actual replacement input stays a password field.
-        */}
-        <Input
-          type={masked ? 'text' : 'password'}
-          readOnly={masked}
-          className="rounded-[8px]"
-          aria-label={t('settings.apiKey')}
-          placeholder={stored ? '' : t('settings.apiKeyPlaceholder')}
-          disabled={state === 'pending' || state === 'deleting'}
-        />
-      </TextField>
+      <Input
+        aria-label={t('settings.apiKey')}
+        value={masked ? `sk-${'*'.repeat(80)}` : draft}
+        onValueChange={setDraft}
+        onFocus={() => setEditing(true)}
+        onBlur={() => { setEditing(false); void save(draft) }}
+        type={masked ? 'text' : 'password'}
+        readOnly={masked}
+        className="settings-control-field"
+        placeholder={stored ? '' : t('settings.apiKeyPlaceholder')}
+        disabled={state === 'pending' || state === 'deleting'}
+      />
       <Button
         variant="tertiary"
         size="sm"
-        className="rounded-[6px]"
-        isPending={state === 'testing'}
-        isDisabled={!stored || state === 'deleting'}
-        onPress={() => {
-          void verify()
-        }}
+        disabled={!stored || state === 'deleting' || state === 'testing'}
+        onClick={() => { void verify() }}
       >
+        {state === 'testing' ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
         {state === 'testing' ? t('settings.testing') : t('modelsSettingsUi.credentialCheck')}
       </Button>
       <Button
         variant="danger"
         size="sm"
-        className="rounded-[6px]"
-        isPending={state === 'deleting'}
-        isDisabled={!stored || state === 'testing' || state === 'deleting'}
-        onPress={() => {
-          void deleteKey()
-        }}
+        disabled={!stored || state === 'testing' || state === 'deleting'}
+        onClick={() => { void deleteKey() }}
       >
+        {state === 'deleting' ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
         {t('settings.deleteKey')}
       </Button>
     </SettingsRow>

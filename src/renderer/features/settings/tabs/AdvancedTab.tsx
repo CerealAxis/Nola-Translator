@@ -8,13 +8,10 @@ import { SettingsRow } from '../SettingsRow'
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import {
-  AlertDialog,
-  Button,
-  Spinner,
-  Surface,
-  Typography,
-} from '@heroui/react'
+import { AlertDialog } from '@base-ui/react/alert-dialog'
+import { LoaderCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { DialogHeader, DialogFooter } from '@/components/ui/dialog'
 
 import { DEFAULT_SETTINGS, PROTOCOL_VERSION } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
@@ -131,7 +128,7 @@ function DiagnosticsReport() {
     return <SettingsRow label={t('settings.diagnosticsUnavailable')}><span className="nola-caption text-muted">-</span></SettingsRow>
   }
   if (rows === null) {
-    return <SettingsRow label={t('settings.diagnosticsLoading')}><Spinner size="sm" /></SettingsRow>
+    return <SettingsRow label={t('settings.diagnosticsLoading')}><LoaderCircle className="animate-spin" aria-hidden="true" /></SettingsRow>
   }
   if (rows.length === 0) {
     return <SettingsRow label={t('settings.diagnosticsEmpty')}><span className="nola-caption text-muted">-</span></SettingsRow>
@@ -153,9 +150,9 @@ function DiagnosticsReport() {
 
 function CodeValue({ value }: { value: string }) {
   return (
-    <Surface className="settings-code rounded-[8px] border border-border px-3 py-1">
-      <Typography.Code className="settings-code nola-mono text-foreground">{value}</Typography.Code>
-    </Surface>
+    <span className="settings-code rounded-md border border-border px-3 py-1">
+      <code className="settings-code nola-mono text-foreground">{value}</code>
+    </span>
   )
 }
 
@@ -197,49 +194,49 @@ function ResetAll({ pending }: { pending: boolean }) {
         variant="danger"
         size="sm"
         className="rounded-[var(--radius-xl)]"
-        isPending={pending}
-        onPress={() => setOpen(true)}
+        disabled={pending || state === 'pending'}
+        onClick={() => setOpen(true)}
       >
         {t('settings.resetAll')}
       </Button>
 
-      <AlertDialog isOpen={open} onOpenChange={setOpen}>
-        <AlertDialog.Backdrop>
-          <AlertDialog.Container>
-            <AlertDialog.Dialog>
-              <AlertDialog.Header>
-                <AlertDialog.Heading className="nola-title text-foreground">
+      <AlertDialog.Root open={open} onOpenChange={next => { if (state !== 'pending') setOpen(next) }}>
+        <AlertDialog.Portal>
+          <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
+            <AlertDialog.Popup className="nola-dialog-content max-w-md">
+              <DialogHeader>
+                <AlertDialog.Title className="nola-title text-foreground">
                   {t('settings.resetAllTitle')}
-                </AlertDialog.Heading>
-              </AlertDialog.Header>
-              <AlertDialog.Body>
-                <p className="nola-body text-muted">{t('settings.resetAllBody')}</p>
-              </AlertDialog.Body>
-              <AlertDialog.Footer className="flex justify-end gap-2">
+                </AlertDialog.Title>
+              </DialogHeader>
+              <AlertDialog.Description>
+                {t('settings.resetAllBody')}
+              </AlertDialog.Description>
+              <DialogFooter className="flex justify-end gap-2">
                 <Button
                   variant="tertiary"
                   size="sm"
                   className="rounded-[var(--radius-xl)]"
-                  onPress={() => setOpen(false)}
+                  disabled={state === 'pending'} onClick={() => setOpen(false)}
                 >
                   {t('common.cancel')}
                 </Button>
                 <Button
-                  variant="danger-soft"
+                  variant="danger"
                   size="sm"
                   className="rounded-[var(--radius-xl)]"
-                  isPending={state === 'pending'}
-                  onPress={() => {
+                  disabled={state === 'pending'}
+                  onClick={() => {
                     void reset()
                   }}
                 >
+                  {state === 'pending' ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
                   {t('settings.resetAll')}
                 </Button>
-              </AlertDialog.Footer>
-            </AlertDialog.Dialog>
-          </AlertDialog.Container>
-        </AlertDialog.Backdrop>
-      </AlertDialog>
+              </DialogFooter>
+            </AlertDialog.Popup>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
     </>
   )
 }

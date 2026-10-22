@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Slider } from '@heroui/react'
+import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
 import '@/features/home/home-records.css'
 
 const MIN_SPLIT = 15
@@ -35,9 +35,14 @@ export function DualColumnView({ segments, sourceLabel, targetLabel, fontScale =
   return (
     <div data-split={split} style={{ '--dual-split': split + '%' } as React.CSSProperties} className={'nola-dual ' + className}>
       <div className="nola-dual__headers"><div>{sourceLabel}</div><div>{targetLabel}</div></div>
-      <Slider aria-label={sourceLabel + ' / ' + targetLabel} className="nola-dual__split" minValue={MIN_SPLIT} maxValue={MAX_SPLIT} step={5} value={split} onChange={(value) => setSplit(Array.isArray(value) ? value[0] : value)}>
-        <Slider.Track><Slider.Fill /><Slider.Thumb /></Slider.Track>
-      </Slider>
+      <SliderRoot className="nola-dual__split" min={MIN_SPLIT} max={MAX_SPLIT} step={5} value={split} onValueChange={(next: number | readonly number[]) => setSplit(typeof next === 'number' ? next : (next[0] ?? split))}>
+        <SliderControl className="py-0">
+          <SliderTrack className="h-1 w-full rounded-full bg-surface-tertiary">
+            <SliderIndicator className="rounded-full bg-accent" />
+            <SliderThumb className="size-3 rounded-full bg-accent focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus" aria-label={sourceLabel + ' / ' + targetLabel} />
+          </SliderTrack>
+        </SliderControl>
+      </SliderRoot>
       <div className="nola-dual__scroll nola-scrollbar" style={{ lineHeight: lineBox + 'px', fontSize: fontSize + 'px' }}>
         {segments.map((segment, index) => (
           <div className="nola-dual__pair" key={segment.id}>

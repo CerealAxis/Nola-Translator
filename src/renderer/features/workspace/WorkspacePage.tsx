@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { Button, Card, EmptyState } from '@heroui/react'
+import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
+import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Captions } from 'lucide-react'
 
 import { findMissingResource } from '@/store'
@@ -414,10 +417,10 @@ export function WorkspacePage() {
         <Card className="nola-workspace-transcript">
           {active ? (
             <>
-              <Card.Header className="nola-transcript-head" data-layout={layout} data-mode={displayMode}>
-                {displayMode !== 'translation' ? <Card.Title>{t('workspace.sourcePanel')}</Card.Title> : null}
-                {displayMode !== 'source' ? <Card.Title>{t('workspace.translationPanel')}</Card.Title> : null}
-              </Card.Header>
+              <CardHeader className="nola-transcript-head" data-layout={layout} data-mode={displayMode}>
+                {displayMode !== 'translation' ? <CardTitle>{t('workspace.sourcePanel')}</CardTitle> : null}
+                {displayMode !== 'source' ? <CardTitle>{t('workspace.translationPanel')}</CardTitle> : null}
+              </CardHeader>
               <CaptionStage
                 className="nola-workspace-caption"
                 segments={session.segments}
@@ -428,7 +431,7 @@ export function WorkspacePage() {
                 paused={status === 'paused'}
                 showTimestamps
                 sourceLanguage={settings?.recognition.sourceLanguage ?? 'auto'}
-                emptyState={<EmptyState className="nola-workspace-empty"><p>{t('workspace.nothingYet')}</p><p className="text-muted">{t('workspace.nothingYetHint')}</p></EmptyState>}
+                emptyState={<Empty className="nola-workspace-empty"><EmptyHeader><EmptyTitle>{t('workspace.nothingYet')}</EmptyTitle><EmptyDescription>{t('workspace.nothingYetHint')}</EmptyDescription></EmptyHeader></Empty>}
               />
             </>
           ) : (
@@ -561,14 +564,14 @@ function IdleGuide({
           </p>
         ) : null}
         <Button
-          variant="primary"
-          size="md"
+          variant="default"
+          size="default"
           className="mt-2 rounded-full px-5"
-          onPress={onStart}
-          isPending={starting}
-          isDisabled={starting}
+          onClick={onStart}
+          aria-busy={starting}
+          disabled={starting}
         >
-          {starting ? t('workspace.starting') : t('workspace.start')}
+          {starting ? <Spinner /> : null}{starting ? t('workspace.starting') : t('workspace.start')}
         </Button>
       </div>
     </div>

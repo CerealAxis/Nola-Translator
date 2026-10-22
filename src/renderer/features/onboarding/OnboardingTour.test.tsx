@@ -1,5 +1,5 @@
 import { StrictMode, useState } from 'react'
-import { Button } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
@@ -41,20 +41,20 @@ function TutorialApp() {
   return <div className="nola-app-shell">
     <div className="nola-app-body" />
     {Object.entries({ settings: '#/settings/appearance', models: '#/models', workspace: '#/workspace', overlay: '#/overlay', 'video-captions': '#/video-captions' }).map(([id, path]) =>
-      <Button key={id} data-onboarding={`nav-${id}`} onPress={() => navigate(path)}>{id}</Button>)}
-    {['compute', 'audio', 'translation'].map(tab => <Button key={tab} data-onboarding={`settings-${tab}`} onPress={() => navigate(`#/settings/${tab}`)}>{tab}</Button>)}
+      <Button key={id} data-onboarding={`nav-${id}`} onClick={() => navigate(path)}>{id}</Button>)}
+    {['compute', 'audio', 'translation'].map(tab => <Button key={tab} data-onboarding={`settings-${tab}`} onClick={() => navigate(`#/settings/${tab}`)}>{tab}</Button>)}
     {['engine', 'llama', 'crisp'].map(kind => <div key={kind}>
-      <Button data-onboarding={`runtime-${kind}`} aria-pressed={active === kind} onPress={() => setActive(kind)}>{kind}</Button>
-      <div id={`runtime-${kind}`} data-onboarding={`runtime-version-${kind}`} hidden={active !== kind}><Button aria-expanded={expanded === kind} onPress={() => setExpanded(expanded ? null : kind)}>{`${kind}-versions`}</Button></div>
+      <Button data-onboarding={`runtime-${kind}`} aria-pressed={active === kind} onClick={() => setActive(kind)}>{kind}</Button>
+      <div id={`runtime-${kind}`} data-onboarding={`runtime-version-${kind}`} hidden={active !== kind}><Button aria-expanded={expanded === kind} onClick={() => setExpanded(expanded ? null : kind)}>{`${kind}-versions`}</Button></div>
     </div>)}
-    {['recognition', 'translation'].map(kind => <Button key={kind} data-onboarding={`model-family-${kind}Model`} onPress={() => setModel(`${kind}Model`)}>{`${kind}-details`}</Button>)}
+    {['recognition', 'translation'].map(kind => <Button key={kind} data-onboarding={`model-family-${kind}Model`} onClick={() => setModel(`${kind}Model`)}>{`${kind}-details`}</Button>)}
     {model ? <div data-onboarding="model-detail" data-model-kind={model}>
-      <Button data-onboarding="model-detail-close" onPress={() => setModel(null)}>close-details</Button>
-      {['engine', 'scale'].map(choice => <div key={choice} data-onboarding={`model-${choice}`}><Button onPress={() => undefined}>{`choose-${choice}`}</Button></div>)}
-      <div data-onboarding="model-version"><Button aria-expanded={expanded === 'model'} onPress={() => setExpanded(expanded ? null : 'model')}>model-versions</Button></div>
+      <Button data-onboarding="model-detail-close" onClick={() => setModel(null)}>close-details</Button>
+      {['engine', 'scale'].map(choice => <div key={choice} data-onboarding={`model-${choice}`}><Button onClick={() => undefined}>{`choose-${choice}`}</Button></div>)}
+      <div data-onboarding="model-version"><Button aria-expanded={expanded === 'model'} onClick={() => setExpanded(expanded ? null : 'model')}>model-versions</Button></div>
       <div data-onboarding="model-sources" />
     </div> : null}
-    {['recognition-provider', 'audio-source', 'translation-provider'].map(id => <div key={id} data-onboarding={id}><Button aria-expanded={expanded === id} onPress={() => setExpanded(expanded ? null : id)}>{id}</Button></div>)}
+    {['recognition-provider', 'audio-source', 'translation-provider'].map(id => <div key={id} data-onboarding={id}><Button aria-expanded={expanded === id} onClick={() => setExpanded(expanded ? null : id)}>{id}</Button></div>)}
     <div data-onboarding="recognition-model" /><div data-onboarding="translation-model" />
     <div data-slot="workspace"><div className="nola-workspace-toolbar" /></div>
     <div className="nola-overlay-page"><div className="nola-page-heading" /></div>
@@ -136,7 +136,7 @@ it('teaches real model details and allows skipping downloads without pretending 
   await expectStep('quick-nav')
   await skipSection()
   const completion = await screen.findByRole('dialog', { name: '恭喜你完成新手指引' })
-  expect(completion.closest('.modal__backdrop')).toBeInTheDocument()
+  expect(completion).toHaveAttribute('data-slot', 'dialog-content')
   expect(document.querySelector('.onboarding-tour__card')).not.toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'GitHub 主页' })).toHaveAttribute('href', 'https://github.com/CerealAxis/Nola-Translator')
   expect(screen.queryByText('本地模型或加载器待准备')).not.toBeInTheDocument()

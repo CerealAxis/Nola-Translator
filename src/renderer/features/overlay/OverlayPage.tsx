@@ -2,7 +2,12 @@ import { useModelOptions } from '@/model-options'
 import { translationLanguages } from '../../../shared/model-capabilities'
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, Label, ListBox, Popover, Select, ToggleButton, ToggleButtonGroup } from '@heroui/react'
+import { Button } from '@/components/ui/button'
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
+import { Popover } from '@base-ui/react/popover'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+
+import { Spinner } from '@/components/ui/spinner'
 import { ArrowRight, ArrowRightLeft, ChevronDown, ExternalLink, Languages, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Settings, Square, X } from 'lucide-react'
 import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { AppSettingsPatch } from '@/bridge'
@@ -62,22 +67,22 @@ export function OverlayPage() {
     <div className="nola-overlay-page">
       <PageHeader className="nola-page-heading" title={t('home.quickStart')}
         actions={<div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onPress={() => {
+          <Button variant="secondary" onClick={() => {
             void actions.settings.showWorkspace().catch(error => notifyError(t('workspaceUi.windowFailed'), { cause: error }))
           }}><ExternalLink aria-hidden="true" />{t('home.quickStart')}</Button>
-          <Button onPress={() => void open()} isPending={opening}><ExternalLink aria-hidden="true" />{t('shellUi.openOverlay')}</Button>
+          <Button onClick={() => void open()} disabled={opening} aria-busy={opening}>{opening ? <Spinner /> : <ExternalLink aria-hidden="true" />}{t('shellUi.openOverlay')}</Button>
         </div>} />
-      <Card className="nola-overlay-preview">
-        <Card.Header>
-          <Card.Title className="text-lg font-semibold">{t('shellUi.captionPreview')}</Card.Title>
-        </Card.Header>
+      <Card className="nola-overlay-preview gap-3 p-5">
+        <CardHeader className="px-0">
+          <CardTitle className="text-lg leading-6 font-semibold">{t('shellUi.captionPreview')}</CardTitle>
+        </CardHeader>
         {/*
          * Text area, top and bottom scrims, the seven action glyphs, then the mic
          * and pills below. Entirely `aria-hidden`: this is an appearance preview, and
          * the real controls are in the form underneath. The scrims and both chrome
          * rows reveal on hover, as they do in the caption window.
          */}
-        <Card.Content className="nola-overlay-stage">
+        <CardContent className="nola-overlay-stage px-[clamp(16px,3vw,30px)]">
           <div
             className="nola-caption-preview"
             data-color-scheme={config.colorScheme}
@@ -110,11 +115,11 @@ export function OverlayPage() {
               {!translationDisabled && <span className="nola-caption-preview__pill">{t(config.layout === 'rolling' ? 'workspace.layoutSplit' : 'workspace.layoutSentence')}<ChevronDown /></span>}
             </div>
           </div>
-        </Card.Content>
+        </CardContent>
       </Card>
-      <Card className="nola-section-card p-5">
-        <Card.Header className="mb-5"><Card.Title>{t('settings.title')}</Card.Title></Card.Header>
-        <Card.Content className="nola-overlay-fields">
+      <Card className="nola-section-card gap-0 p-5 has-data-[slot=card-footer]:pb-5">
+        <CardHeader className="mb-5 px-0"><CardTitle className="leading-6">{t('settings.title')}</CardTitle></CardHeader>
+        <CardContent className="nola-overlay-fields px-0" data-onboarding="quick-settings">
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('session.recognitionModel')}</span>
             <SettingSelect value={settings.recognition.modelId} ariaLabel={t('session.recognitionModel')} isDisabled={sessionActive}
@@ -145,66 +150,54 @@ export function OverlayPage() {
           </div>
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('shellUi.languageDirection')}</span>
-            <Popover>
-              <Button variant="tertiary" className="nola-overlay-language-trigger" isDisabled={sessionActive}
+            <Popover.Root>
+              <Popover.Trigger render={<Button variant="tertiary" />} className="nola-overlay-language-trigger" disabled={sessionActive}
                 aria-label={`${t('shellUi.languageDirection')}: ${label(sourceLanguage)} → ${label(targetLanguage)}`}>
                 <Languages aria-hidden="true" />
                 <span>{label(sourceLanguage)} → {label(targetLanguage)}</span>
                 <ChevronDown aria-hidden="true" />
-              </Button>
-              <Popover.Content placement="top end">
-                <Popover.Dialog aria-label={t('shellUi.languageDirection')} className="nola-overlay-languages">
-                  <Button variant="tertiary" className="self-start" isDisabled={sessionActive || !swappedLanguages}
-                    onPress={() => {
+              </Popover.Trigger>
+              <Popover.Portal><Popover.Positioner side="top" align="end" className="z-dropdown">
+                <Popover.Popup aria-label={t('shellUi.languageDirection')} className="nola-overlay-languages">
+                  <Button variant="tertiary" className="self-start" disabled={sessionActive || !swappedLanguages}
+                    onClick={() => {
                       if (swappedLanguages) patch({ recognition: { sourceLanguage: swappedLanguages.sourceLanguage }, translation: { targetLanguage: swappedLanguages.targetLanguage } })
                     }}>
                     <ArrowRightLeft aria-hidden="true" />{t('session.swapLanguages')}
                   </Button>
-                  <Select value={sourceLanguage} isDisabled={sessionActive} onChange={key => {
-                    if (typeof key === 'string') patch({ recognition: { sourceLanguage: key } })
-                  }}>
-                    <Label>{t('session.sourceLanguage')}</Label>
-                    <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
-                    <Select.Popover><ListBox className="nola-language-options">
-                      {modelOptions.sourceLanguages.map(code => <ListBox.Item key={code} id={code} textValue={label(code)}>{label(code)}<ListBox.ItemIndicator /></ListBox.Item>)}
-                    </ListBox></Select.Popover>
-                  </Select>
-                  <Select value={targetLanguage} isDisabled={sessionActive} onChange={key => {
-                    if (typeof key === 'string') patch(targetLanguagePatch(key, targetLanguage))
-                  }}>
-                    <Label>{t('session.targetLanguage')}</Label>
-                    <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
-                    <Select.Popover><ListBox className="nola-language-options">
-                      {modelOptions.targetLanguages.map(code => <ListBox.Item key={code} id={code} textValue={label(code)}>{label(code)}<ListBox.ItemIndicator /></ListBox.Item>)}
-                    </ListBox></Select.Popover>
-                  </Select>
-                </Popover.Dialog>
-              </Popover.Content>
-            </Popover>
+                  <div className="flex flex-col gap-2"><span className="label">{t('session.sourceLanguage')}</span>
+                    <SettingSelect value={sourceLanguage} isDisabled={sessionActive} ariaLabel={t('session.sourceLanguage')} options={modelOptions.sourceLanguages.map(code => ({ value: code, label: label(code) }))} onChange={sourceLanguage => patch({ recognition: { sourceLanguage } })} />
+                  </div>
+                  <div className="flex flex-col gap-2"><span className="label">{t('session.targetLanguage')}</span>
+                    <SettingSelect value={targetLanguage} isDisabled={sessionActive} ariaLabel={t('session.targetLanguage')} options={modelOptions.targetLanguages.map(code => ({ value: code, label: label(code) }))} onChange={value => patch(targetLanguagePatch(value, targetLanguage))} />
+                  </div>
+                </Popover.Popup>
+              </Popover.Positioner></Popover.Portal>
+            </Popover.Root>
           </div>
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('shellUi.showContent')}</span>
-            <ToggleButtonGroup className="nola-segmented" selectionMode="single" selectedKeys={new Set([display])} aria-label={t('shellUi.showContent')} onSelectionChange={keys => {
+            <ToggleGroup className="nola-segmented" value={[display]} aria-label={t('shellUi.showContent')} onValueChange={keys => {
               const next = [...keys][0]; if (next) patch({ overlay: { showSource: next !== 'translation', showTranslation: next !== 'source' } })
             }}>
-              {!translationDisabled && <ToggleButton id="both">{t('workspace.modeBoth')}</ToggleButton>}
-              <ToggleButton id="source">{t('workspace.modeSource')}</ToggleButton>
-              {!translationDisabled && <ToggleButton id="translation">{t('workspace.modeTranslation')}</ToggleButton>}
-            </ToggleButtonGroup>
+              {!translationDisabled && <ToggleGroupItem className="toggle-button" value="both">{t('workspace.modeBoth')}</ToggleGroupItem>}
+              <ToggleGroupItem className="toggle-button" value="source">{t('workspace.modeSource')}</ToggleGroupItem>
+              {!translationDisabled && <ToggleGroupItem className="toggle-button" value="translation">{t('workspace.modeTranslation')}</ToggleGroupItem>}
+            </ToggleGroup>
           </div>
           {!translationDisabled && <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('shellUi.layout')}</span>
-            <ToggleButtonGroup className="nola-segmented" selectionMode="single" selectedKeys={new Set([config.layout])} aria-label={t('shellUi.layout')} onSelectionChange={keys => {
+            <ToggleGroup className="nola-segmented" value={[config.layout]} aria-label={t('shellUi.layout')} onValueChange={keys => {
               const next = [...keys][0]; if (next === 'rolling' || next === 'sentence') patch({ overlay: { layout: next } })
             }}>
-              <ToggleButton id="rolling">{t('workspace.layoutSplit')}</ToggleButton>
-              <ToggleButton id="sentence">{t('workspace.layoutSentence')}</ToggleButton>
-            </ToggleButtonGroup>
+              <ToggleGroupItem className="toggle-button" value="rolling">{t('workspace.layoutSplit')}</ToggleGroupItem>
+              <ToggleGroupItem className="toggle-button" value="sentence">{t('workspace.layoutSentence')}</ToggleGroupItem>
+            </ToggleGroup>
           </div>}
-        </Card.Content>
-        <Card.Footer className="nola-overlay-footer">
-          <Button variant="secondary" onPress={() => navigate('#/settings/appearance')}><Settings aria-hidden="true" />{t('shellUi.appearance')}<ArrowRight aria-hidden="true" /></Button>
-        </Card.Footer>
+        </CardContent>
+        <CardFooter className="nola-overlay-footer bg-transparent px-0 pb-0">
+          <Button variant="secondary" onClick={() => navigate('#/settings/appearance')}><Settings aria-hidden="true" />{t('shellUi.appearance')}<ArrowRight aria-hidden="true" /></Button>
+        </CardFooter>
       </Card>
     </div>
   )

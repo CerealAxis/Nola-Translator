@@ -12,10 +12,12 @@
  */
 
 import { useEffect } from 'react'
-import { Alert, Button, InputGroup } from '@heroui/react'
+import { LoaderCircle, TriangleAlert } from 'lucide-react'
 
 import { SettingsRow } from '../SettingsRow'
 import { notifySuccess, notifyWarning } from '@/components/primitives/notify'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
 import { reportSettingsFailure } from '../settingsErrorChannel'
@@ -48,15 +50,14 @@ export function StorageTab(_props: SettingsPanelProps) {
     <div className="settings-panel">
       <SettingGroup legend={t('settings.groupStorage')}>
         <SettingsRow label={t('modelsSettingsUi.dataFolder')} desc={t('modelsSettingsUi.dataFolderDescription')} descriptionTooltip>
-          <InputGroup className="settings-path-input">
-            <InputGroup.Input readOnly value={path} aria-label={t('modelsSettingsUi.dataFolder')} />
-          </InputGroup>
+          <div className="settings-path-input flex">
+            <Input readOnly value={path} aria-label={t('modelsSettingsUi.dataFolder')} className="settings-control-field" />
+          </div>
           <Button
             variant="tertiary"
             size="sm"
-            className="rounded-[6px]"
-            isPending={busy}
-            onPress={() => {
+            disabled={busy}
+            onClick={() => {
               void actions.settings
                 .chooseStorageDirectory()
                 .then((chosen) => {
@@ -66,6 +67,7 @@ export function StorageTab(_props: SettingsPanelProps) {
                 .catch(() => undefined)
             }}
           >
+            {busy ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
             {t('settings.browse')}
           </Button>
         </SettingsRow>
@@ -80,26 +82,26 @@ export function StorageTab(_props: SettingsPanelProps) {
       {storage?.restartRequired ? (
         <SettingGroup legend={t('settings.groupRestart')}>
           <div className="flex flex-col gap-3 p-4">
-            <Alert status="warning">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title className="nola-body-strong">{t('settings.restartRequired')}</Alert.Title>
-                <Alert.Description className="nola-caption">{t('errors.storageChangedAction')}</Alert.Description>
-              </Alert.Content>
-            </Alert>
+            <div role="alert" className="flex items-start gap-3 rounded-nola-ui-lg bg-warning-soft px-4 py-3 text-warning-soft-foreground">
+              <TriangleAlert className="size-4 shrink-0" aria-hidden="true" />
+              <div className="flex min-w-0 flex-col gap-1">
+                <p className="nola-body-strong">{t('settings.restartRequired')}</p>
+                <p className="nola-caption">{t('errors.storageChangedAction')}</p>
+              </div>
+            </div>
             <div>
               <Button
-                variant="primary"
+                variant="default"
                 size="sm"
-                className="rounded-full"
-                isPending={busy}
-                onPress={() => {
+                disabled={busy}
+                onClick={() => {
                   void actions.settings
                     .restartAppForStorage()
                     .then(() => notifySuccess(t('common.done')))
                     .catch(() => undefined)
                 }}
               >
+                {busy ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
                 {t('settings.restartNow')}
               </Button>
             </div>

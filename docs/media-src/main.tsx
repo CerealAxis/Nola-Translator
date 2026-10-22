@@ -2,7 +2,8 @@ import '@/index.css'
 import '@/theme/cjk-fonts.css'
 import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Button, Toast } from '@heroui/react'
+import { Button } from '@/components/ui/button'
+import { ToastProvider } from '@/components/ui/toast'
 import { X } from 'lucide-react'
 import { APPLICATION_PAGES, useApplicationNavigation } from '@/application'
 import { OnboardingTour } from '@/features/onboarding'
@@ -103,14 +104,14 @@ function DemoApp() {
       <div className="docs-overlay-panel" role="dialog" aria-modal="true" aria-label={t('shellUi.overlay')}>
         <div className="docs-overlay-heading">
           <span>{t('shellUi.overlay')}</span>
-          <Button className="docs-overlay-dismiss" autoFocus variant="secondary" onPress={closeOverlay}><X aria-hidden="true" />{t('common.close')}</Button>
+          <Button className="docs-overlay-dismiss" autoFocus variant="secondary" onClick={closeOverlay}><X aria-hidden="true" />{t('common.close')}</Button>
         </div>
         <div className="docs-live-overlay"><OverlayRoot /></div>
       </div>
     </div> : null}
     <ModelCapabilityNotices />
     <ModelDownloadNotice />
-    <Toast.Provider />
+    <ToastProvider />
   </>
 }
 

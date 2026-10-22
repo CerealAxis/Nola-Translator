@@ -1,8 +1,14 @@
+import { Spinner } from '@/components/ui/spinner'
+import { Progress } from '@base-ui/react/progress'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { configurationOf } from '../../../shared/model-capabilities'
 import { modelEngines, type InferenceEngine } from '../../../shared/model-engines'
 
 import type { ReactNode } from 'react'
-import { Button, Card, Chip, ProgressBar, Skeleton, Tooltip } from '@heroui/react'
 import { Check, Download, Trash2, X } from 'lucide-react'
 import './models.css'
 
@@ -184,31 +190,31 @@ export function ModelCard({
        * The status pills get a row of their own rather than sharing the title's width: the model
        * name is the first thing on the card to be read, and state is the secondary fact.
        */}
-      <Card.Header>
+      <CardHeader className="card__header">
         <span className={`models-card__icon models-card__icon--${record.kind === 'translationModel' ? 'translation' : 'recognition'}`}>
           <ModelMark record={record} kind={record.kind} />
         </span>
         <div className="models-card__identity">
-          <Card.Title>{record.name}</Card.Title>
+          <CardTitle className="card__title">{record.name}</CardTitle>
           {descriptionLoading ? <div className="models-card__description-loading" aria-hidden="true">
             <Skeleton className="h-3 w-full rounded-[6px]" />
             <Skeleton className="h-3 w-3/4 rounded-[6px]" />
-          </div> : <Card.Description>{description}</Card.Description>}
+          </div> : <CardDescription className="card__description">{description}</CardDescription>}
           <span className="models-card__meta tabular">{metadata ?? factsOf(record).join(' · ')}</span>
         </div>
-      </Card.Header>
-      <Card.Content>
+      </CardHeader>
+      <CardContent className="card__content">
       <div className="models-card__status">
-        {isDefault && record.installed ? <Chip size="sm" variant="soft" color="accent">{t('modelsSettingsUi.default')}</Chip> : null}
+        {isDefault && record.installed ? <Badge  variant="accent">{t('modelsSettingsUi.default')}</Badge> : null}
         {removal && state === 'removing' ? <StatusPill label={t('modelsSettingsUi.removing')} tone="accent" /> : record.kind !== 'ttsModel' && record.installed && !configurationOf(record) ? <StatusPill label={t('modelConfig.pending')} tone="warning" /> : <StatePill state={state} installed={record.installed} />}
-        {(supportedEngines ?? modelEngines(record)).map(engine => <Chip key={engine} size="sm" variant="soft">{engine === 'pytorch' ? 'PyTorch' : engine === 'crisp' ? 'CrispASR' : 'llama.cpp'}</Chip>)}
-        {record.resourceId.startsWith('hub:local/') ? <Chip size="sm" variant="soft">{t('modelsSettingsUi.localImport')}</Chip> : null}
+        {(supportedEngines ?? modelEngines(record)).map(engine => <Badge key={engine} >{engine === 'pytorch' ? 'PyTorch' : engine === 'crisp' ? 'CrispASR' : 'llama.cpp'}</Badge>)}
+        {record.resourceId.startsWith('hub:local/') ? <Badge >{t('modelsSettingsUi.localImport')}</Badge> : null}
       </div>
 
       {inFlight ? <ProgressLine record={record} state={state} /> : null}
-      </Card.Content>
+      </CardContent>
 
-      <Card.Footer>
+      <CardFooter className="card__footer border-0 bg-transparent">
         <Actions
           state={state}
           removal={removal}
@@ -224,17 +230,17 @@ export function ModelCard({
           onSetDefault={onSetDefault}
         />
         {footer && !removal ? <div className="models-card__details">{footer}</div> : null}
-      </Card.Footer>
+      </CardFooter>
     </Card>
 
   if (!loaderUnavailableReason) return card
-  return <Tooltip delay={250}>
-    <Tooltip.Trigger role="group" tabIndex={0} aria-label={record.name} className="h-full min-w-0">
+  return <Tooltip>
+    <TooltipTrigger delay={250} render={<div />} role="group" tabIndex={0} aria-label={record.name} className="h-full min-w-0">
       {card}
-    </Tooltip.Trigger>
-    <Tooltip.Content className="settings-row__tooltip z-overlay max-w-96 whitespace-normal">
+    </TooltipTrigger>
+    <TooltipContent  role="tooltip" className="settings-row__tooltip z-popup max-w-96 whitespace-normal">
       {loaderUnavailableReason}
-    </Tooltip.Content>
+    </TooltipContent>
   </Tooltip>
 }
 
@@ -266,16 +272,16 @@ function ProgressLine({ record, state }: { record: ResourceRecord; state: Resour
 
   return (
     <div className="flex flex-col gap-1">
-      <ProgressBar
+      <Progress.Root
         value={value}
-        maxValue={1}
+        max={1}
         className="w-full"
         aria-label={t('models.stateLabel')}
       >
-        <ProgressBar.Track>
-          <ProgressBar.Fill />
-        </ProgressBar.Track>
-      </ProgressBar>
+        <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm bg-default">
+          <Progress.Indicator className="h-full rounded-sm bg-accent transition-[width] duration-[var(--dur-enter)]" />
+        </Progress.Track>
+      </Progress.Root>
       <span className="nola-micro text-muted tabular">
         {t('models.progress', { percent: Math.round(value * 100) })}
       </span>
@@ -315,20 +321,19 @@ function Actions({
   const { t } = useI18n()
 
   if (removal) {
-    return <Button variant="danger-soft" isDisabled={state === 'removing'} isPending={busy || state === 'removing'} onPress={onRemove}>
+    return <Button variant="danger" disabled={busy || state === 'removing'} aria-busy={busy || state === 'removing'}  onClick={onRemove}>{busy || state === 'removing' ? <Spinner /> : null}
       {t(state === 'removing' ? 'modelsSettingsUi.removing' : 'models.remove')}
     </Button>
   }
 
   if (state === 'failed') {
     return (
-      <Button
-        variant="primary"
+      <Button disabled={busy} aria-busy={busy}
+        variant="default"
         size="sm"
-        className="rounded-[6px]"
-        isPending={busy}
-        onPress={onInstall}
-      >
+
+        onClick={onInstall}
+      >{busy ? <Spinner /> : null}
         {t('models.retry')}
       </Button>
     )
@@ -339,9 +344,9 @@ function Actions({
       <Button
         variant="outline"
         size="sm"
-        className="rounded-[6px]"
-        isDisabled={!cancellable}
-        onPress={onCancel}
+
+        disabled={!cancellable}
+        onClick={onCancel}
       >
         <X aria-hidden="true" className="size-4" />
         {t('models.cancel')}
@@ -352,40 +357,39 @@ function Actions({
   if (state === 'installed') {
     return (
       <>
-        {isDefault ? <Button variant="secondary" isDisabled><Check aria-hidden="true" className="size-4" />{t('modelsSettingsUi.current')}</Button> : null}
+        {isDefault ? <Button variant="secondary" disabled><Check aria-hidden="true" className="size-4" />{t('modelsSettingsUi.current')}</Button> : null}
         {canBeDefault && !isDefault ? (
-          <Button
+          <Button disabled={busy} aria-busy={busy}
             variant="outline"
             size="sm"
-            className="rounded-[6px]"
-            isPending={busy}
-            onPress={onSetDefault}
-          >
+
+            onClick={onSetDefault}
+          >{busy ? <Spinner /> : null}
             {t('models.setDefault')}
           </Button>
         ) : null}
         {!canBeDefault && !isDefault && defaultDisabledReason ? (
-          <Tooltip delay={250}>
-            <Tooltip.Trigger className="block min-w-0 flex-1">
-              <Button variant="outline" size="sm" className="h-10 w-full rounded-xl" isDisabled>
+          <Tooltip>
+            <TooltipTrigger delay={250} render={<div />} className="block min-w-0 flex-1" tabIndex={0}>
+              <Button variant="outline" size="sm" className="h-10 w-full rounded-xl" disabled>
                 {t('models.setDefault')}
               </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content className="settings-row__tooltip z-overlay max-w-96 whitespace-normal">
+            </TooltipTrigger>
+            <TooltipContent  role="tooltip" className="settings-row__tooltip z-popup max-w-96 whitespace-normal">
               {defaultDisabledReason}
-            </Tooltip.Content>
+            </TooltipContent>
           </Tooltip>
         ) : null}
         {/* Destructive removal stays visibly identifiable through its soft-danger fill. */}
-        <Button
-          variant="danger-soft"
-          isIconOnly
+        <Button disabled={busy} aria-busy={busy}
+          variant="danger"
+
           aria-label={t('models.remove')}
-          size="sm"
+          size="icon"
           className="models-card__remove"
-          isPending={busy}
-          onPress={onRemove}
-        >
+
+          onClick={onRemove}
+        >{busy ? <Spinner /> : null}
           <Trash2 aria-hidden="true" className="size-4" />
         </Button>
       </>
@@ -394,14 +398,14 @@ function Actions({
 
   return (
     <Button
-      variant="primary"
+      variant="default"
       size="sm"
       data-onboarding="download-model"
-      className="rounded-full"
-      isDisabled={!installable}
-      isPending={busy}
-      onPress={onInstall}
-    >
+
+      disabled={(!installable) || (busy)} aria-busy={busy}
+
+      onClick={onInstall}
+    >{busy ? <Spinner /> : null}
       <Download aria-hidden="true" className="size-4" />
       {t('models.install')}
     </Button>

@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Card, EmptyState, ListBox, ListBoxItem, Pagination, SearchField, Select, Skeleton } from '@heroui/react'
-import type { Selection } from '@react-types/shared'
-import { Mic } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty'
+import { Input } from '@/components/ui/input'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from '@/components/ui/select'
+import { Pagination, PaginationContent, PaginationItem, PaginationLink } from '@/components/ui/pagination'
+import { Skeleton } from '@/components/ui/skeleton'
+import type { RecordSelection } from './RecordsTable'
+import { Mic, Search } from 'lucide-react'
 import { ErrorBoundary } from '@/components/primitives'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
@@ -35,7 +41,7 @@ export function RecordsPage(): ReactNode {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [sortAscending, setSortAscending] = useState(false)
-  const [selection, setSelection] = useState<Selection>(new Set())
+  const [selection, setSelection] = useState<RecordSelection>(new Set())
   const [renaming, setRenaming] = useState<MeetingMeta | null>(null)
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null)
   const [exporting, setExporting] = useState<MeetingMeta | null>(null)
@@ -144,46 +150,47 @@ export function RecordsPage(): ReactNode {
       <div className="nola-record-page">
         <header className="nola-record-page__header">
           <div><h1>{t('records.title')}</h1><p>{t('records.subtitle')}</p></div>
-          <Button variant="primary" className="nola-record-page__start" onPress={startSession}><Mic aria-hidden="true" size={22} />{t('workspace.start')}</Button>
+          <Button variant="default" className="nola-record-page__start" onClick={startSession}><Mic aria-hidden="true" size={22} />{t('workspace.start')}</Button>
         </header>
         <div className="nola-record-page__search">
-          <SearchField value={filterText} onChange={(value) => { setFilterText(value); setPage(1); setSelection(new Set()) }} aria-label={t('records.search')}>
-            <SearchField.Group><SearchField.SearchIcon /><SearchField.Input placeholder={t('records.searchPlaceholder')} /><SearchField.ClearButton /></SearchField.Group>
-          </SearchField>
+          <div className="nola-record-page__search-field">
+            <Search aria-hidden="true" size={16} />
+            <Input className="h-11 pl-9" type="search" value={filterText} onChange={(event) => { setFilterText(event.target.value); setPage(1); setSelection(new Set()) }} aria-label={t('records.search')} placeholder={t('records.searchPlaceholder')} />
+          </div>
           <span>{t('records.total', { count: filtered.length })}</span>
         </div>
-        <Card className="nola-record-card">
-          <Card.Content>
-            {loading && !loaded ? <div className="nola-record-loading">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} data-testid="skeleton-row" className="h-12 w-full rounded-lg" />)}</div> : loadFailed ? <div className="nola-record-empty"><Button variant="primary" onPress={retryLoad}>{t('common.retry')}</Button></div> : filtered.length === 0 ? <EmptyState className="nola-record-empty"><h2>{isSearching ? t('records.noResults') : t('records.noRecords')}</h2><p>{isSearching ? t('records.noResultsHint') : t('records.noRecordsHint')}</p><Button variant="primary" onPress={isSearching ? () => setFilterText('') : startSession}>{isSearching ? t('records.clearSearch') : t('records.startFirst')}</Button></EmptyState> : <>
+        <Card className="nola-record-card has-data-[slot=card-footer]:pb-5">
+          <CardContent className="flex flex-1 flex-col">
+            {loading && !loaded ? <div className="nola-record-loading">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} data-testid="skeleton-row" className="h-12 w-full rounded-lg" />)}</div> : loadFailed ? <div className="nola-record-empty"><Button variant="default" onClick={retryLoad}>{t('common.retry')}</Button></div> : filtered.length === 0 ? <Empty className="nola-record-empty"><EmptyHeader><EmptyTitle>{isSearching ? t('records.noResults') : t('records.noRecords')}</EmptyTitle><EmptyDescription>{isSearching ? t('records.noResultsHint') : t('records.noRecordsHint')}</EmptyDescription></EmptyHeader><EmptyContent><Button variant="default" onClick={isSearching ? () => setFilterText('') : startSession}>{isSearching ? t('records.clearSearch') : t('records.startFirst')}</Button></EmptyContent></Empty> : <>
               {selectedCount > 0 ? <div className="nola-record-page__bulk">
                 <span className="nola-record-page__bulk-count">{t('records.selectedCount', { count: selectedCount })}</span>
-                <Button variant="secondary" size="sm" onPress={() => setSelection(new Set())} className="nola-record-page__bulk-dismiss">{t('records.clearSelection')}</Button>
-                <Button variant="danger" size="sm" onPress={() => setPendingDelete({ kind: 'bulk' })}>{t('records.deleteSelected', { count: selectedCount })}</Button>
+                <Button variant="secondary" size="sm" onClick={() => setSelection(new Set())} className="nola-record-page__bulk-dismiss">{t('records.clearSelection')}</Button>
+                <Button variant="danger" size="sm" onClick={() => setPendingDelete({ kind: 'bulk' })}>{t('records.deleteSelected', { count: selectedCount })}</Button>
               </div> : null}
               <RecordsTable meetings={visible} pendingIds={pendingIds} sortAscending={sortAscending} onSortChange={setSortAscending} selectedKeys={selection} onSelectionChange={setSelection} onOpen={(id) => navigate(recordPath(id))} onRename={setRenaming} onExport={setExporting} onDelete={(meeting) => setPendingDelete({ kind: 'single', meeting })} />
             </>}
-          </Card.Content>
-          {filtered.length > 0 ? <Card.Footer className="nola-record-page__footer">
+          </CardContent>
+          {filtered.length > 0 ? <CardFooter className="nola-record-page__footer shrink-0 bg-transparent px-0 pb-0">
             <span>{t('records.total', { count: filtered.length })}</span>
             <div className="nola-record-page__paging">
               <span className="nola-record-page__per-page">{t('records.perPage')}</span>
-              <Select className="nola-record-page__page-size" value={String(pageSize)} aria-label={t('records.pageSize')}
-                onChange={(key) => {
+              <Select value={String(pageSize)}
+                onValueChange={(key) => {
                   const next = Number(key)
                   if (!Number.isInteger(next)) return
                   setPageSize(next)
                   setPage(1)
                 }}>
-                <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
-                <Select.Popover><ListBox>{PAGE_SIZES.map((size) => <ListBoxItem key={size} id={String(size)} textValue={String(size)}>{size}<ListBoxItem.Indicator /></ListBoxItem>)}</ListBox></Select.Popover>
+                <SelectTrigger className="nola-record-page__page-size" aria-label={t('records.pageSize')}><SelectValue /></SelectTrigger>
+                <SelectContent><SelectGroup>{PAGE_SIZES.map((size) => <SelectItem key={size} value={String(size)}>{size}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
-              <Pagination size="sm" aria-label={t('records.title')}><Pagination.Content>
-                <Pagination.Item><Pagination.Previous isDisabled={safePage <= 1} onPress={() => setPage(Math.max(1, safePage - 1))} aria-label={t('records.goToPage', { page: Math.max(1, safePage - 1) })}><Pagination.PreviousIcon /></Pagination.Previous></Pagination.Item>
-                {pageNumbers(safePage, pageCount).map((value) => <Pagination.Item key={value}><Pagination.Link isActive={value === safePage} onPress={() => setPage(value)} aria-label={t('records.goToPage', { page: value })}>{value}</Pagination.Link></Pagination.Item>)}
-                <Pagination.Item><Pagination.Next isDisabled={safePage >= pageCount} onPress={() => setPage(Math.min(pageCount, safePage + 1))} aria-label={t('records.goToPage', { page: Math.min(pageCount, safePage + 1) })}><Pagination.NextIcon /></Pagination.Next></Pagination.Item>
-              </Pagination.Content></Pagination>
+              <Pagination aria-label={t('records.title')}><PaginationContent>
+                <PaginationItem><PaginationLink disabled={safePage <= 1} onClick={() => setPage(Math.max(1, safePage - 1))} aria-label={t('records.goToPage', { page: Math.max(1, safePage - 1) })}>‹</PaginationLink></PaginationItem>
+                {pageNumbers(safePage, pageCount).map((value) => <PaginationItem key={value}><PaginationLink isActive={value === safePage} onClick={() => setPage(value)} aria-label={t('records.goToPage', { page: value })}>{value}</PaginationLink></PaginationItem>)}
+                <PaginationItem><PaginationLink disabled={safePage >= pageCount} onClick={() => setPage(Math.min(pageCount, safePage + 1))} aria-label={t('records.goToPage', { page: Math.min(pageCount, safePage + 1) })}>›</PaginationLink></PaginationItem>
+              </PaginationContent></Pagination>
             </div>
-          </Card.Footer> : null}
+          </CardFooter> : null}
         </Card>
       </div>
       <RenameDialog meetingId={renaming?.meetingId ?? null} initialTitle={renaming?.title ?? ''} onClose={() => setRenaming(null)} />

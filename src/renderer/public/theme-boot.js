@@ -33,9 +33,9 @@
     var pref = injected === 'dark' || injected === 'light' ? injected : 'system'
 
     /*
-     * HeroUI `useTheme` 的私有键。预涂必须把权威值镜像一份过去，否则 React 一挂载
-     * `applyThemeToDOM()` 就把预涂的深色覆盖回它自己的默认值 —— 还是闪。
-     * 主进程注入时不需要写 localStorage（file:// 下不可靠），直接等 HeroUI 接管即可。
+     * Renderer theme hook's storage mirror. Pre-paint writes the authoritative value
+     * so the first React render agrees with the document's initial colour scheme.
+     * The main process passes the preference through the window query.
      */
     if (injected !== null) {
       try { window.localStorage.setItem('heroui-theme', pref) } catch (e) { /* 忽略 */ }

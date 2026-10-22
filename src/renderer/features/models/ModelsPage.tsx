@@ -1,3 +1,8 @@
+import { Button } from '@/components/ui/button'
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui'
+import { Empty, EmptyTitle } from '@/components/ui/empty'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { LocalModelImport } from '../offline'
 import { offlineActions } from '@/store/offlineStore'
 import { modelImportEntry } from '../../../shared/model-import-catalog'
@@ -9,7 +14,6 @@ import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Card, Chip, EmptyState, Tabs } from '@heroui/react'
 import { Box } from 'lucide-react'
 
 import { useI18n } from '@/i18n'
@@ -172,13 +176,13 @@ export function ModelsPage() {
    */
   const footerOf = (record: ResourceRecord) => {
     if (record.resourceId.startsWith('hub:') && record.installed && record.kind !== 'ttsModel') {
-      return <Button variant="secondary" onPress={() => setConfiguring({ record, readOnly: false })}>{t(configurationOf(record) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button>
+      return <Button variant="secondary" onClick={() => setConfiguring({ record, readOnly: false })}>{t(configurationOf(record) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button>
     }
     if (!modelImportEntry(record.resourceId)) return undefined
     if (record.installed && record.kind !== 'ttsModel') {
-      return <Button variant="secondary" size="sm" onPress={() => setConfiguring({ record, readOnly: true })}>{t('modelConfig.view')}</Button>
+      return <Button variant="secondary" size="sm" onClick={() => setConfiguring({ record, readOnly: true })}>{t('modelConfig.view')}</Button>
     }
-    return <Button variant="secondary" size="sm" onPress={() => offlineActions.openDownloads(record.resourceId)}>{t('offline.manualDownload')}</Button>
+    return <Button variant="secondary" size="sm" onClick={() => offlineActions.openDownloads(record.resourceId)}>{t('offline.manualDownload')}</Button>
   }
 
   const card = (record: ResourceRecord) => {
@@ -242,22 +246,22 @@ export function ModelsPage() {
         </div>
       </section>
 
-      <Tabs
-        variant="secondary"
-        selectedKey={tab}
-        onSelectionChange={(key) => setTab(String(key) as ModelsTab)}
+      <TabsRoot
+
+        value={tab}
+        onValueChange={(key) => setTab(String(key) as ModelsTab)}
         className="models-tabs"
       >
-        <Tabs.ListContainer>
-          <Tabs.List aria-label={t('modelsSettingsUi.catalogTabs')}>
+        <div className="tabs__list-container">
+          <TabsList className="tabs__list" aria-label={t('modelsSettingsUi.catalogTabs')}>
             <CountTab id="recommended" label={t('models.tabRecommended')} count={null} />
             <CountTab id="installed" label={t('models.tabInstalled')} count={installed.length} />
             <CountTab id="search" label={t('models.tabSearch')} count={null} />
             <CountTab id="downloads" label={t('models.tabDownloads')} count={activeCount} />
-          </Tabs.List>
-        </Tabs.ListContainer>
+          </TabsList>
+        </div>
 
-        <Tabs.Panel id="recommended" data-onboarding="model-downloads">
+        <TabsContent className="tabs__panel" value="recommended" data-onboarding="model-downloads">
           <RecommendedCatalog
             records={resources.filter(record => !record.resourceId.startsWith('hub:'))}
             loading={loading && !loaded}
@@ -265,14 +269,14 @@ export function ModelsPage() {
             onRetry={retryLoad}
             onOpen={setOpenFamily}
             emptyAction={
-              <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={() => setTab('search')}>
+              <Button variant="tertiary" size="sm"  onClick={() => setTab('search')}>
                 {t('models.tabSearch')}
               </Button>
             }
           />
-        </Tabs.Panel>
+        </TabsContent>
 
-        <Tabs.Panel id="installed">
+        <TabsContent className="tabs__panel" value="installed">
           <Catalog
             records={installed}
             loading={loading && !loaded}
@@ -281,59 +285,50 @@ export function ModelsPage() {
             card={card}
             compute={settings?.compute ?? DEFAULT_COMPUTE_SETTINGS}
             emptyAction={
-              <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={() => setTab('recommended')}>
+              <Button variant="tertiary" size="sm"  onClick={() => setTab('recommended')}>
                 {t('models.tabRecommended')}
               </Button>
             }
           />
-        </Tabs.Panel>
+        </TabsContent>
 
-        <Tabs.Panel id="search">
+        <TabsContent className="tabs__panel" value="search">
           <HubSearchTab onGoRecommended={() => setTab('recommended')} />
-        </Tabs.Panel>
+        </TabsContent>
 
-        <Tabs.Panel id="downloads">
+        <TabsContent className="tabs__panel" value="downloads">
           <DownloadsTab />
-        </Tabs.Panel>
-      </Tabs>
-      {/*
-        原来这里挂着一张「模型保存在本机 / 存储设置 →」的卡片。它渲染在 `<Tabs>` **外面**，
-        所以四个 tab 下面都跟着它一次。它说的是「模型存在本地」，而这句话在设置 → 存储里
-        已经讲过一遍，还带真正能改路径的入口；在一张全是模型的列表页底部再放一个跳去别处的
-        按钮，只是把出口从列表里挪到了列表外。按要求整块移除（`.models-storage` 的样式
-        一并删掉，见 models.css）。
-      */}
+        </TabsContent>
+      </TabsRoot>
     </div>
   )
 }
 
-// -- 片段 ---------------------------------------------------------------------
-
 interface CountTabProps {
   id: ModelsTab
   label: string
-  /** 传 null 表示这一屏的数量没有意义（例如搜索 tab 的数量会随输入抖动），不画胶囊。 */
+  /** Null omits counts for tabs whose totals are not meaningful. */
   count: number | null
 }
 
 function CountTab({ id, label, count }: CountTabProps) {
   return (
-    <Tabs.Tab id={id} className="nola-body-strong">
+    <TabsTrigger value={id} className="nola-body-strong">
       <span className="flex items-center gap-2">
         {label}
         {count === null ? null : (
-          <Chip
-            color="default"
-            variant="soft"
-            // `.nola-micro` 在 base 层，压不过 components 层的 `.chip`，所以字阶用任意值工具类。
+          <Badge
+            variant="secondary"
+
+            // Utility typography keeps compact counts aligned with the tab label.
             className="rounded-full text-[12px] leading-[1.45] font-normal tabular"
           >
             {count}
-          </Chip>
+          </Badge>
         )}
       </span>
-      <Tabs.Indicator />
-    </Tabs.Tab>
+
+    </TabsTrigger>
   )
 }
 
@@ -352,7 +347,7 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAc
   const { t } = useI18n()
   if (loading) return <div className={GRID}>{[0, 1, 2, 3].map(index => <ModelCardSkeleton key={index} />)}</div>
   if (failed) return <FailedCatalog onRetry={onRetry} />
-  if (records.length === 0) return <EmptyState className="flex flex-col items-start gap-4 py-8"><p className="nola-title text-foreground">{t('models.notInstalled')}</p>{emptyAction}</EmptyState>
+  if (records.length === 0) return <Empty className="flex flex-col items-start gap-4 py-8"><EmptyTitle>{t('models.notInstalled')}</EmptyTitle>{emptyAction}</Empty>
   const groups = new Map<RecommendedFamily, ResourceRecord[]>()
   for (const record of records) {
     const family = familyOf(record)
@@ -380,10 +375,10 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAc
 function FailedCatalog({ onRetry }: { onRetry: () => void }) {
   const { t } = useI18n()
   return (
-    <EmptyState className="flex flex-col items-start gap-4 py-8">
-      <p className="nola-caption text-muted">{t('errors.modelsLoadFailed')}</p>
-      <Button variant="primary" onPress={onRetry}>{t('common.retry')}</Button>
-    </EmptyState>
+    <Empty className="flex flex-col items-start gap-4 py-8">
+      <EmptyTitle>{t('errors.modelsLoadFailed')}</EmptyTitle>
+      <Button variant="default" onClick={onRetry}>{t('common.retry')}</Button>
+    </Empty>
   )
 }
 
@@ -404,10 +399,10 @@ function Catalog({ records, loading, failed, onRetry, card, emptyAction, compute
 
   if (records.length === 0) {
     return (
-      <EmptyState className="flex flex-col items-start gap-4 py-8">
-        <p className="nola-title text-foreground">{t('models.notInstalled')}</p>
+      <Empty className="flex flex-col items-start gap-4 py-8">
+        <EmptyTitle>{t('models.notInstalled')}</EmptyTitle>
         {emptyAction}
-      </EmptyState>
+      </Empty>
     )
   }
 
@@ -449,8 +444,8 @@ function CurrentModel({ label, name, record, installed, kind }: { label:string; 
   const pending = installed && record && !configurationOf(record)
   return <Card className="models-current">
     <span className={`models-card__icon models-card__icon--${kind === 'recognitionModel' ? 'recognition' : 'translation'}`}><ModelMark record={record} kind={kind} /></span>
-    <Card.Header><Card.Description>{label}</Card.Description><Card.Title>{name}</Card.Title></Card.Header>
-    {installed === null ? null : <Chip color={installed && !pending ? 'success' : 'warning'} variant="soft" size="sm">{pending ? t('modelConfig.pending') : installed ? t('modelsSettingsUi.active') : t('modelsSettingsUi.unavailable')}</Chip>}
+    <CardHeader className="card__header"><CardDescription className="card__description">{label}</CardDescription><CardTitle className="card__title">{name}</CardTitle></CardHeader>
+    {installed === null ? null : <Badge variant={installed && !pending ? 'success' : 'warning'}  >{pending ? t('modelConfig.pending') : installed ? t('modelsSettingsUi.active') : t('modelsSettingsUi.unavailable')}</Badge>}
   </Card>
 }
 

@@ -1,6 +1,10 @@
 import { useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, ColorArea, ColorField, ColorPicker, ColorSlider, ColorSwatch, ColorSwatchPicker, NumberField, Slider, ToggleButton, ToggleButtonGroup } from '@heroui/react'
+
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Button } from '@/components/ui/button'
+import { ColorPicker } from '@/components/ui/color-picker'
+import { StyleSliderRow } from './BrowserTab'
 import { CheckSquare, ChevronDown, CircleAlert, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Square, X } from 'lucide-react'
 
 import { useModelOptions } from '@/model-options'
@@ -140,50 +144,28 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
           {saveError ? <CircleAlert aria-hidden="true" /> : <CheckSquare aria-hidden="true" />}
           {saveError ? t('modelsSettingsUi.saveError') : pending ? t('modelsSettingsUi.saving') : t('modelsSettingsUi.automaticSave')}
         </span>
-        <Button variant="outline" isPending={pending} onPress={restore}>{t('modelsSettingsUi.resetAppearance')}</Button>
+        <Button variant="outline" disabled={pending} onClick={restore}>{t('modelsSettingsUi.resetAppearance')}</Button>
       </div>
     </div>
   )
 }
 
-function Choice({ label, value, options, onChange }: { label:string; value:string; options:PickerOption[]; onChange:(value:string) => void }) {
-  return <ToggleButtonGroup className="nola-segmented" selectionMode="single" disallowEmptySelection selectedKeys={new Set([value])} aria-label={label} size="sm" onSelectionChange={(keys) => {
-    const next = [...keys][0]
-    if (typeof next === 'string') onChange(next)
-  }}>{options.map((option) => <ToggleButton key={option.value} id={option.value}>{option.label}</ToggleButton>)}</ToggleButtonGroup>
+export interface ChoiceProps { label: string; value: string; options: PickerOption[]; onChange: (value: string) => void }
+
+function Choice({ label, value, options, onChange }: ChoiceProps) {
+  return <ToggleGroup className="nola-segmented" value={[value]} aria-label={label} onValueChange={(values) => {
+    if (typeof values[0] === 'string') onChange(values[0])
+  }}>{options.map((option) => <ToggleGroupItem key={option.value} value={option.value} className="toggle-button">{option.label}</ToggleGroupItem>)}</ToggleGroup>
 }
 
-function SliderRow({ label, value, min, max, step, unit, onChange }: { label:string; value:number; min:number; max:number; step:number; unit?:string; onChange:(value:number) => void }) {
-  const scalar = (next:number | number[]) => {
-    const number = Array.isArray(next) ? next[0] : next
-    if (number !== undefined && Number.isFinite(number)) onChange(number)
-  }
-  return <SettingsRow label={label}><div className="settings-slider">
-    <Slider value={value} minValue={min} maxValue={max} step={step} onChange={scalar} aria-label={label}><Slider.Track><Slider.Fill /><Slider.Thumb /></Slider.Track></Slider>
-    <NumberField value={value} minValue={min} maxValue={max} step={step} onChange={scalar} aria-label={label}><NumberField.Group><NumberField.Input className="tabular" /></NumberField.Group></NumberField>
-    {/* Always rendered, empty included: `.settings-slider` is a three-column grid, so a row that
-        omitted this element would leave the third column unfilled and run its track long. */}
-    <span className="settings-slider__unit">{unit}</span>
-  </div></SettingsRow>
+export interface SliderRowProps { label: string; value: number; min: number; max: number; step: number; unit?: string; onChange: (value: number) => void }
+
+function SliderRow({ label, ...props }: SliderRowProps) {
+  return <SettingsRow label={label}><StyleSliderRow label={label} {...props} /></SettingsRow>
 }
 
-function toHex(value:unknown):string {
-  if (typeof value === 'string') return value
-  if (value !== null && typeof value === 'object' && 'toString' in value) return (value as { toString:(format?:string) => string }).toString('hex')
-  return '#000000'
-}
+export interface ColorControlProps { label: string; value: string; onChange: (value: string) => void }
 
-function ColorControl({ label, value, onChange }: { label:string; value:string; onChange:(value:string) => void }) {
-  const changed = (next:unknown) => onChange(toHex(next))
-  return <div className="settings-color"><span>{label}</span>
-    <ColorPicker value={value} onChange={changed}>
-      <ColorPicker.Trigger aria-label={label}><ColorSwatch color={value} className="size-7 rounded-md" /><ChevronDown className="size-4" aria-hidden="true" /></ColorPicker.Trigger>
-      <ColorPicker.Popover aria-label={label}><div className="flex w-60 max-w-full flex-col gap-3 p-3">
-        <ColorArea value={value} onChange={changed} colorSpace="hsb" xChannel="saturation" yChannel="brightness" aria-label={label} className="h-32"><ColorArea.Thumb /></ColorArea>
-        <ColorSlider value={value} onChange={changed} channel="hue" colorSpace="hsb" aria-label={label}><ColorSlider.Track><ColorSlider.Thumb /></ColorSlider.Track></ColorSlider>
-        <ColorSwatchPicker value={value} onChange={changed} aria-label={label}>{PRESET_COLORS.map((color) => <ColorSwatchPicker.Item key={color} color={color}><ColorSwatch /><ColorSwatchPicker.Indicator /></ColorSwatchPicker.Item>)}</ColorSwatchPicker>
-        <ColorField value={value} onChange={changed} aria-label={label}><ColorField.Input /></ColorField>
-      </div></ColorPicker.Popover>
-    </ColorPicker>
-  </div>
+function ColorControl({ label, value, onChange }: ColorControlProps) {
+  return <div className="settings-color"><span>{label}</span><ColorPicker label={label} value={value} presets={PRESET_COLORS} onChange={onChange} /></div>
 }

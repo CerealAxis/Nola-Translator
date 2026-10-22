@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, Label, ListBox, Popover, Select, ToggleButton, ToggleButtonGroup } from '@heroui/react'
-import { AppWindow, ArrowRight, ArrowRightLeft, ChevronDown, Languages, Settings } from 'lucide-react'
+import { Popover } from '@base-ui/react/popover'
+import { Select, SelectContent, SelectFieldLabel, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { AppWindow, ArrowRight, ArrowRightLeft, ChevronDown, Languages, LoaderCircle, Settings } from 'lucide-react'
 import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { AppSettingsPatch, PrewarmErrorCode } from '@/bridge'
 import { useModelOptions } from '@/model-options'
@@ -14,6 +17,8 @@ import { swappedLanguagesOf, targetLanguagePatch } from '@/session-config'
 import { translationLanguages } from '../../../shared/model-capabilities'
 import type { BrowserConnectionStatus } from '../../../shared/browser'
 import { PageHeader } from '@/components/primitives'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { notifyError, notifyWarning } from '@/components/primitives/notify'
 import { reportSettingsFailure } from '@/features/settings/settingsErrorChannel'
 import { SettingSelect } from '../settings/SettingsPage'
@@ -227,26 +232,29 @@ export function VideoCaptionsPage() {
   return (
     <div className="nola-overlay-page">
       <PageHeader className="nola-page-heading" title={t('videoCaptions.title')}
-        actions={<Button onPress={() => void openBrowser()} isPending={opening}><AppWindow aria-hidden="true" />{t('videoCaptions.openBrowser')}</Button>} />
-      <Card className="nola-overlay-preview">
-        <Card.Header>
-          <Card.Title className="text-lg font-semibold">{t('videoCaptions.captionPreview')}</Card.Title>
-        </Card.Header>
+        actions={<Button onClick={() => void openBrowser()} disabled={opening}>
+          {opening ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <AppWindow aria-hidden="true" />}
+          {t('videoCaptions.openBrowser')}
+        </Button>} />
+      <Card className="nola-overlay-preview flex flex-col gap-3 p-5">
+        <CardHeader className="card__header p-0">
+          <CardTitle className="card__title text-lg leading-6 font-semibold">{t('videoCaptions.captionPreview')}</CardTitle>
+        </CardHeader>
         {/*
          * A compact, theme-matched stage with the configured caption block anchored
          * at its saved position. Sample text stands in for a live segment because
          * this page never holds a session.
          */}
-        <Card.Content className="nola-overlay-stage nola-video-stage">
+        <CardContent className="card__content nola-overlay-stage nola-video-stage px-[clamp(16px,3vw,30px)]">
           <div className="nola-video-frame" style={frameStyle} aria-hidden="true">
             {showSource ? <p className="nola-video-caption-line">{t('videoCaptions.previewSource')}</p> : null}
             {showTranslation ? <p className="nola-video-caption-line" data-role="translation">{t('videoCaptions.previewTranslation')}</p> : null}
           </div>
-        </Card.Content>
+        </CardContent>
       </Card>
-      <Card className="nola-section-card p-5">
-        <Card.Header className="mb-5"><Card.Title>{t('videoCaptions.settings')}</Card.Title></Card.Header>
-        <Card.Content className="nola-overlay-fields">
+      <Card className="nola-section-card p-5 flex flex-col gap-0 has-data-[slot=card-footer]:pb-5">
+        <CardHeader className="card__header p-0 mb-5"><CardTitle className="card__title leading-6">{t('videoCaptions.settings')}</CardTitle></CardHeader>
+        <CardContent className="card__content p-0 nola-overlay-fields">
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('videoCaptions.audioSource')}</span>
             {/*
@@ -265,52 +273,54 @@ export function VideoCaptionsPage() {
           </div>
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('shellUi.languageDirection')}</span>
-            <Popover>
-              <Button variant="tertiary" className="nola-overlay-language-trigger"
+            <Popover.Root>
+              <Popover.Trigger render={<Button variant="tertiary" className="nola-overlay-language-trigger"
                 aria-label={`${t('shellUi.languageDirection')}: ${label(sourceLanguage)} → ${label(targetLanguage)}`}>
                 <Languages aria-hidden="true" />
                 <span>{label(sourceLanguage)} → {label(targetLanguage)}</span>
                 <ChevronDown aria-hidden="true" />
-              </Button>
-              <Popover.Content placement="top end">
-                <Popover.Dialog aria-label={t('shellUi.languageDirection')} className="nola-overlay-languages">
-                  <Button variant="tertiary" className="self-start" isDisabled={!swappedLanguages}
-                    onPress={() => {
-                      if (swappedLanguages) patch({ recognition: { sourceLanguage: swappedLanguages.sourceLanguage }, translation: { targetLanguage: swappedLanguages.targetLanguage } })
+              </Button>} />
+              <Popover.Portal>
+                <Popover.Positioner side="top" align="end" sideOffset={8} className="z-dropdown">
+                  <Popover.Popup aria-label={t('shellUi.languageDirection')} className="nola-overlay-languages rounded-xl border border-border bg-overlay text-overlay-foreground shadow-overlay">
+                    <Button variant="tertiary" className="self-start" disabled={!swappedLanguages}
+                      onClick={() => {
+                        if (swappedLanguages) patch({ recognition: { sourceLanguage: swappedLanguages.sourceLanguage }, translation: { targetLanguage: swappedLanguages.targetLanguage } })
+                      }}>
+                      <ArrowRightLeft aria-hidden="true" />{t('session.swapLanguages')}
+                    </Button>
+                    <Select value={sourceLanguage} onValueChange={key => {
+                      if (typeof key === 'string') patch({ recognition: { sourceLanguage: key } })
                     }}>
-                    <ArrowRightLeft aria-hidden="true" />{t('session.swapLanguages')}
-                  </Button>
-                  <Select value={sourceLanguage} onChange={key => {
-                    if (typeof key === 'string') patch({ recognition: { sourceLanguage: key } })
-                  }}>
-                    <Label>{t('session.sourceLanguage')}</Label>
-                    <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
-                    <Select.Popover><ListBox className="nola-language-options">
-                      {modelOptions.sourceLanguages.map(code => <ListBox.Item key={code} id={code} textValue={label(code)}>{label(code)}<ListBox.ItemIndicator /></ListBox.Item>)}
-                    </ListBox></Select.Popover>
-                  </Select>
-                  <Select value={targetLanguage} onChange={key => {
-                    if (typeof key === 'string') patch(targetLanguagePatch(key, targetLanguage))
-                  }}>
-                    <Label>{t('session.targetLanguage')}</Label>
-                    <Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger>
-                    <Select.Popover><ListBox className="nola-language-options">
-                      {modelOptions.targetLanguages.map(code => <ListBox.Item key={code} id={code} textValue={label(code)}>{label(code)}<ListBox.ItemIndicator /></ListBox.Item>)}
-                    </ListBox></Select.Popover>
-                  </Select>
-                </Popover.Dialog>
-              </Popover.Content>
-            </Popover>
+                      <SelectFieldLabel className="label">{t('session.sourceLanguage')}</SelectFieldLabel>
+                      <SelectTrigger className="select__trigger"><SelectValue className="select__value">{value => label(String(value ?? ''))}</SelectValue></SelectTrigger>
+                      <SelectContent className="select__popover rounded-xl border border-border bg-overlay p-1 shadow-overlay"><SelectGroup className="nola-language-options list-box">
+                        {modelOptions.sourceLanguages.map(code => <SelectItem key={code} value={code} label={label(code)} className="list-box-item">{label(code)}</SelectItem>)}
+                      </SelectGroup></SelectContent>
+                    </Select>
+                    <Select value={targetLanguage} onValueChange={key => {
+                      if (typeof key === 'string') patch(targetLanguagePatch(key, targetLanguage))
+                    }}>
+                      <SelectFieldLabel className="label">{t('session.targetLanguage')}</SelectFieldLabel>
+                      <SelectTrigger className="select__trigger"><SelectValue className="select__value">{value => label(String(value ?? ''))}</SelectValue></SelectTrigger>
+                      <SelectContent className="select__popover rounded-xl border border-border bg-overlay p-1 shadow-overlay"><SelectGroup className="nola-language-options list-box">
+                        {modelOptions.targetLanguages.map(code => <SelectItem key={code} value={code} label={label(code)} className="list-box-item">{label(code)}</SelectItem>)}
+                      </SelectGroup></SelectContent>
+                    </Select>
+                  </Popover.Popup>
+                </Popover.Positioner>
+              </Popover.Portal>
+            </Popover.Root>
           </div>
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('shellUi.showContent')}</span>
-            <ToggleButtonGroup className="nola-segmented" selectionMode="single" selectedKeys={new Set([display])} aria-label={t('shellUi.showContent')} onSelectionChange={keys => {
-              const next = [...keys][0]; if (next) patch({ videoCaptions: { showSource: next !== 'translation', showTranslation: next !== 'source' } })
+            <ToggleGroup className="nola-segmented" value={[display]} aria-label={t('shellUi.showContent')} onValueChange={values => {
+              const next = values[0]; if (next) patch({ videoCaptions: { showSource: next !== 'translation', showTranslation: next !== 'source' } })
             }}>
-              {!translationDisabled && <ToggleButton id="both">{t('workspace.modeBoth')}</ToggleButton>}
-              <ToggleButton id="source">{t('workspace.modeSource')}</ToggleButton>
-              {!translationDisabled && <ToggleButton id="translation">{t('workspace.modeTranslation')}</ToggleButton>}
-            </ToggleButtonGroup>
+              {!translationDisabled && <ToggleGroupItem value="both" className="toggle-button" data-selected={display === 'both' ? 'true' : undefined}>{t('workspace.modeBoth')}</ToggleGroupItem>}
+              <ToggleGroupItem value="source" className="toggle-button" data-selected={display === 'source' ? 'true' : undefined}>{t('workspace.modeSource')}</ToggleGroupItem>
+              {!translationDisabled && <ToggleGroupItem value="translation" className="toggle-button" data-selected={display === 'translation' ? 'true' : undefined}>{t('workspace.modeTranslation')}</ToggleGroupItem>}
+            </ToggleGroup>
           </div>
           {/*
            * `layout` is a single-member union: the video overlay always pairs each
@@ -319,20 +329,21 @@ export function VideoCaptionsPage() {
            */}
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('shellUi.layout')}</span>
-            <ToggleButtonGroup className="nola-segmented" selectionMode="single" selectedKeys={new Set([config.layout])} aria-label={t('shellUi.layout')} onSelectionChange={keys => {
-              const next = [...keys][0]; if (next === 'sentence') patch({ videoCaptions: { layout: next } })
+            <ToggleGroup className="nola-segmented" value={[config.layout]} aria-label={t('shellUi.layout')} onValueChange={values => {
+              const next = values[0]; if (next === 'sentence') patch({ videoCaptions: { layout: next } })
             }}>
-              <ToggleButton id="sentence">{t('workspace.layoutSentence')}</ToggleButton>
-            </ToggleButtonGroup>
+              <ToggleGroupItem value="sentence" className="toggle-button" data-selected={config.layout === 'sentence' ? 'true' : undefined}>{t('workspace.layoutSentence')}</ToggleGroupItem>
+            </ToggleGroup>
           </div>
-        </Card.Content>
-        <Card.Footer className="nola-overlay-footer">
-          <Button variant="secondary" onPress={() => navigate(settingsPath('browser'))}><Settings aria-hidden="true" />{t('videoCaptions.browserSettings')}<ArrowRight aria-hidden="true" /></Button>
-        </Card.Footer>
+        </CardContent>
+        <CardFooter className="card__footer bg-transparent px-0 pb-0 nola-overlay-footer">
+          <Button variant="secondary" onClick={() => navigate(settingsPath('browser'))}><Settings aria-hidden="true" />{t('videoCaptions.browserSettings')}<ArrowRight aria-hidden="true" /></Button>
+        </CardFooter>
       </Card>
       <div className="nola-video-service">
-        <Button variant={gateActive ? 'danger' : 'primary'} isPending={captionServiceBusy} isDisabled={prewarming}
-          onPress={() => void (gateActive ? close() : open())}>
+        <Button variant={gateActive ? 'danger' : 'default'} disabled={captionServiceBusy || prewarming}
+          onClick={() => void (gateActive ? close() : open())}>
+          {captionServiceBusy ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
           {prewarming ? t('videoCaptions.serviceLoading') : gateActive ? t('videoCaptions.disableService') : t('videoCaptions.enableService')}
         </Button>
         {serviceIndicator}
