@@ -4,8 +4,11 @@
  */
 
 import type { ReactNode } from 'react'
-import { AlertDialog, Button } from '@heroui/react'
+import { AlertDialog } from '@base-ui/react/alert-dialog'
+import { LoaderCircle } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
+import { DialogFooter, DialogHeader } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n'
 
 export interface RecordDeleteDialogProps {
@@ -30,12 +33,29 @@ export function RecordDeleteDialog({
   const { t } = useI18n()
 
   return (
-    <AlertDialog isOpen={isOpen} onOpenChange={onOpenChange}>
-      <AlertDialog.Backdrop><AlertDialog.Container><AlertDialog.Dialog>
-        <AlertDialog.Header><AlertDialog.Icon /><AlertDialog.Heading>{bulk ? t('records.deleteManyTitle', { count: selectedCount }) : t('records.deleteTitle')}</AlertDialog.Heading></AlertDialog.Header>
-        <AlertDialog.Body><p>{bulk ? t('records.deleteManyBody') : t('records.deleteBody')}</p></AlertDialog.Body>
-        <AlertDialog.Footer><Button variant="tertiary" isDisabled={isPending} onPress={() => onOpenChange(false)}>{t('common.cancel')}</Button><Button variant="danger" isPending={isPending} onPress={onConfirm}>{bulk ? t('records.deleteSelected', { count: selectedCount }) : t('records.delete')}</Button></AlertDialog.Footer>
-      </AlertDialog.Dialog></AlertDialog.Container></AlertDialog.Backdrop>
-    </AlertDialog>
+    <AlertDialog.Root open={isOpen} onOpenChange={onOpenChange}>
+      <AlertDialog.Portal>
+        <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
+        <AlertDialog.Popup className="nola-dialog-content max-w-sm">
+          <DialogHeader>
+            <AlertDialog.Title data-slot="dialog-title">
+              {bulk ? t('records.deleteManyTitle', { count: selectedCount }) : t('records.deleteTitle')}
+            </AlertDialog.Title>
+            <AlertDialog.Description data-slot="dialog-description">
+              {bulk ? t('records.deleteManyBody') : t('records.deleteBody')}
+            </AlertDialog.Description>
+          </DialogHeader>
+          <DialogFooter>
+            <AlertDialog.Close render={<Button variant="tertiary" size="sm" />} disabled={isPending}>
+              {t('common.cancel')}
+            </AlertDialog.Close>
+            <Button variant="danger" size="sm" disabled={isPending} onClick={onConfirm}>
+              {isPending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
+              {bulk ? t('records.deleteSelected', { count: selectedCount }) : t('records.delete')}
+            </Button>
+          </DialogFooter>
+        </AlertDialog.Popup>
+      </AlertDialog.Portal>
+    </AlertDialog.Root>
   )
 }

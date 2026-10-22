@@ -156,7 +156,7 @@ async function run() {
     await waitFor(window, `document.querySelector('[data-onboarding="complete"]')`)
     const completion = await window.webContents.executeJavaScript(`(() => {
       const dialog = document.querySelector('[data-onboarding="complete"]');
-      const backdrop = dialog.closest('.modal__backdrop');
+      const backdrop = dialog.parentElement?.querySelector('[data-slot="dialog-backdrop"]');
       const rect = dialog.getBoundingClientRect();
       return { modal: dialog.getAttribute('aria-modal'), background: backdrop && getComputedStyle(backdrop).backgroundColor,
         blocked: backdrop?.contains(document.elementFromPoint(8, innerHeight - 8)),
@@ -171,7 +171,7 @@ async function run() {
     assert.equal(completion.visible, true)
     assert.equal(completion.overflow, false)
     await writeFile(resolve(output, `${language}-${theme}-${width}-complete.png`), (await window.webContents.capturePage()).toPNG())
-    await click(window, '[data-onboarding="complete"] .modal__footer button:last-child')
+    await click(window, '[data-onboarding="complete"] [data-slot="dialog-footer"] button:last-child')
     await waitFor(window, `!document.querySelector('.onboarding-tour') && location.hash === '#/'`)
     await window.webContents.reload()
     await waitFor(window, `document.querySelector('.nola-home') && !document.getElementById('splash')`)

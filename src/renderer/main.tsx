@@ -6,7 +6,7 @@ import './theme/cjk-fonts.css'
 import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
-import { Toast } from '@heroui/react'
+import { ToastProvider } from './components/ui/toast'
 import { APPLICATION_PAGES, useApplicationNavigation } from './application'
 import { dismissNotice, notifyError } from './components/primitives/notify'
 import { createIpcBridge, isIpcBridgeAvailable } from './bridge/ipc/ipcBridge'
@@ -306,8 +306,8 @@ function Root() {
 flushSync(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <Toast.Provider />
       <I18nProvider>
+        <ToastProvider />
         <Root />
       </I18nProvider>
     </StrictMode>

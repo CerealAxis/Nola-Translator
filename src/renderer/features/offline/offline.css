@@ -84,7 +84,6 @@
 .offline-model-fields { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 .offline-model-option { display: flex; align-items: center; gap: var(--space-1); min-width: 0; width: 100%; }
 .offline-model-option > span:first-child, .offline-model-option > .label { min-width: 0; overflow-wrap: anywhere; }
-.offline-model-option .chip { flex-shrink: 0; margin-inline-start: auto; font: var(--font-label); }
 .offline-model-popover { max-width: calc(100vw - var(--space-4)); }
 .offline-dialog .offline-items { gap: 0; margin: 0; }
 .offline-dialog .offline-items strong { font: var(--font-body-strong); }

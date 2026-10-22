@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
-import { Button } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { ArrowLeft, ArrowRight, RotateCw, LockKeyhole, Play, Pause, Volume2, Maximize, Captions } from 'lucide-react'
 import { OverlayRoot } from '@/features/overlay'
 import { useNolaTheme } from '@/components/primitives'
@@ -12,6 +12,10 @@ import extensionStyles from '../../browser/extension/styles.css?inline'
 import videoFrame from './scene-video-frame.jpg'
 
 export interface SceneProps { browser?: boolean }
+
+/* The shared `.button svg` rule also reaches these player controls, so their
+   larger glyph size must remain explicit. */
+const controlIconStyle = { width: 20, height: 20 }
 
 /** A licensed film frame places the real caption surfaces in a familiar viewing scene. */
 export function Scene({ browser = false }: SceneProps) {
@@ -36,7 +40,7 @@ export function Scene({ browser = false }: SceneProps) {
 
 function PlayerControls({ playing, setPlaying }: { playing: boolean; setPlaying: (playing: boolean) => void }) {
   const { t } = useI18n()
-  return <div className="docs-player-controls"><Button isIconOnly variant="secondary" aria-label={playing ? t('workspace.pause') : t('workspace.resume')} onPress={() => setPlaying(!playing)}>{playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}</Button><Volume2 aria-hidden="true" /><span>00:23 / 12:14</span><div className="docs-player-progress"><i /></div><Captions aria-hidden="true" /><Maximize aria-hidden="true" /></div>
+  return <div className="docs-player-controls"><Button variant="tertiary" size="icon" aria-label={playing ? t('workspace.pause') : t('workspace.resume')} onClick={() => setPlaying(!playing)}>{playing ? <Pause aria-hidden="true" style={controlIconStyle} /> : <Play aria-hidden="true" style={controlIconStyle} />}</Button><Volume2 aria-hidden="true" /><span>00:23 / 12:14</span><div className="docs-player-progress"><i /></div><Captions aria-hidden="true" /><Maximize aria-hidden="true" /></div>
 }
 
 function BrowserCaption() {

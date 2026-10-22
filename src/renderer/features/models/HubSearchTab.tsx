@@ -1,9 +1,18 @@
+import { Spinner } from '@/components/ui/spinner'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
+import { Dialog, DialogCloseButton, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+
+import { AlertTriangle, Search, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Empty, EmptyTitle } from '@/components/ui/empty'
+
 import { configurationOf } from '../../../shared/model-capabilities'
 import { ModelConfigurationDialog } from './ModelConfigurationDialog'
 import { DownloadSourceDialog } from './DownloadSourceDialog'
 /** Hub metadata hits arrive before the README card or any runtime inspection finishes. */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Drawer, EmptyState, SearchField, Tag, TagGroup } from '@heroui/react'
 import type { HubModelSummary, HubSearchResult, ModelDownloadSource, ResourceRecord } from '@/bridge'
 import { actions, stores, useStore } from '@/store'
 import type { HubKind } from '@/store'
@@ -321,38 +330,26 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
       if (target) installHub(target, source)
     }} />
     {configuring ? <ModelConfigurationDialog key={configuring.resourceId} record={configuring} onClose={() => setConfiguring(null)} /> : null}
-    <SearchField value={query} onChange={setQuery} fullWidth aria-label={t('models.searchPlaceholder')}>
-      <SearchField.Group>
-        <SearchField.SearchIcon />
-        <SearchField.Input placeholder={t('models.searchPlaceholder')} />
-      </SearchField.Group>
-    </SearchField>
-    <Alert status="warning">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title className="nola-body-strong">{t('models.experimentalNoticeTitle')}</Alert.Title>
-        <Alert.Description className="nola-caption">
-          {t('models.experimentalNoticeBody')}
-          <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={onGoRecommended}>
-            {t('models.experimentalNoticeAction')}
-          </Button>
-        </Alert.Description>
-      </Alert.Content>
+    <InputGroup>
+      <InputGroupInput type="search" value={query} onChange={event => setQuery(event.target.value)} aria-label={t('models.searchPlaceholder')} placeholder={t('models.searchPlaceholder')} />
+      <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
+    </InputGroup>
+    <Alert variant="warning">
+      <AlertTriangle aria-hidden="true" />
+      <AlertTitle>{t('models.experimentalNoticeTitle')}</AlertTitle>
+      <AlertDescription>
+        {t('models.experimentalNoticeBody')}
+        <Button variant="tertiary" size="sm" onClick={onGoRecommended}>{t('models.experimentalNoticeAction')}</Button>
+      </AlertDescription>
     </Alert>
-    <TagGroup aria-label={t('modelsSettingsUi.filtersLabel')} selectionMode="single"
-      selectedKeys={new Set([filter])} onSelectionChange={(keys) => {
-        const next = [...keys][0]
-        if (typeof next === 'string') setFilter(next as Filter)
-      }}>
-      <TagGroup.List items={filters}>
-        {(item) => <Tag id={item.id} textValue={item.label}>{item.label}</Tag>}
-      </TagGroup.List>
-    </TagGroup>
+    <ToggleGroup className="model-search-filters" aria-label={t('modelsSettingsUi.filtersLabel')} value={[filter]} onValueChange={values => { if (values[0]) setFilter(values[0] as Filter) }}>
+      {filters.map(item => <ToggleGroupItem key={item.id} value={item.id} className="button button--secondary h-6 min-h-0 px-2 text-xs">{item.label}</ToggleGroupItem>)}
+    </ToggleGroup>
     {failed && !awaiting ? <p className="nola-caption text-muted">{t('errors.searchFailed')}</p> : null}
     {awaiting ? <SearchSkeletons /> : null}
-    {!awaiting && !failed && !nextCursor && visible.length === 0 ? <EmptyState>
-      <h3>{t('models.noResults')}</h3>
-    </EmptyState> : null}
+    {!awaiting && !failed && !nextCursor && visible.length === 0 ? <Empty>
+      <EmptyTitle>{t('models.noResults')}</EmptyTitle>
+    </Empty> : null}
     {!awaiting && !failed && visible.length > 0 ? <div className="models-grid">
       {visible.map((hit) => {
         const summary = hit.summary
@@ -375,13 +372,13 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
             notifyError(t('modelsSettingsUi.removeFailed'), { cause })
           }) }}
           onSetDefault={() => undefined}
-          footer={<div className="flex flex-wrap gap-[var(--space-1)]">{live?.installed ? <Button variant="secondary" onPress={() => setConfiguring(live)}>{t(configurationOf(live) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : null}<Button variant="tertiary" size="sm" onPress={() => setDetail(hit)}>
+          footer={<div className="flex flex-wrap gap-[var(--space-1)]">{live?.installed ? <Button variant="secondary" onClick={() => setConfiguring(live)}>{t(configurationOf(live) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : null}<Button variant="tertiary" size="sm" onClick={() => setDetail(hit)}>
             {t('models.openDetails')}
           </Button></div>} />
       })}
     </div> : null}
     {!awaiting && !failed ? <div ref={bottom} className="models-search__pagination" aria-live="polite">
-      {nextCursor ? <Button variant="tertiary" isPending={loadingMore} onPress={() => loadMore(announceSuccess)}>
+      {nextCursor ? <Button disabled={loadingMore} aria-busy={loadingMore} variant="tertiary"  onClick={() => loadMore(announceSuccess)}>{loadingMore ? <Spinner /> : null}
         {loadingMore ? t('common.loading') : moreFailed ? t('models.retry') : t('models.loadMore')}
       </Button> : visible.length > 0 ? <p className="nola-caption text-muted">{t('models.noMoreResults')}</p> : null}
     </div> : null}
@@ -395,14 +392,14 @@ export function DetailDrawer({ hit, description, onClose, onInstall }: {
 }) {
   const { t } = useI18n()
   const summary = hit?.summary
-  return <Drawer isOpen={hit !== null} onOpenChange={(open) => !open && onClose()}>
-    <Drawer.Backdrop><Drawer.Content placement="left">
-      <Drawer.Dialog className="w-[420px] gap-4 p-4">
-        <Drawer.Header className="flex items-start justify-between gap-4">
-          <Drawer.Heading>{summary ? repoName(summary.repo) : t('models.details')}</Drawer.Heading>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body className="nola-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+  return <Dialog open={hit !== null} onOpenChange={(open) => !open && onClose()}>
+
+      <DialogContent className="model-detail-drawer">
+        <DialogHeader>
+          <DialogTitle>{summary ? repoName(summary.repo) : t('models.details')}</DialogTitle>
+        </DialogHeader>
+        <DialogCloseButton aria-label={t('common.close')} />
+        <div className="nola-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
           {summary ? <>
             <p className="nola-body text-muted">{description || t('models.noDescription')}</p>
             {summary.author ? <Row label={t('models.author')} value={summary.author} /> : null}
@@ -414,13 +411,13 @@ export function DetailDrawer({ hit, description, onClose, onInstall }: {
               {t('models.viewOnHub')}
             </a>
           </> : null}
-        </Drawer.Body>
-        <Drawer.Footer>{hit ? <Button variant="primary" onPress={() => onInstall(hit)}>
+        </div>
+        <DialogFooter>{hit ? <Button variant="default" onClick={() => onInstall(hit)}>
           {t('models.install')}
-        </Button> : null}</Drawer.Footer>
-      </Drawer.Dialog>
-    </Drawer.Content></Drawer.Backdrop>
-  </Drawer>
+        </Button> : null}</DialogFooter>
+      </DialogContent>
+
+  </Dialog>
 }
 
 function Row({ label, value }: { label: string; value: string }) {

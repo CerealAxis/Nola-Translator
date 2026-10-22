@@ -12,10 +12,16 @@
  */
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, protocol } from 'electron'
+import { build } from 'esbuild'
+
+const defaultsBundle = await build({ entryPoints: ['src/shared/settings.ts'], bundle: true, platform: 'node', format: 'esm', write: false })
+const { DEFAULT_SETTINGS } = await import('data:text/javascript;base64,' + Buffer.from(defaultsBundle.outputFiles[0].text).toString('base64'))
 
 app.disableHardwareAcceleration()
+protocol.registerSchemesAsPrivileged([{ scheme: 'nola-audio', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }])
 const output = resolve('artifacts/layout')
+app.setPath('userData', resolve(output, `electron-cache-${process.pid}`))
 const delay = (ms) => new Promise((done) => setTimeout(done, ms))
 
 const SETTINGS_TABS = ['general', 'audio', 'translation', 'appearance', 'storage', 'browser', 'advanced', 'more']
@@ -88,7 +94,7 @@ const PAGE_GROUPS = {
   ],
   record: [
     { name: 'record-detail', selector: '.nola-record-detail', min: 1 },
-    { name: 'back', selector: '.nola-record-detail__back', min: 1 },
+    { name: 'back', selector: '.nola-record-detail nav a[href="#/records"]', min: 1 },
     { name: 'reading-card', selector: '.nola-record-detail__reading', min: 1 },
     { name: 'dual', selector: '.nola-dual', min: 1 },
     { name: 'dual-headers', selector: '.nola-dual__headers', min: 1 },
@@ -103,8 +109,7 @@ const PAGE_GROUPS = {
     { name: 'current-model', selector: '.models-current', min: 2 },
     { name: 'tabs', selector: '.models-tabs', min: 1 },
     { name: 'models-grid', selector: '.models-grid', min: 1 },
-    { name: 'model-card', selector: '.models-grid .models-card', min: 4 },
-    { name: 'storage-card', selector: '.models-storage', min: 1 },
+    { name: 'model-card', selector: '.models-grid .models-card', min: 3 },
   ],
   settings: [
     { name: 'settings-page', selector: '.settings-page', min: 1 },
@@ -143,15 +148,34 @@ const RESOURCES = {
  * full surface — the engine-state read, for one, is left out and the store
  * swallows the failure.
  */
+// A valid local recording keeps media loading independent of custom protocols or network.
+const audioSamples = 8000
+const fixtureWav = Buffer.alloc(44 + audioSamples * 2)
+fixtureWav.write('RIFF', 0)
+fixtureWav.writeUInt32LE(fixtureWav.length - 8, 4)
+fixtureWav.write('WAVEfmt ', 8)
+fixtureWav.writeUInt32LE(16, 16)
+fixtureWav.writeUInt16LE(1, 20)
+fixtureWav.writeUInt16LE(1, 22)
+fixtureWav.writeUInt32LE(audioSamples, 24)
+fixtureWav.writeUInt32LE(audioSamples * 2, 28)
+fixtureWav.writeUInt16LE(2, 32)
+fixtureWav.writeUInt16LE(16, 34)
+fixtureWav.write('data', 36)
+fixtureWav.writeUInt32LE(audioSamples * 2, 40)
+const fixtureAudioUrl = 'nola-audio://local/layout/audio.wav'
+
 const preloadSource = `
 const {contextBridge} = require('electron');
+const defaults = ${JSON.stringify(DEFAULT_SETTINGS)};
 let settings = {
-  version: 1, theme: 'system', uiLanguage: 'zh-CN', modelStoragePath: '',
-  recognition: { modelId: 'qwen3-asr-1.7b-hf', sourceLanguage: 'auto', audioSource: 'defaultOutput' },
+  ...defaults,
+  version: 1, theme: 'system', uiLanguage: 'zh-CN', modelStoragePath: '', onboardingSeen: true,
+  recognition: { ...defaults.recognition, modelId: 'qwen3-asr-1.7b-hf', sourceLanguage: 'auto', audioSource: 'defaultOutput' },
   recording: { keepAudio: true },
   appearance: { reduceMotion: false },
   overlay: { mode: 'bottom', colorScheme: 'dark', alwaysOnTop: true, fontFamily: 'Segoe UI Variable', fontSize: 26, fontWeight: 600, translationFontSize: 22, translationFontWeight: 500, sourceColor: '#FFFFFF', translationColor: '#FFFFFF', backgroundColor: '#111111', backgroundOpacity: 0.84, lineHeight: 1.3, translationLineHeight: 1.35, showSource: true, showTranslation: true, layout: 'rolling' },
-  translation: { provider: 'local', localModelId: 'hy-mt2-1.8b-q3-k-m', microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '', cloudEndpoint: 'https://api.openai.com/v1', cloudModel: 'gpt-4.1-mini', cloudApiFormat: 'chat-completions', translateIntermediate: false, targetLanguage: 'zh' },
+  translation: { ...defaults.translation, provider: 'local', localModelId: 'hy-mt2-1.8b-q3-k-m', microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '', cloudEndpoint: 'https://api.openai.com/v1', cloudModel: 'gpt-4.1-mini', cloudApiFormat: 'chat-completions', translateIntermediate: false, targetLanguage: 'zh' },
 };
 const meetings = ${JSON.stringify(MEETINGS)};
 const segments = ${JSON.stringify(SEGMENTS)};
@@ -176,7 +200,10 @@ contextBridge.exposeInMainWorld('nolaTranslator', {
   onSettingsChanged: fn => { settingsListeners.add(fn); return () => settingsListeners.delete(fn) },
   onEngineEvent: fn => { eventListeners.add(fn); return () => eventListeners.delete(fn) },
   onOverlayMenuChanged: () => () => {},
+  onOverlayLockChanged: () => () => {},
   onOpenAppearance: () => () => {},
+  getEngineState: async () => 'ready',
+  browserConnection: async () => ({ enabled: false, registered: false, connections: 0, sessionActive: false, captionServiceActive: false, browsers: [] }),
   listDevices: async () => [],
   listResources: async () => resources,
   manageResource: async (id) => resources.resources.find(r => r.resourceId === id),
@@ -190,7 +217,7 @@ contextBridge.exposeInMainWorld('nolaTranslator', {
   setMeetingNotes: async (id, notes) => Object.assign({}, meetings.find(m => m.meetingId === id) ?? { meetingId: id }, { notes }),
   deleteMeeting: async () => true,
   exportMeeting: async () => 'D:/exports/meeting.srt',
-  getMeetingAudioUrl: async id => (meetings.find(m => m.meetingId === id)?.audioFile ? 'nola-audio://local/' + id + '/audio.wav' : null),
+  getMeetingAudioUrl: async id => (meetings.find(m => m.meetingId === id)?.audioFile ? ${JSON.stringify(fixtureAudioUrl)} : null),
   getDiagnostics: async () => ({ '引擎状态': 'ready', '语音识别': 'Qwen3-ASR 1.7B（nf4）', '本地翻译': 'Hy-MT2 · llama.cpp（cuda）' }),
   copyDiagnostics: async () => {},
   checkLatestRelease: async () => ({ currentVersion: '1.0.7', latestVersion: null, updateAvailable: false, releaseName: null, releaseNotes: '', releaseUrl: null }),
@@ -267,6 +294,7 @@ async function clickAt(window, selector) {
 }
 
 async function main() {
+  protocol.handle('nola-audio', () => new Response(fixtureWav, { headers: { 'Content-Type': 'audio/wav' } }))
   await mkdir(output, { recursive: true })
   const preload = resolve(output, 'fixture.cjs')
   await writeFile(preload, preloadSource)
@@ -276,8 +304,8 @@ async function main() {
   const fail = (context, reason, extra) => failures.push({ ...context, reason, ...(extra ?? {}) })
 
   const window = new BrowserWindow({ width: 1180, height: HEIGHT, show: false, webPreferences: { preload, contextIsolation: true, sandbox: true } })
-  window.webContents.on('console-message', (_event, level, message) => {
-    if (level >= 3) console.log(`[renderer] ${message}`)
+  window.webContents.on('console-message', details => {
+    if (details.level === 'error') console.log(`[renderer] ${details.message}`)
   })
   await window.loadFile(resolve('out/renderer/index.html'))
 
@@ -411,7 +439,7 @@ async function main() {
 
       // The back button: without it the rest of the width sweep stays trapped on the detail page.
       scenarios += 1
-      const wentBack = await clickAt(window, '.nola-record-detail__back')
+      const wentBack = await clickAt(window, '.nola-record-detail nav a[href="#/records"]')
       const backAtList = await window.webContents.executeJavaScript(`document.querySelector('[data-page]')?.getAttribute('data-page') === 'records'`)
       if (!wentBack || !backAtList) fail({ language, width, page: 'record-back' }, 'back button did not return to the records list', { wentBack, backAtList })
     }
@@ -422,24 +450,24 @@ async function main() {
   await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings({ uiLanguage: 'zh-CN' })`)
   await goto(window, '#/', 'home')
   const LANG_LABEL = { 'zh-CN': '界面语言', en: 'Interface language' }
-  const LANG_TRIGGER = (language) => `button[data-slot="dropdown-trigger"].nola-titlebar-icon[aria-label="${LANG_LABEL[language]}"]`
+  const LANG_TRIGGER = (language) => `button.nola-titlebar-icon[aria-haspopup="menu"][aria-label="${LANG_LABEL[language]}"]`
 
   scenarios += 1
   if (!await clickAt(window, LANG_TRIGGER('zh-CN'))) {
     fail({ language: 'zh-CN', width: 1100, page: 'language-menu' }, 'language dropdown trigger not found or not clickable')
   } else {
     const menu = await window.webContents.executeJavaScript(`(() => {
-      const items = [...document.querySelectorAll('[data-slot="menu-item"]')]
+      const items = [...document.querySelectorAll('[role="menuitemradio"]')]
       return { count: items.length, texts: items.map(el => el.textContent.trim()) }
     })()`)
     scenarios += 1
-    // Every HeroUI v3 Dropdown.Menu item carries [data-slot="menu-item"], so match on text rather than order.
+    // Match language radio items by their semantic role and text rather than order.
     if (menu.count < 2 || !menu.texts.includes('English') || !menu.texts.includes('简体中文')) {
       fail({ language: 'zh-CN', width: 1100, page: 'language-menu' }, 'language menu items missing', { menu })
     } else {
       scenarios += 1
       const picked = await window.webContents.executeJavaScript(`(() => {
-        const item = [...document.querySelectorAll('[data-slot="menu-item"]')].find(el => el.textContent.trim() === 'English')
+        const item = [...document.querySelectorAll('[role="menuitemradio"]')].find(el => el.textContent.trim() === 'English')
         if (!item) return false
         item.click(); return true
       })()`)
@@ -455,7 +483,7 @@ async function main() {
       // Back to Chinese, so the language path is covered in both directions.
       await clickAt(window, LANG_TRIGGER('en'))
       const restored = await window.webContents.executeJavaScript(`(() => {
-        const item = [...document.querySelectorAll('[data-slot="menu-item"]')].find(el => el.textContent.trim() === '简体中文')
+        const item = [...document.querySelectorAll('[role="menuitemradio"]')].find(el => el.textContent.trim() === '简体中文')
         if (!item) return ''
         item.click(); return 'clicked'
       })()`)
@@ -548,7 +576,7 @@ async function main() {
     ...segment,
     segmentId: 'after-roll',
     startedAtMs: 4000,
-    sourceText: 'Rest is not a luxury; it is how people recover attention and keep making good decisions.',
+    sourceText: 'Rest is not a luxury; it is how people recover attention and keep making good decisions. '.repeat(4),
     translations: [{ targetLanguage: 'zh', text: '休息不是奢侈；它是人们恢复注意力、继续做出好决定的方式。', state: 'complete', provider: 'hymt2' }],
   } })
   await delay(120)

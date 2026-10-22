@@ -18,7 +18,8 @@
 
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
-import { EmptyState, Spinner } from '@heroui/react'
+import { Empty } from '@/components/ui/empty'
+import { Spinner } from '@/components/ui/spinner'
 import type { RouteId } from '@/bridge'
 import { useI18n } from '@/i18n'
 
@@ -271,12 +272,12 @@ export function Routes({ pages }: RoutesProps): ReactNode {
 
 function MissingPage({ title, label }: { title: string; label: string }): ReactNode {
   return (
-    <EmptyState className="flex flex-col items-start gap-4 py-8">
+    <Empty className="flex flex-col items-start gap-4 py-8">
       <h1 className="nola-display text-foreground">{title}</h1>
       <p className="nola-caption flex items-center gap-2">
         <Spinner size="sm" />
         {label}
       </p>
-    </EmptyState>
+    </Empty>
   )
 }

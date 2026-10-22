@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { Button, Card, EmptyState, Skeleton } from '@heroui/react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowRight } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import type { MeetingMeta } from '@/bridge'
@@ -21,11 +22,11 @@ export function RecentMeetings({ meetings, loading = false, failed = false, onRe
   const { t } = useI18n()
   const recent = sortByEndTime(meetings, false).slice(0, 3)
   return (
-    <Card className={'nola-record-card nola-home__recent ' + className}>
-      <Card.Header className="nola-home__recent-header"><Card.Title>{t('home.recentMeetings')}</Card.Title><Button variant="tertiary" size="sm" onPress={onOpenAll}>{t('homeRecordsUi.allRecords')}<ArrowRight size={16} aria-hidden="true" /></Button></Card.Header>
-      <Card.Content>
-        {loading && recent.length === 0 ? <div className="nola-record-loading">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}</div> : failed ? <div className="nola-record-empty"><Button variant="primary" onPress={onRetry}>{t('common.retry')}</Button></div> : recent.length === 0 ? <EmptyState className="nola-record-empty"><p>{t('home.noMeetings')}</p><Button variant="primary" onPress={onStart}>{t('home.noMeetingsAction')}</Button></EmptyState> : <RecordsTable meetings={recent} onOpen={onOpen} />}
-      </Card.Content>
+    <Card className={['nola-record-card nola-home__recent flex flex-col', className].filter(Boolean).join(' ')}>
+      <CardHeader className="nola-home__recent-header card__header p-0"><CardTitle className="card__title">{t('home.recentMeetings')}</CardTitle><Button variant="tertiary" size="sm" onClick={onOpenAll}>{t('homeRecordsUi.allRecords')}<ArrowRight size={16} aria-hidden="true" /></Button></CardHeader>
+      <CardContent className="card__content flex flex-col">
+        {loading && recent.length === 0 ? <div className="nola-record-loading" aria-busy="true">{Array.from({ length: 3 }, (_, i) => <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-surface-tertiary/70" />)}</div> : failed ? <div className="nola-record-empty"><Button variant="default" onClick={onRetry}>{t('common.retry')}</Button></div> : recent.length === 0 ? <div className="nola-record-empty"><p>{t('home.noMeetings')}</p><Button variant="default" onClick={onStart}>{t('home.noMeetingsAction')}</Button></div> : <RecordsTable meetings={recent} onOpen={onOpen} />}
+      </CardContent>
     </Card>
   )
 }

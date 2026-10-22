@@ -2,7 +2,9 @@
 
 import { useMemo } from 'react'
 
-import { AlertDialog, Button } from '@heroui/react'
+import { AlertDialog } from '@base-ui/react/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 import { actions } from '@/store'
 import type { SessionState } from '@/store'
@@ -24,30 +26,19 @@ export interface StopSessionDialogProps {
 export function StopSessionDialog({ isOpen, onOpenChange, onEnd }: StopSessionDialogProps) {
   const { t } = useI18n()
   return (
-    <AlertDialog isOpen={isOpen} onOpenChange={onOpenChange}>
-      <AlertDialog.Backdrop className="z-overlay">
-        <AlertDialog.Container>
-          <AlertDialog.Dialog className="rounded-2xl border border-border">
-            <AlertDialog.Header>
-              <AlertDialog.Heading className="nola-title text-foreground">
-                {t('workspace.endConfirmTitle')}
-              </AlertDialog.Heading>
-            </AlertDialog.Header>
-            <AlertDialog.Body>
-              <p className="nola-body text-muted">{t('workspace.endConfirmBody')}</p>
-            </AlertDialog.Body>
-            <AlertDialog.Footer>
-              <Button variant="tertiary" size="sm" className="rounded-xl" onPress={() => onOpenChange(false)}>
-                {t('workspace.keepGoing')}
-              </Button>
-              <Button variant="danger" size="sm" className="rounded-xl" onPress={onEnd}>
-                {t('workspace.end')}
-              </Button>
-            </AlertDialog.Footer>
-          </AlertDialog.Dialog>
-        </AlertDialog.Container>
-      </AlertDialog.Backdrop>
-    </AlertDialog>
+    <AlertDialog.Root open={isOpen} onOpenChange={open => { if (!open) onOpenChange(false) }}>
+      <AlertDialog.Portal>
+        <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
+        <AlertDialog.Popup className="nola-dialog-content max-w-sm">
+          <AlertDialog.Title className="nola-title text-foreground">{t('workspace.endConfirmTitle')}</AlertDialog.Title>
+          <AlertDialog.Description className="nola-body text-muted">{t('workspace.endConfirmBody')}</AlertDialog.Description>
+          <div className="nola-dialog-footer">
+            <AlertDialog.Close render={<Button variant="tertiary" size="sm" className="rounded-xl" />}>{t('workspace.keepGoing')}</AlertDialog.Close>
+            <Button variant="danger" size="sm" className="rounded-xl" onClick={() => { onEnd(); onOpenChange(false) }}>{t('workspace.end')}</Button>
+          </div>
+        </AlertDialog.Popup>
+      </AlertDialog.Portal>
+    </AlertDialog.Root>
   )
 }
 
@@ -88,71 +79,49 @@ export function SessionErrorDialog({ state, onCopyDiagnostics, onReset, onViewRe
     : supportErrorCodeForMessage(handle.message) ?? 'ERR-999'
 
   return (
-    <AlertDialog
-      isOpen={isOpen}
-      onOpenChange={(open) => {
-        // Reached by ESC and by a backdrop click. This failure has no "later"
-        // option, and without a reset it would keep covering the transcript, so
-        // closing resets.
-        if (!open) onReset()
-      }}
-    >
-      <AlertDialog.Backdrop className="z-overlay">
-        <AlertDialog.Container>
-          <AlertDialog.Dialog className="rounded-2xl border border-border">
-            <AlertDialog.Header>
-              <AlertDialog.Heading className="nola-title text-foreground">
-                {t(handle.message)}
-              </AlertDialog.Heading>
-            </AlertDialog.Header>
-            {handle.detail ? (
-              <AlertDialog.Body>
-                <p className="nola-body text-muted">{t(handle.detail)}</p>
-              </AlertDialog.Body>
-            ) : null}
-            <AlertDialog.Footer>
-              <Button variant="tertiary" size="sm" className="rounded-xl" onPress={() => onCopyDiagnostics({
-                supportCode,
-                correlationId: state.errorRequestId ?? undefined,
-              })}>
-                {t('errors.copyDiagnosticsAction')}
-              </Button>
-              <Button
-                variant={alive ? 'danger' : 'primary'}
-                size="sm"
-                className="rounded-xl"
-                onPress={() => {
-                  const target = handle.target
-                  if (target.kind === 'runtime') {
-                    onReset()
-                    void actions.settings.openRuntimeSettings(target.component).catch((error: unknown) => {
-                      notifyError(t('errors.runtimeSettingsFailed'), { cause: error })
-                    })
-                  } else if (target.kind === 'record') onViewRecord()
-                  else if (target.kind === 'settings') {
-                    onReset()
-                    navigate(settingsPath(target.tab))
-                  } else if (target.kind === 'models') {
-                    onReset()
-                    navigate(pathOf('models'))
-                  } else if (target.kind === 'stop') {
-                    /*
-                     * The reset closes this dialog, so a session that refuses to
-                     * end would leave the screen without a word about it.
-                     */
-                    void actions.session.stopSession().catch((error: unknown) => {
-                      onReset()
-                      notifyError(t('errors.engineOperationFailed'), { cause: error })
-                    })
-                  } else onReset()
-                }}
-              >
-                {t(handle.action)}
-              </Button>
-            </AlertDialog.Footer>
-          </AlertDialog.Dialog>
-        </AlertDialog.Container>
-      </AlertDialog.Backdrop>
-    </AlertDialog>
+    <Dialog open={isOpen} onOpenChange={open => { if (!open) onReset() }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t(handle.message)}</DialogTitle>
+        </DialogHeader>
+        {handle.detail ? <p className="nola-body mb-4 text-muted">{t(handle.detail)}</p> : null}
+        <DialogFooter>
+          <Button variant="tertiary" size="sm" className="rounded-xl" onClick={() => onCopyDiagnostics({
+            supportCode,
+            correlationId: state.errorRequestId ?? undefined,
+          })}>
+            {t('errors.copyDiagnosticsAction')}
+          </Button>
+          <Button
+            variant={alive ? 'danger' : 'default'}
+            size="sm"
+            className="rounded-xl"
+            onClick={() => {
+              const target = handle.target
+              if (target.kind === 'runtime') {
+                onReset()
+                void actions.settings.openRuntimeSettings(target.component).catch((error: unknown) => {
+                  notifyError(t('errors.runtimeSettingsFailed'), { cause: error })
+                })
+              } else if (target.kind === 'record') onViewRecord()
+              else if (target.kind === 'settings') {
+                onReset()
+                navigate(settingsPath(target.tab))
+              } else if (target.kind === 'models') {
+                onReset()
+                navigate(pathOf('models'))
+              } else if (target.kind === 'stop') {
+                void actions.session.stopSession().catch((error: unknown) => {
+                  onReset()
+                  notifyError(t('errors.engineOperationFailed'), { cause: error })
+                })
+              } else onReset()
+            }}
+          >
+            {t(handle.action)}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

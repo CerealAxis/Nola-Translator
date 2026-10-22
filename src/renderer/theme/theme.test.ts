@@ -20,7 +20,7 @@ describe('主题 token 双套对齐（Phase 1 验收）', () => {
     expect(declaredTokens(dark)).toEqual(declaredTokens(light))
   })
 
-  it('两套都定义了 HeroUI 必需的核心语义 token', () => {
+  it('both themes define the required semantic tokens', () => {
     const required = [
       '--accent',
       '--accent-foreground',
@@ -51,11 +51,10 @@ describe('主题 token 双套对齐（Phase 1 验收）', () => {
     expect(dark).toMatch(/--focus:\s*var\(--accent\)/)
   })
 
-  it('强调色是 Nola 蓝，不是 HeroUI 默认色', () => {
+  it('both themes use the Nola blue accent', () => {
     // CSS 压缩器会把 0.1780 写成 0.178，正则放宽尾部零
     expect(light).toMatch(/--accent:\s*oklch\(60% 0\.22 257\)/)
     expect(dark).toMatch(/--accent:\s*oklch\(70% 0\.16 257\)/)
-    expect(light).not.toMatch(/0\.6204 0\.195 253\.83/)
   })
 })
 

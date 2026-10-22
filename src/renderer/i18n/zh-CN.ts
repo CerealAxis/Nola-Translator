@@ -36,8 +36,8 @@ export const zhCN = {
     "sponsor": "赞助",
     "sourceCode": "查看源代码",
     "specialThanks": "特别鸣谢",
-    "heroThanks": "感谢 HeroUI 开源的组件库，让 Nola 的界面更美观、易用。",
-    "heroWebsite": "HeroUI 官网",
+    "uiThanks": "感谢 shadcn/ui 开源的组件库，让 Nola 的界面更美观、易用。",
+    "uiWebsite": "shadcn/ui 官网",
     "sponsors": "赞助者",
     "sponsorVacancies": "虚位以待",
     "sponsorInfo": "有意赞助？欢迎联系开发者。赞助者可获得专属权益，包括在 Nola 中公开展示、专属功能等。",
@@ -677,6 +677,7 @@ export const zhCN = {
     done: '完成',
     refreshed: '已刷新',
     refreshFailed: '刷新失败，请重试。',
+    info: '说明',
   },
 
   status: {

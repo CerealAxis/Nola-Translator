@@ -9,9 +9,9 @@
 
 import { Component, useEffect, useRef, useState } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
-import { Button, EmptyState } from '@heroui/react'
 import { Check, Copy } from 'lucide-react'
 
+import { Button } from '../ui/button'
 import { useI18n } from '@/i18n'
 import { getBridge } from '@/store'
 
@@ -58,17 +58,16 @@ function CrashFallback(): ReactNode {
   const { t } = useI18n()
 
   return (
-    <EmptyState className="flex flex-col items-start gap-4 py-8">
+    <div className="flex flex-col items-start gap-4 px-2 py-8 text-sm text-muted">
       <h1 className="nola-display text-foreground">{t('status.error')}</h1>
       <p className="nola-body max-w-[var(--nola-content-max)] text-muted">{t('errors.pageCrashed')}</p>
 
       <div className="flex flex-wrap items-center gap-2">
         {/* The copy says "reload the window", so the primary action really reloads it. */}
         <Button
-          variant="primary"
-          size="md"
+          variant="default"
           className="rounded-full px-5"
-          onPress={() => {
+          onClick={() => {
             if (typeof window !== 'undefined') window.location.reload()
           }}
         >
@@ -76,7 +75,7 @@ function CrashFallback(): ReactNode {
         </Button>
         <CopyDiagnosticsButton />
       </div>
-    </EmptyState>
+    </div>
   )
 }
 
@@ -93,7 +92,7 @@ function CopyDiagnosticsButton(): ReactNode {
     }
   }, [copied])
 
-  const onPress = (): void => {
+  const onClick = (): void => {
     void (async () => {
       const bridge = getBridge()
       if (bridge) {
@@ -115,7 +114,7 @@ function CopyDiagnosticsButton(): ReactNode {
   }
 
   return (
-    <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={onPress} isDisabled={copied}>
+    <Button variant="tertiary" size="sm" className="rounded-[6px]" onClick={onClick} disabled={copied}>
       {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
       {copied ? t('settings.copied') : t('errors.copyDiagnosticsAction')}
     </Button>

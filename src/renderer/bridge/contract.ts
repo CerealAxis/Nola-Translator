@@ -93,7 +93,7 @@ export interface NolaBridge {
    * hides the window: hiding alone would leave the engine recording behind it.
    */
   overlay: {
-    /** Desktop-only surface; embedded demos retain their local HeroUI portals. */
+    /** Desktop-only surface; embedded demos retain their local Base UI portals. */
     openMenu?(request: import('../../shared/overlay-menu').OverlayMenuRequest): Promise<void>
     presentMenu?(id: number): Promise<void>
     closeMenu?(id: number): Promise<void>

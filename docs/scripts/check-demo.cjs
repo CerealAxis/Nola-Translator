@@ -15,18 +15,35 @@ async function main() {
   const win = new BrowserWindow({ show: false, width: 1440, height: 960, webPreferences: { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
   const errors = []
   const failedRequests = []
-  win.webContents.on('console-message', event => { if (event.level === 'error') errors.push(event.message) })
+  win.webContents.on('console-message', event => {
+    if (event.level !== 'error') return
+    const message = `${event.message} (${event.sourceId || 'renderer'}:${event.lineNumber ?? 0})`
+    errors.push(message)
+    console.error(`[renderer] ${message}`)
+  })
+  win.webContents.on('render-process-gone', (_event, details) => {
+    const message = `Renderer exited: ${details.reason} (${details.exitCode})`
+    errors.push(message)
+    console.error(message)
+  })
   win.webContents.on('preload-error', (_event, _file, error) => errors.push(error.message))
   win.webContents.session.webRequest.onCompleted(details => {
     if (details.statusCode >= 400) failedRequests.push(`${details.statusCode} ${details.url}`)
   })
   if (site) win.webContents.debugger.attach('1.3')
   const js = async source => {
-    if (!site) return win.webContents.executeJavaScript(source, true)
-    // Evaluate after DOM readiness without waiting for third-party comment frames to finish loading.
-    const { result, exceptionDetails } = await win.webContents.debugger.sendCommand('Runtime.evaluate', { expression: source, returnByValue: true, awaitPromise: true, userGesture: true })
-    if (exceptionDetails) throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text)
-    return result.value
+    // Return renderer exceptions as data; executeJavaScript otherwise loses their message and stack.
+    const expression = `(async () => { try { return { ok: true, value: await (0, eval)(${JSON.stringify(source)}) }; } catch (error) { return { ok: false, message: String(error), stack: error?.stack }; } })()`
+    let outcome
+    if (!site) outcome = await win.webContents.executeJavaScript(expression, true)
+    else {
+      // Evaluate after DOM readiness without waiting for third-party comment frames to finish loading.
+      const { result, exceptionDetails } = await win.webContents.debugger.sendCommand('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true, userGesture: true })
+      if (exceptionDetails) throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text)
+      outcome = result.value
+    }
+    if (!outcome?.ok) throw new Error(`${outcome?.message ?? 'Renderer returned no result'}\n${outcome?.stack ?? ''}\nEvaluation: ${source.slice(0, 1500)}`)
+    return outcome.value
   }
   const until = source => js(`new Promise((resolve, reject) => { const deadline = Date.now() + 15000; const check = () => { if (${source}) resolve(); else if (Date.now() > deadline) reject(new Error(${JSON.stringify(source)})); else setTimeout(check, 50) }; check() })`)
   const settle = () => js('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
@@ -42,7 +59,12 @@ async function main() {
     } finally { clearTimeout(timeout) }
   }
   const clickText = text => js(`(() => { const matches = [...document.querySelectorAll('button')].filter(item => !item.disabled && (item.textContent.trim() === ${JSON.stringify(text)} || item.getAttribute('aria-label') === ${JSON.stringify(text)})); const element = matches.find(item => item.closest('[role=dialog], [role=alertdialog]')) ?? matches[0]; if (!element) throw new Error('Missing button: ' + ${JSON.stringify(text)}); element.click() })()`)
-  const capture = async name => fs.writeFile(path.join(output, `${name}.png`), (await win.webContents.capturePage()).toPNG())
+  const capture = async name => {
+    // Capture readiness is set by React before Chromium necessarily presents its first frame.
+    await settle()
+    try { await fs.writeFile(path.join(output, `${name}.png`), (await win.webContents.capturePage()).toPNG()) }
+    catch (cause) { throw new Error(`Screenshot failed: ${name} (${win.webContents.getURL()})`, { cause }) }
+  }
   const geometry = async label => {
     await settle()
     const result = await js(`({ width: innerWidth, document: document.documentElement.scrollWidth, main: [...document.querySelectorAll('.nola-main')].map(element => ({ client: element.clientWidth, scroll: element.scrollWidth })) })`)
@@ -144,6 +166,8 @@ async function main() {
       win.setContentSize(1440, 960)
       await win.loadURL(`${url}index.html?locale=zh-CN#/workspace`)
       await until("document.documentElement.dataset.captureReady === 'true'")
+      // Loading the same document with another hash can resolve before React commits the route.
+      await until("document.querySelector('[data-page]')?.getAttribute('data-page') === 'workspace' && [...document.querySelectorAll('button')].some(item => !item.disabled && item.textContent.trim() === '开始同传')")
       await clickText('开始同传')
       await until("document.querySelector('[role=dialog] input')")
       await clickText('开始')
@@ -182,7 +206,7 @@ async function main() {
   } catch (error) {
     console.error(error)
     await capture('failure').catch(() => undefined)
-    await fs.writeFile(path.join(output, 'failure.txt'), JSON.stringify({ error: String(error), errors, failedRequests, text: await js('document.body.innerText') }, null, 2))
+    await fs.writeFile(path.join(output, 'failure.txt'), JSON.stringify({ error: error.stack ?? String(error), errors, failedRequests, state: await js("({ url: location.href, page: document.querySelector('[data-page]')?.getAttribute('data-page'), buttons: [...document.querySelectorAll('button')].map(item => ({ text: item.textContent.trim(), label: item.getAttribute('aria-label'), disabled: item.disabled })), text: document.body.innerText })").catch(cause => ({ diagnosticError: String(cause) })) }, null, 2))
     throw error
   } finally {
     win.destroy()

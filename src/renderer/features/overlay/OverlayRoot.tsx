@@ -26,7 +26,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 
-import { Button } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { Lock, Minus, Monitor, Pin, PinOff, SlidersHorizontal, Unlock, X } from 'lucide-react'
 
 import { DEFAULT_SETTINGS } from '@/bridge'
@@ -423,7 +423,7 @@ export function OverlayRoot() {
           <GhostButton
             label={t('overlay.position')}
             active={config.mode === 'top'}
-            onPress={() => patchOverlay({ mode: config.mode === 'top' ? 'bottom' : 'top' })}
+            onClick={() => patchOverlay({ mode: config.mode === 'top' ? 'bottom' : 'top' })}
             color={palette.chrome}
           >
             <Monitor aria-hidden="true" />
@@ -431,7 +431,7 @@ export function OverlayRoot() {
           <GhostButton
             label={locked ? t('overlay.unlock') : t('overlay.lock')}
             active={locked}
-            onPress={toggleLock}
+            onClick={toggleLock}
             color={palette.chrome}
           >
             {locked ? <Lock aria-hidden="true" /> : <Unlock aria-hidden="true" />}
@@ -439,7 +439,7 @@ export function OverlayRoot() {
           <GhostButton
             label={config.alwaysOnTop ? t('overlay.unpin') : t('overlay.pin')}
             active={config.alwaysOnTop}
-            onPress={() => patchOverlay({ alwaysOnTop: !config.alwaysOnTop })}
+            onClick={() => patchOverlay({ alwaysOnTop: !config.alwaysOnTop })}
             color={palette.chrome}
           >
             {config.alwaysOnTop ? <Pin aria-hidden="true" /> : <PinOff aria-hidden="true" />}
@@ -449,14 +449,14 @@ export function OverlayRoot() {
 
           <GhostButton
             label={t('overlay.style')}
-            onPress={openAppearanceSettings}
+            onClick={openAppearanceSettings}
             color={palette.chrome}
           >
             <SlidersHorizontal aria-hidden="true" />
           </GhostButton>
           <GhostButton
             label={t('overlay.minimize')}
-            onPress={() => {
+            onClick={() => {
               const bridge = getBridge()
               if (!bridge) return
               void bridge.overlay.minimize().catch((error: unknown) => {
@@ -471,7 +471,7 @@ export function OverlayRoot() {
            * Closing confirms first: it also stops recognition and is not
            * reversible, since restarting reloads several GB of weights.
            */}
-          <GhostButton label={t('overlay.close')} onPress={requestCloseConfirmation} color={palette.chrome}>
+          <GhostButton label={t('overlay.close')} onClick={requestCloseConfirmation} color={palette.chrome}>
             <X aria-hidden="true" />
           </GhostButton>
         </div>
@@ -494,12 +494,11 @@ export function OverlayRoot() {
               <p className="nola-confirm-title">{t('overlay.closeTitle')}</p>
               <p className="nola-confirm-text">{t('overlay.closeBody')}</p>
               <div className="nola-confirm-actions">
-                <Button variant="secondary" size="sm" isDisabled={closePending} onPress={() => setClosing(false)}>
+                <Button variant="secondary" size="sm" disabled={closePending} onClick={() => setClosing(false)}>
                   {t('common.cancel')}
                 </Button>
-                {/* HeroUI v3 styles the danger button with a `variant`,
-                    There is no `color` prop on this button. */}
-                <Button variant="danger" size="sm" isPending={closePending} onPress={() => void closeOverlay()}>
+
+                <Button variant="danger" size="sm" disabled={closePending} aria-busy={closePending} onClick={() => void closeOverlay()}>
                   {t(closePending ? 'overlay.closing' : 'overlay.closeConfirm')}
                 </Button>
               </div>
@@ -541,14 +540,14 @@ export function withAlpha(hex: string, alpha: number): string {
  */
 function GhostButton({
   label,
-  onPress,
+  onClick,
   color,
   children,
   className,
   active,
 }: {
   label: string
-  onPress: () => void
+  onClick: () => void
   color: string
   /** No children makes this a text-only action. */
   children?: ReactNode
@@ -563,9 +562,8 @@ function GhostButton({
   return (
     <Button
       variant="secondary"
-      size="sm"
-      isIconOnly={children === undefined}
-      onPress={onPress}
+      size={children ? 'icon' : 'sm'}
+      onClick={onClick}
       aria-label={label}
       aria-pressed={active}
       data-active={active ? 'true' : 'false'}

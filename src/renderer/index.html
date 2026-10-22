@@ -53,7 +53,7 @@
       所以这里的时长、缓动、颜色全部自包含。
 
       ── 下面这一行 `@layer` 必须在任何样式之前 ──
-      Tailwind v4 与 HeroUI 依赖预先注册层叠层（`@layer properties, theme, base,
+      Tailwind v4 与组件样式依赖预先注册层叠层（`@layer properties, theme, base,
       components, utilities`）才能把各自的规则放进正确的层。如果 feature 样式先
       创建了这些层，Tailwind 的注册就会变成"往已有层里追加"而不是"按声明顺序建层"，
       基础层会被组件层盖掉 —— 表现为颜色与间距莫名其妙，不报任何错。

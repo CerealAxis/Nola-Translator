@@ -10,8 +10,8 @@
   --dur-exit: 120ms; /* exiting */
   --dur-page: 160ms; /* route change */
 
-  /* Reuse HeroUI's fluid curve so our timing matches every built-in component. */
-  --ease-nola: var(--ease-out-fluid, cubic-bezier(0.32, 0.72, 0, 1));
+  /* Shared easing for product transitions. */
+  --ease-nola: cubic-bezier(0.32, 0.72, 0, 1);
   --press-scale: 0.96;
 }
 
@@ -30,25 +30,6 @@
 .nola-press[aria-disabled='true'] {
   transform: none;
   transition: none;
-}
-
-/* ============================ Overlay timing ============================== */
-/* HeroUI marks overlay elements with data-entering / data-exiting while the
-   transition runs. These two rules retune the duration per phase. Written flat
-   rather than nested so no bundler nesting support is required. */
-
-.nola-fade-enter {
-  transition:
-    opacity var(--dur-enter) var(--ease-nola),
-    transform var(--dur-enter) var(--ease-nola);
-}
-
-.nola-fade-enter[data-entering] {
-  transition-duration: var(--dur-enter);
-}
-
-.nola-fade-enter[data-exiting] {
-  transition-duration: var(--dur-exit);
 }
 
 /* ============================ Overlay enter / exit ======================== */
@@ -233,11 +214,10 @@
 /*
  * One marker per state — hover
  * and keyboard focus use the background, selection uses background + accent
- * text + HeroUI's own checkmark.
+ * text + the selection checkmark.
  *
- * Selection keys off `[data-selected]`, which react-aria writes from
- * `selectedKeys` so the highlight follows keyboard navigation; a hand-rolled
- * checkmark would stay behind on the old item.
+ * Selection uses `[data-selected]`; Base UI menu items also expose
+ * `[data-highlighted]` for pointer and keyboard navigation.
  */
 .nola-menu-item {
   background-color: transparent;
@@ -246,13 +226,13 @@
 
 .nola-menu-item:hover,
 .nola-menu-item[data-hovered='true'],
+.nola-menu-item[data-highlighted='true'],
 .nola-menu-item:focus-visible,
 .nola-menu-item[data-focus-visible='true'] {
   background-color: var(--surface-tertiary);
 }
 
-/* Selection: background to accent-soft, text to accent (DESIGN §8). HeroUI
-   lights its own left checkmark in this state, so nothing is repeated here. */
+/* Selection: background to accent-soft, text to accent (DESIGN §8). */
 .nola-menu-item[data-selected='true'] {
   background-color: var(--accent-soft);
   color: var(--accent);

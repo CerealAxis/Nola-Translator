@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ChoiceField } from './ChoiceField'
 
-describe('inline HeroUI choices', () => {
+describe('inline choice field', () => {
   it('keeps all options in the caller container and routes selection to its action', async () => {
     const action = vi.fn()
     const { container } = render(<ChoiceField label="Audio source" value="tab" options={[{ value: 'tab', label: 'Tab audio' }, { value: 'system', label: 'System audio' }]} onChange={action} />)

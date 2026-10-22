@@ -12,7 +12,7 @@
  * ---------------------------------------------------------------------------
  *  1. typeof window.nolaTranslator === 'object'      桥接在不在
  *  2. document.styleSheets.length > 0                样式表在不在
- *  3. 首个 button 的 borderRadius !== '0px'          HeroUI 的样式有没有真的加载
+ *  3. First button borderRadius !== '0px'            Product button styles are loaded
  *  4. diagnostics['应用版本'] === package.json 的 version   版本漂移
  *
  * 第 4 条极易在重写时被"顺手改掉"：诊断对象的键是中文键

@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
-import { AlertDialog, Button, Tag, TagGroup, ToggleButton, ToggleButtonGroup, Tooltip } from '@heroui/react'
-import { Check, CircleHelp } from 'lucide-react'
+import { AlertDialog } from '@base-ui/react/alert-dialog'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Button } from '@/components/ui/button'
+import { DialogHeader, DialogFooter } from '@/components/ui/dialog'
+import { Check, CircleHelp, LoaderCircle } from 'lucide-react'
 import { notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
@@ -128,27 +132,26 @@ export function RuntimeComponents() {
   const speed = operation?.phase === 'download' ? downloadSpeed(operation.bytes, operation.startedAt) : ''
   const versions = runtimeVersionRows(local)
   return <>
-    <SettingGroup legend={t('runtime.components')} actions={<Button variant="secondary" size="sm" isDisabled={busy} isPending={state.runtimeChecking}
-      onPress={() => void recheck()}>{t('runtime.recheck')}</Button>}>
+    <SettingGroup legend={t('runtime.components')} actions={<Button variant="secondary" size="sm" disabled={busy}
+      onClick={() => void recheck()}>{state.runtimeChecking ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}{t('runtime.recheck')}</Button>}>
       <SettingsRow label={t('runtime.python')} desc={runtimes?.python?.reason || undefined}><span>{t('runtime.builtInPython')}</span></SettingsRow>
       {versions.map(({ kind, version }) => <SettingsRow key={kind}
         label={t(kind === 'engine' ? 'runtime.pytorch' : kind === 'llama' ? 'runtime.llama' : 'runtime.crisp')}
         desc={sourceHint(local?.[kind])} descriptionTooltip={!!sourceHint(local?.[kind])}><span>{version}</span></SettingsRow>)}
     </SettingGroup>
     {sessionBusy ? <p className="compute-hint">{t('runtime.busy')}</p> : null}
-    <SettingGroup legend={t('runtime.engines')} legendHint={<Tooltip delay={300}>
-      <Button variant="secondary" size="sm" isIconOnly aria-label={`${t('runtime.engines')} — Info`} className="settings-row__help"><CircleHelp size={15} aria-hidden="true" /></Button>
-      <Tooltip.Content placement="top" crossOffset={0} className="settings-row__tooltip">{t('runtime.enginesHint')}</Tooltip.Content>
+    <SettingGroup legend={t('runtime.engines')} legendHint={<Tooltip>
+      <TooltipTrigger render={<Button variant="secondary" size="icon" />} aria-label={t('runtime.enginesHint')} className="settings-row__help"><CircleHelp aria-hidden="true" /></TooltipTrigger>
+      <TooltipContent side="top" className="settings-row__tooltip z-popup">{t('runtime.enginesHint')}</TooltipContent>
     </Tooltip>}>
       <div className="runtime-picker">
-        <ToggleButtonGroup className="nola-segmented runtime-picker__group" selectionMode="single" disallowEmptySelection
-          selectedKeys={new Set([active])} aria-label={t('runtime.engines')}
-          onSelectionChange={keys => { const next = [...keys][0]; if (typeof next === 'string') setActive(next as RuntimeKind) }}>
-          {KINDS.map(kind => <ToggleButton key={kind} id={kind} data-onboarding={`runtime-${kind}`} className="runtime-picker__option">
+        <ToggleGroup className="nola-segmented runtime-picker__group" value={[active]} aria-label={t('runtime.engines')}
+          onValueChange={values => { const next = values[0]; if (next === 'engine' || next === 'llama' || next === 'crisp') setActive(next) }}>
+          {KINDS.map(kind => <ToggleGroupItem key={kind} value={kind} data-onboarding={`runtime-${kind}`} className="runtime-picker__option">
             {brand(kind)}
             <span className="runtime-picker__state">{local?.[kind]?.status === 'ready' ? status(local[kind]) : t('runtime.missing')}</span>
-          </ToggleButton>)}
-        </ToggleButtonGroup>
+          </ToggleGroupItem>)}
+        </ToggleGroup>
       </div>
       {KINDS.map(kind => {
         const component = local?.[kind]
@@ -164,46 +167,43 @@ export function RuntimeComponents() {
           ? (component?.managed || component?.bundled) && selected[kind] === CRISP_RUNTIME_ID
           : (component?.managed || component?.bundled) && selected[kind] === component?.id
             || (kind === 'engine' ? runtimes?.recipes : runtimes?.packages)?.some(p => p.id === selected[kind] && p.installed))
-        return <div key={kind} role="tabpanel" id={kind === active ? `runtime-${kind}` : undefined} hidden={kind !== active} className="runtime-panel-body">
+        return <div key={kind} role="region" aria-label={brand(kind)} id={kind === active ? `runtime-${kind}` : undefined} hidden={kind !== active} className="runtime-panel-body">
           <SettingsRow label={t('runtime.current')} desc={sourceHint(component)} descriptionTooltip={!!sourceHint(component)}><span className="runtime-component-status">{component ? description(kind, component) : t('runtime.missing')}</span></SettingsRow>
           <SettingsRow onboardingTarget={`runtime-version-${kind}`} label={t('runtime.select')} desc={<a className="text-accent underline" href="https://nola.xaviermc.top/zh-CN/getting-started/environment" target="_blank" rel="noreferrer">{t('runtime.versionHelpLink')}</a>} descriptionTooltip><SettingSelect value={selected[kind]} options={choices} ariaLabel={t(kind === 'engine' ? 'runtime.installTorch' : kind === 'llama' ? 'runtime.installLlama' : 'runtime.installCrisp')} isDisabled={busy}
             onChange={value => { setSelected(previous => ({ ...previous, [kind]: value })); setForce(previous => ({ ...previous, [kind]: false })) }} /></SettingsRow>
           <SettingsRow label={t('runtime.force')}><SettingSwitch isSelected={force[kind]} isDisabled={busy || !owned} ariaLabel={t('runtime.force')}
             onChange={value => setForce(previous => ({ ...previous, [kind]: value }))} /></SettingsRow>
-          <div className="runtime-actions gap-2">{uninstallable ? <Button variant="danger-soft" size="sm" isDisabled={busy}
-            onPress={() => setConfirmKind(kind)}>{t('runtime.uninstall')}</Button> : null}<Button variant="primary" size="sm" isDisabled={busy || !selected[kind] || selected[kind] === 'current' || (same && !force[kind])}
-            onPress={() => void actions.settings.installRuntimeComponent(selected[kind], force[kind])}>{same && !force[kind] ? <><Check aria-hidden="true" />{t('runtime.installed')}</> : force[kind] ? t('runtime.reinstall') : t('runtime.install')}</Button></div>
+          <div className="runtime-actions gap-2">{uninstallable ? <Button variant="danger" size="sm" disabled={busy}
+            onClick={() => setConfirmKind(kind)}>{t('runtime.uninstall')}</Button> : null}<Button variant="default" size="sm" disabled={busy || !selected[kind] || selected[kind] === 'current' || (same && !force[kind])}
+            onClick={() => void actions.settings.installRuntimeComponent(selected[kind], force[kind])}>{same && !force[kind] ? <><Check aria-hidden="true" />{t('runtime.installed')}</> : force[kind] ? t('runtime.reinstall') : t('runtime.install')}</Button></div>
         </div>
       })}
     </SettingGroup>
-    <AlertDialog isOpen={confirmKind !== null} onOpenChange={open => { if (!open) setConfirmKind(null) }}>
-      <AlertDialog.Backdrop>
-        <AlertDialog.Container>
-          <AlertDialog.Dialog>
-            <AlertDialog.Header>
-              <AlertDialog.Heading className="nola-title text-foreground">{t('runtime.uninstallTitle')}</AlertDialog.Heading>
-            </AlertDialog.Header>
-            <AlertDialog.Body>
-              <p className="nola-body text-muted">{t('runtime.uninstallBody')}</p>
-            </AlertDialog.Body>
-            <AlertDialog.Footer className="flex justify-end gap-2">
-              <Button variant="tertiary" size="sm" onPress={() => setConfirmKind(null)}>{t('common.cancel')}</Button>
-              <Button variant="danger-soft" size="sm" isPending={state.runtimeBusy} onPress={() => { if (confirmKind) void uninstall(confirmKind) }}>
+    <AlertDialog.Root open={confirmKind !== null} onOpenChange={open => { if (!open) setConfirmKind(null) }}>
+      <AlertDialog.Portal>
+        <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
+          <AlertDialog.Popup className="nola-dialog-content max-w-md">
+            <DialogHeader>
+              <AlertDialog.Title className="nola-title text-foreground">{t('runtime.uninstallTitle')}</AlertDialog.Title>
+            </DialogHeader>
+            <AlertDialog.Description>
+              {t('runtime.uninstallBody')}
+            </AlertDialog.Description>
+            <DialogFooter className="flex justify-end gap-2">
+              <Button variant="tertiary" size="sm" onClick={() => setConfirmKind(null)}>{t('common.cancel')}</Button>
+              <Button variant="danger" size="sm" disabled={state.runtimeBusy} onClick={() => { if (confirmKind) void uninstall(confirmKind) }}>
                 {t('runtime.uninstall')}
               </Button>
-            </AlertDialog.Footer>
-          </AlertDialog.Dialog>
-        </AlertDialog.Container>
-      </AlertDialog.Backdrop>
-    </AlertDialog>
-    {local && (local.engine.managed || local.llama.managed || local.crisp?.managed) ? <SettingGroup legend={t('runtime.repair')} actions={<Button variant="secondary" isDisabled={busy || !Object.values(repairs).some(Boolean)} onPress={() => void install((['engine', 'llama', 'crisp'] as const).filter(kind => repairs[kind] && local[kind]?.managed).map(kind => local[kind]!.id!))}>{t('runtime.repairAction')}</Button>}>
-      <TagGroup aria-label={t('runtime.repair')} className="runtime-repair" variant="surface" selectionMode="multiple"
-        selectedKeys={new Set(KINDS.filter(kind => repairs[kind]))}
-        onSelectionChange={keys => { const next = new Set(keys === 'all' ? KINDS : keys); setRepairs({ engine: next.has('engine'), llama: next.has('llama'), crisp: next.has('crisp') }) }}>
-        <TagGroup.List className="runtime-repair__list">
-          {KINDS.filter(kind => local[kind]?.managed).map(kind => <Tag key={kind} id={kind} isDisabled={busy}>{brand(kind)}</Tag>)}
-        </TagGroup.List>
-      </TagGroup>
+            </DialogFooter>
+          </AlertDialog.Popup>
+      </AlertDialog.Portal>
+    </AlertDialog.Root>
+    {local && (local.engine.managed || local.llama.managed || local.crisp?.managed) ? <SettingGroup legend={t('runtime.repair')} actions={<Button variant="secondary" disabled={busy || !Object.values(repairs).some(Boolean)} onClick={() => void install((['engine', 'llama', 'crisp'] as const).filter(kind => repairs[kind] && local[kind]?.managed).map(kind => local[kind]!.id!))}>{t('runtime.repairAction')}</Button>}>
+      <ToggleGroup multiple disabled={busy} aria-label={t('runtime.repair')} className="runtime-repair runtime-repair__list"
+        value={KINDS.filter(kind => repairs[kind])}
+        onValueChange={values => setRepairs({ engine: values.includes('engine'), llama: values.includes('llama'), crisp: values.includes('crisp') })}>
+        {KINDS.filter(kind => local[kind]?.managed).map(kind => <ToggleGroupItem key={kind} value={kind}>{brand(kind)}</ToggleGroupItem>)}
+      </ToggleGroup>
     </SettingGroup> : null}
     {operation ? <div role="status" className="runtime-progress">
       <div className="runtime-progress-copy">
@@ -213,7 +213,7 @@ export function RuntimeComponents() {
           {elapsed ? ` · ${t('runtime.elapsed', { time: elapsed })}` : ''}</span>
         {operation.phase === 'prepare' && operation.detail ? <small>{operation.detail}</small> : null}
       </div>
-      <Button variant="secondary" size="sm" onPress={() => { void cancelInstallation() }}>{t('runtime.cancel')}</Button>
+      <Button variant="secondary" size="sm" onClick={() => { void cancelInstallation() }}>{t('runtime.cancel')}</Button>
     </div> : null}
   </>
 }

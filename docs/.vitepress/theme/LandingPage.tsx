@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { Accordion, Button, Card, Dropdown, Tabs } from '@heroui/react'
+import { Accordion } from '@base-ui/react/accordion'
+import { Menu } from '@base-ui/react/menu'
+import { Tabs } from '@base-ui/react/tabs'
+import { Button } from '../../../src/renderer/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../src/renderer/components/ui/card'
 import { ArrowDown, ArrowUpRight, ChevronDown, Globe2, Monitor, Terminal, Apple, Mic, Captions, Video, Check, Github, Moon, Sun } from 'lucide-react'
 import { copy, downloadSources, downloadUrl, license, localeNames, localePath, repositoryUrl } from './content'
 import type { LandingCopy, Locale } from './content'
@@ -45,14 +49,16 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
       <a className="site-brand" href={`${base}${localePath(locale).slice(1)}`}><img src={`${base}nola-logo.svg`} alt="" /><span>Nola Translator</span></a>
       <nav className="site-nav-links" aria-label={t.nav.menu}><a href="#product">{t.nav.product}</a><a href="#scenarios">{t.nav.scenarios}</a><a href="#download">{t.nav.download}</a><a href={docUrl}>{t.nav.docs}</a></nav>
       <div className="site-nav-end">
-        <Dropdown>
-          <Button variant="secondary" size="sm" className="site-locale" aria-label={t.nav.language}><Globe2 aria-hidden="true" /><span>{languagePreference === 'auto' ? autoLocaleNames[locale] : localeNames[locale]}</span><ChevronDown aria-hidden="true" /></Button>
-          <Dropdown.Popover className="site-locale-menu z-dropdown"><Dropdown.Menu aria-label={t.nav.language} selectionMode="single" selectedKeys={new Set([languagePreference])}>
-            <Dropdown.Item id="auto" textValue={autoLocaleNames[locale]} onAction={() => selectLanguage('auto')}>{autoLocaleNames[locale]}<Dropdown.ItemIndicator /></Dropdown.Item>
-            {(Object.keys(localeNames) as Locale[]).map(item => <Dropdown.Item key={item} id={item} textValue={localeNames[item]} onAction={() => selectLanguage(item)}>{localeNames[item]}<Dropdown.ItemIndicator /></Dropdown.Item>)}
-          </Dropdown.Menu></Dropdown.Popover>
-        </Dropdown>
-        <Button isIconOnly variant="secondary" size="sm" className="site-theme" aria-label={dark ? t.nav.themeToLight : t.nav.themeToDark} onPress={onToggleTheme}>{dark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}</Button>
+        <Menu.Root>
+          <Menu.Trigger render={<Button variant="secondary" size="sm" />} className="site-locale" aria-label={t.nav.language}><Globe2 aria-hidden="true" /><span>{languagePreference === 'auto' ? autoLocaleNames[locale] : localeNames[locale]}</span><ChevronDown aria-hidden="true" /></Menu.Trigger>
+          <Menu.Portal><Menu.Positioner className="z-dropdown" sideOffset={4} align="end"><Menu.Popup className="site-locale-menu" aria-label={t.nav.language}>
+            <Menu.RadioGroup value={languagePreference} onValueChange={(next: LocalePreference) => selectLanguage(next)}>
+              <Menu.RadioItem value="auto">{autoLocaleNames[locale]}<Menu.RadioItemIndicator><Check aria-hidden="true" /></Menu.RadioItemIndicator></Menu.RadioItem>
+              {(Object.keys(localeNames) as Locale[]).map(item => <Menu.RadioItem key={item} value={item}>{localeNames[item]}<Menu.RadioItemIndicator><Check aria-hidden="true" /></Menu.RadioItemIndicator></Menu.RadioItem>)}
+            </Menu.RadioGroup>
+          </Menu.Popup></Menu.Positioner></Menu.Portal>
+        </Menu.Root>
+        <Button variant="secondary" size="icon" className="site-theme" aria-label={dark ? t.nav.themeToLight : t.nav.themeToDark} onClick={onToggleTheme}>{dark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}</Button>
       </div>
     </header>
     <main id="main">
@@ -77,15 +83,15 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
 
       <section id="scenarios" className="site-scenarios site-shell site-section" data-reveal>
         <div className="site-heading"><p className="site-kicker">NOLA, IN YOUR WORLD</p><h2>{t.demo.title}</h2><p>{t.demo.intro}</p></div>
-        <Tabs align="center" selectedKey={scenario} onSelectionChange={key => setScenario(String(key))} className="site-scenario-tabs">
-          <Tabs.List aria-label={t.scenarios.title}>{t.demo.tabs.map((label, i) => <Tabs.Tab id={String(i)} key={i}>{i === 0 ? <Mic aria-hidden="true" /> : i === 1 ? <Captions aria-hidden="true" /> : <Video aria-hidden="true" />}{label}<Tabs.Indicator /></Tabs.Tab>)}</Tabs.List>
-          {t.scenarios.items.map((item, i) => <Tabs.Panel id={String(i)} key={i}>
+        <Tabs.Root value={scenario} onValueChange={(value: string) => setScenario(value)} className="site-scenario-tabs">
+          <Tabs.List className="tabs__list" aria-label={t.scenarios.title}>{t.demo.tabs.map((label, i) => <Tabs.Tab className="tabs__tab" value={String(i)} key={i}>{i === 0 ? <Mic aria-hidden="true" /> : i === 1 ? <Captions aria-hidden="true" /> : <Video aria-hidden="true" />}{label}</Tabs.Tab>)}</Tabs.List>
+          {t.scenarios.items.map((item, i) => <Tabs.Panel value={String(i)} key={i}>
             <div className="site-scenario-panel">
-              <div className="site-scenario-copy"><span>{item.label}</span><h3>{item.title}</h3><p>{item.body}</p><Button variant="secondary" onPress={() => { document.getElementById('product')?.scrollIntoView({ behavior: 'smooth' }); window.dispatchEvent(new CustomEvent('nola-demo-page', { detail: ['workspace', 'overlay', 'video'][i] })) }}>{t.demo.expand}<ArrowUpRight aria-hidden="true" /></Button></div>
+              <div className="site-scenario-copy"><span>{item.label}</span><h3>{item.title}</h3><p>{item.body}</p><Button variant="secondary" onClick={() => { document.getElementById('product')?.scrollIntoView({ behavior: 'smooth' }); window.dispatchEvent(new CustomEvent('nola-demo-page', { detail: ['workspace', 'overlay', 'video'][i] })) }}>{t.demo.expand}<ArrowUpRight aria-hidden="true" /></Button></div>
               <ProductPoster locale={locale} base={base} dark={dark} kind={i === 0 ? 'workspace' : i === 1 ? 'overlay' : 'browser'} label={item.title} />
             </div>
           </Tabs.Panel>)}
-        </Tabs>
+        </Tabs.Root>
       </section>
 
       <section className="site-features site-shell site-section">
@@ -107,7 +113,7 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
           <DownloadCard icon={<Monitor aria-hidden="true" />} title={t.platforms.desktop} description={t.platforms.desktopBody}>
             <div className="site-download-art site-download-art--desktop"><img src={image('home')} loading="lazy" alt="" /></div>
             <DownloadSourceButton label={t.nav.download} className="site-download-link"><WindowsIcon />Windows<ArrowDown aria-hidden="true" /></DownloadSourceButton>
-            <Button className="site-coming" variant="secondary" isDisabled><Apple aria-hidden="true" /><span>macOS</span><small>{t.platforms.soonLabel}</small></Button>
+            <Button className="site-coming" variant="secondary" disabled><Apple aria-hidden="true" /><span>macOS</span><small>{t.platforms.soonLabel}</small></Button>
           </DownloadCard>
           <DownloadCard icon={<Globe2 aria-hidden="true" />} title={t.platforms.browser} description={t.platforms.browserBody}>
             <div className="site-download-art site-download-art--browser"><img src={image('browser-scene')} loading="lazy" alt="" /></div>
@@ -116,7 +122,7 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
           </DownloadCard>
           <DownloadCard icon={<Terminal aria-hidden="true" />} title={t.platforms.terminal} description={t.platforms.terminalBody}>
             <div className="site-download-art site-download-art--terminal" aria-hidden="true"><div><i /><i /><i /></div><p><span>❯</span> nola<span className="site-terminal-cursor">▏</span></p><small>Nola Translator</small></div>
-            <Button className="site-coming" variant="secondary" isDisabled><Terminal aria-hidden="true" /><span>CLI</span><small>{t.platforms.soonLabel}</small></Button>
+            <Button className="site-coming" variant="secondary" disabled><Terminal aria-hidden="true" /><span>CLI</span><small>{t.platforms.soonLabel}</small></Button>
             <a className="site-download-link site-download-link--secondary" href={docUrl}>{t.nav.docs}<ArrowUpRight aria-hidden="true" /></a>
           </DownloadCard>
         </div>
@@ -124,9 +130,9 @@ export function LandingPage({ locale, base, dark, onToggleTheme }: LandingPagePr
 
       <section className="site-faq site-shell site-section" data-reveal>
         <div className="site-heading"><h2>{t.faq.title}</h2></div>
-        <Accordion variant="default" className="site-faq-list">{t.faq.items.map((item, i) => <Accordion.Item id={String(i)} key={i}>
-          <Accordion.Heading><Accordion.Trigger>{item.question}<Accordion.Indicator /></Accordion.Trigger></Accordion.Heading><Accordion.Panel><Accordion.Body>{item.answer}</Accordion.Body></Accordion.Panel>
-        </Accordion.Item>)}</Accordion>
+        <Accordion.Root className="site-faq-list">{t.faq.items.map((item, i) => <Accordion.Item className="accordion__item" value={String(i)} key={i}>
+          <Accordion.Header><Accordion.Trigger className="accordion__trigger">{item.question}<ChevronDown className="accordion__indicator" aria-hidden="true" /></Accordion.Trigger></Accordion.Header><Accordion.Panel><div className="accordion__body">{item.answer}</div></Accordion.Panel>
+        </Accordion.Item>)}</Accordion.Root>
       </section>
 
       <section className="site-final" data-reveal><div className="site-final-orb" aria-hidden="true" /><p className="site-kicker">NOLA TRANSLATOR</p><h2>{t.final.title}</h2><p>{t.final.body}</p><DownloadSourceButton label={t.nav.download} className="site-final-link"><WindowsIcon />{t.final.cta}<ArrowDown aria-hidden="true" /></DownloadSourceButton></section>
@@ -210,48 +216,54 @@ function HeroPointerTrail() {
   return <canvas ref={canvas} className="site-pointer-trail" aria-hidden="true" />
 }
 
-interface DownloadSourceButtonProps {
+export interface DownloadSourceButtonProps {
   children: ReactNode
   className: string
   label: string
 }
 
-function DownloadSourceMenu({ label }: { label: string }) {
-  return <Dropdown.Menu aria-label={label}>
-    {downloadSources.map(source => <Dropdown.Item key={source.id} id={source.id} textValue={source.name} href={source.url} target="_blank" rel="noopener noreferrer">
+export interface DownloadSourceMenuProps { label: string }
+
+function DownloadSourceMenu({ label }: DownloadSourceMenuProps) {
+  return <Menu.Group aria-label={label}>
+    {downloadSources.map(source => <Menu.LinkItem key={source.id} href={source.url} target="_blank" rel="noopener noreferrer">
       {source.icon ? <img className="site-download-source-icon" src={`${import.meta.env.BASE_URL}${source.icon}`} alt="" /> : <Github aria-hidden="true" />}
       <span>{source.name}</span>
-    </Dropdown.Item>)}
-  </Dropdown.Menu>
+    </Menu.LinkItem>)}
+  </Menu.Group>
 }
 
 function DownloadSourceButton({ children, className, label }: DownloadSourceButtonProps) {
-  return <Dropdown>
-    <Button variant="secondary" className={className}>{children}</Button>
-    <Dropdown.Popover className="site-download-menu z-dropdown" placement="bottom" offset={4}>
-      <DownloadSourceMenu label={label} />
-    </Dropdown.Popover>
-  </Dropdown>
+  return <Menu.Root>
+    <Menu.Trigger render={<Button variant="secondary" />} className={className}>{children}</Menu.Trigger>
+    <Menu.Portal><Menu.Positioner className="z-dropdown" side="bottom" sideOffset={4}>
+      <Menu.Popup className="site-download-menu" aria-label={label}><DownloadSourceMenu label={label} /></Menu.Popup>
+    </Menu.Positioner></Menu.Portal>
+  </Menu.Root>
 }
 
-function DownloadButton({ text, menuLabel, soon }: { text: string; menuLabel: string; soon: string }) {
+export interface DownloadButtonProps { text: string; menuLabel: string; soon: string }
+
+function DownloadButton({ text, menuLabel, soon }: DownloadButtonProps) {
   const anchor = useRef<HTMLDivElement>(null)
   return <div className="site-download-button" ref={anchor}>
     <DownloadSourceButton label={menuLabel} className="site-download-primary"><WindowsIcon />{text}</DownloadSourceButton>
-    <Dropdown>
-      <Button isIconOnly variant="secondary" className="site-download-trigger" aria-label={menuLabel}><ChevronDown aria-hidden="true" /></Button>
-      <Dropdown.Popover className="site-download-menu z-dropdown" triggerRef={anchor} placement="bottom" offset={4}>
-        <Dropdown.Menu aria-label={menuLabel}>
-          <Dropdown.SubmenuTrigger>
-            <Dropdown.Item id="windows" textValue="Windows"><WindowsIcon /><span>Windows</span><Dropdown.SubmenuIndicator /></Dropdown.Item>
-            <Dropdown.Popover className="site-download-menu z-dropdown" placement="right top" offset={4}>
-              <DownloadSourceMenu label={menuLabel} />
-            </Dropdown.Popover>
-          </Dropdown.SubmenuTrigger>
-          <Dropdown.Item id="macos" textValue="macOS" isDisabled><Apple aria-hidden="true" /><span>macOS</span><span className="site-menu-note">{soon}</span></Dropdown.Item>
-        </Dropdown.Menu>
-      </Dropdown.Popover>
-    </Dropdown>
+    <Menu.Root>
+      <Menu.Trigger render={<Button size="icon" variant="secondary" />} className="site-download-trigger" aria-label={menuLabel}><ChevronDown aria-hidden="true" /></Menu.Trigger>
+      <Menu.Portal><Menu.Positioner className="z-dropdown" anchor={anchor} side="bottom" sideOffset={4}>
+        <Menu.Popup className="site-download-menu" aria-label={menuLabel}>
+          <Menu.Group>
+            <Menu.SubmenuRoot>
+              <Menu.SubmenuTrigger><WindowsIcon /><span>Windows</span><ChevronDown className="site-submenu-indicator" aria-hidden="true" /></Menu.SubmenuTrigger>
+              <Menu.Portal><Menu.Positioner className="z-dropdown" side="right" align="start" sideOffset={4}>
+                <Menu.Popup className="site-download-menu" aria-label={menuLabel}><DownloadSourceMenu label={menuLabel} /></Menu.Popup>
+              </Menu.Positioner></Menu.Portal>
+            </Menu.SubmenuRoot>
+            <Menu.Item disabled><Apple aria-hidden="true" /><span>macOS</span><span className="site-menu-note">{soon}</span></Menu.Item>
+          </Menu.Group>
+        </Menu.Popup>
+      </Menu.Positioner></Menu.Portal>
+    </Menu.Root>
   </div>
 }
 
@@ -294,6 +306,8 @@ export function ProductPoster({ locale, base, dark, kind, label }: ProductPoster
   </div>
 }
 
-function DownloadCard({ icon, title, description, children }: { icon: ReactNode; title: string; description: string; children: ReactNode }) {
-  return <Card className="site-download-card"><Card.Header><div className="site-download-card-icon">{icon}</div><Card.Title>{title}</Card.Title><Card.Description>{description}</Card.Description></Card.Header><Card.Content>{children}</Card.Content></Card>
+export interface DownloadCardProps { icon: ReactNode; title: string; description: string; children: ReactNode }
+
+function DownloadCard({ icon, title, description, children }: DownloadCardProps) {
+  return <Card className="site-download-card"><CardHeader className="card__header"><div className="site-download-card-icon">{icon}</div><CardTitle className="card__title">{title}</CardTitle><CardDescription className="card__description">{description}</CardDescription></CardHeader><CardContent className="card__content">{children}</CardContent></Card>
 }

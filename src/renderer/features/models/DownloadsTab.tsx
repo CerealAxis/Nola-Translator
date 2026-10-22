@@ -1,10 +1,14 @@
-import { Button, Card, EmptyState, ProgressBar, Table } from '@heroui/react'
+import { Progress } from '@base-ui/react/progress'
+import { LoaderCircle } from 'lucide-react'
 import { useState } from 'react'
 
 import { resourceStateOf } from '@/bridge'
 import type { ResourceRecord, ResourceRecordWithRate } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
 import { notifyError, notifyRetryableFailure } from '@/components/primitives/notify'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
 import { actions, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
 import { formatBytes } from './ModelCard'
@@ -23,10 +27,12 @@ export function DownloadsTab() {
 
   if (rows.length === 0) {
     return (
-      <EmptyState className="flex flex-col items-start gap-4 py-8">
-        <p className="nola-title text-foreground">{t('models.downloadsEmpty')}</p>
-        <p className="nola-caption text-muted">{t('models.downloadsEmptyHint')}</p>
-      </EmptyState>
+      <Empty className="items-start px-2 py-8 text-left">
+        <EmptyHeader className="items-start">
+          <EmptyTitle className="nola-title">{t('models.downloadsEmpty')}</EmptyTitle>
+          <EmptyDescription className="nola-caption">{t('models.downloadsEmptyHint')}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     )
   }
 
@@ -49,29 +55,33 @@ export function DownloadsTab() {
         })
       }} />
 
-      {/* `Table` is only the root; the semantic table is `Table.Content`, inside a `ScrollContainer`. */}
-      <Card className="models-downloads"><Card.Content><Table>
-        <Table.ScrollContainer>
-          <Table.Content aria-label={t('models.tabDownloads')}>
-            <Table.Header>
-              <Table.Column isRowHeader>{t('nav.models')}</Table.Column>
-              <Table.Column>{t('models.size')}</Table.Column>
-              <Table.Column>{t('models.stateLabel')}</Table.Column>
-              <Table.Column>{t('records.columnActions')}</Table.Column>
-            </Table.Header>
-            <Table.Body>
-              {rows.map((record) => (
-                <Row
-                  key={record.resourceId}
-                  record={record}
-                  busy={busyIds.includes(record.resourceId)}
-                  onRetry={() => setDownloadTarget(record)}
-                />
-              ))}
-            </Table.Body>
-          </Table.Content>
-        </Table.ScrollContainer>
-      </Table></Card.Content></Card>
+      <Card className="models-downloads"><CardContent>
+        {/* The table hooks carry the geometry: the column widths and the wrapping rules live in models.css. */}
+        <div className="table-root table-root--primary">
+          <div className="table__scroll-container">
+            <table className="table__content" aria-label={t('models.tabDownloads')}>
+              <thead className="table__header">
+                <tr>
+                  <th scope="col" className="table__column">{t('nav.models')}</th>
+                  <th scope="col" className="table__column">{t('models.size')}</th>
+                  <th scope="col" className="table__column">{t('models.stateLabel')}</th>
+                  <th scope="col" className="table__column">{t('records.columnActions')}</th>
+                </tr>
+              </thead>
+              <tbody className="table__body">
+                {rows.map((record) => (
+                  <Row
+                    key={record.resourceId}
+                    record={record}
+                    busy={busyIds.includes(record.resourceId)}
+                    onRetry={() => setDownloadTarget(record)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </CardContent></Card>
     </div>
   )
 }
@@ -96,20 +106,20 @@ function Row({ record, busy, onRetry }: { record: ResourceRecordWithRate; busy: 
   const tone = failed ? 'neutral' : cancelling ? 'warning' : 'accent'
 
   return (
-    <Table.Row>
-      <Table.Cell>
+    <tr className="table__row">
+      <td role="rowheader" className="table__cell">
         <span className="nola-body-strong text-foreground">{record.name}</span>
-      </Table.Cell>
-      <Table.Cell><span className="nola-caption tabular whitespace-nowrap">{formatBytes(total)}</span></Table.Cell>
-      <Table.Cell>
+      </td>
+      <td className="table__cell"><span className="nola-caption tabular whitespace-nowrap">{formatBytes(total)}</span></td>
+      <td className="table__cell">
         <div className="flex min-w-0 flex-col items-start gap-[var(--space-1)]">
           <StatusPill label={label} tone={tone} live={!failed && !cancelling} />
           {!failed && !cancelling ? <div className="flex w-full min-w-0 flex-col gap-[var(--space-1)]">
-            <ProgressBar value={value} maxValue={1} className="w-full" aria-label={t('models.stateLabel')}>
-              <ProgressBar.Track>
-                <ProgressBar.Fill />
-              </ProgressBar.Track>
-            </ProgressBar>
+            <Progress.Root className="w-full" value={value} min={0} max={1} aria-label={t('models.stateLabel')}>
+              <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm bg-default">
+                <Progress.Indicator className="h-full rounded-sm bg-accent transition-[width] duration-[var(--dur-enter)]" />
+              </Progress.Track>
+            </Progress.Root>
             <span className="nola-micro text-muted tabular">
               {t('models.progress', { percent: Math.round(value * 100) })}
               {' · '}
@@ -118,36 +128,35 @@ function Row({ record, busy, onRetry }: { record: ResourceRecordWithRate; busy: 
             </span>
           </div> : null}
         </div>
-      </Table.Cell>
-      <Table.Cell>
+      </td>
+      <td className="table__cell">
         <div className="flex flex-wrap items-center gap-[var(--space-2)]">
           {failed ? (
             <Button
               variant="secondary"
               size="sm"
-              className="rounded-[var(--radius-xl)]"
-              isPending={busy}
-              onPress={onRetry}
+              disabled={busy}
+              onClick={onRetry}
             >
+              {busy ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
               {t('models.retry')}
             </Button>
           ) : null}
             <Button
               variant="tertiary"
               size="sm"
-              className="rounded-[var(--radius-xl)]"
-              isDisabled={busy || cancelling || (!failed && !record.cancellable)}
-              isPending={cancelling}
-              onPress={() => {
+              disabled={busy || cancelling || (!failed && !record.cancellable)}
+              onClick={() => {
                 void actions.models.manageResource(record.resourceId, 'cancel').catch((cause: unknown) => {
                   notifyError(t('errors.engineOperationFailed'), { cause })
                 })
               }}
             >
+              {cancelling ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
               {t('models.cancelTask')}
             </Button>
         </div>
-      </Table.Cell>
-    </Table.Row>
+      </td>
+    </tr>
   )
 }

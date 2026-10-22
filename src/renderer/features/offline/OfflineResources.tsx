@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
-import { Button, Chip, Label, ListBox, Modal, Select } from '@heroui/react'
-import { FolderInput, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { FolderInput, LoaderCircle } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { stores, useStore } from '@/store'
 import { offlineActions, offlineStore } from '@/store/offlineStore'
-import { SettingSelect } from '../settings/SettingsPage'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogCloseButton, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectFieldLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SettingGroup, SettingSelect } from '../settings/SettingsPage'
 import { SettingsRow } from '../settings/SettingsRow'
-import { SettingGroup } from '../settings/SettingsPage'
 import { CRISP_RUNTIME_ID, CRISP_RUNTIME_FILES } from '../../../shared/compute'
 import type { ResourceRecord } from '../../../shared/contracts'
 import { modelEngines } from '../../../shared/model-engines'
@@ -15,17 +17,28 @@ import { OfflineTaskProgress } from './OfflineTaskProgress'
 import './offline.css'
 
 function bytes(value: number): string { return `${(value / 1024 ** 3).toFixed(2)} GB` }
+
+/** Loader tag for a model. The soft variant of the old chip was a muted fill with inherited text. */
+function LoaderChip({ loaders, className }: { loaders: string; className?: string }) {
+  return <span className={['inline-flex w-fit shrink-0 items-center rounded-2xl bg-default px-1 py-0 text-xs font-medium leading-5 text-foreground', className ?? ''].filter(Boolean).join(' ')}>{loaders}</span>
+}
+
+/** Busy marker for a button that starts an operation; the button itself carries the disabled state. */
+function BusyIcon({ busy }: { busy: boolean }) {
+  return busy ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null
+}
+
 export function LocalModelImport() {
   const { t } = useI18n()
-  return <><Button className="offline-import-button" variant="secondary" onPress={() => { offlineActions.reset(); offlineActions.open('model') }}><FolderInput aria-hidden="true" />{t('offline.modelImport')}</Button><OfflineDialog scope="model" /></>
+  return <><Button className="offline-import-button" variant="secondary" onClick={() => { offlineActions.reset(); offlineActions.open('model') }}><FolderInput aria-hidden="true" />{t('offline.modelImport')}</Button><OfflineDialog scope="model" /></>
 }
 export function OfflineResources() {
   const { t } = useI18n()
   const task = useStore(offlineStore, state => state.task)
   return <><SettingGroup legend={t('offline.title')}><SettingsRow label={t('offline.packageContents')} desc={t('offline.description')} descriptionTooltip>
-    <div className="offline-actions"><Button variant="secondary" onPress={() => { offlineActions.reset(); offlineActions.open('prepare') }}>{t('offline.prepare')}</Button>
-      <Button variant="secondary" onPress={() => { offlineActions.reset(); void offlineActions.pickBundle() }}>{t('offline.bundleImport')}</Button></div>
-  </SettingsRow>{task ? <SettingsRow label={t('offline.task')}><Button variant="secondary" onPress={() => offlineActions.open('bundle')}>{t(`offline.${task.state === 'running' ? task.phase : task.state === 'idle' ? 'ready' : task.state}`)}</Button></SettingsRow> : null}</SettingGroup><OfflineDialog scope="runtime" /></>
+    <div className="offline-actions"><Button variant="secondary" onClick={() => { offlineActions.reset(); offlineActions.open('prepare') }}>{t('offline.prepare')}</Button>
+      <Button variant="secondary" onClick={() => { offlineActions.reset(); void offlineActions.pickBundle() }}>{t('offline.bundleImport')}</Button></div>
+  </SettingsRow>{task ? <SettingsRow label={t('offline.task')}><Button variant="secondary" onClick={() => offlineActions.open('bundle')}>{t(`offline.${task.state === 'running' ? task.phase : task.state === 'idle' ? 'ready' : task.state}`)}</Button></SettingsRow> : null}</SettingGroup><OfflineDialog scope="runtime" /></>
 }
 export interface OfflineDialogProps { scope: 'model' | 'runtime' }
 
@@ -40,6 +53,7 @@ export function OfflineDialog({ scope }: OfflineDialogProps) {
   const [engine, setEngine] = useState('')
   const [llama, setLlama] = useState('')
   const [crisp, setCrisp] = useState('')
+  const popupRef = useRef<HTMLDivElement>(null)
   const visible = state.mode !== null && (scope === 'model' ? state.mode === 'model' : state.mode !== 'model')
   useEffect(() => {
     if (!visible) return
@@ -83,16 +97,26 @@ export function OfflineDialog({ scope }: OfflineDialogProps) {
   const modelPicker = (kind: 'recognitionModel' | 'translationModel', value: string, onChange: (value: string) => void, label: string) => {
     const options = resources.filter(item => item.kind === kind && !item.resourceId.startsWith('hub:'))
     const current = options.find(item => item.resourceId === value && supportsModel(item))
-    return <Select fullWidth aria-label={label} value={current?.resourceId ?? 'none'}
-      disabledKeys={options.filter(item => !supportsModel(item)).map(item => item.resourceId)}
-      onChange={key => { if (typeof key === 'string') onChange(key === 'none' ? '' : key) }}>
-      <Label>{label}</Label><Select.Trigger><Select.Value>{current ? <span className="offline-model-option"><span>{current.name}</span><Chip size="sm" variant="soft">{modelEngines(current).map(loaderName).join(' / ')}</Chip></span> : t('offline.none')}</Select.Value><Select.Indicator /></Select.Trigger>
-      <Select.Popover className="offline-model-popover"><ListBox>
-        <ListBox.Item id="none" textValue={t('offline.none')}>{t('offline.none')}<ListBox.ItemIndicator /></ListBox.Item>
-        {options.map(item => <ListBox.Item key={item.resourceId} id={item.resourceId} textValue={item.name}>
-          <span className="offline-model-option"><Label>{item.name}</Label><Chip size="sm" variant="soft">{modelEngines(item).map(loaderName).join(' / ')}</Chip></span><ListBox.ItemIndicator />
-        </ListBox.Item>)}
-      </ListBox></Select.Popover>
+    const loaders = (item: ResourceRecord) => modelEngines(item).map(loaderName).join(' / ')
+    const itemClass = 'flex cursor-default items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm text-overlay-foreground data-[highlighted]:bg-surface-tertiary data-[selected]:bg-accent-soft aria-disabled:opacity-50'
+    return <Select value={current?.resourceId ?? 'none'} onValueChange={key => { if (typeof key === 'string') onChange(key === 'none' ? '' : key) }}>
+      <div className="flex w-full flex-col gap-1">
+        <SelectFieldLabel className="w-fit text-sm font-medium text-foreground">{label}</SelectFieldLabel>
+        <SelectTrigger className="select__trigger w-full">
+          <SelectValue className="select__value">{selected => {
+            const item = options.find(option => option.resourceId === selected)
+            return item ? <span className="offline-model-option"><span>{item.name}</span><LoaderChip loaders={loaders(item)} className="ms-auto" /></span> : t('offline.none')
+          }}</SelectValue>
+        </SelectTrigger>
+      </div>
+      <SelectContent className="offline-model-popover max-h-72 overflow-auto rounded-xl border border-border bg-overlay p-1 text-overlay-foreground shadow-overlay">
+        <SelectGroup className="flex flex-col">
+          <SelectItem value="none" className={itemClass}>{t('offline.none')}</SelectItem>
+          {options.map(item => <SelectItem key={item.resourceId} value={item.resourceId} disabled={!supportsModel(item)} className={itemClass}>
+            <span className="offline-model-option"><Label className="text-sm">{item.name}</Label><LoaderChip loaders={loaders(item)} className="ms-auto" /></span>
+          </SelectItem>)}
+        </SelectGroup>
+      </SelectContent>
     </Select>
   }
   const previewModelNames = state.preview?.items.map(item => resources.find(resource => resource.resourceId === item.id)?.name ?? item.name).join(' · ') ?? ''
@@ -104,38 +128,42 @@ export function OfflineDialog({ scope }: OfflineDialogProps) {
     </dl>
     {state.preview.items.some(item => { const record = resources.find(resource => resource.resourceId === item.id); return record && modelEngines(record).some(engine => runtimes?.local[engine === 'pytorch' ? 'engine' : engine === 'crisp' ? 'crisp' : 'llama']?.status !== 'ready') }) ? <p role="status">{t('offline.missingRuntime')}</p> : null}
   </section> : null
-  return <Modal.Backdrop isOpen={visible} onOpenChange={open => { if (!open) offlineActions.close() }} className="z-overlay"><Modal.Container size="lg" placement="center" scroll="inside"><Modal.Dialog className={state.mode === 'model' ? 'model-import-dialog' : 'offline-dialog'}>
-    <Modal.CloseTrigger aria-label={t('offline.close')}><X aria-hidden="true" /></Modal.CloseTrigger>
-    <Modal.Header><div className="model-import-heading"><Modal.Heading>{t(`offline.${title}`)}</Modal.Heading><ImportHelp label={t('offline.importInfo')}>{t(state.mode === 'model' ? 'offline.modelHelp' : state.mode === 'prepare' ? 'offline.packageHelp' : 'offline.readyHelp')}</ImportHelp></div>
-      {state.mode === 'prepare' && !task ? <ol className="offline-wizard-steps" aria-label={t('offline.prepare')}>
-        {(['dependencies', 'modelChoice', 'confirm'] as const).map((key, index) => <li key={key} data-active={step === index} data-completed={step > index} aria-current={step === index ? 'step' : undefined}><span>{index + 1}</span>{t(`offline.${key}`)}</li>)}
-      </ol> : null}
-    </Modal.Header>
-    <Modal.Body className="offline-body">
-      {!state.available && state.mode !== 'model' ? <p>{t('offline.unavailable')}</p> : task && task.state !== 'idle' ? <div className="offline-task">
+  return <Dialog open={visible} onOpenChange={open => { if (!open) offlineActions.close() }}>
+    <DialogContent ref={popupRef} initialFocus={popupRef} className={state.mode === 'model' ? 'model-import-dialog max-w-lg' : 'offline-dialog max-w-lg'}>
+    <DialogCloseButton aria-label={t('offline.close')} />
+      <DialogHeader>
+        <div className="model-import-heading"><DialogTitle>{t(`offline.${title}`)}</DialogTitle><ImportHelp label={t('offline.importInfo')}>{t(state.mode === 'model' ? 'offline.modelHelp' : state.mode === 'prepare' ? 'offline.packageHelp' : 'offline.readyHelp')}</ImportHelp></div>
+        {state.mode === 'prepare' && !task ? <ol className="offline-wizard-steps" aria-label={t('offline.prepare')}>
+          {(['dependencies', 'modelChoice', 'confirm'] as const).map((key, index) => <li key={key} data-active={step === index} data-completed={step > index} aria-current={step === index ? 'step' : undefined}><span>{index + 1}</span>{t(`offline.${key}`)}</li>)}
+        </ol> : null}
+      </DialogHeader>
+      <div className="offline-body">
+        {!state.available && state.mode !== 'model' ? <p>{t('offline.unavailable')}</p> : task && task.state !== 'idle' ? <div className="offline-task">
         <OfflineTaskProgress task={task} workflow={state.workflow} />
-        {task.outputPath ? <Button variant="secondary" onPress={() => void offlineActions.openOutput()}>{t('offline.output')}</Button> : null}
+        {task.outputPath ? <Button variant="secondary" onClick={() => void offlineActions.openOutput()}>{t('offline.output')}</Button> : null}
       </div> : state.mode === 'prepare' ? <>
         {step === 0 ? <div className="offline-loader-fields">
           <SettingsRow label="PyTorch"><SettingSelect value={engine} onChange={value => updateLoader(setEngine, value)} ariaLabel="PyTorch" options={[{ value: '', label: t('offline.none') }, ...engineOptions.map(item => ({ value: item.id, label: item.name }))]} /></SettingsRow>
           <SettingsRow label="llama.cpp"><SettingSelect value={llama} onChange={value => updateLoader(setLlama, value)} ariaLabel="llama.cpp" options={[{ value: '', label: t('offline.none') }, ...llamaOptions.map(item => ({ value: item.id, label: item.name }))]} /></SettingsRow>
           <SettingsRow label="CrispASR"><SettingSelect value={crisp} onChange={value => updateLoader(setCrisp, value)} ariaLabel="CrispASR" options={[{ value: '', label: t('offline.none') }, { value: CRISP_RUNTIME_ID, label: '0.8.43 · Vulkan' }]} /></SettingsRow>
         </div> : null}
-        {step === 1 ? <div className="offline-model-fields"><div className="model-import-section-heading"><Label>{t('offline.modelChoice')}</Label><ImportHelp label={t('offline.modelChoice')}>{t('offline.loaderRequired')}</ImportHelp></div>
+        {step === 1 ? <div className="offline-model-fields"><div className="model-import-section-heading"><Label className="text-sm">{t('offline.modelChoice')}</Label><ImportHelp label={t('offline.modelChoice')}>{t('offline.loaderRequired')}</ImportHelp></div>
           {modelPicker('recognitionModel', recognition, setRecognition, t('offline.recognition'))}
           {modelPicker('translationModel', translation, setTranslation, t('offline.translation'))}
         </div> : null}
-        {step === 2 ? <><ul className="offline-items">{runtimeIds.map(id => <li key={id}><strong>{runtimeNames.get(id)}</strong></li>)}{selected.map(item => <li key={item.resourceId}><div className="offline-model-option"><strong>{item.name}</strong><Chip size="sm" variant="soft">{modelEngines(item).map(loaderName).join(' / ')}</Chip></div><span>{bytes(item.downloadBytes ?? item.installedBytes)}</span></li>)}</ul>
-          <SettingsRow label={t('offline.archiveFormat')}><Chip size="sm" variant="soft">ZIP</Chip></SettingsRow>
+        {step === 2 ? <><ul className="offline-items">{runtimeIds.map(id => <li key={id}><strong>{runtimeNames.get(id)}</strong></li>)}{selected.map(item => <li key={item.resourceId}><div className="offline-model-option"><strong>{item.name}</strong><LoaderChip loaders={modelEngines(item).map(loaderName).join(' / ')} className="ms-auto" /></div><span>{bytes(item.downloadBytes ?? item.installedBytes)}</span></li>)}</ul>
+          <SettingsRow label={t('offline.archiveFormat')}><LoaderChip loaders="ZIP" /></SettingsRow>
           <SettingsRow label={t('offline.estimatedSize')} desc={t('offline.estimatedHelp')} descriptionTooltip><span>{bytes(estimatedBytes)}</span></SettingsRow>
         </> : null}
       </> : <>
-        {state.mode === 'model' ? <ModelImportPanel>{modelPreview}</ModelImportPanel> : <><div className="offline-actions"><Button variant="secondary" isPending={state.busy} onPress={() => void offlineActions.pickBundle()}>{t('offline.selectBundle')}</Button></div></>}
+        {state.mode === 'model' ? <ModelImportPanel>{modelPreview}</ModelImportPanel> : <><div className="offline-actions"><Button variant="secondary" disabled={state.busy} onClick={() => void offlineActions.pickBundle()}><BusyIcon busy={state.busy} />{t('offline.selectBundle')}</Button></div></>}
         {state.mode !== 'model' ? state.preview ? <><ul className="offline-items">{state.preview.items.map(item => <li key={item.id}><div><strong>{resources.find(resource => resource.resourceId === item.id)?.name ?? item.name}</strong><p className="nola-caption text-muted">{t(`offline.${item.status}`)} · {bytes(item.bytes)}</p>{item.reason || item.files?.length ? <ImportHelp label={t('offline.importInfo')}>{item.reason}{item.files?.length ? <ul>{item.files.map(file => <li key={file}>{file}</li>)}</ul> : null}</ImportHelp> : null}</div></li>)}</ul><SettingsRow label={t('offline.requiredSpace')}><span>{bytes(state.preview.totalBytes)}</span></SettingsRow>{state.preview.availableBytes !== undefined ? <SettingsRow label={t('offline.availableSpace')}><span>{bytes(state.preview.availableBytes)}</span></SettingsRow> : null}</> : null : null}
       </>}
-    </Modal.Body>{!completedModelImport && (state.mode !== 'model' || task || state.preview) ? <Modal.Footer>
-      {state.mode === 'model' && state.preview && !task ? <Button variant="secondary" isDisabled={state.busy} onPress={() => offlineActions.clearPreview()}>{t('offline.retry')}</Button> : <Button variant="secondary" onPress={() => offlineActions.close()}>{t(running ? 'offline.background' : 'offline.close')}</Button>}
-      {running ? <Button variant="secondary" onPress={() => void offlineActions.cancel()}>{t('offline.cancel')}</Button> : task && task.state !== 'idle' ? <Button variant="secondary" onPress={() => offlineActions.reset()}>{t('offline.retry')}</Button> : state.available && state.mode === 'prepare' ? <>{step > 0 ? <Button variant="secondary" onPress={() => setStep(step - 1)}>{t('offline.back')}</Button> : null}<Button variant="primary" isPending={state.busy} isDisabled={step > 0 && !valid} onPress={() => step < 2 ? setStep(step + 1) : void offlineActions.prepare({ modelIds, runtimeIds })}>{t(step === 2 ? 'offline.start' : 'offline.next')}</Button></> : state.available && state.preview ? <Button variant="primary" isPending={state.busy} isDisabled={!state.preview.compatible || !!state.preview.issues.length} onPress={() => void offlineActions.install()}>{t('offline.install')}</Button> : null}
-    </Modal.Footer> : null}
-  </Modal.Dialog></Modal.Container></Modal.Backdrop>
+      </div>
+      {!completedModelImport && (state.mode !== 'model' || task || state.preview) ? <DialogFooter>
+      {state.mode === 'model' && state.preview && !task ? <Button variant="secondary" disabled={state.busy} onClick={() => offlineActions.clearPreview()}>{t('offline.retry')}</Button> : <Button variant="secondary" onClick={() => offlineActions.close()}>{t(running ? 'offline.background' : 'offline.close')}</Button>}
+      {running ? <Button variant="secondary" onClick={() => void offlineActions.cancel()}>{t('offline.cancel')}</Button> : task && task.state !== 'idle' ? <Button variant="secondary" onClick={() => offlineActions.reset()}>{t('offline.retry')}</Button> : state.available && state.mode === 'prepare' ? <>{step > 0 ? <Button variant="secondary" onClick={() => setStep(step - 1)}>{t('offline.back')}</Button> : null}<Button variant="default" disabled={state.busy || (step > 0 && !valid)} onClick={() => step < 2 ? setStep(step + 1) : void offlineActions.prepare({ modelIds, runtimeIds })}><BusyIcon busy={state.busy} />{t(step === 2 ? 'offline.start' : 'offline.next')}</Button></> : state.available && state.preview ? <Button variant="default" disabled={state.busy || !state.preview.compatible || !!state.preview.issues.length} onClick={() => void offlineActions.install()}><BusyIcon busy={state.busy} />{t('offline.install')}</Button> : null}
+    </DialogFooter> : null}
+    </DialogContent>
+  </Dialog>
 }

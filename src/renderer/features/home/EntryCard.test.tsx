@@ -59,7 +59,8 @@ describe('EntryCard 次级卡', () => {
     render(<EntryCard icon={ICON} title="Records" onPress={() => {}} testId="entry" />)
     const card = screen.getByTestId('entry')
     // No translate, scale or shadow: those belong to overlays, not to a card on a page.
-    expect(card.className).not.toMatch(/translate-|scale-\[|shadow-/)
+    // The default button may move while pressed; hovering the card must not lift it.
+    expect(card.className).not.toMatch(/(?:^|\s)(?:hover:)?(?:translate-|scale-\[|shadow-)/)
   })
 })
 

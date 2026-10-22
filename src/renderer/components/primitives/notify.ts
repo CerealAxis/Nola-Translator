@@ -1,4 +1,4 @@
-import { toast } from '@heroui/react'
+import { closeToast, createToast, updateToast } from '../ui/toast'
 
 /**
  * How long each kind of notification stays on screen.
@@ -56,7 +56,8 @@ function detail(options: NotifyOptions): string | undefined {
 
 /** A failure. Stays on screen and carries the way out. */
 export function notifyError(message: string, options: NotifyOptions = {}): string {
-  return toast.danger(message, {
+  return createToast(message, {
+    variant: 'danger',
     description: detail(options),
     actionProps: actionProps(options.action),
     timeout: options.duration ?? NOTIFY_DURATION.error,
@@ -68,7 +69,8 @@ export function notifyError(message: string, options: NotifyOptions = {}): strin
  * it does not hold the screen: the page itself is the way out, so the notice can leave.
  */
 export function notifyRetryableFailure(message: string, options: NotifyOptions = {}): string {
-  return toast.danger(message, {
+  return createToast(message, {
+    variant: 'danger',
     description: detail(options),
     actionProps: actionProps(options.action),
     timeout: options.duration ?? NOTIFY_DURATION.retryable,
@@ -77,7 +79,8 @@ export function notifyRetryableFailure(message: string, options: NotifyOptions =
 
 /** An operation that finished. */
 export function notifySuccess(message: string, options: NotifyOptions = {}): string {
-  return toast.success(message, {
+  return createToast(message, {
+    variant: 'success',
     description: detail(options),
     actionProps: actionProps(options.action),
     timeout: options.duration ?? NOTIFY_DURATION.success,
@@ -86,7 +89,8 @@ export function notifySuccess(message: string, options: NotifyOptions = {}): str
 
 /** A state change the user should know about but does not have to act on. */
 export function notifyInfo(message: string, options: NotifyOptions = {}): string {
-  return toast.info(message, {
+  return createToast(message, {
+    variant: 'default',
     description: detail(options),
     actionProps: actionProps(options.action),
     timeout: options.duration ?? NOTIFY_DURATION.info,
@@ -95,7 +99,8 @@ export function notifyInfo(message: string, options: NotifyOptions = {}): string
 
 /** Something worth a second look before the user continues. */
 export function notifyWarning(message: string, options: NotifyOptions = {}): string {
-  return toast.warning(message, {
+  return createToast(message, {
+    variant: 'warning',
     description: detail(options),
     actionProps: actionProps(options.action),
     timeout: options.duration ?? NOTIFY_DURATION.warning,
@@ -104,7 +109,7 @@ export function notifyWarning(message: string, options: NotifyOptions = {}): str
 
 /** Takes a notice off the screen before its time is up. */
 export function dismissNotice(id: string): void {
-  toast.close(id)
+  closeToast(id)
 }
 
 /**
@@ -116,7 +121,7 @@ export function dismissNotice(id: string): void {
  * failure into a plain notice. The variant is therefore required.
  */
 export function notifyUpdate(id: string, message: string, options: NotifyOptions & { variant: NotifyVariant }): string {
-  return toast.update(id, message, {
+  return updateToast(id, message, {
     description: detail(options),
     actionProps: actionProps(options.action),
     // A missing duration leaves the running countdown alone, a duration of 0 keeps it open.

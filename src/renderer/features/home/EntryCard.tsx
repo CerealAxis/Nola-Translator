@@ -1,13 +1,15 @@
 /**
  * Home entry card, one cell of the bento grid.
  *
- * Two shapes with different roots: the main card is a `Surface` whose action is the
- * pill button, a sub card is itself a `Button`. Neither carries a subtitle; `meta` is
- * for data the user cannot otherwise see.
+ * Two shapes with different roots: the main card is a plain surface whose action is
+ * the pill button, a sub card is itself a `Button`. Neither carries a subtitle; `meta`
+ * is for data the user cannot otherwise see.
  */
 
 import type { ReactNode } from 'react'
-import { Button, Surface, Tooltip } from '@heroui/react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+
+import { Button } from '@/components/ui/button'
 
 /**
  * Grid geometry: at 1000px and up, `2fr 1fr` by three rows with the main card
@@ -33,6 +35,9 @@ const SUB_PLACEMENT: Record<1 | 2 | 3, string> = {
 
 const ICON_PLATE =
   'grid place-items-center rounded-[10px] bg-surface-secondary text-accent transition-colors duration-[var(--dur-micro)] group-hover:bg-surface-tertiary'
+
+const TOOLTIP_CLASS =
+  'z-overlay max-w-64 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'
 
 export interface EntryCardProps {
   /** Icon plate content at 24px; callers pass a lucide element. */
@@ -113,13 +118,13 @@ export function EntryCard({
 
   if (isMain) {
     return (
-      <Surface
+      <div
         data-testid={testId}
         className={[
           placement,
           // The one primary CTA: a 1px accent outline, no shadow, 24px padding.
           // The main card spans three rows and its content fills about two thirds of that.
-          'flex flex-col items-center justify-center gap-4 rounded-[10px] border border-accent bg-surface p-6',
+          'relative flex flex-col items-center justify-center gap-4 rounded-[10px] border border-accent bg-surface p-6 text-foreground',
           className ?? '',
         ]
           .filter(Boolean)
@@ -152,7 +157,7 @@ export function EntryCard({
           isDisabled={isDisabled}
           onPress={onPress}
         />
-      </Surface>
+      </div>
     )
   }
 
@@ -200,8 +205,8 @@ function SubCard({
   const button = (
     <Button
       variant="secondary"
-      isDisabled={isDisabled}
-      onPress={onPress}
+      disabled={isDisabled}
+      onClick={onPress}
       aria-label={ariaLabel ?? title}
       data-testid={testId}
       className={[
@@ -223,11 +228,14 @@ function SubCard({
   // no pointer events in Chromium, so the tooltip would never appear.
   if (isDisabled && disabledReason) {
     return (
-      <Tooltip delay={1500}>
-        <Tooltip.Trigger className={`block h-full w-full ${placement}`}>{button}</Tooltip.Trigger>
-        <Tooltip.Content>
-          <p className="nola-caption max-w-64">{disabledReason}</p>
-        </Tooltip.Content>
+      <Tooltip>
+        <TooltipTrigger
+          delay={1500}
+          render={<span className={`block h-full w-full ${placement}`} tabIndex={0}>{button}</span>}
+        />
+        <TooltipContent sideOffset={3} className={TOOLTIP_CLASS}>
+              <p className="nola-caption max-w-64">{disabledReason}</p>
+            </TooltipContent>
       </Tooltip>
     )
   }
@@ -250,11 +258,10 @@ function MainAction({
    */
   return (
     <Button
-      variant="primary"
-      size="md"
-      isDisabled={isDisabled}
-      onPress={onPress}
-      // Button ships `rounded-3xl` (24px); the primary CTA is a pill.
+      variant="default"
+      disabled={isDisabled}
+      onClick={onPress}
+      // The shared button's corner is 16px; the CTA states its own radius.
       className="mt-4 rounded-full px-5"
     >
       {label}

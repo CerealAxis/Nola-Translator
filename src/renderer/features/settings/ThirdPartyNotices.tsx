@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Button, Modal } from '@heroui/react'
 import { Scale } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogCloseButton, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n'
 
 // Vite resolves the `?raw` suffix to the file's text at build time, so the notices travel
@@ -21,32 +22,24 @@ export function ThirdPartyNotices() {
 
   return (
     <>
-      <Button variant="tertiary" size="sm" className="rounded-[6px]" onPress={() => setOpen(true)}>
+      <Button variant="tertiary" size="sm" onClick={() => setOpen(true)}>
         <Scale className="size-4" aria-hidden="true" />
         {t('settings.viewNotices')}
       </Button>
 
-      <Modal isOpen={open} onOpenChange={setOpen}>
-        <Modal.Backdrop className="settings-notices-backdrop z-overlay">
-          <Modal.Container size="lg" scroll="inside" className="settings-notices-container">
-            <Modal.Dialog className="settings-notices-dialog">
-              <Modal.Header>
-                <Modal.Heading className="settings-notices-heading">
-                  {t('settings.noticesTitle')}
-                </Modal.Heading>
-              </Modal.Header>
-              <Modal.Body className="settings-notices-body nola-scrollbar">
-                <pre className="settings-notices-text">{leftAlignedNotices}</pre>
-              </Modal.Body>
-              <Modal.Footer className="settings-notices-footer">
-                <Button variant="secondary" size="sm" className="settings-notices-close" onPress={() => setOpen(false)}>
-                  {t('common.close')}
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+      <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="settings-notices-dialog w-[calc(var(--space-8)*11-var(--space-3)*2)] max-w-[calc(100vw-var(--space-3)*2)] overflow-hidden outline-none">
+            <DialogCloseButton />
+            <DialogHeader className="mb-0">
+              <DialogTitle data-slot="dialog-title" className="settings-notices-heading modal__heading">
+                {t('settings.noticesTitle')}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="settings-notices-body modal__body nola-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-contain">
+              <pre className="settings-notices-text">{leftAlignedNotices}</pre>
+            </div>
+          </DialogContent>
+      </Dialog>
     </>
   )
 }

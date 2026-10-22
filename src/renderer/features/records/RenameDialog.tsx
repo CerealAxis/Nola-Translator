@@ -2,13 +2,18 @@
  * Rename dialog, shared by the records list and the record detail.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AlertDialog, Button, Input, TextField } from '@heroui/react'
+import { AlertDialog } from '@base-ui/react/alert-dialog'
 
 import { useI18n } from '@/i18n'
 import { actions } from '@/store'
 import { notifyError } from '@/components/primitives/notify'
+import { Button } from '@/components/ui/button'
+import { DialogFooter, DialogHeader } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Field, FieldLabel } from '@/components/ui/field'
+import { Spinner } from '@/components/ui/spinner'
 
 /** Meeting name cap. The main process truncates to the same length on write. */
 export const TITLE_MAX_LENGTH = 120
@@ -25,6 +30,7 @@ export function RenameDialog({ meetingId, initialTitle = '', onClose }: RenameDi
   const { t } = useI18n()
   const [title, setTitle] = useState(initialTitle)
   const [pending, setPending] = useState(false)
+  const titleId = useId()
 
   // Reset on every open, so one meeting's name cannot leak into the next.
   useEffect(() => {
@@ -34,7 +40,7 @@ export function RenameDialog({ meetingId, initialTitle = '', onClose }: RenameDi
   const empty = title.trim().length === 0
 
   const submit = useCallback(() => {
-    if (meetingId === null) return
+    if (meetingId === null || pending) return
     if (empty) return
     setPending(true)
     void actions.meetings
@@ -49,66 +55,50 @@ export function RenameDialog({ meetingId, initialTitle = '', onClose }: RenameDi
       .finally(() => {
         setPending(false)
       })
-  }, [meetingId, title, empty, onClose, t])
+  }, [meetingId, title, empty, pending, onClose, t])
 
   return (
-    <AlertDialog
-      isOpen={meetingId !== null}
+    <AlertDialog.Root
+      open={meetingId !== null}
       onOpenChange={(open: boolean) => {
-        if (!open) onClose()
+        if (!open && !pending) onClose()
       }}
     >
-      <AlertDialog.Backdrop>
-        <AlertDialog.Container>
-          <AlertDialog.Dialog>
-            <AlertDialog.Header>
-              {/* `.nola-title` is the dialog-title step, as on every other dialog. */}
-              <AlertDialog.Heading className="nola-title text-foreground">
-                {t('records.renameTitle')}
-              </AlertDialog.Heading>
-            </AlertDialog.Header>
+      <AlertDialog.Portal>
+        <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
+        <AlertDialog.Popup className="nola-dialog-content max-w-md">
+          <DialogHeader>
+            <AlertDialog.Title className="nola-title text-foreground">
+              {t('records.renameTitle')}
+            </AlertDialog.Title>
+          </DialogHeader>
 
-            <AlertDialog.Body>
-              <TextField
-                value={title}
-                isDisabled={pending}
-                onChange={setTitle}
-                className="flex flex-col gap-2"
-              >
-                <Input
-                  aria-label={t('records.renameLabel')}
-                  maxLength={TITLE_MAX_LENGTH}
-                  onKeyDown={(event: React.KeyboardEvent<HTMLInputElement>) => {
-                    if (event.key === 'Enter') submit()
-                  }}
-                />
-              </TextField>
-            </AlertDialog.Body>
+          <Field data-disabled={pending || undefined}>
+          <FieldLabel htmlFor={titleId}>{t('records.renameLabel')}</FieldLabel>
+          <Input
+            id={titleId}
+            value={title}
+            disabled={pending}
+            maxLength={TITLE_MAX_LENGTH}
+            onValueChange={(value: string) => setTitle(value)}
+            onKeyDown={(event: React.KeyboardEvent<HTMLInputElement>) => {
+              if (event.key === 'Enter') submit()
+            }}
+          />
+          </Field>
 
-            <AlertDialog.Footer>
-              <Button
-                variant="tertiary"
-                size="sm"
-                className="rounded-[10px]"
-                onPress={onClose}
-              >
-                {t('common.cancel')}
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                isPending={pending}
-                isDisabled={empty}
-                className="rounded-[10px]"
-                onPress={submit}
-              >
-                {t('common.confirm')}
-              </Button>
-            </AlertDialog.Footer>
-          </AlertDialog.Dialog>
-        </AlertDialog.Container>
-      </AlertDialog.Backdrop>
-    </AlertDialog>
+          <DialogFooter>
+            <Button variant="tertiary" size="sm" disabled={pending} onClick={onClose}>
+              {t('common.cancel')}
+            </Button>
+            <Button size="sm" disabled={pending || empty} aria-busy={pending} onClick={submit}>
+              {pending ? <Spinner aria-hidden="true" data-icon="inline-start" /> : null}
+              {t('common.confirm')}
+            </Button>
+          </DialogFooter>
+        </AlertDialog.Popup>
+      </AlertDialog.Portal>
+    </AlertDialog.Root>
   )
 }
 

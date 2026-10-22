@@ -1,0 +1,13 @@
+.nola-color-picker { display: flex; flex-direction: column; gap: var(--space-1); width: min(calc(var(--space-8) * 3 + var(--space-6)), calc(100vw - var(--space-4))); padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--overlay); color: var(--foreground); box-shadow: var(--shadow-lg); }
+.nola-color-picker__trigger { display: inline-flex; align-items: center; gap: var(--space-1); }
+.nola-color-picker__swatch { width: var(--space-3); height: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.nola-color-picker__area { position: relative; height: calc(var(--space-7) * 2); border-radius: var(--radius-md); background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent), var(--picker-hue); touch-action: none; cursor: crosshair; }
+
+.nola-color-picker__cursor, .nola-color-picker__hue-thumb { width: var(--space-2); height: var(--space-2); border: 2px solid #fff; border-radius: var(--radius-full); box-shadow: 0 0 0 1px #000; }
+.nola-color-picker__cursor { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
+.nola-color-picker__hue-control { display: flex; align-items: center; min-height: var(--space-3); touch-action: none; }
+.nola-color-picker__hue-track { position: relative; width: 100%; height: var(--space-1); border-radius: var(--radius-full); background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+.nola-color-picker__hue-thumb { background: var(--surface); }
+.nola-color-picker__hue-thumb:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+.nola-color-picker__presets { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.nola-color-picker__preset { width: var(--space-4); height: var(--space-4); min-width: 0; padding: 0; border: 1px solid var(--border); }

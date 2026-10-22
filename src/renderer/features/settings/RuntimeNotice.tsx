@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Modal, Button } from '@heroui/react'
+import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui'
 import { actions, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
 import { modelEngines, translationEngine } from '../../../shared/model-engines'
@@ -23,19 +23,21 @@ export interface RuntimeNoticeDialogProps {
 
 export function RuntimeNoticeDialog({ issues, isOpen, onOpenChange, onOpenSettings, onDismiss }: RuntimeNoticeDialogProps): ReactNode {
   const { t } = useI18n()
-  return <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-    <Modal.Backdrop className="z-overlay"><Modal.Container size="sm"><Modal.Dialog>
-      <Modal.Header><Modal.Heading>{t('runtime.noticeTitle')}</Modal.Heading></Modal.Header>
-      <Modal.Body>
+  return <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <DialogContent className="max-w-sm">
+      <DialogHeader>
+        <DialogTitle data-slot="dialog-title">{t('runtime.noticeTitle')}</DialogTitle>
+      </DialogHeader>
+      <div className="nola-body flex flex-col gap-2 text-muted">
         {issues.map(issue => <p key={issue.kind}>{issue.reason || (issue.kind === 'crisp' ? `CrispASR · ${t('runtime.missing')}` : t(issue.kind === 'engine' ? 'runtime.torchMissing' : 'runtime.llamaMissing'))}</p>)}
         <p>{t('runtime.noticeBody')}</p>
-      </Modal.Body>
-      <Modal.Footer className="flex flex-wrap gap-2">
-        {issues.map(issue => <Button key={issue.kind} variant="primary" onPress={() => onOpenSettings(issue.kind)}>{t(issue.kind === 'crisp' ? 'runtime.installCrisp' : issue.kind === 'engine' ? 'runtime.goTorch' : 'runtime.goLlama')}</Button>)}
-        <Button variant="tertiary" onPress={onDismiss}>{t('runtime.later')}</Button>
-      </Modal.Footer>
-    </Modal.Dialog></Modal.Container></Modal.Backdrop>
-  </Modal>
+      </div>
+      <DialogFooter>
+        {issues.map(issue => <Button key={issue.kind} onClick={() => onOpenSettings(issue.kind)}>{t(issue.kind === 'crisp' ? 'runtime.installCrisp' : issue.kind === 'engine' ? 'runtime.goTorch' : 'runtime.goLlama')}</Button>)}
+        <Button variant="tertiary" onClick={onDismiss}>{t('runtime.later')}</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 }
 
 export function RuntimeNotice() {

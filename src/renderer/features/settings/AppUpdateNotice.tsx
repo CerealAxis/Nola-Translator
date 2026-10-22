@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Link, Modal } from '@heroui/react'
 import { ArrowUpRight, ImageOff } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { rehypeGithubAlerts } from 'rehype-github-alerts'
@@ -9,6 +8,7 @@ import rehypeSanitize, { defaultSchema, type Options as Schema } from 'rehype-sa
 import remarkGfm from 'remark-gfm'
 
 import type { AppUpdateCheckResult } from '@/bridge'
+import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui'
 import { notifyError } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
@@ -80,47 +80,43 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
   const latestVersion = displayVersion(result.latestVersion ?? '')
   const releaseUrl = result.releaseUrl ?? ''
   return (
-    <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Modal.Backdrop className="z-overlay">
-        <Modal.Container size="lg" placement="center">
-          <Modal.Dialog className="app-update-dialog rounded-2xl border border-border">
-            <Modal.Header className="app-update-dialog-header">
-              <Modal.Heading className="nola-title text-foreground">{t(isCurrentVersion ? 'appUpdate.currentReleaseTitle' : 'appUpdate.title')}</Modal.Heading>
-              <div className="app-update-dialog-meta">
-                <span>{t('appUpdate.version', { version: latestVersion })}</span>
-                {!isCurrentVersion && <span>{t('appUpdate.currentVersion', { version: displayVersion(result.currentVersion) })}</span>}
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="app-update-dialog modal__dialog--lg rounded-2xl border border-border">
+        <DialogHeader className="app-update-dialog-header mb-0">
+          <DialogTitle data-slot="dialog-title" className="nola-title">{t(isCurrentVersion ? 'appUpdate.currentReleaseTitle' : 'appUpdate.title')}</DialogTitle>
+          <div className="app-update-dialog-meta">
+            <span>{t('appUpdate.version', { version: latestVersion })}</span>
+            {!isCurrentVersion && <span>{t('appUpdate.currentVersion', { version: displayVersion(result.currentVersion) })}</span>}
+          </div>
+        </DialogHeader>
+        <div className="app-update-dialog-body nola-scrollbar mt-2 flex-1">
+          {result.releaseNotes.trim()
+            ? (
+              <div className="app-update-markdown">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw, rehypeGithubAlerts, [rehypeSanitize, releaseNotesSchema]]}
+                  components={{
+                    a: ({ href, children }) => href
+                      ? <a href={href} target="_blank" rel="noreferrer" className="app-update-markdown__link">{children}</a>
+                      : <>{children}</>,
+                    img: ReleaseImage,
+                  }}
+                >
+                  {normalizeReleaseNotesCallouts(result.releaseNotes)}
+                </ReactMarkdown>
               </div>
-            </Modal.Header>
-            <Modal.Body className="app-update-dialog-body nola-scrollbar">
-              {result.releaseNotes.trim()
-                ? (
-                  <div className="app-update-markdown">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeRaw, rehypeGithubAlerts, [rehypeSanitize, releaseNotesSchema]]}
-                      components={{
-                        a: ({ href, children }) => href
-                          ? <Link href={href} target="_blank" rel="noreferrer" className="app-update-markdown__link">{children}</Link>
-                          : <>{children}</>,
-                        img: ReleaseImage,
-                      }}
-                    >
-                      {normalizeReleaseNotesCallouts(result.releaseNotes)}
-                    </ReactMarkdown>
-                  </div>
-                )
-                : <div className="nola-caption text-muted">{displayReleaseName(result.releaseName)}<p>{t('appUpdate.notesUnavailable')}</p></div>}
-            </Modal.Body>
-            <Modal.Footer className="app-update-dialog-footer">
-              <Button variant="tertiary" onPress={() => onOpenChange(false)}>{t(isCurrentVersion ? 'common.close' : 'appUpdate.later')}</Button>
-              <Button onPress={() => void onOpenRelease(releaseUrl)} isPending={isOpening}>
-                <ArrowUpRight aria-hidden="true" />{t(isCurrentVersion ? 'appUpdate.viewAnnouncement' : 'appUpdate.openRelease')}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+            )
+            : <div className="nola-caption text-muted">{displayReleaseName(result.releaseName)}<p>{t('appUpdate.notesUnavailable')}</p></div>}
+        </div>
+        <DialogFooter className="app-update-dialog-footer">
+          <Button variant="tertiary" onClick={() => onOpenChange(false)}>{t(isCurrentVersion ? 'common.close' : 'appUpdate.later')}</Button>
+          <Button disabled={isOpening} onClick={() => void onOpenRelease(releaseUrl)}>
+            <ArrowUpRight aria-hidden="true" />{t(isCurrentVersion ? 'appUpdate.viewAnnouncement' : 'appUpdate.openRelease')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

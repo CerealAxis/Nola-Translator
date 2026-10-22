@@ -32,8 +32,8 @@ export const en: Dictionary = {
     "sponsor": "Sponsor",
     "sourceCode": "View source code",
     "specialThanks": "Special thanks",
-    "heroThanks": "Thanks to HeroUI for its open source component library, making Nola more beautiful and easier to use.",
-    "heroWebsite": "HeroUI website",
+    "uiThanks": "Thanks to shadcn/ui for its open source component library, making Nola more beautiful and easier to use.",
+    "uiWebsite": "shadcn/ui website",
     "sponsors": "Sponsors",
     "sponsorVacancies": "Awaiting sponsors",
     "sponsorInfo": "Interested in sponsoring Nola? Contact the developer to discuss exclusive benefits, such as public recognition in Nola and sponsor-only features.",
@@ -656,6 +656,7 @@ export const en: Dictionary = {
     done: 'Done',
     refreshed: 'Refreshed',
     refreshFailed: 'The refresh failed. Please try again.',
+    info: 'Information',
   },
 
   status: {

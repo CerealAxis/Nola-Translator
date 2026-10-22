@@ -9,7 +9,7 @@
  * would make the digits jump size) and not a colour change (harsh on a dark bar).
  */
 
-import { Button, Tooltip } from '@heroui/react'
+import { Button } from '@/components/ui/button'
 import { CircleStop, Mic, Pause, Play } from 'lucide-react'
 
 import type { SessionStatus } from '@/bridge'
@@ -89,49 +89,35 @@ export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, class
 
       <div className="flex shrink-0 items-center gap-2">
         {paused ? (
-          <Tooltip delay={1500}>
-            <Button variant="outline" size="sm" className="rounded-xl" onPress={onResume} isDisabled={busy}>
-              <Play aria-hidden="true" />
-              {t('workspace.resume')}
-            </Button>
-            <Tooltip.Content>
-              <p className="nola-caption">{t('workspace.resume')}</p>
-            </Tooltip.Content>
-          </Tooltip>
+          <Button variant="outline" size="sm" className="rounded-xl" onClick={onResume} disabled={busy} title={t('workspace.resume')}>
+            <Play aria-hidden="true" />
+            {t('workspace.resume')}
+          </Button>
         ) : (
-          <Tooltip delay={1500}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl"
-              onPress={onPause}
-              isDisabled={!running || busy}
-            >
-              <Pause aria-hidden="true" />
-              {t('workspace.pause')}
-            </Button>
-            <Tooltip.Content>
-              <p className="nola-caption">{t('workspace.pause')}</p>
-            </Tooltip.Content>
-          </Tooltip>
-        )}
-
-        <Tooltip delay={1500}>
           <Button
-            variant="danger-soft"
+            variant="outline"
             size="sm"
             className="rounded-xl"
-            onPress={onStop}
-            isDisabled={busy}
-            isPending={status === 'stopping'}
+            onClick={onPause}
+            disabled={!running || busy}
+            title={t('workspace.pause')}
           >
-            <CircleStop aria-hidden="true" />
-            {status === 'stopping' ? t('workspace.stopping') : t('workspace.stop')}
+            <Pause aria-hidden="true" />
+            {t('workspace.pause')}
           </Button>
-          <Tooltip.Content>
-            <p className="nola-caption">{t('workspace.endConfirm')}</p>
-          </Tooltip.Content>
-        </Tooltip>
+        )}
+
+        <Button
+          variant="danger"
+          size="sm"
+          className="rounded-xl"
+          onClick={onStop}
+          disabled={busy}
+          title={t('workspace.endConfirm')}
+        >
+          <CircleStop aria-hidden="true" />
+          {status === 'stopping' ? t('workspace.stopping') : t('workspace.stop')}
+        </Button>
       </div>
     </footer>
   )

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Button, Spinner } from '@heroui/react'
-import { RefreshCw } from 'lucide-react'
+import { LoaderCircle, RefreshCw } from 'lucide-react'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
+import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { encodeHardwarePreference, preferredHardwareId, sameAdapterName } from '../../../../shared/device-selection'
@@ -95,7 +95,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
     })
   }, [computeError, refresh, t])
   return <div className="settings-panel">
-    <SettingGroup legend={t('compute.devices')} actions={<Button variant="secondary" size="sm" isDisabled={loading || refreshing} onPress={() => void refresh()}>{loading || refreshing ? <Spinner size="sm" /> : <RefreshCw size={16} aria-hidden="true" />}{t('compute.refresh')}</Button>}>
+    <SettingGroup legend={t('compute.devices')} actions={<Button variant="secondary" size="sm" disabled={loading || refreshing} onClick={() => void refresh()}>{loading || refreshing ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />}{t('compute.refresh')}</Button>}>
       <SettingsRow label={t('compute.recognition')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={recognition.normalized} options={recognition.choices} ariaLabel={t('compute.recognition')} onChange={recognitionDevice => save({ compute: { recognitionDevice } })} /></SettingsRow>
       <SettingsRow label={t('compute.translation')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={translation.normalized} options={translation.choices} ariaLabel={t('compute.translation')} onChange={translationDevice => save({ compute: { translationDevice } })} /></SettingsRow>
       <SettingsRow label={t('compute.fallback')} descriptionTooltip desc={t('compute.fallbackHint')}><SettingSwitch isSelected={compute.allowCpuFallback} ariaLabel={t('compute.fallback')} onChange={allowCpuFallback => save({ compute: { allowCpuFallback } })} /></SettingsRow>
@@ -110,7 +110,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
           <span className="compute-device-info">{backends.join(' / ') || t('compute.unavailable')}{memory ? ' · ' + t('compute.free') + ' ' + Math.round(memory.freeMemoryMb) + ' / ' + Math.round(memory.totalMemoryMb) + ' MiB' : ''}</span>
         </SettingsRow>
       })}
-      {loading && (!runtimes || !snapshot) ? <p className="compute-hint" role="status"><Spinner size="sm" /> {t('compute.checkingDevices')}</p> : null}
+      {loading && (!runtimes || !snapshot) ? <p className="compute-hint" role="status"><LoaderCircle className="inline-block size-4 animate-spin" aria-hidden="true" /> {t('compute.checkingDevices')}</p> : null}
       {snapshot?.notes.map((note, index) => <p className="compute-hint" key={index}>{note}</p>)}
     </SettingGroup>
     {plan ? <SettingGroup legend={t('compute.actual')}>
