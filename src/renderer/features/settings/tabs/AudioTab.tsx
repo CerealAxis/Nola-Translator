@@ -150,7 +150,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
       </SettingGroup>
 
       {provider !== 'aliyun' ? <SettingGroup legend={t('settings.vadGroup')} actions={
-        <Button variant="secondary" size="sm" onClick={() => {
+        <Button variant="secondary" size="sm" className="bg-surface-tertiary" onClick={() => {
           void updateSettings({ recognition: {
             max_segment_ms: DEFAULT_SETTINGS.recognition.max_segment_ms,
             silence_end_ms: DEFAULT_SETTINGS.recognition.silence_end_ms,

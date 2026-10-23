@@ -22,8 +22,8 @@ import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
 import type { UiLanguagePreference } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
-import { GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PROXY_NODES, findGithubProxyNode } from '../../../../shared/github-proxies'
-import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_OFFICIAL, PYTORCH_WHEEL_MIRRORS } from '../../../../shared/pypi-mirrors'
+import { GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PROXY_NODES, GITHUB_PROXY_OFF, findGithubProxyNode } from '../../../../shared/github-proxies'
+import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYPI_MIRROR_NODES, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_OFF, PYTORCH_WHEEL_MIRRORS } from '../../../../shared/pypi-mirrors'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 
@@ -144,20 +144,26 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
 
   const nodeOptions = useMemo<PickerOption[]>(() => [
     { value: GITHUB_PROXY_AUTO, label: t('settings.githubAccelerateAuto') },
+    { value: GITHUB_PROXY_OFF, label: t('settings.mirrorOff') },
     ...GITHUB_PROXY_NODES.map((node) => ({ value: node, label: githubNodeLabel(node) })),
   ], [t])
   const pypiNodeOptions = useMemo<PickerOption[]>(() => [
     { value: PYPI_MIRROR_AUTO, label: t('settings.pytorchWheelMirrorAuto') },
-    ...PYPI_MIRROR_NODES.slice(1).map((node, index) => ({
+    { value: PYPI_MIRROR_OFF, label: t('settings.mirrorOff') },
+    ...PYPI_MIRROR_NODES.filter(node => node !== PYPI_MIRROR_OFF && node !== PYPI_MIRROR_AUTO).map((node, index) => ({
       value: node,
       label: [t('settings.pypiAliyun'), t('settings.pypiTsinghua'), t('settings.pypiHuawei'), t('settings.pypiTencent')][index] ?? node,
     })),
   ], [t])
   const pytorchWheelOptions = useMemo<PickerOption[]>(() => [
     { value: PYTORCH_WHEEL_MIRROR_AUTO, label: t('settings.pytorchWheelMirrorAuto') },
+    { value: PYTORCH_WHEEL_MIRROR_OFF, label: t('settings.mirrorOff') },
     { value: PYTORCH_WHEEL_MIRRORS[0], label: t('settings.pytorchWheelMirrorSjtu') },
     { value: PYTORCH_WHEEL_MIRRORS[1], label: t('settings.pytorchWheelMirrorAliyun') },
-    { value: PYTORCH_WHEEL_MIRROR_OFFICIAL, label: t('settings.pytorchWheelMirrorOfficial') },
+  ], [t])
+  const huggingFaceOptions = useMemo<PickerOption[]>(() => [
+    { value: 'auto', label: t('settings.pytorchWheelMirrorAuto') },
+    { value: 'off', label: t('settings.mirrorOff') },
   ], [t])
 
   return (
@@ -201,22 +207,12 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
         />
       </SettingsRow>
       <SettingsRow label={t('settings.pypiMirror')} desc={t('settings.pypiMirrorHint')} descriptionTooltip>
-        <SettingSwitch
-          isSelected={network.usePypiMirror}
-          ariaLabel={t('settings.pypiMirror')}
-          onChange={(usePypiMirror) => {
-            void updateSettings({ network: { usePypiMirror } }).catch(() => undefined)
-          }}
-        />
-      </SettingsRow>
-      <SettingsRow label={t('settings.pypiMirrorNode')}>
         <SettingSelect
           value={findPypiMirrorNode(network.pypiMirrorUrl) ?? PYPI_MIRROR_AUTO}
           options={pypiNodeOptions}
-          isDisabled={!network.usePypiMirror}
-          ariaLabel={t('settings.pypiMirrorNode')}
+          ariaLabel={t('settings.pypiMirror')}
           onChange={(pypiMirrorUrl) => {
-            void updateSettings({ network: { pypiMirrorUrl, usePypiMirror: true } }).catch(() => undefined)
+            void updateSettings({ network: { pypiMirrorUrl, usePypiMirror: pypiMirrorUrl !== PYPI_MIRROR_OFF } }).catch(() => undefined)
           }}
         />
       </SettingsRow>
@@ -224,51 +220,33 @@ function NetworkGroup({ settings }: SettingsPanelProps) {
         <SettingSelect
           value={findPytorchWheelMirrorNode(network.pytorchWheelMirrorUrl) ?? PYTORCH_WHEEL_MIRROR_AUTO}
           options={pytorchWheelOptions}
-          isDisabled={!network.usePypiMirror}
           ariaLabel={t('settings.pytorchWheelMirrorNode')}
           onChange={(pytorchWheelMirrorUrl) => {
-            void updateSettings({ network: { pytorchWheelMirrorUrl, usePypiMirror: true } }).catch(() => undefined)
+            void updateSettings({ network: { pytorchWheelMirrorUrl } }).catch(() => undefined)
           }}
         />
       </SettingsRow>
       <SettingsRow label={t('settings.huggingFaceMirror')} desc={t('settings.huggingFaceMirrorHint')} descriptionTooltip>
-        <SettingSwitch
-          isSelected={network.useHuggingFaceMirror}
+        <SettingSelect
+          value={network.useHuggingFaceMirror ? 'auto' : 'off'}
+          options={huggingFaceOptions}
           ariaLabel={t('settings.huggingFaceMirror')}
-          onChange={(useHuggingFaceMirror) => {
-            void updateSettings({ network: { useHuggingFaceMirror } }).catch(() => undefined)
+          onChange={(value) => {
+            void updateSettings({ network: { useHuggingFaceMirror: value === 'auto' } }).catch(() => undefined)
           }}
         />
       </SettingsRow>
       <SettingsRow label={t('settings.githubAccelerate')} desc={t('settings.githubAccelerateHint')} descriptionTooltip>
-        <SettingSwitch
-          isSelected={network.useGithubAccelerate}
-          ariaLabel={t('settings.githubAccelerate')}
-          onChange={(useGithubAccelerate) => {
-            // An address left empty by a settings file predating the toggle means the accelerator is on
-            // while the download path has no prefix to apply, so turning it on is where it gets seeded.
-            // Turning it off writes the flag alone, which leaves a node chosen earlier in place.
-            void updateSettings({
-              network: {
-                useGithubAccelerate,
-                ...(useGithubAccelerate && network.githubAccelerateUrl.trim() === ''
-                  ? { githubAccelerateUrl: GITHUB_PROXY_DEFAULT }
-                  : {}),
-              },
-            }).catch(() => undefined)
-          }}
-        />
-      </SettingsRow>
-      <SettingsRow label={t('settings.githubAccelerateNode')} desc={t('settings.githubAccelerateNodeHint')} descriptionTooltip>
         <SettingSelect
-          value={network.githubAccelerateUrl === GITHUB_PROXY_AUTO
+          value={!network.useGithubAccelerate || network.githubAccelerateUrl === GITHUB_PROXY_OFF
+            ? GITHUB_PROXY_OFF
+            : network.githubAccelerateUrl === GITHUB_PROXY_AUTO
             ? GITHUB_PROXY_AUTO
             : findGithubProxyNode(network.githubAccelerateUrl) ?? GITHUB_PROXY_DEFAULT}
           options={nodeOptions}
-          isDisabled={!network.useGithubAccelerate}
-          ariaLabel={t('settings.githubAccelerateNode')}
+          ariaLabel={t('settings.githubAccelerate')}
           onChange={(githubAccelerateUrl) => {
-            void updateSettings({ network: { githubAccelerateUrl, useGithubAccelerate: true } }).catch(() => undefined)
+            void updateSettings({ network: { githubAccelerateUrl, useGithubAccelerate: githubAccelerateUrl !== GITHUB_PROXY_OFF } }).catch(() => undefined)
           }}
         />
       </SettingsRow>

@@ -12,7 +12,8 @@ import { CRISP_RUNTIME_ID, CRISP_RUNTIME_FILES, runtimePackageSchema, type Compu
 import type { NetworkSettings } from '../shared/settings'
 import { probeHardware } from './hardware-inventory'
 import { PythonEnvironments } from './python-environments'
-import { pytorchWheelUrls } from '../shared/pypi-mirrors'
+import { pytorchWheelUrls, PYTORCH_WHEEL_MIRROR_OFF } from '../shared/pypi-mirrors'
+import { GITHUB_PROXY_OFF } from '../shared/github-proxies'
 import { localCandidates, missingLocalRuntime, probeLocalCrisp, probeLocalEngine, probeLocalLlama } from './local-runtimes'
 import { resolveGithubProxyNode } from './github-proxy-probe'
 import { isMainlandChina } from './network-region'
@@ -594,7 +595,7 @@ export class RuntimeManager {
   /** Picks the first mirror that answers for this artifact's declared size, keeping the official address last. */
   private async resolveWheelUrl(item: { url: string; bytes: number }, signal: AbortSignal): Promise<string> {
     const network = this.options.network?.()
-    if (network?.usePypiMirror !== true) return item.url
+    if (!network || network.pytorchWheelMirrorUrl === PYTORCH_WHEEL_MIRROR_OFF) return item.url
     if (network.pytorchWheelMirrorUrl === 'auto' && !await isMainlandChina()) return item.url
     const candidates = pytorchWheelUrls(item.url, network.pytorchWheelMirrorUrl)
     for (const candidate of candidates.slice(0, -1)) {
@@ -612,7 +613,7 @@ export class RuntimeManager {
     // Read per request so a node picked in settings, or a probe that measured a different one, reaches
     // the next download without a restart.
     const network = this.options.network?.()
-    if (!network?.useGithubAccelerate) return url
+    if (!network?.useGithubAccelerate || network.githubAccelerateUrl === GITHUB_PROXY_OFF) return url
     if (network.githubAccelerateUrl === 'auto' && !await isMainlandChina()) return url
     const prefix = await resolveGithubProxyNode(network.githubAccelerateUrl)
     if (!prefix) return url

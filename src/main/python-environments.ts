@@ -9,7 +9,7 @@ import { execFile } from 'node:child_process'
 import { z } from 'zod'
 import { runtimeRecipeSchema, type RuntimeRecipe, type RuntimeRecipeState, type RuntimeSnapshot } from '../shared/compute'
 import type { NetworkSettings } from '../shared/settings'
-import { pypiIndexUrls, pytorchWheelUrls } from '../shared/pypi-mirrors'
+import { pypiIndexUrls, pytorchWheelUrls, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_OFF } from '../shared/pypi-mirrors'
 import { isMainlandChina } from './network-region'
 import { probeLocalEngine } from './local-runtimes'
 import { offlinePipArguments } from './offline-runtimes'
@@ -186,9 +186,10 @@ export class PythonEnvironments {
     // `--isolated` together with PIP_CONFIG_FILE=nul discards whatever pip.conf the machine
     // carries, so the flag below is the only route a configured proxy can take into pip.
     const network = this.network?.()
-    const useMirrors = network?.usePypiMirror === true
-      && (network.pypiMirrorUrl !== 'auto' || await isMainlandChina())
-    const indexes = useMirrors ? pypiIndexUrls(network.pypiMirrorUrl) : [PYPI_INDEX]
+    const pypiMirror = network?.pypiMirrorUrl ?? PYPI_MIRROR_OFF
+    const useMirrors = pypiMirror !== PYPI_MIRROR_OFF
+      && (pypiMirror !== 'auto' || await isMainlandChina())
+    const indexes = useMirrors ? pypiIndexUrls(pypiMirror) : [PYPI_INDEX]
     const proxy = network?.proxyForPip ? network.proxyUrl.trim() : ''
     let childClosed: Promise<void> | undefined
     const runPip = (pipIndex: string): Promise<void> => new Promise((resolveInstall, reject) => {
@@ -241,7 +242,7 @@ export class PythonEnvironments {
 
   /** Picks the first mirror that answers for this wheel's declared size, keeping the official address last. */
   private async resolveWheelUrl(item: Wheel, network: NetworkSettings | undefined, signal: AbortSignal): Promise<string> {
-    if (network?.usePypiMirror !== true || !this.probe) return item.url
+    if (!network || network.pytorchWheelMirrorUrl === PYTORCH_WHEEL_MIRROR_OFF || !this.probe) return item.url
     if (network.pytorchWheelMirrorUrl === 'auto' && !await isMainlandChina()) return item.url
     const candidates = pytorchWheelUrls(item.url, network.pytorchWheelMirrorUrl)
     for (const candidate of candidates.slice(0, -1)) {

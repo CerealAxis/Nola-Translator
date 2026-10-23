@@ -469,9 +469,8 @@ export const zhCN = {
     groupAppearance: '外观',
     groupLanguage: '语言',
     /*
-     * 网络这一组按「谁负责加速哪一段下载」拆开：代理是一次性的通道，两个镜像各管一个上游，
-     * GitHub 节点只补镜像覆盖不到的组件下载。代理地址留空等于关闭，所以下面三条代理开关在地址
-     * 为空时是禁用状态；GitHub 加速有自己的开关，节点是否为空不再表示开关状态。
+     * 网络设置把代理和下载源分开管理。代理地址留空等于关闭，下面三条代理开关在地址为空时禁用；
+     * 四个镜像源各自通过下拉栏设置为关闭、自动选择或手动节点。
      */
     groupNetwork: '网络设置',
     proxyUrl: '代理服务器地址',
@@ -479,22 +478,23 @@ export const zhCN = {
     proxyForPip: '将代理应用到 Pip',
     proxyForModelDownload: '将代理应用到模型下载',
     proxyForRuntimeDownload: '将代理应用到组件下载',
-    pypiMirror: '启用镜像节点',
-    pypiMirrorHint: '自动选择时会识别网络出口地区：中国大陆优先尝试镜像节点，其他地区直连；也可以在下方手动指定节点。',
+    mirrorOff: '关闭',
+    pypiMirror: 'PyPI 镜像加速',
+    pypiMirrorHint: '自动选择时会识别网络出口地区：中国大陆优先尝试镜像，其他地区直连；也可以手动指定镜像节点。',
     pypiMirrorNode: 'PyPI 镜像节点',
     pypiAliyun: '阿里云',
     pypiTsinghua: '清华大学（TUNA）',
     pypiHuawei: '华为云',
     pypiTencent: '腾讯云',
-    pytorchWheelMirrorNode: 'PyTorch 组件镜像源',
-    pytorchWheelMirrorHint: '用于下载 torch 等推理组件，与上方 Python 软件包镜像独立。自动选择时中国大陆优先尝试镜像，其他地区直连。',
+    pytorchWheelMirrorNode: 'PyTorch 镜像加速',
+    pytorchWheelMirrorHint: '用于下载 torch 等推理组件，与 PyPI 镜像独立。自动选择时中国大陆优先尝试镜像，其他地区直连。',
     pytorchWheelMirrorAuto: '自动选择',
     pytorchWheelMirrorSjtu: '上海交通大学',
     pytorchWheelMirrorAliyun: '阿里云',
     pytorchWheelMirrorOfficial: '官方源',
-    huggingFaceMirror: 'Hugging Face 镜像',
-    huggingFaceMirrorHint: '开启后自动识别网络出口地区：中国大陆使用 Hugging Face 镜像，其他地区直连。',
-    githubAccelerate: '启用加速节点',
+    huggingFaceMirror: 'HuggingFace 镜像加速',
+    huggingFaceMirrorHint: '自动选择时识别网络出口地区：中国大陆优先尝试 hf-mirror，其他地区直连；也可以关闭镜像。',
+    githubAccelerate: 'GitHub 镜像加速',
     githubAccelerateHint: '自动选择时会识别网络出口地区：中国大陆优先尝试 GitHub 加速节点，其他地区直连；也可以在下方手动指定节点。',
     githubAccelerateNode: '加速节点',
     githubAccelerateNodeHint: '自动选择会先判断网络出口地区：中国大陆测速并选择可用节点，其他地区直连；手动选择的节点始终按你的选择使用。',

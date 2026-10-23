@@ -70,7 +70,14 @@ export function RuntimeComponents() {
       const component = new URLSearchParams(window.location.hash.split('?')[1]).get('component')
       if (component !== 'engine' && component !== 'llama' && component !== 'crisp') return
       setActive(component)
-      requestAnimationFrame(() => document.getElementById(`runtime-${component}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
+      requestAnimationFrame(() => {
+        const section = document.getElementById('runtime-engines-section')
+        const scroller = section?.closest<HTMLElement>('.nola-main')
+        if (!section || !scroller) return
+        const marginTop = Number.parseFloat(getComputedStyle(section).scrollMarginTop) || 0
+        const top = scroller.scrollTop + section.getBoundingClientRect().top - scroller.getBoundingClientRect().top - marginTop
+        scroller.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+      })
     }
     focus()
     window.addEventListener('hashchange', focus)
@@ -132,7 +139,7 @@ export function RuntimeComponents() {
   const speed = operation?.phase === 'download' ? downloadSpeed(operation.bytes, operation.startedAt) : ''
   const versions = runtimeVersionRows(local)
   return <>
-    <SettingGroup legend={t('runtime.components')} actions={<Button variant="secondary" size="sm" disabled={busy}
+    <SettingGroup legend={t('runtime.components')} actions={<Button variant="secondary" size="sm" className="bg-surface-tertiary" disabled={busy}
       onClick={() => void recheck()}>{state.runtimeChecking ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}{t('runtime.recheck')}</Button>}>
       <SettingsRow label={t('runtime.python')} desc={runtimes?.python?.reason || undefined}><span>{t('runtime.builtInPython')}</span></SettingsRow>
       {versions.map(({ kind, version }) => <SettingsRow key={kind}
@@ -140,7 +147,7 @@ export function RuntimeComponents() {
         desc={sourceHint(local?.[kind])} descriptionTooltip={!!sourceHint(local?.[kind])}><span>{version}</span></SettingsRow>)}
     </SettingGroup>
     {sessionBusy ? <p className="compute-hint">{t('runtime.busy')}</p> : null}
-    <SettingGroup legend={t('runtime.engines')} legendHint={<Tooltip>
+    <SettingGroup id="runtime-engines-section" legend={t('runtime.engines')} legendHint={<Tooltip>
       <TooltipTrigger render={<Button variant="secondary" size="icon" />} aria-label={t('runtime.enginesHint')} className="settings-row__help"><CircleHelp aria-hidden="true" /></TooltipTrigger>
       <TooltipContent side="top" className="settings-row__tooltip z-popup">{t('runtime.enginesHint')}</TooltipContent>
     </Tooltip>}>
@@ -199,7 +206,7 @@ export function RuntimeComponents() {
           </AlertDialog.Popup>
       </AlertDialog.Portal>
     </AlertDialog.Root>
-    {local && (local.engine.managed || local.llama.managed || local.crisp?.managed) ? <SettingGroup legend={t('runtime.repair')} actions={<Button variant="secondary" disabled={busy || !Object.values(repairs).some(Boolean)} onClick={() => void install((['engine', 'llama', 'crisp'] as const).filter(kind => repairs[kind] && local[kind]?.managed).map(kind => local[kind]!.id!))}>{t('runtime.repairAction')}</Button>}>
+    {local && (local.engine.managed || local.llama.managed || local.crisp?.managed) ? <SettingGroup legend={t('runtime.repair')} actions={<Button variant="secondary" className="bg-surface-tertiary" disabled={busy || !Object.values(repairs).some(Boolean)} onClick={() => void install((['engine', 'llama', 'crisp'] as const).filter(kind => repairs[kind] && local[kind]?.managed).map(kind => local[kind]!.id!))}>{t('runtime.repairAction')}</Button>}>
       <ToggleGroup multiple disabled={busy} aria-label={t('runtime.repair')} className="runtime-repair runtime-repair__list"
         value={KINDS.filter(kind => repairs[kind])}
         onValueChange={values => setRepairs({ engine: values.includes('engine'), llama: values.includes('llama'), crisp: values.includes('crisp') })}>

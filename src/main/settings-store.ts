@@ -3,8 +3,8 @@ import { dirname, isAbsolute } from 'node:path'
 import { computeSettingsSchema, DEFAULT_COMPUTE_SETTINGS } from '../shared/compute'
 
 import { DEFAULT_SETTINGS, RECOGNITION_MODEL_IDS, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS, TRANSLATION_PROVIDERS, type AppSettings, type AppSettingsPatch } from '../shared/settings'
-import { findGithubProxyNode, GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT } from '../shared/github-proxies'
-import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_AUTO } from '../shared/pypi-mirrors'
+import { findGithubProxyNode, GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PROXY_OFF } from '../shared/github-proxies'
+import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_OFF } from '../shared/pypi-mirrors'
 import { ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS } from '../shared/settings'
 import { remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../shared/cloud-config'
 import { settingsPatchSchema } from './settings-schema'
@@ -167,7 +167,9 @@ function migrateGithubAccelerate(raw: Partial<AppSettings['network']> | undefine
   // Normalizing here as well as in the older branch below keeps the stored address and the node the
   // picker highlights the same one: the picker resolves anything outside the catalog to `auto`, so a
   // value left unnormalized would sit behind a row that is not the address actually in use.
-  const node = !trimmed || trimmed === GITHUB_PROXY_AUTO || (migrateFormerDefault && trimmed === GITHUB_PROXY_DEFAULT)
+  const node = raw?.useGithubAccelerate === false
+    ? GITHUB_PROXY_OFF
+    : !trimmed || trimmed === GITHUB_PROXY_AUTO || (migrateFormerDefault && trimmed === GITHUB_PROXY_DEFAULT)
     ? GITHUB_PROXY_AUTO
     : trimmed ? findGithubProxyNode(trimmed) ?? GITHUB_PROXY_DEFAULT : GITHUB_PROXY_DEFAULT
   if (typeof raw?.useGithubAccelerate === 'boolean') return { githubAccelerateUrl: node }
@@ -225,12 +227,16 @@ export class SettingsStore {
         network: {
           ...DEFAULT_SETTINGS.network,
           ...(raw.network ?? {}),
-          pypiMirrorUrl: typeof raw.network?.pypiMirrorUrl === 'string'
-            ? findPypiMirrorNode(raw.network.pypiMirrorUrl) ?? PYPI_MIRROR_AUTO
-            : PYPI_MIRROR_AUTO,
-          pytorchWheelMirrorUrl: typeof raw.network?.pytorchWheelMirrorUrl === 'string'
-            ? findPytorchWheelMirrorNode(raw.network.pytorchWheelMirrorUrl) ?? PYTORCH_WHEEL_MIRROR_AUTO
-            : PYTORCH_WHEEL_MIRROR_AUTO,
+          pypiMirrorUrl: raw.network?.usePypiMirror === false && raw.network.pypiMirrorUrl !== PYPI_MIRROR_OFF
+            ? PYPI_MIRROR_OFF
+            : typeof raw.network?.pypiMirrorUrl === 'string'
+              ? findPypiMirrorNode(raw.network.pypiMirrorUrl) ?? PYPI_MIRROR_AUTO
+              : PYPI_MIRROR_AUTO,
+          pytorchWheelMirrorUrl: raw.network?.usePypiMirror === false && raw.network.pypiMirrorUrl !== PYPI_MIRROR_OFF
+            ? PYTORCH_WHEEL_MIRROR_OFF
+            : typeof raw.network?.pytorchWheelMirrorUrl === 'string'
+              ? findPytorchWheelMirrorNode(raw.network.pytorchWheelMirrorUrl) ?? PYTORCH_WHEEL_MIRROR_AUTO
+              : PYTORCH_WHEEL_MIRROR_AUTO,
           // A build from before the group kept the mirror toggle at the top level; reading it here
           // is the one place that value is honoured, so a user who turned it off does not get it
           // back from the default above.

@@ -132,11 +132,11 @@ export function SettingsPage() {
   )
 }
 
-export interface SettingGroupProps { legend: string; legendHint?: ReactNode; actions?: ReactNode; children: ReactNode; onboardingTarget?: string }
+export interface SettingGroupProps { legend: string; legendHint?: ReactNode; actions?: ReactNode; children: ReactNode; onboardingTarget?: string; id?: string }
 
-export function SettingGroup({ legend, legendHint, actions, children, onboardingTarget }: SettingGroupProps) {
+export function SettingGroup({ legend, legendHint, actions, children, onboardingTarget, id }: SettingGroupProps) {
   return (
-    <Card className="settings-group" data-onboarding={onboardingTarget}>
+    <Card id={id} className="settings-group" data-onboarding={onboardingTarget}>
       <CardHeader className="card__header">
         <CardTitle className={['card__title', legendHint ? 'settings-group__title-with-hint' : undefined].filter(Boolean).join(' ')}>{legend}{legendHint ? <span className="settings-group__hint">{legendHint}</span> : null}</CardTitle>
       </CardHeader>

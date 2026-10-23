@@ -1,5 +1,5 @@
 import { net } from 'electron'
-import { GITHUB_PROXY_AUTO, GITHUB_PROXY_NODES } from '../shared/github-proxies'
+import { GITHUB_PROXY_AUTO, GITHUB_PROXY_OFF, GITHUB_PROXY_NODES } from '../shared/github-proxies'
 import { logDiagnostic, processFailure } from './session-log'
 
 /**
@@ -59,6 +59,7 @@ function probeFastestNode(): Promise<string> {
  */
 export async function resolveGithubProxyNode(selected: string): Promise<string | null> {
   const value = selected.trim()
+  if (value === GITHUB_PROXY_OFF) return null
   if (value !== GITHUB_PROXY_AUTO) return value
   if (cached && Date.now() - cached.at < PROBE_TTL_MS) return cached.node
   // Downloads issued together share one round rather than each opening its own over a hundred sockets.

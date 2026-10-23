@@ -9,7 +9,7 @@ import { z } from 'zod'
 import { CRISP_RUNTIME_ID, CRISP_RUNTIME_FILES, type RuntimePackage, type RuntimeRecipe } from '../shared/compute'
 import type { NetworkSettings } from '../shared/settings'
 import type { OfflineItem, OfflineTask } from '../shared/offline'
-import { pypiIndexUrls } from '../shared/pypi-mirrors'
+import { pypiIndexUrls, PYPI_MIRROR_OFF } from '../shared/pypi-mirrors'
 import { isMainlandChina } from './network-region'
 
 const run = promisify(execFile)
@@ -173,9 +173,10 @@ export class OfflineRuntimes {
       }
       if (recipe) {
         const network = this.options.network?.()
-        const useMirrors = network?.usePypiMirror === true
-          && (network.pypiMirrorUrl !== 'auto' || await isMainlandChina())
-        const indexes = useMirrors ? pypiIndexUrls(network.pypiMirrorUrl) : ['https://pypi.org/simple/']
+        const pypiMirror = network?.pypiMirrorUrl ?? PYPI_MIRROR_OFF
+        const useMirrors = pypiMirror !== PYPI_MIRROR_OFF
+          && (pypiMirror !== 'auto' || await isMainlandChina())
+        const indexes = useMirrors ? pypiIndexUrls(pypiMirror) : ['https://pypi.org/simple/']
         // FunASR includes source-only packages such as jieba; build their wheels here, never on the offline computer.
         const args = ['-I', '-u', '-m', 'pip', '--isolated', 'wheel', '--disable-pip-version-check', '--no-cache-dir', '--prefer-binary', '--wheel-dir', folder, '--find-links', folder,
           '--index-url', indexes[0], ...(network?.proxyForPip ? ['--proxy', network.proxyUrl.trim()] : []), ...parts.map(part => join(folder, part.name)), ...recipe.requirements]

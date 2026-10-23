@@ -4,6 +4,7 @@ import { detachSettingsStore, settingsStore } from '@/store/settingsStore'
 import * as settingsActions from '@/store/settingsStore'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import { ComputeTab } from './tabs/ComputeTab'
+import { RuntimeComponents } from './tabs/RuntimeComponents'
 import { GeneralTab } from './tabs/GeneralTab'
 import { SettingsPage } from './SettingsPage'
 import { MoreTab } from './tabs/MoreTab'
@@ -24,6 +25,26 @@ it('reuses device results when the compute tab is opened again', () => {
   expect(runtime).not.toHaveBeenCalled()
   expect(compute).not.toHaveBeenCalled()
   expect(screen.getByRole('button', { name: '刷新设备' })).toBeInTheDocument()
+})
+
+it('scrolls the main settings viewport to the inference engine section', () => {
+  const frames: FrameRequestCallback[] = []
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { frames.push(callback); return frames.length })
+  window.history.replaceState(null, '', '#/settings/compute?component=engine')
+  const main = document.createElement('main')
+  main.className = 'nola-main'
+  Object.assign(main, { scrollTop: 120, scrollTo: vi.fn() })
+  document.body.append(main)
+  const mainRect = new DOMRect(0, 80, 1000, 800)
+  vi.spyOn(main, 'getBoundingClientRect').mockReturnValue(mainRect)
+  render(<RuntimeComponents />, { container: main })
+
+  const section = document.getElementById('runtime-engines-section')
+  expect(section).not.toBeNull()
+  vi.spyOn(section!, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 620, 900, 300))
+  frames.forEach(frame => frame(0))
+
+  expect(main.scrollTo).toHaveBeenCalledWith({ top: 660, behavior: 'smooth' })
 })
 
 it('shows a retry action instead of a spinner when saved settings cannot be read', () => {

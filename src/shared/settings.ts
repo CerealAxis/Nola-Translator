@@ -77,24 +77,23 @@ export type BrowserCaptionStyleSettings = {
 
 /** Network sources and proxying for every outbound download the app makes. */
 export type NetworkSettings = {
-  /** Weight files use the mirror when enabled and the detected network egress is in mainland China. */
+  /** Whether Hugging Face downloads use the region-aware automatic mirror route. */
   useHuggingFaceMirror: boolean
-  /** Prefer the selected PyPI mirror for component requirements and supported PyTorch wheels. */
+  /** Legacy switch retained for settings-file compatibility; pypiMirrorUrl now controls PyPI alone. */
   usePypiMirror: boolean
-  /** Automatic or manually selected pip index; automatic mode uses mirrors in mainland China only. */
+  /** `off`, automatic routing, or a manually selected pip index. */
   pypiMirrorUrl: string
   /**
    * Wheel host for component packages such as torch. Holds a `PYTORCH_WHEEL_MIRROR_NODES` entry:
-   * Automatic mode probes mirror candidates in mainland China and uses the official source elsewhere;
-   * one mirror base URL restricts candidates to it, and the official sentinel skips mirroring.
+   * `off`, automatic routing, a manually selected mirror, or the official PyTorch wheel source.
    */
   pytorchWheelMirrorUrl: string
-  /** Whether `githubAccelerateUrl` is applied to GitHub asset URLs at all. */
+  /** Legacy switch retained for settings-file compatibility; githubAccelerateUrl now controls routing. */
   useGithubAccelerate: boolean
   /**
    * Prefixed onto a GitHub release asset URL (`prefix + url`). Holds a `GITHUB_PROXY_NODES` entry or
    * `GITHUB_PROXY_AUTO`, which probes the catalog in mainland China and uses direct downloads elsewhere.
-   * A manually selected node is used regardless of region.
+   * `off`, `auto`, or a manually selected node.
    */
   githubAccelerateUrl: string
   /** Empty disables proxying whatever the three scope switches below say. */

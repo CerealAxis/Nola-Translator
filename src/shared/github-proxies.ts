@@ -5,6 +5,7 @@
 
 /** Sentinel meaning region-aware automatic routing: probe nodes in mainland China, otherwise connect directly. */
 export const GITHUB_PROXY_AUTO = 'auto'
+export const GITHUB_PROXY_OFF = 'off'
 
 /** Default selected prefix. This node returned the pinned runtime archive in a HEAD and Range check. */
 export const GITHUB_PROXY_DEFAULT = 'https://gh-proxy.org/'
@@ -72,6 +73,7 @@ const NODE_SET = new Set(GITHUB_PROXY_NODES)
 export function findGithubProxyNode(value: string): string | null {
   const trimmed = value.trim()
   if (!trimmed) return null
+  if (trimmed === GITHUB_PROXY_OFF || trimmed === GITHUB_PROXY_AUTO) return trimmed
   if (NODE_SET.has(trimmed)) return trimmed
   const withSlash = trimmed.endsWith('/') ? trimmed : `${trimmed}/`
   return NODE_SET.has(withSlash) ? withSlash : null

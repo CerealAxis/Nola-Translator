@@ -79,10 +79,7 @@ const FLOOD_VARIANTS: ReadonlyArray<'default' | 'accent' | 'success' | 'warning'
   'accent',
 ]
 
-/**
- * The soft-danger fill has no shadcn button variant of its own, so it rides on the secondary
- * button and repaints the fill and the label with the danger-soft tokens.
- */
+/** Soft danger styling for secondary actions in the component gallery. */
 const DANGER_SOFT_CLASS = 'bg-danger-soft text-danger-soft-foreground hover:bg-danger-soft-hover'
 
 const PILL_TONES: ReadonlyArray<{ tone: StatusPillTone; label: TranslationKey }> = [
@@ -358,8 +355,7 @@ function DialogTrigger({ label, desc, tone, pending, open, onOpenChange, title, 
               </AlertDialog.Close>
               {footer}
               <Button
-                variant={tone === 'danger' ? 'secondary' : 'default'}
-                className={tone === 'danger' ? DANGER_SOFT_CLASS : undefined}
+                variant={tone === 'danger' ? 'danger' : 'default'}
                 size="sm"
                 disabled={pending}
                 onClick={() => onOpenChange(false)}
@@ -692,7 +688,7 @@ function DialogGalleryGroup() {
         issues={DEMO_RUNTIME_ISSUES}
         isOpen={open.runtimeMissing}
         onOpenChange={track('runtimeMissing')}
-        onOpenSettings={inert}
+        onOpenSettings={component => { void actions.settings.openRuntimeSettings(component) }}
         onDismiss={() => hide('runtimeMissing')}
       />
       {appUpdateResult ? (

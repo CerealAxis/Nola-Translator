@@ -23,18 +23,25 @@ export interface RuntimeNoticeDialogProps {
 
 export function RuntimeNoticeDialog({ issues, isOpen, onOpenChange, onOpenSettings, onDismiss }: RuntimeNoticeDialogProps): ReactNode {
   const { t } = useI18n()
+  const firstIssue = issues[0]
+  const componentName = (kind: RuntimeIssue['kind']) => t(kind === 'engine' ? 'runtime.pytorch' : kind === 'llama' ? 'runtime.llama' : 'runtime.crisp')
+  const openSettings = () => {
+    if (!firstIssue) return
+    onOpenChange(false)
+    onOpenSettings(firstIssue.kind)
+  }
   return <Dialog open={isOpen} onOpenChange={onOpenChange}>
     <DialogContent className="max-w-sm">
       <DialogHeader>
         <DialogTitle data-slot="dialog-title">{t('runtime.noticeTitle')}</DialogTitle>
       </DialogHeader>
       <div className="nola-body flex flex-col gap-2 text-muted">
-        {issues.map(issue => <p key={issue.kind}>{issue.reason || (issue.kind === 'crisp' ? `CrispASR · ${t('runtime.missing')}` : t(issue.kind === 'engine' ? 'runtime.torchMissing' : 'runtime.llamaMissing'))}</p>)}
+        <p>{t('runtime.missingComponents', { components: issues.map(issue => componentName(issue.kind)).join(' · ') })}</p>
         <p>{t('runtime.noticeBody')}</p>
       </div>
       <DialogFooter>
-        {issues.map(issue => <Button key={issue.kind} onClick={() => onOpenSettings(issue.kind)}>{t(issue.kind === 'crisp' ? 'runtime.installCrisp' : issue.kind === 'engine' ? 'runtime.goTorch' : 'runtime.goLlama')}</Button>)}
-        <Button variant="tertiary" onClick={onDismiss}>{t('runtime.later')}</Button>
+        <Button onClick={openSettings} disabled={!firstIssue}>{t('runtime.openSettings')}</Button>
+        <Button variant="tertiary" onClick={() => { onOpenChange(false); onDismiss() }}>{t('runtime.close')}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

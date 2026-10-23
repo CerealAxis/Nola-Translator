@@ -140,11 +140,8 @@ export const DEMO_ERROR_SESSION: SessionState = {
   interim: null,
 }
 
-/**
- * Both components are missing, so the dialog renders one install button per issue. Only the engine
- * carries a probe reason, which puts the reported reason and the built-in copy on screen at once.
- */
+/** The sample shows that the dialog summarizes multiple missing components. */
 export const DEMO_RUNTIME_ISSUES: RuntimeIssue[] = [
-  { kind: 'engine', reason: 'Demo probe: the torch wheel is not in the shared Python environment' },
+  { kind: 'engine' },
   { kind: 'llama' },
 ]

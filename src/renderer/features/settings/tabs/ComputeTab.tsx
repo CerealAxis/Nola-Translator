@@ -95,7 +95,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
     })
   }, [computeError, refresh, t])
   return <div className="settings-panel">
-    <SettingGroup legend={t('compute.devices')} actions={<Button variant="secondary" size="sm" disabled={loading || refreshing} onClick={() => void refresh()}>{loading || refreshing ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />}{t('compute.refresh')}</Button>}>
+    <SettingGroup legend={t('compute.devices')} actions={<Button variant="secondary" size="sm" className="bg-surface-tertiary" disabled={loading || refreshing} onClick={() => void refresh()}>{loading || refreshing ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />}{t('compute.refresh')}</Button>}>
       <SettingsRow label={t('compute.recognition')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={recognition.normalized} options={recognition.choices} ariaLabel={t('compute.recognition')} onChange={recognitionDevice => save({ compute: { recognitionDevice } })} /></SettingsRow>
       <SettingsRow label={t('compute.translation')} descriptionTooltip desc={t('compute.assignmentHint')}><SettingSelect value={translation.normalized} options={translation.choices} ariaLabel={t('compute.translation')} onChange={translationDevice => save({ compute: { translationDevice } })} /></SettingsRow>
       <SettingsRow label={t('compute.fallback')} descriptionTooltip desc={t('compute.fallbackHint')}><SettingSwitch isSelected={compute.allowCpuFallback} ariaLabel={t('compute.fallback')} onChange={allowCpuFallback => save({ compute: { allowCpuFallback } })} /></SettingsRow>

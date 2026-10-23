@@ -1,8 +1,10 @@
 /** PyPI simple-index URLs offered by the network settings picker. */
 export const PYPI_MIRROR_DEFAULT = 'https://mirrors.aliyun.com/pypi/simple/'
 export const PYPI_MIRROR_AUTO = 'auto'
+export const PYPI_MIRROR_OFF = 'off'
 
 export const PYPI_MIRROR_NODES = [
+  PYPI_MIRROR_OFF,
   PYPI_MIRROR_AUTO,
   PYPI_MIRROR_DEFAULT,
   'https://pypi.tuna.tsinghua.edu.cn/simple/',
@@ -18,11 +20,12 @@ export const PYTORCH_WHEEL_MIRRORS = [
 
 /** Wheel-mirror selection that tries every catalog entry in order. */
 export const PYTORCH_WHEEL_MIRROR_AUTO = 'auto'
+export const PYTORCH_WHEEL_MIRROR_OFF = 'off'
 /** Official wheel host; selected on its own it is used verbatim, otherwise it closes every candidate list. */
 export const PYTORCH_WHEEL_MIRROR_OFFICIAL = 'https://download-r2.pytorch.org/whl/'
 
 export const PYTORCH_WHEEL_MIRROR_NODES = [
-  PYTORCH_WHEEL_MIRROR_AUTO, ...PYTORCH_WHEEL_MIRRORS, PYTORCH_WHEEL_MIRROR_OFFICIAL,
+  PYTORCH_WHEEL_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO, ...PYTORCH_WHEEL_MIRRORS, PYTORCH_WHEEL_MIRROR_OFFICIAL,
 ] as const
 
 const NODE_SET = new Set<string>(PYPI_MIRROR_NODES)
@@ -36,6 +39,7 @@ export function pytorchWheelUrls(url: string, selection: string = PYTORCH_WHEEL_
   try {
     const parsed = new URL(url)
     if (parsed.hostname !== 'download-r2.pytorch.org' || !parsed.pathname.startsWith('/whl/')) return [url]
+    if (selection === PYTORCH_WHEEL_MIRROR_OFF) return [url]
     if (selection === PYTORCH_WHEEL_MIRROR_OFFICIAL) return [url]
     const suffix = `${parsed.pathname.slice('/whl/'.length)}${parsed.search}`
     const base = selection === PYTORCH_WHEEL_MIRROR_AUTO ? null : findPytorchWheelMirrorNode(selection)
@@ -56,7 +60,10 @@ export function findPypiMirrorNode(value: string): string | null {
 
 /** Mirror choices in automatic mode, with the official index last for a reliable fallback. */
 export function pypiIndexUrls(selection: string = PYPI_MIRROR_AUTO): string[] {
-  if (selection === PYPI_MIRROR_AUTO) return [...PYPI_MIRROR_NODES.slice(1), 'https://pypi.org/simple/']
+  if (selection === PYPI_MIRROR_OFF) return ['https://pypi.org/simple/']
+  if (selection === PYPI_MIRROR_AUTO) {
+    return [...PYPI_MIRROR_NODES.filter(node => node !== PYPI_MIRROR_OFF && node !== PYPI_MIRROR_AUTO), 'https://pypi.org/simple/']
+  }
   const node = findPypiMirrorNode(selection)
   return node ? [node, 'https://pypi.org/simple/'] : ['https://pypi.org/simple/']
 }
