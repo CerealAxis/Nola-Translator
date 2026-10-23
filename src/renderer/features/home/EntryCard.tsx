@@ -1,8 +1,8 @@
 /**
  * Home entry card, one cell of the bento grid.
  *
- * Two shapes with different roots: the main card is a plain surface whose action is
- * the pill button, a sub card is itself a `Button`. Neither carries a subtitle; `meta`
+ * Two shapes with different roots: the main card separates its content and action,
+ * while a sub card is itself a `Button`. Neither carries a subtitle; `meta`
  * is for data the user cannot otherwise see.
  */
 
@@ -10,6 +10,7 @@ import type { ReactNode } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 
 /**
  * Grid geometry: at 1000px and up, `2fr 1fr` by three rows with the main card
@@ -34,7 +35,7 @@ const SUB_PLACEMENT: Record<1 | 2 | 3, string> = {
 }
 
 const ICON_PLATE =
-  'grid place-items-center rounded-[10px] bg-surface-secondary text-accent transition-colors duration-[var(--dur-micro)] group-hover:bg-surface-tertiary'
+  'grid place-items-center rounded-lg bg-surface-secondary text-accent transition-colors duration-[var(--dur-micro)] group-hover:bg-surface-tertiary'
 
 const TOOLTIP_CLASS =
   'z-overlay max-w-64 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'
@@ -46,7 +47,7 @@ export interface EntryCardProps {
   title: string
   /** Press handler. A sub card presses as a whole; on the main card the button calls it. */
   onPress: () => void
-  /** `main` is the single primary CTA (accent outline plus a pill button); `sub` is a hairline card that presses as a whole. */
+  /** `main` has a separate footer action; `sub` is a bordered card that presses as a whole. */
   layout?: 'main' | 'sub'
   /** Button copy, rendered only when `layout='main'`. */
   actionLabel?: string
@@ -118,22 +119,20 @@ export function EntryCard({
 
   if (isMain) {
     return (
-      <div
+      <Card
         data-testid={testId}
         className={[
           placement,
-          // The one primary CTA: a 1px accent outline, no shadow, 24px padding.
-          // The main card spans three rows and its content fills about two thirds of that.
-          'relative flex flex-col items-center justify-center gap-4 rounded-[10px] border border-accent bg-surface p-6 text-foreground',
+          'relative',
           className ?? '',
         ]
           .filter(Boolean)
           .join(' ')}
       >
-        <div className="flex w-full flex-col items-start gap-4">
+        <CardHeader className="flex flex-col gap-4">
           {plate}
           {heading}
-        </div>
+        </CardHeader>
 
         {/*
          * The main card is tall, so the middle band carries the three things that decide
@@ -142,22 +141,22 @@ export function EntryCard({
          * selection, and they match what the workspace will show.
          */}
         {facts.length > 0 ? (
-          <dl className="flex w-full flex-col gap-2 border-t border-separator pt-4">
+          <CardContent><dl className="flex w-full flex-col gap-2">
             {facts.map(([label, value]) => (
               <div key={label} className="flex items-baseline justify-between gap-4">
                 <dt className="nola-caption shrink-0 text-muted">{label}</dt>
                 <dd className="nola-body-strong min-w-0 truncate text-foreground">{value}</dd>
               </div>
             ))}
-          </dl>
+          </dl></CardContent>
         ) : null}
 
-        <MainAction
+        <CardFooter className="mt-auto"><MainAction
           label={actionLabel ?? ''}
           isDisabled={isDisabled}
           onPress={onPress}
-        />
-      </div>
+        /></CardFooter>
+      </Card>
     )
   }
 
@@ -211,7 +210,7 @@ function SubCard({
       data-testid={testId}
       className={[
         placement,
-        'group flex h-full w-full flex-col items-start justify-between gap-3 rounded-[10px] border border-border bg-surface p-5 text-left',
+        'group flex h-full w-full flex-col items-start justify-between gap-4 rounded-xl border border-border bg-surface p-4 text-left',
         // Hover and focus-visible turn the outline accent. No transform and no shadow: a card sitting on a page has neither.
         'transition-colors duration-[var(--dur-micro)] hover:border-accent focus-visible:border-accent',
         className ?? '',
@@ -261,8 +260,7 @@ function MainAction({
       variant="default"
       disabled={isDisabled}
       onClick={onPress}
-      // The shared button's corner is 16px; the CTA states its own radius.
-      className="mt-4 rounded-full px-5"
+      className="w-full"
     >
       {label}
     </Button>

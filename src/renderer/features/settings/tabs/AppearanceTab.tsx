@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 import { Button } from '@/components/ui/button'
 import { ColorPicker } from '@/components/ui/color-picker'
 import { StyleSliderRow } from './BrowserTab'
@@ -153,9 +153,9 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
 export interface ChoiceProps { label: string; value: string; options: PickerOption[]; onChange: (value: string) => void }
 
 function Choice({ label, value, options, onChange }: ChoiceProps) {
-  return <ToggleGroup className="nola-segmented" value={[value]} aria-label={label} onValueChange={(values) => {
-    if (typeof values[0] === 'string') onChange(values[0])
-  }}>{options.map((option) => <ToggleGroupItem key={option.value} value={option.value} className="toggle-button">{option.label}</ToggleGroupItem>)}</ToggleGroup>
+  return <TabsRoot value={value} onValueChange={next => { if (next) onChange(next) }}><TabsList className="nola-segmented" aria-label={label}>
+    {options.map(option => <TabsTrigger key={option.value} value={option.value}>{option.label}</TabsTrigger>)}
+  </TabsList></TabsRoot>
 }
 
 export interface SliderRowProps { label: string; value: number; min: number; max: number; step: number; unit?: string; onChange: (value: number) => void }

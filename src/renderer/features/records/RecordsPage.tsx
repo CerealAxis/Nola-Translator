@@ -159,7 +159,7 @@ export function RecordsPage(): ReactNode {
           </div>
           <span>{t('records.total', { count: filtered.length })}</span>
         </div>
-        <Card className="nola-record-card has-data-[slot=card-footer]:pb-5">
+        <Card className="nola-record-card">
           <CardContent className="flex flex-1 flex-col">
             {loading && !loaded ? <div className="nola-record-loading">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} data-testid="skeleton-row" className="h-12 w-full rounded-lg" />)}</div> : loadFailed ? <div className="nola-record-empty"><Button variant="default" onClick={retryLoad}>{t('common.retry')}</Button></div> : filtered.length === 0 ? <Empty className="nola-record-empty"><EmptyHeader><EmptyTitle>{isSearching ? t('records.noResults') : t('records.noRecords')}</EmptyTitle><EmptyDescription>{isSearching ? t('records.noResultsHint') : t('records.noRecordsHint')}</EmptyDescription></EmptyHeader><EmptyContent><Button variant="default" onClick={isSearching ? () => setFilterText('') : startSession}>{isSearching ? t('records.clearSearch') : t('records.startFirst')}</Button></EmptyContent></Empty> : <>
               {selectedCount > 0 ? <div className="nola-record-page__bulk">
@@ -170,7 +170,7 @@ export function RecordsPage(): ReactNode {
               <RecordsTable meetings={visible} pendingIds={pendingIds} sortAscending={sortAscending} onSortChange={setSortAscending} selectedKeys={selection} onSelectionChange={setSelection} onOpen={(id) => navigate(recordPath(id))} onRename={setRenaming} onExport={setExporting} onDelete={(meeting) => setPendingDelete({ kind: 'single', meeting })} />
             </>}
           </CardContent>
-          {filtered.length > 0 ? <CardFooter className="nola-record-page__footer shrink-0 bg-transparent px-0 pb-0">
+          {filtered.length > 0 ? <CardFooter className="nola-record-page__footer">
             <span>{t('records.total', { count: filtered.length })}</span>
             <div className="nola-record-page__paging">
               <span className="nola-record-page__per-page">{t('records.perPage')}</span>

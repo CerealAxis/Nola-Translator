@@ -5,7 +5,7 @@ import type { CSSProperties } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
 import { Popover } from '@base-ui/react/popover'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 
 import { Spinner } from '@/components/ui/spinner'
 import { ArrowRight, ArrowRightLeft, ChevronDown, ExternalLink, Languages, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Settings, Square, X } from 'lucide-react'
@@ -70,11 +70,11 @@ export function OverlayPage() {
           <Button variant="secondary" onClick={() => {
             void actions.settings.showWorkspace().catch(error => notifyError(t('workspaceUi.windowFailed'), { cause: error }))
           }}><ExternalLink aria-hidden="true" />{t('home.quickStart')}</Button>
-          <Button onClick={() => void open()} disabled={opening} aria-busy={opening}>{opening ? <Spinner /> : <ExternalLink aria-hidden="true" />}{t('shellUi.openOverlay')}</Button>
+          <Button data-onboarding="open-overlay" onClick={() => void open()} disabled={opening} aria-busy={opening}>{opening ? <Spinner /> : <ExternalLink aria-hidden="true" />}{t('shellUi.openOverlay')}</Button>
         </div>} />
-      <Card className="nola-overlay-preview gap-3 p-5">
-        <CardHeader className="px-0">
-          <CardTitle className="text-lg leading-6 font-semibold">{t('shellUi.captionPreview')}</CardTitle>
+      <Card className="nola-overlay-preview">
+        <CardHeader data-onboarding="caption-preview">
+          <CardTitle>{t('shellUi.captionPreview')}</CardTitle>
         </CardHeader>
         {/*
          * Text area, top and bottom scrims, the seven action glyphs, then the mic
@@ -82,7 +82,7 @@ export function OverlayPage() {
          * the real controls are in the form underneath. The scrims and both chrome
          * rows reveal on hover, as they do in the caption window.
          */}
-        <CardContent className="nola-overlay-stage px-[clamp(16px,3vw,30px)]">
+        <CardContent className="nola-overlay-stage">
           <div
             className="nola-caption-preview"
             data-color-scheme={config.colorScheme}
@@ -117,9 +117,9 @@ export function OverlayPage() {
           </div>
         </CardContent>
       </Card>
-      <Card className="nola-section-card gap-0 p-5 has-data-[slot=card-footer]:pb-5">
-        <CardHeader className="mb-5 px-0"><CardTitle className="leading-6">{t('settings.title')}</CardTitle></CardHeader>
-        <CardContent className="nola-overlay-fields px-0" data-onboarding="quick-settings">
+      <Card className="nola-section-card">
+        <CardHeader data-onboarding="quick-settings"><CardTitle>{t('settings.title')}</CardTitle></CardHeader>
+        <CardContent className="nola-overlay-fields">
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('session.recognitionModel')}</span>
             <SettingSelect value={settings.recognition.modelId} ariaLabel={t('session.recognitionModel')} isDisabled={sessionActive}
@@ -177,25 +177,25 @@ export function OverlayPage() {
           </div>
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('shellUi.showContent')}</span>
-            <ToggleGroup className="nola-segmented" value={[display]} aria-label={t('shellUi.showContent')} onValueChange={keys => {
-              const next = [...keys][0]; if (next) patch({ overlay: { showSource: next !== 'translation', showTranslation: next !== 'source' } })
-            }}>
-              {!translationDisabled && <ToggleGroupItem className="toggle-button" value="both">{t('workspace.modeBoth')}</ToggleGroupItem>}
-              <ToggleGroupItem className="toggle-button" value="source">{t('workspace.modeSource')}</ToggleGroupItem>
-              {!translationDisabled && <ToggleGroupItem className="toggle-button" value="translation">{t('workspace.modeTranslation')}</ToggleGroupItem>}
-            </ToggleGroup>
+            <TabsRoot value={display} onValueChange={next => { if (next) patch({ overlay: { showSource: next !== 'translation', showTranslation: next !== 'source' } }) }}>
+              <TabsList className="nola-segmented" aria-label={t('shellUi.showContent')}>
+                {!translationDisabled && <TabsTrigger value="both">{t('workspace.modeBoth')}</TabsTrigger>}
+                <TabsTrigger value="source">{t('workspace.modeSource')}</TabsTrigger>
+                {!translationDisabled && <TabsTrigger value="translation">{t('workspace.modeTranslation')}</TabsTrigger>}
+              </TabsList>
+            </TabsRoot>
           </div>
           {!translationDisabled && <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('shellUi.layout')}</span>
-            <ToggleGroup className="nola-segmented" value={[config.layout]} aria-label={t('shellUi.layout')} onValueChange={keys => {
-              const next = [...keys][0]; if (next === 'rolling' || next === 'sentence') patch({ overlay: { layout: next } })
-            }}>
-              <ToggleGroupItem className="toggle-button" value="rolling">{t('workspace.layoutSplit')}</ToggleGroupItem>
-              <ToggleGroupItem className="toggle-button" value="sentence">{t('workspace.layoutSentence')}</ToggleGroupItem>
-            </ToggleGroup>
+            <TabsRoot value={config.layout} onValueChange={next => { if (next === 'rolling' || next === 'sentence') patch({ overlay: { layout: next } }) }}>
+              <TabsList className="nola-segmented" aria-label={t('shellUi.layout')}>
+                <TabsTrigger value="rolling">{t('workspace.layoutSplit')}</TabsTrigger>
+                <TabsTrigger value="sentence">{t('workspace.layoutSentence')}</TabsTrigger>
+              </TabsList>
+            </TabsRoot>
           </div>}
         </CardContent>
-        <CardFooter className="nola-overlay-footer bg-transparent px-0 pb-0">
+        <CardFooter className="nola-overlay-footer">
           <Button variant="secondary" onClick={() => navigate('#/settings/appearance')}><Settings aria-hidden="true" />{t('shellUi.appearance')}<ArrowRight aria-hidden="true" /></Button>
         </CardFooter>
       </Card>

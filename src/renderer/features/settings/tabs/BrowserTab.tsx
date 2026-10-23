@@ -4,7 +4,7 @@ import { NumberField } from '@base-ui/react/number-field'
 import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
 import { Switch, SwitchThumb } from '@/components/ui/switch'
 
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 import { ArrowLeft, CheckSquare, CircleAlert, ExternalLink, LoaderCircle } from 'lucide-react'
 
 import { DEFAULT_SETTINGS } from '@/bridge'
@@ -14,7 +14,7 @@ import edgeIcon from '@/assets/browsers/edge.png'
 import firefoxIcon from '@/assets/browsers/firefox.svg'
 import { notifyError } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardDescription, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ColorPicker } from '@/components/ui/color-picker'
 import { useI18n } from '@/i18n'
 import { stores, updateSettings, useStore } from '@/store'
@@ -144,9 +144,9 @@ export function BrowserTab() {
       ) : (
         <Card className="browser-settings__card">
           <CardHeader className="card__header browser-settings__heading">
-            <div className="browser-settings__identity"><CardTitle className="card__title">{t('browser.title')}</CardTitle><p>{t('browser.settingsDescription')}</p></div>
-            <BrowserSwitch isSelected={browser?.enabled ?? false} isDisabled={browserBusy || !browser}
-              onChange={enabled => { void browserConnectionAction('enable', enabled) }} ariaLabel={t('browser.enable')} />
+            <CardTitle>{t('browser.title')}</CardTitle><CardDescription>{t('browser.settingsDescription')}</CardDescription>
+            <CardAction><BrowserSwitch isSelected={browser?.enabled ?? false} isDisabled={browserBusy || !browser}
+              onChange={enabled => { void browserConnectionAction('enable', enabled) }} ariaLabel={t('browser.enable')} /></CardAction>
           </CardHeader>
           <CardContent className="card__content">
             <ul className="browser-settings__list" aria-label={t('browser.browserList')}>
@@ -176,7 +176,7 @@ export function BrowserTab() {
         </Card>
       )}
       <Card className="nola-overlay-preview">
-        <CardHeader><CardTitle className="card__title text-lg font-semibold">{t('browser.preview')}</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('browser.preview')}</CardTitle></CardHeader>
         <CardContent className="card__content nola-overlay-stage nola-video-stage">
           <div className="nola-video-frame" style={previewFrameStyle} aria-hidden="true">
             {appearance.showSource ? <p className="nola-video-caption-line" style={previewSourceStyle}>{t('videoCaptions.previewSource')}</p> : null}
@@ -186,10 +186,7 @@ export function BrowserTab() {
       </Card>
       <SettingGroup legend={t('modelsSettingsUi.layoutDisplay')}>
         <SettingsRow label={t('browser.colorScheme')}>
-          <ToggleGroup className="nola-segmented" value={[appearance.colorScheme]} aria-label={t('browser.colorScheme')} onValueChange={values => {
-            // A single-select group reports an empty list when the pressed scheme is clicked
-            // again, so the scheme is never left with nothing selected.
-            const next = values[0]
+          <TabsRoot value={appearance.colorScheme} onValueChange={next => {
             if (next === 'dark' || next === 'light') {
               const palette = next === 'dark'
                 ? { backgroundColor: '#0D0E10', sourceColor: '#F7F7F7', translationColor: '#D7DEE8' }
@@ -197,9 +194,11 @@ export function BrowserTab() {
               patchAppearance({ colorScheme: next, ...palette })
             }
           }}>
-            <ToggleGroupItem value="dark" className="toggle-button" data-selected={appearance.colorScheme === 'dark' ? 'true' : undefined}>{t('settings.schemeDark')}</ToggleGroupItem>
-            <ToggleGroupItem value="light" className="toggle-button" data-selected={appearance.colorScheme === 'light' ? 'true' : undefined}>{t('settings.schemeLight')}</ToggleGroupItem>
-          </ToggleGroup>
+            <TabsList className="nola-segmented" aria-label={t('browser.colorScheme')}>
+              <TabsTrigger value="dark">{t('settings.schemeDark')}</TabsTrigger>
+              <TabsTrigger value="light">{t('settings.schemeLight')}</TabsTrigger>
+            </TabsList>
+          </TabsRoot>
         </SettingsRow>
         <SettingsRow label={t('settings.showSource')}><SettingSwitch isSelected={appearance.showSource} ariaLabel={t('settings.showSource')} onChange={showSource => patchAppearance({ showSource })} /></SettingsRow>
         <SettingsRow label={t('settings.showTranslation')}><SettingSwitch isSelected={appearance.showTranslation} ariaLabel={t('settings.showTranslation')} onChange={showTranslation => patchAppearance({ showTranslation })} /></SettingsRow>

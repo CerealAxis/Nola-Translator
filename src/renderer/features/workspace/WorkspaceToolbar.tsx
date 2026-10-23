@@ -1,7 +1,7 @@
 import { useModelOptions } from '@/model-options'
 import { Select, SelectContent, SelectFieldLabel, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover } from '@base-ui/react/popover'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 
 import { Switch, SwitchThumb } from '@/components/ui/switch'
 import { translationLanguages } from '../../../shared/model-capabilities'
@@ -116,19 +116,25 @@ export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
           <Button variant="outline" className="nola-workspace-overlay" onClick={props.onOpenOverlay}><Captions aria-hidden="true" />{t('workspaceUi.openOverlay')}</Button>
         </div>}
         <div className="nola-workspace-view-controls">
-          <ToggleGroup value={[props.displayMode]} onValueChange={values => { const next = values[0]; if (next) props.onDisplayModeChange(next as CaptionDisplayMode) }} className="nola-segmented" aria-label={t('workspace.displayMode')}>
-            {modes.filter(mode => props.targetLanguage !== NO_TRANSLATION_LANGUAGE || mode.id === 'source').map(mode => <ToggleGroupItem key={mode.id} value={mode.id} aria-label={mode.label} className="toggle-button" data-selected={props.displayMode === mode.id ? 'true' : undefined}>{mode.label}</ToggleGroupItem>)}
-          </ToggleGroup>
-          {props.targetLanguage !== NO_TRANSLATION_LANGUAGE && <ToggleGroup value={[props.layout]} onValueChange={values => { const next = values[0]; if (next) props.onLayoutChange(next as CaptionLayout) }} className="nola-segmented" aria-label={t('workspace.layout')}>
-            <ToggleGroupItem value="split" aria-label={t('workspace.layoutSplit')} className="toggle-button" data-selected={props.layout === 'split' ? 'true' : undefined}>{t('workspace.layoutSplit')}</ToggleGroupItem>
-            <ToggleGroupItem value="sentence" aria-label={t('workspace.layoutSentence')} className="toggle-button" data-selected={props.layout === 'sentence' ? 'true' : undefined}>{t('workspace.layoutSentence')}</ToggleGroupItem>
-          </ToggleGroup>}
+          <TabsRoot value={props.displayMode} onValueChange={value => { if (value) props.onDisplayModeChange(value as CaptionDisplayMode) }}>
+            <TabsList className="nola-segmented" aria-label={t('workspace.displayMode')}>
+              {modes.filter(mode => props.targetLanguage !== NO_TRANSLATION_LANGUAGE || mode.id === 'source').map(mode => <TabsTrigger key={mode.id} value={mode.id} aria-label={mode.label}>{mode.label}</TabsTrigger>)}
+            </TabsList>
+          </TabsRoot>
+          {props.targetLanguage !== NO_TRANSLATION_LANGUAGE && <TabsRoot value={props.layout} onValueChange={value => { if (value) props.onLayoutChange(value as CaptionLayout) }}>
+            <TabsList className="nola-segmented" aria-label={t('workspace.layout')}>
+              <TabsTrigger value="split" aria-label={t('workspace.layoutSplit')}>{t('workspace.layoutSplit')}</TabsTrigger>
+              <TabsTrigger value="sentence" aria-label={t('workspace.layoutSentence')}>{t('workspace.layoutSentence')}</TabsTrigger>
+            </TabsList>
+          </TabsRoot>}
           <div className="nola-workspace-font-control"><span>{t('workspaceUi.fontSize')}</span>
-            <ToggleGroup value={[String(props.fontSize)]} onValueChange={values => { const next = values[0]; if (next) props.onFontSizeChange(Number(next)) }} className="nola-segmented" aria-label={t('workspaceUi.fontSize')}>
-              <ToggleGroupItem value="14" aria-label={t('workspace.fontSmaller')} className="toggle-button" data-selected={props.fontSize === 14 ? 'true' : undefined}><Minus aria-hidden="true" />A</ToggleGroupItem>
-              <ToggleGroupItem value="16" aria-label={t('overlay.size')} className="toggle-button" data-selected={props.fontSize === 16 ? 'true' : undefined}>A</ToggleGroupItem>
-              <ToggleGroupItem value="18" aria-label={t('workspace.fontLarger')} className="toggle-button" data-selected={props.fontSize === 18 ? 'true' : undefined}>A<Plus aria-hidden="true" /></ToggleGroupItem>
-            </ToggleGroup>
+            <TabsRoot value={String(props.fontSize)} onValueChange={value => { if (value) props.onFontSizeChange(Number(value)) }}>
+              <TabsList className="nola-segmented" aria-label={t('workspaceUi.fontSize')}>
+                <TabsTrigger value="14" aria-label={t('workspace.fontSmaller')}><Minus aria-hidden="true" />A</TabsTrigger>
+                <TabsTrigger value="16" aria-label={t('overlay.size')}>A</TabsTrigger>
+                <TabsTrigger value="18" aria-label={t('workspace.fontLarger')}>A<Plus aria-hidden="true" /></TabsTrigger>
+              </TabsList>
+            </TabsRoot>
           </div>
           <Switch checked={props.notesOpen} onCheckedChange={props.onToggleNotes} className="nola-workspace-notes-switch switch">
             <StickyNote aria-hidden="true" />

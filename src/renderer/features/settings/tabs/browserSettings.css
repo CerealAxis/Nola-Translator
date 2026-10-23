@@ -1,22 +1,11 @@
 .browser-settings { min-width: 0; }
 .browser-settings__card.card {
   min-width: 0;
-  gap: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-  box-shadow: none;
+
 }
-.browser-settings__card .card__header,
-.browser-settings__card .card__content { min-width: 0; padding: 0; }
+
 .browser-settings__heading.card__header {
-  display: flex;
-  flex-direction: row;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding-bottom: var(--space-3);
 }
 .browser-settings__heading .card__title { font: var(--font-title); }
 .browser-settings__identity { display: flex; min-width: 0; flex-direction: column; gap: calc(var(--space-1) / 2); }
@@ -40,7 +29,7 @@
 .browser-settings__connection[data-connected='true'] .browser-settings__connection-dot { background: var(--success); }
 .browser-settings__status[data-status='disabled'] { color: var(--muted); }
 @media (max-width: 540px) {
-  .browser-settings__card.card { padding: var(--space-2); }
+  .browser-settings__card.card { --card-spacing: var(--space-2); }
   .browser-settings__browser { flex-wrap: wrap; }
   .browser-settings__row-actions { gap: var(--space-1); }
   .browser-settings__detail-row { flex-wrap: wrap; padding-block: var(--space-1); }

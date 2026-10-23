@@ -12,7 +12,7 @@ import type { ReactNode } from 'react'
 import { AlertDialog } from '@base-ui/react/alert-dialog'
 import { Progress } from '@base-ui/react/progress'
 
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 import { ArrowRight, Check, CircleAlert, CircleCheck, Info, LoaderCircle, Trash2, TriangleAlert } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -168,10 +168,12 @@ function ButtonGroup() {
       </SettingsRow>
 
       <SettingsRow label={t('dev.buttonSegmented')} desc={t('dev.buttonSegmentedDesc')}>
-        <ToggleGroup className="nola-segmented" value={['selected']} aria-label={t('dev.buttonSegmented')}>
-          <ToggleGroupItem value="selected" className="toggle-button" data-selected="true">{t('dev.buttonSelected')}</ToggleGroupItem>
-          <ToggleGroupItem value="unselected" className="toggle-button">{t('dev.buttonUnselected')}</ToggleGroupItem>
-        </ToggleGroup>
+        <TabsRoot value="selected">
+          <TabsList className="nola-segmented" aria-label={t('dev.buttonSegmented')}>
+            <TabsTrigger value="selected">{t('dev.buttonSelected')}</TabsTrigger>
+            <TabsTrigger value="unselected">{t('dev.buttonUnselected')}</TabsTrigger>
+          </TabsList>
+        </TabsRoot>
       </SettingsRow>
 
     </SettingGroup>
@@ -273,7 +275,7 @@ function ToastGroup() {
           // The promise demo rides on this row rather than getting its own: its loading card is
           // the same render, and it exists to check the loading -> success hand-off. The promise
           // is already resolved, so the success card appears one frame later.
-          const id = raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), variant: 'accent' })
+          const id = raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), variant: 'loading' })
           void Promise.resolve().then(() => {
             updateToast(id, t('dev.toastLoadingDone'), { description: t('dev.toastSampleBody'), variant: 'success' })
           })

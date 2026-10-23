@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui'
 import { Empty, EmptyTitle } from '@/components/ui/empty'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardAction, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { LocalModelImport } from '../offline'
 import { offlineActions } from '@/store/offlineStore'
 import { modelImportEntry } from '../../../shared/model-import-catalog'
@@ -442,10 +442,14 @@ function Section({
 function CurrentModel({ label, name, record, installed, kind }: { label:string; name:string; record:ResourceRecord | null; installed:boolean | null; kind:'recognitionModel' | 'translationModel' }) {
   const { t } = useI18n()
   const pending = installed && record && !configurationOf(record)
-  return <Card className="models-current">
-    <span className={`models-card__icon models-card__icon--${kind === 'recognitionModel' ? 'recognition' : 'translation'}`}><ModelMark record={record} kind={kind} /></span>
-    <CardHeader className="card__header"><CardDescription className="card__description">{label}</CardDescription><CardTitle className="card__title">{name}</CardTitle></CardHeader>
+  return <Card size="sm" className="models-current">
+    <CardHeader>
+    <CardAction>
+    <span aria-hidden="true" className={`models-card__icon models-card__icon--${kind === 'recognitionModel' ? 'recognition' : 'translation'}`}><ModelMark record={record} kind={kind} /></span>
+    </CardAction>
+    <CardTitle>{name}</CardTitle><CardDescription>{label}</CardDescription>
     {installed === null ? null : <Badge variant={installed && !pending ? 'success' : 'warning'}  >{pending ? t('modelConfig.pending') : installed ? t('modelsSettingsUi.active') : t('modelsSettingsUi.unavailable')}</Badge>}
+    </CardHeader>
   </Card>
 }
 

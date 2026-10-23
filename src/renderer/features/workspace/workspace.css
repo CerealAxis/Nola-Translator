@@ -12,23 +12,23 @@
      way `PageHeader` places every other page's title against the content area. */
   .nola-workspace-heading { flex: none; padding: 4px 0 0; }
   .nola-workspace-heading h1 { margin: 0 0 10px; color: var(--foreground); font-size: 32px; font-weight: 700; line-height: 1.2; }
-  .nola-workspace-toolbar.card { flex: none; min-width: 0; padding: 0; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: none; }
-  .nola-workspace-toolbar-content { padding: 16px 20px; }
+  .nola-workspace-toolbar.card { flex: none; padding: 0; --card-spacing: var(--space-2); }
+  .nola-workspace-toolbar-content { padding: var(--card-spacing); }
   .nola-workspace-config { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; padding-bottom: 16px; border-bottom: 1px solid var(--separator); }
   .nola-workspace-audio { display: flex; flex-direction: row; flex: 1 1 220px; align-items: center; gap: 12px; min-width: 0; text-align: left; }
   .nola-workspace-audio .label { white-space: nowrap; font-size: 13px; }
-  .nola-workspace-audio .select__trigger { flex: 1; min-width: 0; height: 36px; border-radius: 10px; background: var(--surface-secondary); box-shadow: none; border: 1px solid var(--border); }
+  .nola-workspace-audio .select__trigger { flex: 1; min-width: 0; height: var(--field-control-height); border-radius: var(--field-radius); background: var(--surface-secondary); box-shadow: none; border: 1px solid var(--border); }
   .nola-workspace-audio .select__value { text-align: center; }
   .nola-workspace-audio svg, .nola-workspace-picker svg { flex: none; width: 18px; height: 18px; color: var(--accent); }
   .nola-workspace-field { display: flex; flex: 1 1 220px; gap: 12px; align-items: center; min-width: 0; }
   .nola-workspace-field > span { font-size: 13px; white-space: nowrap; }
-  .nola-workspace-picker { display: flex; gap: 9px; align-items: center; justify-content: start; flex: 1; min-width: 0; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-secondary); font-size: 13px; }
+  .nola-workspace-picker { display: flex; gap: var(--space-1); align-items: center; justify-content: start; flex: 1; min-width: 0; height: var(--field-control-height); padding: 0 var(--space-2); border: 1px solid var(--border); border-radius: var(--field-radius); background: var(--surface-secondary); font: var(--font-body); }
   .nola-workspace-picker > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
   .nola-workspace-picker:disabled { opacity: .65; }
-  .nola-workspace-overlay { height: 36px; min-width: 0; border: 1px solid var(--accent); border-radius: var(--radius-xl); color: var(--accent); font-size: 13px; }
-  .nola-workspace-languages { display: flex; flex-direction: column; gap: 12px; width: 280px; max-width: 90vi; max-height: inherit; overflow-y: auto; padding: 12px; }
+  .nola-workspace-overlay { height: var(--field-control-height); min-width: 0; border: 1px solid var(--accent); border-radius: var(--radius-xl); color: var(--accent); font: var(--font-body); }
+  .nola-workspace-languages { display: flex; flex-direction: column; gap: var(--space-1); width: calc(var(--space-8) * 4); max-width: calc(100vi - var(--space-4)); max-height: var(--available-height); overflow-y: auto; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--overlay); color: var(--overlay-foreground); box-shadow: var(--overlay-shadow); outline: none; }
   .nola-workspace-view-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 20px; padding-top: 14px; }
-  /* Track and selected state come from .nola-segmented in theme/app.css. */
+  /* The TabsList supplies the shared segmented track and selection state. */
   .nola-workspace-font-control { display: flex; align-items: center; gap: 12px; font-size: 13px; }
   .nola-workspace-font-control svg { width: 14px; height: 14px; }
   .nola-workspace-notes-switch { margin-inline-start: auto; }
@@ -36,9 +36,9 @@
   .nola-workspace-notes-switch .label { font-size: 13px; }
   .nola-workspace-notes-switch svg { width: 18px; height: 18px; color: var(--accent); }
   .nola-workspace-body { display: flex; flex: 1 1 0; gap: 16px; min-width: 0; min-height: 0; }
-  .nola-workspace-transcript.card { display: flex; flex-direction: column; gap: 0; flex: 1 1 0; min-width: 0; min-height: 0; padding: 16px; overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: none; }
-  .nola-transcript-head { display: grid; flex: none; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 10px 12px; border-bottom: 1px solid var(--separator); }
-  .nola-transcript-head .card__title { font-size: 18px; font-weight: 650; }
+  .nola-workspace-transcript.card { gap: 0; flex: 1 1 0; min-height: 0; padding: 0; --card-spacing: var(--space-2); }
+  .nola-transcript-head { display: grid; flex: none; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: var(--card-spacing); border-bottom: 1px solid var(--border); }
+  .nola-transcript-head .card__title { font: var(--font-title); }
   .nola-transcript-head .card__title + .card__title { padding-inline-start: 18px; border-inline-start: 1px solid var(--separator); }
   .nola-transcript-head:not([data-mode="both"]) { grid-template-columns: minmax(0, 1fr); }
   .nola-workspace-caption [data-slot="caption-scroll"] { padding: 0; }
@@ -55,15 +55,15 @@
   .nola-workspace-caption[data-paused="true"] [data-slot="caption-line"] { opacity: .8 !important; }
   .nola-workspace-caption .nola-caption-sentence { gap: 8px; padding: 16px 10px; border-bottom: 1px solid var(--separator); }
   .nola-workspace-empty { display: flex; height: 100%; min-height: 120px; justify-content: center; align-items: center; flex-direction: column; gap: 10px; text-align: center; }
-  .nola-workspace-notes.card { display: flex; flex-direction: column; gap: 0; flex: 0 0 280px; min-width: 0; min-height: 0; padding: 18px 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: none; }
-  .nola-workspace-notes-heading { display: flex; flex-direction: row; justify-content: space-between; align-items: center; gap: 10px; flex: none; text-align: left; }
-  .nola-workspace-notes-heading .card__title { font-size: 18px; font-weight: 650; }
+  .nola-workspace-notes.card { gap: 0; flex: 0 0 280px; min-height: 0; padding: 0; --card-spacing: var(--space-2); }
+  .nola-workspace-notes-heading { padding: var(--card-spacing); display: flex; flex-direction: row; justify-content: space-between; align-items: center; gap: 10px; flex: none; text-align: left; }
+  .nola-workspace-notes-heading .card__title { font: var(--font-title); }
   .nola-workspace-notes-state { color: var(--muted); font-size: 12px; white-space: nowrap; }
-  .nola-workspace-notes-tools { display: flex; flex: none; gap: 8px; padding: 14px 0 12px; border-bottom: 1px solid var(--separator); }
+  .nola-workspace-notes-tools { display: flex; flex: none; gap: 8px; padding: var(--space-1) var(--card-spacing); border-block: 1px solid var(--border); background: var(--surface-secondary); flex-wrap: wrap; }
   .nola-workspace-notes-tools :is(.button, .toggle-button) { border-radius: var(--radius-xl); }
   .nola-workspace-notes-tools .toggle-button { background: var(--surface-secondary); color: var(--foreground); }
   .nola-workspace-notes-tools .toggle-button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
-  .nola-workspace-notes-content { display: flex; flex: 1; min-height: 0; padding: 16px 0 8px; }
+  .nola-workspace-notes-content { display: flex; flex: 1; min-height: 0; padding: var(--card-spacing); }
   .nola-workspace-notes-editor { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; color: var(--foreground); font: var(--font-body); }
   .nola-workspace-notes-editor .tiptap { min-height: 100%; padding: var(--space-1); overflow-wrap: anywhere; outline: none; caret-color: var(--accent); }
   .nola-workspace-notes-editor .tiptap:focus-visible { box-shadow: inset 0 0 0 1px var(--field-border-focus); border-radius: var(--radius-sm); }
@@ -100,14 +100,14 @@
   .nola-workspace-bar-spacer { flex: 1; }
   @media (max-width: 1200px) {
     .nola-workspace-heading { padding-inline: 0; }
-    .nola-workspace-notes.card { flex-basis: 240px; padding: 16px; }
+    .nola-workspace-notes.card { flex-basis: 240px; }
   }
   @media (max-width: 999px) {
     .nola-workspace-body[data-notes-open="true"] { flex-wrap: wrap; overflow-y: auto; }
     .nola-workspace-body[data-notes-open="true"] .nola-workspace-transcript { flex-basis: calc(100% - 1px); min-height: 220px; }
     .nola-workspace-body[data-notes-open="true"] .nola-workspace-notes { flex: 1 1 100%; min-height: 220px; }
     .nola-workspace-wave { display: none; }
-    .nola-workspace-toolbar-content { padding: 12px; }
+    .nola-workspace-toolbar-content { padding: var(--space-2); }
     .nola-workspace-heading h1 { font-size: 28px; }
   }
   @media (max-width: 760px) {

@@ -62,7 +62,7 @@
    * grows this layer and lets `.nola-main` scroll instead of crushing the rows.
    */
   .nola-route-content[data-page="records"] { min-height: 100%; }
-  .nola-section-card { gap: 0; min-width: 0; border-radius: 16px; border: 1px solid var(--border); box-shadow: var(--surface-shadow); background: var(--surface); color: var(--foreground); }
+  .nola-section-card { min-width: 0; }
   .nola-setting-row { display: grid; grid-template-columns: minmax(120px, .85fr) minmax(0, 1fr); align-items: center; min-height: 48px; gap: 20px; padding: 9px 16px; }
   .nola-setting-control { display: flex; justify-content: flex-end; align-items: center; min-width: 0; gap: 8px; }
   .nola-setting-control > * { max-width: 100%; }
@@ -70,23 +70,29 @@
   .nola-setting-control .select__trigger { width: 100%; }
   .list-box-item:is([data-selected="true"], [aria-selected="true"], [data-hovered="true"], [data-focused="true"], :hover) { background: var(--selection-neutral); color: var(--foreground); }
   .nola-page-heading { padding: 12px 4px; }
-  .nola-overlay-page { display: flex; flex-direction: column; gap: 20px; }
-  .nola-overlay-preview { padding: 20px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface); }
+  .nola-overlay-page { display: flex; flex-direction: column; gap: var(--space-3); container-type: inline-size; }
+  .nola-overlay-page > .card { --card-spacing: calc(var(--space-2) + var(--space-1) / 2); gap: var(--space-1); }
+  .nola-overlay-preview { min-width: 0; }
   /*
    * Stage for the preview card, which sits bottom-centre (`place-items: end
    * center`) rather than vertically centred: the space above then reads as "a
    * window floating on a desktop" instead of "a card sitting in a frame".
    */
-  .nola-overlay-stage { min-height: 260px; display: grid; place-items: end center; padding: clamp(16px, 3vw, 30px); border: 1px solid var(--border); border-radius: 12px; background: linear-gradient(135deg, color-mix(in oklch, var(--accent) 13%, transparent), transparent 58%), var(--surface-secondary); overflow: hidden; }
+  .nola-overlay-stage { min-height: 260px; display: grid; place-items: end center; margin-inline: var(--card-spacing); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-lg); background: linear-gradient(135deg, color-mix(in oklch, var(--accent) 13%, transparent), transparent 58%), var(--surface-secondary); overflow: hidden; }
   .nola-overlay-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; }
-  .nola-overlay-field { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 12px; min-height: 40px; }
+  .nola-overlay-field { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 12px; min-height: var(--field-control-height); min-width: 0; }
   .nola-overlay-field .select, .nola-overlay-field .select__trigger { width: 100%; }
-  .nola-overlay-language-trigger.button { display: flex; width: 100%; min-width: 0; height: var(--space-5); gap: var(--space-1); padding: 0 var(--space-2); border: 1px solid var(--field-border); border-radius: var(--field-radius); background: var(--surface-secondary); font: var(--font-body); }
+  .nola-overlay-language-trigger.button { display: flex; width: 100%; min-width: 0; height: var(--field-control-height); gap: var(--space-1); padding: 0 var(--space-2); border: 1px solid var(--field-border); border-radius: var(--radius-xl); background: var(--surface-secondary); font: var(--font-body); }
   .nola-overlay-language-trigger > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
   .nola-overlay-language-trigger svg { flex: none; width: var(--space-2); height: var(--space-2); color: var(--accent); }
-  .nola-overlay-languages { display: flex; flex-direction: column; width: calc(var(--space-8) * 4); max-width: calc(100vi - var(--space-4)); max-height: inherit; overflow-y: auto; gap: var(--space-2); padding: var(--space-2); }
+  .nola-overlay-languages { display: flex; flex-direction: column; width: max(var(--anchor-width, 0px), calc(var(--space-8) * 4)); max-width: calc(100vi - var(--space-4)); max-height: var(--available-height); overflow-y: auto; gap: var(--space-2); padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--overlay); color: var(--overlay-foreground); box-shadow: var(--overlay-shadow); outline: none; }
+  .nola-overlay-languages .select { width: 100%; min-width: 0; }
+  .nola-overlay-language-field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
   .nola-language-options.list-box { max-height: min(calc(var(--space-8) * 4), 45dvh); overflow-y: auto; }
-  .nola-overlay-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--separator); }
+  .nola-overlay-footer.card__footer { justify-content: space-between; flex-wrap: wrap; margin-inline: var(--card-spacing); padding: var(--space-2) 0 var(--card-spacing); border-color: var(--separator); background: transparent; }
+}
+@container (max-width: 900px) {
+  .nola-overlay-fields { grid-template-columns: minmax(0, 1fr); }
 }
 @layer utilities {
   .toast { align-items: center; }
@@ -121,11 +127,11 @@
 
 /* The font-size group is three A- / A / A+ icon buttons, so its labels are
    narrower than the default. */
-.nola-workspace-font-control .nola-segmented .toggle-button { padding: 0 8px; }
+.nola-workspace-font-control .nola-segmented .tabs__tab { padding-inline: 8px; }
 
 /* Narrow windows tighten the labels to the workspace toolbar's own breakpoint. */
 @media (max-width: 760px) {
-  .nola-workspace-view-controls .nola-segmented .toggle-button { padding-inline: 9px; font-size: 12px; }
+  .nola-workspace-view-controls .nola-segmented .tabs__tab { padding-inline: 9px; font-size: 12px; }
 }
 
 /* The caption cluster is the last thing in the bar, so it runs flush against the
@@ -134,8 +140,8 @@
    later of the two declarations. */
 .nola-titlebar--windows { padding-right: 0; }
 
-/* Action buttons use one large corner. Only the title-bar controls opt out. */
+/* Action surfaces may provide a compact corner without changing navigation geometry. */
 .button:not(.nola-titlebar-icon):not(.nola-window-control):not(.nola-web-controls .button),
 .toggle-button {
-  border-radius: var(--radius-xl);
+  border-radius: var(--action-radius, var(--radius-xl));
 }

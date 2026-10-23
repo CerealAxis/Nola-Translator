@@ -1,7 +1,7 @@
 /**
  * Entry card tests, asserting the design's checkable constraints: the difference
  * between the main and sub shapes, the absence of a subtitle, a disabled-but-visible
- * entry that explains itself, literal pixel radii, and `.z-*` classes in place of
+ * entry that explains itself, shared corner tokens, and `.z-*` classes in place of
  * `z-50`.
  *
  * Copy arrives as props from the caller's `t(...)`, so the assertions use English.
@@ -38,10 +38,10 @@ describe('EntryCard 次级卡', () => {
     expect(card.textContent).toBe('Records2026-10-01')
   })
 
-  it('圆角写 10px 字面量，不用 rounded-3xl（18px，违反 10px 上限）', () => {
+  it('使用共享卡片圆角', () => {
     render(<EntryCard icon={ICON} title="Records" onPress={() => {}} testId="entry" />)
     const card = screen.getByTestId('entry')
-    expect(card.className).toContain('rounded-[10px]')
+    expect(card.className).toContain('rounded-xl')
     expect(card.className).not.toContain('rounded-3xl')
   })
 
@@ -65,7 +65,7 @@ describe('EntryCard 次级卡', () => {
 })
 
 describe('EntryCard 主卡', () => {
-  it('主卡本体是 Surface（不是 Button），动作用那颗药丸按钮承担', () => {
+  it('主卡使用 Card，动作用底部按钮承担', () => {
     render(
       <EntryCard
         layout="main"
@@ -78,10 +78,10 @@ describe('EntryCard 主卡', () => {
     )
     const main = screen.getByTestId('main')
     expect(main.tagName).toBe('DIV')
-    expect(main.className).toContain('border-accent')
+    expect(main).toHaveAttribute('data-slot', 'card')
 
     const cta = screen.getByRole('button', { name: 'Start' })
-    expect(cta.className).toContain('rounded-full')
+    expect(cta.closest('[data-slot="card-footer"]')).not.toBeNull()
   })
 
   it('主 CTA 的可见文案就是它的无障碍名（不加 aria-label 覆盖）', async () => {

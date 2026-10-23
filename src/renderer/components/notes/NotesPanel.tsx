@@ -89,7 +89,7 @@ export function NotesPanel({ value, onChange, collapsed = false, onToggleCollaps
   }
   return (
     <Card role="complementary" aria-label={t('notes.title')} className={['nola-workspace-notes', className].filter(Boolean).join(' ')}>
-      <CardHeader className="nola-workspace-notes-heading p-0">
+      <CardHeader className="nola-workspace-notes-heading">
         <CardTitle className="card__title">{t('notes.title')}</CardTitle>
         <span className="nola-workspace-notes-state" title={t('workspaceUi.notesLocalHint')}>{t('workspaceUi.notesLocal')}</span>
       </CardHeader>

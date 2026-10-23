@@ -65,45 +65,7 @@ assets/brand/             App Logo 与 GitHub 官方头像
 scripts/                  PowerShell 构建与运行时管理脚本
 ```
 
-引擎细分入口（仅在相应任务中深入阅读）：
-
-| 修改范围 | 入口 |
-| --- | --- |
-| 本地模型注册、离线模型准备 | `engine/nola_translator_engine/local_models.py`、`offline_models.py` |
-| 音频采集 | `engine/nola_translator_engine/audio/capture.py`（WASAPI、浏览器音频） |
-| 云端识别 | `engine/nola_translator_engine/recognition/aliyun.py`、`minimax.py` |
-| GGUF 识别 | `engine/nola_translator_engine/recognition/llama_asr.py`、`crisp_asr.py` |
-| GGUF 权重与 Tokenizer 清单 | `engine/nola_translator_engine/models/qwen_gguf_catalog.py`、`crisp_catalog.py` |
-| 本地及云端翻译 | `engine/nola_translator_engine/translation/transformers_causal.py`、`index_translate.py`、`mymemory.py` |
-| 服务占用与互斥 | `src/main/session-controller.ts` |
-| 浏览器跨进程契约 | `src/shared/browser.ts` |
-
-## 3. 架构与运行时约束
-
-### 渲染进程与 Store
-
-- 组件只调用 **Store Action**，不直接调用 `bridge.*`；渲染进程通过 `src/renderer/bridge/` 的 `NolaBridge` 访问数据与能力（参考 `settingsStore.ts`）。
-- Store 不得在模块顶层访问 Bridge；由 `initStores()` 注入。
-- `src/renderer/` 禁用 `any`，保持 TypeScript 类型约束。
-- 模块求值阶段不得同步抛错，以免阻止 React `createRoot`；IPC 不可用时使用异步 reject 或可控的 no-op 降级。
-
-### 会话与服务互斥
-
-- `src/main/session-controller.ts` 是桌面和浏览器服务**唯一**的会话控制入口；由主进程负责最终并发校验。
-- **快速同传与悬浮字幕共享桌面服务，可以同时使用**；桌面服务与浏览器字幕服务互斥。
-- 浏览器字幕从**模型预热开始到服务关闭并释放模型结束**持续占用，即使扩展尚未连接也不释放占用。
-- 桌面会话或已打开的悬浮字幕窗口（包含最小化）都阻止浏览器字幕启动。
-- 浏览器临时会话不得创建同传记录、传入 `recordingPath` 或打开悬浮字幕窗口。
-- 冲突时渲染器经 Store Action 处理主进程拒绝，显示本地化 Toast：`{running}服务正在运行中，请先关闭{running}服务`；不可误报为模型缺失、浏览器弹窗限制或普通启动失败。
-
-### 其他边界
-
-- `src/shared/browser.ts` 仅暴露受限扩展契约、固定开发 ID 与 Native Messaging 名称；不得向扩展接口暴露凭据、文件或模型管理能力。
-- 音频测试只在内存中采集 **2 秒 PCM** 并进行格式转换；不得为此加载模型。
-- 新手教程采用可访问的欢迎弹窗；完成与再次查看相关状态必须持久化保存。
-- 诊断日志使用 JSONL，保持脱敏与大小限制，禁止泄露密钥或敏感内容。
-
-## 4. React、i18n 与视觉规范
+## 3. React、i18n 与视觉规范
 
 ### 组件和事件
 
@@ -128,14 +90,14 @@ scripts/                  PowerShell 构建与运行时管理脚本
 - shadcn/ui 组件使用 Nola 语义 token，不使用默认黑白主题；同名语义变量须经独立映射，避免与既有全局 token 冲突。原子组件覆盖字阶时可在 utilities 层使用任意值类（例如 `text-[11px]`）；这仅是字号规则的特定例外。
 - z-index 只使用 `DESIGN.MD` 第 8 节规定的 `.z-*` 类，禁止写 `z-50` 等字面层级。
 
-## 5. 注释规范
+## 4. 注释规范
 
 - 代码注释统一使用**英文**。注释解释原因、边界、特殊取值和不明显的副作用，而非重复代码已经表达的行为。
 - 仅对复杂函数、组件、类型或常量添加有价值的注释；需要时写明参数限制、返回值、副作用及单位或范围。行内注释放在对应代码上方，避免行尾堆叠。
 - `TODO` 标记待完成事项，`FIXME` 标记已知问题；说明原因或下一步，解决后删除。
 - 不保留过期、错误、与实现矛盾的注释；不写无用途的作者、日期、修改历史，也不机械要求每个函数或变量都有注释。
 
-## 6. 构建与验证
+## 5. 构建与验证
 
 按改动范围选择相关命令，无需每次全部执行：
 
@@ -159,7 +121,7 @@ node scripts/check-installer-paths.mjs [makensis.exe] # NSIS 安装目录回归�
 - UI 或 i18n 更改：按影响范围检查相应页面、语言、主题与窗口尺寸；改动引导流程时使用 `test:onboarding`，改动演示环境时使用 `test:demo`。
 - 不因纯文案或低风险局部调整机械执行完整打包。若环境缺失导致无法验证，应明确说明限制。
 
-## 7. 协作、提交与文件权限
+## 6. 协作、提交与文件权限
 
 ### Git 与多 Agent
 
@@ -182,6 +144,7 @@ node scripts/check-installer-paths.mjs [makensis.exe] # NSIS 安装目录回归�
 - `docs/PRD/` 仅保存内部需求和架构文档；`docs/nola-docs/` 只放终端用户指引，不混放。
 
 未经用户同意，不准修改以上章节的内容，如果却有需要记录的，请分点记录在下面。
+
 ```
 ### 章节名
 

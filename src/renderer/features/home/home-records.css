@@ -42,11 +42,11 @@
  * pagination lands at the bottom on its own.
  */
 .nola-record-page { flex: 1; }
-.nola-record-card { padding: 20px; min-width: 0; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: 0 2px 10px color-mix(in oklab, var(--accent) 4%, transparent); gap: 16px; }
+.nola-record-card { min-width: 0; }
 .nola-record-page > .nola-record-card { flex: 1 0 auto; }
-.nola-record-card > .card__content { min-width: 0; padding: 0; }
-.nola-home__recent-header { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
-.nola-home__recent-header .card__title { font-size: 20px; font-weight: 650; }
+.nola-record-card > .card__content { min-width: 0; }
+.nola-home__recent-header { align-items: center; }
+
 .nola-records-table { width: 100%; border: 0; border-radius: 0; background: transparent; box-shadow: none; padding: 0; min-width: 0; }
 .nola-records-table__container { overflow: visible; width: 100%; min-width: 0; }
 .nola-records-table .table__content { table-layout: fixed; width: 100%; min-width: 0; border-collapse: collapse; }
@@ -90,7 +90,7 @@
 .nola-record-page__search-field > svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .nola-record-page__search .search-field__group { border: 1px solid var(--border); border-radius: 12px; min-height: 44px; background: var(--surface); }
 .nola-record-page__search > span, .nola-record-page__footer > span { font-size: 13px; color: var(--muted); }
-.nola-record-page__footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--separator); padding-top: 16px; gap: 12px; }
+.nola-record-page__footer { justify-content: space-between; flex-wrap: wrap; }
 .nola-record-page__footer > span { white-space: nowrap; flex-shrink: 0; }
 .nola-record-page__paging { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 .nola-record-page__paging > .pagination { width: auto; }
@@ -100,7 +100,8 @@
 .nola-record-detail { flex: 1; min-height: 0; }
 .nola-record-detail .nola-display { font-size: 32px; }
 .nola-record-detail__reading { flex: 1; min-height: 340px; padding: 0; overflow: hidden; }
-.nola-record-detail__reading > .card__content { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.nola-record-detail__reading { gap: 0; padding: 0; }
+.nola-record-detail__reading > .card__content { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; }
 .nola-dual { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .nola-dual__headers { display: grid; grid-template-columns: var(--dual-split, 50%) minmax(0, 1fr); padding-bottom: 14px; border-bottom: 1px solid var(--separator); }
 .nola-dual__headers > div { font-size: 16px; font-weight: 650; padding-inline: 16px; color: var(--foreground); }
@@ -122,8 +123,8 @@
 }
 @container (min-width: 1000px) { .nola-home__entries { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @container (max-width: 999px) { .nola-home-hero { min-height: 238px; padding: 28px; } .nola-home-hero__features { gap: 12px; } .nola-records-table__time { display: none; } .nola-records-table__name { width: 34%; } .nola-records-table__language { width: 24%; } .nola-records-table__actions { width: 16%; } }
-@container (max-width: 680px) { .nola-home-hero { min-height: 240px; padding: 24px; } .nola-home-hero__copy { width: 100%; } .nola-home-hero__art { opacity: .13; width: 60%; } .nola-home-hero__copy h1 { font-size: 32px; } .nola-home-hero__features { max-width: 360px; gap: 10px; } .nola-home-hero__features > span { font-size: 12px; } .nola-home-hero__features i { width: 30px; height: 30px; } .nola-records-table__language { display: none; } .nola-records-table__name { width: 47%; } .nola-records-table__duration { width: 18%; } .nola-records-table__status { width: 21%; } .nola-records-table__actions { width: 14%; } .nola-records-table__view { display: none; } .nola-records-table th, .nola-records-table td { padding-inline: 8px; } .nola-records-table__title { gap: 8px; } .nola-record-page__header { flex-wrap: wrap; } .nola-record-page__header h1 { font-size: 28px; } .nola-home__recent-header { flex-wrap: wrap; } .nola-entry { padding: 20px; } .nola-dual__headers { grid-template-columns: 1fr 1fr; } .nola-dual__pair { grid-template-columns: 1fr; } .nola-dual__cell + .nola-dual__cell { border-left: none; padding-top: 0; } .nola-dual > [role='separator'] { display: none; } }
-@container (max-width: 420px) { .nola-home__entries { grid-template-columns: 1fr; } .nola-records-table__duration { display: none; } .nola-records-table__name { width: 60%; } .nola-record-card { padding: 16px; } .nola-entry { min-height: 222px; } }
+@container (max-width: 680px) { .nola-home-hero { min-height: 240px; padding: 24px; } .nola-home-hero__copy { width: 100%; } .nola-home-hero__art { opacity: .13; width: 60%; } .nola-home-hero__copy h1 { font-size: 32px; } .nola-home-hero__features { max-width: 360px; gap: 10px; } .nola-home-hero__features > span { font-size: 12px; } .nola-home-hero__features i { width: 30px; height: 30px; } .nola-entry { padding: 20px; }  .nola-records-table__language { display: none; } .nola-records-table__name { width: 47%; } .nola-records-table__duration { width: 18%; } .nola-records-table__status { width: 21%; } .nola-records-table__actions { width: 14%; } .nola-records-table__view { display: none; } .nola-records-table th, .nola-records-table td { padding-inline: 8px; } .nola-records-table__title { gap: 8px; } .nola-record-page__header { flex-wrap: wrap; } .nola-record-page__header h1 { font-size: 28px; }   .nola-dual__headers { grid-template-columns: 1fr 1fr; } .nola-dual__pair { grid-template-columns: 1fr; } .nola-dual__cell + .nola-dual__cell { border-left: none; padding-top: 0; } .nola-dual > [role='separator'] { display: none; } }
+@container (max-width: 420px) { .nola-home__entries { grid-template-columns: 1fr; } .nola-records-table__duration { display: none; } .nola-records-table__name { width: 60%; } .nola-record-card { --card-spacing: var(--space-2); } .nola-entry { min-height: 222px; } }
 
 .nola-dual__split { width: 120px; margin: 12px 16px 0 auto; flex-shrink: 0; }
 .nola-dual__split .slider__track { height: 3px; }

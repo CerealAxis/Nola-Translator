@@ -21,10 +21,10 @@
 .settings-panels { width:100%; min-width:0; }
 .settings-panels .tabs__panel { width:100%; padding:0; margin:0; }
 .settings-panel { display:flex; flex-direction:column; gap:16px; width:100%; min-width:0; }
-.settings-group.card { width:100%; padding:20px; border:1px solid var(--border); border-radius:16px; gap:8px; background:var(--surface); box-shadow:0 2px 10px color-mix(in oklch,var(--accent) 4%,transparent); min-width:0; container-type:inline-size; }
-.settings-group .card__header { padding:0; }
-.settings-group .card__title { font-size:20px; font-weight:650; line-height:1.4; }
-.settings-group .card__content { padding:0; min-width:0; }
+.settings-group.card { width:100%; container-type:inline-size; }
+
+
+
 .settings-group .fieldset { display:block; gap:0; padding:0; border:0; margin:0; min-width:0; }
 .settings-group__rows { display:flex; flex-direction:column; }
 .settings-row { display:grid; grid-template-columns:minmax(130px,1fr) minmax(0,1.15fr); align-items:center; gap:16px; min-height:48px; padding:7px 0; border-bottom:1px solid var(--separator); min-width:0; }
@@ -37,12 +37,12 @@
 .settings-row__control > .settings-path-input { width:100%; min-width:0; max-width:var(--settings-control-max-width); flex:0 1 var(--settings-control-max-width); }
 .settings-row__control .settings-control-field[data-slot='input'],
 .settings-row__control .settings-select-trigger { width:100%; min-width:0; height:var(--field-control-height); min-height:var(--field-control-height); border-radius:var(--settings-control-radius); }
-.settings-select-content { max-height:min(var(--available-height), 250px); overflow-y:auto; padding:4px; border-radius:var(--radius-lg); }
-.settings-select-item { min-height:36px; padding:8px 12px; white-space:normal; }
+.settings-select-content { max-height:min(var(--available-height), calc(var(--space-5) * 8)); overflow-y:auto; }
 .settings-row__control .button { border-radius:var(--radius-xl); }
-/* Colour, radius and height come from .nola-segmented in theme/app.css; this only controls width. */
+/* Colour and radius come from the shared TabsList styles; setting controls fill their row. */
 .settings-row__control .nola-segmented { width:100%; min-height:40px; }
-.settings-row__control .toggle-button { flex:1; }
+.settings-row__control > [data-slot='tabs']:has(> .nola-segmented) { width:100%; max-width:var(--settings-control-max-width); }
+.settings-row__control .nola-segmented .tabs__tab { flex:1; }
 /* Three fixed columns so every track is the same length: the optional unit ("px" is wider than
    "%", and line height carries none) otherwise leaves each row a different amount of slack, which
    the `flex:1` slider absorbs. */
@@ -71,10 +71,10 @@
 }
 @media (max-width:850px) {
  .settings-page .settings-tabs { grid-template-columns:minmax(0,1fr); }
- .settings-nav .tabs__list { flex-direction:row; flex-wrap:wrap; gap:4px; }
- /* Chips wrap onto rows by label width, so a label keeps its own line rather than breaking across two. */
- .settings-nav .tabs__tab { flex:1 1 120px; min-height:44px; height:auto; padding:10px; gap:8px; white-space:nowrap; }
- .settings-group.card { padding:16px; }
+ .settings-nav { position:static; }
+ .settings-nav .tabs__list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-1); }
+ .settings-nav .tabs__tab { min-height:44px; height:auto; padding:10px; gap:var(--space-1); white-space:normal; }
+ .settings-group.card { --card-spacing:var(--space-2); }
 }
 @media (max-width:540px) {
  .settings-row { grid-template-columns:minmax(0,1fr); gap:8px; padding:12px 0; }
@@ -126,13 +126,13 @@
   text-align: left;
 }
 /* Runtime components sit inside a SettingGroup, so the block only lays out what the card cannot:
-   the engine picker and the per-engine panel. `.nola-segmented` already avoids `button` so that
-   `.settings-row__control .button` does not shrink the picker's 38px capsule. */
+   the engine picker and the per-engine panel. */
 .runtime-picker { display: flex; justify-content: center; padding-bottom: var(--space-1); container-type: inline-size; }
 .runtime-picker__group { display: flex; width: 100%; max-width: 520px; }
 .runtime-picker .runtime-picker__option { flex: 1 1 0; justify-content: center; gap: var(--space-1); padding: 0 var(--space-2); font-size: 13px; }
 .runtime-picker__state { font: var(--nola-text-micro); color: var(--muted); white-space: nowrap; }
-.runtime-picker .runtime-picker__option[data-selected='true'] .runtime-picker__state { color: var(--accent); }
+.runtime-picker .runtime-picker__option[data-active] .runtime-picker__state,
+.runtime-picker .runtime-picker__option[aria-selected='true'] .runtime-picker__state { color: var(--accent); }
 .runtime-panel-body { display: flex; flex-direction: column; overflow-wrap: anywhere; }
 .runtime-panel-body .settings-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
 .runtime-component-status { min-width: 0; text-align: end; overflow-wrap: anywhere; }

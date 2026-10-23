@@ -50,8 +50,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
 
   { id: 'quick-nav', chapter: 3, path: '#/settings/translation', target: target('nav-workspace'), title: 'home.quickStart', body: 'onboarding.openQuick', action: 'press', destination: '#/workspace' },
   { id: 'quick', chapter: 3, path: '#/workspace', target: target('quick-settings'), title: 'home.quickStart', body: 'onboarding.useQuick' },
-  { id: 'overlay-nav', chapter: 3, path: '#/workspace', target: target('nav-overlay'), title: 'shellUi.overlay', body: 'onboarding.openOverlay', action: 'press', destination: '#/overlay' },
-  { id: 'overlay', chapter: 3, path: '#/overlay', target: '.nola-overlay-page .nola-page-heading', title: 'shellUi.overlay', body: 'onboarding.useOverlay' },
-  { id: 'browser-nav', chapter: 3, path: '#/overlay', target: target('nav-video-captions'), title: 'videoCaptions.title', body: 'onboarding.openBrowser', action: 'press', destination: '#/video-captions' },
+  { id: 'overlay-nav', chapter: 3, path: '#/workspace', target: target('open-overlay'), title: 'shellUi.overlay', body: 'onboarding.openOverlay' },
+  { id: 'overlay', chapter: 3, path: '#/workspace', target: target('caption-preview'), title: 'shellUi.overlay', body: 'onboarding.useOverlay' },
+  { id: 'browser-nav', chapter: 3, path: '#/workspace', target: target('nav-video-captions'), title: 'videoCaptions.title', body: 'onboarding.openBrowser', action: 'press', destination: '#/video-captions' },
   { id: 'browser', chapter: 3, path: '#/video-captions', target: '.nola-video-service', title: 'videoCaptions.title', body: 'onboarding.useBrowser' },
 ]

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Popover } from '@base-ui/react/popover'
-import { Select, SelectContent, SelectFieldLabel, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { AppWindow, ArrowRight, ArrowRightLeft, ChevronDown, Languages, LoaderCircle, Settings } from 'lucide-react'
@@ -236,25 +235,25 @@ export function VideoCaptionsPage() {
           {opening ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <AppWindow aria-hidden="true" />}
           {t('videoCaptions.openBrowser')}
         </Button>} />
-      <Card className="nola-overlay-preview flex flex-col gap-3 p-5">
-        <CardHeader className="card__header p-0">
-          <CardTitle className="card__title text-lg leading-6 font-semibold">{t('videoCaptions.captionPreview')}</CardTitle>
+      <Card className="nola-overlay-preview">
+        <CardHeader>
+          <CardTitle>{t('videoCaptions.captionPreview')}</CardTitle>
         </CardHeader>
         {/*
          * A compact, theme-matched stage with the configured caption block anchored
          * at its saved position. Sample text stands in for a live segment because
          * this page never holds a session.
          */}
-        <CardContent className="card__content nola-overlay-stage nola-video-stage px-[clamp(16px,3vw,30px)]">
+        <CardContent className="card__content nola-overlay-stage nola-video-stage">
           <div className="nola-video-frame" style={frameStyle} aria-hidden="true">
             {showSource ? <p className="nola-video-caption-line">{t('videoCaptions.previewSource')}</p> : null}
             {showTranslation ? <p className="nola-video-caption-line" data-role="translation">{t('videoCaptions.previewTranslation')}</p> : null}
           </div>
         </CardContent>
       </Card>
-      <Card className="nola-section-card p-5 flex flex-col gap-0 has-data-[slot=card-footer]:pb-5">
-        <CardHeader className="card__header p-0 mb-5"><CardTitle className="card__title leading-6">{t('videoCaptions.settings')}</CardTitle></CardHeader>
-        <CardContent className="card__content p-0 nola-overlay-fields">
+      <Card className="nola-section-card">
+        <CardHeader><CardTitle>{t('videoCaptions.settings')}</CardTitle></CardHeader>
+        <CardContent className="nola-overlay-fields">
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('videoCaptions.audioSource')}</span>
             {/*
@@ -289,24 +288,18 @@ export function VideoCaptionsPage() {
                       }}>
                       <ArrowRightLeft aria-hidden="true" />{t('session.swapLanguages')}
                     </Button>
-                    <Select value={sourceLanguage} onValueChange={key => {
-                      if (typeof key === 'string') patch({ recognition: { sourceLanguage: key } })
-                    }}>
-                      <SelectFieldLabel className="label">{t('session.sourceLanguage')}</SelectFieldLabel>
-                      <SelectTrigger className="select__trigger"><SelectValue className="select__value">{value => label(String(value ?? ''))}</SelectValue></SelectTrigger>
-                      <SelectContent className="select__popover rounded-xl border border-border bg-overlay p-1 shadow-overlay"><SelectGroup className="nola-language-options list-box">
-                        {modelOptions.sourceLanguages.map(code => <SelectItem key={code} value={code} label={label(code)} className="list-box-item">{label(code)}</SelectItem>)}
-                      </SelectGroup></SelectContent>
-                    </Select>
-                    <Select value={targetLanguage} onValueChange={key => {
-                      if (typeof key === 'string') patch(targetLanguagePatch(key, targetLanguage))
-                    }}>
-                      <SelectFieldLabel className="label">{t('session.targetLanguage')}</SelectFieldLabel>
-                      <SelectTrigger className="select__trigger"><SelectValue className="select__value">{value => label(String(value ?? ''))}</SelectValue></SelectTrigger>
-                      <SelectContent className="select__popover rounded-xl border border-border bg-overlay p-1 shadow-overlay"><SelectGroup className="nola-language-options list-box">
-                        {modelOptions.targetLanguages.map(code => <SelectItem key={code} value={code} label={label(code)} className="list-box-item">{label(code)}</SelectItem>)}
-                      </SelectGroup></SelectContent>
-                    </Select>
+                    <div className="nola-overlay-language-field">
+                      <span className="label">{t('session.sourceLanguage')}</span>
+                      <SettingSelect value={sourceLanguage} ariaLabel={t('session.sourceLanguage')}
+                        options={modelOptions.sourceLanguages.map(code => ({ value: code, label: label(code) }))}
+                        onChange={sourceLanguage => patch({ recognition: { sourceLanguage } })} />
+                    </div>
+                    <div className="nola-overlay-language-field">
+                      <span className="label">{t('session.targetLanguage')}</span>
+                      <SettingSelect value={targetLanguage} ariaLabel={t('session.targetLanguage')}
+                        options={modelOptions.targetLanguages.map(code => ({ value: code, label: label(code) }))}
+                        onChange={value => patch(targetLanguagePatch(value, targetLanguage))} />
+                    </div>
                   </Popover.Popup>
                 </Popover.Positioner>
               </Popover.Portal>
@@ -336,7 +329,7 @@ export function VideoCaptionsPage() {
             </ToggleGroup>
           </div>
         </CardContent>
-        <CardFooter className="card__footer bg-transparent px-0 pb-0 nola-overlay-footer">
+        <CardFooter className="nola-overlay-footer">
           <Button variant="secondary" onClick={() => navigate(settingsPath('browser'))}><Settings aria-hidden="true" />{t('videoCaptions.browserSettings')}<ArrowRight aria-hidden="true" /></Button>
         </CardFooter>
       </Card>

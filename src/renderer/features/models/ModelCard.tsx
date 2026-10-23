@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
+import { Card, CardAction, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { configurationOf } from '../../../shared/model-capabilities'
 import { modelEngines, type InferenceEngine } from '../../../shared/model-engines'
 
@@ -190,19 +190,17 @@ export function ModelCard({
        * The status pills get a row of their own rather than sharing the title's width: the model
        * name is the first thing on the card to be read, and state is the secondary fact.
        */}
-      <CardHeader className="card__header">
-        <span className={`models-card__icon models-card__icon--${record.kind === 'translationModel' ? 'translation' : 'recognition'}`}>
+      <CardHeader>
+        <CardAction><span aria-hidden="true" className={`models-card__icon models-card__icon--${record.kind === 'translationModel' ? 'translation' : 'recognition'}`}>
           <ModelMark record={record} kind={record.kind} />
-        </span>
-        <div className="models-card__identity">
+        </span></CardAction>
           <CardTitle className="card__title">{record.name}</CardTitle>
           {descriptionLoading ? <div className="models-card__description-loading" aria-hidden="true">
             <Skeleton className="h-3 w-full rounded-[6px]" />
             <Skeleton className="h-3 w-3/4 rounded-[6px]" />
           </div> : <CardDescription className="card__description">{description}</CardDescription>}
           <span className="models-card__meta tabular">{metadata ?? factsOf(record).join(' · ')}</span>
-        </div>
-      </CardHeader>
+    </CardHeader>
       <CardContent className="card__content">
       <div className="models-card__status">
         {isDefault && record.installed ? <Badge  variant="accent">{t('modelsSettingsUi.default')}</Badge> : null}
@@ -214,7 +212,7 @@ export function ModelCard({
       {inFlight ? <ProgressLine record={record} state={state} /> : null}
       </CardContent>
 
-      <CardFooter className="card__footer border-0 bg-transparent">
+      <CardFooter className="card__footer">
         <Actions
           state={state}
           removal={removal}
@@ -342,7 +340,7 @@ function Actions({
   if (state === 'queued' || state === 'downloading' || state === 'verifying') {
     return (
       <Button
-        variant="outline"
+        variant="secondary"
         size="sm"
 
         disabled={!cancellable}
@@ -360,7 +358,7 @@ function Actions({
         {isDefault ? <Button variant="secondary" disabled><Check aria-hidden="true" className="size-4" />{t('modelsSettingsUi.current')}</Button> : null}
         {canBeDefault && !isDefault ? (
           <Button disabled={busy} aria-busy={busy}
-            variant="outline"
+            variant="default"
             size="sm"
 
             onClick={onSetDefault}
@@ -371,7 +369,7 @@ function Actions({
         {!canBeDefault && !isDefault && defaultDisabledReason ? (
           <Tooltip>
             <TooltipTrigger delay={250} render={<div />} className="block min-w-0 flex-1" tabIndex={0}>
-              <Button variant="outline" size="sm" className="h-10 w-full rounded-xl" disabled>
+              <Button variant="secondary" size="sm" className="h-10 w-full rounded-xl" disabled>
                 {t('models.setDefault')}
               </Button>
             </TooltipTrigger>
@@ -419,20 +417,20 @@ function Actions({
 export function ModelCardSkeleton({ withDetails = false }: { withDetails?: boolean }) {
   return (
     <Card className={`models-card h-full ${withDetails ? 'models-card--hub' : ''}`}>
-      <div className="flex items-start gap-3">
-        <Skeleton className="size-14 shrink-0 rounded-[12px]" />
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
+      <CardHeader>
+        <CardAction><Skeleton className="size-10 rounded-lg" /></CardAction>
+        <div className="flex min-w-0 flex-col gap-2">
           <Skeleton className="h-4 w-3/4 rounded-[6px]" />
           <Skeleton className="h-3 w-1/2 rounded-[6px]" />
           <Skeleton className="h-3 w-full rounded-[6px]" />
           <Skeleton className="h-3 w-3/4 rounded-[6px]" />
         </div>
-      </div>
-      <Skeleton className="h-5 w-16 rounded-full" />
-      <div className="mt-auto flex flex-col gap-2">
-        <Skeleton className="h-10 w-full rounded-[10px]" />
+      </CardHeader>
+      <CardContent><Skeleton className="h-5 w-16 rounded-md" /></CardContent>
+      <CardFooter className="mt-auto flex-col">
+        <Skeleton className="h-10 w-full rounded-xl" />
         {withDetails ? <Skeleton className="h-8 w-full rounded-[6px]" /> : null}
-      </div>
+      </CardFooter>
     </Card>
   )
 }

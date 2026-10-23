@@ -60,6 +60,8 @@ it('keeps reset in Advanced and moves licenses and feedback to More', async () =
   expect(screen.queryByRole('button', { name: '恢复出厂设置' })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: '查看' })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'GitHub 主页' })).toHaveAttribute('href', 'https://github.com/CerealAxis')
+  expect(screen.getByRole('link', { name: '赞助' })).toHaveAttribute('href', 'https://nola.xaviermc.top/zh-CN/contributing/sponsor')
+  expect(document.querySelector('a[href="https://github.com/sponsors/CerealAxis"]')).toBeNull()
   expect(screen.getByRole('link', { name: 'shadcn/ui 官网' })).toHaveAttribute('href', 'https://ui.shadcn.com/')
   expect(screen.getByRole('group', { name: '虚位以待' })).toBeInTheDocument()
   expect(screen.getByText('701699932')).toBeInTheDocument()

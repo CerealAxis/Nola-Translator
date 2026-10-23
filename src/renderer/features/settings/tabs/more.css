@@ -8,9 +8,11 @@
   min-width: 0;
 }
 .settings-more__identity:last-child { border-bottom: 0; padding-bottom: var(--space-1); }
-.settings-more__avatar { flex-shrink: 0; width: var(--space-6); height: var(--space-6); }
-.settings-more__avatar--logo { border-radius: var(--radius-lg); background: transparent; }
-.settings-more__avatar--logo [data-slot='avatar-image'] { border-radius: inherit; object-fit: contain; }
+.settings-more__avatar { flex-shrink: 0; width: var(--space-6); height: var(--space-6); border-radius: 50%; }
+.settings-more__avatar--logo { border-radius: 50%; background: transparent; }
+.settings-more__avatar--logo::after { display: none; }
+.settings-more__avatar--logo [data-slot='avatar-image'] { border-radius: 50%; object-fit: contain; }
+.settings-more__avatar--logo [data-slot='avatar-fallback'] { background: transparent; }
 .settings-more__identity-copy { min-width: 0; }
 .settings-more__identity-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-1); }
 .settings-more__name { margin: 0; font: var(--font-title); color: var(--foreground); overflow-wrap: anywhere; }
@@ -22,12 +24,12 @@
 .settings-more__identity-actions .button { border-radius: var(--radius-xl); }
 .settings-more__sponsors { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) 0 var(--space-1); }
 .settings-more__sponsors [data-slot='avatar-group'] { gap: var(--space-1); flex-shrink: 0; }
+.settings-more__sponsors [data-slot='avatar'] { width: var(--space-6); height: var(--space-6); border-radius: 50%; }
 .settings-more__vacancy svg { width: var(--space-3); height: var(--space-3); }
-.settings-more__sponsor-trigger { display: inline-flex; border-radius: var(--radius-lg); }
-.settings-more__heart { width: var(--space-3); height: var(--space-3); color: var(--accent); margin-left: auto; }
+.settings-more__sponsor-trigger { display: inline-flex; border-radius: 50%; }
+.settings-more__sponsors > .settings-more__link { margin-left: auto; }
 .settings-more__code { border: 1px solid var(--border); border-radius: var(--radius-md); padding: calc(var(--space-1) / 2) var(--space-1); }
 @container (max-width: 620px) {
   .settings-more__identity { grid-template-columns: auto minmax(0, 1fr); gap: var(--space-1) var(--space-2); }
   .settings-more__identity-actions { grid-column: 2; justify-content: flex-start; }
-  .settings-more__heart { display: none; }
 }

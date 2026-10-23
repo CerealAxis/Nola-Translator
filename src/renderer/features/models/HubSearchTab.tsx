@@ -2,7 +2,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Dialog, DialogCloseButton, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 
 import { AlertTriangle, Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -342,9 +342,11 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
         <Button variant="tertiary" size="sm" onClick={onGoRecommended}>{t('models.experimentalNoticeAction')}</Button>
       </AlertDescription>
     </Alert>
-    <ToggleGroup className="model-search-filters" aria-label={t('modelsSettingsUi.filtersLabel')} value={[filter]} onValueChange={values => { if (values[0]) setFilter(values[0] as Filter) }}>
-      {filters.map(item => <ToggleGroupItem key={item.id} value={item.id} className="button button--secondary h-6 min-h-0 px-2 text-xs">{item.label}</ToggleGroupItem>)}
-    </ToggleGroup>
+    <TabsRoot value={filter} onValueChange={value => { if (value) setFilter(value as Filter) }}>
+      <TabsList className="model-search-filters" aria-label={t('modelsSettingsUi.filtersLabel')}>
+        {filters.map(item => <TabsTrigger key={item.id} value={item.id}>{item.label}</TabsTrigger>)}
+      </TabsList>
+    </TabsRoot>
     {failed && !awaiting ? <p className="nola-caption text-muted">{t('errors.searchFailed')}</p> : null}
     {awaiting ? <SearchSkeletons /> : null}
     {!awaiting && !failed && !nextCursor && visible.length === 0 ? <Empty>
@@ -372,7 +374,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
             notifyError(t('modelsSettingsUi.removeFailed'), { cause })
           }) }}
           onSetDefault={() => undefined}
-          footer={<div className="flex flex-wrap gap-[var(--space-1)]">{live?.installed ? <Button variant="secondary" onClick={() => setConfiguring(live)}>{t(configurationOf(live) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : null}<Button variant="tertiary" size="sm" onClick={() => setDetail(hit)}>
+          footer={<div className="flex flex-wrap gap-[var(--space-1)]">{live?.installed ? <Button variant="secondary" onClick={() => setConfiguring(live)}>{t(configurationOf(live) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : null}<Button variant="secondary" size="sm" onClick={() => setDetail(hit)}>
             {t('models.openDetails')}
           </Button></div>} />
       })}

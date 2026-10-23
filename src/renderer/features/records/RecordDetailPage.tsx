@@ -21,7 +21,7 @@ import type { DualColumnSegment } from '@/components/reading'
 import { ErrorBoundary, PageHeader, StatusPill } from '@/components/primitives'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useI18n } from '@/i18n'
 import { formatChineseCaption } from '@/chinese-script'
 import { pathOf, useRoute } from '@/routes'
@@ -233,11 +233,12 @@ export function RecordDetailPage(): ReactNode {
               fontScale={fontScale}
               currentIndex={currentIndex}
               onSplitChange={undefined}
-              className="min-h-0 flex-1 p-5"
+              className="min-h-0 flex-1 p-6"
             />
           )}
 
-          <div className="border-t border-separator">
+          </CardContent>
+          <CardFooter className="p-0">
             <AudioPlayerBar
               audioUrl={detail?.audioUrl ?? null}
               durationMs={detail?.meta.audioDurationMs ?? null}
@@ -254,15 +255,16 @@ export function RecordDetailPage(): ReactNode {
                 setCurrentIndex(index)
               }}
             />
-          </div>
-        </CardContent></Card>
+          </CardFooter>
+        </Card>
 
         {/* Notes are stored as Markdown and rendered read-only in the meeting detail. */}
         {notes ? (
           <Card className="nola-record-card">
+            <CardHeader><CardTitle>{t('homeRecordsUi.notes')}</CardTitle></CardHeader>
             <CardContent className="card__content">
               <div className="flex flex-col gap-3">
-                <h2 className="nola-subtitle text-foreground">{t('homeRecordsUi.notes')}</h2>
+
                 <div className="nola-record-notes-markdown nola-body max-h-64 overflow-y-auto break-words text-foreground">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, [rehypeSanitize, { ...defaultSchema, tagNames: [...defaultSchema.tagNames ?? [], 'u'] }]]}>{notes}</ReactMarkdown>
                 </div>

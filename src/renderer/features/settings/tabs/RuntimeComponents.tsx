@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AlertDialog } from '@base-ui/react/alert-dialog'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { TabsRoot, TabsList, TabsTrigger, ToggleGroup, ToggleGroupItem } from '@/components/ui'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { DialogHeader, DialogFooter } from '@/components/ui/dialog'
@@ -145,13 +145,14 @@ export function RuntimeComponents() {
       <TooltipContent side="top" className="settings-row__tooltip z-popup">{t('runtime.enginesHint')}</TooltipContent>
     </Tooltip>}>
       <div className="runtime-picker">
-        <ToggleGroup className="nola-segmented runtime-picker__group" value={[active]} aria-label={t('runtime.engines')}
-          onValueChange={values => { const next = values[0]; if (next === 'engine' || next === 'llama' || next === 'crisp') setActive(next) }}>
-          {KINDS.map(kind => <ToggleGroupItem key={kind} value={kind} data-onboarding={`runtime-${kind}`} className="runtime-picker__option">
-            {brand(kind)}
-            <span className="runtime-picker__state">{local?.[kind]?.status === 'ready' ? status(local[kind]) : t('runtime.missing')}</span>
-          </ToggleGroupItem>)}
-        </ToggleGroup>
+        <TabsRoot value={active} onValueChange={next => { if (next === 'engine' || next === 'llama' || next === 'crisp') setActive(next) }}>
+          <TabsList className="nola-segmented runtime-picker__group" aria-label={t('runtime.engines')}>
+            {KINDS.map(kind => <TabsTrigger key={kind} value={kind} data-onboarding={`runtime-${kind}`} className="runtime-picker__option">
+              {brand(kind)}
+              <span className="runtime-picker__state">{local?.[kind]?.status === 'ready' ? status(local[kind]) : t('runtime.missing')}</span>
+            </TabsTrigger>)}
+          </TabsList>
+        </TabsRoot>
       </div>
       {KINDS.map(kind => {
         const component = local?.[kind]

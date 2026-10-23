@@ -86,7 +86,7 @@ const walkthrough = [
   ['translation-provider', target('translation-provider') + ' [aria-haspopup="listbox"]', 'inspect'],
   ['translation-config', '.onboarding-tour__actions button:last-child'],
   ['quick-nav', target('nav-workspace')], ['quick', '.onboarding-tour__actions button:last-child'],
-  ['overlay-nav', target('nav-overlay')], ['overlay', '.onboarding-tour__actions button:last-child'],
+  ['overlay-nav', '.onboarding-tour__actions button:last-child'], ['overlay', '.onboarding-tour__actions button:last-child'],
   ['browser-nav', target('nav-video-captions')], ['browser', '.onboarding-tour__actions button:last-child'],
 ]
 
@@ -109,6 +109,10 @@ async function run() {
     { width: 1180, height: 780, theme: 'light', language: 'zh-CN' },
     { width: 760, height: 560, theme: 'dark', language: 'zh-CN' },
     { width: 1440, height: 960, theme: 'light', language: 'en' },
+    { width: 760, height: 560, theme: 'light', language: 'zh-TW' },
+    { width: 1180, height: 780, theme: 'dark', language: 'zh-HK' },
+    { width: 760, height: 560, theme: 'dark', language: 'ja' },
+    { width: 1440, height: 960, theme: 'light', language: 'ko' },
   ].filter(configuration => !requestedWidth || configuration.width === Number(requestedWidth))
   const results = []
   for (const configuration of configurations) {
@@ -142,7 +146,7 @@ async function run() {
       assert.equal(geometry.interactive, true, info)
       assert.equal(geometry.accessible, true, `Teaching controls must remain accessible inside model dialogs: ${info}`)
       results.push({ configuration, step, geometry })
-      if (['torch', 'model-engine', 'model-version', 'recognition-source', 'audio-tab', 'browser'].includes(step)) {
+      if (['torch', 'model-engine', 'model-version', 'recognition-source', 'audio-tab', 'recognition-provider', 'quick', 'overlay', 'browser'].includes(step)) {
         await writeFile(resolve(output, `${language}-${theme}-${width}-${step}.png`), (await window.webContents.capturePage()).toPNG())
       }
       await click(window, selector)

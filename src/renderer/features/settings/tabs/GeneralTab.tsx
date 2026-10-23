@@ -12,7 +12,7 @@ import { SettingsRow } from '../SettingsRow'
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 import { LoaderCircle } from 'lucide-react'
 
 import { useNolaTheme } from '@/components/primitives'
@@ -122,29 +122,11 @@ function ThemeRow() {
 
   return (
     <SettingsRow label={t('settings.theme')}>
-      <ToggleGroup
-        className="nola-segmented"
-        value={[theme]}
-        aria-label={t('settings.theme')}
-        onValueChange={(values) => {
-          // A single-select group reports an empty list when the pressed theme is clicked
-          // again, so the theme is never left with nothing selected.
-          const next = values[0]
-          if (next === undefined) return
-          setTheme(next as typeof theme)
-        }}
-      >
-        {options.map((option) => (
-          <ToggleGroupItem
-            key={option.id}
-            value={option.id}
-            className="toggle-button"
-            data-selected={theme === option.id ? 'true' : undefined}
-          >
-            {option.label}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+      <TabsRoot value={theme} onValueChange={next => { if (next) setTheme(next as typeof theme) }}>
+        <TabsList className="nola-segmented" aria-label={t('settings.theme')}>
+          {options.map(option => <TabsTrigger key={option.id} value={option.id}>{option.label}</TabsTrigger>)}
+        </TabsList>
+      </TabsRoot>
     </SettingsRow>
   )
 }

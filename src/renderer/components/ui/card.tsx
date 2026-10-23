@@ -1,104 +1,39 @@
-import * as React from "react"
-import { cn } from "@/lib/utils"
+import type { ComponentProps } from 'react'
 
-export interface CardProps extends React.ComponentProps<"div"> { size?: "default" | "sm" }
+export interface CardProps extends ComponentProps<'div'> {
+  size?: 'default' | 'sm'
+}
+export interface CardHeaderProps extends ComponentProps<'div'> {}
+export interface CardTitleProps extends ComponentProps<'div'> {}
+export interface CardDescriptionProps extends ComponentProps<'div'> {}
+export interface CardActionProps extends ComponentProps<'div'> {}
+export interface CardContentProps extends ComponentProps<'div'> {}
+export interface CardFooterProps extends ComponentProps<'div'> {}
 
-function Card({
-  className,
-  size = "default",
-  ...props
-}: CardProps) {
-  return (
-    <div
-      data-slot="card"
-      data-size={size}
-      className={cn(
-        "card group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-nola-ui-card py-(--card-spacing) text-sm text-nola-ui-card-foreground ring-1 ring-nola-ui-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
-        className
-      )}
-      {...props}
-    />
-  )
+export function Card({ className, size = 'default', ...props }: CardProps) {
+  return <div data-slot="card" data-size={size} className={['card group/card', className].filter(Boolean).join(' ')} {...props} />
 }
 
-function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-header"
-      className={cn(
-        "card__header group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-xl px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)",
-        className
-      )}
-      {...props}
-    />
-  )
+export function CardHeader({ className, ...props }: CardHeaderProps) {
+  return <div data-slot="card-header" className={['card__header', className].filter(Boolean).join(' ')} {...props} />
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-title"
-      className={cn(
-        "text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
-        className
-      )}
-      {...props}
-    />
-  )
+export function CardTitle({ className, ...props }: CardTitleProps) {
+  return <div data-slot="card-title" className={['card__title', className].filter(Boolean).join(' ')} {...props} />
 }
 
-function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-description"
-      className={cn("text-sm text-nola-ui-muted-foreground", className)}
-      {...props}
-    />
-  )
+export function CardDescription({ className, ...props }: CardDescriptionProps) {
+  return <div data-slot="card-description" className={['card__description', className].filter(Boolean).join(' ')} {...props} />
 }
 
-function CardAction({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-action"
-      className={cn(
-        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
-        className
-      )}
-      {...props}
-    />
-  )
+export function CardAction({ className, ...props }: CardActionProps) {
+  return <div data-slot="card-action" className={['card__action', className].filter(Boolean).join(' ')} {...props} />
 }
 
-function CardContent({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-content"
-      className={cn("card__content px-(--card-spacing)", className)}
-      {...props}
-    />
-  )
+export function CardContent({ className, ...props }: CardContentProps) {
+  return <div data-slot="card-content" className={['card__content', className].filter(Boolean).join(' ')} {...props} />
 }
 
-function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-footer"
-      className={cn(
-        "flex items-center rounded-b-xl border-t bg-nola-ui-muted/50 p-(--card-spacing)",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export {
-  Card,
-  CardHeader,
-  CardFooter,
-  CardTitle,
-  CardAction,
-  CardDescription,
-  CardContent,
+export function CardFooter({ className, ...props }: CardFooterProps) {
+  return <div data-slot="card-footer" className={['card__footer', className].filter(Boolean).join(' ')} {...props} />
 }

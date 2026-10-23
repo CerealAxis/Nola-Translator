@@ -143,7 +143,7 @@ export function SettingGroup({ legend, legendHint, actions, children, onboarding
       <CardContent className="card__content">
         <Fieldset.Root className="fieldset" aria-label={legend}><div className="settings-group__rows">{children}</div></Fieldset.Root>
       </CardContent>
-      {actions ? <CardFooter className="card__footer flex justify-end gap-2 border-0 bg-transparent p-0">{actions}</CardFooter> : null}
+      {actions ? <CardFooter className="justify-end flex-wrap">{actions}</CardFooter> : null}
     </Card>
   )
 }

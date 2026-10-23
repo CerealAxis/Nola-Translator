@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 
 import { LoaderCircle } from 'lucide-react'
 
@@ -75,30 +75,11 @@ export function ExportDialog({
             {t('records.export')}
           </span>
 
-          <ToggleGroup
-            value={[format]}
-            onValueChange={(values: ExportFormat[]) => {
-              // A single-select group reports an empty list when the pressed format is
-              // clicked again, so the export format never clears.
-              if (values.length === 0) return
-              const next = values[0]
-              if (FORMATS.includes(next)) setFormat(next)
-            }}
-            disabled={exporting}
-            className="nola-segmented"
-            aria-label={t('records.export')}
-          >
-            {FORMATS.map((value) => (
-              <ToggleGroupItem
-                key={value}
-                value={value}
-                className="toggle-button leading-[1.5] uppercase"
-                data-selected={format === value ? 'true' : undefined}
-              >
-                {value}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          <TabsRoot value={format} onValueChange={value => { if (FORMATS.includes(value as ExportFormat)) setFormat(value as ExportFormat) }}>
+            <TabsList className="nola-segmented" aria-label={t('records.export')}>
+              {FORMATS.map(value => <TabsTrigger key={value} value={value} disabled={exporting} className="leading-[1.5] uppercase">{value}</TabsTrigger>)}
+            </TabsList>
+          </TabsRoot>
 
           {/*
            * The file holds model-generated translation, so the AI notice has to

@@ -1,23 +1,43 @@
+"use client"
+
 import { Toast as BaseToast } from '@base-ui/react/toast'
-import { X } from 'lucide-react'
+import { CheckCircle2, CircleX, Info, LoaderCircle, TriangleAlert, X } from 'lucide-react'
 import { Button } from './button'
-import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 
-export type ToastVariant = 'default' | 'accent' | 'success' | 'warning' | 'danger'
+export type ToastVariant = 'default' | 'accent' | 'info' | 'success' | 'warning' | 'danger' | 'error' | 'loading'
 export interface ToastAction { children: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'tertiary' | 'outline' | 'danger' }
-export interface ToastData { variant: ToastVariant; action?: ToastAction }
+export interface ToastData {}
 export interface ToastOptions { description?: string; actionProps?: ToastAction; timeout?: number; variant?: ToastVariant }
 
 const manager = BaseToast.createToastManager<ToastData>()
+
+function toastType(variant: ToastVariant | undefined): 'success' | 'info' | 'warning' | 'error' | 'loading' | undefined {
+  switch (variant) {
+    case 'accent':
+    case 'info': return 'info'
+    case 'success': return 'success'
+    case 'warning': return 'warning'
+    case 'danger':
+    case 'error': return 'error'
+    case 'loading': return 'loading'
+    default: return undefined
+  }
+}
+
+function nativeActionProps(action: ToastAction | undefined): { children: string; onClick: () => void } | undefined {
+  if (!action) return undefined
+  return { children: action.children, onClick: action.onPress }
+}
 
 export function createToast(message: string, options: ToastOptions = {}): string {
   return manager.add({
     title: message,
     description: options.description,
     timeout: options.timeout,
-    priority: options.variant === 'danger' ? 'high' : 'low',
-    data: { variant: options.variant ?? 'default', action: options.actionProps },
+    type: toastType(options.variant),
+    actionProps: nativeActionProps(options.actionProps),
+    priority: options.variant === 'danger' || options.variant === 'error' ? 'high' : 'low',
   })
 }
 
@@ -26,8 +46,9 @@ export function updateToast(id: string, message: string, options: ToastOptions &
     title: message,
     description: options.description,
     ...(options.timeout === undefined ? {} : { timeout: options.timeout }),
-    priority: options.variant === 'danger' ? 'high' : 'low',
-    data: { variant: options.variant, action: options.actionProps },
+    type: toastType(options.variant),
+    actionProps: nativeActionProps(options.actionProps),
+    priority: options.variant === 'danger' || options.variant === 'error' ? 'high' : 'low',
   })
   return id
 }
@@ -40,12 +61,15 @@ function ToastViewport() {
   return <BaseToast.Portal>
       <BaseToast.Viewport className="nola-toast-viewport z-toast" data-slot="toast-viewport">
         {toasts.map(toast => {
-          const variant = toast.data?.variant ?? 'default'
-          const action = toast.data?.action
-          return <BaseToast.Root key={toast.id} toast={toast} className={cn('nola-toast', `nola-toast-${variant}`)} data-slot="toast">
+          return <BaseToast.Root key={toast.id} toast={toast} className="nola-toast" data-slot="toast">
             <BaseToast.Content className="nola-toast-content">
+              {toast.type === 'success' ? <CheckCircle2 className="nola-toast-icon" aria-hidden="true" /> : null}
+              {toast.type === 'info' ? <Info className="nola-toast-icon" aria-hidden="true" /> : null}
+              {toast.type === 'warning' ? <TriangleAlert className="nola-toast-icon" aria-hidden="true" /> : null}
+              {toast.type === 'error' ? <CircleX className="nola-toast-icon nola-toast-icon-error" aria-hidden="true" /> : null}
+              {toast.type === 'loading' ? <LoaderCircle className="nola-toast-icon nola-toast-icon-loading" aria-hidden="true" /> : null}
               <div className="nola-toast-copy"><BaseToast.Title className="nola-toast-title" />{toast.description ? <BaseToast.Description className="nola-toast-description" /> : null}</div>
-              {action ? <BaseToast.Action className="nola-toast-action" render={<Button size="sm" variant={action.variant === 'danger' ? 'danger' : action.variant === 'primary' ? 'default' : 'secondary'} onClick={action.onPress} />}>{action.children}</BaseToast.Action> : null}
+              <BaseToast.Action className="nola-toast-action" render={<Button size="sm" variant="outline" />} />
               <BaseToast.Close render={<Button size="icon" variant="tertiary" className="nola-toast-close" aria-label={t('common.close')}><X aria-hidden="true" /></Button>} />
             </BaseToast.Content>
           </BaseToast.Root>

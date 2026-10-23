@@ -13,7 +13,7 @@ import { LoaderCircle, Pause, Play } from 'lucide-react'
 import { notifyError } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 import { useI18n } from '@/i18n'
 
 /** Playback speed steps, in the order they appear. */
@@ -198,31 +198,14 @@ export function AudioPlayerBar({
 
       <span className="nola-mono shrink-0 text-muted">{formatClock(totalMs)}</span>
 
-      <ToggleGroup
-        value={[String(rate)]}
-        // A segmented control reports the pressed values, not a change event. Clicking the
-        // pressed rate clears the selection, and an empty selection is ignored so the rate
-        // is never unset.
-        onValueChange={(values: string[]) => {
-          const first = values[0]
-          if (first === undefined) return
-          const next = Number(first)
-          if (RATES.includes(next as Rate)) changeRate(next as Rate)
-        }}
-        className="nola-segmented shrink-0"
-        aria-label={t('homeRecordsUi.playbackRate')}
-      >
-        {RATES.map((value) => (
-          <ToggleGroupItem
-            key={value}
-            value={String(value)}
-            className="toggle-button tabular-nums"
-            data-selected={rate === value ? 'true' : undefined}
-          >
-            {value}x
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+      <TabsRoot value={String(rate)} onValueChange={value => {
+        const next = Number(value)
+        if (RATES.includes(next as Rate)) changeRate(next as Rate)
+      }}>
+        <TabsList className="nola-segmented shrink-0" aria-label={t('homeRecordsUi.playbackRate')}>
+          {RATES.map(value => <TabsTrigger key={value} value={String(value)} className="tabular-nums">{value}x</TabsTrigger>)}
+        </TabsList>
+      </TabsRoot>
     </div>
   )
 }

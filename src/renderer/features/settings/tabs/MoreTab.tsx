@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Avatar, AvatarImage, AvatarFallback, AvatarGroup } from '@/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Check, ExternalLink, Github, Heart, LoaderCircle, RefreshCw, Slash, UserRound } from 'lucide-react'
+import { Check, ExternalLink, Github, Heart, LoaderCircle, RefreshCw, UserRound } from 'lucide-react'
 
 import type { AppUpdateCheckResult } from '@/bridge'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
@@ -18,10 +18,11 @@ import { AppUpdateDialog } from '../AppUpdateNotice'
 import packageInfo from '../../../../../package.json'
 import nolaLogoUrl from '../../../../../assets/brand/nola-logo.svg'
 import authorAvatarUrl from '../../../../../assets/brand/cerealaxis.png'
+import shadcnLogoUrl from '../../../../../assets/brand/shadcn-ui.png'
 import './more.css'
 
 const AUTHOR_URL = 'https://github.com/CerealAxis'
-const SPONSORS_URL = 'https://github.com/sponsors/CerealAxis'
+const SPONSOR_URL = 'https://nola.xaviermc.top/zh-CN/contributing/sponsor'
 const REPOSITORY_URL = 'https://github.com/CerealAxis/Nola-Translator'
 const SHADCN_UI_URL = 'https://ui.shadcn.com/'
 const COPIED_HOLD_MS = 1500
@@ -92,7 +93,6 @@ export function MoreTab() {
         <IdentityRow name={packageInfo.author} description={t('more.authorDescription')} image={authorAvatarUrl}
           action={<div className="settings-more__identity-actions">
             <ExternalAction href={AUTHOR_URL} label={t('more.githubProfile')} icon={<Github aria-hidden="true" />} />
-            <ExternalAction href={SPONSORS_URL} label={t('more.sponsor')} icon={<Heart aria-hidden="true" />} />
           </div>} />
         <IdentityRow name={packageInfo.productName} description={t('more.appVersion', { version: packageInfo.version })} image={nolaLogoUrl} isLogo
           action={<div className="settings-more__identity-actions">
@@ -107,7 +107,7 @@ export function MoreTab() {
       </SettingGroup>
 
       <SettingGroup legend={t('more.specialThanks')}>
-        <IdentityRow name="shadcn/ui" description={t('more.uiThanks')} fallback={<Slash aria-hidden="true" />}
+        <IdentityRow name="shadcn/ui" description={t('more.uiThanks')} image={shadcnLogoUrl} isLogo
           action={<ExternalAction href={SHADCN_UI_URL} label={t('more.uiWebsite')} />} />
       </SettingGroup>
 
@@ -125,7 +125,7 @@ export function MoreTab() {
             </TooltipTrigger>
             <TooltipContent sideOffset={3} className={TOOLTIP_CLASS}>{t('more.sponsorInfo')}</TooltipContent>
           </Tooltip>
-          <Heart className="settings-more__heart" aria-hidden="true" />
+          <ExternalAction href={SPONSOR_URL} label={t('more.sponsor')} icon={<Heart aria-hidden="true" />} />
         </div>
       </SettingGroup>
 

@@ -13,10 +13,6 @@ export function HeroSection(): ReactNode {
   ]
   return (
     <Card className="nola-home-hero">
-      {/*
-       * The copy column states its own box: it fills the hero row and stacks its
-       * children, which the card surface itself no longer provides.
-       */}
       <CardContent className="nola-home-hero__copy flex flex-1 flex-col gap-1">
         <h1><span>Nola</span> Translator</h1>
         <p>{t('homeRecordsUi.tagline')}</p>

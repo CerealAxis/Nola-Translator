@@ -1,4 +1,4 @@
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 
 import { Spinner } from '@/components/ui/spinner'
 import { Dialog, DialogCloseButton, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -7,7 +7,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectI
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
+import { Card, CardAction, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { useState } from 'react'
 import HuggingFace from '@lobehub/icons/es/HuggingFace/components/Color'
 import ModelScope from '@lobehub/icons/es/ModelScope/components/Color'
@@ -61,20 +61,18 @@ export function RecommendedFamilyCard({ family, records, onOpen }: RecommendedFa
   const first = records[0]
   const engines = [...new Set(records.flatMap(modelEngines))]
   return <Card className="models-card models-family-card h-full">
-    <CardHeader className="card__header">
-      <span className={`models-card__icon models-card__icon--${first.kind === 'translationModel' ? 'translation' : 'recognition'}`}>
+    <CardHeader>
+      <CardAction><span aria-hidden="true" className={`models-card__icon models-card__icon--${first.kind === 'translationModel' ? 'translation' : 'recognition'}`}>
         <ModelMark record={first} kind={first.kind} />
-      </span>
-      <div className="models-card__identity">
+      </span></CardAction>
         <CardTitle className="card__title">{FAMILY_NAMES[family]}</CardTitle>
         <CardDescription className="card__description">{t(`models.familyDescriptions.${family}`)}</CardDescription>
-      </div>
     </CardHeader>
     <CardContent className="card__content"><div className="models-card__status">
       {engines.map(engine => <Badge key={engine} >{engine === 'llama' ? 'llama.cpp' : engine === 'crisp' ? 'CrispASR' : 'PyTorch'}</Badge>)}
       {records.some(record => record.installed) ? <Badge  variant="success">{t('models.installed')}</Badge> : null}
     </div></CardContent>
-    <CardFooter className="card__footer border-0 bg-transparent"><Button variant="secondary" data-onboarding={`model-family-${first.kind}`} onClick={onOpen}>{t('models.openDetails')}</Button></CardFooter>
+    <CardFooter className="card__footer"><Button data-onboarding={`model-family-${first.kind}`} onClick={onOpen}>{t('models.openDetails')}</Button></CardFooter>
   </Card>
 }
 
@@ -165,24 +163,28 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
           <div className="models-family-dialog__filters">
             <section data-onboarding="model-engine" aria-label={t('modelConfig.engine')}>
               <Label className="models-family-dialog__label">{t('modelConfig.engine')}</Label>
-              <ToggleGroup className="models-family-dialog__choices" value={[engine]} onValueChange={values => {
-                const first = records.find(record => modelEngines(record).includes(values[0]))
-                if (first) { setEngine(values[0]); setParameters(paramsOf(first) ?? ''); setSelectedId(first.resourceId); setSource('huggingface') }
-              }}>{engines.map(option => {
-                const available = isEngineAvailable(option, runtimes?.local ?? null)
-                const button = <ToggleGroupItem value={option} render={<Button variant="secondary" />}>{engineLabel(option)}</ToggleGroupItem>
-                return available ? button : <Tooltip key={option}>
-                  <TooltipTrigger delay={250} render={button} />
-                  <TooltipContent  role="tooltip" className="settings-row__tooltip z-popup whitespace-normal">{t('models.engineUnavailable', { engine: engineLabel(option) })}</TooltipContent>
-                </Tooltip>
-              })}</ToggleGroup>
+              <TabsRoot value={engine} onValueChange={value => {
+                const first = records.find(record => modelEngines(record).includes(value))
+                if (first) { setEngine(value); setParameters(paramsOf(first) ?? ''); setSelectedId(first.resourceId); setSource('huggingface') }
+              }}><TabsList className="models-family-dialog__choices">
+                {engines.map(option => {
+                  const available = isEngineAvailable(option, runtimes?.local ?? null)
+                  const button = <TabsTrigger value={option}>{engineLabel(option)}</TabsTrigger>
+                  return available ? button : <Tooltip key={option}>
+                    <TooltipTrigger delay={250} render={button} />
+                    <TooltipContent role="tooltip" className="settings-row__tooltip z-popup whitespace-normal">{t('models.engineUnavailable', { engine: engineLabel(option) })}</TooltipContent>
+                  </Tooltip>
+                })}
+              </TabsList></TabsRoot>
             </section>
             <section data-onboarding="model-scale" aria-label={t('models.parameterScale')}>
               <Label className="models-family-dialog__label">{t('models.parameterScale')}</Label>
-              <ToggleGroup className="models-family-dialog__choices" value={[parameters]} onValueChange={values => {
-                const first = engineRecords.find(record => (paramsOf(record) ?? '') === values[0])
-                if (first) { setParameters(values[0]); setSelectedId(first.resourceId); setSource('huggingface') }
-              }}>{parameterOptions.map(option => <ToggleGroupItem key={option} value={option} render={<Button variant="secondary" />}>{option || selected.name}</ToggleGroupItem>)}</ToggleGroup>
+              <TabsRoot value={parameters} onValueChange={value => {
+                const first = engineRecords.find(record => (paramsOf(record) ?? '') === value)
+                if (first) { setParameters(value); setSelectedId(first.resourceId); setSource('huggingface') }
+              }}><TabsList className="models-family-dialog__choices">
+                {parameterOptions.map(option => <TabsTrigger key={option} value={option}>{option || selected.name}</TabsTrigger>)}
+              </TabsList></TabsRoot>
             </section>
           </div>
           <div className="select models-family-dialog__model-select" data-onboarding="model-version"><Select value={selected.resourceId} onValueChange={key => { if (typeof key === 'string') { setSelectedId(key); setSource('huggingface') } }} aria-label={t('offline.modelChoice')}>
@@ -208,11 +210,13 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
           </section>
           <section data-onboarding="model-sources" aria-label={t('models.downloadSources.title')}>
             <Label className="models-family-dialog__label">{t('models.downloadSources.title')}</Label>
-            <ToggleGroup className="models-family-dialog__sources" value={[selectedSource]} onValueChange={values => { if (values[0]) setSource(values[0]) }}>
-              {sources.map(option => <ToggleGroupItem key={option.source} value={option.source} data-onboarding="model-download-source" render={<Button variant="secondary" />}>
-                {option.source === 'modelscope' ? <ModelScope aria-hidden="true" /> : <HuggingFace aria-hidden="true" />}{t(option.labelKey)}
-              </ToggleGroupItem>)}
-            </ToggleGroup>
+            <TabsRoot value={selectedSource} onValueChange={value => { if (value) setSource(value) }}>
+              <TabsList className="models-family-dialog__sources" aria-label={t('models.downloadSources.title')}>
+                {sources.map(option => <TabsTrigger key={option.source} value={option.source} data-onboarding="model-download-source">
+                  {option.source === 'modelscope' ? <ModelScope aria-hidden="true" /> : <HuggingFace aria-hidden="true" />}{t(option.labelKey)}
+                </TabsTrigger>)}
+              </TabsList>
+            </TabsRoot>
           </section>
         </div>
         <DialogFooter data-onboarding="model-download-actions">

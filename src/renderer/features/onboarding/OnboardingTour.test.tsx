@@ -56,8 +56,11 @@ function TutorialApp() {
     </div> : null}
     {['recognition-provider', 'audio-source', 'translation-provider'].map(id => <div key={id} data-onboarding={id}><Button aria-expanded={expanded === id} onClick={() => setExpanded(expanded ? null : id)}>{id}</Button></div>)}
     <div data-onboarding="recognition-model" /><div data-onboarding="translation-model" />
+    <div data-onboarding="quick-settings" />
     <div data-slot="workspace"><div className="nola-workspace-toolbar" /></div>
     <div className="nola-overlay-page"><div className="nola-page-heading" /></div>
+    <Button data-onboarding="open-overlay">open-overlay</Button>
+    <div data-onboarding="caption-preview" />
     <div className="nola-video-service" />
   </div>
 }
@@ -142,6 +145,24 @@ it('teaches real model details and allows skipping downloads without pretending 
   expect(screen.queryByText('本地模型或加载器待准备')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '退出' }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+it('introduces the current caption entry without opening a window or navigating to a removed sidebar entry', async () => {
+  await start()
+  await skipSection()
+  await skipSection()
+  await skipSection()
+  await expectStep('quick-nav')
+  fireEvent.click(screen.getByRole('button', { name: 'workspace' }))
+  await expectStep('quick')
+  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
+  await expectStep('overlay-nav')
+  const open = vi.fn()
+  screen.getByRole('button', { name: 'open-overlay' }).addEventListener('click', open)
+  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
+  await expectStep('overlay')
+  expect(open).not.toHaveBeenCalled()
+  expect(window.location.hash).toBe('#/workspace')
 })
 
 it('pauses for exploration, returns on request, and exits with Escape', async () => {

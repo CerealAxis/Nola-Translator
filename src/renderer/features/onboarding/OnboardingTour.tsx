@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
-import { Dialog, DialogCloseButton, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Card, CardAction, CardDescription, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
+import { Dialog, DialogCloseButton, DialogContent, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Progress } from '@base-ui/react/progress'
 import { Spinner } from '@/components/ui/spinner'
 import { Badge } from '@/components/ui/badge'
@@ -58,18 +58,20 @@ function WelcomeDialog() {
 
   return <Dialog open onOpenChange={(open, details) => { if (details.reason === 'outside-press') { details.cancel(); return } if (!open) actions.settings.stopOnboarding() }}>
 
-        <DialogContent className="onboarding-welcome">
-          <DialogHeader>
-            <img ref={markPresented} className="onboarding-welcome__logo" src={nolaLogoUrl} alt="" aria-hidden="true" />
-            <DialogTitle>{t('onboarding.welcomeTitle')}</DialogTitle>
-          </DialogHeader>
-          <div className="nola-dialog-body">
-            <p>{t('onboarding.welcomeIntro')}</p>
-            <div className="onboarding-welcome__support">
-              <p>{t('onboarding.starRequest')}</p>
-            </div>
-          </div>
-          <DialogFooter>
+        <DialogContent className="onboarding-welcome onboarding-dialog" aria-modal="true" aria-describedby="onboarding-welcome-description">
+          <Card className="onboarding-dialog__card">
+          <CardHeader>
+            <CardAction><img ref={markPresented} className="onboarding-welcome__logo" src={nolaLogoUrl} alt="" aria-hidden="true" /></CardAction>
+            <CardTitle><DialogTitle>{t('onboarding.welcomeTitle')}</DialogTitle></CardTitle>
+            <CardDescription id="onboarding-welcome-description">{t('onboarding.welcomeIntro')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ol className="onboarding-welcome__chapters">
+              {TOUR_CHAPTERS.map((key, item) => <li key={key}><span aria-hidden="true">{item + 1}</span>{t(key)}</li>)}
+            </ol>
+            <p className="onboarding-welcome__support">{t('onboarding.starRequest')}</p>
+          </CardContent>
+          <CardFooter><DialogFooter>
             <Button variant="default" size="sm" autoFocus onClick={() => actions.settings.beginOnboarding()}>{t('onboarding.begin')}</Button>
             <Button variant="secondary" size="sm" onClick={() => actions.settings.stopOnboarding()}>{t('onboarding.later')}</Button>
             <a className="onboarding-welcome__link button button--sm button--secondary" href="https://nola.xaviermc.top" target="_blank" rel="noreferrer">
@@ -78,7 +80,8 @@ function WelcomeDialog() {
             <a className="onboarding-welcome__link button button--sm button--secondary" href="https://github.com/CerealAxis/Nola-Translator" target="_blank" rel="noreferrer">
               <Github aria-hidden="true" />{t('onboarding.github')}
             </a>
-          </DialogFooter>
+          </DialogFooter></CardFooter>
+          </Card>
         </DialogContent>
 
   </Dialog>
@@ -191,10 +194,26 @@ function TourSteps() {
           target = found
           alignmentKey = alignment
           const behavior = reduced ? 'instant' : 'smooth'
-          const navigationScroller = target.closest('.settings-nav') ? target.closest<HTMLElement>('.nola-main') : null
-          // Centering a sticky settings tab can leave it underneath the following panel on a narrow window.
-          if (navigationScroller) navigationScroller.scrollTo({ top: 0, behavior })
-          else target.scrollIntoView({ block: alignTop ? 'start' : 'center', inline: 'nearest', behavior })
+          const main = target.closest<HTMLElement>('.nola-main')
+          if (target.closest('.settings-nav')) main?.scrollTo({ top: 0, behavior })
+          else {
+            // Scroll only the containing panel: scrollIntoView also moves the document and its title bar.
+            let scroller = target.parentElement
+            while (scroller && scroller !== document.body) {
+              if (/(auto|scroll)/.test(getComputedStyle(scroller).overflowY) && scroller.scrollHeight > scroller.clientHeight) break
+              scroller = scroller.parentElement
+            }
+            if (scroller && scroller !== document.body) {
+              const bounds = scroller.getBoundingClientRect()
+              const nav = main?.querySelector<HTMLElement>('.settings-nav')
+              const stackedNav = scroller === main && target.closest('.settings-panels') && nav && nav.offsetWidth > main.clientWidth / 2 ? nav.offsetHeight + space : 0
+              const top = bounds.top + gap + stackedNav
+              const room = Math.max(0, bounds.bottom - gap - top)
+              const rect = target.getBoundingClientRect()
+              const desired = alignTop ? top : top + Math.max(0, (room - rect.height) / 2)
+              scroller.scrollTo({ top: scroller.scrollTop + rect.top - desired, behavior })
+            }
+          }
           resize.observe(target)
         }
       } else target = null
@@ -316,14 +335,16 @@ function TourSteps() {
         <path className="onboarding-tour__scrim" fillRule="evenodd" d={spotlightPath(geometry?.viewport ?? { width: window.innerWidth, height: window.innerHeight }, geometry?.target ?? null, geometry?.radius ?? 0)} />
         {geometry?.target ? <rect className="onboarding-tour__outline" x={geometry.target.x} y={geometry.target.y} width={geometry.target.width} height={geometry.target.height} rx={geometry.radius} /> : null}
       </svg> : null}
-      <Card ref={cardRef} tabIndex={-1} role="dialog" aria-modal="false" aria-labelledby="onboarding-heading" aria-describedby="onboarding-body"
+      <Card size="sm" ref={cardRef} tabIndex={-1} role="dialog" aria-modal="false" aria-labelledby="onboarding-heading" aria-describedby="onboarding-body"
         className={['onboarding-tour__card', (step?.model || (geometry?.viewport.height ?? window.innerHeight) < 640) && 'onboarding-tour__card--compact', away && 'onboarding-tour__card--center'].filter(Boolean).join(' ')}
         data-ready={away || geometry !== null}
         style={geometry && !away ? { left: geometry.tip.x, top: geometry.tip.y, maxHeight: geometry.maxHeight } : undefined}>
-        <div className="onboarding-tour__topline">
-          <span>{t('onboarding.chapterProgress', { current: chapter + 1, total: TOUR_CHAPTERS.length })}</span>
-          <Button variant="secondary" size="icon" aria-label={t('onboarding.exit')} onClick={() => actions.settings.stopOnboarding()}><X aria-hidden="true" /></Button>
-        </div>
+        <CardHeader>
+          <CardTitle id="onboarding-heading">{t(step.title)}</CardTitle>
+          <CardDescription id="onboarding-body">{away ? t('onboarding.paused') : t(step.body)}</CardDescription>
+          <CardAction><Button variant="secondary" size="icon" aria-label={t('onboarding.exit')} onClick={() => actions.settings.stopOnboarding()}><X aria-hidden="true" /></Button></CardAction>
+        </CardHeader>
+        <CardContent key={step.id} className="onboarding-tour__lesson">
           <ol className="onboarding-tour__chapters" aria-label={t('onboarding.title')}>
             {TOUR_CHAPTERS.map((key, item) => <li key={key} aria-current={item === chapter ? 'step' : undefined} data-state={item < chapter ? 'complete' : item === chapter ? 'current' : 'upcoming'}>
               <span aria-hidden="true">{item < chapter ? <Check /> : item + 1}</span><span>{t(key)}</span>
@@ -332,26 +353,25 @@ function TourSteps() {
           <Progress.Root className="onboarding-tour__meter" aria-label={t('onboarding.title')} value={(index / TOUR_STEPS.length) * 100}>
             <Progress.Track className="onboarding-tour__meter-track"><Progress.Indicator className="onboarding-tour__meter-fill" /></Progress.Track>
           </Progress.Root>
-          <CardHeader><CardTitle id="onboarding-heading">{t(step.title)}</CardTitle></CardHeader>
-          <CardContent key={step.id} className="onboarding-tour__lesson">
-            <p id="onboarding-body">{away ? t('onboarding.paused') : t(step.body)}</p>
             {runtime ? <Badge variant={runtime.status === 'ready' ? 'success' : 'secondary'}>{t(runtime.status === 'ready' ? 'runtime.installed' : 'runtime.missing')}{runtime.status === 'ready' && runtime.version ? ` · ${runtime.version}` : ''}</Badge> : null}
             {!away && missing ? <p className="onboarding-tour__status" role="status">{unavailable ? t('onboarding.targetMissing') : <><Spinner />{t('onboarding.loading')}</>}</p> : null}
             {!away && !missing && step.action ? <p className="onboarding-tour__instruction"><MousePointer2 aria-hidden="true" />{t(step.action === 'inspect' ? 'onboarding.inspectHint' : 'onboarding.actHint')}</p> : null}
-          </CardContent>
-          <div className="onboarding-tour__feedback" role="status" aria-live="polite">{feedback ? <><CheckCircle2 aria-hidden="true" />{t('onboarding.feedback')}</> : null}</div>
-          <CardFooter>
-            <span className="onboarding-tour__progress">{t('onboarding.progress', { current: chapterIndex, total: chapterSteps.length })}</span>
+            {feedback ? <div className="onboarding-tour__feedback" role="status" aria-live="polite"><CheckCircle2 aria-hidden="true" />{t('onboarding.feedback')}</div> : null}
+        </CardContent>
+          <CardFooter className="onboarding-tour__footer">
+            <div className="onboarding-tour__navigation">
+            <span className="onboarding-tour__progress">{t('onboarding.chapterProgress', { current: chapter + 1, total: TOUR_CHAPTERS.length })}<span>{t('onboarding.progress', { current: chapterIndex, total: chapterSteps.length })}</span></span>
             <div className="onboarding-tour__actions">
               <Button variant="secondary" size="sm" disabled={index === 0} onClick={() => moveTo(index - 1)}><ArrowLeft aria-hidden="true" />{t('onboarding.back')}</Button>
               {away || (missing && unavailable) ? <Button variant="default" size="sm" onClick={resume}>{t(away ? 'onboarding.resume' : 'onboarding.retry')}</Button>
                 : !step.action ? <Button variant="default" size="sm" disabled={missing} onClick={() => moveTo(index + 1)}>{t('onboarding.next')}<ArrowRight aria-hidden="true" /></Button> : null}
             </div>
-          </CardFooter>
+            </div>
           <div className="onboarding-tour__secondary">
             <Button variant="tertiary" size="sm" onClick={() => moveTo(index + 1)}>{t('onboarding.skipStep')}</Button>
             <Button variant="tertiary" size="sm" onClick={skipChapter}>{t('onboarding.skipChapter')}</Button>
           </div>
+          </CardFooter>
       </Card>
     </div>, document.body,
   )
@@ -363,16 +383,18 @@ function TourCompletion({ onExit }: TourCompletionProps) {
   const { t } = useI18n()
   return <Dialog open onOpenChange={(open, details) => { if (details.reason === 'outside-press') { details.cancel(); return } if (!open) actions.settings.stopOnboarding() }}>
 
-      <DialogContent data-onboarding="complete">
+      <DialogContent className="onboarding-dialog" data-onboarding="complete" aria-modal="true" aria-describedby="onboarding-complete-description">
+        <Card className="onboarding-dialog__card">
         <DialogCloseButton aria-label={t('onboarding.exit')} />
-        <DialogHeader><DialogTitle>{t('onboarding.finishTitle')}</DialogTitle></DialogHeader>
-        <div className="nola-dialog-body"><p>{t('onboarding.finishBody')}</p></div>
-        <DialogFooter>
+        <CardHeader className="onboarding-dialog__completion-header"><CardTitle><DialogTitle>{t('onboarding.finishTitle')}</DialogTitle></CardTitle><CardDescription id="onboarding-complete-description">{t('onboarding.finishBody')}</CardDescription></CardHeader>
+        <CardContent><CheckCircle2 className="onboarding-dialog__success" aria-hidden="true" /></CardContent>
+        <CardFooter><DialogFooter>
       <a className="onboarding-welcome__link button button--sm button--secondary" href="https://github.com/CerealAxis/Nola-Translator" target="_blank" rel="noreferrer">
         <Github aria-hidden="true" />{t('onboarding.githubHome')}
       </a>
       <Button variant="default" size="sm" onClick={onExit}>{t('onboarding.finishExit')}</Button>
-        </DialogFooter>
+        </DialogFooter></CardFooter>
+        </Card>
       </DialogContent>
 
   </Dialog>
