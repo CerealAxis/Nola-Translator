@@ -2,9 +2,17 @@
 .model-configuration-dialog.modal__dialog--lg { box-sizing:border-box; width:min(calc(100vw - var(--space-4)), calc(var(--space-8) * 11)); max-width:calc(var(--space-8) * 11); max-height:80dvh; overflow:hidden; }
 .model-configuration-dialog.modal__dialog--lg { --settings-control-radius:var(--radius-lg); padding:var(--space-3); border-radius:var(--radius-xl); }
 .model-configuration-dialog .nola-dialog-header { padding-inline-end:var(--space-6); }
-.model-configuration-dialog, .model-configuration-dialog__body, .model-language-popup .nola-language-options { scrollbar-width:none; }
-.model-configuration-dialog::-webkit-scrollbar, .model-configuration-dialog__body::-webkit-scrollbar, .model-language-popup .nola-language-options::-webkit-scrollbar { display:none; width:0; height:0; }
+.model-configuration-dialog, .model-configuration-dialog__body, .model-language-chips, .model-language-popup .nola-language-options { scrollbar-width:none; -ms-overflow-style:none; }
+.model-configuration-dialog::-webkit-scrollbar, .model-configuration-dialog__body::-webkit-scrollbar, .model-language-chips::-webkit-scrollbar, .model-language-popup .nola-language-options::-webkit-scrollbar { display:none; width:0; height:0; }
 .model-configuration-dialog .settings-row__control > .select { width:100%; }
+.model-language-chips { max-height:calc(var(--space-7) * 2); overflow-y:auto; overscroll-behavior:contain; }
+.model-provider-dialog .settings-row__control { overflow-wrap:anywhere; }
+.model-api-key-field { position:relative; display:flex; flex:0 1 var(--settings-control-max-width); width:100%; min-width:0; max-width:var(--settings-control-max-width); }
+.model-api-key-field .settings-control-field { padding-inline-end:calc(var(--space-6) + var(--space-1)); }
+.model-api-key-field__toggle.button { position:absolute; inset-inline-end:var(--space-1); top:50%; width:var(--space-4); min-width:var(--space-4); height:var(--space-4); min-height:var(--space-4); padding:0; transform:translateY(-50%); border-radius:var(--radius-xl); background:transparent; color:var(--muted); }
+.model-api-key-field__toggle.button:hover:not(:disabled) { background:transparent; color:var(--foreground); }
+.model-api-key-field__toggle svg { width:var(--space-2); height:var(--space-2); }
+.models-language-actions { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-1); }
 /* The body is a flex column inside a height-capped dialog. Its rows keep their natural height:
  * a language field holding dozens of tags would otherwise be squeezed down to the body height
  * and spill over the row below it, instead of the body scrolling. */
@@ -77,17 +85,20 @@
 .models-family-dialog__sources { display:flex; flex-wrap:wrap; gap:var(--space-1); }
 .models-family-dialog__sources .tabs__tab svg { width:var(--space-3); height:var(--space-3); }
 .models-section-title { font-size:20px; font-weight:650; margin:0; }
-.models-card.card { height:100%; --action-radius:var(--radius-md); }
+.models-card.card { height:100%; --action-radius:var(--radius-xl); }
 .models-card .card__header { min-width:0; }
 
 
 
 .models-family-card .card__description { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+.models-cloud-card .card__description { display:block; overflow:visible; }
+.models-family-card .card__content { margin-top:auto; }
+.models-card.models-family-card .card__footer { margin-top:0; }
 .models-card__meta { font:var(--font-caption); color:var(--muted); }
 .models-card .card__content { display:flex; flex-direction:column; gap:var(--space-1); }
 .models-card__status { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
 .models-card .card__footer { flex-wrap:wrap; margin-top:auto; }
-.models-card .card__footer .button { border-radius:var(--radius-md); border:0; box-shadow:none; font-weight:600; }
+.models-card .card__footer .button { border-radius:var(--radius-xl); border:0; box-shadow:none; font-weight:600; }
 .models-card .card__footer .button[data-variant='default'] { background:var(--nola-ui-primary); color:var(--nola-ui-primary-foreground); }
 .models-card .card__footer .button[data-variant='default']:hover:not(:disabled) { background:color-mix(in oklch,var(--nola-ui-primary) 88%,var(--foreground)); }
 .models-card .card__footer .button:is([data-variant='outline'],[data-variant='secondary']) { background:var(--surface-tertiary); color:var(--foreground); }
@@ -135,7 +146,10 @@
 .model-language-toggle { display:grid; place-items:center; flex:none; margin-inline-start:auto; padding:var(--space-1); border:0; border-radius:var(--radius-xl); background:var(--surface-secondary); color:var(--muted); }
 .model-language-popup.settings-select-content { display:flex; flex-direction:column; gap:var(--space-1); overflow:hidden; }
 .model-language-popup .input { flex:none; min-height:var(--field-control-height); padding:var(--space-1) var(--space-2); border:1px solid var(--field-border); border-radius:var(--radius-lg); background:var(--field-background); }
-.model-language-popup .list-box-item { display:flex; align-items:center; justify-content:space-between; }
+.model-language-popup .model-language-option { position:relative; display:flex; align-items:center; width:100%; min-height:var(--field-control-height); padding:var(--space-1) var(--space-5) var(--space-1) var(--space-2); border-radius:var(--radius-md); font:var(--font-body); outline:none; cursor:default; user-select:none; }
+.model-language-popup .model-language-option:hover { background:var(--selection-neutral); color:var(--foreground); }
+.model-language-popup .model-language-option > :last-child { margin-inline-start:auto; }
+.model-language-popup .model-language-option svg { width:var(--space-2); height:var(--space-2); flex:none; }
 .model-language-popup .nola-language-options { min-height:0; overflow-y:auto; overflow-x:hidden; }
 .model-configuration-dialog__body, .models-family-dialog__body { min-width:0; min-height:0; overflow-x:hidden; overflow-y:auto; }
 .model-configuration-dialog .nola-dialog-header, .models-family-dialog .nola-dialog-header { flex-shrink:0; margin-bottom:var(--space-2); }

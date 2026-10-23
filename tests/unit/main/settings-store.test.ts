@@ -8,6 +8,22 @@ import { GITHUB_PROXY_AUTO } from '../../../src/shared/github-proxies'
 import { PYPI_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_AUTO } from '../../../src/shared/pypi-mirrors'
 
 describe('设置存储', () => {
+  it('persists multiple custom models and keeps the selected connection synchronized', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-custom-models-'))
+    const path = join(directory, 'settings.json')
+    const first = { id: 'first', name: 'First', endpoint: 'https://first.example/v1', model: 'first-model', apiFormat: 'chat-completions' as const, contextWindow: 32768, maxOutputTokens: 1024, languages: ['zh', 'en'] }
+    const second = { ...first, id: 'second', name: 'Second', endpoint: 'https://second.example/v1', languages: ['ja', 'en'] }
+    try {
+      const store = new SettingsStore(path)
+      await store.update({ translation: { customModels: [first, second], customModelId: 'second', provider: 'cloud' } })
+      const restored = await new SettingsStore(path).load()
+      expect(restored.translation).toMatchObject({ customModels: [first, second], customModelId: 'second', cloudName: 'Second', cloudEndpoint: second.endpoint, cloudLanguages: ['ja', 'en'], targetLanguage: 'ja' })
+      await store.update({ translation: { cloudName: 'Renamed' } })
+      expect(store.current().translation.customModels?.find(model => model.id === 'second')?.name).toBe('Renamed')
+      expect(store.current().translation.customModels?.[0]).toEqual(first)
+      expect(await readFile(path, 'utf8')).not.toContain('apiKey')
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
   it('restores VAD defaults for old settings and persists custom timing', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-vad-settings-'))
     const path = join(directory, 'settings.json')

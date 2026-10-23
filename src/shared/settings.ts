@@ -184,8 +184,24 @@ export type CloudApiFormat = 'chat-completions' | 'chat-responses' | 'anthropic'
  * the Authorization header when the key is empty, while the Anthropic, Microsoft, and Google
  * shapes refuse without one.
  */
-export type CredentialProvider = 'cloud' | 'fallback-cloud' | 'microsoft' | 'google' | 'fallback-google' | 'aliyun-asr' | 'minimax-asr'
+export type CredentialProvider = 'cloud' | 'fallback-cloud' | 'microsoft' | 'google' | 'fallback-google' | 'aliyun-asr' | 'minimax-asr' | `cloud-model:${string}`
 export const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'fallback-cloud', 'microsoft', 'google', 'fallback-google', 'aliyun-asr', 'minimax-asr']
+
+export function isCredentialProvider(value: unknown): value is CredentialProvider {
+  return typeof value === 'string' && (CREDENTIAL_PROVIDERS.includes(value as CredentialProvider) || /^cloud-model:[a-zA-Z0-9_-]{1,64}$/.test(value))
+}
+
+export interface CustomTranslationModel {
+  id: string
+  name: string
+  endpoint: string
+  model: string
+  apiFormat: CloudApiFormat
+  contextWindow: number
+  maxOutputTokens: number
+  languages: string[]
+  sourceLanguages?: string[]
+}
 
 /**
  * Recommended Hy-MT2 sizes and quantizations, or a hub id for an installed GGUF.
@@ -204,6 +220,10 @@ export type TranslationSettings = {
   cloudName: string
   cloudContextWindow: number
   cloudMaxOutputTokens: number
+  customModels?: CustomTranslationModel[]
+  customModelId?: string
+  cloudLanguages?: string[]
+  cloudSourceLanguages?: string[]
   microsoftEndpoint: string
   microsoftRegion: string
   mymemoryEndpoint?: string

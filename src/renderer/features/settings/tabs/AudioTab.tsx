@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+import type { AppSettingsPatch } from '@/bridge'
 import { useModelOptions } from '@/model-options'
 import { recognitionLanguages } from '../../../../shared/model-capabilities'
 /**
@@ -198,19 +200,20 @@ export function AudioTab({ settings }: SettingsPanelProps) {
   )
 }
 
-interface CloudConnectionProps { recognition: RecognitionSettings; stored: boolean }
+export interface CloudConnectionProps { recognition: RecognitionSettings; stored: boolean; onUpdate?: (patch: AppSettingsPatch) => Promise<void>; credentialField?: ReactNode; showNotice?: boolean }
+export interface AliyunConnectionProps extends CloudConnectionProps { nativeTranslationSelected: boolean }
 
 /**
  * Aliyun streams over a persistent WebSocket, so it carries the region and workspace its socket
  * is opened against in addition to the model.
  */
-function AliyunConnection({ recognition, stored, nativeTranslationSelected }: CloudConnectionProps & { nativeTranslationSelected: boolean }) {
+export function AliyunConnection({ recognition, stored, nativeTranslationSelected, onUpdate = updateSettings, credentialField }: AliyunConnectionProps) {
   const { t } = useI18n()
   return <>
     <SettingsRow onboardingTarget="recognition-model" label={t('settings.recognitionModel')} desc={t('settings.aliyunHint')} descriptionTooltip>
       <SettingSelect value={recognition.aliyunModel ?? ALIYUN_RECOGNITION_MODELS[0]} ariaLabel={t('settings.recognitionModel')} options={ALIYUN_RECOGNITION_MODELS.map(value => ({ value, label: value }))} onChange={value => {
         const aliyunModel = value as AliyunRecognitionModel
-        void updateSettings({ recognition: { aliyunModel, sourceLanguage: 'auto' },
+        void onUpdate({ recognition: { aliyunModel, sourceLanguage: 'auto' },
           ...(!supportsRecognitionNativeTranslation({ ...recognition, provider: 'aliyun', aliyunModel }) && nativeTranslationSelected ? { translation: { provider: 'mymemory' as const } } : {}),
         }).catch(() => undefined)
       }} />
@@ -219,10 +222,10 @@ function AliyunConnection({ recognition, stored, nativeTranslationSelected }: Cl
       <SettingSelect value={recognition.aliyunRegion ?? 'cn-beijing'} ariaLabel={t('settings.region')} options={[
         { value: 'cn-beijing', label: t('settings.aliyunBeijing') },
         { value: 'ap-southeast-1', label: t('settings.aliyunSingapore') },
-      ]} onChange={value => { void updateSettings({ recognition: { aliyunRegion: value as 'cn-beijing' | 'ap-southeast-1' } }).catch(() => undefined) }} />
+      ]} onChange={value => { void onUpdate({ recognition: { aliyunRegion: value as 'cn-beijing' | 'ap-southeast-1' } }).catch(() => undefined) }} />
     </SettingsRow>
-    <TextRow label={t('settings.aliyunWorkspace')} value={recognition.aliyunWorkspaceId ?? ''} onCommit={value => { void updateSettings({ recognition: { aliyunWorkspaceId: value.trim() } }).catch(() => undefined) }} />
-    <ApiKeyRow provider="aliyun-asr" stored={stored} />
+    <TextRow label={t('settings.aliyunWorkspace')} value={recognition.aliyunWorkspaceId ?? ''} onCommit={value => { void onUpdate({ recognition: { aliyunWorkspaceId: value.trim() } }).catch(() => undefined) }} />
+    {credentialField ?? <ApiKeyRow provider="aliyun-asr" stored={stored} />}
   </>
 }
 
@@ -232,17 +235,17 @@ function AliyunConnection({ recognition, stored, nativeTranslationSelected }: Cl
  * tooltip because captions arriving a sentence at a time reads as a stall unless it says why
  * before the session starts.
  */
-function MiniMaxConnection({ recognition, stored }: CloudConnectionProps) {
+export function MiniMaxConnection({ recognition, stored, onUpdate = updateSettings, credentialField, showNotice = true }: CloudConnectionProps) {
   const { t } = useI18n()
   return <>
     <SettingsRow onboardingTarget="recognition-model" label={t('settings.recognitionModel')}>
       <SettingSelect value={recognition.minimaxModel ?? MINIMAX_RECOGNITION_MODELS[0]} ariaLabel={t('settings.recognitionModel')} options={MINIMAX_RECOGNITION_MODELS.map(value => ({ value, label: value }))} onChange={value => {
-        void updateSettings({ recognition: { minimaxModel: value as MinimaxRecognitionModel } }).catch(() => undefined)
+        void onUpdate({ recognition: { minimaxModel: value as MinimaxRecognitionModel } }).catch(() => undefined)
       }} />
     </SettingsRow>
-    <TextRow label={t('settings.endpoint')} value={recognition.minimaxEndpoint ?? ''} onCommit={value => { void updateSettings({ recognition: { minimaxEndpoint: value.trim() } }).catch(() => undefined) }} />
-    <ApiKeyRow provider="minimax-asr" stored={stored} />
-    <p className="nola-caption text-muted">{t('settings.minimaxNotice')}</p>
+    <TextRow label={t('settings.endpoint')} value={recognition.minimaxEndpoint ?? ''} onCommit={value => { void onUpdate({ recognition: { minimaxEndpoint: value.trim() } }).catch(() => undefined) }} />
+    {credentialField ?? <ApiKeyRow provider="minimax-asr" stored={stored} />}
+    {showNotice ? <p className="nola-caption text-muted">{t('settings.minimaxNotice')}</p> : null}
   </>
 }
 

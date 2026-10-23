@@ -112,7 +112,7 @@ export function defaultTargetOf(record: ResourceRecord): AppSettingsPatch | null
   const id = record.resourceId
   if (record.kind === 'recognitionModel') {
     if (!configurationOf(record)) return null
-    return { recognition: { modelId: id } }
+    return { recognition: { modelId: id, provider: 'local' } }
   }
   if (!configurationOf(record)) return null
   // Also pin provider to 'local': becoming the default means this is the one running locally.
@@ -203,6 +203,7 @@ export function ModelCard({
     </CardHeader>
       <CardContent className="card__content">
       <div className="models-card__status">
+        <Badge>{t('modelsSettingsUi.localModels')}</Badge>
         {isDefault && record.installed ? <Badge  variant="accent">{t('modelsSettingsUi.default')}</Badge> : null}
         {removal && state === 'removing' ? <StatusPill label={t('modelsSettingsUi.removing')} tone="accent" /> : record.kind !== 'ttsModel' && record.installed && !configurationOf(record) ? <StatusPill label={t('modelConfig.pending')} tone="warning" /> : <StatePill state={state} installed={record.installed} />}
         {(supportedEngines ?? modelEngines(record)).map(engine => <Badge key={engine} >{engine === 'pytorch' ? 'PyTorch' : engine === 'crisp' ? 'CrispASR' : 'llama.cpp'}</Badge>)}
@@ -249,9 +250,9 @@ export function ModelCard({
  */
 function StatePill({ state, installed }: { state: ResourceState; installed: boolean }) {
   const { t } = useI18n()
-  if (state === 'installed') return <StatusPill label={t('models.installed')} tone="success" />
+  if (state === 'installed') return <Badge variant="success">{t('models.installed')}</Badge>
   if (state === 'failed') return installed
-    ? <StatusPill label={t('models.installed')} tone="success" />
+    ? <Badge variant="success">{t('models.installed')}</Badge>
     : <StatusPill label={t('models.notInstalled')} />
   if (state === 'verifying') return <StatusPill label={t('models.verifying')} tone="accent" live />
   if (state === 'queued') return <StatusPill label={t('models.queued')} tone="warning" />

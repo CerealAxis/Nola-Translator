@@ -29,6 +29,10 @@ import { RecommendedFamilyCard, RecommendedFamilyDialog } from './RecommendedFam
 import { familyOf, type RecommendedFamily } from './modelFamily'
 import { isEngineAvailable } from './engine-availability'
 import { notifyModelDownloadFailure } from './ModelDownloadNotice'
+import { recognitionLabel } from '../../../shared/cloud-config'
+import { ALIYUN_LANGUAGES } from '../../../shared/cloud-config'
+import { targetLanguagePatch } from '../../session-config'
+import { CloudModelCard, CloudModelDialog, cloudModelsOf, type CloudModel, type CloudModelId } from './CloudModels'
 import './models.css'
 
 export type ModelsTab = 'recommended' | 'installed' | 'search' | 'downloads'
@@ -42,6 +46,7 @@ export function ModelsPage() {
   const [configuring, setConfiguring] = useState<{ record: ResourceRecord; readOnly: boolean } | null>(null)
   const [downloadTarget, setDownloadTarget] = useState<ResourceRecord | null>(null)
   const [openFamily, setOpenFamily] = useState<RecommendedFamily | null>(null)
+  const [cloudDetail, setCloudDetail] = useState<CloudModelId | null>(null)
 
   const resources = useStore(stores.models, (state) => state.resources)
   const loaded = useStore(stores.models, (state) => state.loaded)
@@ -51,6 +56,25 @@ export function ModelsPage() {
   const settings = useStore(stores.settings, (state) => state.settings)
   const computeSnapshot = useStore(stores.settings, (state) => state.computeSnapshot)
   const runtimes = useStore(stores.settings, (state) => state.runtimes)
+
+  const credentials = useStore(stores.models, state => state.credentials)
+  const cloudModels = cloudModelsOf(settings, credentials)
+  const installedCloudModels = cloudModels.filter(model => model.ready || model.profile)
+  const openCloudModel = (id: CloudModelId) => {
+    if (id !== 'recognition') { setCloudDetail(id); return }
+    const current = stores.settings.getState().settings
+    const ready = cloudModelsOf(current, stores.models.getState().credentials).some(model => model.id === 'recognition' && model.ready)
+    if (!current || !ready) { setCloudDetail('aliyun'); return }
+    const previousTarget = current.translation.targetLanguage
+    const requestedTarget = previousTarget === 'none' ? 'zh' : previousTarget
+    const targetLanguage = ALIYUN_LANGUAGES.includes(requestedTarget as typeof ALIYUN_LANGUAGES[number]) ? requestedTarget : 'zh'
+    const visibility = targetLanguagePatch(targetLanguage, previousTarget)
+    void updateSettings({ ...visibility,
+      recognition: { provider: 'aliyun', sourceLanguage: 'auto' },
+      translation: { ...visibility.translation, provider: 'recognition' },
+    }).then(() => notifySuccess(t('modelsSettingsUi.cloudProviderEnabled', { name: t('settings.providerRecognitionTranslation') })))
+      .catch((cause: unknown) => notifyError(t('modelsSettingsUi.saveError'), { cause }))
+  }
 
   const installed = useMemo(() => resources.filter((item) => item.installed), [resources])
   const activeCount = useMemo(() => countActive(resources), [resources])
@@ -166,7 +190,9 @@ export function ModelsPage() {
   const setDefault = (record: ResourceRecord) => {
     const patch = defaultTargetOf(record)
     if (!isModelReady(record) || !patch || !supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)) return
-    void updateSettings(patch).catch(() => undefined)
+    void updateSettings({ ...patch,
+      ...(record.kind === 'recognitionModel' && settings?.translation.provider === 'recognition' ? { translation: { provider: 'mymemory' } } : {}),
+    }).catch(() => undefined)
   }
 
   /*
@@ -220,6 +246,7 @@ export function ModelsPage() {
         setDownloadTarget(null)
         if (target) install(target, source)
       }} />
+      {cloudDetail ? <CloudModelDialog id={cloudDetail} onClose={() => setCloudDetail(null)} /> : null}
       {openFamily ? <RecommendedFamilyDialog
         key={openFamilyKey}
         family={openFamily}
@@ -255,7 +282,7 @@ export function ModelsPage() {
         <div className="tabs__list-container">
           <TabsList className="tabs__list" aria-label={t('modelsSettingsUi.catalogTabs')}>
             <CountTab id="recommended" label={t('models.tabRecommended')} count={null} />
-            <CountTab id="installed" label={t('models.tabInstalled')} count={installed.length} />
+            <CountTab id="installed" label={t('models.tabInstalled')} count={installed.length + installedCloudModels.length} />
             <CountTab id="search" label={t('models.tabSearch')} count={null} />
             <CountTab id="downloads" label={t('models.tabDownloads')} count={activeCount} />
           </TabsList>
@@ -268,37 +295,30 @@ export function ModelsPage() {
             failed={loadFailed}
             onRetry={retryLoad}
             onOpen={setOpenFamily}
-            emptyAction={
-              <Button variant="tertiary" size="sm"  onClick={() => setTab('search')}>
-                {t('models.tabSearch')}
-              </Button>
-            }
+            cloudModels={cloudModels.filter(model => !model.profile)}
+            onOpenCloud={openCloudModel}
+            emptyAction={<Button variant="tertiary" size="sm" onClick={() => setTab('search')}>{t('models.tabSearch')}</Button>}
           />
         </TabsContent>
 
         <TabsContent className="tabs__panel" value="installed">
           <Catalog
             records={installed}
+            cloudModels={installedCloudModels}
+            onOpenCloud={openCloudModel}
             loading={loading && !loaded}
             failed={loadFailed}
             onRetry={retryLoad}
             card={card}
             compute={settings?.compute ?? DEFAULT_COMPUTE_SETTINGS}
-            emptyAction={
-              <Button variant="tertiary" size="sm"  onClick={() => setTab('recommended')}>
-                {t('models.tabRecommended')}
-              </Button>
-            }
+            emptyAction={<Button variant="tertiary" size="sm" onClick={() => setTab('recommended')}>{t('models.tabRecommended')}</Button>}
           />
         </TabsContent>
 
         <TabsContent className="tabs__panel" value="search">
           <HubSearchTab onGoRecommended={() => setTab('recommended')} />
         </TabsContent>
-
-        <TabsContent className="tabs__panel" value="downloads">
-          <DownloadsTab />
-        </TabsContent>
+        <TabsContent className="tabs__panel" value="downloads"><DownloadsTab /></TabsContent>
       </TabsRoot>
     </div>
   )
@@ -333,6 +353,8 @@ function CountTab({ id, label, count }: CountTabProps) {
 }
 
 interface CatalogProps {
+  cloudModels: readonly CloudModel[]
+  onOpenCloud: (id: CloudModelId) => void
   records: readonly ResourceRecordWithRate[]
   loading: boolean
   /** The catalog could not be read, so the list it would show is unknown rather than empty. */
@@ -343,27 +365,28 @@ interface CatalogProps {
   emptyAction: ReactNode
 }
 
-function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAction }: Pick<CatalogProps, 'records' | 'loading' | 'failed' | 'onRetry' | 'emptyAction'> & { onOpen: (family: RecommendedFamily) => void }) {
+function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAction, cloudModels, onOpenCloud }: Pick<CatalogProps, 'records' | 'loading' | 'failed' | 'onRetry' | 'emptyAction' | 'cloudModels' | 'onOpenCloud'> & { onOpen: (family: RecommendedFamily) => void }) {
   const { t } = useI18n()
-  if (loading) return <div className={GRID}>{[0, 1, 2, 3].map(index => <ModelCardSkeleton key={index} />)}</div>
-  if (failed) return <FailedCatalog onRetry={onRetry} />
-  if (records.length === 0) return <Empty className="flex flex-col items-start gap-4 py-8"><EmptyTitle>{t('models.notInstalled')}</EmptyTitle>{emptyAction}</Empty>
+  if (!loading && !failed && records.length === 0 && cloudModels.length === 0) return <Empty className="flex flex-col items-start gap-4 py-8"><EmptyTitle>{t('models.notInstalled')}</EmptyTitle>{emptyAction}</Empty>
   const groups = new Map<RecommendedFamily, ResourceRecord[]>()
   for (const record of records) {
     const family = familyOf(record)
     groups.set(family, [...(groups.get(family) ?? []), record])
   }
-  const sections: { title: string; families: RecommendedFamily[] }[] = [
-    { title: t('models.asrModels'), families: ['qwen', 'sensevoice', 'funasr', 'vibevoice', 'mimo'] },
-    { title: t('models.mtModels'), families: ['hymt2', 'index', 'other'] },
-    { title: t('models.ttsModels'), families: ['tts'] },
+  const sections: { title: string; kind: ResourceRecord['kind']; families: RecommendedFamily[] }[] = [
+    { title: t('models.asrModels'), kind: 'recognitionModel', families: ['qwen', 'sensevoice', 'funasr', 'vibevoice', 'mimo'] },
+    { title: t('models.mtModels'), kind: 'translationModel', families: ['hymt2', 'index', 'other'] },
+    { title: t('models.ttsModels'), kind: 'ttsModel', families: ['tts'] },
   ]
-  return <div className="flex flex-col gap-6">{sections.map(section => <section key={section.title} className="flex flex-col gap-3">
+  return <div className="flex flex-col gap-6">
+    {failed ? <FailedCatalog onRetry={onRetry} /> : null}
+    {loading ? <div className={GRID}>{[0, 1, 2].map(index => <ModelCardSkeleton key={index} />)}</div> : null}
+    {sections.filter(section => section.families.some(family => groups.has(family)) || cloudModels.some(model => model.kind === section.kind)).map(section => <section key={section.title} className="flex flex-col gap-3">
     <h2 className="models-section-title">{section.title}</h2>
     <div className={GRID}>{section.families.map(family => {
       const familyRecords = groups.get(family)
       return familyRecords ? <RecommendedFamilyCard key={family} family={family} records={familyRecords} onOpen={() => onOpen(family)} /> : null
-    })}</div>
+    })}{cloudModels.filter(model => model.kind === section.kind).map(model => <CloudModelCard key={model.id} model={model} onOpen={onOpenCloud} />)}</div>
   </section>)}</div>
 }
 
@@ -382,22 +405,10 @@ function FailedCatalog({ onRetry }: { onRetry: () => void }) {
   )
 }
 
-function Catalog({ records, loading, failed, onRetry, card, emptyAction, compute }: CatalogProps) {
+function Catalog({ records, loading, failed, onRetry, card, emptyAction, compute, cloudModels, onOpenCloud }: CatalogProps) {
   const { t } = useI18n()
 
-  if (loading) {
-    return (
-      <div className={GRID}>
-        {[0, 1, 2, 3].map((index) => (
-          <ModelCardSkeleton key={index} />
-        ))}
-      </div>
-    )
-  }
-
-  if (failed) return <FailedCatalog onRetry={onRetry} />
-
-  if (records.length === 0) {
+  if (!loading && !failed && records.length === 0 && cloudModels.length === 0) {
     return (
       <Empty className="flex flex-col items-start gap-4 py-8">
         <EmptyTitle>{t('models.notInstalled')}</EmptyTitle>
@@ -414,8 +425,10 @@ function Catalog({ records, loading, failed, onRetry, card, emptyAction, compute
 
   return (
     <div className="flex flex-col gap-6">
-      <Section title={t('models.asrModels')} records={recognition} card={card} />
-      <Section title={t('models.mtModels')} records={translation} card={card} />
+      {loading ? <div className={GRID}>{[0, 1, 2].map(index => <ModelCardSkeleton key={index} />)}</div> : null}
+      {failed ? <FailedCatalog onRetry={onRetry} /> : null}
+      <Section title={t('models.asrModels')} records={recognition} card={card}>{cloudModels.filter(model => model.kind === 'recognitionModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
+      <Section title={t('models.mtModels')} records={translation} card={card}>{cloudModels.filter(model => model.kind === 'translationModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.ttsModels')} records={ordered.filter(record => record.kind === 'ttsModel')} card={card} />
     </div>
   )
@@ -425,16 +438,18 @@ function Section({
   title,
   records,
   card,
+  children,
 }: {
   title: string
   records: readonly ResourceRecordWithRate[]
   card: (record: ResourceRecord) => ReactNode
+  children?: ReactNode[]
 }) {
-  if (records.length === 0) return null
+  if (records.length === 0 && !children?.length) return null
   return (
     <section className="flex flex-col gap-3">
       <h2 className="models-section-title">{title}</h2>
-      <div className={GRID}>{records.map(card)}</div>
+      <div className={GRID}>{records.map(card)}{children}</div>
     </section>
   )
 }
@@ -459,4 +474,3 @@ function countActive(records: readonly ResourceRecordWithRate[]): number {
     (item) => item.phase !== 'remove' && (item.state === 'running' || item.state === 'cancelling' || item.state === 'failed'),
   ).length
 }
-import { recognitionLabel } from '../../../shared/cloud-config'

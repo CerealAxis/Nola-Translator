@@ -10,7 +10,7 @@ import { modelEngines } from './model-engines'
 function record(id: string, configuration?: ModelConfiguration): ResourceRecord {
   return { resourceId: id, kind: 'translationModel', provider: 'llama.cpp', name: id, description: 'Test model', languages: [], installed: true, installedBytes: 0, state: 'idle', cancellable: false, configuration }
 }
-const bilingual: ModelConfiguration = { slot: 'translation', engine: 'llama', languages: [], supportsAutoDetection: false, sourceLanguages: ['en', 'ja'], targetLanguages: ['en', 'ja'] }
+const bilingual: ModelConfiguration = { slot: 'translation', engine: 'llama', languages: [], supportsAutoDetection: true, sourceLanguages: ['auto', 'en', 'ja'], targetLanguages: ['en', 'ja'] }
 
 describe('model language capabilities', () => {
   it('selects backend by weight loader for both tasks', () => {
@@ -39,7 +39,7 @@ describe('model language capabilities', () => {
   it('migrates recommended capabilities with their full language lists', () => {
     expect(recognitionLanguages(record('sensevoice-small'))).toEqual(['auto', 'zh', 'en', 'yue', 'ja', 'ko', 'zh-Hant'])
     expect(configurationOf(record('qwen3-asr-1.7b-hf'))?.languages).toHaveLength(30)
-    expect(configurationOf(record('m2m100-418m'))?.sourceLanguages).toHaveLength(100)
+    expect(configurationOf(record('m2m100-418m'))?.sourceLanguages).toHaveLength(101)
     expect(translationLanguages(record('hy-mt2-1.8b-q4-k-m'), 'en')).toContain('zh-Hant')
     expect(translationLanguages(record('hy-mt2-7b-q4-k-m'), 'en')).toContain('yue')
   })
@@ -91,7 +91,7 @@ describe('model language capabilities', () => {
     const config = configurationOf(translator)!
     const event = parseEventLine(JSON.stringify({ protocolVersion: 1, requestId: 'test', type: 'resourceChanged', resource: { ...translator, languages: config.sourceLanguages, configuration: config } }))
     expect(event.type).toBe('resourceChanged')
-    if (event.type === 'resourceChanged') expect(event.resource.configuration?.sourceLanguages).toHaveLength(100)
+    if (event.type === 'resourceChanged') expect(event.resource.configuration?.sourceLanguages).toHaveLength(101)
     expect(parseCommandLine(JSON.stringify({ protocolVersion: 1, requestId: 'save', type: 'configureModel', resourceId: 'hub:test/model', configuration: bilingual })).type).toBe('configureModel')
   })
 })

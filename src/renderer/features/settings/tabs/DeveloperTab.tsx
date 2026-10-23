@@ -655,13 +655,10 @@ function DialogGalleryGroup() {
         onClose={() => hide('compat')}
         source="zh"
         target="en"
-        recognition={DEMO_ASR_RECORD}
         translation={DEMO_MT_RECORD}
         resources={[DEMO_ASR_RECORD, DEMO_MT_RECORD]}
         compute={DEFAULT_COMPUTE_SETTINGS}
-        onChangeSource={inert}
         onChangeModel={inert}
-        onDisableTranslation={inert}
       />
       <StopSessionDialog
         isOpen={open.stopSession}

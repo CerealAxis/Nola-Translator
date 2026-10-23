@@ -652,13 +652,14 @@ class ResourceManager:
             raise ResourceActionError("invalidConfiguration", {"reason": "modelLoaderMismatch"})
         required = [configuration.languages] if entry.slot == "recognition" else [configuration.sourceLanguages, configuration.targetLanguages]
         from .model_capabilities import LANGUAGE_CODES
-        if any(normalize(code) not in LANGUAGE_CODES for codes in required for code in codes):
+        declared_codes = configuration.languages + [code for code in configuration.sourceLanguages if code != "auto"] + configuration.targetLanguages
+        if any(normalize(code) not in LANGUAGE_CODES for code in declared_codes):
             raise ResourceActionError("invalidConfiguration", {"reason": "unknownLanguage"})
         if any(not codes for codes in required):
             raise ResourceActionError("invalidConfiguration", {"reason": "missingLanguages"})
         # Specialized tokenizers cannot accept language codes outside their vocabularies.
         canonical = {normalize(code) for code in (QWEN_LANGUAGES if entry.adapter_id == "qwen3-asr" else ["zh", "en", "yue", "ja", "ko"] if entry.adapter_id == "sensevoice" else FLORES_LANGUAGES)}
-        if entry.adapter_id in ("qwen3-asr", "sensevoice", "m2m100") and any(normalize(code) not in canonical for codes in required for code in codes):
+        if entry.adapter_id in ("qwen3-asr", "sensevoice", "m2m100") and any(normalize(code) not in canonical for code in declared_codes):
             raise ResourceActionError("invalidConfiguration", {"reason": "unsupportedLanguage"})
         if configuration.translationPairs is not None and (not configuration.translationPairs or any(not supports_translation(configuration, pair.source, pair.target) for pair in configuration.translationPairs)):
             raise ResourceActionError("invalidConfiguration", {"reason": "invalidPair"})

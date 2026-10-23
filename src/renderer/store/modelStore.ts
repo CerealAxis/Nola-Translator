@@ -18,6 +18,7 @@ import type {
 } from '@/bridge'
 import { createStore, createWriteQueue } from './createStore'
 import { CREDENTIAL_PROVIDERS } from '../../shared/settings'
+import { customCredentialSlot, customModelsOf } from '../../shared/custom-models'
 
 export type HubKind = 'all' | 'asr' | 'mt' | 'quant'
 
@@ -170,8 +171,10 @@ export async function loadModels(options: { includeDevices?: boolean } = {}): Pr
 /** Providers that need a query, i.e. the top-level keys of `credentials.json`. */
 
 async function loadCredentials(target: NolaBridge): Promise<Record<CredentialProvider, boolean>> {
+  const settings = await target.settings.get()
+  const providers = [...new Set([...CREDENTIAL_PROVIDERS, ...customModelsOf(settings.translation).map(model => customCredentialSlot(model.id))])]
   const entries = await Promise.all(
-    CREDENTIAL_PROVIDERS.map(async (provider) => [provider, await target.translation.hasCredential(provider)] as const),
+    providers.map(async (provider) => [provider, await target.translation.hasCredential(provider)] as const),
   )
   return entries.reduce<Record<CredentialProvider, boolean>>(
     (flags, [provider, present]) => {

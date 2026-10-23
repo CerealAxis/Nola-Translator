@@ -69,7 +69,7 @@ describe('事实格式化（只写事实，不写形容词）', () => {
 describe('默认模型的可设范围', () => {
   it('识别模型只认资源表里的 id，翻译模型任何 id 都有槽位', () => {
     expect(defaultTargetOf(record({ resourceId: 'qwen3-asr-1.7b-hf' }))).toEqual({
-      recognition: { modelId: 'qwen3-asr-1.7b-hf' },
+      recognition: { modelId: 'qwen3-asr-1.7b-hf', provider: 'local' },
     })
     // Every translation model lands on localModelId + provider:'local', one route for all.
     expect(

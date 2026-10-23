@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { customModelSchema } from '../shared/custom-models'
+import { LANGUAGE_CODES } from '../shared/languages'
 import { PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_NODES } from '../shared/pypi-mirrors'
 import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { computeSettingsPatchSchema } from '../shared/compute'
@@ -124,6 +126,10 @@ export const settingsPatchSchema = z.object({
     cloudEndpoint: z.string().max(2048).optional(), cloudModel: z.string().max(256).optional(),
     cloudApiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']).optional(),
     cloudName: z.string().max(64).optional(),
+    customModels: z.array(customModelSchema).max(100).refine(models => new Set(models.map(model => model.id)).size === models.length).optional(),
+    customModelId: z.string().max(64).optional(),
+    cloudLanguages: z.array(z.string().refine(code => LANGUAGE_CODES.includes(code))).min(1).max(LANGUAGE_CODES.length).optional(),
+    cloudSourceLanguages: z.array(z.string().refine(code => code === 'auto' || LANGUAGE_CODES.includes(code))).min(1).max(LANGUAGE_CODES.length + 1).optional(),
     // Bounds mirror `protocol.py`'s `contextWindow` and `maxOutputTokens`; the 10M ceiling is a
     // fat-finger guard, set to agree with the TypeScript schema rather than to a model's window.
     cloudContextWindow: z.number().int().min(256).max(10_000_000).optional(),

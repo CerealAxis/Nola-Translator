@@ -69,6 +69,7 @@ export function RecommendedFamilyCard({ family, records, onOpen }: RecommendedFa
         <CardDescription className="card__description">{t(`models.familyDescriptions.${family}`)}</CardDescription>
     </CardHeader>
     <CardContent className="card__content"><div className="models-card__status">
+      <Badge>{t('modelsSettingsUi.localModels')}</Badge>
       {engines.map(engine => <Badge key={engine} >{engine === 'llama' ? 'llama.cpp' : engine === 'crisp' ? 'CrispASR' : 'PyTorch'}</Badge>)}
       {records.some(record => record.installed) ? <Badge  variant="success">{t('models.installed')}</Badge> : null}
     </div></CardContent>

@@ -1,3 +1,4 @@
+import { customCredentialSlot } from '../../../../shared/custom-models'
 import { isModelReady, supportsTranslation } from '../../../../shared/model-capabilities'
 import { supportsSelectedEngine } from '../../../../shared/model-engines'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
@@ -5,12 +6,11 @@ import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
  * Translation: provider, intermediate translation, per-provider connection fields, API key.
  * Local model families share `local`; `localModelId` selects their engine adapter.
  * Ollama is a `CloudApiFormat`, not a provider. Keys live in `credentials.json` rather than
- * `AppSettings`, so the check button can only ask whether a key is stored: no endpoint probe.
+ * `AppSettings`; the input replaces a saved credential without exposing the stored value.
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { LoaderCircle } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -279,7 +279,7 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
               void updateSettings({ translation: { cloudEndpoint: value } }).catch(() => undefined)
             }}
           />
-          <ApiKeyRow provider="cloud" stored={credentials.cloud} />
+          <ApiKeyRow provider={translation.customModelId ? customCredentialSlot(translation.customModelId) : 'cloud'} stored={!!credentials[translation.customModelId ? customCredentialSlot(translation.customModelId) : 'cloud']} />
           <SettingsRow label={t('settings.apiFormat')}>
             <SettingSelect
               value={translation.cloudApiFormat}
@@ -388,15 +388,13 @@ export function TextRow({
  * would only report "invalid configuration" without naming the field. The lower bound only
  * rejects an obviously impossible 0 or negative; the right size is the user's call.
  */
-function NumberRow({
+export interface NumberRowProps { label: string; value: number; onCommit: (value: number) => void }
+
+export function NumberRow({
   label,
   value,
   onCommit,
-}: {
-  label: string
-  value: number
-  onCommit: (value: number) => void
-}) {
+}: NumberRowProps) {
   const [draft, setDraft] = useState(String(value))
   const [focused, setFocused] = useState(false)
 
@@ -432,7 +430,7 @@ export function ApiKeyRow({ provider, stored }: ApiKeyRowProps) {
   const { t } = useI18n()
   const [draft, setDraft] = useState('')
   const [editing, setEditing] = useState(false)
-  const [state, setState] = useState<'idle' | 'pending' | 'testing' | 'deleting'>('idle')
+  const [state, setState] = useState<'idle' | 'pending'>('idle')
   const saveTask = useRef<Promise<boolean> | null>(null)
   const masked = stored && !editing && draft === ''
 
@@ -459,34 +457,6 @@ export function ApiKeyRow({ provider, stored }: ApiKeyRowProps) {
     return task
   }, [provider, t])
 
-  const verify = useCallback(async () => {
-    if (draft.trim() !== '' && !(await save(draft))) return
-    setState('testing')
-    try {
-      const ok = await actions.models.checkCredential(provider)
-      if (ok) notifySuccess(t('status.ok'))
-      else notifyError(t('errors.translateFailed'))
-    } catch {
-      notifyError(t('errors.translateFailed'))
-    } finally {
-      setState('idle')
-    }
-  }, [draft, provider, save, t])
-
-  const deleteKey = useCallback(async () => {
-    await saveTask.current
-    setState('deleting')
-    try {
-      await actions.models.setTranslationCredential(provider, '')
-      setDraft('')
-      notifySuccess(t('common.done'))
-    } catch {
-      notifyError(t('errors.translateFailed'))
-    } finally {
-      setState('idle')
-    }
-  }, [provider, t])
-
   return (
     <SettingsRow label={t('settings.apiKey')} desc={t('settings.apiKeyHint')} descriptionTooltip>
       <Input
@@ -499,26 +469,8 @@ export function ApiKeyRow({ provider, stored }: ApiKeyRowProps) {
         readOnly={masked}
         className="settings-control-field"
         placeholder={stored ? '' : t('settings.apiKeyPlaceholder')}
-        disabled={state === 'pending' || state === 'deleting'}
+        disabled={state === 'pending'}
       />
-      <Button
-        variant="tertiary"
-        size="sm"
-        disabled={!stored || state === 'deleting' || state === 'testing'}
-        onClick={() => { void verify() }}
-      >
-        {state === 'testing' ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
-        {state === 'testing' ? t('settings.testing') : t('modelsSettingsUi.credentialCheck')}
-      </Button>
-      <Button
-        variant="danger"
-        size="sm"
-        disabled={!stored || state === 'testing' || state === 'deleting'}
-        onClick={() => { void deleteKey() }}
-      >
-        {state === 'deleting' ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
-        {t('settings.deleteKey')}
-      </Button>
     </SettingsRow>
   )
 }

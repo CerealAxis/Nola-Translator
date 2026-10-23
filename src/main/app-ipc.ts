@@ -14,7 +14,7 @@ import type { SettingsStore } from './settings-store'
 import type { SecureCredentialStore } from './secure-store'
 import { computeOverlayBounds, getOverlayInteractionPolicy, overlayMinimumHeight, OVERLAY_MIN_WIDTH } from './windows'
 import type { AppSettings, AppSettingsPatch, CredentialProvider } from '../shared/settings'
-import { CREDENTIAL_PROVIDERS, RECOGNITION_MODEL_LABELS } from '../shared/settings'
+import { isCredentialProvider, RECOGNITION_MODEL_LABELS } from '../shared/settings'
 import { resolveUiLanguage } from '../shared/languages'
 import type { ModelStorageInfo } from '../shared/bridge'
 import { modelStorageEnvironment, readEngineStatus, validateModelStorageDirectory } from './model-storage'
@@ -72,8 +72,8 @@ const OVERLAY_PAGES = new Set(['appearance', 'captions', 'resources', 'translati
 /** Top-level keys allowed in `credentials.json`. */
 
 function assertCredentialProvider(value: unknown): CredentialProvider {
-  if (!CREDENTIAL_PROVIDERS.includes(value as CredentialProvider)) throw new Error('凭据类型无效')
-  return value as CredentialProvider
+  if (!isCredentialProvider(value)) throw new Error('凭据类型无效')
+  return value
 }
 
 async function diagnostics(engine: EngineProcess, settings: AppSettings): Promise<Record<string, string | number>> {

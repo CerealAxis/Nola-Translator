@@ -7,7 +7,6 @@ import { Switch, SwitchThumb } from '@/components/ui/switch'
 import { translationLanguages } from '../../../shared/model-capabilities'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
 import { Captions, ChevronDown, Languages, Minus, Plus, SlidersHorizontal, StickyNote, Volume2 } from 'lucide-react'
 
 import { languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
@@ -136,10 +135,10 @@ export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
               </TabsList>
             </TabsRoot>
           </div>
-          <Switch checked={props.notesOpen} onCheckedChange={props.onToggleNotes} className="nola-workspace-notes-switch switch">
+          <Switch checked={props.notesOpen} onCheckedChange={props.onToggleNotes} className="nola-workspace-notes-switch">
             <StickyNote aria-hidden="true" />
-            <Label>{t('workspace.notes')}</Label>
-            <SwitchThumb className="switch__thumb" />
+            <span className="nola-workspace-notes-switch__label">{t('workspace.notes')}</span>
+            <span className="switch__control"><SwitchThumb className="switch__thumb" /></span>
           </Switch>
         </div>
       </CardContent>

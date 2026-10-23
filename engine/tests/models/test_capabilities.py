@@ -1,3 +1,6 @@
+import json
+from dataclasses import replace
+
 import pytest
 
 from nola_translator_engine.model_capabilities import supports_translation
@@ -11,7 +14,7 @@ def register(manager, adapter="llama.cpp", slot="translation"):
 
 
 def bilingual(**changes):
-    return ModelConfiguration(**dict(dict(slot="translation", engine="llama", languages=[], supportsAutoDetection=False, sourceLanguages=["en", "ja"], targetLanguages=["en", "ja"]), **changes))
+    return ModelConfiguration(**dict(dict(slot="translation", engine="llama", languages=[], supportsAutoDetection=True, sourceLanguages=["auto", "en", "ja"], targetLanguages=["en", "ja"]), **changes))
 
 
 def test_old_custom_models_retain_files_and_need_configuration(tmp_path):
@@ -49,6 +52,28 @@ def test_configuration_is_persisted_and_broadcast(tmp_path, monkeypatch):
     assert not supports_translation(config, "zh", "en")
 
 
+def test_v1_registry_persists_auto_detection_migration_once(tmp_path):
+    manager = ResourceManager(tmp_path, lambda event: None)
+    entry = register(manager)
+    legacy_configuration = bilingual(supportsAutoDetection=False, sourceLanguages=["en", "ja"])
+    legacy_entry = replace(entry, configuration=legacy_configuration)
+    registry = CustomModelRegistry(tmp_path)
+    registry.path.write_text(json.dumps({"version": 1, "models": [legacy_entry.to_json()]}), encoding="utf-8")
+
+    migrated = registry.get(entry.resource_id)
+
+    assert migrated.configuration.supportsAutoDetection is True
+    assert migrated.configuration.sourceLanguages == ["auto", "en", "ja"]
+    assert supports_translation(migrated.configuration, "auto", "en")
+    saved = json.loads(registry.path.read_text(encoding="utf-8"))
+    assert saved["version"] == 2
+    assert saved["models"][0]["configuration"]["sourceLanguages"] == ["auto", "en", "ja"]
+
+    edited = replace(migrated, configuration=migrated.configuration.model_copy(update={"supportsAutoDetection": False, "sourceLanguages": ["en", "ja"]}))
+    registry.put(edited)
+    assert CustomModelRegistry(tmp_path).get(entry.resource_id).configuration.sourceLanguages == ["en", "ja"]
+
+
 @pytest.mark.parametrize("changes", [dict(engine="pytorch"), dict(slot="recognition"), dict(sourceLanguages=[]), dict(sourceLanguages=["zz"]), dict(translationPairs=[]), dict(translationPairs=[dict(source="zh", target="en")])])
 def test_configuration_cannot_bypass_loader_and_language_validation(tmp_path, changes):
     manager = ResourceManager(tmp_path, lambda event: None)
@@ -61,7 +86,9 @@ def test_configuration_cannot_bypass_loader_and_language_validation(tmp_path, ch
 def test_recommended_models_expose_full_capabilities(tmp_path):
     manager = ResourceManager(tmp_path, lambda event: None)
     assert len(manager.configuration("qwen3-asr-1.7b-hf").languages) == 30
-    assert len(manager.configuration("m2m100-418m").sourceLanguages) == 100
+    assert len(manager.configuration("m2m100-418m").sourceLanguages) == 101
+    assert "auto" in manager.configuration("hy-mt2-1.8b-q4-k-m").sourceLanguages
+    assert manager.configuration("hy-mt2-1.8b-q4-k-m").supportsAutoDetection is True
     assert "zh-Hant" in manager.configuration("hy-mt2-1.8b-q4-k-m").targetLanguages
     assert manager.configuration("sensevoice-small").languages == ["zh", "en", "yue", "ja", "ko"]
 

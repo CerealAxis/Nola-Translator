@@ -5,12 +5,13 @@ import type { ResourceRecord } from './contracts'
 
 const language = z.string().refine(code => LANGUAGE_CODES.includes(normalizeLanguage(code)) || INDEX_TRANSLATE_LANGUAGES.includes(normalizeLanguage(code)))
 const languages = z.array(language).max(200)
+const sourceLanguages = z.array(z.string().refine(code => code === 'auto' || language.safeParse(code).success)).max(200)
 export const modelConfigurationSchema = z.object({
   slot: z.enum(['recognition', 'translation']),
   engine: z.enum(['pytorch', 'llama', 'crisp']),
   languages,
   supportsAutoDetection: z.boolean(),
-  sourceLanguages: languages,
+  sourceLanguages,
   targetLanguages: languages,
   translationPairs: z.array(z.object({ source: language, target: language }).strict()).max(512).optional(),
 }).strict().superRefine((value, context) => {
@@ -29,7 +30,7 @@ export const MIMO_ASR_LANGUAGES: readonly string[] = ['zh', 'en', 'yue']
 export const HYMT2_LANGUAGES: readonly string[] = ["zh", "en", "fr", "pt", "es", "ja", "tr", "ru", "ar", "ko", "th", "it", "de", "vi", "ms", "id", "tl", "hi", "zh-Hant", "pl", "cs", "nl", "km", "my", "fa", "gu", "ur", "te", "mr", "he", "bn", "ta", "uk", "bo", "kk", "mn", "ug", "yue"]
 export const M2M100_LANGUAGES: readonly string[] = ["af", "am", "ar", "ast", "az", "ba", "be", "bg", "bn", "br", "bs", "ca", "ceb", "cs", "cy", "da", "de", "el", "en", "es", "et", "fa", "ff", "fi", "fr", "fy", "ga", "gd", "gl", "gu", "ha", "he", "hi", "hr", "ht", "hu", "hy", "id", "ig", "ilo", "is", "it", "ja", "jv", "ka", "kk", "km", "kn", "ko", "lb", "lg", "ln", "lo", "lt", "lv", "mg", "mk", "ml", "mn", "mr", "ms", "my", "ne", "nl", "no", "ns", "oc", "or", "pa", "pl", "ps", "pt", "ro", "ru", "sd", "si", "sk", "sl", "so", "sq", "sr", "ss", "su", "sv", "sw", "ta", "th", "tl", "tn", "tr", "uk", "ur", "uz", "vi", "wo", "xh", "yi", "yo", "zh", "zu"]
 const recognition = (codes: readonly string[], engine: 'pytorch' | 'llama' | 'crisp' = 'pytorch'): ModelConfiguration => ({ slot: 'recognition', engine, languages: [...codes], supportsAutoDetection: true, sourceLanguages: [], targetLanguages: [] })
-const translation = (codes: readonly string[], engine: 'llama' | 'pytorch', targetCodes: readonly string[] = codes): ModelConfiguration => ({ slot: 'translation', engine, languages: [], supportsAutoDetection: false, sourceLanguages: [...codes], targetLanguages: [...targetCodes] })
+const translation = (codes: readonly string[], engine: 'llama' | 'pytorch', targetCodes: readonly string[] = codes): ModelConfiguration => ({ slot: 'translation', engine, languages: [], supportsAutoDetection: true, sourceLanguages: ['auto', ...codes], targetLanguages: [...targetCodes] })
 export const RECOMMENDED_CONFIGURATIONS: Record<string, ModelConfiguration> = {
   'qwen3-asr-1.7b-hf': recognition(QWEN_LANGUAGES),
   'qwen3-asr-0.6b-hf': recognition(QWEN_LANGUAGES),
@@ -66,7 +67,7 @@ export function supportsTranslation(model: ResourceRecord | undefined, source: s
   if (config?.slot !== 'translation') return false
   const from = normalizeLanguage(source), to = normalizeLanguage(target)
   if (!config.targetLanguages.map(normalizeLanguage).includes(to)) return false
-  if (from === 'auto') return !config.translationPairs || config.translationPairs.some(pair => normalizeLanguage(pair.target) === to)
+  if (from === 'auto') return config.sourceLanguages.includes('auto') && (!config.translationPairs || config.translationPairs.some(pair => normalizeLanguage(pair.target) === to))
   if (!config.sourceLanguages.map(normalizeLanguage).includes(from)) return false
   // A primary-language match can still hide code-switching, so allow the model to inspect it.
   if (from === to) return true

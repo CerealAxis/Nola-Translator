@@ -16,7 +16,7 @@ def start_config(**changes):
 def setup_translator(runtime, monkeypatch):
     runtime.resources.register_hub_model("test/translator", "revision", "llama.cpp", "translation", "Test translator", (CustomFile("model.gguf", 1, "0" * 64),), ())
     monkeypatch.setattr(runtime.resources.models, "is_installed", lambda spec: True)
-    runtime.resources.configure("hub:test/translator", ModelConfiguration(slot="translation", engine="llama", languages=[], supportsAutoDetection=False, sourceLanguages=["ja", "en"], targetLanguages=["ja", "en"]))
+    runtime.resources.configure("hub:test/translator", ModelConfiguration(slot="translation", engine="llama", languages=[], supportsAutoDetection=True, sourceLanguages=["auto", "ja", "en"], targetLanguages=["ja", "en"]))
 
 
 @pytest.mark.asyncio

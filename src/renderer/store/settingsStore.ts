@@ -1,5 +1,6 @@
 import { recognitionLanguages } from '../../shared/model-capabilities'
 import { modelsStore } from './modelStore'
+import { synchronizeCustomModel } from '../../shared/custom-models'
 /**
  * Settings domain: optimistic update + rollback + 180ms debounce + write queue.
  * A rollback returns to "the snapshot the engine confirmed + the patches still
@@ -373,10 +374,10 @@ export function mergeSettings(base: AppSettings, patch: AppSettingsPatch): AppSe
     overlay: { ...base.overlay, ...patch.overlay },
     videoCaptions: { ...base.videoCaptions, ...patch.videoCaptions },
     browserCaptions: { ...base.browserCaptions, ...patch.browserCaptions },
-    translation: {
+    translation: synchronizeCustomModel({
       ...base.translation, ...patch.translation,
       fallback: { ...base.translation.fallback, ...(patch.translation?.fallback ?? {}) },
-    },
+    }, patch.translation),
     compute: { ...base.compute, ...patch.compute },
     network: { ...base.network, ...patch.network },
   }

@@ -25,18 +25,21 @@ it('saves imported GGUF models as llama.cpp translation models', async () => {
   render(<ModelConfigurationDialog record={translator} onClose={vi.fn()} />)
   fireEvent.click(screen.getByRole('button', { name: '保存配置' }))
   await waitFor(() => expect(save).toHaveBeenCalledWith(translator.resourceId, expect.objectContaining({
-    slot: 'translation', engine: 'llama', sourceLanguages: ['en', 'ja'], targetLanguages: ['en', 'ja'],
+    slot: 'translation', engine: 'llama', sourceLanguages: ['auto', 'en', 'ja'], targetLanguages: ['en', 'ja'], supportsAutoDetection: true,
   })))
 })
 
-it('explains the incompatible direction and offers the three agreed actions', () => {
-  const disable = vi.fn(), close = vi.fn()
+it('explains the incompatible direction and offers only model change and close', () => {
+  const close = vi.fn()
   const translator: ResourceRecord = { ...pending, resourceId: 'hub:test/translator', kind: 'translationModel', provider: 'llama.cpp', name: 'English/Japanese', configuration: { slot: 'translation', engine: 'llama', languages: [], supportsAutoDetection: false, sourceLanguages: ['en', 'ja'], targetLanguages: ['en', 'ja'] } }
-  render(<TranslationCompatibilityDialog isOpen onClose={close} source="zh" target="en" recognition={pending} translation={translator} resources={[pending, translator]} compute={DEFAULT_COMPUTE_SETTINGS} onChangeSource={vi.fn()} onChangeModel={vi.fn()} onDisableTranslation={disable} />)
+  render(<TranslationCompatibilityDialog isOpen onClose={close} source="zh" target="en" translation={translator} resources={[pending, translator]} compute={DEFAULT_COMPUTE_SETTINGS} onChangeModel={vi.fn()} />)
   expect(screen.getByText(/English\/Japanese 不支持 中文（简体） → 英语/)).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '更换翻译模型' })).toBeEnabled()
-  expect(screen.getByRole('button', { name: '更换识别语言' })).toBeEnabled()
-  fireEvent.click(screen.getByRole('button', { name: '关闭翻译' }))
-  expect(disable).toHaveBeenCalledOnce()
+  expect(screen.getByRole('button', { name: '更换模型' })).toBeEnabled()
+  expect(screen.getAllByRole('button')).toHaveLength(2)
+  expect(screen.queryByRole('button', { name: '更换识别语言' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '关闭翻译' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '更换模型' }))
+  expect(screen.getByRole('combobox')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '关闭' }))
   expect(close).toHaveBeenCalledOnce()
 })

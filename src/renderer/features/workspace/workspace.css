@@ -31,9 +31,15 @@
   /* The TabsList supplies the shared segmented track and selection state. */
   .nola-workspace-font-control { display: flex; align-items: center; gap: 12px; font-size: 13px; }
   .nola-workspace-font-control svg { width: 14px; height: 14px; }
-  .nola-workspace-notes-switch { margin-inline-start: auto; }
-  .nola-workspace-notes-switch .switch__content { gap: 10px; }
-  .nola-workspace-notes-switch .label { font-size: 13px; }
+  /*
+   * The shared switch root is the track, so the labelled variant turns the root into a
+   * row and keeps the track itself in a switch__control child.
+   */
+  .switch.nola-workspace-notes-switch { display: flex; align-items: center; gap: 10px; width: auto; height: auto; margin-inline-start: auto; border-radius: var(--radius-xl); background: transparent; }
+  .switch.nola-workspace-notes-switch[data-checked], .switch.nola-workspace-notes-switch[aria-checked='true'] { background: transparent; }
+  .switch.nola-workspace-notes-switch .switch__control { flex: none; width: 32px; height: 18.4px; border-radius: 9999px; background: var(--nola-ui-input); }
+  .switch.nola-workspace-notes-switch[data-checked] .switch__control, .switch.nola-workspace-notes-switch[aria-checked='true'] .switch__control { background: var(--nola-ui-primary); }
+  .nola-workspace-notes-switch__label { font-size: 13px; color: var(--foreground); }
   .nola-workspace-notes-switch svg { width: 18px; height: 18px; color: var(--accent); }
   .nola-workspace-body { display: flex; flex: 1 1 0; gap: 16px; min-width: 0; min-height: 0; }
   .nola-workspace-transcript.card { gap: 0; flex: 1 1 0; min-height: 0; padding: 0; --card-spacing: var(--space-2); }

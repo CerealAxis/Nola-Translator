@@ -3,7 +3,8 @@ import { logDiagnostic } from './session-log'
 import type { EngineEvent, PrewarmConfig, PrewarmResult, SessionConfig, AudioTestSource, AudioTestResult } from '../shared/contracts'
 import { sessionConfigSchema } from '../shared/schemas'
 import { NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider, type RecognitionProvider } from '../shared/settings'
-import { supportsIntermediateTranslation } from '../shared/cloud-config'
+import { supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'
+import { customCredentialSlot } from '../shared/custom-models'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
 
@@ -102,9 +103,12 @@ export class SessionController {
     if (parsed.translationProvider && !supportsIntermediateTranslation(parsed.translationProvider)) parsed.allowIntermediateTranslation = false
     if (owner === 'desktop' && (parsed.audioSource.kind === 'browserTab' || parsed.browserTimeline)) throw new Error('invalidConfiguration')
     if (owner === 'browser' && (!parsed.browserTimeline || parsed.audioSource.kind === 'microphone')) throw new Error('invalidConfiguration')
-    parsed.compute = { ...this.options.getSettings().compute }
-    parsed.max_segment_ms = this.options.getSettings().recognition.max_segment_ms ?? 10000
-    parsed.silence_end_ms = this.options.getSettings().recognition.silence_end_ms ?? 800
+    const startSettings = this.options.getSettings()
+    parsed.compute = { ...startSettings.compute }
+    parsed.max_segment_ms = startSettings.recognition.max_segment_ms ?? 10000
+    parsed.silence_end_ms = startSettings.recognition.silence_end_ms ?? 800
+    // A profile switch while the ASR key is loading must not send the new key to the old endpoint.
+    if (parsed.translationProvider === 'cloud' && startSettings.translation.customModelId) parsed.translationOptions = translationOptionsOf({ ...startSettings.translation, provider: 'cloud' })
     delete parsed.recordingPath
     this.starting = true
     const operation = ++this.operation
@@ -131,7 +135,8 @@ export class SessionController {
       const provider = parsed.translationProvider ?? 'local'
       if (provider === 'local' || provider === 'recognition') delete parsed.translationOptions
       if (provider === 'cloud' || provider === 'microsoft' || provider === 'google') {
-        const apiKey = await this.options.getCredential(provider)
+        const customId = startSettings.translation.customModelId
+        const apiKey = await this.options.getCredential(provider === 'cloud' && customId ? customCredentialSlot(customId) : provider)
         checkCancelled()
         if (apiKey) parsed.translationOptions = { ...parsed.translationOptions, apiKey }
       }

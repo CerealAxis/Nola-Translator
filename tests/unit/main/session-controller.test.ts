@@ -5,6 +5,35 @@ import type { PrewarmConfig, PrewarmResult } from '../../../src/shared/contracts
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 import type { SessionConfig } from '../../../src/shared/contracts'
 
+it('injects the selected custom model key without accepting caller-supplied credentials', async () => {
+  const request = vi.fn(async () => ({ sessionId: 'custom-session' }))
+  const getCredential = vi.fn(async () => 'selected-model-secret')
+  const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModelId: 'second-model' } }
+  const controller = new SessionController({ engine: { currentState: 'ready', request } as unknown as EngineProcess, meetings: null,
+    getSettings: () => settings, getCredential, whenReady: async () => {}, prepare: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+  })
+  await controller.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: ['zh'], translationProvider: 'cloud', translationOptions: { endpoint: 'https://second.example/v1', model: 'second', apiKey: 'untrusted-secret' } }, 'desktop')
+  expect(getCredential).toHaveBeenCalledExactlyOnceWith('cloud-model:second-model')
+  expect(request).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ translationOptions: expect.objectContaining({ apiKey: 'selected-model-secret' }) }) }), 'sessionStarted', expect.any(Number))
+})
+
+it('pins a custom connection and its credential to the same settings snapshot during startup', async () => {
+  const request = vi.fn(async () => ({ sessionId: 'pinned-session' }))
+  const first = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'cloud' as const, customModelId: 'first', cloudEndpoint: 'https://first.example/v1', cloudModel: 'first-model' } }
+  let current = first
+  const getCredential = vi.fn(async (provider: string) => {
+    if (provider === 'aliyun-asr') current = { ...first, translation: { ...first.translation, customModelId: 'second', cloudEndpoint: 'https://second.example/v1', cloudModel: 'second-model' } }
+    return 'first-secret'
+  })
+  const controller = new SessionController({ engine: { currentState: 'ready', request } as unknown as EngineProcess, meetings: null,
+    getSettings: () => current, getCredential, whenReady: async () => {},
+    prepare: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+  })
+  await controller.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', recognitionProvider: 'aliyun', sourceLanguage: 'auto', targetLanguages: ['zh'], translationProvider: 'cloud', translationOptions: { endpoint: first.translation.cloudEndpoint, model: first.translation.cloudModel } }, 'desktop')
+  expect(getCredential).toHaveBeenNthCalledWith(2, 'cloud-model:first')
+  expect(request).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ translationOptions: expect.objectContaining({ endpoint: 'https://first.example/v1', apiKey: 'first-secret' }) }) }), 'sessionStarted', expect.any(Number))
+})
+
 it('uses persisted VAD timing when a session starts', async () => {
   const request = vi.fn(async () => ({ sessionId: 'vad-session' }))
   const settings = { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, max_segment_ms: 15000, silence_end_ms: 1200 } }

@@ -194,9 +194,8 @@ export function SessionSetupDialog({
 
   return (
     <>
-    <TranslationCompatibilityDialog key={signature} isOpen={isOpen && incompatible && dismissedPair !== signature} onClose={() => setDismissedPair(signature)} source={draft.sourceLanguage} target={draft.targetLanguage} recognition={modelOptions.recognition} translation={modelOptions.translation} resources={resources} compute={settings.compute ?? DEFAULT_COMPUTE_SETTINGS}
-      onChangeSource={sourceLanguage => patch({ sourceLanguage })} onChangeModel={translationModelId => patch({ translationModelId })}
-      onDisableTranslation={() => patch({ translate: false, targetLanguage: NO_TRANSLATION_LANGUAGE })} />
+    <TranslationCompatibilityDialog key={signature} isOpen={isOpen && incompatible && dismissedPair !== signature} onClose={() => setDismissedPair(signature)} source={draft.sourceLanguage} target={draft.targetLanguage} translation={modelOptions.translation} resources={resources} compute={settings.compute ?? DEFAULT_COMPUTE_SETTINGS}
+      onChangeModel={translationModelId => patch({ translationModelId })} />
     <Dialog open={isOpen && !(incompatible && dismissedPair !== signature)} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-2xl border border-border">
         <DialogHeader><DialogTitle>{t('session.title')}</DialogTitle></DialogHeader>

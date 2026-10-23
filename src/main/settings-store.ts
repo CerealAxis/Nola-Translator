@@ -8,6 +8,8 @@ import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYPI_
 import { ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS } from '../shared/settings'
 import { remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../shared/cloud-config'
 import { settingsPatchSchema } from './settings-schema'
+import { customModelSchema, synchronizeCustomModel } from '../shared/custom-models'
+import { LANGUAGE_CODES } from '../shared/languages'
 
 // Store-internal patches may also touch fields the IPC schema exposes only through their own channels.
 export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 2; browserConnection?: { enabled: boolean } }
@@ -45,6 +47,20 @@ type LegacyTranslation = Record<string, unknown>
 
 /** Old installations default to local recognition; malformed connection fields never survive reload. */
 function sanitizeCloudSettings(settings: AppSettings): void {
+  const models = settings.translation.customModels
+  if (models !== undefined) settings.translation.customModels = Array.isArray(models)
+    ? [...new Map(models.flatMap(model => { const parsed = customModelSchema.safeParse(model); return parsed.success ? [[parsed.data.id, parsed.data] as const] : [] })).values()].slice(0, 100)
+    : []
+  if (settings.translation.customModelId && !settings.translation.customModels?.some(model => model.id === settings.translation.customModelId)) settings.translation.customModelId = ''
+  if (settings.translation.cloudLanguages !== undefined) {
+    const languages = Array.isArray(settings.translation.cloudLanguages) ? settings.translation.cloudLanguages.filter(code => LANGUAGE_CODES.includes(code)) : []
+    settings.translation.cloudLanguages = languages.length ? [...new Set(languages)] : [...LANGUAGE_CODES]
+  }
+  if (settings.translation.cloudSourceLanguages !== undefined) {
+    const languages = Array.isArray(settings.translation.cloudSourceLanguages) ? settings.translation.cloudSourceLanguages.filter(code => SOURCE_LANGUAGE_OPTIONS.includes(code)) : []
+    settings.translation.cloudSourceLanguages = languages.length ? [...new Set(languages)] : [...SOURCE_LANGUAGE_OPTIONS]
+  }
+  settings.translation = synchronizeCustomModel(settings.translation)
   const recognition = settings.recognition
   recognition.provider = RECOGNITION_PROVIDERS.includes(recognition.provider ?? 'local') ? recognition.provider ?? 'local' : 'local'
   for (const [key, fallback, min, max] of [['max_segment_ms', 10000, 3000, 30000], ['silence_end_ms', 800, 300, 2000]] as const) {
@@ -369,6 +385,7 @@ export class SettingsStore {
       network: { ...this.settings.network, ...(patch.network ?? {}) },
     }
     // Writes share the load-time allowlist so no write path can persist an invalid language code.
+    next.translation = synchronizeCustomModel(next.translation, patch.translation)
     next.recognition.sourceLanguage = sanitizeSourceLanguage(next.recognition.sourceLanguage)
     next.translation.targetLanguage = sanitizeTargetLanguage(next.translation.targetLanguage)
     next.translation.localModelId = sanitizeLocalModelId(next.translation.localModelId)

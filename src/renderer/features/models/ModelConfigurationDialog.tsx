@@ -18,7 +18,8 @@ import '../settings/settings.css'
 import './models.css'
 import { CircleHelp } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { LANGUAGE_CODES, normalizeLanguage } from '../../../shared/languages'
+import { normalizeLanguage } from '../../../shared/languages'
+import { SOURCE_LANGUAGE_OPTIONS } from '../../../shared/settings'
 import { INDEX_TRANSLATE_LANGUAGES } from '../../../shared/index-translate'
 import { modelEngines } from '../../../shared/model-engines'
 import { configurationOf, modelConfigurationSchema, QWEN_LANGUAGES, M2M100_LANGUAGES } from '../../../shared/model-capabilities'
@@ -63,7 +64,7 @@ export function ModelLanguageSelect({ label, value, codes, onChange, multiple = 
       <Combobox.Popup className="model-language-popup select__popover settings-select-content">
         <Combobox.Input className="input w-full" aria-label={ariaLabel} placeholder={t('modelConfig.selectLanguages')} />
         <Combobox.List className="nola-language-options">
-          {(code: string) => <Combobox.Item key={code} value={code} className="list-box-item settings-select-item">{name(code)}<Combobox.ItemIndicator><Check aria-hidden="true" className="size-4" /></Combobox.ItemIndicator></Combobox.Item>}
+          {(code: string) => <Combobox.Item key={code} value={code} className="model-language-option">{name(code)}<Combobox.ItemIndicator><Check aria-hidden="true" className="size-4" /></Combobox.ItemIndicator></Combobox.Item>}
         </Combobox.List>
       </Combobox.Popup>
     </Combobox.Positioner></Combobox.Portal>
@@ -78,27 +79,32 @@ export function ModelLanguageSelect({ label, value, codes, onChange, multiple = 
 export function ModelConfigurationDialog({ record, onClose, readOnly = false }: ModelConfigurationDialogProps) {
   const { t, language } = useI18n()
   const engines = modelEngines(record)
-  const [draft, setDraft] = useState<ModelConfiguration>(() => configurationOf(record) ?? {
-    slot: record.kind === 'recognitionModel' ? 'recognition' : 'translation',
-    engine: engines[0] ?? 'pytorch',
-    languages: record.kind === 'recognitionModel' ? record.languages.map(normalizeLanguage) : [],
-    supportsAutoDetection: record.kind === 'recognitionModel',
-    sourceLanguages: record.kind === 'translationModel' ? record.languages.map(normalizeLanguage) : [],
-    targetLanguages: record.kind === 'translationModel' ? record.languages.map(normalizeLanguage) : [],
+  const [draft, setDraft] = useState<ModelConfiguration>(() => {
+    const configured = configurationOf(record)
+    if (configured) return configured
+    return {
+      slot: record.kind === 'recognitionModel' ? 'recognition' : 'translation',
+      engine: engines[0] ?? 'pytorch',
+      languages: record.kind === 'recognitionModel' ? record.languages.map(normalizeLanguage) : [],
+      supportsAutoDetection: true,
+      sourceLanguages: record.kind === 'translationModel' ? ['auto', ...record.languages.map(normalizeLanguage)] : [],
+      targetLanguages: record.kind === 'translationModel' ? record.languages.map(normalizeLanguage) : [],
+    }
   })
   const [saving, setSaving] = useState(false)
   const [pairSource, setPairSource] = useState('')
   const [pairTarget, setPairTarget] = useState('')
   const patch = (value: Partial<ModelConfiguration>) => { setDraft(previous => ({ ...previous, ...value })) }
   // A saved subset must not shrink the vocabulary available when editing the model again.
-  const codes = [...new Set([...LANGUAGE_CODES, ...INDEX_TRANSLATE_LANGUAGES].map(normalizeLanguage))]
+  const codes = [...new Set([...SOURCE_LANGUAGE_OPTIONS, ...INDEX_TRANSLATE_LANGUAGES].map(normalizeLanguage))]
   const loaderCodes = record.provider === 'qwen3-asr' ? QWEN_LANGUAGES
     : record.provider === 'sensevoice' ? ['zh', 'en', 'yue', 'ja', 'ko']
       : record.provider === 'm2m100' ? M2M100_LANGUAGES : codes
   const slot = record.kind === 'recognitionModel' ? 'recognition' : 'translation'
   const selectedCodes = draft.slot === 'recognition' ? draft.languages : [...draft.sourceLanguages, ...draft.targetLanguages]
+  const recognitionCodes = ['auto', ...codes]
   const valid = modelConfigurationSchema.safeParse(draft).success && engines.includes(draft.engine)
-    && draft.slot === slot && selectedCodes.every(code => loaderCodes.includes(normalizeLanguage(code)))
+    && draft.slot === slot && selectedCodes.every(code => (draft.slot === 'translation' && code === 'auto') || loaderCodes.includes(normalizeLanguage(code)))
   const engineLabel = (engine: typeof engines[number]) => engine === 'llama' ? 'llama.cpp' : engine === 'crisp' ? 'CrispASR' : 'PyTorch'
   const loaderHelp = `${t('modelConfig.modelHelp')} ${t('modelConfig.slot')}: ${t(slot === 'recognition' ? 'modelConfig.recognition' : 'modelConfig.translation')} · ${t('modelConfig.engine')}: ${engines.map(engineLabel).join(' / ')}`
   const name = (code: string) => languageName(code, language)
@@ -120,7 +126,13 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false }: 
       <DialogHeader><div className="settings-row__title"><DialogTitle>{t(readOnly ? 'modelConfig.viewTitle' : 'modelConfig.title')}</DialogTitle><Tooltip><TooltipTrigger delay={300} render={<Button variant="secondary" size="sm" className="settings-row__help" aria-label={t(readOnly ? 'modelConfig.viewTitle' : 'modelConfig.title')}><CircleHelp aria-hidden="true" /></Button>} /><TooltipContent  role="tooltip" className="settings-row__tooltip z-popup">{t(readOnly ? 'modelConfig.viewDescription' : 'modelConfig.description')}</TooltipContent></Tooltip></div></DialogHeader>
       <div className="model-configuration-dialog__body flex flex-col gap-[var(--space-2)]">
         {readOnly ? <p className="nola-caption text-muted">{t('modelConfig.viewDescription')}</p> : null}
-        {draft.slot === 'recognition' ? <ModelLanguageSelect label={t('modelConfig.languages')} value={draft.languages} codes={codes} onChange={languages => patch({ languages })} readOnly={readOnly} /> : <>
+        {draft.slot === 'recognition' ? <ModelLanguageSelect
+          label={t('modelConfig.languages')}
+          value={draft.supportsAutoDetection ? ['auto', ...draft.languages] : draft.languages}
+          codes={recognitionCodes}
+          onChange={languages => patch({ languages: languages.filter(code => code !== 'auto'), supportsAutoDetection: languages.includes('auto') })}
+          readOnly={readOnly}
+        /> : <>
           <ModelLanguageSelect label={t('modelConfig.sourceLanguages')} value={draft.sourceLanguages} codes={codes} onChange={sourceLanguages => patch({ sourceLanguages, translationPairs: draft.translationPairs?.filter(pair => sourceLanguages.includes(pair.source)) })} readOnly={readOnly} />
           <ModelLanguageSelect label={t('modelConfig.targetLanguages')} value={draft.targetLanguages} codes={codes} onChange={targetLanguages => patch({ targetLanguages, translationPairs: draft.translationPairs?.filter(pair => targetLanguages.includes(pair.target)) })} readOnly={readOnly} />
         </>}
@@ -138,15 +150,13 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false }: 
           <SelectContent className="settings-select-content"><SelectGroup>{engines.map(engine => <SelectItem className="settings-select-item" key={engine} value={engine} label={engineLabel(engine)}>{engineLabel(engine)}</SelectItem>)}</SelectGroup></SelectContent>
         </Select></div>
         </SettingsRow>
-        {draft.slot === 'recognition' ? <>
-          <SettingsRow label={t('modelConfig.autoDetection')}><SettingSwitch ariaLabel={t('modelConfig.autoDetection')} isDisabled={readOnly} isSelected={draft.supportsAutoDetection} onChange={supportsAutoDetection => { if (!readOnly) patch({ supportsAutoDetection }) }} /></SettingsRow>
-        </> : <>
+        {draft.slot !== 'recognition' ? <>
           <SettingsRow label={t('modelConfig.restrictPairs')} desc={t('modelConfig.pairsHint')} descriptionTooltip>
           <SettingSwitch ariaLabel={t('modelConfig.restrictPairs')} isDisabled={readOnly} isSelected={draft.translationPairs !== undefined} onChange={enabled => { if (!readOnly) patch({ translationPairs: enabled ? [] : undefined }) }} />
           </SettingsRow>
           {draft.translationPairs !== undefined ? <>
             {readOnly ? null : <>
-              <ModelLanguageSelect multiple={false} label={t('session.sourceLanguage')} value={pairSource ? [pairSource] : []} codes={draft.sourceLanguages} onChange={values => setPairSource(values[0] ?? '')} />
+              <ModelLanguageSelect multiple={false} label={t('session.sourceLanguage')} value={pairSource ? [pairSource] : []} codes={draft.sourceLanguages.filter(code => code !== 'auto')} onChange={values => setPairSource(values[0] ?? '')} />
               <ModelLanguageSelect multiple={false} label={t('session.targetLanguage')} value={pairTarget ? [pairTarget] : []} codes={draft.targetLanguages} onChange={values => setPairTarget(values[0] ?? '')} />
               <Button variant="secondary" disabled={!draft.sourceLanguages.includes(pairSource) || !draft.targetLanguages.includes(pairTarget) || draft.translationPairs.length >= 512} onClick={() => {
                 if (!draft.translationPairs?.some(pair => pair.source === pairSource && pair.target === pairTarget)) patch({ translationPairs: [...draft.translationPairs ?? [], { source: pairSource, target: pairTarget }] })
@@ -156,7 +166,7 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false }: 
               <span>{name(pair.source)} → {name(pair.target)}</span>{readOnly ? null : <Button variant="tertiary" onClick={() => patch({ translationPairs: draft.translationPairs?.filter(item => item !== pair) })} aria-label={`${t('modelConfig.removePair')}: ${name(pair.source)} → ${name(pair.target)}`}>{t('modelConfig.removePair')}</Button>}
             </div>)}
           </> : null}
-        </>}
+        </> : null}
       </div>
       {readOnly ? null : <DialogFooter><Button variant="tertiary" disabled={saving} onClick={onClose}>{t('session.cancel')}</Button><Button disabled={(!valid) || (saving)} aria-busy={saving}  onClick={() => void save()}>{saving ? <Spinner /> : null}{t('modelConfig.save')}</Button></DialogFooter>}
     </DialogContent>

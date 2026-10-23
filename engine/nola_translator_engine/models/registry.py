@@ -36,7 +36,7 @@ from ..model_capabilities import LANGUAGE_CODES, normalize, supports_translation
 
 CUSTOM_REGISTRY_FILENAME = ".custom-models.json"
 CUSTOM_RESOURCE_PREFIX = "hub:"
-REGISTRY_VERSION = 1
+REGISTRY_VERSION = 2
 
 Slot = Literal["recognition", "translation", "synthesis"]
 
@@ -163,7 +163,7 @@ class CustomModelEntry:
         )
 
     @classmethod
-    def from_json(cls, raw: object) -> CustomModelEntry:
+    def from_json(cls, raw: object, *, migrate_auto_detection: bool = False) -> CustomModelEntry:
         if not isinstance(raw, dict):
             raise RegistryError("自定义模型注册表的条目不是对象")
         repo = raw.get("repo")
@@ -189,8 +189,16 @@ class CustomModelEntry:
         if raw.get("configuration"):
             try:
                 candidate = ModelConfiguration.model_validate(raw["configuration"])
+                if migrate_auto_detection and candidate.slot == "translation":
+                    source_languages = candidate.sourceLanguages
+                    candidate = candidate.model_copy(update={
+                        "supportsAutoDetection": True,
+                        "sourceLanguages": source_languages if "auto" in source_languages else ["auto", *source_languages],
+                    })
+                elif migrate_auto_detection and candidate.slot == "recognition" and not candidate.supportsAutoDetection:
+                    candidate = candidate.model_copy(update={"supportsAutoDetection": True})
                 required = [candidate.languages] if slot == "recognition" else [candidate.sourceLanguages, candidate.targetLanguages]
-                codes = candidate.languages + candidate.sourceLanguages + candidate.targetLanguages
+                codes = candidate.languages + [code for code in candidate.sourceLanguages if code != "auto"] + candidate.targetLanguages
                 valid_pairs = candidate.translationPairs is None or bool(candidate.translationPairs) and all(supports_translation(candidate, pair.source, pair.target) for pair in candidate.translationPairs)
                 if candidate.slot == slot and candidate.engine == ("llama" if adapter_id in ("llama.cpp", "llama-asr") else "crisp" if adapter_id.startswith('crisp-') else "pytorch") and all(required) and all(normalize(code) in LANGUAGE_CODES for code in codes) and valid_pairs:
                     configuration = candidate
@@ -302,13 +310,17 @@ class CustomModelRegistry:
         if not isinstance(models, list):
             raise RegistryError(f"自定义模型注册表 {self.path} 的 models 不是数组")
         entries: dict[str, CustomModelEntry] = {}
+        version = raw.get("version", 0)
+        migrate_auto_detection = not isinstance(version, int) or version < REGISTRY_VERSION
         for item in models:
-            entry = CustomModelEntry.from_json(item)
+            entry = CustomModelEntry.from_json(item, migrate_auto_detection=migrate_auto_detection)
             entries[entry.resource_id] = entry
+        if migrate_auto_detection:
+            self._write(entries)
         return entries
 
-    def _write(self) -> None:
-        entries = self.entries()
+    def _write(self, entries: dict[str, CustomModelEntry] | None = None) -> None:
+        entries = entries if entries is not None else self.entries()
         payload = {
             "version": REGISTRY_VERSION,
             "models": [entries[key].to_json() for key in sorted(entries)],
