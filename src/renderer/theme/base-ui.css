@@ -42,6 +42,7 @@
   --color-nola-ui-destructive: var(--nola-ui-destructive);
   --color-nola-ui-border: var(--nola-ui-border);
   --color-nola-ui-input: var(--nola-ui-input);
+  --color-nola-ui-field-background: var(--nola-ui-field-background);
   --color-nola-ui-ring: var(--nola-ui-ring);
   --color-nola-ui-success: var(--nola-ui-success);
   --color-nola-ui-warning: var(--nola-ui-warning);
@@ -71,6 +72,7 @@
   --nola-ui-destructive: var(--danger);
   --nola-ui-border: var(--border);
   --nola-ui-input: var(--field-border);
+  --nola-ui-field-background: var(--field-background);
   --nola-ui-ring: var(--focus);
   --nola-ui-success: var(--success);
   --nola-ui-warning: var(--warning);
@@ -100,6 +102,7 @@
   --nola-ui-destructive: var(--danger);
   --nola-ui-border: var(--border);
   --nola-ui-input: var(--field-border);
+  --nola-ui-field-background: var(--field-background);
   --nola-ui-ring: var(--focus);
   --nola-ui-success: var(--success);
   --nola-ui-warning: var(--warning);

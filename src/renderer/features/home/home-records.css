@@ -86,8 +86,7 @@
 .nola-record-page__start { flex-shrink: 0; border-radius: 12px; min-height: 44px; padding-inline: 20px; }
 .nola-record-page__search { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .nola-record-page__search > .search-field { width: min(380px, 100%); }
-.nola-record-page__search-field { position: relative; width: min(380px, 100%); }
-.nola-record-page__search-field > svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.nola-record-page__search-field { width: min(380px, 100%); }
 .nola-record-page__search .search-field__group { border: 1px solid var(--border); border-radius: 12px; min-height: 44px; background: var(--surface); }
 .nola-record-page__search > span, .nola-record-page__footer > span { font-size: 13px; color: var(--muted); }
 .nola-record-page__footer { justify-content: space-between; flex-wrap: wrap; }

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty'
-import { Input } from '@/components/ui/input'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from '@/components/ui/select'
 import { Pagination, PaginationContent, PaginationItem, PaginationLink } from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -153,10 +153,10 @@ export function RecordsPage(): ReactNode {
           <Button variant="default" className="nola-record-page__start" onClick={startSession}><Mic aria-hidden="true" size={22} />{t('workspace.start')}</Button>
         </header>
         <div className="nola-record-page__search">
-          <div className="nola-record-page__search-field">
-            <Search aria-hidden="true" size={16} />
-            <Input className="h-11 pl-9" type="search" value={filterText} onChange={(event) => { setFilterText(event.target.value); setPage(1); setSelection(new Set()) }} aria-label={t('records.search')} placeholder={t('records.searchPlaceholder')} />
-          </div>
+          <InputGroup className="nola-record-page__search-field">
+            <InputGroupInput type="search" value={filterText} onChange={(event) => { setFilterText(event.target.value); setPage(1); setSelection(new Set()) }} aria-label={t('records.search')} placeholder={t('records.searchPlaceholder')} />
+            <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
+          </InputGroup>
           <span>{t('records.total', { count: filtered.length })}</span>
         </div>
         <Card className="nola-record-card">

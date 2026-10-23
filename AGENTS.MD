@@ -1,6 +1,6 @@
 # AGENTS.md
 
-本文件约束 Nola Translator 仓库中的 AI 编程助手。优先完成用户当前任务，遵守项目既有架构与明确的操作边界。视觉规范见 [DESIGN.MD](./DESIGN.MD)。
+本文件约束 Nola Translator 仓库中的 AI 编程助手。优先完成用户当前任务，遵守项目既有架构与明确的操作边界。视觉规范见 [DESIGN.MD](./DESIGN.MD)，shadcn-ui文档见 [./llms.txt]
 
 ## 1. 工作原则
 
@@ -23,7 +23,7 @@
 | 云端能力 | 阿里云 WebSocket 流式识别与译文；MiniMax VAD 分段上传 WAV；MyMemory REST 翻译 |
 | 浏览器扩展 | Chrome / Edge / Firefox MV3；Python Native Messaging 连接桌面程序 |
 | 文档与演示 | VitePress 多语言站；Vue 容器挂载 React，复用桌面 UI、主题及演示入口 |
-| 质量保障 | Vitest + Testing Library；JSONL 诊断日志（自动脱敏、限制大小） |
+| 质量保障 | Vitest + Testing Library；JSONL 诊断日志 |
 
 按任务定位以下目录；结构调整后必须同步更新本节索引。
 

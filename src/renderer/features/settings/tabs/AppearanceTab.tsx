@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 
 import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ColorPicker } from '@/components/ui/color-picker'
 import { StyleSliderRow } from './BrowserTab'
 import { CheckSquare, ChevronDown, CircleAlert, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Square, X } from 'lucide-react'
@@ -59,8 +60,9 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
 
   return (
     <div className="settings-panel">
-      <SettingGroup legend={t('modelsSettingsUi.preview')}>
-        <div className="nola-overlay-stage">
+      <Card className="nola-overlay-preview">
+        <CardHeader><CardTitle>{t('modelsSettingsUi.preview')}</CardTitle></CardHeader>
+        <CardContent className="card__content nola-overlay-stage">
           <div
             className="nola-caption-preview"
             data-color-scheme={overlay.colorScheme}
@@ -99,8 +101,8 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
               <span className="nola-caption-preview__pill">{t(overlay.layout === 'rolling' ? 'workspace.layoutSplit' : 'workspace.layoutSentence')}<ChevronDown /></span>
             </div>
           </div>
-        </div>
-      </SettingGroup>
+        </CardContent>
+      </Card>
 
       <SettingGroup legend={t('modelsSettingsUi.layoutDisplay')}>
         <SettingsRow label={t('settings.overlayPosition')}>
