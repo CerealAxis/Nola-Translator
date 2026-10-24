@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { detachSettingsStore, settingsStore } from '@/store/settingsStore'
@@ -65,6 +66,15 @@ it('starts a forced version check from General settings', () => {
   fireEvent.click(screen.getByRole('button', { name: '检查更新' }))
 
   expect(check).toHaveBeenCalledWith(true)
+})
+
+it('saves the main-window close preference independently of service settings', async () => {
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
+  render(<GeneralTab settings={DEFAULT_SETTINGS} />)
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('combobox', { name: '关闭主窗口时' }))
+  await user.click(await screen.findByRole('option', { name: '退出应用' }))
+  await waitFor(() => expect(update).toHaveBeenCalledWith({ closeBehavior: 'quit' }))
 })
 
 it('keeps reset in Advanced and moves licenses and feedback to More', async () => {

@@ -5,11 +5,14 @@ from nola_translator_engine.audio.devices import (
     AudioDeviceRegistry,
     AudioDeviceUnavailableError,
     enumerate_wasapi_devices,
+    _legacy_device_id,
+    resolve_capture_device,
 )
 
 
 class FakePyAudio:
-    def __init__(self, *, moved_indices: bool = False) -> None:
+    def __init__(self, *, moved_indices: bool = False, loopback_channels: int = 2,
+                 loopback_sample_rate: float = 48000.0) -> None:
         offset = 100 if moved_indices else 0
         self.host_api = {
             "index": 2,
@@ -51,9 +54,9 @@ class FakePyAudio:
                 "index": 33 + offset,
                 "name": "扬声器 [Loopback]",
                 "hostApi": 2,
-                "maxInputChannels": 2,
+                "maxInputChannels": loopback_channels,
                 "maxOutputChannels": 0,
-                "defaultSampleRate": 48000.0,
+                "defaultSampleRate": loopback_sample_rate,
                 "isLoopbackDevice": True,
             }
         ]
@@ -93,6 +96,47 @@ def test_stable_ids_do_not_use_temporary_portaudio_indices() -> None:
     after = enumerate_wasapi_devices(lambda: FakePyAudio(moved_indices=True))
     assert [item.device_id for item in before] == [item.device_id for item in after]
     assert [item.backend_index for item in before] != [item.backend_index for item in after]
+
+
+def test_stable_output_id_survives_mix_format_changes() -> None:
+    before = enumerate_wasapi_devices(lambda: FakePyAudio(loopback_channels=6))
+    after = enumerate_wasapi_devices(
+        lambda: FakePyAudio(loopback_channels=8, loopback_sample_rate=44100.0)
+    )
+
+    assert before[0].device_id == after[0].device_id
+    assert (before[0].channels, before[0].sample_rate) == (6, 48000)
+    assert (after[0].channels, after[0].sample_rate) == (8, 44100)
+
+    registry = AudioDeviceRegistry(lambda: after)
+    resolved = registry.resolve("systemOutput", before[0].device_id)
+    assert resolved.device_id == before[0].device_id
+    assert (resolved.channels, resolved.sample_rate) == (8, 44100)
+
+    capture_device = resolve_capture_device(FakePyAudio(loopback_channels=8), before[0])
+    assert capture_device.device_id == before[0].device_id
+    assert (capture_device.channels, capture_device.sample_rate) == (8, 48000)
+
+
+def test_registry_accepts_previously_persisted_format_based_id() -> None:
+    current = enumerate_wasapi_devices(lambda: FakePyAudio(loopback_channels=6))
+    previous_id = _legacy_device_id("systemOutput", current[0].name, current[0].sample_rate, current[0].channels)
+
+    resolved = AudioDeviceRegistry(lambda: current).resolve("systemOutput", previous_id)
+    assert resolved.device_id == current[0].device_id
+
+
+def test_registry_remaps_cached_device_id_after_mix_format_changes() -> None:
+    before = enumerate_wasapi_devices(lambda: FakePyAudio(loopback_channels=6))
+    after = enumerate_wasapi_devices(lambda: FakePyAudio(loopback_channels=8))
+    snapshots = iter([before, after])
+    registry = AudioDeviceRegistry(lambda: next(snapshots))
+
+    assert registry.refresh()[0].device_id == before[0].device_id
+    resolved = registry.resolve("systemOutput", before[0].device_id)
+    assert resolved.device_id == after[0].device_id
+    assert resolved.channels == 8
+
 
 
 def test_enumeration_failure_records_native_error_and_releases_backend(monkeypatch):

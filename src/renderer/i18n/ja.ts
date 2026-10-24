@@ -1,11 +1,13 @@
-import { localCallJa, localCallEntries } from './local-call-ui'
+import { gatewayJa, gatewayEntries } from './gateway-ui'
+import { workbenchJa, workbenchEntries } from './workbench-ui'
 import { offlineJa, offlineEntries } from './offline-ui'
 import { buildLocaleDictionary } from './locale-builder'
 import { onboardingEntries, onboardingJa } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const jaMessages: Record<DictionaryKey, string> = {
-  ...localCallEntries(localCallJa),
+  ...gatewayEntries(gatewayJa),
+  ...workbenchEntries(workbenchJa),
   "settings.restoreVadDefaults": "既定値に戻す",
   "settings.vadGroup": "音声区間",
   "settings.maxSegmentMs": "最大区間長（ミリ秒）",
@@ -496,6 +498,7 @@ const jaMessages: Record<DictionaryKey, string> = {
   'appUpdate.later': '後で通知',
   'appUpdate.openFailed': 'GitHub のリリースページを開けません。ネットワークを確認して、もう一度お試しください。',
   'nav.home': 'ホーム',
+  'nav.modelGateway': 'モデルゲートウェイ',
   'nav.workspace': 'リアルタイム通訳',
   'nav.records': '通訳記録',
   'nav.models': 'モデル管理',

@@ -48,6 +48,6 @@ it('uses the installed translation model and returns its actual result without p
 it('rejects image translation with a model that does not support images', async () => {
   const direct = createPlaygroundFetch(() => ({ model: 'resource:text-only', kind: 'mt', effort: 'auto', source: 'auto', target: 'zh', voice: '' }), key => key, () => [])
   const response = await direct('/chat', { body: JSON.stringify({ messages: [{ role: 'user', parts: [{ type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,AA==' }] }] }) })
-  expect(await response.text()).toContain('localCall.imageUnsupported')
+  expect(await response.text()).toContain('workbench.imageUnsupported')
   expect(bridge.app.directModel).not.toHaveBeenCalled()
 })

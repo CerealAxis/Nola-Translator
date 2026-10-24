@@ -1,16 +1,16 @@
 @layer theme, base, components, utilities;
 @import 'tailwindcss' source(none);
 @source './components/assistant-ui/native';
-@source './features/local-call';
-@source './native-agent-entry.tsx';
+@source './features/workbench';
+@source './workbench-entry.tsx';
 @source './components/ui/toast.tsx';
 @source './components/ui/popover.tsx';
 @source './components/ui/breadcrumb.tsx';
 @source './components/ui/slider.tsx';
 @import 'tw-shimmer';
 @import './theme/cjk-fonts.css';
-@import './features/local-call/native-agent.css';
-@import './features/local-call/native-generative.css';
+@import './features/workbench/native-agent.css';
+@import './features/workbench/native-generative.css';
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 @custom-variant data-open (&:where([data-state='open'], [data-open]:not([data-open='false'])));

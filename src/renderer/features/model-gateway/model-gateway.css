@@ -1,0 +1,11 @@
+.model-gateway-page { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.model-gateway-heading, .model-gateway-capability { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.model-gateway-heading { flex-wrap: wrap; }
+.model-gateway-heading h1 { font: var(--font-h1); }
+.model-gateway-heading p { color: var(--muted); }
+.model-gateway-control { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
+.model-gateway-control input { min-width: 0; flex: 1; }
+.model-gateway-metrics { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.model-gateway-requests { display: flex; flex-direction: column; gap: var(--space-1); }
+.model-gateway-requests li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); overflow-wrap: anywhere; }
+.model-gateway-example { overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-secondary); padding: var(--space-2); border-radius: var(--radius-lg); margin-block: var(--space-2); }

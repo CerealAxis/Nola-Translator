@@ -64,7 +64,7 @@ class EngineService:
 
         if isinstance(command, ListDevicesCommand):
             try:
-                devices = self.device_enumerator()
+                devices = self.device_registry.refresh()
             except Exception as error:
                 write_debug("engine", "audio.devices.list.failed", {"requestId": command.requestId, **exception_fields(error)})
                 return [

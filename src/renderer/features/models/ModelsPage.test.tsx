@@ -8,6 +8,8 @@ import { LANGUAGE_CODES } from '../../../shared/languages'
 import { SOURCE_LANGUAGE_OPTIONS } from '../../../shared/settings'
 import { useModelOptions } from '../../model-options'
 import * as settingsActions from '@/store/settingsStore'
+import * as storeModule from '@/store'
+import type { NolaBridge } from '@/bridge'
 
 // Publisher avatars pull in an emoji picker with browser-only JSON imports.
 vi.mock('@lobehub/icons/es/features/IconAvatar', () => ({ default: () => null }))
@@ -25,6 +27,21 @@ beforeEach(() => {
 afterEach(() => { cleanup(); stores.models.setState(initialModels); stores.settings.setState(initialSettings); vi.restoreAllMocks() })
 
 const section = (name: string) => within(screen.getByRole('heading', { name }).closest('section')!)
+
+it('shows a synthesis default and uses only voices discovered for that model', async () => {
+  const modelId = 'tts-qwen3-tts-crisp-0.6b-base-q8-0'
+  stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, synthesis: { modelId, voice: '' } } })
+  stores.models.setState({ resources: [{ resourceId: modelId, kind: 'ttsModel', provider: 'crisp-tts', name: 'Installed synthesis', description: '', languages: [], installed: true, installedBytes: 1, state: 'idle', cancellable: false }] })
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
+  vi.spyOn(storeModule, 'getBridge').mockReturnValue({ gateway: {
+    snapshot: async () => ({ services: { tts: { model: `resource:${modelId}`, voices: ['Discovered voice'] } } }),
+    onChanged: () => () => undefined,
+  } } as unknown as NolaBridge)
+  render(<ModelsPage />)
+  expect(screen.getByText('默认语音合成模型')).toBeInTheDocument()
+  await waitFor(() => expect(update).toHaveBeenCalledWith({ synthesis: { voice: 'Discovered voice' } }))
+  expect(screen.getByRole('combobox', { name: '默认声音' })).toHaveTextContent('Discovered voice')
+})
 
 it('groups remote and local cards by capability with icons inside their headers', () => {
   render(<ModelsPage />)

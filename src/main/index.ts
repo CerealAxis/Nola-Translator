@@ -1,14 +1,19 @@
+import { FeatureActivity, type FeatureLease } from './feature-activity'
+import { ModelGateway } from './model-gateway'
+import { NolaTray } from './tray'
+import { loggedHandle } from './logged-ipc'
 import { modelEngines, supportsSelectedEngine } from '../shared/model-engines'
-import { registerLocalCallDemo, isLocalCallDemoWindow } from './local-call-demo'
+import { registerWorkbench, isWorkbenchWindow } from './workbench'
 import { AgentWorkspace } from './agent-workspace'
 import { customModelsOf } from '../shared/custom-models'
 import { captureMainConsole, initializeSessionLog, logActivityTotals, logDiagnostic, relocateSessionLogs } from './session-log'
 import { resolveDeviceIntent } from '../shared/device-selection'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 
-import { app, BrowserWindow, ipcMain, safeStorage, screen, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, safeStorage, screen, shell, type IpcMainInvokeEvent } from 'electron'
 
 import type { AppSettings, OverlaySettings } from '../shared/settings'
 import { NO_TRANSLATION_LANGUAGE } from '../shared/settings'
@@ -49,6 +54,31 @@ let disposeRuntimeIpc: (() => void) | null = null
 let disposeOfflineIpc: (() => Promise<void>) | null = null
 let quitting = false
 let browserConnection: BrowserConnection | null = null
+let tray: NolaTray | null = null
+let gateway: ModelGateway | null = null
+let stopWorkbench: (() => Promise<void>) | null = null
+let stopSessions: (() => Promise<void>) | null = null
+let closeBehavior: () => AppSettings['closeBehavior'] = () => 'tray'
+let requestQuit: () => void = () => app.quit()
+const activity = new FeatureActivity(snapshot => {
+  for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('feature-activity:changed', snapshot)
+  tray?.activityChanged(snapshot)
+})
+function assertFeatureSender(event: IpcMainInvokeEvent, mainOnly = false): void {
+  const window = BrowserWindow.fromWebContents(event.sender)
+  if (!window || window.isDestroyed() || event.senderFrame !== event.sender.mainFrame) throw new Error('Access denied')
+  if (mainOnly ? window !== mainWindow : ![mainWindow, workspaceWindow, overlayWindow].includes(window) && !isWorkbenchWindow(window)) throw new Error('Access denied')
+  const url = new URL(event.sender.getURL())
+  if (process.env.ELECTRON_RENDERER_URL) {
+    if (url.origin !== new URL(process.env.ELECTRON_RENDERER_URL).origin) throw new Error('Access denied')
+  } else if (url.href.split('?')[0].split('#')[0] !== pathToFileURL(join(__dirname, '../renderer/index.html')).href) throw new Error('Access denied')
+}
+function showMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+}
 
 function createMainWindow(theme: AppSettings['theme']): void {
   const preload = resolvePreloadPath(__dirname)
@@ -56,9 +86,14 @@ function createMainWindow(theme: AppSettings['theme']): void {
   mainWindow = window
 
   window.once('ready-to-show', () => window.show())
+  window.on('close', event => {
+    if (quitting) return
+    event.preventDefault()
+    if (closeBehavior() === 'quit') requestQuit()
+    else { window.hide(); tray?.hidden() }
+  })
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null
-    if (!quitting) app.quit()
   })
 
   window.webContents.setWindowOpenHandler(({ url }) => {
@@ -374,7 +409,7 @@ if (!hasSingleInstanceLock) {
     let sessionActive = false
     engine.on('protocolError', (error: unknown) => console.error('engine protocol failed', error))
     engine.on('state', state => logDiagnostic('engine.state', { state }))
-    engine.on('crash', error => logDiagnostic('engine.crash', error))
+    engine.on('crash', error => { logDiagnostic('engine.crash', error); tray?.failure() })
     let componentInstalling = false
     let sessionStarting = false
     let preparation: Promise<void> | null = null
@@ -447,13 +482,13 @@ if (!hasSingleInstanceLock) {
       return preparation
     }
     disposeRuntimeIpc = registerRuntimeIpc(runtimes, () => mainWindow, async components => {
-      if (sessionActive || sessionStarting || componentInstalling) throw new Error('sessionAlreadyRunning')
+      if (activity.snapshot().owner || sessionActive || sessionStarting || componentInstalling) throw new Error('sessionAlreadyRunning')
       componentInstalling = true
       try {
         currentDirectories = JSON.stringify(await recheckRuntimeEnvironment(runtimes, engine!, components))
       } finally { componentInstalling = false }
     },
-      () => sessionActive || sessionStarting || componentInstalling, whenRuntimeReady, async (id, repair) => {
+      () => !!activity.snapshot().owner || sessionActive || sessionStarting || componentInstalling, whenRuntimeReady, async (id, repair) => {
         componentInstalling = true
         try {
           await engine!.stop()
@@ -483,7 +518,8 @@ if (!hasSingleInstanceLock) {
       return overlayWindow!
     }
     const isOverlayVisible = (): boolean => !!overlayWindow && !overlayWindow.isDestroyed() && (overlayWindow.isVisible() || overlayWindow.isMinimized())
-    const sessions = new SessionController({ engine, meetings, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareEnvironment(true, config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => getOverlayWindow().showInactive(), hideOverlay: () => { if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide() }, isBrowserCaptionServiceActive: () => browserConnection?.captionServiceReserved ?? false, isOverlayVisible })
+    const sessions = new SessionController({ engine, meetings, activity, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareEnvironment(true, config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => getOverlayWindow().showInactive(), hideOverlay: () => { if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide() }, isBrowserCaptionServiceActive: () => browserConnection?.captionServiceReserved ?? false, isOverlayVisible })
+    stopSessions = () => sessions.stopCurrent()
     const offline = new OfflineManager({
       python: createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath }).command,
       modelRoot: resourceEnvironment.NOLA_TRANSLATOR_MODEL_DIR,
@@ -503,7 +539,7 @@ if (!hasSingleInstanceLock) {
         } }, request, signal, progress)
       },
       reserve: () => {
-        if (sessions.busy || componentInstalling || preparation) throw new Error('sessionAlreadyRunning')
+        if (activity.snapshot().owner || sessions.busy || componentInstalling || preparation) throw new Error('sessionAlreadyRunning')
         componentInstalling = true
         return async () => {
           try {
@@ -533,16 +569,20 @@ if (!hasSingleInstanceLock) {
       whenRuntimeReady,
       () => { sessionActive = false },
       sessions,
+      config => browserConnection!.prepareCaptionService(config),
     )
-    browserConnection = new BrowserConnection({ engine, sessions, integrations: new BrowserIntegrations({ localAppData: process.env.LOCALAPPDATA ?? app.getPath('userData'), userData: app.getPath('userData') }), isOverlayVisible, getSettings: () => settings.current(), setEnabled: async enabled => {
+    browserConnection = new BrowserConnection({ engine, sessions, activity, integrations: new BrowserIntegrations({ localAppData: process.env.LOCALAPPDATA ?? app.getPath('userData'), userData: app.getPath('userData') }), isOverlayVisible, getSettings: () => settings.current(), setEnabled: async enabled => {
       const saved = await settings.update({ browserConnection: { enabled } })
       for (const window of BrowserWindow.getAllWindows()) window.webContents.send('settings:changed', saved)
     } })
     void browserConnection.initialize(initialSettings.browserConnection.enabled).catch(error => console.error('browser connection initialization failed', error))
+    closeBehavior = () => settings.current().closeBehavior
+    createMainWindow(initialSettings.theme)
     disposeAppIpc = registerAppIpc({
-      isDevelopmentWindow: isLocalCallDemoWindow,
+      isDevelopmentWindow: isWorkbenchWindow,
       settings,
       initialSettings,
+      settingsChanged: async () => { tray?.refresh(); if (gateway?.snapshot().state === 'running') await gateway.reconfigure() },
       meetings,
       audioProtocol: `${MEETING_AUDIO_SCHEME}://`,
       credentials,
@@ -572,25 +612,7 @@ if (!hasSingleInstanceLock) {
     engine.on('state', state => { if (state === 'failed' || state === 'recovering' || state === 'stopped') sessionActive = false })
     createWorkspaceWindow(initialSettings.theme)
     await workspaceReady
-    createMainWindow(initialSettings.theme)
-    registerLocalCallDemo(() => settings.current().theme, __dirname, undefined, {
-      getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
-      workspace: new AgentWorkspace(join(dataRoot, 'local-call')),
-      listDirectModels: async () => {
-        await whenRuntimeReady()
-        if (engine!.currentState !== 'ready') await engine!.start()
-        const inventory = await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: randomUUID() }, 'resources')
-        const models = inventory.resources.filter(item => item.installed).map(item => ({ model: `resource:${item.resourceId}`, name: item.name,
-          kind: item.kind === 'recognitionModel' ? 'asr' : item.kind === 'ttsModel' ? 'tts' : 'mt' }))
-        for (const profile of customModelsOf(settings.current().translation)) models.push({ model: `mt-custom:${profile.id}`, name: profile.name, kind: 'mt' })
-        models.push({ model: 'cloud:index-translate', name: 'Index-Translate', kind: 'mt' }, { model: 'cloud:mymemory', name: 'MyMemory', kind: 'mt' })
-        for (const provider of ['microsoft', 'google', 'aliyun', 'minimax'] as const) {
-          const slot = provider === 'aliyun' ? 'aliyun-asr' : provider === 'minimax' ? 'minimax-asr' : provider
-          if (await credentials.get(slot)) models.push({ model: `cloud:${provider}`, name: provider, kind: provider === 'aliyun' || provider === 'minimax' ? 'asr' : 'mt' })
-        }
-        return models
-      },
-      directLaunch: async model => {
+    const directLaunch = async (model: string) => {
         await whenRuntimeReady()
         const compute = { ...settings.current().compute }
         if (model.startsWith('resource:')) {
@@ -607,8 +629,84 @@ if (!hasSingleInstanceLock) {
         return { ...createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
           managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp, module: 'nola_translator_engine.local_call' }),
           env: { ...resourceEnvironment, NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? '', NOLA_TRANSLATOR_RUN_LOG_STDERR: '1' } }
+    }
+    const workbench = registerWorkbench(() => settings.current().theme, __dirname, undefined, {
+      getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
+      workspace: new AgentWorkspace(join(dataRoot, 'local-call')),
+      listDirectModels: async () => {
+        await whenRuntimeReady()
+        if (engine!.currentState !== 'ready') await engine!.start()
+        const inventory = await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: randomUUID() }, 'resources')
+        const models = inventory.resources.filter(item => item.installed).map(item => ({ model: `resource:${item.resourceId}`, name: item.name,
+          kind: item.kind === 'recognitionModel' ? 'asr' : item.kind === 'ttsModel' ? 'tts' : 'mt' }))
+        for (const profile of customModelsOf(settings.current().translation)) models.push({ model: `mt-custom:${profile.id}`, name: profile.name, kind: 'mt' })
+        models.push({ model: 'cloud:index-translate', name: 'Index-Translate', kind: 'mt' }, { model: 'cloud:mymemory', name: 'MyMemory', kind: 'mt' })
+        for (const provider of ['microsoft', 'google', 'aliyun', 'minimax'] as const) {
+          const slot = provider === 'aliyun' ? 'aliyun-asr' : provider === 'minimax' ? 'minimax-asr' : provider
+          if (await credentials.get(slot)) models.push({ model: `cloud:${provider}`, name: provider, kind: provider === 'aliyun' || provider === 'minimax' ? 'asr' : 'mt' })
+        }
+        return models
+      },
+      directLaunch,
+    }, activity)
+    stopWorkbench = () => workbench.stop()
+    let gatewayLease: FeatureLease | null = null
+    let gatewayStarting: Promise<unknown> | null = null
+    const stopGateway = async () => {
+      const pending = gatewayStarting
+      await gateway!.stop()
+      if (pending) await pending.catch(() => undefined)
+      gatewayLease?.release()
+      gatewayLease = null
+    }
+    const failedServices = new Set<string>()
+    gateway = new ModelGateway({
+      getSettings: () => settings.current(), directLaunch,
+      listResources: async () => {
+        await whenRuntimeReady()
+        if (engine!.currentState !== 'ready') await engine!.start()
+        return (await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: randomUUID() }, 'resources')).resources
+      },
+      getKey: () => credentials.get('model-gateway'), setKey: value => credentials.set('model-gateway', value),
+      onChanged: snapshot => {
+        for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('model-gateway:changed', snapshot)
+        if (snapshot.state === 'failed' || snapshot.state === 'stopped') { gatewayLease?.release(); gatewayLease = null }
+        let serviceFailed = false
+        for (const [kind, service] of Object.entries(snapshot.services)) {
+          if (service.state === 'failed') { if (!failedServices.has(kind)) serviceFailed = true; failedServices.add(kind) }
+          else failedServices.delete(kind)
+        }
+        if (snapshot.state === 'failed' || serviceFailed) tray?.failure()
       },
     })
+    loggedHandle('feature-activity:snapshot', event => { assertFeatureSender(event); return activity.snapshot() })
+    loggedHandle('feature-activity:stop', event => { assertFeatureSender(event); return activity.stop() })
+    loggedHandle('model-gateway:status', event => { assertFeatureSender(event, true); return gateway!.snapshot() })
+    loggedHandle('model-gateway:start', async event => {
+      assertFeatureSender(event, true)
+      if (activity.snapshot().owner === 'model-gateway' && gateway!.snapshot().state === 'running') return gateway!.snapshot()
+      const lease = activity.acquire('model-gateway', stopGateway)
+      gatewayLease = lease
+      const task = gateway!.start()
+      gatewayStarting = task
+      try { const snapshot = await task; lease.running(); return snapshot }
+      catch (error) { lease.release(); throw error }
+      finally { if (gatewayStarting === task) gatewayStarting = null }
+    })
+    loggedHandle('model-gateway:stop', async event => { assertFeatureSender(event, true); if (activity.snapshot().owner === 'model-gateway') await activity.stop(); return gateway!.snapshot() })
+    loggedHandle('model-gateway:reveal-key', event => { assertFeatureSender(event, true); return gateway!.revealKey() })
+    loggedHandle('model-gateway:rotate-key', event => { assertFeatureSender(event, true); return gateway!.rotateKey() })
+    requestQuit = () => {
+      if (activity.snapshot().owner) { showMainWindow(); mainWindow?.webContents.send('app:quit-requested') }
+      else app.quit()
+    }
+    loggedHandle('app:request-quit', event => { assertFeatureSender(event); requestQuit() })
+    loggedHandle('app:confirm-quit', event => {
+      assertFeatureSender(event, true)
+      if (mainWindow && event.sender === mainWindow.webContents) app.quit()
+    })
+    tray = new NolaTray({ getSettings: () => settings.current(), getWindow: () => mainWindow, getActivity: () => activity.snapshot(), show: showMainWindow, stop: () => activity.stop(), quit: () => requestQuit() })
+    await tray.initialize()
     createOverlayWindow(initialSettings.theme, initialSettings.overlay)
     void whenRuntimeReady().then(() => engine!.start()).catch((error) => {
       if (!quitting) console.error('engine environment initialization/start failed', error)
@@ -621,12 +719,13 @@ if (!hasSingleInstanceLock) {
     })
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createMainWindow(settings.current().theme)
+      if (!mainWindow || mainWindow.isDestroyed()) createMainWindow(settings.current().theme)
+      showMainWindow()
     })
   }).catch(error => { console.error('application startup failed', error); app.quit() })
 }
 
-app.on('window-all-closed', () => app.quit())
+app.on('window-all-closed', () => { if (quitting) app.quit() })
 app.on('before-quit', (event) => {
   if (quitting || !engine) return
   event.preventDefault()
@@ -634,7 +733,8 @@ app.on('before-quit', (event) => {
   disposeIpc?.()
   disposeAppIpc?.()
   disposeRuntimeIpc?.()
-  void Promise.allSettled([browserConnection?.dispose(), disposeOfflineIpc?.()])
+  tray?.dispose()
+  void Promise.allSettled([gateway?.dispose(), stopWorkbench?.(), stopSessions?.(), browserConnection?.dispose(), disposeOfflineIpc?.()])
     .finally(() => engine!.stop())
     .catch((error) => console.error('engine shutdown failed', error))
     .finally(() => app.quit())

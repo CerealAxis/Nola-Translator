@@ -144,9 +144,8 @@ const rows = {
   loadEarlier: ["加载更早的消息","Load earlier messages","載入更早的訊息","加載更早的消息","이전 메시지 불러오기","以前のメッセージを読み込む"],
   continue: ["继续","Continue","繼續","繼續","계속","続行"],
   close: ["关闭","Close","關閉","關閉","닫기","閉じる"],
-  title: ['本地调用', 'Local playground', '本機調用', '本機調用', '로컬 실행', 'ローカル実行'],
-  actionFailed: ['无法打开本地调用窗口', 'Could not open the playground', '無法開啟本機調用視窗', '無法開啟本機調用視窗', '실행 창을 열 수 없습니다', '実行ウィンドウを開けません'],
-  preview: ['开发预览 · 模拟结果', 'Development preview · sample results', '開發預覽 · 模擬結果', '開發預覽 · 模擬結果', '개발 미리보기 · 예시 결과', '開発プレビュー · サンプル結果'],
+  title: ['工作台', 'Workbench', '工作台', '工作台', '워크벤치', 'ワークベンチ'],
+  actionFailed: ['无法打开工作台窗口', 'Could not open the workbench', '無法開啟工作台視窗', '無法開啟工作台視窗', '워크벤치 창을 열 수 없습니다', 'ワークベンチを開けません'],
   llm: ['语言模型', 'Language models', '語言模型', '語言模型', '언어 모델', '言語モデル'],
   asr: ['语音识别模型', 'Speech recognition', '語音辨識模型', '語音識別模型', '음성 인식', '音声認識'],
   mt: ['翻译模型', 'Translation', '翻譯模型', '翻譯模型', '번역', '翻訳'],
@@ -197,12 +196,12 @@ const rows = {
 function region(index: number): Record<keyof typeof rows, string> {
   return Object.fromEntries(Object.entries(rows).map(([key, values]) => [key, values[index]])) as Record<keyof typeof rows, string>
 }
-export const localCallZh = region(0)
-export const localCallEn = region(1)
-export const localCallTw = region(2)
-export const localCallHk = region(3)
-export const localCallKo = region(4)
-export const localCallJa = region(5)
-export function localCallEntries(value: typeof localCallZh): Record<`localCall.${keyof typeof rows}`, string> {
-  return Object.fromEntries(Object.entries(value).map(([key, text]) => [`localCall.${key}`, text])) as Record<`localCall.${keyof typeof rows}`, string>
+export const workbenchZh = region(0)
+export const workbenchEn = region(1)
+export const workbenchTw = region(2)
+export const workbenchHk = region(3)
+export const workbenchKo = region(4)
+export const workbenchJa = region(5)
+export function workbenchEntries(value: typeof workbenchZh): Record<`workbench.${keyof typeof rows}`, string> {
+  return Object.fromEntries(Object.entries(value).map(([key, text]) => [`workbench.${key}`, text])) as Record<`workbench.${keyof typeof rows}`, string>
 }

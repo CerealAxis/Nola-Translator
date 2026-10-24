@@ -110,6 +110,7 @@ export function factsOf(record: ResourceRecord): string[] {
  */
 export function defaultTargetOf(record: ResourceRecord): AppSettingsPatch | null {
   const id = record.resourceId
+  if (record.kind === 'ttsModel') return { synthesis: { modelId: id, voice: '' } }
   if (record.kind === 'recognitionModel') {
     if (!configurationOf(record)) return null
     return { recognition: { modelId: id, provider: 'local' } }
@@ -120,7 +121,9 @@ export function defaultTargetOf(record: ResourceRecord): AppSettingsPatch | null
 }
 
 export function isDefaultOf(record: ResourceRecord, settings: AppSettings | null): boolean {
-  if (!settings || !configurationOf(record)) return false
+  if (!settings) return false
+  if (record.kind === 'ttsModel') return settings.synthesis?.modelId === record.resourceId
+  if (!configurationOf(record)) return false
   return (
     (settings.recognition.provider === 'local' && settings.recognition.modelId === record.resourceId) ||
     (settings.translation.provider === 'local' && settings.translation.localModelId === record.resourceId)

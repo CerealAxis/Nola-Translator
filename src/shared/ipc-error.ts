@@ -1,4 +1,5 @@
 import { SUPPORT_ERROR_CATALOG, supportErrorCodeForCause } from './error-catalog'
+import { featureConflictOwner } from './feature-activity'
 import type { SupportErrorOperation } from './error-catalog'
 
 export type AppErrorShape = {
@@ -59,6 +60,7 @@ const ENGINE_UNAVAILABLE_PATTERN = /(ENGINE|PYTHON).*(NOT_AVAILABLE|NOT AVAILABL
 
 /** Recognises a session-mutex refusal before or after Electron normalises its IPC error. */
 export function isSessionAlreadyRunningError(error: unknown): boolean {
+  if (featureConflictOwner(error)) return true
   const source = error && typeof error === 'object' ? error as ErrorLike : undefined
   return [source?.code, source?.engineCode, source?.message, error instanceof Error ? error.message : error]
     .some(value => typeof value === 'string' && value.toLowerCase().replace(/[^a-z0-9]/g, '').includes('sessionalreadyrunning'))

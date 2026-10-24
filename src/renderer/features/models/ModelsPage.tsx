@@ -3,7 +3,7 @@ import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui'
 import { Empty, EmptyTitle } from '@/components/ui/empty'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardAction, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { LocalModelImport } from '../offline'
+import { LocalModelImport } from '../offline/OfflineResources'
 import { offlineActions } from '@/store/offlineStore'
 import { modelImportEntry } from '../../../shared/model-import-catalog'
 import { configurationOf, isModelReady, recognitionLanguages } from '../../../shared/model-capabilities'
@@ -15,6 +15,10 @@ import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Box } from 'lucide-react'
+import { getBridge } from '@/store'
+import { Input } from '@/components/ui/input'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
@@ -46,6 +50,7 @@ export function ModelsPage() {
   const [configuring, setConfiguring] = useState<{ record: ResourceRecord; readOnly: boolean } | null>(null)
   const [downloadTarget, setDownloadTarget] = useState<ResourceRecord | null>(null)
   const [openFamily, setOpenFamily] = useState<RecommendedFamily | null>(null)
+  const [voiceMetadata, setVoiceMetadata] = useState<{ modelId: string; voices: string[] }>({ modelId: '', voices: [] })
   const [cloudDetail, setCloudDetail] = useState<CloudModelId | null>(null)
 
   const resources = useStore(stores.models, (state) => state.resources)
@@ -79,6 +84,22 @@ export function ModelsPage() {
   const installed = useMemo(() => resources.filter((item) => item.installed), [resources])
   const activeCount = useMemo(() => countActive(resources), [resources])
   const recognition = resources.find((item) => item.resourceId === settings?.recognition.modelId)
+  const synthesis = resources.find(item => item.resourceId === settings?.synthesis?.modelId)
+  const voices = voiceMetadata.modelId === settings?.synthesis?.modelId ? voiceMetadata.voices : []
+  useEffect(() => {
+    const gateway = getBridge()?.gateway
+    if (!gateway) return
+    const receive = (snapshot: Awaited<ReturnType<typeof gateway.snapshot>>) => setVoiceMetadata({ modelId: snapshot.services.tts.model.replace(/^resource:/, ''), voices: snapshot.services.tts.voices ?? [] })
+    let alive = true
+    const off = gateway.onChanged(receive)
+    void gateway.snapshot().then(snapshot => { if (alive) receive(snapshot) }).catch(() => undefined)
+    return () => { alive = false; off() }
+  }, [settings?.synthesis?.modelId])
+  useEffect(() => {
+    if (voices.length && settings?.synthesis && !voices.includes(settings.synthesis.voice)) {
+      void updateSettings({ synthesis: { voice: voices[0] } }).catch(() => undefined)
+    }
+  }, [voices, settings?.synthesis?.voice])
   const translation = resources.find((item) => item.resourceId === settings?.translation.localModelId)
   const localTranslation = settings?.translation.provider === 'local'
   const remoteRecognition = !!settings?.recognition.provider && settings.recognition.provider !== 'local'
@@ -189,7 +210,7 @@ export function ModelsPage() {
    */
   const setDefault = (record: ResourceRecord) => {
     const patch = defaultTargetOf(record)
-    if (!isModelReady(record) || !patch || !supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)) return
+    if (!(record.kind === 'ttsModel' ? record.installed : isModelReady(record)) || !patch || !supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)) return
     const supportedLanguages = record.kind === 'recognitionModel' ? recognitionLanguages(record) : []
     const currentSourceLanguage = settings?.recognition.sourceLanguage
     const sourceLanguage = currentSourceLanguage && supportedLanguages.includes(currentSourceLanguage)
@@ -219,7 +240,7 @@ export function ModelsPage() {
 
   const card = (record: ResourceRecord) => {
     const compute = settings?.compute ?? DEFAULT_COMPUTE_SETTINGS
-    const ready = isModelReady(record) && defaultTargetOf(record) !== null
+    const ready = (record.kind === 'ttsModel' ? record.installed : isModelReady(record)) && defaultTargetOf(record) !== null
     const compatible = supportsSelectedEngine(record, compute, record.resourceId)
     const engine = modelEngines(record)[0]
     const loaderUnavailableReason = engine && runtimes?.local && !isEngineAvailable(engine, runtimes.local)
@@ -274,9 +295,16 @@ export function ModelsPage() {
           <div><h1>{t('models.title')}</h1><p>{t('modelsSettingsUi.modelsSubtitle')}</p></div><LocalModelImport />
         </header>
         <div className="models-overview__summaries">
-          <CurrentModel label={t('modelsSettingsUi.currentRecognition')} name={currentRecognition} record={remoteRecognition ? null : recognition ?? null} installed={remoteRecognition ? null : recognition?.installed ?? false} kind="recognitionModel" />
-          <CurrentModel label={t('modelsSettingsUi.currentTranslation')} name={currentTranslation} record={localTranslation ? translation ?? null : null} installed={localTranslation ? translation?.installed ?? false : null} kind="translationModel" />
+          <CurrentModel label={t('modelsSettingsUi.currentRecognition')} name={currentRecognition} record={remoteRecognition ? null : recognition ?? null} installed={remoteRecognition ? null : recognition?.installed ?? false} kind="recognitionModel" onChange={() => setTab('installed')} />
+          <CurrentModel label={t('modelsSettingsUi.currentTranslation')} name={currentTranslation} record={localTranslation ? translation ?? null : null} installed={localTranslation ? translation?.installed ?? false : null} kind="translationModel" onChange={() => setTab('installed')} />
+          <CurrentModel label={t('gateway.synthesisDefault')} name={synthesis?.installed ? synthesis.name : t('modelsSettingsUi.noModelSelected')} record={synthesis ?? null} installed={synthesis?.installed ?? false} kind="ttsModel" onChange={() => setTab('installed')} />
         </div>
+        {synthesis?.installed ? <Field>
+          <FieldLabel htmlFor="default-synthesis-voice">{t('gateway.voice')}</FieldLabel>
+          {voices.length ? <Select value={settings?.synthesis.voice || voices[0]} onValueChange={voice => { if (voice) void updateSettings({ synthesis: { voice } }).catch(() => undefined) }}><SelectTrigger id="default-synthesis-voice"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{voices.map(voice => <SelectItem key={voice} value={voice}>{voice}</SelectItem>)}</SelectGroup></SelectContent></Select>
+            : <Input id="default-synthesis-voice" key={`${synthesis.resourceId}:${settings?.synthesis.voice}`} defaultValue={settings?.synthesis.voice ?? ''} onBlur={event => { const voice = event.currentTarget.value.trim(); if (voice !== settings?.synthesis.voice) void updateSettings({ synthesis: { voice } }).catch(() => undefined) }} />}
+          <FieldDescription>{t('gateway.voiceHint')}</FieldDescription>
+        </Field> : null}
       </section>
 
       <TabsRoot
@@ -381,7 +409,7 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAc
   }
   const sections: { title: string; kind: ResourceRecord['kind']; families: RecommendedFamily[]; language?: boolean }[] = [
     { title: t('models.asrModels'), kind: 'recognitionModel', families: ['qwen', 'sensevoice', 'funasr', 'vibevoice', 'mimo'] },
-    { title: t('localCall.llm'), kind: 'translationModel', families: [], language: true },
+    { title: t('workbench.llm'), kind: 'translationModel', families: [], language: true },
     { title: t('models.mtModels'), kind: 'translationModel', families: ['hymt2', 'index', 'other'] },
     { title: t('models.ttsModels'), kind: 'ttsModel', families: ['tts'] },
   ]
@@ -435,7 +463,7 @@ function Catalog({ records, loading, failed, onRetry, card, emptyAction, compute
       {loading ? <div className={GRID}>{[0, 1, 2].map(index => <ModelCardSkeleton key={index} />)}</div> : null}
       {failed ? <FailedCatalog onRetry={onRetry} /> : null}
       <Section title={t('models.asrModels')} records={recognition} card={card}>{cloudModels.filter(model => model.kind === 'recognitionModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
-      <Section title={t('localCall.llm')} records={[]} card={card}>{cloudModels.filter(model => model.profile || model.id === 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
+      <Section title={t('workbench.llm')} records={[]} card={card}>{cloudModels.filter(model => model.profile || model.id === 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.mtModels')} records={translation} card={card}>{cloudModels.filter(model => model.kind === 'translationModel' && !model.profile && model.id !== 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.ttsModels')} records={ordered.filter(record => record.kind === 'ttsModel')} card={card} />
     </div>
@@ -462,9 +490,9 @@ function Section({
   )
 }
 
-function CurrentModel({ label, name, record, installed, kind }: { label:string; name:string; record:ResourceRecord | null; installed:boolean | null; kind:'recognitionModel' | 'translationModel' }) {
+function CurrentModel({ label, name, record, installed, kind, onChange }: { label:string; name:string; record:ResourceRecord | null; installed:boolean | null; kind:'recognitionModel' | 'translationModel' | 'ttsModel'; onChange: () => void }) {
   const { t } = useI18n()
-  const pending = installed && record && !configurationOf(record)
+  const pending = kind !== 'ttsModel' && installed && record && !configurationOf(record)
   return <Card size="sm" className="models-current">
     <CardHeader>
     <CardAction>
@@ -472,6 +500,7 @@ function CurrentModel({ label, name, record, installed, kind }: { label:string; 
     </CardAction>
     <CardTitle>{name}</CardTitle><CardDescription>{label}</CardDescription>
     {installed === null ? null : <Badge variant={installed && !pending ? 'success' : 'warning'}  >{pending ? t('modelConfig.pending') : installed ? t('modelsSettingsUi.active') : t('modelsSettingsUi.unavailable')}</Badge>}
+    <Button variant="secondary" size="sm" onClick={onChange}>{t('gateway.change')}</Button>
     </CardHeader>
   </Card>
 }

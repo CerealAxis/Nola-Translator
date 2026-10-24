@@ -1,4 +1,5 @@
-import { localCallEn } from './local-call-ui'
+import { gatewayEn } from './gateway-ui'
+import { workbenchEn } from './workbench-ui'
 import { offlineEn } from './offline-ui'
 import type { Dictionary } from './zh-CN'
 import { onboardingEn } from './onboarding-ui'
@@ -16,7 +17,8 @@ import { browserEn } from './browser-ui'
 import { runtimeEn } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const en: Dictionary = {
-  localCall: localCallEn,
+  gateway: gatewayEn,
+  workbench: workbenchEn,
   offline: offlineEn,
   onboarding: onboardingEn,
   startup: {
@@ -77,6 +79,7 @@ export const en: Dictionary = {
   nav: {
     home: 'Home',
     workspace: 'Session',
+    modelGateway: 'Model gateway',
     records: 'Records',
     models: 'Models',
     settings: 'Settings',

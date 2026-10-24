@@ -58,13 +58,31 @@ class AudioDeviceRegistry:
     def resolve(self, kind: DeviceKind, device_id: str | None = None, *, request_id: str | None = None) -> AudioDeviceRecord:
         context = {"requestId": request_id, "kind": kind, "deviceId": device_id,
                    "selection": "explicit" if device_id is not None else "default"}
+        previous_devices = self.devices
         try:
             devices = [device for device in self.refresh() if device.kind == kind]
         except Exception as error:
             write_debug("engine", "audio.device.resolve.failed", {**context, "stage": "enumerate", **exception_fields(error)})
             raise
         if device_id is not None:
-            match = next((device for device in devices if device.device_id == device_id), None)
+            match = next(
+                (
+                    device for device in devices
+                    if device.device_id == device_id
+                    or _legacy_device_id(device.kind, device.name, device.sample_rate, device.channels) == device_id
+                ),
+                None,
+            )
+            if match is None:
+                previous = next(
+                    (device for device in previous_devices
+                     if device.kind == kind and device.device_id == device_id),
+                    None,
+                )
+                if previous is not None:
+                    same_endpoint = [device for device in devices if device.name == previous.name]
+                    if len(same_endpoint) == 1:
+                        match = same_endpoint[0]
         else:
             match = next((device for device in devices if device.is_default), None)
         if match is None:
@@ -99,7 +117,16 @@ def _friendly_loopback_name(name: str) -> str:
     return re.sub(r"\s*\[Loopback\]\s*$", "", name, flags=re.IGNORECASE).strip()
 
 
-def _stable_device_id(kind: DeviceKind, name: str, sample_rate: int, channels: int) -> str:
+def _stable_device_id(kind: DeviceKind, name: str) -> str:
+    normalized = " ".join(unicodedata.normalize("NFKC", name).casefold().split())
+    # Sample rate and channel count describe the current mix format, not the endpoint identity.
+    signature = f"wasapi|{kind}|{normalized}".encode("utf-8")
+    digest = blake2s(signature, digest_size=10).hexdigest()
+    return f"wasapi:{kind}:{digest}"
+
+
+def _legacy_device_id(kind: DeviceKind, name: str, sample_rate: int, channels: int) -> str:
+    """Recognize persisted ids from releases that included the current mix format."""
     normalized = " ".join(unicodedata.normalize("NFKC", name).casefold().split())
     signature = f"wasapi|{kind}|{normalized}|{sample_rate}|{channels}".encode("utf-8")
     digest = blake2s(signature, digest_size=10).hexdigest()
@@ -112,7 +139,7 @@ def _record(info: dict[str, Any], kind: DeviceKind, is_default: bool) -> AudioDe
         name = _friendly_loopback_name(name)
     sample_rate = round(float(info["defaultSampleRate"]))
     channels = max(1, int(info["maxInputChannels"]))
-    device_id = _stable_device_id(kind, name, sample_rate, channels)
+    device_id = _stable_device_id(kind, name)
     # PortAudio can report empty endpoint names; display fallbacks must not change persisted IDs.
     if not name.strip():
         label = "System output" if kind == "systemOutput" else "Microphone"
@@ -140,7 +167,9 @@ def resolve_capture_device(backend: PyAudioBackend, device: AudioDeviceRecord) -
         if device.kind == "microphone" and (info.get("isLoopbackDevice") or int(info.get("maxInputChannels", 0)) <= 0):
             continue
         candidate = _record(info, device.kind, device.is_default)
-        if candidate.device_id == device.device_id:
+        if (candidate.device_id == device.device_id
+                or _legacy_device_id(candidate.kind, candidate.name, candidate.sample_rate, candidate.channels)
+                == device.device_id):
             return candidate
     raise AudioDeviceUnavailableError(device.device_id)
 

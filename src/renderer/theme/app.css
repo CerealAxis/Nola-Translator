@@ -2,7 +2,7 @@
 @layer base {
   :root {
     --nola-titlebar-h: 64px;
-    --nola-sidebar-w: 200px;
+    --nola-sidebar-w: calc(var(--space-5) + var(--space-2));
     --nola-content-max: 1600px;
     --nola-page-padding: 24px;
     --radius: .5rem;
@@ -16,6 +16,7 @@
 }
 @layer components {
   .nola-app-shell {
+    --nola-titlebar-h: var(--space-6);
     display: flex; flex-direction: column; height: 100dvh; overflow: hidden;
     background:
       linear-gradient(139deg, transparent 0 32%, color-mix(in oklch, var(--accent) 2.5%, transparent) 32% 40%, transparent 40% 68%, color-mix(in oklch, var(--accent) 2%, transparent) 68% 77%, transparent 77%),
@@ -42,15 +43,14 @@
   .nola-web-controls { display: flex; gap: 6px; }
   .nola-web-controls .button { width: 42px; height: 40px; padding: 0; border-radius: 8px; }
   .nola-app-body { display: flex; flex: 1; min-height: 0; min-width: 0; }
-  .nola-sidebar { flex: 0 0 var(--nola-sidebar-w); width: var(--nola-sidebar-w); border-right: 1px solid color-mix(in oklch, var(--border) 65%, transparent); }
-  .nola-sidebar-nav { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
-  .nola-nav-button { display: flex; width: 100%; height: 56px; min-width: 0; justify-content: flex-start; gap: 16px; padding: 0 16px; font-size: 14px; font-weight: 550; border: 0; box-shadow: none; border-radius: var(--radius-xl); color: var(--foreground); background: var(--surface-secondary); }
-  .nola-nav-button svg { width: 23px; height: 23px; flex-shrink: 0; }
+  .nola-sidebar { flex: 0 0 var(--nola-sidebar-w); width: var(--nola-sidebar-w); min-height: 0; overflow-y: auto; border-right: 1px solid color-mix(in oklch, var(--border) 65%, transparent); }
+  .nola-sidebar-nav { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-1); }
+  .nola-nav-button { display: flex; width: var(--space-5); height: var(--space-5); min-width: 0; justify-content: center; padding: 0; border: 0; box-shadow: none; border-radius: var(--radius-xl); color: var(--foreground); background: var(--surface-secondary); }
+  .nola-nav-button svg { width: calc(var(--space-2) + var(--space-1) / 2); height: calc(var(--space-2) + var(--space-1) / 2); flex-shrink: 0; }
   .nola-nav-button[data-active="true"] { color: var(--accent-foreground); background: var(--nola-primary-gradient); box-shadow: 0 3px 12px color-mix(in oklch, var(--accent) 17%, transparent); }
   .nola-nav-button:not([data-active="true"]):hover { background: var(--surface-tertiary); }
-  .nola-nav-tooltip { display: none; }
-  /* Keep the centered route width fixed when navigation switches between tall and short pages. */
-  .nola-main { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
+  .nola-main { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+  .nola-main::-webkit-scrollbar { display: none; }
   .nola-route-content { display: flex; flex-direction: column; width: 100%; min-width: 0; max-width: var(--nola-content-max); margin: 0 auto; padding: var(--nola-page-padding); gap: 20px; }
   .nola-route-content > * { min-width: 0; }
   .nola-route-content[data-page="workspace"] { height: 100%; }
@@ -108,11 +108,7 @@
 
 }
 @media (max-width: 1024px) {
-  :root { --nola-sidebar-w: 76px; --nola-page-padding: 20px; }
-  .nola-sidebar-nav { padding: 12px 10px; }
-  .nola-nav-button { justify-content: center; padding: 0; }
-  .nola-nav-label { display: none; }
-  .nola-nav-tooltip { display: block; }
+  :root { --nola-page-padding: 20px; }
   .nola-overlay-fields { grid-template-columns: 1fr; }
 }
 @media (max-width: 800px) {

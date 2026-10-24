@@ -1,4 +1,5 @@
 import { LANGUAGE_CODES } from './languages'
+import { DEFAULT_MODEL_GATEWAY, type ModelGatewaySettings } from './model-gateway'
 import { DEFAULT_COMPUTE_SETTINGS, type ComputeSettings } from './compute'
 import { GITHUB_PROXY_AUTO } from './github-proxies'
 import { PYPI_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_AUTO } from './pypi-mirrors'
@@ -120,6 +121,9 @@ export type AppSettings = {
   translation: TranslationSettings
   compute: ComputeSettings
   browserConnection: { enabled: boolean }
+  synthesis: { modelId: string; voice: string }
+  modelGateway: ModelGatewaySettings
+  closeBehavior: 'tray' | 'quit'
 }
 
 /** `keepAudio: false` stops the engine from being handed a recording path, so no WAV is written. */
@@ -257,7 +261,9 @@ export type CloudFormatDefaults = {
   cloudModel: string
 }
 
-export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recording' | 'appearance' | 'overlay' | 'videoCaptions' | 'browserCaptions' | 'translation' | 'compute' | 'network' | 'modelStoragePath' | 'version' | 'browserConnection'> & {
+export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recording' | 'appearance' | 'overlay' | 'videoCaptions' | 'browserCaptions' | 'translation' | 'compute' | 'network' | 'modelStoragePath' | 'version' | 'browserConnection' | 'synthesis' | 'modelGateway'> & {
+  synthesis?: Partial<AppSettings['synthesis']>
+  modelGateway?: Partial<ModelGatewaySettings>
   network?: Partial<NetworkSettings>
   compute?: Partial<ComputeSettings>
   recognition?: Partial<RecognitionSettings>
@@ -311,6 +317,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   onboardingSeen: false,
   compute: { ...DEFAULT_COMPUTE_SETTINGS },
   browserConnection: { enabled: true },
+  synthesis: { modelId: '', voice: '' },
+  modelGateway: { ...DEFAULT_MODEL_GATEWAY },
+  closeBehavior: 'tray',
   version: 2,
   theme: 'system',
   uiLanguage: 'auto',

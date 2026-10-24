@@ -78,7 +78,7 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
         <SettingsRow label={t('settings.modelId')}><Input aria-label={t('settings.modelId')} className="settings-control-field" value={draft.model} onValueChange={model => patch({ model })} /></SettingsRow>
         <NumberRow label={t('settings.contextWindow')} value={draft.contextWindow} onCommit={contextWindow => patch({ contextWindow })} />
         <NumberRow label={t('settings.maxOutputTokens')} value={draft.maxOutputTokens} onCommit={maxOutputTokens => patch({ maxOutputTokens })} />
-        <details><summary className="cursor-pointer py-2 text-sm">{t('localCall.translationCapabilities')}</summary>
+        <details><summary className="cursor-pointer py-2 text-sm">{t('workbench.translationCapabilities')}</summary>
         <ModelLanguageSelect label={t('modelConfig.sourceLanguages')} codes={[...SOURCE_LANGUAGE_OPTIONS]} value={draft.sourceLanguages ?? [...SOURCE_LANGUAGE_OPTIONS]} onChange={sourceLanguages => patch({ sourceLanguages })} />
         <ModelLanguageSelect label={t('modelConfig.targetLanguages')} codes={[...LANGUAGE_CODES]} value={draft.languages} onChange={languages => patch({ languages })} />
         <div className="models-language-actions"><span className="nola-caption text-muted">{t('modelConfig.selectedLanguageCount', { count: draft.languages.length })}</span>
@@ -89,7 +89,7 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
       </div>
       <DialogFooter><Button variant="secondary" disabled={saving} onClick={onClose}>{t('session.cancel')}</Button>
         <Button variant="secondary" disabled={!valid || saving} aria-busy={saving} onClick={() => void save(false)}>{t('modelConfig.save')}</Button>
-        <Button disabled={!valid || saving} aria-busy={saving} onClick={() => void save(true)}>{t('localCall.useForTranslation')}</Button>
+        <Button disabled={!valid || saving} aria-busy={saving} onClick={() => void save(true)}>{t('workbench.useForTranslation')}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

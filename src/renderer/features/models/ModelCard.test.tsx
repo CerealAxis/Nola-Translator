@@ -67,6 +67,12 @@ describe('事实格式化（只写事实，不写形容词）', () => {
 })
 
 describe('默认模型的可设范围', () => {
+  it('stores a synthesis default in its own slot and clears voices from the previous model', () => {
+    const model = record({ resourceId: 'tts-qwen3-tts-crisp-0.6b-base-q8-0', kind: 'ttsModel', provider: 'crisp-tts', installed: true })
+    expect(defaultTargetOf(model)).toEqual({ synthesis: { modelId: model.resourceId, voice: '' } })
+    expect(isDefaultOf(model, { ...DEFAULT_SETTINGS, synthesis: { modelId: model.resourceId, voice: '' } })).toBe(true)
+    expect(isDefaultOf(model, DEFAULT_SETTINGS)).toBe(false)
+  })
   it('识别模型只认资源表里的 id，翻译模型任何 id 都有槽位', () => {
     expect(defaultTargetOf(record({ resourceId: 'qwen3-asr-1.7b-hf' }))).toEqual({
       recognition: { modelId: 'qwen3-asr-1.7b-hf', provider: 'local' },

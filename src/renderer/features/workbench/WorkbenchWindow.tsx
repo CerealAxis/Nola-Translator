@@ -20,7 +20,7 @@ import { NativeAgentSurface } from './NativeAgentSurface'
 import { nativePresentationTools } from './native-agent-tools'
 
 const generativeUI = new JSONGenerativeUI({ library: styledGenerativeUILibrary })
-const localCallStorage = {
+const workbenchStorage = {
   getItem: async (key: string) => window.localStorage.getItem(key),
   setItem: async (key: string, value: string) => window.localStorage.setItem(key, value),
   removeItem: async (key: string) => window.localStorage.removeItem(key),
@@ -43,7 +43,7 @@ function AgentInstructions({ active }: AgentInstructionsProps) {
   return null
 }
 
-export function LocalCallDemoWindow() {
+export function WorkbenchWindow() {
   const { t } = useI18n()
   const [snapshot, setSnapshot] = useState<AgentWorkspaceSnapshot | null>(null)
   const [busy, setBusy] = useState(false)
@@ -52,19 +52,19 @@ export function LocalCallDemoWindow() {
     if (!api) return
     setBusy(true)
     try { setSnapshot(await api(action)) }
-    catch (error) { notifyError(t('localCall.workspaceActionFailed'), { cause: error }) }
+    catch (error) { notifyError(t('workbench.workspaceActionFailed'), { cause: error }) }
     finally { setBusy(false) }
   }, [t])
   useEffect(() => { void onAction({ action: 'snapshot' }) }, [onAction])
-  return <LocalCallChat key={snapshot?.selectedProject ?? 'standalone'} snapshot={snapshot} onAction={onAction} busy={busy} />
+  return <WorkbenchChat key={snapshot?.selectedProject ?? 'standalone'} snapshot={snapshot} onAction={onAction} busy={busy} />
 }
 
-export interface LocalCallChatProps {
+export interface WorkbenchChatProps {
   snapshot: AgentWorkspaceSnapshot | null
   onAction: (action: WorkspaceAction) => Promise<void>
   busy: boolean
 }
-function LocalCallChat({ snapshot, onAction, busy }: LocalCallChatProps) {
+function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
   const { t } = useI18n()
   const settings = useStore(stores.settings, state => state.settings)
   const resources = useStore(stores.models, state => state.resources)
@@ -82,7 +82,7 @@ function LocalCallChat({ snapshot, onAction, busy }: LocalCallChatProps) {
   useEffect(() => {
     // This independent document skips main-window startup queries and needs its own first snapshot.
     const refresh = () => {
-      void actions.settings.loadSettings().catch(error => notifyError(t('localCall.actionFailed'), { cause: error }))
+      void actions.settings.loadSettings().catch(error => notifyError(t('workbench.actionFailed'), { cause: error }))
       void actions.models.loadModels({ includeDevices: false }).catch(error => notifyError(t('errors.modelsLoadFailed'), { cause: error }))
     }
     refresh()
@@ -99,7 +99,7 @@ function LocalCallChat({ snapshot, onAction, busy }: LocalCallChatProps) {
   const configRef = useRef(config)
   configRef.current = config
   const transport = useMemo(() => new AssistantChatTransport({ api: '/nola-chat', fetch: createPlaygroundFetch(() => configRef.current, t, () => memoriesRef.current) }), [t])
-  const threadAdapter = useMemo(() => createLocalStorageAdapter({ storage: localCallStorage, prefix: snapshot?.selectedProject ? `nola.local-call:project:${snapshot.selectedProject}:` : 'nola.local-call:' }), [])
+  const threadAdapter = useMemo(() => createLocalStorageAdapter({ storage: workbenchStorage, prefix: snapshot?.selectedProject ? `nola.local-call:project:${snapshot.selectedProject}:` : 'nola.local-call:' }), [])
   const attachments = useMemo(() => new CompositeAttachmentAdapter([new SimpleImageAttachmentAdapter(), new SimpleTextAttachmentAdapter(), new AudioAttachmentAdapter()]), [])
   const audioAttachments = useMemo(() => new AudioAttachmentAdapter(), [])
   const speech = useMemo(() => new WebSpeechSynthesisAdapter(), [])
@@ -111,14 +111,14 @@ function LocalCallChat({ snapshot, onAction, busy }: LocalCallChatProps) {
       const preferred = settings?.recognition.provider === 'local' ? `resource:${settings.recognition.modelId}` : `cloud:${settings?.recognition.provider}`
       const asr = models.find(model => model.kind === 'asr' && model.id === preferred) ?? models.find(model => model.kind === 'asr')
       const app = getBridge()?.app
-      if (!asr || !app?.directModel) throw new Error(t('localCall.noAsr'))
+      if (!asr || !app?.directModel) throw new Error(t('workbench.noAsr'))
       const id = crypto.randomUUID()
       dictationRequestId.current = id
       try { return (await app.directModel({ id, model: asr.id, kind: 'asr', audio: data.url })).text }
       finally { if (dictationRequestId.current === id) dictationRequestId.current = null }
     }
-    runtimeRef.current?.thread.append({ role: 'user', content: [{ type: 'file', mimeType: data.mimeType, data: data.url, filename: `${t('localCall.recording')}.wav` }] })
-  }, error => notifyError(t('localCall.micError'), { cause: error }), () => {
+    runtimeRef.current?.thread.append({ role: 'user', content: [{ type: 'file', mimeType: data.mimeType, data: data.url, filename: `${t('workbench.recording')}.wav` }] })
+  }, error => notifyError(t('workbench.micError'), { cause: error }), () => {
     if (dictationRequestId.current) void getBridge()?.app.cancelLanguageModel?.(dictationRequestId.current).catch(() => undefined)
     dictationRequestId.current = null
   }), [config.model, config.kind, settings, models, t])
@@ -134,16 +134,16 @@ function LocalCallChat({ snapshot, onAction, busy }: LocalCallChatProps) {
   })
   runtimeRef.current = runtime
   const agentConfig = useMemo(() => AuiConfig({ tools: Tools({ toolkit: config.kind === 'llm' ? agentTools : defineToolkit({}) }) }), [config.kind])
-  const placeholder = t(config.kind === 'asr' ? 'localCall.asrPrompt' : config.kind === 'tts' ? 'localCall.ttsPrompt'
-    : config.kind === 'mt' ? config.images ? 'localCall.imagePrompt' : 'localCall.mtPrompt' : 'localCall.prompt')
-  const openConfiguration = () => { void actions.settings.openMainPage('#/models').catch(error => notifyError(t('localCall.actionFailed'), { cause: error })) }
+  const placeholder = t(config.kind === 'asr' ? 'workbench.asrPrompt' : config.kind === 'tts' ? 'workbench.ttsPrompt'
+    : config.kind === 'mt' ? config.images ? 'workbench.imagePrompt' : 'workbench.mtPrompt' : 'workbench.prompt')
+  const openConfiguration = () => { void actions.settings.openMainPage('#/models').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) }
   return <AssistantRuntimeProvider runtime={runtime} config={agentConfig}>
     <AgentInstructions active={config.kind === 'llm'} />
     <DictationLifecycle adapter={audioDictation} />
     <NativeAgentSurface config={config} profiles={profiles} models={models} onConfigure={openConfiguration}
       onChange={next => { setConfig(next); if (next.model !== config.model) setTtsVoices({ model: '', names: [] }) }}
       voices={ttsVoices.model === config.model ? ttsVoices.names : []} onVoices={names => setTtsVoices({ model: config.model, names })}
-      snapshot={snapshot} onAction={onAction} busy={busy} placeholder={config.model ? placeholder : t('localCall.noModels')}
-      memories={memories} onMemories={next => { setMemories(next); try { localStorage.setItem('nola.playground.memories', JSON.stringify(next)) } catch (error) { notifyError(t('localCall.actionFailed'), { cause: error }) } }} />
+      snapshot={snapshot} onAction={onAction} busy={busy} placeholder={config.model ? placeholder : t('workbench.noModels')}
+      memories={memories} onMemories={next => { setMemories(next); try { localStorage.setItem('nola.playground.memories', JSON.stringify(next)) } catch (error) { notifyError(t('workbench.actionFailed'), { cause: error }) } }} />
   </AssistantRuntimeProvider>
 }

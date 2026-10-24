@@ -73,7 +73,7 @@ export function NativeAgentSurface(props: NativeAgentSurfaceProps) {
   useEffect(() => {
     if (title || !remoteId || !first) return
     const text = first.content.find(part => part.type === 'text')?.text
-    void aui.threadListItem.rename(text?.slice(0, 48) || t('localCall.recording'))
+    void aui.threadListItem.rename(text?.slice(0, 48) || t('workbench.recording'))
   }, [aui, first, remoteId, t, title])
   const renameCurrent = (text: string) => {
     if (!text.trim()) return
@@ -100,32 +100,32 @@ export function NativeAgentSurface(props: NativeAgentSurfaceProps) {
   return <div className="native-agent-app flex h-full min-h-0 bg-background text-foreground" data-testid="native-agent-app">
     <aside className={`${sidebar ? 'w-[300px]' : 'w-16'} flex shrink-0 flex-col border-e border-border transition-[width] duration-200`}>
       <div className={`native-window-drag flex h-14 shrink-0 items-center ${sidebar ? 'gap-3 px-4' : 'justify-center'}`}>
-        <button className={`${ghostButton} native-window-action size-8`} aria-label={t('localCall.toggleSidebar')} onClick={() => setSidebar(value => !value)}><PanelLeft className="size-4" aria-hidden="true" /></button>
-        {sidebar && <span className="text-sm font-medium">{t('localCall.chats')}</span>}
+        <button className={`${ghostButton} native-window-action size-8`} aria-label={t('workbench.toggleSidebar')} onClick={() => setSidebar(value => !value)}><PanelLeft className="size-4" aria-hidden="true" /></button>
+        {sidebar && <span className="text-sm font-medium">{t('workbench.chats')}</span>}
       </div>
       {sidebar ? <>
-        <div className="px-3 pt-3"><ComposerMenuItem className="w-full" onClick={() => { setMemoryOpen(false); void aui.threads.switchToNewThread() }}><Plus className="size-4" aria-hidden="true" />{t('localCall.newThread')}</ComposerMenuItem></div>
-        <div className="relative px-3 pt-2"><Search className="pointer-events-none absolute start-6 top-[18px] size-4 text-muted-foreground" aria-hidden="true" /><ComposerInput className="h-9 min-h-0 rounded-xl bg-foreground/[0.035] ps-9 text-sm" value={threadQuery} onChange={event => setThreadQuery(event.target.value)} placeholder={t('localCall.searchThreads')} /></div>
-        <div className="min-h-0 flex-1 overflow-auto px-3 pt-5"><ThreadList className="max-w-none" dateLabel={t('localCall.today')} threads={visibleItems.map(item => ({ id: item.id, title: item.title ?? t('localCall.newThread'), time: '', unread: item.isRunning, pinned: Boolean(item.custom?.pinned) }))} activeIndex={visibleItems.findIndex(item => item.id === activeId)} onActiveIndexChange={index => { setMemoryOpen(false); void aui.threads.switchToThread(visibleItems[index].id) }} onRename={(index, nextTitle) => { if (nextTitle.trim()) void aui.threads.item({ id: visibleItems[index].id }).rename(nextTitle.trim().slice(0, 80)) }} onPin={index => togglePin(visibleItems[index].id)} onArchive={index => { void aui.threads.item({ id: visibleItems[index].id }).archive() }} onDelete={index => { void aui.threads.item({ id: visibleItems[index].id }).delete() }} labels={{ more: t('localCall.moreOptions'), rename: t('localCall.renameThread'), pin: t('localCall.pin'), unpin: t('localCall.unpin'), archive: t('localCall.archive'), delete: t('localCall.delete') }} /></div>
-      </> : <div className="flex flex-col items-center gap-2 pt-2"><button className={`${ghostButton} native-window-action size-8`} aria-label={t('localCall.newThread')} onClick={() => aui.threads.switchToNewThread()}><Plus className="size-4" aria-hidden="true" /></button></div>}
+        <div className="px-3 pt-3"><ComposerMenuItem className="w-full" onClick={() => { setMemoryOpen(false); void aui.threads.switchToNewThread() }}><Plus className="size-4" aria-hidden="true" />{t('workbench.newThread')}</ComposerMenuItem></div>
+        <div className="relative px-3 pt-2"><Search className="pointer-events-none absolute start-6 top-[18px] size-4 text-muted-foreground" aria-hidden="true" /><ComposerInput className="h-9 min-h-0 rounded-xl bg-foreground/[0.035] ps-9 text-sm" value={threadQuery} onChange={event => setThreadQuery(event.target.value)} placeholder={t('workbench.searchThreads')} /></div>
+        <div className="min-h-0 flex-1 overflow-auto px-3 pt-5"><ThreadList className="max-w-none" dateLabel={t('workbench.today')} threads={visibleItems.map(item => ({ id: item.id, title: item.title ?? t('workbench.newThread'), time: '', unread: item.isRunning, pinned: Boolean(item.custom?.pinned) }))} activeIndex={visibleItems.findIndex(item => item.id === activeId)} onActiveIndexChange={index => { setMemoryOpen(false); void aui.threads.switchToThread(visibleItems[index].id) }} onRename={(index, nextTitle) => { if (nextTitle.trim()) void aui.threads.item({ id: visibleItems[index].id }).rename(nextTitle.trim().slice(0, 80)) }} onPin={index => togglePin(visibleItems[index].id)} onArchive={index => { void aui.threads.item({ id: visibleItems[index].id }).archive() }} onDelete={index => { void aui.threads.item({ id: visibleItems[index].id }).delete() }} labels={{ more: t('workbench.moreOptions'), rename: t('workbench.renameThread'), pin: t('workbench.pin'), unpin: t('workbench.unpin'), archive: t('workbench.archive'), delete: t('workbench.delete') }} /></div>
+      </> : <div className="flex flex-col items-center gap-2 pt-2"><button className={`${ghostButton} native-window-action size-8`} aria-label={t('workbench.newThread')} onClick={() => aui.threads.switchToNewThread()}><Plus className="size-4" aria-hidden="true" /></button></div>}
     </aside>
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="native-window-drag flex h-14 shrink-0 items-center gap-3 border-b border-border px-5">
         <div className="relative min-w-0 flex-1">
-          {renaming ? <input autoFocus value={titleDraft} onChange={event => setTitleDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') renameCurrent(titleDraft); if (event.key === 'Escape') setRenaming(false) }} onBlur={() => renameCurrent(titleDraft)} className="w-full bg-transparent text-[13.5px] outline-none" aria-label={t('localCall.renameThread')} /> : <span className="block truncate text-[13.5px]">{memoryOpen ? t('localCall.memory') : title || t('localCall.newThread')}</span>}
+          {renaming ? <input autoFocus value={titleDraft} onChange={event => setTitleDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') renameCurrent(titleDraft); if (event.key === 'Escape') setRenaming(false) }} onBlur={() => renameCurrent(titleDraft)} className="w-full bg-transparent text-[13.5px] outline-none" aria-label={t('workbench.renameThread')} /> : <span className="block truncate text-[13.5px]">{memoryOpen ? t('workbench.memory') : title || t('workbench.newThread')}</span>}
         </div>
         <Popover open={headerMenu} onOpenChange={setHeaderMenu}>
-          <PopoverTrigger render={<button className={`${ghostButton} native-window-action size-8`} aria-label={t('localCall.moreOptions')} aria-expanded={headerMenu} />}><Ellipsis className="size-4" aria-hidden="true" /></PopoverTrigger>
+          <PopoverTrigger render={<button className={`${ghostButton} native-window-action size-8`} aria-label={t('workbench.moreOptions')} aria-expanded={headerMenu} />}><Ellipsis className="size-4" aria-hidden="true" /></PopoverTrigger>
           <PopoverContent align="end" side="bottom" sideOffset={6} className="w-64 gap-0.5 rounded-2xl p-1.5">
-            <ComposerMenuItem onClick={() => { void aui.threads.switchToNewThread(); setHeaderMenu(false) }}><Plus className="size-4" aria-hidden="true" />{t('localCall.newThread')}</ComposerMenuItem>
-            <ComposerMenuItem disabled={visibleItems.findIndex(item => item.id === activeId) <= 0} onClick={() => { switchRelative(-1); setHeaderMenu(false) }}><ChevronLeft className="size-4" aria-hidden="true" />{t('localCall.previousThread')}</ComposerMenuItem>
-            <ComposerMenuItem disabled={visibleItems.findIndex(item => item.id === activeId) < 0 || visibleItems.findIndex(item => item.id === activeId) >= visibleItems.length - 1} onClick={() => { switchRelative(1); setHeaderMenu(false) }}><ChevronRight className="size-4" aria-hidden="true" />{t('localCall.nextThread')}</ComposerMenuItem>
-            <ComposerMenuItem onClick={() => { setTitleDraft(title ?? ''); setRenaming(true); setHeaderMenu(false) }}><Settings2 className="size-4" aria-hidden="true" />{t('localCall.renameThread')}</ComposerMenuItem>
-            <ComposerMenuItem onClick={toggleArchive}><Archive className="size-4" aria-hidden="true" />{t('localCall.archiveRestore')}</ComposerMenuItem>
-            <ComposerMenuItem onClick={() => togglePin(activeId)}><Pin className="size-4" aria-hidden="true" />{t(currentItem?.custom?.pinned ? 'localCall.unpin' : 'localCall.pin')}</ComposerMenuItem>
-            <ComposerMenuItem onClick={() => { setSidebar(value => !value); setHeaderMenu(false) }}><PanelLeft className="size-4" aria-hidden="true" />{t('localCall.toggleSidebar')}</ComposerMenuItem>
-            <ComposerMenuItem onClick={() => { document.querySelector<HTMLInputElement>('.aui-composer-input')?.focus(); setHeaderMenu(false) }}><Search className="size-4" aria-hidden="true" />{t('localCall.focusMessage')}</ComposerMenuItem>
-            <ComposerMenuItem onClick={() => { setMemoryOpen(value => !value); setHeaderMenu(false) }}><BrainCircuit className="size-4" aria-hidden="true" />{t('localCall.memory')}</ComposerMenuItem>
+            <ComposerMenuItem onClick={() => { void aui.threads.switchToNewThread(); setHeaderMenu(false) }}><Plus className="size-4" aria-hidden="true" />{t('workbench.newThread')}</ComposerMenuItem>
+            <ComposerMenuItem disabled={visibleItems.findIndex(item => item.id === activeId) <= 0} onClick={() => { switchRelative(-1); setHeaderMenu(false) }}><ChevronLeft className="size-4" aria-hidden="true" />{t('workbench.previousThread')}</ComposerMenuItem>
+            <ComposerMenuItem disabled={visibleItems.findIndex(item => item.id === activeId) < 0 || visibleItems.findIndex(item => item.id === activeId) >= visibleItems.length - 1} onClick={() => { switchRelative(1); setHeaderMenu(false) }}><ChevronRight className="size-4" aria-hidden="true" />{t('workbench.nextThread')}</ComposerMenuItem>
+            <ComposerMenuItem onClick={() => { setTitleDraft(title ?? ''); setRenaming(true); setHeaderMenu(false) }}><Settings2 className="size-4" aria-hidden="true" />{t('workbench.renameThread')}</ComposerMenuItem>
+            <ComposerMenuItem onClick={toggleArchive}><Archive className="size-4" aria-hidden="true" />{t('workbench.archiveRestore')}</ComposerMenuItem>
+            <ComposerMenuItem onClick={() => togglePin(activeId)}><Pin className="size-4" aria-hidden="true" />{t(currentItem?.custom?.pinned ? 'workbench.unpin' : 'workbench.pin')}</ComposerMenuItem>
+            <ComposerMenuItem onClick={() => { setSidebar(value => !value); setHeaderMenu(false) }}><PanelLeft className="size-4" aria-hidden="true" />{t('workbench.toggleSidebar')}</ComposerMenuItem>
+            <ComposerMenuItem onClick={() => { document.querySelector<HTMLInputElement>('.aui-composer-input')?.focus(); setHeaderMenu(false) }}><Search className="size-4" aria-hidden="true" />{t('workbench.focusMessage')}</ComposerMenuItem>
+            <ComposerMenuItem onClick={() => { setMemoryOpen(value => !value); setHeaderMenu(false) }}><BrainCircuit className="size-4" aria-hidden="true" />{t('workbench.memory')}</ComposerMenuItem>
           </PopoverContent>
         </Popover>
         <button className={`${ghostButton} native-window-action size-8`} aria-label={t('titleBar.minimizeWindow')} onClick={() => { void window.nolaTranslator?.minimizeMainWindow() }}><Minus className="size-4" aria-hidden="true" /></button>
@@ -144,8 +144,8 @@ function NativeConversation(props: NativeAgentSurfaceProps & { memoryOpen: boole
   const threadId = useAuiState(s => s.threads.mainThreadId)
   return <ThreadPrimitive.Root className="flex min-h-0 flex-1 flex-col" data-testid="native-conversation">
     <ThreadPrimitive.Viewport className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6" turnAnchor="top">
-      {props.memoryOpen ? <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6"><Breadcrumb aria-label={t('localCall.chats')} className="py-5"><BreadcrumbList><BreadcrumbItem><button type="button" className="rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring" onClick={props.onMemoryClose}>{t('localCall.chats')}</button></BreadcrumbItem><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{t('localCall.memory')}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb><div className="flex flex-1 items-start justify-center"><NativeAgentSettings page="memory" snapshot={props.snapshot} onAction={props.onAction} busy={props.busy} model={props.models.find(model => model.id === props.config.model)?.name ?? ''} onPrompt={() => undefined} memories={props.memories} onMemories={props.onMemories} /></div></div> : <div className="mx-auto flex min-h-full w-full max-w-3xl flex-1 flex-col">
-        {empty ? <div className="flex flex-1 flex-col items-center justify-center gap-6 py-8"><h1 className="text-2xl font-medium">{t('localCall.welcomeHeading')}</h1><div className="w-full px-6"><NativeComposer key={threadId} {...props} /></div></div> : <>
+      {props.memoryOpen ? <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6"><Breadcrumb aria-label={t('workbench.chats')} className="py-5"><BreadcrumbList><BreadcrumbItem><button type="button" className="rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring" onClick={props.onMemoryClose}>{t('workbench.chats')}</button></BreadcrumbItem><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{t('workbench.memory')}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb><div className="flex flex-1 items-start justify-center"><NativeAgentSettings page="memory" snapshot={props.snapshot} onAction={props.onAction} busy={props.busy} model={props.models.find(model => model.id === props.config.model)?.name ?? ''} onPrompt={() => undefined} memories={props.memories} onMemories={props.onMemories} /></div></div> : <div className="mx-auto flex min-h-full w-full max-w-3xl flex-1 flex-col">
+        {empty ? <div className="flex flex-1 flex-col items-center justify-center gap-6 py-8"><h1 className="text-2xl font-medium">{t('workbench.welcomeHeading')}</h1><div className="w-full px-6"><NativeComposer key={threadId} {...props} /></div></div> : <>
           <div className="flex-1 py-8"><ThreadPrimitive.Messages components={{ UserMessage: NativeUserMessage, AssistantMessage: NativeAssistantMessage }} /></div>
           <div className="sticky bottom-0 w-full shrink-0 bg-background pb-5 pt-3"><NativeComposer key={threadId} {...props} /></div>
         </>}
@@ -200,11 +200,11 @@ function NativeAssistantMessage() {
   const [reaction, setReaction] = useState<'up' | 'down' | null>(null)
   const [more, setMore] = useState(false)
   return <><NativeDaySeparator /><MessagePrimitive.Root data-role="assistant" className="group/message flex w-full flex-col items-start gap-3">
-    {running && !content.length && <ThinkingIndicator label={t('localCall.thinkingProcess')} />}
+    {running && !content.length && <ThinkingIndicator label={t('workbench.thinkingProcess')} />}
     <MessagePrimitive.Parts components={{ Text: MarkdownText, Reasoning: NativeReasoning, tools: { Fallback: NativeTool }, File, Image, Source: Sources }} />
-    {error && <ErrorState title={t('localCall.networkError')} detail={typeof error === 'string' ? error : JSON.stringify(error)} retrying={running} onRetry={() => aui.message.reload()} />}
+    {error && <ErrorState title={t('workbench.networkError')} detail={typeof error === 'string' ? error : JSON.stringify(error)} retrying={running} onRetry={() => aui.message.reload()} />}
     <NativeMessageTimestamp />
-    {!running && <div className="relative"><MessageActions copied={copied} reaction={reaction} regenerating={false} onCopy={() => { void navigator.clipboard.writeText(content.filter(part => part.type === 'text').map(part => part.text).join('\n')).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }} onReactionChange={value => { setReaction(value); if (value) aui.message.submitFeedback({ type: value === 'up' ? 'positive' : 'negative' }) }} onRegenerate={() => aui.message.reload()} onMore={() => setMore(value => !value)} />{more && <ComposerMenu open><ComposerMenuItem onClick={() => { aui.message.speak(); setMore(false) }}>{t('localCall.readAloud')}</ComposerMenuItem></ComposerMenu>}</div>}
+    {!running && <div className="relative"><MessageActions copied={copied} reaction={reaction} regenerating={false} onCopy={() => { void navigator.clipboard.writeText(content.filter(part => part.type === 'text').map(part => part.text).join('\n')).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }} onReactionChange={value => { setReaction(value); if (value) aui.message.submitFeedback({ type: value === 'up' ? 'positive' : 'negative' }) }} onRegenerate={() => aui.message.reload()} onMore={() => setMore(value => !value)} />{more && <ComposerMenu open><ComposerMenuItem onClick={() => { aui.message.speak(); setMore(false) }}>{t('workbench.readAloud')}</ComposerMenuItem></ComposerMenu>}</div>}
   </MessagePrimitive.Root></>
 }
 
@@ -217,7 +217,7 @@ function NativeTool(props: ToolCallMessagePartProps) {
   const decide = (approved: boolean, optionId?: string) => {
     if (pending) return
     setPending(true)
-    void props.respondToApproval(optionId ? { optionId } : { approved }).catch(error => notifyError(t('localCall.actionFailed'), { cause: error })).finally(() => setPending(false))
+    void props.respondToApproval(optionId ? { optionId } : { approved }).catch(error => notifyError(t('workbench.actionFailed'), { cause: error })).finally(() => setPending(false))
   }
   if (approval && approval.approved === undefined) {
     const options = approval.options ?? []
@@ -225,13 +225,13 @@ function NativeTool(props: ToolCallMessagePartProps) {
     const alwaysAllow = options.find(option => option.kind === 'allow-always')
     const deny = options.find(option => option.kind === 'reject-once' || option.kind === 'reject-always')
     return <ApprovalCard state="request" title={typeof args.title === 'string' ? args.title : toolName}
-      subtitle={typeof args.subtitle === 'string' ? args.subtitle : t('localCall.sandboxHint')}
+      subtitle={typeof args.subtitle === 'string' ? args.subtitle : t('workbench.sandboxHint')}
       description={typeof args.description === 'string' ? args.description : undefined}
       command={typeof args.command === 'string' ? args.command : argsText}
       onAllowOnce={pending ? undefined : () => decide(true, allowOnce?.id)}
       onAlwaysAllow={pending || !alwaysAllow ? undefined : () => decide(true, alwaysAllow.id)}
       onDeny={pending ? undefined : () => decide(false, deny?.id)}
-      allowOnceLabel={t('localCall.allowOnce')} alwaysAllowLabel={t('localCall.allowAlways')} denyLabel={t('localCall.deny')} />
+      allowOnceLabel={t('workbench.allowOnce')} alwaysAllowLabel={t('workbench.allowAlways')} denyLabel={t('workbench.deny')} />
   }
   if (status.type === 'requires-action' || status.type === 'incomplete' || approval?.approved === false) return <ToolFallback {...props} />
   if (toolName === 'terminal') {
@@ -241,7 +241,7 @@ function NativeTool(props: ToolCallMessagePartProps) {
     const text = typeof record.output === 'string' ? record.output : typeof output === 'string' ? output : ''
     return <TerminalBlock command={String(args.command ?? '')} lines={text.split('\n')} visibleCount={text.split('\n').length} done={!running} exitCode={typeof record.exitCode === 'number' ? record.exitCode : undefined} />
   }
-  return <>{toolName.startsWith('delegate_') && <SubagentList agents={[{ name: t('localCall.subagents'), model: '' }]} completedCount={running ? 0 : 1} progress={[running ? 0 : 100]} showSummary={false} summaryAgent={{ name: '', model: '' }} />}<ToolCall label={toolName} activeLabel={toolName} query={argsText} request={argsText} result={typeof result === 'string' ? result : JSON.stringify(result, null, 2) ?? ''} running={running} open={open} onOpenChange={setOpen} /></>
+  return <>{toolName.startsWith('delegate_') && <SubagentList agents={[{ name: t('workbench.subagents'), model: '' }]} completedCount={running ? 0 : 1} progress={[running ? 0 : 100]} showSummary={false} summaryAgent={{ name: '', model: '' }} />}<ToolCall label={toolName} activeLabel={toolName} query={argsText} request={argsText} result={typeof result === 'string' ? result : JSON.stringify(result, null, 2) ?? ''} running={running} open={open} onOpenChange={setOpen} /></>
 }
 
 function NativeComposer(props: NativeAgentSurfaceProps) {
@@ -307,16 +307,16 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
     if (!props.voices.length) void import('@/store').then(async ({ getBridge }) => {
       const result = await getBridge()?.app.directModel?.({ id: crypto.randomUUID(), model: props.config.model, kind: 'tts' }, true)
       props.onVoices(result?.voices ?? [])
-    }).catch(error => notifyError(t('localCall.actionFailed'), { cause: error }))
+    }).catch(error => notifyError(t('workbench.actionFailed'), { cause: error }))
   }
   return <Composer className="max-w-none" data-testid="native-composer">
-    {!!savedDraft && !text && <DraftRestore draft={savedDraft} savedAt={t('localCall.nativeDraft')} onRestore={() => { aui.thread.composer().setText(savedDraft); setSavedDraft('') }} onDiscard={() => { setSavedDraft(''); try { localStorage.removeItem(`nola.native.draft:${threadId}`) } catch { /* Keep dismissing usable when storage is unavailable. */ } }} />}
-    {menu === 'models' && <ComposerMenu open><ComposerInput placeholder={t('localCall.searchModels')} value={modelQuery} onChange={event => setModelQuery(event.target.value)} />{(['llm', 'asr', 'mt', 'tts'] as const).map(kind => <div key={kind}><p className="px-2.5 py-2 text-xs text-muted-foreground">{t(`localCall.${kind}`)}</p>{props.models.filter(model => model.kind === kind && model.name.toLowerCase().includes(modelQuery.toLowerCase())).map(model => <ComposerModelItem key={model.id} entry={{ name: model.name, meta: t(`localCall.${kind}`) }} selected={props.config.model === model.id} onClick={() => pick({ model: model.id, kind: model.kind, images: model.images, voice: '' })} />)}</div>)}<ComposerMenuItem onClick={props.onConfigure}><Settings2 className="size-4" aria-hidden="true" />{t('nav.models')}</ComposerMenuItem></ComposerMenu>}
-    {menu === 'effort' && <ComposerMenu open className="w-80 gap-3 p-3"><ReasoningEffort variant="slider" levels={(['auto', 'low', 'medium', 'high'] as const).map(key => ({ key, label: t(key === 'auto' ? 'modelsSettingsUi.default' : `localCall.${key}`) }))} selectedKey={props.config.effort} title={t('localCall.reasoningTokens')} onSelect={effort => pick({ effort }, false)} /></ComposerMenu>}
-    {menu === 'language' && <ComposerMenu open>{(props.config.kind === 'mt' ? targetCodes : sourceCodes).map(code => <ComposerMenuItem key={code} onClick={() => pick(props.config.kind === 'mt' ? { target: code } : { source: code })}>{code === 'auto' ? t('localCall.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
-    {menu === 'source' && <ComposerMenu open>{sourceCodes.map(code => <ComposerMenuItem key={code} onClick={() => pick({ source: code })}>{code === 'auto' ? t('localCall.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
+    {!!savedDraft && !text && <DraftRestore draft={savedDraft} savedAt={t('workbench.nativeDraft')} onRestore={() => { aui.thread.composer().setText(savedDraft); setSavedDraft('') }} onDiscard={() => { setSavedDraft(''); try { localStorage.removeItem(`nola.native.draft:${threadId}`) } catch { /* Keep dismissing usable when storage is unavailable. */ } }} />}
+    {menu === 'models' && <ComposerMenu open><ComposerInput placeholder={t('workbench.searchModels')} value={modelQuery} onChange={event => setModelQuery(event.target.value)} />{(['llm', 'asr', 'mt', 'tts'] as const).map(kind => <div key={kind}><p className="px-2.5 py-2 text-xs text-muted-foreground">{t(`workbench.${kind}`)}</p>{props.models.filter(model => model.kind === kind && model.name.toLowerCase().includes(modelQuery.toLowerCase())).map(model => <ComposerModelItem key={model.id} entry={{ name: model.name, meta: t(`workbench.${kind}`) }} selected={props.config.model === model.id} onClick={() => pick({ model: model.id, kind: model.kind, images: model.images, voice: '' })} />)}</div>)}<ComposerMenuItem onClick={props.onConfigure}><Settings2 className="size-4" aria-hidden="true" />{t('nav.models')}</ComposerMenuItem></ComposerMenu>}
+    {menu === 'effort' && <ComposerMenu open className="w-80 gap-3 p-3"><ReasoningEffort variant="slider" levels={(['auto', 'low', 'medium', 'high'] as const).map(key => ({ key, label: t(key === 'auto' ? 'modelsSettingsUi.default' : `workbench.${key}`) }))} selectedKey={props.config.effort} title={t('workbench.reasoningTokens')} onSelect={effort => pick({ effort }, false)} /></ComposerMenu>}
+    {menu === 'language' && <ComposerMenu open>{(props.config.kind === 'mt' ? targetCodes : sourceCodes).map(code => <ComposerMenuItem key={code} onClick={() => pick(props.config.kind === 'mt' ? { target: code } : { source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
+    {menu === 'source' && <ComposerMenu open>{sourceCodes.map(code => <ComposerMenuItem key={code} onClick={() => pick({ source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
     {menu === 'voice' && <ComposerMenu open>{props.voices.map(voice => <ComposerMenuItem key={voice} onClick={() => pick({ voice })}>{voice}</ComposerMenuItem>)}</ComposerMenu>}
-    {menu === 'context' && <ComposerMenu open align="end"><ContextBreakdown limit={profile?.contextWindow ?? 0} segments={[{ label: t('localCall.inputTokens'), tokens: usage?.inputTokens ?? 0, tint: 'bg-blue-400' }, { label: t('localCall.outputTokens'), tokens: usage?.outputTokens ?? 0, tint: 'bg-blue-600' }]} /></ComposerMenu>}
+    {menu === 'context' && <ComposerMenu open align="end"><ContextBreakdown limit={profile?.contextWindow ?? 0} segments={[{ label: t('workbench.inputTokens'), tokens: usage?.inputTokens ?? 0, tint: 'bg-blue-400' }, { label: t('workbench.outputTokens'), tokens: usage?.outputTokens ?? 0, tint: 'bg-blue-600' }]} /></ComposerMenu>}
     <ComposerBar>
       {attachments.length > 0 && <ComposerAttachments>{attachments.map(attachment => <ComposerAttachmentChip key={attachment.id} attachment={{ name: attachment.name, meta: attachment.contentType ?? '', state: attachment.status.type === 'running' ? 'uploading' : attachment.status.type === 'incomplete' ? 'error' : 'done', progress: attachment.status.type === 'running' ? attachment.status.progress : undefined, kind: attachment.type === 'image' ? 'image' : 'text' }} onRemove={() => aui.thread.composer().attachment({ id: attachment.id }).remove()} />)}</ComposerAttachments>}
       {dictation ? <ComposerVoice recording={dictation.status.type === 'running'} seconds={seconds} /> : <ComposerInput className="aui-composer-input" value={text} onChange={event => aui.thread.composer().setText(event.target.value)} onSubmit={send} placeholder={props.placeholder} readOnly={!props.config.model || props.config.kind === 'asr'} onPaste={event => {
@@ -341,22 +341,22 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
         for (const file of acceptedFiles) {
           const extension = file.type === 'image/jpeg' ? 'jpg' : file.type.split('/')[1] || 'bin'
           const attachment = file.name ? file : new globalThis.File([file], `pasted-attachment.${extension}`, { type: file.type })
-          void aui.thread.composer().addAttachment(attachment).catch(error => notifyError(t('localCall.actionFailed'), { cause: error }))
+          void aui.thread.composer().addAttachment(attachment).catch(error => notifyError(t('workbench.actionFailed'), { cause: error }))
         }
       }} />}
       <ComposerToolbar><ComposerActions>
-        <ComposerAttachButton aria-label={t('localCall.addAttachment')} disabled={props.config.kind === 'tts' || props.config.kind === 'mt' && !props.config.images} onClick={() => inputRef.current?.click()} />
-        <ComposerModelTrigger model={selected?.name ?? t('localCall.noModels')} open={menu === 'models'} onClick={() => setMenu(menu === 'models' ? '' : 'models')} />
-        {props.config.kind === 'llm' && <ComposerModelTrigger model={t(props.config.effort === 'auto' ? 'modelsSettingsUi.default' : `localCall.${props.config.effort as 'low' | 'medium' | 'high'}`)} open={menu === 'effort'} onClick={() => setMenu(menu === 'effort' ? '' : 'effort')} />}
-        {props.config.kind === 'mt' && <ComposerModelTrigger model={props.config.source === 'auto' ? t('localCall.auto') : languageName(props.config.source, language)} open={menu === 'source'} onClick={() => setMenu(menu === 'source' ? '' : 'source')} />}
+        <ComposerAttachButton aria-label={t('workbench.addAttachment')} disabled={props.config.kind === 'tts' || props.config.kind === 'mt' && !props.config.images} onClick={() => inputRef.current?.click()} />
+        <ComposerModelTrigger model={selected?.name ?? t('workbench.noModels')} open={menu === 'models'} onClick={() => setMenu(menu === 'models' ? '' : 'models')} />
+        {props.config.kind === 'llm' && <ComposerModelTrigger model={t(props.config.effort === 'auto' ? 'modelsSettingsUi.default' : `workbench.${props.config.effort as 'low' | 'medium' | 'high'}`)} open={menu === 'effort'} onClick={() => setMenu(menu === 'effort' ? '' : 'effort')} />}
+        {props.config.kind === 'mt' && <ComposerModelTrigger model={props.config.source === 'auto' ? t('workbench.auto') : languageName(props.config.source, language)} open={menu === 'source'} onClick={() => setMenu(menu === 'source' ? '' : 'source')} />}
         {(props.config.kind === 'asr' || props.config.kind === 'mt') && <ComposerModelTrigger model={languageName(props.config.kind === 'mt' ? props.config.target : props.config.source, language)} open={menu === 'language'} onClick={() => setMenu(menu === 'language' ? '' : 'language')} />}
-        {props.config.kind === 'tts' && <ComposerModelTrigger model={props.config.voice || t('localCall.voice')} open={menu === 'voice'} onClick={chooseVoices} />}
+        {props.config.kind === 'tts' && <ComposerModelTrigger model={props.config.voice || t('workbench.voice')} open={menu === 'voice'} onClick={chooseVoices} />}
       </ComposerActions><ComposerActions>
         {props.config.kind === 'llm' && <div><ComposerContext usage={{ system: 0, tools: 0, messages: (usage?.totalTokens ?? 0) / 1000, total: (profile?.contextWindow ?? 0) / 1000 }} /></div>}
-        <ComposerVoiceButton active={!!dictation} aria-label={t(dictation ? 'localCall.stopDictation' : 'localCall.record')} onClick={() => { if (dictation) aui.thread.composer().stopDictation(); else aui.thread.composer().startDictation() }} />
+        <ComposerVoiceButton active={!!dictation} aria-label={t(dictation ? 'workbench.stopDictation' : 'workbench.record')} onClick={() => { if (dictation) aui.thread.composer().stopDictation(); else aui.thread.composer().startDictation() }} />
         <ComposerSend className={running ? 'aui-composer-cancel' : 'aui-composer-send'} streaming={running} idle={!text.trim() && !attachments.length} disabled={!running && (!props.config.model || !text.trim() && !attachments.length)} onClick={send} />
       </ComposerActions></ComposerToolbar>
     </ComposerBar>
-    <input ref={inputRef} type="file" className="hidden" multiple accept={props.config.kind === 'asr' ? 'audio/*' : props.config.images || props.config.kind === 'llm' ? 'image/*,audio/*,text/*,.md,.json' : 'text/*,.md,.json'} onChange={event => { for (const file of event.target.files ?? []) void aui.thread.composer().addAttachment(file).catch(error => notifyError(t('localCall.actionFailed'), { cause: error })); event.target.value = '' }} />
+    <input ref={inputRef} type="file" className="hidden" multiple accept={props.config.kind === 'asr' ? 'audio/*' : props.config.images || props.config.kind === 'llm' ? 'image/*,audio/*,text/*,.md,.json' : 'text/*,.md,.json'} onChange={event => { for (const file of event.target.files ?? []) void aui.thread.composer().addAttachment(file).catch(error => notifyError(t('workbench.actionFailed'), { cause: error })); event.target.value = '' }} />
   </Composer>
 }

@@ -153,9 +153,11 @@ export async function testAudio(source: string): Promise<boolean> {
   try {
     if (!bridge) throw new Error('engineNotReady')
     const selected = modelsStore.getState().devices.find(device => device.deviceId === source)
-    if (source !== 'defaultOutput' && !selected) throw new Error('audioDeviceUnavailable')
+    const legacyKind = source.startsWith('wasapi:systemOutput:') ? 'systemOutput'
+      : source.startsWith('wasapi:microphone:') ? 'microphone' : undefined
+    if (source !== 'defaultOutput' && !selected && !legacyKind) throw new Error('audioDeviceUnavailable')
     const result = await bridge.engine.testAudio(source === 'defaultOutput' ? { kind: 'defaultOutput' }
-      : { kind: selected!.kind, deviceId: selected!.deviceId })
+      : { kind: selected?.kind ?? legacyKind!, deviceId: selected?.deviceId ?? source })
     if (generation !== audioTestGeneration) return false
     const decoded = atob(result.audioBase64)
     const bytes = new Uint8Array(decoded.length)
@@ -370,6 +372,9 @@ export function mergeSettings(base: AppSettings, patch: AppSettingsPatch): AppSe
     ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
     ...(patch.uiLanguage !== undefined ? { uiLanguage: patch.uiLanguage } : {}),
     ...(patch.onboardingSeen !== undefined ? { onboardingSeen: patch.onboardingSeen } : {}),
+    ...(patch.closeBehavior !== undefined ? { closeBehavior: patch.closeBehavior } : {}),
+    synthesis: { ...base.synthesis, ...patch.synthesis },
+    modelGateway: { ...base.modelGateway, ...patch.modelGateway },
     recognition: { ...base.recognition, ...patch.recognition },
     overlay: { ...base.overlay, ...patch.overlay },
     videoCaptions: { ...base.videoCaptions, ...patch.videoCaptions },
@@ -414,6 +419,8 @@ function mergePatches(a: AppSettingsPatch, b: AppSettingsPatch): AppSettingsPatc
   return {
     ...a,
     ...b,
+    ...(a.synthesis || b.synthesis ? { synthesis: { ...a.synthesis, ...b.synthesis } } : {}),
+    ...(a.modelGateway || b.modelGateway ? { modelGateway: { ...a.modelGateway, ...b.modelGateway } } : {}),
     ...(a.recognition || b.recognition
       ? { recognition: { ...a.recognition, ...b.recognition } }
       : {}),

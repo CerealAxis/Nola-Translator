@@ -16,6 +16,13 @@ export interface LanguageModelServices extends DirectModelServices {
 /** The official AI SDK stream crosses IPC; provider secrets remain in the main process. */
 export function registerLanguageModelIpc(services: LanguageModelServices, allowed: (sender: WebContents) => boolean) {
   const pending = new Map<string, AbortController>()
+  const settled = new Map<string, { promise: Promise<void>; resolve: () => void }>()
+  const track = (id: string) => {
+    let resolve!: () => void
+    const promise = new Promise<void>(done => { resolve = done })
+    settled.set(id, { promise, resolve })
+  }
+  const finish = (id: string) => { pending.delete(id); settled.get(id)?.resolve(); settled.delete(id) }
   ipcMain.handle('app:agent-workspace', async (event, raw: unknown) => {
     if (!allowed(event.sender) || !services.workspace) throw new Error('Agent workspace unavailable')
     return services.workspace.action(workspaceActionSchema.parse(raw), BrowserWindow.fromWebContents(event.sender) ?? undefined)
@@ -28,9 +35,10 @@ export function registerLanguageModelIpc(services: LanguageModelServices, allowe
     const controller = new AbortController()
     const stop = () => controller.abort()
     pending.set(id, controller)
+    track(id)
     event.sender.once('destroyed', stop)
     try { return await runDirectModel(services, request, controller.signal, inspect === true) }
-    finally { pending.delete(id); if (!event.sender.isDestroyed()) event.sender.removeListener('destroyed', stop) }
+    finally { finish(id); if (!event.sender.isDestroyed()) event.sender.removeListener('destroyed', stop) }
   })
   ipcMain.handle('app:language-model:cancel', (event, id: unknown) => {
     if (allowed(event.sender) && typeof id === 'string') pending.get(event.sender.id + ':' + id)?.abort()
@@ -43,6 +51,7 @@ export function registerLanguageModelIpc(services: LanguageModelServices, allowe
     if (pending.has(id)) throw new Error('Duplicate model request')
     const controller = new AbortController()
     pending.set(id, controller)
+    track(id)
     const stop = () => controller.abort()
     event.sender.once('destroyed', stop)
     try {
@@ -50,8 +59,15 @@ export function registerLanguageModelIpc(services: LanguageModelServices, allowe
     } catch (error) {
       if (!controller.signal.aborted) throw error
     } finally {
-      pending.delete(id)
+      finish(id)
       if (!event.sender.isDestroyed()) event.sender.removeListener('destroyed', stop)
     }
   })
+  return {
+    cancelAll: async (): Promise<void> => {
+      const tasks = [...settled.values()].map(item => item.promise)
+      for (const controller of pending.values()) controller.abort()
+      await Promise.allSettled(tasks)
+    },
+  }
 }

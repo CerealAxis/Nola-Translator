@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { normalizeThrownError } from '../shared/ipc-error'
+import { featureConflictOwner } from '../shared/feature-activity'
 import { logDiagnostic } from './session-log'
 
 /** Record IPC operations centrally without persisting credential or document payloads. */
@@ -21,7 +22,8 @@ export function loggedHandle(channel: string, listener: Parameters<typeof ipcMai
       const correlationId = randomUUID()
       const classification = normalizeThrownError(error, { correlationId, operation: channel })
       logDiagnostic('ipc.failed', { operationId, channel, durationMs: Math.round(performance.now() - started), correlationId, classification, error })
-      const rendererError = new Error(classification.code)
+      const owner = featureConflictOwner(error)
+      const rendererError = new Error(owner ? `FEATURE_CONFLICT:${owner}` : classification.code)
       Object.assign(rendererError, classification)
       throw rendererError
     }

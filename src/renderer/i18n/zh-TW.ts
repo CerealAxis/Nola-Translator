@@ -1,11 +1,13 @@
-import { localCallTw } from './local-call-ui'
+import { gatewayTw } from './gateway-ui'
+import { workbenchTw } from './workbench-ui'
 import { offlineTw } from './offline-ui'
 import type { Dictionary } from './zh-CN'
 import { onboardingTW } from './onboarding-ui'
 
 /** Complete Traditional Chinese dictionary for Taiwan. */
 export const zhTW: Dictionary = {
-  localCall: localCallTw,
+  gateway: gatewayTw,
+  workbench: workbenchTw,
   offline: offlineTw,
   onboarding: onboardingTW,
   startup: {
@@ -515,6 +517,7 @@ export const zhTW: Dictionary = {
   "nav": {
     "home": "首頁",
     "workspace": "快速口譯",
+    "modelGateway": "模型閘道",
     "records": "口譯記錄",
     "models": "模型管理",
     "settings": "設定"

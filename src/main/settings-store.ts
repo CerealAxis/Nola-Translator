@@ -236,6 +236,15 @@ export class SettingsStore {
         ...raw,
         version: 2,
         onboardingSeen: raw.onboardingSeen === true,
+        closeBehavior: raw.closeBehavior === 'quit' ? 'quit' : 'tray',
+        synthesis: {
+          ...DEFAULT_SETTINGS.synthesis,
+          ...(settingsPatchSchema.safeParse({ synthesis: raw.synthesis }).data?.synthesis ?? {}),
+        },
+        modelGateway: {
+          ...DEFAULT_SETTINGS.modelGateway,
+          ...(settingsPatchSchema.safeParse({ modelGateway: raw.modelGateway ?? (raw as { localGateway?: unknown }).localGateway }).data?.modelGateway ?? {}),
+        },
         uiLanguage: typeof raw.uiLanguage === 'string' && ['auto', 'zh-CN', 'zh-TW', 'zh-HK', 'ko', 'ja', 'en'].includes(raw.uiLanguage)
           ? raw.uiLanguage as AppSettings['uiLanguage']
           : DEFAULT_SETTINGS.uiLanguage,
@@ -371,6 +380,8 @@ export class SettingsStore {
       ...this.settings,
       ...patch,
       version: 2,
+      synthesis: { ...this.settings.synthesis, ...patch.synthesis },
+      modelGateway: { ...this.settings.modelGateway, ...patch.modelGateway },
       recognition: { ...this.settings.recognition, ...(patch.recognition ?? {}) },
       recording: { ...this.settings.recording, ...(patch.recording ?? {}) },
       appearance: { ...this.settings.appearance, ...(patch.appearance ?? {}) },

@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BrowserConnection } from '../../../src/main/browser-connection'
+import { FeatureActivity } from '../../../src/main/feature-activity'
 import { SessionController } from '../../../src/main/session-controller'
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, type BrowserResponse } from '../../../src/shared/browser'
@@ -25,6 +26,7 @@ class TestEngine extends EventEmitter {
   supports = () => true
   start = vi.fn(async () => { this.currentState = 'ready' })
   stop = vi.fn(async () => { this.currentState = 'stopped' })
+  prewarmModels = vi.fn(async () => ({ state: 'ready' as const }))
   delayedAudio = false
   private acknowledgements: Array<() => void> = []
   request = vi.fn(async (command: EngineCommand) => {
@@ -36,14 +38,14 @@ class TestEngine extends EventEmitter {
   })
 }
 
-async function fixture(integrations?: BrowserIntegrations) {
+async function fixture(integrations?: BrowserIntegrations, activity?: FeatureActivity) {
   const directory = await mkdtemp(join(tmpdir(), 'nola-browser-test-'))
   vi.stubEnv('LOCALAPPDATA', directory)
   const engine = new TestEngine()
   const typed = engine as unknown as EngineProcess
-  const sessions = new SessionController({ engine: typed, meetings: null, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', prepare: async () => {}, whenReady: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {} })
+  const sessions = new SessionController({ activity, engine: typed, meetings: null, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', prepare: async () => {}, whenReady: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {} })
   engine.on('state', () => sessions.releaseOnLoss())
-  const connection = new BrowserConnection({ engine: typed, sessions, integrations, getSettings: () => DEFAULT_SETTINGS, setEnabled: async () => {} })
+  const connection = new BrowserConnection({ activity, engine: typed, sessions, integrations, getSettings: () => DEFAULT_SETTINGS, setEnabled: async () => {} })
   disposers.push(async () => { await connection.dispose(); await rm(directory, { recursive: true, force: true }) })
   await connection.setEnabled(true)
   connection.setCaptionServiceActive(true)
@@ -264,4 +266,54 @@ describe('native pipe boundary', () => {
     host.stdin.end()
     await expect.poll(() => f.connection.status().connections).toBe(0)
   }, 15_000)
+})
+
+
+it('holds one browser reservation through model preparation and gate activation', async () => {
+  const activity = new FeatureActivity()
+  const f = await fixture(undefined, activity)
+  await f.connection.stopCaptionService()
+  let finish!: () => void
+  f.engine.prewarmModels.mockImplementationOnce(() => new Promise(resolve => { finish = () => resolve({ state: 'ready' }) }))
+  const prepared = f.connection.prepareCaptionService({ compute: DEFAULT_SETTINGS.compute, recognitionModelId: DEFAULT_SETTINGS.recognition.modelId, sourceLanguage: 'auto', targetLanguages: [] })
+  expect(activity.snapshot()).toEqual({ owner: 'browser-captions', phase: 'starting' })
+  expect(f.connection.status().captionServiceActive).toBe(false)
+  expect(() => activity.acquire('workbench', async () => {})).toThrow('FEATURE_CONFLICT:browser-captions')
+  await vi.waitFor(() => expect(f.engine.prewarmModels).toHaveBeenCalledOnce())
+  finish()
+  await expect(prepared).resolves.toEqual({ state: 'ready' })
+  expect(f.connection.status().captionServiceActive).toBe(true)
+  expect(activity.snapshot()).toEqual({ owner: 'browser-captions', phase: 'running' })
+  expect(() => activity.acquire('model-gateway', async () => {})).toThrow('FEATURE_CONFLICT:browser-captions')
+  await activity.stop()
+  expect(activity.snapshot().owner).toBeNull()
+})
+
+it('does not reactivate the browser gate when stop wins during model preparation', async () => {
+  const activity = new FeatureActivity()
+  const f = await fixture(undefined, activity)
+  await f.connection.stopCaptionService()
+  let finish!: () => void
+  f.engine.prewarmModels.mockImplementationOnce(() => new Promise(resolve => { finish = () => resolve({ state: 'ready' }) }))
+  const prepared = f.connection.prepareCaptionService({ compute: DEFAULT_SETTINGS.compute, recognitionModelId: DEFAULT_SETTINGS.recognition.modelId, sourceLanguage: 'auto', targetLanguages: [] })
+  await vi.waitFor(() => expect(f.engine.prewarmModels).toHaveBeenCalledOnce())
+  const stopped = activity.stop()
+  await vi.waitFor(() => expect(activity.snapshot().phase).toBe('stopping'))
+  finish()
+  await stopped
+  await expect(prepared).resolves.toMatchObject({ state: 'failed' })
+  expect(f.connection.status().captionServiceActive).toBe(false)
+  expect(activity.snapshot().owner).toBeNull()
+})
+
+it('unloads models and releases ownership after browser preparation fails', async () => {
+  const activity = new FeatureActivity()
+  const f = await fixture(undefined, activity)
+  await f.connection.stopCaptionService()
+  f.engine.prewarmModels.mockRejectedValueOnce(new Error('model failure'))
+  f.engine.request.mockClear()
+  await expect(f.connection.prepareCaptionService({ compute: DEFAULT_SETTINGS.compute, recognitionModelId: DEFAULT_SETTINGS.recognition.modelId, sourceLanguage: 'auto', targetLanguages: [] })).rejects.toThrow('model failure')
+  expect(f.connection.status().captionServiceActive).toBe(false)
+  expect(activity.snapshot().owner).toBeNull()
+  expect(f.engine.request).toHaveBeenCalledWith(expect.objectContaining({ type: 'releaseModels' }), 'modelsReleased', 60_000)
 })

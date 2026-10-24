@@ -36,6 +36,25 @@ it('captures the selected source and plays the returned audio before reporting c
   } finally { cancelAudioTest(); vi.unstubAllGlobals() }
 })
 
+it('passes a persisted format-based device id through to the engine for migration', async () => {
+  const bridge = createIpcBridge()
+  const request = vi.spyOn(bridge.engine, 'testAudio').mockResolvedValue({
+    audioBase64: btoa('wave data'), durationMs: 2000, hasSignal: true,
+  })
+  vi.stubGlobal('URL', class extends URL { static createObjectURL = vi.fn(() => 'blob:preview'); static revokeObjectURL = vi.fn() })
+  vi.stubGlobal('Audio', class {
+    onended: (() => void) | null = null
+    onerror: (() => void) | null = null
+    play = async () => { this.onended?.() }
+    pause = vi.fn()
+  })
+  try {
+    attachSettingsStore(bridge, false)
+    await expect(testAudio('wasapi:systemOutput:legacy-id')).resolves.toBe(true)
+    expect(request).toHaveBeenCalledWith({ kind: 'systemOutput', deviceId: 'wasapi:systemOutput:legacy-id' })
+  } finally { cancelAudioTest(); vi.unstubAllGlobals() }
+})
+
 it('does not play an audio test that was cancelled while capture was pending', async () => {
   const bridge = createIpcBridge()
   const recording = deferred<{ audioBase64: string; durationMs: 2000; hasSignal: boolean }>()

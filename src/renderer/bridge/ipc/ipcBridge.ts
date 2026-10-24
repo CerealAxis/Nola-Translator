@@ -98,6 +98,22 @@ function subscribe<T>(method: keyof NolaTranslatorApi, run: (injected: NolaTrans
 
 export function createIpcBridge(): NolaBridge {
   return {
+    requestQuit: () => call('requestQuit', api => api.requestQuit?.() ?? Promise.reject(new MissingIpcApiError('requestQuit'))),
+    confirmQuit: () => call('confirmQuit', api => api.confirmQuit?.() ?? Promise.reject(new MissingIpcApiError('confirmQuit'))),
+    onQuitRequested: cb => injectedApi()?.onQuitRequested?.(cb) ?? (() => undefined),
+    gateway: {
+      snapshot: () => call('gateway', api => api.gateway?.snapshot() ?? Promise.reject(new MissingIpcApiError('gateway.snapshot'))),
+      start: () => call('gateway', api => api.gateway?.start() ?? Promise.reject(new MissingIpcApiError('gateway.start'))),
+      stop: () => call('gateway', api => api.gateway?.stop() ?? Promise.reject(new MissingIpcApiError('gateway.stop'))),
+      revealKey: () => call('gateway', api => api.gateway?.revealKey() ?? Promise.reject(new MissingIpcApiError('gateway.revealKey'))),
+      rotateKey: () => call('gateway', api => api.gateway?.rotateKey() ?? Promise.reject(new MissingIpcApiError('gateway.rotateKey'))),
+      onChanged: cb => subscribe('gateway', api => api.gateway?.onChanged ?? (() => () => undefined), cb),
+    },
+    activity: {
+      snapshot: () => call('activity', api => api.activity?.snapshot() ?? Promise.reject(new MissingIpcApiError('activity.snapshot'))),
+      stop: () => call('activity', api => api.activity?.stop() ?? Promise.reject(new MissingIpcApiError('activity.stop'))),
+      onChanged: cb => subscribe('activity', api => api.activity?.onChanged ?? (() => () => undefined), cb),
+    },
     offline: {
       selectModel: (kind, repo, path) => call('offline', api => api.offline?.selectModel(kind, repo, path) ?? Promise.reject(new MissingIpcApiError('offline.selectModel'))),
       selectDestination: path => call('offline', api => api.offline?.selectDestination(path) ?? Promise.reject(new MissingIpcApiError('offline.selectDestination'))),
@@ -218,9 +234,9 @@ export function createIpcBridge(): NolaBridge {
         if (!api?.onLanguageModelStream) throw new Error('Language model streaming unavailable')
         return api.onLanguageModelStream(callback)
       },
-      openLocalCallDemo: surface => call('openLocalCallDemo', injected => {
-        if (!injected.openLocalCallDemo) throw new Error('Development preview is unavailable')
-        return injected.openLocalCallDemo(surface)
+      openWorkbench: surface => call('openWorkbench', injected => {
+        if (!injected.openWorkbench) throw new Error('Workbench is unavailable')
+        return injected.openWorkbench(surface)
       }),
       showWorkspace: () => call('showWorkspace', injected => injected.showWorkspace()),
       openMainPage: path => call('openMainPage', injected => injected.openMainPage(path)),

@@ -6,6 +6,7 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
+import pyaudiowpatch as pyaudio
 
 from nola_translator_engine.audio.capture import (
     AudioDeviceDisconnectedError,
@@ -88,16 +89,18 @@ def test_bounded_callback_queue_drops_oldest_chunk_without_blocking() -> None:
 
 
 class FakeStream:
-    def __init__(self, callback, frame_count: int, channels: int) -> None:
+    def __init__(self, callback, frame_count: int, channels: int, sample_format: int) -> None:
         self.callback = callback
         self.frame_count = frame_count
         self.channels = channels
+        self.sample_format = sample_format
         self.started = False
         self.closed = False
 
     def start_stream(self) -> None:
         self.started = True
-        data = np.zeros(self.frame_count * self.channels, dtype=np.float32).tobytes()
+        dtype = np.int16 if self.sample_format == pyaudio.paInt16 else np.float32
+        data = np.zeros(self.frame_count * self.channels, dtype=dtype).tobytes()
         self.callback(data, self.frame_count, {}, 0)
 
     def stop_stream(self) -> None:
@@ -126,7 +129,9 @@ class FakeBackend:
         self.open_options = options
         if self.fail_open:
             raise OSError("device unavailable")
-        self.stream = FakeStream(options["stream_callback"], options["frames_per_buffer"], options["channels"])
+        self.stream = FakeStream(
+            options["stream_callback"], options["frames_per_buffer"], options["channels"], options["format"]
+        )
         return self.stream
 
     def terminate(self) -> None:
@@ -135,7 +140,7 @@ class FakeBackend:
 
 def _device() -> AudioDeviceRecord:
     return AudioDeviceRecord(
-        device_id=_stable_device_id("systemOutput", "测试扬声器", 48_000, 2),
+        device_id=_stable_device_id("systemOutput", "测试扬声器"),
         backend_index=33,
         name="测试扬声器",
         kind="systemOutput",
@@ -149,8 +154,7 @@ def _device() -> AudioDeviceRecord:
 async def test_loopback_opens_with_the_advertised_channel_count(monkeypatch):
     import pyaudiowpatch as pyaudio
 
-    device = replace(_device(), channels=8,
-                     device_id=_stable_device_id("systemOutput", _device().name, 48_000, 8))
+    device = replace(_device(), channels=8)
     backend = FakeBackend()
     backend.device = replace(device, backend_index=41)
     attempts = []

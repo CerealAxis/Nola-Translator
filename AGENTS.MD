@@ -29,7 +29,7 @@
 
 ```
 src/
-  main/                   Electron 主进程：IPC、窗口、设置、引擎与会话
+  main/                   Electron 主进程：IPC、窗口、设置、引擎与会话、工作台、模型网关、托盘和功能互斥
   preload/                单文件 contextBridge → window.nolaTranslator
   shared/                 跨进程类型、Zod 校验、默认值和浏览器契约
   renderer/
@@ -37,14 +37,15 @@ src/
     bridge/               渲染进程唯一数据出口（NolaBridge）
     store/                5 个领域 Store 与 useSyncExternalStore 实现
     components/
-      assistant-ui/       官方聊天、附件、模型选择等组件源码（本地调用开发预览）
+      assistant-ui/       工作台 Agent 对话、附件、模型选择等组件源码
       ui/                 shadcn/ui Base UI 基础组件源码
       primitives/         Nola 产品级 primitives 与通知适配
       reading/            阅读与播放器组件
       notes/              笔记组件
       home/               首页展示组件
     features/             home、workspace、overlay 等功能模块
-      local-call/         仅 Electron 开发模式可见的 assistant-ui 本地调用界面
+      workbench/          正式工作台 Agent 对话界面；workbench.html 为独立窗口入口
+      model-gateway/      模型网关服务控制、能力开关、连接状态与 API 接入示例
     i18n/                 完整语言字典及组装逻辑
     theme/                设计 token 唯一来源及 CJK 字体样式
     assets/browsers/      Chrome / Edge / Firefox 图标
@@ -165,7 +166,7 @@ node scripts/check-installer-paths.mjs [makensis.exe] # NSIS 安装目录回归�
 - 分点
 ```
 
-### 独立本地调用入口
+### 独立工作台入口
 
-- 本地调用开发窗口使用 `src/renderer/native-agent.html`、`native-agent-entry.tsx` 和 `native-agent-entry.css`，不加载主页面的 `index.css` 或 Nola 产品主题。窗口由 `src/main/local-call-demo.ts` 注册，仅 Electron 开发环境可打开。
-- 官方 Elements 源码位于 `src/renderer/components/assistant-ui/native/`；实际界面组合、原生卡片工具和渲染状态分别位于 `features/local-call/NativeAgentSurface.tsx`、`native-agent-tools.tsx` 和 `NativeAgentSettings.tsx`。旧聊天组件、旧侧栏和旧工作区组件已移除。
+- 正式工作台 Agent 对话窗口使用 `src/renderer/workbench.html`、`workbench-entry.tsx` 和 `workbench-entry.css`，不加载主页面的 `index.css` 或 Nola 产品主题。窗口由 `src/main/workbench.ts` 注册，开发环境与正式构建均可打开。
+- 官方 Elements 源码位于 `src/renderer/components/assistant-ui/native/`；实际界面组合、原生卡片工具和渲染状态分别位于 `features/workbench/NativeAgentSurface.tsx`、`native-agent-tools.tsx` 和 `NativeAgentSettings.tsx`。旧聊天组件、旧侧栏和旧工作区组件已移除。

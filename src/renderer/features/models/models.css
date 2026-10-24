@@ -40,7 +40,7 @@
 .models-overview__heading p { margin:0; font-size:14px; color:var(--muted); }
 .models-overview__icon { display:grid; place-items:center; width:68px; height:68px; flex-shrink:0; border-radius:16px; background:var(--success-soft); color:var(--success-soft-foreground); }
 .models-overview__icon svg { width:38px; height:38px; }
-.models-overview__summaries { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.models-overview__summaries { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
 .models-current.card { --card-spacing:var(--space-2); }
 .models-current .card__header { align-items:center; }
 

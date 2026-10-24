@@ -1,4 +1,5 @@
 import { useModelOptions } from '@/model-options'
+import { featureConflictOwner } from '../../../shared/feature-activity'
 /**
  * Control bar at the bottom of the caption window.
  *
@@ -288,7 +289,10 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
       setLastIntent('start')
       setDismissedFailure(null)
       void actions.session.startSession(startConfigOf(settings, devices)).catch((error: unknown) => {
-        if (isSessionAlreadyRunningError(error)) {
+        const owner = featureConflictOwner(error)
+        if (owner) {
+          notifyError(t('errors.serviceConflict', { running: t(`gateway.${owner}`) }))
+        } else if (isSessionAlreadyRunningError(error)) {
           notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
         } else if (unsupportedRecognitionLanguageOf(error)) {
           notifyError(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))

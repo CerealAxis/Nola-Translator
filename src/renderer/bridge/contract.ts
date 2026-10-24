@@ -47,9 +47,14 @@ export type { HubCompatibility, HubInspectResult, HubModelSummary, HubSearchResu
 export type { PrewarmErrorCode, PrewarmResult } from '../../shared/contracts'
 
 /** Route id for this app's multi-window UI; `routes.tsx` holds the hash mapping. */
-export type RouteId = 'home' | 'workspace' | 'overlay' | 'video-captions' | 'records' | 'record' | 'models' | 'settings'
+export type RouteId = 'home' | 'workspace' | 'overlay' | 'video-captions' | 'model-gateway' | 'records' | 'record' | 'models' | 'settings'
 
 export interface NolaBridge {
+  gateway?: import('../../shared/model-gateway').ModelGatewayApi
+  activity?: import('../../shared/feature-activity').FeatureActivityApi
+  requestQuit?(): Promise<void>
+  confirmQuit?(): Promise<void>
+  onQuitRequested?(callback: () => void): () => void
   offline?: import('../../shared/offline').OfflineApi
   engine: {
     listComputeDevices(): Promise<ComputeSnapshot>
@@ -145,7 +150,7 @@ export interface NolaBridge {
    * button, which must not invent a start page to satisfy `shell.openExternal`.
    */
   app: {
-    openLocalCallDemo?(surface: import('../../shared/local-call-demo').LocalCallDemoSurface): Promise<void>
+    openWorkbench?(surface: import('../../shared/workbench').WorkbenchSurface): Promise<void>
     cancelLanguageModel?(id: string): Promise<void>
     agentWorkspace?(action: import('../../shared/agent-workspace').WorkspaceAction): Promise<import('../../shared/agent-workspace').AgentWorkspaceSnapshot>
     directModel?(request: import('../../shared/agent-workspace').DirectModelRequest, inspect?: boolean): Promise<import('../../shared/agent-workspace').DirectModelResult>
@@ -207,7 +212,7 @@ export interface NolaBridge {
  * Two methods have no UI caller: `overlay.hide` and `overlay.resize`.
  */
 export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
-  'app.openLocalCallDemo': 'ipc',
+  'app.openWorkbench': 'ipc',
   'app.cancelLanguageModel': 'ipc',
     'app.agentWorkspace': 'ipc',
     'app.directModel': 'ipc',

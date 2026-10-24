@@ -68,7 +68,12 @@ export type EngineChannelEvent = EngineEvent | EngineLifecycleEvent
 export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'translation' | 'torch' | 'llama' | 'crisp'
 
 export type NolaTranslatorApi = {
-  openLocalCallDemo?(surface: import('./local-call-demo').LocalCallDemoSurface): Promise<void>
+  gateway?: import('./model-gateway').ModelGatewayApi
+  activity?: import('./feature-activity').FeatureActivityApi
+  requestQuit?(): Promise<void>
+  confirmQuit?(): Promise<void>
+  onQuitRequested?(callback: () => void): () => void
+  openWorkbench?(surface: import('./workbench').WorkbenchSurface): Promise<void>
   cancelLanguageModel?(id: string): Promise<void>
   agentWorkspace?(action: import('./agent-workspace').WorkspaceAction): Promise<import('./agent-workspace').AgentWorkspaceSnapshot>
   directModel?(request: import('./agent-workspace').DirectModelRequest, inspect?: boolean): Promise<import('./agent-workspace').DirectModelResult>

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { modelGatewaySettingsSchema } from '../shared/model-gateway'
 import { customModelSchema } from '../shared/custom-models'
 import { LANGUAGE_CODES } from '../shared/languages'
 import { PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_NODES } from '../shared/pypi-mirrors'
@@ -43,6 +44,9 @@ const localModelIdSchema = z.union([
 ])
 
 export const settingsPatchSchema = z.object({
+  closeBehavior: z.enum(['tray', 'quit']).optional(),
+  synthesis: z.object({ modelId: z.string().max(512), voice: z.string().max(256) }).partial().optional(),
+  modelGateway: modelGatewaySettingsSchema.partial().optional(),
   onboardingSeen: z.boolean().optional(),
   compute: computeSettingsPatchSchema.optional(),
   theme: z.enum(['system', 'light', 'dark']).optional(),

@@ -16,6 +16,7 @@ import { CaptionStage } from '@/components/caption'
 import type { CaptionDisplayMode, CaptionLayout } from '@/components/caption'
 import { NotesPanel } from '@/components/notes'
 import { notifyError, notifySuccess, notifyWarning, describeError } from '@/components/primitives/notify'
+import { FeatureActivityNotice, requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
 import { useI18n } from '@/i18n'
 import { recordPath, useRoute } from '@/routes'
 import { NO_TRANSLATION_LANGUAGE } from '@/bridge'
@@ -245,7 +246,8 @@ export function WorkspacePage() {
       }
     }
     try {
-      await actions.session.startSession(config)
+      await requestFeatureStart(() => actions.session.startSession(config), 'interpretation')
+      if (sessionStore.getState().status !== 'running') return
       setNotes('')
       const meetingId = sessionStore.getState().meetingId
       if (meetingId) {
@@ -343,6 +345,7 @@ export function WorkspacePage() {
       aria-label={t('home.quickStart')}
       className="nola-workspace"
     >
+      <FeatureActivityNotice />
       <WorkspaceToolbar readerOnly
         modelId={pendingConfig?.recognitionModelId ?? settings?.recognition.modelId ?? 'qwen3-asr-1.7b-hf'} onModelChange={(modelId) => {
           void actions.settings.updateSettings({ recognition: { modelId } }).catch(() => undefined)

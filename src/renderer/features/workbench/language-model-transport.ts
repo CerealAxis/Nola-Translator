@@ -12,13 +12,13 @@ export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key
     const signal = init?.signal
     const app = getBridge()?.app
     if (config.kind !== 'llm') {
-      if (!app?.directModel) throw new Error(t('localCall.runtimeUnavailable'))
+      if (!app?.directModel) throw new Error(t('workbench.runtimeUnavailable'))
       const id = crypto.randomUUID()
       return createUIMessageStreamResponse({ stream: createUIMessageStream({ execute: async ({ writer }) => {
         const user = [...body.messages].reverse().find(message => message.role === 'user')
         const image = user?.parts.find(part => part.type === 'file' && part.mediaType.startsWith('image/'))
         const audio = user?.parts.find(part => part.type === 'file' && part.mediaType.startsWith('audio/'))
-        if (image && !config.images) throw new Error(t('localCall.imageUnsupported'))
+        if (image && !config.images) throw new Error(t('workbench.imageUnsupported'))
         const cancel = () => { void app.cancelLanguageModel?.(id).catch(() => undefined) }
         signal?.addEventListener('abort', cancel, { once: true })
         try {
@@ -38,9 +38,9 @@ export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key
           if (result.audio) writer.write({ type: 'file', mediaType: 'audio/wav', url: result.audio })
           writer.write({ type: 'finish', finishReason: 'stop' })
         } finally { signal?.removeEventListener('abort', cancel) }
-      }, onError: error => error instanceof Error ? error.message : t('localCall.networkError') }) })
+      }, onError: error => error instanceof Error ? error.message : t('workbench.networkError') }) })
     }
-    if (!config.model.startsWith('custom:') || !app?.streamLanguageModel || !app.onLanguageModelStream) throw new Error(t('localCall.configureFirst'))
+    if (!config.model.startsWith('custom:') || !app?.streamLanguageModel || !app.onLanguageModelStream) throw new Error(t('workbench.configureFirst'))
     signal?.throwIfAborted()
     const id = crypto.randomUUID()
     const encoder = new TextEncoder()
@@ -67,7 +67,7 @@ export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key
         signal?.addEventListener('abort', abort, { once: true })
         void app.streamLanguageModel!({ id, modelId: config.model.slice(7), body, projectId: config.projectId ?? null,
           effort: ['low', 'medium', 'high'].includes(config.effort) ? config.effort as 'low' | 'medium' | 'high' : 'auto',
-        }).catch(() => finish(new Error(t('localCall.networkError'))))
+        }).catch(() => finish(new Error(t('workbench.networkError'))))
       },
       cancel() { closed = true; unsubscribe?.(); cancel() },
     })

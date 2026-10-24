@@ -1,3 +1,4 @@
+import { FeatureActivityNotice } from './FeatureActivityNotice'
 /** Desktop shell geometry is owned here; route content owns its only padding. */
 import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
@@ -20,14 +21,15 @@ export interface AppShellProps {
 export function AppShell({ children, navigation, className = '' }: AppShellProps) {
   return (
     <div className={`nola-app-shell ${className}`}>
-      <TitleBar />
+      <TitleBar brand={false} />
+      <FeatureActivityNotice />
       <div className="nola-app-body">
         <aside className="nola-sidebar">
           <nav className="nola-sidebar-nav">
             {navigation?.map(item => <NavigationItem key={item.id} {...item} />)}
           </nav>
         </aside>
-        <main className="nola-main nola-scrollbar">{children}</main>
+        <main className="nola-main">{children}</main>
       </div>
     </div>
   )

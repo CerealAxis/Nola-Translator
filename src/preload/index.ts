@@ -79,7 +79,35 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 }
 
 const api: NolaTranslatorApi = {
-  openLocalCallDemo: surface => invoke('app:local-call-demo', surface),
+  requestQuit: () => invoke('app:request-quit'),
+  confirmQuit: () => invoke('app:confirm-quit'),
+  onQuitRequested: callback => {
+    const listener = () => callback()
+    ipcRenderer.on('app:quit-requested', listener)
+    return () => ipcRenderer.off('app:quit-requested', listener)
+  },
+  gateway: {
+    snapshot: () => invoke('model-gateway:status'),
+    start: () => invoke('model-gateway:start'),
+    stop: () => invoke('model-gateway:stop'),
+    revealKey: () => invoke('model-gateway:reveal-key'),
+    rotateKey: () => invoke('model-gateway:rotate-key'),
+    onChanged: callback => {
+      const listener = (_event: Electron.IpcRendererEvent, value: import('../shared/model-gateway').ModelGatewaySnapshot) => callback(value)
+      ipcRenderer.on('model-gateway:changed', listener)
+      return () => ipcRenderer.off('model-gateway:changed', listener)
+    },
+  },
+  activity: {
+    snapshot: () => invoke('feature-activity:snapshot'),
+    stop: () => invoke('feature-activity:stop'),
+    onChanged: callback => {
+      const listener = (_event: Electron.IpcRendererEvent, value: import('../shared/feature-activity').FeatureActivitySnapshot) => callback(value)
+      ipcRenderer.on('feature-activity:changed', listener)
+      return () => ipcRenderer.off('feature-activity:changed', listener)
+    },
+  },
+  openWorkbench: surface => invoke('workbench:open', surface),
   cancelLanguageModel: id => invoke('app:language-model:cancel', id),
     agentWorkspace: action => invoke('app:agent-workspace', action),
     directModel: (request, inspect) => invoke('app:direct-model', request, inspect),

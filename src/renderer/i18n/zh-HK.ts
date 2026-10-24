@@ -1,11 +1,13 @@
-import { localCallHk } from './local-call-ui'
+import { gatewayHk } from './gateway-ui'
+import { workbenchHk } from './workbench-ui'
 import { offlineHk } from './offline-ui'
 import type { Dictionary } from './zh-CN'
 import { onboardingHK } from './onboarding-ui'
 
 /** Complete Traditional Chinese dictionary for Hong Kong. */
 export const zhHK: Dictionary = {
-  localCall: localCallHk,
+  gateway: gatewayHk,
+  workbench: workbenchHk,
   offline: offlineHk,
   onboarding: onboardingHK,
   startup: {
@@ -515,6 +517,7 @@ export const zhHK: Dictionary = {
   "nav": {
     "home": "首頁",
     "workspace": "快速傳譯",
+    "modelGateway": "模型閘道",
     "records": "傳譯紀錄",
     "models": "模型管理",
     "settings": "設定"

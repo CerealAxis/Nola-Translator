@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 
-export default defineConfig(({ command }) => ({
+export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()]
   },
@@ -21,7 +21,6 @@ export default defineConfig(({ command }) => ({
     }
   },
   renderer: {
-    define: { __NOLA_LOCAL_CALL_DEMO__: JSON.stringify(command === 'serve') },
     resolve: {
       alias: {
         // `@renderer` 是主仓原有的；`@` 是新 UI 带来的。
@@ -32,10 +31,8 @@ export default defineConfig(({ command }) => ({
       }
     },
     // Base UI components use the existing Tailwind pipeline and product theme cascade.
-    //
-    // 也不要给 renderer 加 `build.rollupOptions.input`：主窗与浮窗**共享同一份
-    // index.html**，靠 `?overlay=1` 在 main.tsx 里分流（见 src/renderer/main.tsx）。
-    // 加多入口会直接打破这条约定。
+    // Caption windows share index.html; the standalone agent workbench has its own document.
+    build: { rollupOptions: { input: { main: resolve('src/renderer/index.html'), workbench: resolve('src/renderer/workbench.html') } } },
     plugins: [react(), tailwindcss()]
   }
-}))
+})

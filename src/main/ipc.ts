@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 
 import { BrowserWindow, ipcMain, net, screen } from 'electron'
 
-import type { AudioDevice, EngineEvent, EngineProcessState, PrewarmConfig, SessionConfig } from '../shared/contracts'
+import type { AudioDevice, EngineEvent, EngineProcessState, PrewarmConfig, PrewarmResult, SessionConfig } from '../shared/contracts'
 import { DEFAULT_SETTINGS, NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider } from '../shared/settings'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
@@ -77,13 +77,23 @@ export function registerEngineIpc(
   onStartingChanged: (starting: boolean) => void = () => {},
   whenRuntimeReady: () => Promise<void> = async () => {},
   onSessionStopped: () => void = () => {},
-  sharedController?: SessionController
+  sharedController?: SessionController,
+  prepareCaptionService?: (config: PrewarmConfig) => Promise<PrewarmResult>
 ): () => void {
   const controller = sharedController ?? new SessionController({ engine, meetings, getSettings, getCredential: getTranslationCredential, prepare: prepareEnvironment, whenReady: whenRuntimeReady, startingChanged: onStartingChanged, showOverlay: () => getOverlayWindow()?.showInactive(), hideOverlay: () => getOverlayWindow()?.hide() })
   let closingOverlay: Promise<void> | null = null
   const ensureReady = () => controller.ensureReady()
   const stopActiveSession = (id: string) => controller.stop(id)
   const releaseSessionOnEngineLoss = () => controller.releaseOnLoss()
+  /**
+   * The engine never confirmed the stop, so the session is over from the app's point of view.
+   * The main process tracks that separately and has to be told, or it keeps refusing the next
+   * start.
+   */
+  function notifySessionStopped(sessionId: string): void {
+    onSessionStopped()
+    forwardEvent({ protocolVersion: 1, type: 'sessionStopped', requestId: `close-${randomUUID()}`, sessionId })
+  }
   let listingDevices: Promise<AudioDevice[]> | null = null
   loggedHandle(IPC_CHANNELS.listDevices, async () => {
     if (listingDevices) return listingDevices
@@ -292,7 +302,8 @@ export function registerEngineIpc(
   // What "enable captions" means: the models are resident, so the browser side starts a session
   // against weights that are already in memory.
   loggedHandle(IPC_CHANNELS.prewarmModels, async () => {
-    return controller.prewarm(prewarmConfigFrom(getSettings()))
+    const config = prewarmConfigFrom(getSettings())
+    return prepareCaptionService ? prepareCaptionService(config) : controller.prewarm(config)
   })
 
   loggedHandle(IPC_CHANNELS.showOverlay, () => {
@@ -311,19 +322,20 @@ export function registerEngineIpc(
     const request = (async () => {
       const sessionId = controller.browserActive ? null : controller.activeSessionId
       if (sessionId) {
-        try {
-          // A dead engine cannot own a live session; don't restart it just to stop a stale id.
-          if (engine.currentState !== 'ready') throw new Error('Engine is unavailable during overlay close')
-          await stopActiveSession(sessionId)
-        } catch (error) {
-          console.error('[overlay] session stop failed; stopping engine process', error)
-          // Release audio capture even if teardown or transport failed, then notify both windows.
+        // A dead engine cannot own a live session; don't restart it just to stop a stale id.
+        if (engine.currentState !== 'ready') {
+          console.error('[overlay] engine is unavailable during overlay close; stopping engine process')
           await engine.stop()
-          // The engine never confirmed the stop, so the session is over from the app's point of
-          // view. The main process tracks that separately and has to be told, or it keeps
-          // refusing the next start.
-          onSessionStopped()
-          forwardEvent({ protocolVersion: 1, type: 'sessionStopped', requestId: `close-${randomUUID()}`, sessionId })
+          notifySessionStopped(sessionId)
+        } else {
+          try {
+            await stopActiveSession(sessionId)
+          } catch (error) {
+            // The controller stops the engine process itself when the teardown request fails,
+            // so the failure already released the session.
+            console.error('[overlay] session stop failed; the engine process was stopped with it', error)
+            notifySessionStopped(sessionId)
+          }
         }
       }
       getOverlayWindow()?.hide()

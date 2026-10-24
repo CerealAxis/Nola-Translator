@@ -5,6 +5,7 @@ import { sessionConfigSchema } from '../shared/schemas'
 import { NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider, type RecognitionProvider } from '../shared/settings'
 import { supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'
 import { customCredentialSlot } from '../shared/custom-models'
+import type { FeatureActivity, FeatureLease } from './feature-activity'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
 
@@ -20,6 +21,7 @@ const RECOGNITION_CREDENTIAL_SLOTS: Partial<Record<RecognitionProvider, Credenti
 export type SessionOwner = 'desktop' | 'browser'
 export interface SessionControllerOptions {
   engine: EngineProcess
+  activity?: FeatureActivity
   meetings: MeetingStore | null
   getSettings(): AppSettings
   getCredential(provider: CredentialProvider): Promise<string>
@@ -43,8 +45,52 @@ export class SessionController {
   private operation = 0
   private cancelling: Promise<void> | null = null
   private browserPreparing = false
+  private featureLease: FeatureLease | null = null
+  private readonly inFlight = new Set<Promise<unknown>>()
   constructor(private readonly options: SessionControllerOptions) {}
 
+  testAudio(audioSource: AudioTestSource): Promise<AudioTestResult> {
+    return this.withActivity('interpretation', false, () => this.testAudioInternal(audioSource))
+  }
+  prewarm(config: PrewarmConfig): Promise<PrewarmResult> {
+    return this.withActivity('browser-captions', false, () => this.prewarmInternal(config))
+  }
+  start(raw: unknown, owner: SessionOwner): Promise<{ sessionId: string; meetingId: string | null }> {
+    return this.withActivity(owner === 'desktop' ? 'interpretation' : 'browser-captions', true, () => this.startInternal(raw, owner))
+  }
+  private withActivity<T>(owner: 'interpretation' | 'browser-captions', retain: boolean, run: () => Promise<T>): Promise<T> {
+    const activity = this.options.activity
+    activity?.assertAvailable(owner)
+    const lease = activity && !activity.snapshot().owner ? activity.acquire(owner, () => this.stopCurrent()) : null
+    if (lease) this.featureLease = lease
+    const task = run().then(result => { if (retain) lease?.running(); return result }).finally(() => {
+      this.inFlight.delete(task)
+      if (!retain || !this.activeSessionId) {
+        lease?.release()
+        if (this.featureLease === lease) this.featureLease = null
+      }
+    })
+    this.inFlight.add(task)
+    return task
+  }
+  async stopCurrent(): Promise<void> {
+    const pending = [...this.inFlight]
+    if (this.starting) {
+      this.operation++
+      await this.options.engine.stop()
+      await Promise.allSettled(pending)
+      this.starting = false
+      this.browserPreparing = false
+      this.options.startingChanged(false)
+    }
+    if (this.activeSessionId) {
+      try { await this.stop(this.activeSessionId) }
+      catch (error) { if (this.options.engine.currentState !== 'stopped') throw error }
+    }
+    this.options.hideOverlay()
+    this.featureLease?.release()
+    this.featureLease = null
+  }
   get browserActive(): boolean { return this.owner === 'browser' }
   get browserServiceStarting(): boolean { return this.browserPreparing || (this.starting && this.browserActive) }
   get busy(): boolean { return this.starting || this.activeSessionId !== null || this.stopping !== null || this.cancelling !== null }
@@ -57,7 +103,7 @@ export class SessionController {
     if ('sessionId' in event) return this.browserSessions.has(event.sessionId) || (this.starting && this.browserActive)
     return this.browserActive && (event.type === 'status' || event.type === 'error')
   }
-  async testAudio(audioSource: AudioTestSource): Promise<AudioTestResult> {
+  private async testAudioInternal(audioSource: AudioTestSource): Promise<AudioTestResult> {
     if (this.busy) throw new Error('sessionAlreadyRunning')
     this.starting = true
     this.options.startingChanged(true)
@@ -72,7 +118,7 @@ export class SessionController {
       this.options.startingChanged(false)
     }
   }
-  async prewarm(config: PrewarmConfig): Promise<PrewarmResult> {
+  private async prewarmInternal(config: PrewarmConfig): Promise<PrewarmResult> {
     if (this.busy || this.options.isOverlayVisible?.()) return { state: 'failed', code: 'sessionAlreadyRunning' }
     // Model preparation owns the same reservation as starting capture, so neither a second
     // client nor component installation can replace an environment while weights load.
@@ -81,8 +127,11 @@ export class SessionController {
     this.options.startingChanged(true)
     try {
       const session: SessionConfig = { ...config, audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime' }
-      await this.options.prepare(session)
+      const operation = this.operation
+      await this.options.prepare(session, () => operation !== this.operation)
+      if (operation !== this.operation) throw new Error('sessionStartCancelled')
       await this.ensureReady()
+      if (operation !== this.operation) throw new Error('sessionStartCancelled')
       return await this.options.engine.prewarmModels({ ...config, compute: session.compute ?? config.compute,
         max_segment_ms: this.options.getSettings().recognition.max_segment_ms ?? 10000,
         silence_end_ms: this.options.getSettings().recognition.silence_end_ms ?? 800,
@@ -93,7 +142,7 @@ export class SessionController {
       this.options.startingChanged(false)
     }
   }
-  async start(raw: unknown, owner: SessionOwner): Promise<{ sessionId: string; meetingId: string | null }> {
+  private async startInternal(raw: unknown, owner: SessionOwner): Promise<{ sessionId: string; meetingId: string | null }> {
     logDiagnostic('session.start.requested', { owner })
     if (owner === 'desktop' && !this.canShowOverlay()) throw new Error('sessionAlreadyRunning')
     if (this.busy) throw new Error('sessionAlreadyRunning')
@@ -200,16 +249,19 @@ export class SessionController {
     if (this.stopping?.id === id) return this.stopping.task
     if (id !== this.activeSessionId) return Promise.resolve()
     const browser = this.browserSessions.has(id)
+    this.featureLease?.stopping()
     const task = (async () => {
       try {
         await this.ensureReady()
         await this.options.engine.request({ protocolVersion: 1, type: 'stopSession', requestId: `stop-${randomUUID()}`, sessionId: id }, 'sessionStopped', 60_000)
       } catch (error) {
-        if (browser) await this.options.engine.stop()
+        await this.options.engine.stop()
         throw error
       } finally {
         if (this.activeSessionId === id) this.activeSessionId = null
         this.owner = null
+        this.featureLease?.release()
+        this.featureLease = null
         if (!browser) await this.options.meetings?.finish(id).catch(error => console.error('meeting finalize failed', error))
       }
     })()
@@ -226,7 +278,10 @@ export class SessionController {
     if (event.type === 'sessionStarted' && this.browserActive) this.rememberBrowser(event.sessionId)
     if (event.type === 'sessionStopped') {
       if (this.activeSessionId === event.sessionId) this.activeSessionId = null
-      if (!this.starting) this.owner = null
+      if (!this.starting) {
+        this.owner = null
+        if (!this.stopping) { this.featureLease?.release(); this.featureLease = null }
+      }
     }
   }
   releaseOnLoss(): void {
@@ -236,6 +291,8 @@ export class SessionController {
     this.activeSessionId = null
     this.owner = null
     if (id && !browser) void this.options.meetings?.finish(id).catch(error => console.error('meeting finalize failed', error))
+    this.featureLease?.release()
+    this.featureLease = null
     this.options.hideOverlay()
   }
   private rememberBrowser(id: string): void {

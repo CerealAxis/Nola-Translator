@@ -1,4 +1,6 @@
-import { Home, Mic, Clock, SlidersHorizontal, Settings, Video, MessagesSquare } from 'lucide-react'
+import { ModelGatewayPage } from './features/model-gateway/ModelGatewayPage'
+import { requestFeatureStart } from './components/primitives/FeatureActivityNotice'
+import { Home, Mic, Clock, SlidersHorizontal, Settings, Video, MessagesSquare, Network } from 'lucide-react'
 import { getBridge } from './store'
 import { notifyError } from './components/primitives/notify'
 import { useI18n } from './i18n'
@@ -18,6 +20,7 @@ export const APPLICATION_PAGES = {
   workspace: () => <OverlayPage />,
   overlay: () => <OverlayPage />,
   'video-captions': () => <VideoCaptionsPage />,
+  'model-gateway': () => <ModelGatewayPage />,
   records: () => <RecordsPage />,
   record: () => <RecordDetailPage />,
   models: () => <ModelsPage />,
@@ -31,6 +34,7 @@ export function useApplicationNavigation(): AppShellNavigationItem[] {
     ['home', 'nav.home', Home, '#/'],
     ['workspace', 'nav.workspace', Mic, '#/workspace'],
     ['video-captions', 'videoCaptions.title', Video, '#/video-captions'],
+    ['model-gateway', 'nav.modelGateway', Network, '#/model-gateway'],
     ['records', 'nav.records', Clock, '#/records'],
     ['models', 'nav.models', SlidersHorizontal, '#/models'],
     ['settings', 'nav.settings', Settings, '#/settings/appearance'],
@@ -40,11 +44,9 @@ export function useApplicationNavigation(): AppShellNavigationItem[] {
     active: route === id || id === 'workspace' && route === 'overlay' || id === 'records' && route === 'record',
     onPress: () => navigate(path),
   }))
-  if (typeof __NOLA_LOCAL_CALL_DEMO__ !== 'undefined' && __NOLA_LOCAL_CALL_DEMO__) {
-    navigation.splice(3, 0, {
-      id: 'local-call-demo', label: t('localCall.title'), icon: MessagesSquare, path: '#local-call-demo',
-      onPress: () => { void getBridge()?.app.openLocalCallDemo?.('chat').catch(error => notifyError(t('localCall.actionFailed'), { cause: error })) },
-    })
-  }
+  navigation.splice(1, 0, {
+      id: 'workbench', label: t('workbench.title'), icon: MessagesSquare, path: '#workbench',
+      onPress: () => { void requestFeatureStart(async () => getBridge()?.app.openWorkbench?.('chat'), 'workbench').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) },
+  })
   return navigation
 }

@@ -82,6 +82,8 @@ export function pathOf(route: RouteId, options?: { tab?: SettingsTab; id?: strin
       return '#/overlay'
     case 'video-captions':
       return '#/video-captions'
+    case 'model-gateway':
+      return '#/model-gateway'
     case 'records':
       return '#/records'
     case 'record':
@@ -109,6 +111,7 @@ const PARENT_ROUTES: Record<RouteId, RouteId | null> = {
   workspace: 'home',
   overlay: 'home',
   'video-captions': 'home',
+  'model-gateway': 'home',
   records: 'home',
   record: 'records',
   models: 'home',
@@ -140,6 +143,8 @@ export function parseRoute(hash: string): Route {
       return { route: 'overlay', path: '#/overlay' }
     case 'video-captions':
       return { route: 'video-captions', path: '#/video-captions' }
+    case 'model-gateway':
+      return { route: 'model-gateway', path: '#/model-gateway' }
     case 'records': {
       const id = segments[1]
       if (id === undefined) return { route: 'records', path: '#/records' }
@@ -233,11 +238,12 @@ export function useRoute(): UseRoute {
 // -- 渲染 ---------------------------------------------------------------------
 
 /** 路由 id 到页面标题。文案是页面自己的名字，不是"占位"两个字。 */
-const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay' | 'videoCaptions.title'> = {
+const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.modelGateway' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay' | 'videoCaptions.title'> = {
   home: 'nav.home',
   workspace: 'nav.workspace',
   overlay: 'shellUi.overlay',
   'video-captions': 'videoCaptions.title',
+  'model-gateway': 'nav.modelGateway',
   records: 'nav.records',
   record: 'nav.records',
   models: 'nav.models',

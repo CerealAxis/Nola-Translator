@@ -1,11 +1,13 @@
-import { localCallKo, localCallEntries } from './local-call-ui'
+import { gatewayKo, gatewayEntries } from './gateway-ui'
+import { workbenchKo, workbenchEntries } from './workbench-ui'
 import { offlineKo, offlineEntries } from './offline-ui'
 import { buildLocaleDictionary } from './locale-builder'
 import { onboardingEntries, onboardingKo } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const koMessages: Record<DictionaryKey, string> = {
-  ...localCallEntries(localCallKo),
+  ...gatewayEntries(gatewayKo),
+  ...workbenchEntries(workbenchKo),
   "settings.restoreVadDefaults": "기본값 복원",
   "settings.vadGroup": "음성 분할",
   "settings.maxSegmentMs": "최대 구간 길이 (밀리초)",
@@ -496,6 +498,7 @@ const koMessages: Record<DictionaryKey, string> = {
   'appUpdate.later': '나중에 알림',
   'appUpdate.openFailed': 'GitHub 릴리스 페이지를 열 수 없습니다. 네트워크를 확인한 후 다시 시도하세요.',
   'nav.home': '홈',
+  'nav.modelGateway': '모델 게이트웨이',
   'nav.workspace': '실시간 통역',
   'nav.records': '통역 기록',
   'nav.models': '모델 관리',

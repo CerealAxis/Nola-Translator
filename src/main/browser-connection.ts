@@ -8,8 +8,9 @@ import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { FIREFOX_EXTENSION_ID, BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, BROWSER_HOST_NAME, browserRequestSchema, type BrowserCaptionConfig, type BrowserConnectionStatus, type BrowserRequest, type BrowserResponse, type BrowserKind, type BrowserWireErrorCode } from '../shared/browser'
+import type { FeatureActivity, FeatureLease } from './feature-activity'
 import type { BrowserIntegrations } from './browser-integrations'
-import type { AudioDevice, SessionConfig, EngineEvent, EngineProcessState } from '../shared/contracts'
+import type { AudioDevice, SessionConfig, EngineEvent, EngineProcessState, PrewarmConfig, PrewarmResult } from '../shared/contracts'
 import { NO_TRANSLATION_LANGUAGE, type AppSettings } from '../shared/settings'
 import type { EngineProcess } from './engine-process'
 import type { SessionController } from './session-controller'
@@ -53,6 +54,7 @@ const PUBLIC_ERRORS = new Set<BrowserWireErrorCode>([
 
 function publicErrorCode(error: unknown): BrowserWireErrorCode {
   const message = error instanceof Error ? error.message : ''
+  if (message.startsWith('FEATURE_CONFLICT:')) return 'browserSessionAlreadyRunning'
   const legacy = LEGACY_BROWSER_ERROR_CODES[message]
   if (legacy) return legacy
   if (message.startsWith('RUNTIME_TORCH:')) return 'torchUnavailable'
@@ -65,6 +67,7 @@ interface Client { socket: Socket; browser: BrowserKind; extensionVersion?: stri
 interface AudioWindow { count: number; lastBytes: number; lastAudioMs: number; loggedAtMs: number }
 export interface BrowserConnectionOptions {
   engine: EngineProcess
+  activity?: FeatureActivity
   sessions: SessionController
   getSettings(): AppSettings
   setEnabled(enabled: boolean): Promise<void>
@@ -117,7 +120,7 @@ export class BrowserConnection {
    */
   private captionServiceActive = false
   private captionServiceClosing: Promise<void> | null = null
-  get captionServiceReserved(): boolean { return this.captionServiceActive || this.captionServiceClosing !== null }
+  get captionServiceReserved(): boolean { return this.captionServiceActive || this.captionPreparation !== null || this.captionServiceClosing !== null }
   private disposing = false
   private operation = 0
   private mutation: Promise<void> = Promise.resolve()
@@ -138,23 +141,8 @@ export class BrowserConnection {
     loggedHandle(CAPTION_SERVICE_CHANNEL, async (_event, active: unknown) => {
       if (typeof active !== 'boolean') throw new Error('invalidConfiguration')
       if (active && (options.sessions.busy || this.captionServiceClosing || options.isOverlayVisible?.())) throw new Error('sessionAlreadyRunning')
-      this.setCaptionServiceActive(active)
-      if (!active) {
-        this.captionServiceClosing ??= (async () => {
-          await options.sessions.cancelBrowserStart()
-          const sessionId = options.sessions.browserActive ? options.sessions.activeSessionId : null
-          if (sessionId) await options.sessions.stop(sessionId)
-          // Keep the service reserved until stopping and releasing weights have both finished.
-          if (!options.sessions.busy && options.engine.currentState === 'ready') {
-            await options.engine.request({ protocolVersion: 1, type: 'releaseModels', requestId: `release-${randomUUID()}` }, 'modelsReleased', 60_000)
-          }
-        })()
-        const closing = this.captionServiceClosing
-        try { await closing }
-        finally {
-          if (this.captionServiceClosing === closing) this.captionServiceClosing = null
-        }
-      }
+      if (active) this.setCaptionServiceActive(true)
+      else await this.stopCaptionService()
       return this.status()
     })
     loggedHandle(CHANNEL, async (_event, action: unknown, enabled?: unknown, browser?: unknown) => {
@@ -212,7 +200,66 @@ export class BrowserConnection {
    * Opens or closes the gate every `start` is held to. In-memory and per app run, so the
    * service starts closed however the last run left it.
    */
-  setCaptionServiceActive(active: boolean): void { this.captionServiceActive = active }
+  private featureLease: FeatureLease | null = null
+  private captionPreparation: Promise<PrewarmResult> | null = null
+  private captionGeneration = 0
+  prepareCaptionService(config: PrewarmConfig): Promise<PrewarmResult> {
+    if (this.captionPreparation) return this.captionPreparation
+    if (this.captionServiceActive) return Promise.resolve({ state: 'ready' })
+    if (this.disposing || this.captionServiceClosing || this.options.sessions.busy || this.options.isOverlayVisible?.()) return Promise.resolve({ state: 'failed', code: 'sessionAlreadyRunning' })
+    this.options.activity?.assertAvailable('browser-captions')
+    if (this.options.activity?.snapshot().owner) throw new Error('FEATURE_CONFLICT:browser-captions')
+    this.featureLease = this.options.activity?.acquire('browser-captions', () => this.stopCaptionService()) ?? null
+    const generation = this.captionGeneration
+    const task = (async (): Promise<PrewarmResult> => {
+      try {
+        const result = await this.options.sessions.prewarm(config)
+        if (result.state === 'ready' && generation === this.captionGeneration && !this.disposing && !this.captionServiceClosing) {
+          this.setCaptionServiceActive(true)
+          return result
+        }
+        await this.stopCaptionService()
+        return result.state === 'ready' ? { state: 'failed', code: 'resourceBusy' } : result
+      } catch (error) {
+        await this.stopCaptionService()
+        throw error
+      }
+    })().finally(() => { if (this.captionPreparation === task) this.captionPreparation = null })
+    this.captionPreparation = task
+    return task
+  }
+  setCaptionServiceActive(active: boolean): void {
+    if (active && !this.captionServiceActive) {
+      this.options.activity?.assertAvailable('browser-captions')
+      if (this.options.activity?.snapshot().owner && !this.featureLease) throw new Error('FEATURE_CONFLICT:browser-captions')
+      if (!this.options.activity?.snapshot().owner) this.featureLease = this.options.activity?.acquire('browser-captions', () => this.stopCaptionService()) ?? null
+      this.featureLease?.running()
+    }
+    this.captionServiceActive = active
+    if (!active && !this.captionServiceClosing) { this.featureLease?.release(); this.featureLease = null }
+  }
+  async stopCaptionService(): Promise<void> {
+    if (this.captionServiceClosing) return this.captionServiceClosing
+    this.captionGeneration++
+    this.captionServiceActive = false
+    this.featureLease?.stopping()
+    const closing = (async () => {
+      try {
+        if (this.options.sessions.browserActive || this.options.sessions.browserServiceStarting) await this.options.sessions.stopCurrent()
+        if (!this.options.sessions.busy && this.options.engine.currentState === 'ready') {
+          await this.options.engine.request({ protocolVersion: 1, type: 'releaseModels', requestId: `release-${randomUUID()}` }, 'modelsReleased', 60_000)
+        }
+      } catch (error) {
+        console.error('browser caption teardown failed; stopping engine', error)
+        await this.options.engine.stop()
+      } finally {
+        this.featureLease?.release()
+        this.featureLease = null
+      }
+    })()
+    this.captionServiceClosing = closing
+    try { await closing } finally { if (this.captionServiceClosing === closing) this.captionServiceClosing = null }
+  }
   status(): BrowserConnectionStatus {
     const connected = [...this.clients].filter(c => c.authenticated && this.options.integrations?.allows(c.browser) !== false)
     // One session at a time by construction, so the first owner is the session; deriving both
@@ -292,6 +339,7 @@ export class BrowserConnection {
   }
   async dispose(): Promise<void> {
     this.disposing = true
+    await this.stopCaptionService().catch(() => undefined)
     this.options.engine.off('event', this.onEvent)
     this.options.engine.off('state', this.onState)
     ipcMain.removeHandler(CHANNEL)
@@ -534,6 +582,7 @@ export class BrowserConnection {
     }
   }
   private readonly onState = (state: string): void => {
+    if (state === 'failed' || state === 'recovering') this.setCaptionServiceActive(false)
     if (['failed', 'recovering', 'stopped'].includes(state)) for (const client of this.clients) if (client.sessionId) client.socket.destroy()
   }
 }

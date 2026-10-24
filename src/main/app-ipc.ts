@@ -100,6 +100,7 @@ async function diagnostics(engine: EngineProcess, settings: AppSettings): Promis
 export function registerAppIpc(options: {
   settings: SettingsStore
   initialSettings: AppSettings
+  settingsChanged?: () => Promise<void>
   meetings: MeetingStore
   /** Base of the meeting audio protocol, including the trailing `://` (e.g. `nola-audio://`). Concatenate the path directly. */
   audioProtocol: string
@@ -287,6 +288,7 @@ export function registerAppIpc(options: {
     applyOverlay(patch.overlay?.mode !== undefined)
     applyTheme()
     broadcastSettings()
+    await options.settingsChanged?.()
     return current
   })
   loggedHandle(channels.listMeetings, () => options.meetings.list())

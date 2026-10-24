@@ -16,6 +16,7 @@ import { swappedLanguagesOf, targetLanguagePatch } from '@/session-config'
 import { translationLanguages } from '../../../shared/model-capabilities'
 import type { BrowserConnectionStatus } from '../../../shared/browser'
 import { PageHeader } from '@/components/primitives'
+import { requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { notifyError, notifyWarning } from '@/components/primitives/notify'
@@ -335,7 +336,7 @@ export function VideoCaptionsPage() {
       </Card>
       <div className="nola-video-service">
         <Button variant={gateActive ? 'danger' : 'default'} disabled={captionServiceBusy || prewarming}
-          onClick={() => void (gateActive ? close() : open())}>
+          onClick={() => void (gateActive ? close() : requestFeatureStart(open, 'browser-captions')).catch(error => notifyError(t('videoCaptions.serviceFailed'), { cause: error }))}>
           {captionServiceBusy ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
           {prewarming ? t('videoCaptions.serviceLoading') : gateActive ? t('videoCaptions.disableService') : t('videoCaptions.enableService')}
         </Button>

@@ -15,10 +15,9 @@ if (!process.versions.electron) {
   const { default: tailwind } = await import('@tailwindcss/vite')
   if (!process.argv.includes('--skip-build')) await build({ configFile: false, root: resolve('src/renderer'), base: './', plugins: [react(), tailwind()],
     resolve: { alias: { '@': resolve('src/renderer'), '@renderer': resolve('src/renderer') } },
-    define: { __NOLA_LOCAL_CALL_DEMO__: 'true' },
-    build: { rollupOptions: { input: resolve('src/renderer/native-agent.html') }, outDir: resolve(output, 'renderer'), emptyOutDir: true, minify: false, chunkSizeWarningLimit: 5000 } })
+    build: { rollupOptions: { input: resolve('src/renderer/workbench.html') }, outDir: resolve(output, 'renderer'), emptyOutDir: true, minify: false, chunkSizeWarningLimit: 5000 } })
   const { build: bundle } = await import('esbuild')
-  await bundle({ entryPoints: ['src/main/local-call-demo.ts'], bundle: true, packages: 'external', platform: 'node', format: 'esm', external: ['electron'], outfile: resolve(output, 'window.mjs') })
+  await bundle({ entryPoints: ['src/main/workbench.ts'], bundle: true, packages: 'external', platform: 'node', format: 'esm', external: ['electron'], outfile: resolve(output, 'window.mjs') })
   const { default: electron } = await import('electron')
   const childEnv = { ...process.env }; delete childEnv.ELECTRON_RUN_AS_NODE
   const child = spawn(electron, [self, ...process.argv.slice(2)], { stdio: 'inherit', env: childEnv })
@@ -70,7 +69,7 @@ if (!process.versions.electron) {
       openMainPage:path=>ipcRenderer.invoke('fixture:main-page',path),
       isMainWindowMaximized:async()=>false,onMainWindowMaximizedChanged:()=>()=>{},
       minimizeMainWindow:async()=>{},toggleMainWindowMaximize:async()=>false,closeMainWindow:async()=>{},
-      openLocalCallDemo:surface=>ipcRenderer.invoke('app:local-call-demo',surface)
+      openWorkbench:surface=>ipcRenderer.invoke('workbench:open',surface)
     });`)
     const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.wav': 'audio/wav', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.png': 'image/png' }
     const server = createServer(async (req, res) => {
@@ -126,22 +125,24 @@ if (!process.versions.electron) {
       settings.translation.customModels[0].endpoint = origin + '/anthropic'
       settings.translation.customModels[0].apiFormat = 'anthropic'
     }
-    process.env.ELECTRON_RENDERER_URL = origin
+    if (process.argv.includes('--production')) delete process.env.ELECTRON_RENDERER_URL
+    else process.env.ELECTRON_RENDERER_URL = origin
     const fixtureProject = { id: 'c29b359b-c948-40b2-99ed-6143e9243fd4', name: 'Fixture project', path: 'C:/fixture' }
     const workspaceSnapshot = { projects: [fixtureProject], selectedProject: process.argv.includes('--smoke') ? fixtureProject.id : null, skills: [], subagents: [], activity: [], sandbox: { available: false, backend: 'fixture', reason: 'fixture isolation disabled' } }
     const workspace = { project: async () => workspaceSnapshot.selectedProject ? fixtureProject : undefined, skills: async () => [], definitions: async () => workspaceSnapshot.subagents, canUseTerminal: async () => !!workspaceSnapshot.selectedProject,
       terminal: async () => { terminalExecutions++; return JSON.stringify({ exitCode: 0, output: 'Native approved terminal output' }) },
       action: async action => { if (action.action === 'subagent') workspaceSnapshot.subagents = [...workspaceSnapshot.subagents.filter(item => item.id !== action.agent.id), action.agent]; if (action.action === 'selectProject') workspaceSnapshot.selectedProject = action.id; return workspaceSnapshot } }
-    const { registerLocalCallDemo } = await import(pathToFileURL(resolve(output, 'window.mjs')).href)
-    registerLocalCallDemo(() => settings.theme, resolve('out/main'), options => {
+    const { registerWorkbench } = await import(pathToFileURL(resolve(output, 'window.mjs')).href)
+    registerWorkbench(() => settings.theme, resolve('out/main'), options => {
       const win = new BrowserWindow({ ...options, show: false, webPreferences: { ...options.webPreferences, preload, offscreen: true, backgroundThrottling: false } })
       win.webContents.on('console-message', event => { if (event.level === 'error') errors.push(event.message) })
       win.webContents.on('render-process-gone', (_, details) => errors.push(JSON.stringify(details)))
       return win
     }, { getSettings: () => settings, getCredential: async () => 'fixture-secret', workspace })
     const host = new BrowserWindow({ show: false, webPreferences: { preload, offscreen: true, backgroundThrottling: false } })
-    await host.loadURL(origin + '/host')
-    await host.webContents.executeJavaScript(`window.nolaTranslator.openLocalCallDemo('chat')`)
+    if (process.argv.includes('--production')) await host.loadFile(resolve('out/renderer/index.html'))
+    else await host.loadURL(origin + '/host')
+    await host.webContents.executeJavaScript(`window.nolaTranslator.openWorkbench('chat')`)
     const win = BrowserWindow.getAllWindows().find(item => item !== host)
     const evaluate = code => win.webContents.executeJavaScript(code, true).catch(error => { console.error('Evaluation failed:', code, errors); throw error })
     const waitFor = async code => {
@@ -267,7 +268,7 @@ if (!process.versions.electron) {
     assert.equal(await evaluate(`document.querySelectorAll('[data-slot="aui_thread-list-item"]').length`), 1)
     await input('[data-slot="aui_thread-list-search"] input', '')
     await click('[data-slot="aui_thread-list-item-trigger"]')
-    await host.webContents.executeJavaScript(`window.nolaTranslator.openLocalCallDemo('chat')`)
+    await host.webContents.executeJavaScript(`window.nolaTranslator.openWorkbench('chat')`)
     assert.equal(BrowserWindow.getAllWindows().length, 2)
     await evaluate(`window.nolaTranslator.updateSettings({theme:'dark',uiLanguage:'en'})`)
     await pause(400)
