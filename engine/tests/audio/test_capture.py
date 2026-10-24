@@ -146,7 +146,7 @@ def _device() -> AudioDeviceRecord:
 
 
 @pytest.mark.asyncio
-async def test_loopback_remaps_device_and_recovers_invalid_multichannel_format(monkeypatch):
+async def test_loopback_opens_with_the_advertised_channel_count(monkeypatch):
     import pyaudiowpatch as pyaudio
 
     device = replace(_device(), channels=8,
@@ -158,7 +158,7 @@ async def test_loopback_remaps_device_and_recovers_invalid_multichannel_format(m
 
     def compatible_open(**options):
         attempts.append(options)
-        if options["input_device_index"] != 41 or options["channels"] != 2 or options["format"] != pyaudio.paInt16:
+        if options["input_device_index"] != 41 or options["channels"] != 8 or options["format"] != pyaudio.paInt16:
             raise OSError(-9996, "Invalid device")
         return original_open(**options)
 
@@ -176,7 +176,7 @@ async def test_loopback_remaps_device_and_recovers_invalid_multichannel_format(m
         assert frame.samples.shape == (320,)
         assert np.mean(frame.samples) == pytest.approx(0.125, abs=0.001)
         assert all(attempt["input_device_index"] == 41 for attempt in attempts)
-        assert len(attempts) <= 4
+        assert [(attempt["channels"], attempt["format"]) for attempt in attempts] == [(8, pyaudio.paInt16)]
     finally:
         capture.stop()
     assert backend.terminated

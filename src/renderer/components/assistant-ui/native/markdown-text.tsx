@@ -59,7 +59,7 @@ const MarkdownTextImpl: FC<MarkdownTextProps> = ({
       className="aui-md"
       components={markdownComponents}
       componentsByLanguage={stableComponentsByLanguage}
-      defer
+      defer={false}
     />
   );
 };

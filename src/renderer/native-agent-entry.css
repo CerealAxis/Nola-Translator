@@ -4,6 +4,9 @@
 @source './features/local-call';
 @source './native-agent-entry.tsx';
 @source './components/ui/toast.tsx';
+@source './components/ui/popover.tsx';
+@source './components/ui/breadcrumb.tsx';
+@source './components/ui/slider.tsx';
 @import 'tw-shimmer';
 @import './theme/cjk-fonts.css';
 @import './features/local-call/native-agent.css';

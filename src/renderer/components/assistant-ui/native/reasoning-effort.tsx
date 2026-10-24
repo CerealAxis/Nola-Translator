@@ -2,36 +2,33 @@
 
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
-import { field, mono } from "./surfaces";
-import { announced, pct } from "../utils/range";
-
-const fmt = (n: number) => n.toLocaleString("en-US");
+import { field } from "./surfaces";
+import { SliderControl, SliderIndicator, SliderRoot, SliderThumb, SliderTrack } from "@/components/ui/slider";
 
 export interface EffortLevel {
   key: string;
   label: string;
-  budget: number;
 }
 
 export function ReasoningEffort({
   levels,
   selectedKey,
-  spent,
+  title,
   onSelect,
+  variant = "segments",
   className,
   ...props
 }: Omit<
   ComponentProps<"div">,
-  "children" | "levels" | "selectedKey" | "spent" | "onSelect"
+  "children" | "levels" | "selectedKey" | "onSelect" | "variant" | "title"
 > & {
   levels: readonly EffortLevel[];
   selectedKey: string;
-  spent: number;
   onSelect?: (key: string) => void;
+  variant?: "segments" | "slider";
+  title: string;
 }) {
-  const selected = levels.find((level) => level.key === selectedKey);
-  const budget = selected?.budget ?? 0;
-  const used = pct(spent, budget);
+  const selectedIndex = Math.max(0, levels.findIndex((level) => level.key === selectedKey));
 
   return (
     <div
@@ -40,14 +37,24 @@ export function ReasoningEffort({
 
       {...props}
     >
-      <div className="flex items-baseline justify-between">
-        <span className="text-[13.5px] font-medium">Thinking</span>
-        <span className={cn(mono, "text-muted-foreground tabular-nums")}>
-          {fmt(spent)} / {fmt(budget)}
-        </span>
-      </div>
-
-      <div className={cn(field, "flex gap-0.5 rounded-full p-0.5")}>
+      {variant === "slider" ? <div className="px-1">
+        <SliderRoot min={0} max={Math.max(0, levels.length - 1)} step={1} value={selectedIndex} onValueChange={value => {
+          if (typeof value === "number" && Number.isInteger(value)) onSelect?.(levels[value]?.key ?? selectedKey);
+        }}>
+          <SliderControl className="relative flex w-full touch-none items-center py-2 select-none">
+            <SliderTrack className="relative h-1 w-full rounded-full bg-foreground/[0.1]">
+              <SliderIndicator className="rounded-full bg-primary" />
+              <SliderThumb aria-label={title} className="relative size-5 rounded-full border-2 border-primary bg-background shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
+            </SliderTrack>
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-1 top-1/2 flex -translate-y-1/2 items-center justify-between">
+              {levels.map((level, index) => <span key={level.key} className={cn("size-1.5 rounded-full", index <= selectedIndex ? "bg-primary-foreground/40" : "bg-foreground/20")} />)}
+            </div>
+          </SliderControl>
+        </SliderRoot>
+        <div className="mt-2 grid" style={{ gridTemplateColumns: `repeat(${levels.length}, minmax(0, 1fr))` }}>
+          {levels.map(level => <span key={level.key} className="text-center text-[11px] text-muted-foreground">{level.label}</span>)}
+        </div>
+      </div> : <div className={cn(field, "flex gap-0.5 rounded-full p-0.5")}>
         {levels.map((level) => {
           const active = level.key === selectedKey;
           const className = cn(
@@ -79,22 +86,8 @@ export function ReasoningEffort({
             </span>
           );
         })}
-      </div>
+      </div>}
 
-      <span
-        role="progressbar"
-        aria-label="Thinking budget used"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={announced(used)}
-        aria-valuetext={`${fmt(spent)} of ${fmt(budget)}`}
-        className="bg-foreground/[0.06] inset-ring-border h-[3px] w-full overflow-hidden rounded-full inset-ring forced-colors:outline"
-      >
-        <span
-          className="block h-full rounded-full bg-blue-500 transition-[width] duration-500 forced-color-adjust-none motion-reduce:transition-none dark:bg-blue-400"
-          style={{ width: `${used}%` }}
-        />
-      </span>
     </div>
   );
 }

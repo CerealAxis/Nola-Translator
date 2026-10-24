@@ -282,15 +282,14 @@ class PortAudioCapture:
             context.update(backendIndex=self.device.backend_index, sampleRate=self.device.sample_rate,
                            channels=self.device.channels, framesPerBuffer=max(1, self.device.sample_rate // 50))
             stage = "open"
-            # MP3 has no multichannel mode. Ask WASAPI for its stereo mix instead of
-            # averaging an unlabelled surround layout and risking phase cancellation.
-            channels = [min(self.device.channels, 2)]
+            # PyAudioWPatch's WASAPI loopback endpoints are opened with their reported input channel count.
+            channels = [self.device.channels]
             # WASAPI may advertise more channels than its current shared mix accepts. PortAudio
             # also maps IAudioClient initialization failures to paInvalidDevice, so try compatible
             # PCM layouts on this same endpoint before declaring it unavailable.
             # Prefer the recorder's native PCM16 representation; some input devices only expose float32.
             formats = [pyaudio.paInt16, pyaudio.paFloat32]
-            candidates = [(count, sample_format) for sample_format in formats for count in channels]
+            candidates = [(count, sample_format) for count in channels for sample_format in formats]
             for attempt, (count, sample_format) in enumerate(candidates):
                 context.update(channels=count, sampleFormat="float32" if sample_format == pyaudio.paFloat32 else "int16")
                 write_debug("engine", "audio.capture.open.start", {**context, "attempt": attempt + 1})
