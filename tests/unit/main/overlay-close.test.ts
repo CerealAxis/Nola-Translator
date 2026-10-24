@@ -40,6 +40,21 @@ it('closes an idle overlay without starting the engine', async () => {
   expect(engine.request).not.toHaveBeenCalled()
 })
 
+it('shares concurrent audio-device enumeration across windows', async () => {
+  const { engine, invoke } = setup()
+  const devices = [{ deviceId: 'mic-1', name: 'Microphone', kind: 'microphone', isDefault: true }]
+  let finish!: (value: unknown) => void
+  engine.request.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+
+  const first = invoke(IPC_CHANNELS.listDevices)
+  const second = invoke(IPC_CHANNELS.listDevices)
+  await flushMicrotasks()
+  expect(engine.request.mock.calls.filter(([command]) => command.type === 'listDevices')).toHaveLength(1)
+
+  finish({ devices })
+  await expect(Promise.all([first, second])).resolves.toEqual([devices, devices])
+})
+
 /** Drains the whole microtask queue; one `await Promise.resolve()` advances a single step. */
 const flushMicrotasks = () => new Promise<void>(resolve => { setTimeout(resolve, 0) })
 

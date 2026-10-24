@@ -72,7 +72,7 @@ export function createEngineLaunchSpec(options: {
   resourcesPath: string
   managedEngineDirectory?: string
   managedCrispDirectory?: string
-  module?: 'nola_translator_engine.offline_models'
+  module?: 'nola_translator_engine.offline_models' | 'nola_translator_engine.local_call'
 }): EngineLaunchSpec {
   const pythonDirectory = options.isPackaged ? join(options.resourcesPath, 'engine')
     : join(options.appPath, 'engine', 'dist', 'NolaPythonEngine')

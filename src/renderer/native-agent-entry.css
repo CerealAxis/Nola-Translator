@@ -1,0 +1,29 @@
+@layer theme, base, components, utilities;
+@import 'tailwindcss' source(none);
+@source './components/assistant-ui/native';
+@source './features/local-call';
+@source './native-agent-entry.tsx';
+@source './components/ui/toast.tsx';
+@import 'tw-shimmer';
+@import './theme/cjk-fonts.css';
+@import './features/local-call/native-agent.css';
+@import './features/local-call/native-generative.css';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+@custom-variant data-open (&:where([data-state='open'], [data-open]:not([data-open='false'])));
+@custom-variant data-closed (&:where([data-state='closed'], [data-closed]:not([data-closed='false'])));
+
+html, body, #root { height: 100%; min-height: 0; margin: 0; overflow: hidden; }
+body { background: var(--background); color: var(--foreground); font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; -webkit-font-smoothing: antialiased; }
+@utility z-overlay { z-index: 60; }
+@utility z-dropdown { z-index: 40; }
+@utility z-popup { z-index: 65; }
+@utility z-toast { z-index: 80; }
+
+.nola-toast-viewport { position: fixed; right: 1rem; bottom: 1rem; display: flex; width: min(24rem, calc(100vw - 2rem)); flex-direction: column; gap: .5rem; outline: none; }
+.nola-toast { border: 1px solid var(--border); border-radius: 1rem; background: var(--popover); color: var(--popover-foreground); padding: 1rem; }
+.nola-toast-content { display: flex; align-items: start; gap: .75rem; }
+.nola-toast-copy { min-width: 0; flex: 1; }
+.nola-toast-title { font-size: .875rem; font-weight: 500; }
+.nola-toast-description { font-size: .8125rem; color: var(--muted-foreground); }
+.nola-toast-icon, .nola-toast-close svg { width: 1rem; height: 1rem; flex-shrink: 0; }

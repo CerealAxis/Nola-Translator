@@ -200,6 +200,28 @@ export function createIpcBridge(): NolaBridge {
       openLogs: () => call('openLogs', (injected) => injected.openLogs()),
     },
     app: {
+        agentWorkspace: action => call('agentWorkspace', injected => {
+          if (!injected.agentWorkspace) throw new Error('Agent workspace unavailable')
+          return injected.agentWorkspace(action)
+        }),
+        directModel: (request, inspect) => call('directModel', injected => {
+          if (!injected.directModel) throw new Error('Direct model runtime unavailable')
+          return injected.directModel(request, inspect)
+        }),
+      cancelLanguageModel: id => call('cancelLanguageModel', injected => injected.cancelLanguageModel?.(id) ?? Promise.resolve()),
+      streamLanguageModel: request => call('streamLanguageModel', injected => {
+        if (!injected.streamLanguageModel) throw new Error('Language model streaming unavailable')
+        return injected.streamLanguageModel(request)
+      }),
+      onLanguageModelStream: callback => {
+        const api = injectedApi()
+        if (!api?.onLanguageModelStream) throw new Error('Language model streaming unavailable')
+        return api.onLanguageModelStream(callback)
+      },
+      openLocalCallDemo: surface => call('openLocalCallDemo', injected => {
+        if (!injected.openLocalCallDemo) throw new Error('Development preview is unavailable')
+        return injected.openLocalCallDemo(surface)
+      }),
       showWorkspace: () => call('showWorkspace', injected => injected.showWorkspace()),
       openMainPage: path => call('openMainPage', injected => injected.openMainPage(path)),
       // No payload and no translation: the main process resolves the user's default browser

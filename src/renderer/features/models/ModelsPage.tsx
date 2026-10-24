@@ -6,7 +6,7 @@ import { Card, CardAction, CardHeader, CardTitle, CardDescription } from '@/comp
 import { LocalModelImport } from '../offline'
 import { offlineActions } from '@/store/offlineStore'
 import { modelImportEntry } from '../../../shared/model-import-catalog'
-import { configurationOf, isModelReady } from '../../../shared/model-capabilities'
+import { configurationOf, isModelReady, recognitionLanguages } from '../../../shared/model-capabilities'
 import { ModelConfigurationDialog } from './ModelConfigurationDialog'
 import { modelEngines, supportsSelectedEngine } from '../../../shared/model-engines'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
@@ -190,7 +190,13 @@ export function ModelsPage() {
   const setDefault = (record: ResourceRecord) => {
     const patch = defaultTargetOf(record)
     if (!isModelReady(record) || !patch || !supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)) return
+    const supportedLanguages = record.kind === 'recognitionModel' ? recognitionLanguages(record) : []
+    const currentSourceLanguage = settings?.recognition.sourceLanguage
+    const sourceLanguage = currentSourceLanguage && supportedLanguages.includes(currentSourceLanguage)
+      ? currentSourceLanguage
+      : supportedLanguages.includes('auto') ? 'auto' : supportedLanguages[0]
     void updateSettings({ ...patch,
+      ...(record.kind === 'recognitionModel' && sourceLanguage ? { recognition: { ...patch.recognition, sourceLanguage } } : {}),
       ...(record.kind === 'recognitionModel' && settings?.translation.provider === 'recognition' ? { translation: { provider: 'mymemory' } } : {}),
     }).catch(() => undefined)
   }
@@ -373,20 +379,21 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAc
     const family = familyOf(record)
     groups.set(family, [...(groups.get(family) ?? []), record])
   }
-  const sections: { title: string; kind: ResourceRecord['kind']; families: RecommendedFamily[] }[] = [
+  const sections: { title: string; kind: ResourceRecord['kind']; families: RecommendedFamily[]; language?: boolean }[] = [
     { title: t('models.asrModels'), kind: 'recognitionModel', families: ['qwen', 'sensevoice', 'funasr', 'vibevoice', 'mimo'] },
+    { title: t('localCall.llm'), kind: 'translationModel', families: [], language: true },
     { title: t('models.mtModels'), kind: 'translationModel', families: ['hymt2', 'index', 'other'] },
     { title: t('models.ttsModels'), kind: 'ttsModel', families: ['tts'] },
   ]
   return <div className="flex flex-col gap-6">
     {failed ? <FailedCatalog onRetry={onRetry} /> : null}
     {loading ? <div className={GRID}>{[0, 1, 2].map(index => <ModelCardSkeleton key={index} />)}</div> : null}
-    {sections.filter(section => section.families.some(family => groups.has(family)) || cloudModels.some(model => model.kind === section.kind)).map(section => <section key={section.title} className="flex flex-col gap-3">
+    {sections.filter(section => section.families.some(family => groups.has(family)) || cloudModels.some(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language))).map(section => <section key={section.title} className="flex flex-col gap-3">
     <h2 className="models-section-title">{section.title}</h2>
     <div className={GRID}>{section.families.map(family => {
       const familyRecords = groups.get(family)
       return familyRecords ? <RecommendedFamilyCard key={family} family={family} records={familyRecords} onOpen={() => onOpen(family)} /> : null
-    })}{cloudModels.filter(model => model.kind === section.kind).map(model => <CloudModelCard key={model.id} model={model} onOpen={onOpenCloud} />)}</div>
+    })}{cloudModels.filter(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language)).map(model => <CloudModelCard key={model.id} model={model} onOpen={onOpenCloud} />)}</div>
   </section>)}</div>
 }
 
@@ -428,7 +435,8 @@ function Catalog({ records, loading, failed, onRetry, card, emptyAction, compute
       {loading ? <div className={GRID}>{[0, 1, 2].map(index => <ModelCardSkeleton key={index} />)}</div> : null}
       {failed ? <FailedCatalog onRetry={onRetry} /> : null}
       <Section title={t('models.asrModels')} records={recognition} card={card}>{cloudModels.filter(model => model.kind === 'recognitionModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
-      <Section title={t('models.mtModels')} records={translation} card={card}>{cloudModels.filter(model => model.kind === 'translationModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
+      <Section title={t('localCall.llm')} records={[]} card={card}>{cloudModels.filter(model => model.profile || model.id === 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
+      <Section title={t('models.mtModels')} records={translation} card={card}>{cloudModels.filter(model => model.kind === 'translationModel' && !model.profile && model.id !== 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.ttsModels')} records={ordered.filter(record => record.kind === 'ttsModel')} card={card} />
     </div>
   )

@@ -15,6 +15,8 @@ export type TitleBarVariant = 'brand' | 'session'
 export interface TitleBarHelpItem { key: string; label: ReactNode; onSelect: () => void }
 export interface TitleBarProps {
   variant?: TitleBarVariant
+  /** Session windows carry the product identity in their sidebar header, so they hide this mark. */
+  brand?: boolean
   sessionTitle?: ReactNode
   status?: ReactNode
   timer?: ReactNode
@@ -29,7 +31,7 @@ const MENU_POPUP_CLASS = 'z-dropdown min-w-40 rounded-nola-ui-xl bg-overlay p-1 
 const MENU_ITEM_CLASS = 'nola-menu-item flex cursor-pointer items-center justify-between gap-3 rounded-nola-ui-md px-3 py-2 text-sm'
 const TOOLTIP_CLASS = 'z-popup max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'
 
-export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actions, leading, helpItems, className = '' }: TitleBarProps) {
+export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status, timer, actions, leading, helpItems, className = '' }: TitleBarProps) {
   const { t, uiLanguage, setLanguage } = useI18n()
   const { navigate } = useRoute()
   const { resolved, setTheme } = useNolaTheme()
@@ -74,9 +76,9 @@ export function TitleBar({ variant = 'brand', sessionTitle, status, timer, actio
     <header className={`nola-titlebar nola-drag z-sticky${windowsShell ? ' nola-titlebar--windows' : ''} ${className}`} onDoubleClick={event => {
       if (windowsShell && !(event.target instanceof Element && event.target.closest('.nola-no-drag'))) toggleMaximize()
     }}>
-      <div className="nola-brand">
+      {brand ? <div className="nola-brand">
         <img className="nola-brand__mark" src={nolaLogoUrl} alt={t('app.name')} />
-      </div>
+      </div> : null}
       {variant === 'session' ? <div className="nola-no-drag flex min-w-0 items-center gap-3">{leading}{sessionTitle}{status}{timer}</div> : null}
       <div className={`nola-titlebar-tools nola-no-drag${windowsShell ? ' nola-titlebar-tools--windows' : ''}`}>
         {actions}

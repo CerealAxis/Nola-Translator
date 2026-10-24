@@ -108,6 +108,7 @@ export function registerAppIpc(options: {
   getOverlayWindow: () => BrowserWindow | null
   getMainWindow: () => BrowserWindow | null
   getWorkspaceWindow?: () => BrowserWindow | null
+  isDevelopmentWindow?: (window: BrowserWindow) => boolean
   showWorkspace?: () => Promise<void>
 }): () => void {
   loggedHandle(channels.showWorkspace, () => options.showWorkspace?.())
@@ -257,7 +258,7 @@ export function registerAppIpc(options: {
   })
   const controlledWindow = (sender: Electron.WebContents): BrowserWindow | null => {
     const window = BrowserWindow.fromWebContents(sender)
-    return window === options.getMainWindow() || window === options.getWorkspaceWindow?.() ? window : null
+    return window && (window === options.getMainWindow() || window === options.getWorkspaceWindow?.() || options.isDevelopmentWindow?.(window)) ? window : null
   }
   loggedHandle(channels.minimizeMainWindow, (event) => {
     const window = controlledWindow(event.sender)

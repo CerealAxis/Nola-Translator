@@ -45,6 +45,7 @@ from .protocol import (
     StreamFinishedEvent,
     ComputeDevicesEvent,
     ListComputeDevicesCommand,
+    ListDevicesCommand,
     CaptionSegment,
     DebugLogCommand,
     DebugLoggedEvent,
@@ -328,6 +329,8 @@ class EngineRuntime:
         self._retain_models = False
         self._compute_inventory: tuple[list[ComputeDevice], list[str], str] | None = None
         self._compute_inventory_at = 0.0
+        self._compute_inventory_task: asyncio.Task[tuple[list[ComputeDevice], list[str], str]] | None = None
+        self._device_enumeration_lock = asyncio.Lock()
         self._dependency_task: asyncio.Task[None] | None = None
         self._closing = False
         self._last_heartbeat_at: float | None = None
@@ -363,9 +366,12 @@ class EngineRuntime:
             if model_id and self._dependency_task is None:
                 self._dependency_task = asyncio.create_task(self._import_recognition_dependencies(model_id))
             return self.service.handle(command)
+        if isinstance(command, ListDevicesCommand):
+            async with self._device_enumeration_lock:
+                return await asyncio.to_thread(self.service.handle, command)
         if isinstance(command, ListComputeDevicesCommand):
-            self._update_compute_plan()
             devices, notes, version = await self._probe_compute_inventory(refresh=True)
+            self._update_compute_plan()
             return [ComputeDevicesEvent(
                 protocolVersion=1, type="computeDevices", requestId=command.requestId,
                 devices=[asdict(d) for d in devices], notes=notes, torchVersion=version,
@@ -479,10 +485,23 @@ class EngineRuntime:
     async def _probe_compute_inventory(self, *, refresh: bool = False) -> tuple[list[ComputeDevice], list[str], str]:
         # Main-process device-intent resolution and model placement run back to back. Reuse
         # that inventory briefly; an explicit list request still refreshes live free memory.
-        if refresh or self._compute_inventory is None or monotonic() - self._compute_inventory_at > 5:
-            self._compute_inventory = await asyncio.to_thread(probe_devices, resolve_llama_dir())
-            self._compute_inventory_at = monotonic()
-        return self._compute_inventory
+        inventory = self._compute_inventory
+        if refresh or inventory is None or monotonic() - self._compute_inventory_at > 5:
+            task = self._compute_inventory_task
+            if task is None:
+                task = asyncio.create_task(asyncio.to_thread(probe_devices, resolve_llama_dir()))
+                self._compute_inventory_task = task
+            try:
+                inventory = await task
+                if task is self._compute_inventory_task:
+                    self._compute_inventory = inventory
+                    self._compute_inventory_at = monotonic()
+            finally:
+                if task is self._compute_inventory_task:
+                    self._compute_inventory_task = None
+        if inventory is None:
+            raise RuntimeError("计算设备探测未返回结果")
+        return inventory
 
     async def _inspect_hub_repo(self, command: InspectHubRepoCommand) -> list[EngineEvent]:
         """Report what a Hugging Face repo declares about itself and whether the engine can run it.

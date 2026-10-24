@@ -15,6 +15,8 @@ from pydantic import ValidationError
 
 from .protocol import (
     MAX_PROTOCOL_LINE_BYTES,
+    ListComputeDevicesCommand,
+    ListDevicesCommand,
     ErrorEvent,
     parse_command_line,
     serialize_event,
@@ -107,31 +109,15 @@ async def _run() -> int:
         handle = runtime.handle
         close = runtime.close
 
-    while raw_with_newline := await asyncio.to_thread(sys.stdin.buffer.readline):
-        raw_line = raw_with_newline
-        raw_line = raw_line.rstrip(b"\r\n")
-        request_id = _request_id(raw_line)
-        if len(raw_line) > MAX_PROTOCOL_LINE_BYTES:
-            _write_error(protocol_out, request_id, "lineTooLarge")
-            continue
+    background_commands: set[asyncio.Task[None]] = set()
 
-        try:
-            command = parse_command_line(raw_line.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError, ValidationError, ValueError):
-            try:
-                value = json.loads(raw_line.decode("utf-8"))
-                code = "unsupportedProtocol" if value.get("protocolVersion") != 1 else "invalidMessage"
-            except (UnicodeDecodeError, json.JSONDecodeError, AttributeError):
-                code = "invalidMessage"
-            _write_error(protocol_out, request_id, code)
-            continue
-
+    async def process_command(command) -> None:
         try:
             events = await handle(command)
         except Exception as error:  # one bad command must not wedge the sidecar; the detail only goes to stderr.
             print(f"engine command failed: {type(error).__name__}", file=sys.stderr, flush=True)
             details: dict[str, object] = {
-                "requestId": request_id,
+                "requestId": command.requestId,
                 "commandType": type(command).__name__,
                 "exceptionType": type(error).__name__,
                 "frames": [
@@ -153,14 +139,49 @@ async def _run() -> int:
                 ]
             diagnostic = {"layer": "engine", "event": "command.failed", "data": details}
             print("NOLA_DIAGNOSTIC " + json.dumps(diagnostic, ensure_ascii=True), file=sys.stderr, flush=True)
-            _write_error(protocol_out, request_id, "internalError")
-            continue
+            _write_error(protocol_out, command.requestId, "internalError")
+            return
 
         for event in events:
             write_event(event)
+
+    def schedule_device_probe(command: ListComputeDevicesCommand | ListDevicesCommand) -> None:
+        task = asyncio.create_task(process_command(command))
+        background_commands.add(task)
+        task.add_done_callback(background_commands.discard)
+
+    while raw_with_newline := await asyncio.to_thread(sys.stdin.buffer.readline):
+        raw_line = raw_with_newline
+        raw_line = raw_line.rstrip(b"\r\n")
+        request_id = _request_id(raw_line)
+        if len(raw_line) > MAX_PROTOCOL_LINE_BYTES:
+            _write_error(protocol_out, request_id, "lineTooLarge")
+            continue
+
+        try:
+            command = parse_command_line(raw_line.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError, ValidationError, ValueError):
+            try:
+                value = json.loads(raw_line.decode("utf-8"))
+                code = "unsupportedProtocol" if value.get("protocolVersion") != 1 else "invalidMessage"
+            except (UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+                code = "invalidMessage"
+            _write_error(protocol_out, request_id, code)
+            continue
+
+        if isinstance(command, (ListComputeDevicesCommand, ListDevicesCommand)):
+            # Driver and WASAPI probes can block on cold startup. Keep the JSONL loop free
+            # so resource queries and other independent requests continue to make progress.
+            schedule_device_probe(command)
+        else:
+            await process_command(command)
         if service.should_exit:
+            if background_commands:
+                await asyncio.gather(*background_commands)
             await close()
             return 0
+    if background_commands:
+        await asyncio.gather(*background_commands)
     await close()
     return 0
 

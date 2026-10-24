@@ -1,3 +1,4 @@
+import { localCallZh } from './local-call-ui'
 import { offlineZh } from './offline-ui'
 /**
  * 中文词典。`en.ts` 的类型由本文件推导，缺 key 会在编译期报错。
@@ -19,6 +20,7 @@ import { browserZh } from './browser-ui'
 import { runtimeZh } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const zhCN = {
+  localCall: localCallZh,
   offline: offlineZh,
   onboarding: onboardingZh,
   startup: {
@@ -115,7 +117,7 @@ export const zhCN = {
 
   home: {
     quickStart: '快速同传',
-    overlayCaptions: '悬浮字幕',
+    overlayCaptions: '浏览器字幕',
     records: '同传记录',
     models: '模型管理',
     recentMeetings: '最近的同传',
@@ -192,9 +194,9 @@ export const zhCN = {
   },
 
   videoCaptions: {
-    title: '视频字幕',
+    title: '浏览器字幕',
     captionPreview: '字幕预览',
-    settings: '视频字幕设置',
+    settings: '浏览器字幕设置',
     openBrowser: '打开浏览器',
     audioSource: '输入声源',
     tabAudio: '标签页声音',

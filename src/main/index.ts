@@ -1,4 +1,7 @@
 import { modelEngines, supportsSelectedEngine } from '../shared/model-engines'
+import { registerLocalCallDemo, isLocalCallDemoWindow } from './local-call-demo'
+import { AgentWorkspace } from './agent-workspace'
+import { customModelsOf } from '../shared/custom-models'
 import { captureMainConsole, initializeSessionLog, logActivityTotals, logDiagnostic, relocateSessionLogs } from './session-log'
 import { resolveDeviceIntent } from '../shared/device-selection'
 import { join } from 'node:path'
@@ -537,6 +540,7 @@ if (!hasSingleInstanceLock) {
     } })
     void browserConnection.initialize(initialSettings.browserConnection.enabled).catch(error => console.error('browser connection initialization failed', error))
     disposeAppIpc = registerAppIpc({
+      isDevelopmentWindow: isLocalCallDemoWindow,
       settings,
       initialSettings,
       meetings,
@@ -569,6 +573,42 @@ if (!hasSingleInstanceLock) {
     createWorkspaceWindow(initialSettings.theme)
     await workspaceReady
     createMainWindow(initialSettings.theme)
+    registerLocalCallDemo(() => settings.current().theme, __dirname, undefined, {
+      getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
+      workspace: new AgentWorkspace(join(dataRoot, 'local-call')),
+      listDirectModels: async () => {
+        await whenRuntimeReady()
+        if (engine!.currentState !== 'ready') await engine!.start()
+        const inventory = await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: randomUUID() }, 'resources')
+        const models = inventory.resources.filter(item => item.installed).map(item => ({ model: `resource:${item.resourceId}`, name: item.name,
+          kind: item.kind === 'recognitionModel' ? 'asr' : item.kind === 'ttsModel' ? 'tts' : 'mt' }))
+        for (const profile of customModelsOf(settings.current().translation)) models.push({ model: `mt-custom:${profile.id}`, name: profile.name, kind: 'mt' })
+        models.push({ model: 'cloud:index-translate', name: 'Index-Translate', kind: 'mt' }, { model: 'cloud:mymemory', name: 'MyMemory', kind: 'mt' })
+        for (const provider of ['microsoft', 'google', 'aliyun', 'minimax'] as const) {
+          const slot = provider === 'aliyun' ? 'aliyun-asr' : provider === 'minimax' ? 'minimax-asr' : provider
+          if (await credentials.get(slot)) models.push({ model: `cloud:${provider}`, name: provider, kind: provider === 'aliyun' || provider === 'minimax' ? 'asr' : 'mt' })
+        }
+        return models
+      },
+      directLaunch: async model => {
+        await whenRuntimeReady()
+        const compute = { ...settings.current().compute }
+        if (model.startsWith('resource:')) {
+          if (sessionActive || sessionStarting || componentInstalling) throw new Error('Local models are busy with a caption session or runtime installation. Stop that task before direct inference.')
+          if (engine!.currentState !== 'ready') await engine!.start()
+          const inventory = await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: randomUUID() }, 'resources')
+          const resource = inventory.resources.find(item => item.resourceId === model.slice(9) && item.installed)
+          if (!resource) throw new Error('Selected model is not installed')
+          const loader = modelEngines(resource)[0]
+          if (resource.kind === 'translationModel' && loader !== 'crisp') compute.translationEngine = loader
+          else if (loader) compute.recognitionEngine = loader
+        }
+        const directories = runtimes.selectedDirectories(compute)
+        return { ...createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
+          managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp, module: 'nola_translator_engine.local_call' }),
+          env: { ...resourceEnvironment, NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? '', NOLA_TRANSLATOR_RUN_LOG_STDERR: '1' } }
+      },
+    })
     createOverlayWindow(initialSettings.theme, initialSettings.overlay)
     void whenRuntimeReady().then(() => engine!.start()).catch((error) => {
       if (!quitting) console.error('engine environment initialization/start failed', error)

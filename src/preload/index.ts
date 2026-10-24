@@ -79,6 +79,16 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 }
 
 const api: NolaTranslatorApi = {
+  openLocalCallDemo: surface => invoke('app:local-call-demo', surface),
+  cancelLanguageModel: id => invoke('app:language-model:cancel', id),
+    agentWorkspace: action => invoke('app:agent-workspace', action),
+    directModel: (request, inspect) => invoke('app:direct-model', request, inspect),
+  streamLanguageModel: request => invoke('app:language-model:stream', request),
+  onLanguageModelStream: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, data: import('../shared/language-model').LanguageModelStreamEvent) => callback(data)
+    ipcRenderer.on('app:language-model:chunk', listener)
+    return () => ipcRenderer.removeListener('app:language-model:chunk', listener)
+  },
   offline: {
     selectModel: (kind, repo, path) => invoke('offline:select-model', kind, repo, path),
     selectDestination: path => invoke('offline:select-destination', path),

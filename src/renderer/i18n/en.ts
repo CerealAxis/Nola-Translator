@@ -1,3 +1,4 @@
+import { localCallEn } from './local-call-ui'
 import { offlineEn } from './offline-ui'
 import type { Dictionary } from './zh-CN'
 import { onboardingEn } from './onboarding-ui'
@@ -15,6 +16,7 @@ import { browserEn } from './browser-ui'
 import { runtimeEn } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const en: Dictionary = {
+  localCall: localCallEn,
   offline: offlineEn,
   onboarding: onboardingEn,
   startup: {
@@ -111,7 +113,7 @@ export const en: Dictionary = {
 
   home: {
     quickStart: 'Quick session',
-    overlayCaptions: 'Floating captions',
+    overlayCaptions: 'Browser captions',
     records: 'Records',
     models: 'Models',
     recentMeetings: 'Recent sessions',
@@ -186,9 +188,9 @@ export const en: Dictionary = {
   },
 
   videoCaptions: {
-    title: 'Video captions',
+    title: 'Browser captions',
     captionPreview: 'Caption preview',
-    settings: 'Video caption settings',
+    settings: 'Browser caption settings',
     openBrowser: 'Open browser',
     audioSource: 'Input source',
     tabAudio: 'Tab audio',

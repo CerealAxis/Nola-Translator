@@ -1,9 +1,11 @@
+import { localCallKo, localCallEntries } from './local-call-ui'
 import { offlineKo, offlineEntries } from './offline-ui'
 import { buildLocaleDictionary } from './locale-builder'
 import { onboardingEntries, onboardingKo } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const koMessages: Record<DictionaryKey, string> = {
+  ...localCallEntries(localCallKo),
   "settings.restoreVadDefaults": "기본값 복원",
   "settings.vadGroup": "음성 분할",
   "settings.maxSegmentMs": "최대 구간 길이 (밀리초)",
@@ -131,7 +133,7 @@ const koMessages: Record<DictionaryKey, string> = {
   'browser.statusRecognizing': '인식 중',
   'browser.configManagedByDesktop': 'Nola 앱에서 자막 스타일과 언어를 변경하세요',
   'browser.shareTabAudio': '이 탭의 오디오 공유',
-  'browser.captionServiceOff': '자막 서비스가 꺼져 있습니다. Nola의 동영상 자막 설정에서 서비스를 켜세요.',
+  'browser.captionServiceOff': '자막 서비스가 꺼져 있습니다. Nola의 브라우저 자막 설정에서 서비스를 켜세요.',
   'browser.error': '자막을 시작하지 못했습니다. Nola가 실행 중이고 브라우저 자막이 켜져 있는지 확인하세요.',
   'browser.protocolValidationFailed': '엔진 통신 검증에 실패했습니다. 자막을 다시 켜고, 문제가 반복되면 Nola를 다시 시작하세요.',
   'browser.sessionInvalidStream': '자막 스트림이 더 이상 유효하지 않습니다. 자막을 다시 켜세요.',
@@ -371,10 +373,10 @@ const koMessages: Record<DictionaryKey, string> = {
   'homeRecordsUi.meetings': '회의와 학습',
   'homeRecordsUi.live': '라이브 방송',
   'homeRecordsUi.quickDescription': '실시간 음성 인식 및 번역\n다국어 번역 지원',
-  'homeRecordsUi.overlayDescription': '실시간 번역 자막\n데스크톱 위에 표시',
+  'homeRecordsUi.overlayDescription': '브라우저 확장 프로그램으로 동영상 오디오를 받아\n실시간으로 음성을 인식하고 번역',
   'homeRecordsUi.recordsDescription': '기록 확인 및 이름 변경\n저장된 대본 내보내기',
   'homeRecordsUi.modelsDescription': '음성 인식 및 번역 모델\n관리하고 전환하기',
-  'homeRecordsUi.openOverlay': '플로팅 자막 열기',
+  'homeRecordsUi.openOverlay': '브라우저 자막 열기',
   'homeRecordsUi.openRecords': '기록 보기',
   'homeRecordsUi.openModels': '모델 관리',
   'homeRecordsUi.allRecords': '모든 기록 보기',
@@ -468,7 +470,7 @@ const koMessages: Record<DictionaryKey, string> = {
   'modelsSettingsUi.cloudService': "사용자 지정 모델",
   'modelsSettingsUi.noConfigurationRequired': '설정 필요 없음',
   'modelsSettingsUi.addToInstalled': '설치됨에 추가',
-  'modelsSettingsUi.cloudDescription': "OpenAI Chat Completions, Responses, Anthropic, Ollama 등의 프로토콜을 지원합니다. 원활한 사용을 위해 출력 속도가 빠른 모델을 권장합니다.",
+  'modelsSettingsUi.cloudDescription': "OpenAI Chat Completions 및 Responses API, Anthropic Messages, Ollama Chat API 형식을 지원합니다.",
   'modelsSettingsUi.microsoftDescription': "Microsoft 제공. 중국어, 영어, 일본어 등 다국어 번역을 지원하며 API 키 설정이 필요합니다.",
   'modelsSettingsUi.mymemoryDescription': "Translated 제공. 중국어, 영어, 일본어 등 다국어 번역을 지원하며 API 키 설정이 필요하지 않습니다.",
   'modelsSettingsUi.googleDescription': "Google 제공. 중국어, 영어, 일본어 등 다국어 번역을 지원하며 API 키 설정이 필요합니다.",
@@ -522,7 +524,7 @@ const koMessages: Record<DictionaryKey, string> = {
   'language.ja': '日本語',
   'language.en': 'English',
   'home.quickStart': '실시간 통역',
-  'home.overlayCaptions': '플로팅 자막',
+  'home.overlayCaptions': '브라우저 자막',
   'home.records': '통역 기록',
   'home.models': '모델 관리',
   'home.recentMeetings': '최근 통역',
@@ -582,9 +584,9 @@ const koMessages: Record<DictionaryKey, string> = {
   'workspace.nothingYetHint': '세션을 시작하면 인식된 문장이 여기에 하나씩 표시됩니다.',
   'workspace.sourcePanel': '실시간 음성 인식',
   'workspace.translationPanel': '번역 결과',
-  'videoCaptions.title': '비디오 자막',
+  'videoCaptions.title': '브라우저 자막',
   'videoCaptions.captionPreview': '자막 미리보기',
-  'videoCaptions.settings': '비디오 자막 설정',
+  'videoCaptions.settings': '브라우저 자막 설정',
   'videoCaptions.openBrowser': '브라우저 열기',
   'videoCaptions.audioSource': '입력 소스',
   'videoCaptions.tabAudio': '탭 오디오',

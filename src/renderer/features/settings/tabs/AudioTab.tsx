@@ -128,10 +128,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
               const supported = recognitionLanguages(resources.find(model => model.resourceId === value))
               const sourceLanguage = supported.includes(settings.recognition.sourceLanguage)
                 ? settings.recognition.sourceLanguage
-                : supported.includes('auto') ? 'auto' : settings.recognition.sourceLanguage
-              if (sourceLanguage === settings.recognition.sourceLanguage && !supported.includes(sourceLanguage)) {
-                notifyError(t('errors.unsupportedRecognitionLanguage', { language: languageName(sourceLanguage, language) }))
-              }
+                : supported.includes('auto') ? 'auto' : supported[0] ?? 'auto'
               void updateSettings({
                 recognition: { modelId: value, sourceLanguage },
               }).catch(() => undefined)

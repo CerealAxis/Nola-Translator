@@ -1,4 +1,6 @@
-import { Home, Mic, Clock, SlidersHorizontal, Settings, Video } from 'lucide-react'
+import { Home, Mic, Clock, SlidersHorizontal, Settings, Video, MessagesSquare } from 'lucide-react'
+import { getBridge } from './store'
+import { notifyError } from './components/primitives/notify'
 import { useI18n } from './i18n'
 import { useRoute } from './routes'
 import { HomePage } from './features/home'
@@ -33,9 +35,16 @@ export function useApplicationNavigation(): AppShellNavigationItem[] {
     ['models', 'nav.models', SlidersHorizontal, '#/models'],
     ['settings', 'nav.settings', Settings, '#/settings/appearance'],
   ] as const
-  return entries.map(([id, key, icon, path]) => ({
+  const navigation: AppShellNavigationItem[] = entries.map(([id, key, icon, path]) => ({
     id, label: t(key), icon, path,
     active: route === id || id === 'workspace' && route === 'overlay' || id === 'records' && route === 'record',
     onPress: () => navigate(path),
   }))
+  if (typeof __NOLA_LOCAL_CALL_DEMO__ !== 'undefined' && __NOLA_LOCAL_CALL_DEMO__) {
+    navigation.splice(3, 0, {
+      id: 'local-call-demo', label: t('localCall.title'), icon: MessagesSquare, path: '#local-call-demo',
+      onPress: () => { void getBridge()?.app.openLocalCallDemo?.('chat').catch(error => notifyError(t('localCall.actionFailed'), { cause: error })) },
+    })
+  }
+  return navigation
 }

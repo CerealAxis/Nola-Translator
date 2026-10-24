@@ -145,6 +145,12 @@ export interface NolaBridge {
    * button, which must not invent a start page to satisfy `shell.openExternal`.
    */
   app: {
+    openLocalCallDemo?(surface: import('../../shared/local-call-demo').LocalCallDemoSurface): Promise<void>
+    cancelLanguageModel?(id: string): Promise<void>
+    agentWorkspace?(action: import('../../shared/agent-workspace').WorkspaceAction): Promise<import('../../shared/agent-workspace').AgentWorkspaceSnapshot>
+    directModel?(request: import('../../shared/agent-workspace').DirectModelRequest, inspect?: boolean): Promise<import('../../shared/agent-workspace').DirectModelResult>
+    streamLanguageModel?(request: import('../../shared/language-model').LanguageModelStreamRequest): Promise<void>
+    onLanguageModelStream?(callback: (event: import('../../shared/language-model').LanguageModelStreamEvent) => void): () => void
     showWorkspace?(): Promise<void>
     openMainPage?(path: string): Promise<void>
     openDefaultBrowser(): Promise<void>
@@ -201,6 +207,12 @@ export interface NolaBridge {
  * Two methods have no UI caller: `overlay.hide` and `overlay.resize`.
  */
 export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
+  'app.openLocalCallDemo': 'ipc',
+  'app.cancelLanguageModel': 'ipc',
+    'app.agentWorkspace': 'ipc',
+    'app.directModel': 'ipc',
+  'app.streamLanguageModel': 'ipc',
+  'app.onLanguageModelStream': 'ipc',
   'engine.listDevices': 'ipc',
   'engine.testAudio': 'ipc',
   'engine.listResources': 'ipc',

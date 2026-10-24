@@ -64,7 +64,7 @@ export const browserZh = {
   statusRecognizing: '识别中',
   configManagedByDesktop: '字幕样式与语言在 Nola 软件中修改',
   shareTabAudio: '共享本页音频',
-  captionServiceOff: '字幕服务未开启，请先在 Nola 软件的「视频字幕」页开启字幕服务。',
+  captionServiceOff: '字幕服务未开启，请先在 Nola 软件的「浏览器字幕」页开启字幕服务。',
   error: '字幕启动失败，请确认 Nola 正在运行且已启用浏览器字幕。',
 } as const
 export const browserEn: { [K in keyof typeof browserZh]: string } = {
@@ -128,6 +128,6 @@ export const browserEn: { [K in keyof typeof browserZh]: string } = {
   statusRecognizing: 'Recognizing',
   configManagedByDesktop: 'Change caption style and languages in Nola',
   shareTabAudio: 'Share this tab audio',
-  captionServiceOff: 'The caption service is off. Enable it on the Video captions page in Nola first.',
+  captionServiceOff: 'The caption service is off. Enable it on the Browser captions page in Nola first.',
   error: 'Could not start captions. Make sure Nola is running and browser captions are enabled.',
 }

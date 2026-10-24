@@ -63,12 +63,6 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
       <DialogCloseButton disabled={saving} aria-label={t('common.close')} />
       <DialogHeader><DialogTitle>{modelId ? draft.name : t('modelsSettingsUi.cloudService')}</DialogTitle><p className="models-family-dialog__intro">{t('modelsSettingsUi.cloudDescription')}</p></DialogHeader>
       <div className="model-configuration-dialog__body models-family-dialog__body">
-        <ModelLanguageSelect label={t('modelConfig.sourceLanguages')} codes={[...SOURCE_LANGUAGE_OPTIONS]} value={draft.sourceLanguages ?? [...SOURCE_LANGUAGE_OPTIONS]} onChange={sourceLanguages => patch({ sourceLanguages })} />
-        <ModelLanguageSelect label={t('modelConfig.targetLanguages')} codes={[...LANGUAGE_CODES]} value={draft.languages} onChange={languages => patch({ languages })} />
-        <div className="models-language-actions"><span className="nola-caption text-muted">{t('modelConfig.selectedLanguageCount', { count: draft.languages.length })}</span>
-          <Button variant="secondary" size="sm" onClick={() => patch({ sourceLanguages: [...SOURCE_LANGUAGE_OPTIONS], languages: [...LANGUAGE_CODES] })}>{t('modelsSettingsUi.selectAllLanguages')}</Button>
-          <Button variant="secondary" size="sm" onClick={() => patch({ sourceLanguages: [], languages: [] })}>{t('modelsSettingsUi.clearLanguages')}</Button>
-        </div>
         <SettingsRow label={t('settings.apiName')}><Input aria-label={t('settings.apiName')} className="settings-control-field" maxLength={64} value={draft.name} onValueChange={name => patch({ name })} /></SettingsRow>
         <SettingsRow label={t('settings.endpoint')}><Input aria-label={t('settings.endpoint')} className="settings-control-field" value={draft.endpoint} onValueChange={endpoint => patch({ endpoint })} /></SettingsRow>
         <SettingsRow label={t('settings.apiKey')}><div className="model-api-key-field">
@@ -84,10 +78,18 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
         <SettingsRow label={t('settings.modelId')}><Input aria-label={t('settings.modelId')} className="settings-control-field" value={draft.model} onValueChange={model => patch({ model })} /></SettingsRow>
         <NumberRow label={t('settings.contextWindow')} value={draft.contextWindow} onCommit={contextWindow => patch({ contextWindow })} />
         <NumberRow label={t('settings.maxOutputTokens')} value={draft.maxOutputTokens} onCommit={maxOutputTokens => patch({ maxOutputTokens })} />
+        <details><summary className="cursor-pointer py-2 text-sm">{t('localCall.translationCapabilities')}</summary>
+        <ModelLanguageSelect label={t('modelConfig.sourceLanguages')} codes={[...SOURCE_LANGUAGE_OPTIONS]} value={draft.sourceLanguages ?? [...SOURCE_LANGUAGE_OPTIONS]} onChange={sourceLanguages => patch({ sourceLanguages })} />
+        <ModelLanguageSelect label={t('modelConfig.targetLanguages')} codes={[...LANGUAGE_CODES]} value={draft.languages} onChange={languages => patch({ languages })} />
+        <div className="models-language-actions"><span className="nola-caption text-muted">{t('modelConfig.selectedLanguageCount', { count: draft.languages.length })}</span>
+          <Button variant="secondary" size="sm" onClick={() => patch({ sourceLanguages: [...SOURCE_LANGUAGE_OPTIONS], languages: [...LANGUAGE_CODES] })}>{t('modelsSettingsUi.selectAllLanguages')}</Button>
+          <Button variant="secondary" size="sm" onClick={() => patch({ sourceLanguages: [], languages: [] })}>{t('modelsSettingsUi.clearLanguages')}</Button>
+        </div>
+        </details>
       </div>
       <DialogFooter><Button variant="secondary" disabled={saving} onClick={onClose}>{t('session.cancel')}</Button>
         <Button variant="secondary" disabled={!valid || saving} aria-busy={saving} onClick={() => void save(false)}>{t('modelConfig.save')}</Button>
-        <Button disabled={!valid || saving} aria-busy={saving} onClick={() => void save(true)}>{t('models.setDefault')}</Button>
+        <Button disabled={!valid || saving} aria-busy={saving} onClick={() => void save(true)}>{t('localCall.useForTranslation')}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

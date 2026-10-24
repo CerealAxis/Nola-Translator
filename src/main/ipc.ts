@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 
 import { BrowserWindow, ipcMain, net, screen } from 'electron'
 
-import type { EngineEvent, EngineProcessState, PrewarmConfig, SessionConfig } from '../shared/contracts'
+import type { AudioDevice, EngineEvent, EngineProcessState, PrewarmConfig, SessionConfig } from '../shared/contracts'
 import { DEFAULT_SETTINGS, NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider } from '../shared/settings'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
@@ -84,20 +84,27 @@ export function registerEngineIpc(
   const ensureReady = () => controller.ensureReady()
   const stopActiveSession = (id: string) => controller.stop(id)
   const releaseSessionOnEngineLoss = () => controller.releaseOnLoss()
+  let listingDevices: Promise<AudioDevice[]> | null = null
   loggedHandle(IPC_CHANNELS.listDevices, async () => {
-    await ensureReady()
-    const response = await engine.request(
-      { protocolVersion: 1, type: 'listDevices', requestId: `devices-${randomUUID()}` },
-      'devices'
-    )
-    return response.devices
+    if (listingDevices) return listingDevices
+    const request = (async () => {
+      await ensureReady()
+      const response = await engine.request(
+        { protocolVersion: 1, type: 'listDevices', requestId: `devices-${randomUUID()}` },
+        'devices'
+      )
+      return response.devices
+    })()
+    listingDevices = request
+    try { return await request } finally { if (listingDevices === request) listingDevices = null }
   })
 
   loggedHandle(IPC_CHANNELS.listComputeDevices, async () => {
     await ensureReady()
     const response = await engine.request(
       { protocolVersion: 1, type: 'listComputeDevices', requestId: `compute-${randomUUID()}` },
-      'computeDevices', 30_000,
+      // A first PyTorch/driver enumeration can exceed the normal engine request budget.
+      'computeDevices', 60_000,
     )
     const { protocolVersion: _version, type: _type, requestId: _request, ...snapshot } = response
     return snapshot

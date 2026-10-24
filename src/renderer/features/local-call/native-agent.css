@@ -1,0 +1,85 @@
+/* shadcn neutral defaults for the independent Elements document; product styles are not imported into the composition. */
+:root, .native-agent-document {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --radius: .625rem;
+  --surface: var(--background);
+  --surface-secondary: var(--secondary);
+  --overlay: var(--popover);
+  --overlay-foreground: var(--popover-foreground);
+  --font-ui: ui-sans-serif, system-ui, sans-serif;
+  --nola-ui-background: var(--background);
+  --nola-ui-foreground: var(--foreground);
+  --nola-ui-popover: var(--popover);
+  --nola-ui-popover-foreground: var(--popover-foreground);
+  --nola-ui-primary: var(--primary);
+  --nola-ui-primary-foreground: var(--primary-foreground);
+  --nola-ui-muted: var(--muted);
+  --nola-ui-muted-foreground: var(--muted-foreground);
+  --nola-ui-border: var(--border);
+}
+.native-agent-document[data-theme='dark'], .native-agent-document.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+}
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-destructive: oklch(0.577 0.245 27.325);
+  --color-nola-ui-background: var(--background);
+  --color-nola-ui-foreground: var(--foreground);
+  --color-nola-ui-popover: var(--popover);
+  --color-nola-ui-popover-foreground: var(--popover-foreground);
+  --color-nola-ui-muted: var(--muted);
+  --color-nola-ui-muted-foreground: var(--muted-foreground);
+  --color-nola-ui-border: var(--border);
+  --color-muted-foreground: var(--muted-foreground, var(--muted));
+  --color-card: var(--card, var(--surface));
+  --color-card-foreground: var(--card-foreground, var(--foreground));
+  --color-popover: var(--popover, var(--overlay));
+  --color-popover-foreground: var(--popover-foreground, var(--overlay-foreground));
+  --color-secondary: var(--secondary, var(--surface-secondary));
+  --color-secondary-foreground: var(--secondary-foreground, var(--foreground));
+  --color-input: var(--input, var(--field-border));
+  --color-ring: var(--ring, var(--focus));
+}
+.native-agent-document body { background: var(--background); color: var(--foreground); }
+.native-window-drag { -webkit-app-region: drag; }
+.native-window-action { -webkit-app-region: no-drag; }
+.native-agent-app [data-slot='composer-menu'] { max-height: min(60vh, 28rem); overflow-y: auto; }

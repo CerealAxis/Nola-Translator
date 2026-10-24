@@ -1,9 +1,11 @@
+import { localCallJa, localCallEntries } from './local-call-ui'
 import { offlineJa, offlineEntries } from './offline-ui'
 import { buildLocaleDictionary } from './locale-builder'
 import { onboardingEntries, onboardingJa } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const jaMessages: Record<DictionaryKey, string> = {
+  ...localCallEntries(localCallJa),
   "settings.restoreVadDefaults": "既定値に戻す",
   "settings.vadGroup": "音声区間",
   "settings.maxSegmentMs": "最大区間長（ミリ秒）",
@@ -131,7 +133,7 @@ const jaMessages: Record<DictionaryKey, string> = {
   'browser.statusRecognizing': '認識中',
   'browser.configManagedByDesktop': '字幕スタイルと言語は Nola アプリで変更してください',
   'browser.shareTabAudio': 'このタブの音声を共有',
-  'browser.captionServiceOff': '字幕サービスがオフです。Nola の「動画字幕」設定でサービスを有効にしてください。',
+  'browser.captionServiceOff': '字幕サービスがオフです。Nola の「ブラウザー字幕」設定でサービスを有効にしてください。',
   'browser.error': '字幕を開始できませんでした。Nola が起動しており、ブラウザー字幕が有効か確認してください。',
   'browser.protocolValidationFailed': 'エンジン通信の検証に失敗しました。字幕をもう一度有効にし、繰り返し発生する場合は Nola を再起動してください。',
   'browser.sessionInvalidStream': '字幕ストリームは無効になりました。字幕をもう一度有効にしてください。',
@@ -371,10 +373,10 @@ const jaMessages: Record<DictionaryKey, string> = {
   'homeRecordsUi.meetings': '会議と学習',
   'homeRecordsUi.live': 'ライブ配信',
   'homeRecordsUi.quickDescription': '音声をリアルタイムで認識・翻訳\n多言語の翻訳に対応',
-  'homeRecordsUi.overlayDescription': 'リアルタイム翻訳字幕\nデスクトップ上に表示',
+  'homeRecordsUi.overlayDescription': 'ブラウザー拡張機能で動画音声を取得\n音声をリアルタイムで認識・翻訳',
   'homeRecordsUi.recordsDescription': 'セッションの確認と名前変更\n保存した文字起こしをエクスポート',
   'homeRecordsUi.modelsDescription': '音声認識・翻訳モデルを\n管理して切り替え',
-  'homeRecordsUi.openOverlay': '字幕オーバーレイを開く',
+  'homeRecordsUi.openOverlay': 'ブラウザー字幕を開く',
   'homeRecordsUi.openRecords': '記録を表示',
   'homeRecordsUi.openModels': 'モデルを管理',
   'homeRecordsUi.allRecords': 'すべての記録を表示',
@@ -468,7 +470,7 @@ const jaMessages: Record<DictionaryKey, string> = {
   'modelsSettingsUi.cloudService': "カスタムモデル",
   'modelsSettingsUi.noConfigurationRequired': '設定不要',
   'modelsSettingsUi.addToInstalled': 'インストール済みに追加',
-  'modelsSettingsUi.cloudDescription': "OpenAI Chat Completions、Responses、Anthropic、Ollama などのプロトコルに対応。快適に利用するため、出力の速いモデルを推奨します。",
+  'modelsSettingsUi.cloudDescription': "OpenAI Chat Completions と Responses API、Anthropic Messages、Ollama Chat API 形式に対応しています。",
   'modelsSettingsUi.microsoftDescription': "Microsoft が提供。中国語、英語、日本語などの多言語翻訳に対応。API キーの設定が必要です。",
   'modelsSettingsUi.mymemoryDescription': "Translated が提供。中国語、英語、日本語などの多言語翻訳に対応。API キーの設定は不要です。",
   'modelsSettingsUi.googleDescription': "Google が提供。中国語、英語、日本語などの多言語翻訳に対応。API キーの設定が必要です。",
@@ -522,7 +524,7 @@ const jaMessages: Record<DictionaryKey, string> = {
   'language.ja': '日本語',
   'language.en': 'English',
   'home.quickStart': 'リアルタイム通訳',
-  'home.overlayCaptions': '字幕オーバーレイ',
+  'home.overlayCaptions': 'ブラウザー字幕',
   'home.records': '通訳記録',
   'home.models': 'モデル管理',
   'home.recentMeetings': '最近の通訳',
@@ -582,9 +584,9 @@ const jaMessages: Record<DictionaryKey, string> = {
   'workspace.nothingYetHint': 'セッションを開始すると、認識された文がここに順番に表示されます。',
   'workspace.sourcePanel': 'リアルタイム文字起こし',
   'workspace.translationPanel': '翻訳結果',
-  'videoCaptions.title': '動画字幕',
+  'videoCaptions.title': 'ブラウザー字幕',
   'videoCaptions.captionPreview': '字幕プレビュー',
-  'videoCaptions.settings': '動画字幕の設定',
+  'videoCaptions.settings': 'ブラウザー字幕の設定',
   'videoCaptions.openBrowser': 'ブラウザーを開く',
   'videoCaptions.audioSource': '入力ソース',
   'videoCaptions.tabAudio': 'タブの音声',

@@ -1,9 +1,11 @@
+import { localCallTw } from './local-call-ui'
 import { offlineTw } from './offline-ui'
 import type { Dictionary } from './zh-CN'
 import { onboardingTW } from './onboarding-ui'
 
 /** Complete Traditional Chinese dictionary for Taiwan. */
 export const zhTW: Dictionary = {
+  localCall: localCallTw,
   offline: offlineTw,
   onboarding: onboardingTW,
   startup: {
@@ -126,7 +128,7 @@ export const zhTW: Dictionary = {
     "statusRecognizing": "辨識中",
     "configManagedByDesktop": "字幕樣式與語言在 Nola 軟體中修改",
     "shareTabAudio": "共享本頁音訊",
-    "captionServiceOff": "字幕服務未開啟，請先在 Nola 軟體的「影片字幕」頁開啟字幕服務。",
+    "captionServiceOff": "字幕服務未開啟，請先在 Nola 軟體的「瀏覽器字幕」頁開啟字幕服務。",
     "error": "字幕啟動失敗，請確認 Nola 正在執行且已啟用瀏覽器字幕。",
     "protocolValidationFailed": "引擎通訊校驗失敗，請重新開啟字幕；若反覆出現請重啟 Nola。",
     "sessionInvalidStream": "字幕串流已失效，請重新開啟字幕。",
@@ -378,10 +380,10 @@ export const zhTW: Dictionary = {
     "meetings": "會議與學習",
     "live": "直播場景",
     "quickDescription": "即時語音辨識與翻譯\n支援多語言互譯",
-    "overlayDescription": "即時翻譯字幕\n支援桌面懸浮顯示",
+    "overlayDescription": "透過瀏覽器擴充功能取得影片音訊\n即時辨識語音並顯示翻譯字幕",
     "recordsDescription": "檢視、編輯\n匯出歷史記錄",
     "modelsDescription": "管理和切換\n翻譯與辨識模型",
-    "openOverlay": "開啟懸浮字幕",
+    "openOverlay": "開啟瀏覽器字幕",
     "openRecords": "檢視記錄",
     "openModels": "進入管理",
     "allRecords": "檢視全部記錄",
@@ -480,7 +482,7 @@ export const zhTW: Dictionary = {
     "cloudService": "自訂模型",
     "noConfigurationRequired": "無需設定",
     "addToInstalled": "新增至已安裝",
-    "cloudDescription": "支援 OpenAI Chat Completions、Responses、Anthropic 和 Ollama 等協定。為確保使用體驗，建議使用輸出速度快的自訂模型。",
+    "cloudDescription": "支援 OpenAI Chat Completions、Responses、Anthropic Messages 和 Ollama Chat 等介面協定。",
     "microsoftDescription": "由 Microsoft 提供服務，支援中文、英語、日語等多語言翻譯，需設定 API 金鑰。",
     "mymemoryDescription": "由 Translated 提供服務，支援中文、英語、日語等多語言翻譯，無需設定 API 金鑰。",
     "googleDescription": "由 Google 提供服務，支援中文、英語、日語等多語言翻譯，需設定 API 金鑰。",
@@ -546,7 +548,7 @@ export const zhTW: Dictionary = {
   },
   "home": {
     "quickStart": "快速口譯",
-    "overlayCaptions": "懸浮字幕",
+    "overlayCaptions": "瀏覽器字幕",
     "records": "口譯記錄",
     "models": "模型管理",
     "recentMeetings": "最近的口譯",
@@ -614,9 +616,9 @@ export const zhTW: Dictionary = {
     "translationPanel": "翻譯結果"
   },
   "videoCaptions": {
-    "title": "影片字幕",
+    "title": "瀏覽器字幕",
     "captionPreview": "字幕預覽",
-    "settings": "影片字幕設定",
+    "settings": "瀏覽器字幕設定",
     "openBrowser": "開啟瀏覽器",
     "audioSource": "輸入聲源",
     "tabAudio": "標籤頁聲音",

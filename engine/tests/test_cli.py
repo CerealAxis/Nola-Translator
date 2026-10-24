@@ -1,12 +1,14 @@
 import io
 import json
 import queue
+import asyncio
 import subprocess
 import sys
 import threading
+import types
+from types import SimpleNamespace
 from unittest import mock
 
-from nola_translator_engine.__main__ import _redirect_third_party_stdout
 from nola_translator_engine.protocol import MAX_PROTOCOL_LINE_BYTES
 
 
@@ -38,6 +40,7 @@ def test_third_party_stdout_noise_never_reaches_protocol_channel() -> None:
     """
     protocol_out = io.StringIO()
     log_out = io.StringIO()
+    from nola_translator_engine.__main__ import _redirect_third_party_stdout
     with mock.patch("sys.stdout", protocol_out), mock.patch("sys.stderr", log_out):
         saved = _redirect_third_party_stdout()
         assert saved is protocol_out
@@ -102,3 +105,47 @@ def test_jsonl_cli_handles_handshake_errors_size_limit_and_shutdown() -> None:
         if process.poll() is None:
             process.kill()
             process.wait(timeout=2)
+
+
+def test_slow_device_probes_do_not_block_resource_queries(monkeypatch) -> None:
+    """Cold GPU and WASAPI probes must not block unrelated startup queries."""
+    try:
+        import pyaudiowpatch  # noqa: F401
+    except ModuleNotFoundError:
+        monkeypatch.setitem(sys.modules, "pyaudiowpatch", types.SimpleNamespace(paWASAPI=13, PyAudio=object))
+    from nola_translator_engine import runtime as runtime_module
+    from nola_translator_engine.__main__ import _run
+
+    commands = iter([
+        b'{"protocolVersion":1,"type":"hello","requestId":"hello","clientVersion":"test"}\n',
+        b'{"protocolVersion":1,"type":"listComputeDevices","requestId":"compute"}\n',
+        b'{"protocolVersion":1,"type":"listDevices","requestId":"devices"}\n',
+        b'{"protocolVersion":1,"type":"listResources","requestId":"resources"}\n',
+        b'{"protocolVersion":1,"type":"shutdown","requestId":"shutdown"}\n',
+        b"",
+    ])
+    handled: list[str] = []
+
+    class FakeRuntime:
+        def __init__(self, _model_root, _write_event) -> None:
+            self.service = SimpleNamespace(should_exit=False)
+
+        async def handle(self, command):
+            if command.type in ("listComputeDevices", "listDevices"):
+                await asyncio.sleep(0.05)
+            handled.append(command.type)
+            if command.type == "shutdown":
+                self.service.should_exit = True
+            return []
+
+        async def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(runtime_module, "EngineRuntime", FakeRuntime)
+    monkeypatch.setattr(sys, "stdin", SimpleNamespace(buffer=SimpleNamespace(readline=lambda: next(commands))))
+    monkeypatch.setattr(sys, "stdout", io.StringIO())
+    monkeypatch.setattr(sys, "stderr", io.StringIO())
+
+    assert asyncio.run(_run()) == 0
+    assert handled.index("listResources") < handled.index("listComputeDevices")
+    assert handled.index("listResources") < handled.index("listDevices")

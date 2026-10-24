@@ -141,24 +141,34 @@ export async function loadModels(options: { includeDevices?: boolean } = {}): Pr
   if (modelsStore.getState().loading) return
   const includeDevices = options.includeDevices ?? true
   modelsStore.setState({ loading: true, error: null })
+  // Credential flags come from the settings IPC, not from the engine, so they are fetched on
+  // their own: a cold engine can let `listResources` time out, and failing the whole call with
+  // it left every credential-gated cloud card reading as unconfigured — its default button
+  // disabled — even though the catalog still filled in from the engine's `resources` event.
+  const credentials = loadCredentials(bridge).then(
+    (flags) => {
+      modelsStore.setState({ credentials: flags })
+      return flags
+    },
+    () => modelsStore.getState().credentials,
+  )
   try {
     // Both engine calls block until the handshake finishes, so on a cold start this
     // resolves after the engine is up rather than answering empty. Preflight can skip
     // the independent device probe so a transient enumeration fault does not hide models.
     // Keep that isolation for the normal load too: device enumeration is not required to show
     // the model catalog, and a transient audio-device fault must not discard a good resource list.
-    const [snapshot, devices, credentials] = await Promise.all([
+    const [snapshot, devices] = await Promise.all([
       bridge.engine.listResources(),
       includeDevices
         ? bridge.engine.listDevices().catch(() => modelsStore.getState().devices)
         : Promise.resolve(modelsStore.getState().devices),
-      loadCredentials(bridge),
     ])
     modelsStore.setState({
       storagePath: snapshot.storagePath,
       resources: snapshot.resources,
       devices,
-      credentials,
+      credentials: await credentials,
       loaded: true,
       loading: false,
     })
@@ -338,6 +348,10 @@ export function attachModelsStore(next: NolaBridge): void {
         break
       case 'ready':
         modelsStore.setState({ engineVersion: event.engineVersion })
+        // A snapshot asked before the handshake finished can time out, and nothing asks again:
+        // the failure would outlive the engine and leave the catalog's error banner — and every
+        // credential-gated card — in place until the window reloads.
+        if (!modelsStore.getState().loaded || modelsStore.getState().error) void loadModels().catch(() => undefined)
         break
       default:
         break

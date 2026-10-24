@@ -127,7 +127,7 @@ export function CloudModelCard({ model, installed = false, onOpen }: CloudModelC
     </div></CardContent>
     <CardFooter className="card__footer">
       {installed ? <>
-        <Button disabled={removing || !model.ready || model.active} onClick={() => void setDefault()}>{model.active ? t('modelsSettingsUi.current') : t('models.setDefault')}</Button>
+        <Button disabled={removing || !model.ready || model.active} onClick={() => void setDefault()}>{model.active ? t('modelsSettingsUi.current') : t(model.profile ? 'localCall.useForTranslation' : 'models.setDefault')}</Button>
         {!model.free && !nativeTranslation ? <Button variant="danger" size="icon" className="models-card__remove" disabled={removing} aria-label={t('modelsSettingsUi.deleteInterface', { name: model.profile?.name ?? name })} onClick={() => void remove()}><Trash2 aria-hidden="true" /></Button> : null}
         <div className="models-card__details"><Button variant="secondary" disabled={removing} onClick={() => onOpen(model.id)}>{t('models.openDetails')}</Button></div>
       </> : <Button disabled={removing || (nativeTranslation && model.ready && model.active)} onClick={() => onOpen(model.id)}>{recommendedActionLabel}</Button>}

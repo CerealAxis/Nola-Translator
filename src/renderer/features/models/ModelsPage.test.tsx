@@ -140,13 +140,23 @@ const customModel = { id: 'custom-first', name: 'First model', endpoint: 'https:
 it('shows named saved models only in installed and leaves the recommended template available', () => {
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModels: [customModel, { ...customModel, id: 'custom-second', name: 'Second model' }] } } })
   render(<ModelsPage />)
-  expect(section('翻译模型').getByText('自定义模型')).toBeInTheDocument()
+  expect(section('语言模型').getByRole('heading', { name: '语言模型' })).toBeInTheDocument()
   expect(screen.queryByText('First model')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
-  expect(section('翻译模型').getByText('First model')).toBeInTheDocument()
-  expect(section('翻译模型').getByText('Second model')).toBeInTheDocument()
+  expect(section('语言模型').getByText('First model')).toBeInTheDocument()
+  expect(section('语言模型').getByText('Second model')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '删除 First model' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '删除 MyMemory 免费翻译' })).not.toBeInTheDocument()
+})
+
+it('offers a saved custom model as the default translation model once its key is stored', () => {
+  stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModels: [customModel] } } })
+  stores.models.setState({ credentials: { ...initialModels.credentials, 'cloud-model:custom-first': true } })
+  render(<ModelsPage />)
+  fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
+  const card = section('语言模型').getByText('First model').closest('[data-slot="card"]') as HTMLElement
+  expect(within(card).getByText('已安装')).toBeInTheDocument()
+  expect(within(card).getByRole('button', { name: '设置为默认翻译模型' })).toBeEnabled()
 })
 
 it('saves a new independent custom model with every translation language selected by default', async () => {

@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   main: {
     plugins: [externalizeDepsPlugin()]
   },
@@ -21,6 +21,7 @@ export default defineConfig({
     }
   },
   renderer: {
+    define: { __NOLA_LOCAL_CALL_DEMO__: JSON.stringify(command === 'serve') },
     resolve: {
       alias: {
         // `@renderer` 是主仓原有的；`@` 是新 UI 带来的。
@@ -37,4 +38,4 @@ export default defineConfig({
     // 加多入口会直接打破这条约定。
     plugins: [react(), tailwindcss()]
   }
-})
+}))
