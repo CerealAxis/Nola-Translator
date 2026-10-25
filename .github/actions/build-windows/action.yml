@@ -13,6 +13,9 @@ outputs:
   edge-extension:
     description: Edge MV3 extension archive
     value: ${{ steps.package.outputs.edge-extension }}
+  firefox-extension:
+    description: Firefox MV3 extension archive
+    value: ${{ steps.package.outputs.firefox-extension }}
 runs:
   using: composite
   steps:

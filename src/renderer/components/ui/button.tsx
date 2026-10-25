@@ -11,7 +11,9 @@ const buttonVariants = cva(
         outline:
           "border-nola-ui-border bg-nola-ui-background hover:bg-nola-ui-muted hover:text-nola-ui-foreground aria-expanded:bg-nola-ui-muted aria-expanded:text-nola-ui-foreground dark:border-nola-ui-input dark:bg-nola-ui-input/30 dark:hover:bg-nola-ui-input/50",
         secondary:
-          "bg-nola-ui-secondary text-nola-ui-secondary-foreground hover:bg-[color-mix(in_oklch,var(--nola-ui-secondary),var(--nola-ui-foreground)_5%)] aria-expanded:bg-nola-ui-secondary aria-expanded:text-nola-ui-secondary-foreground",
+          "border-nola-ui-border bg-surface-tertiary text-nola-ui-foreground hover:bg-[color-mix(in_oklch,var(--surface-tertiary)_88%,var(--foreground))] aria-expanded:bg-surface-tertiary aria-expanded:text-nola-ui-foreground",
+        nav:
+          "border-0 bg-transparent text-nola-ui-foreground data-[active=false]:hover:bg-surface-tertiary aria-expanded:bg-surface-tertiary data-[active=true]:bg-[image:var(--nola-primary-gradient)] data-[active=true]:text-nola-ui-primary-foreground data-[active=true]:shadow-[0_3px_12px_color-mix(in_oklch,var(--accent)_17%,transparent)]",
         destructive:
           "bg-nola-ui-destructive/10 text-nola-ui-destructive hover:bg-nola-ui-destructive/20 focus-visible:border-nola-ui-destructive/40 focus-visible:ring-nola-ui-destructive/20 dark:bg-nola-ui-destructive/20 dark:hover:bg-nola-ui-destructive/30 dark:focus-visible:ring-nola-ui-destructive/40",
         link: "text-nola-ui-primary underline-offset-4 hover:underline",

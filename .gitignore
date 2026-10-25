@@ -9,6 +9,7 @@ coverage/
 /vendor/
 /models/
 .vite/
+.zcode/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

@@ -36,6 +36,7 @@
 .models-source-list__arrow { width:var(--space-2); height:var(--space-2); margin-inline-start:auto; flex-shrink:0; color:var(--muted); }
 .models-overview { padding:20px; border-radius:16px; background:linear-gradient(120deg,var(--accent-soft),color-mix(in oklch,var(--surface) 65%,var(--accent-soft))); }
 .models-overview__heading { display:flex; align-items:center; gap:18px; margin-bottom:20px; }
+.models-overview__actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:var(--space-1); margin-inline-start:auto; }
 .models-overview__heading h1 { font-size:32px; line-height:1.2; font-weight:700; margin:0 0 8px; }
 .models-overview__heading p { margin:0; font-size:14px; color:var(--muted); }
 .models-overview__icon { display:grid; place-items:center; width:68px; height:68px; flex-shrink:0; border-radius:16px; background:var(--success-soft); color:var(--success-soft-foreground); }

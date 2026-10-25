@@ -70,14 +70,17 @@ export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'trans
 export type NolaTranslatorApi = {
   gateway?: import('./model-gateway').ModelGatewayApi
   activity?: import('./feature-activity').FeatureActivityApi
+  onboardingCard?: import('./onboarding-card').OnboardingCardApi
   requestQuit?(): Promise<void>
   confirmQuit?(): Promise<void>
   onQuitRequested?(callback: () => void): () => void
   openWorkbench?(surface: import('./workbench').WorkbenchSurface): Promise<void>
   cancelLanguageModel?(id: string): Promise<void>
+  releaseDirectModel?(): Promise<void>
   agentWorkspace?(action: import('./agent-workspace').WorkspaceAction): Promise<import('./agent-workspace').AgentWorkspaceSnapshot>
   directModel?(request: import('./agent-workspace').DirectModelRequest, inspect?: boolean): Promise<import('./agent-workspace').DirectModelResult>
   streamLanguageModel?(request: import('./language-model').LanguageModelStreamRequest): Promise<void>
+  resolveLanguageModelAudio?(result: import('./language-model').LanguageModelAudioResult): Promise<void>
   onLanguageModelStream?(callback: (event: import('./language-model').LanguageModelStreamEvent) => void): () => void
   offline?: import('./offline').OfflineApi
   openOverlayMenu(request: import('./overlay-menu').OverlayMenuRequest): Promise<void>

@@ -232,6 +232,80 @@ PYTORCH_TTS_SPECS = (
 
 QWEN3_TTS_SPECS = CRISP_TTS_SPECS + LLAMA_TTS_SPECS + PYTORCH_TTS_SPECS
 
+KOKORO_TTS = ModelSpec(
+    "tts-kokoro-crisp-q8-0", "tts-kokoro-crisp-q8-0",
+    "cstr/kokoro-82m-GGUF", "ab19534a3b5cc12bc2741478e9790eadb328654a",
+    (
+        FileEntry("kokoro-82m-q8_0.gguf", 141_322_336,
+                  "3c8b60064b287a10abd35396a59c9981675c618db8bc91bd290db63f55eb492d"),
+        FileEntry("kokoro-voice-af_heart.gguf", 522_784,
+                  "14463a5a5204a16a382b2da87b4b0206fcda225b44b7c4627999eb527f49c018",
+                  repo="cstr/kokoro-voices-GGUF",
+                  revision="1c98db113c69e3feef9644cf0aaec5c0bea02a8e"),
+    ),
+    modelscope_repo="mysteriov/kokoro-82m-GGUF",
+    modelscope_revision="1583b681322fb62fdb0490f82af05b0bf371bccf",
+    modelscope_files=(
+        FileEntry("kokoro-82m-q8_0.gguf", 141_322_336,
+                  "3c8b60064b287a10abd35396a59c9981675c618db8bc91bd290db63f55eb492d",
+                  modelscope_repo="mysteriov/kokoro-82m-GGUF",
+                  modelscope_revision="1583b681322fb62fdb0490f82af05b0bf371bccf"),
+        FileEntry("kokoro-voice-af_heart.gguf", 522_784,
+                  "14463a5a5204a16a382b2da87b4b0206fcda225b44b7c4627999eb527f49c018",
+                  modelscope_repo="mysteriov/kokoro-voices-GGUF",
+                  modelscope_revision="03e0646233c9d6fd6d970eaf8a7b9bd74e207702"),
+    ),
+)
+
+PIPER_TTS = ModelSpec(
+    "tts-piper-crisp-en-gb-cori-medium", "tts-piper-crisp-en-gb-cori-medium",
+    "cstr/piper-voices-GGUF", "d1f80d187a377bb70fe06a064f49856e0972a98a",
+    (FileEntry("piper-en_GB-cori-medium-f16.gguf", 31_418_816,
+               "483cd9dc06a70b2cc63446c29db5b7ada2de0f34a09085359858bfde3151b0bd"),),
+    modelscope_repo="mysteriov/piper-voices-GGUF",
+    modelscope_revision="1af3d1266e50ed6e18ba0a114d987b557d759aa6",
+    modelscope_files=(
+        FileEntry("piper-en_GB-cori-medium-f16.gguf", 31_418_816,
+                  "483cd9dc06a70b2cc63446c29db5b7ada2de0f34a09085359858bfde3151b0bd",
+                  modelscope_repo="mysteriov/piper-voices-GGUF",
+                  modelscope_revision="1af3d1266e50ed6e18ba0a114d987b557d759aa6"),
+    ),
+)
+
+COSYVOICE3_TTS = ModelSpec(
+    "tts-cosyvoice3-crisp-0.5b-q4-k", "tts-cosyvoice3-crisp-0.5b-q4-k",
+    "cstr/cosyvoice3-0.5b-2512-GGUF", "aa0ea5eb7279bcf54668bcbaa7348019de7d7178",
+    (
+        FileEntry("cosyvoice3-llm-q4_k.gguf", 383_891_200,
+                  "33d899490108bce896c3448bca40ebd994daa125ce0b118e6267f6b84fc09530"),
+        FileEntry("cosyvoice3-flow-q8_0.gguf", 360_751_936,
+                  "ab264405ca243baf9aa2f2f26959d213d3e3ca9fb204db2a0b582ed2ca243d86"),
+        FileEntry("cosyvoice3-hift-f16.gguf", 41_601_888,
+                  "6df249e52901714f30f9bb163ff47cedfa56f6df3385567b657610eeb8b8cfd3"),
+        FileEntry("cosyvoice3-voices.gguf", 665_472,
+                  "73b5cac894d8e715d418d0228d2878ad6e836a809ccb85799ff08ae5f63ac6a2"),
+    ),
+    modelscope_repo="mysteriov/cosyvoice3-0.5b-2512-GGUF",
+    modelscope_revision="dd888b2cc495eb9c5de5dc0bd5453ca37172a5e4",
+    modelscope_files=(
+        FileEntry("cosyvoice3-llm-q4_k.gguf", 383_891_200,
+                  "33d899490108bce896c3448bca40ebd994daa125ce0b118e6267f6b84fc09530"),
+        FileEntry("cosyvoice3-flow-q8_0.gguf", 360_751_936,
+                  "ab264405ca243baf9aa2f2f26959d213d3e3ca9fb204db2a0b582ed2ca243d86"),
+        FileEntry("cosyvoice3-hift-f16.gguf", 41_601_888,
+                  "6df249e52901714f30f9bb163ff47cedfa56f6df3385567b657610eeb8b8cfd3"),
+        FileEntry("cosyvoice3-voices.gguf", 665_472,
+                  "73b5cac894d8e715d418d0228d2878ad6e836a809ccb85799ff08ae5f63ac6a2"),
+    ),
+)
+
+ADDITIONAL_TTS_SPECS = (KOKORO_TTS, PIPER_TTS, COSYVOICE3_TTS)
+ADDITIONAL_TTS_NAMES = {
+    KOKORO_TTS.model_id: "Kokoro-82M Q8_0 · CrispASR",
+    PIPER_TTS.model_id: "Piper English (UK) Cori Medium · CrispASR",
+    COSYVOICE3_TTS.model_id: "CosyVoice3 0.5B Q4_K · CrispASR",
+}
+
 
 def _tts_name(model_id: str) -> str:
     size = "0.6B" if "0.6b" in model_id else "1.7B"

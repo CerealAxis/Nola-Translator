@@ -2,6 +2,10 @@
 
 The extension has its own release version in `browser/version.json`. The extension build and desktop compatibility check both read that file. Every extension release must update the version and this log together. Desktop app versions remain independent.
 
+## 1.1.4 — 2026-10-25
+
+- Align extension controls with the shared Nola interface styling.
+
 ## 1.1.3 — 2026-10-18
 
 - Add a Firefox MV3 build, native host registration and desktop connection controls.

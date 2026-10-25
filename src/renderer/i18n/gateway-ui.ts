@@ -1,4 +1,6 @@
 export const gatewayZh = {
+  modelId: 'API 模型 ID', localModel: '对应的本地模型', copyModelId: '复制模型 ID：{model}',
+  modelIdHint: '在第三方应用的「模型」字段填写下方 API 模型 ID。更换默认本地模型后，ID 保持不变。',
   realtimeBrowserHint: '浏览器客户端先用 API 密钥调用 POST /v1/realtime/sessions，再使用响应中的一次性 url 建立 WebSocket 连接。',
 
   capabilityFailed: '{name} 已停止响应',
@@ -41,6 +43,8 @@ export const gatewayZh = {
 }
 
 export const gatewayEn: Record<keyof typeof gatewayZh, string> = {
+  modelId: 'API model ID', localModel: 'Mapped local model', copyModelId: 'Copy model ID: {model}',
+  modelIdHint: 'Enter the API model ID below in the third-party app’s model field. The ID stays the same when you change the default local model.',
   realtimeBrowserHint: 'Browser clients first call POST /v1/realtime/sessions with the API key, then connect a WebSocket using the one-use url in the response.',
 
   capabilityFailed: '{name} is unavailable',
@@ -83,6 +87,8 @@ export const gatewayEn: Record<keyof typeof gatewayZh, string> = {
 }
 
 export const gatewayTw: typeof gatewayEn = {
+  modelId: 'API 模型 ID', localModel: '對應的本機模型', copyModelId: '複製模型 ID：{model}',
+  modelIdHint: '在第三方應用程式的「模型」欄位填入下方 API 模型 ID。更換預設本機模型後，ID 保持不變。',
   realtimeBrowserHint: '瀏覽器用戶端先用 API 金鑰呼叫 POST /v1/realtime/sessions，再使用回應中的一次性 url 建立 WebSocket 連線。',
 
   capabilityFailed: '{name} 已停止回應',
@@ -113,6 +119,8 @@ export const gatewayTw: typeof gatewayEn = {
 }
 export const gatewayHk: typeof gatewayEn = { ...gatewayTw, closeTray: '保留在系統匣', interpretation: '即時傳譯', asr: '語音識別', lan: '本地網絡', actionFailed: '操作失敗，請檢查本機服務和記錄後重試。' }
 export const gatewayJa: typeof gatewayEn = {
+  modelId: 'API モデル ID', localModel: '対応するローカルモデル', copyModelId: 'モデル ID をコピー：{model}',
+  modelIdHint: '外部アプリのモデル欄には、下記の API モデル ID を入力してください。既定のローカルモデルを変更しても ID は変わりません。',
   realtimeBrowserHint: 'ブラウザーは API キーで POST /v1/realtime/sessions を呼び出し、応答に含まれる一度限りの url で WebSocket 接続を作成します。',
 
   capabilityFailed: '{name} を利用できません',
@@ -139,6 +147,8 @@ export const gatewayJa: typeof gatewayEn = {
   examples: '接続例', examplesHint: 'YOUR_API_KEY を上のキーに置き換えてください。モデル ID は GET /v1/models で取得できます。', network: '接続範囲', loopback: 'このコンピューターのみ', lan: 'ローカルネットワーク', lanHint: '他の端末はこのコンピューターの実際の IP アドレスとファイアウォールの許可が必要です。信頼できるアプリとのみキーを共有してください。', port: 'ポート', targetLanguage: '既定の翻訳先言語', configHint: '実行中に設定を変更すると、有効な機能が再読み込みされます。', synthesisDefault: '既定の音声合成モデル', change: '変更', voice: '既定の音声', voiceHint: '音声合成を起動するとモデルで利用可能な音声を表示します。', closeBehavior: 'メインウィンドウを閉じたとき', closeHint: 'トレイに常駐するとローカルサービスは動作し続けます。', closeTray: 'システムトレイに常駐', closeQuit: 'アプリを終了', conflictTitle: '実行中の機能を切り替えますか？', conflictDescription: '{name} がモデルを使用しています。停止すると選択した機能を開始できます。', switchFeature: '停止して開始', workbench: 'ワークベンチ', interpretation: '同時通訳', 'browser-captions': 'ブラウザー字幕', 'model-gateway': 'モデルゲートウェイ', requestFailed: 'リクエスト失敗', duration: '{value} ミリ秒', refresh: '状態を更新',
 }
 export const gatewayKo: typeof gatewayEn = {
+  modelId: 'API 모델 ID', localModel: '연결된 로컬 모델', copyModelId: '모델 ID 복사: {model}',
+  modelIdHint: '외부 앱의 모델 필드에 아래 API 모델 ID를 입력하세요. 기본 로컬 모델을 변경해도 ID는 유지됩니다.',
   realtimeBrowserHint: '브라우저 클라이언트는 API 키로 POST /v1/realtime/sessions를 호출한 후 응답의 일회용 url로 WebSocket에 연결합니다。',
 
   capabilityFailed: '{name}을 사용할 수 없습니다',

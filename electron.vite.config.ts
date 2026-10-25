@@ -32,7 +32,7 @@ export default defineConfig({
     },
     // Base UI components use the existing Tailwind pipeline and product theme cascade.
     // Caption windows share index.html; the standalone agent workbench has its own document.
-    build: { rollupOptions: { input: { main: resolve('src/renderer/index.html'), workbench: resolve('src/renderer/workbench.html') } } },
+    build: { rollupOptions: { input: { main: resolve('src/renderer/index.html'), workbench: resolve('src/renderer/workbench.html'), onboardingCard: resolve('src/renderer/onboarding-card.html') } } },
     plugins: [react(), tailwindcss()]
   }
 })

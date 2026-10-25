@@ -5,6 +5,8 @@ import { loggedHandle } from './logged-ipc'
 import { modelEngines, supportsSelectedEngine } from '../shared/model-engines'
 import { INDEX_TRANSLATE_MODEL_IDS } from '../shared/index-translate'
 import { registerWorkbench, isWorkbenchWindow } from './workbench'
+import { registerOnboardingCard } from './onboardingCard'
+import { closeDirectModelWorker } from './direct-model'
 import { AgentWorkspace } from './agent-workspace'
 import { customModelsOf } from '../shared/custom-models'
 import { captureMainConsole, initializeSessionLog, logActivityTotals, logDiagnostic, relocateSessionLogs } from './session-log'
@@ -59,6 +61,7 @@ let browserConnection: BrowserConnection | null = null
 let tray: NolaTray | null = null
 let gateway: ModelGateway | null = null
 let stopWorkbench: (() => Promise<void>) | null = null
+let stopOnboardingCard: (() => void) | null = null
 let stopSessions: (() => Promise<void>) | null = null
 let closeBehavior: () => AppSettings['closeBehavior'] = () => 'tray'
 let requestQuit: () => void = () => app.quit()
@@ -715,9 +718,10 @@ if (!hasSingleInstanceLock) {
         }
         return models
       },
-      directLaunch,
+      directLaunch, releaseDirectModel: closeDirectModelWorker,
     }, activity)
     stopWorkbench = () => workbench.stop()
+    stopOnboardingCard = registerOnboardingCard(() => settings.current().theme, __dirname, () => mainWindow).stop
     requestQuit = () => {
       if (activity.snapshot().owner) { showMainWindow(); mainWindow?.webContents.send('app:quit-requested') }
       else app.quit()
@@ -756,6 +760,7 @@ app.on('before-quit', (event) => {
   disposeAppIpc?.()
   disposeRuntimeIpc?.()
   tray?.dispose()
+  stopOnboardingCard?.()
   void Promise.allSettled([gateway?.dispose(), stopWorkbench?.(), stopSessions?.(), browserConnection?.dispose(), disposeOfflineIpc?.()])
     .finally(() => engine!.stop())
     .catch((error) => console.error('engine shutdown failed', error))

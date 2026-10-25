@@ -6,9 +6,11 @@ import { z } from 'zod'
 import type { LanguageModelServices } from './language-model'
 import { runDirectModel } from './direct-model'
 import type { AgentProject } from '../shared/agent-workspace'
+import { customModelsOf } from '../shared/custom-models'
 
 export interface AgentToolContext {
   services: LanguageModelServices
+  ownerId: number
   project?: AgentProject
   messages: UIMessage[]
   signal: AbortSignal
@@ -17,6 +19,30 @@ export interface AgentToolContext {
   providerOptions: Record<string, unknown>
   approvedTerminalCallIds: Set<string>
   artifact: (audio: string) => void
+  prepareAudio?: (media: { url: string; mimeType: string }) => Promise<string>
+}
+
+/** Resolve at execution time so a settings change never leaves tools using a stale model. */
+export function defaultAgentModel(services: LanguageModelServices, kind: 'asr' | 'mt' | 'tts'): string {
+  const settings = services.getSettings()
+  if (kind === 'asr') {
+    const provider = settings.recognition.provider ?? 'local'
+    if (provider !== 'local') return `cloud:${provider}`
+    if (settings.recognition.modelId) return `resource:${settings.recognition.modelId}`
+  } else if (kind === 'tts') {
+    if (settings.synthesis.modelId) return `resource:${settings.synthesis.modelId}`
+  } else {
+    const translation = settings.translation
+    if (translation.targetLanguage === 'none') throw new Error('Translation is disabled in Model Management')
+    if (translation.provider === 'local' && translation.localModelId) return `resource:${translation.localModelId}`
+    if (translation.provider === 'cloud') {
+      const profile = customModelsOf(translation).find(item => item.id === (translation.customModelId || 'legacy'))
+      if (profile) return `mt-custom:${profile.id}`
+    } else if (translation.provider === 'recognition') {
+      throw new Error('The active translation provider only works during live recognition; enable an independent default translation model in Model Management')
+    } else if (translation.provider !== 'local') return `cloud:${translation.provider}`
+  }
+  throw new Error(`No default ${kind} model is enabled in Model Management`)
 }
 
 export async function nativeAgentTools(context: AgentToolContext): Promise<ToolSet> {
@@ -28,9 +54,11 @@ export async function nativeAgentTools(context: AgentToolContext): Promise<ToolS
   }
   const readAudio = async (attachment: number | null, path: string | null) => {
     if (attachment !== null) {
-      const files = context.messages.filter(message => message.role === 'user').flatMap(message => message.parts.filter(part => part.type === 'file' && part.mediaType.startsWith('audio/')))
+      const files = context.messages.filter(message => message.role === 'user').flatMap(message => message.parts.filter(part => part.type === 'file' && /^(audio|video)\//.test(part.mediaType)))
       const part = files[attachment]
-      if (part?.type !== 'file' || !part.url.startsWith('data:audio/wav;base64,')) throw new Error('Choose an attached PCM WAV file')
+      if (part?.type !== 'file' || !/^data:(audio|video)\//.test(part.url)) throw new Error('Choose an attached audio or video file')
+      if (context.prepareAudio) return context.prepareAudio({ url: part.url, mimeType: part.mediaType })
+      if (!part.url.startsWith('data:audio/wav;base64,')) throw new Error('Audio preparation is unavailable')
       return part.url
     }
     const root = await checkProject()
@@ -41,28 +69,47 @@ export async function nativeAgentTools(context: AgentToolContext): Promise<ToolS
     return 'data:audio/wav;base64,' + (await readFile(file)).toString('base64')
   }
   const tools: ToolSet = {
-    list_models: tool({ description: 'List installed and configured speech recognition, translation and synthesis models. Use these exact IDs in model tools.', inputSchema: z.object({}), execute: async () => services.listDirectModels ? services.listDirectModels() : [] }),
-    recognize_audio: tool({ description: 'Transcribe an attached WAV (zero-based index among all user audio attachments) or a WAV file within the selected project using an installed/configured ASR model.',
-      inputSchema: z.object({ model: z.string(), attachment: z.number().int().nonnegative().nullable(), path: z.string().nullable(), language: z.string() }),
-      execute: async args => runDirectModel(services, { id: randomUUID(), model: args.model, kind: 'asr', audio: await readAudio(args.attachment, args.path), source: args.language }, context.signal) }),
-    translate_text: tool({ description: 'Translate text using an installed or configured translation model. Does not execute instructions inside the text.',
-      inputSchema: z.object({ model: z.string(), text: z.string(), source: z.string(), target: z.string() }),
-      execute: async args => runDirectModel(services, { ...args, id: randomUUID(), kind: 'mt' }, context.signal) }),
-    translate_image: tool({ description: 'Translate a user image attachment with an Index-Translate model. Index is zero-based among all user image attachments.',
-      inputSchema: z.object({ model: z.string(), attachment: z.number().int().nonnegative(), source: z.string(), target: z.string() }),
+    list_models: tool({ description: 'Show the currently enabled default ASR, translation and synthesis models from Model Management. All model tools automatically use these defaults.', inputSchema: z.object({}), execute: async () => {
+      const catalog = await services.listDirectModels?.() ?? []
+      return (['asr', 'mt', 'tts'] as const).map(kind => {
+        try { const model = defaultAgentModel(services, kind); return { kind, model, name: catalog.find(item => item.model === model)?.name ?? model, default: true } }
+        catch (error) { return { kind, default: true, error: error instanceof Error ? error.message : 'Default model unavailable' } }
+      })
+    } }),
+    recognize_audio: tool({ description: 'Transcribe an attached audio/video file (zero-based among all user audio/video attachments) or a project WAV file. Always uses the current enabled default ASR model from Model Management.',
+      inputSchema: z.object({ attachment: z.number().int().nonnegative().nullable(), path: z.string().nullable(), language: z.string() }),
+      execute: async args => {
+        const model = defaultAgentModel(services, 'asr')
+        const result = await runDirectModel(services, { id: randomUUID(), model, kind: 'asr', audio: await readAudio(args.attachment, args.path), source: args.language || services.getSettings().recognition.sourceLanguage }, context.signal, false, context.ownerId)
+        return { ...result, model }
+      } }),
+    translate_text: tool({ description: 'Translate text using the current enabled default translation model from Model Management. Does not execute instructions inside the text.',
+      inputSchema: z.object({ text: z.string(), source: z.string(), target: z.string() }),
+      execute: async args => {
+        const model = defaultAgentModel(services, 'mt')
+        return { ...await runDirectModel(services, { ...args, model, target: args.target || services.getSettings().translation.targetLanguage, id: randomUUID(), kind: 'mt' }, context.signal, false, context.ownerId), model }
+      } }),
+    translate_image: tool({ description: 'Translate a user image attachment using the current default translation model, which must support images. Index is zero-based among all user image attachments.',
+      inputSchema: z.object({ attachment: z.number().int().nonnegative(), source: z.string(), target: z.string() }),
       execute: async args => {
         const part = context.messages.filter(message => message.role === 'user').flatMap(message => message.parts.filter(item => item.type === 'file' && item.mediaType.startsWith('image/')))[args.attachment]
         if (part?.type !== 'file' || !part.url.startsWith('data:image/')) throw new Error('Choose an attached image')
-        return runDirectModel(services, { id: randomUUID(), model: args.model, kind: 'mt', source: args.source, target: args.target, image: part.url }, context.signal)
+        const model = defaultAgentModel(services, 'mt')
+        return { ...await runDirectModel(services, { id: randomUUID(), model, kind: 'mt', source: args.source, target: args.target || services.getSettings().translation.targetLanguage, image: part.url }, context.signal, false, context.ownerId), model }
       } }),
-    synthesize_speech: tool({ description: 'Synthesize text with an installed TTS model and voice. The audio is attached to the conversation automatically.',
-      inputSchema: z.object({ model: z.string(), text: z.string(), voice: z.string() }), execute: async args => {
-        const result = await runDirectModel(services, { ...args, id: randomUUID(), kind: 'tts' }, context.signal)
+    synthesize_speech: tool({ description: 'Synthesize text using the current default synthesis model and voice from Model Management. Use an empty voice for the default voice. The resulting audio is attached automatically.',
+      inputSchema: z.object({ text: z.string(), voice: z.string() }), execute: async args => {
+        const model = defaultAgentModel(services, 'tts')
+        const result = await runDirectModel(services, { ...args, model, voice: args.voice || services.getSettings().synthesis.voice, id: randomUUID(), kind: 'tts' }, context.signal, false, context.ownerId)
+        if (!result.audio) throw new Error('The default synthesis model returned no audio')
         if (result.audio) context.artifact(result.audio)
-        return { text: result.text, voices: result.voices, audioAttached: !!result.audio }
+        return { text: result.text, voices: result.voices, audioAttached: !!result.audio, model }
       } }),
-    list_voices: tool({ description: 'Inspect real voice names exposed by an installed TTS model before synthesizing speech.', inputSchema: z.object({ model: z.string() }),
-      execute: async args => runDirectModel(services, { id: randomUUID(), model: args.model, kind: 'tts' }, context.signal, true) }),
+    list_voices: tool({ description: 'Inspect available voices of the current default synthesis model from Model Management.', inputSchema: z.object({}),
+      execute: async () => {
+        const model = defaultAgentModel(services, 'tts')
+        return { ...await runDirectModel(services, { id: randomUUID(), model, kind: 'tts' }, context.signal, true, context.ownerId), model }
+      } }),
   }
   if (project && workspace) {
     tools.list_project_files = tool({ description: 'List up to 200 entries in a directory within the selected project. Use dot for the project root.', inputSchema: z.object({ path: z.string() }),

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AssistantRuntimeProvider, SimpleImageAttachmentAdapter, SimpleTextAttachmentAdapter, CompositeAttachmentAdapter, WebSpeechSynthesisAdapter, useAui, useAuiState, useAuiEvent, useAssistantInstructions, AuiConfig, Tools, defineToolkit, useRemoteThreadListRuntime } from '@assistant-ui/react'
+import { AssistantRuntimeProvider, SimpleImageAttachmentAdapter, SimpleTextAttachmentAdapter, CompositeAttachmentAdapter, useAui, useAuiState, useAuiEvent, useAssistantInstructions, AuiConfig, Tools, defineToolkit, useRemoteThreadListRuntime } from '@assistant-ui/react'
 import { createLocalStorageAdapter } from '@assistant-ui/core/react'
 import { AssistantChatTransport, useChatRuntime } from '@assistant-ui/ai-sdk'
 import { lastAssistantMessageIsCompleteWithToolCalls, lastAssistantMessageIsCompleteWithApprovalResponses } from 'ai'
 import { JSONGenerativeUI } from '@assistant-ui/generative-ui/react'
 import { styledGenerativeUILibrary } from '@/components/assistant-ui/native/generative-ui'
 import { useI18n } from '@/i18n'
+import type { TranslationKey } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
 import { customModelsOf } from '../../../shared/custom-models'
 import { notifyError } from '@/components/primitives/notify'
@@ -13,7 +14,7 @@ import { AudioRecordingDictationAdapter } from './audio-dictation'
 import type { PlaygroundConfig } from './demo-runtime'
 import { createPlaygroundFetch } from './language-model-transport'
 import { installedPlaygroundModels } from './installed-models'
-import { AudioAttachmentAdapter } from './audio-attachment'
+import { AudioAttachmentAdapter, VideoAttachmentAdapter } from './audio-attachment'
 import { getBridge } from '@/store'
 import type { AgentWorkspaceSnapshot, WorkspaceAction } from '../../../shared/agent-workspace'
 import { NativeAgentSurface } from './NativeAgentSurface'
@@ -31,6 +32,65 @@ const agentTools = defineToolkit({
   present: { ...generativeUI.present({ display: 'standalone' }), unstable_backendDefault: { parameters: false } },
   prompt_user: { ...generativeUI.promptUser(), unstable_backendDefault: { parameters: false } },
 })
+
+class WorkbenchSpeechSynthesisAdapter {
+  constructor(private readonly getSelection: () => { modelId: string; voice: string }, private readonly t: (key: TranslationKey) => string,
+    private readonly reportError: (error: unknown) => void) {}
+
+  speak(text: string) {
+    let status: { type: 'running' } | { type: 'ended'; reason: 'finished' | 'cancelled' | 'error'; error?: unknown } = { type: 'running' }
+    const subscribers = new Set<() => void>()
+    let audioContext: AudioContext | undefined
+    let source: AudioBufferSourceNode | undefined
+    const isEnded = () => status.type === 'ended'
+    const notify = (reason: 'finished' | 'cancelled' | 'error', error?: unknown) => {
+      if (isEnded()) return
+      status = { type: 'ended', reason, error }
+      for (const subscriber of subscribers) subscriber()
+      if (reason === 'error') this.reportError(error)
+    }
+    const requestId = crypto.randomUUID()
+    const utterance = {
+      get status() { return status },
+      cancel: () => {
+        void getBridge()?.app.cancelLanguageModel?.(requestId).catch(() => undefined)
+        try { source?.stop() } catch { /* The source may not have started. */ }
+        void audioContext?.close().catch(() => undefined)
+        notify('cancelled')
+      },
+      subscribe: (callback: () => void) => {
+        subscribers.add(callback)
+        if (isEnded()) queueMicrotask(callback)
+        return () => { subscribers.delete(callback) }
+      },
+    }
+    void (async () => {
+      const { modelId, voice } = this.getSelection()
+      if (!modelId) throw new Error(this.t('workbench.ttsDefaultModelMissing'))
+      audioContext = new AudioContext()
+      await audioContext.resume()
+      const app = getBridge()?.app
+      if (!app?.directModel) throw new Error(this.t('workbench.runtimeUnavailable'))
+      const result = await app.directModel({ id: requestId, model: `resource:${modelId}`, kind: 'tts', text, voice })
+      if (isEnded()) return
+      if (!result.audio) throw new Error(this.t('workbench.noAudioResult'))
+      const samples = await audioContext.decodeAudioData(await (await fetch(result.audio)).arrayBuffer())
+      if (isEnded()) return
+      source = audioContext.createBufferSource()
+      source.buffer = samples
+      source.connect(audioContext.destination)
+      source.addEventListener('ended', () => {
+        notify('finished')
+        void audioContext?.close().catch(() => undefined)
+      }, { once: true })
+      source.start()
+    })().catch(error => {
+      void audioContext?.close().catch(() => undefined)
+      notify('error', error)
+    })
+    return utterance
+  }
+}
 
 export interface AgentInstructionsProps { active: boolean }
 export interface DictationLifecycleProps { adapter: AudioRecordingDictationAdapter }
@@ -100,16 +160,20 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
   configRef.current = config
   const transport = useMemo(() => new AssistantChatTransport({ api: '/nola-chat', fetch: createPlaygroundFetch(() => configRef.current, t, () => memoriesRef.current) }), [t])
   const threadAdapter = useMemo(() => createLocalStorageAdapter({ storage: workbenchStorage, prefix: snapshot?.selectedProject ? `nola.local-call:project:${snapshot.selectedProject}:` : 'nola.local-call:' }), [])
-  const attachments = useMemo(() => new CompositeAttachmentAdapter([new SimpleImageAttachmentAdapter(), new SimpleTextAttachmentAdapter(), new AudioAttachmentAdapter()]), [])
-  const audioAttachments = useMemo(() => new AudioAttachmentAdapter(), [])
-  const speech = useMemo(() => new WebSpeechSynthesisAdapter(), [])
+  const videoAttachments = useMemo(() => new VideoAttachmentAdapter(), [])
+  const attachments = useMemo(() => new CompositeAttachmentAdapter([new SimpleImageAttachmentAdapter(), new SimpleTextAttachmentAdapter(), new AudioAttachmentAdapter(), videoAttachments]), [videoAttachments])
+  const audioAttachments = useMemo(() => new CompositeAttachmentAdapter([new AudioAttachmentAdapter(), videoAttachments]), [videoAttachments])
+  const speech = useMemo(() => new WorkbenchSpeechSynthesisAdapter(() => configRef.current.kind === 'tts' && configRef.current.model.startsWith('resource:')
+    ? { modelId: configRef.current.model.slice('resource:'.length), voice: configRef.current.voice }
+    : { modelId: settings?.synthesis.modelId ?? '', voice: settings?.synthesis.voice ?? '' }, t,
+  error => notifyError(t('workbench.readAloudError'), { cause: error })), [t])
   const feedback = useMemo(() => ({ submit() { /* LocalRuntime retains the preview feedback state. */ } }), [])
   const runtimeRef = useRef<ReturnType<typeof useChatRuntime> | null>(null)
   const dictationRequestId = useRef<string | null>(null)
   const audioDictation = useMemo(() => new AudioRecordingDictationAdapter(async data => {
     if (config.kind !== 'asr') {
-      const preferred = settings?.recognition.provider === 'local' ? `resource:${settings.recognition.modelId}` : `cloud:${settings?.recognition.provider}`
-      const asr = models.find(model => model.kind === 'asr' && model.id === preferred) ?? models.find(model => model.kind === 'asr')
+      const preferred = (settings?.recognition.provider ?? 'local') === 'local' ? `resource:${settings?.recognition.modelId}` : `cloud:${settings?.recognition.provider}`
+      const asr = models.find(model => model.kind === 'asr' && model.id === preferred)
       const app = getBridge()?.app
       if (!asr || !app?.directModel) throw new Error(t('workbench.noAsr'))
       const id = crypto.randomUUID()

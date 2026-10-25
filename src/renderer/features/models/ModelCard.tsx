@@ -36,6 +36,12 @@ export const BUILTIN_DESCRIPTION_KEYS: Readonly<Record<string, TranslationKey>> 
   'index-translate-2b-fp4': 'models.descriptions.indexTranslate2bFp4',
   'index-translate-9b-q4-k-m': 'models.descriptions.indexTranslate9b',
   'index-translate-35b-a3b-q4-k-m': 'models.descriptions.indexTranslate35b',
+  'qwen35-0.8b-q4-k-m': 'models.descriptions.qwen35Small',
+  'qwen35-2b-q4-k-m': 'models.descriptions.qwen35Small',
+  'qwen35-4b-q4-k-m': 'models.descriptions.qwen35Small',
+  'tts-kokoro-crisp-q8-0': 'models.descriptions.kokoroTts',
+  'tts-piper-crisp-en-gb-cori-medium': 'models.descriptions.piperTts',
+  'tts-cosyvoice3-crisp-0.5b-q4-k': 'models.descriptions.cosyvoice3Tts',
 }
 
 export function descriptionKeyOf(record: ResourceRecord): TranslationKey | undefined {

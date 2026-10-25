@@ -18,7 +18,7 @@ class NativeBoundary extends Component<NativeBoundaryProps, { error: Error | nul
 export interface NativeFailureProps { error: Error }
 function NativeFailure({ error }: NativeFailureProps) {
   const { t } = useI18n()
-  return <div className="flex h-full items-center justify-center p-6"><ErrorState title={t('workbench.actionFailed')} detail={error.message} retrying={false} onRetry={() => window.location.reload()} /></div>
+  return <div className="flex h-full items-center justify-center p-6"><ErrorState title={t('workbench.actionFailed')} detail={error.message} retryLabel={t('workbench.retry')} retryingLabel={t('workbench.retrying')} retrying={false} onRetry={() => window.location.reload()} /></div>
 }
 
 initStores(createIpcBridge(), { backgroundChecks: false, overlayMenu: true, offline: false })

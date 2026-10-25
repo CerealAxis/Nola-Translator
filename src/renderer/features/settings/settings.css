@@ -92,8 +92,8 @@
 .settings-row__title { display: flex; align-items: center; gap: 0.35rem; }
 .settings-group__title-with-hint { display: flex; align-items: center; gap: var(--space-1); }
 .settings-group__hint { display: inline-flex; align-items: center; }
-.settings-row__help { min-width: 1.5rem; width: 1.5rem; height: 1.5rem; padding: 0; color: var(--muted); background: var(--surface-secondary); }
-.settings-row__help:hover { background: var(--surface-tertiary); }
+.settings-row__help { min-width: 1.5rem; width: 1.5rem; height: 1.5rem; padding: 0; color: var(--muted); border-color: transparent; background: transparent; }
+.settings-row__help:hover { background: var(--surface-secondary); }
 .settings-row__tooltip { max-width: min(24rem, calc(100vw - 2rem)); white-space: normal; }
 
 .settings-notices-dialog {

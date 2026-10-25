@@ -72,8 +72,8 @@ export function OverlayPage() {
           }}><ExternalLink aria-hidden="true" />{t('home.quickStart')}</Button>
           <Button data-onboarding="open-overlay" onClick={() => void open()} disabled={opening} aria-busy={opening}>{opening ? <Spinner /> : <ExternalLink aria-hidden="true" />}{t('shellUi.openOverlay')}</Button>
         </div>} />
-      <Card className="nola-overlay-preview">
-        <CardHeader data-onboarding="caption-preview">
+      <Card className="nola-overlay-preview" data-onboarding="caption-preview">
+        <CardHeader>
           <CardTitle>{t('shellUi.captionPreview')}</CardTitle>
         </CardHeader>
         {/*
@@ -117,8 +117,8 @@ export function OverlayPage() {
           </div>
         </CardContent>
       </Card>
-      <Card className="nola-section-card">
-        <CardHeader data-onboarding="quick-settings"><CardTitle>{t('settings.title')}</CardTitle></CardHeader>
+      <Card className="nola-section-card" data-onboarding="quick-settings">
+        <CardHeader><CardTitle>{t('settings.title')}</CardTitle></CardHeader>
         <CardContent className="nola-overlay-fields">
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('session.recognitionModel')}</span>

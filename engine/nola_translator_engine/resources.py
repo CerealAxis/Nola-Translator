@@ -39,7 +39,9 @@ from .models.catalog import (
     SENSEVOICE_SMALL,
 )
 from .models.manager import ModelManager, ModelSpec
-from .models.crisp_catalog import CRISP_ASR_SPECS, QWEN3_TTS_NAMES, QWEN3_TTS_SPECS
+from .models.crisp_catalog import (ADDITIONAL_TTS_NAMES, ADDITIONAL_TTS_SPECS, CRISP_ASR_SPECS,
+                                   QWEN3_TTS_NAMES, QWEN3_TTS_SPECS)
+from .models.qwen35_catalog import QWEN35_NAMES, QWEN35_SPECS
 from .models.qwen_gguf_catalog import QWEN3_ASR_GGUF_SPECS
 from .models.registry import CustomFile, CustomModelEntry, CustomModelRegistry
 from .local_models import declared_languages_from_snapshot
@@ -240,6 +242,23 @@ RESOURCE_DEFINITIONS = _definitions() + tuple(
         spec.total_bytes,
     )
     for spec in QWEN3_TTS_SPECS
+) + tuple(
+    ResourceDefinition(
+        spec.model_id, "ttsModel", "crisp-tts", ADDITIONAL_TTS_NAMES[spec.model_id],
+        ("Kokoro-82M 多语言轻量语音合成模型；当前预装 af_heart 英语音色。" if "kokoro" in spec.model_id
+         else "Piper 英式英语 Cori 中等音质音色，文件小、合成速度快。" if "piper" in spec.model_id
+         else "CosyVoice3 0.5B 支持 9 种语言及 18 种中文方言，并支持零样本音色克隆。"),
+        (("en", "es", "fr", "hi", "it", "ja", "pt", "zh") if "kokoro" in spec.model_id
+         else ("en",) if "piper" in spec.model_id
+         else ("zh", "en", "ja", "ko", "de", "fr", "es", "it", "ru")),
+        spec.total_bytes,
+    ) for spec in ADDITIONAL_TTS_SPECS
+) + tuple(
+    ResourceDefinition(
+        spec.model_id, "translationModel", "llama.cpp", QWEN35_NAMES[spec.model_id],
+        "Qwen3.5 小型多语言语言模型，使用 Q4_K_M GGUF 并由 llama.cpp 本地运行。",
+        tuple(normalize(code) for code in FLORES_LANGUAGES), spec.total_bytes,
+    ) for spec in QWEN35_SPECS
 )
 RESOURCE_BY_ID = {item.resource_id: item for item in RESOURCE_DEFINITIONS}
 
@@ -747,6 +766,8 @@ class ResourceManager:
             **{spec.model_id: spec for spec in CRISP_ASR_SPECS},
             **{spec.model_id: spec for spec in QWEN3_TTS_SPECS},
             **{spec.model_id: spec for spec in QWEN3_ASR_GGUF_SPECS},
+            **{spec.model_id: spec for spec in ADDITIONAL_TTS_SPECS},
+            **{spec.model_id: spec for spec in QWEN35_SPECS},
         }.get(resource_id)
         if builtin is not None:
             return builtin

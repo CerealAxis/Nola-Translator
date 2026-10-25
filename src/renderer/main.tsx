@@ -281,7 +281,7 @@ function Root() {
       <ModelCapabilityNotices />
       <RuntimeNotice />
       <RuntimeOperationNotice />
-      <AppUpdateNotice />
+      <AppUpdateNotice isAppReady={!isIpcBridgeAvailable() || engineSettled || startupTimedOut} />
       <StartupFailureDialog
         isOpen={!startupDialogDismissed && (engineStatus === 'failed' || (startupTimedOut && engineStatus !== 'ready'))}
         onOpenChange={open => { if (!open) setStartupDialogDismissed(true) }}

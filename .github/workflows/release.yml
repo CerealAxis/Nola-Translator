@@ -34,6 +34,7 @@ jobs:
           source: ${{ steps.package.outputs.source }}
           chrome-extension: ${{ steps.package.outputs.chrome-extension }}
           edge-extension: ${{ steps.package.outputs.edge-extension }}
+          firefox-extension: ${{ steps.package.outputs.firefox-extension }}
           retention-days: 30
       - name: Publish release assets
         shell: pwsh

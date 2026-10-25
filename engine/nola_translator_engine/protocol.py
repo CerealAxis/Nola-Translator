@@ -491,7 +491,7 @@ class ResourceRecord(ProtocolModel):
 class ResourcesEvent(Envelope):
     type: Literal["resources"]
     storagePath: str = Field(min_length=1, max_length=2048)
-    resources: list[ResourceRecord] = Field(max_length=64)
+    resources: list[ResourceRecord] = Field(max_length=128)
 
 
 class ResourceActionResultEvent(Envelope):

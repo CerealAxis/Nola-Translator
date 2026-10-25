@@ -12,7 +12,7 @@ export function NavigationItem({ id, icon: Icon, label, active = false, onPress 
   return (
     <Tooltip>
       <TooltipTrigger delay={400} render={<Button
-        variant={active ? 'default' : 'secondary'}
+        variant="nav"
         size="icon"
         onClick={onPress}
         aria-label={label}

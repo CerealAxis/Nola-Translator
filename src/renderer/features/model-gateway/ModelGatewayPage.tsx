@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Copy, Eye, EyeOff, RotateCcw } from 'lucide-react'
+import { Activity, Copy, Eye, EyeOff, Mic, Languages, RotateCcw, Volume2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { getBridge, stores, updateSettings, useStore } from '@/store'
 import { useRoute } from '@/routes'
@@ -7,7 +7,8 @@ import { requestFeatureStart } from '@/components/primitives/FeatureActivityNoti
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Switch, SwitchThumb } from '@/components/ui/switch'
@@ -21,6 +22,7 @@ import { translationLanguages } from '../../../shared/model-capabilities'
 import './model-gateway.css'
 
 const CAPABILITIES: GatewayCapability[] = ['asr', 'mt', 'tts']
+const REQUEST_ICONS = { asr: Mic, mt: Languages, tts: Volume2 }
 
 export function ModelGatewayPage() {
   const { t, language } = useI18n()
@@ -102,7 +104,7 @@ socket.on('open', async () => {
       const result = running ? await api.stop() : await requestFeatureStart(() => api.start(), 'model-gateway')
       if (result) setSnapshot(result)
     }, true)}>{t(running ? 'gateway.stop' : 'gateway.start')}</Button></header>
-    <Card><CardHeader><CardTitle>{t('gateway.service')}</CardTitle><CardDescription><Badge variant={snapshot.state === 'running' ? 'success' : snapshot.state === 'failed' ? 'danger' : 'secondary'}>{t(`gateway.${snapshot.state}`)}</Badge></CardDescription></CardHeader>
+    <Card data-onboarding="gateway-service"><CardHeader><CardTitle>{t('gateway.service')}</CardTitle><CardDescription><Badge variant={snapshot.state === 'running' ? 'success' : snapshot.state === 'failed' ? 'danger' : 'secondary'}>{t(`gateway.${snapshot.state}`)}</Badge></CardDescription></CardHeader>
       <CardContent><FieldGroup>
         <Field><FieldLabel htmlFor="gateway-address">{t('gateway.address')}</FieldLabel><div className="model-gateway-control"><Input id="gateway-address" readOnly value={address} /><Button variant="secondary" aria-label={t('gateway.copy')} onClick={() => void copy(address)}><Copy aria-hidden="true" data-icon="inline-start" />{t('gateway.copy')}</Button></div></Field>
         <Field><FieldLabel htmlFor="gateway-key">{t('gateway.key')}</FieldLabel><div className="model-gateway-control"><Input id="gateway-key" readOnly type={key === null ? 'password' : 'text'} value={key ?? '••••••••••••••••'} />
@@ -111,9 +113,12 @@ socket.on('open', async () => {
           <Button variant="secondary" aria-label={t('gateway.rotate')} onClick={() => setRotating(true)}><RotateCcw aria-hidden="true" /></Button></div></Field>
         <div className="model-gateway-metrics"><p>{t('gateway.connections')}: <strong>{snapshot.connections}</strong></p><p>{t('gateway.activeRequests')}: <strong>{snapshot.activeRequests}</strong></p></div>
       </FieldGroup></CardContent></Card>
-    <Card><CardHeader><CardTitle>{t('gateway.capabilities')}</CardTitle><CardDescription>{t('gateway.defaultsHint')}</CardDescription></CardHeader><CardContent><FieldGroup>
-      {CAPABILITIES.map(kind => <Field key={kind}><div className="model-gateway-capability"><FieldLabel htmlFor={`gateway-${kind}`}>{t(`gateway.${kind}`)}</FieldLabel><Switch id={`gateway-${kind}`} disabled={busy} checked={config[kind]} onCheckedChange={checked => { void perform(() => updateSettings({ modelGateway: { [kind]: checked } })) }}><SwitchThumb /></Switch></div>
-        <FieldDescription>{serviceName(kind)}{config[kind] ? <> · <Badge variant={snapshot.services[kind].state === 'ready' ? 'success' : snapshot.services[kind].state === 'failed' ? 'danger' : 'secondary'}>{t(`gateway.${snapshot.services[kind].state}`)}</Badge></> : null}</FieldDescription>
+    <Card data-onboarding="gateway-capabilities"><CardHeader><CardTitle>{t('gateway.capabilities')}</CardTitle><CardDescription>{t('gateway.modelIdHint')}</CardDescription><CardDescription>{t('gateway.defaultsHint')}</CardDescription></CardHeader><CardContent><FieldGroup>
+      {CAPABILITIES.map(kind => <Field key={kind} className="model-gateway-capability-row"><div className="model-gateway-capability"><div className="model-gateway-capability-title"><FieldLabel htmlFor={`gateway-${kind}`}>{t(`gateway.${kind}`)}</FieldLabel>{config[kind] ? <Badge variant={snapshot.services[kind].state === 'ready' ? 'success' : snapshot.services[kind].state === 'failed' ? 'danger' : 'secondary'}>{t(`gateway.${snapshot.services[kind].state}`)}</Badge> : null}</div><Switch id={`gateway-${kind}`} disabled={busy} checked={config[kind]} onCheckedChange={checked => { void perform(() => updateSettings({ modelGateway: { [kind]: checked } })) }}><SwitchThumb /></Switch></div>
+        <dl className="model-gateway-model-mapping">
+          <div><dt>{t('gateway.modelId')}</dt><dd className="model-gateway-model-id"><code>{`nola-${kind}`}</code><Button variant="tertiary" size="icon-sm" aria-label={t('gateway.copyModelId', { model: `nola-${kind}` })} title={t('gateway.copyModelId', { model: `nola-${kind}` })} onClick={() => void copy(`nola-${kind}`)}><Copy aria-hidden="true" /></Button></dd></div>
+          <div><dt>{t('gateway.localModel')}</dt><dd className="model-gateway-local-model">{serviceName(kind)}</dd></div>
+        </dl>
         {config[kind] && snapshot.services[kind].state === 'failed' ? <Alert variant="danger"><AlertDescription>{t('gateway.serviceFailed')}</AlertDescription></Alert> : null}
       </Field>)}
       <Button variant="secondary" onClick={() => navigate('#/models')}>{t('gateway.models')}</Button>
@@ -122,7 +127,35 @@ socket.on('open', async () => {
       <Field><FieldLabel htmlFor="gateway-target">{t('gateway.targetLanguage')}</FieldLabel><Select value={config.targetLanguage} onValueChange={targetLanguage => { if (targetLanguage) void perform(() => updateSettings({ modelGateway: { targetLanguage } })) }}><SelectTrigger id="gateway-target"><SelectValue>{languageName(config.targetLanguage, language)}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{targetLanguages.map(code => <SelectItem key={code} value={code}>{languageName(code, language)}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
       <FieldDescription>{t('gateway.configHint')}</FieldDescription>
     </FieldGroup></CardContent></Card>
-    <Card><CardHeader><CardTitle>{t('gateway.requests')}</CardTitle></CardHeader><CardContent>{snapshot.requests.length ? <ul className="model-gateway-requests">{snapshot.requests.map(request => <li key={request.id}><span>{t(`gateway.${request.kind}`)} · {request.model}</span><Badge variant={request.status === 'failed' ? 'danger' : 'secondary'}>{t(`gateway.${request.status}`)}</Badge>{request.durationMs !== undefined ? <span>{t('gateway.duration', { value: request.durationMs })}</span> : null}</li>)}</ul> : <p>{t('gateway.noRequests')}</p>}</CardContent></Card>
+    <Card>
+      <CardHeader>
+        <CardTitle id="gateway-requests-title">{t('gateway.requests')}</CardTitle>
+        <CardAction><Badge variant="secondary">{snapshot.requests.length}</Badge></CardAction>
+      </CardHeader>
+      <CardContent>
+        {snapshot.requests.length ? <div className="model-gateway-requests-scroll" role="region" aria-labelledby="gateway-requests-title" tabIndex={0}>
+          <ul className="model-gateway-requests">
+            {snapshot.requests.map(request => {
+              const Icon = REQUEST_ICONS[request.kind]
+              return <li key={request.id}>
+                <span className="model-gateway-request-icon"><Icon aria-hidden="true" /></span>
+                <div className="model-gateway-request-info">
+                  <div className="model-gateway-request-heading">
+                    <span>{t(`gateway.${request.kind}`)}</span>
+                    <time dateTime={new Date(request.startedAt).toISOString()}>{new Date(request.startedAt).toLocaleTimeString(language)}</time>
+                  </div>
+                  <span className="model-gateway-request-model truncate" title={request.model}>{request.model}</span>
+                </div>
+                <div className="model-gateway-request-result">
+                  <Badge variant={request.status === 'failed' ? 'danger' : request.status === 'completed' ? 'success' : request.status === 'running' ? 'accent' : 'secondary'}>{t(`gateway.${request.status}`)}</Badge>
+                  {request.durationMs !== undefined ? <span className="model-gateway-request-duration">{t('gateway.duration', { value: request.durationMs })}</span> : null}
+                </div>
+              </li>
+            })}
+          </ul>
+        </div> : <Empty><EmptyHeader><EmptyMedia variant="icon"><Activity aria-hidden="true" /></EmptyMedia><EmptyTitle>{t('gateway.noRequests')}</EmptyTitle></EmptyHeader></Empty>}
+      </CardContent>
+    </Card>
     <Card><CardHeader><CardTitle>{t('gateway.examples')}</CardTitle><CardDescription>{t('gateway.examplesHint')}</CardDescription></CardHeader><CardContent><Tabs defaultValue="mt"><TabsList aria-label={t('gateway.examples')}>{CAPABILITIES.map(kind => <TabsTrigger key={kind} value={kind}>{t(`gateway.${kind}`)}</TabsTrigger>)}<TabsTrigger value="realtime">{t('gateway.realtime')}</TabsTrigger></TabsList>{CAPABILITIES.map(kind => <TabsContent key={kind} value={kind}><pre className="model-gateway-example"><code>{example(kind)}</code></pre><Button variant="secondary" onClick={() => void copy(example(kind))}>{t('gateway.copy')}</Button></TabsContent>)}<TabsContent value="realtime"><FieldDescription>{t('gateway.realtimeHint')}</FieldDescription><FieldDescription>{t('gateway.realtimeBrowserHint')}</FieldDescription><pre className="model-gateway-example"><code>{realtimeExample}</code></pre><Button variant="secondary" onClick={() => void copy(realtimeExample)}>{t('gateway.copy')}</Button></TabsContent></Tabs></CardContent></Card>
     <Dialog open={rotating} onOpenChange={setRotating}><DialogContent><DialogHeader><DialogTitle>{t('gateway.rotateTitle')}</DialogTitle><DialogDescription>{t('gateway.rotateDescription')}</DialogDescription></DialogHeader><DialogFooter><Button variant="secondary" onClick={() => setRotating(false)}>{t('common.cancel')}</Button><Button disabled={busy} onClick={() => void perform(async () => { const nextKey = await api.rotateKey(); if (key !== null) setKey(nextKey); setRotating(false) })}>{t('gateway.rotate')}</Button></DialogFooter></DialogContent></Dialog>
   </div>

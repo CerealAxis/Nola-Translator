@@ -82,4 +82,7 @@
 .native-agent-document body { background: var(--background); color: var(--foreground); }
 .native-window-drag { -webkit-app-region: drag; }
 .native-window-action { -webkit-app-region: no-drag; }
-.native-agent-app [data-slot='composer-menu'] { max-height: min(60vh, 28rem); overflow-y: auto; }
+.native-agent-app [data-slot='composer-menu'] { max-height: min(60vh, 28rem); overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.native-agent-app [data-hide-scrollbar]::-webkit-scrollbar,
+.native-agent-app [data-slot='composer-menu']::-webkit-scrollbar { display: none; }
+.native-agent-app [data-hide-scrollbar] { scrollbar-width: none; -ms-overflow-style: none; }

@@ -11,6 +11,8 @@ export interface ErrorStateProps extends Omit<
 > {
   title: string;
   detail: string;
+  retryLabel: string;
+  retryingLabel: string;
   retrying: boolean;
   onRetry: () => void;
 }
@@ -18,6 +20,8 @@ export interface ErrorStateProps extends Omit<
 export function ErrorState({
   title,
   detail,
+  retryLabel,
+  retryingLabel,
   retrying,
   onRetry,
   className,
@@ -38,7 +42,7 @@ export function ErrorState({
       >
         <RefreshCwIcon className="text-muted-foreground size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
         <ShimmerLabel className="text-muted-foreground relative inline-block">
-          Retrying
+          {retryingLabel}
         </ShimmerLabel>
       </div>
     );
@@ -69,7 +73,7 @@ export function ErrorState({
         className="ms-auto flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/10 dark:text-red-400"
       >
         <RefreshCwIcon className="size-3" />
-        Retry
+        {retryLabel}
       </button>
     </div>
   );

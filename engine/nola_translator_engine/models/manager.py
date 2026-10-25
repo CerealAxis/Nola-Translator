@@ -96,6 +96,8 @@ class FileEntry:
     blob_sha1: str | None = None
     repo: str | None = None
     revision: str | None = None
+    modelscope_repo: str | None = None
+    modelscope_revision: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,11 +122,12 @@ class ModelSpec:
             return self.files
         # ModelScope is a separate repository, not a byte-identical HF mirror. Never
         # substitute HF metadata or a moving branch when its own manifest is missing.
-        if (not self.modelscope_repo or not re.fullmatch(r"[0-9a-f]{40}", self.modelscope_revision)
-                or not self.modelscope_files or any(
-                    not entry.sha256 or not re.fullmatch(r"[0-9a-f]{64}", entry.sha256)
-                    for entry in self.modelscope_files
-                )):
+        if (not self.modelscope_files or any(
+                not entry.sha256 or not re.fullmatch(r"[0-9a-f]{64}", entry.sha256)
+                or not (entry.modelscope_repo or self.modelscope_repo)
+                or not re.fullmatch(r"[0-9a-f]{40}", entry.modelscope_revision or self.modelscope_revision)
+                for entry in self.modelscope_files
+        )):
             raise ValueError("modelscopeSourceUnavailable")
         return self.modelscope_files
 
@@ -138,10 +141,12 @@ class ModelSpec:
     ) -> str:
         if source == "modelscope":
             self.files_for(source)
+            repo = entry.modelscope_repo or self.modelscope_repo
+            revision = entry.modelscope_revision or self.modelscope_revision
             if entry.repo:
                 endpoint = HF_MIRROR_ENDPOINT if network is not None and network.useHuggingFaceMirror else HF_ENDPOINT
                 return f"{endpoint}/{entry.repo}/resolve/{entry.revision}/{entry.path}"
-            return f"{MODELSCOPE_ENDPOINT}/{self.modelscope_repo}/resolve/{self.modelscope_revision}/{entry.path}"
+            return f"{MODELSCOPE_ENDPOINT}/{repo}/resolve/{revision}/{entry.path}"
         if source == "huggingface":
             endpoint = HF_ENDPOINT
         elif source == "hf-mirror":

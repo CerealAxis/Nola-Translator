@@ -5065,5 +5065,305 @@
         ]
       }
     }
+  },
+  {
+    "id": "tts-kokoro-crisp-q8-0",
+    "name": "Kokoro-82M Q8_0 · CrispASR",
+    "family": "tts",
+    "sources": {
+      "huggingface": {
+        "revision": "ab19534a3b5cc12bc2741478e9790eadb328654a",
+        "repositoryUrl": "https://huggingface.co/cstr/kokoro-82m-GGUF/tree/ab19534a3b5cc12bc2741478e9790eadb328654a",
+        "files": [
+          {
+            "path": "kokoro-82m-q8_0.gguf",
+            "size": 141322336,
+            "url": "https://huggingface.co/cstr/kokoro-82m-GGUF/resolve/ab19534a3b5cc12bc2741478e9790eadb328654a/kokoro-82m-q8_0.gguf"
+          },
+          {
+            "path": "kokoro-voice-af_heart.gguf",
+            "size": 522784,
+            "url": "https://huggingface.co/cstr/kokoro-voices-GGUF/resolve/1c98db113c69e3feef9644cf0aaec5c0bea02a8e/kokoro-voice-af_heart.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "ab19534a3b5cc12bc2741478e9790eadb328654a",
+        "repositoryUrl": "https://hf-mirror.com/cstr/kokoro-82m-GGUF/tree/ab19534a3b5cc12bc2741478e9790eadb328654a",
+        "files": [
+          {
+            "path": "kokoro-82m-q8_0.gguf",
+            "size": 141322336,
+            "url": "https://hf-mirror.com/cstr/kokoro-82m-GGUF/resolve/ab19534a3b5cc12bc2741478e9790eadb328654a/kokoro-82m-q8_0.gguf"
+          },
+          {
+            "path": "kokoro-voice-af_heart.gguf",
+            "size": 522784,
+            "url": "https://hf-mirror.com/cstr/kokoro-voices-GGUF/resolve/1c98db113c69e3feef9644cf0aaec5c0bea02a8e/kokoro-voice-af_heart.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "1583b681322fb62fdb0490f82af05b0bf371bccf",
+        "repositoryUrl": "https://modelscope.cn/models/mysteriov/kokoro-82m-GGUF/files?Revision=1583b681322fb62fdb0490f82af05b0bf371bccf",
+        "files": [
+          {
+            "path": "kokoro-82m-q8_0.gguf",
+            "size": 141322336,
+            "url": "https://www.modelscope.cn/models/mysteriov/kokoro-82m-GGUF/resolve/1583b681322fb62fdb0490f82af05b0bf371bccf/kokoro-82m-q8_0.gguf"
+          },
+          {
+            "path": "kokoro-voice-af_heart.gguf",
+            "size": 522784,
+            "url": "https://www.modelscope.cn/models/mysteriov/kokoro-voices-GGUF/resolve/03e0646233c9d6fd6d970eaf8a7b9bd74e207702/kokoro-voice-af_heart.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "tts-piper-crisp-en-gb-cori-medium",
+    "name": "Piper English (UK) Cori Medium · CrispASR",
+    "family": "tts",
+    "sources": {
+      "huggingface": {
+        "revision": "d1f80d187a377bb70fe06a064f49856e0972a98a",
+        "repositoryUrl": "https://huggingface.co/cstr/piper-voices-GGUF/tree/d1f80d187a377bb70fe06a064f49856e0972a98a",
+        "files": [
+          {
+            "path": "piper-en_GB-cori-medium-f16.gguf",
+            "size": 31418816,
+            "url": "https://huggingface.co/cstr/piper-voices-GGUF/resolve/d1f80d187a377bb70fe06a064f49856e0972a98a/piper-en_GB-cori-medium-f16.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "d1f80d187a377bb70fe06a064f49856e0972a98a",
+        "repositoryUrl": "https://hf-mirror.com/cstr/piper-voices-GGUF/tree/d1f80d187a377bb70fe06a064f49856e0972a98a",
+        "files": [
+          {
+            "path": "piper-en_GB-cori-medium-f16.gguf",
+            "size": 31418816,
+            "url": "https://hf-mirror.com/cstr/piper-voices-GGUF/resolve/d1f80d187a377bb70fe06a064f49856e0972a98a/piper-en_GB-cori-medium-f16.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "1af3d1266e50ed6e18ba0a114d987b557d759aa6",
+        "repositoryUrl": "https://modelscope.cn/models/mysteriov/piper-voices-GGUF/files?Revision=1af3d1266e50ed6e18ba0a114d987b557d759aa6",
+        "files": [
+          {
+            "path": "piper-en_GB-cori-medium-f16.gguf",
+            "size": 31418816,
+            "url": "https://www.modelscope.cn/models/mysteriov/piper-voices-GGUF/resolve/1af3d1266e50ed6e18ba0a114d987b557d759aa6/piper-en_GB-cori-medium-f16.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "tts-cosyvoice3-crisp-0.5b-q4-k",
+    "name": "CosyVoice3 0.5B Q4_K · CrispASR",
+    "family": "tts",
+    "sources": {
+      "huggingface": {
+        "revision": "aa0ea5eb7279bcf54668bcbaa7348019de7d7178",
+        "repositoryUrl": "https://huggingface.co/cstr/cosyvoice3-0.5b-2512-GGUF/tree/aa0ea5eb7279bcf54668bcbaa7348019de7d7178",
+        "files": [
+          {
+            "path": "cosyvoice3-llm-q4_k.gguf",
+            "size": 383891200,
+            "url": "https://huggingface.co/cstr/cosyvoice3-0.5b-2512-GGUF/resolve/aa0ea5eb7279bcf54668bcbaa7348019de7d7178/cosyvoice3-llm-q4_k.gguf"
+          },
+          {
+            "path": "cosyvoice3-flow-q8_0.gguf",
+            "size": 360751936,
+            "url": "https://huggingface.co/cstr/cosyvoice3-0.5b-2512-GGUF/resolve/aa0ea5eb7279bcf54668bcbaa7348019de7d7178/cosyvoice3-flow-q8_0.gguf"
+          },
+          {
+            "path": "cosyvoice3-hift-f16.gguf",
+            "size": 41601888,
+            "url": "https://huggingface.co/cstr/cosyvoice3-0.5b-2512-GGUF/resolve/aa0ea5eb7279bcf54668bcbaa7348019de7d7178/cosyvoice3-hift-f16.gguf"
+          },
+          {
+            "path": "cosyvoice3-voices.gguf",
+            "size": 665472,
+            "url": "https://huggingface.co/cstr/cosyvoice3-0.5b-2512-GGUF/resolve/aa0ea5eb7279bcf54668bcbaa7348019de7d7178/cosyvoice3-voices.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "aa0ea5eb7279bcf54668bcbaa7348019de7d7178",
+        "repositoryUrl": "https://hf-mirror.com/cstr/cosyvoice3-0.5b-2512-GGUF/tree/aa0ea5eb7279bcf54668bcbaa7348019de7d7178",
+        "files": [
+          {
+            "path": "cosyvoice3-llm-q4_k.gguf",
+            "size": 383891200,
+            "url": "https://hf-mirror.com/cstr/cosyvoice3-0.5b-2512-GGUF/resolve/aa0ea5eb7279bcf54668bcbaa7348019de7d7178/cosyvoice3-llm-q4_k.gguf"
+          },
+          {
+            "path": "cosyvoice3-flow-q8_0.gguf",
+            "size": 360751936,
+            "url": "https://hf-mirror.com/cstr/cosyvoice3-0.5b-2512-GGUF/resolve/aa0ea5eb7279bcf54668bcbaa7348019de7d7178/cosyvoice3-flow-q8_0.gguf"
+          },
+          {
+            "path": "cosyvoice3-hift-f16.gguf",
+            "size": 41601888,
+            "url": "https://hf-mirror.com/cstr/cosyvoice3-0.5b-2512-GGUF/resolve/aa0ea5eb7279bcf54668bcbaa7348019de7d7178/cosyvoice3-hift-f16.gguf"
+          },
+          {
+            "path": "cosyvoice3-voices.gguf",
+            "size": 665472,
+            "url": "https://hf-mirror.com/cstr/cosyvoice3-0.5b-2512-GGUF/resolve/aa0ea5eb7279bcf54668bcbaa7348019de7d7178/cosyvoice3-voices.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "dd888b2cc495eb9c5de5dc0bd5453ca37172a5e4",
+        "repositoryUrl": "https://modelscope.cn/models/mysteriov/cosyvoice3-0.5b-2512-GGUF/files?Revision=dd888b2cc495eb9c5de5dc0bd5453ca37172a5e4",
+        "files": [
+          {
+            "path": "cosyvoice3-llm-q4_k.gguf",
+            "size": 383891200,
+            "url": "https://www.modelscope.cn/models/mysteriov/cosyvoice3-0.5b-2512-GGUF/resolve/dd888b2cc495eb9c5de5dc0bd5453ca37172a5e4/cosyvoice3-llm-q4_k.gguf"
+          },
+          {
+            "path": "cosyvoice3-flow-q8_0.gguf",
+            "size": 360751936,
+            "url": "https://www.modelscope.cn/models/mysteriov/cosyvoice3-0.5b-2512-GGUF/resolve/dd888b2cc495eb9c5de5dc0bd5453ca37172a5e4/cosyvoice3-flow-q8_0.gguf"
+          },
+          {
+            "path": "cosyvoice3-hift-f16.gguf",
+            "size": 41601888,
+            "url": "https://www.modelscope.cn/models/mysteriov/cosyvoice3-0.5b-2512-GGUF/resolve/dd888b2cc495eb9c5de5dc0bd5453ca37172a5e4/cosyvoice3-hift-f16.gguf"
+          },
+          {
+            "path": "cosyvoice3-voices.gguf",
+            "size": 665472,
+            "url": "https://www.modelscope.cn/models/mysteriov/cosyvoice3-0.5b-2512-GGUF/resolve/dd888b2cc495eb9c5de5dc0bd5453ca37172a5e4/cosyvoice3-voices.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen35-0.8b-q4-k-m",
+    "name": "Qwen3.5 0.8B Q4_K_M · llama.cpp",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "6ab461498e2023f6e3c1baea90a8f0fe38ab64d0",
+        "repositoryUrl": "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/tree/6ab461498e2023f6e3c1baea90a8f0fe38ab64d0",
+        "files": [
+          {
+            "path": "Qwen3.5-0.8B-Q4_K_M.gguf",
+            "size": 532517120,
+            "url": "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/6ab461498e2023f6e3c1baea90a8f0fe38ab64d0/Qwen3.5-0.8B-Q4_K_M.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "6ab461498e2023f6e3c1baea90a8f0fe38ab64d0",
+        "repositoryUrl": "https://hf-mirror.com/unsloth/Qwen3.5-0.8B-GGUF/tree/6ab461498e2023f6e3c1baea90a8f0fe38ab64d0",
+        "files": [
+          {
+            "path": "Qwen3.5-0.8B-Q4_K_M.gguf",
+            "size": 532517120,
+            "url": "https://hf-mirror.com/unsloth/Qwen3.5-0.8B-GGUF/resolve/6ab461498e2023f6e3c1baea90a8f0fe38ab64d0/Qwen3.5-0.8B-Q4_K_M.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "88467eb7c8e3b6e7894c794f373050d4dbc6ae8a",
+        "repositoryUrl": "https://modelscope.cn/models/unsloth/Qwen3.5-0.8B-GGUF/files?Revision=88467eb7c8e3b6e7894c794f373050d4dbc6ae8a",
+        "files": [
+          {
+            "path": "Qwen3.5-0.8B-Q4_K_M.gguf",
+            "size": 532517120,
+            "url": "https://www.modelscope.cn/models/unsloth/Qwen3.5-0.8B-GGUF/resolve/88467eb7c8e3b6e7894c794f373050d4dbc6ae8a/Qwen3.5-0.8B-Q4_K_M.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen35-2b-q4-k-m",
+    "name": "Qwen3.5 2B Q4_K_M · llama.cpp",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "f6d5376be1edb4d416d56da11e5397a961aca8ae",
+        "repositoryUrl": "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/tree/f6d5376be1edb4d416d56da11e5397a961aca8ae",
+        "files": [
+          {
+            "path": "Qwen3.5-2B-Q4_K_M.gguf",
+            "size": 1280835840,
+            "url": "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/f6d5376be1edb4d416d56da11e5397a961aca8ae/Qwen3.5-2B-Q4_K_M.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "f6d5376be1edb4d416d56da11e5397a961aca8ae",
+        "repositoryUrl": "https://hf-mirror.com/unsloth/Qwen3.5-2B-GGUF/tree/f6d5376be1edb4d416d56da11e5397a961aca8ae",
+        "files": [
+          {
+            "path": "Qwen3.5-2B-Q4_K_M.gguf",
+            "size": 1280835840,
+            "url": "https://hf-mirror.com/unsloth/Qwen3.5-2B-GGUF/resolve/f6d5376be1edb4d416d56da11e5397a961aca8ae/Qwen3.5-2B-Q4_K_M.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "90057e31161eb95cc0bc1413c4f53b44de9b49c8",
+        "repositoryUrl": "https://modelscope.cn/models/unsloth/Qwen3.5-2B-GGUF/files?Revision=90057e31161eb95cc0bc1413c4f53b44de9b49c8",
+        "files": [
+          {
+            "path": "Qwen3.5-2B-Q4_K_M.gguf",
+            "size": 1280835840,
+            "url": "https://www.modelscope.cn/models/unsloth/Qwen3.5-2B-GGUF/resolve/90057e31161eb95cc0bc1413c4f53b44de9b49c8/Qwen3.5-2B-Q4_K_M.gguf"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "qwen35-4b-q4-k-m",
+    "name": "Qwen3.5 4B Q4_K_M · llama.cpp",
+    "family": "translation",
+    "sources": {
+      "huggingface": {
+        "revision": "e87f176479d0855a907a41277aca2f8ee7a09523",
+        "repositoryUrl": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/tree/e87f176479d0855a907a41277aca2f8ee7a09523",
+        "files": [
+          {
+            "path": "Qwen3.5-4B-Q4_K_M.gguf",
+            "size": 2740937888,
+            "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf"
+          }
+        ]
+      },
+      "hf-mirror": {
+        "revision": "e87f176479d0855a907a41277aca2f8ee7a09523",
+        "repositoryUrl": "https://hf-mirror.com/unsloth/Qwen3.5-4B-GGUF/tree/e87f176479d0855a907a41277aca2f8ee7a09523",
+        "files": [
+          {
+            "path": "Qwen3.5-4B-Q4_K_M.gguf",
+            "size": 2740937888,
+            "url": "https://hf-mirror.com/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf"
+          }
+        ]
+      },
+      "modelscope": {
+        "revision": "167b4afc359863325cb4164418c715421b4e9118",
+        "repositoryUrl": "https://modelscope.cn/models/unsloth/Qwen3.5-4B-GGUF/files?Revision=167b4afc359863325cb4164418c715421b4e9118",
+        "files": [
+          {
+            "path": "Qwen3.5-4B-Q4_K_M.gguf",
+            "size": 2740937888,
+            "url": "https://www.modelscope.cn/models/unsloth/Qwen3.5-4B-GGUF/resolve/167b4afc359863325cb4164418c715421b4e9118/Qwen3.5-4B-Q4_K_M.gguf"
+          }
+        ]
+      }
+    }
   }
 ]

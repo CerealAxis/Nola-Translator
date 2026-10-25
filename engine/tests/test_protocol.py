@@ -31,6 +31,33 @@ def test_accepts_shared_event_samples(messages: dict[str, list[dict[str, object]
         assert parse_event_line(json.dumps(event, ensure_ascii=False)).type == event["type"]
 
 
+def test_accepts_resource_catalog_larger_than_legacy_limit() -> None:
+    resource = {
+        "resourceId": "model",
+        "kind": "translationModel",
+        "provider": "llama.cpp",
+        "name": "Model",
+        "description": "A local model.",
+        "languages": ["en"],
+        "installed": False,
+        "installedBytes": 0,
+        "state": "idle",
+        "cancellable": False,
+    }
+    event = {
+        "protocolVersion": 1,
+        "type": "resources",
+        "requestId": "resources-many",
+        "storagePath": "models",
+        "resources": [resource] * 68,
+    }
+
+    parsed = parse_event_line(json.dumps(event))
+
+    assert parsed.type == "resources"
+    assert len(parsed.resources) == 68
+
+
 def test_rejects_unknown_type_missing_request_id_and_negative_revision(
     messages: dict[str, list[dict[str, object]]],
 ) -> None:

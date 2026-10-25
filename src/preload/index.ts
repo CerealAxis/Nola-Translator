@@ -107,11 +107,42 @@ const api: NolaTranslatorApi = {
       return () => ipcRenderer.off('feature-activity:changed', listener)
     },
   },
+  onboardingCard: {
+    available: () => true,
+    show: () => ipcRenderer.send('onboarding-card:show'),
+    hide: () => ipcRenderer.send('onboarding-card:hide'),
+    sendState: (state: import('../shared/onboarding-card').OnboardingCardState) => ipcRenderer.send('onboarding-card:state', state),
+    onState: (callback: (state: import('../shared/onboarding-card').OnboardingCardState & import('../shared/onboarding-card').OnboardingCardPlacement) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: import('../shared/onboarding-card').OnboardingCardState & import('../shared/onboarding-card').OnboardingCardPlacement) => callback(value)
+      ipcRenderer.on('onboarding-card:state', listener)
+      return () => ipcRenderer.off('onboarding-card:state', listener)
+    },
+    onPlacement: (callback: (placement: import('../shared/onboarding-card').OnboardingCardPlacement) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: import('../shared/onboarding-card').OnboardingCardPlacement) => callback(value)
+      ipcRenderer.on('onboarding-card:placement', listener)
+      return () => ipcRenderer.off('onboarding-card:placement', listener)
+    },
+    sendAction: (action: import('../shared/onboarding-card').OnboardingCardActionType) => ipcRenderer.send('onboarding-card:action', action),
+    onAction: (callback: (action: import('../shared/onboarding-card').OnboardingCardActionType) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: import('../shared/onboarding-card').OnboardingCardActionType) => callback(value)
+      ipcRenderer.on('onboarding-tour:action', listener)
+      return () => ipcRenderer.off('onboarding-tour:action', listener)
+    },
+    sendRect: (rect: { x: number; y: number; width: number; height: number } | null) => ipcRenderer.send('onboarding-card:rect', rect),
+    onRect: (callback: (payload: { rect: { x: number; y: number; width: number; height: number } | null; mainOffset: { x: number; y: number } }) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: { rect: { x: number; y: number; width: number; height: number } | null; mainOffset: { x: number; y: number } }) => callback(value)
+      ipcRenderer.on('onboarding-card:rect-forward', listener)
+      return () => ipcRenderer.off('onboarding-card:rect-forward', listener)
+    },
+    sendHit: (interactive: boolean) => ipcRenderer.send('onboarding-card:hit', interactive),
+  },
   openWorkbench: surface => invoke('workbench:open', surface),
   cancelLanguageModel: id => invoke('app:language-model:cancel', id),
+  releaseDirectModel: () => invoke('app:direct-model:release'),
     agentWorkspace: action => invoke('app:agent-workspace', action),
     directModel: (request, inspect) => invoke('app:direct-model', request, inspect),
   streamLanguageModel: request => invoke('app:language-model:stream', request),
+  resolveLanguageModelAudio: result => invoke('app:language-model:audio-result', result),
   onLanguageModelStream: callback => {
     const listener = (_event: Electron.IpcRendererEvent, data: import('../shared/language-model').LanguageModelStreamEvent) => callback(data)
     ipcRenderer.on('app:language-model:chunk', listener)

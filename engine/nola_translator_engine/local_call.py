@@ -1,7 +1,7 @@
-"""One-shot inference worker using the same installed models and compute policy as captions.
+"""Owner-scoped inference worker using the same installed models and compute policy as captions.
 
-The dedicated process owns its models and is killed on cancellation. It never replaces the
-caption process's loaded weights or capture session. stdin/stdout carry one private JSON RPC.
+The dedicated process reuses loaded models until cancellation, model changes, or owner shutdown.
+It never replaces caption weights or capture state. stdin/stdout carry private JSON lines.
 """
 from __future__ import annotations
 
@@ -16,6 +16,8 @@ import sys
 import wave
 
 import numpy as np
+
+_TTS_CACHE = {}
 
 
 def torch_device_for_tts(compute, devices) -> str:
@@ -89,8 +91,6 @@ def decode_audio(data: str) -> np.ndarray:
     with wave.open(io.BytesIO(raw), 'rb') as source:
         if source.getnchannels() != 1 or source.getsampwidth() != 2 or source.getframerate() != 16000:
             raise ValueError('Audio must be mono 16 kHz PCM16 WAV')
-        if source.getnframes() > 16000 * 300:
-            raise ValueError('Audio exceeds five minutes')
         return np.frombuffer(source.readframes(source.getnframes()), dtype='<i2').astype(np.float32) / 32768
 
 
@@ -110,17 +110,66 @@ def encode_audio(audio, rate: int) -> str:
     return 'data:audio/wav;base64,' + base64.b64encode(output.getvalue()).decode('ascii')
 
 
+def split_crisp_tts_text(text: str, max_chars: int = 120) -> list[str]:
+    """Keep Kokoro chunks below its finite phoneme context while preserving sentence boundaries."""
+    remaining = text.strip()
+    chunks = []
+    punctuation = '.!?。！？;；\n'
+    while len(remaining) > max_chars:
+        window = remaining[:max_chars]
+        boundary = max((window.rfind(mark) for mark in punctuation), default=-1)
+        if boundary < max_chars // 2:
+            boundary = window.rfind(' ')
+            end = boundary if boundary >= max_chars // 2 else max_chars
+        else:
+            end = boundary + 1
+        chunk = remaining[:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        remaining = remaining[end:].strip()
+    if remaining:
+        chunks.append(remaining)
+    return chunks
+
+
+def synthesize_crisp_text(session, text: str) -> np.ndarray:
+    """Generate long Kokoro text in bounded pieces and insert short natural pauses."""
+    chunks = split_crisp_tts_text(text)
+    if not chunks:
+        raise ValueError('Speech synthesis text is empty')
+    audio = []
+    for chunk in chunks:
+        samples = np.asarray(session.synthesize(chunk), dtype=np.float32).squeeze()
+        if samples.ndim != 1 or not samples.size:
+            raise RuntimeError('CrispASR returned an empty audio chunk')
+        audio.append(samples)
+    if len(audio) == 1:
+        return audio[0]
+    silence = np.zeros(2400, dtype=np.float32)
+    combined = []
+    for index, samples in enumerate(audio):
+        if index:
+            combined.append(silence)
+        combined.append(samples)
+    return np.concatenate(combined)
+
+
 def synthesize(resources, request, compute):
     from .recognition.crisp_asr import CrispAsrRuntime, prepare_crisp_synthesis
     model_id = request['resourceId']
     root = resources.model_path(model_id)
     adapter = resources.adapter_for(model_id)
+    cache_key = (model_id, compute.recognitionDevice, compute.cpuThreads, compute.precision, compute.quantization)
     if adapter == 'crisp-tts' or '-crisp-' in model_id:
         def run_crisp(use_vulkan):
-            runtime = CrispAsrRuntime(resources.recognition_weight_path(model_id), threads=compute.cpuThreads or 4,
-                use_vulkan=use_vulkan, allow_cpu_fallback=compute.allowCpuFallback)
-            try:
+            key = (*cache_key, use_vulkan)
+            runtime = _TTS_CACHE.get(key)
+            if runtime is None:
+                runtime = CrispAsrRuntime(resources.recognition_weight_path(model_id), threads=compute.cpuThreads or 4,
+                    use_vulkan=use_vulkan, allow_cpu_fallback=compute.allowCpuFallback)
                 runtime.load()
+                _TTS_CACHE[key] = runtime
+            try:
                 session = runtime._session
                 prepare_crisp_synthesis(session, root)
                 voices = list(session.speakers() or [])
@@ -134,10 +183,12 @@ def synthesize(resources, request, compute):
                 sample_rate = session.output_sample_rate()
                 if sample_rate <= 0:
                     raise ValueError('Selected CrispASR model does not provide speech synthesis')
-                audio = session.synthesize(request['text'])
+                audio = synthesize_crisp_text(session, request['text']) if 'kokoro' in model_id.casefold() else session.synthesize(request['text'])
                 return {'text': request['text'], 'audio': encode_audio(audio, sample_rate), 'voices': voices}
-            finally:
+            except Exception:
+                _TTS_CACHE.pop(key, None)
                 runtime.unload()
+                raise
 
         use_vulkan = compute.recognitionDevice != 'cpu'
         retry_on_cpu = False
@@ -161,7 +212,10 @@ def synthesize(resources, request, compute):
         from .compute import probe_devices
         devices, _, _ = probe_devices(None)
         device = torch_device_for_tts(compute, devices)
-        model = Qwen3TTSModel.from_pretrained(str(root), device_map=device, local_files_only=True)
+        model = _TTS_CACHE.get(cache_key)
+        if model is None:
+            model = Qwen3TTSModel.from_pretrained(str(root), device_map=device, local_files_only=True)
+            _TTS_CACHE[cache_key] = model
         voices = model.get_supported_speakers() or []
         if request.get('inspect'):
             return {'text': '', 'voices': voices}
@@ -179,12 +233,20 @@ def synthesize(resources, request, compute):
     from .translation.transformers_causal import load_verified_model
     config = AutoConfig.from_pretrained(str(root), local_files_only=True, trust_remote_code=False)
     loader = AutoModelForTextToWaveform if type(config) in AutoModelForTextToWaveform._model_mapping else AutoModelForTextToSpectrogram
-    model = load_verified_model(loader, root)
+    model = _TTS_CACHE.get(cache_key)
+    if model is None:
+        model = load_verified_model(loader, root)
+        _TTS_CACHE[cache_key] = model
     if request.get('inspect'):
         return {'text': '', 'voices': []}
     from .compute import probe_devices
     devices, _, _ = probe_devices(None)
-    result = pipeline('text-to-audio', model=model, device=torch_device_for_tts(compute, devices), trust_remote_code=False)(request['text'])
+    pipeline_key = (*cache_key, 'pipeline')
+    audio_pipeline = _TTS_CACHE.get(pipeline_key)
+    if audio_pipeline is None:
+        audio_pipeline = pipeline('text-to-audio', model=model, device=torch_device_for_tts(compute, devices), trust_remote_code=False)
+        _TTS_CACHE[pipeline_key] = audio_pipeline
+    result = audio_pipeline(request['text'])
     return {'text': request['text'], 'audio': encode_audio(result['audio'], result['sampling_rate']), 'voices': []}
 
 
@@ -230,15 +292,15 @@ async def translate_image(runtime, request):
     projector = find_vision_projector(model_dir, weight_path.name)
     if projector is None:
         raise ValueError('当前本地 Index-Translate 模型缺少视觉投影文件（mmproj）。请在模型管理页补充下载该文件后重试。')
-    runtime.llama_manager.mmproj_path = projector
-    await runtime.llama_manager.stop()
-    await runtime.llama_manager.start()
+    if runtime.llama_manager.mmproj_path != projector:
+        runtime.llama_manager.mmproj_path = projector
+        await runtime.llama_manager.stop()
+        await runtime.llama_manager.start()
     return await asyncio.to_thread(runtime.llama_manager.chat_sync, [{'role': 'user', 'content': content}], max_tokens=4096)
 
 
-async def infer(request):
+def create_runtime():
     from .runtime import EngineRuntime
-    from .protocol import PrewarmConfig, PrewarmModelsCommand
 
     # The caption process owns this shared status file even though models run in a separate process.
     class LocalCallRuntime(EngineRuntime):
@@ -248,67 +310,89 @@ async def infer(request):
         def _remove_engine_status(self):
             pass
 
-    runtime = LocalCallRuntime(Path(os.environ['NOLA_TRANSLATOR_MODEL_DIR']), lambda _event: None)
-    try:
-        config = PrewarmConfig.model_validate(request['config'])
-        command = PrewarmModelsCommand(protocolVersion=1, requestId='direct', type='prewarmModels', config=config)
-        if request.get('resourceId'):
-            from .resources import INDEX_TRANSLATE_RESOURCE_IDS
-            record = runtime.resources.record(request['resourceId'])
-            expected = {'asr': 'recognitionModel', 'mt': 'translationModel', 'tts': 'ttsModel'}.get(request['kind'])
-            legacy_text_model = (expected == 'translationModel' and not request.get('image') and
-                request['resourceId'] in INDEX_TRANSLATE_RESOURCE_IDS and
-                runtime.resources.translation_gguf_path(request['resourceId']).is_file())
-            if expected is None:
-                raise ValueError('Unsupported inference task')
-            if (not record.installed and not legacy_text_model) or record.kind != expected:
-                raise ValueError('Selected model is not installed or has the wrong task type')
-        if request['kind'] == 'tts':
-            return await asyncio.to_thread(synthesize, runtime.resources, request, config.compute)
-        await runtime._configure_device_plan(command)
-        if request['kind'] == 'mt':
+    return LocalCallRuntime(Path(os.environ['NOLA_TRANSLATOR_MODEL_DIR']), lambda _event: None)
+
+
+async def infer(request, runtime):
+    from .protocol import PrewarmConfig, PrewarmModelsCommand
+
+    config = PrewarmConfig.model_validate(request['config'])
+    command = PrewarmModelsCommand(protocolVersion=1, requestId='direct', type='prewarmModels', config=config)
+    if request.get('resourceId'):
+        from .resources import INDEX_TRANSLATE_RESOURCE_IDS
+        record = runtime.resources.record(request['resourceId'])
+        expected = {'asr': 'recognitionModel', 'mt': 'translationModel', 'tts': 'ttsModel'}.get(request['kind'])
+        legacy_text_model = (expected == 'translationModel' and not request.get('image') and
+            request['resourceId'] in INDEX_TRANSLATE_RESOURCE_IDS and
+            runtime.resources.translation_gguf_path(request['resourceId']).is_file())
+        if expected is None:
+            raise ValueError('Unsupported inference task')
+        if (not record.installed and not legacy_text_model) or record.kind != expected:
+            raise ValueError('Selected model is not installed or has the wrong task type')
+    if request['kind'] == 'tts':
+        return await asyncio.to_thread(synthesize, runtime.resources, request, config.compute)
+    await runtime._configure_device_plan(command)
+    if request['kind'] == 'mt':
+        translation_key = (runtime._local_translation_model_id(config), config.compute.model_dump_json())
+        if getattr(runtime, '_local_call_translation_key', None) != translation_key:
             runtime._configure_translation(command)
-            await runtime._ensure_translation_server(command)
-            text = await translate_image(runtime, request) if request.get('image') else (
-                await runtime.translation_provider.translate(request['text'], request['source'], request['target'])).text
-            return {'text': text}
-        samples = decode_audio(request['audio'])
-        if config.recognitionProvider == 'local':
+            runtime._local_call_translation_key = translation_key
+        await runtime._ensure_translation_server(command)
+        text = await translate_image(runtime, request) if request.get('image') else (
+            await runtime.translation_provider.translate(request['text'], request['source'], request['target'])).text
+        return {'text': text}
+    samples = decode_audio(request['audio'])
+    if config.recognitionProvider == 'local':
+        if runtime.active_model_id != request['resourceId'] or runtime._active_recognition_runtime is None:
             await runtime._create_recognizer(command)
-            text, _language = await asyncio.to_thread(runtime._recognition_runtime().transcribe, samples,
-                language=None if config.sourceLanguage == 'auto' else config.sourceLanguage)
-            return {'text': text}
-        from .recognition.minimax import MiniMaxRecognizer
-        from .recognition.aliyun import AliyunRecognizer
-        from .audio.resample import AudioFrame
-        recognizer = MiniMaxRecognizer(config) if config.recognitionProvider == 'minimax' else AliyunRecognizer(config)
-        updates = {}
-        async def collect(update):
-            updates[update.segment_id] = update
-        recognizer.on_update = collect
-        try:
-            await recognizer.start()
-            for offset in range(0, samples.size, 320):
-                for update in await recognizer.accept(AudioFrame(samples[offset:offset + 320], offset / 16)):
-                    await collect(update)
-            for update in await recognizer.flush(samples.size / 16):
+        text, _language = await asyncio.to_thread(runtime._recognition_runtime().transcribe, samples,
+            language=None if config.sourceLanguage == 'auto' else config.sourceLanguage)
+        return {'text': text}
+    from .recognition.minimax import MiniMaxRecognizer
+    from .recognition.aliyun import AliyunRecognizer
+    from .audio.resample import AudioFrame
+    recognizer = MiniMaxRecognizer(config) if config.recognitionProvider == 'minimax' else AliyunRecognizer(config)
+    updates = {}
+    async def collect(update):
+        updates[update.segment_id] = update
+    recognizer.on_update = collect
+    try:
+        await recognizer.start()
+        for offset in range(0, samples.size, 320):
+            for update in await recognizer.accept(AudioFrame(samples[offset:offset + 320], offset / 16)):
                 await collect(update)
-            return {'text': ' '.join(update.source_text for update in sorted(updates.values(), key=lambda item: item.started_at_ms))}
-        finally:
-            await recognizer.close()
+        for update in await recognizer.flush(samples.size / 16):
+            await collect(update)
+        return {'text': ' '.join(update.source_text for update in sorted(updates.values(), key=lambda item: item.started_at_ms))}
     finally:
-        await runtime.close()
+        await recognizer.close()
 
 
 def main():
     protocol = sys.stdout
     sys.stdout = sys.stderr
-    try:
-        request = json.loads(sys.stdin.read(40000000))
-        result = asyncio.run(infer(request))
-    except Exception as error:
-        result = {'error': f'{type(error).__name__}: {error}'[:2000]}
-    print(json.dumps(result, ensure_ascii=True), file=protocol, flush=True)
+    async def serve():
+        runtime = create_runtime()
+        try:
+            for line in sys.stdin:
+                if len(line) > 40000000:
+                    break
+                request = None
+                try:
+                    request = json.loads(line)
+                    result = await infer(request, runtime)
+                    result = {'id': request.get('id'), **result}
+                except Exception as error:
+                    message = str(error)
+                    prefix = f'{type(error).__name__}: '
+                    while message.startswith(prefix):
+                        message = message[len(prefix):]
+                    result = {'id': request.get('id') if isinstance(request, dict) else None,
+                        'error': f'{prefix}{message}'[:2000]}
+                print(json.dumps(result, ensure_ascii=True), file=protocol, flush=True)
+        finally:
+            await runtime.close()
+    asyncio.run(serve())
 
 
 if __name__ == '__main__':

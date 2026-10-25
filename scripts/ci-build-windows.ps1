@@ -72,7 +72,7 @@ Assert-NativeSuccess 'Source archive'
 $assets += $sourceName
 $browserVersion = (Get-Content -LiteralPath 'browser/version.json' -Raw | ConvertFrom-Json).version
 $extensionOutputs = @()
-foreach ($browser in @('Chrome', 'Edge')) {
+foreach ($browser in @('Chrome', 'Edge', 'Firefox')) {
     $name = "Nola-$browser-Extension-v$browserVersion.zip"
     if (-not (Test-Path -LiteralPath "release/$name")) { throw "Missing browser extension: $name" }
     $assets += $name

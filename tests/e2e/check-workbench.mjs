@@ -35,6 +35,9 @@ if (!process.versions.electron) {
     let settings = { ...structuredClone(DEFAULT_SETTINGS), theme: 'light', uiLanguage: 'zh-CN' }
     const resources = []
     if (process.argv.includes('--smoke')) {
+      settings.recognition.modelId = 'qwen3-asr-1.7b-crisp-q4-k'
+      settings.translation.localModelId = 'index-translate-2b-q4-k-m'
+      settings.synthesis = { modelId: 'hub:voice/custom', voice: 'default-fixture-voice' }
       settings.translation.customModels = [{ id: 'existing', name: 'Existing language model', endpoint: 'http://fixture.invalid/v1', model: 'existing-model', apiFormat: 'chat-completions', contextWindow: 4096, maxOutputTokens: 256, languages: ['zh', 'en'] }]
       for (const [resourceId, kind, name, installed] of [
         ['qwen3-asr-1.7b-crisp-q4-k', 'recognitionModel', 'Installed Qwen3-ASR Q4_K', true],
@@ -47,7 +50,24 @@ if (!process.versions.electron) {
     ipcMain.handle('fixture:resources', () => ({ storagePath: '', resources }))
     let mainPage = ''
     let terminalExecutions = 0
+    const wavFixture = Buffer.alloc(44 + 3200)
+    wavFixture.write('RIFF', 0); wavFixture.writeUInt32LE(wavFixture.length - 8, 4); wavFixture.write('WAVEfmt ', 8)
+    wavFixture.writeUInt32LE(16, 16); wavFixture.writeUInt16LE(1, 20); wavFixture.writeUInt16LE(1, 22)
+    wavFixture.writeUInt32LE(16000, 24); wavFixture.writeUInt32LE(32000, 28); wavFixture.writeUInt16LE(2, 32); wavFixture.writeUInt16LE(16, 34)
+    wavFixture.write('data', 36); wavFixture.writeUInt32LE(3200, 40)
+    const fixtureAudio = 'data:audio/wav;base64,' + wavFixture.toString('base64')
     ipcMain.handle('fixture:terminal-count', () => terminalExecutions)
+    ipcMain.handle('fixture:direct-model', async (_, request) => {
+      if (request.kind === 'mt') { await pause(1200); return { text: 'Fixture translation result' } }
+      if (request.kind === 'tts') { await pause(1200); return { text: '', audio: fixtureAudio } }
+      assert.equal(request.kind, 'asr')
+      assert.ok(request.audio.startsWith('data:audio/wav;base64,'))
+      const wav = Buffer.from(request.audio.split(',')[1], 'base64')
+      assert.equal(wav.toString('ascii', 0, 4), 'RIFF')
+      assert.equal(wav.readUInt32LE(24), 16000)
+      await pause(1200)
+      return { text: request.text.includes('empty') ? '' : 'Fixture video transcript' }
+    })
     ipcMain.handle('fixture:main-page', (_, path) => { mainPage = path })
     ipcMain.handle('fixture:update', (event, patch) => {
       settings = { ...settings, ...patch }
@@ -63,6 +83,8 @@ if (!process.versions.electron) {
       onOverlayMenuChanged:()=>()=>{},onOverlayLockChanged:()=>()=>{},onEngineEvent:()=>()=>{},onOpenAppearance:()=>()=>{},
       listResources:()=>ipcRenderer.invoke('fixture:resources'),hasTranslationCredential:async()=>false,
       streamLanguageModel:request=>ipcRenderer.invoke('app:language-model:stream',request),
+      resolveLanguageModelAudio:result=>ipcRenderer.invoke('app:language-model:audio-result',result),
+      directModel:request=>ipcRenderer.invoke('fixture:direct-model',request),
       agentWorkspace:action=>ipcRenderer.invoke('app:agent-workspace',action),
       cancelLanguageModel:id=>{chunks.push('CANCEL:'+id);return ipcRenderer.invoke('app:language-model:cancel',id)},
       onLanguageModelStream:fn=>{const cb=(_,data)=>{chunks.push(data.chunk);fn(data)};ipcRenderer.on('app:language-model:chunk',cb);return()=>ipcRenderer.removeListener('app:language-model:chunk',cb)},
@@ -90,20 +112,25 @@ if (!process.versions.electron) {
           const present = JSON.stringify(last).includes('Show widget') && !JSON.stringify(last).includes('tool_result')
           const plan = JSON.stringify(last).includes('Plan native task') && !JSON.stringify(last).includes('tool_result')
           const terminal = JSON.stringify(last).includes('Run approved command') && !JSON.stringify(last).includes('tool_result')
-          if (present || plan || terminal) {
-            const toolName = terminal ? 'terminal' : plan ? 'update_plan' : 'present'
+          const nativeModelTool = !JSON.stringify(last).includes('tool_result') && (JSON.stringify(last).includes('Use default translation') ? 'translate_text'
+            : JSON.stringify(last).includes('Use default speech') ? 'synthesize_speech' : JSON.stringify(last).includes('Use default recognition') ? 'recognize_audio' : '')
+          if (present || plan || terminal || nativeModelTool) {
+            const toolName = nativeModelTool || (terminal ? 'terminal' : plan ? 'update_plan' : 'present')
             assert.ok(request.tools.some(tool => tool.name === toolName))
+            if (nativeModelTool) assert.ok(!('model' in request.tools.find(tool => tool.name === nativeModelTool).input_schema.properties))
             event({ type: 'content_block_start', index: 1, content_block: { type: 'text', text: '' } })
             event({ type: 'content_block_delta', index: 1, delta: { type: 'text_delta', text: plan ? 'Updating native execution plan.' : 'Preparing native generated UI.' } })
             event({ type: 'content_block_stop', index: 1 })
-            event({ type: 'content_block_start', index: 2, content_block: { type: 'tool_use', id: terminal ? 'fixture-terminal' : plan ? 'fixture-plan' : 'fixture-present', name: toolName, input: {} } })
-            event({ type: 'content_block_delta', index: 2, delta: { type: 'input_json_delta', partial_json: JSON.stringify(terminal ? { command: 'echo native approval' } : plan ? { title: 'Native execution plan', steps: ['Inspect configuration', 'Verify native UI'], activeIndex: 1 } : { _type: 'Text', value: 'Native generated UI' }) } })
+            event({ type: 'content_block_start', index: 2, content_block: { type: 'tool_use', id: nativeModelTool ? `fixture-${nativeModelTool}` : terminal ? 'fixture-terminal' : plan ? 'fixture-plan' : 'fixture-present', name: toolName, input: {} } })
+            event({ type: 'content_block_delta', index: 2, delta: { type: 'input_json_delta', partial_json: JSON.stringify(nativeModelTool === 'translate_text' ? { text: 'Hello', source: 'en', target: 'zh' }
+              : nativeModelTool === 'synthesize_speech' ? { text: 'Hello', voice: '' } : nativeModelTool === 'recognize_audio' ? { attachment: 0, path: null, language: 'auto' }
+                : terminal ? { command: 'echo native approval' } : plan ? { title: 'Native execution plan', steps: ['Inspect configuration', 'Verify native UI'], activeIndex: 1 } : { _type: 'Text', value: 'Native generated UI' }) } })
           } else {
             event({ type: 'content_block_start', index: 1, content_block: { type: 'text', text: '' } })
             event({ type: 'content_block_delta', index: 1, delta: { type: 'text_delta', text: JSON.stringify(last).includes('tool_result') ? 'Native widget completed' : 'Native streamed answer' } })
           }
-          event({ type: 'content_block_stop', index: present || plan || terminal ? 2 : 1 })
-          event({ type: 'message_delta', delta: { stop_reason: present || plan || terminal ? 'tool_use' : 'end_turn', stop_sequence: null }, usage: { output_tokens: 25 } })
+          event({ type: 'content_block_stop', index: present || plan || terminal || nativeModelTool ? 2 : 1 })
+          event({ type: 'message_delta', delta: { stop_reason: present || plan || terminal || nativeModelTool ? 'tool_use' : 'end_turn', stop_sequence: null }, usage: { output_tokens: 25 } })
           event({ type: 'message_stop' }); res.end(); return
         }
         if (url.pathname === '/host') { res.end('<html><body>window fixture</body></html>'); return }
@@ -133,12 +160,21 @@ if (!process.versions.electron) {
       terminal: async () => { terminalExecutions++; return JSON.stringify({ exitCode: 0, output: 'Native approved terminal output' }) },
       action: async action => { if (action.action === 'subagent') workspaceSnapshot.subagents = [...workspaceSnapshot.subagents.filter(item => item.id !== action.agent.id), action.agent]; if (action.action === 'selectProject') workspaceSnapshot.selectedProject = action.id; return workspaceSnapshot } }
     const { registerWorkbench } = await import(pathToFileURL(resolve(output, 'window.mjs')).href)
+    const workerPath = resolve(output, 'fixture-model-worker.cjs')
+    await writeFile(workerPath, `require('node:readline').createInterface({ input: process.stdin }).on('line', line => {
+      const request = JSON.parse(line);
+      if (request.kind === 'asr' && !request.audio?.startsWith('data:audio/wav;base64,')) throw new Error('ASR requires normalized audio');
+      const result = request.kind === 'tts' ? { text: '', audio: ${JSON.stringify(fixtureAudio)}, voices: ['default-fixture-voice'] }
+        : { text: request.kind === 'asr' ? 'Default ASR tool transcript' : 'Default MT tool translation' };
+      setTimeout(() => process.stdout.write(JSON.stringify({ ...result, id: request.id }) + '\\n'), 800);
+    });`)
     registerWorkbench(() => settings.theme, resolve('out/main'), options => {
       const win = new BrowserWindow({ ...options, show: false, webPreferences: { ...options.webPreferences, preload, offscreen: true, backgroundThrottling: false } })
       win.webContents.on('console-message', event => { if (event.level === 'error') errors.push(event.message) })
       win.webContents.on('render-process-gone', (_, details) => errors.push(JSON.stringify(details)))
       return win
-    }, { getSettings: () => settings, getCredential: async () => 'fixture-secret', workspace })
+    }, { getSettings: () => settings, getCredential: async () => 'fixture-secret', workspace,
+      directLaunch: async () => ({ command: process.execPath, args: [workerPath], cwd: output, env: { ELECTRON_RUN_AS_NODE: '1' } }) })
     const host = new BrowserWindow({ show: false, webPreferences: { preload, offscreen: true, backgroundThrottling: false } })
     if (process.argv.includes('--production')) await host.loadFile(resolve('out/renderer/index.html'))
     else await host.loadURL(origin + '/host')
@@ -203,7 +239,71 @@ if (!process.versions.electron) {
       for (const name of ['Installed Qwen3-ASR Q4_K', 'Installed Index Translate Q4_K_M', 'Installed custom TTS']) assert.ok(names.includes(name), name)
       for (const name of ['Whisper', 'NLLB', 'Uninstalled model', 'LLM']) assert.ok(!names.includes(name), name)
       await evaluate(`[...document.querySelectorAll('[data-slot="composer-menu-item"]')].find(el=>el.querySelector('span')?.innerText==='Installed Qwen3-ASR Q4_K').click()`)
-      await waitFor(`document.querySelector('.aui-composer-input').readOnly`)
+      await waitFor(`!document.querySelector('.aui-composer-input').readOnly`)
+      await type('empty')
+      const addVideo = `async () => {
+        const canvas = document.createElement('canvas'); canvas.width = 16; canvas.height = 16;
+        const context = new AudioContext(); const oscillator = context.createOscillator();
+        const destination = context.createMediaStreamDestination(); oscillator.connect(destination); oscillator.start(); await context.resume();
+        const stream = canvas.captureStream(10); destination.stream.getAudioTracks().forEach(track => stream.addTrack(track));
+        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8,opus' }); const chunks = [];
+        recorder.ondataavailable = event => chunks.push(event.data);
+        const stopped = new Promise(resolve => recorder.onstop = resolve);
+        recorder.start(); const timer = setInterval(() => canvas.getContext('2d').fillRect(0, 0, 16, 16), 100);
+        await new Promise(resolve => setTimeout(resolve, 1500)); recorder.stop(); await stopped; clearInterval(timer);
+        stream.getTracks().forEach(track => track.stop()); oscillator.stop(); await context.close();
+        const clipboard = new DataTransfer(); clipboard.items.add(new File(chunks, 'very-long-video-filename-for-attachment-layout-and-transcription.webm', { type: 'video/webm' }));
+        document.querySelector('.aui-composer-input').dispatchEvent(new ClipboardEvent('paste', { clipboardData: clipboard, bubbles: true }));
+      }`
+      await evaluate(`(${addVideo})()`)
+      await waitFor(`!!document.querySelector('[data-slot="composer-attachments"] [data-slot="file-root"]')`)
+      await click('.aui-composer-send')
+      await waitFor(`!!document.querySelector('[data-role="assistant"] [data-slot="run-activity"][data-status="running"]') && document.body.innerText.includes('提取视频音轨')`)
+      assert.equal(await evaluate(`document.querySelector('[data-testid="native-composer"]').innerText.includes('正在准备文件并提取音频')`), false)
+      assert.equal(await evaluate(`[...document.querySelectorAll('[data-role="user"]')].some(el => el.innerText.includes('正在准备文件并提取音频'))`), false)
+      await screenshot('asr-preparing-video')
+      await waitFor(`!!document.querySelector('[data-role="assistant"] [data-slot="run-activity"][data-status="running"]') && [...document.querySelectorAll('[data-slot="tool-call"]')].some(el => el.innerText.includes('语音识别'))`)
+      await screenshot('asr-transcribing-video')
+      await waitFor(`document.body.innerText.includes('识别已完成，未检测到可识别的语音')`)
+      await evaluate(`(${addVideo})()`)
+      await waitFor(`!!document.querySelector('[data-slot="composer-attachments"] [data-slot="file-root"]')`)
+      await click('.aui-composer-send')
+      await waitFor(`document.body.innerText.includes('Fixture video transcript')`)
+      assert.equal(await evaluate(`document.querySelectorAll('[data-role="user"] [data-slot="file-root"]').length`), 2)
+      assert.equal(await evaluate(`document.querySelectorAll('[data-role="user"] video').length`), 2)
+      assert.equal(await evaluate(`document.querySelectorAll('[data-role="user"] audio').length`), 0)
+      assert.ok(await evaluate(`[...document.querySelectorAll('[data-role="user"] [data-slot="file-name"]')].every(el => el.textContent.endsWith('.webm'))`))
+      assert.equal(await evaluate(`document.querySelectorAll('[data-role="assistant"] [data-slot="run-activity"][data-status="complete"]').length`), 2)
+      assert.ok(await evaluate(`[...document.querySelectorAll('[data-role="user"] [data-slot="file-root"]')].every(el => el.getBoundingClientRect().right <= innerWidth && el.scrollWidth <= el.clientWidth + 1)`))
+      await screenshot('asr-video-result')
+      const selectInstalled = async name => {
+        await click('[data-testid="native-composer"] [data-slot="composer-model-trigger"]')
+        await waitFor(`!!document.querySelector('[data-slot="composer-menu"][data-open]')`)
+        await evaluate(`[...document.querySelectorAll('[data-slot="composer-menu-item"]')].find(el=>el.querySelector('span')?.innerText===${JSON.stringify(name)}).click()`)
+      }
+      await selectInstalled('Installed Index Translate Q4_K_M')
+      await type('Translate this text'); await click('.aui-composer-send')
+      await waitFor(`document.querySelectorAll('[data-slot="run-activity"][data-status="running"]').length > 0`)
+      await waitFor(`document.body.innerText.includes('Fixture translation result') && !document.querySelector('.aui-composer-cancel')`)
+      await selectInstalled('Installed custom TTS')
+      await send('Synthesize this text')
+      await waitFor(`!!document.querySelector('[data-role="assistant"] audio')`)
+      await screenshot('direct-mt-tts-results')
+      await selectInstalled('Existing language model')
+      await evaluate(`[...document.querySelectorAll('aside button')].find(el=>el.innerText.includes('新建对话')).click()`)
+      for (const [prompt, model] of [['Use default translation', 'resource:index-translate-2b-q4-k-m'], ['Use default speech', 'resource:hub:voice/custom'], ['Use default recognition', 'resource:qwen3-asr-1.7b-crisp-q4-k']]) {
+        if (prompt.includes('recognition')) {
+          await evaluate(`(${addVideo})()`)
+          await waitFor(`!!document.querySelector('[data-slot="composer-attachments"] [data-slot="file-root"]')`)
+        }
+        await send(prompt)
+        await waitFor(`!document.querySelector('.aui-composer-cancel') && !!document.querySelector('[data-slot="run-activity"][data-status="complete"]')`)
+        await evaluate(`[...document.querySelectorAll('[data-slot="run-activity"]')].at(-1).querySelector('button').click()`)
+        assert.ok(await evaluate(`[...document.querySelectorAll('[data-slot="run-activity"]')].at(-1).textContent.includes(${JSON.stringify(model)})`), `Tool must use ${model}`)
+      }
+      assert.ok(await evaluate(`!!document.querySelector('[data-role="assistant"] audio')`))
+      assert.equal(await evaluate(`document.querySelectorAll('[data-role="user"] video').length`), 1)
+      await screenshot('language-model-default-tools')
       await click('[data-testid="native-composer"] [data-slot="composer-model-trigger"]')
       await waitFor(`!!document.querySelector('[data-slot="composer-menu"][data-open]')`)
       await evaluate(`[...document.querySelectorAll('[data-slot="composer-menu-item"]')].find(el=>el.innerText==='模型管理').click()`)
@@ -251,7 +351,7 @@ if (!process.versions.electron) {
     await evaluate(`document.querySelector('audio').pause()`)
     await screenshot('tts')
     await selectModel('SenseVoice')
-    assert.equal(await evaluate(`document.querySelector('.aui-composer-input').readOnly`), true)
+    assert.equal(await evaluate(`document.querySelector('.aui-composer-input').readOnly`), false)
     await click('[aria-label="开始录音"]')
     await waitFor(`!!document.querySelector('[aria-pressed="true"]')`)
     await pause(500)

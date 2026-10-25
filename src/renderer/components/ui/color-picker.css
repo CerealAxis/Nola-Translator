@@ -1,5 +1,6 @@
 .nola-color-picker { display: flex; flex-direction: column; gap: var(--space-1); width: min(calc(var(--space-8) * 3 + var(--space-6)), calc(100vw - var(--space-4))); padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--overlay); color: var(--foreground); box-shadow: var(--shadow-lg); }
-.nola-color-picker__trigger { display: inline-flex; align-items: center; gap: var(--space-1); }
+.nola-color-picker__trigger { display: inline-flex; align-items: center; gap: var(--space-1); border-color: transparent; background: transparent; }
+.nola-color-picker__trigger:hover { background: var(--surface-secondary); }
 .nola-color-picker__swatch { width: var(--space-3); height: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); }
 .nola-color-picker__area { position: relative; height: calc(var(--space-7) * 2); border-radius: var(--radius-md); background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent), var(--picker-hue); touch-action: none; cursor: crosshair; }
 

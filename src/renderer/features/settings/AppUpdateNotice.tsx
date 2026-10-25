@@ -120,16 +120,27 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
   )
 }
 
-export function AppUpdateNotice(): React.JSX.Element | null {
+export interface AppUpdateNoticeProps {
+  isAppReady: boolean
+}
+
+export function AppUpdateNotice({ isAppReady }: AppUpdateNoticeProps): React.JSX.Element | null {
   const { t } = useI18n()
   const result = useStore(stores.settings, (state) => state.appUpdate)
   const deferForTour = useStore(stores.settings, state => state.onboardingActive || (!!state.settings && !state.settings.onboardingSeen && !state.onboardingAutoAttempted))
   const [isOpen, setIsOpen] = useState(false)
   const [opening, setOpening] = useState(false)
+  const [startupSettled, setStartupSettled] = useState(false)
 
   useEffect(() => {
     void actions.settings.checkForAppUpdate()
   }, [])
+
+  useEffect(() => {
+    if (!isAppReady) return
+    const timer = window.setTimeout(() => setStartupSettled(true), 150)
+    return () => window.clearTimeout(timer)
+  }, [isAppReady])
 
   useEffect(() => {
     if (result?.updateAvailable) setIsOpen(true)
@@ -153,7 +164,7 @@ export function AppUpdateNotice(): React.JSX.Element | null {
   return (
     <AppUpdateDialog
       result={result}
-      isOpen={isOpen && !deferForTour}
+      isOpen={isOpen && startupSettled && !deferForTour}
       onOpenChange={setIsOpen}
       onOpenRelease={url => { void openRelease(url) }}
       isOpening={opening}

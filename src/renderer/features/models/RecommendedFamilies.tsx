@@ -36,11 +36,15 @@ import { ModelMark } from './modelBrand'
 
 const FAMILY_NAMES: Record<RecommendedFamily, string> = {
   qwen: 'Qwen3-ASR',
+  qwen35: 'Qwen3.5',
   sensevoice: 'SenseVoiceSmall',
   funasr: 'Fun-ASR',
   vibevoice: 'VibeVoice-ASR',
   mimo: 'MiMo-V2.5-ASR',
   tts: 'Qwen3-TTS',
+  kokoro: 'Kokoro-82M',
+  piper: 'Piper',
+  cosyvoice3: 'CosyVoice3',
   hymt2: 'Hy-MT2',
   index: 'Index-Translate',
   other: 'M2M100',
@@ -207,7 +211,9 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
               vram: estimatedVramGb === null ? t('models.vramUnknown') : `${estimatedVramGb.toFixed(estimatedVramGb >= 10 ? 0 : 1)} GB`,
               device: t(`models.deviceTier.${deviceTier}`),
             })}</p>
-            {(family === 'hymt2' || family === 'index' || family === 'tts') && selectedDescription !== familyDescription ? <p>{selectedDescription}</p> : null}
+            {(family === 'hymt2' || family === 'index' || family === 'tts' || family === 'kokoro'
+              || family === 'piper' || family === 'cosyvoice3' || family === 'qwen35') && selectedDescription !== familyDescription
+              ? <p>{selectedDescription}</p> : null}
           </section>
           <section data-onboarding="model-sources" aria-label={t('models.downloadSources.title')}>
             <Label className="models-family-dialog__label">{t('models.downloadSources.title')}</Label>

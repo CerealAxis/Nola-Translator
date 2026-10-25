@@ -157,11 +157,12 @@
 
   .button--secondary {
     color: var(--nola-ui-foreground);
-    background: var(--nola-ui-secondary);
+    border-color: var(--nola-ui-border);
+    background: var(--surface-tertiary);
   }
 
   .button--secondary:hover:not(:disabled):not([aria-disabled='true']) {
-    background: var(--surface-tertiary);
+    background: color-mix(in oklch, var(--surface-tertiary) 88%, var(--foreground));
   }
 
   .button--outline {

@@ -114,6 +114,19 @@ export function createIpcBridge(): NolaBridge {
       stop: () => call('activity', api => api.activity?.stop() ?? Promise.reject(new MissingIpcApiError('activity.stop'))),
       onChanged: cb => subscribe('activity', api => api.activity?.onChanged ?? (() => () => undefined), cb),
     },
+    onboardingCard: {
+      available: () => !!injectedApi()?.onboardingCard,
+      show: () => injectedApi()?.onboardingCard?.show(),
+      hide: () => injectedApi()?.onboardingCard?.hide(),
+      sendState: state => injectedApi()?.onboardingCard?.sendState(state),
+      onState: cb => subscribe('onboardingCard', api => api.onboardingCard?.onState ?? (() => () => undefined), cb),
+      onPlacement: cb => subscribe('onboardingCard', api => api.onboardingCard?.onPlacement ?? (() => () => undefined), cb),
+      sendAction: action => injectedApi()?.onboardingCard?.sendAction(action),
+      onAction: cb => subscribe('onboardingCard', api => api.onboardingCard?.onAction ?? (() => () => undefined), cb),
+      sendRect: rect => injectedApi()?.onboardingCard?.sendRect(rect),
+      onRect: cb => subscribe('onboardingCard', api => api.onboardingCard?.onRect ?? (() => () => undefined), cb),
+      sendHit: interactive => injectedApi()?.onboardingCard?.sendHit(interactive),
+    },
     offline: {
       selectModel: (kind, repo, path) => call('offline', api => api.offline?.selectModel(kind, repo, path) ?? Promise.reject(new MissingIpcApiError('offline.selectModel'))),
       selectDestination: path => call('offline', api => api.offline?.selectDestination(path) ?? Promise.reject(new MissingIpcApiError('offline.selectDestination'))),
@@ -225,6 +238,11 @@ export function createIpcBridge(): NolaBridge {
           return injected.directModel(request, inspect)
         }),
       cancelLanguageModel: id => call('cancelLanguageModel', injected => injected.cancelLanguageModel?.(id) ?? Promise.resolve()),
+      releaseDirectModel: () => call('releaseDirectModel', injected => injected.releaseDirectModel?.() ?? Promise.resolve()),
+      resolveLanguageModelAudio: result => call('resolveLanguageModelAudio', injected => {
+        if (!injected.resolveLanguageModelAudio) throw new Error('Audio preparation unavailable')
+        return injected.resolveLanguageModelAudio(result)
+      }),
       streamLanguageModel: request => call('streamLanguageModel', injected => {
         if (!injected.streamLanguageModel) throw new Error('Language model streaming unavailable')
         return injected.streamLanguageModel(request)

@@ -4,8 +4,8 @@
 .offline-items > li { display: flex; justify-content: space-between; gap: var(--space-3); overflow-wrap: anywhere; padding-block: var(--space-2); border-bottom: 1px solid var(--border); }
 .offline-task { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); }
 
-.offline-import-button { margin-inline-start: auto; flex-shrink: 0; }
-.models-overview__heading:has(.offline-import-button) { flex-wrap: wrap; }
+.offline-import-button { flex-shrink: 0; }
+.models-overview__heading:has(.models-overview__actions) { flex-wrap: wrap; }
 
 .model-import-heading { display: flex; align-items: center; gap: var(--space-1); padding-inline-end: var(--space-5); }
 .model-import-dialog .modal__header + .modal__body { margin-top: 0; }

@@ -14,24 +14,50 @@ export interface DirectModelServices {
 
 let workerQueue: Promise<unknown> = Promise.resolve()
 let queuedWorkers = 0
-export async function runDirectModel(services: DirectModelServices, raw: DirectModelRequest, signal: AbortSignal, inspect = false): Promise<DirectModelResult> {
+type PersistentWorker = { model: string; child: ReturnType<typeof spawn>; buffer: string; pending: { resolve: (value: DirectModelResult) => void; reject: (error: Error) => void; id: string } | null }
+const persistentWorkers = new Map<number, PersistentWorker>()
+
+function terminateWorker(worker: PersistentWorker): void {
+  if (process.platform === 'win32' && worker.child.pid) execFile('taskkill', ['/PID', String(worker.child.pid), '/T', '/F'], { windowsHide: true }, () => undefined)
+  else worker.child.kill()
+}
+
+export async function closeDirectModelWorker(ownerId: number): Promise<void> {
+  const worker = persistentWorkers.get(ownerId)
+  if (!worker) return
+  persistentWorkers.delete(ownerId)
+  if (worker.pending) worker.pending.reject(new DOMException('Workbench model released', 'AbortError'))
+  worker.pending = null
+  const exited = worker.child.exitCode !== null
+    ? Promise.resolve()
+    : new Promise<void>(resolve => worker!.child.once('close', () => resolve()))
+  terminateWorker(worker)
+  await Promise.race([exited, new Promise<void>(resolve => setTimeout(resolve, 10_000))])
+}
+
+export async function closeAllDirectModelWorkers(): Promise<void> {
+  await Promise.all([...persistentWorkers.keys()].map(closeDirectModelWorker))
+}
+
+export async function runDirectModel(services: DirectModelServices, raw: DirectModelRequest, signal: AbortSignal, inspect = false, ownerId?: number): Promise<DirectModelResult> {
   if (queuedWorkers >= 8) throw new Error('Too many pending inference tasks')
   queuedWorkers++
   const task = workerQueue.catch(() => undefined).then(() => {
     signal.throwIfAborted()
-    return executeDirectModel(services, raw, signal, inspect)
+    return executeDirectModel(services, raw, signal, inspect, ownerId)
   })
   workerQueue = task
   try { return await task }
   finally { queuedWorkers-- }
 }
 
-/** Per-task workers use installed runtime paths; keys travel over private stdin, never argv. */
-async function executeDirectModel(services: DirectModelServices, raw: DirectModelRequest, signal: AbortSignal, inspect: boolean): Promise<DirectModelResult> {
+/** Local models stay in an owner-scoped worker; cloud work uses a one-shot worker. */
+async function executeDirectModel(services: DirectModelServices, raw: DirectModelRequest, signal: AbortSignal, inspect: boolean, ownerId?: number): Promise<DirectModelResult> {
   const request = directModelRequestSchema.parse(raw)
   if (!services.directLaunch) throw new Error('Direct model runtime unavailable')
   const settings = services.getSettings()
   const resourceId = request.model.startsWith('resource:') ? request.model.slice(9) : undefined
+  if (ownerId !== undefined && !resourceId) await closeDirectModelWorker(ownerId)
   const config: Record<string, unknown> = { compute: { ...settings.compute }, recognitionProvider: 'aliyun',
     sourceLanguage: request.source, targetLanguages: request.kind === 'mt' ? [request.target] : [], translationProvider: 'local' }
   if (request.kind === 'asr') {
@@ -61,6 +87,8 @@ async function executeDirectModel(services: DirectModelServices, raw: DirectMode
   signal.throwIfAborted()
   const launch = await services.directLaunch(request.model, { requiresImages: !!request.image })
   signal.throwIfAborted()
+  const workerRequest = { ...request, resourceId, config, inspect }
+  if (ownerId !== undefined && resourceId) return runPersistentWorker(ownerId, request.model, launch, workerRequest, signal)
   return new Promise((resolve, reject) => {
     const child = spawn(launch.command, launch.args, { cwd: launch.cwd, env: { ...process.env, ...launch.env,
       HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true, stdio: 'pipe' })
@@ -93,6 +121,79 @@ async function executeDirectModel(services: DirectModelServices, raw: DirectMode
       } catch { reject(new Error(diagnostic || 'Inference worker returned no result')) }
     })
     child.stdin.on('error', () => undefined)
-    child.stdin.end(JSON.stringify({ ...request, resourceId, config, inspect }))
+    child.stdin.end(JSON.stringify(workerRequest))
   })
+}
+
+function runPersistentWorker(ownerId: number, model: string, launch: EngineLaunchSpec, request: object & { id: string }, signal: AbortSignal): Promise<DirectModelResult> {
+  return (async () => {
+    let worker = persistentWorkers.get(ownerId)
+    if (worker && worker.model !== model) {
+      await closeDirectModelWorker(ownerId)
+      worker = undefined
+    }
+    if (!worker) {
+      const child = spawn(launch.command, launch.args, { cwd: launch.cwd, env: { ...process.env, ...launch.env,
+        HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true, stdio: 'pipe' })
+      worker = { model, child, buffer: '', pending: null }
+      persistentWorkers.set(ownerId, worker)
+      child.stdout.setEncoding('utf8').on('data', (chunk: string) => {
+        worker!.buffer += chunk
+        let newline = worker!.buffer.indexOf('\n')
+        while (newline >= 0) {
+          const line = worker!.buffer.slice(0, newline)
+          worker!.buffer = worker!.buffer.slice(newline + 1)
+          newline = worker!.buffer.indexOf('\n')
+          if (!line || !worker!.pending) continue
+          const pending = worker!.pending
+          worker!.pending = null
+          try {
+            const value = JSON.parse(line) as DirectModelResult & { id?: string; error?: string }
+            if (value.id !== pending.id) throw new Error('Inference worker returned an out-of-order response')
+            if (value.error) throw new Error(value.error)
+            pending.resolve(value)
+          } catch (error) { pending.reject(error instanceof Error ? error : new Error(String(error))) }
+        }
+      })
+      child.once('error', error => {
+        if (persistentWorkers.get(ownerId) === worker) persistentWorkers.delete(ownerId)
+        worker!.pending?.reject(error)
+        worker!.pending = null
+      })
+      child.once('close', () => {
+        if (persistentWorkers.get(ownerId) === worker) persistentWorkers.delete(ownerId)
+        worker!.pending?.reject(new Error('Local model worker stopped'))
+        worker!.pending = null
+      })
+    }
+    signal.throwIfAborted()
+    return new Promise<DirectModelResult>((resolve, reject) => {
+      const active = worker!
+      const stop = () => {
+        if (active.pending?.id === request.id) {
+          active.pending.reject(new DOMException('Aborted', 'AbortError'))
+          active.pending = null
+          void closeDirectModelWorker(ownerId)
+        }
+      }
+      signal.addEventListener('abort', stop, { once: true })
+      const timeout = setTimeout(() => {
+        if (active.pending?.id === request.id) {
+          active.pending.reject(new Error('Local model inference timed out'))
+          active.pending = null
+          void closeDirectModelWorker(ownerId)
+        }
+      }, 10 * 60 * 1000)
+      const cleanup = () => { clearTimeout(timeout); signal.removeEventListener('abort', stop) }
+      active.pending = { id: request.id,
+        resolve: value => { cleanup(); resolve(value) },
+        reject: error => { cleanup(); reject(error) },
+      }
+      const stdin = active.child.stdin
+      if (!stdin) { active.pending = null; cleanup(); reject(new Error('Local model worker input is unavailable')); return }
+      stdin.write(`${JSON.stringify(request)}\n`, error => {
+        if (error && active.pending?.id === request.id) { active.pending = null; cleanup(); reject(error) }
+      })
+    })
+  })()
 }

@@ -14,11 +14,11 @@ import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Box } from 'lucide-react'
+import { Box, Cpu } from 'lucide-react'
 import { getBridge } from '@/store'
 
 import { useI18n } from '@/i18n'
-import { useRoute } from '@/routes'
+import { settingsPath, useRoute } from '@/routes'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { notifyError, notifyInfo, notifySuccess } from '@/components/primitives/notify'
 import type { ModelDownloadSource, ResourceRecord, ResourceRecordWithRate } from '@/bridge'
@@ -45,7 +45,7 @@ const attemptedVisionSupplements = new Set<string>()
 
 export function ModelsPage() {
   const { t } = useI18n()
-  const { modelsTab } = useRoute()
+  const { modelsTab, navigate } = useRoute()
   const [tab, setTab] = useState<ModelsTab>('recommended')
   useEffect(() => { if (modelsTab === 'downloads') setTab('downloads') }, [modelsTab])
   const [configuring, setConfiguring] = useState<{ record: ResourceRecord; readOnly: boolean } | null>(null)
@@ -324,9 +324,15 @@ export function ModelsPage() {
       <section className="models-overview">
         <header className="models-overview__heading">
           <span className="models-overview__icon"><Box aria-hidden="true" /></span>
-          <div><h1>{t('models.title')}</h1><p>{t('modelsSettingsUi.modelsSubtitle')}</p></div><LocalModelImport />
+          <div><h1>{t('models.title')}</h1><p>{t('modelsSettingsUi.modelsSubtitle')}</p></div>
+          <div className="models-overview__actions">
+            <Button variant="secondary" data-onboarding="models-runtime-setup" onClick={() => navigate(`${settingsPath('compute')}?component=engine`)}>
+              <Cpu aria-hidden="true" />{t('modelsSettingsUi.runtimeSetup')}
+            </Button>
+            <LocalModelImport />
+          </div>
         </header>
-        <div className="models-overview__summaries">
+        <div className="models-overview__summaries" data-onboarding="models-active">
           <CurrentModel label={t('modelsSettingsUi.currentRecognition')} name={currentRecognition} record={remoteRecognition ? null : recognition ?? null} installed={remoteRecognition ? null : recognition?.installed ?? false} kind="recognitionModel" onChange={() => setTab('installed')} />
           <CurrentModel label={t('modelsSettingsUi.currentTranslation')} name={currentTranslation} record={localTranslation ? translation ?? null : null} installed={localTranslation ? translation?.installed ?? false : null} kind="translationModel" onChange={() => setTab('installed')} />
           <CurrentModel label={t('gateway.synthesisDefault')} name={synthesis?.installed ? synthesis.name : t('modelsSettingsUi.noModelSelected')} record={synthesis ?? null} installed={synthesis?.installed ?? false} kind="ttsModel" onChange={() => setTab('installed')} />
@@ -339,7 +345,7 @@ export function ModelsPage() {
         onValueChange={(key) => setTab(String(key) as ModelsTab)}
         className="models-tabs"
       >
-        <div className="tabs__list-container">
+        <div className="tabs__list-container" data-onboarding="models-tabs">
           <TabsList className="tabs__list" aria-label={t('modelsSettingsUi.catalogTabs')}>
             <CountTab id="recommended" label={t('models.tabRecommended')} count={null} />
             <CountTab id="installed" label={t('models.tabInstalled')} count={installed.length + installedCloudModels.length} />
@@ -435,9 +441,9 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAc
   }
   const sections: { title: string; kind: ResourceRecord['kind']; families: RecommendedFamily[]; language?: boolean }[] = [
     { title: t('models.asrModels'), kind: 'recognitionModel', families: ['qwen', 'sensevoice', 'funasr', 'vibevoice', 'mimo'] },
-    { title: t('workbench.llm'), kind: 'translationModel', families: [], language: true },
+    { title: t('workbench.llm'), kind: 'translationModel', families: ['qwen35'], language: true },
     { title: t('models.mtModels'), kind: 'translationModel', families: ['hymt2', 'index', 'other'] },
-    { title: t('models.ttsModels'), kind: 'ttsModel', families: ['tts'] },
+    { title: t('models.ttsModels'), kind: 'ttsModel', families: ['tts', 'kokoro', 'piper', 'cosyvoice3'] },
   ]
   return <div className="flex flex-col gap-6">
     {failed ? <FailedCatalog onRetry={onRetry} /> : null}
@@ -483,14 +489,16 @@ function Catalog({ records, loading, failed, onRetry, card, emptyAction, compute
   )
   const recognition = ordered.filter((item) => item.kind === 'recognitionModel')
   const translation = ordered.filter((item) => item.kind === 'translationModel')
+  const languageModels = translation.filter(item => familyOf(item) === 'qwen35')
+  const mtModels = translation.filter(item => familyOf(item) !== 'qwen35')
 
   return (
     <div className="flex flex-col gap-6">
       {loading ? <div className={GRID}>{[0, 1, 2].map(index => <ModelCardSkeleton key={index} />)}</div> : null}
       {failed ? <FailedCatalog onRetry={onRetry} /> : null}
       <Section title={t('models.asrModels')} records={recognition} card={card}>{cloudModels.filter(model => model.kind === 'recognitionModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
-      <Section title={t('workbench.llm')} records={[]} card={card}>{cloudModels.filter(model => model.profile || model.id === 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
-      <Section title={t('models.mtModels')} records={translation} card={card}>{cloudModels.filter(model => model.kind === 'translationModel' && !model.profile && model.id !== 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
+      <Section title={t('workbench.llm')} records={languageModels} card={card}>{cloudModels.filter(model => model.profile || model.id === 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
+      <Section title={t('models.mtModels')} records={mtModels} card={card}>{cloudModels.filter(model => model.kind === 'translationModel' && !model.profile && model.id !== 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.ttsModels')} records={ordered.filter(record => record.kind === 'ttsModel')} card={card} />
     </div>
   )

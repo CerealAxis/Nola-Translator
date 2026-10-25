@@ -152,26 +152,35 @@ export function ComposerBar({
 function useFitInComposer(
   menuRef: RefObject<HTMLDivElement | null>,
   align: "start" | "end",
+  anchor?: string,
 ) {
-  const [fit, setFit] = useState<{ shift: number; maxWidth: number } | null>(
-    null,
-  );
+  const [fit, setFit] = useState<{ shift?: number; maxWidth: number; top?: number; left?: number } | null>(null);
 
   useLayoutEffect(() => {
     const menu = menuRef.current;
     if (!menu) return undefined;
-    const bounds =
-      menu.closest<HTMLElement>('[data-slot="composer"]') ??
-      document.documentElement;
+    const bounds = menu.closest<HTMLElement>('[data-slot="composer"]') ?? document.documentElement;
     const measure = () => {
+      const rect = bounds.getBoundingClientRect();
+      const width = Math.min(menu.offsetWidth, window.innerWidth - 16);
+      if (anchor) {
+        const trigger = bounds.querySelector<HTMLElement>(`[data-menu-anchor="${anchor}"]`);
+        if (!trigger) return;
+        const triggerRect = trigger.getBoundingClientRect();
+        const left = Math.max(8, Math.min(window.innerWidth - width - 8, align === "end" ? triggerRect.right - width : triggerRect.left));
+        const above = triggerRect.top - menu.offsetHeight - 8;
+        const top = above >= 8 ? above : Math.min(window.innerHeight - menu.offsetHeight - 8, triggerRect.bottom + 8);
+        setFit(current => current?.left === left && current.top === top && current.maxWidth === width ? current : { left, top, maxWidth: width });
+        return;
+      }
       const parent = menu.offsetParent;
       if (!parent) return;
-      const { left: min, right: max } = bounds.getBoundingClientRect();
+      const { left: min, right: max } = rect;
       const left = parent.getBoundingClientRect().left + menu.offsetLeft;
-      const width = Math.min(menu.offsetWidth, max - min);
-      const shift = Math.max(min - left, Math.min(0, max - left - width));
+      const boundedWidth = Math.min(menu.offsetWidth, max - min);
+      const shift = Math.max(min - left, Math.min(0, max - left - boundedWidth));
       setFit((current) =>
-        current?.shift === shift && current.maxWidth === max - min
+        current?.shift === shift && current.maxWidth === max - min && current.top === undefined
           ? current
           : { shift, maxWidth: max - min },
       );
@@ -180,21 +189,32 @@ function useFitInComposer(
     const observer = new ResizeObserver(measure);
     observer.observe(bounds);
     observer.observe(menu);
+    if (anchor) {
+      const trigger = bounds.querySelector<HTMLElement>(`[data-menu-anchor="${anchor}"]`);
+      if (trigger) observer.observe(trigger);
+      window.addEventListener("resize", measure);
+      window.addEventListener("scroll", measure, true);
+      return () => {
+        observer.disconnect();
+        window.removeEventListener("resize", measure);
+        window.removeEventListener("scroll", measure, true);
+      };
+    }
     return () => observer.disconnect();
-  }, [menuRef, align]);
+  }, [menuRef, align, anchor]);
 
   return fit;
 }
 
 export const ComposerMenu = forwardRef<
   HTMLDivElement,
-  ComponentPropsWithoutRef<"div"> & { open: boolean; align?: "start" | "end" }
+  ComponentPropsWithoutRef<"div"> & { open: boolean; align?: "start" | "end"; anchor?: string }
 >(function ComposerMenu(
-  { open, align = "start", className, style, ...props },
+  { open, align = "start", anchor, className, style, ...props },
   ref,
 ) {
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const fit = useFitInComposer(menuRef, align);
+  const fit = useFitInComposer(menuRef, align, anchor);
   const composedRef = useCallback(
     (node: HTMLDivElement | null) => {
       menuRef.current = node;
@@ -212,12 +232,14 @@ export const ComposerMenu = forwardRef<
       data-open={open || undefined}
       style={
         fit
-          ? { maxWidth: fit.maxWidth, translate: `${fit.shift}px 0`, ...style }
+          ? anchor && fit.left !== undefined && fit.top !== undefined
+            ? { position: "fixed", left: fit.left, top: fit.top, maxWidth: fit.maxWidth, ...style }
+            : { maxWidth: fit.maxWidth, translate: `${fit.shift ?? 0}px 0`, ...style }
           : style
       }
       className={cn(
         floating,
-        "absolute bottom-full z-dropdown mb-2 flex w-72 flex-col gap-0.5 rounded-2xl p-1.5",
+        anchor ? "fixed z-popup flex w-72 flex-col gap-0.5 rounded-2xl p-1.5" : "absolute bottom-full z-dropdown mb-2 flex w-72 flex-col gap-0.5 rounded-2xl p-1.5",
         align === "start"
           ? "start-0 origin-bottom-left"
           : "end-0 origin-bottom-right",

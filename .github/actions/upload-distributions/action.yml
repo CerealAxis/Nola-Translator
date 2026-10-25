@@ -1,5 +1,5 @@
 name: Upload application downloads
-description: Upload the x64 installer, both browser extension archives and the source ZIP as separate files
+description: Upload the x64 installer, browser extension archives and the source ZIP as separate files
 inputs:
   exe-x64:
     required: true
@@ -13,6 +13,9 @@ inputs:
   edge-extension:
     required: true
     description: edge extension file path
+  firefox-extension:
+    required: true
+    description: firefox extension file path
   retention-days:
     default: '14'
     description: Artifact retention period
@@ -44,6 +47,13 @@ runs:
       uses: actions/upload-artifact@v7
       with:
         path: ${{ inputs.edge-extension }}
+        archive: false
+        if-no-files-found: error
+        retention-days: ${{ inputs.retention-days }}
+    - name: Upload Firefox extension
+      uses: actions/upload-artifact@v7
+      with:
+        path: ${{ inputs.firefox-extension }}
         archive: false
         if-no-files-found: error
         retention-days: ${{ inputs.retention-days }}

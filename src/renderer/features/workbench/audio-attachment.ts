@@ -1,4 +1,5 @@
 import type { AttachmentAdapter, PendingAttachment, CompleteAttachment } from '@assistant-ui/react'
+import { getFileDataURL } from '@assistant-ui/core/internal'
 
 /** Normalize browser recordings and uploaded audio to the engine's mono 16 kHz PCM contract. */
 export async function pcmWavData(input: Blob | string, signal?: AbortSignal): Promise<string> {
@@ -7,7 +8,6 @@ export async function pcmWavData(input: Blob | string, signal?: AbortSignal): Pr
   const context = new AudioContext()
   try {
     const decoded = await context.decodeAudioData(data)
-    if (decoded.duration > 300) throw new Error('Audio exceeds five minutes')
     const offline = new OfflineAudioContext(1, Math.max(1, Math.ceil(decoded.duration * 16000)), 16000)
     const source = offline.createBufferSource()
     source.buffer = decoded; source.connect(offline.destination); source.start()
@@ -35,8 +35,85 @@ export class AudioAttachmentAdapter implements AttachmentAdapter {
       status: { type: 'requires-action', reason: 'composer-send' } }
   }
   async send(attachment: PendingAttachment, options?: { signal?: AbortSignal }): Promise<CompleteAttachment> {
-    return { ...attachment, status: { type: 'complete' }, content: [{ type: 'file', mimeType: 'audio/wav',
-      filename: attachment.name, data: await pcmWavData(attachment.file, options?.signal) }] }
+    return { ...attachment, status: { type: 'complete' }, content: [{ type: 'file', mimeType: attachment.contentType || attachment.file.type || 'audio/wav',
+      filename: attachment.name, data: await getFileDataURL(attachment.file, options) }] }
   }
   async remove() {}
+}
+
+type VideoErrorKey = 'videoUnsupported' | 'videoNoAudio' | 'videoExtractFailed'
+class VideoAttachmentError extends Error {}
+
+/** Keep the uploaded video intact; extraction belongs to the assistant's processing run. */
+export class VideoAttachmentAdapter extends AudioAttachmentAdapter {
+  override accept = 'video/*'
+}
+
+export async function extractVideoAudio(file: Blob, signal: AbortSignal | undefined, translate: (key: VideoErrorKey) => string): Promise<Blob> {
+  signal?.throwIfAborted()
+  const url = URL.createObjectURL(file)
+  const video = document.createElement('video')
+  video.preload = 'metadata'
+  video.playsInline = true
+  video.src = url
+  let context: AudioContext | undefined
+  let recorder: MediaRecorder | undefined
+  let source: MediaElementAudioSourceNode | undefined
+  let destination: MediaStreamAudioDestinationNode | undefined
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = () => { video.removeEventListener('loadedmetadata', loaded); video.removeEventListener('error', failed); signal?.removeEventListener('abort', aborted) }
+      const loaded = () => { cleanup(); resolve() }
+      const failed = () => { cleanup(); reject(new VideoAttachmentError(translate('videoUnsupported'))) }
+      const aborted = () => { cleanup(); reject(signal?.reason ?? new DOMException('Aborted', 'AbortError')) }
+      video.addEventListener('loadedmetadata', loaded, { once: true })
+      video.addEventListener('error', failed, { once: true })
+      signal?.addEventListener('abort', aborted, { once: true })
+    })
+    signal?.throwIfAborted()
+    if (!Number.isFinite(video.duration) || video.duration <= 0) throw new VideoAttachmentError(translate('videoUnsupported'))
+    context = new AudioContext()
+    destination = context.createMediaStreamDestination()
+    source = context.createMediaElementSource(video)
+    source.connect(destination)
+    const mimeType = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4']
+      .find(type => MediaRecorder.isTypeSupported(type))
+    if (!mimeType) throw new VideoAttachmentError(translate('videoUnsupported'))
+    const chunks: BlobPart[] = []
+    recorder = new MediaRecorder(destination.stream, { mimeType })
+    recorder.addEventListener('dataavailable', event => { if (event.data.size) chunks.push(event.data) })
+    const recorded = new Promise<Blob>((resolve, reject) => {
+      recorder!.addEventListener('stop', () => chunks.length ? resolve(new Blob(chunks, { type: mimeType })) : reject(new VideoAttachmentError(translate('videoNoAudio'))), { once: true })
+      recorder!.addEventListener('error', () => reject(new VideoAttachmentError(translate('videoExtractFailed'))), { once: true })
+      signal?.addEventListener('abort', () => { if (recorder?.state === 'recording') recorder.stop() }, { once: true })
+    })
+    await context.resume()
+    recorder.start()
+    await video.play()
+    await new Promise<void>((resolve, reject) => {
+      const ended = () => { cleanup(); resolve() }
+      const failed = () => { cleanup(); reject(new VideoAttachmentError(translate('videoUnsupported'))) }
+      const aborted = () => { cleanup(); video.pause(); reject(signal?.reason ?? new DOMException('Aborted', 'AbortError')) }
+      const cleanup = () => { video.removeEventListener('ended', ended); video.removeEventListener('error', failed); signal?.removeEventListener('abort', aborted) }
+      video.addEventListener('ended', ended, { once: true })
+      video.addEventListener('error', failed, { once: true })
+      signal?.addEventListener('abort', aborted, { once: true })
+    })
+    if (recorder.state === 'recording') recorder.stop()
+    const blob = await recorded
+    if (!blob.size) throw new VideoAttachmentError(translate('videoNoAudio'))
+    return blob
+  } catch (error) {
+    if (signal?.aborted) throw error
+    if (error instanceof VideoAttachmentError) throw error
+    throw new Error(translate('videoExtractFailed'), { cause: error })
+  } finally {
+    video.pause()
+    video.removeAttribute('src')
+    video.load()
+    source?.disconnect()
+    destination?.stream.getTracks().forEach(track => track.stop())
+    if (context && context.state !== 'closed') await context.close()
+    URL.revokeObjectURL(url)
+  }
 }

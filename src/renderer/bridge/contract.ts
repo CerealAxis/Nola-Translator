@@ -52,6 +52,7 @@ export type RouteId = 'home' | 'workspace' | 'overlay' | 'video-captions' | 'mod
 export interface NolaBridge {
   gateway?: import('../../shared/model-gateway').ModelGatewayApi
   activity?: import('../../shared/feature-activity').FeatureActivityApi
+  onboardingCard?: import('../../shared/onboarding-card').OnboardingCardApi
   requestQuit?(): Promise<void>
   confirmQuit?(): Promise<void>
   onQuitRequested?(callback: () => void): () => void
@@ -152,9 +153,11 @@ export interface NolaBridge {
   app: {
     openWorkbench?(surface: import('../../shared/workbench').WorkbenchSurface): Promise<void>
     cancelLanguageModel?(id: string): Promise<void>
+    releaseDirectModel?(): Promise<void>
     agentWorkspace?(action: import('../../shared/agent-workspace').WorkspaceAction): Promise<import('../../shared/agent-workspace').AgentWorkspaceSnapshot>
     directModel?(request: import('../../shared/agent-workspace').DirectModelRequest, inspect?: boolean): Promise<import('../../shared/agent-workspace').DirectModelResult>
     streamLanguageModel?(request: import('../../shared/language-model').LanguageModelStreamRequest): Promise<void>
+    resolveLanguageModelAudio?(result: import('../../shared/language-model').LanguageModelAudioResult): Promise<void>
     onLanguageModelStream?(callback: (event: import('../../shared/language-model').LanguageModelStreamEvent) => void): () => void
     showWorkspace?(): Promise<void>
     openMainPage?(path: string): Promise<void>
@@ -214,9 +217,11 @@ export interface NolaBridge {
 export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'app.openWorkbench': 'ipc',
   'app.cancelLanguageModel': 'ipc',
+  'app.releaseDirectModel': 'ipc',
     'app.agentWorkspace': 'ipc',
     'app.directModel': 'ipc',
   'app.streamLanguageModel': 'ipc',
+  'app.resolveLanguageModelAudio': 'ipc',
   'app.onLanguageModelStream': 'ipc',
   'engine.listDevices': 'ipc',
   'engine.testAudio': 'ipc',
@@ -268,6 +273,17 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'models.getHuggingFaceModelCard': 'ipc',
   'models.installHuggingFaceModel': 'ipc',
   'feedback.submit': 'ipc-new',
+  'onboardingCard.available': 'ipc',
+  'onboardingCard.show': 'ipc',
+  'onboardingCard.hide': 'ipc',
+  'onboardingCard.sendState': 'ipc',
+  'onboardingCard.onState': 'ipc',
+  'onboardingCard.onPlacement': 'ipc',
+  'onboardingCard.sendAction': 'ipc',
+  'onboardingCard.onAction': 'ipc',
+  'onboardingCard.sendRect': 'ipc',
+  'onboardingCard.onRect': 'ipc',
+  'onboardingCard.sendHit': 'ipc',
 }
 
 /**

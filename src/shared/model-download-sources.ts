@@ -20,6 +20,12 @@ const MODELSCOPE_MODELS = new Set([
   'index-translate-35b-a3b-preview-bf16',
   'index-translate-35b-a3b-preview-fp8',
   'index-translate-35b-a3b-preview-fp4',
+  'tts-kokoro-crisp-q8-0',
+  'tts-piper-crisp-en-gb-cori-medium',
+  'tts-cosyvoice3-crisp-0.5b-q4-k',
+  'qwen35-0.8b-q4-k-m',
+  'qwen35-2b-q4-k-m',
+  'qwen35-4b-q4-k-m',
 ])
 
 export type DownloadSourceOption = {

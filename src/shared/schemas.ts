@@ -48,7 +48,7 @@ const recognitionModelIdSchema = z.union([
 ])
 
 const translationModelIdSchema = z.union([
-  z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m', 'hy-mt2-7b-q4-k-m', 'm2m100-418m', ...INDEX_TRANSLATE_MODEL_IDS, ...INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS]),
+  z.enum(['hy-mt2-1.8b-q4-k-m', 'hy-mt2-1.8b-q3-k-m', 'hy-mt2-1.8b-iq2-m', 'hy-mt2-7b-q4-k-m', 'm2m100-418m', 'qwen35-0.8b-q4-k-m', 'qwen35-2b-q4-k-m', 'qwen35-4b-q4-k-m', ...INDEX_TRANSLATE_MODEL_IDS, ...INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS]),
   hubModelId,
 ])
 
@@ -383,7 +383,7 @@ export const engineEventSchema = z.discriminatedUnion('type', [
     ...envelope,
     type: z.literal('resources'),
     storagePath: z.string().min(1).max(2048),
-    resources: z.array(resourceSchema).max(64),
+    resources: z.array(resourceSchema).max(128),
   }).strip(),
   z.object({ ...envelope, type: z.literal('resourceActionResult'), resource: resourceSchema }).strip(),
   z.object({ ...envelope, type: z.literal('resourceChanged'), resource: resourceSchema }).strip(),

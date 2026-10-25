@@ -35,6 +35,30 @@ def test_audio_codec_uses_synthesizer_sample_rate_and_round_trips():
     np.testing.assert_array_equal(decoded, np.zeros(320, dtype=np.float32))
 
 
+def test_kokoro_long_text_is_split_before_synthesis_and_joined_with_pauses():
+    class Session:
+        def __init__(self):
+            self.chunks = []
+
+        def synthesize(self, text):
+            self.chunks.append(text)
+            if len(text) > 120:
+                raise RuntimeError("synthesize returned no audio for backend 'kokoro'")
+            return np.ones(8, dtype=np.float32)
+
+    session = Session()
+    output = local_call.synthesize_crisp_text(session, ' '.join(['Hello world.'] * 40))
+
+    assert len(session.chunks) > 1
+    assert all(len(chunk) <= 120 for chunk in session.chunks)
+    assert output.size == len(session.chunks) * 8 + (len(session.chunks) - 1) * 2400
+
+
+def test_audio_decoder_accepts_recordings_longer_than_five_minutes():
+    frames = 16000 * 301
+    assert local_call.decode_audio(wav_data_url(frames=frames)).size == frames
+
+
 def test_finds_official_index_translate_projector_filename(tmp_path):
     projector = tmp_path / 'Index-Translate-2B.mmproj-Q8_0.gguf'
     projector.touch()
@@ -115,7 +139,7 @@ def test_crisp_tts_retries_runtime_error_on_cpu_after_unloading_vulkan(monkeypat
         adapter_for=lambda _model_id: "crisp-tts")
 
     result = local_call.synthesize(resources, {"resourceId": "test-crisp-tts", "text": "Hello."},
-        SimpleNamespace(cpuThreads=2, recognitionDevice="auto", allowCpuFallback=True))
+        SimpleNamespace(cpuThreads=2, recognitionDevice="auto", allowCpuFallback=True, precision="auto", quantization="auto"))
 
     assert result["audio"].startswith("data:audio/wav;base64,")
     assert events == ["vulkan-loaded", "vulkan-unloaded"]
@@ -151,7 +175,7 @@ def test_decode_audio_rejects_non_normalized_input(rate, channels):
         local_call.decode_audio(wav_data_url(rate=rate, channels=channels))
 
 
-def test_cloud_asr_uses_final_source_text_and_closes_worker_runtime(monkeypatch, tmp_path):
+def test_cloud_asr_uses_final_source_text_and_keeps_runtime_until_worker_shutdown(monkeypatch, tmp_path):
     class FakeRuntime:
         def __init__(self, model_root, _emit):
             self.status_path = Path(model_root) / ".runtime" / "engine-status.json"
@@ -212,8 +236,17 @@ def test_cloud_asr_uses_final_source_text_and_closes_worker_runtime(monkeypatch,
         "translationProvider": "local",
     }
 
-    result = asyncio.run(local_call.infer({"kind": "asr", "resourceId": "test-asr", "config": config,
-        "audio": wav_data_url(frames=640)}))
+    async def run_inference():
+        runtime = local_call.create_runtime()
+        try:
+            result = await local_call.infer({"kind": "asr", "resourceId": "test-asr", "config": config,
+                "audio": wav_data_url(frames=640)}, runtime)
+            assert not runtime.closed
+            return result
+        finally:
+            await runtime.close()
+
+    result = asyncio.run(run_inference())
 
     assert result == {"text": "hello world"}
     assert recognizer_instances[0].closed

@@ -45,10 +45,8 @@
   .nola-app-body { display: flex; flex: 1; min-height: 0; min-width: 0; }
   .nola-sidebar { flex: 0 0 var(--nola-sidebar-w); width: var(--nola-sidebar-w); min-height: 0; overflow-y: auto; border-right: 1px solid color-mix(in oklch, var(--border) 65%, transparent); }
   .nola-sidebar-nav { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-1); }
-  .nola-nav-button { display: flex; width: var(--space-5); height: var(--space-5); min-width: 0; justify-content: center; padding: 0; border: 0; box-shadow: none; border-radius: var(--radius-xl); color: var(--foreground); background: var(--surface-secondary); }
+  .nola-nav-button { display: flex; width: var(--space-5); height: var(--space-5); min-width: 0; justify-content: center; padding: 0; border: 0; box-shadow: none; border-radius: var(--radius-xl); }
   .nola-nav-button svg { width: calc(var(--space-2) + var(--space-1) / 2); height: calc(var(--space-2) + var(--space-1) / 2); flex-shrink: 0; }
-  .nola-nav-button[data-active="true"] { color: var(--accent-foreground); background: var(--nola-primary-gradient); box-shadow: 0 3px 12px color-mix(in oklch, var(--accent) 17%, transparent); }
-  .nola-nav-button:not([data-active="true"]):hover { background: var(--surface-tertiary); }
   .nola-main { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
   .nola-main::-webkit-scrollbar { display: none; }
   .nola-route-content { display: flex; flex-direction: column; width: 100%; min-width: 0; max-width: var(--nola-content-max); margin: 0 auto; padding: var(--nola-page-padding); gap: 20px; }
