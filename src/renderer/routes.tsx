@@ -56,6 +56,8 @@ export interface Route {
   route: RouteId
   /** 仅 `settings` 有。 */
   tab?: SettingsTab
+  /** Only `models` has this optional subtab. */
+  modelsTab?: 'downloads'
   /** 仅 `record` 有，是 meetingId。 */
   id?: string
   /** 规范化后的 hash，例如 `#/settings/audio`。用作过渡动画的 key。 */
@@ -152,7 +154,7 @@ export function parseRoute(hash: string): Route {
       return { route: 'record', id: decoded, path: `#/records/${id}` }
     }
     case 'models':
-      return { route: 'models', path: '#/models' }
+      return segments[1] === 'downloads' ? { route: 'models', modelsTab: 'downloads', path: '#/models/downloads' } : { route: 'models', path: '#/models' }
     case 'settings': {
       const tab = normalizeTab(segments[1])
       return { route: 'settings', tab, path: `#/settings/${tab}` }

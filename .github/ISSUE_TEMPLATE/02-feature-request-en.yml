@@ -1,0 +1,49 @@
+name: "✨ Feature Request (English)"
+description: "Suggest a new feature or improvement."
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your suggestion. Please focus on one request and explain the problem and use case it addresses.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and confirmed there is no duplicate or similar request.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What is difficult today, and how would this help you?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior or feature you would like. If there are multiple options, say which one you prefer.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Live captions / speech recognition
+        - Translation / models
+        - Workbench
+        - Browser extension
+        - Installation / updates
+        - Settings / other
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives tried or additional context
+      description: Optional. Examples, links, or additional use cases can help us understand the request.
+    validations:
+      required: false

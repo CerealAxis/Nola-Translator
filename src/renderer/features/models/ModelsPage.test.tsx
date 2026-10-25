@@ -50,7 +50,7 @@ it('groups remote and local cards by capability with icons inside their headers'
   expect(recognition.getByText('阿里云ASR')).toBeInTheDocument()
   const local = recognition.getByText('SenseVoiceSmall').closest('[data-slot="card"]')!
   expect(within(local as HTMLElement).getByText('本地模型')).toBeInTheDocument()
-  expect(within(local as HTMLElement).getByRole('button', { name: '查看详情' })).toBeInTheDocument()
+  expect(within(local as HTMLElement).getByRole('button', { name: '开始配置' })).toBeInTheDocument()
   const aliyunAsr = recognition.getByText('阿里云ASR').closest('[data-slot="card"]')!
   expect(within(aliyunAsr as HTMLElement).getByRole('button', { name: '配置阿里云ASR' })).toBeInTheDocument()
   const translation = section('翻译模型')

@@ -3,6 +3,7 @@ import { ModelGateway } from './model-gateway'
 import { NolaTray } from './tray'
 import { loggedHandle } from './logged-ipc'
 import { modelEngines, supportsSelectedEngine } from '../shared/model-engines'
+import { INDEX_TRANSLATE_MODEL_IDS } from '../shared/index-translate'
 import { registerWorkbench, isWorkbenchWindow } from './workbench'
 import { AgentWorkspace } from './agent-workspace'
 import { customModelsOf } from '../shared/custom-models'
@@ -42,6 +43,7 @@ import { SecureCredentialStore } from './secure-store'
 import { createMainWindowOptions, resolvePreloadPath } from './window-options'
 import { computeOverlayBounds, createOverlayWindowOptions, suppressSystemMenuOnRightClick } from './windows'
 import { prepareOverlayMenu } from './overlay-menu'
+import { resolveModelNetwork } from './network-region'
 
 let mainWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
@@ -552,7 +554,7 @@ if (!hasSingleInstanceLock) {
       beforeInstall: async () => {
         if (engine!.currentState === 'ready') {
           const resources = await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: `offline-check-${randomUUID()}` }, 'resources')
-          if (resources.resources.some(resource => resource.state === 'running' || resource.state === 'cancelling')) throw new Error('resourceBusy')
+          if (resources.resources.some(resource => resource.state === 'running' || resource.state === 'paused' || resource.state === 'cancelling')) throw new Error('resourceBusy')
         }
         await engine!.stop()
       },
@@ -577,50 +579,35 @@ if (!hasSingleInstanceLock) {
     } })
     void browserConnection.initialize(initialSettings.browserConnection.enabled).catch(error => console.error('browser connection initialization failed', error))
     closeBehavior = () => settings.current().closeBehavior
-    createMainWindow(initialSettings.theme)
-    disposeAppIpc = registerAppIpc({
-      isDevelopmentWindow: isWorkbenchWindow,
-      settings,
-      initialSettings,
-      settingsChanged: async () => { tray?.refresh(); if (gateway?.snapshot().state === 'running') await gateway.reconfigure() },
-      meetings,
-      audioProtocol: `${MEETING_AUDIO_SCHEME}://`,
-      credentials,
-      engine,
-      getOverlayWindow,
-      getMainWindow: () => mainWindow,
-      getWorkspaceWindow: () => workspaceWindow,
-      showWorkspace: async () => {
-        if (!workspaceWindow || workspaceWindow.isDestroyed()) createWorkspaceWindow(settings.current().theme)
-        await workspaceReady
-        if (workspaceWindow?.isMinimized()) workspaceWindow.restore()
-        workspaceWindow?.show()
-        workspaceWindow?.focus()
-      },
-    })
-    engine.on('event', (event) => {
-      if (event.type === 'sessionStarted') sessionActive = true
-      if (event.type === 'sessionStopped') sessionActive = false
-      if (event.type === 'caption' && event.segment.isFinal && !sessions.isBrowserEvent(event)) {
-        void meetings.append(event.sessionId, event.segment).catch((error) =>
-          console.error('meeting transcript write failed', error),
-        )
-      }
-    })
-    // A stopped engine owns no session, so the flag has to clear with it. Without this a
-    // session that failed to stop leaves the flag set, and every later start is refused.
-    engine.on('state', state => { if (state === 'failed' || state === 'recovering' || state === 'stopped') sessionActive = false })
-    createWorkspaceWindow(initialSettings.theme)
-    await workspaceReady
-    const directLaunch = async (model: string) => {
+    // These handlers must be registered before the first window exists: the renderer asks for
+    // both snapshots as soon as it mounts, and an invoke that wins the race against late
+    // registration is rejected by Electron with "No handler registered".
+    const directLaunch = async (model: string, options: { requiresImages?: boolean } = {}) => {
         await whenRuntimeReady()
         const compute = { ...settings.current().compute }
         if (model.startsWith('resource:')) {
           if (sessionActive || sessionStarting || componentInstalling) throw new Error('Local models are busy with a caption session or runtime installation. Stop that task before direct inference.')
           if (engine!.currentState !== 'ready') await engine!.start()
           const inventory = await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: randomUUID() }, 'resources')
-          const resource = inventory.resources.find(item => item.resourceId === model.slice(9) && item.installed)
+          const resourceId = model.slice(9)
+          const resource = inventory.resources.find(item => item.resourceId === resourceId)
           if (!resource) throw new Error('Selected model is not installed')
+          const modelWeightBytes: Record<string, number> = {
+            'index-translate-2b-q4-k-m': 1_312_164_352,
+            'index-translate-9b-q4-k-m': 5_780_090_304,
+            'index-translate-35b-a3b-q4-k-m': 21_713_462_400,
+          }
+          const legacyVisionModel = INDEX_TRANSLATE_MODEL_IDS.includes(resourceId as typeof INDEX_TRANSLATE_MODEL_IDS[number]) &&
+            !resource.installed && (modelWeightBytes[resourceId] ?? Number.MAX_SAFE_INTEGER) <= resource.installedBytes
+          if (legacyVisionModel && options.requiresImages) {
+            if (resource.state === 'idle') {
+              await engine!.request({ protocolVersion: 1, type: 'manageResource', requestId: randomUUID(), resourceId,
+                action: 'install', network: await resolveModelNetwork(settings.current().network) }, 'resourceActionResult')
+            }
+            if (resource.state === 'failed') throw new Error('NOLA_IMAGE_PROJECTOR_DOWNLOAD_FAILED')
+            throw new Error('NOLA_IMAGE_PROJECTOR_DOWNLOAD_STARTED')
+          }
+          if (!resource.installed && !legacyVisionModel) throw new Error('Selected model is not installed')
           const loader = modelEngines(resource)[0]
           if (resource.kind === 'translationModel' && loader !== 'crisp') compute.translationEngine = loader
           else if (loader) compute.recognitionEngine = loader
@@ -630,26 +617,6 @@ if (!hasSingleInstanceLock) {
           managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp, module: 'nola_translator_engine.local_call' }),
           env: { ...resourceEnvironment, NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? '', NOLA_TRANSLATOR_RUN_LOG_STDERR: '1' } }
     }
-    const workbench = registerWorkbench(() => settings.current().theme, __dirname, undefined, {
-      getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
-      workspace: new AgentWorkspace(join(dataRoot, 'local-call')),
-      listDirectModels: async () => {
-        await whenRuntimeReady()
-        if (engine!.currentState !== 'ready') await engine!.start()
-        const inventory = await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: randomUUID() }, 'resources')
-        const models = inventory.resources.filter(item => item.installed).map(item => ({ model: `resource:${item.resourceId}`, name: item.name,
-          kind: item.kind === 'recognitionModel' ? 'asr' : item.kind === 'ttsModel' ? 'tts' : 'mt' }))
-        for (const profile of customModelsOf(settings.current().translation)) models.push({ model: `mt-custom:${profile.id}`, name: profile.name, kind: 'mt' })
-        models.push({ model: 'cloud:index-translate', name: 'Index-Translate', kind: 'mt' }, { model: 'cloud:mymemory', name: 'MyMemory', kind: 'mt' })
-        for (const provider of ['microsoft', 'google', 'aliyun', 'minimax'] as const) {
-          const slot = provider === 'aliyun' ? 'aliyun-asr' : provider === 'minimax' ? 'minimax-asr' : provider
-          if (await credentials.get(slot)) models.push({ model: `cloud:${provider}`, name: provider, kind: provider === 'aliyun' || provider === 'minimax' ? 'asr' : 'mt' })
-        }
-        return models
-      },
-      directLaunch,
-    }, activity)
-    stopWorkbench = () => workbench.stop()
     let gatewayLease: FeatureLease | null = null
     let gatewayStarting: Promise<unknown> | null = null
     const stopGateway = async () => {
@@ -696,6 +663,61 @@ if (!hasSingleInstanceLock) {
     loggedHandle('model-gateway:stop', async event => { assertFeatureSender(event, true); if (activity.snapshot().owner === 'model-gateway') await activity.stop(); return gateway!.snapshot() })
     loggedHandle('model-gateway:reveal-key', event => { assertFeatureSender(event, true); return gateway!.revealKey() })
     loggedHandle('model-gateway:rotate-key', event => { assertFeatureSender(event, true); return gateway!.rotateKey() })
+    createMainWindow(initialSettings.theme)
+    disposeAppIpc = registerAppIpc({
+      isDevelopmentWindow: isWorkbenchWindow,
+      settings,
+      initialSettings,
+      settingsChanged: async () => { tray?.refresh(); if (gateway?.snapshot().state === 'running') await gateway.reconfigure() },
+      meetings,
+      audioProtocol: `${MEETING_AUDIO_SCHEME}://`,
+      credentials,
+      engine,
+      getOverlayWindow,
+      getMainWindow: () => mainWindow,
+      getWorkspaceWindow: () => workspaceWindow,
+      showWorkspace: async () => {
+        if (!workspaceWindow || workspaceWindow.isDestroyed()) createWorkspaceWindow(settings.current().theme)
+        await workspaceReady
+        if (workspaceWindow?.isMinimized()) workspaceWindow.restore()
+        workspaceWindow?.show()
+        workspaceWindow?.focus()
+      },
+    })
+    engine.on('event', (event) => {
+      if (event.type === 'sessionStarted') sessionActive = true
+      if (event.type === 'sessionStopped') sessionActive = false
+      if (event.type === 'caption' && event.segment.isFinal && !sessions.isBrowserEvent(event)) {
+        void meetings.append(event.sessionId, event.segment).catch((error) =>
+          console.error('meeting transcript write failed', error),
+        )
+      }
+    })
+    // A stopped engine owns no session, so the flag has to clear with it. Without this a
+    // session that failed to stop leaves the flag set, and every later start is refused.
+    engine.on('state', state => { if (state === 'failed' || state === 'recovering' || state === 'stopped') sessionActive = false })
+    createWorkspaceWindow(initialSettings.theme)
+    await workspaceReady
+    const workbench = registerWorkbench(() => settings.current().theme, __dirname, undefined, {
+      getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
+      workspace: new AgentWorkspace(join(dataRoot, 'local-call')),
+      listDirectModels: async () => {
+        await whenRuntimeReady()
+        if (engine!.currentState !== 'ready') await engine!.start()
+        const inventory = await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: randomUUID() }, 'resources')
+        const models = inventory.resources.filter(item => item.installed).map(item => ({ model: `resource:${item.resourceId}`, name: item.name,
+          kind: item.kind === 'recognitionModel' ? 'asr' : item.kind === 'ttsModel' ? 'tts' : 'mt' }))
+        for (const profile of customModelsOf(settings.current().translation)) models.push({ model: `mt-custom:${profile.id}`, name: profile.name, kind: 'mt' })
+        models.push({ model: 'cloud:index-translate', name: 'Index-Translate', kind: 'mt' }, { model: 'cloud:mymemory', name: 'MyMemory', kind: 'mt' })
+        for (const provider of ['microsoft', 'google', 'aliyun', 'minimax'] as const) {
+          const slot = provider === 'aliyun' ? 'aliyun-asr' : provider === 'minimax' ? 'minimax-asr' : provider
+          if (await credentials.get(slot)) models.push({ model: `cloud:${provider}`, name: provider, kind: provider === 'aliyun' || provider === 'minimax' ? 'asr' : 'mt' })
+        }
+        return models
+      },
+      directLaunch,
+    }, activity)
+    stopWorkbench = () => workbench.stop()
     requestQuit = () => {
       if (activity.snapshot().owner) { showMainWindow(); mainWindow?.webContents.send('app:quit-requested') }
       else app.quit()

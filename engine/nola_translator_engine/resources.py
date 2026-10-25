@@ -124,12 +124,13 @@ class ResourceDefinition:
 @dataclass(slots=True)
 class Operation:
     action: Literal["install", "remove"]
-    state: Literal["running", "cancelling", "failed"] = "running"
+    state: Literal["running", "paused", "cancelling", "failed"] = "running"
     phase: Literal["resolve", "download", "verify", "install", "remove", "cleanup"] = "resolve"
     progress: float | None = None
     cancellable: bool = False
     error_code: str | None = None
     cancel_event: threading.Event | None = None
+    resume_event: threading.Event | None = None
 
 
 def _definitions() -> tuple[ResourceDefinition, ...]:
@@ -415,7 +416,7 @@ class ResourceManager:
         )
 
     async def manage(
-        self, resource_id: str, action: Literal["install", "remove", "cancel"],
+        self, resource_id: str, action: Literal["install", "remove", "cancel", "pause", "resume"],
         network: NetworkSettings | None = None,
         download_source: str | None = None,
     ) -> ResourceRecord:
@@ -434,12 +435,28 @@ class ResourceManager:
             self._emit_changed(resource_id)
             return self.record(resource_id)
 
+        if action in ("pause", "resume"):
+            operation = self.operations.get(resource_id)
+            if operation is None or operation.action != "install" or operation.state not in ("running", "paused"):
+                raise ResourceActionError("resourceBusy", {"reason": "operationNotPausable"})
+            if action == "pause":
+                operation.state = "paused"
+                if operation.resume_event is not None:
+                    operation.resume_event.clear()
+            else:
+                operation.state = "running"
+                if operation.resume_event is not None:
+                    operation.resume_event.set()
+            self._emit_changed(resource_id)
+            return self.record(resource_id)
+
         if resource_id in self.tasks:
             raise ResourceActionError("resourceBusy")
         if action == "install" and self.is_installed(resource_id):
             return self.record(resource_id)
         if action == "remove" and not self.is_installed(resource_id) and self.registry.get(resource_id) is None:
-            return self.record(resource_id)
+            if not self.models.model_path(self._spec(resource_id)).exists():
+                return self.record(resource_id)
 
         cancellable = action == "install"
         operation = Operation(
@@ -448,7 +465,10 @@ class ResourceManager:
             progress=0.0 if action == "install" else None,
             cancellable=cancellable,
             cancel_event=threading.Event() if cancellable else None,
+            resume_event=threading.Event() if cancellable else None,
         )
+        if operation.resume_event is not None:
+            operation.resume_event.set()
         self.operations[resource_id] = operation
         task = asyncio.create_task(self._run(resource_id, action, operation, network, download_source))
         self.tasks[resource_id] = task
@@ -507,8 +527,7 @@ class ResourceManager:
 
         def progress(current: int, total: int) -> None:
             nonlocal last_progress_at, last_progress_bytes
-            if operation.cancel_event and operation.cancel_event.is_set():
-                raise ResourceOperationCancelled()
+            self._wait_if_paused(operation)
             now = time.monotonic()
             if now - last_progress_at < 0.2 and not (current == total and current != last_progress_bytes):
                 return
@@ -517,8 +536,7 @@ class ResourceManager:
             loop.call_soon_threadsafe(self._set_progress, resource_id, ratio)
 
         def on_phase(phase: str) -> None:
-            if operation.cancel_event and operation.cancel_event.is_set():
-                raise ResourceOperationCancelled()
+            self._wait_if_paused(operation)
             if phase not in ("download", "verify", "install"):
                 return
             loop.call_soon_threadsafe(self._set_phase, resource_id, phase)
@@ -526,6 +544,17 @@ class ResourceManager:
         await asyncio.to_thread(self.models.ensure, spec, progress, on_phase, network, download_source)
         # clean up legacy resources once the install succeeds; a cleanup failure doesn't change the result.
         await asyncio.to_thread(self._cleanup_after_install, resource_id)
+
+    @staticmethod
+    def _wait_if_paused(operation: Operation) -> None:
+        if operation.cancel_event and operation.cancel_event.is_set():
+            raise ResourceOperationCancelled()
+        if operation.resume_event is not None:
+            while not operation.resume_event.wait(0.2):
+                if operation.cancel_event and operation.cancel_event.is_set():
+                    raise ResourceOperationCancelled()
+        if operation.cancel_event and operation.cancel_event.is_set():
+            raise ResourceOperationCancelled()
 
     def _cleanup_after_install(self, resource_id: str) -> None:
         """Remove legacy resources by exact known name; never scans, never touches unknown directories or Ollama."""

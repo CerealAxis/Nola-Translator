@@ -200,7 +200,7 @@ export type EngineCommand =
   | Envelope<'listResources'>
   | (Envelope<'manageResource'> & {
       resourceId: string
-      action: 'install' | 'remove' | 'cancel'
+      action: 'install' | 'remove' | 'cancel' | 'pause' | 'resume'
       downloadSource?: ModelDownloadSource
       // Every command that reaches the network carries its own copy, so a settings change
       // applies to the next request instead of needing an engine restart.
@@ -247,7 +247,7 @@ export type ResourceRecord = {
   installed: boolean
   installedBytes: number
   downloadBytes?: number
-  state: 'idle' | 'running' | 'cancelling' | 'failed'
+  state: 'idle' | 'running' | 'paused' | 'cancelling' | 'failed'
   phase?: 'resolve' | 'download' | 'verify' | 'install' | 'remove' | 'cleanup'
   progress?: number
   cancellable: boolean

@@ -218,7 +218,8 @@ export const zhHK: Dictionary = {
     "operationStarted": "執行環境元件{action}已開始",
     "operationProgress": "操作進行中，可向下捲動查看進度。",
     "operationComplete": "執行環境元件{action}完成",
-    "operationFailed": "執行環境元件{action}失敗"
+    "operationFailed": "執行環境元件{action}失敗",
+    "pipDependencyTimeout": "PyTorch 依賴安裝逾時，安裝失敗。請檢查網絡後重試。"
   },
   "compute": {
     "devices": "運算裝置",
@@ -424,6 +425,7 @@ export const zhHK: Dictionary = {
   "modelsSettingsUi": {
     "removing": "正在移除…",
     "removeFailed": "移除失敗",
+    "removeComplete": "已刪除 {name}",
     "modelsSubtitle": "管理本機與雲端語音辨識、翻譯模型",
     "currentRecognition": "目前辨識模型",
     "currentTranslation": "目前翻譯模型",
@@ -753,7 +755,12 @@ export const zhHK: Dictionary = {
     "cancelTask": "取消任務",
     "cancelling": "正在取消",
     "downloadRate": "{speed}/秒",
+    "pause": "暫停",
+    "resume": "繼續",
+    "paused": "已暫停",
+    "viewProgress": "查看進度",
     "downloadStarted": "{name} 已開始下載",
+    "visionSupplementStarted": "{name} 缺少視覺模型檔案，正在開始補充下載。",
     "downloadComplete": "{name} 下載完成",
     "downloadCancelled": "{name} 下載已取消",
     "downloadError": "{name} 下載失敗，可重試或更換下載來源。",

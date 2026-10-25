@@ -21,12 +21,10 @@ const config = {
     ...build.win,
     target: [
       { target: 'nsis', arch: ['x64'] },
-      { target: 'msi', arch: ['x64'] },
     ],
     artifactName: 'Nola-Translator-${version}-Windows-${arch}-Setup.${ext}',
   },
   nsis: { ...build.nsis, buildUniversalInstaller: false },
-  msi: { oneClick: false, perMachine: false, createDesktopShortcut: true, createStartMenuShortcut: true },
 }
 fs.mkdirSync('artifacts', { recursive: true })
 fs.writeFileSync('artifacts/ci-builder.json', JSON.stringify(config, null, 2))

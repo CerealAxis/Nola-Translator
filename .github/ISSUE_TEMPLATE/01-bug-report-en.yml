@@ -1,0 +1,126 @@
+name: "🐛 Bug Report (English)"
+description: "Report a reproducible problem in Nola Translator."
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Nola Translator. Before submitting, complete the checks below. You can find troubleshooting guides at [nola.xaviermc.top](https://nola.xaviermc.top).
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Troubleshooting checklist
+      description: Please confirm each item before submitting this bug report.
+      options:
+        - label: I searched existing issues and confirmed this has not already been reported.
+          required: true
+        - label: I checked the help documentation at [nola.xaviermc.top](https://nola.xaviermc.top).
+          required: true
+        - label: I updated Nola Translator to the latest stable release.
+          required: true
+        - label: I updated my graphics driver to the latest version available for my device.
+          required: true
+        - label: I shared the relevant logs with an AI assistant and tried its suggestions, but the issue remains unresolved.
+          required: true
+  - type: checkboxes
+    id: inference-troubleshooting
+    attributes:
+      label: Inference framework troubleshooting (if applicable)
+      description: If this issue involves a local inference framework or model loader, confirm that you tried both options below.
+      options:
+        - label: I switched between the llama.cpp and CrispASR loaders and tried the corresponding model files, but the issue still occurs.
+          required: false
+  - type: input
+    id: version
+    attributes:
+      label: Nola Translator version
+      description: "You can find the version in Settings or the About page."
+      placeholder: "For example: 1.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU / graphics adapter model
+      description: Include the manufacturer and exact model if known. If you are unsure, enter "Unknown".
+      placeholder: "For example: NVIDIA GeForce RTX 4060, Intel Iris Xe, or Unknown"
+    validations:
+      required: true
+  - type: input
+    id: gpu-driver
+    attributes:
+      label: Graphics driver version
+      description: Include the driver version currently installed. If you are unsure, enter "Unknown".
+      placeholder: "For example: 566.36 or Unknown"
+    validations:
+      required: true
+  - type: input
+    id: cpu
+    attributes:
+      label: CPU model (optional)
+      placeholder: "For example: Intel Core i7-12700H"
+    validations:
+      required: false
+  - type: input
+    id: memory
+    attributes:
+      label: System memory / RAM (optional)
+      placeholder: "For example: 16 GB"
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Live captions / speech recognition
+        - Translation / models
+        - Workbench
+        - Browser extension
+        - Installation / updates
+        - Settings / other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the steps in order. If the issue is intermittent, describe how often it occurs.
+      placeholder: |
+        1. Open…
+        2. Select…
+        3. Observe…
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Describe what happened. Include the full error message if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Describe what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshots, logs, or additional context
+      description: You can attach screenshots or log files. Remove API keys, personal information, and other sensitive data before sharing.
+    validations:
+      required: false

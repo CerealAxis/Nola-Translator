@@ -136,7 +136,7 @@ export function registerEngineIpc(
   loggedHandle(
     IPC_CHANNELS.manageResource,
     async (_event, resourceId: unknown, action: unknown, downloadSource: unknown) => {
-      if (typeof resourceId !== 'string' || !['install', 'remove', 'cancel'].includes(String(action))) {
+      if (typeof resourceId !== 'string' || !['install', 'remove', 'cancel', 'pause', 'resume'].includes(String(action))) {
         throw new Error('资源操作参数无效')
       }
       if (downloadSource !== undefined && !['huggingface', 'hf-mirror', 'modelscope'].includes(String(downloadSource))) {
@@ -149,7 +149,7 @@ export function registerEngineIpc(
           type: 'manageResource',
           requestId: `resource-action-${randomUUID()}`,
           resourceId,
-          action: action as 'install' | 'remove' | 'cancel',
+          action: action as 'install' | 'remove' | 'cancel' | 'pause' | 'resume',
           downloadSource: downloadSource as 'huggingface' | 'hf-mirror' | 'modelscope' | undefined,
           network: await resolveModelNetwork(getSettings().network),
         },

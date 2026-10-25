@@ -24,7 +24,14 @@ export function installedPlaygroundModels(
   credentials: Readonly<Record<CredentialProvider, boolean>>,
   t: (key: TranslationKey) => string,
 ): PlaygroundModel[] {
-  const models: PlaygroundModel[] = resources.filter(resource => resource.installed).map(resource => ({
+  const legacyIndexWeights: Record<string, number> = {
+    'index-translate-2b-q4-k-m': 1_312_164_352,
+    'index-translate-9b-q4-k-m': 5_780_090_304,
+    'index-translate-35b-a3b-q4-k-m': 21_713_462_400,
+  }
+  const models: PlaygroundModel[] = resources.filter(resource => resource.installed ||
+    INDEX_TRANSLATE_MODEL_IDS.includes(resource.resourceId as typeof INDEX_TRANSLATE_MODEL_IDS[number]) &&
+    resource.installedBytes >= (legacyIndexWeights[resource.resourceId] ?? Number.MAX_SAFE_INTEGER)).map(resource => ({
     id: `resource:${resource.resourceId}`, name: resource.name,
     kind: resource.kind === 'recognitionModel' ? 'asr' : resource.kind === 'ttsModel' ? 'tts' : 'mt',
     images: new Set<string>([...INDEX_TRANSLATE_MODEL_IDS, ...INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS]).has(resource.resourceId),

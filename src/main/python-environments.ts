@@ -16,6 +16,7 @@ import { offlinePipArguments } from './offline-runtimes'
 
 const PYPI_INDEX = 'https://pypi.org/simple/'
 const WHEEL_DOWNLOAD_ATTEMPTS = 3
+const PIP_INSTALL_TIMEOUT_MS = 60 * 60_000
 const recipesSchema = z.object({ version: z.literal(1), recipes: z.array(runtimeRecipeSchema).max(256) })
 type Download = (wheel: RuntimeRecipe['wheel'], path: string, signal: AbortSignal, progress: (bytes: number) => void) => Promise<void>
 type Verify = (path: string, signal: AbortSignal) => Promise<string>
@@ -161,7 +162,10 @@ export class PythonEnvironments {
       if (movedOld) await rm(backup, { recursive: true, force: true }).catch(() => undefined)
     } catch (error) {
       logDiagnostic('runtime.python-install.failed', { id, phase: this.operation?.phase, cancelled: controller.signal.aborted, ...processFailure(error) })
-      this.lastError = controller.signal.aborted ? '安装已取消' : String(error)
+      const pipTimedOut = this.operation?.phase === 'prepare' && isProcessTimeout(error)
+      this.lastError = controller.signal.aborted ? '安装已取消'
+        : pipTimedOut ? `PYTORCH_DEPENDENCY_TIMEOUT: ${error instanceof Error ? error.message : String(error)}`
+          : String(error)
       throw new Error(this.lastError)
     } finally {
       // Startup removes wheel-cache through cleanupRuntimeArtifacts, so a retained fragment never
@@ -191,16 +195,19 @@ export class PythonEnvironments {
       && (pypiMirror !== 'auto' || await isMainlandChina())
     const indexes = useMirrors ? pypiIndexUrls(pypiMirror) : [PYPI_INDEX]
     const proxy = network?.proxyForPip ? network.proxyUrl.trim() : ''
+    const installDeadline = Date.now() + PIP_INSTALL_TIMEOUT_MS
     let childClosed: Promise<void> | undefined
     const runPip = (pipIndex: string): Promise<void> => new Promise((resolveInstall, reject) => {
         // Same-volume temporary files avoid copying the whole CUDA package a second time.
         // Compile only imported modules at runtime, rather than every dependency during installation.
         const child = execFile(join(this.baseDirectory, 'python.exe'), ['-I', '-u', '-m', 'pip', '--isolated', 'install',
-          '--disable-pip-version-check', '--no-warn-script-location', '--no-cache-dir', '--no-compile', '--progress-bar', 'off', '--target', staging,
+          '--disable-pip-version-check', '--no-warn-script-location', '--no-cache-dir', '--no-compile', '--progress-bar', 'off', '--retries', '10', '--timeout', '120', '--target', staging,
           '--index-url', pipIndex,
           ...(proxy ? ['--proxy', proxy] : []),
           ...artifacts, ...state.requirements], {
-          cwd: this.baseDirectory, windowsHide: true, signal, timeout: 30 * 60_000, maxBuffer: 4 * 1024 * 1024,
+          // Dependency wheels can take hours on a slow but active connection; the old 30-minute
+          // wall clock killed pip regardless of its own retry behavior.
+          cwd: this.baseDirectory, windowsHide: true, signal, timeout: Math.max(1, installDeadline - Date.now()), maxBuffer: 4 * 1024 * 1024,
           env: { ...process.env, PYTHONUTF8: '1', PIP_CONFIG_FILE: 'nul', TEMP: temporary, TMP: temporary },
         }, error => error ? reject(error) : resolveInstall())
         childClosed = new Promise<void>(resolveClosed => { child.once('close', () => resolveClosed()) })
@@ -250,4 +257,10 @@ export class PythonEnvironments {
     }
     return candidates.at(-1) ?? item.url
   }
+}
+
+function isProcessTimeout(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+  const processError = error as NodeJS.ErrnoException & { killed?: boolean; signal?: string }
+  return processError.code === 'ETIMEDOUT' || processError.killed === true && processError.signal === 'SIGTERM'
 }

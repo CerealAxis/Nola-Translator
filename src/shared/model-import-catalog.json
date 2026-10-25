@@ -1315,6 +1315,11 @@
             "path": "Index-Translate-2B.Q4_K_M.gguf",
             "size": 1312164352,
             "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-GGUF/resolve/3a0eca6ce931d88d00614d427ab3ed8ff0743902/Index-Translate-2B.Q4_K_M.gguf"
+          },
+          {
+            "path": "Index-Translate-2B.mmproj-Q8_0.gguf",
+            "size": 361518144,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-GGUF/resolve/3a0eca6ce931d88d00614d427ab3ed8ff0743902/Index-Translate-2B.mmproj-Q8_0.gguf"
           }
         ]
       },
@@ -1326,6 +1331,11 @@
             "path": "Index-Translate-2B.Q4_K_M.gguf",
             "size": 1312164352,
             "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-GGUF/resolve/3a0eca6ce931d88d00614d427ab3ed8ff0743902/Index-Translate-2B.Q4_K_M.gguf"
+          },
+          {
+            "path": "Index-Translate-2B.mmproj-Q8_0.gguf",
+            "size": 361518144,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-2B-GGUF/resolve/3a0eca6ce931d88d00614d427ab3ed8ff0743902/Index-Translate-2B.mmproj-Q8_0.gguf"
           }
         ]
       },
@@ -1337,6 +1347,11 @@
             "path": "Index-Translate-2B.Q4_K_M.gguf",
             "size": 1312164352,
             "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-2B-GGUF/resolve/b92a7c7bf499a6f05da1a66fab8549da3de5b603/Index-Translate-2B.Q4_K_M.gguf"
+          },
+          {
+            "path": "Index-Translate-2B.mmproj-Q8_0.gguf",
+            "size": 361518144,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-2B-GGUF/resolve/3a0eca6ce931d88d00614d427ab3ed8ff0743902/Index-Translate-2B.mmproj-Q8_0.gguf"
           }
         ]
       }
@@ -1355,6 +1370,11 @@
             "path": "Index-Translate-9B.Q4_K_M.gguf",
             "size": 5780090304,
             "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-GGUF/resolve/645939fbab839a656f1bc39975a872bc8ad749f8/Index-Translate-9B.Q4_K_M.gguf"
+          },
+          {
+            "path": "Index-Translate-9B.mmproj-Q8_0.gguf",
+            "size": 620690272,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-GGUF/resolve/645939fbab839a656f1bc39975a872bc8ad749f8/Index-Translate-9B.mmproj-Q8_0.gguf"
           }
         ]
       },
@@ -1366,6 +1386,11 @@
             "path": "Index-Translate-9B.Q4_K_M.gguf",
             "size": 5780090304,
             "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-GGUF/resolve/645939fbab839a656f1bc39975a872bc8ad749f8/Index-Translate-9B.Q4_K_M.gguf"
+          },
+          {
+            "path": "Index-Translate-9B.mmproj-Q8_0.gguf",
+            "size": 620690272,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-9B-GGUF/resolve/645939fbab839a656f1bc39975a872bc8ad749f8/Index-Translate-9B.mmproj-Q8_0.gguf"
           }
         ]
       },
@@ -1377,6 +1402,11 @@
             "path": "Index-Translate-9B.Q4_K_M.gguf",
             "size": 5780090304,
             "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-9B-GGUF/resolve/e97205e0e68986a643eab5ebfd75cebeb67234d0/Index-Translate-9B.Q4_K_M.gguf"
+          },
+          {
+            "path": "Index-Translate-9B.mmproj-Q8_0.gguf",
+            "size": 620690272,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-9B-GGUF/resolve/645939fbab839a656f1bc39975a872bc8ad749f8/Index-Translate-9B.mmproj-Q8_0.gguf"
           }
         ]
       }
@@ -1395,6 +1425,11 @@
             "path": "Index-Translate-35B-A3B-preview.Q4_K_M.gguf",
             "size": 21713462400,
             "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-GGUF/resolve/3319ce338363a181c6c20c06b7379063d9baf484/Index-Translate-35B-A3B-preview.Q4_K_M.gguf"
+          },
+          {
+            "path": "Index-Translate-35B-A3B-preview.mmproj-Q8_0.gguf",
+            "size": 610655072,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-GGUF/resolve/3319ce338363a181c6c20c06b7379063d9baf484/Index-Translate-35B-A3B-preview.mmproj-Q8_0.gguf"
           }
         ]
       },
@@ -1406,6 +1441,11 @@
             "path": "Index-Translate-35B-A3B-preview.Q4_K_M.gguf",
             "size": 21713462400,
             "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-GGUF/resolve/3319ce338363a181c6c20c06b7379063d9baf484/Index-Translate-35B-A3B-preview.Q4_K_M.gguf"
+          },
+          {
+            "path": "Index-Translate-35B-A3B-preview.mmproj-Q8_0.gguf",
+            "size": 610655072,
+            "url": "https://hf-mirror.com/IndexTeam/Index-Translate-35B-A3B-preview-GGUF/resolve/3319ce338363a181c6c20c06b7379063d9baf484/Index-Translate-35B-A3B-preview.mmproj-Q8_0.gguf"
           }
         ]
       },
@@ -1417,6 +1457,11 @@
             "path": "Index-Translate-35B-A3B-preview.Q4_K_M.gguf",
             "size": 21713462400,
             "url": "https://www.modelscope.cn/models/IndexTeam/Index-Translate-35B-A3B-preview-GGUF/resolve/91f6e204309d1808f3779d4a3822f8ce011785bb/Index-Translate-35B-A3B-preview.Q4_K_M.gguf"
+          },
+          {
+            "path": "Index-Translate-35B-A3B-preview.mmproj-Q8_0.gguf",
+            "size": 610655072,
+            "url": "https://huggingface.co/IndexTeam/Index-Translate-35B-A3B-preview-GGUF/resolve/3319ce338363a181c6c20c06b7379063d9baf484/Index-Translate-35B-A3B-preview.mmproj-Q8_0.gguf"
           }
         ]
       }

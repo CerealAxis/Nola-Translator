@@ -1,0 +1,49 @@
+name: "✨ 功能建议（中文）"
+description: "提出新功能或改进建议。"
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你的建议。请聚焦一个需求，并说明它解决的问题和使用场景。
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索现有 Issues，确认没有相同或相近的建议。
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你遇到的问题或需求
+      description: 目前哪里不方便？这项能力对你有什么帮助？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 你希望怎样改进
+      description: 描述你期望的行为或功能；如果有多个方案，请说明更倾向哪一个。
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及的功能
+      options:
+        - 实时字幕 / 语音识别
+        - 翻译 / 模型
+        - 工作台
+        - 浏览器扩展
+        - 安装 / 更新
+        - 设置 / 其他
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 你试过的替代方案或其他背景
+      description: 可选。示例、参考链接或补充场景都能帮助我们理解需求。
+    validations:
+      required: false

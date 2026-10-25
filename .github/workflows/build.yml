@@ -31,7 +31,6 @@ jobs:
         uses: ./.github/actions/upload-distributions
         with:
           exe-x64: ${{ steps.package.outputs.exe-x64 }}
-          msi-x64: ${{ steps.package.outputs.msi-x64 }}
           source: ${{ steps.package.outputs.source }}
           chrome-extension: ${{ steps.package.outputs.chrome-extension }}
           edge-extension: ${{ steps.package.outputs.edge-extension }}

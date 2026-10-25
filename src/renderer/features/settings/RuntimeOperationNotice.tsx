@@ -20,13 +20,18 @@ export function RuntimeOperationNotice() {
       // carries a code rather than a sentence, so the notice names what the user has to close
       // instead of reading the code back.
       const conflict = current.runtimeError !== null && isSessionConflictFailure(current.runtimeError)
+      const pipTimeout = current.runtimeError?.startsWith('PYTORCH_DEPENDENCY_TIMEOUT:') ?? false
+      const pipDetails = pipTimeout ? current.runtimeError!.slice('PYTORCH_DEPENDENCY_TIMEOUT:'.length).trim() : undefined
       if (!wasBusy && current.runtimeBusy) {
         notifyInfo(t('runtime.operationStarted', { action }), { description: t('runtime.operationProgress') })
         return
       }
       if (wasBusy && !current.runtimeBusy) {
         if (conflict) notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
-        else if (current.runtimeError) notifyError(t('runtime.operationFailed', { action }), { cause: current.runtimeError })
+        else if (current.runtimeError) notifyError(
+          pipTimeout ? t('runtime.pipDependencyTimeout') : t('runtime.operationFailed', { action }),
+          { cause: pipDetails ?? current.runtimeError },
+        )
         else notifySuccess(t('runtime.operationComplete', { action }))
         return
       }
@@ -35,7 +40,10 @@ export function RuntimeOperationNotice() {
         // that caused it, so the message here would be a second one for the same failure.
         if (isRuntimeFailureClaimed()) return
         if (conflict) notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
-        else notifyError(t('runtime.operationFailed', { action: t('runtime.recheck') }), { cause: current.runtimeError })
+        else notifyError(
+          pipTimeout ? t('runtime.pipDependencyTimeout') : t('runtime.operationFailed', { action: t('runtime.recheck') }),
+          { cause: pipDetails ?? current.runtimeError },
+        )
       }
     })
   }, [t])

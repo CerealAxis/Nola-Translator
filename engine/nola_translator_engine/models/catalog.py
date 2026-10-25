@@ -9,42 +9,63 @@ from .manager import FileEntry, ModelSpec
 # sizes and SHA-256 belong to that repository, including its non-weight files.
 
 # Official GGUF Q4_K_M artifacts, pinned from Hugging Face's blobs API.
-# Text captions do not need the separate mmproj vision weights.
+# The Q8_0 projector is the official compact vision companion for image translation.
 # Source: https://huggingface.co/IndexTeam/Index-Translate-2B-GGUF (and 9B / 35B-A3B-preview).
 INDEX_TRANSLATE_2B_Q4_K_M = ModelSpec(
     model_id="index-translate-2b-q4-k-m", directory="index-translate-2b-q4-k-m",
     repo="IndexTeam/Index-Translate-2B-GGUF", revision="3a0eca6ce931d88d00614d427ab3ed8ff0743902",
     modelscope_repo="IndexTeam/Index-Translate-2B-GGUF",
-    files=(FileEntry("Index-Translate-2B.Q4_K_M.gguf", 1_312_164_352,
-        "044b313d29342bd3b2c77cbb64023ca0d209bd9b3247763f9d162767ef2d746a"),),
+    files=(
+        FileEntry("Index-Translate-2B.Q4_K_M.gguf", 1_312_164_352,
+            "044b313d29342bd3b2c77cbb64023ca0d209bd9b3247763f9d162767ef2d746a"),
+        FileEntry("Index-Translate-2B.mmproj-Q8_0.gguf", 361_518_144,
+            "b100ca29aaf437461d0b22ada7492d5d2dfeaa15959e329c4267598ddebe446d"),
+    ),
     modelscope_revision="b92a7c7bf499a6f05da1a66fab8549da3de5b603",
     modelscope_files=(
         FileEntry("Index-Translate-2B.Q4_K_M.gguf", 1_312_164_352,
             "044b313d29342bd3b2c77cbb64023ca0d209bd9b3247763f9d162767ef2d746a"),
+        FileEntry("Index-Translate-2B.mmproj-Q8_0.gguf", 361_518_144,
+            "b100ca29aaf437461d0b22ada7492d5d2dfeaa15959e329c4267598ddebe446d",
+            repo="IndexTeam/Index-Translate-2B-GGUF", revision="3a0eca6ce931d88d00614d427ab3ed8ff0743902"),
     ),
 )
 INDEX_TRANSLATE_9B_Q4_K_M = ModelSpec(
     model_id="index-translate-9b-q4-k-m", directory="index-translate-9b-q4-k-m",
     repo="IndexTeam/Index-Translate-9B-GGUF", revision="645939fbab839a656f1bc39975a872bc8ad749f8",
     modelscope_repo="IndexTeam/Index-Translate-9B-GGUF",
-    files=(FileEntry("Index-Translate-9B.Q4_K_M.gguf", 5_780_090_304,
-        "9cc6758b0007f4cbf42ea3400768cbff91ae74ef8d640e467158348426d33713"),),
+    files=(
+        FileEntry("Index-Translate-9B.Q4_K_M.gguf", 5_780_090_304,
+            "9cc6758b0007f4cbf42ea3400768cbff91ae74ef8d640e467158348426d33713"),
+        FileEntry("Index-Translate-9B.mmproj-Q8_0.gguf", 620_690_272,
+            "0c654bbb219cea5dbb80656ec506e308c82b06aac7287f7636b9b6d06a44b957"),
+    ),
     modelscope_revision="e97205e0e68986a643eab5ebfd75cebeb67234d0",
     modelscope_files=(
         FileEntry("Index-Translate-9B.Q4_K_M.gguf", 5_780_090_304,
             "9cc6758b0007f4cbf42ea3400768cbff91ae74ef8d640e467158348426d33713"),
+        FileEntry("Index-Translate-9B.mmproj-Q8_0.gguf", 620_690_272,
+            "0c654bbb219cea5dbb80656ec506e308c82b06aac7287f7636b9b6d06a44b957",
+            repo="IndexTeam/Index-Translate-9B-GGUF", revision="645939fbab839a656f1bc39975a872bc8ad749f8"),
     ),
 )
 INDEX_TRANSLATE_35B_A3B_Q4_K_M = ModelSpec(
     model_id="index-translate-35b-a3b-q4-k-m", directory="index-translate-35b-a3b-q4-k-m",
     repo="IndexTeam/Index-Translate-35B-A3B-preview-GGUF", revision="3319ce338363a181c6c20c06b7379063d9baf484",
     modelscope_repo="IndexTeam/Index-Translate-35B-A3B-preview-GGUF",
-    files=(FileEntry("Index-Translate-35B-A3B-preview.Q4_K_M.gguf", 21_713_462_400,
-        "7d803928b68110b64880206f79ccd18e209d11091a21c689ca9e369687cb93f6"),),
+    files=(
+        FileEntry("Index-Translate-35B-A3B-preview.Q4_K_M.gguf", 21_713_462_400,
+            "7d803928b68110b64880206f79ccd18e209d11091a21c689ca9e369687cb93f6"),
+        FileEntry("Index-Translate-35B-A3B-preview.mmproj-Q8_0.gguf", 610_655_072,
+            "b476ad3bd07dd13a1064de4d0af68fdb7faeec826fc233084b50b207e97c3c0a"),
+    ),
     modelscope_revision="91f6e204309d1808f3779d4a3822f8ce011785bb",
     modelscope_files=(
         FileEntry("Index-Translate-35B-A3B-preview.Q4_K_M.gguf", 21_713_462_400,
             "7d803928b68110b64880206f79ccd18e209d11091a21c689ca9e369687cb93f6"),
+        FileEntry("Index-Translate-35B-A3B-preview.mmproj-Q8_0.gguf", 610_655_072,
+            "b476ad3bd07dd13a1064de4d0af68fdb7faeec826fc233084b50b207e97c3c0a",
+            repo="IndexTeam/Index-Translate-35B-A3B-preview-GGUF", revision="3319ce338363a181c6c20c06b7379063d9baf484"),
     ),
 )
 

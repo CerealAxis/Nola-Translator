@@ -61,7 +61,7 @@ export interface NolaBridge {
     listDevices(): Promise<AudioDevice[]>
     testAudio(source: AudioTestSource): Promise<AudioTestResult>
     listResources(): Promise<ResourceSnapshotWithRate>
-    manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel', source?: ModelDownloadSource): Promise<ResourceRecord>
+    manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel' | 'pause' | 'resume', source?: ModelDownloadSource): Promise<ResourceRecord>
     startSession(config: SessionConfig): Promise<SessionStartResult>
     stopSession(sessionId: string): Promise<void>
     /**
@@ -319,6 +319,7 @@ export const BRIDGE_ADAPTER_NOTES: Record<string, string> = {
  */
 export function resourceStateOf(record: ResourceRecord): ResourceState {
   if (record.state === 'failed') return 'failed'
+  if (record.state === 'paused') return 'paused'
   if (record.state === 'running') {
     if (record.phase === 'remove') return 'removing'
     if (record.phase === 'verify' || record.phase === 'install') return 'verifying'

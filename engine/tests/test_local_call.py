@@ -35,6 +35,36 @@ def test_audio_codec_uses_synthesizer_sample_rate_and_round_trips():
     np.testing.assert_array_equal(decoded, np.zeros(320, dtype=np.float32))
 
 
+def test_finds_official_index_translate_projector_filename(tmp_path):
+    projector = tmp_path / 'Index-Translate-2B.mmproj-Q8_0.gguf'
+    projector.touch()
+
+    assert local_call.find_vision_projector(tmp_path, 'Index-Translate-2B.Q4_K_M.gguf') == projector
+
+
+def test_index_translate_public_image_request_uses_openai_image_url_payload(monkeypatch):
+    from nola_translator_engine.translation import index_translate, network
+
+    image = "data:image/png;base64,aGVsbG8="
+    captured = {}
+
+    def post_json(url, payload, headers):
+        captured.update(url=url, payload=payload, headers=headers)
+        return {"choices": [{"message": {"content": "translated"}}]}
+
+    monkeypatch.setattr(network, "_post_json", post_json)
+    runtime = SimpleNamespace(translation_provider=index_translate.IndexTranslatePublicProvider())
+    result = asyncio.run(local_call.translate_image(runtime, {
+        "image": image, "source": "en", "target": "zh", "text": "context",
+    }))
+
+    assert result == "translated"
+    assert captured["url"] == index_translate.PUBLIC_ENDPOINT + "/chat/completions"
+    assert captured["headers"]["User-Agent"] == "Index-Translate-Client/1.0"
+    content = captured["payload"]["messages"][0]["content"]
+    assert content[1] == {"type": "image_url", "image_url": {"url": image}}
+
+
 def test_tts_device_selection_honors_request_and_cpu_fallback():
     devices = [SimpleNamespace(id="cpu", torchDevice="cpu", score=0, recognition=True),
         SimpleNamespace(id="cuda:test", torchDevice="cuda:0", score=20, recognition=True)]

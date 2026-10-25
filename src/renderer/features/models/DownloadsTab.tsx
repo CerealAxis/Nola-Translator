@@ -99,11 +99,13 @@ function Row({ record, busy, onRetry }: { record: ResourceRecordWithRate; busy: 
    * A failed download is reported by the notice that says what went wrong, so the row
    * says what is true about the model instead of repeating the failure in a pill.
    */
+  const paused = record.state === 'paused'
   const label = failed ? t('models.notInstalled')
+    : paused ? t('models.paused')
     : cancelling ? t('models.cancelling')
     : state === 'verifying' ? t('models.verifying')
     : state === 'queued' ? t('models.queued') : t('status.downloading')
-  const tone = failed ? 'neutral' : cancelling ? 'warning' : 'accent'
+  const tone = failed ? 'neutral' : cancelling || paused ? 'warning' : 'accent'
 
   return (
     <tr className="table__row">
@@ -113,10 +115,10 @@ function Row({ record, busy, onRetry }: { record: ResourceRecordWithRate; busy: 
       <td className="table__cell"><span className="nola-caption tabular whitespace-nowrap">{formatBytes(total)}</span></td>
       <td className="table__cell">
         <div className="flex min-w-0 flex-col items-start gap-[var(--space-1)]">
-          <StatusPill label={label} tone={tone} live={!failed && !cancelling} />
+          {state !== 'downloading' ? <StatusPill label={label} tone={tone} live={!failed && !cancelling && !paused} /> : null}
           {!failed && !cancelling ? <div className="flex w-full min-w-0 flex-col gap-[var(--space-1)]">
             <Progress.Root className="w-full" value={value} min={0} max={1} aria-label={t('models.stateLabel')}>
-              <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm bg-default">
+              <Progress.Track className="relative h-2 w-full overflow-hidden rounded-sm border border-border bg-surface-secondary">
                 <Progress.Indicator className="h-full rounded-sm bg-accent transition-[width] duration-[var(--dur-enter)]" />
               </Progress.Track>
             </Progress.Root>
@@ -142,6 +144,11 @@ function Row({ record, busy, onRetry }: { record: ResourceRecordWithRate; busy: 
               {t('models.retry')}
             </Button>
           ) : null}
+          {!failed && !cancelling ? <Button variant="secondary" size="sm" disabled={busy} onClick={() => {
+            void actions.models.manageResource(record.resourceId, paused ? 'resume' : 'pause').catch((cause: unknown) => {
+              notifyError(t('errors.engineOperationFailed'), { cause })
+            })
+          }}>{t(paused ? 'models.resume' : 'models.pause')}</Button> : null}
             <Button
               variant="tertiary"
               size="sm"

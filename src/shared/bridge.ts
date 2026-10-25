@@ -102,7 +102,7 @@ export type NolaTranslatorApi = {
   importRuntime(): Promise<boolean>
   cancelRuntimeInstall(): Promise<void>
   listResources(): Promise<ResourceSnapshot>
-  manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel', source?: ModelDownloadSource): Promise<ResourceRecord>
+  manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel' | 'pause' | 'resume', source?: ModelDownloadSource): Promise<ResourceRecord>
   /**
    * Search Hugging Face for candidate models. Filters published PyTorch/GGUF weights from one
    * metadata response; the category narrows the server query, while README reads and runtime

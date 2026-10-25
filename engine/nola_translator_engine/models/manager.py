@@ -138,6 +138,9 @@ class ModelSpec:
     ) -> str:
         if source == "modelscope":
             self.files_for(source)
+            if entry.repo:
+                endpoint = HF_MIRROR_ENDPOINT if network is not None and network.useHuggingFaceMirror else HF_ENDPOINT
+                return f"{endpoint}/{entry.repo}/resolve/{entry.revision}/{entry.path}"
             return f"{MODELSCOPE_ENDPOINT}/{self.modelscope_repo}/resolve/{self.modelscope_revision}/{entry.path}"
         if source == "huggingface":
             endpoint = HF_ENDPOINT
@@ -158,6 +161,14 @@ class _DownloadProtocolError(RuntimeError):
 
 class _DownloadTruncatedError(_DownloadProtocolError):
     """A valid response ended early; retrying the same range can recover it."""
+
+
+class _ProgressCallbackCancelled(Exception):
+    """A caller stopped this download from its progress callback."""
+
+    def __init__(self, cause: Exception) -> None:
+        super().__init__(str(cause))
+        self.cause = cause
 
 
 class ResumableParallelDownloader:
@@ -189,17 +200,24 @@ class ResumableParallelDownloader:
     ) -> None:
         cache_dir = self._cache_dir(url, entry)
         started_at = time.monotonic()
-        download_url, ranges = (self._resolve_download(url, entry.size, progress)
-                                if entry.size >= self.parallel_threshold else (url, False))
-        write_diagnostic('engine', 'model.download.start', {
-            'file': entry.path, 'sourceHost': urlparse(url).hostname,
-            'downloadHost': urlparse(download_url).hostname, 'bytes': entry.size,
-            'workers': self.max_workers if ranges else 1, 'chunkBytes': self.chunk_size,
-        })
-        if ranges:
-            self._download_parallel(download_url, destination, entry.size, cache_dir, progress)
-        else:
-            self._download_sequential(download_url, destination, entry.size, cache_dir, progress)
+        try:
+            download_url, ranges = (self._resolve_download(url, entry.size, progress)
+                                    if entry.size >= self.parallel_threshold else (url, False))
+            write_diagnostic('engine', 'model.download.start', {
+                'file': entry.path, 'sourceHost': urlparse(url).hostname,
+                'downloadHost': urlparse(download_url).hostname, 'bytes': entry.size,
+                'workers': self.max_workers if ranges else 1, 'chunkBytes': self.chunk_size,
+            })
+            if ranges:
+                self._download_parallel(download_url, destination, entry.size, cache_dir, progress)
+            else:
+                self._download_sequential(download_url, destination, entry.size, cache_dir, progress)
+        except _ProgressCallbackCancelled as stopped:
+            # Explicit cancellation discards resumable chunks. Pausing never raises from the
+            # callback, so it keeps these files and resumes from the same byte ranges.
+            shutil.rmtree(cache_dir, ignore_errors=True)
+            self._remove_empty_cache_root()
+            raise stopped.cause
         shutil.rmtree(cache_dir, ignore_errors=True)
         self._remove_empty_cache_root()
         write_diagnostic('engine', 'model.download.complete', {
@@ -257,7 +275,7 @@ class ResumableParallelDownloader:
         # repeating the origin request. Cache identity still uses the stable repository URL.
         for attempt in range(self.max_retries + 1):
             if attempt:
-                progress(0, size)
+                self._report_progress(progress, 0, size)
             request = Request(url, headers={"User-Agent": "Nola Translator/0.1", "Range": "bytes=0-0"})
             try:
                 with self.opener.open(request, timeout=30) as response:
@@ -299,7 +317,7 @@ class ResumableParallelDownloader:
                     active.pop(index, None)
                 else:
                     active[index] = current
-                progress(sum(completed.values()) + sum(active.values()), size)
+                self._report_progress(progress, sum(completed.values()) + sum(active.values()), size)
 
         def fetch(index: int) -> None:
             if stopped.is_set():
@@ -382,7 +400,7 @@ class ResumableParallelDownloader:
             for index in range(chunk_count):
                 with (cache_dir / f"chunk-{index:06d}.part").open("rb") as source:
                     shutil.copyfileobj(source, output, length=1024 * 1024)
-        progress(size, size)
+        self._report_progress(progress, size, size)
 
     def _download_sequential(
         self, url: str, destination: Path, size: int, cache_dir: Path,
@@ -390,7 +408,7 @@ class ResumableParallelDownloader:
     ) -> None:
         for attempt in range(self.max_retries + 1):
             partial = cache_dir / 'sequential.part'
-            progress(partial.stat().st_size if partial.is_file() else 0, size)
+            self._report_progress(progress, partial.stat().st_size if partial.is_file() else 0, size)
             try:
                 self._download_sequential_once(url, destination, size, cache_dir, progress)
                 return
@@ -413,7 +431,7 @@ class ResumableParallelDownloader:
             partial_path.unlink()
             offset = 0
         if offset == size:
-            progress(size, size)
+            self._report_progress(progress, size, size)
             shutil.copyfile(partial_path, destination)
             return
 
@@ -439,13 +457,13 @@ class ResumableParallelDownloader:
         current = offset
         mode = "ab" if append else "wb"
         with response, partial_path.open(mode) as output:
-            progress(current, size)
+            self._report_progress(progress, current, size)
             while data := response.read(1024 * 1024):
                 output.write(data)
                 current += len(data)
                 if current > size:
                     raise _DownloadProtocolError("下载文件长度超过模型清单")
-                progress(current, size)
+                self._report_progress(progress, current, size)
         if current != size:
             raise _DownloadTruncatedError("下载文件长度与模型清单不匹配")
         shutil.copyfile(partial_path, destination)
@@ -454,6 +472,13 @@ class ResumableParallelDownloader:
     def _status(response: object) -> int:
         status = getattr(response, "status", None)
         return int(status if status is not None else response.getcode())
+
+    @staticmethod
+    def _report_progress(progress: ProgressCallback, current: int, total: int) -> None:
+        try:
+            progress(current, total)
+        except Exception as error:
+            raise _ProgressCallbackCancelled(error) from error
 
     @staticmethod
     def _retryable(error: Exception) -> bool:
@@ -573,6 +598,17 @@ class ModelManager:
         if self.is_installed(spec):
             return self.model_path(spec)
 
+        target = self.model_path(spec)
+        if target.exists() and not self._owned_directory(target):
+            raise ModelStorageError('不能覆盖外部链接模型目录')
+        # A newer manifest may add optional assets such as a vision projector. Keep valid
+        # weights already installed and fetch only missing or size-mismatched files.
+        existing_files = tuple(entry for entry in files if (target / entry.path).is_file()
+                                and (target / entry.path).stat().st_size == entry.size) if target.is_dir() else ()
+        missing_files = tuple(entry for entry in files if entry not in existing_files)
+        preserve_existing = bool(existing_files and missing_files)
+        pending_files = missing_files if preserve_existing else files
+
         def phase(name: str) -> None:
             if on_phase is not None:
                 on_phase(name)
@@ -588,13 +624,13 @@ class ModelManager:
             raise ModelStorageError(
                 f"无法在模型目录 {self.model_root} 下创建临时目录：{error}"
             ) from error
-        total = sum(entry.size for entry in files)
+        total = sum(entry.size for entry in pending_files)
         done = 0
         try:
             phase("download")
             fetcher = self.fetcher
             downloader = None if fetcher is not None else self._downloader_for(network)
-            for entry in files:
+            for entry in pending_files:
                 part = temp / f".{entry.path}.part"
                 part.parent.mkdir(parents=True, exist_ok=True)
                 # cancellation checkpoint between files, so a fetcher that never reports per chunk still gets noticed
@@ -628,13 +664,20 @@ class ModelManager:
                 done += entry.size
 
             phase("verify")
-            for entry in files:
+            for entry in pending_files:
                 part = temp / f".{entry.path}.part"
                 self._verify_file(part, entry, lambda: progress(done, total))
                 os.replace(part, temp / entry.path)
 
             phase("install")
             target = self.model_path(spec)
+            if target.is_dir() and preserve_existing:
+                for entry in pending_files:
+                    destination = target / entry.path
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(temp / entry.path, destination)
+                shutil.rmtree(temp, ignore_errors=True)
+                return target
             corrupt = self.model_root / f".{spec.directory}.corrupt"
             moved_old = False
             if target.exists():

@@ -31,7 +31,6 @@ jobs:
         uses: ./.github/actions/upload-distributions
         with:
           exe-x64: ${{ steps.package.outputs.exe-x64 }}
-          msi-x64: ${{ steps.package.outputs.msi-x64 }}
           source: ${{ steps.package.outputs.source }}
           chrome-extension: ${{ steps.package.outputs.chrome-extension }}
           edge-extension: ${{ steps.package.outputs.edge-extension }}
@@ -49,6 +48,6 @@ jobs:
             gh release create $env:RELEASE_TAG @options
             if ($LASTEXITCODE -ne 0) { throw 'Creating release failed' }
           }
-          $assets = @(Get-ChildItem -LiteralPath release -File | Where-Object { $_.Name -like '*-Setup.exe' -or $_.Name -like '*-Setup.msi' -or $_.Name -like '*-Source.zip' -or $_.Name -like 'Nola-Chrome-Extension-v*.zip' -or $_.Name -like 'Nola-Edge-Extension-v*.zip' -or $_.Name -like 'Nola-Firefox-Extension-v*.zip' } | ForEach-Object FullName)
+          $assets = @(Get-ChildItem -LiteralPath release -File | Where-Object { $_.Name -like '*-Setup.exe' -or $_.Name -like '*-Source.zip' -or $_.Name -like 'Nola-Chrome-Extension-v*.zip' -or $_.Name -like 'Nola-Edge-Extension-v*.zip' -or $_.Name -like 'Nola-Firefox-Extension-v*.zip' } | ForEach-Object FullName)
           gh release upload $env:RELEASE_TAG @assets --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Uploading release assets failed' }

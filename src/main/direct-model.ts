@@ -9,7 +9,7 @@ import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } fro
 export interface DirectModelServices {
   getSettings(): AppSettings
   getCredential(provider: CredentialProvider): Promise<string>
-  directLaunch?(model: string): Promise<EngineLaunchSpec>
+  directLaunch?(model: string, options?: { requiresImages?: boolean }): Promise<EngineLaunchSpec>
 }
 
 let workerQueue: Promise<unknown> = Promise.resolve()
@@ -59,7 +59,7 @@ async function executeDirectModel(services: DirectModelServices, raw: DirectMode
   } else if (!resourceId) throw new Error('Select an installed speech synthesis model')
   if (request.kind === 'tts' && !inspect && !request.text.trim()) throw new Error('Speech input is empty')
   signal.throwIfAborted()
-  const launch = await services.directLaunch(request.model)
+  const launch = await services.directLaunch(request.model, { requiresImages: !!request.image })
   signal.throwIfAborted()
   return new Promise((resolve, reject) => {
     const child = spawn(launch.command, launch.args, { cwd: launch.cwd, env: { ...process.env, ...launch.env,

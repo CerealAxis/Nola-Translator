@@ -4,6 +4,12 @@ import { actions, stores } from '@/store'
 import { useI18n } from '@/i18n'
 import { notifyInfo, notifyRetryableFailure, notifySuccess, notifyWarning } from '@/components/primitives/notify'
 
+const suppressedStartNotices = new Set<string>()
+
+export function suppressNextDownloadStartNotice(resourceId: string) {
+  suppressedStartNotices.add(resourceId)
+}
+
 /**
  * A download that stopped. The user can start it again from the page, so the notice only has
  * to say what went wrong and leaves on its own.
@@ -25,12 +31,22 @@ export function ModelDownloadNotice() {
       if (current === previous) return
       const before = new Map(previous.map(record => [record.resourceId, record]))
       previous = current
+      const after = new Map(current.map(record => [record.resourceId, record]))
+      for (const prior of before.values()) {
+        if (prior.state === 'running' && prior.phase === 'remove' && !after.has(prior.resourceId)) {
+          notifySuccess(t('modelsSettingsUi.removeComplete', { name: prior.name }))
+        }
+      }
       for (const record of current) {
         const prior = before.get(record.resourceId)
-        const startedNow = prior?.state !== 'running' && prior?.state !== 'cancelling' &&
+        const startedNow = prior?.state !== 'running' && prior?.state !== 'paused' && prior?.state !== 'cancelling' &&
           record.state === 'running' && (record.phase === 'resolve' || record.phase === 'download')
         if (startedNow) {
-          notifyInfo(t('models.downloadStarted', { name: record.name }))
+          if (suppressedStartNotices.delete(record.resourceId)) continue
+          notifyInfo(t('models.downloadStarted', { name: record.name }), {
+            action: { label: t('models.viewProgress'), onPress: () => { window.location.hash = '#/models/downloads' } },
+            duration: 12000,
+          })
           continue
         }
         /*
@@ -42,7 +58,7 @@ export function ModelDownloadNotice() {
         if (wasRemoving) {
           if (record.state === 'failed') {
             notifyRetryableFailure(t('modelsSettingsUi.removeFailed'), { description: record.errorCode ?? undefined })
-          }
+          } else if (record.state === 'idle' && !record.installed) notifySuccess(t('modelsSettingsUi.removeComplete', { name: record.name }))
           continue
         }
         const wasInstalling = (prior?.state === 'running' &&

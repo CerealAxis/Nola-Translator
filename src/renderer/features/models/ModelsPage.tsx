@@ -16,13 +16,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Box } from 'lucide-react'
 import { getBridge } from '@/store'
-import { Input } from '@/components/ui/input'
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 import { useI18n } from '@/i18n'
+import { useRoute } from '@/routes'
 import { actions, stores, updateSettings, useStore } from '@/store'
-import { notifyError, notifySuccess } from '@/components/primitives/notify'
+import { notifyError, notifyInfo, notifySuccess } from '@/components/primitives/notify'
 import type { ModelDownloadSource, ResourceRecord, ResourceRecordWithRate } from '@/bridge'
 import { DownloadsTab } from './DownloadsTab'
 import { HubSearchTab } from './HubSearchTab'
@@ -32,7 +30,7 @@ import { ModelMark } from './modelBrand'
 import { RecommendedFamilyCard, RecommendedFamilyDialog } from './RecommendedFamilies'
 import { familyOf, type RecommendedFamily } from './modelFamily'
 import { isEngineAvailable } from './engine-availability'
-import { notifyModelDownloadFailure } from './ModelDownloadNotice'
+import { notifyModelDownloadFailure, suppressNextDownloadStartNotice } from './ModelDownloadNotice'
 import { recognitionLabel } from '../../../shared/cloud-config'
 import { ALIYUN_LANGUAGES } from '../../../shared/cloud-config'
 import { targetLanguagePatch } from '../../session-config'
@@ -43,10 +41,13 @@ export type ModelsTab = 'recommended' | 'installed' | 'search' | 'downloads'
 
 /** Three catalog columns collapse to two and one as the application narrows. */
 const GRID = 'models-grid'
+const attemptedVisionSupplements = new Set<string>()
 
 export function ModelsPage() {
   const { t } = useI18n()
+  const { modelsTab } = useRoute()
   const [tab, setTab] = useState<ModelsTab>('recommended')
+  useEffect(() => { if (modelsTab === 'downloads') setTab('downloads') }, [modelsTab])
   const [configuring, setConfiguring] = useState<{ record: ResourceRecord; readOnly: boolean } | null>(null)
   const [downloadTarget, setDownloadTarget] = useState<ResourceRecord | null>(null)
   const [openFamily, setOpenFamily] = useState<RecommendedFamily | null>(null)
@@ -61,6 +62,37 @@ export function ModelsPage() {
   const settings = useStore(stores.settings, (state) => state.settings)
   const computeSnapshot = useStore(stores.settings, (state) => state.computeSnapshot)
   const runtimes = useStore(stores.settings, (state) => state.runtimes)
+
+  useEffect(() => {
+    if (!loaded) return
+    const legacyModels = [
+      ['index-translate-2b-q4-k-m', 1_312_164_352],
+      ['index-translate-9b-q4-k-m', 5_780_090_304],
+      ['index-translate-35b-a3b-q4-k-m', 21_713_462_400],
+    ] as const
+    for (const [resourceId, weightBytes] of legacyModels) {
+      const record = resources.find(item => item.resourceId === resourceId)
+      if (!record || record.installed || record.state !== 'idle' || record.installedBytes < weightBytes) continue
+      const key = `nola:index-translate-vision-supplement:${resourceId}:v1`
+      if (attemptedVisionSupplements.has(resourceId)) continue
+      attemptedVisionSupplements.add(resourceId)
+      try {
+        if (window.localStorage.getItem(key)) continue
+        window.localStorage.setItem(key, 'started')
+      } catch {
+        // Keep the migration available if browser storage is disabled; the in-memory guard
+        // still prevents duplicate starts while this page remains mounted.
+      }
+      notifyInfo(t('models.visionSupplementStarted', { name: record.name }), {
+        action: { label: t('models.viewProgress'), onPress: () => { window.location.hash = '#/models/downloads' } },
+        duration: 12000,
+      })
+      suppressNextDownloadStartNotice(resourceId)
+      void actions.models.manageResource(resourceId, 'install').catch((cause: unknown) => {
+        notifyError(t('models.downloadError', { name: record.name }), { cause })
+      })
+    }
+  }, [loaded, resources, t])
 
   const credentials = useStore(stores.models, state => state.credentials)
   const cloudModels = cloudModelsOf(settings, credentials)
@@ -299,12 +331,6 @@ export function ModelsPage() {
           <CurrentModel label={t('modelsSettingsUi.currentTranslation')} name={currentTranslation} record={localTranslation ? translation ?? null : null} installed={localTranslation ? translation?.installed ?? false : null} kind="translationModel" onChange={() => setTab('installed')} />
           <CurrentModel label={t('gateway.synthesisDefault')} name={synthesis?.installed ? synthesis.name : t('modelsSettingsUi.noModelSelected')} record={synthesis ?? null} installed={synthesis?.installed ?? false} kind="ttsModel" onChange={() => setTab('installed')} />
         </div>
-        {synthesis?.installed ? <Field>
-          <FieldLabel htmlFor="default-synthesis-voice">{t('gateway.voice')}</FieldLabel>
-          {voices.length ? <Select value={settings?.synthesis.voice || voices[0]} onValueChange={voice => { if (voice) void updateSettings({ synthesis: { voice } }).catch(() => undefined) }}><SelectTrigger id="default-synthesis-voice"><SelectValue /></SelectTrigger><SelectContent><SelectGroup>{voices.map(voice => <SelectItem key={voice} value={voice}>{voice}</SelectItem>)}</SelectGroup></SelectContent></Select>
-            : <Input id="default-synthesis-voice" key={`${synthesis.resourceId}:${settings?.synthesis.voice}`} defaultValue={settings?.synthesis.voice ?? ''} onBlur={event => { const voice = event.currentTarget.value.trim(); if (voice !== settings?.synthesis.voice) void updateSettings({ synthesis: { voice } }).catch(() => undefined) }} />}
-          <FieldDescription>{t('gateway.voiceHint')}</FieldDescription>
-        </Field> : null}
       </section>
 
       <TabsRoot
@@ -508,6 +534,6 @@ function CurrentModel({ label, name, record, installed, kind, onChange }: { labe
 /** 在飞 + 失败。失败的留在表里是为了让"重试"有个落点。 */
 function countActive(records: readonly ResourceRecordWithRate[]): number {
   return records.filter(
-    (item) => item.phase !== 'remove' && (item.state === 'running' || item.state === 'cancelling' || item.state === 'failed'),
+    (item) => item.phase !== 'remove' && (item.state === 'running' || item.state === 'paused' || item.state === 'cancelling' || item.state === 'failed'),
   ).length
 }

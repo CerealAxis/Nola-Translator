@@ -50,17 +50,17 @@ if (-not $pyInstallerRequirement) { throw 'PyInstaller requirement is missing' }
 Assert-NativeSuccess 'Install browser host build tool'
 & "$PSScriptRoot/build-browser-host.ps1" -Python $hostPython
 & "$PSScriptRoot/build-python-base.ps1" -BasePython $basePython
-# Build separate x64 EXE and MSI installers.
+# Build the x64 EXE installer.
 & node "$PSScriptRoot/ci-package-config.cjs"
 Assert-NativeSuccess 'Generate packaging configuration'
-& npx --no-install electron-builder --config artifacts/ci-builder.json --win nsis msi --x64 --publish never
+& npx --no-install electron-builder --config artifacts/ci-builder.json --win nsis --x64 --publish never
 Assert-NativeSuccess 'Installer packaging'
 
 $buildVersion = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
 $distributionPrefix = "Nola-Translator-$buildVersion"
 $assets = @()
 foreach ($arch in @('x64')) {
-    foreach ($extension in @('exe', 'msi')) {
+    foreach ($extension in @('exe')) {
         $name = "$distributionPrefix-Windows-$arch-Setup.$extension"
         if (-not (Test-Path -LiteralPath "release/$name")) { throw "Missing installer: $name" }
         $assets += $name
@@ -86,7 +86,6 @@ Set-Content -LiteralPath 'release/SHA256SUMS.txt' -Value $checksum -Encoding asc
 if ($env:GITHUB_OUTPUT) {
     Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8 -Value (@(
         "exe-x64=release/$distributionPrefix-Windows-x64-Setup.exe",
-        "msi-x64=release/$distributionPrefix-Windows-x64-Setup.msi",
         "source=release/$sourceName"
     ) + $extensionOutputs)
 }

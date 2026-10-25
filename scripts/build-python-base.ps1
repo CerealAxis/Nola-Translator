@@ -20,10 +20,14 @@ try {
     & $buildPython -m pip --isolated install --index-url 'https://pypi.org/simple' -r (Join-Path $projectRoot 'engine\requirements-base.txt')
 } finally { $env:PIP_CONFIG_FILE = $previousPipConfig }
 if ($LASTEXITCODE -ne 0) { throw 'Could not install base dependencies' }
+# onnxruntime declares sympy as a dependency but never imports it at inference time;
+# removing it and its mpmath dependency keeps ~79 MB out of the packaged runtime.
+& $buildPython -m pip --isolated uninstall -y sympy mpmath
+if ($LASTEXITCODE -ne 0) { throw 'Could not remove unused onnxruntime dependencies' }
 & $buildPython (Join-Path $PSScriptRoot 'install-crispasr-vulkan.py')
 if ($LASTEXITCODE -ne 0) { throw 'Could not install CrispASR Vulkan libraries' }
 & $buildPython (Join-Path $PSScriptRoot 'build-python-runtime.py')
 if ($LASTEXITCODE -ne 0) { throw 'Python runtime build failed' }
 $privatePython = Join-Path $projectRoot 'engine\dist\NolaPythonEngine\python.exe'
-& $privatePython -I -c "import sys,importlib.util; import nola_translator_engine.runtime; assert sys.version_info[:2] == (3,12); assert importlib.util.find_spec('torch') is None"
+& $privatePython -I -c "import sys,importlib.util; import onnxruntime; import nola_translator_engine.runtime; assert sys.version_info[:2] == (3,12); assert importlib.util.find_spec('torch') is None; assert importlib.util.find_spec('sympy') is None and importlib.util.find_spec('mpmath') is None"
 if ($LASTEXITCODE -ne 0) { throw 'Base runtime must work without Torch' }

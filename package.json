@@ -18,7 +18,7 @@
     "build": "npm run typecheck && electron-vite build",
     "build:python": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-python-base.ps1",
     "fetch:llama-vulkan": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-llama-vulkan.ps1",
-    "dist:win": "npm run fetch:llama-vulkan && npm run build && npm run build:browser && npm run package:browser && npm run build:browser-host && npm run build:python && electron-builder --win nsis msi --x64",
+    "dist:win": "npm run fetch:llama-vulkan && npm run build && npm run build:browser && npm run package:browser && npm run build:browser-host && npm run build:python && electron-builder --win nsis --x64",
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:ui": "electron tests/e2e/capture-ui.mjs",
@@ -165,12 +165,6 @@
           "arch": [
             "x64"
           ]
-        },
-        {
-          "target": "msi",
-          "arch": [
-            "x64"
-          ]
         }
       ],
       "artifactName": "Nola-Translator-${version}-Setup-${arch}.${ext}"
@@ -180,7 +174,6 @@
         "en_US",
         "zh_CN"
       ],
-      "useZip": true,
       "differentialPackage": false,
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
@@ -189,12 +182,6 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "include": "build/installer.nsh"
-    },
-    "msi": {
-      "oneClick": false,
-      "perMachine": false,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
     }
   }
 }

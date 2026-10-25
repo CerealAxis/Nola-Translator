@@ -31,6 +31,15 @@ def torch_device_for_tts(compute, devices) -> str:
     raise ValueError(f'Requested TTS device is unavailable: {requested}')
 
 
+def find_vision_projector(model_dir: Path, model_name: str) -> Path | None:
+    """Find the matching projector; official Index files put `mmproj` after the model name."""
+    family = Path(model_name).name.split('.', 1)[0]
+    candidates = [path for path in model_dir.rglob(f'{family}.mmproj*.gguf') if path.is_file()]
+    if not candidates:
+        candidates = [path for path in model_dir.rglob('*mmproj*.gguf') if path.is_file()]
+    return next((path for path in sorted(candidates, key=lambda item: ('q8_0' not in item.name.casefold(), item.name.casefold()))), None)
+
+
 def retry_tts_on_cpu(request):
     cpu_request = dict(request)
     config = dict(request['config'])
@@ -216,10 +225,12 @@ async def translate_image(runtime, request):
         return await asyncio.to_thread(run)
     if not request.get('resourceId'):
         raise ValueError('The selected translation provider does not support image translation')
-    projectors = list(runtime.resources.model_path(request['resourceId']).rglob('mmproj*.gguf'))
-    if not projectors:
-        raise ValueError('Image translation requires the matching vision projector; use the Index-Translate PyTorch model or public API')
-    runtime.llama_manager.mmproj_path = projectors[0]
+    model_dir = runtime.resources.model_path(request['resourceId'])
+    weight_path = runtime.resources.translation_gguf_path(request['resourceId'])
+    projector = find_vision_projector(model_dir, weight_path.name)
+    if projector is None:
+        raise ValueError('当前本地 Index-Translate 模型缺少视觉投影文件（mmproj）。请在模型管理页补充下载该文件后重试。')
+    runtime.llama_manager.mmproj_path = projector
     await runtime.llama_manager.stop()
     await runtime.llama_manager.start()
     return await asyncio.to_thread(runtime.llama_manager.chat_sync, [{'role': 'user', 'content': content}], max_tokens=4096)
@@ -242,11 +253,15 @@ async def infer(request):
         config = PrewarmConfig.model_validate(request['config'])
         command = PrewarmModelsCommand(protocolVersion=1, requestId='direct', type='prewarmModels', config=config)
         if request.get('resourceId'):
+            from .resources import INDEX_TRANSLATE_RESOURCE_IDS
             record = runtime.resources.record(request['resourceId'])
             expected = {'asr': 'recognitionModel', 'mt': 'translationModel', 'tts': 'ttsModel'}.get(request['kind'])
+            legacy_text_model = (expected == 'translationModel' and not request.get('image') and
+                request['resourceId'] in INDEX_TRANSLATE_RESOURCE_IDS and
+                runtime.resources.translation_gguf_path(request['resourceId']).is_file())
             if expected is None:
                 raise ValueError('Unsupported inference task')
-            if not record.installed or record.kind != expected:
+            if (not record.installed and not legacy_text_model) or record.kind != expected:
                 raise ValueError('Selected model is not installed or has the wrong task type')
         if request['kind'] == 'tts':
             return await asyncio.to_thread(synthesize, runtime.resources, request, config.compute)

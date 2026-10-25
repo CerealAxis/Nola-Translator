@@ -196,16 +196,36 @@ function NativeAssistantMessage() {
   const running = useAuiState(s => s.message.status?.type === 'running')
   const content = useAuiState(s => s.message.content)
   const error = useAuiState(s => s.message.status?.type === 'incomplete' ? s.message.status.error : undefined)
+  const errorText = errorDetail(error)
+  const missingProjector = /mmproj|vision projector|视觉投影文件/i.test(errorText)
+  const projectorDownloadStarted = errorText === 'NOLA_IMAGE_PROJECTOR_DOWNLOAD_STARTED'
+  const projectorDownloadFailed = errorText === 'NOLA_IMAGE_PROJECTOR_DOWNLOAD_FAILED'
   const [copied, setCopied] = useState(false)
   const [reaction, setReaction] = useState<'up' | 'down' | null>(null)
   const [more, setMore] = useState(false)
   return <><NativeDaySeparator /><MessagePrimitive.Root data-role="assistant" className="group/message flex w-full flex-col items-start gap-3">
     {running && !content.length && <ThinkingIndicator label={t('workbench.thinkingProcess')} />}
     <MessagePrimitive.Parts components={{ Text: MarkdownText, Reasoning: NativeReasoning, tools: { Fallback: NativeTool }, File, Image, Source: Sources }} />
-    {error && <ErrorState title={t('workbench.networkError')} detail={typeof error === 'string' ? error : JSON.stringify(error)} retrying={running} onRetry={() => aui.message.reload()} />}
+    {error && <ErrorState
+      title={projectorDownloadStarted ? t('workbench.imageProjectorDownloadTitle') : missingProjector || projectorDownloadFailed ? t('workbench.imageProjectorMissingTitle') : t('workbench.networkError')}
+      detail={projectorDownloadStarted ? t('workbench.imageProjectorDownloadStarted') : missingProjector || projectorDownloadFailed ? t('workbench.imageProjectorMissingDetail') : errorText}
+      retrying={running} onRetry={() => aui.message.reload()}
+    />}
     <NativeMessageTimestamp />
     {!running && <div className="relative"><MessageActions copied={copied} reaction={reaction} regenerating={false} onCopy={() => { void navigator.clipboard.writeText(content.filter(part => part.type === 'text').map(part => part.text).join('\n')).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }} onReactionChange={value => { setReaction(value); if (value) aui.message.submitFeedback({ type: value === 'up' ? 'positive' : 'negative' }) }} onRegenerate={() => aui.message.reload()} onMore={() => setMore(value => !value)} />{more && <ComposerMenu open><ComposerMenuItem onClick={() => { aui.message.speak(); setMore(false) }}>{t('workbench.readAloud')}</ComposerMenuItem></ComposerMenu>}</div>}
   </MessagePrimitive.Root></>
+}
+
+function errorDetail(error: unknown): string {
+  if (typeof error === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(error)
+      if (parsed && typeof parsed === 'object' && 'message' in parsed && typeof parsed.message === 'string') return parsed.message
+    } catch { /* Keep non-JSON error text as-is. */ }
+    return error
+  }
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') return error.message
+  return error ? JSON.stringify(error) : ''
 }
 
 function NativeTool(props: ToolCallMessagePartProps) {

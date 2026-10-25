@@ -149,7 +149,11 @@ def test_catalog_modelscope_manifests_are_independently_pinned() -> None:
         for entry in spec.modelscope_files:
             assert entry.size > 0
             assert entry.sha256 and len(entry.sha256) == 64
-            assert f"/resolve/{spec.modelscope_revision}/" in spec.url_for(entry, source="modelscope")
+            url = spec.url_for(entry, source="modelscope")
+            if entry.repo:
+                assert f"/{entry.repo}/resolve/{entry.revision}/" in url
+            else:
+                assert f"/resolve/{spec.modelscope_revision}/" in url
 
 
 def test_catalog_pins_pinned_values() -> None:
@@ -302,6 +306,29 @@ def test_incomplete_existing_model_is_not_installed(tmp_path: Path) -> None:
         (target / entry.path).write_bytes(payloads[spec.url_for(entry)])
     (target / spec.files[1].path).write_bytes(b"wrong size")
     assert ModelManager(tmp_path / "models").is_installed(spec) is False
+
+
+def test_manifest_supplement_keeps_existing_weights_and_downloads_only_missing_file(tmp_path: Path) -> None:
+    from dataclasses import replace
+
+    original, original_payloads = _snapshot_spec()
+    manager = ModelManager(tmp_path / "models", _fetcher(original_payloads))
+    target = manager.ensure(original)
+    extra = FileEntry("vision.mmproj.gguf", 9, sha256(b"projector").hexdigest())
+    expanded = replace(original, files=(*original.files, extra))
+    requested = []
+
+    def fetch(url, destination, progress):
+        requested.append(url)
+        destination.write_bytes(b"projector")
+        progress(extra.size, extra.size)
+
+    manager.fetcher = fetch
+    assert manager.ensure(expanded) == target
+    assert requested == [expanded.url_for(extra)]
+    assert (target / original.files[0].path).read_bytes() == original_payloads[original.url_for(original.files[0])]
+    assert (target / extra.path).read_bytes() == b"projector"
+    assert manager.is_installed(expanded)
 
 
 def test_sha256_mismatch_rejected_without_target(tmp_path: Path) -> None:

@@ -73,7 +73,7 @@ export function RecommendedFamilyCard({ family, records, onOpen }: RecommendedFa
       {engines.map(engine => <Badge key={engine} >{engine === 'llama' ? 'llama.cpp' : engine === 'crisp' ? 'CrispASR' : 'PyTorch'}</Badge>)}
       {records.some(record => record.installed) ? <Badge  variant="success">{t('models.installed')}</Badge> : null}
     </div></CardContent>
-    <CardFooter className="card__footer"><Button data-onboarding={`model-family-${first.kind}`} onClick={onOpen}>{t('models.openDetails')}</Button></CardFooter>
+    <CardFooter className="card__footer"><Button data-onboarding={`model-family-${first.kind}`} onClick={onOpen}>{t('modelsSettingsUi.startConfiguration')}</Button></CardFooter>
   </Card>
 }
 

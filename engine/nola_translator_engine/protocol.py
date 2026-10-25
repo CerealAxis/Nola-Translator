@@ -255,7 +255,7 @@ class ListResourcesCommand(Envelope):
 class ManageResourceCommand(Envelope):
     type: Literal["manageResource"]
     resourceId: str = Field(min_length=1, max_length=256)
-    action: Literal["install", "remove", "cancel"]
+    action: Literal["install", "remove", "cancel", "pause", "resume"]
     downloadSource: Literal["huggingface", "hf-mirror", "modelscope"] | None = None
     network: NetworkSettings = Field(default_factory=NetworkSettings)
 
@@ -481,7 +481,7 @@ class ResourceRecord(ProtocolModel):
     installed: bool
     installedBytes: int = Field(ge=0)
     downloadBytes: int | None = Field(default=None, ge=0)
-    state: Literal["idle", "running", "cancelling", "failed"] = "idle"
+    state: Literal["idle", "running", "paused", "cancelling", "failed"] = "idle"
     phase: Literal["resolve", "download", "verify", "install", "remove", "cleanup"] | None = None
     progress: float | None = Field(default=None, ge=0, le=1)
     cancellable: bool = False

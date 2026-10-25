@@ -59,6 +59,15 @@ try {
         if (-not (Test-Path -LiteralPath (Join-Path $staging $file))) { throw "Vulkan runtime archive is missing $file." }
     }
     if (-not (Get-ChildItem -LiteralPath $staging -Filter $cpuBackendPattern -File)) { throw 'Vulkan runtime archive has no CPU backend library.' }
+    # The application only launches llama-server; the release archive also ships ~20 CLI
+    # tools that never run here. Drop them before verification so the import-closure
+    # check runs against exactly what the installer will carry.
+    $serverFiles = @('llama-server.exe', 'llama-server-impl.dll', 'llama-common.dll', 'llama.dll', 'mtmd.dll',
+                     'ggml.dll', 'ggml-base.dll', 'ggml-vulkan.dll', 'libomp.dll', 'LICENSE-LLVM-OpenMP')
+    Get-ChildItem -LiteralPath $staging -File | Where-Object {
+        $name = $_.Name
+        -not ($serverFiles -contains $name -or $name -like $cpuBackendPattern)
+    } | Remove-Item -Force
     & node (Join-Path $PSScriptRoot 'verify-llama-runtime.mjs') $staging
     if ($LASTEXITCODE -ne 0) { throw 'Vulkan llama runtime does not resolve its dependencies.' }
     Set-Content -LiteralPath (Join-Path $staging 'nola-runtime-source.txt') -Value $expectedSource -Encoding ASCII

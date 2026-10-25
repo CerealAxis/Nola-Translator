@@ -197,7 +197,7 @@ async function loadCredentials(target: NolaBridge): Promise<Record<CredentialPro
 
 export async function manageResource(
   resourceId: string,
-  action: 'install' | 'remove' | 'cancel',
+  action: 'install' | 'remove' | 'cancel' | 'pause' | 'resume',
   source?: import('../../shared/contracts').ModelDownloadSource,
 ): Promise<ResourceRecord> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
