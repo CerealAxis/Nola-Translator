@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS, NO_TRANSLATION_LANGUAGE } from '@/bridge'
-import { swappedLanguagesOf, targetLanguagePatch, translationFieldsOf, translationModelPatch } from './session-config'
-import type { ResourceRecord } from '@/bridge'
+import { audioDeviceNameOf, swappedLanguagesOf, targetLanguagePatch, translationFieldsOf, translationModelPatch } from './session-config'
+import type { AudioDevice, ResourceRecord } from '@/bridge'
+
+it('resolves the selected audio device name, including the default output', () => {
+  const devices: AudioDevice[] = [
+    { deviceId: 'output-1', name: 'Speakers', kind: 'systemOutput', isDefault: true },
+    { deviceId: 'mic-1', name: 'Microphone', kind: 'microphone', isDefault: true },
+  ]
+  expect(audioDeviceNameOf({ kind: 'defaultOutput' }, devices, 'Unknown device')).toBe('Speakers')
+  expect(audioDeviceNameOf({ kind: 'microphone', deviceId: 'mic-1' }, devices, 'Unknown device')).toBe('Microphone')
+  expect(audioDeviceNameOf({ kind: 'systemOutput', deviceId: 'missing' }, devices, 'Unknown device')).toBe('Unknown device')
+})
 
 describe('translation language choices', () => {
   const translator: ResourceRecord = {

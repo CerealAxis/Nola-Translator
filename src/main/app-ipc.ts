@@ -29,6 +29,7 @@ const channels = {
   closeMainWindow: 'app:window:close',
   showWorkspace: 'app:show-workspace',
   openMainPage: 'app:open-main-page',
+  notifyMainError: 'app:overlay-error', mainErrorNotification: 'app:main-error-notification',
   openAppearance: 'app:open-appearance',
   checkLatestRelease: 'app:check-latest-release', openReleasePage: 'app:open-release-page',
   getModelStorage: 'storage:get', chooseModelStorageDirectory: 'storage:choose', restartApp: 'app:restart',
@@ -112,6 +113,21 @@ export function registerAppIpc(options: {
   isDevelopmentWindow?: (window: BrowserWindow) => boolean
   showWorkspace?: () => Promise<void>
 }): () => void {
+  const onOverlayError = (event: Electron.IpcMainEvent, payload: unknown): void => {
+    const overlay = options.getOverlayWindow()
+    if (!overlay || overlay.isDestroyed() || event.sender !== overlay.webContents) return
+    if (typeof payload !== 'object' || payload === null || !('message' in payload) || typeof payload.message !== 'string') return
+    const message = payload.message.trim()
+    const description = 'description' in payload && typeof payload.description === 'string' ? payload.description.trim() : ''
+    if (!message || message.length > 500 || description.length > 1500) return
+    const window = options.getMainWindow()
+    if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return
+    if (window.isMinimized()) window.restore()
+    window.show()
+    window.focus()
+    window.webContents.send(channels.mainErrorNotification, { message, ...(description ? { description } : {}) })
+  }
+  ipcMain.on(channels.notifyMainError, onOverlayError)
   loggedHandle(channels.showWorkspace, () => options.showWorkspace?.())
   loggedHandle(channels.openMainPage, (_event, path: unknown) => {
     if (typeof path !== 'string' || !/^#\/(?:models|settings\/[a-z-]+|records\/[a-zA-Z0-9-]+)$/.test(path)) throw new Error('Invalid main page')
@@ -379,6 +395,7 @@ export function registerAppIpc(options: {
   })
 
   return () => {
+    ipcMain.off(channels.notifyMainError, onOverlayError)
     mainWindow?.off('maximize', onMaximize)
     mainWindow?.off('unmaximize', onUnmaximize)
     overlayLockListeners.delete(onOverlayLock)

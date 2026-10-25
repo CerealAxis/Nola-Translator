@@ -83,7 +83,7 @@ function useCloudCopy(id: Exclude<CloudModelId, `custom:${string}`>) {
 
 export interface CloudMarkProps { id: CloudModelId }
 
-function CloudMark({ id }: CloudMarkProps) {
+export function CloudMark({ id }: CloudMarkProps) {
   const Mark = id === 'aliyun' || id === 'recognition' ? Alibaba : id === 'minimax' ? MiniMax
     : id === 'google' ? Google : id === 'microsoft' ? Microsoft : id === 'index-translate' ? Bilibili : Globe
   return <Mark aria-hidden="true" />

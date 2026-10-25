@@ -655,6 +655,8 @@ export const zhHK: Dictionary = {
     "micPause": "暫停字幕",
     "micResume": "繼續字幕",
     "micLoading": "正在準備辨識引擎",
+    "audioDeviceOpenFailed": "無法開啟音訊裝置「{device}」，請檢查該裝置是否已開啟並連接正常。（AUD-002）",
+    "selectedAudioDevice": "所選音訊裝置",
     "pin": "置頂",
     "unpin": "取消置頂",
     "lock": "鎖定位置與大小",

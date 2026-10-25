@@ -261,6 +261,7 @@ export function createIpcBridge(): NolaBridge {
       // No payload and no translation: the main process resolves the user's default browser
       // itself, so nothing about *which* browser crosses this boundary.
       openDefaultBrowser: () => call('openDefaultBrowser', (injected) => injected.openDefaultBrowser()),
+      notifyMainError: (message, description) => injectedApi()?.notifyMainError?.(message, description),
       checkLatestRelease: (force) => call('checkLatestRelease', (injected) => injected.checkLatestRelease(force)),
       openReleasePage: (url) => call('openReleasePage', (injected) => injected.openReleasePage(url)),
     },
@@ -270,6 +271,7 @@ export function createIpcBridge(): NolaBridge {
     },
     events: {
       onMainPageRequested: cb => injectedApi()?.onMainPageRequested?.(cb) ?? (() => undefined),
+      onMainErrorNotification: cb => injectedApi()?.onMainErrorNotification?.(cb) ?? (() => undefined),
       onOverlayMenuChanged: cb => subscribe('onOverlayMenuChanged', injected => injected.onOverlayMenuChanged, cb),
       onEngineEvent: (cb) => subscribe('onEngineEvent', (injected) => injected.onEngineEvent, cb),
       onSettingsChanged: (cb) => subscribe('onSettingsChanged', (injected) => injected.onSettingsChanged, cb),

@@ -1,7 +1,7 @@
 /** Session translation settings preserve disabled targets and explicit local model overrides. */
 
 import { NO_TRANSLATION_LANGUAGE, SOURCE_LANGUAGE_OPTIONS, TARGET_LANGUAGE_OPTIONS } from '@/bridge'
-import type { AppSettings, AppSettingsPatch, ResourceRecord, SessionConfig } from '@/bridge'
+import type { AppSettings, AppSettingsPatch, AudioDevice, ResourceRecord, SessionConfig } from '@/bridge'
 import { isModelReady, translationLanguages } from '../shared/model-capabilities'
 import { normalizeLanguage } from '../shared/languages'
 import { supportsSelectedEngine } from '../shared/model-engines'
@@ -25,6 +25,14 @@ export function targetLanguagePatch(targetLanguage: string, previousTargetLangua
       ? { overlay: { showSource: true, showTranslation: false } }
       : previousTargetLanguage === NO_TRANSLATION_LANGUAGE ? { overlay: { showTranslation: true } } : {}),
   }
+}
+
+/** Resolve the device the session will capture, including the current system default output. */
+export function audioDeviceNameOf(source: SessionConfig['audioSource'], devices: readonly AudioDevice[], fallback: string): string {
+  const device = source.kind === 'defaultOutput'
+    ? devices.find(item => item.kind === 'systemOutput' && item.isDefault)
+    : 'deviceId' in source ? devices.find(item => item.deviceId === source.deviceId) : undefined
+  return device?.name ?? fallback
 }
 
 /** Selecting a model after disabling translation must also restore a usable target. */

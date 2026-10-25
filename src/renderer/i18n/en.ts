@@ -231,6 +231,8 @@ export const en: Dictionary = {
     micPause: 'Pause captions',
     micResume: 'Resume captions',
     micLoading: 'Preparing the recognition engine',
+    audioDeviceOpenFailed: 'Could not open “{device}”. Check that this audio device is turned on and connected. (AUD-002)',
+    selectedAudioDevice: 'selected audio device',
     pin: 'Pin',
     unpin: 'Unpin',
     lock: 'Lock position and size',

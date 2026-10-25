@@ -184,12 +184,21 @@ function Shell() {
 
   return (
     <AppShell navigation={navigation}>
+      <MainWindowErrorNotifications />
       {isEngineConnected() ? null : <EngineDisconnectedNotice />}
       <SettingsErrorNotice />
       <Routes pages={APPLICATION_PAGES} />
       <OnboardingTour />
     </AppShell>
   )
+}
+
+/** Receives errors raised by the transparent caption window so they never cover its controls. */
+function MainWindowErrorNotifications() {
+  useEffect(() => bridge.events.onMainErrorNotification?.(notification => {
+    notifyError(notification.message, { description: notification.description })
+  }), [])
+  return null
 }
 
 /**

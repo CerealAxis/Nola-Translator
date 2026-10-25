@@ -40,7 +40,7 @@ import { audioSourceFrom } from '@/features/workspace/SessionSetupDialog'
 import { errorCopyOf } from '@/features/workspace/WorkspacePage'
 import { actions, sessionStore, stores, useStore } from '@/store'
 import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
-import { targetLanguagePatch, translationFieldsOf } from '@/session-config'
+import { audioDeviceNameOf, targetLanguagePatch, translationFieldsOf } from '@/session-config'
 import { useI18n } from '@/i18n'
 import { notifyError } from '@/components/primitives/notify'
 
@@ -288,7 +288,8 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
     if (status === 'idle' || status === 'error') {
       setLastIntent('start')
       setDismissedFailure(null)
-      void actions.session.startSession(startConfigOf(settings, devices)).catch((error: unknown) => {
+      const config = startConfigOf(settings, devices)
+      void actions.session.startSession(config).catch((error: unknown) => {
         const owner = featureConflictOwner(error)
         if (owner) {
           notifyError(t('errors.serviceConflict', { running: t(`gateway.${owner}`) }))
@@ -296,6 +297,8 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
           notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
         } else if (unsupportedRecognitionLanguageOf(error)) {
           notifyError(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
+        } else if (sessionStore.getState().errorCode === 'AUDIODEVICEUNAVAILABLE') {
+          notifyError(t('overlay.audioDeviceOpenFailed', { device: audioDeviceNameOf(config.audioSource, devices, t('overlay.selectedAudioDevice')) }))
         } else if (sessionStore.getState().errorCode === null) {
           /*
            * The native menu surface renders this bar but has no session bridge, so

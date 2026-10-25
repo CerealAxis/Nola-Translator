@@ -27,7 +27,7 @@ export type {
   Translation,
 } from '../../shared/contracts'
 
-export type { DiagnosticCopyContext, EngineChannelEvent, EngineLifecycleEvent, ModelStorageInfo, OverlayTargetPage, SessionStartResult } from '../../shared/bridge'
+export type { DiagnosticCopyContext, EngineChannelEvent, EngineLifecycleEvent, MainErrorNotification, ModelStorageInfo, OverlayTargetPage, SessionStartResult } from '../../shared/bridge'
 export type { AppUpdateCheckResult } from '../../shared/app-updates'
 
 export type {

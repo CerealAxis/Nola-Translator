@@ -641,6 +641,8 @@ const koMessages: Record<DictionaryKey, string> = {
   'overlay.size': '글자 크기',
   'overlay.appearanceFailed': '자막 모양 설정을 열지 못했습니다. 다시 시도하세요.',
   'overlay.menuFailed': '메뉴를 열지 못했습니다. 다시 시도하세요.',
+  'overlay.audioDeviceOpenFailed': '“{device}” 오디오 장치를 열 수 없습니다. 장치가 켜져 있고 연결되어 있는지 확인하세요. (AUD-002)',
+  'overlay.selectedAudioDevice': '선택한 오디오 장치',
   'records.title': '통역 기록',
   'records.subtitle': '통역 기록을 확인하고 관리하세요',
   'records.search': '기록 검색',

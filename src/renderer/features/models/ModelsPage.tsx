@@ -34,7 +34,7 @@ import { notifyModelDownloadFailure, suppressNextDownloadStartNotice } from './M
 import { recognitionLabel } from '../../../shared/cloud-config'
 import { ALIYUN_LANGUAGES } from '../../../shared/cloud-config'
 import { targetLanguagePatch } from '../../session-config'
-import { CloudModelCard, CloudModelDialog, cloudModelsOf, type CloudModel, type CloudModelId } from './CloudModels'
+import { CloudMark, CloudModelCard, CloudModelDialog, cloudModelsOf, type CloudModel, type CloudModelId } from './CloudModels'
 import './models.css'
 
 export type ModelsTab = 'recommended' | 'installed' | 'search' | 'downloads'
@@ -172,6 +172,8 @@ export function ModelsPage() {
     : settings?.translation.provider === 'cloud'
       ? cloudModel || providerNames.cloud
       : providerNames[settings?.translation.provider ?? 'microsoft']
+  const currentTranslationCloud = cloudModels.find(model => model.kind === 'translationModel' && model.active)
+  const currentTranslationCloudReady = currentTranslationCloud?.ready ?? false
 
   const openFamilyRecords = openFamily
     ? resources.filter(record => !record.resourceId.startsWith('hub:') && familyOf(record) === openFamily)
@@ -334,7 +336,7 @@ export function ModelsPage() {
         </header>
         <div className="models-overview__summaries" data-onboarding="models-active">
           <CurrentModel label={t('modelsSettingsUi.currentRecognition')} name={currentRecognition} record={remoteRecognition ? null : recognition ?? null} installed={remoteRecognition ? null : recognition?.installed ?? false} kind="recognitionModel" onChange={() => setTab('installed')} />
-          <CurrentModel label={t('modelsSettingsUi.currentTranslation')} name={currentTranslation} record={localTranslation ? translation ?? null : null} installed={localTranslation ? translation?.installed ?? false : null} kind="translationModel" onChange={() => setTab('installed')} />
+          <CurrentModel label={t('modelsSettingsUi.currentTranslation')} name={currentTranslation} record={localTranslation ? translation ?? null : null} cloudId={localTranslation ? undefined : currentTranslationCloud?.id} installed={localTranslation ? translation?.installed ?? false : settings ? currentTranslationCloudReady : null} kind="translationModel" onChange={() => setTab('installed')} />
           <CurrentModel label={t('gateway.synthesisDefault')} name={synthesis?.installed ? synthesis.name : t('modelsSettingsUi.noModelSelected')} record={synthesis ?? null} installed={synthesis?.installed ?? false} kind="ttsModel" onChange={() => setTab('installed')} />
         </div>
       </section>
@@ -524,13 +526,13 @@ function Section({
   )
 }
 
-function CurrentModel({ label, name, record, installed, kind, onChange }: { label:string; name:string; record:ResourceRecord | null; installed:boolean | null; kind:'recognitionModel' | 'translationModel' | 'ttsModel'; onChange: () => void }) {
+function CurrentModel({ label, name, record, cloudId, installed, kind, onChange }: { label:string; name:string; record:ResourceRecord | null; cloudId?: CloudModelId; installed:boolean | null; kind:'recognitionModel' | 'translationModel' | 'ttsModel'; onChange: () => void }) {
   const { t } = useI18n()
   const pending = kind !== 'ttsModel' && installed && record && !configurationOf(record)
   return <Card size="sm" className="models-current">
     <CardHeader>
     <CardAction>
-    <span aria-hidden="true" className={`models-card__icon models-card__icon--${kind === 'recognitionModel' ? 'recognition' : 'translation'}`}><ModelMark record={record} kind={kind} /></span>
+    <span aria-hidden="true" className={`models-card__icon models-card__icon--${kind === 'recognitionModel' ? 'recognition' : 'translation'}`} data-cloud-model={cloudId}>{cloudId ? <CloudMark id={cloudId} /> : <ModelMark record={record} kind={kind} />}</span>
     </CardAction>
     <CardTitle>{name}</CardTitle><CardDescription>{label}</CardDescription>
     {installed === null ? null : <Badge variant={installed && !pending ? 'success' : 'warning'}  >{pending ? t('modelConfig.pending') : installed ? t('modelsSettingsUi.active') : t('modelsSettingsUi.unavailable')}</Badge>}

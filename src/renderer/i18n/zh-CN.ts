@@ -242,6 +242,8 @@ export const zhCN = {
     micPause: '暂停字幕',
     micResume: '继续字幕',
     micLoading: '正在准备识别引擎',
+    audioDeviceOpenFailed: '无法打开音频设备“{device}”，请检查该设备是否已开启且连接正常。（AUD-002）',
+    selectedAudioDevice: '所选音频设备',
     pin: '置顶',
     unpin: '取消置顶',
     lock: '锁定位置与大小',

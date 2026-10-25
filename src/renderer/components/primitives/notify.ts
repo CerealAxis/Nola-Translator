@@ -1,4 +1,5 @@
 import { closeToast, createToast, updateToast } from '../ui/toast'
+import { getBridge } from '@/store'
 
 /**
  * How long each kind of notification stays on screen.
@@ -56,6 +57,13 @@ function detail(options: NotifyOptions): string | undefined {
 
 /** A failure. Stays on screen and carries the way out. */
 export function notifyError(message: string, options: NotifyOptions = {}): string {
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('overlay') === '1' && !options.action) {
+    const bridge = getBridge()
+    if (bridge?.app.notifyMainError) {
+      bridge.app.notifyMainError(message, detail(options))
+      return 'main-window-error'
+    }
+  }
   return createToast(message, {
     variant: 'danger',
     description: detail(options),

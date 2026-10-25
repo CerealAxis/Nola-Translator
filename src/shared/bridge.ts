@@ -28,6 +28,8 @@ export type DiagnosticCopyContext = {
 }
 
 export type SessionStartResult = { sessionId: string; meetingId: string | null }
+/** A plain-text error raised by the caption window and rendered in the main app. */
+export type MainErrorNotification = { message: string; description?: string }
 
 /**
  * Where models are stored, plus one number measured from that folder.
@@ -154,6 +156,7 @@ export type NolaTranslatorApi = {
   showWorkspace(): Promise<void>
   openMainPage(path: string): Promise<void>
   onMainPageRequested?(listener: (path: string) => void): () => void
+  onMainErrorNotification?(listener: (notification: MainErrorNotification) => void): () => void
   showOverlay(): Promise<boolean>
   hideOverlay(): Promise<void>
   /** Stops recognition and then hides the window. Distinct from hideOverlay, which only hides. */
@@ -200,6 +203,7 @@ export type NolaTranslatorApi = {
    * main process resolves the registered handler itself; see `open-default-browser.ts`.
    */
   openDefaultBrowser(): Promise<void>
+  notifyMainError?(message: string, description?: string): void
   checkLatestRelease(force?: boolean): Promise<AppUpdateCheckResult>
   openReleasePage(url: string): Promise<void>
 }

@@ -641,6 +641,8 @@ const jaMessages: Record<DictionaryKey, string> = {
   'overlay.size': '文字サイズ',
   'overlay.appearanceFailed': '字幕の外観設定を開けませんでした。もう一度お試しください。',
   'overlay.menuFailed': 'メニューを開けませんでした。もう一度お試しください。',
+  'overlay.audioDeviceOpenFailed': 'オーディオデバイス「{device}」を開けません。デバイスの電源が入り、接続されているか確認してください。（AUD-002）',
+  'overlay.selectedAudioDevice': '選択したオーディオデバイス',
   'records.title': '通訳記録',
   'records.subtitle': '通訳の履歴を表示・管理',
   'records.search': '記録を検索',

@@ -21,7 +21,7 @@ import { useI18n } from '@/i18n'
 import { recordPath, useRoute } from '@/routes'
 import { NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { DiagnosticCopyContext } from '@/bridge'
-import { targetLanguagePatch, translationModelPatch } from '@/session-config'
+import { audioDeviceNameOf, targetLanguagePatch, translationModelPatch } from '@/session-config'
 
 import { PreflightDialog } from './PreflightDialog'
 import { SessionBar } from './SessionBar'
@@ -267,6 +267,8 @@ export function WorkspacePage() {
         notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
       } else if (unsupportedRecognitionLanguageOf(error)) {
         notifyError(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
+      } else if (sessionStore.getState().errorCode === 'AUDIODEVICEUNAVAILABLE') {
+        notifyError(t('overlay.audioDeviceOpenFailed', { device: audioDeviceNameOf(config.audioSource, devices, t('overlay.selectedAudioDevice')) }))
       } else if (sessionStore.getState().status !== 'error') {
         /*
          * The store leaves the status at 'idle' for the failures it does not own,
@@ -276,7 +278,7 @@ export function WorkspacePage() {
         notifyError(t('errors.startFailed'), { cause: error })
       }
     }
-  }, [draft, t])
+  }, [devices, draft, t])
 
   const stop = useCallback(async () => {
     // Read before stopping: the store's `finally` clears it unconditionally.

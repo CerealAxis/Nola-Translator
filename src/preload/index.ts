@@ -65,6 +65,7 @@ const channels = {
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
   setCaptionService: 'browser:caption-service',
   openDefaultBrowser: 'app:open-default-browser',
+  notifyMainError: 'app:overlay-error', mainErrorNotification: 'app:main-error-notification',
   checkLatestRelease: 'app:check-latest-release', openReleasePage: 'app:open-release-page',
 } as const
 
@@ -221,6 +222,11 @@ const api: NolaTranslatorApi = {
     ipcRenderer.on(channels.mainPageRequested, wrapped)
     return () => ipcRenderer.off(channels.mainPageRequested, wrapped)
   },
+  onMainErrorNotification: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, value: Parameters<typeof callback>[0]) => callback(value)
+    ipcRenderer.on(channels.mainErrorNotification, listener)
+    return () => ipcRenderer.off(channels.mainErrorNotification, listener)
+  },
   showOverlay: () => invoke(channels.showOverlay),
   hideOverlay: () => invoke(channels.hideOverlay),
   closeOverlay: () => invoke(channels.closeOverlay),
@@ -263,6 +269,7 @@ const api: NolaTranslatorApi = {
   setTranslationCredential: (provider, value) => invoke(channels.setTranslationCredential, provider, value),
   setCaptionService: (active) => invoke(channels.setCaptionService, active),
   openDefaultBrowser: () => invoke(channels.openDefaultBrowser),
+  notifyMainError: (message, description) => ipcRenderer.send(channels.notifyMainError, { message, description }),
   checkLatestRelease: (force?: boolean) => invoke(channels.checkLatestRelease, force),
   openReleasePage: (url: string) => invoke(channels.openReleasePage, url),
 }

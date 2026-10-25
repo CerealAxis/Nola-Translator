@@ -72,6 +72,19 @@ it('shows both free services in installed with no local downloads or active clou
   expect(translation.queryByText('未安装')).not.toBeInTheDocument()
 })
 
+it('shows the active cloud translation capsule and the provider logo in the overview', () => {
+  stores.models.setState({ resources: [] })
+  stores.settings.setState({ settings: {
+    ...DEFAULT_SETTINGS,
+    translation: { ...DEFAULT_SETTINGS.translation, provider: 'index-translate', targetLanguage: 'en' },
+  } })
+  render(<ModelsPage />)
+  const card = screen.getByText('当前翻译模型').closest('[data-slot="card"]')!
+  expect(within(card as HTMLElement).getByText('已启用')).toBeInTheDocument()
+  expect(card.querySelector('[data-cloud-model="index-translate"] svg')).not.toBeNull()
+  expect(within(card as HTMLElement).getByRole('button', { name: '更改' })).toBeInTheDocument()
+})
+
 it('keeps configured inactive providers installed and excludes providers missing credentials', () => {
   stores.models.setState({ credentials: { ...initialModels.credentials, google: true, 'aliyun-asr': true } })
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, aliyunWorkspaceId: 'workspace' } } })
