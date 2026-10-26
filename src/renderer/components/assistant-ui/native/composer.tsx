@@ -333,10 +333,12 @@ export function ComposerAttachments({
 export function ComposerAttachmentChip({
   attachment,
   onRemove,
+  removeLabel,
   className,
   ...props
 }: Omit<ComponentProps<"div">, "children"> & {
   attachment: ComposerAttachment;
+  removeLabel: string;
   onRemove?: (name: string) => void;
 }) {
   const Icon = ATTACHMENT_ICONS[attachment.kind ?? "text"];
@@ -375,7 +377,7 @@ export function ComposerAttachmentChip({
         ) : attachment.state === "done" && onRemove ? (
           <button
             type="button"
-            aria-label={`Remove ${attachment.name}`}
+            aria-label={removeLabel}
             onClick={() => onRemove(attachment.name)}
             className={cn(ghostButton, "size-5 [&_svg]:size-3")}
           >
@@ -505,7 +507,6 @@ export function ComposerAttachButton({
   return (
     <button
       type="button"
-      aria-label="Add attachment"
       data-slot="composer-attach"
       disabled={!props.onClick}
       className={cn(
@@ -571,17 +572,18 @@ export function ComposerModelItem({
 
 export function ComposerContext({
   usage,
+  labels,
   className,
   ...props
-}: Omit<ComponentProps<"div">, "children"> & { usage: ComposerUsage }) {
+}: Omit<ComponentProps<"div">, "children"> & { usage: ComposerUsage; labels: { context: string; system: string; tools: string; messages: string; total: string } }) {
   const used = usage.system + usage.tools + usage.messages;
   const fraction = usage.total === 0 ? 0 : used / usage.total;
   const warn = fraction > 0.85;
   const circumference = 2 * Math.PI * 6;
   const segments = [
-    { label: "System", value: usage.system, className: "bg-foreground/25" },
-    { label: "Tools", value: usage.tools, className: "bg-foreground/45" },
-    { label: "Messages", value: usage.messages, className: "bg-foreground/80" },
+    { label: labels.system, value: usage.system, className: "bg-foreground/25" },
+    { label: labels.tools, value: usage.tools, className: "bg-foreground/45" },
+    { label: labels.messages, value: usage.messages, className: "bg-foreground/80" },
   ];
 
   return (
@@ -601,7 +603,7 @@ export function ComposerContext({
         )}
       >
         <div className="flex items-baseline justify-between">
-          <p className="text-[13.5px] font-medium">Context</p>
+          <p className="text-[13.5px] font-medium">{labels.context}</p>
           <p
             className={cn(
               mono,
@@ -646,7 +648,7 @@ export function ComposerContext({
         </div>
         <div className="bg-foreground/[0.06] h-px" />
         <div className="text-muted-foreground flex items-center justify-between text-[13px]">
-          <span>Total</span>
+          <span>{labels.total}</span>
           <span className={cn(mono, "text-muted-foreground tabular-nums")}>
             {used}k / {usage.total}k
           </span>
@@ -654,7 +656,7 @@ export function ComposerContext({
       </div>
       <button
         type="button"
-        aria-label="Context usage"
+        aria-label={labels.context}
         className={cn(
           ghostButton,
           "size-8",
@@ -695,7 +697,6 @@ export function ComposerVoiceButton({
   return (
     <button
       type="button"
-      aria-label={active ? "Stop recording" : "Start voice input"}
       data-slot="composer-voice-button"
       className={cn(
         active
@@ -729,7 +730,6 @@ export function ComposerSend({
   return (
     <button
       type="button"
-      aria-label={streaming ? "Stop generating" : "Send message"}
       data-slot="composer-send"
       className={cn(
         "grid size-8 place-items-center rounded-full",

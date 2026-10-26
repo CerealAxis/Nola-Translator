@@ -73,7 +73,7 @@ const OVERLAY_PAGES = new Set(['appearance', 'captions', 'resources', 'translati
 /** Top-level keys allowed in `credentials.json`. */
 
 function assertCredentialProvider(value: unknown): CredentialProvider {
-  if (!isCredentialProvider(value)) throw new Error('凭据类型无效')
+  if (!isCredentialProvider(value)) throw new Error('INVALID_CREDENTIAL')
   return value
 }
 
@@ -221,7 +221,7 @@ export function registerAppIpc(options: {
   loggedHandle(channels.checkLatestRelease, (_event, force: unknown) =>
     checkLatestRelease(app.getVersion(), join(resolveDataRoot(), '.cache', 'github-release.json'), force === true))
   loggedHandle(channels.openReleasePage, (_event, url: unknown) => {
-    if (!isTrustedReleaseUrl(url)) throw new Error('Release 页面地址无效')
+    if (!isTrustedReleaseUrl(url)) throw new Error('INVALID_ARGUMENT')
     return shell.openExternal(url)
   })
   loggedHandle(channels.openAppearance, (_event, page: unknown) => {
@@ -309,16 +309,16 @@ export function registerAppIpc(options: {
   })
   loggedHandle(channels.listMeetings, () => options.meetings.list())
   loggedHandle(channels.getMeeting, (_event, meetingId: unknown) => {
-    if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
+    if (typeof meetingId !== 'string') throw new Error('INVALID_ARGUMENT')
     return options.meetings.get(meetingId)
   })
   loggedHandle(channels.readMeeting, async (_event, meetingId: unknown) => {
-    if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
-    if (!options.meetings.get(meetingId)) throw new Error('会议不存在')
+    if (typeof meetingId !== 'string') throw new Error('INVALID_ARGUMENT')
+    if (!options.meetings.get(meetingId)) throw new Error('MEETING_NOT_FOUND')
     return options.meetings.segments(meetingId)
   })
   loggedHandle(channels.meetingAudioUrl, (_event, meetingId: unknown) => {
-    if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
+    if (typeof meetingId !== 'string') throw new Error('INVALID_ARGUMENT')
     const meta = options.meetings.get(meetingId)
     /*
      * `audioProtocol` already ends in `://`, so only the path is appended here.
@@ -330,28 +330,28 @@ export function registerAppIpc(options: {
     return meta?.audioFile ? `${options.audioProtocol}local/${meetingId}/${meta.audioFile}` : null
   })
   loggedHandle(channels.renameMeeting, async (_event, meetingId: unknown, title: unknown) => {
-    if (typeof meetingId !== 'string' || typeof title !== 'string') throw new Error('会议名称无效')
+    if (typeof meetingId !== 'string' || typeof title !== 'string') throw new Error('INVALID_ARGUMENT')
     const meta = await options.meetings.rename(meetingId, title)
-    if (!meta) throw new Error('会议不存在')
+    if (!meta) throw new Error('MEETING_NOT_FOUND')
     return meta
   })
   loggedHandle(channels.setMeetingNotes, async (_event, meetingId: unknown, notes: unknown) => {
-    if (typeof meetingId !== 'string' || typeof notes !== 'string') throw new Error('笔记内容无效')
+    if (typeof meetingId !== 'string' || typeof notes !== 'string') throw new Error('INVALID_ARGUMENT')
     const meta = await options.meetings.setNotes(meetingId, notes)
-    if (!meta) throw new Error('会议不存在')
+    if (!meta) throw new Error('MEETING_NOT_FOUND')
     return meta
   })
   loggedHandle(channels.deleteMeeting, async (_event, meetingId: unknown) => {
-    if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
+    if (typeof meetingId !== 'string' || !/^[0-9A-Za-z-]{1,64}$/.test(meetingId)) throw new Error('INVALID_ARGUMENT')
     await options.meetings.remove(meetingId)
     return true
   })
   loggedHandle(channels.exportMeeting, async (_event, meetingId: unknown, format: unknown) => {
-    if (typeof meetingId !== 'string') throw new Error('会议 ID 无效')
-    if (!['txt', 'srt', 'vtt'].includes(String(format))) throw new Error('导出格式无效')
+    if (typeof meetingId !== 'string') throw new Error('INVALID_ARGUMENT')
+    if (!['txt', 'srt', 'vtt'].includes(String(format))) throw new Error('INVALID_ARGUMENT')
     const value = String(format) as 'txt' | 'srt' | 'vtt'
     const meta = options.meetings.get(meetingId)
-    if (!meta) throw new Error('会议不存在')
+    if (!meta) throw new Error('MEETING_NOT_FOUND')
     const language = resolveUiLanguage(current.uiLanguage, app.getLocale())
     const result = await dialog.showSaveDialog({
       title: language === 'zh-CN' ? '导出字幕'
@@ -390,7 +390,7 @@ export function registerAppIpc(options: {
     options.credentials.has(assertCredentialProvider(provider)))
   loggedHandle(channels.setTranslationCredential, (_event, provider: unknown, value: unknown) => {
     const target = assertCredentialProvider(provider)
-    if (typeof value !== 'string' || value.length > 4096) throw new Error('凭据内容无效')
+    if (typeof value !== 'string' || value.length > 4096) throw new Error('INVALID_CREDENTIAL')
     return options.credentials.set(target, value)
   })
 

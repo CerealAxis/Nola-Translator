@@ -8,7 +8,7 @@ import type { AppSettings } from '@/bridge'
 import { Button } from '@/components/ui/button'
 import { Switch, SwitchThumb, TabsContent, TabsIndicator, TabsList, TabsRoot, TabsTrigger } from '@/components/ui'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
 import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, settingsPath, useRoute } from '@/routes'
 import type { SettingsTab } from '@/routes'
@@ -160,7 +160,9 @@ export function SettingSelect({ value, options, onChange, ariaLabel, className, 
           <SelectValue>{(current) => options.find((option) => option.value === current)?.label ?? String(current ?? '')}</SelectValue>
         </SelectTrigger>
         <SelectContent className="settings-select-content" align="start" alignItemWithTrigger={false}>
+          <SelectGroup>
           {options.map((option) => <SelectItem key={option.value} value={option.value} disabled={option.isDisabled} className="settings-select-item">{option.label}</SelectItem>)}
+          </SelectGroup>
         </SelectContent>
       </Select>
     </div>

@@ -52,7 +52,7 @@ const en: typeof zh = {
   import: 'Import offline package', cancel: 'Cancel installation', restore: 'Restore defaults', repair: 'Rebuild & repair',
   noPackages: 'This release has no additional runtime packages yet. The bundled runtime remains available.',
   planUnknown: 'Actual device not confirmed', unloaded: 'Not loaded',
-  precision: 'Compute precision', precisionHint: 'Qwen / M2M100 use device capabilities; CPU uses FP32. SenseVoice keeps its model precision policy.',
+  precision: 'Compute precision', precisionHint: 'PyTorch models select precision based on device capabilities; CPU defaults to FP32. Supported precision depends on the model loader.',
   quantization: 'Model quantization', quantHint: 'Automatic uses quantization on compatible NVIDIA devices; CPU uses unquantized weights. Model files are not modified.',
   none: 'Unquantized', reserve: 'Reserved VRAM (MiB)', reserveHint: 'Leave room for the desktop, other apps and compute peaks. Both tasks share a memory budget on the same GPU.',
   threads: 'CPU thread limit', threadsHint: '0 means automatic; recognition and llama translation share the CPU budget.',
@@ -66,48 +66,4 @@ const en: typeof zh = {
   modelChanged: 'The model was automatically changed from {previousModel} to {nextModel}.',
   noCompatibleModel: 'No installed {task} model supports {engine}. The engine was not changed.',
 }
-const zhTW: typeof zh = {
-  ...zh, devices: '計算裝置', performance: '效能與顯存', memoryCpu: '顯存與 CPU', automatic: '自動', autoEnvironment: '自動（優先重用現有環境）',
-  restart: '檢查並套用環境', prepareRecommended: '檢查計算環境', hardware: '偵測到的系統顯示卡', environmentStorage: '執行環境儲存位置',
-  environmentStorageHint: '跟隨模型儲存位置，可在儲存與下載設定中修改。', refresh: '重新整理裝置', detected: '可用系統裝置', recognition: '語音辨識優先裝置',
-  translation: '本機翻譯優先裝置', assignmentHint: '優先使用所選裝置；無法使用時，由目前模型的載入器自動分配。',
-  nextSession: '裝置與效能設定會在下次啟動口譯時生效。', fallback: 'GPU 失敗時改用 CPU', free: '可用顯存', total: '總顯存', actual: '目前執行配置',
-  recognitionTask: '語音辨識', translationTask: '本機翻譯', engineChanged: '已將{task}引擎切換為 {engine}', modelChanged: '模型已由 {previousModel} 自動更換為 {nextModel}。', noCompatibleModel: '沒有已安裝且相容 {engine} 的{task}模型，未更改引擎。',
-  recognitionActual: '辨識實際裝置', translationActual: '翻譯實際裝置', noSession: '尚未啟動口譯', environments: '推論環境', engineEnvironment: 'PyTorch 環境',
-  llamaEnvironment: 'llama.cpp 環境', install: '下載並安裝', installed: '已安裝', localEnvironment: '本機現有環境', available: '可直接使用',
-  notReady: '檢查未通過', found: '已找到', notFound: '未找到', checkingDevices: '正在檢查計算裝置', deviceFallbackNotice: '未偵測到所選計算裝置，已切換為「由引擎決定」。', restore: '還原預設值', repair: '重新準備並修復',
-  planUnknown: '尚未確認實際裝置', unloaded: '未載入', precision: '計算精度', quantization: '模型量化', none: '不量化', reserve: '保留顯存（MiB）',
-  threads: 'CPU 執行緒上限', layers: '翻譯 GPU 卸載層數', context: '翻譯上下文長度', flash: 'llama Flash Attention', on: '開啟', off: '關閉',
-  download: '下載中', verify: '驗證中', extract: '解壓縮中', prepare: '正在準備相依項目', check: '檢查安裝結果', checkingEnvironment: '準備計算環境',
-  environmentFailed: '計算環境準備未完成', retry: '重試準備', useCpu: '改用 CPU 繼續', saveError: '無法儲存設定',
-  precisionHint: 'PyTorch 模型會依裝置能力選擇計算精度；CPU 預設使用 FP32。實際支援的精度由模型載入器決定。',
-  quantHint: '僅對支援執行階段量化的模型生效；NF4／8bit 需要相容裝置。GGUF 量化由模型檔案決定，無法在此切換。',
-  reserveHint: '為桌面、其他應用程式與計算尖峰預留空間；兩項工作共用顯示卡時會一起計算預算。',
-  threadsHint: '0 表示自動；辨識與 llama 翻譯共用 CPU 執行緒預算。', layersHint: '-1 表示自動，0 表示 CPU；僅適用於 llama.cpp 翻譯。',
-  contextHint: '增加上下文長度會提高 KV 快取的顯存需求；僅適用於本機 llama.cpp。', flashHint: '自動由目前的 llama 後端判斷；強制啟用需要後端與模型支援。',
-}
-const ko: typeof zh = {
-  ...en, devices: '컴퓨팅 장치', performance: '성능 및 메모리', memoryCpu: 'VRAM 및 CPU', automatic: '자동', bundled: '기본 제공 런타임', autoEnvironment: '자동(기존 런타임 우선 사용)', restart: '환경 확인 및 적용',
-  prepareRecommended: '컴퓨팅 환경 확인', hardware: '감지된 시스템 GPU', environmentStorage: '실행 환경 저장 위치', environmentStorageHint: '모델 저장 위치를 따릅니다. 저장 공간 설정에서 변경할 수 있습니다.',
-  refresh: '장치 새로고침', detected: '사용 가능한 시스템 장치', recognition: '음성 인식 우선 장치', translation: '로컬 번역 우선 장치', assignmentHint: '선택한 장치를 우선 사용합니다. 사용할 수 없으면 현재 모델 로더가 자동으로 장치를 선택합니다.',
-  nextSession: '장치 및 성능 설정은 다음 세션부터 적용됩니다.', fallback: 'GPU 오류 시 CPU로 전환', fallbackHint: '장치 오류나 메모리 부족일 때만 CPU로 전환합니다. 실제 사용 장치를 표시하며, 사용자가 지정한 다른 GPU로 임의 전환하지 않습니다.', free: '사용 가능한 VRAM', total: '총 VRAM', unavailable: '현재 모델 백엔드에서 사용할 수 없음', actual: '현재 할당', recognitionActual: '인식에 사용 중인 장치', translationActual: '번역에 사용 중인 장치', noSession: '시작된 세션 없음',
-  environments: '추론 런타임', engineEnvironment: 'PyTorch 런타임', llamaEnvironment: 'llama.cpp 런타임', install: '다운로드 및 설치', installed: '설치됨', localEnvironment: '기존 로컬 런타임', localPython: '기존 Python', localTorch: '기존 PyTorch', localLlama: '기존 llama.cpp', project: '프로젝트 환경', available: '사용 가능', notReady: '확인 실패', found: '찾음', notFound: '찾지 못함', checkingDevices: '컴퓨팅 장치 확인 중', deviceCheckFailed: '컴퓨팅 장치를 확인하지 못했습니다. 장치 새로고침을 눌러 다시 시도하세요.', deviceFallbackNotice: '선택한 컴퓨팅 장치를 찾지 못해 ‘엔진에서 결정’으로 전환했습니다.',
-  recognitionTask: '음성 인식', translationTask: '로컬 번역', engineChanged: '{task} 엔진을 {engine}(으)로 변경했습니다', modelChanged: '모델을 {previousModel}에서 {nextModel}(으)로 자동 변경했습니다.', noCompatibleModel: '{engine}을 지원하는 설치된 {task} 모델이 없어 엔진을 변경하지 않았습니다.',
-  import: '오프라인 패키지 가져오기', cancel: '설치 취소', restore: '기본값 복원', repair: '다시 준비 및 복구', noPackages: '현재 릴리스에는 추가 런타임 패키지가 없습니다. 기본 제공 런타임을 계속 사용할 수 있습니다.',
-  planUnknown: '실제 장치가 확인되지 않음', unloaded: '로드되지 않음', precision: '계산 정밀도', quantization: '모델 양자화', none: '양자화 없음', reserve: '예약 VRAM (MiB)', threads: 'CPU 스레드 제한', layers: '번역 GPU 레이어', context: '번역 컨텍스트 길이', flash: 'llama Flash Attention', on: '켜기', off: '끄기',
-  download: '다운로드 중', verify: '검증 중', extract: '압축 해제 중', prepare: '필요한 구성 요소 준비 중', check: '설치 결과 확인', checkingEnvironment: '컴퓨팅 환경 준비', environmentFailed: '환경 준비 실패', retry: '다시 준비', useCpu: 'CPU로 계속', saveError: '설정을 저장할 수 없음',
-  precisionHint: 'PyTorch 모델은 장치 성능에 따라 계산 정밀도를 선택하며, CPU는 기본적으로 FP32를 사용합니다. 지원 정밀도는 모델 로더에 따라 다릅니다.', quantHint: '런타임 양자화를 지원하는 모델에만 적용됩니다. NF4와 8bit는 호환 장치가 필요하며, GGUF 양자화는 모델 파일에 지정되어 있어 여기서 바꿀 수 없습니다. 모델 파일 자체는 수정하지 않습니다.', reserveHint: '데스크톱과 다른 앱, 계산량이 많은 순간을 위해 여유 메모리를 남겨 둡니다. 두 작업이 같은 GPU를 사용하면 메모리 예산을 함께 계산합니다.', threadsHint: '0은 자동입니다. 인식과 llama 번역이 CPU 스레드 예산을 공유합니다.', layersHint: '-1은 자동, 0은 CPU입니다. llama.cpp 번역에만 적용됩니다.', contextHint: '컨텍스트가 길수록 KV 캐시에 더 많은 VRAM이 필요합니다. 로컬 llama.cpp 번역에만 적용됩니다.', flashHint: '자동은 현재 llama 백엔드가 결정합니다. 강제로 켜려면 백엔드와 모델이 지원해야 합니다.',
-}
-const ja: typeof zh = {
-  ...en, devices: '計算デバイス', performance: 'パフォーマンスとメモリ', memoryCpu: 'VRAM と CPU', automatic: '自動', bundled: '同梱ランタイム', autoEnvironment: '自動（既存のランタイムを優先）', restart: '環境を確認して適用',
-  prepareRecommended: '計算環境を確認', hardware: 'システムで検出された GPU', environmentStorage: '実行環境の保存先', environmentStorageHint: 'モデルの保存先に合わせます。ストレージ設定から変更できます。',
-  refresh: 'デバイスを更新', detected: '利用可能なシステムデバイス', recognition: '音声認識の優先デバイス', translation: 'ローカル翻訳の優先デバイス', assignmentHint: '選択したデバイスを優先します。使用できない場合は、現在のモデルのローダーが自動的に割り当てます。',
-  nextSession: 'デバイスとパフォーマンスの設定は次回のセッションから適用されます。', fallback: 'GPU に問題が起きたときは CPU に切り替える', fallbackHint: 'デバイスエラーまたはメモリ不足の場合に限り CPU に切り替えます。実際に使用中のデバイスを表示し、指定した別の GPU へ自動で切り替えることはありません。', free: '空き VRAM', total: '合計 VRAM', unavailable: '現在のモデルバックエンドでは利用できません', actual: '現在の割り当て', recognitionActual: '認識に使用中のデバイス', translationActual: '翻訳に使用中のデバイス', noSession: 'セッション未開始',
-  environments: '推論ランタイム', engineEnvironment: 'PyTorch ランタイム', llamaEnvironment: 'llama.cpp ランタイム', install: 'ダウンロードしてインストール', installed: 'インストール済み', localEnvironment: '既存のローカルランタイム', localPython: '既存の Python', localTorch: '既存の PyTorch', localLlama: '既存の llama.cpp', project: 'プロジェクト環境', available: '使用可能', notReady: '確認できませんでした', found: '見つかりました', notFound: '見つかりません', checkingDevices: '計算デバイスを確認中', deviceCheckFailed: '計算デバイスを確認できませんでした。「デバイスを更新」を押して、もう一度お試しください。', deviceFallbackNotice: '選択した計算デバイスが検出されなかったため、「エンジンに任せる」に切り替えました。',
-  recognitionTask: '音声認識', translationTask: 'ローカル翻訳', engineChanged: '{task}エンジンを {engine} に切り替えました', modelChanged: 'モデルを {previousModel} から {nextModel} に自動で切り替えました。', noCompatibleModel: '{engine} に対応するインストール済みの{task}モデルがないため、エンジンは変更されませんでした。',
-  import: 'オフラインパッケージをインポート', cancel: 'インストールをキャンセル', restore: '既定値に戻す', repair: '環境を再準備して修復', noPackages: 'このリリースには追加のランタイムパッケージがありません。同梱ランタイムは引き続き使用できます。',
-  planUnknown: '実際のデバイスは未確認', unloaded: '未読み込み', precision: '計算精度', quantization: 'モデル量子化', none: '量子化しない', reserve: '確保する VRAM（MiB）', threads: 'CPU スレッド上限', layers: '翻訳時に GPU へオフロードするレイヤー数', context: '翻訳コンテキスト長', flash: 'llama Flash Attention', on: 'オン', off: 'オフ',
-  download: 'ダウンロード中', verify: '検証中', extract: '展開中', prepare: '依存関係を準備中', check: 'インストール結果を確認', checkingEnvironment: '計算環境を準備中', environmentFailed: '環境の準備が完了しませんでした', retry: '再試行', useCpu: 'CPU で続行', saveError: '設定を保存できません',
-  precisionHint: 'PyTorch モデルはデバイス性能に応じて計算精度を選びます。CPU では既定で FP32 を使用します。対応する精度はモデルローダーによって異なります。', quantHint: 'ランタイム量子化に対応するモデルにのみ適用されます。NF4 と 8bit には対応デバイスが必要です。GGUF の量子化はモデルファイルで決まり、ここでは変更できません。モデルファイル自体は変更されません。', reserveHint: 'デスクトップやほかのアプリ、一時的な高負荷に備えて VRAM に余裕を残します。同じ GPU を使う場合は、認識と翻訳の両方を合わせて計算します。', threadsHint: '0 は自動です。認識と llama 翻訳で CPU スレッドの上限を共有します。', layersHint: '-1 は自動、0 は CPU です。llama.cpp の翻訳にのみ適用されます。', contextHint: 'コンテキストが長いほど KV キャッシュに必要な VRAM が増えます。ローカルの llama.cpp にのみ適用されます。', flashHint: '自動では現在の llama バックエンドが判断します。強制的に有効にするには、バックエンドとモデルの対応が必要です。',
-}
-export const computeUi = { zh, zhTW, ko, ja, en }
+export const computeUi = { zh, en }

@@ -22,12 +22,7 @@ export type TrackLine = { key: string; text: string; stableText?: string }
 /** Sentences that have scrolled far out of view; dropped in bulk so the DOM cannot grow without bound. */
 const MAX_ENTRIES = 40
 
-/*
- * CJK and full-width punctuation, written as \uXXXX escapes rather than literal
- * characters: `scripts/check-guardrails.mjs` `no-hardcoded-cjk` flags CJK
- * literals in components, and a character class written out would be read as UI
- * copy. The escapes match the same set.
- */
+/** CJK and full-width punctuation do not need Latin word spacing. */
 const CJK = /[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/
 
 /** Only Latin text needs a space inserted at the seam. */

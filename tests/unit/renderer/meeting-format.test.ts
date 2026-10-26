@@ -35,6 +35,10 @@ const t = (key: string, values?: Record<string, string | number>) =>
   translate(key, 'zh-CN', values)
 
 describe('会议展示格式', () => {
+  it.each([['zh-TW', '記錄'], ['zh-HK', '記錄'], ['ko', '기록'], ['ja', '記録']] as const)('localizes automatic titles for %s', (language, label) => {
+    expect(meetingTitleFor(meeting({ daySequence: 2 }), language)).toContain(`_${label}_2`)
+    expect(meetingTitleFor(meeting(), language)).not.toContain('记录')
+  })
   it('自动标题按界面语言渲染, 不读盘上的 title', () => {
     expect(meetingTitleFor(meeting(), 'zh-CN')).toBe('2026年09月29日_记录')
     expect(meetingTitleFor(meeting({ daySequence: 2 }), 'zh-CN')).toBe('2026年09月29日_记录_2')

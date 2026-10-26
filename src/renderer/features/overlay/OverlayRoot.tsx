@@ -27,6 +27,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { CSSProperties, ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { Dialog as BaseDialog } from '@base-ui/react/dialog'
 import { Lock, Minus, Monitor, Pin, PinOff, SlidersHorizontal, Unlock, X } from 'lucide-react'
 
 import { DEFAULT_SETTINGS } from '@/bridge'
@@ -419,7 +420,7 @@ export function OverlayRoot() {
          * splits changing how the window sits from changing whether it is
          * there at all.
          */}
-        <div className="nola-caption-actions" aria-label={t('overlay.title')}>
+        <div role="group" className="nola-caption-actions" aria-label={t('overlay.title')}>
           <GhostButton
             label={t('overlay.position')}
             active={config.mode === 'top'}
@@ -489,10 +490,13 @@ export function OverlayRoot() {
          * would cover the viewport.
          */}
         {closing ? (
-          <div className="nola-confirm-layer" role="dialog" aria-modal="true" aria-label={t('overlay.closeTitle')}>
-            {detachedConfirmation ? null : <div className="nola-confirm-dialog">
-              <p className="nola-confirm-title">{t('overlay.closeTitle')}</p>
-              <p className="nola-confirm-text">{t('overlay.closeBody')}</p>
+          detachedConfirmation ? <div className="nola-confirm-layer" aria-hidden="true" /> :
+          <BaseDialog.Root open onOpenChange={open => { if (!closePending) setClosing(open) }}>
+          <BaseDialog.Portal container={cardRef}>
+          <BaseDialog.Popup className="nola-confirm-layer">
+            <div className="nola-confirm-dialog">
+              <BaseDialog.Title render={<p />} className="nola-confirm-title">{t('overlay.closeTitle')}</BaseDialog.Title>
+              <BaseDialog.Description render={<p />} className="nola-confirm-text">{t('overlay.closeBody')}</BaseDialog.Description>
               <div className="nola-confirm-actions">
                 <Button variant="secondary" size="sm" disabled={closePending} onClick={() => setClosing(false)}>
                   {t('common.cancel')}
@@ -502,8 +506,10 @@ export function OverlayRoot() {
                   {t(closePending ? 'overlay.closing' : 'overlay.closeConfirm')}
                 </Button>
               </div>
-            </div>}
-          </div>
+            </div>
+          </BaseDialog.Popup>
+          </BaseDialog.Portal>
+          </BaseDialog.Root>
         ) : null}
       </section>
     </main>

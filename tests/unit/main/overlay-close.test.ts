@@ -1,3 +1,4 @@
+import { configureIpcSenderValidation } from '../../../src/main/logged-ipc'
 import { EventEmitter } from 'node:events'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { EngineProcess } from '../../../src/main/engine-process'
@@ -17,6 +18,7 @@ let dispose: () => void
 afterEach(() => { dispose?.(); vi.clearAllMocks(); vi.restoreAllMocks() })
 
 function setup() {
+  configureIpcSenderValidation(() => undefined)
   const engine = Object.assign(new EventEmitter(), {
     currentState: 'ready', start: vi.fn(), stop: vi.fn().mockResolvedValue(undefined),
     request: vi.fn().mockImplementation(async (command) => ({ sessionId: 'session-1', type: command.type === 'startSession' ? 'sessionStarted' : 'sessionStopped' })),

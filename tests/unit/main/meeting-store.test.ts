@@ -208,7 +208,7 @@ describe('MeetingStore', () => {
     const meeting = await store.begin({ sourceLanguage: 'auto', targetLanguage: 'zh', recordAudio: true })
     const renamed = await store.rename(meeting.meetingId, '  周会  ')
     expect(renamed).toMatchObject({ title: '周会', titleIsCustom: true })
-    await expect(store.rename(meeting.meetingId, '   ')).rejects.toThrow('会议名称不能为空')
+    await expect(store.rename(meeting.meetingId, '   ')).rejects.toThrow('MEETING_NAME_EMPTY')
 
     const reopened = new MeetingStore(join(root, 'meetings'))
     await reopened.initialize(join(root, 'history.jsonl'))

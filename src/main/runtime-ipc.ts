@@ -23,7 +23,7 @@ export function registerRuntimeIpc(manager: RuntimeManager, window: () => Browse
   uninstall: (kind: 'engine' | 'llama' | 'crisp') => Promise<void> = kind => manager.uninstall(kind)): () => void {
   const channels = ['runtime:list', 'runtime:install', 'runtime:import', 'runtime:cancel', 'runtime:prepare', 'runtime:settings', 'runtime:uninstall']
   loggedHandle(channels[5], (_event, component: unknown) => {
-    if (component !== 'engine' && component !== 'llama' && component !== 'crisp') throw new Error('组件无效')
+    if (component !== 'engine' && component !== 'llama' && component !== 'crisp') throw new Error('INVALID_ARGUMENT')
     const main = window()
     if (!main) return
     if (main.isMinimized()) main.restore()
@@ -34,14 +34,14 @@ export function registerRuntimeIpc(manager: RuntimeManager, window: () => Browse
   loggedHandle(channels[1], async (_event, id: unknown, repair: unknown) => {
     await whenRuntimeReady()
     if (isSessionBusy()) throw new Error('sessionAlreadyRunning')
-    if (typeof id !== 'string' || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(id)) throw new Error('运行包 ID 无效')
-    if (repair !== undefined && typeof repair !== 'boolean') throw new Error('修复参数无效')
+    if (typeof id !== 'string' || !/^[a-z0-9][a-z0-9-]{0,79}$/.test(id)) throw new Error('INVALID_ARGUMENT')
+    if (repair !== undefined && typeof repair !== 'boolean') throw new Error('INVALID_ARGUMENT')
     return install(id, repair === true)
   })
   loggedHandle(channels[6], async (_event, kind: unknown) => {
     await whenRuntimeReady()
     if (isSessionBusy()) throw new Error('sessionAlreadyRunning')
-    if (kind !== 'engine' && kind !== 'llama' && kind !== 'crisp') throw new Error('运行组件类型无效')
+    if (kind !== 'engine' && kind !== 'llama' && kind !== 'crisp') throw new Error('INVALID_ARGUMENT')
     return uninstall(kind)
   })
   loggedHandle(channels[2], async () => {
@@ -60,7 +60,7 @@ export function registerRuntimeIpc(manager: RuntimeManager, window: () => Browse
   loggedHandle(channels[4], async (_event, requested: unknown) => {
     await whenRuntimeReady()
     if (requested !== undefined && (!Array.isArray(requested) || requested.some(kind => kind !== 'engine' && kind !== 'llama' && kind !== 'crisp'))) {
-      throw new Error('运行组件列表无效')
+      throw new Error('INVALID_ARGUMENT')
     }
     await prepare(requested as ('engine' | 'llama' | 'crisp')[] | undefined)
     return manager.snapshot()

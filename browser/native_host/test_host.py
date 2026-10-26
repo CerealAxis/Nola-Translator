@@ -21,6 +21,11 @@ class NativeFramingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             read_message(io.BytesIO(struct.pack('<I', 2) + b'xx'))
 
+    def test_pretty_json_stays_in_one_desktop_frame(self):
+        payload = b'{\n  "id": "hello",\n  "text": "line\\nbreak"\n}'
+        frame = struct.pack('<I', len(payload)) + payload
+        self.assertEqual(read_message(io.BytesIO(frame)), b'{"id":"hello","text":"line\\nbreak"}')
+
 
 
 

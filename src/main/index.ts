@@ -1,7 +1,7 @@
 import { FeatureActivity, type FeatureLease } from './feature-activity'
 import { ModelGateway } from './model-gateway'
 import { NolaTray } from './tray'
-import { loggedHandle } from './logged-ipc'
+import { configureIpcSenderValidation, loggedHandle } from './logged-ipc'
 import { modelEngines, supportsSelectedEngine } from '../shared/model-engines'
 import { INDEX_TRANSLATE_MODEL_IDS } from '../shared/index-translate'
 import { registerWorkbench, isWorkbenchWindow } from './workbench'
@@ -12,11 +12,10 @@ import { customModelsOf } from '../shared/custom-models'
 import { captureMainConsole, initializeSessionLog, logActivityTotals, logDiagnostic, relocateSessionLogs } from './session-log'
 import { resolveDeviceIntent } from '../shared/device-selection'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 
-import { app, BrowserWindow, ipcMain, safeStorage, screen, shell, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, ipcMain, safeStorage, screen, session, shell, type IpcMainInvokeEvent } from 'electron'
 
 import type { AppSettings, OverlaySettings } from '../shared/settings'
 import { NO_TRANSLATION_LANGUAGE } from '../shared/settings'
@@ -42,7 +41,7 @@ import { registerOfflineIpc } from './offline-ipc'
 import { runOfflineModelWorker } from './offline-worker'
 import { SettingsStore } from './settings-store'
 import { SecureCredentialStore } from './secure-store'
-import { createMainWindowOptions, resolvePreloadPath } from './window-options'
+import { createMainWindowOptions, isAllowedRendererPermission, isTrustedRendererUrl, resolvePreloadPath } from './window-options'
 import { computeOverlayBounds, createOverlayWindowOptions, suppressSystemMenuOnRightClick } from './windows'
 import { prepareOverlayMenu } from './overlay-menu'
 import { resolveModelNetwork } from './network-region'
@@ -73,10 +72,7 @@ function assertFeatureSender(event: IpcMainInvokeEvent, mainOnly = false): void 
   const window = BrowserWindow.fromWebContents(event.sender)
   if (!window || window.isDestroyed() || event.senderFrame !== event.sender.mainFrame) throw new Error('Access denied')
   if (mainOnly ? window !== mainWindow : ![mainWindow, workspaceWindow, overlayWindow].includes(window) && !isWorkbenchWindow(window)) throw new Error('Access denied')
-  const url = new URL(event.sender.getURL())
-  if (process.env.ELECTRON_RENDERER_URL) {
-    if (url.origin !== new URL(process.env.ELECTRON_RENDERER_URL).origin) throw new Error('Access denied')
-  } else if (url.href.split('?')[0].split('#')[0] !== pathToFileURL(join(__dirname, '../renderer/index.html')).href) throw new Error('Access denied')
+  if (!isTrustedRendererUrl(event.sender.getURL(), __dirname)) throw new Error('Access denied')
 }
 function showMainWindow(): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
@@ -204,6 +200,32 @@ if (!hasSingleInstanceLock) {
   })
 
   void app.whenReady().then(async () => {
+    const trustedContents = (contents: Electron.WebContents | null): boolean => {
+      if (!contents || contents.isDestroyed()) return false
+      const owner = BrowserWindow.fromWebContents(contents)
+      return !!owner && !owner.isDestroyed() && isTrustedRendererUrl(contents.getURL(), __dirname)
+    }
+    configureIpcSenderValidation(event => {
+      if (!trustedContents(event.sender) || event.senderFrame !== event.sender.mainFrame
+        || !isTrustedRendererUrl(event.senderFrame.url, __dirname)) throw new Error('Access denied')
+    })
+    app.on('web-contents-created', (_event, contents) => {
+      contents.on('will-navigate', (event, target) => {
+        if (!isTrustedRendererUrl(target, __dirname)) event.preventDefault()
+      })
+      contents.on('will-redirect', (event, target) => {
+        if (!isTrustedRendererUrl(target, __dirname)) event.preventDefault()
+      })
+    })
+    session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
+      callback(isAllowedRendererPermission(permission,
+        trustedContents(contents) && details.isMainFrame && isTrustedRendererUrl(details.requestingUrl, __dirname),
+        'mediaTypes' in details ? details.mediaTypes : []))
+    })
+    session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) =>
+      isAllowedRendererPermission(permission,
+        trustedContents(contents) && details.isMainFrame && !!details.requestingUrl && isTrustedRendererUrl(details.requestingUrl, __dirname),
+        details.mediaType ? [details.mediaType] : []))
     await initializeSessionLog(join(app.getPath('userData'), 'logs'), {
       version: app.getVersion(), electron: process.versions.electron, node: process.versions.node,
       platform: process.platform, architecture: process.arch, systemVersion: process.getSystemVersion(), packaged: app.isPackaged,

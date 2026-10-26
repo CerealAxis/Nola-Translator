@@ -708,6 +708,11 @@ export const zhCN = {
   },
 
   errors: {
+    "invalidArgument": "操作参数无效，请检查输入。",
+    "meetingNameEmpty": "会议名称不能为空。",
+    "meetingNotFound": "会议记录不存在，请刷新列表。",
+    "invalidCredential": "凭据内容或类型无效，请重新输入。",
+
     errorCodeLabel: '错误码 {code}',
     cloudRecognitionCredentialMissing: '请在设置 → 音频与识别中保存云端识别服务的 API Key，再启动字幕。',
     configureCloudRecognitionAction: '去配置云端识别',

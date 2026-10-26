@@ -47,6 +47,10 @@ export interface ErrorCopy {
  * fix. Adding a code to the catalog now fails the build until it says what its button does.
  */
 const ERROR_ACTIONS: Record<SupportErrorCode, { target: ErrorActionTarget; label: TranslationKey; detail?: TranslationKey }> = {
+  'ARG-001': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
+  'ARG-002': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
+  'ARG-003': { target: { kind: 'record' }, label: 'errors.engineLostAction' },
+  'ARG-004': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.configureCloudRecognitionAction' },
   // Cloud recognition: Aliyun LiveTranslate and MiniMax both bill per account, so a missing
   // key, a spent balance or a rejected response is settled in the provider's settings.
   'ASR-001': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.configureCloudRecognitionAction' },

@@ -19,11 +19,23 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 export type MermaidDiagramProps = {
+  labels: MermaidLabels;
   code: string;
   className?: string;
   /** Renders a skeleton instead of the diagram while `true`. */
   streaming?: boolean;
 };
+
+export interface MermaidLabels {
+  expand: string;
+  diagram: string;
+  zoomIn: string;
+  zoomOut: string;
+  reset: string;
+  close: string;
+  rendering: string;
+  error: string;
+}
 
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 4;
@@ -169,11 +181,12 @@ function MermaidSvg({ svg, ...props }: MermaidSvgProps) {
 }
 
 type MermaidZoomProps = {
+  labels: MermaidLabels;
   svg: string;
   children: ReactNode;
 };
 
-function MermaidZoom({ svg, children }: MermaidZoomProps) {
+function MermaidZoom({ svg, children, labels }: MermaidZoomProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -309,7 +322,7 @@ function MermaidZoom({ svg, children }: MermaidZoomProps) {
         ref={triggerRef}
         type="button"
         data-slot="mermaid-zoom-trigger"
-        aria-label="Expand diagram"
+        aria-label={labels.expand}
         onClick={() => setIsOpen(true)}
         className="aui-mermaid-zoom-trigger text-muted-foreground hover:text-foreground hover:border-muted-foreground/70 border-border bg-background absolute top-2 right-2 cursor-pointer rounded-md border p-1.5 opacity-0 transition group-hover/mermaid:opacity-100 focus-visible:opacity-100"
       >
@@ -322,7 +335,7 @@ function MermaidZoom({ svg, children }: MermaidZoomProps) {
             data-slot="mermaid-zoom-overlay"
             role="dialog"
             aria-modal="true"
-            aria-label="Diagram"
+            aria-label={labels.diagram}
             className="aui-mermaid-zoom-overlay fade-in animate-in bg-background fixed inset-0 z-overlay duration-200"
           >
             <div
@@ -350,7 +363,7 @@ function MermaidZoom({ svg, children }: MermaidZoomProps) {
             >
               <button
                 type="button"
-                aria-label="Zoom in"
+                aria-label={labels.zoomIn}
                 onClick={() => zoomBy(1.25)}
                 className="text-muted-foreground hover:text-foreground cursor-pointer rounded-sm p-1.5"
               >
@@ -358,7 +371,7 @@ function MermaidZoom({ svg, children }: MermaidZoomProps) {
               </button>
               <button
                 type="button"
-                aria-label="Zoom out"
+                aria-label={labels.zoomOut}
                 onClick={() => zoomBy(0.8)}
                 className="text-muted-foreground hover:text-foreground cursor-pointer rounded-sm p-1.5"
               >
@@ -366,7 +379,7 @@ function MermaidZoom({ svg, children }: MermaidZoomProps) {
               </button>
               <button
                 type="button"
-                aria-label="Reset zoom"
+                aria-label={labels.reset}
                 onClick={() => setTransform({ x: 0, y: 0, scale: 1 })}
                 className="text-muted-foreground hover:text-foreground cursor-pointer rounded-sm p-1.5"
               >
@@ -375,7 +388,7 @@ function MermaidZoom({ svg, children }: MermaidZoomProps) {
               <button
                 ref={closeRef}
                 type="button"
-                aria-label="Close"
+                aria-label={labels.close}
                 onClick={handleClose}
                 className="text-muted-foreground hover:text-foreground cursor-pointer rounded-sm p-1.5"
               >
@@ -390,6 +403,7 @@ function MermaidZoom({ svg, children }: MermaidZoomProps) {
 }
 
 const MermaidDiagramImpl: FC<MermaidDiagramProps> = ({
+  labels,
   code,
   className,
   streaming = false,
@@ -421,7 +435,7 @@ const MermaidDiagramImpl: FC<MermaidDiagramProps> = ({
     return (
       <div
         data-slot="mermaid-skeleton"
-        aria-label="Rendering diagram"
+        aria-label={labels.rendering}
         className={cn(
           "aui-mermaid-skeleton bg-muted flex h-32 animate-pulse items-center justify-center gap-3 rounded-b-lg p-4",
           className,
@@ -447,14 +461,14 @@ const MermaidDiagramImpl: FC<MermaidDiagramProps> = ({
       >
         <pre className="overflow-x-auto p-4 text-sm">{code.trim()}</pre>
         <p className="text-muted-foreground border-border border-t px-4 py-1.5 text-xs">
-          diagram could not be rendered
+          {labels.error}
         </p>
       </div>
     );
   }
 
   return (
-    <MermaidZoom svg={result.svg}>
+    <MermaidZoom labels={labels} svg={result.svg}>
       <MermaidSvg
         data-slot="mermaid-diagram"
         className={cn(

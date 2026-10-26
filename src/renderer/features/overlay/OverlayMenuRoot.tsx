@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { actions, getBridge, stores, useStore } from '@/store'
 import { Button } from '@/components/ui/button'
+import { Dialog as BaseDialog } from '@base-ui/react/dialog'
 import { OverlayControls } from './OverlayControls'
 import { useI18n } from '@/i18n'
 import { notifyError } from '@/components/primitives/notify'
@@ -72,6 +73,13 @@ export function OverlayMenuRoot() {
 function OverlayCloseConfirmation({ id }: { id: number }) {
   const { t } = useI18n()
   const [pending, setPending] = useState(false)
+  const surfaceRef = useRef<HTMLElement>(null)
+  const cancel = (): void => {
+    if (pending) return
+    void actions.settings.closeOverlayMenu(id).catch((error: unknown) => {
+      notifyError(t('overlay.menuFailed'), { cause: error })
+    })
+  }
 
   const close = async (): Promise<void> => {
     if (pending) return
@@ -89,24 +97,24 @@ function OverlayCloseConfirmation({ id }: { id: number }) {
   }
 
   return (
-    <main className="nola-overlay-confirm-surface">
-      <div className="nola-confirm-dialog" role="dialog" aria-modal="true" aria-label={t('overlay.closeTitle')}>
-        <p className="nola-confirm-title">{t('overlay.closeTitle')}</p>
-        <p className="nola-confirm-text">{t('overlay.closeBody')}</p>
+    <main ref={surfaceRef} className="nola-overlay-confirm-surface">
+      <BaseDialog.Root open onOpenChange={open => { if (!open) cancel() }}>
+      <BaseDialog.Portal container={surfaceRef}>
+      <BaseDialog.Popup className="nola-confirm-dialog">
+        <BaseDialog.Title render={<p />} className="nola-confirm-title">{t('overlay.closeTitle')}</BaseDialog.Title>
+        <BaseDialog.Description render={<p />} className="nola-confirm-text">{t('overlay.closeBody')}</BaseDialog.Description>
         <div className="nola-confirm-actions">
           <Button variant="secondary" size="sm" disabled={pending}
-            onClick={() => {
-              void actions.settings.closeOverlayMenu(id).catch((error: unknown) => {
-                notifyError(t('overlay.menuFailed'), { cause: error })
-              })
-            }}>
+            onClick={cancel}>
             {t('common.cancel')}
           </Button>
           <Button variant="danger" size="sm" disabled={pending} aria-busy={pending} onClick={() => void close()}>
             {t(pending ? 'overlay.closing' : 'overlay.closeConfirm')}
           </Button>
         </div>
-      </div>
+      </BaseDialog.Popup>
+      </BaseDialog.Portal>
+      </BaseDialog.Root>
     </main>
   )
 }

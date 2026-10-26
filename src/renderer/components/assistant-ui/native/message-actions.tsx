@@ -25,6 +25,7 @@ export interface MessageActionsProps extends Omit<
   onReactionChange: (reaction: Reaction) => void;
   onRegenerate: () => void;
   onMore: () => void;
+  labels: { copied: string; copy: string; helpful: string; unhelpful: string; regenerate: string; more: string };
 }
 
 export function MessageActions({
@@ -35,6 +36,7 @@ export function MessageActions({
   onReactionChange,
   onRegenerate,
   onMore,
+  labels,
   className,
   ...props
 }: MessageActionsProps) {
@@ -49,7 +51,7 @@ export function MessageActions({
     >
       <button
         type="button"
-        aria-label={copied ? "Copied response" : "Copy response"}
+        aria-label={copied ? labels.copied : labels.copy}
         onClick={onCopy}
         className={cn(
           buttonClassName,
@@ -74,7 +76,7 @@ export function MessageActions({
       </button>
       <button
         type="button"
-        aria-label="Mark response helpful"
+        aria-label={labels.helpful}
         aria-pressed={reaction === "up"}
         onClick={() => onReactionChange(reaction === "up" ? null : "up")}
         className={cn(
@@ -87,7 +89,7 @@ export function MessageActions({
       </button>
       <button
         type="button"
-        aria-label="Mark response unhelpful"
+        aria-label={labels.unhelpful}
         aria-pressed={reaction === "down"}
         onClick={() => onReactionChange(reaction === "down" ? null : "down")}
         className={cn(
@@ -100,7 +102,7 @@ export function MessageActions({
       </button>
       <button
         type="button"
-        aria-label="Regenerate response"
+        aria-label={labels.regenerate}
         onClick={onRegenerate}
         className={buttonClassName}
       >
@@ -113,7 +115,7 @@ export function MessageActions({
       </button>
       <button
         type="button"
-        aria-label="More response actions"
+        aria-label={labels.more}
         onClick={onMore}
         className={buttonClassName}
       >

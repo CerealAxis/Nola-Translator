@@ -178,7 +178,7 @@ function ExternalAction({ href, label, icon }: ExternalActionProps) {
   // Electron opens HTTPS links in the default browser through setWindowOpenHandler.
   // Keep external actions as anchors while reusing the shared outlined button appearance.
   return (
-    <Button variant="tertiary" size="sm" className="settings-more__link no-underline"
+    <Button nativeButton={false} role="link" variant="tertiary" size="sm" className="settings-more__link no-underline"
       render={<a href={href} target="_blank" rel="noreferrer" />}>
       {icon}{label}<ExternalLink aria-hidden="true" />
     </Button>

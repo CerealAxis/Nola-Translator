@@ -688,6 +688,11 @@ export const en: Dictionary = {
   },
 
   errors: {
+    "invalidArgument": "Invalid parameters. Check your input.",
+    "meetingNameEmpty": "The meeting name cannot be empty.",
+    "meetingNotFound": "Meeting not found. Refresh the list.",
+    "invalidCredential": "Invalid credential type or value. Enter it again.",
+
     errorCodeLabel: 'Code {code}',
     cloudRecognitionCredentialMissing: 'Save the cloud recognition API key in Settings → Audio and recognition before starting captions.',
     configureCloudRecognitionAction: 'Configure cloud recognition',

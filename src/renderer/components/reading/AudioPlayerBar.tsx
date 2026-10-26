@@ -13,7 +13,7 @@ import { LoaderCircle, Pause, Play } from 'lucide-react'
 import { notifyError } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
-import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useI18n } from '@/i18n'
 
 /** Playback speed steps, in the order they appear. */
@@ -198,14 +198,13 @@ export function AudioPlayerBar({
 
       <span className="nola-mono shrink-0 text-muted">{formatClock(totalMs)}</span>
 
-      <TabsRoot value={String(rate)} onValueChange={value => {
+      <ToggleGroup className="shrink-0" aria-label={t('homeRecordsUi.playbackRate')} value={[String(rate)]} onValueChange={([value]) => {
         const next = Number(value)
         if (RATES.includes(next as Rate)) changeRate(next as Rate)
       }}>
-        <TabsList className="nola-segmented shrink-0" aria-label={t('homeRecordsUi.playbackRate')}>
-          {RATES.map(value => <TabsTrigger key={value} value={String(value)} className="tabular-nums">{value}x</TabsTrigger>)}
-        </TabsList>
-      </TabsRoot>
+          {RATES.map(value => <ToggleGroupItem key={value} value={String(value)} className="tabular-nums">{value}x</ToggleGroupItem>)}
+
+      </ToggleGroup>
     </div>
   )
 }

@@ -19,6 +19,7 @@ import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { cn } from "@/lib/utils";
 
 type MarkdownTextProps = Partial<TextMessagePartProps> & {
+  copyLabel: string;
   components?: Parameters<typeof memoizeMarkdownComponents>[0];
   componentsByLanguage?: MarkdownTextPrimitiveProps["componentsByLanguage"];
 };
@@ -40,18 +41,19 @@ const useShallowStable = <T extends Record<string, unknown> | undefined>(
 };
 
 const MarkdownTextImpl: FC<MarkdownTextProps> = ({
+  copyLabel,
   components,
   componentsByLanguage,
 }) => {
   const stableComponents = useShallowStable(components);
   const stableComponentsByLanguage = useShallowStable(componentsByLanguage);
   const markdownComponents = useMemo(() => {
-    if (!stableComponents) return defaultComponents;
     return {
       ...defaultComponents,
-      ...memoizeMarkdownComponents(stableComponents),
+      CodeHeader: (props: CodeHeaderProps) => <CodeHeader {...props} copyLabel={copyLabel} />,
+      ...(stableComponents ? memoizeMarkdownComponents(stableComponents) : {}),
     };
-  }, [stableComponents]);
+  }, [stableComponents, copyLabel]);
 
   return (
     <MarkdownTextPrimitive
@@ -66,7 +68,7 @@ const MarkdownTextImpl: FC<MarkdownTextProps> = ({
 
 export const MarkdownText = memo(MarkdownTextImpl);
 
-const CodeHeader: FC<CodeHeaderProps> = ({ language, code }) => {
+const CodeHeader: FC<CodeHeaderProps & { copyLabel: string }> = ({ language, code, copyLabel }) => {
   const { isCopied, copyToClipboard } = useCopyToClipboard();
   const onCopy = () => {
     if (!code || isCopied) return;
@@ -78,7 +80,7 @@ const CodeHeader: FC<CodeHeaderProps> = ({ language, code }) => {
       <span className="aui-code-header-language text-muted-foreground font-medium lowercase">
         {language}
       </span>
-      <TooltipIconButton tooltip="Copy" onClick={onCopy}>
+      <TooltipIconButton tooltip={copyLabel} onClick={onCopy}>
         {!isCopied && (
           <CopyIcon className="animate-in zoom-in-75 fade-in duration-150" />
         )}
@@ -271,5 +273,4 @@ const defaultComponents = memoizeMarkdownComponents({
       />
     );
   },
-  CodeHeader,
 });

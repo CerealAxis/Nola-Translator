@@ -3,9 +3,14 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { AppInfo } from 'app-builder-lib/out/appInfo.js'
+import { getWindowsInstallationDirName } from 'app-builder-lib/out/targets/targetUtil.js'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const { build } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+const metadata = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+const { build } = metadata
+const appInfo = new AppInfo({ metadata, config: build }, undefined, build.win)
+const appFilename = getWindowsInstallationDirName(appInfo, !build.nsis.oneClick || build.nsis.perMachine === true)
 const templates = join(root, 'node_modules/app-builder-lib/templates/nsis')
 const include = resolve(root, build.nsis.include)
 
@@ -73,7 +78,7 @@ Name "Nola install path regression"
 OutFile "paths.exe"
 RequestExecutionLevel user
 SilentInstall silent
-!define APP_FILENAME "${nsis(build.productName)}"
+!define APP_FILENAME "${nsis(appFilename)}"
 !define INSTALL_MODE_PER_ALL_USERS
 !define HIDE_RUN_AFTER_FINISH
 !define allowToChangeInstallationDirectory
@@ -90,6 +95,7 @@ SilentInstall silent
 !macroend
 Function .onInit
   FileOpen $R0 "$EXEDIR\\result.tsv" w
+  FileWriteUTF16LE $R0 "data root$\\t\${NOLA_DATA_ROOT}$\\r$\\n"
   ${checks}
   FileClose $R0
   SetErrorLevel 0
@@ -112,10 +118,11 @@ run(compiler, ['/WX', '/INPUTCHARSET', 'UTF8', '/V2', `/X!addincludedir "${templ
 run(join(directory, 'paths.exe'), ['/S'])
 const results = new Map(readFileSync(join(directory, 'result.tsv'), 'utf16le').trim().split(/\r?\n/).map(line => line.split('\t')))
 const failures = []
+assert.equal(results.get('data root'), join(process.env.LOCALAPPDATA, 'Programs', appInfo.productName), 'Installer data root must match the application data root')
 for (const [name, , expected] of cases) {
   for (const label of [name, `${name} repeated`]) {
     if (results.get(label) !== expected) failures.push(`${label}: expected ${expected}, received ${results.get(label)}`)
   }
 }
 assert.equal(failures.length, 0, failures.join('\n'))
-console.log(`NSIS install paths: ${cases.length * 2} checks passed (${directory})`)
+console.log(`NSIS install paths: ${cases.length * 2 + 1} checks passed (${directory})`)

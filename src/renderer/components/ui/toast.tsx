@@ -7,7 +7,7 @@ import { useI18n } from '@/i18n'
 
 export type ToastVariant = 'default' | 'accent' | 'info' | 'success' | 'warning' | 'danger' | 'error' | 'loading'
 export interface ToastAction { children: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'tertiary' | 'outline' | 'danger' }
-export interface ToastData {}
+export interface ToastData { actionVariant?: ToastAction['variant'] }
 export interface ToastOptions { description?: string; actionProps?: ToastAction; timeout?: number; variant?: ToastVariant }
 
 const manager = BaseToast.createToastManager<ToastData>()
@@ -37,6 +37,7 @@ export function createToast(message: string, options: ToastOptions = {}): string
     timeout: options.timeout,
     type: toastType(options.variant),
     actionProps: nativeActionProps(options.actionProps),
+    data: { actionVariant: options.actionProps?.variant },
     priority: options.variant === 'danger' || options.variant === 'error' ? 'high' : 'low',
   })
 }
@@ -48,6 +49,7 @@ export function updateToast(id: string, message: string, options: ToastOptions &
     ...(options.timeout === undefined ? {} : { timeout: options.timeout }),
     type: toastType(options.variant),
     actionProps: nativeActionProps(options.actionProps),
+    data: { actionVariant: options.actionProps?.variant },
     priority: options.variant === 'danger' || options.variant === 'error' ? 'high' : 'low',
   })
   return id
@@ -69,7 +71,7 @@ function ToastViewport() {
               {toast.type === 'error' ? <CircleX className="nola-toast-icon nola-toast-icon-error" aria-hidden="true" /> : null}
               {toast.type === 'loading' ? <LoaderCircle className="nola-toast-icon nola-toast-icon-loading" aria-hidden="true" /> : null}
               <div className="nola-toast-copy"><BaseToast.Title className="nola-toast-title" />{toast.description ? <BaseToast.Description className="nola-toast-description" /> : null}</div>
-              <BaseToast.Action className="nola-toast-action" render={<Button size="sm" variant="outline" />} />
+              <BaseToast.Action className="nola-toast-action" render={<Button size="sm" variant={toast.data?.actionVariant === 'primary' ? 'default' : toast.data?.actionVariant ?? 'outline'} />} />
               <BaseToast.Close render={<Button size="icon" variant="tertiary" className="nola-toast-close" aria-label={t('common.close')}><X aria-hidden="true" /></Button>} />
             </BaseToast.Content>
           </BaseToast.Root>

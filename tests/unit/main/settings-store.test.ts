@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { SettingsStore } from '../../../src/main/settings-store'
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 import { GITHUB_PROXY_AUTO } from '../../../src/shared/github-proxies'
-import { PYPI_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_AUTO } from '../../../src/shared/pypi-mirrors'
+import { PYPI_MIRROR_AUTO, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO } from '../../../src/shared/pypi-mirrors'
 
 describe('设置存储', () => {
   it('persists multiple custom models and keeps the selected connection synchronized', async () => {
@@ -138,12 +138,14 @@ describe('设置存储', () => {
       await store.load()
       await store.update({ network: {
         usePypiMirror: false,
-        pypiMirrorUrl: 'https://mirrors.aliyun.com/pypi/simple/',
+        pypiMirrorUrl: PYPI_MIRROR_OFF,
+        pytorchWheelMirrorUrl: 'https://mirror.sjtu.edu.cn/pytorch-wheels/',
         githubAccelerateUrl: 'https://gh-proxy.org/',
       } })
       const reloaded = await new SettingsStore(path).load()
       expect(reloaded.network.usePypiMirror).toBe(false)
-      expect(reloaded.network.pypiMirrorUrl).toBe('https://mirrors.aliyun.com/pypi/simple/')
+      expect(reloaded.network.pypiMirrorUrl).toBe(PYPI_MIRROR_OFF)
+      expect(reloaded.network.pytorchWheelMirrorUrl).toBe('https://mirror.sjtu.edu.cn/pytorch-wheels/')
       expect(reloaded.network.githubAccelerateUrl).toBe('https://gh-proxy.org/')
     } finally {
       await rm(directory, { recursive: true, force: true })

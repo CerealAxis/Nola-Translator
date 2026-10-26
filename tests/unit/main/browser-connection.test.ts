@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BrowserConnection } from '../../../src/main/browser-connection'
 import { FeatureActivity } from '../../../src/main/feature-activity'
 import { SessionController } from '../../../src/main/session-controller'
@@ -16,6 +16,9 @@ import type { EngineProcess } from '../../../src/main/engine-process'
 import type { EngineCommand } from '../../../src/shared/contracts'
 import { ipcMain } from 'electron'
 import { BrowserIntegrations } from '../../../src/main/browser-integrations'
+import { configureIpcSenderValidation } from '../../../src/main/logged-ipc'
+
+beforeEach(() => { configureIpcSenderValidation(() => undefined) })
 
 vi.mock('electron', () => ({ app: { isPackaged: false, getPath: () => tmpdir(), getAppPath: () => resolve('.') }, dialog: { showSaveDialog: vi.fn() }, ipcMain: { handle: vi.fn(), removeHandler: vi.fn() } }))
 const disposers: Array<() => Promise<void>> = []

@@ -8,7 +8,16 @@ const read = (name: string) => readFileSync(join(here, name), 'utf8')
 
 const light = read('nola-light.css')
 const dark = read('nola-dark.css')
-const all = [light, dark, read('typography.css'), read('motion.css'), read('z-index.css'), read('index.css')]
+const all = [light, dark, read('typography.css'), read('motion.css'), read('z-index.css'), read('index.css'), read('base-ui.css'), read('app.css')]
+
+it('registers every status pill soft color without self references', () => {
+  const css = read('base-ui.css')
+  for (const status of ['accent', 'success', 'warning', 'danger']) {
+    expect(css).toContain(`--color-${status}-soft: var(--${status}-soft)`)
+    expect(css).toContain(`--color-${status}-soft-foreground:`)
+  }
+  expect(css).not.toMatch(/(--[\w-]+):\s*var\(\1\)/)
+})
 
 /** 取出某段 CSS 里声明的自定义属性名（去重）。 */
 function declaredTokens(css: string): string[] {
@@ -75,6 +84,7 @@ describe('设计硬规则由 CSS 自证（§1.8）', () => {
     for (const css of all) {
       expect(css, css.slice(0, 40)).not.toMatch(/#000000/i)
       expect(css, css.slice(0, 40)).not.toMatch(/#ffffff/i)
+      expect(css).not.toMatch(/(?:background(?:-color)?|color)\s*:\s*(?:white|black)\s*[;}]/i)
     }
   })
 

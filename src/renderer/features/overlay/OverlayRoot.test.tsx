@@ -32,6 +32,15 @@ it('uses one main-process close request and disables dragging while confirmation
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 
+it('focuses cancel and dismisses the confirmation with Escape', async () => {
+  const close = vi.fn().mockResolvedValue(undefined)
+  setup(close)
+  await waitFor(() => expect(screen.getByRole('button', { name: '取消' })).toHaveFocus())
+  fireEvent.keyDown(screen.getByRole('button', { name: '取消' }), { key: 'Escape' })
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  expect(close).not.toHaveBeenCalled()
+})
+
 it('keeps a pending confirmation visible and prevents repeated close requests', async () => {
   let finish!: () => void
   const close = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))

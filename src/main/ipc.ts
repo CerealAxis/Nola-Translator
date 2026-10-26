@@ -137,10 +137,10 @@ export function registerEngineIpc(
     IPC_CHANNELS.manageResource,
     async (_event, resourceId: unknown, action: unknown, downloadSource: unknown) => {
       if (typeof resourceId !== 'string' || !['install', 'remove', 'cancel', 'pause', 'resume'].includes(String(action))) {
-        throw new Error('资源操作参数无效')
+        throw new Error('INVALID_ARGUMENT')
       }
       if (downloadSource !== undefined && !['huggingface', 'hf-mirror', 'modelscope'].includes(String(downloadSource))) {
-        throw new Error('模型下载源无效')
+        throw new Error('INVALID_ARGUMENT')
       }
       await ensureReady()
       const response = await engine.request(
@@ -168,17 +168,17 @@ export function registerEngineIpc(
        * scripted call — and keeps its own message so the two are not diagnosed as one.
        */
       if (typeof query !== 'string') {
-        throw new Error('搜索关键词无效')
+        throw new Error('INVALID_ARGUMENT')
       }
       if (query.length > 256) {
-        throw new Error('搜索关键词过长：超过 256 个字符')
+        throw new Error('INVALID_ARGUMENT')
       }
       if (cursor !== undefined && (typeof cursor !== 'string' || cursor.length < 1 || cursor.length > 2048)) {
-        throw new Error('分页游标无效')
+        throw new Error('INVALID_ARGUMENT')
       }
       // 'asr'/'mt' are the renderer's category names; the engine keys on a slot instead, and
       // 'quant' is the same filter expressed as a weight format.
-      if (kind !== 'all' && kind !== 'asr' && kind !== 'mt' && kind !== 'quant') throw new Error('模型类别无效')
+      if (kind !== 'all' && kind !== 'asr' && kind !== 'mt' && kind !== 'quant') throw new Error('INVALID_ARGUMENT')
       const slot = kind === 'asr' ? 'recognition' : kind === 'mt' ? 'translation' : undefined
       await ensureReady()
       const response = await engine.request(
@@ -212,7 +212,7 @@ export function registerEngineIpc(
 
   loggedHandle(IPC_CHANNELS.configureModel, async (_event, resourceId: unknown, configuration: unknown) => {
     if (controller.busy) throw new Error('sessionAlreadyRunning')
-    if (typeof resourceId !== 'string' || resourceId.length > 256) throw new Error('模型 ID 无效')
+    if (typeof resourceId !== 'string' || resourceId.length > 256) throw new Error('INVALID_ARGUMENT')
     const validated = modelConfigurationSchema.parse(configuration)
     await ensureReady()
     const response = await engine.request({ protocolVersion: 1, type: 'configureModel', requestId: `configure-${randomUUID()}`, resourceId, configuration: validated }, 'resourceActionResult')
@@ -221,7 +221,7 @@ export function registerEngineIpc(
 
   loggedHandle(IPC_CHANNELS.inspectHuggingFace, async (_event, repo: unknown) => {
     if (typeof repo !== 'string' || repo.length < 3 || repo.length > 256) {
-      throw new Error('仓库名无效')
+      throw new Error('INVALID_ARGUMENT')
     }
     await ensureReady()
     const response = await engine.request(
@@ -242,13 +242,13 @@ export function registerEngineIpc(
     IPC_CHANNELS.installHuggingFaceModel,
     async (_event, repo: unknown, slot: unknown, downloadSource: unknown) => {
       if (typeof repo !== 'string' || repo.length < 3 || repo.length > 256) {
-        throw new Error('仓库名无效')
+        throw new Error('INVALID_ARGUMENT')
       }
       if (slot !== undefined && slot !== 'recognition' && slot !== 'translation') {
-        throw new Error('模型类别无效')
+        throw new Error('INVALID_ARGUMENT')
       }
       if (downloadSource !== undefined && !['huggingface', 'hf-mirror'].includes(String(downloadSource))) {
-        throw new Error('模型下载源无效')
+        throw new Error('INVALID_ARGUMENT')
       }
       if (slot !== undefined && controller.busy) {
         // An install rewrites files a live session has already loaded, and forcing a
@@ -280,13 +280,13 @@ export function registerEngineIpc(
     return started
   })
   loggedHandle(IPC_CHANNELS.stopSession, async (_event, sessionId: unknown) => {
-    if (typeof sessionId !== 'string') throw new Error('字幕会话 ID 无效')
+    if (typeof sessionId !== 'string') throw new Error('INVALID_ARGUMENT')
     controller.assertOwner(sessionId, 'desktop')
     await controller.stop(sessionId)
     getOverlayWindow()?.hide()
   })
   loggedHandle(IPC_CHANNELS.setSessionPaused, async (_event, sessionId: unknown, paused: unknown) => {
-    if (typeof sessionId !== 'string' || typeof paused !== 'boolean') throw new Error('暂停参数无效')
+    if (typeof sessionId !== 'string' || typeof paused !== 'boolean') throw new Error('INVALID_ARGUMENT')
     controller.assertOwner(sessionId, 'desktop')
     await controller.pause(sessionId, paused)
   })

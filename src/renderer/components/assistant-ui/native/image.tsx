@@ -22,10 +22,24 @@ import {
 } from "lucide-react";
 import type {
   ImageMessagePart,
-  ImageMessagePartComponent,
+  ImageMessagePartProps,
 } from "@assistant-ui/react";
 import { cn } from "@/lib/utils";
 import { hostOf, safeHref } from "../utils/href";
+
+export interface ImageLabels {
+  content: string;
+  zoom: string;
+  zoomed: string;
+  close: string;
+  generating: string;
+  error: string;
+  blocked: string;
+  regenerate: string;
+  download: string;
+  copy: string;
+}
+export interface ImageProps extends ImageMessagePartProps { labels: ImageLabels }
 
 const extensionForMimeType = (mimeType?: string): string => {
   switch (mimeType) {
@@ -214,7 +228,7 @@ function ImagePreview({
   fit = "contain",
   onLoad,
   onError,
-  alt = "Image content",
+  alt,
   src,
   ...props
 }: ImagePreviewProps) {
@@ -302,6 +316,7 @@ function ImagePreview({
 
 export type ImageSourceProps = {
   label?: string | undefined;
+  newTabLabel: string;
   url?: string | undefined;
   iconUrl?: string | undefined;
 } & React.ComponentProps<"div">;
@@ -311,6 +326,7 @@ function ImageSource({
   label,
   url,
   iconUrl,
+  newTabLabel,
   ...props
 }: ImageSourceProps) {
   const href = safeHref(url);
@@ -357,7 +373,7 @@ function ImageSource({
           className="hover:text-foreground truncate"
         >
           {displayLabel}
-          <span className="sr-only"> (opens in a new tab)</span>
+          <span className="sr-only"> {newTabLabel}</span>
         </a>
       ) : (
         <span data-slot="image-source-label" className="truncate">
@@ -392,9 +408,10 @@ function ImageFilename({
 type ImageZoomProps = PropsWithChildren<{
   src: string;
   alt?: string;
+  labels: Pick<ImageLabels, "zoom" | "zoomed" | "close">;
 }>;
 
-function ImageZoom({ src, alt = "Image preview", children }: ImageZoomProps) {
+function ImageZoom({ src, alt, children, labels }: ImageZoomProps) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -464,7 +481,7 @@ function ImageZoom({ src, alt = "Image preview", children }: ImageZoomProps) {
         role="button"
         tabIndex={0}
         className="aui-image-zoom-trigger cursor-zoom-in"
-        aria-label="Click to zoom image"
+        aria-label={labels.zoom}
       >
         {children}
       </div>
@@ -477,7 +494,7 @@ function ImageZoom({ src, alt = "Image preview", children }: ImageZoomProps) {
             aria-modal="true"
             className="aui-image-zoom-overlay fade-in animate-in fixed inset-0 z-overlay flex items-center justify-center bg-black/80 duration-200"
             onClick={handleClose}
-            aria-label="Zoomed image"
+            aria-label={labels.zoomed}
           >
             <img
               data-slot="image-zoom-content"
@@ -492,7 +509,7 @@ function ImageZoom({ src, alt = "Image preview", children }: ImageZoomProps) {
             <button
               ref={closeRef}
               type="button"
-              aria-label="Close zoomed image"
+              aria-label={labels.close}
               onClick={(e) => {
                 e.stopPropagation();
                 handleClose();
@@ -508,7 +525,7 @@ function ImageZoom({ src, alt = "Image preview", children }: ImageZoomProps) {
   );
 }
 
-function ImageGenerating({ className }: { className?: string }) {
+function ImageGenerating({ className, label }: { className?: string; label: string }) {
   return (
     <div
       data-slot="image-generating"
@@ -518,7 +535,7 @@ function ImageGenerating({ className }: { className?: string }) {
       )}
     >
       <Loader2Icon className="text-muted-foreground size-8 animate-spin" />
-      <span className="sr-only">Generating image…</span>
+      <span className="sr-only">{label}</span>
     </div>
   );
 }
@@ -526,7 +543,9 @@ function ImageGenerating({ className }: { className?: string }) {
 function ImageContentFilterError({
   className,
   reason,
+  label,
 }: {
+  label: string;
   className?: string;
   reason?: string;
 }) {
@@ -539,13 +558,14 @@ function ImageContentFilterError({
       )}
     >
       <ShieldAlertIcon className="text-muted-foreground size-8" />
-      <p className="text-sm font-medium">Image could not be generated</p>
+      <p className="text-sm font-medium">{label}</p>
       {reason && <p className="text-muted-foreground text-xs">{reason}</p>}
     </div>
   );
 }
 
 export type ImageActionsProps = {
+  labels: Pick<ImageLabels, "regenerate" | "download" | "copy">;
   part: ImageMessagePart;
   /**
    * Wire to your own generation call to show a regenerate button. The button
@@ -557,8 +577,10 @@ export type ImageActionsProps = {
 
 function RegenerateButton({
   onRegenerate,
+  label,
 }: {
   onRegenerate: () => void | Promise<void>;
+  label: string;
 }) {
   const [isRegenerating, setIsRegenerating] = useState(false);
   return (
@@ -575,7 +597,7 @@ function RegenerateButton({
       }}
       disabled={isRegenerating}
       data-slot="image-regenerate"
-      aria-label="Regenerate image"
+      aria-label={label}
       className="hover:bg-muted inline-flex size-7 items-center justify-center rounded disabled:opacity-50"
     >
       <RefreshCwIcon
@@ -585,7 +607,7 @@ function RegenerateButton({
   );
 }
 
-function ImageActions({ part, onRegenerate, className }: ImageActionsProps) {
+function ImageActions({ part, onRegenerate, className, labels }: ImageActionsProps) {
   return (
     <div
       data-slot="image-actions"
@@ -595,7 +617,7 @@ function ImageActions({ part, onRegenerate, className }: ImageActionsProps) {
         type="button"
         onClick={() => downloadImagePart(part)}
         data-slot="image-download"
-        aria-label="Download image"
+        aria-label={labels.download}
         className="hover:bg-muted inline-flex size-7 items-center justify-center rounded"
       >
         <DownloadIcon className="size-4" />
@@ -606,23 +628,23 @@ function ImageActions({ part, onRegenerate, className }: ImageActionsProps) {
           copyImagePart(part).catch(() => {});
         }}
         data-slot="image-copy"
-        aria-label="Copy image"
+        aria-label={labels.copy}
         className="hover:bg-muted inline-flex size-7 items-center justify-center rounded"
       >
         <CopyIcon className="size-4" />
       </button>
-      {onRegenerate && <RegenerateButton onRegenerate={onRegenerate} />}
+      {onRegenerate && <RegenerateButton label={labels.regenerate} onRegenerate={onRegenerate} />}
     </div>
   );
 }
 
-const ImageImpl: ImageMessagePartComponent = (props) => {
-  const { image, filename, status } = props;
+const ImageImpl = (props: ImageProps) => {
+  const { image, filename, status, labels } = props;
 
   if (status?.type === "running") {
     return (
       <ImageRoot>
-        <ImageGenerating />
+        <ImageGenerating label={labels.generating} />
         <ImageFilename>{filename}</ImageFilename>
       </ImageRoot>
     );
@@ -631,22 +653,22 @@ const ImageImpl: ImageMessagePartComponent = (props) => {
   if (status?.type === "incomplete" && status.reason === "content-filter") {
     return (
       <ImageRoot>
-        <ImageContentFilterError reason="The provider blocked this image." />
+        <ImageContentFilterError label={labels.error} reason={labels.blocked} />
       </ImageRoot>
     );
   }
 
   return (
     <ImageRoot>
-      <ImageZoom src={image} alt={filename || "Image content"}>
-        <ImagePreview src={image} alt={filename || "Image content"} />
+      <ImageZoom labels={labels} src={image} alt={filename || labels.content}>
+        <ImagePreview src={image} alt={filename || labels.content} />
       </ImageZoom>
       <ImageFilename>{filename}</ImageFilename>
     </ImageRoot>
   );
 };
 
-const Image = memo(ImageImpl) as unknown as ImageMessagePartComponent & {
+const Image = memo(ImageImpl) as unknown as React.FC<ImageProps> & {
   Root: typeof ImageRoot;
   Preview: typeof ImagePreview;
   Source: typeof ImageSource;

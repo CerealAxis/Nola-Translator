@@ -6,6 +6,7 @@ import type { NolaBridge } from '@/bridge'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import type { ModelGatewayApi, ModelGatewaySnapshot } from '../../../shared/model-gateway'
 import { ModelGatewayPage } from './ModelGatewayPage'
+import { notifyError } from '@/components/primitives/notify'
 
 vi.mock('@/components/primitives/notify', () => ({ notifyError: vi.fn(), notifySuccess: vi.fn() }))
 const initialSettings = store.stores.settings.getState()
@@ -32,6 +33,16 @@ it('renders real service updates without showing diagnostics or exposing its key
   expect(screen.getByText('2')).toBeInTheDocument()
   expect(screen.getByText('模型加载失败，请检查模型、运行组件与可用内存。')).toBeInTheDocument()
   expect(screen.queryByText('raw database path secret')).not.toBeInTheDocument()
+})
+
+it('leaves settings write failures to the shared settings notice', async () => {
+  vi.mocked(notifyError).mockClear()
+  vi.spyOn(settingsActions, 'updateSettings').mockRejectedValue(new Error('settings write failed'))
+  render(<ModelGatewayPage />)
+  await screen.findByText(/Default translator/)
+  fireEvent.click(screen.getByRole('switch', { name: '语音识别' }))
+  await waitFor(() => expect(screen.getByRole('switch', { name: '语音识别' })).not.toBeDisabled())
+  expect(notifyError).not.toHaveBeenCalled()
 })
 
 it('persists capability switches without a second model selector and resets keys after confirmation', async () => {

@@ -27,6 +27,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbS
 import { useAttachmentSrc } from '@/hooks/use-attachment-src'
 import { ghostButton } from '@/components/assistant-ui/native/surfaces'
 import { useI18n } from '@/i18n'
+import { stores, useStore } from '@/store'
 import { notifyError } from '@/components/primitives/notify'
 import { languageName, LANGUAGE_CODES } from '../../../shared/languages'
 import type { CustomTranslationModel } from '../../../shared/settings'
@@ -52,9 +53,23 @@ export interface NativeAgentSurfaceProps {
 
 const WorkbenchConfigContext = createContext<PlaygroundConfig | null>(null)
 
-/** Only application wiring lives here; every visible control comes from the unmodified Elements catalog. */
+/** Connect runtime state and localized labels to the Elements components. */
 export function NativeAgentSurface(props: NativeAgentSurfaceProps) {
   const { t } = useI18n()
+  const theme = useStore(stores.settings, state => state.settings?.theme)
+  useEffect(() => {
+    if (!theme) return
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const apply = () => {
+      const dark = theme === 'dark' || theme === 'system' && media.matches
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      document.documentElement.classList.toggle('dark', dark)
+      document.documentElement.classList.toggle('light', !dark)
+    }
+    apply()
+    media.addEventListener('change', apply)
+    return () => media.removeEventListener('change', apply)
+  }, [theme])
   const aui = useAui()
   const items = useAuiState(s => s.threads.threadItems)
   const activeId = useAuiState(s => s.threads.mainThreadId)
@@ -146,7 +161,7 @@ function NativeConversation(props: NativeAgentSurfaceProps & { memoryOpen: boole
   const empty = useAuiState(s => s.thread.messages.length === 0)
   const threadId = useAuiState(s => s.threads.mainThreadId)
   return <ThreadPrimitive.Root className="flex min-h-0 flex-1 flex-col" data-testid="native-conversation">
-    <ThreadPrimitive.Viewport data-hide-scrollbar className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6" turnAnchor="top">
+    <ThreadPrimitive.Viewport data-hide-scrollbar className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6" turnAnchor="top" autoScroll>
       {props.memoryOpen ? <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6"><Breadcrumb aria-label={t('workbench.chats')} className="py-5"><BreadcrumbList><BreadcrumbItem><button type="button" className="rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring" onClick={props.onMemoryClose}>{t('workbench.chats')}</button></BreadcrumbItem><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{t('workbench.memory')}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb><div className="flex flex-1 items-start justify-center"><NativeAgentSettings page="memory" snapshot={props.snapshot} onAction={props.onAction} busy={props.busy} model={props.models.find(model => model.id === props.config.model)?.name ?? ''} onPrompt={() => undefined} memories={props.memories} onMemories={props.onMemories} /></div></div> : <div className="mx-auto flex min-h-full w-full max-w-3xl flex-1 flex-col">
         {empty ? <div className="flex flex-1 flex-col items-center justify-center gap-6 py-8"><h1 className="text-2xl font-medium">{t('workbench.welcomeHeading')}</h1><div className="w-full px-6"><NativeComposer key={threadId} {...props} /></div></div> : <>
           <WorkbenchConfigContext.Provider value={props.config}><div className="flex-1 py-8"><ThreadPrimitive.Messages components={{ UserMessage: NativeUserMessage, AssistantMessage: NativeAssistantMessage }} /></div></WorkbenchConfigContext.Provider>
@@ -157,9 +172,14 @@ function NativeConversation(props: NativeAgentSurfaceProps & { memoryOpen: boole
   </ThreadPrimitive.Root>
 }
 
+function NativeMarkdown() {
+  const { t } = useI18n()
+  return <MarkdownText copyLabel={t('workbench.copyResponse')} />
+}
+
 function NativeUserMessage() {
   const hasAttachments = useAuiState(s => !!s.message.attachments?.length)
-  return <div className="mb-8"><NativeDaySeparator /><MessagePrimitive.Root data-role="user" className="group/message flex w-full flex-col items-end gap-2"><div className={['flex min-w-0 max-w-full items-end gap-2', hasAttachments && 'w-full max-w-sm'].filter(Boolean).join(' ')}><div className={['min-w-0 rounded-2xl bg-foreground/[0.04] px-3.5 py-2 text-sm', hasAttachments ? 'w-full' : 'max-w-[85%]'].filter(Boolean).join(' ')}><MessagePrimitive.Attachments components={{ Image: NativeUserAttachment, File: NativeUserAttachment, Document: NativeUserAttachment }} /><MessagePrimitive.Parts components={{ Text: MarkdownText }} /></div><NativeMessageTimestamp /></div></MessagePrimitive.Root></div>
+  return <div className="mb-8"><NativeDaySeparator /><MessagePrimitive.Root data-role="user" className="group/message flex w-full flex-col items-end gap-2"><div className={['flex min-w-0 max-w-full items-end gap-2', hasAttachments && 'w-full max-w-sm'].filter(Boolean).join(' ')}><div className={['min-w-0 rounded-2xl bg-foreground/[0.04] px-3.5 py-2 text-sm', hasAttachments ? 'w-full' : 'max-w-[85%]'].filter(Boolean).join(' ')}><MessagePrimitive.Attachments components={{ Image: NativeUserAttachment, File: NativeUserAttachment, Document: NativeUserAttachment }} /><MessagePrimitive.Parts components={{ Text: NativeMarkdown }} /></div><NativeMessageTimestamp /></div></MessagePrimitive.Root></div>
 }
 
 function NativeDaySeparator() {
@@ -180,6 +200,11 @@ function NativeMessageTimestamp() {
   if (!createdAt) return null
   const time = createdAt.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' })
   return <time dateTime={createdAt.toISOString()} className="shrink-0 text-[11px] tabular-nums text-muted-foreground opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100">{time}</time>
+}
+
+function NativeImage(props: Omit<React.ComponentProps<typeof Image>, 'labels'>) {
+  const { t } = useI18n()
+  return <Image {...props} labels={{ content: t('workbench.imageContent'), zoom: t('workbench.zoomImage'), zoomed: t('workbench.zoomedImage'), close: t('workbench.closeZoom'), generating: t('workbench.generatingImage'), error: t('workbench.imageError'), blocked: t('workbench.imageBlocked'), regenerate: t('workbench.regenerateImage'), download: t('workbench.downloadImage'), copy: t('workbench.copyImage') }} />
 }
 
 function NativeUserAttachment() {
@@ -219,7 +244,7 @@ function NativeMediaStep({ part, running }: NativeMediaStepProps) {
   const result = part.result && typeof part.result === 'object' ? part.result as Record<string, unknown> : undefined
   const query = String(part.args.filename || part.args.model || result?.model || part.args.target || '')
   if (part.isError || (!running && part.result === undefined)) return <div className="text-sm text-muted-foreground"><p>{label} · {t(part.isError ? 'workbench.taskFailed' : 'workbench.cancel')}</p>{part.isError && <p role="alert">{errorDetail(part.result)}</p>}</div>
-  return <ToolCall label={label} activeLabel={label} query={query} request={part.argsText} result={typeof part.result === 'string' ? part.result : JSON.stringify(part.result, null, 2) ?? ''}
+  return <ToolCall labels={{ request: t('workbench.requestLabel'), result: t('workbench.resultLabel') }} label={label} activeLabel={label} query={query} request={part.argsText} result={typeof part.result === 'string' ? part.result : JSON.stringify(part.result, null, 2) ?? ''}
     running={running && part.result === undefined} open={open} onOpenChange={setOpen} />
 }
 
@@ -246,7 +271,7 @@ function NativeMediaWorkflow() {
 
 function NativeReasoning() {
   const streaming = useAuiState(s => s.part.status.type === 'running')
-  return <ReasoningRoot variant="ghost" streaming={streaming}><ReasoningTrigger active={streaming} /><ReasoningContent><ReasoningText><MarkdownText /></ReasoningText></ReasoningContent></ReasoningRoot>
+  return <ReasoningRoot variant="ghost" streaming={streaming}><ReasoningTrigger active={streaming} /><ReasoningContent><ReasoningText><NativeMarkdown /></ReasoningText></ReasoningContent></ReasoningRoot>
 }
 
 function NativeAssistantMessage() {
@@ -280,7 +305,7 @@ function NativeAssistantMessage() {
     <NativeMediaWorkflow />
     {running && !hasContent && <ThinkingIndicator role="status" label={t(audioRequest ? 'workbench.transcribingMedia' : 'workbench.thinkingProcess')} />}
     {!running && !hasContent && !error && <p role="status" className="text-sm text-muted-foreground">{t('workbench.emptyResult')}</p>}
-    <MessagePrimitive.Parts components={{ Text: MarkdownText, Reasoning: NativeReasoning, tools: { Fallback: NativeTool }, File, Image, Source: Sources }} />
+    <MessagePrimitive.Parts components={{ Text: NativeMarkdown, Reasoning: NativeReasoning, tools: { Fallback: NativeTool }, File, Image: NativeImage, Source: Sources }} />
     {!hasWorkflow && <NativeMessageTiming />}
     {error && <ErrorState
       title={errorTitle}
@@ -290,7 +315,7 @@ function NativeAssistantMessage() {
       retrying={running} onRetry={() => aui.message.reload()}
     />}
     <NativeMessageTimestamp />
-    {!running && <div className="relative"><MessageActions copied={copied} reaction={reaction} regenerating={false} onCopy={() => { void navigator.clipboard.writeText(content.filter(part => part.type === 'text').map(part => part.text).join('\n')).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }} onReactionChange={value => { setReaction(value); if (value) aui.message.submitFeedback({ type: value === 'up' ? 'positive' : 'negative' }) }} onRegenerate={() => aui.message.reload()} onMore={() => setMore(value => !value)} />{more && <ComposerMenu open><ComposerMenuItem onClick={() => { aui.message.speak(); setMore(false) }}>{t('workbench.readAloud')}</ComposerMenuItem></ComposerMenu>}</div>}
+    {!running && <div className="relative"><MessageActions labels={{ copied: t('workbench.copiedResponse'), copy: t('workbench.copyResponse'), helpful: t('workbench.helpfulResponse'), unhelpful: t('workbench.unhelpfulResponse'), regenerate: t('workbench.regenerateResponse'), more: t('workbench.moreOptions') }} copied={copied} reaction={reaction} regenerating={false} onCopy={() => { void navigator.clipboard.writeText(content.filter(part => part.type === 'text').map(part => part.text).join('\n')).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }) }} onReactionChange={value => { setReaction(value); if (value) aui.message.submitFeedback({ type: value === 'up' ? 'positive' : 'negative' }) }} onRegenerate={() => aui.message.reload()} onMore={() => setMore(value => !value)} />{more && <ComposerMenu open><ComposerMenuItem onClick={() => { aui.message.speak(); setMore(false) }}>{t('workbench.readAloud')}</ComposerMenuItem></ComposerMenu>}</div>}
   </MessagePrimitive.Root></div>
 }
 
@@ -349,7 +374,7 @@ function NativeTool(props: ToolCallMessagePartProps) {
     const text = typeof record.output === 'string' ? record.output : typeof output === 'string' ? output : ''
     return <TerminalBlock command={String(args.command ?? '')} lines={text.split('\n')} visibleCount={text.split('\n').length} done={!running} exitCode={typeof record.exitCode === 'number' ? record.exitCode : undefined} />
   }
-  return <>{toolName.startsWith('delegate_') && <SubagentList agents={[{ name: t('workbench.subagents'), model: '' }]} completedCount={running ? 0 : 1} progress={[running ? 0 : 100]} showSummary={false} summaryAgent={{ name: '', model: '' }} />}<ToolCall label={toolName} activeLabel={toolName} query={argsText} request={argsText} result={typeof result === 'string' ? result : JSON.stringify(result, null, 2) ?? ''} running={running} open={open} onOpenChange={setOpen} /></>
+  return <>{toolName.startsWith('delegate_') && <SubagentList agents={[{ name: t('workbench.subagents'), model: '' }]} completedCount={running ? 0 : 1} progress={[running ? 0 : 100]} showSummary={false} summaryAgent={{ name: '', model: '' }} />}<ToolCall labels={{ request: t('workbench.requestLabel'), result: t('workbench.resultLabel') }} label={toolName} activeLabel={toolName} query={argsText} request={argsText} result={typeof result === 'string' ? result : JSON.stringify(result, null, 2) ?? ''} running={running} open={open} onOpenChange={setOpen} /></>
 }
 
 function NativeComposer(props: NativeAgentSurfaceProps) {
@@ -473,9 +498,9 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
         {(props.config.kind === 'asr' || props.config.kind === 'mt') && <ComposerModelTrigger data-menu-anchor="language" model={languageName(props.config.kind === 'mt' ? props.config.target : props.config.source, language)} open={menu === 'language'} onClick={() => setMenu(menu === 'language' ? '' : 'language')} />}
         {props.config.kind === 'tts' && <ComposerModelTrigger data-menu-anchor="voice" model={props.config.voice || t('workbench.voice')} open={menu === 'voice'} onClick={chooseVoices} />}
       </ComposerActions><ComposerActions>
-        {props.config.kind === 'llm' && <div><ComposerContext usage={{ system: 0, tools: 0, messages: (usage?.totalTokens ?? 0) / 1000, total: (profile?.contextWindow ?? 0) / 1000 }} /></div>}
+        {props.config.kind === 'llm' && <div><ComposerContext labels={{ context: t('workbench.contextUsage'), system: t('workbench.contextSystem'), tools: t('workbench.contextTools'), messages: t('workbench.contextMessages'), total: t('workbench.contextTotal') }} usage={{ system: 0, tools: 0, messages: (usage?.totalTokens ?? 0) / 1000, total: (profile?.contextWindow ?? 0) / 1000 }} /></div>}
         <ComposerVoiceButton active={!!dictation} aria-label={t(dictation ? 'workbench.stopDictation' : 'workbench.record')} onClick={() => { if (dictation) aui.thread.composer().stopDictation(); else aui.thread.composer().startDictation() }} />
-        <ComposerSend className={running || preparing ? 'aui-composer-cancel' : 'aui-composer-send'} streaming={running || preparing} idle={!preparing && !text.trim() && !attachments.length} disabled={!running && !preparing && (!props.config.model || !text.trim() && !attachments.length)} onClick={send} />
+        <ComposerSend aria-label={t(running || preparing ? 'workbench.stopGenerating' : 'workbench.sendMessage')} className={running || preparing ? 'aui-composer-cancel' : 'aui-composer-send'} streaming={running || preparing} idle={!preparing && !text.trim() && !attachments.length} disabled={!running && !preparing && (!props.config.model || !text.trim() && !attachments.length)} onClick={send} />
       </ComposerActions></ComposerToolbar>
     </ComposerBar>
     <input ref={inputRef} type="file" className="hidden" multiple accept={props.config.kind === 'asr' ? 'audio/*,video/*' : props.config.images || props.config.kind === 'llm' ? 'image/*,audio/*,video/*,text/*,.md,.json' : 'text/*,.md,.json'} onChange={event => { for (const file of event.target.files ?? []) void aui.thread.composer().addAttachment(file).catch(error => notifyError(t('workbench.actionFailed'), { cause: error })); event.target.value = '' }} />

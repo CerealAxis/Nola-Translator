@@ -12,7 +12,14 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-accent-soft: var(--color-accent-soft);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-foreground: var(--accent);
+  --color-success-soft: var(--success-soft);
+  --color-success-soft-foreground: var(--success-soft-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-foreground: var(--warning);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-soft-foreground: var(--danger);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted);
   --color-border: var(--border);
@@ -67,7 +74,7 @@
   --nola-ui-secondary-foreground: var(--surface-secondary-foreground, var(--foreground));
   --nola-ui-muted: var(--surface-secondary);
   --nola-ui-muted-foreground: var(--muted);
-  --nola-ui-accent: var(--color-accent-soft);
+  --nola-ui-accent: var(--accent-soft);
   --nola-ui-accent-foreground: var(--foreground);
   --nola-ui-destructive: var(--danger);
   --nola-ui-border: var(--border);
@@ -97,7 +104,7 @@
   --nola-ui-secondary-foreground: var(--surface-secondary-foreground, var(--foreground));
   --nola-ui-muted: var(--surface-secondary);
   --nola-ui-muted-foreground: var(--muted);
-  --nola-ui-accent: var(--color-accent-soft);
+  --nola-ui-accent: var(--accent-soft);
   --nola-ui-accent-foreground: var(--foreground);
   --nola-ui-destructive: var(--danger);
   --nola-ui-border: var(--border);
@@ -282,7 +289,7 @@
     position: absolute;
     inset-block-start: var(--space-2);
     inset-inline-end: var(--space-2);
-    z-index: 1;
+    z-index: var(--z-sticky);
     border-radius: var(--radius-xl);
   }
 
@@ -308,7 +315,7 @@
     --nola-toast-offset-y: calc(var(--toast-offset-y) * -1 + var(--toast-index) * var(--nola-toast-gap) * -1 + var(--toast-swipe-movement-y));
     position: absolute;
     inset: auto 0 0 auto;
-    z-index: calc(1000 - var(--toast-index));
+    z-index: calc(var(--z-toast) - var(--toast-index));
     transform: translateX(var(--toast-swipe-movement-x)) translateY(calc(var(--toast-swipe-movement-y) - var(--toast-index) * var(--nola-toast-peek) - var(--nola-toast-shrink) * var(--nola-toast-height))) scale(var(--nola-toast-scale));
     transform-origin: bottom;
     height: var(--nola-toast-height);
@@ -480,7 +487,7 @@
   .slider { width: 100%; min-width: 0; }
   .slider__track { position: relative; flex: 1; width: 100%; height: 4px; border-radius: 9999px; background: var(--nola-ui-muted); user-select: none; }
   .slider__fill { height: 100%; border-radius: inherit; background: var(--nola-ui-primary); user-select: none; }
-  .slider__thumb { display: block; width: 12px; height: 12px; flex: none; border: 1px solid var(--nola-ui-ring); border-radius: 9999px; background: white; outline: none; transition: box-shadow 150ms; }
+  .slider__thumb { display: block; width: 12px; height: 12px; flex: none; border: 1px solid var(--nola-ui-ring); border-radius: 9999px; background: var(--surface); outline: none; transition: box-shadow 150ms; }
   .slider__thumb::after { content: ''; position: absolute; inset: -8px; }
   .slider__thumb:hover, .slider__thumb:focus-visible, .slider__thumb:active { box-shadow: 0 0 0 3px color-mix(in oklch, var(--nola-ui-ring) 50%, transparent); }
 

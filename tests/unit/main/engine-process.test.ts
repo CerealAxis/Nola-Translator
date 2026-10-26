@@ -97,47 +97,52 @@ describe('Python 引擎进程', () => {
       args: ['-m', 'nola_translator_engine'],
       cwd: resolve('engine'),
       env: { NOLA_TRANSLATOR_PROTOCOL_ONLY: '1' },
-      startupTimeoutMs: 3_000,
-      restartDelaysMs: [10, 20, 30],
+      // Real Python imports need headroom on cold Windows starts; retries have a separate test.
+      startupTimeoutMs: 10_000,
+      restartDelaysMs: [],
     })
 
-    await engine.start()
-    expect(engine.currentState).toBe('ready')
+    try {
+      await engine.start()
+      expect(engine.currentState).toBe('ready')
 
-    const devices = await engine.request(
-      { protocolVersion: 1, type: 'listDevices', requestId: 'devices-1' },
-      'devices'
-    )
-    expect(Array.isArray(devices.devices)).toBe(true)
+      const devices = await engine.request(
+        { protocolVersion: 1, type: 'listDevices', requestId: 'devices-1' },
+        'devices'
+      )
+      expect(Array.isArray(devices.devices)).toBe(true)
 
-    const started = await engine.request(
-      {
-        protocolVersion: 1,
-        type: 'startSession',
-        requestId: 'start-1',
-        config: {
-          audioSource: { kind: 'defaultOutput' },
-          recognitionMode: 'realtime',
-          sourceLanguage: 'auto',
-          targetLanguages: ['zh-CN'],
+      const started = await engine.request(
+        {
+          protocolVersion: 1,
+          type: 'startSession',
+          requestId: 'start-1',
+          config: {
+            audioSource: { kind: 'defaultOutput' },
+            recognitionMode: 'realtime',
+            sourceLanguage: 'auto',
+            targetLanguages: ['zh-CN'],
+          },
         },
-      },
-      'sessionStarted'
-    )
-    expect(started.sessionId).toBeTruthy()
+        'sessionStarted'
+      )
+      expect(started.sessionId).toBeTruthy()
 
-    await engine.request(
-      {
-        protocolVersion: 1,
-        type: 'stopSession',
-        requestId: 'stop-1',
-        sessionId: started.sessionId,
-      },
-      'sessionStopped'
-    )
-    await engine.stop()
-    expect(engine.currentState).toBe('stopped')
-  })
+      await engine.request(
+        {
+          protocolVersion: 1,
+          type: 'stopSession',
+          requestId: 'stop-1',
+          sessionId: started.sessionId,
+        },
+        'sessionStopped'
+      )
+      await engine.stop()
+      expect(engine.currentState).toBe('stopped')
+    } finally {
+      await engine.stop()
+    }
+  }, 20_000)
 
   it('引擎异常退出后最多按配置退避并恢复握手', async () => {
     const work = await mkdtemp(join(tmpdir(), 'nola-translator-engine-'))

@@ -46,7 +46,7 @@ const RUNTIME_PREFIX_PATTERN = /^RUNTIME_(TORCH|LLAMA|CRISP):/i
  * before the text recognisers below get a chance to read a different meaning into it. The catalog
  * decides whether the identifier is one it claims; an identifier nobody claims falls through.
  */
-const IDENTIFIER_PATTERN = /^[a-z][A-Za-z0-9_]*$/
+const IDENTIFIER_PATTERN = /^[a-z][a-z0-9_]*$/i
 
 /**
  * The remaining recognisers key on identifiers that survive a copy of the failure text. The

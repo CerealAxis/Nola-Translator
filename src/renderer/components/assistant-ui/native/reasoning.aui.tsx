@@ -7,6 +7,7 @@ import {
   type ReasoningMessagePartComponent,
   type ReasoningGroupComponent,
 } from "@assistant-ui/react";
+import { useAssistantText } from "../utils/labels";
 import { MarkdownText } from "@/components/assistant-ui/native/markdown-text";
 import {
   ANIMATION_DURATION,
@@ -62,7 +63,10 @@ const ReasoningRoot = forwardRef<
   );
 });
 
-const ReasoningImpl: ReasoningMessagePartComponent = () => <MarkdownText />;
+const ReasoningImpl: ReasoningMessagePartComponent = () => {
+  const text = useAssistantText();
+  return <MarkdownText copyLabel={text("copyResponse")} />;
+};
 
 const ReasoningGroupImpl: ReasoningGroupComponent = ({
   children,

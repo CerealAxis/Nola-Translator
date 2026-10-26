@@ -468,7 +468,7 @@ export class MeetingStore {
 
   async rename(meetingId: string, title: string): Promise<MeetingMeta | null> {
     const trimmed = title.trim()
-    if (!trimmed) throw new Error('会议名称不能为空')
+    if (!trimmed) throw new Error('MEETING_NAME_EMPTY')
     return this.serialize(meetingId, async () => {
       const meta = this.cache.get(meetingId)
       if (!meta) return null

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { en, ja, ko, zhCN, zhHK, zhTW } from './index'
 import { appNameForLanguage, resolveUiLanguage, translate } from '../i18n'
 import { supportErrorCodeForMessage } from '../../shared/error-catalog'
+import { browserJa, browserKo, browserZhHK, browserZhTW } from './browser-locales'
 
 /*
  * Interface language preferences live in the main-process settings store. The renderer resolves
@@ -30,6 +31,12 @@ const localeFlats = {
   ko: leaves(ko),
   ja: leaves(ja),
 }
+
+it('keeps extension browser copy aligned with the desktop dictionaries', () => {
+  for (const [extension, desktop] of [[browserZhTW, zhTW.browser], [browserZhHK, zhHK.browser], [browserKo, ko.browser], [browserJa, ja.browser]]) {
+    expect(extension).toEqual(desktop)
+  }
+})
 
 describe('语言由主进程设置决定', () => {
   it('核心品牌名按界面语言显示', () => {

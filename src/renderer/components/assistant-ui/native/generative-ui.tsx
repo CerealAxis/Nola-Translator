@@ -6,6 +6,13 @@ import type { GenerativeUILibrary } from "@assistant-ui/generative-ui/react";
 import { defaultGenerativeUILibrary } from "@assistant-ui/generative-ui/react";
 import { GeoMap, type GeoMapPlace } from "./geo-map";
 import { MermaidDiagram } from "./mermaid-diagram";
+import { useI18n } from '@/i18n';
+
+export interface LocalizedDiagramProps { code: unknown }
+function LocalizedDiagram({ code }: LocalizedDiagramProps) {
+  const { t } = useI18n();
+  return <MermaidDiagram code={typeof code === 'string' ? code : ''} labels={{ expand: t('workbench.expandDiagram'), diagram: t('workbench.diagramLabel'), zoomIn: t('workbench.zoomIn'), zoomOut: t('workbench.zoomOut'), reset: t('workbench.resetZoom'), close: t('common.close'), rendering: t('workbench.renderingDiagram'), error: t('workbench.diagramError') }} />;
+}
 
 const markdownBase = defaultGenerativeUILibrary.Markdown!;
 
@@ -46,7 +53,7 @@ export const styledGenerativeUILibrary: GenerativeUILibrary = {
     ...defaultGenerativeUILibrary.Diagram!,
     render: ({ code, title }) => (
       <figure data-aui="diagram">
-        <MermaidDiagram code={typeof code === "string" ? code : ""} />
+        <LocalizedDiagram code={code} />
         {typeof title === "string" || typeof title === "number" ? (
           <figcaption data-aui="diagram-title">{title}</figcaption>
         ) : null}

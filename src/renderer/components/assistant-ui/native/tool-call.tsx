@@ -25,6 +25,7 @@ export interface ToolCallProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   className?: string;
+  labels: { request: string; result: string };
 }
 
 export function ToolCall({
@@ -37,6 +38,7 @@ export function ToolCall({
   open,
   onOpenChange,
   className,
+  labels,
 }: ToolCallProps) {
   return (
     <Collapsible
@@ -76,14 +78,14 @@ export function ToolCall({
       <CollapsibleContent className={cn(collapsePanel, "outline-none")}>
         <div className={cn(field, "mt-2 overflow-hidden rounded-2xl text-xs")}>
           <div className="px-3.5 pt-2.5 pb-2">
-            <p className={cn(mono, "text-muted-foreground mb-1")}>Request</p>
+            <p className={cn(mono, "text-muted-foreground mb-1")}>{labels.request}</p>
             <p className="text-muted-foreground font-mono break-words">
               {request}
             </p>
           </div>
           <div className="bg-foreground/[0.06] mx-3.5 h-px" />
           <div className="px-3.5 pt-2 pb-2.5">
-            <p className={cn(mono, "text-muted-foreground mb-1")}>Result</p>
+            <p className={cn(mono, "text-muted-foreground mb-1")}>{labels.result}</p>
             <p className="text-foreground/90 break-words">{result}</p>
           </div>
         </div>

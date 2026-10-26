@@ -5,7 +5,7 @@ import type { CSSProperties } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
 import { Popover } from '@base-ui/react/popover'
-import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 import { Spinner } from '@/components/ui/spinner'
 import { ArrowRight, ArrowRightLeft, ChevronDown, ExternalLink, Languages, Lock, Mic, Minus, Monitor, MoreHorizontal, Pin, Settings, Square, X } from 'lucide-react'
@@ -177,22 +177,18 @@ export function OverlayPage() {
           </div>
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('shellUi.showContent')}</span>
-            <TabsRoot value={display} onValueChange={next => { if (next) patch({ overlay: { showSource: next !== 'translation', showTranslation: next !== 'source' } }) }}>
-              <TabsList className="nola-segmented" aria-label={t('shellUi.showContent')}>
-                {!translationDisabled && <TabsTrigger value="both">{t('workspace.modeBoth')}</TabsTrigger>}
-                <TabsTrigger value="source">{t('workspace.modeSource')}</TabsTrigger>
-                {!translationDisabled && <TabsTrigger value="translation">{t('workspace.modeTranslation')}</TabsTrigger>}
-              </TabsList>
-            </TabsRoot>
+            <ToggleGroup aria-label={t('shellUi.showContent')} value={[display]} onValueChange={([next]) => { if (next) patch({ overlay: { showSource: next !== 'translation', showTranslation: next !== 'source' } }) }}>
+                {!translationDisabled && <ToggleGroupItem value="both">{t('workspace.modeBoth')}</ToggleGroupItem>}
+                <ToggleGroupItem value="source">{t('workspace.modeSource')}</ToggleGroupItem>
+                {!translationDisabled && <ToggleGroupItem value="translation">{t('workspace.modeTranslation')}</ToggleGroupItem>}
+            </ToggleGroup>
           </div>
           {!translationDisabled && <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('shellUi.layout')}</span>
-            <TabsRoot value={config.layout} onValueChange={next => { if (next === 'rolling' || next === 'sentence') patch({ overlay: { layout: next } }) }}>
-              <TabsList className="nola-segmented" aria-label={t('shellUi.layout')}>
-                <TabsTrigger value="rolling">{t('workspace.layoutSplit')}</TabsTrigger>
-                <TabsTrigger value="sentence">{t('workspace.layoutSentence')}</TabsTrigger>
-              </TabsList>
-            </TabsRoot>
+            <ToggleGroup aria-label={t('shellUi.layout')} value={[config.layout]} onValueChange={([next]) => { if (next === 'rolling' || next === 'sentence') patch({ overlay: { layout: next } }) }}>
+                <ToggleGroupItem value="rolling">{t('workspace.layoutSplit')}</ToggleGroupItem>
+                <ToggleGroupItem value="sentence">{t('workspace.layoutSentence')}</ToggleGroupItem>
+            </ToggleGroup>
           </div>}
         </CardContent>
         <CardFooter className="nola-overlay-footer">

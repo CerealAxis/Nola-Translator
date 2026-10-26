@@ -1,6 +1,5 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { FieldLabel } from '../ui/field'
 
 export interface SettingRowProps {
   label: ReactNode
@@ -20,13 +19,14 @@ export interface SettingRowProps {
 const LABEL_CLASS = 'text-sm font-medium text-foreground'
 const TOOLTIP_CLASS = 'z-popup max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'
 export function SettingRow({ label, desc, children, className = '', descriptionTooltip = false }: SettingRowProps) {
+  const labelId = useId()
   return (
-    <div className={`nola-setting-row ${className}`}>
+    <div role="group" aria-labelledby={labelId} className={['nola-setting-row', className].filter(Boolean).join(' ')}>
       <div className="min-w-0">
         {desc && descriptionTooltip ? <Tooltip>
-          <TooltipTrigger delay={300} render={<FieldLabel className={LABEL_CLASS} tabIndex={0}>{label}</FieldLabel>} />
+          <TooltipTrigger delay={300} render={<span id={labelId} className={LABEL_CLASS} tabIndex={0}>{label}</span>} />
           <TooltipContent sideOffset={3} className={TOOLTIP_CLASS}>{desc}</TooltipContent>
-        </Tooltip> : <FieldLabel className={LABEL_CLASS}>{label}</FieldLabel>}
+        </Tooltip> : <span id={labelId} className={LABEL_CLASS}>{label}</span>}
         {desc && !descriptionTooltip ? <p className="mt-1 text-xs text-muted">{desc}</p> : null}
       </div>
       <div className="nola-setting-control">{children}</div>

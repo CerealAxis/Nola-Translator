@@ -1,9 +1,31 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import type { BrowserWindowConstructorOptions } from 'electron'
 
 import type { AppSettings } from '../shared/settings'
+
+/** Match renderer documents, never the shared null origin of arbitrary file URLs. */
+export function isTrustedRendererUrl(raw: string, mainDirectory: string, rendererUrl = process.env.ELECTRON_RENDERER_URL): boolean {
+  try {
+    const url = new URL(raw)
+    if (rendererUrl) {
+      const base = new URL(rendererUrl)
+      if (url.origin === base.origin && url.pathname === base.pathname) return true
+    }
+    return ['index.html', 'workbench.html', 'onboarding-card.html'].some(entry => {
+      const expected = rendererUrl ? new URL(entry, rendererUrl) : pathToFileURL(join(mainDirectory, '../renderer', entry))
+      return url.origin === expected.origin && url.protocol === expected.protocol && url.host === expected.host && url.pathname === expected.pathname
+    })
+  } catch { return false }
+}
+
+/** Copy controls need sanitized writes; clipboard reads and non-audio capture stay denied. */
+export function isAllowedRendererPermission(permission: string, trustedMainFrame: boolean, mediaTypes: readonly string[] = []): boolean {
+  return trustedMainFrame && (permission === 'clipboard-sanitized-write'
+    || permission === 'media' && mediaTypes.length > 0 && mediaTypes.every(type => type === 'audio'))
+}
 
 /** Matches the light/dark surfaces the renderer paints, so the window never shows a bare white frame before the page draws. */
 const SURFACE = { light: '#F2F7FF', dark: '#101A2D' } as const

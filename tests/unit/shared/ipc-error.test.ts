@@ -3,6 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { normalizeThrownError, stripIpcErrorMessage } from '../../../src/shared/ipc-error'
 
 describe('normalizeThrownError', () => {
+  it.each([
+    ['INVALID_ARGUMENT', 'ARG-001'], ['MEETING_NAME_EMPTY', 'ARG-002'],
+    ['MEETING_NOT_FOUND', 'ARG-003'], ['INVALID_CREDENTIAL', 'ARG-004'],
+  ])('preserves validation cause %s across IPC', (code, supportCode) => {
+    expect(normalizeThrownError(new Error(code))).toMatchObject({ code, supportCode, retryable: false })
+  })
   it('preserves distinct runtime failures and support codes', () => {
     expect(normalizeThrownError(new Error('RUNTIME_TORCH: 尚未安装 PyTorch'))).toMatchObject({
       code: 'RUNTIME_TORCH', supportCode: 'RNT-001',

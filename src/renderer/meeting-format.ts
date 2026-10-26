@@ -1,16 +1,7 @@
-/**
- * Meeting time, duration and auto-generated title.
- *
- * The auto title is computed at render time and never persisted — which is why
- * `MeetingMeta` stores `title` and `titleIsCustom` separately: changing the UI
- * language renames every record without touching a file.
- *
- * `daySequence` matters most: recording several meetings in one day would make
- * them all share a date-only name, so the Nth one carries a `_记录_N` suffix.
- */
+/** Meeting lifecycle, session-title previews, and display formatting. */
 
 import type { MeetingMeta } from '@/bridge'
-import type { TranslationKey, UiLanguage } from '@/i18n'
+import { translate, type TranslationKey, type UiLanguage } from '@/i18n'
 
 function pad(value: number): string {
   return value.toString().padStart(2, '0')
@@ -43,19 +34,22 @@ export function isLive(meta: MeetingMeta): boolean {
 /**
  * Pure formatter for the auto title.
  *
- * Shared by `meetingTitleFor` (the record list) and the preview in the session
- * dialog's name field. A second copy would let the preview disagree with the
- * list about the name of the same meeting.
+ * The session dialog previews this title. `meetingTitleFor` also exposes the
+ * formatter; the record list uses its separate persisted-title fallback.
  */
 export function autoMeetingTitle(startedAtMs: number, daySequence: number, language: UiLanguage): string {
   const at = new Date(startedAtMs)
+  const label = translate('workbench.defaultMeetingLabel', language)
   if (language === 'en') {
     const date = at.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
     return daySequence > 0
-      ? date.replace(/\//g, '-') + ' meeting ' + daySequence
-      : date.replace(/\//g, '-') + ' meeting'
+      ? date.replace(/\//g, '-') + ' ' + label + ' ' + daySequence
+      : date.replace(/\//g, '-') + ' ' + label
   }
-  const base = at.getFullYear() + '年' + pad(at.getMonth() + 1) + '月' + pad(at.getDate()) + '日_记录'
+  const date = language === 'ko'
+    ? at.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+    : at.getFullYear() + '年' + pad(at.getMonth() + 1) + '月' + pad(at.getDate()) + '日'
+  const base = date + '_' + label
   return daySequence > 0 ? base + '_' + daySequence : base
 }
 

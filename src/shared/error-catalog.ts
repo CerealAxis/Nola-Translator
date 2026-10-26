@@ -27,6 +27,10 @@ interface SupportErrorEntry {
 }
 
 export const SUPPORT_ERROR_CATALOG = {
+  'ARG-001': { messageKey: 'errors.invalidArgument', retryable: false, causes: ['INVALID_ARGUMENT'] },
+  'ARG-002': { messageKey: 'errors.meetingNameEmpty', retryable: false, causes: ['MEETING_NAME_EMPTY'] },
+  'ARG-003': { messageKey: 'errors.meetingNotFound', retryable: false, causes: ['MEETING_NOT_FOUND'] },
+  'ARG-004': { messageKey: 'errors.invalidCredential', retryable: false, causes: ['INVALID_CREDENTIAL'] },
   'ASR-001': { messageKey: 'errors.cloudRecognitionCredentialMissing', retryable: false, causes: ['CLOUDRECOGNITIONCREDENTIALMISSING'] },
   // MiniMax separates a spent account from a rejected key, and the two need different user action.
   // https://platform.minimax.io/docs/api-reference/speech-to-text → 402 / 429.

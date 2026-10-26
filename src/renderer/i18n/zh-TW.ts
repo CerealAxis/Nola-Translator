@@ -1080,6 +1080,11 @@ export const zhTW: Dictionary = {
     "ok": "正常"
   },
   "errors": {
+    "invalidArgument": "操作參數無效，請檢查輸入。",
+    "meetingNameEmpty": "會議名稱不能為空。",
+    "meetingNotFound": "會議記錄不存在，請重新整理清單。",
+    "invalidCredential": "憑證內容或類型無效，請重新輸入。",
+
     "errorCodeLabel": "錯誤碼 {code}",
     "cloudRecognitionCredentialMissing": "請在設定 → 音訊與辨識中儲存雲端辨識服務的 API Key，再啟動字幕。",
     "configureCloudRecognitionAction": "請設定雲端辨識",

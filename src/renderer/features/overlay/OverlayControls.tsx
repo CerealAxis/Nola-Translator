@@ -1,3 +1,4 @@
+import { recognitionFieldsOf } from '../../../shared/cloud-config'
 import { useModelOptions } from '@/model-options'
 import { featureConflictOwner } from '../../../shared/feature-activity'
 /**
@@ -505,4 +506,3 @@ function LanguagePill({
     </OverlayDropdown>
   )
 }
-import { recognitionFieldsOf } from '../../../shared/cloud-config'

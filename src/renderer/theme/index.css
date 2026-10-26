@@ -32,7 +32,7 @@
     --font-mono: "Cascadia Mono", "SF Mono", Consolas, var(--font-cjk-fallback), ui-monospace, monospace;
 
     /* --- Typography scale ----------------------------------------------------
-       Per DESIGN.md §8.2. 8 steps, display to label.
+       Per DESIGN.MD typography. 8 steps, display to label.
        CSS shorthand: font-weight size/line-height family */
     --font-display: 600 48px/1.2 var(--font-ui);
     --font-h1: 600 32px/1.25 var(--font-ui);
@@ -44,7 +44,7 @@
     --font-label: 500 12px/1.4 var(--font-ui);
 
     /* --- Spacing scale -------------------------------------------------------
-       Per DESIGN.md §8.3. 8 steps on an 8px base. */
+       Per DESIGN.MD spacing and geometry. 8 steps on an 8px base. */
     --space-1: 8px;
     --space-2: 16px;
     --space-3: 24px;
@@ -56,7 +56,7 @@
     --space-8: 80px;
 
     /* --- Radius scale --------------------------------------------------------
-       Per DESIGN.md §8.3. */
+       Per DESIGN.MD spacing and geometry. */
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
@@ -71,10 +71,12 @@
     --shadow-surface: var(--surface-shadow);
     --accent-soft: color-mix(in oklab, var(--accent) 15%, transparent);
     --success-soft: color-mix(in oklab, var(--success) 15%, transparent);
+    --warning-soft: color-mix(in oklab, var(--warning) 15%, transparent);
+    --danger-soft: color-mix(in oklab, var(--danger) 15%, transparent);
     --success-soft-foreground: color-mix(in oklab, var(--success) 80%, var(--foreground) 60%);
 
     /* --- Shadow scale --------------------------------------------------------
-       Per DESIGN.md §8.3. Light mode is based on slate-900 (15, 23, 42). */
+       Per DESIGN.MD spacing and geometry. Light mode is based on slate-900 (15, 23, 42). */
     --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.1), 0 2px 4px -1px rgba(15, 23, 42, 0.06);
     --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -2px rgba(15, 23, 42, 0.05);
@@ -91,10 +93,10 @@
     --nola-space-7: var(--space-7);
     --nola-space-8: var(--space-8);
 
-    /* Legacy radius names. Nothing in the renderer reads them. */
+    /* Legacy radius aliases used by product surfaces. */
     --nola-r-sm: var(--radius-sm);
     --nola-r-md: var(--radius-md);
-    --nola-r-lg: var(--radius-lg);
+    --nola-r-lg: var(--radius-xl);
     --nola-r-pill: var(--radius-full);
   }
 
@@ -103,6 +105,8 @@
   [data-theme='dark'] {
     --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
     --success-soft: color-mix(in oklab, var(--success) 12%, transparent);
+    --warning-soft: color-mix(in oklab, var(--warning) 12%, transparent);
+    --danger-soft: color-mix(in oklab, var(--danger) 12%, transparent);
     --success-soft-foreground: color-mix(in oklab, var(--success) 80%, var(--foreground) 30%);
     --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.025);
     --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -1px rgba(15, 23, 42, 0.03);

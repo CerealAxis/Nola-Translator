@@ -54,12 +54,12 @@ export function ModelGatewayPage() {
   const targetLanguages = [...new Set([config.targetLanguage, ...translationLanguages(translationModel, 'auto').filter(code => code !== 'none')])]
   const running = snapshot.state === 'running' || snapshot.state === 'starting'
   const changing = busy || snapshot.state === 'starting' || snapshot.state === 'stopping'
-  const perform = async (action: () => Promise<unknown>, runtimeOperation = false) => {
+  const perform = async (action: () => Promise<unknown>, operation: 'action' | 'runtime' | 'settings' = 'action') => {
     setBusy(true)
     try { await action() } catch (error) {
       console.error('[gateway.action]', error)
-      const current = runtimeOperation ? await api.snapshot().catch(() => null) : null
-      if (!current || current.state !== 'failed' && !Object.values(current.services).some(service => service.state === 'failed')) notifyError(t('gateway.actionFailed'))
+      const current = operation === 'runtime' ? await api.snapshot().catch(() => null) : null
+      if (operation !== 'settings' && (!current || (current.state !== 'failed' && !Object.values(current.services).some(service => service.state === 'failed')))) notifyError(t('gateway.actionFailed'))
     }
     finally { setBusy(false) }
   }
@@ -103,7 +103,7 @@ socket.on('open', async () => {
     <header className="model-gateway-heading"><div><h1>{t('gateway.title')}</h1><p>{t('gateway.subtitle')}</p></div><Button disabled={changing || (!running && !CAPABILITIES.some(kind => config[kind]))} onClick={() => void perform(async () => {
       const result = running ? await api.stop() : await requestFeatureStart(() => api.start(), 'model-gateway')
       if (result) setSnapshot(result)
-    }, true)}>{t(running ? 'gateway.stop' : 'gateway.start')}</Button></header>
+    }, 'runtime')}>{t(running ? 'gateway.stop' : 'gateway.start')}</Button></header>
     <Card data-onboarding="gateway-service"><CardHeader><CardTitle>{t('gateway.service')}</CardTitle><CardDescription><Badge variant={snapshot.state === 'running' ? 'success' : snapshot.state === 'failed' ? 'danger' : 'secondary'}>{t(`gateway.${snapshot.state}`)}</Badge></CardDescription></CardHeader>
       <CardContent><FieldGroup>
         <Field><FieldLabel htmlFor="gateway-address">{t('gateway.address')}</FieldLabel><div className="model-gateway-control"><Input id="gateway-address" readOnly value={address} /><Button variant="secondary" aria-label={t('gateway.copy')} onClick={() => void copy(address)}><Copy aria-hidden="true" data-icon="inline-start" />{t('gateway.copy')}</Button></div></Field>
@@ -114,7 +114,7 @@ socket.on('open', async () => {
         <div className="model-gateway-metrics"><p>{t('gateway.connections')}: <strong>{snapshot.connections}</strong></p><p>{t('gateway.activeRequests')}: <strong>{snapshot.activeRequests}</strong></p></div>
       </FieldGroup></CardContent></Card>
     <Card data-onboarding="gateway-capabilities"><CardHeader><CardTitle>{t('gateway.capabilities')}</CardTitle><CardDescription>{t('gateway.modelIdHint')}</CardDescription><CardDescription>{t('gateway.defaultsHint')}</CardDescription></CardHeader><CardContent><FieldGroup>
-      {CAPABILITIES.map(kind => <Field key={kind} className="model-gateway-capability-row"><div className="model-gateway-capability"><div className="model-gateway-capability-title"><FieldLabel htmlFor={`gateway-${kind}`}>{t(`gateway.${kind}`)}</FieldLabel>{config[kind] ? <Badge variant={snapshot.services[kind].state === 'ready' ? 'success' : snapshot.services[kind].state === 'failed' ? 'danger' : 'secondary'}>{t(`gateway.${snapshot.services[kind].state}`)}</Badge> : null}</div><Switch id={`gateway-${kind}`} disabled={busy} checked={config[kind]} onCheckedChange={checked => { void perform(() => updateSettings({ modelGateway: { [kind]: checked } })) }}><SwitchThumb /></Switch></div>
+      {CAPABILITIES.map(kind => <Field key={kind} className="model-gateway-capability-row"><div className="model-gateway-capability"><div className="model-gateway-capability-title"><FieldLabel htmlFor={`gateway-${kind}`}>{t(`gateway.${kind}`)}</FieldLabel>{config[kind] ? <Badge variant={snapshot.services[kind].state === 'ready' ? 'success' : snapshot.services[kind].state === 'failed' ? 'danger' : 'secondary'}>{t(`gateway.${snapshot.services[kind].state}`)}</Badge> : null}</div><Switch id={`gateway-${kind}`} disabled={busy} checked={config[kind]} onCheckedChange={checked => { void perform(() => updateSettings({ modelGateway: { [kind]: checked } }), 'settings') }}><SwitchThumb /></Switch></div>
         <dl className="model-gateway-model-mapping">
           <div><dt>{t('gateway.modelId')}</dt><dd className="model-gateway-model-id"><code>{`nola-${kind}`}</code><Button variant="tertiary" size="icon-sm" aria-label={t('gateway.copyModelId', { model: `nola-${kind}` })} title={t('gateway.copyModelId', { model: `nola-${kind}` })} onClick={() => void copy(`nola-${kind}`)}><Copy aria-hidden="true" /></Button></dd></div>
           <div><dt>{t('gateway.localModel')}</dt><dd className="model-gateway-local-model">{serviceName(kind)}</dd></div>
@@ -122,9 +122,9 @@ socket.on('open', async () => {
         {config[kind] && snapshot.services[kind].state === 'failed' ? <Alert variant="danger"><AlertDescription>{t('gateway.serviceFailed')}</AlertDescription></Alert> : null}
       </Field>)}
       <Button variant="secondary" onClick={() => navigate('#/models')}>{t('gateway.models')}</Button>
-      <Field><FieldLabel htmlFor="gateway-host">{t('gateway.network')}</FieldLabel><Select value={config.host} onValueChange={host => { if (host === '127.0.0.1' || host === '0.0.0.0') void perform(() => updateSettings({ modelGateway: { host } })) }}><SelectTrigger id="gateway-host"><SelectValue>{t(config.host === '127.0.0.1' ? 'gateway.loopback' : 'gateway.lan')}</SelectValue></SelectTrigger><SelectContent><SelectGroup><SelectItem value="127.0.0.1">{t('gateway.loopback')}</SelectItem><SelectItem value="0.0.0.0">{t('gateway.lan')}</SelectItem></SelectGroup></SelectContent></Select>{config.host === '0.0.0.0' ? <FieldDescription>{t('gateway.lanHint')}</FieldDescription> : null}</Field>
-      <Field><FieldLabel htmlFor="gateway-port">{t('gateway.port')}</FieldLabel><Input key={config.port} id="gateway-port" type="number" min={1024} max={65535} defaultValue={config.port} onBlur={event => { const port = Number(event.currentTarget.value); if (Number.isInteger(port) && port >= 1024 && port <= 65535 && port !== config.port) void perform(() => updateSettings({ modelGateway: { port } })); else event.currentTarget.value = String(config.port) }} /></Field>
-      <Field><FieldLabel htmlFor="gateway-target">{t('gateway.targetLanguage')}</FieldLabel><Select value={config.targetLanguage} onValueChange={targetLanguage => { if (targetLanguage) void perform(() => updateSettings({ modelGateway: { targetLanguage } })) }}><SelectTrigger id="gateway-target"><SelectValue>{languageName(config.targetLanguage, language)}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{targetLanguages.map(code => <SelectItem key={code} value={code}>{languageName(code, language)}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
+      <Field><FieldLabel htmlFor="gateway-host">{t('gateway.network')}</FieldLabel><Select value={config.host} onValueChange={host => { if (host === '127.0.0.1' || host === '0.0.0.0') void perform(() => updateSettings({ modelGateway: { host } }), 'settings') }}><SelectTrigger id="gateway-host"><SelectValue>{t(config.host === '127.0.0.1' ? 'gateway.loopback' : 'gateway.lan')}</SelectValue></SelectTrigger><SelectContent><SelectGroup><SelectItem value="127.0.0.1">{t('gateway.loopback')}</SelectItem><SelectItem value="0.0.0.0">{t('gateway.lan')}</SelectItem></SelectGroup></SelectContent></Select>{config.host === '0.0.0.0' ? <FieldDescription>{t('gateway.lanHint')}</FieldDescription> : null}</Field>
+      <Field><FieldLabel htmlFor="gateway-port">{t('gateway.port')}</FieldLabel><Input key={config.port} id="gateway-port" type="number" min={1024} max={65535} defaultValue={config.port} onBlur={event => { const port = Number(event.currentTarget.value); if (Number.isInteger(port) && port >= 1024 && port <= 65535 && port !== config.port) void perform(() => updateSettings({ modelGateway: { port } }), 'settings'); else event.currentTarget.value = String(config.port) }} /></Field>
+      <Field><FieldLabel htmlFor="gateway-target">{t('gateway.targetLanguage')}</FieldLabel><Select value={config.targetLanguage} onValueChange={targetLanguage => { if (targetLanguage) void perform(() => updateSettings({ modelGateway: { targetLanguage } }), 'settings') }}><SelectTrigger id="gateway-target"><SelectValue>{languageName(config.targetLanguage, language)}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{targetLanguages.map(code => <SelectItem key={code} value={code}>{languageName(code, language)}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
       <FieldDescription>{t('gateway.configHint')}</FieldDescription>
     </FieldGroup></CardContent></Card>
     <Card>

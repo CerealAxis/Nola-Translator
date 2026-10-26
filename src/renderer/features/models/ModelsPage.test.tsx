@@ -28,7 +28,7 @@ afterEach(() => { cleanup(); stores.models.setState(initialModels); stores.setti
 
 const section = (name: string) => within(screen.getByRole('heading', { name }).closest('section')!)
 
-it('shows a synthesis default and uses only voices discovered for that model', async () => {
+it('shows the synthesis default and initializes its voice from discovered metadata', async () => {
   const modelId = 'tts-qwen3-tts-crisp-0.6b-base-q8-0'
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, synthesis: { modelId, voice: '' } } })
   stores.models.setState({ resources: [{ resourceId: modelId, kind: 'ttsModel', provider: 'crisp-tts', name: 'Installed synthesis', description: '', languages: [], installed: true, installedBytes: 1, state: 'idle', cancellable: false }] })
@@ -38,9 +38,9 @@ it('shows a synthesis default and uses only voices discovered for that model', a
     onChanged: () => () => undefined,
   } } as unknown as NolaBridge)
   render(<ModelsPage />)
-  expect(screen.getByText('默认语音合成模型')).toBeInTheDocument()
-  await waitFor(() => expect(update).toHaveBeenCalledWith({ synthesis: { voice: 'Discovered voice' } }))
-  expect(screen.getByRole('combobox', { name: '默认声音' })).toHaveTextContent('Discovered voice')
+  const summary = screen.getByText('默认语音合成模型').closest('[data-slot="card"]')!
+  expect(within(summary as HTMLElement).getByText('Installed synthesis')).toBeInTheDocument()
+  await waitFor(() => expect(update).toHaveBeenCalledExactlyOnceWith({ synthesis: { voice: 'Discovered voice' } }))
 })
 
 it('groups remote and local cards by capability with icons inside their headers', () => {
@@ -189,6 +189,7 @@ it('offers a saved custom model as the default translation model once its key is
   expect(within(card).getByRole('button', { name: '设置为默认翻译模型' })).toBeEnabled()
 })
 
+// Rendering the complete source and target language inventories needs integration-test headroom in JSDOM.
 it('saves a new independent custom model with every translation language selected by default', async () => {
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
   const saveKey = vi.spyOn(actions.models, 'setTranslationCredential').mockResolvedValue()
@@ -203,7 +204,7 @@ it('saves a new independent custom model with every translation language selecte
   await waitFor(() => expect(update).toHaveBeenCalledWith(expect.objectContaining({ translation: expect.objectContaining({ customModels: expect.arrayContaining([customModel, expect.objectContaining({ name: 'Second model', model: 'second-model', languages: LANGUAGE_CODES, sourceLanguages: SOURCE_LANGUAGE_OPTIONS })]) }) })))
   expect(saveKey).toHaveBeenCalledWith(expect.stringMatching(/^cloud-model:/), 'second-secret')
   expect(JSON.stringify(update.mock.calls)).not.toContain('second-secret')
-})
+}, 20_000)
 
 it('shows locked source and target language support for built-in cloud translation providers', () => {
   render(<CloudModelDialog id="index-translate" onClose={() => undefined} />)
@@ -222,6 +223,7 @@ it('deletes only the chosen custom model and its key and falls back when it was 
   expect(deleteKey).toHaveBeenCalledExactlyOnceWith('cloud-model:custom-first', '')
 })
 
+// Rendering the complete source and target language inventories needs integration-test headroom in JSDOM.
 it('uses the selected custom model language inventory and blocks an empty selection', () => {
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'cloud', customModelId: customModel.id, customModels: [customModel], cloudLanguages: ['zh', 'en'] } } })
   const options = renderHook(() => useModelOptions())
@@ -231,4 +233,4 @@ it('uses the selected custom model language inventory and blocks an empty select
   expect(screen.getByRole('button', { name: '保存配置' })).toBeDisabled()
   fireEvent.click(screen.getByRole('button', { name: '全选语言' }))
   expect(screen.getByRole('button', { name: '保存配置' })).toBeEnabled()
-})
+}, 20_000)

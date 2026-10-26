@@ -61,8 +61,8 @@ def read_message(stream: BinaryIO) -> bytes:
     if size < 2 or size > MAX_MESSAGE_BYTES:
         raise ValueError("Invalid native message size")
     payload = read_exact(stream, size)
-    json.loads(payload)
-    return payload
+    # The desktop pipe uses newline framing, unlike the browser's length framing.
+    return json.dumps(json.loads(payload), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
 def write_message(stream: BinaryIO, payload: bytes) -> None:

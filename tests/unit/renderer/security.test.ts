@@ -4,6 +4,16 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('renderer content security policy', () => {
+  it.each(['workbench.html', 'onboarding-card.html'])('protects the %s entry document', entry => {
+    const content = readFileSync(resolve(process.cwd(), 'src/renderer', entry), 'utf8')
+    expect(content).toContain('http-equiv="Content-Security-Policy"')
+    expect(content).toContain("script-src 'self'")
+    expect(content).toContain("object-src 'none'")
+    expect(content).toContain("base-uri 'none'")
+    expect(content).toContain("form-action 'none'")
+    expect(content).toContain('ws://localhost:*')
+    expect(content).not.toContain("'unsafe-eval'")
+  })
   const html = readFileSync(resolve(process.cwd(), 'src/renderer/index.html'), 'utf8')
 
   it('blocks remote scripts and unsafe evaluation', () => {

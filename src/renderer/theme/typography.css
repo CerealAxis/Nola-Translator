@@ -17,8 +17,8 @@
   /* --- Type scale ----------------------------------------------------------
      Every entry is a complete `font` shorthand, family included, so it applies
      without the shorthand resetting the family to the browser default. */
-  --nola-text-display: 600 32px/1.25 var(--font-ui); /* page title */
-  --nola-text-title: 600 15px/1.4 var(--font-ui); /* section / dialog title */
+  --nola-text-display: 700 32px/1.25 var(--font-ui); /* page title */
+  --nola-text-title: 650 20px/1.4 var(--font-ui); /* section / dialog title */
   --nola-text-subtitle: 600 14px/1.45 var(--font-ui); /* card title, table head */
   --nola-text-body: 400 14px/1.65 var(--font-ui); /* body copy */
   --nola-text-body-strong: 600 14px/1.45 var(--font-ui); /* emphasis, control label */

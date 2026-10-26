@@ -131,6 +131,7 @@ describe('local gateway', () => {
     expect(test.gateway.snapshot().services.asr.state).toBe('ready')
   })
 
+  // Real worker startup and Windows process-tree cleanup need more than the default 5s budget.
   it('cancels one client without killing its persistent worker or another request', async () => {
     const script = `// nola_translator_engine.gateway_worker\nconst r=require('readline').createInterface({input:process.stdin});r.on('line',line=>{const v=JSON.parse(line);setTimeout(()=>process.stdout.write(JSON.stringify({id:v.id,result:{text:v.text||'ready'}})+'\\n'),v.op==='init'?0:80)})`
     const worker = createGatewayWorker({ command: process.execPath, args: ['-e', script], cwd: process.cwd() }, {}, vi.fn())
@@ -144,7 +145,7 @@ describe('local gateway', () => {
       expect(await second).toEqual({ text: 'survives' })
       expect(await worker.request({ op: 'infer', text: 'still loaded' })).toEqual({ text: 'still loaded' })
     } finally { await worker.close() }
-  })
+  }, 20_000)
 
   it('understands common translation prompts and explicit language overrides', () => {
     expect(translationRequest({ messages: [{ role: 'system', content: 'Translate the following text into Japanese.' }, { role: 'user', content: 'Hello' }] }, 'zh')).toMatchObject({ text: 'Hello', target: 'ja' })
