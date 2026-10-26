@@ -18,6 +18,8 @@ const jaMessages: Record<DictionaryKey, string> = {
   ...onboardingEntries(onboardingJa),
   'workspaceUi.windowFailed': '同時通訳ウィンドウを開けませんでした。もう一度お試しください。',
   'startup.failedTitle': '起動が完了しませんでした',
+  'startup.migratingData': '旧バージョンのデータを移行中',
+  'startup.migrationPreview': 'データを移動・削除せずにプレビューします。外側をクリックするか Esc キーで閉じます。',
   'startup.timedOut': 'ローカルエンジンの応答を45秒待ちました。起動が停止している可能性があります。',
   'startup.engineFailed': 'ローカルエンジンの起動に失敗しました。',
   'startup.settingsHint': 'アプリを開いて実行コンポーネントと設定を確認するか、ログフォルダーを開いてください。',

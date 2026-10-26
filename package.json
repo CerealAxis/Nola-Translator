@@ -121,6 +121,10 @@
     ],
     "extraResources": [
       {
+        "from": "build/tray.png",
+        "to": "tray.png"
+      },
+      {
         "from": "release/Nola-Firefox-Extension.zip",
         "to": "browser/Nola-Firefox-Extension.zip"
       },

@@ -380,6 +380,7 @@ export async function migrateDataRoot(
   extraSources: readonly string[] = [],
   removeSource = true,
   cleanupOnly = false,
+  onProgress?: (percent: number) => void,
 ): Promise<DataRootMigrationReport> {
   if (unsafeRootOverlap(from, to)) return refusedReport(from, to)
   if (cleanupOnly) {
@@ -394,16 +395,26 @@ export async function migrateDataRoot(
     }
   }
   const { report, plans } = await survey(from, to, extraSources)
+  const totalBytes = [...plans.values()].reduce((total, plan) => total + plan.bytes, 0)
+  let copiedBytes = 0
+  let removedEntries = 0
+  onProgress?.(cleanupOnly ? 90 : 0)
 
   for (const name of DATA_ROOT_ENTRIES) {
     const plan = plans.get(name)
     if (!plan) continue
     if (cleanupOnly) continue
-    if (plan.identical) continue
+    if (plan.identical) {
+      copiedBytes += plan.bytes
+      onProgress?.(totalBytes ? copiedBytes / totalBytes * 90 : 90)
+      continue
+    }
     try {
       await mkdir(to, { recursive: true })
       for (const file of plan.files) {
         await copyThroughStaging(join(plan.source, name, file.relative), join(to, name, file.relative))
+        copiedBytes += file.bytes
+        onProgress?.(totalBytes ? copiedBytes / totalBytes * 90 : 90)
       }
       if (name === SETTINGS_ENTRY) await clearModelStoragePath(join(to, name))
     } catch (error) {
@@ -429,6 +440,7 @@ export async function migrateDataRoot(
       try {
         await rm(join(plan.source, name), { recursive: true, force: true })
         report.removed.push(name)
+        onProgress?.(90 + ++removedEntries / plans.size * 10)
       } catch (error) {
         // A locked file (a runtime still mapped by a running engine) leaves a duplicate behind rather than losing data, so this is reported, not thrown.
         report.failed.push(name)
@@ -436,7 +448,7 @@ export async function migrateDataRoot(
       }
     }
   }
-  // There is no migration UI: this runs before the window exists, so the console is the only place a user can learn that several GB left a folder the app no longer references.
+  // Keep legacy-source details in diagnostics; the startup dialog only displays aggregate progress.
   const fromLegacy = [...plans.values()].filter((plan) => plan.source !== from)
   if (fromLegacy.length > 0) {
     console.log(

@@ -169,6 +169,7 @@ export interface NolaBridge {
   }
   translation: { hasCredential(p: CredentialProvider): Promise<boolean>; setCredential(p: CredentialProvider, v: string): Promise<void> }
   events: {
+    onDataMigrationProgress?(cb: (percent: number) => void): () => void
     onMainPageRequested?(cb: (path: string) => void): () => void
     onMainErrorNotification?(cb: (notification: MainErrorNotification) => void): () => void
     onOverlayMenuChanged?(cb: (menu: import('../../shared/overlay-menu').OverlayMenuPresentation | null) => void): () => void
@@ -262,6 +263,7 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'app.openMainPage': 'ipc',
   'events.onMainPageRequested': 'ipc',
   'events.onMainErrorNotification': 'ipc',
+  'events.onDataMigrationProgress': 'ipc',
   'app.openDefaultBrowser': 'ipc',
   'app.notifyMainError': 'ipc',
   'app.checkLatestRelease': 'ipc',
@@ -330,6 +332,7 @@ export const BRIDGE_ADAPTER_NOTES: Record<string, string> = {
   'app.openDefaultBrowser': 'preload: openDefaultBrowser() · app:open-default-browser — 不带 URL，适配器原样透传；选哪个浏览器是主进程读注册表决定的，不是这里，也不是渲染进程',
   'app.notifyMainError': 'preload: notifyMainError(message, description?) · app:overlay-error — 只允许悬浮字幕窗口发起，由主进程验证来源并转发到主窗口 Toast',
   'events.onMainErrorNotification': 'preload: onMainErrorNotification(listener) · app:main-error-notification — 悬浮窗错误通知只在主窗口订阅并展示',
+  'events.onDataMigrationProgress': 'preload: onDataMigrationProgress(listener) · app:data-migration-progress',
   'settings.setCaptionService':
     'preload: setCaptionService(active) · browser:caption-service — 字幕服务闸门，不是 engine:prewarm-models 的加载态；返回 BrowserConnectionStatus 而非 boolean，页面挂载时用 browserConnection(\'status\') 读初值，两者读的是同一个字段 captionServiceActive',
 }

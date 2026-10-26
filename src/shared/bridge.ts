@@ -156,6 +156,7 @@ export type NolaTranslatorApi = {
   showWorkspace(): Promise<void>
   openMainPage(path: string): Promise<void>
   onMainPageRequested?(listener: (path: string) => void): () => void
+  onDataMigrationProgress?(listener: (percent: number) => void): () => void
   onMainErrorNotification?(listener: (notification: MainErrorNotification) => void): () => void
   showOverlay(): Promise<boolean>
   hideOverlay(): Promise<void>

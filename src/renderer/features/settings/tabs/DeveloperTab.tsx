@@ -44,6 +44,7 @@ import { ThirdPartyNotices } from '../ThirdPartyNotices'
 import { AppUpdateDialog } from '../AppUpdateNotice'
 import { RuntimeNoticeDialog } from '../RuntimeNotice'
 import { StartupFailureDialog } from '../StartupFailureDialog'
+import { DataMigrationDialog } from '../DataMigrationDialog'
 import {
   DEMO_ASR_RECORD,
   DEMO_BULK_COUNT,
@@ -492,6 +493,7 @@ type GalleryDialog =
   | 'appUpdate'
   | 'modelDetail'
   | 'startupFailure'
+  | 'dataMigration'
 
 const ALL_CLOSED: Record<GalleryDialog, boolean> = {
   sessionSetup: false,
@@ -507,6 +509,7 @@ const ALL_CLOSED: Record<GalleryDialog, boolean> = {
   appUpdate: false,
   modelDetail: false,
   startupFailure: false,
+  dataMigration: false,
 }
 
 /** The gallery has no page behind it, so an action that would belong to a page is deliberately inert. */
@@ -628,6 +631,9 @@ function DialogGalleryGroup() {
         <GalleryRow label={t('dev.dialogStartupFailure')} desc={t('dev.dialogStartupFailureDesc')}>
           <RunButton onClick={() => show('startupFailure')} />
         </GalleryRow>
+        <GalleryRow label={t('startup.migratingData')} desc={t('startup.migrationPreview')}>
+          <RunButton onClick={() => show('dataMigration')} />
+        </GalleryRow>
       </SettingGroup>
 
       <SessionSetupDialog
@@ -705,6 +711,7 @@ function DialogGalleryGroup() {
         onInstall={inert}
       />
       <StartupFailureDialog isOpen={open.startupFailure} onOpenChange={track('startupFailure')} timedOut />
+      <DataMigrationDialog isOpen={open.dataMigration} onOpenChange={track('dataMigration')} percent={42} />
     </>
   )
 }

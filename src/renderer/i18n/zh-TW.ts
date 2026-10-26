@@ -11,6 +11,8 @@ export const zhTW: Dictionary = {
   offline: offlineTw,
   onboarding: onboardingTW,
   startup: {
+    migratingData: '舊版本資料遷移中',
+    migrationPreview: '預覽遷移視窗，不會移動或刪除資料。點擊視窗外部或按 Esc 關閉。',
     failedTitle: '啟動尚未完成', timedOut: '等待本機引擎超過 45 秒，啟動可能已卡住。',
     engineFailed: '本機引擎啟動失敗。', settingsHint: '可以繼續進入軟體檢查執行元件與設定，或開啟日誌目錄排查。', continue: '進入軟體',
   },

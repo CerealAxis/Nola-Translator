@@ -24,6 +24,7 @@
  */
 ;(function () {
   var root = document.documentElement
+  root.classList.toggle('is-migration', new URLSearchParams(window.location.search).get('migration') === '1')
   try {
     /*
      * 预涂的权威值，由主进程通过窗口 query 传进来。

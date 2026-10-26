@@ -215,6 +215,11 @@ const api: NolaTranslatorApi = {
     return () => ipcRenderer.off(channels.event, wrapped)
   },
   getEngineState: () => invoke<EngineProcessState>(channels.getEngineState),
+  onDataMigrationProgress: callback => {
+    const listener = (_event: Electron.IpcRendererEvent, percent: number) => callback(percent)
+    ipcRenderer.on('app:data-migration-progress', listener)
+    return () => ipcRenderer.off('app:data-migration-progress', listener)
+  },
   showWorkspace: () => invoke(channels.showWorkspace),
   openMainPage: path => invoke(channels.openMainPage, path),
   onMainPageRequested: listener => {

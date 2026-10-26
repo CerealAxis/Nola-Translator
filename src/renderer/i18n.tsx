@@ -92,7 +92,7 @@ const I18nContext = createContext<I18nContextValue>({
   setLanguage: async () => undefined,
 })
 
-export function I18nProvider({ children }: { children: ReactNode }): React.JSX.Element {
+export function I18nProvider({ children, readSettings = true }: { children: ReactNode; readSettings?: boolean }): React.JSX.Element {
   const [uiLanguage, setUiLanguageState] = useState<UiLanguagePreference>('auto')
   const [systemLocale, setSystemLocale] = useState(() => typeof navigator === 'undefined' ? 'en' : navigator.language)
   const language = resolveUiLanguage(uiLanguage, systemLocale)
@@ -112,7 +112,7 @@ export function I18nProvider({ children }: { children: ReactNode }): React.JSX.E
 
   useEffect(() => {
     const api = window.nolaTranslator
-    if (!api) return
+    if (!api || !readSettings) return
     let active = true
     const initialRevision = revision.current
     const unsubscribe = api.onSettingsChanged((settings) => {
@@ -127,7 +127,7 @@ export function I18nProvider({ children }: { children: ReactNode }): React.JSX.E
       })
       .catch(() => undefined)
     return () => { active = false; unsubscribe() }
-  }, [])
+  }, [readSettings])
 
   useEffect(() => {
     document.documentElement.lang = language

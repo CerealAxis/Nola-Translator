@@ -272,6 +272,7 @@ export function createIpcBridge(): NolaBridge {
     events: {
       onMainPageRequested: cb => injectedApi()?.onMainPageRequested?.(cb) ?? (() => undefined),
       onMainErrorNotification: cb => injectedApi()?.onMainErrorNotification?.(cb) ?? (() => undefined),
+      onDataMigrationProgress: cb => injectedApi()?.onDataMigrationProgress?.(cb) ?? (() => undefined),
       onOverlayMenuChanged: cb => subscribe('onOverlayMenuChanged', injected => injected.onOverlayMenuChanged, cb),
       onEngineEvent: (cb) => subscribe('onEngineEvent', (injected) => injected.onEngineEvent, cb),
       onSettingsChanged: (cb) => subscribe('onSettingsChanged', (injected) => injected.onSettingsChanged, cb),

@@ -5,7 +5,7 @@ import { NolaTray } from '../../../src/main/tray'
 const mocks = vi.hoisted(() => ({ menus: [] as any[][], notify: vi.fn(), destroy: vi.fn(), show: vi.fn(), callbacks: new Map<string, () => void>() }))
 vi.mock('electron', () => ({
   app: { isPackaged: false, getAppPath: () => 'C:/Nola', getLocale: () => 'en-US' },
-  nativeImage: { createFromPath: () => ({}) },
+  nativeImage: { createFromPath: () => ({ isEmpty: () => false, resize: () => ({}) }) },
   Menu: { buildFromTemplate: (items: any[]) => { mocks.menus.push(items); return items } },
   Tray: class { setToolTip() {} setContextMenu() {} on(name: string, callback: () => void) { mocks.callbacks.set(name, callback) } destroy = mocks.destroy },
   Notification: class { static isSupported() { return true } constructor(options: unknown) { mocks.notify(options) } on() {} show = mocks.show; close() {} },

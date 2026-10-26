@@ -35,6 +35,7 @@ release-verify*/
 release-v[0-9]*/
 /build/*
 !/build/icon.ico
+!/build/tray.png
 !/build/runtime-catalog.json
 !/build/runtime-recipes.json
 !/build/installer.nsh

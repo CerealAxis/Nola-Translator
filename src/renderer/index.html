@@ -191,7 +191,8 @@
          浮层窗是窄条，上面摆一个 120px 的 Logo 只会莫名其妙；而且它本来就是
          show:false + ready-to-show，加载路径短，没必要遮。
          theme-boot.js 给 <html> 打上 is-overlay，这里纯 CSS 隐藏。 */
-      html.is-overlay #splash {
+      html.is-overlay #splash,
+      html.is-migration #splash {
         display: none;
       }
 

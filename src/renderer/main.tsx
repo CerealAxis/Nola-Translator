@@ -26,6 +26,7 @@ import { SETTINGS_WRITE_FAILURE_KEYS, settingsWriteFailure } from './features/se
 import { StartupFailureDialog } from './features/settings/StartupFailureDialog'
 import { AppUpdateNotice } from './features/settings/AppUpdateNotice'
 import { OnboardingTour } from './features/onboarding'
+import { DataMigrationDialog } from './features/settings/DataMigrationDialog'
 
 /*
  * 桥接的唯一挂载点。
@@ -43,8 +44,18 @@ import { OnboardingTour } from './features/onboarding'
 const isWorkspaceDocument = new URLSearchParams(window.location.search).get('workspace') === '1'
 const isOverlayDocument = new URLSearchParams(window.location.search).get('overlay') === '1'
 const isOverlayMenuDocument = new URLSearchParams(window.location.search).get('overlayMenu') === '1'
+const isMigrationDocument = new URLSearchParams(window.location.search).get('migration') === '1'
 const bridge = createIpcBridge()
-initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument && !isWorkspaceDocument, overlayMenu: isOverlayMenuDocument, offline: !isOverlayDocument && !isWorkspaceDocument })
+// Migration owns the data files before stores or engine IPC can safely start.
+if (!isMigrationDocument) initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument && !isWorkspaceDocument, overlayMenu: isOverlayMenuDocument, offline: !isOverlayDocument && !isWorkspaceDocument })
+
+function MigrationWindow() {
+  const [percent, setPercent] = useState(0)
+  useEffect(() => bridge.events.onDataMigrationProgress?.(value => {
+    if (Number.isFinite(value)) setPercent(Math.max(0, Math.min(100, value)))
+  }), [])
+  return <DataMigrationDialog isOpen percent={percent} />
+}
 
 /**
  * 浮窗点「字幕外观」→ 主窗跳到对应设置页。
@@ -315,9 +326,8 @@ function Root() {
 flushSync(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <I18nProvider>
-        <ToastProvider />
-        <Root />
+      <I18nProvider readSettings={!isMigrationDocument}>
+        {isMigrationDocument ? <MigrationWindow /> : <><ToastProvider /><Root /></>}
       </I18nProvider>
     </StrictMode>
   )

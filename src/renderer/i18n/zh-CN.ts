@@ -26,6 +26,8 @@ export const zhCN = {
   offline: offlineZh,
   onboarding: onboardingZh,
   startup: {
+    migratingData: '旧版本数据迁移中',
+    migrationPreview: '预览迁移弹窗，不会移动或删除数据。点击弹窗外部或按 Esc 关闭。',
     failedTitle: '启动未完成',
     timedOut: '等待本地引擎超过 45 秒，启动可能已卡住。',
     engineFailed: '本地引擎启动失败。',

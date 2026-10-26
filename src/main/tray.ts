@@ -24,8 +24,11 @@ export class NolaTray {
     return ({ 'zh-CN': gatewayZh, 'zh-TW': gatewayTw, 'zh-HK': gatewayHk, en: gatewayEn, ja: gatewayJa, ko: gatewayKo })[language]
   }
   async initialize(): Promise<void> {
-    const icon = app.isPackaged ? await app.getFileIcon(process.execPath, { size: 'small' }) : nativeImage.createFromPath(join(app.getAppPath(), 'build/icon.ico'))
-    this.tray = new Tray(icon)
+    // Use a bundled image instead of relying on Windows shell extraction or its icon cache.
+    const iconPath = app.isPackaged ? join(process.resourcesPath, 'tray.png') : join(app.getAppPath(), 'build/tray.png')
+    const icon = nativeImage.createFromPath(iconPath)
+    if (icon.isEmpty()) throw new Error(`Tray icon could not be loaded: ${iconPath}`)
+    this.tray = new Tray(icon.resize({ width: 32, height: 32 }))
     this.tray.setToolTip('Nola Translator')
     this.tray.on('double-click', () => this.options.show())
     this.refresh()

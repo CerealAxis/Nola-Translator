@@ -22,6 +22,8 @@ export const en: Dictionary = {
   offline: offlineEn,
   onboarding: onboardingEn,
   startup: {
+    migratingData: 'Migrating data from the previous version',
+    migrationPreview: 'Preview without moving or deleting data. Click outside or press Esc to close.',
     failedTitle: 'Startup did not finish',
     timedOut: 'The local engine has not responded for 45 seconds. Startup may be stuck.',
     engineFailed: 'The local engine failed to start.',

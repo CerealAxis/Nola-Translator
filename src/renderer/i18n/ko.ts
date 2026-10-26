@@ -18,6 +18,8 @@ const koMessages: Record<DictionaryKey, string> = {
   ...onboardingEntries(onboardingKo),
   'workspaceUi.windowFailed': '동시통역 창을 열 수 없습니다. 다시 시도해 주세요.',
   'startup.failedTitle': '시작을 완료하지 못했습니다',
+  'startup.migratingData': '이전 버전 데이터 이전 중',
+  'startup.migrationPreview': '데이터를 이동하거나 삭제하지 않고 미리 봅니다. 바깥을 클릭하거나 Esc를 눌러 닫으세요.',
   'startup.timedOut': '로컬 엔진 응답을 45초 동안 기다렸습니다. 시작이 멈췄을 수 있습니다.',
   'startup.engineFailed': '로컬 엔진을 시작하지 못했습니다.',
   'startup.settingsHint': '앱에서 실행 구성 요소와 설정을 확인하거나 로그 폴더를 여세요.',

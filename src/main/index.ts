@@ -47,6 +47,8 @@ import { prepareOverlayMenu } from './overlay-menu'
 import { resolveModelNetwork } from './network-region'
 
 let mainWindow: BrowserWindow | null = null
+let migrationWindow: BrowserWindow | null = null
+let migrationProgress = -1
 let overlayWindow: BrowserWindow | null = null
 let workspaceWindow: BrowserWindow | null = null
 let workspaceReady: Promise<void> = Promise.resolve()
@@ -111,6 +113,38 @@ function createMainWindow(theme: AppSettings['theme']): void {
     // world can read synchronously: with contextIsolation + sandbox there is no window.process,
     // so the pre-paint boot script would fall back to prefers-color-scheme and flash white.
     void window.loadFile(join(__dirname, '../renderer/index.html'), { query: { theme } })
+  }
+}
+
+/** Paint the migration dialog before walking or copying data; no stores exist at this point. */
+async function showDataMigrationWindow(): Promise<void> {
+  const window = new BrowserWindow({
+    ...createMainWindowOptions(resolvePreloadPath(__dirname), 'system', __dirname),
+    width: 520, height: 200, minWidth: 520, minHeight: 200,
+    resizable: false, maximizable: false, minimizable: false, closable: false,
+    frame: false, backgroundMaterial: 'none',
+  })
+  migrationWindow = window
+  migrationProgress = -1
+  const painted = new Promise<void>(resolve => window.once('ready-to-show', () => resolve()))
+  if (process.env.ELECTRON_RENDERER_URL) {
+    const url = new URL(process.env.ELECTRON_RENDERER_URL)
+    url.searchParams.set('migration', '1')
+    await window.loadURL(url.toString())
+  } else {
+    await window.loadFile(join(__dirname, '../renderer/index.html'), { query: { migration: '1' } })
+  }
+  await painted
+  window.show()
+}
+
+function publishMigrationProgress(percent: number): void {
+  // Keep thousands of small files from flooding the startup renderer with IPC messages.
+  const next = Math.max(0, Math.min(100, Math.floor(percent)))
+  if (next === migrationProgress) return
+  migrationProgress = next
+  if (migrationWindow && !migrationWindow.isDestroyed()) {
+    migrationWindow.webContents.send('app:data-migration-progress', next)
   }
 }
 
@@ -193,6 +227,7 @@ if (!hasSingleInstanceLock) {
   app.setAppUserModelId('com.nola-translator.app')
 
   app.on('second-instance', () => {
+    if (migrationWindow && !migrationWindow.isDestroyed()) { migrationWindow.focus(); return }
     if (!mainWindow) return
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()
@@ -313,6 +348,7 @@ if (!hasSingleInstanceLock) {
        * re-picks after freeing space. Planning is read-only, so the extra pass is cheap.
        */
       try {
+        await showDataMigrationWindow()
         // A failed automatic restoration keeps the old data usable and retries on next launch.
         const legacyRoot = legacyDefaultDataRoot()
         const carryOver = legacyRoot !== null && sameDirectory(pending.from, legacyRoot)
@@ -343,18 +379,16 @@ if (!hasSingleInstanceLock) {
             )
           }
         } else {
-          // Expect this to take a while — the runtimes in `build/runtime-catalog.json` total
-          // roughly 680 MB. There is no progress UI because it runs before the window exists,
-          // and one line is the whole report a user can act on.
+          // The startup dialog remains visible while models and runtimes move.
           console.log('moving app data to the chosen data root before the window opens', pending.from, '->', dataRoot)
-          let report = pending.copied ? null : await migrateDataRoot(pending.from, dataRoot, pending.extra, false)
+          let report = pending.copied ? null : await migrateDataRoot(pending.from, dataRoot, pending.extra, false, false, publishMigrationProgress)
           const copyCompleted = pending.copied || report?.failed.length === 0
           if (copyCompleted) {
             // Persist this BEFORE deleting anything. A cleanup retry must not restore stale settings
             // or models over files the user has since changed at the destination.
             writePendingDataMigration(pending.from, pending.extra, true)
             copyCommitted = true
-            report = await migrateDataRoot(pending.from, dataRoot, pending.extra, true, true)
+            report = await migrateDataRoot(pending.from, dataRoot, pending.extra, true, true, publishMigrationProgress)
           }
           if (!report) throw new Error('Data migration produced no result')
           const bytes = report.requiredBytes ?? 0
@@ -376,6 +410,9 @@ if (!hasSingleInstanceLock) {
       } catch (error) {
         if (!copyCommitted && sameDirectory(pending.from, legacyDefaultDataRoot() ?? '')) dataRoot = pending.from
         console.error('the data root migration could not run; the app starts on the current data root', error)
+      } finally {
+        if (migrationWindow && !migrationWindow.isDestroyed()) migrationWindow.destroy()
+        migrationWindow = null
       }
     }
     setSessionDataRoot(dataRoot)
