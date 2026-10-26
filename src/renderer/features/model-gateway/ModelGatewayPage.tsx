@@ -18,7 +18,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { GatewayCapability, ModelGatewaySnapshot } from '../../../shared/model-gateway'
 import { languageName } from '../../../shared/languages'
-import { translationLanguages } from '../../../shared/model-capabilities'
+import { useModelOptions } from '@/model-options'
+import { recognitionLabel } from '../../../shared/cloud-config'
 import './model-gateway.css'
 
 const CAPABILITIES: GatewayCapability[] = ['asr', 'mt', 'tts']
@@ -28,6 +29,7 @@ export function ModelGatewayPage() {
   const { t, language } = useI18n()
   const { navigate } = useRoute()
   const settings = useStore(stores.settings, state => state.settings)
+  const modelOptions = useModelOptions()
   const resources = useStore(stores.models, state => state.resources)
   const api = getBridge()?.gateway
   const [snapshot, setSnapshot] = useState<ModelGatewaySnapshot | null>(null)
@@ -50,8 +52,7 @@ export function ModelGatewayPage() {
   if (!api) return <Alert><AlertDescription>{t('gateway.unavailable')}</AlertDescription></Alert>
   if (!settings || !snapshot) return <div className="model-gateway-page"><h1>{t('gateway.title')}</h1><p>{t(loadFailed ? 'gateway.actionFailed' : 'common.loading')}</p>{loadFailed ? <Button onClick={() => void refresh()}>{t('gateway.refresh')}</Button> : null}</div>
   const config = settings.modelGateway
-  const translationModel = resources.find(record => record.resourceId === settings.translation.localModelId)
-  const targetLanguages = [...new Set([config.targetLanguage, ...translationLanguages(translationModel, 'auto').filter(code => code !== 'none')])]
+  const targetLanguages = [...new Set([config.targetLanguage, ...modelOptions.targetLanguages.filter(code => code !== 'none')])]
   const running = snapshot.state === 'running' || snapshot.state === 'starting'
   const changing = busy || snapshot.state === 'starting' || snapshot.state === 'stopping'
   const perform = async (action: () => Promise<unknown>, operation: 'action' | 'runtime' | 'settings' = 'action') => {
@@ -66,6 +67,13 @@ export function ModelGatewayPage() {
   const copy = (value: string) => perform(async () => { await navigator.clipboard.writeText(value); notifySuccess(t('gateway.copied')) })
   const address = snapshot.state === 'stopped' ? `http://127.0.0.1:${config.port}/v1` : snapshot.address.replace('://0.0.0.0', '://127.0.0.1') || `http://127.0.0.1:${config.port}/v1`
   const serviceName = (kind: GatewayCapability) => {
+    if (kind === 'asr' && (settings.recognition.provider ?? 'local') !== 'local') return recognitionLabel(settings.recognition)
+    if (kind === 'mt' && settings.translation.provider !== 'local') {
+      if (settings.translation.provider === 'cloud') return settings.translation.cloudName || settings.translation.cloudModel
+      const names = { microsoft: t('settings.providerMicrosoft'), mymemory: t('settings.providerMyMemory'),
+        google: t('settings.providerGoogle'), 'index-translate': t('settings.providerIndexTranslate'), recognition: t('settings.providerRecognitionTranslation') }
+      return names[settings.translation.provider]
+    }
     if (snapshot.state !== 'stopped') return snapshot.services[kind].name || t('gateway.configureModel')
     const id = kind === 'asr' ? settings.recognition.modelId : kind === 'mt' ? settings.translation.localModelId : settings.synthesis.modelId
     const record = resources.find(resource => resource.resourceId === id && resource.installed)

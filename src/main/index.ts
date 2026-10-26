@@ -24,12 +24,12 @@ import { randomUUID } from 'node:crypto'
 import { handleMeetingAudio, MEETING_AUDIO_SCHEME, registerMeetingAudioScheme } from './audio-protocol'
 import { registerAppIpc, resetOverlayLock } from './app-ipc'
 import { createEngineLaunchSpec, EngineProcess } from './engine-process'
-import { clearDataRootPointer, clearPendingDataMigration, defaultDataRoot, fallbackDataRoot, legacyDefaultDataRoot, readDataRootPointer, readPendingDataMigration, resolveDataRoot, writeDataRootPointer, writePendingDataMigration } from './data-root'
+import { clearDataRootPointer, clearPendingDataMigration, defaultDataRoot, fallbackDataRoot, legacyDefaultDataRoot, readDataRootPointer, readPendingDataMigration, resolveDataRoot, setSessionDataRoot, writeDataRootPointer, writePendingDataMigration } from './data-root'
 import { freeBytesForDirectory } from './disk-usage'
 import { dataRootEntries, migrateDataRoot, planDataRootMigration } from './data-migration'
 import { migrateLegacyUserData } from './legacy-migration'
 import { MeetingStore } from './meeting-store'
-import { modelStorageEnvironment } from './model-storage'
+import { cleanupStorageCaches, modelStorageEnvironment } from './model-storage'
 import { registerEngineIpc } from './ipc'
 import { SessionController } from './session-controller'
 import { BrowserConnection } from './browser-connection'
@@ -264,7 +264,11 @@ if (!hasSingleInstanceLock) {
     // FluentCaptions -> Nola rename migration. See `data-root.ts` for why the two stay apart.
     const userData = app.getPath('userData')
     await migrateLegacyUserData(app.getPath('appData'), userData)
-    const dataRoot = resolveDataRoot()
+    let dataRoot = resolveDataRoot()
+    // No workers are running yet. Also discard caches left at the affected release's C: root.
+    for (const root of new Set([dataRoot, legacyDefaultDataRoot()].filter((root): root is string => root !== null))) {
+      await cleanupStorageCaches(root)
+    }
     logDiagnostic('app.data-root', { dataRoot })
     // A data-root change runs here, before any store is constructed: this is the one moment the
     // tree has no open handles — the meeting store has not mapped an audio file and
@@ -278,17 +282,17 @@ if (!hasSingleInstanceLock) {
     // separator, so the same folder written two ways cannot look like a move onto itself.
     const sameDirectory = (left: string, right: string): boolean =>
       left.replace(/[\\/]+$/, '').toLowerCase() === right.replace(/[\\/]+$/, '').toLowerCase()
-    // An install that predates the per-user data root kept its data beside the program, and a
-    // machine-wide install puts that program in a directory the user cannot write to. The move
-    // below carries that data over; this step only records where it is.
+    // Restore data from the affected fixed-location release to the actual installation's Data/.
+    // A pending migration must survive retries; user-selected destinations remain authoritative.
     try {
       const legacyRoot = legacyDefaultDataRoot()
       const currentRoot = defaultDataRoot()
       const legacyEntries = legacyRoot === null ? [] : dataRootEntries(legacyRoot)
-      const currentEntries = dataRootEntries(currentRoot)
-      const alreadyCarriedOver = legacyEntries.some((name) => currentEntries.includes(name))
       const rootIsDefault = readDataRootPointer() === null && sameDirectory(dataRoot, currentRoot)
-      if (legacyRoot !== null && legacyEntries.length > 0 && !alreadyCarriedOver && rootIsDefault) {
+      const previousMigration = readPendingDataMigration()
+      // Retire an interrupted automatic move in the opposite direction from the affected release.
+      if (rootIsDefault && previousMigration && sameDirectory(previousMigration.from, currentRoot)) clearPendingDataMigration()
+      if (legacyRoot !== null && legacyEntries.length > 0 && rootIsDefault && readPendingDataMigration() === null) {
         writePendingDataMigration(legacyRoot, [])
       }
     } catch (error) {
@@ -300,6 +304,7 @@ if (!hasSingleInstanceLock) {
       // silently drop a folder the settings page is still showing as the pending destination.
       console.warn('the pending data migration source is already the current data root; nothing to move', dataRoot)
     } else if (pending) {
+      let copyCommitted = pending.copied
       /*
        * Measure the target drive first and cancel the whole move when it does not fit. A
        * half-finished copy is the worst state: part of the old root is gone, part of the new one
@@ -308,15 +313,12 @@ if (!hasSingleInstanceLock) {
        * re-picks after freeing space. Planning is read-only, so the extra pass is cheap.
        */
       try {
-        // The carry-over of the root the app used to derive from the executable copies its files
-        // and leaves them in place: that root usually sits in a directory the user cannot write
-        // to, and a removal that fails would keep the marker alive and repeat the copy on every
-        // launch.
+        // A failed automatic restoration keeps the old data usable and retries on next launch.
         const legacyRoot = legacyDefaultDataRoot()
         const carryOver = legacyRoot !== null && sameDirectory(pending.from, legacyRoot)
           && sameDirectory(dataRoot, defaultDataRoot())
         const plan = await planDataRootMigration(pending.from, dataRoot, pending.extra)
-        const required = plan.requiredBytes ?? 0
+        const required = pending.copied ? 0 : plan.requiredBytes ?? 0
         const available = freeBytesForDirectory(dataRoot)
         if (available !== undefined && required > available) {
           // Cancelling only has to land the next launch on the directory that still holds the
@@ -324,15 +326,12 @@ if (!hasSingleInstanceLock) {
           // root by itself. A root the pointer used to point at has to be written back instead,
           // or the next launch resolves to an empty directory and the data is orphaned.
           //
-          // The carry-over is the one case where the old root cannot be written back: it is a
-          // directory the user has no access to, so pointing at it would land the app on a root
-          // it cannot write to. The data stays where it is and the app stays on the writable root.
           if (carryOver) {
-            clearPendingDataMigration()
+            dataRoot = pending.from
             console.error(
               `the carry-over of the data from ${pending.from} was cancelled: `
               + `${Math.round(required / 1_048_576)} MB are needed on the new drive but only `
-              + `${Math.round(available / 1_048_576)} MB are free. The app stays on ${dataRoot}.`,
+              + `${Math.round(available / 1_048_576)} MB are free. The app stays on ${dataRoot} and retries next launch.`,
             )
           } else {
             if (sameDirectory(fallbackDataRoot(), pending.from)) clearDataRootPointer()
@@ -348,7 +347,16 @@ if (!hasSingleInstanceLock) {
           // roughly 680 MB. There is no progress UI because it runs before the window exists,
           // and one line is the whole report a user can act on.
           console.log('moving app data to the chosen data root before the window opens', pending.from, '->', dataRoot)
-          const report = await migrateDataRoot(pending.from, dataRoot, pending.extra, !carryOver)
+          let report = pending.copied ? null : await migrateDataRoot(pending.from, dataRoot, pending.extra, false)
+          const copyCompleted = pending.copied || report?.failed.length === 0
+          if (copyCompleted) {
+            // Persist this BEFORE deleting anything. A cleanup retry must not restore stale settings
+            // or models over files the user has since changed at the destination.
+            writePendingDataMigration(pending.from, pending.extra, true)
+            copyCommitted = true
+            report = await migrateDataRoot(pending.from, dataRoot, pending.extra, true, true)
+          }
+          if (!report) throw new Error('Data migration produced no result')
           const bytes = report.requiredBytes ?? 0
           console.log('data root migration finished', {
             copied: report.copied.length, skipped: report.skipped.length,
@@ -359,15 +367,23 @@ if (!hasSingleInstanceLock) {
           // failed entry at the old root for good, whereas leaving it costs one more launch's
           // idempotent pass.
           if (report.failed.length === 0) clearPendingDataMigration()
-          else console.error('the data root migration left entries at the old root; it will be retried on the next launch', report.failed)
+          else {
+            // Copy failures retain the entire source. Removal failures already have a full copy.
+            if (carryOver && !copyCompleted) dataRoot = pending.from
+            console.error('the data root migration left entries at the old root; it will be retried on the next launch', report.failed)
+          }
         }
       } catch (error) {
+        if (!copyCommitted && sameDirectory(pending.from, legacyDefaultDataRoot() ?? '')) dataRoot = pending.from
         console.error('the data root migration could not run; the app starts on the current data root', error)
       }
     }
+    setSessionDataRoot(dataRoot)
+    logDiagnostic('app.data-root.ready', { dataRoot })
     relocateSessionLogs(join(dataRoot, 'logs'))
     const settings = new SettingsStore(join(dataRoot, 'settings.json'))
     const initialSettings = await settings.load()
+    if (initialSettings.modelStoragePath) await cleanupStorageCaches(initialSettings.modelStoragePath)
     const meetings = new MeetingStore(join(dataRoot, 'meetings'))
     const credentials = new SecureCredentialStore(join(dataRoot, 'credentials.json'), safeStorage)
     // A read-only data root must not take the window down with it; the store degrades to empty.
@@ -659,6 +675,7 @@ if (!hasSingleInstanceLock) {
         if (engine!.currentState !== 'ready') await engine!.start()
         return (await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: randomUUID() }, 'resources')).resources
       },
+      getCredential: provider => credentials.get(provider),
       getKey: () => credentials.get('model-gateway'), setKey: value => credentials.set('model-gateway', value),
       onChanged: snapshot => {
         for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('model-gateway:changed', snapshot)

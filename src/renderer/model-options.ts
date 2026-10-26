@@ -50,6 +50,7 @@ export function useModelOptions(recognitionId?: string, translationId?: string, 
     // Native translation reuses the Aliyun socket, so its targets are that connection's language
     // table. A provider without one has already fallen back to MyMemory above.
     targetLanguages: settings.translation.provider === 'recognition' ? ['none', ...ALIYUN_LANGUAGES] : settings.translation.provider === 'index-translate' ? ['none', ...INDEX_TRANSLATE_LANGUAGES] : settings.translation.provider === 'local' ? translationLanguages(translation, sourceLanguage) : settings.translation.provider === 'cloud' && settings.translation.cloudLanguages ? ['none', ...settings.translation.cloudLanguages] : [...TARGET_LANGUAGE_OPTIONS],
+    localRecognitionModels: installedRecognitionModels(resources, recognitionId ?? settings.recognition.modelId, settings.compute ?? DEFAULT_COMPUTE_SETTINGS),
     recognitionModels: remote ? [{ value: settings.recognition.modelId, label: recognitionLabel(settings.recognition), isDisabled: false }] : installedRecognitionModels(resources, settings.recognition.modelId, settings.compute ?? DEFAULT_COMPUTE_SETTINGS),
     translationModels: resources.filter(model => model.kind === 'translationModel' && model.installed).map(model => ({
       value: model.resourceId, label: model.name,

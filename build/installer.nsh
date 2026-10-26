@@ -1,22 +1,8 @@
-; Layout: the program lives in an `App` subfolder, while app data lives in the per-user install
-; root. The uninstaller empties $INSTDIR on every update — atomicRMDir walks "$INSTDIR\*.*"
-; (uninstaller.nsh) — so app data is kept outside the program folder.
-;
-; <install root>\App  the program, $INSTDIR
-; %LOCALAPPDATA%\Programs\<product> app data
-;
-; The data folder is %LOCALAPPDATA%\Programs\<product>, which is the folder the app resolves at
-; runtime. It is not derived from $INSTDIR, because the app writes its models, runtimes and
-; settings there, while a program installed under C:\Program Files belongs to the installer,
-; not to the user who runs the app.
-
+; The selected install root owns App/ (replaceable program) and Data/ (persistent data).
+; Keep Data outside $INSTDIR: electron-builder empties the program directory on updates.
 !define NOLA_APP_DIR_NAME "App"
 !define NOLA_DATA_DIR_NAME "Data"
-
-; The data root is %LOCALAPPDATA%\Programs\<product>, which the app resolves at runtime.
-; The per-user context is selected explicitly where it is used: a machine-wide install runs with
-; the all-users context, whose LOCALAPPDATA belongs to the installing account.
-!define NOLA_DATA_ROOT "$LOCALAPPDATA\Programs\${APP_FILENAME}"
+!define NOLA_DATA_ROOT "$INSTDIR\..\${NOLA_DATA_DIR_NAME}"
 
 ; Keep these entries aligned with nsis.installerLanguages in package.json. electron-builder
 ; otherwise enables all bundled languages, and missing LangStrings fail compilation with -WX.
@@ -78,14 +64,7 @@ FunctionEnd
 !endif
 
 !macro customInstall
-  ; The app resolves its data root here, so the folder has to exist before the first launch.
-  ${If} $installMode == "all"
-    SetShellVarContext current
-  ${EndIf}
   CreateDirectory "${NOLA_DATA_ROOT}"
-  ${If} $installMode == "all"
-    SetShellVarContext all
-  ${EndIf}
   !ifdef ZIP_COMPRESSION
     !ifndef APP_BUILD_DIR
       ; Extraction has finished; release the embedded payload before the finish page.
@@ -122,14 +101,6 @@ Var /GLOBAL NolaDeleteData
   ${EndIf}
 
   ${If} $NolaDeleteData == "1"
-    ${If} $installMode == "all"
-      SetShellVarContext current
-    ${EndIf}
     RMDir /r "${NOLA_DATA_ROOT}"
-    ; An install from the era when the data sat beside the program still has it there.
-    RMDir /r "$INSTDIR\..\${NOLA_DATA_DIR_NAME}"
-    ${If} $installMode == "all"
-      SetShellVarContext all
-    ${EndIf}
   ${EndIf}
 !macroend

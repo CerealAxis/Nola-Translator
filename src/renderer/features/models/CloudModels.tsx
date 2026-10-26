@@ -294,36 +294,35 @@ export async function removeCloudModel(model: CloudModel): Promise<void> {
   await actions.models.setTranslationCredential(credential, '')
 }
 
-async function setCloudModelDefault(model: CloudModel): Promise<void> {
-  const settings = stores.settings.getState().settings
-  if (!settings || !model.ready || model.active) return
-  const translation = settings.translation
-  const previousTarget = translation.targetLanguage
+/** Shared by model management and quick captions so switching keeps connection fields together. */
+export function cloudModelSettingsPatch(settings: AppSettings, model: CloudModel): AppSettingsPatch | null {
+  if (!model.ready) return null
+  const previousTarget = settings.translation.targetLanguage
   if (model.kind === 'recognitionModel') {
-    if (model.id === 'aliyun' || model.id === 'minimax') {
-      await updateSettings({ recognition: { provider: model.id, sourceLanguage: 'auto' } })
-      return
-    }
-    return
+    return model.id === 'aliyun' || model.id === 'minimax'
+      ? { recognition: { provider: model.id, sourceLanguage: 'auto' } } : null
   }
   if (model.id === 'recognition') {
-    if (!supportsRecognitionNativeTranslation(settings.recognition)) return
+    if (!supportsRecognitionNativeTranslation({ ...settings.recognition, provider: 'aliyun' })) return null
     const target = previousTarget === 'none' || !ALIYUN_LANGUAGES.includes(previousTarget as typeof ALIYUN_LANGUAGES[number]) ? 'zh' : previousTarget
     const visibility = targetLanguagePatch(target, previousTarget)
-    await updateSettings({ ...visibility,
-      recognition: { provider: 'aliyun', sourceLanguage: 'auto' },
-      translation: { ...visibility.translation, provider: 'recognition' },
-    })
-    return
+    return { ...visibility, recognition: { provider: 'aliyun', sourceLanguage: 'auto' },
+      translation: { ...visibility.translation, provider: 'recognition' } }
   }
   if (model.profile) {
-    const selected = customModelPatch(translation, model.profile)
+    const selected = customModelPatch(settings.translation, model.profile)
     const visibility = targetLanguagePatch(selected.targetLanguage ?? 'zh', previousTarget)
-    await updateSettings({ ...visibility, translation: { ...visibility.translation, ...selected } })
-    return
+    return { ...visibility, translation: { ...visibility.translation, ...selected } }
   }
   const target = previousTarget === 'none' ? 'zh' : previousTarget
   const supported = model.id === 'index-translate' ? INDEX_TRANSLATE_LANGUAGES : undefined
   const visibility = targetLanguagePatch(supported && !supported.includes(target) ? 'zh' : target, previousTarget)
-  await updateSettings({ ...visibility, translation: { ...visibility.translation, provider: model.id as AppSettings['translation']['provider'] } })
+  return { ...visibility, translation: { ...visibility.translation, provider: model.id as AppSettings['translation']['provider'] } }
+}
+
+async function setCloudModelDefault(model: CloudModel): Promise<void> {
+  const settings = stores.settings.getState().settings
+  if (!settings || model.active) return
+  const patch = cloudModelSettingsPatch(settings, model)
+  if (patch) await updateSettings(patch)
 }

@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, isAbsolute, join, normalize } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { basename, dirname, isAbsolute, join, normalize } from 'node:path'
 
 import { app } from 'electron'
 
@@ -9,9 +9,7 @@ import { app } from 'electron'
  */
 
 /**
- * The product name, and the name electron-builder gives the per-user install folder it creates
- * from `build.productName` in package.json. The data root is a sibling of that folder, so the
- * folder name and the product name are one and the same string.
+ * The product name used by the affected release’s fixed data directory.
  */
 const PRODUCT_NAME = 'Nola Translator'
 
@@ -21,72 +19,35 @@ const POINTER_FILE = 'data-location.json'
 /** Shape version of the pointer file. See `writeDataRootPointer`. */
 const POINTER_VERSION = 1
 
-/**
- * The root of a per-user install: `%LOCALAPPDATA%\Programs\Nola Translator`. The installer
- * places the program in its `App\` subfolder.
- *
- * `LOCALAPPDATA` is the variable the shell itself resolves, so it names the folder a per-user
- * install lands in. When it is missing, `appData` is the roaming `%APPDATA%`, whose `..\Local`
- * sibling is `%LOCALAPPDATA%` on Windows.
- */
-function perUserInstallRoot(): string {
-  const localAppData = process.env.LOCALAPPDATA ?? join(app.getPath('appData'), '..', 'Local')
-  return join(localAppData, 'Programs', PRODUCT_NAME)
+let sessionDataRoot: string | null = null
+
+/** Keep every consumer on the intact source after a failed startup migration; never persist it. */
+export function setSessionDataRoot(root: string | null): void {
+  if (root !== null && !isAbsolute(root)) throw new Error('The data root must be an absolute path')
+  sessionDataRoot = root === null ? null : normalize(root)
 }
 
-/**
- * The root every app-owned file lives under.
- *
- * Packaged, this is `%LOCALAPPDATA%\Programs\Nola Translator`, the per-user install root, where
- * the program itself sits in `App\`. The data cannot live beside the
- * program inside `C:\Program Files`, where a machine-wide install puts it, because a normal user
- * has no write access there and the engine's runtime folders are created under the data root. The
- * per-user folder belongs to the account that runs the app, and a per-user install already keeps
- * its data in exactly this folder.
- *
- * The root is not derived from the executable: that path can be a location the user cannot write
- * to, and an MSI install has no `App\` subfolder, so the `..\Data` of the executable would name
- * the parent of the install directory.
- *
- * In dev the executable is the Electron binary inside `node_modules\electron\dist`, where the
- * per-user folder does not exist and the repository is the app root.
- */
+/** Packaged data follows the actual executable; NSIS uses App/, flat installs do not. */
 export function defaultDataRoot(): string {
-  if (app.isPackaged) {
-    try {
-      return perUserInstallRoot()
-    } catch (error) {
-      // A path lookup must never take startup down; `getAppPath()` is absolute and writable even
-      // though it is the wrong directory for a packaged build, and a warning beats a dead launch.
-      console.warn('the per-user install root is unavailable; falling back to the app path for the data root', error)
-    }
-  }
-  return app.getAppPath()
+  if (!app.isPackaged) return app.getAppPath()
+  const programDirectory = dirname(app.getPath('exe'))
+  const installRoot = basename(programDirectory).toLowerCase() === 'app'
+    ? dirname(programDirectory) : programDirectory
+  return join(installRoot, 'Data')
 }
 
-/**
- * The root an older build used: the `Data` folder beside the program's install root.
- *
- * A per-user NSIS install put the program in `<root>\App`, so the old root was `<root>\Data`.
- * A machine-wide install put it under
- * `C:\Program Files`, and an MSI install has no `App\` subfolder, so the old root landed in the
- * parent of the install directory. `null` in dev, where no such root exists.
- */
+/** Compatibility source for the release that incorrectly fixed all data to LOCALAPPDATA. */
 export function legacyDefaultDataRoot(): string | null {
   if (!app.isPackaged) return null
-  try {
-    return join(dirname(app.getPath('exe')), '..', 'Data')
-  } catch (error) {
-    console.warn('the exe path is unavailable; there is no legacy data root to look for', error)
-    return null
-  }
+  const localAppData = process.env.LOCALAPPDATA ?? join(app.getPath('appData'), '..', 'Local')
+  return join(localAppData, 'Programs', PRODUCT_NAME)
 }
 
 function dataLocationFile(): string {
   return join(defaultDataRoot(), POINTER_FILE)
 }
 
-/** The pointer location used before the data root moved out of the install directory. */
+/** The pointer location used by the affected fixed-location release. */
 function legacyDataLocationFile(): string | null {
   const root = legacyDefaultDataRoot()
   if (root === null) return null
@@ -149,10 +110,10 @@ export function fallbackDataRoot(): string {
  * The one data root. Synchronous and safe to call before `app.whenReady()`.
  *
  * Three tiers, in order: an explicit pointer the user wrote, the directory an existing install
- * already uses, and finally the per-user data folder for a fresh install.
+ * already uses, and finally the actual installation’s Data folder for a fresh install.
  */
 export function resolveDataRoot(): string {
-  return readDataRootPointer() ?? fallbackDataRoot()
+  return readDataRootPointer() ?? sessionDataRoot ?? fallbackDataRoot()
 }
 
 /**
@@ -179,6 +140,8 @@ export type PendingDataMigration = {
   from: string
   /** Legacy directories outside the root that must move with it; absent means none. */
   extra: string[]
+  /** All entries were copied; retries may delete the old copies but must never overwrite new data. */
+  copied: boolean
 }
 
 /**
@@ -188,7 +151,7 @@ export type PendingDataMigration = {
  * handle, the one moment nothing is open. Relative paths are rejected as in
  * `writeDataRootPointer` — `normalize` and `join` never make one absolute.
  */
-export function writePendingDataMigration(from: string, extraSources: readonly string[] = []): void {
+export function writePendingDataMigration(from: string, extraSources: readonly string[] = [], copied = false): void {
   if (!isAbsolute(from)) throw new Error('The migration source must be an absolute path')
   for (const extra of extraSources) {
     if (!isAbsolute(extra)) throw new Error('A legacy migration source must be an absolute path')
@@ -199,8 +162,16 @@ export function writePendingDataMigration(from: string, extraSources: readonly s
   const file = join(defaultDataRoot(), PENDING_MIGRATION_FILE)
   mkdirSync(dirname(file), { recursive: true })
   // `extra` is always written, even when empty, so a missing key reads as `[]`.
-  const marker = { version: POINTER_VERSION, from: normalize(from), extra: extraSources.map((extra) => normalize(extra)) }
-  writeFileSync(file, `${JSON.stringify(marker, null, 2)}\n`, 'utf8')
+  const marker = { version: POINTER_VERSION, from: normalize(from), extra: extraSources.map((extra) => normalize(extra)), copied }
+  // The completed-copy phase must survive interruption before source deletion starts.
+  const temporary = `${file}.tmp`
+  try {
+    writeFileSync(temporary, `${JSON.stringify(marker, null, 2)}\n`, 'utf8')
+    renameSync(temporary, file)
+  } catch (error) {
+    rmSync(temporary, { force: true })
+    throw error
+  }
 }
 
 /**
@@ -237,7 +208,7 @@ export function readPendingDataMigration(): PendingDataMigration | null {
     }
     return true
   })
-  return { from: normalize(candidate), extra: extra.map((value) => normalize(value)) }
+  return { from: normalize(candidate), extra: extra.map((value) => normalize(value)), copied: record.copied === true }
 }
 
 /**
@@ -256,4 +227,6 @@ export function clearPendingDataMigration(): void {
  */
 export function clearDataRootPointer(): void {
   rmSync(dataLocationFile(), { force: true })
+  const legacyFile = legacyDataLocationFile()
+  if (legacyFile !== null) rmSync(legacyFile, { force: true })
 }

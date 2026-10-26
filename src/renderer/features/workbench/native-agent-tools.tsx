@@ -1,10 +1,71 @@
-import { defineToolkit } from '@assistant-ui/react'
+import { defineToolkit, type ToolCallMessagePartProps, type ToolCallMessagePartComponent } from '@assistant-ui/react'
+import { JSONGenerativeUI, type GenerativeUILibrary } from '@assistant-ui/generative-ui/react'
+import { normalizeUINode } from '@assistant-ui/generative-ui'
+import { Component, type ReactNode } from 'react'
 import { z } from 'zod'
 import { AgentPlan } from '@/components/assistant-ui/native/agent-plan'
 import { TodoList } from '@/components/assistant-ui/native/todo-list'
 import { ArtifactCard } from '@/components/assistant-ui/native/artifact-card'
 import { CodeDiff } from '@/components/assistant-ui/native/code-diff'
 import { MathBlock } from '@/components/assistant-ui/native/math-block'
+import { ToolFallback } from '@/components/assistant-ui/native/tool-fallback.aui'
+
+/** Validate the completed tree before acknowledging it; the library silently drops unknown nodes. */
+function validatePresentation(value: unknown, library: GenerativeUILibrary, depth = 0): number {
+  if (depth > 32) throw new Error('UI tree exceeds 32 levels')
+  if (value == null || typeof value === 'boolean') return 0
+  if (typeof value === 'string' || typeof value === 'number') return 1
+  if (Array.isArray(value)) return value.reduce((count, child) => count + validatePresentation(child, library, depth + 1), 0)
+  const node = normalizeUINode(value)
+  if (!node || typeof node !== 'object' || !('type' in node)) throw new Error('UI nodes must select a component with _type and pass its props inline')
+  const entry = Object.hasOwn(library, node.type) ? library[node.type] : undefined
+  if (!entry) throw new Error(`Unknown UI component ${node.type}. Available components: ${Object.keys(library).join(', ')}`)
+  const schema = entry.properties
+  if (schema && 'safeParse' in schema && typeof schema.safeParse === 'function') {
+    const result = schema.safeParse(node.props)
+    if (!result.success) throw new Error(`Invalid ${node.type} properties: ${result.error.issues.map((issue: { path: PropertyKey[]; message: string }) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`)
+  }
+  const raw = value as Record<string, unknown>
+  return 1 + validatePresentation(raw.children, library, depth + 1)
+}
+
+class PresentationBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  render() { return this.state.failed ? this.props.fallback : this.props.children }
+}
+
+/** Desktop IPC uploads schemas directly; no generative compiler or backend renderer is required. */
+export function createGenerativePresentationTools(library: GenerativeUILibrary) {
+  const ui = new JSONGenerativeUI({ library })
+  const present = ui.present({ display: 'standalone' })
+  const prompt = ui.promptUser()
+  const presentParameters = present.parameters
+  const promptParameters = prompt.parameters
+  if (!presentParameters || !promptParameters || !present.render || !prompt.render) throw new Error('Generative UI tools are missing their schema or renderer')
+  const guardedRender = <Args extends Record<string, unknown>, Result,>(Render: ToolCallMessagePartComponent<Args, Result>) => (props: ToolCallMessagePartProps<Args, Result>) => {
+    let error: string | undefined
+    if (props.status.type !== 'running') {
+      try {
+        if (!validatePresentation(props.args, library)) throw new Error('UI tree is empty')
+      } catch (cause) { error = cause instanceof Error ? cause.message : 'Invalid UI tree' }
+    }
+    const fallback = <ToolFallback {...props} isError result={error ?? props.result} />
+    if (error || props.isError) return fallback
+    return <PresentationBoundary key={`${props.toolCallId}:${props.status.type}`} fallback={fallback}><Render {...props} /></PresentationBoundary>
+  }
+  return {
+    present: { type: 'frontend' as const, description: present.description, parameters: presentParameters,
+      display: 'standalone' as const, unstable_backendDefault: { parameters: false }, render: guardedRender(present.render!),
+      execute: async (args: Record<string, unknown>) => {
+        const components = validatePresentation(args, library)
+        if (!components) throw new Error('UI tree is empty')
+        return {}
+      } },
+    prompt_user: { type: 'human' as const, description: prompt.description, parameters: promptParameters,
+      unstable_backendDefault: { parameters: false }, render: guardedRender(prompt.render!) },
+  }
+}
 
 /** These client tools persist their real arguments in the conversation; they never execute model-written code. */
 export const nativePresentationTools = defineToolkit({

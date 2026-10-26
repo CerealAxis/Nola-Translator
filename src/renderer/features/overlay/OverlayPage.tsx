@@ -1,4 +1,5 @@
 import { useModelOptions } from '@/model-options'
+import { cloudModelsOf, cloudModelSettingsPatch } from '../models/CloudModels'
 import { translationLanguages } from '../../../shared/model-capabilities'
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
@@ -25,6 +26,23 @@ export function OverlayPage() {
   const { navigate } = useRoute()
   const settings = useStore(stores.settings, state => state.settings) ?? DEFAULT_SETTINGS
   const modelOptions = useModelOptions()
+  const resources = useStore(stores.models, state => state.resources)
+  const credentials = useStore(stores.models, state => state.credentials)
+  const cloudModels = cloudModelsOf(settings, credentials).filter(model => model.ready)
+  const cloudNames = {
+    cloud: t('modelsSettingsUi.cloudService'), microsoft: t('settings.providerMicrosoft'), mymemory: t('settings.providerMyMemory'),
+    google: t('settings.providerGoogle'), 'index-translate': t('settings.providerIndexTranslate'),
+    aliyun: t('modelsSettingsUi.aliyunAsr'), minimax: t('settings.providerMiniMax'), recognition: t('settings.providerRecognitionTranslation'),
+  }
+  const cloudChoice = (model: typeof cloudModels[number]) => ({ value: model.id, label: model.profile?.name ?? cloudNames[model.id as keyof typeof cloudNames] })
+  const recognitionChoices = [...modelOptions.localRecognitionModels, ...cloudModels.filter(model => model.kind === 'recognitionModel').map(cloudChoice)]
+  const recognitionValue = (settings.recognition.provider ?? 'local') === 'local' ? settings.recognition.modelId : settings.recognition.provider ?? 'local'
+  const translationValue = settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? NO_TRANSLATION_LANGUAGE
+    : settings.translation.provider === 'local' ? settings.translation.localModelId
+      : settings.translation.provider === 'cloud' ? `custom:${settings.translation.customModelId || 'legacy'}` : settings.translation.provider
+  const translationChoices = [{ value: NO_TRANSLATION_LANGUAGE, label: t('workspaceUi.translationOff') },
+    ...modelOptions.translationModels, ...cloudModels.filter(model => model.kind === 'translationModel').map(cloudChoice)]
+  if (!translationChoices.some(model => model.value === translationValue)) translationChoices.push({ value: translationValue, label: modelOptions.translation?.name ?? translationValue, isDisabled: true })
   const devices = useStore(stores.models, state => state.devices)
   const session = useStore(sessionStore, state => state)
   const sessionActive = !['idle', 'error'].includes(session.status)
@@ -122,23 +140,23 @@ export function OverlayPage() {
         <CardContent className="nola-overlay-fields">
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('session.recognitionModel')}</span>
-            <SettingSelect value={settings.recognition.modelId} ariaLabel={t('session.recognitionModel')} isDisabled={sessionActive}
-              options={modelOptions.recognitionModels.length ? modelOptions.recognitionModels : [{ value: settings.recognition.modelId, label: settings.recognition.modelId, isDisabled: true }]} onChange={modelId => patch({ recognition: { modelId } })} />
+            <SettingSelect value={recognitionValue} ariaLabel={t('session.recognitionModel')} isDisabled={sessionActive}
+              options={recognitionChoices.length ? recognitionChoices : [{ value: recognitionValue, label: recognitionValue, isDisabled: true }]} onChange={value => {
+                const cloud = cloudModels.find(model => model.kind === 'recognitionModel' && model.id === value)
+                const next = cloud ? cloudModelSettingsPatch(settings, cloud) : { recognition: { provider: 'local' as const, modelId: value } }
+                if (next) patch(next)
+              }} />
           </div>
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('session.translationModel')}</span>
-            <SettingSelect value={settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? NO_TRANSLATION_LANGUAGE : settings.translation.provider === 'local' ? settings.translation.localModelId : settings.translation.provider}
-              ariaLabel={t('session.translationModel')} isDisabled={sessionActive}
-              options={[{ value: NO_TRANSLATION_LANGUAGE, label: t('workspaceUi.translationOff') }, ...modelOptions.translationModels,
-                ...(settings.translation.provider === 'local' && settings.translation.localModelId && !modelOptions.translationModels.some(model => model.value === settings.translation.localModelId) ? [{ value: settings.translation.localModelId, label: modelOptions.translation?.name ?? settings.translation.localModelId, isDisabled: true }] : []),
-                ...(settings.translation.provider !== 'local' ? [{ value: settings.translation.provider, label: t(settings.translation.provider === 'index-translate' ? 'settings.providerIndexTranslate' : settings.translation.provider === 'mymemory' ? 'settings.providerMyMemory' : settings.translation.provider === 'google' ? 'settings.providerGoogle' : settings.translation.provider === 'recognition' ? 'settings.providerRecognitionTranslation' : settings.translation.provider === 'cloud' ? 'settings.providerCloud' : 'settings.providerMicrosoft') }] : [])]}
-              onChange={value => {
+            <SettingSelect value={translationValue} ariaLabel={t('session.translationModel')} isDisabled={sessionActive}
+              options={translationChoices} onChange={value => {
                 if (value === NO_TRANSLATION_LANGUAGE) patch(targetLanguagePatch(value, targetLanguage))
                 else {
-                  const model = stores.models.getState().resources.find(item => item.resourceId === value)
-                  const next = model && translationModelPatch(settings, model)
+                  const cloud = cloudModels.find(model => model.kind === 'translationModel' && model.id === value)
+                  const model = resources.find(item => item.resourceId === value)
+                  const next = cloud ? cloudModelSettingsPatch(settings, cloud) : model ? translationModelPatch(settings, model) : null
                   if (next) patch(next)
-                  else if (value === settings.translation.provider && translationDisabled) patch(targetLanguagePatch(sourceLanguage === 'zh' ? 'en' : 'zh', targetLanguage))
                 }
               }} />
           </div>

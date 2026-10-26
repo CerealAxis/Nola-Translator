@@ -20,6 +20,29 @@ def run_async(test):
     return execute
 
 
+def test_cloud_translation_initializes_without_local_weights(monkeypatch, tmp_path):
+    calls = []
+    class Runtime:
+        def __init__(self, *_):
+            self.resources = SimpleNamespace(record=lambda _: pytest.fail('cloud translation looked up local weights'))
+
+        def _configure_translation(self, command):
+            calls.append(command.config.translationProvider)
+            async def translate(text, source, target):
+                return SimpleNamespace(text=f'{target}:{text}')
+            self.translation_provider = SimpleNamespace(translate=translate)
+
+    monkeypatch.setitem(sys.modules, 'nola_translator_engine.runtime', SimpleNamespace(EngineRuntime=Runtime))
+    monkeypatch.setenv('NOLA_TRANSLATOR_MODEL_DIR', str(tmp_path))
+    async def check():
+        worker = GatewayWorker(lambda _: None)
+        await worker.initialize({'kind': 'mt', 'config': {'recognitionProvider': 'aliyun',
+            'translationProvider': 'index-translate', 'sourceLanguage': 'auto', 'targetLanguages': ['zh']}})
+        assert await worker.request({'op': 'infer', 'text': 'hello', 'target': 'ja'}) == {'text': 'ja:hello'}
+    asyncio.run(check())
+    assert calls == ['index-translate']
+
+
 def wav_data(samples, rate=16000, channels=1, width=2):
     output = io.BytesIO()
     with wave.open(output, 'wb') as target:

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { AppInfo } from 'app-builder-lib/out/appInfo.js'
 import { getWindowsInstallationDirName } from 'app-builder-lib/out/targets/targetUtil.js'
@@ -43,6 +43,7 @@ const customPages = [...readFileSync(include, 'utf8').matchAll(/^\s*Page custom 
   .map(match => `Call ${match[1]}`).join('\n')
 
 const cases = [
+  ['default install root', join(process.env.LOCALAPPDATA, 'Programs', appInfo.productName), join(process.env.LOCALAPPDATA, 'Programs', appInfo.productName, 'App')],
   ['registered install survives a directory-page edit', 'D:\\UserChanged', 'C:\\Program Files\\NolaTranslator\\App', 'C:\\Program Files\\NolaTranslator\\App'],
   ['existing compact name', 'C:\\Program Files\\NolaTranslator\\App', 'C:\\Program Files\\NolaTranslator\\App'],
   ['existing product name', 'C:\\Program Files\\Nola Translator\\App', 'C:\\Program Files\\Nola Translator\\App'],
@@ -69,6 +70,7 @@ const checks = cases.map(([name, input, , existingInstallDir = '']) => `
   StrCpy $NolaExistingInstallDir "${nsis(existingInstallDir)}"
   !insertmacro testInstallPre
   FileWriteUTF16LE $R0 "${name}$\\t$INSTDIR$\\r$\\n"
+  FileWriteUTF16LE $R0 "${name} data$\\t\${NOLA_DATA_ROOT}$\\r$\\n"
   !insertmacro testInstallPre
   FileWriteUTF16LE $R0 "${name} repeated$\\t$INSTDIR$\\r$\\n"`).join('\n')
 
@@ -95,7 +97,6 @@ SilentInstall silent
 !macroend
 Function .onInit
   FileOpen $R0 "$EXEDIR\\result.tsv" w
-  FileWriteUTF16LE $R0 "data root$\\t\${NOLA_DATA_ROOT}$\\r$\\n"
   ${checks}
   FileClose $R0
   SetErrorLevel 0
@@ -118,11 +119,11 @@ run(compiler, ['/WX', '/INPUTCHARSET', 'UTF8', '/V2', `/X!addincludedir "${templ
 run(join(directory, 'paths.exe'), ['/S'])
 const results = new Map(readFileSync(join(directory, 'result.tsv'), 'utf16le').trim().split(/\r?\n/).map(line => line.split('\t')))
 const failures = []
-assert.equal(results.get('data root'), join(process.env.LOCALAPPDATA, 'Programs', appInfo.productName), 'Installer data root must match the application data root')
 for (const [name, , expected] of cases) {
+  assert.equal(normalize(results.get(`${name} data`)), join(dirname(expected), 'Data'), `${name}: data must follow the selected installation root`)
   for (const label of [name, `${name} repeated`]) {
     if (results.get(label) !== expected) failures.push(`${label}: expected ${expected}, received ${results.get(label)}`)
   }
 }
 assert.equal(failures.length, 0, failures.join('\n'))
-console.log(`NSIS install paths: ${cases.length * 2 + 1} checks passed (${directory})`)
+console.log(`NSIS install paths: ${cases.length * 3} checks passed (${directory})`)

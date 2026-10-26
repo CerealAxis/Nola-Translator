@@ -18,6 +18,8 @@ export const DATA_ROOT_ENTRIES: readonly string[] = [
   'models',
   'cache',
   'runtimes',
+  'logs',
+  'local-call',
 ]
 
 /**
@@ -211,6 +213,18 @@ function usableExtraSources(from: string, to: string, extraSources: readonly str
 async function survey(source: string, to: string, extraSources: readonly string[]): Promise<Survey> {
   const report = emptyReport()
   const plans = new Map<string, EntryPlan>()
+  for (const root of [source, to]) {
+    try {
+      const stats = await lstat(root)
+      if (stats.isSymbolicLink() || !stats.isDirectory()) throw new Error('migration root is not an owned directory')
+    } catch (error) {
+      if (errorCode(error) !== 'ENOENT') {
+        console.error('data migration root could not be used safely', root, error)
+        report.failed.push(...DATA_ROOT_ENTRIES)
+        return { report, plans }
+      }
+    }
+  }
   const extras = usableExtraSources(source, to, extraSources)
   let requiredBytes = 0
   for (const name of DATA_ROOT_ENTRIES) {
@@ -247,6 +261,12 @@ async function survey(source: string, to: string, extraSources: readonly string[
       continue
     }
     const files = read.files
+    const destination = await readEntry(join(to, name))
+    if (destination.state === 'fault') {
+      console.error('data migration destination could not be used safely', join(to, name), destination.error)
+      report.failed.push(name)
+      continue
+    }
     const entryOrigin = join(entrySource, name)
     const bytes = files.reduce((total, file) => total + file.bytes, 0)
     let identical = false
@@ -312,7 +332,7 @@ async function clearModelStoragePath(settingsPath: string): Promise<void> {
 }
 
 /**
- * Refuse roots that are the same directory or nested in each other.
+ * Refuse roots that overlap, except the controlled migration into a direct Data child.
  *
  * Copying a root into itself would walk into the copy, and moving one into its own subdirectory would
  * delete the tree being walked. The answer is a report the caller can show, not an exception.
@@ -322,6 +342,12 @@ function refusedReport(from: string, to: string): DataRootMigrationReport {
   const report = emptyReport()
   report.failed.push(...DATA_ROOT_ENTRIES)
   return report
+}
+
+/** The affected default install moves into Data/, which is outside every allowlisted entry. */
+function unsafeRootOverlap(from: string, to: string): boolean {
+  if (resolve(to).toLowerCase() === resolve(from, 'Data').toLowerCase()) return false
+  return isSameOrInside(from, to) || isSameOrInside(to, from)
 }
 
 /**
@@ -334,7 +360,7 @@ export async function planDataRootMigration(
   to: string,
   extraSources: readonly string[] = [],
 ): Promise<DataRootMigrationReport> {
-  if (isSameOrInside(from, to) || isSameOrInside(to, from)) return refusedReport(from, to)
+  if (unsafeRootOverlap(from, to)) return refusedReport(from, to)
   return (await survey(from, to, extraSources)).report
 }
 
@@ -342,25 +368,37 @@ export async function planDataRootMigration(
  * Copy the allowlist to the new root, rewrite `settings.json`, then delete the source entries.
  *
  * Per-entry failures are reported rather than thrown: one unreadable entry must not cost the user the
- * other six, and the caller reads `failed` and `removed` to tell the user what moved and what did not.
+ * other entries, and the caller reads `failed` and `removed` to tell the user what moved and what did not.
  *
- * `removeSource` decides whether the source entries are deleted afterwards. The carry-over of a root
- * the app used to derive from the executable passes `false`: that root usually sits in a directory
- * the user cannot write to, so its files can only be copied, and a removal that fails would keep
- * the pending marker alive and repeat the copy on every launch.
+ * Source deletion starts only after every entry has copied successfully. An interrupted copy
+ * therefore leaves a complete usable source; removal failures retain a complete destination.
+ * `removeSource=false` is available for callers that explicitly request a copy.
  */
 export async function migrateDataRoot(
   from: string,
   to: string,
   extraSources: readonly string[] = [],
   removeSource = true,
+  cleanupOnly = false,
 ): Promise<DataRootMigrationReport> {
-  if (isSameOrInside(from, to) || isSameOrInside(to, from)) return refusedReport(from, to)
+  if (unsafeRootOverlap(from, to)) return refusedReport(from, to)
+  if (cleanupOnly) {
+    try {
+      const destination = await lstat(to)
+      if (!destination.isDirectory() || destination.isSymbolicLink()) throw new Error('migration destination is unavailable')
+    } catch (error) {
+      console.error('completed data migration destination is unavailable; keeping the source', to, error)
+      const report = emptyReport()
+      report.failed.push(...DATA_ROOT_ENTRIES)
+      return report
+    }
+  }
   const { report, plans } = await survey(from, to, extraSources)
 
   for (const name of DATA_ROOT_ENTRIES) {
     const plan = plans.get(name)
     if (!plan) continue
+    if (cleanupOnly) continue
     if (plan.identical) continue
     try {
       await mkdir(to, { recursive: true })
@@ -382,8 +420,9 @@ export async function migrateDataRoot(
   // dropped every folder overlapping either root. The old root's shell stays behind: it may hold files that
   // are not ours. An entry merely absent at the source is in neither `copied` nor identical, so it is never
   // reported as removed.
-  if (removeSource) {
-    const settled = new Set<string>(settledEntries(report, plans))
+  if (removeSource && report.failed.length === 0) {
+    // A persisted completed-copy marker makes the destination authoritative, even after edits.
+    const settled = new Set<string>(cleanupOnly ? plans.keys() : settledEntries(report, plans))
     for (const name of DATA_ROOT_ENTRIES) {
       const plan = plans.get(name)
       if (!plan || !settled.has(name)) continue

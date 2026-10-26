@@ -1,7 +1,26 @@
-import { mkdir, mkdtemp, readFile, rmdir } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, rmdir, rm } from 'node:fs/promises'
 import { isAbsolute, join, normalize } from 'node:path'
 
 import { RECOGNITION_MODEL_IDS, type RecognitionModelId } from '../shared/settings'
+
+/** Run before workers start. Only app-owned cache paths are disposable, never installed models. */
+export async function cleanupStorageCaches(root: string): Promise<void> {
+  if (!isAbsolute(root)) throw new Error('Storage path must be absolute')
+  for (const parts of [['cache'], ['.cache'], ['models', '.downloads'], ['runtimes', 'wheel-cache'], ['runtimes', 'pip-temp']]) {
+    let target = normalize(root)
+    try {
+      // Check every parent as well as the target; a junction must not redirect recursive cleanup.
+      for (const part of ['', ...parts]) {
+        if (part) target = join(target, part)
+        const entry = await lstat(target)
+        if (entry.isSymbolicLink() || !entry.isDirectory()) { target = ''; break }
+      }
+      if (target) await rm(target, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.warn('storage cache cleanup failed', target, error)
+    }
+  }
+}
 
 // `dataRoot` is the app's single data root, not `userData`: models and cache default next to the
 // rest of the app's data (see `data-root.ts`). A configured path still wins, but only when it is

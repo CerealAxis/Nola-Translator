@@ -48,6 +48,23 @@ async function fixture(factory?: GatewayWorkerFactory) {
 }
 
 describe('local gateway', () => {
+  it('internally routes cloud translation while keeping public model IDs fixed', async () => {
+    const initialized: GatewayWorkerResult[] = []
+    const test = await fixture((_launch, init) => {
+      initialized.push(init)
+      return { ready: Promise.resolve({}), request: async () => ({ text: 'translated' }), subscribe: () => () => undefined, close: async () => undefined }
+    })
+    test.settings.modelGateway.asr = false; test.settings.modelGateway.tts = false
+    test.settings.translation.provider = 'index-translate'
+    await test.gateway.start()
+    expect(test.gateway.snapshot().services.mt.state).toBe('ready')
+    expect(initialized[0]).toMatchObject({ kind: 'mt', config: { translationProvider: 'index-translate' } })
+    const models = await fetch(test.base + '/v1/models', { headers: await test.headers() }).then(response => response.json())
+    expect(models.data.map((model: { id: string }) => model.id)).toEqual(['nola-mt'])
+    const result = await fetch(test.base + '/v1/chat/completions', { method: 'POST', headers: await test.headers(), body: JSON.stringify({ model: 'nola-mt', messages: [{ role: 'user', content: 'hello' }] }) }).then(response => response.json())
+    expect(result.model).toBe('nola-mt')
+    expect(result.choices[0].message.content).toBe('translated')
+  })
   it('starts all enabled models concurrently and retains successful capabilities after an OOM', async () => {
     const started: string[] = []; const hydration = deferred<GatewayWorkerResult>()
     const test = await fixture((_launch, init) => {
@@ -114,7 +131,7 @@ describe('local gateway', () => {
     expect((await fetch(test.base + '/v1/models', { headers: await test.headers() })).status).toBe(200)
   })
 
-  it('reconfigures only affected models, pins running requests, and rejects cloud defaults explicitly', async () => {
+  it('reconfigures only affected models, pins running requests, and supports cloud defaults', async () => {
     const test = await fixture(); await test.gateway.start()
     const mt = test.workers.find(worker => worker.kind === 'mt')!
     const answer = deferred<GatewayWorkerResult>()
@@ -127,7 +144,7 @@ describe('local gateway', () => {
     await vi.waitFor(() => expect(mt.close).toHaveBeenCalledOnce())
     expect(test.workers.filter(worker => worker.kind === 'asr')).toHaveLength(1)
     test.settings.modelGateway.mt = true; test.settings.translation.provider = 'cloud'; await test.gateway.reconfigure()
-    expect(test.gateway.snapshot().services.mt.error).toContain('cloud provider')
+    expect(test.gateway.snapshot().services.mt.state).toBe('ready')
     expect(test.gateway.snapshot().services.asr.state).toBe('ready')
   })
 

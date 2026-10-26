@@ -1,9 +1,11 @@
-import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { Socket } from 'node:net'
 import { WebSocket, WebSocketServer } from 'ws'
 import type { ResourceRecord } from '../shared/contracts'
-import type { AppSettings } from '../shared/settings'
+import { recognitionFieldsOf, translationOptionsOf } from '../shared/cloud-config'
+import { customCredentialSlot } from '../shared/custom-models'
+import type { AppSettings, CredentialProvider } from '../shared/settings'
 import { DEFAULT_MODEL_GATEWAY, modelGatewaySettingsSchema, type GatewayCapability, type GatewayRequestSnapshot, type ModelGatewaySnapshot } from '../shared/model-gateway'
 import type { EngineLaunchSpec } from './engine-process'
 import { createGatewayWorker, GatewayWorkerError, type GatewayWorker, type GatewayWorkerFactory, type GatewayWorkerResult } from './model-gateway-worker'
@@ -17,6 +19,7 @@ export interface ModelGatewayOptions {
   getSettings(): AppSettings
   directLaunch(model: string): Promise<EngineLaunchSpec>
   listResources(): Promise<ResourceRecord[]>
+  getCredential?(provider: CredentialProvider): Promise<string>
   getKey(): Promise<string>
   setKey(value: string): Promise<void>
   onChanged?(snapshot: ModelGatewaySnapshot): void
@@ -136,30 +139,57 @@ export class ModelGateway {
   private async configureWorkers(): Promise<void> {
     const settings = this.options.getSettings()
     const config = modelGatewaySettingsSchema.parse(settings.modelGateway)
-    const resources = await this.options.listResources()
+    const usesLocal = (kind: GatewayCapability) => kind === 'tts' || (kind === 'asr' ? (settings.recognition.provider ?? 'local') === 'local' : settings.translation.provider === 'local')
+    const resources = KINDS.some(kind => config[kind] && usesLocal(kind)) ? await this.options.listResources() : []
     await Promise.all(KINDS.map(async kind => {
+      const local = usesLocal(kind)
       const modelId = kind === 'asr' ? settings.recognition.modelId : kind === 'mt' ? settings.translation.localModelId : settings.synthesis.modelId
-      const model = modelId ? `resource:${modelId}` : ''
-      const signature = JSON.stringify([model, settings.compute, kind === 'asr' ? settings.recognition.provider : kind === 'mt' ? settings.translation.provider : '', kind === 'mt' ? config.targetLanguage : ''])
-      const previous = this.slots.get(kind)
-      if (config[kind] && previous?.signature === signature && this.services[kind].state === 'ready') return
-      this.slots.delete(kind)
-      if (previous) this.retire(previous)
-      this.services[kind] = { state: config[kind] ? 'loading' : 'stopped', model, name: resources.find(item => item.resourceId === modelId)?.name ?? modelId ?? '' }
-      this.changed()
-      if (!config[kind] || this.stopping) return
+      const provider = kind === 'asr' ? settings.recognition.provider ?? 'local' : settings.translation.provider
+      const model = local ? `resource:${modelId}` : kind === 'mt' && provider === 'cloud'
+        ? `mt-custom:${settings.translation.customModelId || 'legacy'}` : `cloud:${provider}`
+      const name = local ? resources.find(item => item.resourceId === modelId)?.name ?? modelId
+        : kind === 'mt' && provider === 'cloud' ? settings.translation.cloudName || settings.translation.cloudModel
+          : kind === 'asr' ? provider === 'aliyun' ? settings.recognition.aliyunModel : settings.recognition.minimaxModel : provider
       let slot: WorkerSlot | undefined
+      const previous = this.slots.get(kind)
       try {
-        if ((kind === 'asr' && settings.recognition.provider !== 'local') || (kind === 'mt' && settings.translation.provider !== 'local')) throw new Error('The configured default uses a cloud provider. Select a local model for this gateway capability.')
-        const record = resources.find(item => item.resourceId === modelId)
-        if (!record?.installed || record.kind !== RESOURCE_KIND[kind]) throw new Error('Select an installed model with the correct capability.')
+        const workerConfig: GatewayWorkerResult = { compute: settings.compute,
+          recognitionProvider: kind === 'asr' ? settings.recognition.provider ?? 'local' : 'aliyun',
+          recognitionModelId: kind === 'asr' && local ? modelId : undefined,
+          translationProvider: kind === 'mt' ? settings.translation.provider : 'local',
+          translationModelId: kind === 'mt' && local ? modelId : undefined,
+          sourceLanguage: 'auto', targetLanguages: kind === 'mt' ? [config.targetLanguage] : [],
+          max_segment_ms: settings.recognition.max_segment_ms, silence_end_ms: settings.recognition.silence_end_ms }
+        if (config[kind] && !local) {
+          if (kind === 'asr') {
+            Object.assign(workerConfig, recognitionFieldsOf(settings.recognition))
+            const key = await this.options.getCredential?.(provider === 'aliyun' ? 'aliyun-asr' : 'minimax-asr')
+            if (!key) throw new Error('The configured default requires a cloud recognition API key.')
+            workerConfig.recognitionOptions = { ...workerConfig.recognitionOptions as object, apiKey: key }
+          } else {
+            if (provider === 'recognition') throw new Error('The configured default returns translation with audio. Select a text translation provider for nola-mt.')
+            const credential: CredentialProvider | undefined = provider === 'cloud'
+              ? customCredentialSlot(settings.translation.customModelId || 'legacy') : provider === 'microsoft' || provider === 'google' ? provider : undefined
+            const key = credential ? await this.options.getCredential?.(credential) : undefined
+            workerConfig.translationOptions = { ...translationOptionsOf(settings.translation), ...(key ? { apiKey: key } : {}) }
+          }
+        }
+        // Secrets influence reloads but must never appear in snapshots, diagnostics or model IDs.
+        const signature = createHash('sha256').update(JSON.stringify([model, workerConfig])).digest('hex')
+        if (config[kind] && previous?.signature === signature && this.services[kind].state === 'ready') return
+        this.slots.delete(kind)
+        if (previous) this.retire(previous)
+        this.services[kind] = { state: config[kind] ? 'loading' : 'stopped', model, name: name ?? '' }
+        this.changed()
+        if (!config[kind] || this.stopping) return
+        if (local) {
+          const record = resources.find(item => item.resourceId === modelId)
+          if (!record?.installed || record.kind !== RESOURCE_KIND[kind]) throw new Error('Select an installed model with the correct capability.')
+        }
         const launch = await this.options.directLaunch(model)
         if (this.stopping) return
-        const worker = (this.options.createWorker ?? createGatewayWorker)(launch, { kind, resourceId: modelId,
-          config: { compute: settings.compute, recognitionProvider: kind === 'asr' ? 'local' : 'aliyun', recognitionModelId: kind === 'asr' ? modelId : undefined,
-            translationProvider: 'local', translationModelId: kind === 'mt' ? modelId : undefined,
-            sourceLanguage: 'auto', targetLanguages: kind === 'mt' ? [config.targetLanguage] : [],
-            max_segment_ms: settings.recognition.max_segment_ms, silence_end_ms: settings.recognition.silence_end_ms } }, message => {
+        const worker = (this.options.createWorker ?? createGatewayWorker)(launch, { kind,
+          ...(local ? { resourceId: modelId } : {}), config: workerConfig }, message => {
           if (this.slots.get(kind) === slot && !this.stopping) { this.services[kind].state = 'failed'; this.services[kind].error = message; this.changed() }
         })
         slot = { worker, model, signature, refs: 0, retired: false }; this.slots.set(kind, slot)
@@ -168,7 +198,8 @@ export class ModelGateway {
         this.services[kind] = { ...this.services[kind], state: 'ready', ...(Array.isArray(ready.voices) ? { voices: ready.voices.filter((voice): voice is string => typeof voice === 'string') } : {}) }
       } catch (error) {
         if (slot) { this.slots.delete(kind); await slot.worker.close() }
-        if (!this.stopping) this.services[kind] = { ...this.services[kind], state: 'failed', error: error instanceof Error && /^(Select an installed|The configured default)/.test(error.message) ? error.message : 'Model could not load. Check the installed runtime and available memory.' }
+        else if (previous && this.slots.get(kind) === previous) { this.slots.delete(kind); this.retire(previous) }
+        if (!this.stopping) this.services[kind] = { state: 'failed', model, name: name ?? '', error: error instanceof Error && /^(Select an installed|The configured default)/.test(error.message) ? error.message : 'Model could not load. Check the model configuration, runtime and connection.' }
       }
       this.changed()
     }))
@@ -202,7 +233,7 @@ export class ModelGateway {
   private acquire(kind: GatewayCapability, model: unknown): { slot: WorkerSlot; release(): void } {
     const slot = this.slots.get(kind)
     if (!slot || this.services[kind].state !== 'ready') throw new GatewayError(503, `${kind.toUpperCase()} model is not ready`, 'model_unavailable')
-    if (model !== undefined && model !== '' && model !== slot.model && model !== slot.model.slice(9) && model !== kind && model !== `nola-${kind}`) throw new GatewayError(404, 'Model does not match the active capability', 'model_not_found')
+    if (model !== undefined && model !== '' && !(slot.model.startsWith('resource:') && (model === slot.model || model === slot.model.slice(9))) && model !== kind && model !== `nola-${kind}`) throw new GatewayError(404, 'Model does not match the active capability', 'model_not_found')
     slot.refs++
     let released = false
     return { slot, release: () => { if (released) return; released = true; slot.refs--; if (slot.retired && !slot.refs) { this.retiring.delete(slot); void slot.worker.close() } } }
@@ -249,7 +280,7 @@ export class ModelGateway {
         this.json(response, 200, { client_secret: { value: ticket, expires_at: Math.floor(expires / 1000) }, url: `/v1/realtime?ticket=${ticket}` }); return
       }
       if (request.method === 'GET' && path === '/v1/models') {
-        this.json(response, 200, { object: 'list', data: KINDS.filter(kind => this.services[kind].state === 'ready').map(kind => ({ id: this.services[kind].model, object: 'model', created: 0, owned_by: 'nola', capabilities: [kind], ...(kind === 'tts' ? { voices: this.services[kind].voices ?? [] } : {}) })) }); return
+        this.json(response, 200, { object: 'list', data: KINDS.filter(kind => this.services[kind].state === 'ready').map(kind => ({ id: `nola-${kind}`, object: 'model', created: 0, owned_by: 'nola', capabilities: [kind], ...(kind === 'tts' ? { voices: this.services[kind].voices ?? [] } : {}) })) }); return
       }
       if (request.method !== 'POST' || !['/v1/chat/completions', '/v1/audio/speech', '/v1/audio/transcriptions'].includes(path)) throw new GatewayError(404, 'Unknown endpoint')
       if (this.state !== 'running') throw new GatewayError(503, 'Gateway is loading')
@@ -289,9 +320,9 @@ export class ModelGateway {
         const content = String(result.text ?? '')
         if (data.stream === true) {
           response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' })
-          const send = (delta: unknown, finish: string | null) => response.write('data: ' + JSON.stringify({ id, object: 'chat.completion.chunk', created, model: acquired.slot.model, choices: [{ index: 0, delta, finish_reason: finish }] }) + '\n\n')
+          const send = (delta: unknown, finish: string | null) => response.write('data: ' + JSON.stringify({ id, object: 'chat.completion.chunk', created, model: `nola-${kind}`, choices: [{ index: 0, delta, finish_reason: finish }] }) + '\n\n')
           send({ role: 'assistant', content }, null); send({}, 'stop'); response.end('data: [DONE]\n\n')
-        } else this.json(response, 200, { id, object: 'chat.completion', created, model: acquired.slot.model, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }] })
+        } else this.json(response, 200, { id, object: 'chat.completion', created, model: `nola-${kind}`, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }] })
       }
       this.finish(entry)
     } catch (cause) {

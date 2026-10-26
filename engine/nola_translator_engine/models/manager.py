@@ -539,21 +539,8 @@ class ModelManager:
         if not self.model_root.exists():
             return
         names = list(self.model_root.iterdir())
-        cache_root = self.model_root / ".downloads"
-        if cache_root.is_dir() and not cache_root.is_symlink() and not cache_root.is_junction():
-            cutoff = time.time() - 30 * 24 * 60 * 60
-            for cache in cache_root.iterdir():
-                try:
-                    is_stale = cache.stat().st_mtime < cutoff
-                except OSError:
-                    continue
-                if (cache.is_dir() and not cache.is_symlink() and not cache.is_junction()
-                        and is_stale):
-                    shutil.rmtree(cache, ignore_errors=True)
-            try:
-                cache_root.rmdir()
-            except OSError:
-                pass
+        # The desktop clears download caches before launching any worker. Do not purge them
+        # here: offline import/export also calls this method during an active app session.
         for spec in specs:
             target = self.model_path(spec)
             prefix = _UNSAFE_PATH_CHARS.sub('-', spec.directory)[:_SAFE_PREFIX_LIMIT] or 'model'

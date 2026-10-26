@@ -3,7 +3,6 @@ import { AssistantRuntimeProvider, SimpleImageAttachmentAdapter, SimpleTextAttac
 import { createLocalStorageAdapter } from '@assistant-ui/core/react'
 import { AssistantChatTransport, useChatRuntime } from '@assistant-ui/ai-sdk'
 import { lastAssistantMessageIsCompleteWithToolCalls, lastAssistantMessageIsCompleteWithApprovalResponses } from 'ai'
-import { JSONGenerativeUI } from '@assistant-ui/generative-ui/react'
 import { styledGenerativeUILibrary } from '@/components/assistant-ui/native/generative-ui'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
@@ -18,9 +17,8 @@ import { AudioAttachmentAdapter, VideoAttachmentAdapter } from './audio-attachme
 import { getBridge } from '@/store'
 import type { AgentWorkspaceSnapshot, WorkspaceAction } from '../../../shared/agent-workspace'
 import { NativeAgentSurface } from './NativeAgentSurface'
-import { nativePresentationTools } from './native-agent-tools'
+import { createGenerativePresentationTools, nativePresentationTools } from './native-agent-tools'
 
-const generativeUI = new JSONGenerativeUI({ library: styledGenerativeUILibrary })
 const workbenchStorage = {
   getItem: async (key: string) => window.localStorage.getItem(key),
   setItem: async (key: string, value: string) => window.localStorage.setItem(key, value),
@@ -29,8 +27,7 @@ const workbenchStorage = {
 // This desktop transport forwards schemas instead of relying on a server-side generative compiler.
 const agentTools = defineToolkit({
   ...nativePresentationTools,
-  present: { ...generativeUI.present({ display: 'standalone' }), unstable_backendDefault: { parameters: false } },
-  prompt_user: { ...generativeUI.promptUser(), unstable_backendDefault: { parameters: false } },
+  ...createGenerativePresentationTools(styledGenerativeUILibrary),
 })
 
 class WorkbenchSpeechSynthesisAdapter {

@@ -1,6 +1,6 @@
 export const gatewayZh = {
-  modelId: 'API 模型 ID', localModel: '对应的本地模型', copyModelId: '复制模型 ID：{model}',
-  modelIdHint: '在第三方应用的「模型」字段填写下方 API 模型 ID。更换默认本地模型后，ID 保持不变。',
+  modelId: 'API 模型 ID', localModel: '对应模型', copyModelId: '复制模型 ID：{model}',
+  modelIdHint: '在第三方应用的「模型」字段填写下方 API 模型 ID。更换默认模型后，ID 保持不变。',
   realtimeBrowserHint: '浏览器客户端先用 API 密钥调用 POST /v1/realtime/sessions，再使用响应中的一次性 url 建立 WebSocket 连接。',
 
   capabilityFailed: '{name} 已停止响应',
@@ -28,9 +28,9 @@ export const gatewayZh = {
   loading: '加载中', ready: '已就绪', completed: '已完成', cancelled: '已取消',
   address: '服务地址', key: 'API 密钥', copy: '复制', copied: '已复制', reveal: '显示密钥', hide: '隐藏密钥', rotate: '重置密钥',
   rotateTitle: '重置 API 密钥？', rotateDescription: '现有应用需要使用新密钥才能继续连接。',
-  capabilities: '开放能力', defaultsHint: '使用模型管理中的默认本地模型。启用的模型会同时加载，请确认可用内存。',
+  capabilities: '开放能力', defaultsHint: '使用模型管理中的默认模型，支持本地模型和已配置的云端服务。',
   asr: '语音识别', mt: '文本翻译', tts: '语音合成', models: '管理默认模型',
-  configureModel: '请先安装并设置默认本地模型', serviceFailed: '模型加载失败，请检查模型、运行组件与可用内存。',
+  configureModel: '请先设置默认模型或配置云端服务', serviceFailed: '模型不可用，请检查模型配置、运行组件或网络连接。',
   actionFailed: '操作失败，请检查本地服务和日志后重试。', connections: '连接数', activeRequests: '进行中的请求', requests: '最近请求', noRequests: '暂无请求',
   examples: '连接示例', examplesHint: '将 YOUR_API_KEY 替换为上方密钥。模型 ID 可通过 GET /v1/models 获取。',
   network: '连接范围', loopback: '仅本机', lan: '局域网', lanHint: '局域网设备需要使用这台电脑的实际 IP 地址，并允许防火墙访问。请仅向可信应用提供密钥。',
@@ -43,8 +43,8 @@ export const gatewayZh = {
 }
 
 export const gatewayEn: Record<keyof typeof gatewayZh, string> = {
-  modelId: 'API model ID', localModel: 'Mapped local model', copyModelId: 'Copy model ID: {model}',
-  modelIdHint: 'Enter the API model ID below in the third-party app’s model field. The ID stays the same when you change the default local model.',
+  modelId: 'API model ID', localModel: 'Mapped model', copyModelId: 'Copy model ID: {model}',
+  modelIdHint: 'Enter the API model ID below in the third-party app’s model field. The ID stays the same when you change the default model.',
   realtimeBrowserHint: 'Browser clients first call POST /v1/realtime/sessions with the API key, then connect a WebSocket using the one-use url in the response.',
 
   capabilityFailed: '{name} is unavailable',
@@ -72,9 +72,9 @@ export const gatewayEn: Record<keyof typeof gatewayZh, string> = {
   loading: 'Loading', ready: 'Ready', completed: 'Completed', cancelled: 'Cancelled',
   address: 'Service address', key: 'API key', copy: 'Copy', copied: 'Copied', reveal: 'Show key', hide: 'Hide key', rotate: 'Reset key',
   rotateTitle: 'Reset the API key?', rotateDescription: 'Connected applications will need the new key to reconnect.',
-  capabilities: 'Capabilities', defaultsHint: 'Uses the default local models from model management. Enabled models load together; check available memory.',
+  capabilities: 'Capabilities', defaultsHint: 'Uses the defaults from model management, including local models and configured cloud services.',
   asr: 'Speech recognition', mt: 'Text translation', tts: 'Speech synthesis', models: 'Manage default models',
-  configureModel: 'Install and select a default local model first', serviceFailed: 'The model could not load. Check the model, runtime, and available memory.',
+  configureModel: 'Select a default model or configure a cloud service first', serviceFailed: 'The model is unavailable. Check its configuration, runtime or network connection.',
   actionFailed: 'The operation failed. Check the local service and logs, then try again.', connections: 'Connections', activeRequests: 'Active requests', requests: 'Recent requests', noRequests: 'No requests yet',
   examples: 'Connection examples', examplesHint: 'Replace YOUR_API_KEY with the key above. Get model IDs from GET /v1/models.',
   network: 'Access', loopback: 'This computer only', lan: 'Local network', lanHint: 'Other devices need this computer’s actual IP address and firewall access. Share the key only with trusted applications.',
@@ -87,8 +87,8 @@ export const gatewayEn: Record<keyof typeof gatewayZh, string> = {
 }
 
 export const gatewayTw: typeof gatewayEn = {
-  modelId: 'API 模型 ID', localModel: '對應的本機模型', copyModelId: '複製模型 ID：{model}',
-  modelIdHint: '在第三方應用程式的「模型」欄位填入下方 API 模型 ID。更換預設本機模型後，ID 保持不變。',
+  modelId: 'API 模型 ID', localModel: '對應模型', copyModelId: '複製模型 ID：{model}',
+  modelIdHint: '在第三方應用程式的「模型」欄位填入下方 API 模型 ID。更換預設模型後，ID 保持不變。',
   realtimeBrowserHint: '瀏覽器用戶端先用 API 金鑰呼叫 POST /v1/realtime/sessions，再使用回應中的一次性 url 建立 WebSocket 連線。',
 
   capabilityFailed: '{name} 已停止回應',
@@ -113,14 +113,14 @@ export const gatewayTw: typeof gatewayEn = {
   title: '模型閘道', subtitle: '讓其他應用程式透過本機 API 使用 Nola 的預設模型。', service: '服務', start: '啟動服務', stop: '停止服務', unavailable: '此環境不支援本機服務',
   stopped: '已停止', starting: '正在啟動', running: '執行中', stopping: '正在停止', failed: '失敗', loading: '載入中', ready: '已就緒', completed: '已完成', cancelled: '已取消',
   address: '服務位址', key: 'API 金鑰', copy: '複製', copied: '已複製', reveal: '顯示金鑰', hide: '隱藏金鑰', rotate: '重設金鑰', rotateTitle: '重設 API 金鑰？', rotateDescription: '現有應用程式需要使用新金鑰才能繼續連線。',
-  capabilities: '開放能力', defaultsHint: '使用模型管理中的預設本機模型。啟用的模型會同時載入，請確認可用記憶體。', asr: '語音辨識', mt: '文字翻譯', tts: '語音合成', models: '管理預設模型', configureModel: '請先安裝並設定預設本機模型', serviceFailed: '模型載入失敗，請檢查模型、執行元件與可用記憶體。', actionFailed: '操作失敗，請檢查本機服務和記錄後重試。', connections: '連線數', activeRequests: '進行中的請求', requests: '最近請求', noRequests: '尚無請求',
+  capabilities: '開放能力', defaultsHint: '使用模型管理中的預設模型，支援本機模型與已設定的雲端服務。', asr: '語音辨識', mt: '文字翻譯', tts: '語音合成', models: '管理預設模型', configureModel: '請先設定預設模型或雲端服務', serviceFailed: '模型無法使用，請檢查模型設定、執行元件或網路連線。', actionFailed: '操作失敗，請檢查本機服務和記錄後重試。', connections: '連線數', activeRequests: '進行中的請求', requests: '最近請求', noRequests: '尚無請求',
   examples: '連線範例', examplesHint: '將 YOUR_API_KEY 替換為上方金鑰。模型 ID 可透過 GET /v1/models 取得。', network: '連線範圍', loopback: '僅本機', lan: '區域網路', lanHint: '區域網路裝置需要使用這台電腦的實際 IP 位址，並允許防火牆存取。請僅向可信應用程式提供金鑰。', port: '連接埠', targetLanguage: '預設翻譯目標語言', configHint: '服務執行時修改設定會重新載入已啟用的能力。',
   synthesisDefault: '預設語音合成模型', change: '變更', voice: '預設聲音', voiceHint: '啟動語音合成後顯示模型實際提供的聲音。', closeBehavior: '關閉主視窗時', closeHint: '保留在系統匣時，本機服務會繼續執行。', closeTray: '保留在系統匣', closeQuit: '結束應用程式', conflictTitle: '切換正在執行的功能？', conflictDescription: '{name} 正在使用模型。停止後即可啟動所選功能。', switchFeature: '停止並啟動', workbench: '工作台', interpretation: '同步口譯', 'browser-captions': '瀏覽器字幕', 'model-gateway': '模型閘道', requestFailed: '請求失敗', duration: '{value} 毫秒', refresh: '重新整理狀態',
 }
 export const gatewayHk: typeof gatewayEn = { ...gatewayTw, closeTray: '保留在系統匣', interpretation: '即時傳譯', asr: '語音識別', lan: '本地網絡', actionFailed: '操作失敗，請檢查本機服務和記錄後重試。' }
 export const gatewayJa: typeof gatewayEn = {
-  modelId: 'API モデル ID', localModel: '対応するローカルモデル', copyModelId: 'モデル ID をコピー：{model}',
-  modelIdHint: '外部アプリのモデル欄には、下記の API モデル ID を入力してください。既定のローカルモデルを変更しても ID は変わりません。',
+  modelId: 'API モデル ID', localModel: '対応するモデル', copyModelId: 'モデル ID をコピー：{model}',
+  modelIdHint: '外部アプリのモデル欄には、下記の API モデル ID を入力してください。既定のモデルを変更しても ID は変わりません。',
   realtimeBrowserHint: 'ブラウザーは API キーで POST /v1/realtime/sessions を呼び出し、応答に含まれる一度限りの url で WebSocket 接続を作成します。',
 
   capabilityFailed: '{name} を利用できません',
@@ -143,12 +143,12 @@ export const gatewayJa: typeof gatewayEn = {
   quit: 'アプリを終了',
 
   title: 'モデルゲートウェイ', subtitle: '他のアプリからローカル API を通じて Nola の既定モデルを利用できます。', service: 'サービス', start: 'サービスを開始', stop: 'サービスを停止', unavailable: 'この環境ではローカルサービスを利用できません', stopped: '停止済み', starting: '起動中', running: '実行中', stopping: '停止中', failed: '失敗', loading: '読み込み中', ready: '準備完了', completed: '完了', cancelled: 'キャンセル済み',
-  address: 'サービスアドレス', key: 'API キー', copy: 'コピー', copied: 'コピーしました', reveal: 'キーを表示', hide: 'キーを非表示', rotate: 'キーをリセット', rotateTitle: 'API キーをリセットしますか？', rotateDescription: '接続中のアプリは新しいキーで再接続する必要があります。', capabilities: '公開する機能', defaultsHint: 'モデル管理の既定ローカルモデルを使います。有効なモデルは同時に読み込まれるため、空きメモリを確認してください。', asr: '音声認識', mt: 'テキスト翻訳', tts: '音声合成', models: '既定モデルを管理', configureModel: '既定のローカルモデルをインストールして選択してください', serviceFailed: 'モデルの読み込みに失敗しました。モデル、実行環境、空きメモリを確認してください。', actionFailed: '操作に失敗しました。ローカルサービスとログを確認して再試行してください。', connections: '接続数', activeRequests: '処理中のリクエスト', requests: '最近のリクエスト', noRequests: 'リクエストはありません',
+  address: 'サービスアドレス', key: 'API キー', copy: 'コピー', copied: 'コピーしました', reveal: 'キーを表示', hide: 'キーを非表示', rotate: 'キーをリセット', rotateTitle: 'API キーをリセットしますか？', rotateDescription: '接続中のアプリは新しいキーで再接続する必要があります。', capabilities: '公開する機能', defaultsHint: 'モデル管理の既定モデルを使います。ローカルモデルと設定済みのクラウドサービスに対応します。', asr: '音声認識', mt: 'テキスト翻訳', tts: '音声合成', models: '既定モデルを管理', configureModel: '既定モデルを選択するかクラウドサービスを設定してください', serviceFailed: 'モデルを利用できません。設定、実行環境、ネットワーク接続を確認してください。', actionFailed: '操作に失敗しました。ローカルサービスとログを確認して再試行してください。', connections: '接続数', activeRequests: '処理中のリクエスト', requests: '最近のリクエスト', noRequests: 'リクエストはありません',
   examples: '接続例', examplesHint: 'YOUR_API_KEY を上のキーに置き換えてください。モデル ID は GET /v1/models で取得できます。', network: '接続範囲', loopback: 'このコンピューターのみ', lan: 'ローカルネットワーク', lanHint: '他の端末はこのコンピューターの実際の IP アドレスとファイアウォールの許可が必要です。信頼できるアプリとのみキーを共有してください。', port: 'ポート', targetLanguage: '既定の翻訳先言語', configHint: '実行中に設定を変更すると、有効な機能が再読み込みされます。', synthesisDefault: '既定の音声合成モデル', change: '変更', voice: '既定の音声', voiceHint: '音声合成を起動するとモデルで利用可能な音声を表示します。', closeBehavior: 'メインウィンドウを閉じたとき', closeHint: 'トレイに常駐するとローカルサービスは動作し続けます。', closeTray: 'システムトレイに常駐', closeQuit: 'アプリを終了', conflictTitle: '実行中の機能を切り替えますか？', conflictDescription: '{name} がモデルを使用しています。停止すると選択した機能を開始できます。', switchFeature: '停止して開始', workbench: 'ワークベンチ', interpretation: '同時通訳', 'browser-captions': 'ブラウザー字幕', 'model-gateway': 'モデルゲートウェイ', requestFailed: 'リクエスト失敗', duration: '{value} ミリ秒', refresh: '状態を更新',
 }
 export const gatewayKo: typeof gatewayEn = {
-  modelId: 'API 모델 ID', localModel: '연결된 로컬 모델', copyModelId: '모델 ID 복사: {model}',
-  modelIdHint: '외부 앱의 모델 필드에 아래 API 모델 ID를 입력하세요. 기본 로컬 모델을 변경해도 ID는 유지됩니다.',
+  modelId: 'API 모델 ID', localModel: '연결된 모델', copyModelId: '모델 ID 복사: {model}',
+  modelIdHint: '외부 앱의 모델 필드에 아래 API 모델 ID를 입력하세요. 기본 모델을 변경해도 ID는 유지됩니다.',
   realtimeBrowserHint: '브라우저 클라이언트는 API 키로 POST /v1/realtime/sessions를 호출한 후 응답의 일회용 url로 WebSocket에 연결합니다。',
 
   capabilityFailed: '{name}을 사용할 수 없습니다',
@@ -171,7 +171,7 @@ export const gatewayKo: typeof gatewayEn = {
   quit: '앱 종료',
 
   title: '모델 게이트웨이', subtitle: '다른 앱에서 로컬 API로 Nola의 기본 모델을 사용할 수 있습니다.', service: '서비스', start: '서비스 시작', stop: '서비스 중지', unavailable: '이 환경에서는 로컬 서비스를 사용할 수 없습니다', stopped: '중지됨', starting: '시작 중', running: '실행 중', stopping: '중지 중', failed: '실패', loading: '불러오는 중', ready: '준비됨', completed: '완료', cancelled: '취소됨',
-  address: '서비스 주소', key: 'API 키', copy: '복사', copied: '복사됨', reveal: '키 표시', hide: '키 숨기기', rotate: '키 재설정', rotateTitle: 'API 키를 재설정할까요?', rotateDescription: '연결된 앱은 새 키로 다시 연결해야 합니다.', capabilities: '제공 기능', defaultsHint: '모델 관리에서 선택한 기본 로컬 모델을 사용합니다. 활성화한 모델을 동시에 불러오므로 사용 가능한 메모리를 확인하세요.', asr: '음성 인식', mt: '텍스트 번역', tts: '음성 합성', models: '기본 모델 관리', configureModel: '먼저 기본 로컬 모델을 설치하고 선택하세요', serviceFailed: '모델을 불러오지 못했습니다. 모델, 런타임, 사용 가능한 메모리를 확인하세요.', actionFailed: '작업에 실패했습니다. 로컬 서비스와 로그를 확인한 후 다시 시도하세요.', connections: '연결 수', activeRequests: '처리 중인 요청', requests: '최근 요청', noRequests: '아직 요청이 없습니다',
+  address: '서비스 주소', key: 'API 키', copy: '복사', copied: '복사됨', reveal: '키 표시', hide: '키 숨기기', rotate: '키 재설정', rotateTitle: 'API 키를 재설정할까요?', rotateDescription: '연결된 앱은 새 키로 다시 연결해야 합니다.', capabilities: '제공 기능', defaultsHint: '모델 관리의 기본 모델을 사용합니다. 로컬 모델과 설정된 클라우드 서비스를 지원합니다.', asr: '음성 인식', mt: '텍스트 번역', tts: '음성 합성', models: '기본 모델 관리', configureModel: '먼저 기본 모델을 선택하거나 클라우드 서비스를 설정하세요', serviceFailed: '모델을 사용할 수 없습니다. 설정, 런타임 또는 네트워크 연결을 확인하세요.', actionFailed: '작업에 실패했습니다. 로컬 서비스와 로그를 확인한 후 다시 시도하세요.', connections: '연결 수', activeRequests: '처리 중인 요청', requests: '최근 요청', noRequests: '아직 요청이 없습니다',
   examples: '연결 예시', examplesHint: 'YOUR_API_KEY를 위의 키로 바꾸세요. GET /v1/models에서 모델 ID를 확인할 수 있습니다.', network: '접속 범위', loopback: '이 컴퓨터만', lan: '로컬 네트워크', lanHint: '다른 기기는 이 컴퓨터의 실제 IP 주소와 방화벽 허용이 필요합니다. 신뢰할 수 있는 앱에만 키를 제공하세요.', port: '포트', targetLanguage: '기본 번역 대상 언어', configHint: '실행 중 설정을 변경하면 활성화한 기능을 다시 불러옵니다.', synthesisDefault: '기본 음성 합성 모델', change: '변경', voice: '기본 음성', voiceHint: '음성 합성을 시작하면 모델에서 제공하는 음성을 표시합니다.', closeBehavior: '메인 창을 닫을 때', closeHint: '트레이에 유지하면 로컬 서비스가 계속 실행됩니다.', closeTray: '시스템 트레이에 유지', closeQuit: '앱 종료', conflictTitle: '실행 중인 기능을 전환할까요?', conflictDescription: '{name}에서 모델을 사용 중입니다. 중지하면 선택한 기능을 시작할 수 있습니다.', switchFeature: '중지 후 시작', workbench: '워크벤치', interpretation: '동시 통역', 'browser-captions': '브라우저 자막', 'model-gateway': '모델 게이트웨이', requestFailed: '요청 실패', duration: '{value} 밀리초', refresh: '상태 새로 고침',
 }
 

@@ -4,8 +4,18 @@ import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 const handlers = vi.hoisted(() => new Map<string, (...args: any[]) => any>())
 vi.mock('electron', () => ({ ipcMain: { handle: (name: string, callback: (...args: any[]) => any) => handlers.set(name, callback) } }))
 import { registerLanguageModelIpc } from '../../../src/main/language-model'
+import { normalizeDirectToolHistory } from '../../../src/main/language-model-stream'
 import type { AgentWorkspace } from '../../../src/main/agent-workspace'
 afterEach(() => { vi.restoreAllMocks(); handlers.clear() })
+
+it('keeps desktop media workflow history without presenting it as provider-executed cloud tools', () => {
+  const history = [{ id: 'media', role: 'assistant' as const, parts: [{ type: 'dynamic-tool' as const,
+    toolName: 'nola_translate_text', toolCallId: 'direct', providerExecuted: true, state: 'output-available' as const,
+    input: { model: 'resource:test' }, output: 'Translation completed' }] }]
+  const normalized = normalizeDirectToolHistory(history)
+  expect(normalized[0].parts).toEqual([{ type: 'text', text: 'Nola media operation nola_translate_text completed: Translation completed' }])
+  expect(history[0].parts[0].providerExecuted).toBe(true)
+})
 
 it('streams Anthropic reasoning before completion and forwards text and actual usage', async () => {
   let finish!: () => void

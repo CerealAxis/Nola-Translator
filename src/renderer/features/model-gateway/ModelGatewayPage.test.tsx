@@ -31,7 +31,7 @@ it('renders real service updates without showing diagnostics or exposing its key
   act(() => receive({ ...snapshot, connections: 3, activeRequests: 2, services: { ...snapshot.services, mt: { ...snapshot.services.mt, state: 'failed', error: 'raw database path secret' } } }))
   expect(screen.getByText('3')).toBeInTheDocument()
   expect(screen.getByText('2')).toBeInTheDocument()
-  expect(screen.getByText('模型加载失败，请检查模型、运行组件与可用内存。')).toBeInTheDocument()
+  expect(screen.getByText('模型不可用，请检查模型配置、运行组件或网络连接。')).toBeInTheDocument()
   expect(screen.queryByText('raw database path secret')).not.toBeInTheDocument()
 })
 

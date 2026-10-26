@@ -1,9 +1,36 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, rmdir, writeFile, unlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, rmdir, writeFile, unlink, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { modelStorageEnvironment, readEngineStatus, validateModelStorageDirectory } from '../../../src/main/model-storage'
+import { cleanupStorageCaches, modelStorageEnvironment, readEngineStatus, validateModelStorageDirectory } from '../../../src/main/model-storage'
 
 describe('model storage', () => {
+  it('does not follow a models junction when removing download fragments', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nola-cache-link-'))
+    try {
+      const external = join(root, 'external')
+      const storage = join(root, 'storage')
+      await mkdir(join(external, '.downloads'), { recursive: true })
+      await writeFile(join(external, '.downloads', 'user-file'), 'keep')
+      await mkdir(storage)
+      await symlink(external, join(storage, 'models'), 'junction')
+      await cleanupStorageCaches(storage)
+      expect(await readFile(join(external, '.downloads', 'user-file'), 'utf8')).toBe('keep')
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+  it('removes fresh download and temporary caches at startup while preserving installed data', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nola-cache-'))
+    try {
+      for (const name of ['cache/tmp', '.cache', 'models/.downloads/fresh', 'runtimes/wheel-cache', 'runtimes/pip-temp', 'models/installed', 'meetings']) {
+        await mkdir(join(root, name), { recursive: true })
+        await writeFile(join(root, name, 'keep-or-remove'), 'data')
+      }
+      await cleanupStorageCaches(root)
+      expect((await readdir(root)).sort()).toEqual(['meetings', 'models', 'runtimes'])
+      expect(await readdir(join(root, 'models'))).toEqual(['installed'])
+      expect(await readdir(join(root, 'runtimes'))).toEqual([])
+      expect(await readFile(join(root, 'meetings', 'keep-or-remove'), 'utf8')).toBe('data')
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
   it('points the model directory at the default root and forces offline model loads', () => {
     const root = join(tmpdir(), 'user-data')
     const env = modelStorageEnvironment(root)

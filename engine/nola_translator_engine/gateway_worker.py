@@ -166,6 +166,15 @@ class GatewayWorker:
         self.kind = ''
         self.sessions = {}
         self.inference = asyncio.Lock()
+        self.config = None
+
+    def remote_recognizer(self, config=None):
+        config = config or self.config
+        if config.recognitionProvider == 'minimax':
+            from .recognition.minimax import MiniMaxRecognizer
+            return MiniMaxRecognizer(config)
+        from .recognition.aliyun import AliyunRecognizer
+        return AliyunRecognizer(config)
 
     async def initialize(self, request):
         from .runtime import EngineRuntime
@@ -183,6 +192,21 @@ class GatewayWorker:
             raise ValueError('Unknown capability')
         self.runtime = IsolatedRuntime(Path(os.environ['NOLA_TRANSLATOR_MODEL_DIR']), lambda _event: None)
         config = PrewarmConfig.model_validate(request['config'])
+        self.config = config
+        if self.kind == 'asr' and config.recognitionProvider != 'local':
+            # Validate configuration without opening or billing a cloud session at gateway startup.
+            recognizer = self.remote_recognizer()
+            try:
+                recognizer.validate_credentials()
+            finally:
+                await recognizer.close()
+            return {}
+        if self.kind == 'mt' and config.translationProvider != 'local':
+            if config.translationProvider == 'recognition':
+                raise ValueError('Native speech translation requires audio, not a text request')
+            command = PrewarmModelsCommand(protocolVersion=1, requestId='gateway', type='prewarmModels', config=config)
+            self.runtime._configure_translation(command)
+            return {}
         model_id = request['resourceId']
         record = self.runtime.resources.record(model_id)
         if not record.installed or record.kind != {'asr': 'recognitionModel', 'mt': 'translationModel', 'tts': 'ttsModel'}[self.kind]:
@@ -206,6 +230,25 @@ class GatewayWorker:
 
     async def transcribe(self, samples, language=None, prefix=None):
         async with self.inference:
+            if self.config is not None and self.config.recognitionProvider != 'local':
+                from .audio.resample import AudioFrame
+                config = self.config.model_copy(update={'sourceLanguage': language or 'auto'})
+                recognizer = self.remote_recognizer(config)
+                updates = {}
+                async def collect(update):
+                    updates[update.segment_id] = update
+                recognizer.on_update = collect
+                try:
+                    await recognizer.start()
+                    for offset in range(0, samples.size, 320):
+                        for update in await recognizer.accept(AudioFrame(samples[offset:offset + 320], offset / 16)):
+                            await collect(update)
+                    for update in await recognizer.flush(samples.size / 16):
+                        await collect(update)
+                    ordered = sorted(updates.values(), key=lambda item: item.started_at_ms)
+                    return ' '.join(update.source_text for update in ordered), next((item.language for item in ordered if item.language), language)
+                finally:
+                    await recognizer.close()
             return await asyncio.to_thread(self.runtime._recognition_runtime().transcribe, samples, language=language, prefix=prefix)
 
     async def request(self, request):
@@ -240,6 +283,25 @@ class GatewayWorker:
         if op == 'session.open':
             if session_id in self.sessions or len(self.sessions) >= 8:
                 raise ValueError('Session limit reached')
+            if self.config is not None and self.config.recognitionProvider != 'local':
+                async def update(item):
+                    if session_id in self.sessions:
+                        self.emit({'session': session_id, 'event': {
+                            'type': 'conversation.item.input_audio_transcription.completed' if item.is_final else 'conversation.item.input_audio_transcription.text',
+                            'item_id': item.segment_id, 'content_index': 0, 'language': item.language,
+                            'transcript': item.source_text, 'text': item.source_text,
+                            'audio_start_ms': item.started_at_ms, 'audio_end_ms': item.ended_at_ms}})
+                config = self.config.model_copy(update={'sourceLanguage': request.get('language') or 'auto'})
+                recognizer = self.remote_recognizer(config)
+                recognizer.on_update = update
+                self.sessions[session_id] = {'remote': True, 'recognizer': recognizer, 'samples': 0}
+                try:
+                    await recognizer.start()
+                except Exception:
+                    self.sessions.pop(session_id, None)
+                    await recognizer.close()
+                    raise
+                return {}
             if request.get('manual'):
                 self.sessions[session_id] = {'recognizer': None, 'samples': 0, 'audio': [], 'last_partial': 0,
                     'language': request.get('language'), 'item_id': 'item_' + uuid4().hex}
@@ -274,6 +336,28 @@ class GatewayWorker:
                 return {}
             raise ValueError('Unknown realtime session')
         recognizer = state['recognizer']
+        if state.get('remote'):
+            if op == 'session.append':
+                raw = base64.b64decode(request['audio'], validate=True)
+                if not raw or len(raw) % 2 or len(raw) > 768 * 1024:
+                    raise ValueError('Invalid PCM16 audio')
+                samples = np.frombuffer(raw, dtype='<i2').astype(np.float32) / 32768
+                for offset in range(0, samples.size, 320):
+                    frame = samples[offset:offset + 320]
+                    for update in await recognizer.accept(AudioFrame(frame, state['samples'] / 16)):
+                        await recognizer.on_update(update)
+                    state['samples'] += frame.size
+                return {}
+            if op in ('session.commit', 'session.finish'):
+                for update in await recognizer.flush(state['samples'] / 16):
+                    await recognizer.on_update(update)
+                if op == 'session.commit':
+                    return {}
+            if op in ('session.close', 'session.finish'):
+                self.sessions.pop(session_id, None)
+                await recognizer.close()
+                return {}
+            raise ValueError('Unknown realtime operation')
         if recognizer is None:
             return await self.manual_realtime(request, state)
         if op == 'session.append':
