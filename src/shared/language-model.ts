@@ -1,8 +1,12 @@
 import { z } from 'zod'
 
+// Agent instructions and tool schemas need their own budget, separate from translation context.
+export const LOCAL_LANGUAGE_MODEL_CONTEXT_SIZE = 32768
+
 export const languageModelStreamRequestSchema = z.object({
   id: z.string().uuid(),
-  modelId: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/),
+  modelId: z.string().regex(/^[a-zA-Z0-9_.-]{1,256}$/),
+  source: z.enum(['custom', 'local']).default('custom'),
   effort: z.enum(['auto', 'low', 'medium', 'high']).default('auto'),
   projectId: z.string().uuid().nullable().optional(),
   body: z.object({ messages: z.array(z.unknown()).min(1).max(200) }).passthrough(),

@@ -11,6 +11,7 @@ import type { LanguageModelServices } from './language-model'
 import { languageModelAudioResultSchema, type LanguageModelStreamRequest } from '../shared/language-model'
 import { nativeAgentTools } from './agent-tools'
 import { logDiagnostic } from './session-log'
+import { prepareLocalLanguageModel } from './direct-model'
 
 const DIRECT_WORKFLOW_TOOLS = new Set(['nola_extract_audio', 'nola_prepare_audio', 'nola_transcribe_audio', 'nola_translate_text', 'nola_translate_image', 'nola_synthesize_speech'])
 
@@ -63,12 +64,22 @@ function prepareLanguageModelAudio(sender: WebContents, requestId: string, media
 /** Run the model and tools in the main process while emitting the native AI SDK UI stream over IPC. */
 export async function streamSavedLanguageModel(services: LanguageModelServices, sender: WebContents,
   request: LanguageModelStreamRequest, signal: AbortSignal): Promise<void> {
-  const profile = customModelsOf(services.getSettings().translation).find(model => model.id === request.modelId)
+  const local = request.source === 'local'
+  const connection = local ? await prepareLocalLanguageModel(services, sender.id, request.modelId, signal) : undefined
+  const profile = connection ? {
+    id: `local:${request.modelId}`, model: request.modelId, endpoint: connection.endpoint,
+    apiFormat: 'chat-completions' as const, contextWindow: connection.contextWindow,
+    maxOutputTokens: Math.min(4096, Math.floor(connection.contextWindow / 2)),
+  } : customModelsOf(services.getSettings().translation).find(model => model.id === request.modelId)
   if (!profile) throw new Error('Language model configuration unavailable')
-  const key = await services.getCredential(customCredentialSlot(profile.id))
+  logDiagnostic('agent.model.selected', { source: local ? 'local' : 'custom', modelId: profile.model, contextWindow: profile.contextWindow })
+  const key = local ? '' : await services.getCredential(customCredentialSlot(profile.id))
   const baseURL = profile.endpoint.replace(/\/+$/, '')
   const apiKey = key || 'no-key'
-  const model = profile.apiFormat === 'anthropic'
+  const model = local ? createOpenAICompatible({ name: 'llama.cpp', baseURL, includeUsage: true,
+    transformRequestBody: body => ({ ...body, parallel_tool_calls: false,
+      chat_template_kwargs: { enable_thinking: request.effort === 'medium' || request.effort === 'high' } }),
+  }).chatModel(profile.model) : profile.apiFormat === 'anthropic'
     ? createAnthropic({ apiKey, baseURL: `${baseURL}/v1` })(profile.model)
     : profile.apiFormat === 'ollama'
       ? createOpenAICompatible({ name: 'ollama', baseURL: `${baseURL}/v1`, apiKey }).chatModel(profile.model)
@@ -103,7 +114,7 @@ export async function streamSavedLanguageModel(services: LanguageModelServices, 
   }
   const providerOptions: Record<string, unknown> = {}
   if (profile.apiFormat === 'anthropic' && /^MiniMax-M3/i.test(profile.model)) providerOptions.anthropic = { thinking: { type: 'adaptive' } }
-  if (request.effort !== 'auto') {
+  if (!local && request.effort !== 'auto') {
     if (profile.apiFormat === 'anthropic') providerOptions.anthropic = { ...(providerOptions.anthropic as object), effort: request.effort }
     else providerOptions.openai = { reasoningEffort: request.effort }
   }
@@ -121,6 +132,10 @@ export async function streamSavedLanguageModel(services: LanguageModelServices, 
   let mediaIndex = 0
   // Keep original media in the conversation and tool context; text-only providers receive descriptors.
   const providerMessages = normalizeDirectToolHistory(messages).map(message => ({ ...message, parts: message.parts.map(part => {
+    // The bundled Qwen GGUF contains text weights only; image tools still receive the original attachment.
+    if (local && part.type === 'file' && part.mediaType.startsWith('image/')) {
+      return { type: 'text' as const, text: `User image attachment: ${JSON.stringify(part.filename ?? '')}. This local model cannot see images directly; use translate_image when translation is requested.` }
+    }
     if (part.type !== 'file' || !/^(audio|video)\//.test(part.mediaType)) return part
     return { type: 'text' as const, text: message.role === 'user'
       ? `User media attachment ${mediaIndex++}: ${JSON.stringify(part.filename ?? '')} (${part.mediaType}). Use recognize_audio with this attachment index to transcribe it.`

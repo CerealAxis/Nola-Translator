@@ -8,6 +8,7 @@ function fallbackErrorKey(config: PlaygroundConfig): TranslationKey {
   if (config.kind === 'tts') return 'workbench.localTtsError'
   if (config.kind === 'asr') return config.model.startsWith('cloud:') ? 'workbench.serviceError' : 'workbench.localAsrError'
   if (config.kind === 'mt') return config.model.startsWith('resource:') ? 'workbench.localMtError' : 'workbench.serviceError'
+  if (config.model.startsWith('resource:')) return 'workbench.localLlmError'
   return 'workbench.networkError'
 }
 
@@ -78,7 +79,8 @@ export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key
         } finally { signal?.removeEventListener('abort', cancel) }
       }, onError: error => error instanceof Error ? error.message : t(fallbackErrorKey(config)) }) })
     }
-    if (!config.model.startsWith('custom:') || !app?.streamLanguageModel || !app.onLanguageModelStream) throw new Error(t('workbench.configureFirst'))
+    const local = config.model.startsWith('resource:')
+    if ((!local && !config.model.startsWith('custom:')) || !app?.streamLanguageModel || !app.onLanguageModelStream) throw new Error(t('workbench.configureFirst'))
     signal?.throwIfAborted()
     const id = crypto.randomUUID()
     const encoder = new TextEncoder()
@@ -121,9 +123,9 @@ export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key
           else controller.enqueue(encoder.encode(event.chunk))
         })
         signal?.addEventListener('abort', abort, { once: true })
-        void app.streamLanguageModel!({ id, modelId: config.model.slice(7), body, projectId: config.projectId ?? null,
+        void app.streamLanguageModel!({ id, source: local ? 'local' : 'custom', modelId: config.model.slice(local ? 9 : 7), body, projectId: config.projectId ?? null,
           effort: ['low', 'medium', 'high'].includes(config.effort) ? config.effort as 'low' | 'medium' | 'high' : 'auto',
-        }).catch(error => finish(error instanceof Error ? error : new Error(t('workbench.networkError'))))
+        }).catch(error => finish(error instanceof Error ? error : new Error(t(fallbackErrorKey(config)))))
       },
       cancel() { closed = true; unsubscribe?.(); cancel() },
     })

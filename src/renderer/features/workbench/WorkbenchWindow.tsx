@@ -149,7 +149,7 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
   useEffect(() => {
     if (!loaded || !settings) return
     const selected = models.find(model => model.id === config.model) ?? models.find(model => model.kind === config.kind) ?? models[0]
-    if (config.model !== (selected?.id ?? '') || config.images !== selected?.images) {
+    if (config.model !== (selected?.id ?? '') || config.kind !== (selected?.kind ?? 'llm') || config.images !== selected?.images) {
       setConfig(previous => ({ ...previous, model: selected?.id ?? '', kind: selected?.kind ?? 'llm', images: selected?.images }))
     }
   }, [loaded, settings, models, config.kind, config.model, config.images])

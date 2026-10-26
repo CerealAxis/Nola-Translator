@@ -1,10 +1,13 @@
 import { execFile, spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { z } from 'zod'
 import type { EngineLaunchSpec } from './engine-process'
 import { directModelRequestSchema, type DirectModelRequest, type DirectModelResult } from '../shared/agent-workspace'
 import type { AppSettings, CredentialProvider, TranslationProvider } from '../shared/settings'
 import { recognitionFieldsOf, translationOptionsOf } from '../shared/cloud-config'
 import { customCredentialSlot, customModelsOf } from '../shared/custom-models'
 import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
+import { LOCAL_LANGUAGE_MODEL_CONTEXT_SIZE } from '../shared/language-model'
 
 export interface DirectModelServices {
   getSettings(): AppSettings
@@ -16,6 +19,9 @@ let workerQueue: Promise<unknown> = Promise.resolve()
 let queuedWorkers = 0
 type PersistentWorker = { model: string; child: ReturnType<typeof spawn>; buffer: string; pending: { resolve: (value: DirectModelResult) => void; reject: (error: Error) => void; id: string } | null }
 const persistentWorkers = new Map<number, PersistentWorker>()
+// Tool inference must not replace the language model that requested the tool.
+const languageModelWorkers = new Map<number, PersistentWorker>()
+const localConnectionSchema = z.object({ endpoint: z.string().url(), contextWindow: z.number().int().min(512).max(32768) })
 
 function terminateWorker(worker: PersistentWorker): void {
   if (process.platform === 'win32' && worker.child.pid) execFile('taskkill', ['/PID', String(worker.child.pid), '/T', '/F'], { windowsHide: true }, () => undefined)
@@ -23,9 +29,13 @@ function terminateWorker(worker: PersistentWorker): void {
 }
 
 export async function closeDirectModelWorker(ownerId: number): Promise<void> {
-  const worker = persistentWorkers.get(ownerId)
+  await Promise.all([closeWorker(ownerId, persistentWorkers), closeWorker(ownerId, languageModelWorkers)])
+}
+
+async function closeWorker(ownerId: number, workers: Map<number, PersistentWorker>): Promise<void> {
+  const worker = workers.get(ownerId)
   if (!worker) return
-  persistentWorkers.delete(ownerId)
+  workers.delete(ownerId)
   if (worker.pending) worker.pending.reject(new DOMException('Workbench model released', 'AbortError'))
   worker.pending = null
   const exited = worker.child.exitCode !== null
@@ -36,19 +46,44 @@ export async function closeDirectModelWorker(ownerId: number): Promise<void> {
 }
 
 export async function closeAllDirectModelWorkers(): Promise<void> {
-  await Promise.all([...persistentWorkers.keys()].map(closeDirectModelWorker))
+  await Promise.all([...new Set([...persistentWorkers.keys(), ...languageModelWorkers.keys()])].map(closeDirectModelWorker))
 }
 
 export async function runDirectModel(services: DirectModelServices, raw: DirectModelRequest, signal: AbortSignal, inspect = false, ownerId?: number): Promise<DirectModelResult> {
+  return queueWorker(() => executeDirectModel(services, raw, signal, inspect, ownerId), signal)
+}
+
+async function queueWorker<T>(run: () => Promise<T>, signal: AbortSignal): Promise<T> {
   if (queuedWorkers >= 8) throw new Error('Too many pending inference tasks')
   queuedWorkers++
   const task = workerQueue.catch(() => undefined).then(() => {
     signal.throwIfAborted()
-    return executeDirectModel(services, raw, signal, inspect, ownerId)
+    return run()
   })
   workerQueue = task
   try { return await task }
   finally { queuedWorkers-- }
+}
+
+/** The worker returns a loopback connection only to the main process, never to renderer IPC. */
+export async function prepareLocalLanguageModel(services: DirectModelServices, ownerId: number, resourceId: string, signal: AbortSignal) {
+  if (!/^qwen35-[a-zA-Z0-9_.-]+$/.test(resourceId)) throw new Error('Select an installed local language model')
+  return queueWorker(async () => {
+    if (!services.directLaunch) throw new Error('Local language model runtime unavailable')
+    const compute = { ...services.getSettings().compute, translationEngine: 'llama', contextSize: LOCAL_LANGUAGE_MODEL_CONTEXT_SIZE }
+    const model = `resource:${resourceId}`
+    const launch = await services.directLaunch(model)
+    signal.throwIfAborted()
+    const result = localConnectionSchema.parse(await runPersistentWorker(ownerId, `${model}:${JSON.stringify(compute)}`, launch, {
+      id: randomUUID(), kind: 'llm', resourceId,
+      config: { compute, recognitionProvider: 'aliyun', sourceLanguage: 'auto', targetLanguages: ['zh'],
+        translationProvider: 'local', translationModelId: resourceId },
+    }, signal, languageModelWorkers))
+    const endpoint = new URL(result.endpoint)
+    if (endpoint.protocol !== 'http:' || endpoint.hostname !== '127.0.0.1' || !endpoint.port || endpoint.pathname !== '/v1'
+      || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new Error('Invalid local language model endpoint')
+    return result
+  }, signal)
 }
 
 /** Local models stay in an owner-scoped worker; cloud work uses a one-shot worker. */
@@ -57,7 +92,7 @@ async function executeDirectModel(services: DirectModelServices, raw: DirectMode
   if (!services.directLaunch) throw new Error('Direct model runtime unavailable')
   const settings = services.getSettings()
   const resourceId = request.model.startsWith('resource:') ? request.model.slice(9) : undefined
-  if (ownerId !== undefined && !resourceId) await closeDirectModelWorker(ownerId)
+  if (ownerId !== undefined && !resourceId) await closeWorker(ownerId, persistentWorkers)
   const config: Record<string, unknown> = { compute: { ...settings.compute }, recognitionProvider: 'aliyun',
     sourceLanguage: request.source, targetLanguages: request.kind === 'mt' ? [request.target] : [], translationProvider: 'local' }
   if (request.kind === 'asr') {
@@ -125,18 +160,22 @@ async function executeDirectModel(services: DirectModelServices, raw: DirectMode
   })
 }
 
-function runPersistentWorker(ownerId: number, model: string, launch: EngineLaunchSpec, request: object & { id: string }, signal: AbortSignal): Promise<DirectModelResult> {
+function runPersistentWorker(ownerId: number, model: string, launch: EngineLaunchSpec, request: Record<string, unknown> & { id: string }, signal: AbortSignal,
+  workers = persistentWorkers): Promise<DirectModelResult> {
   return (async () => {
-    let worker = persistentWorkers.get(ownerId)
+    let worker = workers.get(ownerId)
     if (worker && worker.model !== model) {
-      await closeDirectModelWorker(ownerId)
+      await closeWorker(ownerId, workers)
       worker = undefined
     }
     if (!worker) {
       const child = spawn(launch.command, launch.args, { cwd: launch.cwd, env: { ...process.env, ...launch.env,
         HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true, stdio: 'pipe' })
       worker = { model, child, buffer: '', pending: null }
-      persistentWorkers.set(ownerId, worker)
+      workers.set(ownerId, worker)
+      // Drain native diagnostics so a full stderr pipe cannot stall model startup.
+      // Request failures arrive on stdout; prompts and credentials must not be forwarded.
+      child.stderr.on('data', () => undefined)
       child.stdout.setEncoding('utf8').on('data', (chunk: string) => {
         worker!.buffer += chunk
         let newline = worker!.buffer.indexOf('\n')
@@ -156,12 +195,12 @@ function runPersistentWorker(ownerId: number, model: string, launch: EngineLaunc
         }
       })
       child.once('error', error => {
-        if (persistentWorkers.get(ownerId) === worker) persistentWorkers.delete(ownerId)
+        if (workers.get(ownerId) === worker) workers.delete(ownerId)
         worker!.pending?.reject(error)
         worker!.pending = null
       })
       child.once('close', () => {
-        if (persistentWorkers.get(ownerId) === worker) persistentWorkers.delete(ownerId)
+        if (workers.get(ownerId) === worker) workers.delete(ownerId)
         worker!.pending?.reject(new Error('Local model worker stopped'))
         worker!.pending = null
       })
@@ -173,7 +212,7 @@ function runPersistentWorker(ownerId: number, model: string, launch: EngineLaunc
         if (active.pending?.id === request.id) {
           active.pending.reject(new DOMException('Aborted', 'AbortError'))
           active.pending = null
-          void closeDirectModelWorker(ownerId)
+          void closeWorker(ownerId, workers)
         }
       }
       signal.addEventListener('abort', stop, { once: true })
@@ -181,7 +220,7 @@ function runPersistentWorker(ownerId: number, model: string, launch: EngineLaunc
         if (active.pending?.id === request.id) {
           active.pending.reject(new Error('Local model inference timed out'))
           active.pending = null
-          void closeDirectModelWorker(ownerId)
+          void closeWorker(ownerId, workers)
         }
       }, 10 * 60 * 1000)
       const cleanup = () => { clearTimeout(timeout); signal.removeEventListener('abort', stop) }

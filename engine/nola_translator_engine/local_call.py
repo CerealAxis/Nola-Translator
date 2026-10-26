@@ -318,6 +318,24 @@ async def infer(request, runtime):
 
     config = PrewarmConfig.model_validate(request['config'])
     command = PrewarmModelsCommand(protocolVersion=1, requestId='direct', type='prewarmModels', config=config)
+    if request['kind'] == 'llm':
+        from .models.qwen35_catalog import QWEN35_SPECS
+        model_id = request.get('resourceId')
+        if model_id not in {spec.model_id for spec in QWEN35_SPECS}:
+            raise ValueError('Selected resource is not a supported local language model')
+        record = runtime.resources.record(model_id)
+        if not record.installed or record.kind != 'translationModel' or config.translationModelId != model_id:
+            raise ValueError('Selected language model is not installed')
+        # Language-model workers are separate from direct ASR/MT/TTS tool workers.
+        # The desktop AI SDK owns chat history, streaming and tool execution over loopback.
+        if getattr(runtime, '_local_call_language_model', None) != model_id:
+            await runtime._configure_device_plan(command)
+            runtime._configure_translation(command)
+            runtime.llama_manager.model_alias = model_id
+            runtime._local_call_language_model = model_id
+        await runtime._ensure_translation_server(command)
+        return {'text': '', 'endpoint': runtime.llama_manager.api_base_url,
+                'contextWindow': config.compute.contextSize}
     if request.get('resourceId'):
         from .resources import INDEX_TRANSLATE_RESOURCE_IDS
         record = runtime.resources.record(request['resourceId'])

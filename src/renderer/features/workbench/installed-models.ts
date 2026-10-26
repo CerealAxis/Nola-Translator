@@ -7,11 +7,13 @@ import type { ModelKind } from './demo-runtime'
 import { configurationOf, recognitionLanguages } from '../../../shared/model-capabilities'
 import { LANGUAGE_CODES } from '../../../shared/languages'
 import { remoteSourceLanguages } from '../../../shared/cloud-config'
+import { LOCAL_LANGUAGE_MODEL_CONTEXT_SIZE } from '../../../shared/language-model'
 
 export interface PlaygroundModel {
   id: string
   name: string
   kind: ModelKind
+  contextWindow?: number
   images?: boolean
   sourceLanguages?: readonly string[]
   targetLanguages?: readonly string[]
@@ -33,7 +35,8 @@ export function installedPlaygroundModels(
     INDEX_TRANSLATE_MODEL_IDS.includes(resource.resourceId as typeof INDEX_TRANSLATE_MODEL_IDS[number]) &&
     resource.installedBytes >= (legacyIndexWeights[resource.resourceId] ?? Number.MAX_SAFE_INTEGER)).map(resource => ({
     id: `resource:${resource.resourceId}`, name: resource.name,
-    kind: resource.kind === 'recognitionModel' ? 'asr' : resource.kind === 'ttsModel' ? 'tts' : 'mt',
+    kind: resource.kind === 'recognitionModel' ? 'asr' : resource.kind === 'ttsModel' ? 'tts' : resource.resourceId.startsWith('qwen35-') ? 'llm' : 'mt',
+    contextWindow: resource.resourceId.startsWith('qwen35-') ? LOCAL_LANGUAGE_MODEL_CONTEXT_SIZE : undefined,
     images: new Set<string>([...INDEX_TRANSLATE_MODEL_IDS, ...INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS]).has(resource.resourceId),
     sourceLanguages: resource.kind === 'recognitionModel' ? recognitionLanguages(resource) : configurationOf(resource)?.sourceLanguages,
     targetLanguages: configurationOf(resource)?.targetLanguages,

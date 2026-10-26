@@ -297,6 +297,7 @@ function NativeAssistantMessage() {
     : config?.kind === 'tts' ? t('workbench.localTtsError')
     : config?.kind === 'asr' ? (config.model.startsWith('cloud:') ? t('workbench.serviceError') : t('workbench.localAsrError'))
     : config?.kind === 'mt' ? (config.model.startsWith('resource:') ? t('workbench.localMtError') : t('workbench.serviceError'))
+    : config?.model.startsWith('resource:') ? t('workbench.localLlmError')
     : t('workbench.networkError')
   const [copied, setCopied] = useState(false)
   const [reaction, setReaction] = useState<'up' | 'down' | null>(null)
@@ -433,6 +434,7 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
   const profile = props.profiles.find(profile => `custom:${profile.id}` === props.config.model)
   const usage = [...messages].reverse().find(message => message.role === 'assistant' && message.metadata?.custom?.usage)?.metadata.custom.usage as { inputTokens?: number; outputTokens?: number; totalTokens?: number; reasoningTokens?: number } | undefined
   const selected = props.models.find(model => model.id === props.config.model)
+  const contextWindow = profile?.contextWindow ?? selected?.contextWindow ?? 0
   const send = () => { if (preparing || running) aui.thread.composer().cancel(); else if (props.config.model && (text.trim() || attachments.length)) aui.thread.composer().send() }
   const pick = (change: Partial<PlaygroundConfig>, closeMenu = true) => {
     if ('model' in change || 'kind' in change) aui.thread.cancelRun()
@@ -462,7 +464,7 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
     {menu === 'language' && <ComposerMenu open anchor="language">{(props.config.kind === 'mt' ? targetCodes : sourceCodes).map(code => <ComposerMenuItem key={code} onClick={() => pick(props.config.kind === 'mt' ? { target: code } : { source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
     {menu === 'source' && <ComposerMenu open anchor="source">{sourceCodes.map(code => <ComposerMenuItem key={code} onClick={() => pick({ source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
     {menu === 'voice' && <ComposerMenu open anchor="voice">{props.voices.map(voice => <ComposerMenuItem key={voice} onClick={() => pick({ voice })}>{voice}</ComposerMenuItem>)}</ComposerMenu>}
-    {menu === 'context' && <ComposerMenu open align="end"><ContextBreakdown limit={profile?.contextWindow ?? 0} segments={[{ label: t('workbench.inputTokens'), tokens: usage?.inputTokens ?? 0, tint: 'bg-blue-400' }, { label: t('workbench.outputTokens'), tokens: usage?.outputTokens ?? 0, tint: 'bg-blue-600' }]} /></ComposerMenu>}
+    {menu === 'context' && <ComposerMenu open align="end"><ContextBreakdown limit={contextWindow} segments={[{ label: t('workbench.inputTokens'), tokens: usage?.inputTokens ?? 0, tint: 'bg-blue-400' }, { label: t('workbench.outputTokens'), tokens: usage?.outputTokens ?? 0, tint: 'bg-blue-600' }]} /></ComposerMenu>}
     <ComposerBar>
       {attachments.length > 0 && <ComposerAttachments><ComposerPrimitive.Attachments components={{ Attachment: NativeComposerAttachment }} /></ComposerAttachments>}
       {dictation ? <ComposerVoice recording={dictation.status.type === 'running'} seconds={seconds} /> : <ComposerPrimitive.Input className="aui-composer-input min-h-11 max-h-40 w-full resize-none bg-transparent px-3 py-2 text-[15px] outline-none placeholder:text-muted-foreground" rows={1} addAttachmentOnPaste={false} placeholder={props.placeholder} readOnly={!props.config.model} onPaste={event => {
@@ -498,7 +500,7 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
         {(props.config.kind === 'asr' || props.config.kind === 'mt') && <ComposerModelTrigger data-menu-anchor="language" model={languageName(props.config.kind === 'mt' ? props.config.target : props.config.source, language)} open={menu === 'language'} onClick={() => setMenu(menu === 'language' ? '' : 'language')} />}
         {props.config.kind === 'tts' && <ComposerModelTrigger data-menu-anchor="voice" model={props.config.voice || t('workbench.voice')} open={menu === 'voice'} onClick={chooseVoices} />}
       </ComposerActions><ComposerActions>
-        {props.config.kind === 'llm' && <div><ComposerContext labels={{ context: t('workbench.contextUsage'), system: t('workbench.contextSystem'), tools: t('workbench.contextTools'), messages: t('workbench.contextMessages'), total: t('workbench.contextTotal') }} usage={{ system: 0, tools: 0, messages: (usage?.totalTokens ?? 0) / 1000, total: (profile?.contextWindow ?? 0) / 1000 }} /></div>}
+        {props.config.kind === 'llm' && <div><ComposerContext labels={{ context: t('workbench.contextUsage'), system: t('workbench.contextSystem'), tools: t('workbench.contextTools'), messages: t('workbench.contextMessages'), total: t('workbench.contextTotal') }} usage={{ system: 0, tools: 0, messages: (usage?.totalTokens ?? 0) / 1000, total: contextWindow / 1000 }} /></div>}
         <ComposerVoiceButton active={!!dictation} aria-label={t(dictation ? 'workbench.stopDictation' : 'workbench.record')} onClick={() => { if (dictation) aui.thread.composer().stopDictation(); else aui.thread.composer().startDictation() }} />
         <ComposerSend aria-label={t(running || preparing ? 'workbench.stopGenerating' : 'workbench.sendMessage')} className={running || preparing ? 'aui-composer-cancel' : 'aui-composer-send'} streaming={running || preparing} idle={!preparing && !text.trim() && !attachments.length} disabled={!running && !preparing && (!props.config.model || !text.trim() && !attachments.length)} onClick={send} />
       </ComposerActions></ComposerToolbar>

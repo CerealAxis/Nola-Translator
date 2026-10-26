@@ -122,6 +122,7 @@ class LlamaServerManager:
         self._offloaded_layers: int | None = None
         self.fallback_reason: str | None = None
         self.chat_template: str | None = None
+        self.model_alias: str | None = None
         self.mmproj_path: Path | None = None
 
     def configure_compute(self, device: ComputeDevice, options: ComputeOptions) -> None:
@@ -162,6 +163,13 @@ class LlamaServerManager:
     @property
     def device(self) -> str | None:
         return self._device
+
+    @property
+    def api_base_url(self) -> str:
+        """Expose the ready loopback connection to the owning desktop worker only."""
+        if not self._ready or self._port is None or self._process is None or self._process.poll() is not None:
+            raise LlamaServerError("llama-server 未就绪")
+        return f"http://{_HOST}:{self._port}/v1"
 
     def switch_gguf(self, gguf_path: Path) -> bool:
         """Switch the selected GGUF; returns whether anything actually changed.
@@ -247,6 +255,8 @@ class LlamaServerManager:
                     args.append("--no-mmproj-offload")
             if self.chat_template is not None:
                 args.extend(["--chat-template", self.chat_template])
+            if self.model_alias is not None:
+                args.extend(["--alias", self.model_alias])
             if ngl != 0 and self._selected_device and self._selected_device.backend == "openvino":
                 # b11532 chooses its native OpenVINO device via this variable, not --device.
                 # Source: ggml/src/ggml-openvino/ggml-openvino.cpp device descriptions.
