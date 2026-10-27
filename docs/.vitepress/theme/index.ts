@@ -25,7 +25,7 @@ export default {
     const preference = readLocalePreference()
     const locale = preference === 'auto' ? detectSiteLocale(navigator.languages.length ? navigator.languages : [navigator.language]) : preference
     const target = localizedSitePath(location.pathname, locale, base)
-    if (target !== location.pathname) location.replace(`${target}${location.search}${location.hash}`)
+    if (location.pathname === base && target !== location.pathname) location.replace(`${target}${location.search}${location.hash}`)
     // VitePress's document-language links should persist the same preference as the homepage menu.
     router.onBeforeRouteChange = href => {
       const pathname = new URL(href, location.href).pathname

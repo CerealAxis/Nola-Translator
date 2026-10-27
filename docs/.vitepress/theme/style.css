@@ -1,6 +1,7 @@
 @import '../../../src/renderer/theme/nola-light.css';
 @import '../../../src/renderer/theme/nola-dark.css';
 @import '../../../src/renderer/theme/typography.css';
+@import '../../../src/renderer/theme/z-index.css';
 
 :root {
   --vp-font-family-base: var(--font-ui);
@@ -106,3 +107,56 @@
 @keyframes site-loader-breathe { 50% { transform: translateY(-4px); opacity: .75; } }
 @keyframes site-loader-wave { 0%, 100% { transform: scaleY(.25); opacity: .4; } 50% { transform: scaleY(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .site-loader-symbol img, .site-loader-orbit, .site-loader-wave i { animation: none; } }
+
+/* Map the library's own theme variables to the site's semantic colors. */
+#cc-main {
+  --cc-font-family: var(--font-ui);
+  --cc-z-index: var(--z-overlay);
+  --cc-bg: var(--surface);
+  --cc-primary-color: var(--foreground);
+  --cc-secondary-color: var(--muted);
+  --cc-btn-primary-bg: var(--accent);
+  --cc-btn-primary-color: var(--accent-foreground);
+  --cc-btn-primary-border-color: var(--accent);
+  --cc-btn-primary-hover-bg: color-mix(in oklch, var(--accent) 88%, var(--foreground));
+  --cc-btn-primary-hover-color: var(--accent-foreground);
+  --cc-btn-primary-hover-border-color: var(--cc-btn-primary-hover-bg);
+  --cc-btn-secondary-bg: var(--surface-secondary);
+  --cc-btn-secondary-color: var(--foreground);
+  --cc-btn-secondary-border-color: var(--border);
+  --cc-btn-secondary-hover-bg: var(--surface-tertiary);
+  --cc-btn-secondary-hover-color: var(--foreground);
+  --cc-btn-secondary-hover-border-color: var(--border);
+  --cc-separator-border-color: var(--border);
+  --cc-toggle-on-bg: var(--accent);
+  --cc-toggle-off-bg: var(--muted);
+  --cc-toggle-on-knob-bg: var(--accent-foreground);
+  --cc-toggle-off-knob-bg: var(--surface);
+  --cc-toggle-readonly-bg: var(--surface-tertiary);
+  --cc-toggle-readonly-knob-bg: var(--surface);
+  --cc-toggle-readonly-knob-icon-color: var(--muted);
+  --cc-cookie-category-block-bg: var(--surface-secondary);
+  --cc-cookie-category-block-border: var(--border);
+  --cc-cookie-category-block-hover-bg: var(--surface-tertiary);
+  --cc-cookie-category-block-hover-border: var(--border);
+  --cc-cookie-category-expanded-block-bg: var(--surface);
+  --cc-cookie-category-expanded-block-hover-bg: var(--surface-secondary);
+  --cc-overlay-bg: var(--backdrop);
+  --cc-footer-bg: var(--surface-secondary);
+  --cc-footer-color: var(--muted);
+  --cc-footer-border-color: var(--border);
+  --cc-modal-border-radius: var(--radius-lg, 12px);
+  --cc-btn-border-radius: var(--radius-xl, 16px);
+}
+.nola-cookie-settings {
+  position: fixed;
+  inset: auto auto var(--space-1, 8px) var(--space-1, 8px);
+  padding: var(--space-1, 8px) var(--space-2, 16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl, 16px);
+  background: var(--surface-secondary);
+  color: var(--foreground);
+  font: inherit;
+  box-shadow: var(--surface-shadow);
+  cursor: pointer;
+}

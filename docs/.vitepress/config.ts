@@ -113,6 +113,7 @@ const locales = Object.fromEntries((Object.keys(localeNames) as Locale[]).map(lo
   const text = copy[locale]
   const path = localePath(locale)
   return [locale === 'zh-CN' ? 'root' : locale, {
+    ...(locale === 'zh-CN' ? { link: path } : {}),
     label: localeNames[locale],
     lang: locale,
     title: 'Nola Translator',

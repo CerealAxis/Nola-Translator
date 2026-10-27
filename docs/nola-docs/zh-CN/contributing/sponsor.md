@@ -10,4 +10,4 @@
 - [爱发电](https://afdian.com/a/CerealAxis)
 
 **2. 其他地区**
-- [Github Sponsor](ttps://github.com/sponsors/CerealAxis/)
+- [Github Sponsor](https://github.com/sponsors/CerealAxis/)

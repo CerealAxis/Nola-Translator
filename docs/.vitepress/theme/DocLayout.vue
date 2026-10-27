@@ -3,6 +3,7 @@ import DefaultTheme from 'vitepress/theme'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useData } from 'vitepress'
 import Giscus from '@giscus/vue'
+import CookieConsent from './CookieConsent.vue'
 import { copy } from './content'
 import { localeOfPath } from './siteLocale'
 import type { Locale } from './content'
@@ -14,6 +15,9 @@ const pageViewsLabel = computed(() => ({
   en: 'Page views', ja: 'ページビュー', ko: '페이지 조회수',
 } satisfies Record<Locale, string>)[lang.value as Locale])
 const showPageViews = ref(false)
+const analyticsAllowed = ref(false)
+let counterLoaded = false
+let counterRequest = 0
 let zoom: ReturnType<typeof import('medium-zoom').default> | undefined
 const refreshImageZoom = async () => {
   await nextTick()
@@ -26,14 +30,18 @@ onMounted(() => { void refreshImageZoom() })
 watch(() => page.value.relativePath, () => { void refreshImageZoom() }, { flush: 'post' })
 onMounted(() => {
   showPageViews.value = location.hostname === 'nola.xaviermc.top'
-  if (showPageViews.value && page.value.relativePath !== 'index.md') void import('busuanzi.pure.js')
 })
-watch(() => page.value.relativePath, (path, previousPath) => {
-  if (path === 'index.md' || !showPageViews.value) return
-  void import('busuanzi.pure.js').then(({ fetch: refreshViews }) => {
-    if (previousPath) refreshViews()
-  })
-}, { immediate: true })
+watch([() => page.value.relativePath, analyticsAllowed, showPageViews], async ([path, choice, enabled]) => {
+  const request = ++counterRequest
+  if (!enabled || !choice || path === 'index.md' || /^[^/]+\/index\.md$/.test(path)) return
+  await nextTick()
+  if (request !== counterRequest) return
+  // The module automatically makes its first request when imported.
+  const counter = await import('busuanzi.pure.js')
+  if (request !== counterRequest) return
+  if (counterLoaded) counter.fetch()
+  counterLoaded = true
+}, { flush: 'post' })
 // Public identifiers supplied by the repository's Giscus setup.
 const repo = 'CerealAxis/Nola-Translator'
 const repoId = 'R_kgDOUvoCYg'
@@ -45,7 +53,7 @@ const categoryId = 'DIC_kwDOUvoCYs4DIc6Z'
     <template #doc-before>
       <div class="nola-doc-meta">
         <time v-if="page.lastUpdated" :datetime="new Date(page.lastUpdated).toISOString()">{{ new Date(page.lastUpdated).toLocaleDateString(lang) }}</time>
-        <span v-if="showPageViews" id="busuanzi_container_page_pv" class="nola-doc-views"><span>{{ pageViewsLabel }}</span> <span id="busuanzi_value_page_pv">--</span></span>
+        <span v-if="showPageViews && analyticsAllowed" :key="page.relativePath" id="busuanzi_container_page_pv" class="nola-doc-views"><span>{{ pageViewsLabel }}</span> <span id="busuanzi_value_page_pv">--</span></span>
       </div>
     </template>
     <template #doc-after>
@@ -57,4 +65,5 @@ const categoryId = 'DIC_kwDOUvoCYs4DIc6Z'
       <a class="nola-doc-top" href="#VPContent">↑ {{ backToTop }}</a>
     </template>
   </DefaultTheme.Layout>
+  <CookieConsent @analytics-change="analyticsAllowed = $event" />
 </template>
