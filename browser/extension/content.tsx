@@ -10,6 +10,7 @@ import { NolaLogo } from './logo'
 import { CaptionClock, captionLines, deepFullscreenElement, fullscreenCueBounds, subtitleGeometry, visibleControlReserve } from './captionPresentation'
 import type { CaptionConfig } from './store'
 import { NativeCaptionTrack } from './nativeCaptions'
+import { splitTranslationText } from '../../src/renderer/components/caption/translationText'
 import css from './styles.css?inline'
 
 /**
@@ -18,7 +19,6 @@ import css from './styles.css?inline'
  * the bar is on screen.
  */
 type CaptionPhase = 'idle' | 'appearing' | 'shown' | 'fading'
-interface PendingCaption { key: string; lines: string[] }
 
 function install(): void {
   if (window !== window.top || location.protocol !== 'https:' || document.documentElement.dataset.nolaInstalled) return
@@ -54,40 +54,58 @@ function install(): void {
   let nativeCueStyleText = ''
   let captionPhase: CaptionPhase = 'idle'
   let captionKey = ''
-  let pendingCaption: PendingCaption | null = null
+  let translationTail = ''
+  let pendingSegmentKey = ''
+  let pendingTranslation = ''
   /** Takes the block down at once: a stopped session has nothing left to fade out to. */
   const dismissCaption = (): void => {
-    pendingCaption = null
     captionPhase = 'idle'
     captionKey = ''
+    translationTail = ''
+    pendingSegmentKey = ''
+    pendingTranslation = ''
     caption.dataset.phase = 'idle'
     caption.replaceChildren()
     overlay.host.hidden = true
   }
-  const updateCaptionLines = (lines: string[], config: CaptionConfig): void => {
-    const rows = document.createDocumentFragment()
-    let sourceIndex = 0
-    for (const line of lines) {
-      const row = document.createElement('div')
-      row.textContent = line
-      const isSource = config.showSource && sourceIndex === 0
-      if (isSource) {
-        row.style.color = config.sourceColor
-        row.style.fontSize = `${config.sourceFontSize}px`
-        sourceIndex += 1
-      } else {
-        row.style.color = config.translationColor
-        row.style.fontSize = `${config.translationFontSize}px`
+  const updateCaptionLines = (lines: string[], config: CaptionConfig, stableText?: string): void => {
+    // Keep each track and its text nodes mounted while interim recognition and translation revisions arrive.
+    while (caption.childElementCount > lines.length) caption.lastElementChild?.remove()
+    lines.forEach((line, index) => {
+      let row = caption.children[index] as HTMLDivElement | undefined
+      if (!row) {
+        row = document.createElement('div')
+        row.className = 'nola-caption-line'
+        const confirmed = document.createElement('span')
+        const tail = document.createElement('span')
+        row.append(confirmed, tail)
+        caption.append(row)
       }
-      rows.append(row)
-    }
-    caption.replaceChildren(rows)
+      const isTranslation = index === (config.showSource ? 1 : 0)
+      if (isTranslation) {
+        const split = splitTranslationText(line, stableText)
+        const confirmedText = split.confirmed ?? ''
+        const tailText = split.confirmed === undefined ? line : split.tail
+        const confirmed = row.children[0].firstChild ?? row.children[0].appendChild(document.createTextNode(''))
+        const tail = row.children[1].firstChild ?? row.children[1].appendChild(document.createTextNode(''))
+        confirmed.nodeValue = confirmedText
+        tail.nodeValue = tailText
+        translationTail = tailText
+      } else {
+        const text = row.children[0].firstChild ?? row.children[0].appendChild(document.createTextNode(''))
+        if (text.nodeValue !== line) text.nodeValue = line
+        const tail = row.children[1].firstChild ?? row.children[1].appendChild(document.createTextNode(''))
+        tail.nodeValue = ''
+      }
+      const isSource = config.showSource && index === 0
+      row.style.color = isSource ? config.sourceColor : config.translationColor
+      row.style.fontSize = `${isSource ? config.sourceFontSize : config.translationFontSize}px`
+    })
   }
   /** Paints one phrase and lets it fade in as a whole, so a revision never reveals itself character by character. */
-  const paintCaption = (key: string, lines: string[], config: CaptionConfig): void => {
-    updateCaptionLines(lines, config)
+  const paintCaption = (key: string, lines: string[], config: CaptionConfig, stableText?: string): void => {
+    updateCaptionLines(lines, config, stableText)
     captionKey = key
-    pendingCaption = null
     captionPhase = 'appearing'
     overlay.host.hidden = false
     // The phase is cleared and then set again around a forced layout, which is what restarts the
@@ -126,12 +144,8 @@ function install(): void {
     caption.style.height = 'auto'
     return caption.scrollHeight
   }
-  // Finish the outgoing fade before painting the latest revision of the queued sentence.
   caption.addEventListener('animationend', event => {
     if (event.target !== caption || (captionPhase !== 'appearing' && captionPhase !== 'fading')) return
-    const next = pendingCaption
-    pendingCaption = null
-    if (next && captionPhase === 'fading') { paintCaption(next.key, next.lines, store.getSnapshot().config); return }
     if (captionPhase === 'appearing') { captionPhase = 'shown'; caption.dataset.phase = 'shown' }
     else dismissCaption()
   })
@@ -184,24 +198,52 @@ function install(): void {
     overlay.host.style.width = `${rect.width * 0.84}px`
     caption.style.fontFamily = `${state.config.fontFamily}, ${theme.getPropertyValue('--font-ui')}`
     caption.style.lineHeight = String(state.config.lineHeight)
-    caption.style.backgroundColor = `color-mix(in oklab, ${state.config.backgroundColor} ${state.config.backgroundOpacity * 100}%, transparent)`
+    caption.style.removeProperty('background-color')
+    caption.style.setProperty('--caption-fill', state.config.backgroundColor)
+    caption.style.setProperty('--caption-fill-opacity', `${state.config.backgroundOpacity * 100}%`)
     updateNativeCueStyles(state.config)
     const segment = state.captions[0]
     const remaining = captionClock.update(segment ? `${state.epoch}:${segment.segmentId}:${segment.revision}` : '', performance.now(), state.playbackPaused || !segment?.isFinal, video.playbackRate)
-    const lines = remaining > 0 ? captionLines(segment, state.config) : []
+    const translation = state.config.showTranslation && state.config.targetLanguage !== 'none'
+      ? segment?.translations.find(item => item.targetLanguage === state.config.targetLanguage && item.state !== 'failed' && item.text)
+      : undefined
+    const segmentKey = segment ? `${state.epoch}:${segment.segmentId}` : ''
+    if (segmentKey && segmentKey !== captionKey && !translation?.text) {
+      pendingSegmentKey = segmentKey
+    }
+    const holdingPrevious = !!pendingSegmentKey && pendingSegmentKey === segmentKey && !translation?.text && !!captionKey
+    if (pendingSegmentKey === segmentKey && translation?.text) {
+      pendingTranslation = translation.text
+    }
+    const activeSegment = holdingPrevious ? undefined : segment
+    const lines = remaining > 0 ? captionLines(activeSegment, state.config) : []
     // Segment identity survives streaming revisions and late translations of the same sentence.
     const key = lines.length ? `${state.epoch}:${segment?.segmentId}` : ''
     if (state.status !== 'active' || fullscreen === video) dismissCaption()
-    else if (key && key === captionKey) {
-      updateCaptionLines(lines, state.config)
+    else if (holdingPrevious) {
+      // Keep the previous phrase visible until the next sentence has a translation.
+    } else if (key && key === captionKey) {
+      translationTail = caption.children[state.config.showSource ? 1 : 0]?.children[1]?.textContent ?? translationTail
+      updateCaptionLines(lines, state.config, translation?.stableText)
     } else if (key) {
-      if (captionPhase === 'idle') paintCaption(key, lines, state.config)
+      if (pendingTranslation && pendingSegmentKey === key && lines.length) {
+        lines[state.config.showSource ? 1 : 0] = pendingTranslation
+      }
+      if (captionPhase === 'idle') paintCaption(key, lines, state.config, translation?.stableText)
       else {
-        pendingCaption = { key, lines }
-        if (captionPhase !== 'fading') beginFade()
+        // VAD can advance to a new phrase while the previous caption is still visible.
+        // Fade only when speech stops; fading every segment boundary makes live captions blink.
+        captionKey = key
+        pendingSegmentKey = ''
+        pendingTranslation = ''
+        translationTail = ''
+        updateCaptionLines(lines, state.config, translation?.stableText)
+        if (captionPhase === 'fading') {
+          captionPhase = 'shown'
+          caption.dataset.phase = 'shown'
+        }
       }
     } else if (captionPhase !== 'idle') {
-      pendingCaption = null
       if (captionPhase !== 'fading') beginFade()
     }
     // The control bar expands on hover and fades out again on its own, so the band it reserves is read

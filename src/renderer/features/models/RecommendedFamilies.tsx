@@ -9,8 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardAction, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { useState } from 'react'
-import HuggingFace from '@lobehub/icons/es/HuggingFace/components/Color'
-import ModelScope from '@lobehub/icons/es/ModelScope/components/Color'
 import QwenAvatar from '@lobehub/icons/es/Qwen/components/Avatar'
 import AlibabaAvatar from '@lobehub/icons/es/Alibaba/components/Avatar'
 import HunyuanAvatar from '@lobehub/icons/es/Hunyuan/components/Avatar'
@@ -33,6 +31,7 @@ import { isEngineAvailable } from './engine-availability'
 import { estimatedVramMb, modelFit, type ModelFit } from './model-fit'
 import { type RecommendedFamily } from './modelFamily'
 import { ModelMark } from './modelBrand'
+import { DownloadSourceTabs } from './DownloadSourceTabs'
 
 const FAMILY_NAMES: Record<RecommendedFamily, string> = {
   qwen: 'Qwen3-ASR',
@@ -217,13 +216,14 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
           </section>
           <section data-onboarding="model-sources" aria-label={t('models.downloadSources.title')}>
             <Label className="models-family-dialog__label">{t('models.downloadSources.title')}</Label>
-            <TabsRoot value={selectedSource} onValueChange={value => { if (value) setSource(value) }}>
-              <TabsList className="models-family-dialog__sources" aria-label={t('models.downloadSources.title')}>
-                {sources.map(option => <TabsTrigger key={option.source} value={option.source} data-onboarding="model-download-source">
-                  {option.source === 'modelscope' ? <ModelScope aria-hidden="true" /> : <HuggingFace aria-hidden="true" />}{t(option.labelKey)}
-                </TabsTrigger>)}
-              </TabsList>
-            </TabsRoot>
+            <DownloadSourceTabs
+              options={sources}
+              value={selectedSource}
+              onValueChange={setSource}
+              ariaLabel={t('models.downloadSources.title')}
+              getLabel={option => t(option.labelKey)}
+              dataOnboarding="model-download-source"
+            />
           </section>
         </div>
         <DialogFooter data-onboarding="model-download-actions">

@@ -45,7 +45,7 @@ it('shows the synthesis default and initializes its voice from discovered metada
 
 it('groups remote and local cards by capability with icons inside their headers', () => {
   render(<ModelsPage />)
-  const recognition = section('语音模型')
+  const recognition = section('ASR模型')
   expect(recognition.getByText('MiniMax 语音识别')).toBeInTheDocument()
   expect(recognition.getByText('阿里云ASR')).toBeInTheDocument()
   const local = recognition.getByText('SenseVoiceSmall').closest('[data-slot="card"]')!
@@ -53,7 +53,7 @@ it('groups remote and local cards by capability with icons inside their headers'
   expect(within(local as HTMLElement).getByRole('button', { name: '开始配置' })).toBeInTheDocument()
   const aliyunAsr = recognition.getByText('阿里云ASR').closest('[data-slot="card"]')!
   expect(within(aliyunAsr as HTMLElement).getByRole('button', { name: '配置阿里云ASR' })).toBeInTheDocument()
-  const translation = section('翻译模型')
+  const translation = section('MT模型')
   const card = translation.getByText('MyMemory 免费翻译').closest('[data-slot="card"]')!
   expect(card.querySelector('[data-slot="card-header"] [data-slot="card-action"] svg')).not.toBeNull()
   expect(within(card as HTMLElement).getByRole('button', { name: '开始配置' })).toBeInTheDocument()
@@ -64,7 +64,7 @@ it('shows both free services in installed with no local downloads or active clou
   stores.models.setState({ resources: [] })
   render(<ModelsPage />)
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
-  const translation = section('翻译模型')
+  const translation = section('MT模型')
   expect(translation.getByText('MyMemory 免费翻译')).toBeInTheDocument()
   expect(translation.getByText('Index Translate 免费API')).toBeInTheDocument()
   expect(translation.getAllByText('免费')).toHaveLength(2)
@@ -90,8 +90,8 @@ it('keeps configured inactive providers installed and excludes providers missing
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, aliyunWorkspaceId: 'workspace' } } })
   render(<ModelsPage />)
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
-  expect(section('翻译模型').getByText('Google 翻译')).toBeInTheDocument()
-  expect(section('语音模型').getByText('阿里云ASR')).toBeInTheDocument()
+  expect(section('MT模型').getByText('Google 翻译')).toBeInTheDocument()
+  expect(section('ASR模型').getByText('阿里云ASR')).toBeInTheDocument()
   expect(screen.queryByText('MiniMax 语音识别')).not.toBeInTheDocument()
 })
 
@@ -113,7 +113,7 @@ it('keeps free services available when the local catalog fails', () => {
   stores.models.setState({ resources: [], loaded: false, loading: false, error: 'catalog unavailable' })
   render(<ModelsPage />)
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
-  expect(section('翻译模型').getAllByText('免费')).toHaveLength(2)
+  expect(section('MT模型').getAllByText('免费')).toHaveLength(2)
   expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument()
 })
 
@@ -171,11 +171,11 @@ const customModel = { id: 'custom-first', name: 'First model', endpoint: 'https:
 it('shows named saved models only in installed and leaves the recommended template available', () => {
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModels: [customModel, { ...customModel, id: 'custom-second', name: 'Second model' }] } } })
   render(<ModelsPage />)
-  expect(section('语言模型').getByRole('heading', { name: '语言模型' })).toBeInTheDocument()
+  expect(section('大语言模型（LLM）').getByRole('heading', { name: '大语言模型（LLM）' })).toBeInTheDocument()
   expect(screen.queryByText('First model')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
-  expect(section('语言模型').getByText('First model')).toBeInTheDocument()
-  expect(section('语言模型').getByText('Second model')).toBeInTheDocument()
+  expect(section('大语言模型（LLM）').getByText('First model')).toBeInTheDocument()
+  expect(section('大语言模型（LLM）').getByText('Second model')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '删除 First model' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '删除 MyMemory 免费翻译' })).not.toBeInTheDocument()
 })
@@ -185,7 +185,7 @@ it('offers a saved custom model as the default translation model once its key is
   stores.models.setState({ credentials: { ...initialModels.credentials, 'cloud-model:custom-first': true } })
   render(<ModelsPage />)
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
-  const card = section('语言模型').getByText('First model').closest('[data-slot="card"]') as HTMLElement
+  const card = section('大语言模型（LLM）').getByText('First model').closest('[data-slot="card"]') as HTMLElement
   expect(within(card).getByText('已安装')).toBeInTheDocument()
   expect(within(card).getByRole('button', { name: '设置为默认翻译模型' })).toBeEnabled()
 })

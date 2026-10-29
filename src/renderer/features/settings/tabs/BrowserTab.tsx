@@ -77,6 +77,14 @@ export function BrowserTab() {
     <BrowserSwitch isSelected={info.enabled} isDisabled={browserBusy || !info.available || !hasExtension(info)}
       onChange={enabled => { void browserConnectionAction('browserEnable', enabled, info.browser) }} ariaLabel={enableLabel(info.browser)} />
   )
+  const downloadExtension = async (kind: BrowserKind) => {
+    await browserConnectionAction('download', undefined, kind)
+    const error = stores.settings.getState().browserError
+    if (error) {
+      reportedBrowserError.current = error
+      notifyError(t('browser.downloadFailed'))
+    }
+  }
   const selected = selectedBrowser ? getBrowser(selectedBrowser) : null
   const patchAppearance = (patch: Partial<typeof appearance>) => {
     void updateSettings({ browserCaptions: patch })
@@ -104,7 +112,7 @@ export function BrowserTab() {
     <div className="settings-panel browser-settings">
       {selected ? (
         <>
-          <Button variant="secondary" className="browser-settings__back" onClick={() => setSelectedBrowser(null)}>
+          <Button variant="secondary" size="sm" className="browser-settings__back" onClick={() => setSelectedBrowser(null)}>
             <ArrowLeft aria-hidden="true" />{t('browser.backToBrowsers')}
           </Button>
           <Card className="browser-settings__card">
@@ -117,9 +125,9 @@ export function BrowserTab() {
                 </div>
               </header>
               <div className="browser-settings__detail-actions">
-                <Button variant="secondary" disabled={browserBusy}
-                  onClick={() => { void browserConnectionAction('download', undefined, selected.browser) }}>{t('browser.downloadExtension')}</Button>
-                <Button variant="secondary" disabled={browserBusy || !selected.available}
+                <Button variant="secondary" size="sm" disabled={browserBusy}
+                  onClick={() => { void downloadExtension(selected.browser) }}>{t('browser.downloadExtension')}</Button>
+                <Button variant="secondary" size="sm" disabled={browserBusy || !selected.available}
                   onClick={() => { void browserConnectionAction('manage', undefined, selected.browser) }}>
                   {t('browser.manageExtension')}<ExternalLink aria-hidden="true" />
                 </Button>
@@ -160,10 +168,10 @@ export function BrowserTab() {
                       <p className="browser-settings__status" data-status={info.extensionStatus} role="status">{extensionStatus(info)}</p>
                     </div>
                     <div className="browser-settings__row-actions">
-                      <Button variant="secondary" disabled={browserBusy}
+                      <Button variant="secondary" size="sm" disabled={browserBusy}
                         aria-label={t('browser.downloadBrowserExtension', { browser: browserName(kind) })}
-                        onClick={() => { void browserConnectionAction('download', undefined, kind) }}>{t('browser.downloadExtension')}</Button>
-                      {hasExtension(info) ? <Button variant="secondary" disabled={browserBusy || !info.available}
+                        onClick={() => { void downloadExtension(kind) }}>{t('browser.downloadExtension')}</Button>
+                      {hasExtension(info) ? <Button variant="secondary" size="sm" disabled={browserBusy || !info.available}
                         aria-label={t('browser.manageBrowserExtension', { browser: browserName(kind) })}
                         onClick={() => setSelectedBrowser(kind)}>{t('browser.manage')}</Button> : null}
                       {hasExtension(info) ? extensionSwitch(info) : null}
@@ -221,7 +229,7 @@ export function BrowserTab() {
           {saveError ? <CircleAlert aria-hidden="true" /> : <CheckSquare aria-hidden="true" />}
           {saveError ? t('modelsSettingsUi.saveError') : pending ? t('modelsSettingsUi.saving') : t('modelsSettingsUi.automaticSave')}
         </span>
-        <Button variant="outline" disabled={pending} onClick={restoreAppearance}>
+        <Button variant="outline" size="sm" disabled={pending} onClick={restoreAppearance}>
           {pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
           {t('modelsSettingsUi.resetAppearance')}
         </Button>

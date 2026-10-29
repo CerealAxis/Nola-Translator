@@ -65,6 +65,23 @@ describe('independent feature activity', () => {
     const failed = { ...ready, services: { ...ready.services, asr: { ...ready.services.asr, state: 'failed' as const, error: 'CUDA out of memory: private traceback' } } }
     act(() => { receive(failed); receive({ ...failed, connections: 2 }) })
     expect(notifyError).toHaveBeenCalledOnce()
-    expect(notifyError).toHaveBeenCalledWith('语音识别 已停止响应', { description: '可用内存不足。请关闭其他模型或选择更小的模型后重试。' })
+    expect(notifyError).toHaveBeenCalledWith('ASR模型 已停止响应', { description: '可用内存不足。请关闭其他模型或选择更小的模型后重试。' })
+  })
+
+  it('does not report capability failures emitted during a normal gateway shutdown', async () => {
+    vi.mocked(notifyError).mockClear()
+    const ready: ModelGatewaySnapshot = { state: 'running', address: '', port: 17860, connections: 0, activeRequests: 0, requests: [], services: {
+      asr: { state: 'ready', model: 'asr', name: 'ASR' }, mt: { state: 'ready', model: 'mt', name: 'MT' }, tts: { state: 'ready', model: 'tts', name: 'TTS' }, llm: { state: 'ready', model: 'llm', name: 'LLM' },
+    } }
+    let receive!: (snapshot: ModelGatewaySnapshot) => void
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    vi.spyOn(store, 'getBridge').mockReturnValue({ gateway: {
+      snapshot: async () => ready,
+      onChanged: (callback: typeof receive) => { receive = callback; return () => undefined },
+    } } as unknown as NolaBridge)
+    render(<FeatureActivityNotice />)
+    await act(async () => undefined)
+    act(() => receive({ ...ready, state: 'stopping', services: { ...ready.services, llm: { ...ready.services.llm, state: 'failed', error: 'aborted' } } }))
+    expect(notifyError).not.toHaveBeenCalled()
   })
 })

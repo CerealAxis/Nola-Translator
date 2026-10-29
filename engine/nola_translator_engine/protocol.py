@@ -125,6 +125,7 @@ class ModelSelection(ProtocolModel):
     sourceLanguage: str = Field(min_length=1, max_length=32)
     targetLanguages: list[str] = Field(max_length=8)
     allowIntermediateTranslation: bool = False
+    intermediateTranslationIntervalMs: int = Field(default=500, ge=0, le=2000)
     # `local` and `cloud` are provider names, not wire formats. `local` dispatches on the adapter
     # the selected model's own metadata resolved to, so a hub GGUF and the bundled transformers
     # model are both "local"; `cloud` dispatches on `translationOptions.apiFormat`.

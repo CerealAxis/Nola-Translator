@@ -21,9 +21,9 @@ export function StartupFailureDialog({ isOpen, onOpenChange, timedOut }: Startup
         <p className="startup-failure__hint">{t('startup.settingsHint')}</p>
       </div>
       <DialogFooter>
-        <Button variant="secondary" onClick={() => { void openLogs().catch(() => undefined) }}>{t('settings.openLogs')}</Button>
-        <Button variant="secondary" onClick={() => onOpenChange(false)}>{t('startup.continue')}</Button>
-        <Button onClick={() => window.location.reload()}>{t('errors.pageCrashedAction')}</Button>
+        <Button variant="secondary" size="sm" onClick={() => { void openLogs().catch(() => undefined) }}>{t('settings.openLogs')}</Button>
+        <Button variant="secondary" size="sm" onClick={() => onOpenChange(false)}>{t('startup.continue')}</Button>
+        <Button size="sm" onClick={() => window.location.reload()}>{t('errors.pageCrashedAction')}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

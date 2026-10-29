@@ -122,8 +122,7 @@ export function RuntimeComponents() {
   /**
    * Checks the runtime environment and the devices again.
    *
-   * A failure of either half is reported by the notice that owns it: the runtime notice
-   * for the environment, the compute notice in the compute tab for the devices.
+   * A failed environment or device check is reported by its corresponding settings notice.
    */
   const recheck = async () => {
     try {
@@ -131,7 +130,7 @@ export function RuntimeComponents() {
       await actions.settings.refreshComputeDevices()
       notifySuccess(t('common.refreshed'))
     } catch {
-      // The runtime notice and the compute notice report these failures.
+      // The runtime operation and compute notices report these failures.
     }
   }
   const elapsedSeconds = operation?.startedAt ? Math.max(0, Math.floor((now - operation.startedAt) / 1000)) : null
@@ -206,7 +205,7 @@ export function RuntimeComponents() {
           </AlertDialog.Popup>
       </AlertDialog.Portal>
     </AlertDialog.Root>
-    {local && (local.engine.managed || local.llama.managed || local.crisp?.managed) ? <SettingGroup legend={t('runtime.repair')} actions={<Button variant="secondary" className="bg-surface-tertiary" disabled={busy || !Object.values(repairs).some(Boolean)} onClick={() => void install((['engine', 'llama', 'crisp'] as const).filter(kind => repairs[kind] && local[kind]?.managed).map(kind => local[kind]!.id!))}>{t('runtime.repairAction')}</Button>}>
+    {local && (local.engine.managed || local.llama.managed || local.crisp?.managed) ? <SettingGroup legend={t('runtime.repair')} actions={<Button variant="secondary" size="sm" className="bg-surface-tertiary" disabled={busy || !Object.values(repairs).some(Boolean)} onClick={() => void install((['engine', 'llama', 'crisp'] as const).filter(kind => repairs[kind] && local[kind]?.managed).map(kind => local[kind]!.id!))}>{t('runtime.repairAction')}</Button>}>
       <ToggleGroup multiple disabled={busy} aria-label={t('runtime.repair')} className="runtime-repair runtime-repair__list"
         value={KINDS.filter(kind => repairs[kind])}
         onValueChange={values => setRepairs({ engine: values.includes('engine'), llama: values.includes('llama'), crisp: values.includes('crisp') })}>

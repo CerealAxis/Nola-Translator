@@ -28,8 +28,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
   /**
    * Reads the runtime list for the refresh button.
    *
-   * The runtime notice names the check button in its failure message, so the failure is
-   * claimed before the read and reported here in the words of this button instead.
+   * Claim the runtime operation error so it does not duplicate this refresh failure.
    */
   const loadRuntimes = useCallback(async (): Promise<boolean> => {
     claimRuntimeFailure()
@@ -110,8 +109,8 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
           <span className="compute-device-info">{backends.join(' / ') || t('compute.unavailable')}{memory ? ' · ' + t('compute.free') + ' ' + Math.round(memory.freeMemoryMb) + ' / ' + Math.round(memory.totalMemoryMb) + ' MiB' : ''}</span>
         </SettingsRow>
       })}
+      {snapshot?.torchVersion && snapshot.torchVersion !== 'unavailable' ? <SettingsRow label={t('runtime.pytorch')}><span>{snapshot.torchVersion}</span></SettingsRow> : null}
       {loading && (!runtimes || !snapshot) ? <p className="compute-hint" role="status"><LoaderCircle className="inline-block size-4 animate-spin" aria-hidden="true" /> {t('compute.checkingDevices')}</p> : null}
-      {snapshot?.notes.map((note, index) => <p className="compute-hint" key={index}>{note}</p>)}
     </SettingGroup>
     {plan ? <SettingGroup legend={t('compute.actual')}>
       <SettingsRow label={t('compute.recognitionActual')}><span>{actual(plan.recognitionActual)}</span></SettingsRow>

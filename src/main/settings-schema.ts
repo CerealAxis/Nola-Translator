@@ -141,6 +141,7 @@ export const settingsPatchSchema = z.object({
     cloudContextWindow: z.number().int().min(256).max(10_000_000).optional(),
     cloudMaxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
     translateIntermediate: z.boolean().optional(),
+    intermediateTranslationIntervalMs: z.number().int().min(0).max(2000).optional(),
     targetLanguage: z.string().min(1).max(32).optional(),
     fallback: z.object({
       provider: z.enum(['disabled', 'local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate']).optional(),

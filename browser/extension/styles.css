@@ -42,11 +42,11 @@
   .nola-warning { font: var(--font-caption); color: var(--foreground); margin: 0; padding: var(--space-1); background: color-mix(in oklab, var(--warning) 14%, var(--surface)); border-radius: var(--radius-md); }
   .nola-muted { font: var(--font-caption); color: var(--muted); margin: 0; }
   /* The block hangs from the bottom edge the renderer anchors it to, so a bilingual phrase growing
-     from one line to two extends upward and leaves the anchor where it was. Its height is pinned to
-     its own text by the renderer, since a transition cannot interpolate to `auto`. White glyphs over a
-     translucent black fill keep their contrast whatever the frame underneath is doing, so the block
-     needs no stroke to stay legible. */
-  .nola-caption { position: absolute; left: 0; bottom: 0; display: grid; gap: calc(var(--space-1) / 2); width: 100%; overflow: hidden; text-align: center; color: var(--accent-foreground); font-family: var(--font-ui); line-height: var(--browser-caption-line-height); padding: var(--space-1) var(--space-2); border-radius: var(--radius-md); background: color-mix(in oklab, var(--browser-caption-fill) var(--browser-caption-background-mix), transparent); pointer-events: auto; transition: height var(--dur-enter) var(--ease-nola); }
+     from one line to two extends upward and leaves the anchor where it was. Its width follows the
+     text up to the video bounds. White glyphs over a translucent black fill keep their contrast over
+     the frame underneath, so the block needs no stroke to stay legible. */
+  .nola-caption { position: absolute; left: 0; right: 0; bottom: 0; margin-inline: auto; display: grid; justify-items: center; gap: calc(var(--space-1) / 2); width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; text-align: center; color: var(--accent-foreground); font-family: var(--font-ui); line-height: var(--browser-caption-line-height); pointer-events: auto; }
+  .nola-caption-line { width: fit-content; max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; padding: var(--space-1) var(--space-2); border-radius: var(--radius-md); background: color-mix(in oklab, var(--caption-fill, var(--browser-caption-fill)) var(--caption-fill-opacity, var(--browser-caption-background-mix)), transparent); }
   /* One phrase is one animation: the block settles in from half a space-1, and a phrase that replaces
      another fades out first, so text is never revealed a character at a time. */
   .nola-caption[data-phase='appearing'] { animation: nola-caption-block-in var(--dur-enter) var(--ease-nola) both; }

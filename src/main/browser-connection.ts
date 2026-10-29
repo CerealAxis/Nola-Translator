@@ -102,6 +102,7 @@ export function browserSessionConfig(settings: AppSettings, request: Extract<Bro
     targetLanguages: translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? [] : [translation.targetLanguage],
     translationProvider: translation.provider, translationModelId: translation.localModelId,
     allowIntermediateTranslation: supportsIntermediateTranslation(translation.provider) && translation.translateIntermediate,
+    intermediateTranslationIntervalMs: translation.intermediateTranslationIntervalMs,
     translationOptions: translationOptionsOf(translation),
     ...fallbackTranslationFieldsOf(translation),
     browserTimeline: { epoch: request.epoch, videoTimeMs: request.videoTimeMs, playbackRate: request.playbackRate },

@@ -201,6 +201,7 @@ class TranslationRequest:
     source: str
     targets: tuple[str, ...]
     allow_intermediate: bool
+    interval_seconds: float = 0.5
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,7 +298,6 @@ class EngineRuntime:
         self.caption_revisions: dict[str, int] = {}
         self.completed_segments: OrderedDict[str, None] = OrderedDict()
         self.completed_segment_limit = 512
-        self.partial_translation_interval = 0.3
         self.translation_last_started: dict[str, float] = {}
         self._first_translation_timing_logged = False
         self.translation_wake: dict[str, asyncio.Event] = {}
@@ -1687,6 +1687,7 @@ class EngineRuntime:
             allow_intermediate=bool(
                 getattr(config, "allowIntermediateTranslation", False)
             ),
+            interval_seconds=max(0, min(2000, int(getattr(config, "intermediateTranslationIntervalMs", 500)))) / 1000,
         )
         self.translation_wake.setdefault(update.segment_id, asyncio.Event()).set()
         task = self.translation_tasks.get(update.segment_id)
@@ -1731,7 +1732,7 @@ class EngineRuntime:
                     except asyncio.CancelledError:
                         raise
                     continue
-                delay = self.partial_translation_interval - (
+                delay = request.interval_seconds - (
                     monotonic() - self.translation_last_started.get(segment_id, 0)
                 )
                 if not request.update.is_final and delay > 0:

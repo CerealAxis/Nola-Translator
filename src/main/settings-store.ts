@@ -307,6 +307,9 @@ export class SettingsStore {
           translateIntermediate: typeof rawTranslation.translateIntermediate === 'boolean'
             ? rawTranslation.translateIntermediate
             : DEFAULT_SETTINGS.translation.translateIntermediate,
+          intermediateTranslationIntervalMs: typeof rawTranslation.intermediateTranslationIntervalMs === 'number'
+            ? Math.max(0, Math.min(2000, Math.round(rawTranslation.intermediateTranslationIntervalMs)))
+            : DEFAULT_SETTINGS.translation.intermediateTranslationIntervalMs,
         },
       }
       // The three retired recognition ids all migrate to Qwen3-ASR 1.7B; `sourceLanguage` is sanitized separately.

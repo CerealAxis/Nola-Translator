@@ -36,8 +36,8 @@ export function OfflineResources() {
   const { t } = useI18n()
   const task = useStore(offlineStore, state => state.task)
   return <><SettingGroup legend={t('offline.title')}><SettingsRow label={t('offline.packageContents')} desc={t('offline.description')} descriptionTooltip>
-    <div className="offline-actions"><Button variant="secondary" onClick={() => { offlineActions.reset(); offlineActions.open('prepare') }}>{t('offline.prepare')}</Button>
-      <Button variant="secondary" onClick={() => { offlineActions.reset(); void offlineActions.pickBundle() }}>{t('offline.bundleImport')}</Button></div>
+    <div className="offline-actions"><Button size="sm" variant="secondary" onClick={() => { offlineActions.reset(); offlineActions.open('prepare') }}>{t('offline.prepare')}</Button>
+      <Button size="sm" variant="secondary" onClick={() => { offlineActions.reset(); void offlineActions.pickBundle() }}>{t('offline.bundleImport')}</Button></div>
   </SettingsRow>{task ? <SettingsRow label={t('offline.task')}><Button variant="secondary" onClick={() => offlineActions.open('bundle')}>{t(`offline.${task.state === 'running' ? task.phase : task.state === 'idle' ? 'ready' : task.state}`)}</Button></SettingsRow> : null}</SettingGroup><OfflineDialog scope="runtime" /></>
 }
 export interface OfflineDialogProps { scope: 'model' | 'runtime' }

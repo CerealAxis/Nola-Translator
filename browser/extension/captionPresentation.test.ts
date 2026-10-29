@@ -7,9 +7,11 @@ const config = (patch: Partial<CaptionConfig> = {}): CaptionConfig => ({ showSou
 describe('live caption presentation', () => {
   it('keeps recognition visible while translation is pending or unavailable', () => {
     expect(captionLines(phrase, config())).toEqual(['Hello'])
-    expect(captionLines(phrase, config({ showTranslation: true }))).toEqual(['Hello'])
-    expect(captionLines({ ...phrase, translations: [{ targetLanguage: 'zh', state: 'failed', provider: 'test', errorCode: 'translationUnavailable' }] }, config({ showTranslation: true }))).toEqual(['Hello'])
+    expect(captionLines(phrase, config({ showTranslation: true }))).toEqual(['Hello', ''])
+    expect(captionLines({ ...phrase, translations: [{ targetLanguage: 'zh', state: 'failed', provider: 'test', errorCode: 'translationUnavailable' }] }, config({ showTranslation: true }))).toEqual(['Hello', ''])
     expect(captionLines(phrase, config({ showSource: false, showTranslation: true }))).toEqual([])
+    expect(captionLines(phrase, config({ showTranslation: true }))).toEqual(['Hello', ''])
+    expect(captionLines(undefined, config({ showTranslation: true }))).toEqual(['', ''])
     expect(captionLines(phrase, config({ showSource: false, targetLanguage: 'none' }))).toEqual([])
     expect(captionLines(phrase, config({ showTranslation: false, targetLanguage: 'none' }))).toEqual(['Hello'])
     const translated = { ...phrase, translations: [{ targetLanguage: 'zh', text: '你好', state: 'complete' as const, provider: 'test' }] }

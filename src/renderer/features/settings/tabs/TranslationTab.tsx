@@ -2,41 +2,37 @@
 
 import { useCallback, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { CircleHelp } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
 import type { CredentialProvider } from '@/bridge'
 import { SettingsRow } from '../SettingsRow'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions, updateSettings } from '@/store'
-import { useRoute } from '@/routes'
 import { SettingGroup, SettingSwitch } from '../SettingsPage'
 import type { SettingsPanelProps } from '../SettingsPage'
-import { supportsIntermediateTranslation } from '../../../../shared/cloud-config'
 
 export function TranslationTab({ settings }: SettingsPanelProps) {
   const { t } = useI18n()
-  const { navigate } = useRoute()
   const translation = settings.translation
 
   return (
     <div className="settings-panel" data-onboarding="translation-settings">
       <SettingGroup onboardingTarget="translation-service" legend={t('settings.groupProvider')}>
-        {translation.targetLanguage !== 'none' && supportsIntermediateTranslation(translation.provider) ? <SettingsRow label={t('settings.translateIntermediate')} desc={t('settings.translateIntermediateHint')} descriptionTooltip>
+        <SettingsRow label={t('settings.translateIntermediate')} desc={t('settings.translateIntermediateHint')} descriptionTooltip>
           <SettingSwitch isSelected={translation.translateIntermediate} ariaLabel={t('settings.translateIntermediate')}
             onChange={next => { void updateSettings({ translation: { translateIntermediate: next } }).catch(() => undefined) }} />
+        </SettingsRow>
+        {translation.translateIntermediate ? <SettingsRow label={t('settings.intermediateTranslationInterval')} desc={t('settings.intermediateTranslationIntervalHint')} descriptionTooltip>
+          <div className="flex w-full max-w-64 items-center gap-3">
+            <SliderRoot className="slider min-w-0 flex-1" min={0} max={2000} step={100} value={translation.intermediateTranslationIntervalMs} onValueChange={value => {
+              if (typeof value === 'number') void updateSettings({ translation: { intermediateTranslationIntervalMs: value } }).catch(() => undefined)
+            }}>
+              <SliderControl><SliderTrack><SliderIndicator /><SliderThumb aria-label={t('settings.intermediateTranslationInterval')} /></SliderTrack></SliderControl>
+            </SliderRoot>
+            <span className="min-w-12 text-end tabular-nums">{(translation.intermediateTranslationIntervalMs / 1000).toFixed(1)}s</span>
+          </div>
         </SettingsRow> : null}
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => navigate('#/models')}>{t('modelsPolicy.title')}</Button>
-          <Tooltip>
-            <TooltipTrigger render={<Button variant="secondary" size="icon-xs" className="min-h-6 border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('modelsPolicy.defaultHint')} />}>
-              <CircleHelp aria-hidden="true" />
-            </TooltipTrigger>
-            <TooltipContent side="top" className="z-popup max-w-96 whitespace-normal">{t('modelsPolicy.defaultHint')}</TooltipContent>
-          </Tooltip>
-        </div>
       </SettingGroup>
     </div>
   )

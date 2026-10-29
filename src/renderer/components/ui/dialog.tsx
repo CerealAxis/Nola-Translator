@@ -22,7 +22,7 @@ export function DialogCloseButton({ className, ...props }: DialogCloseButtonProp
     <BaseDialog.Close
       {...props}
       aria-label={label}
-      render={<Button variant="secondary" size="icon" className={cn('nola-dialog-close', className)} />}
+      render={<Button variant="tertiary" size="icon" className={cn('nola-dialog-close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent', className)} />}
     >
       <X aria-hidden="true" />
     </BaseDialog.Close>

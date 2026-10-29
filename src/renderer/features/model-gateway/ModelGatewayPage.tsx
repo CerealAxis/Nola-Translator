@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Activity, Copy, Eye, EyeOff, Mic, Languages, RotateCcw, Volume2, Bot } from 'lucide-react'
+import { Activity, CircleHelp, Copy, Eye, EyeOff, Mic, Languages, RotateCcw, Volume2, Bot } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { getBridge, stores, updateSettings, useStore } from '@/store'
 import { useRoute } from '@/routes'
 import { requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
+import { PageHeader } from '@/components/primitives'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -19,11 +20,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { GatewayCapability, ModelGatewaySnapshot } from '../../../shared/model-gateway'
 import { bindingIsLocal, normalizeModelBinding } from '../../../shared/model-gateway'
-import { defaultModelBinding, isModelEnabled } from '../../../shared/model-policy'
+import { defaultModelBinding, modelEnablePatch } from '../../../shared/model-policy'
 import { languageName } from '../../../shared/languages'
 import { useModelOptions } from '@/model-options'
 import { customModelsOf } from '../../../shared/custom-models'
-import { gatewayBindingPatch, useAvailableModels } from '@/available-models'
+import { cloudModelsOf } from '../../../shared/cloud-models'
+import { gatewayBindingPatch } from '@/available-models'
 import { installedPlaygroundModels } from '../workbench/installed-models'
 import { isModelReady } from '../../../shared/model-capabilities'
 import { supportsSelectedEngine, modelEngines } from '../../../shared/model-engines'
@@ -38,10 +40,10 @@ export function ModelGatewayPage() {
   const { navigate } = useRoute()
   const settings = useStore(stores.settings, state => state.settings)
   const modelOptions = useModelOptions()
-  const callable = useAvailableModels()
   const runtimes = useStore(stores.settings, state => state.runtimes)
   const resources = useStore(stores.models, state => state.resources)
   const credentials = useStore(stores.models, state => state.credentials)
+  const configuredCloudModels = settings ? cloudModelsOf(settings, credentials).filter(model => model.ready) : []
   const api = getBridge()?.gateway
   const [snapshot, setSnapshot] = useState<ModelGatewaySnapshot | null>(null)
   const [busy, setBusy] = useState(false)
@@ -61,22 +63,44 @@ export function ModelGatewayPage() {
     return () => { alive = false; unsubscribe() }
   }, [api])
   if (!api) return <Alert><AlertDescription>{t('gateway.unavailable')}</AlertDescription></Alert>
-  if (!settings || !snapshot) return <div className="model-gateway-page"><h1>{t('gateway.title')}</h1><p>{t(loadFailed ? 'gateway.actionFailed' : 'common.loading')}</p>{loadFailed ? <Button onClick={() => void refresh()}>{t('gateway.refresh')}</Button> : null}</div>
+  if (!settings || !snapshot) return <div className="model-gateway-page"><PageHeader className="nola-page-heading" title={t('gateway.title')} /><p>{t(loadFailed ? 'gateway.actionFailed' : 'common.loading')}</p>{loadFailed ? <Button onClick={() => void refresh()}>{t('gateway.refresh')}</Button> : null}</div>
   const config = settings.modelGateway
-  // Loading candidates are separate from the callable catalog: installation does not imply readiness.
+  // Gateway candidates are ready local models and usable cloud connections; selection enables them.
   const localChoices = installedPlaygroundModels(resources, settings, credentials, t).filter(model => {
-    if (!bindingIsLocal(model.id) || !isModelEnabled(settings, model.kind, model.id)) return false
+    if (!bindingIsLocal(model.id)) return false
     const resource = resources.find(item => item.resourceId === model.id.slice(9))
     if (!resource || !(resource.kind === 'ttsModel' ? resource.installed : isModelReady(resource))) return false
     const engine = modelEngines(resource)[0]
     return supportsSelectedEngine(resource, settings.compute, resource.resourceId)
       && (!engine || !runtimes?.local || isEngineAvailable(engine, runtimes.local))
   })
-  const choices = CAPABILITIES.flatMap(kind => [
-    ...localChoices.filter(model => model.kind === kind),
-    ...callable[kind].filter(model => model.origin === 'cloud' && model.binding !== 'cloud:recognition')
-      .map(model => ({ id: model.binding, name: model.name, kind })),
-  ])
+  const cloudChoices: Array<{ id: string; name: string; kind: GatewayCapability }> = []
+  configuredCloudModels.forEach(model => {
+    if (model.profile) {
+      cloudChoices.push(
+        { id: `mt-custom:${model.profile.id}`, name: model.profile.name, kind: 'mt' },
+        { id: `custom:${model.profile.id}`, name: model.profile.name, kind: 'llm' },
+      )
+      return
+    }
+    const name = model.id === 'aliyun' ? t('modelsSettingsUi.aliyunAsr')
+      : model.id === 'minimax' ? t('settings.providerMiniMax')
+      : model.id === 'microsoft' ? t('settings.providerMicrosoft')
+      : model.id === 'mymemory' ? t('settings.providerMyMemory')
+      : model.id === 'google' ? t('settings.providerGoogle')
+      : model.id === 'index-translate' ? t('settings.providerIndexTranslate')
+      : ''
+    if (!name || model.id === 'recognition') return
+    cloudChoices.push({ id: `cloud:${model.id}`, name, kind: model.kind === 'recognitionModel' ? 'asr' : 'mt' })
+  })
+  const choices = CAPABILITIES.flatMap(kind => {
+    const options = [
+      ...localChoices.filter(model => model.kind === kind),
+      ...cloudChoices.filter(model => model.kind === kind),
+    ]
+    const seen = new Set<string>()
+    return options.filter(option => !seen.has(option.id) && !!seen.add(option.id))
+  })
   const profiles = customModelsOf(settings.translation)
   /**
    * The binding the gateway loads for a capability. An empty stored field falls back to what the
@@ -107,7 +131,8 @@ export function ModelGatewayPage() {
     }
     if (!choices.some(choice => choice.kind === kind && choice.id === model)) return
     const patch = gatewayBindingPatch(kind, model)
-    await updateSettings({ modelGateway: { ...patch.modelGateway, [kind]: true } })
+    const enabled = modelEnablePatch(settings, kind, model, true)
+    await updateSettings({ ...patch, ...enabled, modelGateway: { ...patch.modelGateway, [kind]: true } })
   }
   const selectFallback = async (model: string) => {
     await updateSettings({ modelGateway: { mtFallbackModel: model === 'none' ? '' : normalizeModelBinding('mt', model) } })
@@ -143,20 +168,11 @@ socket.on('open', async () => {
   socket.send(JSON.stringify({ type: 'session.finish' }));
 });`
   return <div className="model-gateway-page">
-    <header className="model-gateway-heading"><div><h1>{t('gateway.title')}</h1><p>{t('gateway.subtitle')}</p></div><Button disabled={changing || (!running && config.externalEnabled === false && !CAPABILITIES.some(kind => config[kind]))} onClick={() => void perform(async () => {
+    <PageHeader className="nola-page-heading" title={t('gateway.title')} actions={<Button variant={running ? 'danger' : 'default'} disabled={changing || (!running && config.externalEnabled === false && !CAPABILITIES.some(kind => config[kind]))} onClick={() => void perform(async () => {
       const result = running ? await api.stop() : await requestFeatureStart(() => api.start(), 'model-gateway')
       if (result) setSnapshot(result)
-    }, 'runtime')}>{t(running ? 'gateway.stop' : 'gateway.start')}</Button></header>
-    <Card data-onboarding="gateway-service"><CardHeader><CardTitle>{t('gateway.service')}</CardTitle><CardDescription><Badge variant={snapshot.state === 'running' ? 'success' : snapshot.state === 'failed' ? 'danger' : 'secondary'}>{t(`gateway.${snapshot.state}`)}</Badge></CardDescription></CardHeader>
-      <CardContent><FieldGroup>
-        <Field><FieldLabel htmlFor="gateway-address">{t('gateway.address')}</FieldLabel><div className="model-gateway-control"><Input id="gateway-address" readOnly value={address} /><Button variant="secondary" aria-label={t('gateway.copy')} onClick={() => void copy(address)}><Copy aria-hidden="true" data-icon="inline-start" />{t('gateway.copy')}</Button></div></Field>
-        <Field><FieldLabel htmlFor="gateway-key">{t('gateway.key')}</FieldLabel><div className="model-gateway-control"><Input id="gateway-key" readOnly type={key === null ? 'password' : 'text'} value={key ?? '••••••••••••••••'} />
-          <Button variant="secondary" disabled={busy} aria-label={t(key === null ? 'gateway.reveal' : 'gateway.hide')} onClick={() => { if (key !== null) setKey(null); else void perform(async () => setKey(await api.revealKey())) }}>{key === null ? <Eye aria-hidden="true" /> : <EyeOff aria-hidden="true" />}</Button>
-          <Button variant="secondary" aria-label={t('gateway.copy')} onClick={() => void perform(async () => { await navigator.clipboard.writeText(await api.revealKey()); notifySuccess(t('gateway.copied')) })}><Copy aria-hidden="true" /></Button>
-          <Button variant="secondary" aria-label={t('gateway.rotate')} onClick={() => setRotating(true)}><RotateCcw aria-hidden="true" /></Button></div></Field>
-        <div className="model-gateway-metrics"><p>{t('gateway.connections')}: <strong>{snapshot.connections}</strong></p><p>{t('gateway.activeRequests')}: <strong>{snapshot.activeRequests}</strong></p></div>
-      </FieldGroup></CardContent></Card>
-    <Card data-onboarding="gateway-capabilities"><CardHeader><CardTitle>{t('gateway.capabilities')}</CardTitle><CardDescription>{t('gateway.gatewayBindingHint')}</CardDescription></CardHeader><CardContent><FieldGroup>
+    }, 'runtime')}>{t(running ? 'gateway.stop' : 'gateway.start')}</Button>} />
+    <Card data-onboarding="gateway-capabilities"><CardHeader><CardTitle className="flex items-center gap-2">{t('gateway.capabilities')}<Tooltip><TooltipTrigger delay={300} render={<Button variant="tertiary" size="icon-xs" className="border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('common.info')}><CircleHelp aria-hidden="true" className="size-3.5" /></Button>} /><TooltipContent className="z-popup max-w-96 whitespace-normal">{t('gateway.gatewayBindingHint')}</TooltipContent></Tooltip></CardTitle></CardHeader><CardContent><FieldGroup>
       {(['asr', 'mt', 'fallback', 'llm', 'tts'] as const).map(row => {
         const kind = row === 'fallback' ? 'mt' : row
         const fallback = row === 'fallback'
@@ -181,7 +197,7 @@ socket.on('open', async () => {
           {!fallback ? <>
             {kind === 'llm' ? <FieldDescription>{t('gateway.protocol')}: {profiles.find(profile => `custom:${profile.id}` === binding)?.apiFormat ?? (bindingIsLocal(binding) ? 'llama.cpp' : t('gateway.configureModel'))}</FieldDescription> : null}
             <dl className="model-gateway-model-mapping">
-              <div><dt>{t('gateway.modelId')}</dt><dd className="model-gateway-model-id"><code>{`nola-${kind}`}</code><Button variant="tertiary" size="icon-sm" aria-label={t('gateway.copyModelId', { model: `nola-${kind}` })} onClick={() => void copy(`nola-${kind}`)}><Copy aria-hidden="true" /></Button></dd></div>
+              <div><dt>{t('gateway.modelId')}</dt><dd className="model-gateway-model-id"><code>{`nola-${kind}`}</code><Tooltip><TooltipTrigger delay={300} render={<Button variant="tertiary" size="icon-xs" className="border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('gateway.copyModelId', { model: `nola-${kind}` })} onClick={() => void copy(`nola-${kind}`)}><Copy aria-hidden="true" className="size-3.5" /></Button>} /><TooltipContent sideOffset={3} className="z-popup max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay">{t('gateway.copyModelId', { model: `nola-${kind}` })}</TooltipContent></Tooltip></dd></div>
               <div><dt>{t('gateway.localModel')}</dt><dd className="model-gateway-local-model">{binding ? selected?.name ?? t('gateway.modelNoneShort') : t('gateway.proxyDisabled')}</dd></div>
             </dl>
             {config[kind] && snapshot.services[kind].state === 'failed' ? <Alert variant="danger"><AlertDescription>{t('gateway.serviceFailed')}</AlertDescription></Alert> : null}
@@ -195,6 +211,15 @@ socket.on('open', async () => {
       <Field><FieldLabel htmlFor="gateway-target">{t('gateway.targetLanguage')}</FieldLabel><Select value={config.targetLanguage} onValueChange={targetLanguage => { if (targetLanguage) void perform(() => updateSettings({ modelGateway: { targetLanguage } }), 'settings') }}><SelectTrigger id="gateway-target"><SelectValue>{languageName(config.targetLanguage, language)}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{targetLanguages.map(code => <SelectItem key={code} value={code}>{languageName(code, language)}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
       <FieldDescription>{t('gateway.configHint')}</FieldDescription>
     </FieldGroup></CardContent></Card>
+    <Card data-onboarding="gateway-service"><CardHeader><CardTitle>{t('gateway.service')}</CardTitle><CardDescription><Badge variant={snapshot.state === 'running' ? 'success' : snapshot.state === 'failed' ? 'danger' : 'secondary'}>{t(`gateway.${snapshot.state}`)}</Badge></CardDescription></CardHeader>
+      <CardContent><FieldGroup>
+        <Field><FieldLabel htmlFor="gateway-address">{t('gateway.address')}</FieldLabel><div className="model-gateway-control"><Input id="gateway-address" readOnly value={address} /><Button variant="secondary" aria-label={t('gateway.copy')} onClick={() => void copy(address)}><Copy aria-hidden="true" data-icon="inline-start" />{t('gateway.copy')}</Button></div></Field>
+        <Field><FieldLabel htmlFor="gateway-key">{t('gateway.key')}</FieldLabel><div className="model-gateway-control"><Input id="gateway-key" readOnly type={key === null ? 'password' : 'text'} value={key ?? '••••••••••••••••'} />
+          <Button variant="secondary" disabled={busy} aria-label={t(key === null ? 'gateway.reveal' : 'gateway.hide')} onClick={() => { if (key !== null) setKey(null); else void perform(async () => setKey(await api.revealKey())) }}>{key === null ? <Eye aria-hidden="true" /> : <EyeOff aria-hidden="true" />}</Button>
+          <Button variant="secondary" aria-label={t('gateway.copy')} onClick={() => void perform(async () => { await navigator.clipboard.writeText(await api.revealKey()); notifySuccess(t('gateway.copied')) })}><Copy aria-hidden="true" /></Button>
+          <Button variant="secondary" aria-label={t('gateway.rotate')} onClick={() => setRotating(true)}><RotateCcw aria-hidden="true" /></Button></div></Field>
+        <div className="model-gateway-metrics"><p>{t('gateway.connections')}: <strong>{snapshot.connections}</strong></p><p>{t('gateway.activeRequests')}: <strong>{snapshot.activeRequests}</strong></p></div>
+      </FieldGroup></CardContent></Card>
     <Card>
       <CardHeader>
         <CardTitle id="gateway-requests-title">{t('gateway.requests')}</CardTitle>

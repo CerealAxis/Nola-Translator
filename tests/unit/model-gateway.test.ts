@@ -344,6 +344,15 @@ describe('local gateway', () => {
     expect(test.gateway.snapshot().services.mt.state).toBe('ready')
   })
 
+  it('does not validate or fail an unconfigured LLM capability while it is disabled', async () => {
+    const test = await fixture()
+    test.settings.modelGateway.llm = false
+    test.settings.modelGateway.llmModel = 'custom:missing'
+    await test.gateway.start()
+    expect(test.gateway.snapshot().state).toBe('running')
+    expect(test.gateway.snapshot().services.llm).toMatchObject({ state: 'stopped', model: 'custom:missing' })
+  })
+
   it.each(['cloud', 'google'] as const)('uses the independent %s fallback credential for native speech translation', async provider => {
     const initialized: GatewayWorkerResult[] = []
     const credentials = vi.fn(async (slot: CredentialProvider) => `secret-for-${slot}`)

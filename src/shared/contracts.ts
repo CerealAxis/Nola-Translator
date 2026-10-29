@@ -45,6 +45,7 @@ export type SessionConfig = {
   sourceLanguage: string
   targetLanguages: string[]
   allowIntermediateTranslation?: boolean
+  intermediateTranslationIntervalMs?: number
   translationProvider?: TranslationProvider
   /**
    * Local translation model id. The engine refuses an id no resource resolves rather than falling
@@ -101,6 +102,7 @@ export type PrewarmConfig = {
   sourceLanguage: string
   targetLanguages: string[]
   allowIntermediateTranslation?: boolean
+  intermediateTranslationIntervalMs?: number
   translationProvider?: TranslationProvider
   translationModelId?: string
   translationOptions?: SessionConfig['translationOptions']

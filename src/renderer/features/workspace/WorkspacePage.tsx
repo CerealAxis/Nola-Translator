@@ -9,14 +9,14 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Captions } from 'lucide-react'
 
 import { findMissingResource } from '@/store'
-import { savedBindingOf } from '@/available-models'
+import { savedBindingOf, useAvailableModels } from '@/available-models'
 import type { MissingResource, SessionState } from '@/store'
 import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
 import { CaptionStage } from '@/components/caption'
 import type { CaptionDisplayMode, CaptionLayout } from '@/components/caption'
 import { NotesPanel } from '@/components/notes'
-import { notifyError, notifySuccess, notifyWarning, describeError } from '@/components/primitives/notify'
+import { notifyError, notifyGatewayModelUnavailable, notifySuccess, notifyWarning, describeError } from '@/components/primitives/notify'
 import { FeatureActivityNotice, requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
 import { useI18n } from '@/i18n'
 import { recordPath, useRoute } from '@/routes'
@@ -50,6 +50,7 @@ export function WorkspacePage() {
   const settings = useStore(stores.settings, (state) => state.settings)
   const devices = useStore(stores.models, (state) => state.devices)
   const resources = useStore(stores.models, (state) => state.resources)
+  const catalog = useAvailableModels()
   const meetings = useStore(stores.meetings, (state) => state.meetings)
 
   // -- Session config: the draft exists only while the dialog is open ------
@@ -232,6 +233,18 @@ export function WorkspacePage() {
   const start = useCallback(async () => {
     const config = configRef.current
     if (config === null) return
+    const missingGatewayModel = config.recognitionBinding?.startsWith('resource:')
+      && !catalog.asr.some(model => model.binding === config.recognitionBinding && model.origin === 'gateway')
+      ? 'asr'
+      : config.targetLanguages.length > 0 && config.translationBinding?.startsWith('resource:')
+        && !catalog.mt.some(model => model.binding === config.translationBinding && model.origin === 'gateway')
+        ? 'mt'
+        : null
+    if (missingGatewayModel) {
+      setPreflightOpen(false)
+      notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t(`gateway.${missingGatewayModel}`) }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
+      return
+    }
     setPreflightOpen(false)
     if (draft) {
       /*
@@ -281,7 +294,7 @@ export function WorkspacePage() {
         notifyError(t('errors.startFailed'), { cause: error })
       }
     }
-  }, [devices, draft, t])
+  }, [catalog, devices, draft, t])
 
   const stop = useCallback(async () => {
     // Read before stopping: the store's `finally` clears it unconditionally.

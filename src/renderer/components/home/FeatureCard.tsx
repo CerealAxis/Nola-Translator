@@ -5,6 +5,7 @@ import { ArrowRight, ChevronRight } from 'lucide-react'
 
 export interface FeatureCardProps {
   onboardingTarget?: string
+  className?: string
   variant: 'primary' | 'secondary' | 'tertiary' | 'quaternary'
   icon: ReactNode
   title: string
@@ -12,9 +13,9 @@ export interface FeatureCardProps {
   buttonText: string
   onButtonClick: () => void
 }
-export function FeatureCard({ variant, icon, title, description, buttonText, onButtonClick, onboardingTarget }: FeatureCardProps): ReactNode {
+export function FeatureCard({ variant, className, icon, title, description, buttonText, onButtonClick, onboardingTarget }: FeatureCardProps): ReactNode {
   return (
-    <Card className={['nola-entry', 'nola-entry--' + variant, 'flex flex-col'].filter(Boolean).join(' ')} data-onboarding={onboardingTarget}>
+    <Card className={['nola-entry', 'nola-entry--' + variant, className, 'flex flex-col'].filter(Boolean).join(' ')} data-onboarding={onboardingTarget}>
       <div className="nola-entry__top"><span className="nola-entry__icon">{icon}</span><ChevronRight aria-hidden="true" /></div>
       <CardHeader className="card__header p-0">
         <CardTitle className="card__title">{title}</CardTitle>

@@ -128,6 +128,7 @@ const prewarmConfigSchema = z.object({
   sourceLanguage: z.string().min(1).max(32),
   targetLanguages: z.array(z.string().min(1).max(32)).max(8),
   allowIntermediateTranslation: z.boolean().optional(),
+  intermediateTranslationIntervalMs: z.number().int().min(0).max(2000).optional(),
   translationProvider: z.enum(['local', 'cloud', 'microsoft', 'mymemory', 'google', 'index-translate', 'recognition']).optional(),
   translationModelId: translationModelIdSchema.optional(),
   translationOptions: z.object({

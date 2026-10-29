@@ -27,10 +27,11 @@ export function FeatureActivityNotice() {
     const receive = (snapshot: ModelGatewaySnapshot) => {
       received = true
       if (previous && document.visibilityState !== 'hidden') {
+        const stopping = snapshot.state === 'stopping' || snapshot.state === 'stopped'
         for (const kind of ['asr', 'mt', 'tts', 'llm'] as const) {
           const service = snapshot.services[kind]
           const before = previous.services[kind]
-          if (service.state === 'failed' && (before.state !== 'failed' || before.error !== service.error)) {
+          if (!stopping && service.state === 'failed' && (before.state !== 'failed' || before.error !== service.error)) {
             console.error(`[gateway.${kind}]`, service.error)
             notifyError(t('gateway.capabilityFailed', { name: t(`gateway.${kind}`) }), {
               description: t(service.errorCode === 'model_disabled' ? 'modelsPolicy.modelDisabled'
@@ -39,7 +40,7 @@ export function FeatureActivityNotice() {
             })
           }
         }
-        if (snapshot.state === 'failed' && previous.state !== 'failed' && !Object.values(snapshot.services).some(service => service.state === 'failed')) notifyError(t('gateway.actionFailed'))
+        if (!stopping && snapshot.state === 'failed' && previous.state !== 'failed' && !Object.values(snapshot.services).some(service => service.state === 'failed')) notifyError(t('gateway.actionFailed'))
         if (snapshot.state === 'running' && previous.state !== 'running') notifySuccess(t('gateway.startedNotice'))
         if (snapshot.state === 'stopped' && previous.state !== 'stopped') notifyInfo(t('gateway.stoppedNotice'))
       }

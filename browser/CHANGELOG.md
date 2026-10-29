@@ -2,6 +2,10 @@
 
 The extension has its own release version in `browser/version.json`. The extension build and desktop compatibility check both read that file. Every extension release must update the version and this log together. Desktop app versions remain independent.
 
+## 1.1.6 — 2026-10-30
+
+- Smooth interim translations and stabilize bilingual browser caption tracks.
+
 ## 1.1.5 — 2026-10-26
 
 - Fix Native Messaging frame handling and align generated browser identities.

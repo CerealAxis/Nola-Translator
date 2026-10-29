@@ -69,7 +69,6 @@ export interface SettingsState {
   runtimeAction: 'install' | 'uninstall' | null
   runtimeChecking: boolean
   runtimeError: string | null
-  runtimeNoticeDismissed: boolean
   appUpdate: AppUpdateCheckResult | null
   appUpdateChecking: boolean
   appUpdateError: boolean
@@ -99,7 +98,7 @@ const initialState: SettingsState = {
   captionServiceCode: null,
   captionServiceBusy: false,
   runtimes: null, computeSnapshot: null, computeChecking: false, computeError: null,
-  runtimeBusy: false, runtimeAction: null, runtimeChecking: false, runtimeError: null, runtimeNoticeDismissed: false,
+  runtimeBusy: false, runtimeAction: null, runtimeChecking: false, runtimeError: null,
   appUpdate: null, appUpdateChecking: false, appUpdateError: false,
 }
 
@@ -258,9 +257,7 @@ export async function uninstallRuntimeComponent(kind: 'engine' | 'llama' | 'cris
 }
 
 export async function cancelRuntimeInstallation(): Promise<void> { await bridge?.runtimes.cancel() }
-export function dismissRuntimeNotice(): void { settingsStore.setState({ runtimeNoticeDismissed: true }) }
 export async function openRuntimeSettings(component: 'engine' | 'llama' | 'crisp'): Promise<void> {
-  settingsStore.setState({ runtimeNoticeDismissed: true })
   await bridge?.runtimes.openSettings(component)
 }
 

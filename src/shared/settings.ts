@@ -235,6 +235,7 @@ export type TranslationSettings = {
   mymemoryEndpoint?: string
   mymemoryEmail?: string
   translateIntermediate: boolean
+  intermediateTranslationIntervalMs: number
   targetLanguage: string
   /** Optional provider used only after every final-caption attempt with the primary has failed. */
   fallback: FallbackTranslationSettings
@@ -412,6 +413,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     mymemoryEndpoint: 'https://api.mymemory.translated.net/get',
     mymemoryEmail: '',
     translateIntermediate: true,
+    intermediateTranslationIntervalMs: 500,
     targetLanguage: 'zh',
     fallback: {
       provider: 'disabled',

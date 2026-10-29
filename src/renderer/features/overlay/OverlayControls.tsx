@@ -45,7 +45,7 @@ import { actions, sessionStore, stores, useStore } from '@/store'
 import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
 import { audioDeviceNameOf, targetLanguagePatch, translationFieldsOf } from '@/session-config'
 import { useI18n } from '@/i18n'
-import { notifyError, notifyInfo } from '@/components/primitives/notify'
+import { notifyError, notifyInfo, notifyGatewayModelUnavailable } from '@/components/primitives/notify'
 
 import { OverlayDisplayMenu, OverlayLayoutMenu } from './OverlayDisplayMenu'
 import { OverlayDropdown } from './OverlayDropdown'
@@ -295,11 +295,11 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
     }
     if (status === 'idle' || status === 'error') {
       if (asrUnavailable) {
-        notifyError(t('gateway.modelNone', { name: t('session.recognitionModel') }))
+        notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.asr') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
         return
       }
       if (mtUnavailable) {
-        notifyError(t('gateway.modelNone', { name: t('session.translationModel') }))
+        notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.mt') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
         return
       }
       setLastIntent('start')
@@ -381,18 +381,19 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
               maxHeight={menuMaxHeight}
               onChange={next => patch({ recognition: { sourceLanguage: next } })}
             />
-            <LanguagePill
-              kind="target"
-              caption={t('session.targetLanguage')}
-              value={target}
-              options={modelOptions.targetLanguages}
-              labelOf={label}
-              isDisabled={active}
-              maxHeight={menuMaxHeight}
-              onChange={next => patch(targetLanguagePatch(next, target))}
-            />
-
-            <OverlayDisplayMenu />
+            {!translationDisabled ? <>
+              <LanguagePill
+                kind="target"
+                caption={t('session.targetLanguage')}
+                value={target}
+                options={modelOptions.targetLanguages}
+                labelOf={label}
+                isDisabled={active}
+                maxHeight={menuMaxHeight}
+                onChange={next => patch(targetLanguagePatch(next, target))}
+              />
+              <OverlayDisplayMenu />
+            </> : null}
             <OverlayLayoutMenu />
           </div>
         </div>

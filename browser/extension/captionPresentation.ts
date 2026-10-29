@@ -9,12 +9,13 @@ export function deepFullscreenElement(document: Document): Element | null {
   return element
 }
 export function captionLines(caption: Caption | undefined, config: CaptionConfig): string[] {
-  if (!caption) return []
-  const source = config.showSource && caption.sourceText ? [caption.sourceText] : []
+  if (!caption) return config.showSource && config.showTranslation && config.targetLanguage !== 'none' ? ['', ''] : []
+  const source = config.showSource ? [caption.sourceText] : []
   if (config.targetLanguage === 'none' || !config.showTranslation) return source
   const translation = caption.translations.find(item => item.targetLanguage === config.targetLanguage && item.state !== 'failed' && item.text)?.text
   // Translation latency or failure must not hide speech that recognition already produced.
-  return translation ? [...source, translation] : source
+  if (config.showSource) return [caption.sourceText, translation ?? '']
+  return translation ? [translation] : []
 }
 /** A phrase expires once, even when layout or fullscreen causes another render of the same revision. */
 export class CaptionClock {

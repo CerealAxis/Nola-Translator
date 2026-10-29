@@ -10,7 +10,25 @@ export interface ToastAction { children: string; onPress: () => void; variant?: 
 export interface ToastData { actionVariant?: ToastAction['variant'] }
 export interface ToastOptions { description?: string; actionProps?: ToastAction; timeout?: number; variant?: ToastVariant }
 
+const DEFAULT_TOAST_TIMEOUT = 6000
+
 const manager = BaseToast.createToastManager<ToastData>()
+const toastExpirationTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+function resetToastExpiration(id: string, timeout: number): void {
+  const existingTimer = toastExpirationTimers.get(id)
+  if (existingTimer) clearTimeout(existingTimer)
+  toastExpirationTimers.set(id, setTimeout(() => {
+    toastExpirationTimers.delete(id)
+    manager.close(id)
+  }, timeout))
+}
+
+function clearToastExpiration(id: string): void {
+  const timer = toastExpirationTimers.get(id)
+  if (timer) clearTimeout(timer)
+  toastExpirationTimers.delete(id)
+}
 
 function toastType(variant: ToastVariant | undefined): 'success' | 'info' | 'warning' | 'error' | 'loading' | undefined {
   switch (variant) {
@@ -31,31 +49,39 @@ function nativeActionProps(action: ToastAction | undefined): { children: string;
 }
 
 export function createToast(message: string, options: ToastOptions = {}): string {
-  return manager.add({
+  const timeout = options.timeout === undefined || options.timeout === 0 ? DEFAULT_TOAST_TIMEOUT : options.timeout
+  let id = ''
+  id = manager.add({
     title: message,
     description: options.description,
-    timeout: options.timeout,
+    timeout,
     type: toastType(options.variant),
     actionProps: nativeActionProps(options.actionProps),
     data: { actionVariant: options.actionProps?.variant },
     priority: options.variant === 'danger' || options.variant === 'error' ? 'high' : 'low',
+    onClose: () => clearToastExpiration(id),
   })
-}
-
-export function updateToast(id: string, message: string, options: ToastOptions & { variant: ToastVariant }): string {
-  manager.update(id, {
-    title: message,
-    description: options.description,
-    ...(options.timeout === undefined ? {} : { timeout: options.timeout }),
-    type: toastType(options.variant),
-    actionProps: nativeActionProps(options.actionProps),
-    data: { actionVariant: options.actionProps?.variant },
-    priority: options.variant === 'danger' || options.variant === 'error' ? 'high' : 'low',
-  })
+  resetToastExpiration(id, timeout)
   return id
 }
 
-export function closeToast(id: string): void { manager.close(id) }
+export function updateToast(id: string, message: string, options: ToastOptions & { variant: ToastVariant }): string {
+  const timeout = options.timeout === undefined ? DEFAULT_TOAST_TIMEOUT : options.timeout === 0 ? DEFAULT_TOAST_TIMEOUT : options.timeout
+  manager.update(id, {
+    title: message,
+    description: options.description,
+    timeout,
+    type: toastType(options.variant),
+    actionProps: nativeActionProps(options.actionProps),
+    data: { actionVariant: options.actionProps?.variant },
+    priority: options.variant === 'danger' || options.variant === 'error' ? 'high' : 'low',
+    onClose: () => clearToastExpiration(id),
+  })
+  resetToastExpiration(id, timeout)
+  return id
+}
+
+export function closeToast(id: string): void { clearToastExpiration(id); manager.close(id) }
 
 function ToastViewport() {
   const { t } = useI18n()
@@ -72,7 +98,7 @@ function ToastViewport() {
               {toast.type === 'loading' ? <LoaderCircle className="nola-toast-icon nola-toast-icon-loading" aria-hidden="true" /> : null}
               <div className="nola-toast-copy"><BaseToast.Title className="nola-toast-title" />{toast.description ? <BaseToast.Description className="nola-toast-description" /> : null}</div>
               <BaseToast.Action className="nola-toast-action" render={<Button size="sm" variant={toast.data?.actionVariant === 'primary' ? 'default' : toast.data?.actionVariant ?? 'outline'} />} />
-              <BaseToast.Close render={<Button size="icon" variant="tertiary" className="nola-toast-close" aria-label={t('common.close')}><X aria-hidden="true" /></Button>} />
+              <BaseToast.Close render={<Button size="icon" variant="tertiary" className="nola-toast-close !bg-transparent hover:!bg-transparent !border-transparent" aria-label={t('common.close')}><X aria-hidden="true" /></Button>} />
             </BaseToast.Content>
           </BaseToast.Root>
         })}

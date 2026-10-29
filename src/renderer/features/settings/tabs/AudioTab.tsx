@@ -20,7 +20,7 @@ import { useModelOptions } from '@/model-options'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
-import { CircleHelp, LoaderCircle } from 'lucide-react'
+import { LoaderCircle } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 import { languageName } from '@/bridge'
@@ -28,7 +28,6 @@ import { SettingsRow } from '../SettingsRow'
 import { notifyError, notifySuccess, notifyWarning } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
-import { useRoute } from '@/routes'
 import { errorCopyOf } from '@/features/workspace/error-copy'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
@@ -41,7 +40,6 @@ const DEFAULT_OUTPUT = 'defaultOutput'
 
 export function AudioTab({ settings }: SettingsPanelProps) {
   const { t, language } = useI18n()
-  const { navigate } = useRoute()
   const modelChoices = useModelOptions()
   const devices = useStore(stores.models, (state) => state.devices)
   const provider = settings.recognition.provider ?? 'local'
@@ -92,17 +90,6 @@ export function AudioTab({ settings }: SettingsPanelProps) {
       </SettingGroup>
 
       <SettingGroup onboardingTarget="recognition-service" legend={t('settings.groupRecognition')}>
-        {/*
-         * Which model or service recognises speech is the model gateway's decision: a business
-         * page picks it per session from what the gateway already loaded. A picker here would let
-         * a settings change load a different model under a session that is running.
-         */}
-        <p className="nola-caption text-muted">{t('settings.gatewayModelHint')}</p>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => navigate('#/models')}>{t('modelsPolicy.title')}</Button>
-          <Tooltip><TooltipTrigger render={<Button variant="secondary" size="icon-xs" className="min-h-6 border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('modelsPolicy.enableHint')} />}><CircleHelp aria-hidden="true" /></TooltipTrigger>
-            <TooltipContent side="top" className="z-popup max-w-96 whitespace-normal">{t('modelsPolicy.enableHint')}</TooltipContent></Tooltip>
-        </div>
         <SettingsRow label={t('settings.sourceLanguage')}>
           <SettingSelect
             value={settings.recognition.sourceLanguage}

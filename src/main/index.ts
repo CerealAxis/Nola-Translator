@@ -822,7 +822,6 @@ if (!hasSingleInstanceLock) {
     // session that failed to stop leaves the flag set, and every later start is refused.
     desktopEngine.on('state', state => { if (state === 'failed' || state === 'recovering' || state === 'stopped') sessionActive = false })
     createWorkspaceWindow(initialSettings.theme)
-    await workspaceReady
     const workbench = registerWorkbench(() => settings.current().theme, __dirname, undefined, {
       getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
       workspace: new AgentWorkspace(join(dataRoot, 'local-call')),

@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
 import { useEffect, useRef } from 'react'
-import { Mic, Captions, Clock, SlidersHorizontal } from 'lucide-react'
+import { Mic, Captions, Clock, SlidersHorizontal, Network, MessageSquareText } from 'lucide-react'
 import { ErrorBoundary } from '@/components/primitives'
+import { requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { HeroSection, FeatureCard } from '@/components/home'
 import { useI18n } from '@/i18n'
 import { pathOf, recordPath, useRoute } from '@/routes'
-import { actions, stores, useStore } from '@/store'
+import { actions, getBridge, stores, useStore } from '@/store'
 import { RecentMeetings } from './RecentMeetings'
 import './home-records.css'
 
@@ -54,10 +55,11 @@ export function HomePage(): ReactNode {
       <div className="nola-home">
         <HeroSection />
         <div className="nola-home__entries">
-          <FeatureCard onboardingTarget="home-quick" variant="primary" icon={<Mic aria-hidden="true" />} title={t('home.quickStart')} description={t('homeRecordsUi.quickDescription')} buttonText={t('workspace.start')} onButtonClick={goWorkspace} />
-          <FeatureCard onboardingTarget="home-overlay" variant="secondary" icon={<Captions aria-hidden="true" />} title={t('home.overlayCaptions')} description={t('homeRecordsUi.overlayDescription')} buttonText={t('homeRecordsUi.openOverlay')} onButtonClick={() => navigate('#/video-captions')} />
-          <FeatureCard variant="tertiary" icon={<Clock aria-hidden="true" />} title={t('home.records')} description={t('homeRecordsUi.recordsDescription')} buttonText={t('homeRecordsUi.openRecords')} onButtonClick={goRecords} />
+          <FeatureCard variant="tertiary" icon={<Network aria-hidden="true" />} title={t('homeRecordsUi.gatewayTitle')} description={t('homeRecordsUi.gatewayDescription')} buttonText={t('homeRecordsUi.openGateway')} onButtonClick={() => navigate(pathOf('model-gateway'))} />
           <FeatureCard variant="quaternary" icon={<SlidersHorizontal aria-hidden="true" />} title={t('home.models')} description={t('homeRecordsUi.modelsDescription')} buttonText={t('homeRecordsUi.openModels')} onButtonClick={() => navigate(pathOf('models'))} />
+          <FeatureCard onboardingTarget="home-quick" variant="primary" icon={<Mic aria-hidden="true" />} title={t('home.quickStart')} description={t('homeRecordsUi.quickDescription')} buttonText={t('workspace.start')} onButtonClick={goWorkspace} />
+          <FeatureCard onboardingTarget="home-overlay" variant="secondary" className="nola-entry--browser" icon={<Captions aria-hidden="true" />} title={t('home.overlayCaptions')} description={t('homeRecordsUi.overlayDescription')} buttonText={t('homeRecordsUi.openOverlay')} onButtonClick={() => navigate('#/video-captions')} />
+          <FeatureCard variant="secondary" className="nola-entry--workbench" icon={<MessageSquareText aria-hidden="true" />} title={t('workbench.title')} description={t('homeRecordsUi.workbenchDescription')} buttonText={t('homeRecordsUi.openWorkbench')} onButtonClick={() => { void requestFeatureStart(async () => getBridge()?.app.openWorkbench?.('chat'), 'workbench').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) }} />
         </div>
         <RecentMeetings meetings={meetings} loading={loading} failed={loadFailed} onRetry={retryLoad} onOpen={(id) => navigate(recordPath(id))} onStart={goWorkspace} onOpenAll={goRecords} />
       </div>

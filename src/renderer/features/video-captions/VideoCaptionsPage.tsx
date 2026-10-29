@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react'
 import { Popover } from '@base-ui/react/popover'
 
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { AppWindow, ArrowRight, ArrowRightLeft, ChevronDown, Languages, LoaderCircle, Settings } from 'lucide-react'
+import { ArrowRight, ArrowRightLeft, ChevronDown, Languages, LoaderCircle, Settings } from 'lucide-react'
 import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { AppSettingsPatch, PrewarmErrorCode } from '@/bridge'
 import { useModelOptions } from '@/model-options'
@@ -21,10 +21,9 @@ import { PageHeader } from '@/components/primitives'
 import { requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { notifyError, notifyInfo, notifyWarning } from '@/components/primitives/notify'
+import { notifyError, notifyGatewayModelUnavailable, notifyInfo, notifySuccess, notifyWarning } from '@/components/primitives/notify'
 import { reportSettingsFailure } from '@/features/settings/settingsErrorChannel'
 import { SettingSelect } from '../settings/SettingsPage'
-import { openDefaultBrowser } from './openDefaultBrowser'
 import { isSessionAlreadyRunningError } from '../../../shared/ipc-error'
 import './video-captions.css'
 
@@ -65,7 +64,6 @@ export function VideoCaptionsPage() {
   const captionServiceBusy = useStore(stores.settings, state => state.captionServiceBusy)
   const browserStatus = useStore(stores.settings, state => state.browser)
   const devices = useStore(stores.models, state => state.devices)
-  const [opening, setOpening] = useState(false)
   /*
    * The gate is the desktop's answer to a toggle the extension pulls from inside a web page,
    * so this page reads it on a poll the way the browser settings tab does, rather than
@@ -109,11 +107,6 @@ export function VideoCaptionsPage() {
     : value === SYSTEM_DEFAULT_OUTPUT
       ? { videoCaptions: { audioSource: 'system', audioDeviceId: undefined } }
       : { videoCaptions: { audioSource: 'system', audioDeviceId: value } }
-  const openBrowser = async () => {
-    setOpening(true)
-    try { await openDefaultBrowser() } catch (error) { notifyError(t('videoCaptions.errorOpeningBrowser'), { cause: error }) }
-    finally { setOpening(false) }
-  }
   const prewarmDetail = (code?: PrewarmErrorCode) =>
     code ? t(PREWARM_ERROR_KEYS[code]) : undefined
   const notifyConflict = (cause?: unknown) => {
@@ -149,11 +142,11 @@ export function VideoCaptionsPage() {
    */
   const open = async () => {
     if (asrUnavailable) {
-      notifyError(t('gateway.modelNone', { name: t('session.recognitionModel') }))
+      notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.asr') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
       return
     }
     if (!translationDisabled && mtUnavailable) {
-      notifyError(t('gateway.modelNone', { name: t('session.translationModel') }))
+      notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.mt') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
       return
     }
     let browsers: NonNullable<BrowserConnectionStatus['browsers']> = []
@@ -215,6 +208,7 @@ export function VideoCaptionsPage() {
     }
     try {
       await setCaptionServiceActive(true)
+      notifySuccess(t('videoCaptions.serviceStarted'))
     } catch (error) {
       if (isSessionAlreadyRunningError(error)) {
         notifyConflict(error)
@@ -246,23 +240,19 @@ export function VideoCaptionsPage() {
   } as CSSProperties
   const prewarming = captionService === 'loading'
   const gateActive = browserStatus?.captionServiceActive === true
-  const serviceRunning = browserStatus?.sessionActive === true
-  const serviceIndicator = prewarming ? null
-    : gateActive && serviceRunning
-      ? <span className="nola-caption text-muted" role="status">{t('videoCaptions.serviceRunning')}</span>
-      : gateActive
-        ? <span className="nola-caption text-muted" role="status">{t('videoCaptions.serviceReady')}</span>
-        : null
   const showSource = config.showSource || translationDisabled
   const showTranslation = config.showTranslation && !translationDisabled
 
   return (
     <div className="nola-overlay-page">
       <PageHeader className="nola-page-heading" title={t('videoCaptions.title')}
-        actions={<Button onClick={() => void openBrowser()} disabled={opening}>
-          {opening ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <AppWindow aria-hidden="true" />}
-          {t('videoCaptions.openBrowser')}
-        </Button>} />
+        actions={<>
+          <Button variant={gateActive ? 'danger' : 'default'} disabled={captionServiceBusy || prewarming}
+            onClick={() => void (gateActive ? close() : requestFeatureStart(open, 'browser-captions')).catch(error => notifyError(t('videoCaptions.serviceFailed'), { cause: error }))}>
+            {captionServiceBusy || prewarming ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
+            {prewarming ? t('videoCaptions.serviceLoading') : gateActive ? t('videoCaptions.disableService') : t('videoCaptions.enableService')}
+          </Button>
+        </>} />
       <Card className="nola-overlay-preview">
         <CardHeader>
           <CardTitle>{t('videoCaptions.captionPreview')}</CardTitle>
@@ -373,14 +363,6 @@ export function VideoCaptionsPage() {
           <Button variant="secondary" onClick={() => navigate(settingsPath('browser'))}><Settings aria-hidden="true" />{t('videoCaptions.browserSettings')}<ArrowRight aria-hidden="true" /></Button>
         </CardFooter>
       </Card>
-      <div className="nola-video-service">
-        <Button variant={gateActive ? 'danger' : 'default'} disabled={captionServiceBusy || prewarming}
-          onClick={() => void (gateActive ? close() : requestFeatureStart(open, 'browser-captions')).catch(error => notifyError(t('videoCaptions.serviceFailed'), { cause: error }))}>
-          {captionServiceBusy ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
-          {prewarming ? t('videoCaptions.serviceLoading') : gateActive ? t('videoCaptions.disableService') : t('videoCaptions.enableService')}
-        </Button>
-        {serviceIndicator}
-      </div>
     </div>
   )
 }

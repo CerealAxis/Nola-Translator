@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui'
 import { Empty, EmptyTitle } from '@/components/ui/empty'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardAction, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardAction, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { LocalModelImport } from '../offline/OfflineResources'
 import { offlineActions } from '@/store/offlineStore'
 import { modelImportEntry } from '../../../shared/model-import-catalog'
@@ -14,15 +14,16 @@ import { defaultModelBinding, defaultModelPatch } from '../../../shared/model-po
 import { ModelPolicyPanel } from './ModelPolicyPanel'
 /** Model catalog and download manager. The router owns the page padding. */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Box, Cpu } from 'lucide-react'
+import { Box, CircleHelp, Cpu } from 'lucide-react'
 import { getBridge } from '@/store'
 
 import { useI18n } from '@/i18n'
 import { settingsPath, useRoute } from '@/routes'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { notifyError, notifyInfo, notifySuccess } from '@/components/primitives/notify'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ModelDownloadSource, ResourceRecord, ResourceRecordWithRate } from '@/bridge'
 import { DownloadsTab } from './DownloadsTab'
 import { HubSearchTab } from './HubSearchTab'
@@ -296,9 +297,9 @@ export function ModelsPage() {
           </div>
         </header>
         <div className="models-overview__summaries" data-onboarding="models-active">
-          <CurrentModel label={t('modelsSettingsUi.currentRecognition')} name={currentRecognition} record={remoteRecognition ? null : recognition ?? null} installed={remoteRecognition ? null : recognition?.installed ?? false} kind="recognitionModel" onChange={() => setTab('installed')} />
-          <CurrentModel label={t('modelsSettingsUi.currentTranslation')} name={currentTranslation} record={localTranslation ? translation ?? null : null} cloudId={localTranslation ? undefined : currentTranslationCloud?.id} installed={localTranslation ? translation?.installed ?? false : settings ? currentTranslationCloudReady : null} kind="translationModel" onChange={() => setTab('installed')} />
-          <CurrentModel label={t('gateway.synthesisDefault')} name={synthesis?.installed ? synthesis.name : t('modelsSettingsUi.noModelSelected')} record={synthesis ?? null} installed={synthesis?.installed ?? false} kind="ttsModel" onChange={() => setTab('installed')} />
+          <CurrentModel label={t('modelsSettingsUi.currentRecognition')} name={currentRecognition} record={remoteRecognition || !recognition?.installed ? null : recognition ?? null} installed={remoteRecognition ? null : recognition?.installed ?? false} kind="recognitionModel" onChange={() => setTab('installed')} />
+          <CurrentModel label={t('modelsSettingsUi.currentTranslation')} name={currentTranslation} record={localTranslation && translation?.installed ? translation : null} cloudId={localTranslation ? undefined : currentTranslationCloud?.id} installed={localTranslation ? translation?.installed ?? false : settings ? currentTranslationCloudReady : null} kind="translationModel" onChange={() => setTab('installed')} />
+          <CurrentModel label={t('gateway.synthesisDefault')} name={synthesis?.installed ? synthesis.name : t('modelsSettingsUi.noModelSelected')} record={synthesis?.installed ? synthesis : null} installed={synthesis?.installed ?? false} kind="ttsModel" onChange={() => setTab('installed')} />
         </div>
       </section>
 
@@ -401,25 +402,34 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAc
   if (!loading && !failed && records.length === 0 && cloudModels.length === 0) return <Empty className="flex flex-col items-start gap-4 py-8"><EmptyTitle>{t('models.notInstalled')}</EmptyTitle>{emptyAction}</Empty>
   const groups = new Map<RecommendedFamily, ResourceRecord[]>()
   for (const record of records) {
+    // Keep legacy M2M100 installations available in Installed, but stop recommending it.
+    if (record.resourceId === 'm2m100-418m') continue
     const family = familyOf(record)
+    if (family === 'kokoro' || family === 'piper') continue
     groups.set(family, [...(groups.get(family) ?? []), record])
   }
-  const sections: { title: string; kind: ResourceRecord['kind']; families: RecommendedFamily[]; language?: boolean }[] = [
-    { title: t('models.asrModels'), kind: 'recognitionModel', families: ['qwen', 'sensevoice', 'funasr', 'vibevoice', 'mimo'] },
-    { title: t('workbench.llm'), kind: 'translationModel', families: ['qwen35'], language: true },
-    { title: t('models.mtModels'), kind: 'translationModel', families: ['hymt2', 'index', 'other'] },
-    { title: t('models.ttsModels'), kind: 'ttsModel', families: ['tts', 'kokoro', 'piper', 'cosyvoice3'] },
+  const sections: { title: string; hint: string; kind: ResourceRecord['kind']; families: RecommendedFamily[]; language?: boolean }[] = [
+    { title: t('models.asrModels'), hint: t('models.asrModelsHint'), kind: 'recognitionModel', families: ['qwen', 'sensevoice', 'funasr', 'vibevoice', 'mimo'] },
+    { title: t('models.mtModels'), hint: t('models.mtModelsHint'), kind: 'translationModel', families: ['hymt2', 'index', 'other'] },
+    { title: t('models.ttsModels'), hint: t('models.ttsModelsHint'), kind: 'ttsModel', families: ['tts', 'kokoro', 'piper', 'cosyvoice3'] },
+    { title: t('models.llmModels'), hint: t('models.llmModelsHint'), kind: 'translationModel', families: ['qwen35'], language: true },
   ]
   return <div className="flex flex-col gap-6">
     {failed ? <FailedCatalog onRetry={onRetry} /> : null}
     {loading ? <div className={GRID}>{[0, 1, 2].map(index => <ModelCardSkeleton key={index} />)}</div> : null}
-    {sections.filter(section => section.families.some(family => groups.has(family)) || cloudModels.some(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language))).map(section => <section key={section.title} className="flex flex-col gap-3">
-    <h2 className="models-section-title">{section.title}</h2>
+    {sections.filter(section => section.families.some(family => groups.has(family)) || cloudModels.some(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language))).map(section => {
+      const sectionCloudModels = cloudModels.filter(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language))
+      const indexTranslation = section.kind === 'translationModel' ? sectionCloudModels.find(model => model.id === 'index-translate') : undefined
+      const otherCloudModels = indexTranslation ? sectionCloudModels.filter(model => model !== indexTranslation) : sectionCloudModels
+      const renderCloudModel = (model: CloudModel) => <CloudModelCard key={model.id} model={model} onOpen={onOpenCloud} />
+      return <section key={section.title} className="flex flex-col gap-3">
+    <ModelSectionHeading title={section.title} hint={section.hint} />
     <div className={GRID}>{section.families.map(family => {
       const familyRecords = groups.get(family)
-      return familyRecords ? <RecommendedFamilyCard key={family} family={family} records={familyRecords} onOpen={() => onOpen(family)} /> : null
-    })}{cloudModels.filter(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language)).map(model => <CloudModelCard key={model.id} model={model} onOpen={onOpenCloud} />)}</div>
-  </section>)}</div>
+      return <Fragment key={family}>{familyRecords ? <RecommendedFamilyCard family={family} records={familyRecords} onOpen={() => onOpen(family)} /> : null}{family === 'index' && indexTranslation ? renderCloudModel(indexTranslation) : null}</Fragment>
+    })}{otherCloudModels.map(renderCloudModel)}</div>
+  </section>
+    })}</div>
 }
 
 /**
@@ -461,21 +471,23 @@ function Catalog({ records, loading, failed, onRetry, card, emptyAction, compute
     <div className="flex flex-col gap-6">
       {loading ? <div className={GRID}>{[0, 1, 2].map(index => <ModelCardSkeleton key={index} />)}</div> : null}
       {failed ? <FailedCatalog onRetry={onRetry} /> : null}
-      <Section title={t('models.asrModels')} records={recognition} card={card}>{cloudModels.filter(model => model.kind === 'recognitionModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
-      <Section title={t('workbench.llm')} records={languageModels} card={card}>{cloudModels.filter(model => model.profile || model.id === 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
-      <Section title={t('models.mtModels')} records={mtModels} card={card}>{cloudModels.filter(model => model.kind === 'translationModel' && !model.profile && model.id !== 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
-      <Section title={t('models.ttsModels')} records={ordered.filter(record => record.kind === 'ttsModel')} card={card} />
+      <Section title={t('models.asrModels')} hint={t('models.asrModelsHint')} records={recognition} card={card}>{cloudModels.filter(model => model.kind === 'recognitionModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
+      <Section title={t('models.mtModels')} hint={t('models.mtModelsHint')} records={mtModels} card={card}>{cloudModels.filter(model => model.kind === 'translationModel' && !model.profile && model.id !== 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
+      <Section title={t('models.ttsModels')} hint={t('models.ttsModelsHint')} records={ordered.filter(record => record.kind === 'ttsModel')} card={card} />
+      <Section title={t('models.llmModels')} hint={t('models.llmModelsHint')} records={languageModels} card={card}>{cloudModels.filter(model => model.profile || model.id === 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
     </div>
   )
 }
 
 function Section({
   title,
+  hint,
   records,
   card,
   children,
 }: {
   title: string
+  hint: string
   records: readonly ResourceRecordWithRate[]
   card: (record: ResourceRecord) => ReactNode
   children?: ReactNode[]
@@ -483,9 +495,23 @@ function Section({
   if (records.length === 0 && !children?.length) return null
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="models-section-title">{title}</h2>
+      <ModelSectionHeading title={title} hint={hint} />
       <div className={GRID}>{records.map(card)}{children}</div>
     </section>
+  )
+}
+
+function ModelSectionHeading({ title, hint }: { title: string; hint: string }) {
+  const titleId = useId()
+  const { t } = useI18n()
+  return (
+    <h2 className="models-section-title" aria-labelledby={titleId}>
+      <span id={titleId}>{title}</span>
+      <Tooltip>
+        <TooltipTrigger delay={300} render={<Button variant="tertiary" size="icon-xs" className="border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('common.info')}><CircleHelp aria-hidden="true" className="size-3.5" /></Button>} />
+        <TooltipContent sideOffset={3} className="settings-row__tooltip z-popup max-w-96 whitespace-normal">{hint}</TooltipContent>
+      </Tooltip>
+    </h2>
   )
 }
 
@@ -493,14 +519,16 @@ function CurrentModel({ label, name, record, cloudId, installed, kind, onChange 
   const { t } = useI18n()
   const pending = kind !== 'ttsModel' && installed && record && !configurationOf(record)
   return <Card size="sm" className="models-current">
-    <CardHeader>
-    <CardAction>
-    <span aria-hidden="true" className={`models-card__icon models-card__icon--${kind === 'recognitionModel' ? 'recognition' : 'translation'}`} data-cloud-model={cloudId}>{cloudId ? <CloudMark id={cloudId} /> : <ModelMark record={record} kind={kind} />}</span>
-    </CardAction>
-    <CardTitle>{name}</CardTitle><CardDescription>{label}</CardDescription>
-    {installed === null ? null : <Badge variant={installed && !pending ? 'success' : 'warning'}  >{pending ? t('modelConfig.pending') : installed ? t('modelsSettingsUi.active') : t('modelsSettingsUi.unavailable')}</Badge>}
-    <Button variant="secondary" size="sm" onClick={onChange}>{t('gateway.change')}</Button>
+    <CardHeader className="models-current__header">
+      <div className="models-current__copy"><CardTitle>{name}</CardTitle><CardDescription>{label}</CardDescription></div>
+      <CardAction>
+        <span aria-hidden="true" className={`models-card__icon models-card__icon--${kind === 'recognitionModel' ? 'recognition' : 'translation'}`} data-cloud-model={cloudId}>{cloudId ? <CloudMark id={cloudId} /> : <ModelMark record={record} kind={kind} />}</span>
+      </CardAction>
     </CardHeader>
+    <CardContent className="models-current__footer">
+      {installed === null ? <span /> : <Badge variant={installed && !pending ? 'success' : 'warning'}>{pending ? t('modelConfig.pending') : installed ? t('modelsSettingsUi.active') : t('modelsSettingsUi.unavailable')}</Badge>}
+      <Button variant="secondary" size="sm" onClick={onChange}>{t('gateway.change')}</Button>
+    </CardContent>
   </Card>
 }
 

@@ -21,7 +21,7 @@ export const lessonsZh = {
   useWorkbench: '工作台是独立的 Agent 对话窗口，可以调用本地模型完成翻译、总结等任务。点击侧栏图标即可打开，本步骤无需操作。',
   openGateway: '最后是模型网关。请点击「模型网关」。',
   useGatewayService: '启动网关后，这里显示服务地址和 API 密钥。网关提供 OpenAI 兼容接口，第三方应用可以直接调用本地模型。',
-  useGatewayCapabilities: '在这里为语音识别、翻译、备用翻译、语言模型和语音合成选择要启动的模型。选择“不启用”可关闭对应能力；对外 API 默认复用这些绑定。',
+  useGatewayCapabilities: '在这里为语音识别、翻译、备用翻译、大语言模型和语音合成选择要启动的模型。选择“不启用”可关闭对应能力；对外 API 默认复用这些绑定。',
   finishTitle: '恭喜你完成新手指引',
   finishBody: '教程到此结束。以后想再看一遍，可以到「设置 · 更多」中点击「再次查看」。',
   githubHome: 'GitHub 主页', finishExit: '退出',
@@ -52,7 +52,7 @@ export const lessonsEn: LessonMessages = {
   useWorkbench: 'The workbench is a separate agent chat window that can use your local models for translation, summarizing and more. Open it from the sidebar icon whenever you like; there is nothing to do in this step.',
   openGateway: 'Last stop: the model gateway. Select Model gateway.',
   useGatewayService: 'After the gateway starts, this card shows the service address and API key. The gateway exposes an OpenAI-compatible API, so third-party apps can call your local models directly.',
-  useGatewayCapabilities: 'Choose models to start for speech recognition, translation, backup translation, language models and speech synthesis. Select Disabled to turn off a capability. The external API uses these bindings by default.',
+  useGatewayCapabilities: 'Choose models to start for speech recognition, translation, backup translation, large language models and speech synthesis. Select Disabled to turn off a capability. The external API uses these bindings by default.',
   finishTitle: 'Congratulations, you completed the getting-started guide',
   finishBody: 'The tour is complete. To see it again later, open Settings and More, then select View again.',
   githubHome: 'GitHub home', finishExit: 'Exit',
@@ -80,7 +80,7 @@ export const lessonsTW: LessonMessages = {
   useWorkbench: '工作台是獨立的 Agent 對話視窗，可以呼叫本機模型完成翻譯、摘要等任務。點選側欄圖示即可開啟，本步驟無需操作。',
   openGateway: '最後是模型閘道。請點選「模型閘道」。',
   useGatewayService: '啟動閘道後，這裡顯示服務位址和 API 金鑰。閘道提供 OpenAI 相容介面，第三方應用可以直接呼叫本機模型。',
-  useGatewayCapabilities: '在這裡為語音辨識、翻譯、備用翻譯、語言模型和語音合成選擇要啟動的模型。選擇「不啟用」可關閉對應功能；對外 API 預設沿用這些綁定。',
+  useGatewayCapabilities: '在這裡為語音辨識、翻譯、備用翻譯、大型語言模型和語音合成選擇要啟動的模型。選擇「不啟用」可關閉對應功能；對外 API 預設沿用這些綁定。',
   finishTitle: '恭喜你完成新手指引', finishBody: '教學到此結束。以後想再看一遍，可以到「設定 · 更多」中點選「再次查看」。',
   githubHome: 'GitHub 首頁', finishExit: '離開',
 }
@@ -99,7 +99,7 @@ export const lessonsHK: LessonMessages = {
   useBrowser: '安裝瀏覽器擴充功能並在設定中允許連線後，在這裏開啟字幕服務，就能在網頁影片上顯示字幕。瀏覽器字幕與桌面字幕無法同時使用。',
   useWorkbench: '工作台是獨立的 Agent 對話視窗，可以呼叫本機模型完成翻譯、摘要等任務。按側欄圖示即可開啟，本步驟無需操作。',
   useGatewayService: '啟動閘道後，這裏顯示服務位址和 API 金鑰。閘道提供 OpenAI 相容介面，第三方應用可以直接呼叫本機模型。',
-  useGatewayCapabilities: '在這裏為語音識別、翻譯、備用翻譯、語言模型和語音合成選擇要啟動的模型。選擇「不啟用」可關閉對應功能；對外 API 預設沿用這些綁定。',
+  useGatewayCapabilities: '在這裏為語音識別、翻譯、備用翻譯、大型語言模型和語音合成選擇要啟動的模型。選擇「不啟用」可關閉對應功能；對外 API 預設沿用這些綁定。',
   finishBody: '教學到此結束。以後想再看一遍，可以到「設定 · 更多」中按「再次查看」。',
 }
 
@@ -125,7 +125,7 @@ export const lessonsJa: LessonMessages = {
   useWorkbench: 'ワークベンチは独立したエージェント対話ウィンドウで、ローカルモデルを使って翻訳や要約などを行えます。サイドバーのアイコンからいつでも開けます。この手順での操作は不要です。',
   openGateway: '最後はモデルゲートウェイです。「モデルゲートウェイ」を選んでください。',
   useGatewayService: 'ゲートウェイを起動すると、ここにサービスアドレスと API キーが表示されます。OpenAI 互換 API を提供するため、サードパーティアプリからローカルモデルを直接呼び出せます。',
-  useGatewayCapabilities: '音声認識、翻訳、バックアップ翻訳、言語モデル、音声合成で起動するモデルを選択します。「無効」で機能を停止できます。外部 API は既定でこの設定を使います。',
+  useGatewayCapabilities: '音声認識、翻訳、バックアップ翻訳、大規模言語モデル、音声合成で起動するモデルを選択します。「無効」で機能を停止できます。外部 API は既定でこの設定を使います。',
   finishTitle: 'ガイドの完了、おめでとうございます', finishBody: 'ガイドは完了です。もう一度見たいときは、「設定」の「その他」にある「もう一度見る」を選んでください。',
   githubHome: 'GitHub ホーム', finishExit: '終了',
 }
@@ -152,7 +152,7 @@ export const lessonsKo: LessonMessages = {
   useWorkbench: '워크벤치는 독립된 에이전트 대화 창으로, 로컬 모델을 활용해 번역·요약 등을 수행할 수 있습니다. 사이드바 아이콘으로 언제든 열 수 있으며 이 단계에서는 조작이 필요 없습니다.',
   openGateway: '마지막은 모델 게이트웨이입니다. 모델 게이트웨이를 선택하세요.',
   useGatewayService: '게이트웨이를 시작하면 여기에 서비스 주소와 API 키가 표시됩니다. OpenAI 호환 API를 제공하므로 서드파티 앱에서 로컬 모델을 직접 호출할 수 있습니다.',
-  useGatewayCapabilities: '음성 인식, 번역, 예비 번역, 언어 모델, 음성 합성에 시작할 모델을 선택하세요. 사용 안 함을 선택하면 해당 기능이 꺼집니다. 외부 API는 기본적으로 이 설정을 사용합니다.',
+  useGatewayCapabilities: '음성 인식, 번역, 예비 번역, 대규모 언어 모델, 음성 합성에 사용할 모델을 선택하세요. 사용 안 함을 선택하면 해당 기능이 꺼집니다. 외부 API는 기본적으로 이 설정을 사용합니다.',
   finishTitle: '시작 안내를 완성하셨습니다', finishBody: '안내가 끝났습니다. 다시 보고 싶을 때는 설정의 더 보기에서 다시 보기를 선택하세요.',
   githubHome: 'GitHub 홈', finishExit: '종료',
 }

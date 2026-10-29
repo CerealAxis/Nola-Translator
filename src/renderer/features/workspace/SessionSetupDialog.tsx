@@ -21,7 +21,7 @@ import {
 } from '@/bridge'
 import type { AudioDevice, AudioSourceOption, RecognitionModelId, SessionConfig } from '@/bridge'
 import { SettingRow } from '@/components/primitives'
-import { notifyError, notifyInfo } from '@/components/primitives/notify'
+import { notifyError, notifyGatewayModelUnavailable, notifyInfo } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import type { UiLanguage } from '@/i18n'
 import { autoMeetingTitle, nextDaySequence } from '@/meeting-format'
@@ -160,7 +160,11 @@ export function SessionSetupDialog({
 
   const submit = useCallback(() => {
     if (incompatible) { setDismissedPair(null); return }
-    if (!modelsConfigured) { notifyError(t('gateway.modelNone', { name: t(asr.unavailable ? 'session.recognitionModel' : 'session.translationModel') })); return }
+    if (!modelsConfigured) {
+      const kind = asr.unavailable ? 'asr' : 'mt'
+      notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t(`gateway.${kind}`) }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
+      return
+    }
     if (!recognitionValid) return
     for (const replacement of [asr.replaced, draft.translate ? mt.replaced : null]) {
       if (replacement) notifyInfo(t('gateway.modelSwitched', { name: replacement.name }), { description: t('gateway.modelSwitchedLoaded') })
@@ -240,7 +244,7 @@ export function SessionSetupDialog({
         </div>
         <DialogFooter>
           <Button variant="tertiary" size="sm" onClick={() => onOpenChange(false)}>{t('session.cancel')}</Button>
-          <Button size="sm" disabled={!modelsConfigured || !recognitionValid} onClick={submit}>{t('session.start')}</Button>
+          <Button size="sm" disabled={!recognitionValid} onClick={submit}>{t('session.start')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

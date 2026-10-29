@@ -69,7 +69,7 @@ def probe_devices(llama_dir: Path | None) -> tuple[list[ComputeDevice], list[str
                     name=props.name, backend=backend, torchDevice=f"cuda:{index}",
                     totalMemoryMb=total / 2**20, freeMemoryMb=free / 2**20,
                     stableId=bool(uuid), recognition=enabled, translation=enabled,
-                    reason="" if enabled else "此运行包尚未声明该后端的模型适配",
+                    reason="" if enabled else "This runtime package does not declare model support for this backend",
                     score=float(getattr(props, "multi_processor_count", 1)) * 10 + props.major * 100,
                 ))
         if hasattr(torch, "xpu") and torch.xpu.is_available():
@@ -86,7 +86,7 @@ def probe_devices(llama_dir: Path | None) -> tuple[list[ComputeDevice], list[str
                     backend="xpu", torchDevice=f"xpu:{index}", totalMemoryMb=total / 2**20,
                     freeMemoryMb=free / 2**20, integrated=integrated, stableId=bool(uuid),
                     recognition=enabled, translation=enabled,
-                    reason="" if enabled else "此运行包尚未声明 Intel 模型适配", score=100,
+                    reason="" if enabled else "This runtime package does not declare Intel model support", score=100,
                 ))
         try:
             import torch_directml
@@ -100,7 +100,7 @@ def probe_devices(llama_dir: Path | None) -> tuple[list[ComputeDevice], list[str
                     stableId=False, recognition=True, translation=True, score=100,
                 ))
     except Exception as error:
-        notes.append(f"PyTorch 设备探测失败：{type(error).__name__}: {str(error)[:256]}")
+        notes.append(f"PyTorch device probe failed: {type(error).__name__}: {str(error)[:256]}")
     if llama_dir and (llama_dir / "llama-server.exe").is_file():
         try:
             result = subprocess.run(
@@ -109,7 +109,7 @@ def probe_devices(llama_dir: Path | None) -> tuple[list[ComputeDevice], list[str
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
             if result.returncode:
-                notes.append(f"llama.cpp 设备探测退出（{result.returncode}）：{result.stderr[-256:].strip()}")
+                notes.append(f"llama.cpp device probe exited ({result.returncode}): {result.stderr[-256:].strip()}")
             matches = [match for line in (result.stdout + result.stderr).splitlines()
                        if (match := re.match(r"\s*((?:CUDA|Vulkan|SYCL|HIP|ROCm|OpenVINO)\d+):\s*(.*?)\s*\((\d+)\s*MiB,\s*(\d+)\s*MiB free\)", line, re.IGNORECASE))]
             for match in matches:
@@ -138,12 +138,12 @@ def probe_devices(llama_dir: Path | None) -> tuple[list[ComputeDevice], list[str
                         id=f"llama:{identifier}:{name}", name=name, backend="rocm" if identifier.upper().startswith("HIP") else re.sub(r"\d+$", "", identifier).lower(),
                         llamaDevice=identifier, llamaDeviceNative=native_name, totalMemoryMb=float(total), freeMemoryMb=float(free),
                         stableId=False, recognition=True, translation=True, score=100,
-                        reason="由 llama.cpp 使用，支持兼容的语音识别或翻译 GGUF 模型",
+                        reason="Used by llama.cpp for compatible speech recognition or translation GGUF models",
                     ))
         except Exception as error:
-            notes.append(f"llama.cpp 设备探测失败：{type(error).__name__}: {str(error)[:256]}")
+            notes.append(f"llama.cpp device probe failed: {type(error).__name__}: {str(error)[:256]}")
     else:
-        notes.append("未找到 llama.cpp 运行包")
+        notes.append("llama.cpp runtime package not found")
     return devices[:64], notes[:32], version[:64]
 
 

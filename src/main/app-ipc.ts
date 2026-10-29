@@ -131,7 +131,7 @@ export function registerAppIpc(options: {
   ipcMain.on(channels.notifyMainError, onOverlayError)
   loggedHandle(channels.showWorkspace, () => options.showWorkspace?.())
   loggedHandle(channels.openMainPage, (_event, path: unknown) => {
-    if (typeof path !== 'string' || !/^#\/(?:models|settings\/[a-z-]+|records\/[a-zA-Z0-9-]+)$/.test(path)) throw new Error('Invalid main page')
+    if (typeof path !== 'string' || !/^#\/(?:models|model-gateway|settings\/[a-z-]+|records\/[a-zA-Z0-9-]+)$/.test(path)) throw new Error('Invalid main page')
     const window = options.getMainWindow()
     if (!window || window.isDestroyed()) throw new Error('Main window unavailable')
     window.webContents.send('app:main-page-requested', path)

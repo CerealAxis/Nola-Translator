@@ -62,6 +62,7 @@ export function prewarmConfigFrom(settings: AppSettings): PrewarmConfig {
     sourceLanguage: settings.recognition.sourceLanguage,
     targetLanguages: translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? [] : [translation.targetLanguage],
     allowIntermediateTranslation: supportsIntermediateTranslation(translation.provider) && translation.translateIntermediate,
+    intermediateTranslationIntervalMs: translation.intermediateTranslationIntervalMs,
     translationProvider: translation.provider,
     translationModelId: translation.localModelId,
     translationOptions: translationOptionsOf(translation),

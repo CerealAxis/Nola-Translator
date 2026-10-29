@@ -8,7 +8,6 @@
 
 import type { AudioDevice, ResourceRecord } from '@/bridge'
 import type { MissingResource, SessionState } from '@/store'
-import type { RuntimeIssue } from './RuntimeNotice'
 import type { HubHit } from '../models/HubSearchTab'
 import type { SetupDraft } from '../workspace/SessionSetupDialog'
 
@@ -139,9 +138,3 @@ export const DEMO_ERROR_SESSION: SessionState = {
   segments: [],
   interim: null,
 }
-
-/** The sample shows that the dialog summarizes multiple missing components. */
-export const DEMO_RUNTIME_ISSUES: RuntimeIssue[] = [
-  { kind: 'engine' },
-  { kind: 'llama' },
-]

@@ -36,10 +36,3 @@
 .nola-video-caption-line[data-role='translation'] {
   opacity: 0.92;
 }
-
-.nola-video-service {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}

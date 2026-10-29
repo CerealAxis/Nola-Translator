@@ -352,8 +352,8 @@
   .nola-toast-icon-error { color: var(--nola-ui-destructive); }
   .nola-toast-icon-loading { animation: nola-toast-spin 1s linear infinite; }
   @keyframes nola-toast-spin { to { transform: rotate(360deg); } }
-  .nola-toast-close.button { flex: none; width: 32px; min-width: 32px; height: 32px; min-height: 32px; border-radius: var(--radius-xl); color: var(--nola-ui-muted-foreground); }
-  .nola-toast-close.button:hover { color: var(--nola-ui-foreground); background: var(--nola-ui-accent); }
+  .nola-toast-close.button { flex: none; width: 32px; min-width: 32px; height: 32px; min-height: 32px; border-radius: var(--radius-xl); border-color: transparent; background: transparent; color: var(--nola-ui-muted-foreground); }
+  .nola-toast-close.button:hover:not(:disabled):not([aria-disabled='true']) { color: var(--nola-ui-foreground); background: transparent; }
 
   @media (max-width: 600px) {
     .nola-toast-viewport { inset: auto 12px 12px; width: auto; }

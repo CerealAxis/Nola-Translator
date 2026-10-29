@@ -146,7 +146,7 @@ export function AppearanceTab({ settings }: SettingsPanelProps) {
           {saveError ? <CircleAlert aria-hidden="true" /> : <CheckSquare aria-hidden="true" />}
           {saveError ? t('modelsSettingsUi.saveError') : pending ? t('modelsSettingsUi.saving') : t('modelsSettingsUi.automaticSave')}
         </span>
-        <Button variant="outline" disabled={pending} onClick={restore}>{t('modelsSettingsUi.resetAppearance')}</Button>
+        <Button variant="outline" size="sm" disabled={pending} onClick={restore}>{t('modelsSettingsUi.resetAppearance')}</Button>
       </div>
     </div>
   )

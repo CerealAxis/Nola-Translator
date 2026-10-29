@@ -64,36 +64,36 @@ const rows = {
     "利用可能な有効モデルがありません"
   ],
   "defaultAsr": [
-    "默认识别模型",
-    "Default recognition model",
-    "預設辨識模型",
-    "預設識別模型",
-    "기본 인식 모델",
-    "既定の認識モデル"
+    "默认 ASR 模型",
+    "Default ASR model",
+    "預設 ASR 模型",
+    "預設 ASR 模型",
+    "기본 ASR 모델",
+    "既定の ASR モデル"
   ],
   "defaultMt": [
-    "默认翻译模型",
-    "Default translation model",
-    "預設翻譯模型",
-    "預設翻譯模型",
-    "기본 번역 모델",
-    "既定の翻訳モデル"
+    "默认 MT 模型",
+    "Default MT model",
+    "預設 MT 模型",
+    "預設 MT 模型",
+    "기본 MT 모델",
+    "既定の MT モデル"
   ],
   "defaultTts": [
-    "默认语音合成模型",
-    "Default speech synthesis model",
-    "預設語音合成模型",
-    "預設語音合成模型",
-    "기본 음성 합성 모델",
-    "既定の音声合成モデル"
+    "默认 TTS 模型",
+    "Default TTS model",
+    "預設 TTS 模型",
+    "預設 TTS 模型",
+    "기본 TTS 모델",
+    "既定の TTS モデル"
   ],
   "defaultLlm": [
-    "默认语言模型",
-    "Default language model",
-    "預設語言模型",
-    "預設語言模型",
-    "기본 언어 모델",
-    "既定の言語モデル"
+    "默认大语言模型",
+    "Default LLM model",
+    "預設大型語言模型",
+    "預設大型語言模型",
+    "기본 대규모 언어 모델(LLM)",
+    "既定の大規模言語モデル（LLM）"
   ],
   "proxyTitle": [
     "对外 API 模型映射",
@@ -104,23 +104,23 @@ const rows = {
     "外部 API のモデル対応"
   ],
   "proxyHint": [
-    "对外 API 可代理已启用的云端接口或已加载的本地模型；云端接口无需加载本地权重。",
-    "The public API serves enabled cloud interfaces or loaded local models. Cloud interfaces need no local weights.",
-    "對外 API 可代理已啟用的雲端介面或已載入的本機模型，雲端無須載入本機權重。",
-    "對外 API 可代理已啟用的雲端介面或已載入的本機模型，雲端毋須載入本機權重。",
-    "외부 API는 활성 클라우드 인터페이스 또는 로드된 로컬 모델을 제공합니다.",
-    "外部 API は有効なクラウド接続または読み込み済みのローカルモデルを提供します。"
+    "对外 API 可反代已就绪的云端接口或已加载的本地模型；云端接口无需加载本地权重。",
+    "The public API proxies ready cloud interfaces or loaded local models. Cloud interfaces need no local weights.",
+    "對外 API 可反向代理已就緒的雲端介面或已載入的本機模型；雲端介面無須載入本機權重。",
+    "對外 API 可反向代理已就緒的雲端介面或已載入的本機模型；雲端介面毋須載入本機權重。",
+    "외부 API는 사용 가능한 클라우드 인터페이스 또는 로드된 로컬 모델을 프록시합니다. 클라우드 인터페이스에는 로컬 가중치가 필요하지 않습니다.",
+    "外部 API は利用可能なクラウド接続または読み込み済みのローカルモデルをプロキシします。クラウド接続にローカルの重みは不要です。"
   ],
   "localHint": [
-    "此处只加载已启用的本地模型。云端接口在场景中直接选择，对外代理单独配置。",
-    "Load enabled local models here. Select cloud interfaces in scenes; configure their public aliases separately.",
-    "此處只載入已啟用的本機模型。雲端介面於情境中選擇，對外代理另行設定。",
-    "此處只載入已啟用的本機模型。雲端介面於場景中選擇，對外代理另行設定。",
-    "여기서는 활성 로컬 모델만 로드합니다. 클라우드 연결과 외부 매핑은 별도로 선택하세요.",
-    "ここでは有効なローカルモデルを読み込みます。クラウド接続と外部 API の対応は別に設定します。"
+    "网关启动时加载所选本地模型，并按需反代所选云端接口。",
+    "Model Gateway loads selected local models and proxies selected cloud interfaces on demand.",
+    "模型閘道啟動時會載入所選本機模型，並依需求反向代理所選雲端介面。",
+    "模型閘道啟動時會載入所選本機模型，並按需反向代理所選雲端介面。",
+    "모델 게이트웨이는 선택한 로컬 모델을 로드하고 클라우드 인터페이스는 요청 시 프록시합니다.",
+    "モデルゲートウェイは選択したローカルモデルを読み込み、クラウド接続は要求時にプロキシします。"
   ],
 "modelDisabled": ["模型尚未启用，请先在模型管理中启用。", "This model is disabled. Enable it in Model Management.", "模型尚未啟用，請先在模型管理中啟用。", "模型尚未啟用，請先在模型管理中啟用。", "모델이 비활성화되어 있습니다. 모델 관리에서 활성화하세요.", "モデルが無効です。モデル管理で有効にしてください。"],
-"modelNotLoaded": ["所选本地模型未加载，请在模型网关加载，或选择已启用的云端接口。", "This local model is not loaded. Load it in Model Gateway or select an enabled cloud interface.", "所選本機模型尚未載入，請於模型閘道載入，或選擇已啟用的雲端介面。", "所選本機模型尚未載入，請於模型閘道載入，或選擇已啟用的雲端介面。", "선택한 로컬 모델이 로드되지 않았습니다. 모델 게이트웨이에서 로드하거나 활성 클라우드 연결을 선택하세요.", "選択したローカルモデルは未読み込みです。モデルゲートウェイで読み込むか、有効なクラウド接続を選択してください。"],
+"modelNotLoaded": ["所选本地模型未加载，请在模型网关加载，或选择可用的云端接口。", "This local model is not loaded. Load it in Model Gateway or select a ready cloud interface.", "所選本機模型尚未載入，請於模型閘道載入，或選擇可用的雲端介面。", "所選本機模型尚未載入，請於模型閘道載入，或選擇可用的雲端介面。", "선택한 로컬 모델이 로드되지 않았습니다. 모델 게이트웨이에서 로드하거나 사용 가능한 클라우드 인터페이스를 선택하세요.", "選択したローカルモデルは未読み込みです。モデルゲートウェイで読み込むか、利用可能なクラウド接続を選択してください。"],
 "busy": ["模型正在被任务使用。请先停止相关任务，再更换模型或加载配置。", "This model is in use. Stop its tasks before changing the model or loader settings.", "模型正由任務使用，請先停止相關任務，再更換模型或載入設定。", "模型正由任務使用，請先停止相關任務，再更換模型或載入設定。", "모델이 사용 중입니다. 관련 작업을 중지한 후 모델이나 로더 설정을 변경하세요.", "モデルは使用中です。関連する処理を停止してからモデルや読み込み設定を変更してください。"]
 } as const
 

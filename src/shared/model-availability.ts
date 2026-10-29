@@ -1,8 +1,7 @@
 import { cloudModelsOf } from './cloud-models'
-import { ALIYUN_LANGUAGES, recognitionLabel, remoteSourceLanguages } from './cloud-config'
+import { recognitionLabel, remoteSourceLanguages } from './cloud-config'
 import { INDEX_TRANSLATE_LANGUAGES } from './index-translate'
 import { LANGUAGE_CODES } from './languages'
-import { isModelEnabled } from './model-policy'
 import type { AvailableGatewayModel, GatewayCapability } from './model-gateway'
 import type { AppSettings, CredentialProvider } from './settings'
 
@@ -11,7 +10,7 @@ export function buildConfiguredCloudModels(settings: AppSettings, credentials: R
   const result: Record<GatewayCapability, AvailableGatewayModel[]> = { asr: [], mt: [], tts: [], llm: [] }
   const providers: Record<string, string> = { microsoft: 'Microsoft Translator', google: 'Google Translate', mymemory: 'MyMemory', 'index-translate': 'Index Translate', recognition: 'Aliyun LiveTranslate' }
   const add = (model: AvailableGatewayModel) => {
-    if (isModelEnabled(settings, model.kind, model.binding)) result[model.kind].push(model)
+    result[model.kind].push(model)
   }
   for (const model of cloudModelsOf(settings, credentials).filter(item => item.ready)) {
     if (model.profile) {
@@ -28,10 +27,10 @@ export function buildConfiguredCloudModels(settings: AppSettings, credentials: R
         sourceLanguages: remoteSourceLanguages(recognition) })
       continue
     }
-    if (model.id === 'cloud') continue
+    if (model.id === 'cloud' || model.id === 'recognition') continue
     add({ binding: `cloud:${model.id}`, name: providers[model.id] ?? model.id, kind: 'mt', origin: 'cloud', free: model.free,
-      sourceLanguages: model.id === 'recognition' ? ['auto', ...ALIYUN_LANGUAGES] : model.id === 'index-translate' ? INDEX_TRANSLATE_LANGUAGES : ['auto', ...LANGUAGE_CODES],
-      targetLanguages: model.id === 'recognition' ? ALIYUN_LANGUAGES : model.id === 'index-translate' ? INDEX_TRANSLATE_LANGUAGES : LANGUAGE_CODES,
+      sourceLanguages: model.id === 'index-translate' ? INDEX_TRANSLATE_LANGUAGES : ['auto', ...LANGUAGE_CODES],
+      targetLanguages: model.id === 'index-translate' ? INDEX_TRANSLATE_LANGUAGES : LANGUAGE_CODES,
       images: model.id === 'index-translate' })
   }
   return result

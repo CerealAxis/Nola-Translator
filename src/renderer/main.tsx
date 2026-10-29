@@ -19,7 +19,6 @@ import type { SettingsCommand } from './store/settingsStore'
 import { OverlayRoot } from './features/overlay/OverlayRoot'
 import { WorkspacePage } from './features/workspace'
 import { OverlayMenuRoot } from './features/overlay/OverlayMenuRoot'
-import { RuntimeNotice } from './features/settings/RuntimeNotice'
 import { RuntimeOperationNotice } from './features/settings/RuntimeOperationNotice'
 import { isSettingsErrorClaimed } from './features/settings/settingsErrorChannel'
 import { SETTINGS_WRITE_FAILURE_KEYS, settingsWriteFailure } from './features/settings/settingsWriteError'
@@ -299,7 +298,6 @@ function Root() {
       <ModelDownloadNotice />
       <OfflineFailureNotice />
       <ModelCapabilityNotices />
-      <RuntimeNotice />
       <RuntimeOperationNotice />
       <AppUpdateNotice isAppReady={!isIpcBridgeAvailable() || engineSettled || startupTimedOut} />
       <StartupFailureDialog

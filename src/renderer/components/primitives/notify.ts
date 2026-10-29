@@ -4,13 +4,11 @@ import { getBridge } from '@/store'
 /**
  * How long each kind of notification stays on screen.
  *
- * A failure the user has to act on stays until they do: a toast that disappears while the
- * message is still being read is a failure the user never learns about. A failure the user can
- * repeat from the page needs no such attention, and everything else is a courtesy. Both leave
- * on their own.
+ * Notifications stay visible long enough to read, then dismiss themselves. Callers may override
+ * these defaults when an operation needs a different amount of time.
  */
 export const NOTIFY_DURATION = {
-  error: 0,
+  error: 12000,
   retryable: 12000,
   success: 4000,
   info: 6000,
@@ -69,6 +67,21 @@ export function notifyError(message: string, options: NotifyOptions = {}): strin
     description: detail(options),
     actionProps: actionProps(options.action),
     timeout: options.duration ?? NOTIFY_DURATION.error,
+  })
+}
+
+/** An unavailable local model can be made usable by loading it in Model Gateway. */
+export function notifyGatewayModelUnavailable(message: string, description: string, actionLabel: string): string {
+  return notifyError(message, {
+    description,
+    action: {
+      label: actionLabel,
+      onPress: () => {
+        const bridge = getBridge()
+        if (bridge?.app.openMainPage) void bridge.app.openMainPage('#/model-gateway').catch(error => console.error('[gateway.navigation]', error))
+        else window.location.hash = '#/model-gateway'
+      },
+    },
   })
 }
 

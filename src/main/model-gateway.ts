@@ -218,7 +218,7 @@ export class ModelGateway {
   private availableModels(): Record<GatewayCapability, AvailableGatewayModel[]> {
     const settings = this.options.getSettings()
     const selectedAsr = sceneModelBinding(settings, 'asr')
-    const effectiveAsr = this.cloudCatalog.asr.some(model => model.binding === selectedAsr && isModelEnabled(settings, 'asr', model.binding))
+    const effectiveAsr = this.cloudCatalog.asr.some(model => model.binding === selectedAsr)
       ? selectedAsr : this.services.asr.state === 'ready' ? this.services.asr.model : selectedAsr
     const nativeTranslation = effectiveAsr === 'cloud:aliyun'
       ? supportsRecognitionNativeTranslation({ ...settings.recognition, provider: 'aliyun' })
@@ -233,7 +233,7 @@ export class ModelGateway {
           images: [...INDEX_TRANSLATE_MODEL_IDS, ...INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS].some(id => `resource:${id}` === service.model),
           ...(configuration ? { sourceLanguages: kind === 'asr' ? recognitionLanguages(resource!) : configuration.sourceLanguages, targetLanguages: configuration.targetLanguages } : {}) })
       }
-      return [kind, [...local, ...this.cloudCatalog[kind].filter(model => isModelEnabled(settings, kind, model.binding) && (model.binding !== 'cloud:recognition' || nativeTranslation))]]
+      return [kind, [...local, ...this.cloudCatalog[kind].filter(model => model.binding !== 'cloud:recognition' || nativeTranslation)]]
     })) as Record<GatewayCapability, AvailableGatewayModel[]>
   }
   async snapshotWithCatalog(): Promise<ModelGatewaySnapshot> {
@@ -340,7 +340,7 @@ export class ModelGateway {
   async acquireLanguageModel(binding?: string) {
     const settings = this.options.getSettings()
     const wanted = normalizeModelBinding('llm', binding) || defaultModelBinding(settings, 'llm')
-    if (!wanted || !isModelEnabled(settings, 'llm', wanted)) throw new GatewayError(503, 'The language model is not enabled in Model Management', 'model_disabled')
+    if (!wanted || (bindingIsLocal(wanted) && !isModelEnabled(settings, 'llm', wanted))) throw new GatewayError(503, 'The language model is not enabled in Model Management', 'model_disabled')
     if (bindingIsLocal(wanted)) return this.languageModel(wanted)
     const controller = new AbortController()
     this.cloudLanguageControllers.add(controller)
@@ -380,6 +380,7 @@ export class ModelGateway {
       if (this.stopping) return this.snapshot()
       this.state = 'running'; this.changed()
     } catch {
+      if (this.stopping || version !== this.stopVersion) return this.snapshot()
       await this.stopInternal(); this.state = 'failed'; this.error = 'Gateway could not start. Check the address, port and installed runtime.'; this.changed()
     }
     return this.snapshot()
@@ -461,8 +462,8 @@ export class ModelGateway {
    */
   private async plan(kind: WorkerKind, binding: string, resources: ResourceRecord[], settings: AppSettings, config: ModelGatewaySettings): Promise<WorkerPlan> {
     const policyBinding = binding === 'native:cloud' ? 'mt-custom:legacy-fallback' : binding.startsWith('native:') ? `cloud:${binding.slice(7)}` : binding
-    if (!isModelEnabled(settings, kind, policyBinding)) throw new GatewayError(503, 'Enable this model in Model Management before using it.', 'model_disabled')
     const local = bindingIsLocal(binding)
+    if (local && !isModelEnabled(settings, kind, policyBinding)) throw new GatewayError(503, 'Enable this model in Model Management before using it.', 'model_disabled')
     const nativeFallback = settings.translation.provider === 'recognition' && settings.translation.fallback.provider !== 'disabled'
     // A `native:` binding is the text backup of a native-speech session: its connection fields and
     // credential slot come from the fallback configuration, not the primary one.
@@ -578,8 +579,23 @@ export class ModelGateway {
     let plan: WorkerPlan
     try { plan = await this.plan(kind, binding, resources, stored, config) }
     catch (error) {
+      if (this.stopping) return
       const message = error instanceof GatewayError ? error.message : 'Model could not load. Check the model configuration, runtime and connection.'
       this.services[kind] = { state: 'failed', model: binding, name: '', error: message, errorCode: error instanceof GatewayError ? error.code : 'inference_failed' }
+      this.changed(); return
+    }
+    if (!bindingIsLocal(binding)) {
+      const existing = this.slots.get(`${kind}:${binding}`)
+      if (existing && !existing.retired && existing.signature !== plan.signature) {
+        this.slots.delete(`${kind}:${binding}`); this.retire(existing)
+      }
+      if (previous && previous !== binding) {
+        const stale = this.slots.get(`${kind}:${previous}`)
+        if (stale) { this.slots.delete(`${kind}:${previous}`); this.retire(stale) }
+      }
+      if (this.stopping) return
+      this.services[kind] = { state: 'ready', model: binding, name: plan.name,
+        ...(kind === 'asr' ? { nativeTranslation: binding === 'cloud:aliyun' && supportsRecognitionNativeTranslation({ ...stored.recognition, provider: 'aliyun' }) } : {}) }
       this.changed(); return
     }
     const existing = this.slots.get(`${kind}:${binding}`)
@@ -634,7 +650,7 @@ export class ModelGateway {
       config: plan.workerConfig, ...(plan.fallbackConfig ? { fallbackConfig: plan.fallbackConfig, fallbackResourceId: plan.fallbackResourceId } : {}),
       ...(plan.fallbackUsesPrimary ? { fallbackUsesPrimary: true } : {}) }, message => {
       // Only the bound instance reports through the service state; a warm cloud failure is per-request.
-      if (this.slots.get(key) !== slot || this.eager.get(kind) !== binding || this.stopping) return
+      if (slot.lazy || this.slots.get(key) !== slot || this.eager.get(kind) !== binding || this.stopping) return
       this.services[kind].state = 'failed'; this.services[kind].error = message; this.changed()
     })
     this.slots.set(key, slot)
@@ -650,7 +666,7 @@ export class ModelGateway {
     const config = modelGatewaySettingsSchema.parse(stored.modelGateway)
     const wanted = binding || this.eager.get(kind) || this.bindingFor(kind, config, stored)
     if (!wanted) throw new GatewayError(503, `${kind.toUpperCase()} has no model bound in Model Gateway.`, 'model_unavailable')
-    if (!isModelEnabled(stored, kind, wanted === 'native:cloud' ? 'mt-custom:legacy-fallback' : wanted.startsWith('native:') ? `cloud:${wanted.slice(7)}` : wanted)) throw new GatewayError(503, 'Enable this model in Model Management before using it.', 'model_disabled')
+    if (bindingIsLocal(wanted) && !isModelEnabled(stored, kind, wanted === 'native:cloud' ? 'mt-custom:legacy-fallback' : wanted.startsWith('native:') ? `cloud:${wanted.slice(7)}` : wanted)) throw new GatewayError(503, 'Enable this model in Model Management before using it.', 'model_disabled')
     if (bindingIsLocal(wanted) && (this.state !== 'running' || this.stopping || !config[kind])) throw new GatewayError(503, `${kind.toUpperCase()} is not loaded in Model Gateway.`, 'model_not_loaded')
     const key = `${kind}:${wanted}`
     const ready = (slot?: WorkerSlot) => slot && !slot.retired && this.services[slot.kind].model === slot.binding
@@ -670,7 +686,7 @@ export class ModelGateway {
       if (JSON.stringify(stored) !== JSON.stringify(this.options.getSettings())) throw new GatewayError(409, 'Model configuration changed during initialization. Retry the request.', 'configuration_changed')
       if (found && !found.retired && found.signature === plan.signature) return found
       if (found) { this.slots.delete(key); this.retire(found) }
-      const slot = await this.createSlot(kind, wanted, plan, wanted !== (this.eager.get(kind) ?? ''))
+      const slot = await this.createSlot(kind, wanted, plan, !bindingIsLocal(wanted) || wanted !== (this.eager.get(kind) ?? ''))
       await slot.worker.ready
       if ((bindingIsLocal(wanted) && this.stopping) || this.slots.get(key) !== slot) throw new GatewayError(503, `${kind.toUpperCase()} instance stopped.`, 'model_unavailable')
       return slot
@@ -718,34 +734,56 @@ export class ModelGateway {
   }
 
   private async configureLanguageModel(): Promise<void> {
+    if (this.stopping) return
     const settings = this.options.getSettings()
     const binding = normalizeModelBinding('llm', settings.modelGateway.llmModel)
     const previous = this.llm
+    if (!settings.modelGateway.llm) {
+      for (const retired of this.retiredLanguageModels) retired.controller.abort()
+      this.llm = undefined
+      if (previous) {
+        previous.retired = true
+        previous.controller.abort()
+        if (previous.refs) this.retiredLanguageModels.add(previous)
+        else await previous.runtime.close()
+      }
+      this.services.llm = { state: 'stopped', model: binding, name: '' }
+      this.changed()
+      return
+    }
     const services: DirectModelServices = { getSettings: this.options.getSettings, directLaunch: this.options.directLaunch,
       getCredential: provider => this.options.getCredential?.(provider) ?? Promise.resolve('') }
+    let cloudName = ''
     let signature: string
     try {
       const profile = customModelsOf(settings.translation).find(item => item.id === binding.replace(/^custom:/, ''))
-      signature = createHash('sha256').update(JSON.stringify([binding, settings.compute, profile,
-        !settings.modelGateway.llm || !binding || bindingIsLocal(binding) ? '' : await services.getCredential(customCredentialSlot(binding.replace(/^custom:/, '')))])).digest('hex')
+      if (!bindingIsLocal(binding)) {
+        const configured = (await buildConfiguredCloudModels(settings, await this.credentialPresence(settings))).llm.find(model => model.binding === binding)
+        if (!configured) throw new Error('The selected cloud LLM is not configured or ready')
+        cloudName = configured.name
+      }
+      signature = createHash('sha256').update(JSON.stringify([binding, settings.compute, profile])).digest('hex')
     } catch {
+      if (this.stopping) return
       this.services.llm = { state: 'failed', model: binding, name: '', error: 'LLM credentials are unavailable' }
       this.changed(); return
     }
-    if (settings.modelGateway.llm && previous?.signature === signature && this.services.llm.state === 'ready') return
-    if (!settings.modelGateway.llm) for (const retired of this.retiredLanguageModels) retired.controller.abort()
+    if (previous?.signature === signature && this.services.llm.state === 'ready') return
     this.llm = undefined
     if (previous) {
       previous.retired = true
-      if (!settings.modelGateway.llm) previous.controller.abort()
       if (previous.refs) this.retiredLanguageModels.add(previous)
       else await previous.runtime.close()
     }
-    this.services.llm = { state: settings.modelGateway.llm ? 'loading' : 'stopped', model: binding, name: '' }
+    this.services.llm = { state: 'loading', model: binding, name: '' }
     this.changed()
-    if (!settings.modelGateway.llm || this.stopping) return
-    if (!isModelEnabled(settings, 'llm', binding)) {
+    if (this.stopping) return
+    if (bindingIsLocal(binding) && !isModelEnabled(settings, 'llm', binding)) {
       this.services.llm = { state: 'failed', model: binding, name: '', error: 'Enable this model in Model Management before loading it.', errorCode: 'model_disabled' }
+      this.changed(); return
+    }
+    if (!bindingIsLocal(binding)) {
+      this.services.llm = { state: 'ready', model: binding, name: cloudName }
       this.changed(); return
     }
     const controller = new AbortController()

@@ -42,9 +42,9 @@ import { SessionErrorDialog, StopSessionDialog } from '../../workspace/Workspace
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
 import { ThirdPartyNotices } from '../ThirdPartyNotices'
 import { AppUpdateDialog } from '../AppUpdateNotice'
-import { RuntimeNoticeDialog } from '../RuntimeNotice'
 import { StartupFailureDialog } from '../StartupFailureDialog'
 import { DataMigrationDialog } from '../DataMigrationDialog'
+import { DownloadSourceDialog } from '../../models/DownloadSourceDialog'
 import {
   DEMO_ASR_RECORD,
   DEMO_BULK_COUNT,
@@ -56,7 +56,6 @@ import {
   DEMO_MEETING_ID,
   DEMO_MISSING,
   DEMO_MT_RECORD,
-  DEMO_RUNTIME_ISSUES,
   DEMO_TITLE,
 } from '../developer-demo-data'
 import { SettingsRow } from '../SettingsRow'
@@ -194,6 +193,7 @@ function ToastGroup() {
   const { t } = useI18n()
   const updateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const raised = useRef<Set<string>>(new Set())
+  const [downloadTarget, setDownloadTarget] = useState<{ resourceId: string; name: string } | null>(null)
 
   /**
    * Every toast this tab raises is remembered, so the clear row can take the whole queue down
@@ -264,7 +264,20 @@ function ToastGroup() {
       <ToastTrigger
         label={t('dev.toastSticky')}
         desc={t('dev.toastStickyDesc')}
-        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), timeout: 0 }) }}
+        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), timeout: 12000 }) }}
+      />
+      <ToastTrigger
+        label={t('dev.toastDownloadRetry')}
+        desc={t('dev.toastDownloadRetryDesc')}
+        run={() => { raise(t('models.downloadError', { name: 'SenseVoiceSmall' }), {
+          variant: 'danger',
+          description: t('errors.downloadFailed'),
+          actionProps: {
+            children: t('errors.downloadFailedAction'),
+            variant: 'tertiary',
+            onPress: () => setDownloadTarget({ resourceId: 'sensevoice-small', name: 'SenseVoiceSmall' }),
+          },
+        }) }}
       />
       <ToastTrigger
         label={t('dev.toastLoading')}
@@ -307,6 +320,11 @@ function ToastGroup() {
         label={t('dev.toastClear')}
         desc={t('dev.toastClearDesc')}
         run={clear}
+      />
+      <DownloadSourceDialog
+        record={downloadTarget}
+        onClose={() => setDownloadTarget(null)}
+        onSelect={() => setDownloadTarget(null)}
       />
     </SettingGroup>
   )
@@ -489,7 +507,6 @@ type GalleryDialog =
   | 'stopSession'
   | 'sessionError'
   | 'bulkDelete'
-  | 'runtimeMissing'
   | 'appUpdate'
   | 'modelDetail'
   | 'startupFailure'
@@ -505,7 +522,6 @@ const ALL_CLOSED: Record<GalleryDialog, boolean> = {
   stopSession: false,
   sessionError: false,
   bulkDelete: false,
-  runtimeMissing: false,
   appUpdate: false,
   modelDetail: false,
   startupFailure: false,
@@ -619,9 +635,6 @@ function DialogGalleryGroup() {
         <GalleryRow label={t('dev.dialogBulkDelete')} desc={t('dev.dialogBulkDeleteDesc')}>
           <RunButton onClick={() => show('bulkDelete')} />
         </GalleryRow>
-        <GalleryRow label={t('dev.dialogRuntimeMissing')} desc={t('dev.dialogRuntimeMissingDesc')}>
-          <RunButton onClick={() => show('runtimeMissing')} />
-        </GalleryRow>
         <GalleryRow label={t('dev.dialogAppUpdate')} desc={t('dev.dialogAppUpdateDesc')}>
           <RunButton onClick={() => { void showLatestRelease() }} isPending={appUpdateChecking} />
         </GalleryRow>
@@ -686,13 +699,6 @@ function DialogGalleryGroup() {
         selectedCount={DEMO_BULK_COUNT}
         isPending={false}
         onConfirm={inert}
-      />
-      <RuntimeNoticeDialog
-        issues={DEMO_RUNTIME_ISSUES}
-        isOpen={open.runtimeMissing}
-        onOpenChange={track('runtimeMissing')}
-        onOpenSettings={component => { void actions.settings.openRuntimeSettings(component) }}
-        onDismiss={() => hide('runtimeMissing')}
       />
       {appUpdateResult ? (
         <AppUpdateDialog

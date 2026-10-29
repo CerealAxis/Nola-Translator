@@ -11,8 +11,8 @@ import type { ResourceRecord } from '../shared/contracts'
 import { configurationOf, recognitionLanguages } from '../shared/model-capabilities'
 import { INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { LANGUAGE_CODES } from '../shared/languages'
-import { defaultModelBinding, isModelEnabled, sceneModelBinding, sceneModelPatch } from '../shared/model-policy'
-import { notifyError } from '@/components/primitives/notify'
+import { defaultModelBinding, isModelEnabled, modelEnablePatch, modelPolicyOf, sceneModelBinding, sceneModelPatch } from '../shared/model-policy'
+import { notifyError, notifyGatewayModelUnavailable } from '@/components/primitives/notify'
 import { cloudModelsOf } from '../shared/cloud-models'
 
 const imageTranslationIds = new Set<string>([...INDEX_TRANSLATE_MODEL_IDS, ...INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS])
@@ -116,7 +116,7 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
       sourceLanguages: remoteSourceLanguages({ ...DEFAULT_SETTINGS.recognition, ...settings.recognition, provider: model.id as 'aliyun' | 'minimax' }),
     }
   })
-  const asrOptions = [...(asrLoaded ? [asrLoaded] : []), ...cloudAsr].filter(model => isModelEnabled(settings, 'asr', model.binding))
+  const asrOptions = [...(asrLoaded ? [asrLoaded] : []), ...cloudAsr]
   const effectiveAsr = resolveModelBinding('asr', sceneModelBinding(settings, 'asr'), asrOptions)
   const nativeTranslation = !effectiveAsr.unavailable && (effectiveAsr.binding === 'cloud:aliyun'
     ? supportsRecognitionNativeTranslation({ ...settings.recognition, provider: 'aliyun' })
@@ -136,7 +136,7 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
   })
   const merge = (kind: GatewayCapability, ...lists: AvailableModel[][]): AvailableModel[] => {
     const seen = new Set<string>()
-    return lists.flat().filter(model => model.kind === kind && isModelEnabled(settings, kind, model.binding) && !seen.has(model.binding) && !!seen.add(model.binding))
+    return lists.flat().filter(model => model.kind === kind && !seen.has(model.binding) && !!seen.add(model.binding))
   }
   return {
     asr: merge('asr', asrLoaded ? [asrLoaded] : [], cloudAsr),
@@ -152,15 +152,39 @@ export function useAvailableModels(): AvailableModels {
   const resources = useStore(stores.models, state => state.resources)
   const credentials = useStore(stores.models, state => state.credentials)
   const snapshot = useGatewaySnapshot()
-  const names = useMemo(() => Object.fromEntries(installedPlaygroundModels(resources, settings, credentials, t).map(model => [model.id, model.name])), [resources, settings, credentials, t])
+  const names = useMemo(() => {
+    const localNames = installedPlaygroundModels(resources, settings, credentials, t).map(model => [model.id, model.name] as const)
+    const cloudNames: Array<readonly [string, string]> = []
+    cloudModelsOf(settings, credentials).forEach(model => {
+      const providerName = model.profile?.name ?? (model.id === 'aliyun' ? t('modelsSettingsUi.aliyunAsr')
+        : model.id === 'minimax' ? t('settings.providerMiniMax')
+        : model.id === 'microsoft' ? t('settings.providerMicrosoft')
+        : model.id === 'mymemory' ? t('settings.providerMyMemory')
+        : model.id === 'google' ? t('settings.providerGoogle')
+        : model.id === 'index-translate' ? t('settings.providerIndexTranslate')
+        : model.id === 'recognition' ? t('settings.providerRecognitionTranslation')
+        : '')
+      if (!providerName) return
+      if (model.profile) cloudNames.push([`mt-custom:${model.profile.id}`, providerName], [`custom:${model.profile.id}`, providerName])
+      else cloudNames.push([`cloud:${model.id}`, providerName])
+    })
+    return Object.fromEntries([...localNames, ...cloudNames])
+  }, [resources, settings, credentials, t])
   if (snapshot?.availableModels) {
     const catalog = snapshot.availableModels
     const forKind = (kind: GatewayCapability) => catalog[kind]
-      .filter(model => isModelEnabled(settings, kind, model.binding)
-        && (!bindingIsLocal(model.binding) || (resources.some(resource => resource.resourceId === model.binding.slice(9) && resource.installed)
-          && normalizeModelBinding(kind, readyService(snapshot, kind)?.model) === model.binding)))
+      .filter(model => bindingIsLocal(model.binding)
+        && isModelEnabled(settings, kind, model.binding)
+        && resources.some(resource => resource.resourceId === model.binding.slice(9) && resource.installed)
+        && normalizeModelBinding(kind, readyService(snapshot, kind)?.model) === model.binding)
       .map(model => ({ ...model, name: names[model.binding] || model.name }))
-    return { asr: forKind('asr'), mt: forKind('mt'), tts: forKind('tts'), llm: forKind('llm') }
+    const cloud = buildAvailableModels({ settings, resources, credentials, snapshot, names })
+    const combine = (kind: GatewayCapability) => {
+      const models = [...forKind(kind), ...cloud[kind].filter(model => model.origin === 'cloud')]
+      const seen = new Set<string>()
+      return models.filter(model => !seen.has(model.binding) && !!seen.add(model.binding))
+    }
+    return { asr: combine('asr'), mt: combine('mt'), tts: combine('tts'), llm: combine('llm') }
   }
   return buildAvailableModels({ settings, resources, credentials, snapshot, names })
 }
@@ -195,7 +219,17 @@ export function savedBindingOf(kind: GatewayCapability, settings: AppSettings): 
  * here changes its session default, never what the gateway has loaded.
  */
 export function modelBindingPatch(kind: GatewayCapability, binding: string, settings: AppSettings): AppSettingsPatch {
-  return { ...legacyModelBindingPatch(kind, binding, settings), ...sceneModelPatch(settings, kind, binding) }
+  const scenePatch = sceneModelPatch(settings, kind, binding)
+  const enablePatch = modelEnablePatch(settings, kind, binding, true)
+  const currentPolicy = modelPolicyOf(settings)
+  return {
+    ...legacyModelBindingPatch(kind, binding, settings),
+    modelPolicy: {
+      enabled: { ...currentPolicy.enabled, ...scenePatch.modelPolicy?.enabled, ...enablePatch.modelPolicy?.enabled },
+      defaults: { ...currentPolicy.defaults, ...scenePatch.modelPolicy?.defaults, ...enablePatch.modelPolicy?.defaults },
+      selections: { ...currentPolicy.selections, ...scenePatch.modelPolicy?.selections, ...enablePatch.modelPolicy?.selections },
+    },
+  }
 }
 
 function legacyModelBindingPatch(kind: GatewayCapability, binding: string, settings: AppSettings): AppSettingsPatch {
@@ -271,6 +305,7 @@ export interface ModelSelection {
 export function useModelSelection(kind: GatewayCapability, options: readonly AvailableModel[],
   settings: AppSettings, onSwitch?: (replaced: AvailableModel) => void, off = false): ModelSelection {
   const { t } = useI18n()
+  const gatewaySnapshot = useGatewaySnapshot()
   const active = useStore(sessionStore, state => !['idle', 'error'].includes(state.status))
   const browserActive = useStore(stores.settings, state => state.browser?.captionServiceActive === true || state.captionServiceBusy || state.captionService === 'loading')
   const locked = active || browserActive
@@ -282,11 +317,11 @@ export function useModelSelection(kind: GatewayCapability, options: readonly Ava
   useEffect(() => {
     if (locked || off) return
     if (!resolution.unavailable) { hadAvailable.current = true; return }
-    if (!hadAvailable.current) return
+    if (!hadAvailable.current || gatewaySnapshot?.state !== 'running' || gatewaySnapshot.services?.[kind]?.state !== 'failed') return
     hadAvailable.current = false
     const label = kind === 'asr' ? t('session.recognitionModel') : kind === 'mt' ? t('session.translationModel') : t(`gateway.${kind}`)
-    notifyError(t('gateway.modelNone', { name: label }), { description: t('gateway.modelNoneHint') })
-  }, [resolution.unavailable, locked, off, kind, t])
+    notifyGatewayModelUnavailable(t('gateway.modelNone', { name: label }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
+  }, [resolution.unavailable, locked, off, kind, t, gatewaySnapshot])
   // Do not leak a stale saved binding into the UI when nothing can serve it.
   const binding = locked ? saved : resolution.unavailable ? '' : resolution.binding
   useEffect(() => {
