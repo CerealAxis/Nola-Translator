@@ -6,6 +6,7 @@ export function featureConflictOwner(error: unknown): ActiveFeature | undefined 
 export interface FeatureActivitySnapshot {
   owner: ActiveFeature | null
   phase: 'idle' | 'starting' | 'running' | 'stopping'
+  activities?: Array<{ owner: ActiveFeature; phase: 'starting' | 'running' | 'stopping' }>
 }
 export interface FeatureActivityApi {
   snapshot(): Promise<FeatureActivitySnapshot>

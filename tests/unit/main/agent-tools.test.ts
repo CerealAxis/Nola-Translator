@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 import { defaultAgentModel, nativeAgentTools, type AgentToolContext } from '../../../src/main/agent-tools'
 import { runDirectModel } from '../../../src/main/direct-model'
 import type { ToolSet } from 'ai'
+import { defaultModelPatch, mergeModelPolicy, modelEnablePatch, sceneModelPatch } from '../../../src/shared/model-policy'
 
 vi.mock('../../../src/main/direct-model', () => ({ runDirectModel: vi.fn() }))
 let settings = structuredClone(DEFAULT_SETTINGS)
@@ -38,13 +39,13 @@ it('uses the current defaults at execution time and ignores a model ID supplied 
   expect(artifact).toHaveBeenCalledWith('data:audio/wav;base64,AA==')
 })
 
-it('honors enabled cloud defaults and refuses disabled or coupled-only translation providers', () => {
+it('honors cloud defaults independently of scene translation and rejects coupled-only providers', () => {
   settings.recognition.provider = 'minimax'
   expect(defaultAgentModel(context.services, 'asr')).toBe('cloud:minimax')
   settings.translation.provider = 'mymemory'
   expect(defaultAgentModel(context.services, 'mt')).toBe('cloud:mymemory')
   settings.translation.targetLanguage = 'none'
-  expect(() => defaultAgentModel(context.services, 'mt')).toThrow('disabled')
+  expect(defaultAgentModel(context.services, 'mt')).toBe('cloud:mymemory')
   settings.translation.targetLanguage = 'zh'
   settings.translation.provider = 'recognition'
   expect(() => defaultAgentModel(context.services, 'mt')).toThrow('independent')
@@ -59,4 +60,14 @@ it('normalizes a video internally and transcribes it using the selected default 
   expect(prepareAudio).toHaveBeenCalledWith({ mimeType: 'video/webm', url: 'data:video/webm;base64,AA==' })
   expect(runDirectModel).toHaveBeenCalledWith(context.services, expect.objectContaining({ model: `resource:${settings.recognition.modelId}`, audio: 'data:audio/wav;base64,AA==' }), context.signal, false, context.ownerId)
   expect(context.messages[0].parts[0]).toMatchObject({ mediaType: 'video/webm', filename: 'original.webm' })
+})
+
+it('uses the explicit management default instead of the scene or gateway binding', () => {
+  settings.modelPolicy = mergeModelPolicy(settings, defaultModelPatch(settings, 'mt', 'cloud:mymemory').modelPolicy)
+  settings.modelPolicy = mergeModelPolicy(settings, sceneModelPatch(settings, 'mt', 'resource:scene-model').modelPolicy)
+  settings.modelGateway.mtModel = 'resource:gateway-model'
+  const services = { ...context.services, inferModel: vi.fn() }
+  expect(defaultAgentModel(services, 'mt')).toBe('cloud:mymemory')
+  settings.modelPolicy = mergeModelPolicy(settings, modelEnablePatch(settings, 'mt', 'cloud:mymemory', false).modelPolicy)
+  expect(() => defaultAgentModel(services, 'mt')).toThrow('disabled')
 })

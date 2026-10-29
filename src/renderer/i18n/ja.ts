@@ -1,3 +1,4 @@
+import { modelPolicyJa, modelPolicyEntries } from './model-policy-ui'
 import { gatewayJa, gatewayEntries } from './gateway-ui'
 import { workbenchJa, workbenchEntries } from './workbench-ui'
 import { offlineJa, offlineEntries } from './offline-ui'
@@ -6,6 +7,7 @@ import { onboardingEntries, onboardingJa } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const jaMessages: Record<DictionaryKey, string> = {
+  ...modelPolicyEntries(modelPolicyJa),
   ...gatewayEntries(gatewayJa),
   ...workbenchEntries(workbenchJa),
   "settings.restoreVadDefaults": "既定値に戻す",
@@ -1013,19 +1015,13 @@ const jaMessages: Record<DictionaryKey, string> = {
   "settings.audioTestFailed": "音声テストに失敗しました",
   'settings.sourceLanguage': '原文の言語',
   'settings.recognitionModel': '音声認識モデル',
-  'settings.recognitionModelEmpty': 'ローカルの音声認識モデルがインストールされていません。先にモデル管理からダウンロードしてください。',
   'settings.keepAudio': '録音を保存',
   'settings.keepAudioHint': 'オフにすると音声は保存されず、再生やエクスポートができません。',
   'settings.groupProvider': '翻訳サービス',
   'settings.groupConnection': '接続',
-  'settings.provider': 'サービス提供元',
+  'settings.gatewayModelHint': '音声認識と翻訳のモデルはモデルゲートウェイで読み込みます。各機能は開始前に、読み込み済みのローカルモデルまたは設定済みのクラウドサービスから選び直すことができます。',
   'settings.translateIntermediate': '未確定の字幕を翻訳',
   'settings.translateIntermediateHint': 'オンにすると翻訳を早く表示できます。音声認識の更新で翻訳が変わることがあり、リクエスト数も増えます。オフの場合は確定した字幕のみ翻訳します。',
-  'settings.fallbackTranslation': '予備の翻訳',
-  'settings.fallbackProvider': '予備サービス',
-  'settings.fallbackDisabled': '予備の翻訳を使わない',
-  'settings.fallbackTranslationHint': 'メインの翻訳が複数回失敗すると、確定した字幕をこのサービスで翻訳します。同じローカルモデル、Bilibili API、MyMemory は重複して選択できません。クラウドモデルは別の設定で併用できます。',
-  'settings.fallbackLocalModelHint': '予備翻訳では上で選択したローカルモデルを使います。',
   'settings.endpoint': 'エンドポイント',
   'settings.region': 'リージョン',
   'settings.model': 'モデル',
@@ -1035,7 +1031,6 @@ const jaMessages: Record<DictionaryKey, string> = {
   'settings.deleteKey': 'キーを削除',
   'settings.testing': '接続をテスト中',
   'settings.providerLocal': 'ローカルモデル',
-  'settings.providerDisabled': '翻訳サービスを使用しない',
   'settings.providerCloud': 'クラウドモデル',
   'settings.providerMicrosoft': 'Microsoft Translator',
   'settings.providerMyMemory': 'MyMemory 無料翻訳',
@@ -1045,7 +1040,6 @@ const jaMessages: Record<DictionaryKey, string> = {
   'settings.providerRecognitionTranslation': 'Aliyun',
   'settings.providerAliyun': 'Aliyun',
   'settings.providerMiniMax': 'MiniMax 音声認識',
-  'settings.aliyunTranslationHint': '音声認識で Aliyun Qwen3.5 または Qwen3.8 LiveTranslate を選択した場合のみ利用できます。',
   'settings.aliyunBeijing': '華北2（北京）',
   'settings.aliyunSingapore': 'シンガポール',
   'settings.aliyunWorkspace': 'Model Studio ワークスペース ID',
@@ -1054,7 +1048,6 @@ const jaMessages: Record<DictionaryKey, string> = {
   'settings.mymemoryHint': 'API キーは不要です。確定した文を REST で翻訳するため、トークンのストリーミング出力はありません。無料サービスには利用枠とレート制限があります。',
   'settings.mymemoryEmail': '連絡先メールアドレス（任意）',
   'settings.nativeTranslationHint': '現在の Aliyun 音声認識接続が返すストリーミング翻訳を使用するため、別の翻訳 API は不要です。Aliyun LiveTranslate のみ対応しています。',
-  'settings.localModelEmpty': 'ローカル翻訳モデルがインストールされていません。先にモデル管理からダウンロードしてください。',
   'settings.apiFormat': 'API 形式',
   'settings.apiFormatChatCompletions': 'Chat Completions (/v1/chat/completions)',
   'settings.apiFormatChatResponses': 'Chat Responses (/v1/responses)',

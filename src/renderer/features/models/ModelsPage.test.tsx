@@ -144,25 +144,26 @@ it('saves an Aliyun connection explicitly without selecting it as the default', 
   expect(close).toHaveBeenCalledOnce()
 })
 
-it('enables native translation together with its Aliyun recognizer', async () => {
+it('sets the native translation default without changing the selected scene', async () => {
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
   stores.models.setState({ credentials: { ...initialModels.credentials, 'aliyun-asr': true } })
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, aliyunWorkspaceId: 'workspace', provider: 'minimax' }, translation: { ...DEFAULT_SETTINGS.translation, targetLanguage: 'none' } } })
   render(<CloudModelDialog id="recognition" onClose={() => undefined} />)
   fireEvent.click(screen.getByRole('button', { name: '设为默认' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith(expect.objectContaining({
-    recognition: { provider: 'aliyun', sourceLanguage: 'auto' },
-    translation: expect.objectContaining({ provider: 'recognition', targetLanguage: 'zh' }),
+    modelPolicy: expect.objectContaining({ defaults: expect.objectContaining({ mt: 'cloud:recognition' }), enabled: expect.objectContaining({ 'mt:cloud:recognition': true }), selections: expect.objectContaining({ asr: 'cloud:minimax' }) }),
   })))
+  expect(update.mock.calls[0][0]).not.toHaveProperty('recognition')
+  expect(update.mock.calls[0][0]).not.toHaveProperty('translation')
 })
 
-it('retires native translation when selecting MiniMax recognition', async () => {
+it('sets the MiniMax recognition default without retiring the selected native translation', async () => {
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
   stores.models.setState({ credentials: { ...initialModels.credentials, 'minimax-asr': true } })
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'recognition' } } })
   render(<CloudModelDialog id="minimax" onClose={() => undefined} />)
   fireEvent.click(screen.getByRole('button', { name: '设为默认' }))
-  await waitFor(() => expect(update).toHaveBeenCalledWith({ recognition: { provider: 'minimax', sourceLanguage: 'auto' }, translation: { provider: 'mymemory' } }))
+  await waitFor(() => expect(update).toHaveBeenCalledWith({ modelPolicy: expect.objectContaining({ defaults: expect.objectContaining({ asr: 'cloud:minimax' }), enabled: expect.objectContaining({ 'asr:cloud:minimax': true }), selections: expect.objectContaining({ mt: 'cloud:recognition' }) }) }))
 })
 
 const customModel = { id: 'custom-first', name: 'First model', endpoint: 'https://example.com/v1', model: 'fast-model', apiFormat: 'chat-completions' as const, contextWindow: 32768, maxOutputTokens: 1024, languages: ['zh', 'en'] }
@@ -219,7 +220,7 @@ it('deletes only the chosen custom model and its key and falls back when it was 
   const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'cloud' as const, customModelId: customModel.id, customModels: [customModel, other] } }
   stores.settings.setState({ settings })
   await removeCloudModel(cloudModelsOf(settings, initialModels.credentials).find(model => model.id === `custom:${customModel.id}`)!)
-  expect(update).toHaveBeenCalledWith({ translation: expect.objectContaining({ customModels: [other], customModelId: '', provider: 'mymemory' }) })
+  expect(update).toHaveBeenCalledWith(expect.objectContaining({ translation: expect.objectContaining({ customModels: [other], customModelId: '', provider: 'mymemory' }), modelPolicy: expect.objectContaining({ enabled: expect.objectContaining({ 'mt:mt-custom:custom-first': false, 'llm:custom:custom-first': false }) }) }))
   expect(deleteKey).toHaveBeenCalledExactlyOnceWith('cloud-model:custom-first', '')
 })
 

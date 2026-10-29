@@ -14,6 +14,7 @@ describe('shared documentation and Toy demo', () => {
   it('starts idle for exploration and seeds configured demo models', () => {
     prepareDemo('zh-CN', 'home')
     expect(stores.session.getState().status).toBe('idle')
+    expect(stores.settings.getState().captionService).toBe('idle')
     expect(stores.session.getState().sessionId).toBeNull()
     const resources = stores.models.getState().resources
     const settings = stores.settings.getState().settings!
@@ -45,6 +46,18 @@ describe('shared documentation and Toy demo', () => {
     await bridge.translation.setCredential('cloud', '')
     expect(await bridge.translation.hasCredential('cloud')).toBe(false)
     expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('exposes loaded demo gateway bindings and opens the session surface in memory', async () => {
+    const openWorkspace = vi.fn()
+    const settings = prepareDemo('en', 'home')
+    connectDemo(settings, () => undefined, openWorkspace)
+    const bridge = getBridge()!
+    const snapshot = await bridge.gateway!.snapshot()
+    expect(snapshot.services.asr).toMatchObject({ state: 'ready', model: `resource:${settings.recognition.modelId}` })
+    expect(snapshot.services.mt).toMatchObject({ state: 'ready', model: `resource:${settings.translation.localModelId}` })
+    await bridge.app.showWorkspace!()
+    expect(openWorkspace).toHaveBeenCalledOnce()
   })
 
   it('does not restore stale captions when an overlay is closed after stopping', async () => {

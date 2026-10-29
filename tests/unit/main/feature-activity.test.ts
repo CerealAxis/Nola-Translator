@@ -9,17 +9,17 @@ it('reserves synchronously and keeps ownership until asynchronous teardown settl
   const stop = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
   const activity = new FeatureActivity()
   const lease = activity.acquire('workbench', stop)
-  expect(() => activity.acquire('model-gateway', async () => {})).toThrow('FEATURE_CONFLICT:workbench')
+  expect(() => activity.acquire('workbench', async () => {})).toThrow('FEATURE_CONFLICT:workbench')
   lease.running()
   const stopping = activity.stop()
-  expect(activity.snapshot()).toEqual({ owner: 'workbench', phase: 'stopping' })
+  expect(activity.snapshot()).toMatchObject({ owner: 'workbench', phase: 'stopping' })
   lease.release()
   expect(activity.snapshot().owner).toBe('workbench')
   await vi.waitFor(() => expect(stop).toHaveBeenCalledOnce())
   expect(activity.stop()).toBe(stopping)
   finish()
   await stopping
-  expect(activity.snapshot()).toEqual({ owner: null, phase: 'idle' })
+  expect(activity.snapshot()).toEqual({ owner: null, phase: 'idle', activities: [] })
   const next = activity.acquire('model-gateway', async () => {})
   lease.release()
   expect(activity.snapshot().owner).toBe('model-gateway')
@@ -30,10 +30,10 @@ it('keeps a failed teardown reserved so another feature cannot overlap it', asyn
   const activity = new FeatureActivity()
   activity.acquire('browser-captions', async () => { throw new Error('still busy') }).running()
   await expect(activity.stop()).rejects.toThrow('still busy')
-  expect(activity.snapshot()).toEqual({ owner: 'browser-captions', phase: 'running' })
+  expect(activity.snapshot()).toMatchObject({ owner: 'browser-captions', phase: 'running' })
 })
 
-it('guards desktop starts before preparation and releases a failed startup', async () => {
+it('allows desktop preparation alongside the gateway and releases only the failed feature', async () => {
   const activity = new FeatureActivity()
   const prepare = vi.fn(async () => { throw new Error('model unavailable') })
   const controller = new SessionController({ activity, engine: { currentState: 'ready' } as EngineProcess,
@@ -41,11 +41,25 @@ it('guards desktop starts before preparation and releases a failed startup', asy
     whenReady: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
   })
   const lease = activity.acquire('model-gateway', async () => {})
-  expect(() => controller.start({}, 'desktop')).toThrow('FEATURE_CONFLICT:model-gateway')
-  expect(prepare).not.toHaveBeenCalled()
-  lease.release()
   await expect(controller.start({ audioSource: { kind: 'defaultOutput' }, sourceLanguage: 'auto', targetLanguages: [], recognitionMode: 'realtime' }, 'desktop')).rejects.toThrow('model unavailable')
+  expect(prepare).toHaveBeenCalledOnce()
+  expect(activity.has('model-gateway')).toBe(true)
+  expect(activity.has('interpretation')).toBe(false)
+  lease.release()
   expect(activity.snapshot().owner).toBeNull()
+})
+
+it('tracks all features and stops consumers before the shared gateway', async () => {
+  const activity = new FeatureActivity()
+  const order: string[] = []
+  activity.acquire('model-gateway', async () => { order.push('gateway') }).running()
+  activity.acquire('workbench', async () => { order.push('workbench') }).running()
+  activity.acquire('interpretation', async () => { order.push('interpretation') }).running()
+  activity.acquire('browser-captions', async () => { order.push('browser') }).running()
+  expect(activity.snapshot().activities).toHaveLength(4)
+  await activity.stop()
+  expect(order.at(-1)).toBe('gateway')
+  expect(activity.snapshot().activities).toEqual([])
 })
 
 it('waits for preparation cancellation before releasing a starting interpretation', async () => {

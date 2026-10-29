@@ -5,7 +5,10 @@ import { DEFAULT_SETTINGS, SOURCE_LANGUAGE_OPTIONS, type AppSettingsPatch, type 
 export const customModelSchema = z.object({
   id: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/),
   name: z.string().trim().min(1).max(64),
-  endpoint: z.string().max(2048).url().refine(value => ['http:', 'https:'].includes(new URL(value).protocol)),
+  endpoint: z.string().max(2048).url().refine(value => {
+    try { return ['http:', 'https:'].includes(new URL(value).protocol) }
+    catch { return false }
+  }),
   model: z.string().trim().min(1).max(256),
   apiFormat: z.enum(['chat-completions', 'chat-responses', 'anthropic', 'ollama']),
   contextWindow: z.number().int().min(256).max(10_000_000),

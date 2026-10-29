@@ -57,10 +57,14 @@ html.is-overlay body {
 
 .nola-overlay-confirm-surface {
   -webkit-app-region: no-drag;
+  /* The positioned popup must paint above Base UI's fixed pointer-dismissal layer. */
+  position: fixed;
+  inset: 0;
   display: grid;
   width: 100vw;
   height: 100vh;
   place-items: center;
+  outline: none;
 }
 
 .nola-overlay-confirm-surface .nola-confirm-dialog button {
@@ -543,16 +547,34 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   -webkit-app-region: no-drag;
   min-width: 168px;
   max-width: 260px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--overlay);
+  color: var(--overlay-foreground);
+  box-shadow: var(--overlay-shadow);
+  outline: none;
 }
 
 .nola-caption-menu-list {
   -webkit-app-region: no-drag;
+  /* Base UI focuses the list itself; item highlights carry keyboard navigation. */
+  outline: none;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.26) transparent;
-  padding: 4px;
-  border-radius: 12px;
+  padding: calc(var(--space-1) / 2);
+  border-radius: var(--radius-lg);
+}
+
+/* Match the settings Select's row height and label spacing. */
+.nola-caption-menu .nola-menu-item {
+  width: 100%;
+  min-height: var(--field-control-height);
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  font: var(--font-body);
 }
 
 .nola-caption-menu-list::-webkit-scrollbar {
@@ -653,23 +675,6 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   height: 11px;
 }
 
-/* A min-width and centred content, so the control row's rhythm does not change
-   with the length of a model name. */
-.nola-caption-card .nola-caption-pill--mode {
-  gap: 6px;
-  min-width: 96px;
-  justify-content: center;
-}
-
-/* Vendor dot: a hollow ring that follows currentColor, so it takes the overlay's own palette. */
-.nola-caption-card .nola-caption-mode-dot {
-  width: 9px;
-  height: 9px;
-  flex-shrink: 0;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-}
-
 /* Inset matches the action row, so both rows sit the same distance from the card edge. */
 .nola-caption-controls {
   position: absolute;
@@ -707,22 +712,6 @@ html[data-reduce-motion='true'] .nola-caption-track-sentence .nola-caption-entry
   width: max-content;
   visibility: hidden;
   pointer-events: none;
-}
-
-.nola-caption-card .nola-caption-menu-trigger[data-menu-kind='model'] {
-  min-width: 0;
-}
-
-.nola-caption-card .nola-caption-menu-trigger[data-menu-kind='model'] > .nola-caption-pill {
-  min-width: 0;
-  max-width: 100%;
-}
-
-.nola-caption-model-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Toolbar labels are controls, not transcript text that should join a drag selection. */

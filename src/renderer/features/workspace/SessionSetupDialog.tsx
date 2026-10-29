@@ -1,7 +1,8 @@
+import { ModelAvailabilityLabel } from './ModelAvailabilityLabel'
 import { useModelOptions } from '@/model-options'
-import { configurationOf, isModelReady, recognitionLanguages, supportsTranslation } from '../../../shared/model-capabilities'
+import { modelBindingPatch, resolveModelBinding, savedBindingOf, useAvailableModels } from '@/available-models'
+import { supportsTranslation } from '../../../shared/model-capabilities'
 import { TranslationCompatibilityDialog } from '../models/TranslationCompatibilityDialog'
-import { supportsSelectedEngine } from '../../../shared/model-engines'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 import { useCallback, useMemo, useState } from 'react'
 
@@ -20,7 +21,7 @@ import {
 } from '@/bridge'
 import type { AudioDevice, AudioSourceOption, RecognitionModelId, SessionConfig } from '@/bridge'
 import { SettingRow } from '@/components/primitives'
-import { notifyError } from '@/components/primitives/notify'
+import { notifyError, notifyInfo } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import type { UiLanguage } from '@/i18n'
 import { autoMeetingTitle, nextDaySequence } from '@/meeting-format'
@@ -33,10 +34,16 @@ export interface SetupDraft {
   audioSource: string
   sourceLanguage: string
   recognitionModelId: RecognitionModelId
+  /**
+   * Which model the gateway should serve this session with, in binding form. It is the draft's own
+   * choice, so picking a cloud interface here does not rewrite the global recognition provider.
+   */
+  recognitionBinding?: string
   translate: boolean
   targetLanguage: string
   /** Local model for this session. Empty string falls back to the setting's `translation.localModelId`. */
   translationModelId: string
+  translationBinding?: string
   keepAudio: boolean
 }
 
@@ -73,11 +80,26 @@ export function SessionSetupDialog({
   const translation = settings.translation
   const resources = useStore(stores.models, (state) => state.resources)
   const modelOptions = useModelOptions(draft.recognitionModelId, draft.translationModelId || translation.localModelId, draft.sourceLanguage)
+  const catalog = useAvailableModels()
+  const asr = resolveModelBinding('asr', draft.recognitionBinding ?? savedBindingOf('asr', settings), catalog.asr)
+  const mt = resolveModelBinding('mt', draft.translationBinding ?? (translation.provider === 'local' && draft.translationModelId ? `resource:${draft.translationModelId}` : savedBindingOf('mt', settings)), catalog.mt)
+  const selectedAsr = catalog.asr.find(model => model.binding === asr.binding)
+  const selectedMt = catalog.mt.find(model => model.binding === mt.binding)
+  const asrChoices = catalog.asr.length ? catalog.asr.map(model => ({ value: model.binding, label: model.name }))
+    : [{ value: '', label: t('gateway.modelNoneShort'), isDisabled: true }]
+  const mtChoices = catalog.mt.length ? catalog.mt.map(model => ({ value: model.binding, label: model.name }))
+    : [{ value: '', label: t('gateway.modelNoneShort'), isDisabled: true }]
+  const translationPatch = modelBindingPatch('mt', mt.binding, settings).translation
+  const effectiveTranslation = { ...translation, ...translationPatch, fallback: { ...translation.fallback, ...translationPatch?.fallback } }
+  const effectiveRecognition = { ...settings.recognition, ...modelBindingPatch('asr', asr.binding, settings).recognition }
+  const sourceLanguages = selectedAsr?.sourceLanguages ?? modelOptions.sourceLanguages
+  const targetLanguages = selectedMt?.targetLanguages ?? modelOptions.targetLanguages
   const [dismissedPair, setDismissedPair] = useState<string | null>(null)
-  const signature = `${draft.translationModelId}|${draft.sourceLanguage}|${draft.targetLanguage}`
-  const incompatible = draft.translate && translation.provider === 'local' && !!configurationOf(modelOptions.translation) && !supportsTranslation(modelOptions.translation, draft.sourceLanguage, draft.targetLanguage)
-  const recognitionValid = modelOptions.sourceLanguages.includes(draft.sourceLanguage)
-  const modelsConfigured = modelOptions.configured && (!draft.translate || translation.provider !== 'local' || !!configurationOf(modelOptions.translation))
+  const signature = `${mt.binding}|${draft.sourceLanguage}|${draft.targetLanguage}`
+  const selectedTranslation = mt.binding.startsWith('resource:') ? resources.find(model => model.resourceId === mt.binding.slice(9)) : undefined
+  const incompatible = draft.translate && !!selectedTranslation && !supportsTranslation(selectedTranslation, draft.sourceLanguage, draft.targetLanguage)
+  const recognitionValid = sourceLanguages.includes(draft.sourceLanguage)
+  const modelsConfigured = !asr.unavailable && (!draft.translate || !mt.unavailable)
   const meetings = useStore(stores.meetings, (state) => state.meetings)
 
   /**
@@ -136,41 +158,23 @@ export function SessionSetupDialog({
     return known.has(systemDefault.value) ? fromDevices : [systemDefault, ...fromDevices]
   }, [devices, t])
 
-  /**
-   * Options for "translation model": local translation models installed on
-   * this machine, the same route as the settings dropdown
-   * (`settings/tabs/TranslationTab`). Compatibility uses the same
-   * `supportsSelectedEngine`, or this could offer a model that dropdown has
-   * already greyed out — Hy-MT2 with the engine locked to pytorch.
-   */
-  const localModelOptions = useMemo(() => {
-    const options = resources
-      .filter((item) => item.kind === 'translationModel' && item.installed)
-      .map((item) => ({
-        value: item.resourceId,
-        label: item.name,
-        isDisabled: !isModelReady(item) || !supportsSelectedEngine(item, settings.compute ?? DEFAULT_COMPUTE_SETTINGS, item.resourceId) || !supportsTranslation(item, draft.sourceLanguage, draft.targetLanguage),
-      }))
-    // The selected model stays listed even when not installed (just removed,
-    // or settings synced from another machine): it is the current value, not
-    // a candidate, and dropping it leaves the dropdown looking broken.
-    if (options.length > 0 && !options.some((option) => option.value === draft.translationModelId)) {
-      options.push({ value: draft.translationModelId, label: draft.translationModelId, isDisabled: true })
-    }
-    return options
-  }, [draft.translationModelId, draft.sourceLanguage, draft.targetLanguage, resources, settings.compute])
-
   const submit = useCallback(() => {
     if (incompatible) { setDismissedPair(null); return }
-    if (!modelsConfigured || !recognitionValid) return
+    if (!modelsConfigured) { notifyError(t('gateway.modelNone', { name: t(asr.unavailable ? 'session.recognitionModel' : 'session.translationModel') })); return }
+    if (!recognitionValid) return
+    for (const replacement of [asr.replaced, draft.translate ? mt.replaced : null]) {
+      if (replacement) notifyInfo(t('gateway.modelSwitched', { name: replacement.name }), { description: t('gateway.modelSwitchedLoaded') })
+    }
     // The name is optional: the engine generates one from the start time and
     // the day sequence, so there is no "cannot be empty" error here.
     const option = audioOptions.find((item) => item.value === draft.audioSource)
     onSubmit({
       audioSource: audioSourceFrom(option, draft.audioSource),
       recognitionMode: 'realtime',
-      recognitionModelId: draft.recognitionModelId,
-      ...recognitionFieldsOf(settings.recognition),
+      recognitionModelId: asr.binding.startsWith('resource:') ? asr.binding.slice(9) as RecognitionModelId : draft.recognitionModelId,
+      recognitionBinding: asr.binding,
+      ...(draft.translate ? { translationBinding: mt.binding } : {}),
+      ...recognitionFieldsOf(effectiveRecognition),
       sourceLanguage: draft.sourceLanguage,
       /*
        * Provider, quantization and cloud credential all come from settings.
@@ -184,18 +188,18 @@ export function SessionSetupDialog({
        * and the absent field a local provider requires, see
        * `@/session-config`.
        */
-      ...translationFieldsOf(translation, {
+      ...translationFieldsOf(effectiveTranslation, {
         enabled: draft.translate,
         targetLanguage: draft.targetLanguage,
-        modelId: draft.translationModelId,
+        modelId: mt.binding.startsWith('resource:') ? mt.binding.slice(9) : undefined,
       }),
     })
-  }, [audioOptions, draft, onSubmit, translation, settings.recognition, incompatible, modelsConfigured, recognitionValid])
+  }, [audioOptions, draft, onSubmit, effectiveTranslation, effectiveRecognition, incompatible, modelsConfigured, recognitionValid, asr, mt, t])
 
   return (
     <>
-    <TranslationCompatibilityDialog key={signature} isOpen={isOpen && incompatible && dismissedPair !== signature} onClose={() => setDismissedPair(signature)} source={draft.sourceLanguage} target={draft.targetLanguage} translation={modelOptions.translation} resources={resources} compute={settings.compute ?? DEFAULT_COMPUTE_SETTINGS}
-      onChangeModel={translationModelId => patch({ translationModelId })} />
+    <TranslationCompatibilityDialog key={signature} isOpen={isOpen && incompatible && dismissedPair !== signature} onClose={() => setDismissedPair(signature)} source={draft.sourceLanguage} target={draft.targetLanguage} translation={selectedTranslation} resources={resources.filter(resource => catalog.mt.some(model => model.binding === `resource:${resource.resourceId}`))} compute={settings.compute ?? DEFAULT_COMPUTE_SETTINGS}
+      onChangeModel={translationModelId => patch({ translationModelId, translationBinding: `resource:${translationModelId}` })} />
     <Dialog open={isOpen && !(incompatible && dismissedPair !== signature)} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-2xl border border-border">
         <DialogHeader><DialogTitle>{t('session.title')}</DialogTitle></DialogHeader>
@@ -203,25 +207,28 @@ export function SessionSetupDialog({
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-1">
               <Label htmlFor="session-name">{t('session.name')}</Label>
-              <Tooltip><TooltipTrigger render={<Button variant="secondary" size="icon" aria-label={t('session.nameHelpAria')} className="size-6 shrink-0 text-muted" />}><CircleHelp aria-hidden="true" /></TooltipTrigger><TooltipContent className="max-w-96 whitespace-normal">{t('session.nameHint')}</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger render={<Button variant="secondary" size="icon-xs" aria-label={t('session.nameHelpAria')} className="min-h-6 shrink-0 border-transparent bg-transparent text-muted hover:bg-surface-secondary" />}><CircleHelp aria-hidden="true" /></TooltipTrigger><TooltipContent className="max-w-96 whitespace-normal">{t('session.nameHint')}</TooltipContent></Tooltip>
             </div>
             <Input id="session-name" value={draft.title || previewName} onChange={event => patch({ title: event.target.value })} />
           </div>
           <SetupSelect label={t('session.audioSource')} value={draft.audioSource} options={audioOptions.map(option => ({ value: option.value, label: option.name }))} onChange={audioSource => patch({ audioSource })} />
-          <SetupSelect label={t('session.sourceLanguage')} value={draft.sourceLanguage} options={modelOptions.sourceLanguages.map(code => ({ value: code, label: languageLabel(code) }))} onChange={sourceLanguage => patch({ sourceLanguage })} />
-          <SetupSelect label={t('session.recognitionModel')} value={draft.recognitionModelId} options={modelOptions.recognitionModels} onChange={key => {
-            const codes = (settings.recognition.provider ?? 'local') === 'local' ? recognitionLanguages(resources.find(model => model.resourceId === key)) : modelOptions.sourceLanguages
+          <SetupSelect label={t('session.sourceLanguage')} value={draft.sourceLanguage} options={sourceLanguages.map(code => ({ value: code, label: languageLabel(code) }))} onChange={sourceLanguage => patch({ sourceLanguage })} />
+          <SetupSelect hint={t('gateway.modelNoneHint')} label={t('session.recognitionModel')} value={asr.unavailable ? '' : asr.binding} options={asrChoices} onChange={binding => {
+            const model = catalog.asr.find(item => item.binding === binding)
+            const codes = model?.sourceLanguages ?? modelOptions.sourceLanguages
             const sourceLanguage = codes.includes(draft.sourceLanguage) ? draft.sourceLanguage : codes.includes('auto') ? 'auto' : draft.sourceLanguage
             if (sourceLanguage === draft.sourceLanguage && !codes.includes(sourceLanguage)) notifyError(t('errors.unsupportedRecognitionLanguage', { language: languageName(sourceLanguage, language) }))
-            patch({ recognitionModelId: key as RecognitionModelId, sourceLanguage })
+            patch({ recognitionBinding: binding,
+              ...(binding.startsWith('resource:') ? { recognitionModelId: binding.slice(9) as RecognitionModelId } : {}),
+              sourceLanguage })
           }} />
           <div className="flex flex-col gap-2 rounded-2xl border border-border">
             <SettingRow label={t('session.translation')} className="hover:bg-transparent">
               <SettingSwitch isSelected={draft.translate} ariaLabel={t('session.translation')} onChange={next => patch({ translate: next, ...(next && draft.targetLanguage === NO_TRANSLATION_LANGUAGE ? { targetLanguage: DEFAULT_SETTINGS.translation.targetLanguage } : {}) })} />
             </SettingRow>
             {draft.translate ? <div className="flex flex-col gap-4 px-4 pb-4">
-              <SetupSelect label={t('session.translationLanguage')} value={draft.targetLanguage} options={modelOptions.targetLanguages.map(code => ({ value: code, label: languageLabel(code) }))} onChange={targetLanguage => patch({ targetLanguage, translate: targetLanguage !== NO_TRANSLATION_LANGUAGE })} />
-              {translation.provider === 'local' ? <SetupSelect label={t('session.translationModel')} value={draft.translationModelId} options={localModelOptions} onChange={translationModelId => patch({ translationModelId })} /> : null}
+              <SetupSelect label={t('session.translationLanguage')} value={draft.targetLanguage} options={targetLanguages.map(code => ({ value: code, label: languageLabel(code) }))} onChange={targetLanguage => patch({ targetLanguage, translate: targetLanguage !== NO_TRANSLATION_LANGUAGE })} />
+              <SetupSelect hint={t('gateway.modelNoneHint')} label={t('session.translationModel')} value={mt.unavailable ? '' : mt.binding} options={mtChoices} onChange={translationBinding => patch({ translationBinding, ...(translationBinding.startsWith('resource:') ? { translationModelId: translationBinding.slice(9) } : {}) })} />
             </div> : null}
           </div>
           <div className="rounded-2xl border border-border">
@@ -251,12 +258,13 @@ export function audioSourceFrom(option: AudioSourceOption | undefined, fallbackV
 import { recognitionFieldsOf } from '../../../shared/cloud-config'
 
 interface SetupSelectProps {
+  hint?: string
   label: string
   value: string
   options: readonly { value: string; label: string; isDisabled?: boolean }[]
   onChange: (value: string) => void
 }
 
-function SetupSelect({ label, value, options, onChange }: SetupSelectProps) {
-  return <div className="flex flex-col gap-2"><span className="label">{label}</span><SettingSelect value={value} ariaLabel={label} options={[...options]} onChange={onChange} /></div>
+function SetupSelect({ label, hint, value, options, onChange }: SetupSelectProps) {
+  return <div className="flex flex-col gap-2"><span className="label">{hint ? <ModelAvailabilityLabel label={label} hint={hint} /> : label}</span><SettingSelect value={value} ariaLabel={label} options={[...options]} onChange={onChange} /></div>
 }

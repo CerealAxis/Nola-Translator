@@ -598,8 +598,44 @@ if (!hasSingleInstanceLock) {
       return overlayWindow!
     }
     const isOverlayVisible = (): boolean => !!overlayWindow && !overlayWindow.isDestroyed() && (overlayWindow.isVisible() || overlayWindow.isMinimized())
-    const sessions = new SessionController({ engine, meetings, activity, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareEnvironment(true, config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => getOverlayWindow().showInactive(), hideOverlay: () => { if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide() }, isBrowserCaptionServiceActive: () => browserConnection?.captionServiceReserved ?? false, isOverlayVisible })
-    stopSessions = () => sessions.stopCurrent()
+    const createSessionEngine = () => new EngineProcess({
+      ...createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath }),
+      resolveLaunchSpec: () => {
+        const directories = runtimes.selectedDirectories(settings.current().compute)
+        return { ...createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
+          managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp }),
+          env: { ...resourceEnvironment, ...gateway!.sessionEnvironment(), NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? '', NOLA_TRANSLATOR_RUN_LOG_STDERR: '1' } }
+      },
+    })
+    const desktopEngine = createSessionEngine()
+    const browserEngine = createSessionEngine()
+    // Business processes capture NOLA_GATEWAY_* at spawn time. Restarting the gateway replaces the
+    // private listener and key, so only then does an idle process need to be replaced.
+    let sessionEnvironmentKey: string | undefined
+    const prepareSession = async (config: SessionConfig, cancelled: () => boolean = () => false) => {
+      await whenRuntimeReady()
+      if (componentInstalling) throw new Error('Runtime installation is in progress')
+      await gateway!.prepareSession(config)
+      if (cancelled()) throw new Error('sessionStartCancelled')
+      const key = gateway!.sessionEnvironment().NOLA_GATEWAY_KEY ?? ''
+      if (key !== sessionEnvironmentKey) {
+        sessionEnvironmentKey = key
+        // A gateway teardown already stopped both controllers, so neither process owns a session here.
+        await Promise.all([desktopEngine, browserEngine].map(engine => engine.currentState === 'ready' ? engine.stop() : undefined))
+      }
+      if (cancelled()) throw new Error('sessionStartCancelled')
+    }
+    const sessions = new SessionController({ engine: desktopEngine, audioTestEngine: engine, meetings, activity, useGateway: true, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareSession(config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => getOverlayWindow().showInactive(), hideOverlay: () => { if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide() }, isOverlayVisible })
+    const browserSessions = new SessionController({ engine: browserEngine, meetings: null, activity, useGateway: true,
+      getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
+      prepare: (config, cancelled) => prepareSession(config, cancelled), whenReady: whenRuntimeReady,
+      startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {} })
+    browserEngine.on('event', event => browserSessions.handleEvent(event))
+    browserEngine.on('state', state => { if (state === 'failed' || state === 'recovering') browserSessions.releaseOnLoss() })
+    stopSessions = async () => {
+      await Promise.all([sessions.stopCurrent(), browserSessions.stopCurrent()])
+      await Promise.all([desktopEngine.stop(), browserEngine.stop()])
+    }
     const offline = new OfflineManager({
       python: createEngineLaunchSpec({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath }).command,
       modelRoot: resourceEnvironment.NOLA_TRANSLATOR_MODEL_DIR,
@@ -650,8 +686,9 @@ if (!hasSingleInstanceLock) {
       () => { sessionActive = false },
       sessions,
       config => browserConnection!.prepareCaptionService(config),
+      resourceId => gateway?.resourceInUse(resourceId) ?? false,
     )
-    browserConnection = new BrowserConnection({ engine, sessions, activity, integrations: new BrowserIntegrations({ localAppData: process.env.LOCALAPPDATA ?? app.getPath('userData'), userData: app.getPath('userData') }), isOverlayVisible, getSettings: () => settings.current(), setEnabled: async enabled => {
+    browserConnection = new BrowserConnection({ engine: browserEngine, sessions: browserSessions, activity, useGateway: true, integrations: new BrowserIntegrations({ localAppData: process.env.LOCALAPPDATA ?? app.getPath('userData'), userData: app.getPath('userData') }), getSettings: () => settings.current(), setEnabled: async enabled => {
       const saved = await settings.update({ browserConnection: { enabled } })
       for (const window of BrowserWindow.getAllWindows()) window.webContents.send('settings:changed', saved)
     } })
@@ -664,7 +701,7 @@ if (!hasSingleInstanceLock) {
         await whenRuntimeReady()
         const compute = { ...settings.current().compute }
         if (model.startsWith('resource:')) {
-          if (sessionActive || sessionStarting || componentInstalling) throw new Error('Local models are busy with a caption session or runtime installation. Stop that task before direct inference.')
+          if (componentInstalling) throw new Error('Runtime installation is in progress')
           if (engine!.currentState !== 'ready') await engine!.start()
           const inventory = await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: randomUUID() }, 'resources')
           const resourceId = model.slice(9)
@@ -699,6 +736,8 @@ if (!hasSingleInstanceLock) {
     let gatewayStarting: Promise<unknown> | null = null
     const stopGateway = async () => {
       const pending = gatewayStarting
+      if (browserSessions.usesLocalModels) await browserConnection?.stopCaptionService()
+      await Promise.all([sessions, browserSessions].filter(controller => controller.usesLocalModels).map(controller => controller.stopCurrent()))
       await gateway!.stop()
       if (pending) await pending.catch(() => undefined)
       gatewayLease?.release()
@@ -727,10 +766,10 @@ if (!hasSingleInstanceLock) {
     })
     loggedHandle('feature-activity:snapshot', event => { assertFeatureSender(event); return activity.snapshot() })
     loggedHandle('feature-activity:stop', event => { assertFeatureSender(event); return activity.stop() })
-    loggedHandle('model-gateway:status', event => { assertFeatureSender(event, true); return gateway!.snapshot() })
+    loggedHandle('model-gateway:status', () => gateway!.snapshotWithCatalog())
     loggedHandle('model-gateway:start', async event => {
       assertFeatureSender(event, true)
-      if (activity.snapshot().owner === 'model-gateway' && gateway!.snapshot().state === 'running') return gateway!.snapshot()
+      if (activity.has('model-gateway') && gateway!.snapshot().state === 'running') return gateway!.snapshot()
       const lease = activity.acquire('model-gateway', stopGateway)
       gatewayLease = lease
       const task = gateway!.start()
@@ -739,7 +778,7 @@ if (!hasSingleInstanceLock) {
       catch (error) { lease.release(); throw error }
       finally { if (gatewayStarting === task) gatewayStarting = null }
     })
-    loggedHandle('model-gateway:stop', async event => { assertFeatureSender(event, true); if (activity.snapshot().owner === 'model-gateway') await activity.stop(); return gateway!.snapshot() })
+    loggedHandle('model-gateway:stop', async event => { assertFeatureSender(event, true); await stopGateway(); return gateway!.snapshot() })
     loggedHandle('model-gateway:reveal-key', event => { assertFeatureSender(event, true); return gateway!.revealKey() })
     loggedHandle('model-gateway:rotate-key', event => { assertFeatureSender(event, true); return gateway!.rotateKey() })
     createMainWindow(initialSettings.theme)
@@ -747,7 +786,14 @@ if (!hasSingleInstanceLock) {
       isDevelopmentWindow: isWorkbenchWindow,
       settings,
       initialSettings,
-      settingsChanged: async () => { tray?.refresh(); if (gateway?.snapshot().state === 'running') await gateway.reconfigure() },
+      beforeSettingsChange: patch => gateway?.assertSettingsChange(patch),
+      settingsChanged: async () => {
+        tray?.refresh()
+        if (!gateway) return
+        if (gateway.snapshot().state === 'running') await gateway.reconfigure()
+        const snapshot = await gateway.snapshotWithCatalog()
+        for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('model-gateway:changed', snapshot)
+      },
       meetings,
       audioProtocol: `${MEETING_AUDIO_SCHEME}://`,
       credentials,
@@ -763,7 +809,7 @@ if (!hasSingleInstanceLock) {
         workspaceWindow?.focus()
       },
     })
-    engine.on('event', (event) => {
+    desktopEngine.on('event', (event) => {
       if (event.type === 'sessionStarted') sessionActive = true
       if (event.type === 'sessionStopped') sessionActive = false
       if (event.type === 'caption' && event.segment.isFinal && !sessions.isBrowserEvent(event)) {
@@ -774,27 +820,19 @@ if (!hasSingleInstanceLock) {
     })
     // A stopped engine owns no session, so the flag has to clear with it. Without this a
     // session that failed to stop leaves the flag set, and every later start is refused.
-    engine.on('state', state => { if (state === 'failed' || state === 'recovering' || state === 'stopped') sessionActive = false })
+    desktopEngine.on('state', state => { if (state === 'failed' || state === 'recovering' || state === 'stopped') sessionActive = false })
     createWorkspaceWindow(initialSettings.theme)
     await workspaceReady
     const workbench = registerWorkbench(() => settings.current().theme, __dirname, undefined, {
       getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
       workspace: new AgentWorkspace(join(dataRoot, 'local-call')),
       listDirectModels: async () => {
-        await whenRuntimeReady()
-        if (engine!.currentState !== 'ready') await engine!.start()
-        const inventory = await engine!.request({ protocolVersion: 1, type: 'listResources', requestId: randomUUID() }, 'resources')
-        const models = inventory.resources.filter(item => item.installed).map(item => ({ model: `resource:${item.resourceId}`, name: item.name,
-          kind: item.kind === 'recognitionModel' ? 'asr' : item.kind === 'ttsModel' ? 'tts' : 'mt' }))
-        for (const profile of customModelsOf(settings.current().translation)) models.push({ model: `mt-custom:${profile.id}`, name: profile.name, kind: 'mt' })
-        models.push({ model: 'cloud:index-translate', name: 'Index-Translate', kind: 'mt' }, { model: 'cloud:mymemory', name: 'MyMemory', kind: 'mt' })
-        for (const provider of ['microsoft', 'google', 'aliyun', 'minimax'] as const) {
-          const slot = provider === 'aliyun' ? 'aliyun-asr' : provider === 'minimax' ? 'minimax-asr' : provider
-          if (await credentials.get(slot)) models.push({ model: `cloud:${provider}`, name: provider, kind: provider === 'aliyun' || provider === 'minimax' ? 'asr' : 'mt' })
-        }
-        return models
+        const snapshot = await gateway!.snapshotWithCatalog()
+        return Object.values(snapshot.availableModels ?? {}).flat().map(model => ({ model: model.binding, name: model.name, kind: model.kind }))
       },
-      directLaunch, releaseDirectModel: closeDirectModelWorker,
+      inferModel: (request, signal, inspect) => gateway!.infer(request, signal, inspect),
+      acquireLanguageModel: binding => gateway!.acquireLanguageModel(binding),
+      releaseDirectModel: async () => {},
     }, activity)
     stopWorkbench = () => workbench.stop()
     stopOnboardingCard = registerOnboardingCard(() => settings.current().theme, __dirname, () => mainWindow).stop

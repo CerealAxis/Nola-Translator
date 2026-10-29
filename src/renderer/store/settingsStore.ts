@@ -10,6 +10,7 @@ import { synchronizeCustomModel } from '../../shared/custom-models'
 
 import type { NolaBridge } from '@/bridge'
 import type { AppSettings, AppSettingsPatch, AppUpdateCheckResult, ModelStorageInfo, PrewarmErrorCode, PrewarmResult } from '@/bridge'
+import { mergeModelPolicy } from '../../shared/model-policy'
 import type { OverlayMenuRequest, OverlayMenuPresentation } from '../../shared/overlay-menu'
 import type { BrowserConnectionAction, BrowserConnectionStatus, BrowserKind } from '../../shared/browser'
 import { createStore, createWriteQueue } from './createStore'
@@ -373,6 +374,7 @@ export function mergeSettings(base: AppSettings, patch: AppSettingsPatch): AppSe
     ...(patch.uiLanguage !== undefined ? { uiLanguage: patch.uiLanguage } : {}),
     ...(patch.onboardingSeen !== undefined ? { onboardingSeen: patch.onboardingSeen } : {}),
     ...(patch.closeBehavior !== undefined ? { closeBehavior: patch.closeBehavior } : {}),
+    ...(patch.modelPolicy ? { modelPolicy: mergeModelPolicy(base, patch.modelPolicy) } : {}),
     synthesis: { ...base.synthesis, ...patch.synthesis },
     modelGateway: { ...base.modelGateway, ...patch.modelGateway },
     recognition: { ...base.recognition, ...patch.recognition },

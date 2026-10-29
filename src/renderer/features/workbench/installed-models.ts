@@ -2,12 +2,13 @@ import type { AppSettings, CredentialProvider } from '../../../shared/settings'
 import type { ResourceRecord } from '../../../shared/contracts'
 import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../../../shared/index-translate'
 import type { TranslationKey } from '@/i18n'
-import { cloudModelsOf } from '../models/CloudModels'
+import { cloudModelsOf } from '../../../shared/cloud-models'
 import type { ModelKind } from './demo-runtime'
 import { configurationOf, recognitionLanguages } from '../../../shared/model-capabilities'
 import { LANGUAGE_CODES } from '../../../shared/languages'
 import { remoteSourceLanguages } from '../../../shared/cloud-config'
 import { LOCAL_LANGUAGE_MODEL_CONTEXT_SIZE } from '../../../shared/language-model'
+import type { AvailableModels } from '@/available-models'
 
 export interface PlaygroundModel {
   id: string
@@ -17,6 +18,21 @@ export interface PlaygroundModel {
   images?: boolean
   sourceLanguages?: readonly string[]
   targetLanguages?: readonly string[]
+}
+
+/**
+ * What the workbench may run: the model the gateway loaded for each capability, plus every cloud
+ * interface the user configured enough to call. An installed but unloaded local model stays out,
+ * because selecting one would start a model the user never asked the gateway to load.
+ */
+export function callableModels(catalog: AvailableModels, playground: readonly PlaygroundModel[]): PlaygroundModel[] {
+  return (['llm', 'asr', 'mt', 'tts'] as const).flatMap(kind => catalog[kind].map(model => {
+    const known = playground.find(item => item.kind === kind && item.id === model.binding)
+    return { ...known, id: model.binding, name: model.name, kind,
+      ...(model.sourceLanguages ? { sourceLanguages: model.sourceLanguages } : {}),
+      ...(model.targetLanguages ? { targetLanguages: model.targetLanguages } : {}),
+      ...(model.images !== undefined ? { images: model.images } : {}) }
+  }))
 }
 
 /** Mirrors the installed catalog, including saved profiles and configured cloud services. */

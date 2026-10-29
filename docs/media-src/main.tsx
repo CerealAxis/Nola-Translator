@@ -17,6 +17,7 @@ import { Routes, useRoute } from '@/routes'
 import { stores, updateSettings } from '@/store'
 import { demoCopy, prepareDemo } from './demo'
 import { connectDemo } from './demoBridge'
+import { WorkspacePage } from '@/features/workspace/WorkspacePage'
 import { Scene } from './Scene'
 import './media.css'
 
@@ -29,13 +30,16 @@ const requestedTheme = params.get('theme')
 const settings = prepareDemo(locale, page, snapshot, requestedTheme === 'dark' || requestedTheme === 'light' ? requestedTheme : undefined)
 if (page.endsWith('-scene')) stores.session.setState({ status: 'running', segments: stores.session.getState().segments.slice(0, 1) })
 const sampleSegments = stores.session.getState().segments
+let showWorkspace: () => void = () => undefined
 let showOverlay: (open: boolean) => void = () => undefined
-const { publish, closeOverlay } = connectDemo(settings, open => showOverlay(open))
+const { publish, closeOverlay } = connectDemo(settings, open => showOverlay(open), () => showWorkspace())
 
 function DemoApp() {
   const { t, language } = useI18n()
   const { navigate } = useRoute()
   const navigation = useApplicationNavigation()
+  const [workspaceOpen, setWorkspaceOpen] = useState(false)
+  showWorkspace = () => { setWorkspaceOpen(true); navigate('#/workspace') }
   const [overlayOpen, setOverlayOpen] = useState(false)
   showOverlay = setOverlayOpen
   useEffect(() => {
@@ -96,7 +100,7 @@ function DemoApp() {
     {import.meta.env.MODE === 'toy' ? <div className="docs-demo-label z-toast" role="note">{demoCopy[language].label}</div> : null}
     <div className="docs-desktop-surface z-base" inert={overlayOpen}>
     {page.endsWith('-scene') ? <Scene browser={page === 'browser-scene'} /> : <AppShell navigation={navigation}>
-      <Routes pages={APPLICATION_PAGES} />
+      <Routes pages={{ ...APPLICATION_PAGES, workspace: workspaceOpen ? () => <WorkspacePage /> : APPLICATION_PAGES.workspace }} />
       <OnboardingTour autoStart={false} />
     </AppShell>}
     </div>

@@ -1624,7 +1624,8 @@ class EngineRuntime:
         # Cloud transcripts can switch languages mid-sentence, so the recognizer's single
         # language label must not suppress translation when it happens to match the target.
         targets = list(dict.fromkeys(targets))
-        if config is not None and getattr(config, "translationProvider", None) == "local" and targets:
+        if (config is not None and getattr(config, "translationProvider", None) == "local" and targets
+                and not getattr(self.translation_provider, 'managed_externally', False)):
             capability = self.resources.configuration(self._local_translation_model_id(config))
             # Automatic language detection is allowed to retain untranslated speech silently.
             targets = [target for target in targets if supports_translation(capability, source, target)]
@@ -2031,7 +2032,10 @@ class EngineRuntime:
             self._publish_translation_result(request, result, session_id, generation)
 
         target_errors: dict[str, str] = {}
-        if provider_name in {"hymt2", "index-translate-local"}:
+        # Proxy providers retain their real strategy name, but their model owner validates
+        # weights and device readiness; this business process owns no local model server.
+        validate_local_model = not getattr(self.translation_provider, 'managed_externally', False)
+        if validate_local_model and provider_name in {"hymt2", "index-translate-local"}:
             active = self.active_config
             try:
                 model_id = self._local_translation_model_id(active) if active else HYMT2_RESOURCE_ID
@@ -2048,13 +2052,13 @@ class EngineRuntime:
                 target_errors = {target: "unsupportedLanguagePair" for target in targets if not supports_translation(capability, request.source, target)}
                 if not target_errors and not self.llama_manager.ready:
                     target_errors = dict.fromkeys(targets, "llamaServerUnavailable")
-        elif provider_name in {"transformers-causal", "transformers-seq2seq", "index-translate-transformers"}:
+        elif validate_local_model and provider_name in {"transformers-causal", "transformers-seq2seq", "index-translate-transformers"}:
             model_id = self._local_translation_model_id(self.active_config) if self.active_config else ""
             capability = self.resources.configuration(model_id) if model_id else None
             target_errors = {target: "unsupportedLanguagePair" for target in targets if not supports_translation(capability, request.source, target)}
             if not model_id or not self.resources.is_installed(model_id):
                 target_errors = dict.fromkeys(targets, "resourceUnavailable")
-        elif provider_name == "m2m100":
+        elif validate_local_model and provider_name == "m2m100":
             model_id = self._local_translation_model_id(self.active_config) if self.active_config else M2M100_RESOURCE_ID
             if not self.resources.is_installed(model_id):
                 target_errors = dict.fromkeys(targets, "resourceUnavailable")
@@ -2330,7 +2334,8 @@ class EngineRuntime:
         if capture is not None:
             capture.pause()
         await self._cancel_stream_tasks()
-        if self.recognizer is not None:
+        keep_connection = self.recognizer is not None and getattr(self.recognizer, 'reset_keeps_connection', False)
+        if self.recognizer is not None and not keep_connection:
             await self.recognizer.close()
         if isinstance(capture, PortAudioCapture):
             # Old callback packets carry pre-seek wall time and must never cross the anchor.
@@ -2345,10 +2350,14 @@ class EngineRuntime:
         self._stream_anchored = True
         self._epoch_initialized = True
         self._stream_finishing = False
-        if config.recognitionProvider != "local":
-            self.recognizer = self._remote_recognizer(config)
+        if config.recognitionProvider != "local" or keep_connection:
+            if not keep_connection:
+                self.recognizer = self._remote_recognizer(config)
             try:
-                await self.recognizer.start()
+                if keep_connection:
+                    await self.recognizer.reset()
+                else:
+                    await self.recognizer.start()
             except Exception as error:
                 await self.recognizer.close()
                 # The recognizer never ran, so the stream is not anchored; the epoch and

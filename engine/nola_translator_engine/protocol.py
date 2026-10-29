@@ -133,6 +133,10 @@ class ModelSelection(ProtocolModel):
     translationOptions: TranslationOptions | None = None
     fallbackTranslationProvider: Literal["local", "cloud", "microsoft", "mymemory", "google", "index-translate"] | None = None
     fallbackTranslationOptions: TranslationOptions | None = None
+    # Which model the private model gateway should serve this session with. Only the gateway-backed
+    # runtime reads them; an empty value means "whatever that capability is bound to".
+    recognitionBinding: str = Field(default="", max_length=512)
+    translationBinding: str = Field(default="", max_length=512)
 
 
 class SessionConfig(ModelSelection):

@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react'
 import type { AppSettingsPatch } from '@/bridge'
 import { useModelOptions } from '@/model-options'
-import { recognitionLanguages } from '../../../../shared/model-capabilities'
 /**
- * Audio and recognition: source device, recognition model, source language, audio retention.
+ * Audio and recognition: source device, source language, VAD segmentation and audio retention.
+ *
+ * The recognition model itself is no longer chosen here. The model gateway decides which local
+ * model or cloud interface is loaded, and a caption session picks among those per session, so a
+ * settings-level picker would silently load another model under a running feature.
  *
  * `recognition.audioSource` is either a device id or the protocol sentinel `'defaultOutput'`,
  * which the dropdown offers as its own first option: the sentinel resolves to whatever Windows
@@ -17,18 +20,20 @@ import { recognitionLanguages } from '../../../../shared/model-capabilities'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
-import { LoaderCircle } from 'lucide-react'
+import { CircleHelp, LoaderCircle } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 import { languageName } from '@/bridge'
 import { SettingsRow } from '../SettingsRow'
 import { notifyError, notifySuccess, notifyWarning } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
+import { useRoute } from '@/routes'
 import { errorCopyOf } from '@/features/workspace/error-copy'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
-import { DEFAULT_SETTINGS, ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, RECOGNITION_PROVIDERS, type AliyunRecognitionModel, type MinimaxRecognitionModel, type RecognitionProvider, type RecognitionSettings } from '../../../../shared/settings'
+import { DEFAULT_SETTINGS, ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, type AliyunRecognitionModel, type MinimaxRecognitionModel, type RecognitionSettings } from '../../../../shared/settings'
 import { ApiKeyRow, TextRow } from './TranslationTab'
 import { supportsRecognitionNativeTranslation } from '../../../../shared/cloud-config'
 
@@ -36,10 +41,9 @@ const DEFAULT_OUTPUT = 'defaultOutput'
 
 export function AudioTab({ settings }: SettingsPanelProps) {
   const { t, language } = useI18n()
+  const { navigate } = useRoute()
   const modelChoices = useModelOptions()
   const devices = useStore(stores.models, (state) => state.devices)
-  const resources = useStore(stores.models, state => state.resources)
-  const credentials = useStore(stores.models, state => state.credentials)
   const provider = settings.recognition.provider ?? 'local'
   // Retention is on by default: with it off nothing can be replayed or exported, and
   // `ipc.ts` reads the flag to decide both `recordAudio` and the `recordingPath` it injects,
@@ -69,22 +73,6 @@ export function AudioTab({ settings }: SettingsPanelProps) {
     [language, modelChoices.sourceLanguages],
   )
 
-  const modelOptions = useMemo<PickerOption[]>(
-    () => modelChoices.recognitionModels,
-    [modelChoices.recognitionModels],
-  )
-
-  // The option list comes from `RECOGNITION_PROVIDERS`, so the dropdown cannot offer a provider
-  // the main process would sanitize back to `local`.
-  const providerOptions = useMemo<PickerOption[]>(() => RECOGNITION_PROVIDERS.map((id) => ({
-    value: id,
-    label: {
-      local: t('settings.providerLocal'),
-      aliyun: t('settings.providerAliyun'),
-      minimax: t('settings.providerMiniMax'),
-    }[id],
-  })), [t])
-
   return (
     <div className="settings-panel" data-onboarding="recognition-settings">
       <SettingGroup legend={t('settings.groupInput')}>
@@ -104,38 +92,17 @@ export function AudioTab({ settings }: SettingsPanelProps) {
       </SettingGroup>
 
       <SettingGroup onboardingTarget="recognition-service" legend={t('settings.groupRecognition')}>
-        <SettingsRow onboardingTarget="recognition-provider" label={t('settings.provider')}>
-          <SettingSelect value={provider} ariaLabel={t('settings.provider')} options={providerOptions} onChange={value => {
-            const next = value as RecognitionProvider
-            // Only Aliyun LiveTranslate models return a translation of their own, so leaving them
-            // retires the native-translation provider rather than leaving a target untranslated.
-            void updateSettings({ recognition: { provider: next, sourceLanguage: 'auto' },
-              ...(!supportsRecognitionNativeTranslation({ ...settings.recognition, provider: next }) && settings.translation.provider === 'recognition' ? { translation: { provider: 'mymemory' as const } } : {}),
-            }).catch(() => undefined)
-          }} />
-        </SettingsRow>
-        {provider === 'local' ? (modelOptions.length === 0 ? (
-          <SettingsRow onboardingTarget="recognition-model" label={t('settings.recognitionModel')}>
-            <span className="nola-caption text-muted">{t('settings.recognitionModelEmpty')}</span>
-          </SettingsRow>
-        ) : (
-        <SettingsRow onboardingTarget="recognition-model" label={t('settings.recognitionModel')}>
-          <SettingSelect
-            value={settings.recognition.modelId}
-            options={modelOptions}
-            ariaLabel={t('settings.recognitionModel')}
-            onChange={(value) => {
-              const supported = recognitionLanguages(resources.find(model => model.resourceId === value))
-              const sourceLanguage = supported.includes(settings.recognition.sourceLanguage)
-                ? settings.recognition.sourceLanguage
-                : supported.includes('auto') ? 'auto' : supported[0] ?? 'auto'
-              void updateSettings({
-                recognition: { modelId: value, sourceLanguage },
-              }).catch(() => undefined)
-            }}
-          />
-        </SettingsRow>
-        )) : provider === 'minimax' ? <MiniMaxConnection recognition={settings.recognition} stored={credentials['minimax-asr']} /> : <AliyunConnection recognition={settings.recognition} stored={credentials['aliyun-asr']} nativeTranslationSelected={settings.translation.provider === 'recognition'} />}
+        {/*
+         * Which model or service recognises speech is the model gateway's decision: a business
+         * page picks it per session from what the gateway already loaded. A picker here would let
+         * a settings change load a different model under a session that is running.
+         */}
+        <p className="nola-caption text-muted">{t('settings.gatewayModelHint')}</p>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => navigate('#/models')}>{t('modelsPolicy.title')}</Button>
+          <Tooltip><TooltipTrigger render={<Button variant="secondary" size="icon-xs" className="min-h-6 border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('modelsPolicy.enableHint')} />}><CircleHelp aria-hidden="true" /></TooltipTrigger>
+            <TooltipContent side="top" className="z-popup max-w-96 whitespace-normal">{t('modelsPolicy.enableHint')}</TooltipContent></Tooltip>
+        </div>
         <SettingsRow label={t('settings.sourceLanguage')}>
           <SettingSelect
             value={settings.recognition.sourceLanguage}

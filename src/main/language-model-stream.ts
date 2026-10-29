@@ -1,17 +1,13 @@
 import type { WebContents } from 'electron'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
-import { createAnthropic } from '@ai-sdk/anthropic'
-import { createOpenAI } from '@ai-sdk/openai'
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { convertToModelMessages, createUIMessageStream, createUIMessageStreamResponse, isToolUIPart, stepCountIs, streamText, type UIMessage, type UIMessageChunk } from 'ai'
 import { frontendTools, injectQuoteContext } from '@assistant-ui/ai-sdk'
-import { customCredentialSlot, customModelsOf } from '../shared/custom-models'
 import type { LanguageModelServices } from './language-model'
 import { languageModelAudioResultSchema, type LanguageModelStreamRequest } from '../shared/language-model'
 import { nativeAgentTools } from './agent-tools'
 import { logDiagnostic } from './session-log'
-import { prepareLocalLanguageModel } from './direct-model'
+import type { GatewayLanguageModel } from './gateway-language-model'
 
 const DIRECT_WORKFLOW_TOOLS = new Set(['nola_extract_audio', 'nola_prepare_audio', 'nola_transcribe_audio', 'nola_translate_text', 'nola_translate_image', 'nola_synthesize_speech'])
 
@@ -64,28 +60,20 @@ function prepareLanguageModelAudio(sender: WebContents, requestId: string, media
 /** Run the model and tools in the main process while emitting the native AI SDK UI stream over IPC. */
 export async function streamSavedLanguageModel(services: LanguageModelServices, sender: WebContents,
   request: LanguageModelStreamRequest, signal: AbortSignal): Promise<void> {
-  const local = request.source === 'local'
-  const connection = local ? await prepareLocalLanguageModel(services, sender.id, request.modelId, signal) : undefined
-  const profile = connection ? {
-    id: `local:${request.modelId}`, model: request.modelId, endpoint: connection.endpoint,
-    apiFormat: 'chat-completions' as const, contextWindow: connection.contextWindow,
-    maxOutputTokens: Math.min(4096, Math.floor(connection.contextWindow / 2)),
-  } : customModelsOf(services.getSettings().translation).find(model => model.id === request.modelId)
-  if (!profile) throw new Error('Language model configuration unavailable')
+  if (!services.acquireLanguageModel) throw new Error('Language model service unavailable')
+  const binding = request.source === 'local' ? `resource:${request.modelId}` : `custom:${request.modelId}`
+  const lease = await services.acquireLanguageModel(binding)
+  let error: unknown
+  try { signal.throwIfAborted(); await streamGatewayLanguageModel(services, sender, request, AbortSignal.any([signal, lease.signal]), lease) }
+  catch (cause) { error = cause; throw cause }
+  finally { lease.release(error) }
+}
+
+async function streamGatewayLanguageModel(services: LanguageModelServices, sender: WebContents,
+  request: LanguageModelStreamRequest, signal: AbortSignal, runtime: GatewayLanguageModel): Promise<void> {
+  const { profile, local } = runtime
   logDiagnostic('agent.model.selected', { source: local ? 'local' : 'custom', modelId: profile.model, contextWindow: profile.contextWindow })
-  const key = local ? '' : await services.getCredential(customCredentialSlot(profile.id))
-  const baseURL = profile.endpoint.replace(/\/+$/, '')
-  const apiKey = key || 'no-key'
-  const model = local ? createOpenAICompatible({ name: 'llama.cpp', baseURL, includeUsage: true,
-    transformRequestBody: body => ({ ...body, parallel_tool_calls: false,
-      chat_template_kwargs: { enable_thinking: request.effort === 'medium' || request.effort === 'high' } }),
-  }).chatModel(profile.model) : profile.apiFormat === 'anthropic'
-    ? createAnthropic({ apiKey, baseURL: `${baseURL}/v1` })(profile.model)
-    : profile.apiFormat === 'ollama'
-      ? createOpenAICompatible({ name: 'ollama', baseURL: `${baseURL}/v1`, apiKey }).chatModel(profile.model)
-      : profile.apiFormat === 'chat-responses'
-        ? createOpenAI({ apiKey, baseURL }).responses(profile.model)
-        : createOpenAI({ apiKey, baseURL }).chat(profile.model)
+  const model = runtime.model(request.effort ?? 'auto')
   const project = request.projectId === null ? undefined : await services.workspace?.project()
   if (request.projectId && request.projectId !== project?.id) throw new Error('Selected project changed')
   const messages = injectQuoteContext(request.body.messages as UIMessage[])
@@ -182,7 +170,7 @@ export async function streamSavedLanguageModel(services: LanguageModelServices, 
       cachedInputTokens: usage.inputTokenDetails.cacheReadTokens }, modelId: profile.model, backend: 'ai-sdk' } })
   }, onError: error => {
     const message = error instanceof Error ? error.message : 'Language model request failed'
-    return (key ? message.replaceAll(key, '[redacted]') : message).slice(0, 1000)
+    return runtime.redact(message)
   } }) })
   if (!response.body) throw new Error('Missing model stream')
   const decoder = new TextDecoder()

@@ -1,4 +1,5 @@
 import { loggedHandle } from './logged-ipc'
+import { sceneModelBinding } from '../shared/model-policy'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { createServer, type Server, type Socket } from 'node:net'
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
@@ -73,6 +74,7 @@ export interface BrowserConnectionOptions {
   setEnabled(enabled: boolean): Promise<void>
   integrations?: BrowserIntegrations
   isOverlayVisible?(): boolean
+  useGateway?: boolean
 }
 
 /** The desktop's independent browser caption appearance and session audio source. */
@@ -92,6 +94,7 @@ export function browserSessionConfig(settings: AppSettings, request: Extract<Bro
   // carry it from the browser caption picker, so resolve it as the live system default.
   const deviceId = request.deviceId === 'defaultOutput' ? undefined : request.deviceId
   return {
+    recognitionBinding: sceneModelBinding(settings, 'asr'), translationBinding: sceneModelBinding(settings, 'mt'),
     audioSource: request.source === 'tab' ? { kind: 'browserTab', streamId: request.streamId } : deviceId ? { kind: 'systemOutput', deviceId } : { kind: 'defaultOutput' },
     recognitionMode: 'realtime', recognitionModelId: settings.recognition.modelId,
     ...recognitionFieldsOf(settings.recognition),
@@ -140,7 +143,7 @@ export class BrowserConnection {
      */
     loggedHandle(CAPTION_SERVICE_CHANNEL, async (_event, active: unknown) => {
       if (typeof active !== 'boolean') throw new Error('invalidConfiguration')
-      if (active && (options.sessions.busy || this.captionServiceClosing || options.isOverlayVisible?.())) throw new Error('sessionAlreadyRunning')
+      if (active && (options.sessions.busy || this.captionServiceClosing || (!options.useGateway && options.isOverlayVisible?.()))) throw new Error('sessionAlreadyRunning')
       if (active) this.setCaptionServiceActive(true)
       else await this.stopCaptionService()
       return this.status()
@@ -206,9 +209,9 @@ export class BrowserConnection {
   prepareCaptionService(config: PrewarmConfig): Promise<PrewarmResult> {
     if (this.captionPreparation) return this.captionPreparation
     if (this.captionServiceActive) return Promise.resolve({ state: 'ready' })
-    if (this.disposing || this.captionServiceClosing || this.options.sessions.busy || this.options.isOverlayVisible?.()) return Promise.resolve({ state: 'failed', code: 'sessionAlreadyRunning' })
+    if (this.disposing || this.captionServiceClosing || this.options.sessions.busy || (!this.options.useGateway && this.options.isOverlayVisible?.())) return Promise.resolve({ state: 'failed', code: 'sessionAlreadyRunning' })
     this.options.activity?.assertAvailable('browser-captions')
-    if (this.options.activity?.snapshot().owner) throw new Error('FEATURE_CONFLICT:browser-captions')
+    if (this.options.activity?.has('browser-captions')) throw new Error('FEATURE_CONFLICT:browser-captions')
     this.featureLease = this.options.activity?.acquire('browser-captions', () => this.stopCaptionService()) ?? null
     const generation = this.captionGeneration
     const task = (async (): Promise<PrewarmResult> => {
@@ -231,8 +234,8 @@ export class BrowserConnection {
   setCaptionServiceActive(active: boolean): void {
     if (active && !this.captionServiceActive) {
       this.options.activity?.assertAvailable('browser-captions')
-      if (this.options.activity?.snapshot().owner && !this.featureLease) throw new Error('FEATURE_CONFLICT:browser-captions')
-      if (!this.options.activity?.snapshot().owner) this.featureLease = this.options.activity?.acquire('browser-captions', () => this.stopCaptionService()) ?? null
+      if (this.options.activity?.has('browser-captions') && !this.featureLease) throw new Error('FEATURE_CONFLICT:browser-captions')
+      if (!this.options.activity?.has('browser-captions')) this.featureLease = this.options.activity?.acquire('browser-captions', () => this.stopCaptionService()) ?? null
       this.featureLease?.running()
     }
     this.captionServiceActive = active
@@ -246,7 +249,7 @@ export class BrowserConnection {
     const closing = (async () => {
       try {
         if (this.options.sessions.browserActive || this.options.sessions.browserServiceStarting) await this.options.sessions.stopCurrent()
-        if (!this.options.sessions.busy && this.options.engine.currentState === 'ready') {
+        if (!this.options.useGateway && !this.options.sessions.busy && this.options.engine.currentState === 'ready') {
           await this.options.engine.request({ protocolVersion: 1, type: 'releaseModels', requestId: `release-${randomUUID()}` }, 'modelsReleased', 60_000)
         }
       } catch (error) {
@@ -271,7 +274,7 @@ export class BrowserConnection {
       const client = live.find(item => item.extensionVersion !== BROWSER_EXTENSION_VERSION) ?? live[0]
       return { ...row, available: row.available || !!client, connected: connected.some(item => item.browser === row.browser), ...(client ? { extensionStatus: 'installed' as const, extensionVersion: client.extensionVersion, extensionCompatible: client.extensionVersion === BROWSER_EXTENSION_VERSION } : {}) }
     })
-    return { enabled: this.enabled, registered: this.registered, connections: connected.length, captionServiceActive: this.captionServiceActive, sessionActive: sessionId !== undefined, sessionStarting: this.options.sessions.browserServiceStarting || this.captionServiceClosing !== null, overlayActive: this.options.isOverlayVisible?.() ?? false, ...(sessionId ? { sessionId } : {}), ...(browsers ? { browsers } : {}), ...(this.error ? { error: this.error } : {}) }
+    return { enabled: this.enabled, registered: this.registered, connections: connected.length, captionServiceActive: this.captionServiceActive, sessionActive: sessionId !== undefined, sessionStarting: this.options.sessions.browserServiceStarting || this.captionServiceClosing !== null, overlayActive: !this.options.useGateway && (this.options.isOverlayVisible?.() ?? false), ...(sessionId ? { sessionId } : {}), ...(browsers ? { browsers } : {}), ...(this.error ? { error: this.error } : {}) }
   }
   async initialize(enabled: boolean): Promise<void> {
     const operation = this.operation

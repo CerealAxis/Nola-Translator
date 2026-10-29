@@ -1,3 +1,4 @@
+import { modelPolicyZh } from './model-policy-ui'
 import { gatewayZh } from './gateway-ui'
 import { workbenchZh } from './workbench-ui'
 import { offlineZh } from './offline-ui'
@@ -22,6 +23,7 @@ import { runtimeZh } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const zhCN = {
   gateway: gatewayZh,
+  modelsPolicy: modelPolicyZh,
   workbench: workbenchZh,
   offline: offlineZh,
   onboarding: onboardingZh,
@@ -544,19 +546,13 @@ export const zhCN = {
     audioTestFailed: "音频测试失败",
     sourceLanguage: '原文语言',
     recognitionModel: '识别模型',
-    recognitionModelEmpty: '尚未安装本地识别模型，请先到「模型管理」下载。',
     keepAudio: '保存录音',
     keepAudioHint: '关闭后不保存音频，无法回放与导出。',
     groupProvider: '翻译服务',
     groupConnection: '连接',
-    provider: '服务商',
+    gatewayModelHint: '识别与翻译模型由「模型网关」统一加载；各功能启动前仍可在已加载的本地模型和已配置的云服务之间二次指定。',
     translateIntermediate: '翻译未定稿字幕',
     translateIntermediateHint: '开启后可更早看到译文；识别更新时译文可能调整，也会增加翻译请求量。关闭后只翻译定稿字幕。',
-    fallbackTranslation: '备用翻译',
-    fallbackProvider: '备用服务',
-    fallbackDisabled: '不使用备用翻译',
-    fallbackTranslationHint: '主翻译多次失败后，自动使用此服务翻译定稿字幕。相同的本地模型、B站接口或 MyMemory 不能重复选择；云端模型可以使用不同配置。',
-    fallbackLocalModelHint: '备用翻译使用上方已选择的本地模型。',
     endpoint: '接口地址',
     region: '区域',
     model: '模型',
@@ -572,7 +568,6 @@ export const zhCN = {
      * 所以这两行必须跟着界面语言走；产品名保留服务商自己的名称。
      */
     providerLocal: '本地模型',
-    providerDisabled: '不启用翻译服务',
     providerCloud: '云端模型',
     providerMicrosoft: 'Microsoft Translator',
     providerMyMemory: 'MyMemory 免费翻译',
@@ -582,7 +577,6 @@ export const zhCN = {
     providerRecognitionTranslation: '阿里云',
     providerAliyun: '阿里云',
     providerMiniMax: 'MiniMax 语音识别',
-    aliyunTranslationHint: '仅在语音识别选择阿里云 Qwen3.5 或 Qwen3.8 LiveTranslate 时可用。',
     aliyunBeijing: '华北 2（北京）',
     aliyunSingapore: '新加坡',
     aliyunWorkspace: '百炼业务空间 ID',
@@ -596,7 +590,6 @@ export const zhCN = {
     mymemoryHint: '无需 API Key，每句确认后通过 REST 翻译，无逐字流式输出，免费服务有配额和限流',
     mymemoryEmail: '联系邮箱（可选）',
     nativeTranslationHint: '使用当前阿里云识别连接返回的流式译文，无需额外翻译接口。仅支持阿里云 LiveTranslate。',
-    localModelEmpty: '尚未安装本地翻译模型，请先到「模型管理」下载。',
     /*
      * 云端那七项。**API 格式决定接口地址该填到哪一层**（Anthropic 只填站点根地址，
      * 其余填到 /v1），所以每种格式各带一句提示 —— 层级填错最难从报错里看出来。

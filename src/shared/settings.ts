@@ -1,4 +1,5 @@
 import { LANGUAGE_CODES } from './languages'
+import type { ModelPolicy } from './model-policy'
 import { DEFAULT_MODEL_GATEWAY, type ModelGatewaySettings } from './model-gateway'
 import { DEFAULT_COMPUTE_SETTINGS, type ComputeSettings } from './compute'
 import { GITHUB_PROXY_AUTO } from './github-proxies'
@@ -123,6 +124,7 @@ export type AppSettings = {
   browserConnection: { enabled: boolean }
   synthesis: { modelId: string; voice: string }
   modelGateway: ModelGatewaySettings
+  modelPolicy?: ModelPolicy
   closeBehavior: 'tray' | 'quit'
 }
 

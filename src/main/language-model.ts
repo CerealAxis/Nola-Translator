@@ -5,6 +5,7 @@ import { resolveLanguageModelAudio, streamSavedLanguageModel } from './language-
 import { directModelRequestSchema, workspaceActionSchema } from '../shared/agent-workspace'
 import { closeAllDirectModelWorkers, closeDirectModelWorker, runDirectModel, type DirectModelServices } from './direct-model'
 import type { AgentWorkspace } from './agent-workspace'
+import type { GatewayLanguageModel } from './gateway-language-model'
 
 export interface LanguageModelServices extends DirectModelServices {
   getSettings: () => AppSettings
@@ -12,6 +13,7 @@ export interface LanguageModelServices extends DirectModelServices {
   workspace?: AgentWorkspace
   listDirectModels?: () => Promise<Array<{ model: string; kind: string; name: string }>>
   releaseDirectModel?: (ownerId: number) => Promise<void>
+  acquireLanguageModel?: (binding?: string) => Promise<GatewayLanguageModel & { signal: AbortSignal; release(error?: unknown): void }>
 }
 
 /** The official AI SDK stream crosses IPC; provider secrets remain in the main process. */
@@ -51,7 +53,7 @@ export function registerLanguageModelIpc(services: LanguageModelServices, allowe
   ipcMain.handle('app:direct-model:release', async event => {
     if (!allowed(event.sender)) throw new Error('Direct model access denied')
     if (services.releaseDirectModel) await services.releaseDirectModel(event.sender.id)
-    else await closeDirectModelWorker(event.sender.id)
+      else if (!services.inferModel) await closeDirectModelWorker(event.sender.id)
   })
   ipcMain.handle('app:language-model:stream', async (event, raw: unknown) => {
     if (!allowed(event.sender)) throw new Error('Language model access denied')
@@ -79,7 +81,7 @@ export function registerLanguageModelIpc(services: LanguageModelServices, allowe
       const tasks = [...settled.values()].map(item => item.promise)
       for (const controller of pending.values()) controller.abort()
       await Promise.allSettled(tasks)
-      await closeAllDirectModelWorkers()
+      if (!services.inferModel) await closeAllDirectModelWorkers()
     },
   }
 }

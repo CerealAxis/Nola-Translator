@@ -8,11 +8,12 @@ import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
 import { customModelsOf } from '../../../shared/custom-models'
-import { notifyError } from '@/components/primitives/notify'
+import { notifyError, notifyInfo } from '@/components/primitives/notify'
 import { AudioRecordingDictationAdapter } from './audio-dictation'
 import type { PlaygroundConfig } from './demo-runtime'
 import { createPlaygroundFetch } from './language-model-transport'
-import { installedPlaygroundModels } from './installed-models'
+import { callableModels, installedPlaygroundModels } from './installed-models'
+import { resolveModelBinding, savedBindingOf, selectModelBinding, useAvailableModels } from '@/available-models'
 import { AudioAttachmentAdapter, VideoAttachmentAdapter } from './audio-attachment'
 import { getBridge } from '@/store'
 import type { AgentWorkspaceSnapshot, WorkspaceAction } from '../../../shared/agent-workspace'
@@ -126,10 +127,16 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
   const settings = useStore(stores.settings, state => state.settings)
   const resources = useStore(stores.models, state => state.resources)
   const credentials = useStore(stores.models, state => state.credentials)
-  const loaded = useStore(stores.models, state => state.loaded)
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
   const profiles = useMemo(() => settings ? customModelsOf(settings.translation) : [], [settings])
-  const models = useMemo(() => installedPlaygroundModels(resources, settings, credentials, t), [resources, settings, credentials, t])
+  const available = useAvailableModels()
+  const playground = useMemo(() => installedPlaygroundModels(resources, settings, credentials, t), [resources, settings, credentials, t])
+  const models = useMemo(() => callableModels(available, playground), [available, playground])
+  const modelsRef = useRef(models)
+  modelsRef.current = models
   const [config, setConfig] = useState<PlaygroundConfig>({ model: '', kind: 'llm', effort: 'auto', source: 'auto', target: 'zh', voice: '', projectId: snapshot?.selectedProject ?? null })
+  const [requestRunning, setRequestRunning] = useState(false)
   const [ttsVoices, setTtsVoices] = useState<{ model: string; names: string[] }>({ model: '', names: [] })
 
   const [memories, setMemories] = useState<string[]>(() => { try { const saved: unknown = JSON.parse(localStorage.getItem('nola.playground.memories') || '[]'); return Array.isArray(saved) ? saved.filter((item): item is string => typeof item === 'string') : [] } catch { return [] } })
@@ -147,30 +154,35 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
     return () => window.removeEventListener('focus', refresh)
   }, [t])
   useEffect(() => {
-    if (!loaded || !settings) return
-    const selected = models.find(model => model.id === config.model) ?? models.find(model => model.kind === config.kind) ?? models[0]
-    if (config.model !== (selected?.id ?? '') || config.kind !== (selected?.kind ?? 'llm') || config.images !== selected?.images) {
-      setConfig(previous => ({ ...previous, model: selected?.id ?? '', kind: selected?.kind ?? 'llm', images: selected?.images }))
+    if (!settings || requestRunning) return
+    const saved = config.model || savedBindingOf(config.kind, settings)
+    const resolution = resolveModelBinding(config.kind, saved, available[config.kind])
+    const selected = models.find(model => model.kind === config.kind && model.id === resolution.binding)
+    if (config.model !== (selected?.id ?? '') || config.images !== selected?.images) {
+      setConfig(previous => ({ ...previous, model: selected?.id ?? '', images: selected?.images }))
+      if (resolution.unavailable && config.model) notifyError(t('gateway.modelNone', { name: t(`gateway.${config.kind}`) }), { description: t('gateway.modelNoneHint') })
+      if (resolution.replaced && config.model) notifyInfo(t('gateway.modelSwitched', { name: resolution.replaced.name }),
+        { description: t('gateway.modelSwitchedLoaded') })
     }
-  }, [loaded, settings, models, config.kind, config.model, config.images])
+  }, [settings, models, available, requestRunning, config.kind, config.model, config.images, t])
   const configRef = useRef(config)
   configRef.current = config
-  const transport = useMemo(() => new AssistantChatTransport({ api: '/nola-chat', fetch: createPlaygroundFetch(() => configRef.current, t, () => memoriesRef.current) }), [t])
+  const transport = useMemo(() => new AssistantChatTransport({ api: '/nola-chat', fetch: createPlaygroundFetch(() => configRef.current, t, () => memoriesRef.current, () => modelsRef.current) }), [t])
   const threadAdapter = useMemo(() => createLocalStorageAdapter({ storage: workbenchStorage, prefix: snapshot?.selectedProject ? `nola.local-call:project:${snapshot.selectedProject}:` : 'nola.local-call:' }), [])
   const videoAttachments = useMemo(() => new VideoAttachmentAdapter(), [])
   const attachments = useMemo(() => new CompositeAttachmentAdapter([new SimpleImageAttachmentAdapter(), new SimpleTextAttachmentAdapter(), new AudioAttachmentAdapter(), videoAttachments]), [videoAttachments])
   const audioAttachments = useMemo(() => new CompositeAttachmentAdapter([new AudioAttachmentAdapter(), videoAttachments]), [videoAttachments])
-  const speech = useMemo(() => new WorkbenchSpeechSynthesisAdapter(() => configRef.current.kind === 'tts' && configRef.current.model.startsWith('resource:')
-    ? { modelId: configRef.current.model.slice('resource:'.length), voice: configRef.current.voice }
-    : { modelId: settings?.synthesis.modelId ?? '', voice: settings?.synthesis.voice ?? '' }, t,
+  const speech = useMemo(() => new WorkbenchSpeechSynthesisAdapter(() => {
+    const ready = modelsRef.current.find(model => model.kind === 'tts')
+    return { modelId: ready?.id.startsWith('resource:') ? ready.id.slice(9) : '', voice: configRef.current.kind === 'tts' ? configRef.current.voice : settingsRef.current?.synthesis.voice ?? '' }
+  }, t,
   error => notifyError(t('workbench.readAloudError'), { cause: error })), [t])
   const feedback = useMemo(() => ({ submit() { /* LocalRuntime retains the preview feedback state. */ } }), [])
   const runtimeRef = useRef<ReturnType<typeof useChatRuntime> | null>(null)
   const dictationRequestId = useRef<string | null>(null)
   const audioDictation = useMemo(() => new AudioRecordingDictationAdapter(async data => {
     if (config.kind !== 'asr') {
-      const preferred = (settings?.recognition.provider ?? 'local') === 'local' ? `resource:${settings?.recognition.modelId}` : `cloud:${settings?.recognition.provider}`
-      const asr = models.find(model => model.kind === 'asr' && model.id === preferred)
+      const asr = models.find(model => model.kind === 'asr')
       const app = getBridge()?.app
       if (!asr || !app?.directModel) throw new Error(t('workbench.noAsr'))
       const id = crypto.randomUUID()
@@ -197,14 +209,30 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
   const agentConfig = useMemo(() => AuiConfig({ tools: Tools({ toolkit: config.kind === 'llm' ? agentTools : defineToolkit({}) }) }), [config.kind])
   const placeholder = t(config.kind === 'asr' ? 'workbench.asrPrompt' : config.kind === 'tts' ? 'workbench.ttsPrompt'
     : config.kind === 'mt' ? config.images ? 'workbench.imagePrompt' : 'workbench.mtPrompt' : 'workbench.prompt')
-  const openConfiguration = () => { void actions.settings.openMainPage('#/models').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) }
+  const openConfiguration = () => { void actions.settings.openMainPage('#/model-gateway').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) }
   return <AssistantRuntimeProvider runtime={runtime} config={agentConfig}>
+    <WorkbenchRequestLifecycle onRunningChange={setRequestRunning} />
     <AgentInstructions active={config.kind === 'llm'} />
     <DictationLifecycle adapter={audioDictation} />
     <NativeAgentSurface config={config} profiles={profiles} models={models} onConfigure={openConfiguration}
-      onChange={next => { setConfig(next); if (next.model !== config.model) setTtsVoices({ model: '', names: [] }) }}
+      onChange={next => {
+        if (requestRunning) return
+        setConfig(next)
+        if (next.model !== config.model) {
+          setTtsVoices({ model: '', names: [] })
+          if (settings && next.model) void selectModelBinding(next.kind, next.model, settings).catch(error => notifyError(t('errors.settingsSaveFailed'), { cause: error }))
+        }
+      }}
       voices={ttsVoices.model === config.model ? ttsVoices.names : []} onVoices={names => setTtsVoices({ model: config.model, names })}
       snapshot={snapshot} onAction={onAction} busy={busy} placeholder={config.model ? placeholder : t('workbench.noModels')}
       memories={memories} onMemories={next => { setMemories(next); try { localStorage.setItem('nola.playground.memories', JSON.stringify(next)) } catch (error) { notifyError(t('workbench.actionFailed'), { cause: error }) } }} />
   </AssistantRuntimeProvider>
+}
+
+
+/** Freeze the current request's model and apply catalog repairs only after it completes. */
+function WorkbenchRequestLifecycle({ onRunningChange }: { onRunningChange: (running: boolean) => void }) {
+  const running = useAuiState(state => state.thread.isRunning || !!state.composer.submission)
+  useEffect(() => { onRunningChange(running) }, [running, onRunningChange])
+  return null
 }

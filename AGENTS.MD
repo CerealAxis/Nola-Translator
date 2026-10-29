@@ -33,6 +33,7 @@ src/
   preload/                单文件 contextBridge → window.nolaTranslator
   shared/                 跨进程类型、Zod 校验、默认值和浏览器契约
   renderer/
+    available-models.ts   业务可调用模型目录、绑定选择与失效选择回退
     application.tsx       桌面、文档站、Toy 共用的页面及导航注册
     bridge/               渲染进程唯一数据出口（NolaBridge）
     store/                5 个领域 Store 与 useSyncExternalStore 实现

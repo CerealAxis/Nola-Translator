@@ -2,6 +2,7 @@ import type { SessionConfig } from './contracts'
 import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_PUBLIC_MODEL } from './index-translate'
 import { GOOGLE_TRANSLATE_ENDPOINT } from './google-translate'
 import { DEFAULT_SETTINGS, MINIMAX_RECOGNITION_MODELS, type RecognitionProvider, type RecognitionSettings, type TranslationProvider, type TranslationSettings } from './settings'
+import { customModelsOf } from './custom-models'
 
 /** Connection options are public configuration; credentials are injected only by the main process. */
 export function recognitionFieldsOf(settings: RecognitionSettings): Pick<SessionConfig, 'recognitionProvider' | 'recognitionOptions' | 'max_segment_ms' | 'silence_end_ms'> {
@@ -24,6 +25,30 @@ export function recognitionFieldsOf(settings: RecognitionSettings): Pick<Session
 export function translationOptionsOf(settings: TranslationSettings): SessionConfig['translationOptions'] {
   switch (settings.provider) {
     case 'cloud': return { endpoint: settings.cloudEndpoint, model: settings.cloudModel, apiFormat: settings.cloudApiFormat, contextWindow: settings.cloudContextWindow, maxOutputTokens: settings.cloudMaxOutputTokens }
+    case 'microsoft': return { endpoint: settings.microsoftEndpoint, region: settings.microsoftRegion }
+    case 'mymemory': return { endpoint: settings.mymemoryEndpoint ?? DEFAULT_SETTINGS.translation.mymemoryEndpoint, email: settings.mymemoryEmail ?? '' }
+    case 'google': return { endpoint: GOOGLE_TRANSLATE_ENDPOINT }
+    case 'index-translate': return { endpoint: INDEX_TRANSLATE_ENDPOINT, model: INDEX_TRANSLATE_PUBLIC_MODEL, apiFormat: 'chat-completions', contextWindow: 32768, maxOutputTokens: 1024 }
+    default: return undefined
+  }
+}
+
+/**
+ * Connection fields for one explicit translation provider.
+ *
+ * `translationOptionsOf` follows whichever provider is currently selected, but the model gateway can
+ * hold several providers at once, so a binding has to resolve its own endpoint without reading the
+ * selection of another consumer.
+ */
+export function translationOptionsFor(settings: TranslationSettings, provider: TranslationProvider, customModelId = ''): SessionConfig['translationOptions'] {
+  switch (provider) {
+    case 'cloud': {
+      const profiles = customModelsOf(settings)
+      const profile = profiles.find(item => item.id === (customModelId || settings.customModelId || 'legacy')) ?? profiles[0]
+      if (!profile) return undefined
+      return { endpoint: profile.endpoint, model: profile.model, apiFormat: profile.apiFormat,
+        contextWindow: profile.contextWindow, maxOutputTokens: profile.maxOutputTokens }
+    }
     case 'microsoft': return { endpoint: settings.microsoftEndpoint, region: settings.microsoftRegion }
     case 'mymemory': return { endpoint: settings.mymemoryEndpoint ?? DEFAULT_SETTINGS.translation.mymemoryEndpoint, email: settings.mymemoryEmail ?? '' }
     case 'google': return { endpoint: GOOGLE_TRANSLATE_ENDPOINT }

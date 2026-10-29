@@ -84,7 +84,7 @@ export function prepareDemo(locale: UiLanguage, page: string, snapshot = false, 
       cloudModel: 'deepseek-chat',
     }
   }
-  stores.settings.setState({ settings, loaded: true, loading: false, captionService: 'ready' })
+  stores.settings.setState({ settings, loaded: true, loading: false, captionService: snapshot ? 'ready' : 'idle' })
   const resources: ResourceRecord[] = models.map(([resourceId, name, provider, downloadBytes]) => {
     const configuration = RECOMMENDED_CONFIGURATIONS[resourceId]
     const installed = resourceId === settings.recognition.modelId || resourceId === settings.translation.localModelId

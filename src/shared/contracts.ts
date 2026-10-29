@@ -69,6 +69,13 @@ export type SessionConfig = {
   /** Used only for a failed final caption; credentials are injected by the main process. */
   fallbackTranslationProvider?: FallbackTranslationProvider
   fallbackTranslationOptions?: NonNullable<SessionConfig['translationOptions']>
+  /**
+   * Which model the model gateway serves this session with, in binding form (`resource:<id>`,
+   * `cloud:<provider>`, `mt-custom:<id>`). Only the gateway-backed path reads them; empty means
+   * "whatever that capability is currently bound to".
+   */
+  recognitionBinding?: string
+  translationBinding?: string
   /** Absolute path the engine records this meeting's audio to. Omitted means no audio file. */
   recordingPath?: string
   browserTimeline?: { epoch: number; videoTimeMs: number; playbackRate: number }
@@ -99,6 +106,8 @@ export type PrewarmConfig = {
   translationOptions?: SessionConfig['translationOptions']
   fallbackTranslationProvider?: FallbackTranslationProvider
   fallbackTranslationOptions?: SessionConfig['translationOptions']
+  recognitionBinding?: string
+  translationBinding?: string
 }
 
 /**

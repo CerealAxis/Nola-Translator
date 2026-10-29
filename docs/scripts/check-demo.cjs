@@ -166,6 +166,8 @@ async function main() {
       win.setContentSize(1440, 960)
       await win.loadURL(`${url}index.html?locale=zh-CN#/workspace`)
       await until("document.documentElement.dataset.captureReady === 'true'")
+      await until("document.querySelector('[data-page]')?.getAttribute('data-page') === 'workspace'")
+      await js("document.querySelector('[data-page=workspace] .nola-page-heading button').click()")
       // Loading the same document with another hash can resolve before React commits the route.
       await until("document.querySelector('[data-page]')?.getAttribute('data-page') === 'workspace' && [...document.querySelectorAll('button')].some(item => !item.disabled && item.textContent.trim() === '开始同传')")
       await clickText('开始同传')
@@ -186,8 +188,10 @@ async function main() {
       await capture('toy-stop-dialog')
       await js("[...document.querySelectorAll('[role=alertdialog] button')].find(item => item.textContent.includes('结束')).click()")
       await until("location.hash === '#/records/docs-demo'")
-      await js("location.hash = '#/settings/more'")
-      await until("document.querySelector('[data-onboarding=replay]')")
+      // Check manual onboarding in a fresh idle document after exercising the session controls.
+      await win.loadURL(`${url}index.html?locale=zh-CN&page=onboarding#/settings/more`)
+      await until("document.documentElement.dataset.captureReady === 'true'")
+      await until("document.querySelector('[data-onboarding=replay]')?.disabled === false")
       await js("document.querySelector('[data-onboarding=replay]').click()")
       await until("document.querySelector('.onboarding-welcome')")
       await capture('toy-onboarding')

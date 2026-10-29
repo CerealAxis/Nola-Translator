@@ -1,3 +1,4 @@
+import { modelPolicyKo, modelPolicyEntries } from './model-policy-ui'
 import { gatewayKo, gatewayEntries } from './gateway-ui'
 import { workbenchKo, workbenchEntries } from './workbench-ui'
 import { offlineKo, offlineEntries } from './offline-ui'
@@ -6,6 +7,7 @@ import { onboardingEntries, onboardingKo } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const koMessages: Record<DictionaryKey, string> = {
+  ...modelPolicyEntries(modelPolicyKo),
   ...gatewayEntries(gatewayKo),
   ...workbenchEntries(workbenchKo),
   "settings.restoreVadDefaults": "기본값 복원",
@@ -1013,19 +1015,13 @@ const koMessages: Record<DictionaryKey, string> = {
   "settings.audioTestFailed": "오디오 테스트 실패",
   'settings.sourceLanguage': '원문 언어',
   'settings.recognitionModel': '음성 인식 모델',
-  'settings.recognitionModelEmpty': '로컬 음성 인식 모델이 설치되지 않았습니다. 먼저 모델 관리에서 다운로드하세요.',
   'settings.keepAudio': '녹음 저장',
   'settings.keepAudioHint': '끄면 오디오가 저장되지 않아 다시 듣거나 내보낼 수 없습니다.',
   'settings.groupProvider': '번역 서비스',
   'settings.groupConnection': '연결',
-  'settings.provider': '서비스 제공업체',
+  'settings.gatewayModelHint': '인식 및 번역 모델은 모델 게이트웨이에서 불러옵니다. 각 기능은 시작 전에 불러온 로컬 모델이나 설정된 클라우드 서비스 중에서 다시 선택할 수 있습니다.',
   'settings.translateIntermediate': '미확정 자막 번역',
   'settings.translateIntermediateHint': '켜면 번역을 더 빨리 볼 수 있지만 음성 인식 내용이 바뀔 때 번역도 수정될 수 있으며 요청량이 늘어납니다. 끄면 확정된 자막만 번역합니다.',
-  'settings.fallbackTranslation': '대체 번역',
-  'settings.fallbackProvider': '대체 서비스',
-  'settings.fallbackDisabled': '대체 번역 사용 안 함',
-  'settings.fallbackTranslationHint': '기본 번역이 여러 번 실패하면 이 서비스가 확정 자막을 번역합니다. 같은 로컬 모델, Bilibili API, MyMemory는 중복 선택할 수 없습니다. 클라우드 모델은 별도 설정으로 함께 사용할 수 있습니다.',
-  'settings.fallbackLocalModelHint': '대체 번역은 위에서 선택한 로컬 모델을 사용합니다.',
   'settings.endpoint': '엔드포인트 주소',
   'settings.region': '지역',
   'settings.model': '모델',
@@ -1035,7 +1031,6 @@ const koMessages: Record<DictionaryKey, string> = {
   'settings.deleteKey': '키 삭제',
   'settings.testing': '연결 테스트 중',
   'settings.providerLocal': '로컬 모델',
-  'settings.providerDisabled': '번역 서비스 사용 안 함',
   'settings.providerCloud': '클라우드 모델',
   'settings.providerMicrosoft': 'Microsoft Translator',
   'settings.providerMyMemory': 'MyMemory 무료 번역',
@@ -1045,7 +1040,6 @@ const koMessages: Record<DictionaryKey, string> = {
   'settings.providerRecognitionTranslation': 'Aliyun',
   'settings.providerAliyun': 'Aliyun',
   'settings.providerMiniMax': 'MiniMax 음성 인식',
-  'settings.aliyunTranslationHint': '음성 인식에서 Aliyun Qwen3.5 또는 Qwen3.8 LiveTranslate를 선택한 경우에만 사용할 수 있습니다.',
   'settings.aliyunBeijing': '화북 2(베이징)',
   'settings.aliyunSingapore': '싱가포르',
   'settings.aliyunWorkspace': 'Model Studio 작업 공간 ID',
@@ -1054,7 +1048,6 @@ const koMessages: Record<DictionaryKey, string> = {
   'settings.mymemoryHint': 'API 키가 필요하지 않습니다. 확정된 문장마다 REST로 번역하며 토큰 스트리밍은 지원하지 않습니다. 무료 서비스에는 사용량과 요청 제한이 있습니다.',
   'settings.mymemoryEmail': '연락처 이메일(선택 사항)',
   'settings.nativeTranslationHint': '현재 Aliyun 음성 인식 연결에서 제공하는 스트리밍 번역을 사용하므로 별도의 번역 API가 필요하지 않습니다. Aliyun LiveTranslate만 지원합니다.',
-  'settings.localModelEmpty': '로컬 번역 모델이 설치되지 않았습니다. 먼저 모델 관리에서 다운로드하세요.',
   'settings.apiFormat': 'API 형식',
   'settings.apiFormatChatCompletions': 'Chat Completions (/v1/chat/completions)',
   'settings.apiFormatChatResponses': 'Chat Responses (/v1/responses)',

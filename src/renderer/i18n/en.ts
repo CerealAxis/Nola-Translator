@@ -1,3 +1,4 @@
+import { modelPolicyEn } from './model-policy-ui'
 import { gatewayEn } from './gateway-ui'
 import { workbenchEn } from './workbench-ui'
 import { offlineEn } from './offline-ui'
@@ -18,6 +19,7 @@ import { runtimeEn } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const en: Dictionary = {
   gateway: gatewayEn,
+  modelsPolicy: modelPolicyEn,
   workbench: workbenchEn,
   offline: offlineEn,
   onboarding: onboardingEn,
@@ -530,19 +532,13 @@ export const en: Dictionary = {
     audioTestFailed: "Audio test failed",
     sourceLanguage: 'Source language',
     recognitionModel: 'Recognition model',
-    recognitionModelEmpty: 'No local recognition model is installed yet. Download one in Models first.',
     keepAudio: 'Keep audio',
     keepAudioHint: 'Without audio you cannot replay or export the session.',
     groupProvider: 'Translation provider',
     groupConnection: 'Connection',
-    provider: 'Provider',
+    gatewayModelHint: 'Recognition and translation models are loaded by Model Gateway. Each feature can still pick one of them, or a configured cloud service, before it starts.',
     translateIntermediate: 'Translate interim captions',
     translateIntermediateHint: 'See translations sooner. Recognition updates may revise the text and increase translation requests. When off, only finalized captions are translated.',
-    fallbackTranslation: 'Backup translation',
-    fallbackProvider: 'Backup service',
-    fallbackDisabled: 'No backup translation',
-    fallbackTranslationHint: 'After the primary fails repeatedly, this service translates the finalized caption. The same local model, Bilibili API, or MyMemory service cannot be selected twice; cloud models can use separate configurations.',
-    fallbackLocalModelHint: 'The backup uses the local model selected above.',
     endpoint: 'Endpoint',
     region: 'Region',
     model: 'Model',
@@ -558,7 +554,6 @@ export const en: Dictionary = {
      * Provider product names stay in their original form.
      */
     providerLocal: 'Local model',
-    providerDisabled: 'Translation disabled',
     providerCloud: 'Cloud model',
     providerMicrosoft: 'Microsoft Translator',
     providerMyMemory: 'MyMemory (free translation)',
@@ -568,7 +563,6 @@ export const en: Dictionary = {
     providerRecognitionTranslation: 'Aliyun',
     providerAliyun: 'Aliyun',
     providerMiniMax: 'MiniMax Speech Recognition',
-    aliyunTranslationHint: 'Available only when Aliyun Qwen3.5 or Qwen3.8 LiveTranslate is selected for speech recognition.',
     aliyunBeijing: 'North China 2 (Beijing)',
     aliyunSingapore: 'Singapore',
     aliyunWorkspace: 'Model Studio workspace ID',
@@ -577,7 +571,6 @@ export const en: Dictionary = {
     mymemoryHint: 'No API key. Confirmed sentences use REST translation with no token streaming. The free service has quotas and rate limits.',
     mymemoryEmail: 'Contact email (optional)',
     nativeTranslationHint: 'Use streamed translations from the active Aliyun recognition connection, with no separate translation API. Requires Aliyun LiveTranslate.',
-    localModelEmpty: 'No local translation model is installed yet. Download one in Models first.',
     /*
      * The seven cloud fields. The API format decides how deep the endpoint has to go (Anthropic
      * takes a bare origin, the rest stop at /v1), so each format carries its own hint — getting

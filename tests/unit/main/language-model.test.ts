@@ -6,6 +6,7 @@ vi.mock('electron', () => ({ ipcMain: { handle: (name: string, callback: (...arg
 import { registerLanguageModelIpc } from '../../../src/main/language-model'
 import { normalizeDirectToolHistory } from '../../../src/main/language-model-stream'
 import type { AgentWorkspace } from '../../../src/main/agent-workspace'
+import { createGatewayLanguageModel } from '../../../src/main/gateway-language-model'
 afterEach(() => { vi.restoreAllMocks(); handlers.clear() })
 
 it('keeps desktop media workflow history without presenting it as provider-executed cloud tools', () => {
@@ -38,7 +39,9 @@ it('streams Anthropic reasoning before completion and forwards text and actual u
   const fetchModel = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response)
   const profile = { id: 'saved', name: 'MiniMax', endpoint: 'https://api.minimax.cn/anthropic', model: 'MiniMax-M3.1-Flash', apiFormat: 'anthropic' as const, contextWindow: 4096, maxOutputTokens: 512, languages: ['zh'] }
   const getCredential = vi.fn().mockResolvedValue('fixture-secret')
-  registerLanguageModelIpc({ getSettings: () => ({ ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModels: [profile] } }), getCredential }, () => true)
+  const services = { getSettings: () => ({ ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModels: [profile] } }), getCredential }
+  const runtime = await createGatewayLanguageModel(services, 'custom:saved', new AbortController().signal)
+  registerLanguageModelIpc({ ...services, acquireLanguageModel: async () => ({ ...runtime, signal: new AbortController().signal, release: vi.fn() }) }, () => true)
   const chunks: string[] = []
   const sender = Object.assign(new EventEmitter(), { id: 1, isDestroyed: () => false, send: (_channel: string, data: { chunk: string }) => chunks.push(data.chunk) })
   let completed = false
@@ -87,7 +90,9 @@ it.each([true, false])('executes a terminal tool only after an SDK approval resp
     { type: 'message_stop' },
   ].map(item => 'data: ' + JSON.stringify(item) + '\n\n').join(''), { headers: { 'Content-Type': 'text/event-stream' } })
   vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => sse(true)).mockImplementation(async () => sse(false))
-  registerLanguageModelIpc({ getSettings: () => ({ ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModels: [profile] } }), getCredential: async () => 'secret', workspace }, () => true)
+  const services = { getSettings: () => ({ ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModels: [profile] } }), getCredential: async () => 'secret', workspace }
+  const runtime = await createGatewayLanguageModel(services, 'custom:approval-model', new AbortController().signal)
+  registerLanguageModelIpc({ ...services, acquireLanguageModel: async () => ({ ...runtime, signal: new AbortController().signal, release: vi.fn() }) }, () => true)
   const chunks: string[] = []
   const sender = Object.assign(new EventEmitter(), { id: approved ? 201 : 202, isDestroyed: () => false, send: (_channel: string, data: { chunk: string }) => chunks.push(data.chunk) })
   const user = { id: 'u', role: 'user', parts: [{ type: 'text', text: 'Run echo safe' }] }
@@ -113,4 +118,22 @@ it.each([true, false])('executes a terminal tool only after an SDK approval resp
   expect(allEvents.filter(event => event.type === 'reasoning-delta' && event.delta).map(event => event.delta)).toEqual(['Step reasoning.', 'Step reasoning.'])
   await expect(invoke([user, answer])).rejects.toThrow('pending approval')
   expect(terminal).toHaveBeenCalledTimes(approved ? 1 : 0)
+})
+
+it('releases an asynchronously acquired model if the request was cancelled while acquiring it', async () => {
+  let resolveLease!: (lease: any) => void
+  const acquireLanguageModel = vi.fn(() => new Promise<any>(resolve => { resolveLease = resolve }))
+  const release = vi.fn()
+  const model = vi.fn()
+  registerLanguageModelIpc({ getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', acquireLanguageModel }, () => true)
+  const sender = Object.assign(new EventEmitter(), { id: 301, isDestroyed: () => false, send: vi.fn() })
+  const id = crypto.randomUUID()
+  const run = handlers.get('app:language-model:stream')!({ sender }, { id, modelId: 'saved', body: { messages: [{ id: 'u', role: 'user', parts: [{ type: 'text', text: 'Hello' }] }], tools: {} } })
+  expect(acquireLanguageModel).toHaveBeenCalledWith('custom:saved')
+  handlers.get('app:language-model:cancel')!({ sender }, id)
+  resolveLease({ signal: new AbortController().signal, release, model })
+  await run
+  expect(model).not.toHaveBeenCalled()
+  expect(release).toHaveBeenCalledOnce()
+  expect(release.mock.calls[0][0]).toMatchObject({ name: 'AbortError' })
 })

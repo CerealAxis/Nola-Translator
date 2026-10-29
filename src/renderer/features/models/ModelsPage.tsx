@@ -6,10 +6,12 @@ import { Card, CardAction, CardHeader, CardTitle, CardDescription } from '@/comp
 import { LocalModelImport } from '../offline/OfflineResources'
 import { offlineActions } from '@/store/offlineStore'
 import { modelImportEntry } from '../../../shared/model-import-catalog'
-import { configurationOf, isModelReady, recognitionLanguages } from '../../../shared/model-capabilities'
+import { configurationOf, isModelReady } from '../../../shared/model-capabilities'
 import { ModelConfigurationDialog } from './ModelConfigurationDialog'
 import { modelEngines, supportsSelectedEngine } from '../../../shared/model-engines'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
+import { defaultModelBinding, defaultModelPatch } from '../../../shared/model-policy'
+import { ModelPolicyPanel } from './ModelPolicyPanel'
 /** Model catalog and download manager. The router owns the page padding. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -31,9 +33,6 @@ import { RecommendedFamilyCard, RecommendedFamilyDialog } from './RecommendedFam
 import { familyOf, type RecommendedFamily } from './modelFamily'
 import { isEngineAvailable } from './engine-availability'
 import { notifyModelDownloadFailure, suppressNextDownloadStartNotice } from './ModelDownloadNotice'
-import { recognitionLabel } from '../../../shared/cloud-config'
-import { ALIYUN_LANGUAGES } from '../../../shared/cloud-config'
-import { targetLanguagePatch } from '../../session-config'
 import { CloudMark, CloudModelCard, CloudModelDialog, cloudModelsOf, type CloudModel, type CloudModelId } from './CloudModels'
 import './models.css'
 
@@ -102,21 +101,21 @@ export function ModelsPage() {
     const current = stores.settings.getState().settings
     const ready = cloudModelsOf(current, stores.models.getState().credentials).some(model => model.id === 'recognition' && model.ready)
     if (!current || !ready) { setCloudDetail('aliyun'); return }
-    const previousTarget = current.translation.targetLanguage
-    const requestedTarget = previousTarget === 'none' ? 'zh' : previousTarget
-    const targetLanguage = ALIYUN_LANGUAGES.includes(requestedTarget as typeof ALIYUN_LANGUAGES[number]) ? requestedTarget : 'zh'
-    const visibility = targetLanguagePatch(targetLanguage, previousTarget)
-    void updateSettings({ ...visibility,
-      recognition: { provider: 'aliyun', sourceLanguage: 'auto' },
-      translation: { ...visibility.translation, provider: 'recognition' },
-    }).then(() => notifySuccess(t('modelsSettingsUi.cloudProviderEnabled', { name: t('settings.providerRecognitionTranslation') })))
+    void updateSettings(defaultModelPatch(current, 'mt', 'cloud:recognition')).then(() => notifySuccess(t('modelsSettingsUi.cloudProviderEnabled', { name: t('settings.providerRecognitionTranslation') })))
       .catch((cause: unknown) => notifyError(t('modelsSettingsUi.saveError'), { cause }))
   }
 
   const installed = useMemo(() => resources.filter((item) => item.installed), [resources])
   const activeCount = useMemo(() => countActive(resources), [resources])
-  const recognition = resources.find((item) => item.resourceId === settings?.recognition.modelId)
-  const synthesis = resources.find(item => item.resourceId === settings?.synthesis?.modelId)
+  const asrDefault = settings ? defaultModelBinding(settings, 'asr') : ''
+  const mtDefault = settings ? defaultModelBinding(settings, 'mt') : ''
+  const ttsDefault = settings ? defaultModelBinding(settings, 'tts') : ''
+  const recognition = resources.find(item => item.resourceId === asrDefault.replace(/^resource:/, '') && asrDefault.startsWith('resource:'))
+  const synthesis = resources.find(item => item.resourceId === ttsDefault.replace(/^resource:/, '') && ttsDefault.startsWith('resource:'))
+  const translation = resources.find(item => item.resourceId === mtDefault.replace(/^resource:/, '') && mtDefault.startsWith('resource:'))
+  const currentRecognitionCloud = cloudModels.find(model => model.kind === 'recognitionModel' && model.active)
+  const currentTranslationCloud = cloudModels.find(model => model.kind === 'translationModel' && model.active)
+  const currentTranslationCloudReady = currentTranslationCloud?.ready ?? false
   const voices = voiceMetadata.modelId === settings?.synthesis?.modelId ? voiceMetadata.voices : []
   useEffect(() => {
     const gateway = getBridge()?.gateway
@@ -132,49 +131,21 @@ export function ModelsPage() {
       void updateSettings({ synthesis: { voice: voices[0] } }).catch(() => undefined)
     }
   }, [voices, settings?.synthesis?.voice])
-  const translation = resources.find((item) => item.resourceId === settings?.translation.localModelId)
-  const localTranslation = settings?.translation.provider === 'local'
-  const remoteRecognition = !!settings?.recognition.provider && settings.recognition.provider !== 'local'
-  /*
-   * The catalog always carries every model the engine knows about, installed or not, so finding a
-   * record by id says nothing about whether it can run. Both overview cards ask `installed`
-   * instead: an uninstalled model would otherwise be announced as the one in use, right above the
-   * list that marks it as uninstalled. Cloud recognition names its remote model instead, chosen
-   * independently of the local id.
-   */
-  const currentRecognition = remoteRecognition && settings
-    ? recognitionLabel(settings.recognition)
+  const localTranslation = mtDefault.startsWith('resource:')
+  const remoteRecognition = !!currentRecognitionCloud
+  const currentRecognition = currentRecognitionCloud
+    ? currentRecognitionCloud.id === 'aliyun' ? t('modelsSettingsUi.aliyunAsr') : t('settings.providerMiniMax')
     : recognition?.installed ? recognition.name : t('modelsSettingsUi.noModelSelected')
-  /*
-   * 服务商显示名跟着界面语言走：「本地模型 / 云端模型」是界面概念而非产品名
-   * （Hy-MT2 与 M2M100 合并成前者，OpenAI 与 Ollama 合并成后者）。
-   * 只有 Microsoft Translator 是产品名。
-   */
   const providerNames = {
-    local: t('settings.providerLocal'),
-    cloud: t('settings.providerCloud'),
-    microsoft: t('settings.providerMicrosoft'),
-    mymemory: t('settings.providerMyMemory'),
-    google: t('settings.providerGoogle'),
-    'index-translate': t('settings.providerIndexTranslate'),
+    cloud: t('settings.providerCloud'), microsoft: t('settings.providerMicrosoft'), mymemory: t('settings.providerMyMemory'),
+    google: t('settings.providerGoogle'), 'index-translate': t('settings.providerIndexTranslate'),
     recognition: t('settings.providerRecognitionTranslation'),
   }
-  /*
-   * 云端那一栏显示**模型 ID**，不是服务商名。服务商名在这一栏是废话：三家云端服务商
-   * 都只是"把请求发给某个 OpenAI 兼容 endpoint"，真正决定用的是哪个模型的是
-   * `cloudModel`。只显示 "OpenAI" 会让人以为选服务商就等于选好了模型 —— 实际配置的是
-   * 另一个服务商、模型却还是 OpenAI 的，那一栏就整个说错了。模型 id 为空（还没填）
-   * 才退回服务商名，总得显示点什么。
-   */
-  const cloudModel = settings?.translation.cloudModel?.trim() ?? ''
   const currentTranslation = localTranslation
     ? translation?.installed ? translation.name : t('modelsSettingsUi.noModelSelected')
-    : settings?.translation.provider === 'cloud'
-      ? cloudModel || providerNames.cloud
-      : providerNames[settings?.translation.provider ?? 'microsoft']
-  const currentTranslationCloud = cloudModels.find(model => model.kind === 'translationModel' && model.active)
-  const currentTranslationCloudReady = currentTranslationCloud?.ready ?? false
-
+    : currentTranslationCloud?.profile?.name ?? (currentTranslationCloud?.id === 'cloud'
+      ? settings?.translation.cloudModel?.trim() || providerNames.cloud
+      : currentTranslationCloud ? providerNames[currentTranslationCloud.id as keyof typeof providerNames] : t('modelsSettingsUi.noModelSelected'))
   const openFamilyRecords = openFamily
     ? resources.filter(record => !record.resourceId.startsWith('hub:') && familyOf(record) === openFamily)
     : []
@@ -237,23 +208,13 @@ export function ModelsPage() {
     })
   }
 
-  /*
-   * `defaultTargetOf` 已经把 `provider: 'local'` 一起写进 patch 了，所以这里不再补写。
-   * 以前这里硬按 `hymt2`：那会儿 m2m100 在设置里没有槽位，从模型页设默认只能强行把
-   * provider 改回 hymt2，于是"给 M2M100 设默认"这件事根本无法表达。
-   */
+  // Capability defaults and scene selections are independent, including for local language models.
   const setDefault = (record: ResourceRecord) => {
     const patch = defaultTargetOf(record)
     if (!(record.kind === 'ttsModel' ? record.installed : isModelReady(record)) || !patch || !supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)) return
-    const supportedLanguages = record.kind === 'recognitionModel' ? recognitionLanguages(record) : []
-    const currentSourceLanguage = settings?.recognition.sourceLanguage
-    const sourceLanguage = currentSourceLanguage && supportedLanguages.includes(currentSourceLanguage)
-      ? currentSourceLanguage
-      : supportedLanguages.includes('auto') ? 'auto' : supportedLanguages[0]
-    void updateSettings({ ...patch,
-      ...(record.kind === 'recognitionModel' && sourceLanguage ? { recognition: { ...patch.recognition, sourceLanguage } } : {}),
-      ...(record.kind === 'recognitionModel' && settings?.translation.provider === 'recognition' ? { translation: { provider: 'mymemory' } } : {}),
-    }).catch(() => undefined)
+    if (!settings) return
+    const kind = record.kind === 'recognitionModel' ? 'asr' : record.kind === 'ttsModel' ? 'tts' : familyOf(record) === 'qwen35' ? 'llm' : 'mt'
+    void updateSettings(defaultModelPatch(settings, kind, `resource:${record.resourceId}`)).catch((cause: unknown) => notifyError(t('modelsSettingsUi.saveError'), { cause }))
   }
 
   /*
@@ -340,6 +301,8 @@ export function ModelsPage() {
           <CurrentModel label={t('gateway.synthesisDefault')} name={synthesis?.installed ? synthesis.name : t('modelsSettingsUi.noModelSelected')} record={synthesis ?? null} installed={synthesis?.installed ?? false} kind="ttsModel" onChange={() => setTab('installed')} />
         </div>
       </section>
+
+      <ModelPolicyPanel />
 
       <TabsRoot
 

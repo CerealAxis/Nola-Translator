@@ -1,3 +1,4 @@
+import { ModelAvailabilityLabel } from '@/features/workspace/ModelAvailabilityLabel'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Popover } from '@base-ui/react/popover'
@@ -7,6 +8,7 @@ import { AppWindow, ArrowRight, ArrowRightLeft, ChevronDown, Languages, LoaderCi
 import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { AppSettingsPatch, PrewarmErrorCode } from '@/bridge'
 import { useModelOptions } from '@/model-options'
+import { useModelSelection, useAvailableModels, type AvailableModel } from '@/available-models'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 import { settingsPath, useRoute } from '@/routes'
@@ -19,7 +21,7 @@ import { PageHeader } from '@/components/primitives'
 import { requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { notifyError, notifyWarning } from '@/components/primitives/notify'
+import { notifyError, notifyInfo, notifyWarning } from '@/components/primitives/notify'
 import { reportSettingsFailure } from '@/features/settings/settingsErrorChannel'
 import { SettingSelect } from '../settings/SettingsPage'
 import { openDefaultBrowser } from './openDefaultBrowser'
@@ -57,6 +59,8 @@ export function VideoCaptionsPage() {
   const { navigate } = useRoute()
   const settings = useStore(stores.settings, state => state.settings) ?? DEFAULT_SETTINGS
   const modelOptions = useModelOptions()
+  const catalog = useAvailableModels()
+  const sessionActive = useStore(sessionStore, state => !['idle', 'error'].includes(state.status))
   const captionService = useStore(stores.settings, state => state.captionService)
   const captionServiceBusy = useStore(stores.settings, state => state.captionServiceBusy)
   const browserStatus = useStore(stores.settings, state => state.browser)
@@ -76,6 +80,21 @@ export function VideoCaptionsPage() {
   const sourceLanguage = settings.recognition.sourceLanguage
   const targetLanguage = settings.translation.targetLanguage
   const translationDisabled = targetLanguage === NO_TRANSLATION_LANGUAGE
+  const reportSwitch = (model: AvailableModel) => notifyInfo(t('gateway.modelSwitched', { name: model.name }),
+    { description: t('gateway.modelSwitchedLoaded') })
+  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch)
+  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationDisabled)
+  const asrUnavailable = asr.unavailable
+  const mtUnavailable = mt.unavailable
+  const asrOptions = catalog.asr.length ? catalog.asr.map(model => ({ value: model.binding, label: model.name }))
+    : [{ value: '', label: t('gateway.modelNoneShort'), isDisabled: true }]
+  const mtOptions = [
+    { value: NO_TRANSLATION_LANGUAGE, label: t('workspaceUi.translationOff') },
+    ...(mtUnavailable ? [{ value: '', label: t('gateway.modelNoneShort'), isDisabled: true }] : []),
+    ...catalog.mt.map(model => ({ value: model.binding, label: model.name })),
+  ]
+  const asrValue = asr.binding
+  const mtValue = translationDisabled ? NO_TRANSLATION_LANGUAGE : mt.binding
   const display = translationDisabled ? 'source' : config.showSource && config.showTranslation ? 'both' : config.showSource ? 'source' : 'translation'
   const label = (code: string) => languageName(code, language)
   const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch(() => undefined) }
@@ -129,6 +148,14 @@ export function VideoCaptionsPage() {
    * leaves the extension shut out rather than let in by a service with no weights in memory.
    */
   const open = async () => {
+    if (asrUnavailable) {
+      notifyError(t('gateway.modelNone', { name: t('session.recognitionModel') }))
+      return
+    }
+    if (!translationDisabled && mtUnavailable) {
+      notifyError(t('gateway.modelNone', { name: t('session.translationModel') }))
+      return
+    }
     let browsers: NonNullable<BrowserConnectionStatus['browsers']> = []
     try {
       await browserConnectionAction('inspect')
@@ -255,6 +282,18 @@ export function VideoCaptionsPage() {
       <Card className="nola-section-card">
         <CardHeader><CardTitle>{t('videoCaptions.settings')}</CardTitle></CardHeader>
         <CardContent className="nola-overlay-fields">
+          <div className="nola-overlay-field">
+            <span className="text-sm text-muted"><ModelAvailabilityLabel label={t('session.recognitionModel')} hint={t('gateway.modelNoneHint')} /></span>
+            <SettingSelect value={asrValue} isDisabled={sessionActive || browserStatus?.captionServiceActive === true || captionServiceBusy || captionService === 'loading'} ariaLabel={t('session.recognitionModel')} options={asrOptions}
+              onChange={value => asr.select(value)} />
+          </div>
+          <div className="nola-overlay-field">
+            <span className="text-sm text-muted"><ModelAvailabilityLabel label={t('session.translationModel')} hint={t('gateway.modelNoneHint')} /></span>
+            <SettingSelect value={mtValue} isDisabled={sessionActive || browserStatus?.captionServiceActive === true || captionServiceBusy || captionService === 'loading'} ariaLabel={t('session.translationModel')} options={mtOptions}
+              onChange={value => value === NO_TRANSLATION_LANGUAGE
+                ? void updateSettings(targetLanguagePatch(value, targetLanguage)).catch(error => notifyError(t('errors.settingsSaveFailed'), { cause: error }))
+                : mt.select(value)} />
+          </div>
           <div className="nola-overlay-field">
             <span className="text-sm text-muted">{t('videoCaptions.audioSource')}</span>
             {/*

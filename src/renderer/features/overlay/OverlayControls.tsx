@@ -1,5 +1,6 @@
 import { recognitionFieldsOf } from '../../../shared/cloud-config'
 import { useModelOptions } from '@/model-options'
+import { useModelSelection, useAvailableModels, type AvailableModel } from '@/available-models'
 import { featureConflictOwner } from '../../../shared/feature-activity'
 /**
  * Control bar at the bottom of the caption window.
@@ -10,9 +11,9 @@ import { featureConflictOwner } from '../../../shared/feature-activity'
  * (`.nola-caption-controls`); this file owns the contents.
  *
  * Every pill writes the same settings store the workspace writes
- * (`recognition.modelId`, `recognition.sourceLanguage`,
- * `translation.targetLanguage`), so a model picked here is the model the next
- * workspace session runs. Model and language pills are disabled while a session
+ * (`recognition.sourceLanguage`,
+ * `translation.targetLanguage`), so language choices also apply to the next
+ * workspace session. Language pills are disabled while a session
  * is active: `startSession` has already fixed them, so a mid-session change
  * would only edit settings and look like it did something.
  *
@@ -35,6 +36,7 @@ import { Check, Mic, Pause, Play } from 'lucide-react'
 import {
   DEFAULT_SETTINGS,
   languageName,
+  NO_TRANSLATION_LANGUAGE,
 } from '@/bridge'
 import type { AppSettings, AudioDevice, AudioSourceOption, RecognitionModelId, SessionConfig } from '@/bridge'
 import { audioSourceFrom } from '@/features/workspace/SessionSetupDialog'
@@ -43,7 +45,7 @@ import { actions, sessionStore, stores, useStore } from '@/store'
 import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
 import { audioDeviceNameOf, targetLanguagePatch, translationFieldsOf } from '@/session-config'
 import { useI18n } from '@/i18n'
-import { notifyError } from '@/components/primitives/notify'
+import { notifyError, notifyInfo } from '@/components/primitives/notify'
 
 import { OverlayDisplayMenu, OverlayLayoutMenu } from './OverlayDisplayMenu'
 import { OverlayDropdown } from './OverlayDropdown'
@@ -180,10 +182,8 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
       let used = mic?.offsetWidth ?? 0
       let fits = true
       for (const menu of menus) {
-        const required = menu.dataset.menuKind === 'model'
-        if (required) menu.style.maxWidth = `${Math.max(0, width - used - gap)}px`
         const next = used + (used > 0 ? gap : 0) + menu.getBoundingClientRect().width
-        fits = required || fits && next <= width
+        fits = fits && next <= width
         menu.toggleAttribute('data-overflow-hidden', !fits)
         if (fits) used = next
       }
@@ -221,7 +221,14 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
   const missing = useStore(sessionStore, (state) => state.missing)
 
   const modelOptions = useModelOptions()
-  const modelId = settings.recognition.modelId
+  const catalog = useAvailableModels()
+  const translationDisabled = settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE
+  const reportSwitch = (model: AvailableModel) => notifyInfo(t('gateway.modelSwitched', { name: model.name }),
+    { description: t('gateway.modelSwitchedLoaded') })
+  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch)
+  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationDisabled)
+  const asrUnavailable = asr.unavailable
+  const mtUnavailable = mt.unavailable
   const source = settings.recognition.sourceLanguage
   const target = settings.translation.targetLanguage
 
@@ -287,9 +294,17 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
       return
     }
     if (status === 'idle' || status === 'error') {
+      if (asrUnavailable) {
+        notifyError(t('gateway.modelNone', { name: t('session.recognitionModel') }))
+        return
+      }
+      if (mtUnavailable) {
+        notifyError(t('gateway.modelNone', { name: t('session.translationModel') }))
+        return
+      }
       setLastIntent('start')
       setDismissedFailure(null)
-      const config = startConfigOf(settings, devices)
+      const config = { ...startConfigOf(settings, devices), recognitionBinding: asr.binding, ...(translationDisabled ? {} : { translationBinding: mt.binding }) }
       void actions.session.startSession(config).catch((error: unknown) => {
         const owner = featureConflictOwner(error)
         if (owner) {
@@ -355,35 +370,6 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
             >
               {starting ? <Spinner /> : running ? <Pause aria-hidden="true" /> : status === 'paused' ? <Play aria-hidden="true" /> : <Mic aria-hidden="true" />}
             </Button>
-
-            <OverlayDropdown kind="model">
-              <Menu.Trigger disabled={active} className={[CAPSULE, 'nola-caption-pill--mode'].filter(Boolean).join(' ')}>
-                <span className="nola-caption-mode-dot" aria-hidden="true" />
-                <span className="nola-caption-model-label">{modelOptions.recognitionModels.find(model => model.value === modelId)?.label ?? modelId}</span>
-              </Menu.Trigger>
-              <Menu.Portal>
-                <Menu.Positioner className="z-dropdown" style={{ maxHeight: menuMaxHeight }}>
-                  <Menu.Popup className="nola-caption-menu">
-                    <Menu.List className="nola-caption-menu-list" style={{ maxHeight: menuMaxHeight }}>
-                      <Menu.RadioGroup value={modelId} onValueChange={value => patch({ recognition: { modelId: value as RecognitionModelId } })}>
-                        {modelOptions.recognitionModels.map(model => (
-                          <Menu.RadioItem
-                            key={model.value}
-                            value={model.value}
-                            disabled={model.isDisabled}
-                            className="nola-menu-item"
-                            data-selected={model.value === modelId ? 'true' : undefined}
-                          >
-                            {model.label}
-                            <Menu.RadioItemIndicator><Check aria-hidden="true" /></Menu.RadioItemIndicator>
-                          </Menu.RadioItem>
-                        ))}
-                      </Menu.RadioGroup>
-                    </Menu.List>
-                  </Menu.Popup>
-                </Menu.Positioner>
-              </Menu.Portal>
-            </OverlayDropdown>
 
             <LanguagePill
               kind="source"

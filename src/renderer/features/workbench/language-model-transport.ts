@@ -1,6 +1,7 @@
 import { createUIMessageStream, createUIMessageStreamResponse, type UIMessage } from 'ai'
 import { getBridge } from '@/store'
 import type { TranslationKey } from '@/i18n'
+import type { PlaygroundModel } from './installed-models'
 import type { PlaygroundConfig } from './demo-runtime'
 import { extractVideoAudio, pcmWavData } from './audio-attachment'
 
@@ -14,9 +15,12 @@ function fallbackErrorKey(config: PlaygroundConfig): TranslationKey {
 
 /** Custom fetch keeps provider credentials in Electron while preserving the native AI SDK wire format. */
 export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key: TranslationKey) => string,
-  getMemories: () => readonly string[]): typeof fetch {
+  getMemories: () => readonly string[], getModels?: () => readonly PlaygroundModel[]): typeof fetch {
   return async (_input, init) => {
     const config = { ...getConfig() }
+    if (getModels && !getModels().some(model => model.id === config.model && model.kind === config.kind)) {
+      throw new Error(t('workbench.noModels'))
+    }
     const body = JSON.parse(String(init?.body ?? '{}')) as { messages: UIMessage[]; system?: string }
     const signal = init?.signal
     const app = getBridge()?.app

@@ -1,3 +1,4 @@
+import { ModelAvailabilityLabel } from '@/features/workspace/ModelAvailabilityLabel'
 import { useModelOptions } from '@/model-options'
 import { Select, SelectContent, SelectFieldLabel, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover } from '@base-ui/react/popover'
@@ -9,21 +10,18 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Captions, ChevronDown, Languages, Minus, Plus, SlidersHorizontal, StickyNote, Volume2 } from 'lucide-react'
 
-import { languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
-import type { AudioDevice, RecognitionModelId, TranslationProvider } from '@/bridge'
+import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
+import type { AudioDevice } from '@/bridge'
 import { useI18n } from '@/i18n'
 import type { CaptionDisplayMode, CaptionLayout } from '@/components/caption'
-import { swappedLanguagesOf } from '@/session-config'
+import { swappedLanguagesOf, targetLanguagePatch } from '@/session-config'
 import type { UiLanguage } from '@/i18n'
+import { stores, updateSettings, useStore } from '@/store'
+import { notifyInfo } from '@/components/primitives/notify'
+import { useAvailableModels, useModelSelection, type AvailableModel } from '@/available-models'
 
 export interface WorkspaceToolbarProps {
   readerOnly?: boolean
-  modelId: RecognitionModelId
-  onModelChange: (modelId: RecognitionModelId) => void
-  translationModelId: string
-  translationProvider: TranslationProvider
-  translationProviderLabel: string
-  onTranslationModelChange: (value: string) => void
   audioSource: string
   devices: readonly AudioDevice[]
   onAudioSourceChange: (value: string) => void
@@ -47,18 +45,33 @@ export interface WorkspaceToolbarProps {
 
 export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
   const { t } = useI18n()
-  const { recognitionModels, translationModels, sourceLanguages, targetLanguages, translation } = useModelOptions(props.modelId, props.translationModelId, props.sourceLanguage, props.targetLanguage)
-  const translationChoices = [
-    { value: NO_TRANSLATION_LANGUAGE, label: t('workspaceUi.translationOff'), isDisabled: false },
-    ...translationModels,
-    ...(props.translationProvider !== 'local' ? [{ value: props.translationProvider, label: props.translationProviderLabel, isDisabled: false }] : []),
-  ]
-  const translationValue = props.targetLanguage === NO_TRANSLATION_LANGUAGE ? NO_TRANSLATION_LANGUAGE : props.translationProvider === 'local' ? props.translationModelId : props.translationProvider
-  if (!translationChoices.some(option => option.value === translationValue)) translationChoices.push({ value: translationValue, label: translationValue, isDisabled: true })
+  const settings = useStore(stores.settings, state => state.settings) ?? DEFAULT_SETTINGS
+  const browserActive = useStore(stores.settings, state => state.browser?.captionServiceActive === true || state.captionServiceBusy)
+  const locked = props.sessionLocked || browserActive
+  const catalog = useAvailableModels()
+  // The gateway may have loaded another model since the last session, and a cloud profile can lose
+  // its key; the picker follows what is callable and says so rather than failing at start.
+  const reportSwitch = (model: AvailableModel) => notifyInfo(t('gateway.modelSwitched', { name: model.name }),
+    { description: t(model.origin === 'gateway' ? 'gateway.modelSwitchedLoaded' : 'gateway.modelSwitchedCloud') })
+  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch)
+  const translationOff = props.targetLanguage === NO_TRANSLATION_LANGUAGE
+  // A session that shows source text only has nothing to repair: replacing its model would turn
+  // translation back on by itself.
+  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationOff)
+  const { sourceLanguages, targetLanguages, translation } = useModelOptions(
+    asr.binding.startsWith('resource:') ? asr.binding.slice(9) : undefined,
+    mt.binding.startsWith('resource:') ? mt.binding.slice(9) : undefined,
+    props.sourceLanguage, props.targetLanguage)
+  const translationChoices: AvailableModel[] = [{ binding: NO_TRANSLATION_LANGUAGE, name: t('workspaceUi.translationOff'), kind: 'mt', origin: 'cloud', free: true }, ...catalog.mt]
+  const translationValue = translationOff ? NO_TRANSLATION_LANGUAGE : mt.binding
   const swappedLanguages = swappedLanguagesOf(props.sourceLanguage, props.targetLanguage, sourceLanguages, translation ? translationLanguages(translation, props.targetLanguage) : targetLanguages)
   const languageLabel = (code: string): string => languageName(code, props.language)
   const audioOptions = [{ value: 'defaultOutput', label: t('workspaceUi.systemAudio') }, ...props.devices.filter((device) => device.deviceId !== 'defaultOutput').map((device) => ({ value: device.deviceId, label: device.name }))]
   const modes = [{ id: 'both', label: t('workspace.modeBoth') }, { id: 'source', label: t('workspace.modeSource') }, { id: 'translation', label: t('workspace.modeTranslation') }] as const
+  const pickTranslation = (value: string) => {
+    if (value === NO_TRANSLATION_LANGUAGE) { void updateSettings(targetLanguagePatch(NO_TRANSLATION_LANGUAGE, props.targetLanguage)).catch(() => undefined); return }
+    mt.select(value)
+  }
   return (
     <Card data-slot="workspace-toolbar" className="nola-workspace-toolbar">
       <CardContent className="nola-workspace-toolbar-content">
@@ -66,7 +79,7 @@ export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
           <Select value={props.audioSource} onValueChange={value => { if (typeof value === 'string') props.onAudioSourceChange(value) }}>
             <div className="nola-workspace-audio">
               <SelectFieldLabel className="label">{t('workspaceUi.input')}</SelectFieldLabel>
-              <SelectTrigger disabled={props.sessionLocked} className="select__trigger">
+              <SelectTrigger disabled={locked} className="select__trigger">
                 <Volume2 aria-hidden="true" /><SelectValue className="select__value" />
 
               </SelectTrigger>
@@ -76,36 +89,37 @@ export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
             </SelectGroup></SelectContent>
           </Select>
           <div className="nola-workspace-field">
-            <span>{t('session.recognitionModel')}</span>
-            <Select value={props.modelId} onValueChange={value => { if (typeof value === 'string') props.onModelChange(value as RecognitionModelId) }}>
-              <SelectTrigger disabled={props.sessionLocked} className="nola-workspace-picker"><SlidersHorizontal aria-hidden="true" /><SelectValue>{value => recognitionModels.find(model => model.value === value)?.label ?? String(value ?? '')}</SelectValue></SelectTrigger>
+            <span><ModelAvailabilityLabel label={t('session.recognitionModel')} hint={t('gateway.modelNoneHint')} /></span>
+            <Select value={asr.binding || null} onValueChange={value => { if (typeof value === 'string') asr.select(value) }}>
+              <SelectTrigger disabled={locked} className="nola-workspace-picker"><SlidersHorizontal aria-hidden="true" /><SelectValue>{value => asr.unavailable ? t('gateway.modelNoneShort') : catalog.asr.find(model => model.binding === value)?.name ?? String(value ?? '')}</SelectValue></SelectTrigger>
               <SelectContent className="select__popover rounded-xl border border-border bg-overlay p-1 shadow-overlay"><SelectGroup>
-                {recognitionModels.map(model => <SelectItem key={model.value} value={model.value} label={model.label} disabled={model.isDisabled} className="list-box-item">{model.label}</SelectItem>)}
+                {asr.unavailable ? <SelectItem value="none" disabled>{t('gateway.modelNoneShort')}</SelectItem> : null}
+                {catalog.asr.map(model => <SelectItem key={model.binding} value={model.binding} label={model.name} className="list-box-item">{model.name}</SelectItem>)}
               </SelectGroup></SelectContent>
             </Select>
           </div>
           <div className="nola-workspace-field">
-            <span>{t('session.translationModel')}</span>
-            <Select value={translationValue} onValueChange={value => { if (typeof value === 'string') props.onTranslationModelChange(value) }}>
-              <SelectTrigger disabled={props.sessionLocked} aria-label={t('session.translationModel')} className="nola-workspace-picker"><Languages aria-hidden="true" /><SelectValue>{value => translationChoices.find(option => option.value === value)?.label ?? String(value ?? '')}</SelectValue></SelectTrigger>
+            <span><ModelAvailabilityLabel label={t('session.translationModel')} hint={t('gateway.modelNoneHint')} /></span>
+            <Select value={translationValue || null} onValueChange={value => { if (typeof value === 'string') pickTranslation(value) }}>
+              <SelectTrigger disabled={locked} aria-label={t('session.translationModel')} className="nola-workspace-picker"><Languages aria-hidden="true" /><SelectValue>{value => translationChoices.find(option => option.binding === value)?.name ?? t('gateway.modelNoneShort')}</SelectValue></SelectTrigger>
               <SelectContent className="select__popover rounded-xl border border-border bg-overlay p-1 shadow-overlay"><SelectGroup>
-                {translationChoices.map(option => <SelectItem key={option.value} value={option.value} label={option.label} disabled={option.isDisabled} className="list-box-item">{option.label}</SelectItem>)}
+                {translationChoices.map(option => <SelectItem key={option.binding} value={option.binding} label={option.name} className="list-box-item">{option.name}</SelectItem>)}
               </SelectGroup></SelectContent>
             </Select>
           </div>
           <div className="nola-workspace-field">
             <span>{t('workspaceUi.languages')}</span>
             <Popover.Root>
-              <Popover.Trigger disabled={props.sessionLocked} aria-label={`${t('session.sourceLanguage')} / ${t('session.targetLanguage')}`} className="nola-workspace-picker"><Languages aria-hidden="true" /><span>{languageLabel(props.sourceLanguage)} → {languageLabel(props.targetLanguage)}</span><ChevronDown aria-hidden="true" /></Popover.Trigger>
+              <Popover.Trigger disabled={locked} aria-label={`${t('session.sourceLanguage')} / ${t('session.targetLanguage')}`} className="nola-workspace-picker"><Languages aria-hidden="true" /><span>{languageLabel(props.sourceLanguage)} → {languageLabel(props.targetLanguage)}</span><ChevronDown aria-hidden="true" /></Popover.Trigger>
               <Popover.Portal><Popover.Positioner className="z-dropdown"><Popover.Popup className="nola-workspace-languages" aria-label={t('workspaceUi.languages')}>
-                <Button variant="tertiary" disabled={props.sessionLocked || !swappedLanguages} onClick={() => {
+                <Button variant="tertiary" disabled={locked || !swappedLanguages} onClick={() => {
                   if (swappedLanguages) props.onLanguagePairChange(swappedLanguages.sourceLanguage, swappedLanguages.targetLanguage)
                 }}>{t('session.swapLanguages')}</Button>
-                <Select value={props.sourceLanguage} disabled={props.sessionLocked} onValueChange={value => { if (typeof value === 'string') props.onSourceLanguageChange(value) }}>
+                <Select value={props.sourceLanguage} disabled={locked} onValueChange={value => { if (typeof value === 'string') props.onSourceLanguageChange(value) }}>
                   <SelectFieldLabel className="label">{t('session.sourceLanguage')}</SelectFieldLabel><SelectTrigger className="select__trigger"><SelectValue className="select__value">{value => languageLabel(String(value ?? ''))}</SelectValue></SelectTrigger>
                   <SelectContent className="select__popover rounded-xl border border-border bg-overlay p-1 shadow-overlay"><SelectGroup className="nola-language-options">{sourceLanguages.map(code => <SelectItem key={code} value={code} label={languageLabel(code)} className="list-box-item">{languageLabel(code)}</SelectItem>)}</SelectGroup></SelectContent>
                 </Select>
-                <Select value={props.targetLanguage} disabled={props.sessionLocked} onValueChange={value => { if (typeof value === 'string') props.onTargetLanguageChange(value) }}>
+                <Select value={props.targetLanguage} disabled={locked} onValueChange={value => { if (typeof value === 'string') props.onTargetLanguageChange(value) }}>
                   <SelectFieldLabel className="label">{t('session.targetLanguage')}</SelectFieldLabel><SelectTrigger className="select__trigger"><SelectValue className="select__value">{value => languageLabel(String(value ?? ''))}</SelectValue></SelectTrigger>
                   <SelectContent className="select__popover rounded-xl border border-border bg-overlay p-1 shadow-overlay"><SelectGroup className="nola-language-options">{targetLanguages.map(code => <SelectItem key={code} value={code} label={languageLabel(code)} className="list-box-item">{languageLabel(code)}</SelectItem>)}</SelectGroup></SelectContent>
                 </Select>

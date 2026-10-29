@@ -56,52 +56,48 @@ it('bounds the sliders and restores only speech segmentation defaults', async ()
   await waitFor(() => expect(update).toHaveBeenCalledExactlyOnceWith({ recognition: { max_segment_ms: 10000, silence_end_ms: 800 } }))
 })
 
-it('shows regional workspace and a dedicated key field for Aliyun recognition', () => {
+it('leaves recognition model choice to Model Gateway and keeps only the source language here', () => {
   const settings = { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, provider: 'aliyun' as const, aliyunWorkspaceId: 'workspace-123' } }
   settingsStore.setState({ settings })
   render(<AudioTab settings={settings} />)
-  expect(screen.getByDisplayValue('workspace-123')).toBeInTheDocument()
-  expect(screen.getByLabelText('API 密钥', { selector: 'input' })).toHaveAttribute('type', 'password')
-  expect(screen.getByRole('button', { name: '识别模型 说明' })).toBeInTheDocument()
-  expect(screen.queryByText(/3.8 自动识别源语言/)).not.toBeInTheDocument()
-  expect(screen.queryByText('SenseVoiceSmall')).not.toBeInTheDocument()
+  const group = within(screen.getByRole('group', { name: '识别' }))
+  expect(group.getByText('原文语言')).toBeInTheDocument()
+  // The provider picker, the recognition model and the Aliyun workspace fields all moved: the
+  // connection is configured in model management and the loaded model is chosen in Model Gateway.
+  expect(group.queryByRole('combobox', { name: '服务商' })).not.toBeInTheDocument()
+  expect(screen.queryByDisplayValue('workspace-123')).not.toBeInTheDocument()
+  expect(group.getByText(/模型网关/)).toBeInTheDocument()
 })
 
-it('shows MyMemory endpoint and moves its explanation into a tooltip', () => {
+it('keeps translation behavior here and routes connection setup to Model Management', async () => {
   const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'mymemory' as const, mymemoryEmail: 'test@example.com', translateIntermediate: true } }
   settingsStore.setState({ settings })
   render(<TranslationTab settings={settings} />)
-  expect(screen.getByDisplayValue('https://api.mymemory.translated.net/get')).toBeInTheDocument()
-  expect(screen.getByDisplayValue('test@example.com')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'MyMemory 免费翻译 说明' })).toBeInTheDocument()
-  expect(screen.queryByText(/每句确认后通过 REST 翻译/)).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '模型启用与默认模型' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '默认模型供新场景和工具调用使用；不会改变运行中的任务。' })).toBeInTheDocument()
+  expect(screen.queryByDisplayValue('https://api.mymemory.translated.net/get')).not.toBeInTheDocument()
+  expect(screen.queryByDisplayValue('test@example.com')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('API 密钥')).not.toBeInTheDocument()
-  expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+  await fireEvent.click(screen.getByRole('button', { name: '模型启用与默认模型' }))
+  expect(window.location.hash).toBe('#/models')
 })
 
-it('shows Google Translate endpoint and a dedicated key field', () => {
-  const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'google' as const } }
+it('keeps translation intermediate behavior available without connection fields', () => {
+  const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'google' as const, translateIntermediate: true } }
   settingsStore.setState({ settings })
   render(<TranslationTab settings={settings} />)
-  expect(screen.getByText('https://translation.googleapis.com/language/translate/v2')).toBeInTheDocument()
-  expect(screen.getByLabelText('API 密钥', { selector: 'input' })).toHaveAttribute('type', 'password')
-  expect(screen.getByRole('switch')).toBeInTheDocument()
-})
-
-it('keeps the local model choice inside the translation service card', () => {
-  render(<TranslationTab settings={DEFAULT_SETTINGS} />)
-  const translationService = screen.getByRole('group', { name: '翻译服务' })
-  expect(within(translationService).getByText('模型')).toBeInTheDocument()
-  expect(screen.getByRole('group', { name: '备用翻译' })).toBeInTheDocument()
-})
-
-it('shows the fixed public Index-Translate model with streaming and no key field', () => {
-  const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'index-translate' as const } }
-  settingsStore.setState({ settings })
-  render(<TranslationTab settings={settings} />)
-  expect(screen.getByText('Index-Translate-35B-A3B')).toBeInTheDocument()
-  expect(screen.getByText('https://index-translate.bilibili.com/v1')).toBeInTheDocument()
-  expect(screen.queryByText(/原文会发送给哔哩哔哩/)).not.toBeInTheDocument()
+  expect(screen.getByRole('switch', { name: '翻译未定稿字幕' })).toBeInTheDocument()
   expect(screen.queryByLabelText('API 密钥')).not.toBeInTheDocument()
-  expect(screen.getByRole('switch')).toBeInTheDocument()
+  expect(screen.queryByText('https://translation.googleapis.com/language/translate/v2')).not.toBeInTheDocument()
+})
+
+it('routes ASR connection setup to Model Management while preserving recognition behavior controls', async () => {
+  const settings = { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, provider: 'aliyun' as const, aliyunWorkspaceId: 'workspace-123' } }
+  settingsStore.setState({ settings })
+  render(<AudioTab settings={settings} />)
+  expect(screen.getByRole('button', { name: '模型启用与默认模型' })).toBeInTheDocument()
+  expect(screen.queryByDisplayValue('workspace-123')).not.toBeInTheDocument()
+  expect(screen.getByText('原文语言')).toBeInTheDocument()
+  await fireEvent.click(screen.getByRole('button', { name: '模型启用与默认模型' }))
+  expect(window.location.hash).toBe('#/models')
 })

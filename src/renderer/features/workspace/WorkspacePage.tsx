@@ -9,6 +9,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Captions } from 'lucide-react'
 
 import { findMissingResource } from '@/store'
+import { savedBindingOf } from '@/available-models'
 import type { MissingResource, SessionState } from '@/store'
 import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
@@ -198,9 +199,11 @@ export function WorkspacePage() {
       audioSource: settings?.recognition.audioSource ?? 'defaultOutput',
       sourceLanguage: settings?.recognition.sourceLanguage ?? 'auto',
       recognitionModelId: settings?.recognition.modelId ?? 'qwen3-asr-1.7b-hf',
+      recognitionBinding: settings ? savedBindingOf('asr', settings) : '',
       translate: settings?.translation.targetLanguage !== NO_TRANSLATION_LANGUAGE,
       targetLanguage: settings?.translation.targetLanguage ?? 'zh',
       translationModelId: settings?.translation.localModelId ?? '',
+      translationBinding: settings ? savedBindingOf('mt', settings) : '',
       keepAudio: settings?.recording.keepAudio ?? true,
     })
     setSetupOpen(true)
@@ -349,26 +352,6 @@ export function WorkspacePage() {
     >
       <FeatureActivityNotice />
       <WorkspaceToolbar readerOnly
-        modelId={pendingConfig?.recognitionModelId ?? settings?.recognition.modelId ?? 'qwen3-asr-1.7b-hf'} onModelChange={(modelId) => {
-          void actions.settings.updateSettings({ recognition: { modelId } }).catch(() => undefined)
-        }}
-        translationModelId={currentConfig?.translationModelId ?? settings?.translation.localModelId ?? ''}
-        translationProvider={currentConfig?.translationProvider ?? settings?.translation.provider ?? 'local'}
-              translationProviderLabel={settings?.translation.provider === 'cloud' ? settings.translation.cloudModel || t('settings.providerCloud') : settings?.translation.provider === 'index-translate' ? t('settings.providerIndexTranslate') : settings?.translation.provider === 'mymemory' ? t('settings.providerMyMemory') : settings?.translation.provider === 'google' ? t('settings.providerGoogle') : settings?.translation.provider === 'recognition' ? t('settings.providerRecognitionTranslation') : t('settings.providerMicrosoft')}
-        onTranslationModelChange={(value) => {
-          if (!settings) return
-          const previousTarget = settings.translation.targetLanguage
-          if (value === NO_TRANSLATION_LANGUAGE) {
-            void actions.settings.updateSettings(targetLanguagePatch(NO_TRANSLATION_LANGUAGE, previousTarget)).catch(() => undefined)
-          } else if (value === settings.translation.provider && value !== 'local') {
-            const target = previousTarget === NO_TRANSLATION_LANGUAGE ? settings.recognition.sourceLanguage === 'zh' ? 'en' : 'zh' : previousTarget
-            void actions.settings.updateSettings(targetLanguagePatch(target, previousTarget)).catch(() => undefined)
-          } else {
-            const model = resources.find(item => item.resourceId === value)
-            const patch = model && translationModelPatch(settings, model)
-            if (patch) void actions.settings.updateSettings(patch).catch(() => undefined)
-          }
-        }}
         audioSource={audioSource}
         devices={devices}
         onAudioSourceChange={(next) => { void actions.settings.updateSettings({ recognition: { audioSource: next } }).catch(() => undefined) }}

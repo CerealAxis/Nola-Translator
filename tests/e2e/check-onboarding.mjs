@@ -129,7 +129,12 @@ async function run() {
   ipcMain.handle('onboarding-fixture:get', () => settings)
   ipcMain.handle('onboarding-fixture:update', (_event, patch) => {
     if (patch.onboardingSeen === true) markerWrites++
-    settings = { ...settings, ...patch }
+    // Match production's nested settings patches when automatic model selection writes defaults.
+    settings = { ...settings, ...patch,
+      recognition: { ...settings.recognition, ...patch.recognition },
+      translation: { ...settings.translation, ...patch.translation },
+      modelGateway: { ...settings.modelGateway, ...patch.modelGateway },
+    }
     return settings
   })
   ipcMain.handle('onboarding-fixture:side-effect', () => { sideEffects++; throw new Error('The lesson must not start installations or captures automatically') })

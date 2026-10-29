@@ -4,7 +4,7 @@ import type { EngineLaunchSpec } from './engine-process'
 
 export type GatewayWorkerResult = Record<string, unknown>
 export class GatewayWorkerError extends Error {
-  constructor(readonly code: 'invalid_request' | 'inference_failed' | 'out_of_memory', message: string) { super(message) }
+  constructor(readonly code: 'invalid_request' | 'inference_failed' | 'out_of_memory' | 'authentication_failed' | 'rate_limited' | 'network_unavailable' | 'request_timeout', message: string) { super(message) }
 }
 export interface GatewayWorker {
   ready: Promise<GatewayWorkerResult>
@@ -49,7 +49,14 @@ class PythonGatewayWorker implements GatewayWorker {
     return new Promise((resolve, reject) => {
       // Native inference may not be interruptible. Detach this response while the worker
       // drains its bounded task; another client's request keeps its loaded model.
-      const abort = () => { const pending = this.pending.get(id); if (!pending) return; this.pending.delete(id); pending.cleanup(); reject(new DOMException('Aborted', 'AbortError')) }
+      const abort = () => {
+        const pending = this.pending.get(id)
+        if (!pending) return
+        this.pending.delete(id); pending.cleanup()
+        // The worker cancels remote jobs by request ID; native inference keeps draining safely.
+        if (!this.stopped) this.child.stdin.write(JSON.stringify({ op: 'cancel', requestId: id }) + '\n')
+        reject(new DOMException('Aborted', 'AbortError'))
+      }
       const timer = setTimeout(() => this.fail(payload.op === 'init' ? 'Model loading timed out' : 'Inference request timed out'), 10 * 60_000)
       this.pending.set(id, { resolve, reject, onEvent, cleanup: () => { clearTimeout(timer); signal?.removeEventListener('abort', abort) } })
       signal?.addEventListener('abort', abort, { once: true })
@@ -69,14 +76,18 @@ class PythonGatewayWorker implements GatewayWorker {
         if (message.fatal && !request) { this.fail('Inference worker failed'); return }
         if (message.event) {
           // Realtime events use their persistent session id rather than an individual append id.
-          for (const entry of this.pending.values()) entry.onEvent?.(message)
+          request?.onEvent?.(message)
           for (const listener of this.listeners) listener(message)
         } else if (request) {
           this.pending.delete(String(message.id)); request.cleanup()
           if (message.error) {
-            const code = message.error === 'out_of_memory' ? 'Model ran out of memory' : message.error === 'invalid_request' ? 'Invalid inference request' : 'Inference worker failed'
-            request.reject(new GatewayWorkerError(message.error === 'invalid_request' ? 'invalid_request' : message.error === 'out_of_memory' ? 'out_of_memory' : 'inference_failed', code))
-            if (message.fatal) this.fail(code)
+            const messages = { out_of_memory: 'Model ran out of memory', invalid_request: 'Invalid inference request',
+              authentication_failed: 'Cloud authentication failed', rate_limited: 'Cloud rate limit or quota exceeded',
+              network_unavailable: 'Cloud connection unavailable', request_timeout: 'Cloud request timed out', inference_failed: 'Inference worker failed' } as const
+            const reason = String(message.error) as keyof typeof messages
+            const code = Object.hasOwn(messages, reason) ? reason : 'inference_failed'
+            request.reject(new GatewayWorkerError(code, messages[code]))
+            if (message.fatal) this.fail(messages[code])
           } else request.resolve((message.result ?? {}) as GatewayWorkerResult)
         }
       } catch { this.fail('Inference worker returned an invalid response') }
@@ -107,6 +118,8 @@ class PythonGatewayWorker implements GatewayWorker {
     this.stopped = true
     for (const request of this.pending.values()) { request.cleanup(); request.reject(new DOMException('Gateway stopped', 'AbortError')) }
     this.pending.clear()
+    for (const listener of this.listeners) listener({ fatal: true })
+    this.listeners.clear()
     this.kill()
     this.closing = Promise.race([this.closed, new Promise<void>(resolve => { const timer = setTimeout(resolve, 5000); timer.unref() })])
     return this.closing

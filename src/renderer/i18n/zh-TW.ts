@@ -1,3 +1,4 @@
+import { modelPolicyTw } from './model-policy-ui'
 import { gatewayTw } from './gateway-ui'
 import { workbenchTw } from './workbench-ui'
 import { offlineTw } from './offline-ui'
@@ -7,6 +8,7 @@ import { onboardingTW } from './onboarding-ui'
 /** Complete Traditional Chinese dictionary for Taiwan. */
 export const zhTW: Dictionary = {
   gateway: gatewayTw,
+  modelsPolicy: modelPolicyTw,
   workbench: workbenchTw,
   offline: offlineTw,
   onboarding: onboardingTW,
@@ -939,19 +941,13 @@ export const zhTW: Dictionary = {
     audioTestFailed: "音訊測試失敗",
     "sourceLanguage": "原文語言",
     "recognitionModel": "辨識模型",
-    "recognitionModelEmpty": "尚未安裝本機辨識模型，請先到「模型管理」下載。",
     "keepAudio": "儲存錄音",
     "keepAudioHint": "關閉後不儲存音訊，無法回放與匯出。",
     "groupProvider": "翻譯服務",
     "groupConnection": "連線",
-    "provider": "服務供應商",
+    "gatewayModelHint": "辨識與翻譯模型由模型閘道統一啟動；各功能啟動前仍可從已啟動的本機模型與已設定的雲端服務之間二次指定。",
     "translateIntermediate": "翻譯未定稿字幕",
     "translateIntermediateHint": "開啟後可更早看到譯文；辨識更新時譯文可能調整，也會增加翻譯請求量。關閉後只翻譯定稿字幕。",
-    "fallbackTranslation": "備用翻譯",
-    "fallbackProvider": "備用服務",
-    "fallbackDisabled": "不使用備用翻譯",
-    "fallbackTranslationHint": "主要翻譯多次失敗後，自動使用此服務翻譯定稿字幕。相同的本機模型、Bilibili API 或 MyMemory 不能重複選擇；雲端模型可以使用不同設定。",
-    "fallbackLocalModelHint": "備用翻譯使用上方選取的本機模型。",
     "endpoint": "介面地址",
     "region": "區域",
     "model": "模型",
@@ -961,7 +957,6 @@ export const zhTW: Dictionary = {
     "deleteKey": "刪除金鑰",
     "testing": "正在測試連線",
     "providerLocal": "本機模型",
-    "providerDisabled": "不啟用翻譯服務",
     "providerCloud": "雲端模型",
     "providerMicrosoft": "Microsoft Translator",
     "providerMyMemory": "MyMemory 免費翻譯",
@@ -971,7 +966,6 @@ export const zhTW: Dictionary = {
     "providerRecognitionTranslation": "阿里雲",
     "providerAliyun": "阿里雲",
     "providerMiniMax": "MiniMax 語音辨識",
-    "aliyunTranslationHint": "僅在語音辨識選擇阿里雲 Qwen3.5 或 Qwen3.8 LiveTranslate 時可用。",
     "aliyunBeijing": "華北 2（北京）",
     "aliyunSingapore": "新加坡",
     "aliyunWorkspace": "百鍊業務空間 ID",
@@ -980,7 +974,6 @@ export const zhTW: Dictionary = {
     "mymemoryHint": "無需 API Key，每句確認後會透過 REST 翻譯，不會逐字串流輸出，免費服務有使用額度和請求頻率限制",
     "mymemoryEmail": "聯絡郵箱（可選）",
     "nativeTranslationHint": "使用目前阿里雲辨識連線返回的流式譯文，無需額外翻譯介面。僅支援阿里雲 LiveTranslate。",
-    "localModelEmpty": "尚未安裝本機翻譯模型，請先到「模型管理」下載。",
     "apiFormat": "API 格式",
     "apiFormatChatCompletions": "Chat Completions (/v1/chat/completions)",
     "apiFormatChatResponses": "Chat Responses (/v1/responses)",

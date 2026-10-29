@@ -18,6 +18,7 @@ import { StatusPill } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 import { ModelMark } from './modelBrand'
+import { defaultModelBinding } from '../../../shared/model-policy'
 
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
 
@@ -128,6 +129,10 @@ export function defaultTargetOf(record: ResourceRecord): AppSettingsPatch | null
 
 export function isDefaultOf(record: ResourceRecord, settings: AppSettings | null): boolean {
   if (!settings) return false
+  if (settings.modelPolicy) {
+    const kind = record.kind === 'recognitionModel' ? 'asr' : record.kind === 'ttsModel' ? 'tts' : record.resourceId.startsWith('qwen35-') ? 'llm' : 'mt'
+    return defaultModelBinding(settings, kind) === `resource:${record.resourceId}`
+  }
   if (record.kind === 'ttsModel') return settings.synthesis?.modelId === record.resourceId
   if (!configurationOf(record)) return false
   return (

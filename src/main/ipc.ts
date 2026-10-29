@@ -1,4 +1,5 @@
 import { loggedHandle } from './logged-ipc'
+import { sceneModelBinding } from '../shared/model-policy'
 import { modelConfigurationSchema } from '../shared/model-capabilities'
 import { audioTestSourceSchema } from '../shared/schemas'
 import { randomUUID } from 'node:crypto'
@@ -54,6 +55,7 @@ export const IPC_CHANNELS = {
 export function prewarmConfigFrom(settings: AppSettings): PrewarmConfig {
   const translation = settings.translation
   return {
+    recognitionBinding: sceneModelBinding(settings, 'asr'), translationBinding: sceneModelBinding(settings, 'mt'),
     compute: { ...settings.compute },
     ...recognitionFieldsOf(settings.recognition),
     recognitionModelId: settings.recognition.modelId,
@@ -78,11 +80,13 @@ export function registerEngineIpc(
   whenRuntimeReady: () => Promise<void> = async () => {},
   onSessionStopped: () => void = () => {},
   sharedController?: SessionController,
-  prepareCaptionService?: (config: PrewarmConfig) => Promise<PrewarmResult>
+  prepareCaptionService?: (config: PrewarmConfig) => Promise<PrewarmResult>,
+  resourceInUse: (resourceId: string) => boolean = () => false,
 ): () => void {
   const controller = sharedController ?? new SessionController({ engine, meetings, getSettings, getCredential: getTranslationCredential, prepare: prepareEnvironment, whenReady: whenRuntimeReady, startingChanged: onStartingChanged, showOverlay: () => getOverlayWindow()?.showInactive(), hideOverlay: () => getOverlayWindow()?.hide() })
   let closingOverlay: Promise<void> | null = null
-  const ensureReady = () => controller.ensureReady()
+  const sessionEngine = controller.engine
+  const ensureReady = async () => { await whenRuntimeReady(); if (engine.currentState !== 'ready') await engine.start() }
   const stopActiveSession = (id: string) => controller.stop(id)
   const releaseSessionOnEngineLoss = () => controller.releaseOnLoss()
   /**
@@ -142,6 +146,7 @@ export function registerEngineIpc(
       if (downloadSource !== undefined && !['huggingface', 'hf-mirror', 'modelscope'].includes(String(downloadSource))) {
         throw new Error('INVALID_ARGUMENT')
       }
+      if ((action === 'remove' || action === 'install') && resourceInUse(resourceId)) throw new Error('resourceInUse')
       await ensureReady()
       const response = await engine.request(
         {
@@ -211,8 +216,9 @@ export function registerEngineIpc(
     readHubModelCard(repo, revision, net.fetch, async () => resolveModelNetwork(getSettings().network)))
 
   loggedHandle(IPC_CHANNELS.configureModel, async (_event, resourceId: unknown, configuration: unknown) => {
-    if (controller.busy) throw new Error('sessionAlreadyRunning')
+    if (sessionEngine === engine && controller.busy) throw new Error('sessionAlreadyRunning')
     if (typeof resourceId !== 'string' || resourceId.length > 256) throw new Error('INVALID_ARGUMENT')
+    if (resourceInUse(resourceId)) throw new Error('resourceInUse')
     const validated = modelConfigurationSchema.parse(configuration)
     await ensureReady()
     const response = await engine.request({ protocolVersion: 1, type: 'configureModel', requestId: `configure-${randomUUID()}`, resourceId, configuration: validated }, 'resourceActionResult')
@@ -250,7 +256,7 @@ export function registerEngineIpc(
       if (downloadSource !== undefined && !['huggingface', 'hf-mirror'].includes(String(downloadSource))) {
         throw new Error('INVALID_ARGUMENT')
       }
-      if (slot !== undefined && controller.busy) {
+      if ((slot !== undefined && sessionEngine === engine && controller.busy) || resourceInUse(`hub:${repo}`)) {
         // An install rewrites files a live session has already loaded, and forcing a
         // mid-meeting weight unload to swap models is not this channel's call to make.
         throw new Error('sessionAlreadyRunning')
@@ -323,9 +329,9 @@ export function registerEngineIpc(
       const sessionId = controller.browserActive ? null : controller.activeSessionId
       if (sessionId) {
         // A dead engine cannot own a live session; don't restart it just to stop a stale id.
-        if (engine.currentState !== 'ready') {
+        if (sessionEngine.currentState !== 'ready') {
           console.error('[overlay] engine is unavailable during overlay close; stopping engine process')
-          await engine.stop()
+          await sessionEngine.stop()
           notifySessionStopped(sessionId)
         } else {
           try {
@@ -398,6 +404,7 @@ export function registerEngineIpc(
     void finalized.finally(() => broadcast(event))
   }
   engine.on('event', forwardEvent)
+  if (sessionEngine !== engine) sessionEngine.on('event', forwardEvent)
 
   /*
    * The engine's state rides the same `engine:event` channel as protocol events, which is what
@@ -409,15 +416,26 @@ export function registerEngineIpc(
    * `setState` before emitting `fatalError` / `crash`.
    */
   const forwardState = (state: EngineProcessState): void => {
-    if (state === 'recovering' || state === 'failed') releaseSessionOnEngineLoss()
+    if (sessionEngine === engine && (state === 'recovering' || state === 'failed')) releaseSessionOnEngineLoss()
+    // Inventory failures cannot end capture owned by the independent business process.
+    if (sessionEngine !== engine && controller.busy && (state === 'recovering' || state === 'failed')) return
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(IPC_CHANNELS.event, { type: 'engineStateChanged', state })
     }
   }
   engine.on('state', forwardState)
+  const sessionState = (state: EngineProcessState) => {
+    if (state === 'recovering' || state === 'failed') {
+      const id = controller.activeSessionId
+      releaseSessionOnEngineLoss()
+      if (id) notifySessionStopped(id)
+    }
+  }
+  if (sessionEngine !== engine) sessionEngine.on('state', sessionState)
 
   return () => {
     engine.off('event', forwardEvent)
+    if (sessionEngine !== engine) { sessionEngine.off('event', forwardEvent); sessionEngine.off('state', sessionState) }
     // A listener left on the long-lived EngineProcess is a real leak: every later state change
     // would still broadcast into windows whose IPC has already been torn down.
     engine.off('state', forwardState)

@@ -1,6 +1,7 @@
 import type { AppSettings, AppSettingsPatch, CredentialProvider, EngineChannelEvent, MeetingMeta, NolaBridge, ResourceRecord } from '@/bridge'
 import { initStores, stores } from '@/store'
 import { mergeSettings } from '@/store/settingsStore'
+import type { ModelGatewaySnapshot } from '../../src/shared/model-gateway'
 import type { BrowserConnectionStatus } from '../../src/shared/browser'
 import { CRISP_RUNTIME_ID } from '../../src/shared/compute'
 import { createDemoRuntime, DEMO_COMPUTE } from './demoRuntime'
@@ -9,8 +10,16 @@ const noop = () => undefined
 const done = async () => undefined
 
 /** All desktop actions stay in memory. No IPC, captures, model downloads, or credentials exist here. */
-export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => void) {
+export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => void, onWorkspace: () => void = noop) {
   let settings = initial
+  const gatewaySnapshot = (): ModelGatewaySnapshot => ({
+    state: 'running', port: 8717, address: 'http://127.0.0.1:8717/v1', connections: 0, activeRequests: 0, requests: [],
+    services: {
+      asr: { state: 'ready', model: `resource:${settings.recognition.modelId}`, name: 'Demo ASR' },
+      mt: { state: 'ready', model: `resource:${settings.translation.localModelId}`, name: 'Demo MT' },
+      tts: { state: 'stopped', model: '', name: '' }, llm: { state: 'stopped', model: '', name: '' },
+    },
+  })
   const credentials = new Set<CredentialProvider>()
   const transcript = [...stores.session.getState().segments]
   const settingListeners = new Set<(settings: AppSettings) => void>()
@@ -141,7 +150,9 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
       }, audioUrl: async () => null,
     },
     diagnostics: { get: async () => ({ demo: 1 }), copy: done, openLogs: done },
+    gateway: { snapshot: async () => gatewaySnapshot(), start: async () => gatewaySnapshot(), stop: async () => gatewaySnapshot(), onChanged: () => noop, revealKey: async () => 'demo-only', rotateKey: async () => 'demo-only' },
     app: {
+      showWorkspace: async () => onWorkspace(),
       openDefaultBrowser: async () => { location.hash = '#/video-captions' },
       checkLatestRelease: async () => ({ currentVersion: 'Demo', latestVersion: null, updateAvailable: false, releaseName: null, releaseNotes: '', releaseUrl: null }),
       openReleasePage: done,

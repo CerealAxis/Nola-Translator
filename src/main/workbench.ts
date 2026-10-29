@@ -34,7 +34,7 @@ export function registerWorkbench(
   let closing: Promise<void> | null = null
   const languageModels = services ? registerLanguageModelIpc(services, sender => {
     const owner = BrowserWindow.fromWebContents(sender)
-    return !!owner && isWorkbenchWindow(owner) && trustedDocument(sender.getURL(), true) && !closing && (!activity || (activity.snapshot().owner === 'workbench' && activity.snapshot().phase !== 'stopping'))
+    return !!owner && isWorkbenchWindow(owner) && trustedDocument(sender.getURL(), true) && !closing && (!activity || (activity.has('workbench') && !activity.isStopping('workbench')))
   }) : null
   const stop = (): Promise<void> => {
     if (closing) return closing

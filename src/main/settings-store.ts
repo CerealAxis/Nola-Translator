@@ -10,6 +10,7 @@ import { remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../
 import { settingsPatchSchema } from './settings-schema'
 import { customModelSchema, synchronizeCustomModel } from '../shared/custom-models'
 import { LANGUAGE_CODES } from '../shared/languages'
+import { mergeModelPolicy, modelPolicyOf, modelPolicySchema } from '../shared/model-policy'
 
 // Store-internal patches may also touch fields the IPC schema exposes only through their own channels.
 export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 2; browserConnection?: { enabled: boolean } }
@@ -236,6 +237,7 @@ export class SettingsStore {
         ...raw,
         version: 2,
         onboardingSeen: raw.onboardingSeen === true,
+        modelPolicy: raw.modelPolicy === undefined ? undefined : (modelPolicySchema.safeParse(raw.modelPolicy).data ?? { enabled: {}, defaults: {}, selections: {} }),
         closeBehavior: raw.closeBehavior === 'quit' ? 'quit' : 'tray',
         synthesis: {
           ...DEFAULT_SETTINGS.synthesis,
@@ -365,6 +367,7 @@ export class SettingsStore {
     } catch {
       this.settings = structuredClone(DEFAULT_SETTINGS)
     }
+    this.settings.modelPolicy = modelPolicyOf(this.settings)
     return structuredClone(this.settings)
   }
 
@@ -379,6 +382,7 @@ export class SettingsStore {
     const next: AppSettings = {
       ...this.settings,
       ...patch,
+      modelPolicy: mergeModelPolicy(this.settings, patch.modelPolicy),
       version: 2,
       synthesis: { ...this.settings.synthesis, ...patch.synthesis },
       modelGateway: { ...this.settings.modelGateway, ...patch.modelGateway },

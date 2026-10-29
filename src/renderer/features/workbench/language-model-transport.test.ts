@@ -109,3 +109,11 @@ it('prepares the language model tool audio on demand without replacing the origi
   listener({ id, chunk: '', done: true })
   expect(await response.text()).toBe('')
 })
+
+
+it('rejects a model removed from the live callable catalog before starting the request', async () => {
+  const fetch = createPlaygroundFetch(() => ({ model: 'resource:removed', kind: 'mt', effort: 'auto', source: 'en', target: 'zh', voice: '' }), key => key, () => [], () => [])
+  await expect(fetch('/chat', { body })).rejects.toThrow('workbench.noModels')
+  expect(bridge.app.directModel).not.toHaveBeenCalled()
+  expect(bridge.app.streamLanguageModel).not.toHaveBeenCalled()
+})

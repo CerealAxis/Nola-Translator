@@ -95,6 +95,8 @@ const ERROR_ACTIONS: Record<SupportErrorCode, { target: ErrorActionTarget; label
   'MDL-021': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'MDL-022': { target: { kind: 'models' }, label: 'errors.modelLoadFailedAction' },
   'MDL-023': { target: { kind: 'models' }, label: 'errors.modelMissingAction' },
+  'MDL-024': { target: { kind: 'models' }, label: 'modelsPolicy.modelDisabled' },
+  'MDL-025': { target: { kind: 'models' }, label: 'modelsPolicy.modelNotLoaded' },
 
   // Translation: the hosted providers (LLM translation, Microsoft, Google, MyMemory) need the
   // service's key and credit, which is configured in the translation settings.

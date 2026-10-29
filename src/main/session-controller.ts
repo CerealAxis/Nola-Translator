@@ -5,6 +5,7 @@ import { sessionConfigSchema } from '../shared/schemas'
 import { NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider, type RecognitionProvider } from '../shared/settings'
 import { supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'
 import { customCredentialSlot } from '../shared/custom-models'
+import { bindingIsLocal, normalizeModelBinding } from '../shared/model-gateway'
 import type { FeatureActivity, FeatureLease } from './feature-activity'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
@@ -16,6 +17,24 @@ import type { MeetingStore } from './meeting-store'
 const RECOGNITION_CREDENTIAL_SLOTS: Partial<Record<RecognitionProvider, CredentialProvider>> = {
   aliyun: 'aliyun-asr',
   minimax: 'minimax-asr',
+}
+
+/** The model-gateway binding a config's recognition fields describe. */
+export function recognitionBindingOf(config: Pick<SessionConfig, 'recognitionProvider' | 'recognitionModelId'>): string {
+  const provider = config.recognitionProvider ?? 'local'
+  return provider === 'local' ? (config.recognitionModelId ? `resource:${config.recognitionModelId}` : '') : `cloud:${provider}`
+}
+
+/**
+ * The binding a config's translation fields describe. Native translation is a property of the
+ * recognition stream, so it names no translation model and leaves the gateway binding in place.
+ */
+export function translationBindingOf(config: Pick<SessionConfig, 'translationProvider' | 'translationModelId'>, settings: AppSettings): string {
+  const provider = config.translationProvider ?? 'local'
+  if (provider === 'recognition') return ''
+  if (provider === 'local') return config.translationModelId ? `resource:${config.translationModelId}` : ''
+  if (provider === 'cloud') return `mt-custom:${settings.translation.customModelId || 'legacy'}`
+  return `cloud:${provider}`
 }
 
 export type SessionOwner = 'desktop' | 'browser'
@@ -33,6 +52,8 @@ export interface SessionControllerOptions {
   /** The browser caption gate reserves the caption service even before an extension connects. */
   isBrowserCaptionServiceActive?(): boolean
   isOverlayVisible?(): boolean
+  useGateway?: boolean
+  audioTestEngine?: EngineProcess
 }
 
 /** One reservation covers runtime preparation as well as inference, across both clients. */
@@ -46,8 +67,11 @@ export class SessionController {
   private cancelling: Promise<void> | null = null
   private browserPreparing = false
   private featureLease: FeatureLease | null = null
+  private localModelsInUse = false
   private readonly inFlight = new Set<Promise<unknown>>()
   constructor(private readonly options: SessionControllerOptions) {}
+  get engine(): EngineProcess { return this.options.engine }
+  get usesLocalModels(): boolean { return (this.starting || !!this.activeSessionId) && this.localModelsInUse }
 
   testAudio(audioSource: AudioTestSource): Promise<AudioTestResult> {
     return this.withActivity('interpretation', false, () => this.testAudioInternal(audioSource))
@@ -61,7 +85,7 @@ export class SessionController {
   private withActivity<T>(owner: 'interpretation' | 'browser-captions', retain: boolean, run: () => Promise<T>): Promise<T> {
     const activity = this.options.activity
     activity?.assertAvailable(owner)
-    const lease = activity && !activity.snapshot().owner ? activity.acquire(owner, () => this.stopCurrent()) : null
+    const lease = activity && !activity.has(owner) ? activity.acquire(owner, () => this.stopCurrent()) : null
     if (lease) this.featureLease = lease
     const task = run().then(result => { if (retain) lease?.running(); return result }).finally(() => {
       this.inFlight.delete(task)
@@ -98,7 +122,7 @@ export class SessionController {
     await this.options.whenReady()
     if (this.options.engine.currentState !== 'ready') await this.options.engine.start()
   }
-  canShowOverlay(): boolean { return !this.browserPreparing && !this.browserActive && !this.options.isBrowserCaptionServiceActive?.() }
+  canShowOverlay(): boolean { return this.options.useGateway ? !this.browserActive : !this.browserPreparing && !this.browserActive && !this.options.isBrowserCaptionServiceActive?.() }
   isBrowserEvent(event: EngineEvent): boolean {
     if ('sessionId' in event) return this.browserSessions.has(event.sessionId) || (this.starting && this.browserActive)
     return this.browserActive && (event.type === 'status' || event.type === 'error')
@@ -108,9 +132,11 @@ export class SessionController {
     this.starting = true
     this.options.startingChanged(true)
     try {
-      await this.ensureReady()
-      if (!this.options.engine.supports('audioTest')) throw new Error('engineUpdateRequired')
-      const result = await this.options.engine.request({ protocolVersion: 1, type: 'testAudio',
+      const engine = this.options.audioTestEngine ?? this.options.engine
+      await this.options.whenReady()
+      if (engine.currentState !== 'ready') await engine.start()
+      if (!engine.supports('audioTest')) throw new Error('engineUpdateRequired')
+      const result = await engine.request({ protocolVersion: 1, type: 'testAudio',
         requestId: `audio-test-${randomUUID()}`, audioSource }, 'audioTested', 8000)
       return { audioBase64: result.audioBase64, durationMs: result.durationMs, hasSignal: result.hasSignal }
     } finally {
@@ -119,7 +145,7 @@ export class SessionController {
     }
   }
   private async prewarmInternal(config: PrewarmConfig): Promise<PrewarmResult> {
-    if (this.busy || this.options.isOverlayVisible?.()) return { state: 'failed', code: 'sessionAlreadyRunning' }
+    if (this.busy || (!this.options.useGateway && this.options.isOverlayVisible?.())) return { state: 'failed', code: 'sessionAlreadyRunning' }
     // Model preparation owns the same reservation as starting capture, so neither a second
     // client nor component installation can replace an environment while weights load.
     this.starting = true
@@ -133,6 +159,8 @@ export class SessionController {
       await this.ensureReady()
       if (operation !== this.operation) throw new Error('sessionStartCancelled')
       return await this.options.engine.prewarmModels({ ...config, compute: session.compute ?? config.compute,
+        recognitionBinding: session.recognitionBinding, recognitionProvider: session.recognitionProvider, recognitionModelId: session.recognitionModelId ?? config.recognitionModelId,
+        translationBinding: session.translationBinding, translationProvider: session.translationProvider, translationModelId: session.translationModelId,
         max_segment_ms: this.options.getSettings().recognition.max_segment_ms ?? 10000,
         silence_end_ms: this.options.getSettings().recognition.silence_end_ms ?? 800,
       })
@@ -147,6 +175,22 @@ export class SessionController {
     if (owner === 'desktop' && !this.canShowOverlay()) throw new Error('sessionAlreadyRunning')
     if (this.busy) throw new Error('sessionAlreadyRunning')
     const parsed = sessionConfigSchema.parse(raw) as SessionConfig
+    if (this.options.useGateway) {
+      // Bindings are authoritative; renderer settings persistence may still be in flight after fallback.
+      const asr = normalizeModelBinding('asr', parsed.recognitionBinding)
+      if (asr) {
+        parsed.recognitionBinding = asr
+        if (bindingIsLocal(asr)) { parsed.recognitionProvider = 'local'; parsed.recognitionModelId = asr.slice(9) }
+        else parsed.recognitionProvider = asr.slice(6) as RecognitionProvider
+      }
+      const mt = normalizeModelBinding('mt', parsed.translationBinding)
+      if (mt) {
+        parsed.translationBinding = mt
+        if (bindingIsLocal(mt)) { parsed.translationProvider = 'local'; parsed.translationModelId = mt.slice(9) }
+        else parsed.translationProvider = mt.startsWith('mt-custom:') ? 'cloud' : mt.slice(6) as SessionConfig['translationProvider']
+      }
+    }
+    this.localModelsInUse = (parsed.recognitionProvider ?? 'local') === 'local' || parsed.targetLanguages.length > 0 && (parsed.translationProvider ?? 'local') === 'local'
     // The provider gate lives in `supportsIntermediateTranslation`. Re-applying it here keeps a
     // stale or hand-assembled config from carrying a preference the chosen provider cannot act on.
     if (parsed.translationProvider && !supportsIntermediateTranslation(parsed.translationProvider)) parsed.allowIntermediateTranslation = false
@@ -174,7 +218,15 @@ export class SessionController {
       const credentialSlot = RECOGNITION_CREDENTIAL_SLOTS[recognitionProvider]
       // A provider without a slot of its own carries no key, so its options are dropped rather
       // than forwarded with whatever the renderer sent.
-      if (!credentialSlot) delete parsed.recognitionOptions
+      if (this.options.useGateway) {
+        delete parsed.recognitionOptions
+        delete parsed.translationOptions
+        delete parsed.fallbackTranslationOptions
+        // The consumer names the model it wants; a config assembled without a binding still gets
+        // the one its provider fields describe.
+        parsed.recognitionBinding ||= recognitionBindingOf(parsed)
+        parsed.translationBinding ||= translationBindingOf(parsed, startSettings)
+      } else if (!credentialSlot) delete parsed.recognitionOptions
       else {
         const apiKey = await this.options.getCredential(credentialSlot)
         checkCancelled()
@@ -183,14 +235,14 @@ export class SessionController {
       }
       const provider = parsed.translationProvider ?? 'local'
       if (provider === 'local' || provider === 'recognition') delete parsed.translationOptions
-      if (provider === 'cloud' || provider === 'microsoft' || provider === 'google') {
+      if (!this.options.useGateway && (provider === 'cloud' || provider === 'microsoft' || provider === 'google')) {
         const customId = startSettings.translation.customModelId
         const apiKey = await this.options.getCredential(provider === 'cloud' && customId ? customCredentialSlot(customId) : provider)
         checkCancelled()
         if (apiKey) parsed.translationOptions = { ...parsed.translationOptions, apiKey }
       }
       const fallbackProvider = parsed.fallbackTranslationProvider
-      if (fallbackProvider === 'cloud' || fallbackProvider === 'microsoft' || fallbackProvider === 'google') {
+      if (!this.options.useGateway && (fallbackProvider === 'cloud' || fallbackProvider === 'microsoft' || fallbackProvider === 'google')) {
         const slot: CredentialProvider = fallbackProvider === 'cloud'
           ? 'fallback-cloud'
           : fallbackProvider === 'google' ? 'fallback-google' : 'microsoft'

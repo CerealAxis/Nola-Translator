@@ -14,7 +14,7 @@ import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
 import type { AppSettings, AppSettingsPatch, CredentialProvider } from '@/bridge'
-import { DEFAULT_SETTINGS, SOURCE_LANGUAGE_OPTIONS, type CustomTranslationModel } from '../../../shared/settings'
+import { DEFAULT_SETTINGS, SOURCE_LANGUAGE_OPTIONS } from '../../../shared/settings'
 import { ALIYUN_LANGUAGES, remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../../../shared/cloud-config'
 import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_PUBLIC_MODEL } from '../../../shared/index-translate'
 import { GOOGLE_TRANSLATE_ENDPOINT } from '../../../shared/google-translate'
@@ -25,45 +25,12 @@ import { AliyunConnection, MiniMaxConnection } from '../settings/tabs/AudioTab'
 import { TextRow } from '../settings/tabs/TranslationTab'
 import { ModelLanguageSelect } from './ModelConfigurationDialog'
 
-import { customModelsOf, customModelSchema, customCredentialSlot, customModelPatch } from '../../../shared/custom-models'
+import { customModelsOf, customCredentialSlot, customModelPatch } from '../../../shared/custom-models'
 import { CustomModelDialog } from './CustomModelDialog'
+import { defaultModelPatch, modelEnablePatch } from '../../../shared/model-policy'
 
-export type CloudModelId = `custom:${string}` | 'cloud' | 'microsoft' | 'mymemory' | 'google' | 'index-translate' | 'aliyun' | 'minimax' | 'recognition'
-export interface CloudModel {
-  id: CloudModelId
-  profile?: CustomTranslationModel
-  kind: 'recognitionModel' | 'translationModel'
-  free: boolean
-  ready: boolean
-  active: boolean
-}
-
-function validEndpoint(value: string | undefined): boolean {
-  try { return ['https:', 'http:'].includes(new URL(value ?? '').protocol) } catch { return false }
-}
-
-/** Saved connection readiness is independent of which service is currently selected. */
-export function cloudModelsOf(settings: AppSettings | null, credentials: Readonly<Record<CredentialProvider, boolean>>): CloudModel[] {
-  const translation = settings?.translation
-  const recognition = settings?.recognition
-  const aliyunReady = !!credentials['aliyun-asr'] && !!recognition?.aliyunWorkspaceId?.trim()
-  const nativeReady = aliyunReady && supportsRecognitionNativeTranslation({ ...DEFAULT_SETTINGS.recognition, ...recognition, provider: 'aliyun' })
-  return [
-    { id: 'aliyun', kind: 'recognitionModel', free: false, ready: aliyunReady, active: recognition?.provider === 'aliyun' },
-    { id: 'minimax', kind: 'recognitionModel', free: false, ready: !!credentials['minimax-asr'] && validEndpoint(recognition?.minimaxEndpoint), active: recognition?.provider === 'minimax' },
-    ...(['cloud', 'microsoft', 'mymemory', 'google', 'index-translate', 'recognition'] as const).map(id => ({
-      id, kind: 'translationModel' as const, free: id === 'mymemory' || id === 'index-translate',
-      ready: id === 'cloud' ? false : id === 'microsoft' ? credentials.microsoft && validEndpoint(translation?.microsoftEndpoint)
-        : id === 'google' ? credentials.google : id === 'recognition' ? nativeReady : true,
-      active: id !== 'cloud' && translation?.provider === id && translation.targetLanguage !== 'none',
-    })),
-    ...(translation ? customModelsOf(translation).map(profile => ({
-      id: `custom:${profile.id}` as const, profile, kind: 'translationModel' as const, free: false,
-      ready: customModelSchema.safeParse(profile).success && (profile.apiFormat !== 'anthropic' || !!credentials[customCredentialSlot(profile.id)]),
-      active: translation.provider === 'cloud' && translation.targetLanguage !== 'none' && (translation.customModelId === profile.id || (!translation.customModelId && profile.id === 'legacy')),
-    })) : []),
-  ]
-}
+export { cloudModelsOf, type CloudModel, type CloudModelId } from '../../../shared/cloud-models'
+import { cloudModelsOf, validEndpoint, type CloudModel, type CloudModelId } from '../../../shared/cloud-models'
 
 function useCloudCopy(id: Exclude<CloudModelId, `custom:${string}`>) {
   const { t } = useI18n()
@@ -195,25 +162,7 @@ function FixedCloudModelDialog({ id, onClose }: FixedCloudModelDialogProps) {
       if (slot && key.trim()) await actions.models.setTranslationCredential(slot, key.trim())
       let patch = draftRef.current
       const current = stores.settings.getState().settings!
-      if (id === 'aliyun') {
-        const nextRecognition = { ...current.recognition, ...patch.recognition, ...(activate ? { provider: 'aliyun' as const } : {}) }
-        if (current.translation.provider === 'recognition' && !supportsRecognitionNativeTranslation(nextRecognition)) {
-          patch = { ...patch, translation: { ...patch.translation, provider: 'mymemory' } }
-        }
-      }
-      if (activate && (id === 'aliyun' || id === 'minimax')) {
-        const nextRecognition = { ...current.recognition, ...patch.recognition, provider: id }
-        patch = { ...patch, recognition: { ...patch.recognition, provider: id, sourceLanguage: 'auto' },
-          ...(!supportsRecognitionNativeTranslation(nextRecognition) && current.translation.provider === 'recognition' ? { translation: { ...patch.translation, provider: 'mymemory' } } : {}),
-        }
-      } else if (activate && id !== 'aliyun' && id !== 'minimax') {
-        const restored = current.translation.targetLanguage === 'none' ? 'zh' : current.translation.targetLanguage
-        const supported = id === 'recognition' ? ALIYUN_LANGUAGES : id === 'index-translate' ? INDEX_TRANSLATE_LANGUAGES : undefined
-        const visibility = targetLanguagePatch(supported && !supported.includes(restored) ? 'zh' : restored, current.translation.targetLanguage)
-        patch = { ...patch, ...visibility, translation: { ...patch.translation, ...visibility.translation, provider: id },
-          ...(id === 'recognition' ? { recognition: { ...patch.recognition, provider: 'aliyun', sourceLanguage: 'auto' } } : {}),
-        }
-      }
+      if (activate) patch = { ...patch, ...defaultModelPatch(current, id === 'aliyun' || id === 'minimax' ? 'asr' : 'mt', `cloud:${id}`) }
       await updateSettings(patch)
       notifySuccess(activate ? t('modelsSettingsUi.cloudProviderEnabled', { name }) : t('common.saved'))
       onClose()
@@ -290,6 +239,12 @@ export async function removeCloudModel(model: CloudModel): Promise<void> {
       ...(settings.translation.fallback.provider === model.id ? { fallback: { provider: 'disabled' } } : {}),
     } }
   }
+  const kind = model.kind === 'recognitionModel' ? 'asr' : 'mt'
+  patch = { ...patch, ...modelEnablePatch(settings, kind, model.profile ? `mt-custom:${model.profile.id}` : `cloud:${model.id}`, false) }
+  if (model.profile) {
+    const policy = patch.modelPolicy!
+    patch = { ...patch, modelPolicy: { ...policy, enabled: { ...policy.enabled, [`llm:${model.id}`]: false } } }
+  }
   await updateSettings(patch)
   await actions.models.setTranslationCredential(credential, '')
 }
@@ -323,6 +278,5 @@ export function cloudModelSettingsPatch(settings: AppSettings, model: CloudModel
 async function setCloudModelDefault(model: CloudModel): Promise<void> {
   const settings = stores.settings.getState().settings
   if (!settings || model.active) return
-  const patch = cloudModelSettingsPatch(settings, model)
-  if (patch) await updateSettings(patch)
+  if (model.ready) await updateSettings(defaultModelPatch(settings, model.kind === 'recognitionModel' ? 'asr' : 'mt', model.profile ? `mt-custom:${model.profile.id}` : `cloud:${model.id}`))
 }

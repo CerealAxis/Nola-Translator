@@ -9,11 +9,11 @@ import { actions, stores, updateSettings, useStore } from '@/store'
 import { CLOUD_API_FORMATS, CLOUD_FORMAT_DEFAULTS, DEFAULT_SETTINGS, SOURCE_LANGUAGE_OPTIONS, type CustomTranslationModel, type CloudApiFormat } from '../../../shared/settings'
 import { customCredentialSlot, customModelPatch, customModelsOf, customModelSchema } from '../../../shared/custom-models'
 import { LANGUAGE_CODES } from '../../../shared/languages'
-import { targetLanguagePatch } from '../../session-config'
 import { SettingSelect } from '../settings/SettingsPage'
 import { SettingsRow } from '../settings/SettingsRow'
 import { NumberRow } from '../settings/tabs/TranslationTab'
 import { ModelLanguageSelect } from './ModelConfigurationDialog'
+import { defaultModelPatch } from '../../../shared/model-policy'
 
 export interface CustomModelDialogProps { modelId?: string; onClose: () => void }
 
@@ -44,10 +44,9 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
       const model = customModelSchema.parse(draft)
       const customModels = current.some(item => item.id === model.id) ? current.map(item => item.id === model.id ? model : item) : [...current, model]
       const selected = translation.customModelId === model.id || (model.id === 'legacy' && !translation.customModelId && translation.provider === 'cloud')
-      const activePatch = activate || selected ? customModelPatch(translation, model) : {}
-      const visibility = activate ? targetLanguagePatch(activePatch.targetLanguage!, translation.targetLanguage) : {}
-      await updateSettings({ ...visibility, translation: { ...visibility.translation, customModels, ...activePatch,
-        ...(!activate ? { provider: translation.provider, targetLanguage: translation.targetLanguage } : {}),
+      const activePatch = selected ? customModelPatch(translation, model) : {}
+      await updateSettings({ ...(activate ? defaultModelPatch(stores.settings.getState().settings!, 'mt', `mt-custom:${model.id}`) : {}), translation: { customModels, ...activePatch,
+        provider: translation.provider, targetLanguage: translation.targetLanguage,
       } })
       notifySuccess(t('modelConfig.saved'))
       onClose()

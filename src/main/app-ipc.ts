@@ -102,6 +102,7 @@ export function registerAppIpc(options: {
   settings: SettingsStore
   initialSettings: AppSettings
   settingsChanged?: () => Promise<void>
+  beforeSettingsChange?: (patch: AppSettingsPatch) => void
   meetings: MeetingStore
   /** Base of the meeting audio protocol, including the trailing `://` (e.g. `nola-audio://`). Concatenate the path directly. */
   audioProtocol: string
@@ -300,6 +301,7 @@ export function registerAppIpc(options: {
     // The cast trusts that the schema accepts every field `AppSettingsPatch` declares; that parity
     // is the one thing that can silently break it.
     const patch = settingsPatchSchema.parse(raw) as AppSettingsPatch
+    options.beforeSettingsChange?.(patch)
     current = await options.settings.update(patch)
     applyOverlay(patch.overlay?.mode !== undefined)
     applyTheme()
@@ -388,10 +390,11 @@ export function registerAppIpc(options: {
   })
   loggedHandle(channels.hasTranslationCredential, (_event, provider: unknown) =>
     options.credentials.has(assertCredentialProvider(provider)))
-  loggedHandle(channels.setTranslationCredential, (_event, provider: unknown, value: unknown) => {
+  loggedHandle(channels.setTranslationCredential, async (_event, provider: unknown, value: unknown) => {
     const target = assertCredentialProvider(provider)
     if (typeof value !== 'string' || value.length > 4096) throw new Error('INVALID_CREDENTIAL')
-    return options.credentials.set(target, value)
+    await options.credentials.set(target, value)
+    await options.settingsChanged?.()
   })
 
   return () => {

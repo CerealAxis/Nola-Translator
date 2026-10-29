@@ -96,7 +96,10 @@ async def _run() -> int:
         async def close() -> None:
             return None
     else:
-        from .runtime import EngineRuntime
+        if os.environ.get('NOLA_GATEWAY_ADDRESS'):
+            from .gateway_session_runtime import GatewaySessionRuntime as EngineRuntime
+        else:
+            from .runtime import EngineRuntime
 
         model_root = Path(
             os.environ.get(

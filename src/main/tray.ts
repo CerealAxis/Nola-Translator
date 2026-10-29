@@ -39,7 +39,8 @@ export class NolaTray {
     this.tray?.setContextMenu(Menu.buildFromTemplate([
       { label: t.trayOpen, click: () => this.options.show() },
       { type: 'separator' },
-      { label: activity.owner ? `${t[activity.owner]} · ${t[activity.phase === 'idle' ? 'stopped' : activity.phase]}` : t.trayIdle, enabled: false },
+      ...((activity.activities?.length ? activity.activities : activity.owner ? [{ owner: activity.owner, phase: activity.phase }] : []).map(item => ({ label: `${t[item.owner]} · ${t[item.phase === 'idle' ? 'stopped' : item.phase]}`, enabled: false }))),
+      ...(!activity.owner ? [{ label: t.trayIdle, enabled: false }] : []),
       { label: t.trayStop, enabled: !!activity.owner && activity.phase !== 'stopping', click: () => { void this.options.stop().catch(error => console.error('tray stop failed', error)) } },
       { type: 'separator' },
       { label: t.trayExit, click: () => this.options.quit() },

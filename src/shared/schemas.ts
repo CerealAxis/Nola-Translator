@@ -107,6 +107,8 @@ export const sessionConfigSchema = z
       maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
     }).strip().optional(),
     recordingPath: z.string().min(1).max(4096).optional(),
+    recognitionBinding: z.string().max(512).optional(),
+    translationBinding: z.string().max(512).optional(),
     browserTimeline: z.object({ epoch: z.number().int().nonnegative(), videoTimeMs: z.number().nonnegative().finite(), playbackRate: z.number().positive().max(16) }).strip().optional(),
   })
   .strip()
@@ -146,6 +148,8 @@ const prewarmConfigSchema = z.object({
     contextWindow: z.number().int().min(256).max(10_000_000).optional(),
     maxOutputTokens: z.number().int().min(1).max(10_000_000).optional(),
   }).strip().optional(),
+  recognitionBinding: z.string().max(512).optional(),
+  translationBinding: z.string().max(512).optional(),
 }).strip()
 
 const translationSchema = z

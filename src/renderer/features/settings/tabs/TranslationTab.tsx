@@ -1,336 +1,43 @@
-import { customCredentialSlot } from '../../../../shared/custom-models'
-import { isModelReady, supportsTranslation } from '../../../../shared/model-capabilities'
-import { supportsSelectedEngine } from '../../../../shared/model-engines'
-import { DEFAULT_COMPUTE_SETTINGS } from '../../../../shared/compute'
-/**
- * Translation: provider, intermediate translation, per-provider connection fields, API key.
- * Local model families share `local`; `localModelId` selects their engine adapter.
- * Ollama is a `CloudApiFormat`, not a provider. Keys live in `credentials.json` rather than
- * `AppSettings`; the input replaces a saved credential without exposing the stored value.
- */
+/** Translation behavior stays here; model and connection configuration lives in Model Management. */
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-
+import { CircleHelp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-
-import { CLOUD_API_FORMATS, CLOUD_FORMAT_DEFAULTS, NO_TRANSLATION_LANGUAGE, TRANSLATION_PROVIDERS } from '@/bridge'
-import type { CloudApiFormat, CredentialProvider, TranslationProvider, TranslationSettings } from '@/bridge'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import type { CredentialProvider } from '@/bridge'
 import { SettingsRow } from '../SettingsRow'
 import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
-import { actions, stores, updateSettings, useStore } from '@/store'
-import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
-import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
-import { ALIYUN_LANGUAGES, supportsIntermediateTranslation, supportsRecognitionNativeTranslation } from '../../../../shared/cloud-config'
-import { targetLanguagePatch } from '../../../session-config'
-import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_PUBLIC_MODEL } from '../../../../shared/index-translate'
-import { GOOGLE_TRANSLATE_ENDPOINT } from '../../../../shared/google-translate'
+import { actions, updateSettings } from '@/store'
+import { useRoute } from '@/routes'
+import { SettingGroup, SettingSwitch } from '../SettingsPage'
+import type { SettingsPanelProps } from '../SettingsPage'
+import { supportsIntermediateTranslation } from '../../../../shared/cloud-config'
 
 export function TranslationTab({ settings }: SettingsPanelProps) {
   const { t } = useI18n()
+  const { navigate } = useRoute()
   const translation = settings.translation
-  const credentials = useStore(stores.models, (state) => state.credentials)
-  const resources = useStore(stores.models, (state) => state.resources)
-
-  // Keep the settings picker in sync with the providers accepted by the main sanitizer.
-  const providerLabels = useMemo<Record<TranslationProvider, string>>(() => ({
-    local: t('settings.providerLocal'),
-    cloud: t('settings.providerCloud'),
-    microsoft: t('settings.providerMicrosoft'),
-    mymemory: t('settings.providerMyMemory'),
-    google: t('settings.providerGoogle'),
-    'index-translate': t('settings.providerIndexTranslate'),
-    recognition: t('settings.providerRecognitionTranslation'),
-  }), [t])
-
-  const providerOptions = useMemo<PickerOption[]>(
-    () => [
-      { value: 'disabled', label: t('settings.providerDisabled') },
-      // Only Aliyun LiveTranslate recognition carries its own translation; other models return
-      // recognized text only, so the option is unavailable rather than selectable and reverted.
-      ...TRANSLATION_PROVIDERS.map((id) => ({ value: id, label: providerLabels[id], isDisabled: id === 'recognition' && !supportsRecognitionNativeTranslation(settings.recognition) })),
-    ],
-    [providerLabels, settings.recognition, t],
-  )
-
-  const apiFormatLabels = useMemo<Record<CloudApiFormat, string>>(() => ({
-    'chat-completions': t('settings.apiFormatChatCompletions'),
-    'chat-responses': t('settings.apiFormatChatResponses'),
-    anthropic: t('settings.apiFormatAnthropic'),
-    ollama: t('settings.apiFormatOllama'),
-  }), [t])
-
-  const apiFormatOptions = useMemo<PickerOption[]>(
-    () => CLOUD_API_FORMATS.map((id) => ({ value: id, label: apiFormatLabels[id] })),
-    [apiFormatLabels],
-  )
-
-  // The dropdown lists what is actually installed, from the models store, so an uninstalled
-  // id can never be selected and size or quality text baked into a label cannot go stale.
-  // M2M100 and hub GGUF models travel the same `resourceId` route as the Hy-MT2 tiers.
-  // Option text is the model name alone: size, parameters and quantisation are read off the
-  // model card.
-  const localModelOptions = useMemo<PickerOption[]>(() => {
-    const installed = resources
-      .filter((item) => item.kind === 'translationModel' && item.installed)
-      .map((item) => ({ value: item.resourceId, label: item.name, isDisabled: !isModelReady(item) || !supportsSelectedEngine(item, settings.compute ?? DEFAULT_COMPUTE_SETTINGS, item.resourceId) || !supportsTranslation(item, settings.recognition.sourceLanguage, translation.targetLanguage) }))
-    /*
-     * The current value is patched in even when it is not among the installed models (just
-     * uninstalled, or settings synced from another machine): it is the current value rather
-     * than a candidate, and dropping it leaves the dropdown blank, which looks broken. It is
-     * disabled, and when nothing at all is installed the empty branch below takes over.
-     */
-    if (installed.length > 0 && !installed.some((option) => option.value === translation.localModelId)) {
-      installed.push({ value: translation.localModelId, label: translation.localModelId, isDisabled: true })
-    }
-    return installed
-  }, [resources, translation.localModelId, translation.targetLanguage, settings.recognition.sourceLanguage, settings.compute])
-
-  const fallbackProviderOptions = useMemo<PickerOption[]>(() => [
-    { value: 'disabled', label: t('settings.fallbackDisabled') },
-    ...TRANSLATION_PROVIDERS.filter((id) => id !== 'recognition').map((id) => ({
-      value: id,
-      label: providerLabels[id],
-      isDisabled: id === 'local'
-        ? !localModelOptions.some((option) => option.value === translation.localModelId && !option.isDisabled)
-        : id === translation.provider && id !== 'cloud',
-    })),
-  ], [localModelOptions, providerLabels, t, translation.localModelId, translation.provider])
-
-  /*
-   * How deep the address goes depends on the format: Anthropic takes a bare origin and Ollama
-   * a bare host, while the OpenAI shapes include the version segment. Getting that depth wrong
-   * is hard to read off an error, so each format gets its own hint.
-   */
-  const endpointHint = useMemo(() => {
-    switch (translation.cloudApiFormat) {
-      case 'chat-responses': return t('settings.endpointHintChatResponses')
-      case 'anthropic': return t('settings.endpointHintAnthropic')
-      case 'ollama': return t('settings.endpointHintOllama')
-      default: return t('settings.endpointHintChatCompletions')
-    }
-  }, [translation.cloudApiFormat, t])
-
-  const setProvider = (value: string) => {
-    if (value === 'disabled') {
-      void updateSettings(targetLanguagePatch(NO_TRANSLATION_LANGUAGE, translation.targetLanguage)).catch(() => undefined)
-      return
-    }
-    const restoredTarget = translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? 'zh' : translation.targetLanguage
-    const supportedTargets = value === 'recognition' ? ALIYUN_LANGUAGES : value === 'index-translate' ? INDEX_TRANSLATE_LANGUAGES : undefined
-    const targetLanguage = supportedTargets && !supportedTargets.includes(restoredTarget)
-      ? 'zh' : restoredTarget
-    const languagePatch = targetLanguagePatch(targetLanguage, translation.targetLanguage)
-    void updateSettings({
-      ...languagePatch,
-      translation: { ...languagePatch.translation, provider: value as TranslationProvider },
-    }).catch(() => undefined)
-  }
-
-  /**
-   * Switching format moves the endpoint and model together: the engine appends the path
-   * each format needs, so a leftover base is silently wrong (an OpenAI base plus
-   * `/api/chat` reaches OpenAI, not Ollama). A field is replaced only while it still equals
-   * the default of the format being left, so swapping the two OpenAI shapes changes nothing.
-   */
-  const setApiFormat = (value: string) => {
-    const next = value as CloudApiFormat
-    const previous = translation.cloudApiFormat
-    if (next === previous) return
-    const from = CLOUD_FORMAT_DEFAULTS[previous]
-    const to = CLOUD_FORMAT_DEFAULTS[next]
-    const patch: Partial<TranslationSettings> = { cloudApiFormat: next }
-    if (translation.cloudEndpoint === from.cloudEndpoint) patch.cloudEndpoint = to.cloudEndpoint
-    if (translation.cloudModel === from.cloudModel) patch.cloudModel = to.cloudModel
-    void updateSettings({ translation: patch }).catch(() => undefined)
-  }
-
-  const setFallbackApiFormat = (value: string) => {
-    const next = value as CloudApiFormat
-    const previous = translation.fallback.cloudApiFormat
-    if (next === previous) return
-    const from = CLOUD_FORMAT_DEFAULTS[previous]
-    const to = CLOUD_FORMAT_DEFAULTS[next]
-    const patch: Partial<TranslationSettings['fallback']> = { cloudApiFormat: next }
-    if (translation.fallback.cloudEndpoint === from.cloudEndpoint) patch.cloudEndpoint = to.cloudEndpoint
-    if (translation.fallback.cloudModel === from.cloudModel) patch.cloudModel = to.cloudModel
-    void updateSettings({ translation: { fallback: patch } }).catch(() => undefined)
-  }
 
   return (
     <div className="settings-panel" data-onboarding="translation-settings">
       <SettingGroup onboardingTarget="translation-service" legend={t('settings.groupProvider')}>
-        <SettingsRow
-          onboardingTarget="translation-provider"
-          label={t('settings.provider')}
-          desc={t('settings.aliyunTranslationHint')}
-          descriptionTooltip
-        >
-          <SettingSelect
-            value={translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? 'disabled' : translation.provider}
-            options={providerOptions}
-            ariaLabel={t('settings.provider')}
-            onChange={setProvider}
-          />
-        </SettingsRow>
-        {translation.provider === 'local' && translation.targetLanguage !== NO_TRANSLATION_LANGUAGE ? (localModelOptions.length === 0 ? (
-          <SettingsRow onboardingTarget="translation-model" label={t('settings.model')}>
-            <span className="nola-caption text-muted">{t('settings.localModelEmpty')}</span>
-          </SettingsRow>
-        ) : (
-          <SettingsRow onboardingTarget="translation-model" label={t('settings.model')}>
-            <SettingSelect
-              value={translation.localModelId}
-              options={localModelOptions}
-              ariaLabel={t('settings.model')}
-              onChange={(value) => {
-                void updateSettings({ translation: { localModelId: value } }).catch(() => undefined)
-              }}
-            />
-          </SettingsRow>
-        )) : null}
-        {translation.targetLanguage !== NO_TRANSLATION_LANGUAGE && supportsIntermediateTranslation(translation.provider) ? <SettingsRow label={t('settings.translateIntermediate')} desc={t('settings.translateIntermediateHint')} descriptionTooltip>
-          <SettingSwitch
-            isSelected={translation.translateIntermediate}
-            ariaLabel={t('settings.translateIntermediate')}
-            onChange={(next) => {
-              void updateSettings({ translation: { translateIntermediate: next } }).catch(() => undefined)
-            }}
-          />
+        {translation.targetLanguage !== 'none' && supportsIntermediateTranslation(translation.provider) ? <SettingsRow label={t('settings.translateIntermediate')} desc={t('settings.translateIntermediateHint')} descriptionTooltip>
+          <SettingSwitch isSelected={translation.translateIntermediate} ariaLabel={t('settings.translateIntermediate')}
+            onChange={next => { void updateSettings({ translation: { translateIntermediate: next } }).catch(() => undefined) }} />
         </SettingsRow> : null}
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => navigate('#/models')}>{t('modelsPolicy.title')}</Button>
+          <Tooltip>
+            <TooltipTrigger render={<Button variant="secondary" size="icon-xs" className="min-h-6 border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('modelsPolicy.defaultHint')} />}>
+              <CircleHelp aria-hidden="true" />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="z-popup max-w-96 whitespace-normal">{t('modelsPolicy.defaultHint')}</TooltipContent>
+          </Tooltip>
+        </div>
       </SettingGroup>
-
-      <SettingGroup legend={t('settings.fallbackTranslation')}>
-        <SettingsRow label={t('settings.fallbackProvider')} desc={t('settings.fallbackTranslationHint')} descriptionTooltip>
-          <SettingSelect
-            value={translation.fallback?.provider ?? 'disabled'}
-            options={fallbackProviderOptions}
-            ariaLabel={t('settings.fallbackProvider')}
-            onChange={(value) => { void updateSettings({ translation: { fallback: { provider: value as TranslationSettings['fallback']['provider'] } } }).catch(() => undefined) }}
-          />
-        </SettingsRow>
-        {translation.fallback?.provider === 'local' ? <SettingsRow onboardingTarget="translation-model" label={t('settings.model')} desc={t('settings.fallbackLocalModelHint')} descriptionTooltip>
-          <span className="nola-caption text-muted">{localModelOptions.find((option) => option.value === translation.localModelId)?.label ?? translation.localModelId}</span>
-        </SettingsRow> : null}
-        {translation.fallback?.provider === 'cloud' ? <>
-          <TextRow label={t('settings.endpoint')} value={translation.fallback.cloudEndpoint} onCommit={(value) => { void updateSettings({ translation: { fallback: { cloudEndpoint: value } } }).catch(() => undefined) }} />
-          <ApiKeyRow provider="fallback-cloud" stored={credentials['fallback-cloud']} />
-          <SettingsRow label={t('settings.apiFormat')}><SettingSelect value={translation.fallback.cloudApiFormat} options={apiFormatOptions} ariaLabel={t('settings.apiFormat')} onChange={setFallbackApiFormat} /></SettingsRow>
-          <TextRow label={t('settings.modelId')} value={translation.fallback.cloudModel} onCommit={(value) => { void updateSettings({ translation: { fallback: { cloudModel: value } } }).catch(() => undefined) }} />
-          <NumberRow label={t('settings.contextWindow')} value={translation.fallback.cloudContextWindow} onCommit={(value) => { void updateSettings({ translation: { fallback: { cloudContextWindow: value } } }).catch(() => undefined) }} />
-          <NumberRow label={t('settings.maxOutputTokens')} value={translation.fallback.cloudMaxOutputTokens} onCommit={(value) => { void updateSettings({ translation: { fallback: { cloudMaxOutputTokens: value } } }).catch(() => undefined) }} />
-        </> : null}
-        {translation.fallback?.provider === 'microsoft' ? <>
-          <TextRow label={t('settings.endpoint')} value={translation.fallback.microsoftEndpoint} onCommit={(value) => { void updateSettings({ translation: { fallback: { microsoftEndpoint: value } } }).catch(() => undefined) }} />
-          <TextRow label={t('settings.region')} value={translation.fallback.microsoftRegion} onCommit={(value) => { void updateSettings({ translation: { fallback: { microsoftRegion: value } } }).catch(() => undefined) }} />
-          <ApiKeyRow provider="microsoft" stored={credentials.microsoft} />
-        </> : null}
-        {translation.fallback?.provider === 'mymemory' ? <>
-          <TextRow label={t('settings.endpoint')} value={translation.fallback.mymemoryEndpoint} onCommit={(value) => { void updateSettings({ translation: { fallback: { mymemoryEndpoint: value } } }).catch(() => undefined) }} />
-          <TextRow label={t('settings.mymemoryEmail')} value={translation.fallback.mymemoryEmail} onCommit={(value) => { void updateSettings({ translation: { fallback: { mymemoryEmail: value } } }).catch(() => undefined) }} />
-        </> : null}
-        {translation.fallback?.provider === 'google' ? <>
-          <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{GOOGLE_TRANSLATE_ENDPOINT}</span></SettingsRow>
-          <ApiKeyRow provider="fallback-google" stored={credentials['fallback-google']} />
-        </> : null}
-        {translation.fallback?.provider === 'index-translate' ? <SettingsRow label={t('settings.providerIndexTranslate')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_PUBLIC_MODEL}</span></SettingsRow> : null}
-      </SettingGroup>
-
-      {translation.provider === 'index-translate' ? (
-        <SettingGroup legend={t('settings.groupConnection')}>
-          <SettingsRow onboardingTarget="translation-model" label={t('settings.model')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_PUBLIC_MODEL}</span></SettingsRow>
-          <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_ENDPOINT}</span></SettingsRow>
-        </SettingGroup>
-      ) : translation.provider === 'mymemory' ? (
-        <SettingGroup legend={t('settings.groupConnection')}>
-          <SettingsRow label={t('settings.providerMyMemory')} desc={t('settings.mymemoryHint')} descriptionTooltip children={null} />
-          <TextRow label={t('settings.endpoint')} value={translation.mymemoryEndpoint ?? 'https://api.mymemory.translated.net/get'} onCommit={value => { void updateSettings({ translation: { mymemoryEndpoint: value } }).catch(() => undefined) }} />
-          <TextRow label={t('settings.mymemoryEmail')} value={translation.mymemoryEmail ?? ''} onCommit={value => { void updateSettings({ translation: { mymemoryEmail: value } }).catch(() => undefined) }} />
-        </SettingGroup>
-      ) : translation.provider === 'google' ? (
-        <SettingGroup legend={t('settings.groupConnection')}>
-          <SettingsRow label={t('settings.providerGoogle')} children={null} />
-          <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{GOOGLE_TRANSLATE_ENDPOINT}</span></SettingsRow>
-          <ApiKeyRow provider="google" stored={credentials.google} />
-        </SettingGroup>
-      ) : translation.provider === 'recognition' ? (
-        <SettingGroup legend={t('settings.groupConnection')}><SettingsRow label={t('settings.providerRecognitionTranslation')} desc={t('settings.nativeTranslationHint')} children={null} /></SettingGroup>
-      ) : null}
-
-      {translation.provider === 'cloud' ? (
-        <SettingGroup legend={t('settings.groupConnection')}>
-          <TextRow
-            label={t('settings.apiName')}
-            placeholder={t('settings.apiNamePlaceholder')}
-            value={translation.cloudName}
-            onCommit={(value) => {
-              void updateSettings({ translation: { cloudName: value } }).catch(() => undefined)
-            }}
-          />
-          <TextRow
-            label={t('settings.endpoint')}
-            desc={endpointHint}
-            descriptionTooltip
-            placeholder={t('settings.endpointPlaceholder')}
-            value={translation.cloudEndpoint}
-            onCommit={(value) => {
-              void updateSettings({ translation: { cloudEndpoint: value } }).catch(() => undefined)
-            }}
-          />
-          <ApiKeyRow provider={translation.customModelId ? customCredentialSlot(translation.customModelId) : 'cloud'} stored={!!credentials[translation.customModelId ? customCredentialSlot(translation.customModelId) : 'cloud']} />
-          <SettingsRow label={t('settings.apiFormat')}>
-            <SettingSelect
-              value={translation.cloudApiFormat}
-              options={apiFormatOptions}
-              ariaLabel={t('settings.apiFormat')}
-              onChange={setApiFormat}
-            />
-          </SettingsRow>
-          <TextRow
-            label={t('settings.modelId')}
-            value={translation.cloudModel}
-            onCommit={(value) => {
-              void updateSettings({ translation: { cloudModel: value } }).catch(() => undefined)
-            }}
-          />
-          <NumberRow
-            label={t('settings.contextWindow')}
-            value={translation.cloudContextWindow}
-            onCommit={(value) => {
-              void updateSettings({ translation: { cloudContextWindow: value } }).catch(() => undefined)
-            }}
-          />
-          <NumberRow
-            label={t('settings.maxOutputTokens')}
-            value={translation.cloudMaxOutputTokens}
-            onCommit={(value) => {
-              void updateSettings({ translation: { cloudMaxOutputTokens: value } }).catch(() => undefined)
-            }}
-          />
-        </SettingGroup>
-      ) : null}
-
-      {translation.provider === 'microsoft' ? (
-        <SettingGroup legend={t('settings.groupConnection')}>
-          <TextRow
-            label={t('settings.endpoint')}
-            value={translation.microsoftEndpoint}
-            onCommit={(value) => {
-              void updateSettings({ translation: { microsoftEndpoint: value } }).catch(() => undefined)
-            }}
-          />
-          <TextRow
-            label={t('settings.region')}
-            value={translation.microsoftRegion}
-            onCommit={(value) => {
-              void updateSettings({ translation: { microsoftRegion: value } }).catch(() => undefined)
-            }}
-          />
-          <ApiKeyRow provider="microsoft" stored={credentials.microsoft} />
-        </SettingGroup>
-      ) : null}
     </div>
   )
 }

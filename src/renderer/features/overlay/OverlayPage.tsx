@@ -1,5 +1,5 @@
+import { ModelAvailabilityLabel } from '@/features/workspace/ModelAvailabilityLabel'
 import { useModelOptions } from '@/model-options'
-import { cloudModelsOf, cloudModelSettingsPatch } from '../models/CloudModels'
 import { translationLanguages } from '../../../shared/model-capabilities'
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
@@ -17,7 +17,8 @@ import { useRoute } from '@/routes'
 import { actions, sessionStore, stores, updateSettings, useStore } from '@/store'
 import { swappedLanguagesOf, targetLanguagePatch, translationModelPatch } from '@/session-config'
 import { PageHeader } from '@/components/primitives'
-import { notifyError } from '@/components/primitives/notify'
+import { notifyError, notifyInfo } from '@/components/primitives/notify'
+import { useAvailableModels, useModelSelection, type AvailableModel } from '@/available-models'
 import { SettingSelect } from '../settings/SettingsPage'
 import { captionScrimColor } from './scrimColor'
 
@@ -28,27 +29,28 @@ export function OverlayPage() {
   const modelOptions = useModelOptions()
   const resources = useStore(stores.models, state => state.resources)
   const credentials = useStore(stores.models, state => state.credentials)
-  const cloudModels = cloudModelsOf(settings, credentials).filter(model => model.ready)
-  const cloudNames = {
-    cloud: t('modelsSettingsUi.cloudService'), microsoft: t('settings.providerMicrosoft'), mymemory: t('settings.providerMyMemory'),
-    google: t('settings.providerGoogle'), 'index-translate': t('settings.providerIndexTranslate'),
-    aliyun: t('modelsSettingsUi.aliyunAsr'), minimax: t('settings.providerMiniMax'), recognition: t('settings.providerRecognitionTranslation'),
-  }
-  const cloudChoice = (model: typeof cloudModels[number]) => ({ value: model.id, label: model.profile?.name ?? cloudNames[model.id as keyof typeof cloudNames] })
-  const recognitionChoices = [...modelOptions.localRecognitionModels, ...cloudModels.filter(model => model.kind === 'recognitionModel').map(cloudChoice)]
-  const recognitionValue = (settings.recognition.provider ?? 'local') === 'local' ? settings.recognition.modelId : settings.recognition.provider ?? 'local'
-  const translationValue = settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? NO_TRANSLATION_LANGUAGE
-    : settings.translation.provider === 'local' ? settings.translation.localModelId
-      : settings.translation.provider === 'cloud' ? `custom:${settings.translation.customModelId || 'legacy'}` : settings.translation.provider
-  const translationChoices = [{ value: NO_TRANSLATION_LANGUAGE, label: t('workspaceUi.translationOff') },
-    ...modelOptions.translationModels, ...cloudModels.filter(model => model.kind === 'translationModel').map(cloudChoice)]
-  if (!translationChoices.some(model => model.value === translationValue)) translationChoices.push({ value: translationValue, label: modelOptions.translation?.name ?? translationValue, isDisabled: true })
+  // The overlay follows what is callable now: the model the gateway loaded, plus configured cloud
+  // interfaces. A stale local selection moves on its own instead of failing when captions start.
+  const catalog = useAvailableModels()
+  const reportSwitch = (model: AvailableModel) => notifyInfo(t('gateway.modelSwitched', { name: model.name }),
+    { description: t(model.origin === 'gateway' ? 'gateway.modelSwitchedLoaded' : 'gateway.modelSwitchedCloud') })
+  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch)
+  const translationDisabled = settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE
+  // With translation switched off there is nothing to repair: replacing its model would re-enable it.
+  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationDisabled)
+  const asrOptions: { value: string; label: string; isDisabled?: boolean }[] = catalog.asr.length
+    ? catalog.asr.map(model => ({ value: model.binding, label: model.name }))
+    : [{ value: '', label: t('gateway.modelNoneShort'), isDisabled: true }]
+  const translationValue = translationDisabled ? NO_TRANSLATION_LANGUAGE : mt.binding
+  const translationChoices: { value: string; label: string; isDisabled?: boolean }[] = [{ value: NO_TRANSLATION_LANGUAGE, label: t('workspaceUi.translationOff') },
+    ...catalog.mt.map(model => ({ value: model.binding, label: model.name }))]
+  if (!translationChoices.some(model => model.value === translationValue)) translationChoices.push({ value: translationValue, label: t('gateway.modelNoneShort'), isDisabled: true })
   const devices = useStore(stores.models, state => state.devices)
   const session = useStore(sessionStore, state => state)
-  const sessionActive = !['idle', 'error'].includes(session.status)
+  const browserActive = useStore(stores.settings, state => state.browser?.captionServiceActive === true || state.captionServiceBusy)
+  const sessionActive = !['idle', 'error'].includes(session.status) || browserActive
   const [opening, setOpening] = useState(false)
   const config = settings.overlay
-  const translationDisabled = settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE
   const display = translationDisabled ? 'source' : config.showSource && config.showTranslation ? 'both' : config.showSource ? 'source' : 'translation'
   const label = (code: string) => languageName(code, language)
   const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch(() => undefined) }
@@ -120,13 +122,12 @@ export function OverlayPage() {
             </div>
             <div className="nola-caption-preview__controls">
               {/*
-               * Mirrors the control bar's six items in order: mic, recognition
-               * model, source language, target language, display, layout. Only the
+               * Mirrors the control bar's five items in order: mic, source
+               * language, target language, display, layout. Only the
                * last two carry a chevron, because only those two open menus in
                * the real window.
                */}
               <span className="nola-caption-preview__mic">{sessionActive ? <Square /> : <Mic />}</span>
-              <span className="nola-caption-preview__pill">{modelOptions.recognitionModels.find(model => model.value === settings.recognition.modelId)?.label ?? settings.recognition.modelId}</span>
               <span className="nola-caption-preview__pill">{label(settings.recognition.sourceLanguage)}</span>
               <span className="nola-caption-preview__pill">{label(settings.translation.targetLanguage)}</span>
               <span className="nola-caption-preview__pill">{t(display === 'both' ? 'workspace.modeBoth' : display === 'source' ? 'workspace.modeSource' : 'workspace.modeTranslation')}<ChevronDown /></span>
@@ -139,25 +140,16 @@ export function OverlayPage() {
         <CardHeader><CardTitle>{t('settings.title')}</CardTitle></CardHeader>
         <CardContent className="nola-overlay-fields">
           <div className="nola-overlay-field">
-            <span className="text-sm text-muted">{t('session.recognitionModel')}</span>
-            <SettingSelect value={recognitionValue} ariaLabel={t('session.recognitionModel')} isDisabled={sessionActive}
-              options={recognitionChoices.length ? recognitionChoices : [{ value: recognitionValue, label: recognitionValue, isDisabled: true }]} onChange={value => {
-                const cloud = cloudModels.find(model => model.kind === 'recognitionModel' && model.id === value)
-                const next = cloud ? cloudModelSettingsPatch(settings, cloud) : { recognition: { provider: 'local' as const, modelId: value } }
-                if (next) patch(next)
-              }} />
+            <span className="text-sm text-muted"><ModelAvailabilityLabel label={t('session.recognitionModel')} hint={t('gateway.modelNoneHint')} /></span>
+            <SettingSelect value={asr.binding} ariaLabel={t('session.recognitionModel')} isDisabled={sessionActive}
+              options={asrOptions} onChange={value => asr.select(value)} />
           </div>
           <div className="nola-overlay-field">
-            <span className="text-sm text-muted">{t('session.translationModel')}</span>
+            <span className="text-sm text-muted"><ModelAvailabilityLabel label={t('session.translationModel')} hint={t('gateway.modelNoneHint')} /></span>
             <SettingSelect value={translationValue} ariaLabel={t('session.translationModel')} isDisabled={sessionActive}
               options={translationChoices} onChange={value => {
                 if (value === NO_TRANSLATION_LANGUAGE) patch(targetLanguagePatch(value, targetLanguage))
-                else {
-                  const cloud = cloudModels.find(model => model.kind === 'translationModel' && model.id === value)
-                  const model = resources.find(item => item.resourceId === value)
-                  const next = cloud ? cloudModelSettingsPatch(settings, cloud) : model ? translationModelPatch(settings, model) : null
-                  if (next) patch(next)
-                }
+                else mt.select(value)
               }} />
           </div>
           <div className="nola-overlay-field">

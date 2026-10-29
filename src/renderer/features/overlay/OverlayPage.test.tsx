@@ -21,13 +21,14 @@ const initialModels = stores.models.getState()
 const profile = { id: 'saved', name: 'Saved cloud translator', endpoint: 'https://example.com/v1', model: 'translator', apiFormat: 'chat-completions' as const, contextWindow: 32768, maxOutputTokens: 1024, languages: ['zh', 'en'] }
 beforeEach(() => {
   stores.settings.setState({ settings: { ...structuredClone(DEFAULT_SETTINGS), uiLanguage: 'zh-CN',
+    modelPolicy: { enabled: { 'mt:mt-custom:saved': true, 'mt:cloud:microsoft': true, 'asr:cloud:aliyun': true }, defaults: {}, selections: {} },
     recognition: { ...DEFAULT_SETTINGS.recognition, aliyunWorkspaceId: 'workspace' },
     translation: { ...DEFAULT_SETTINGS.translation, customModels: [profile] } } })
   stores.models.setState({ ...initialModels, credentials: { ...initialModels.credentials, microsoft: true, 'aliyun-asr': true } })
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); stores.settings.setState(initialSettings); stores.models.setState(initialModels) })
 
-it('lists configured cloud translators and recognition services before they are selected', () => {
+it('lists enabled configured cloud translators and recognition services before they are selected', () => {
   render(<OverlayPage />)
   const translation = within(screen.getByRole('combobox', { name: '翻译模型' }))
   expect(translation.getByRole('option', { name: 'Saved cloud translator' })).toBeEnabled()
@@ -39,9 +40,18 @@ it('selects a saved cloud profile with its connection and restores disabled tran
   stores.settings.setState({ settings: { ...settings, translation: { ...settings.translation, targetLanguage: 'none' } } })
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
   render(<OverlayPage />)
-  fireEvent.change(screen.getByRole('combobox', { name: '翻译模型' }), { target: { value: 'custom:saved' } })
+  fireEvent.change(screen.getByRole('combobox', { name: '翻译模型' }), { target: { value: 'mt-custom:saved' } })
   expect(update).toHaveBeenCalledWith(expect.objectContaining({
     translation: expect.objectContaining({ provider: 'cloud', customModelId: 'saved', cloudEndpoint: profile.endpoint, targetLanguage: 'zh' }),
     overlay: { showTranslation: true },
   }))
+})
+
+
+it('hides configured cloud services after they are disabled', () => {
+  const settings = stores.settings.getState().settings!
+  stores.settings.setState({ settings: { ...settings, modelPolicy: { enabled: {}, defaults: {}, selections: {} } } })
+  render(<OverlayPage />)
+  expect(within(screen.getByRole('combobox', { name: '翻译模型' })).queryByRole('option', { name: 'Saved cloud translator' })).toBeNull()
+  expect(within(screen.getByRole('combobox', { name: '识别模型' })).getByRole('option', { name: '暂无可用模型' })).toBeDisabled()
 })

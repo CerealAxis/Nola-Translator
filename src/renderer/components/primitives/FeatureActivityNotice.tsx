@@ -7,39 +7,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { notifyError, notifyInfo, notifySuccess } from './notify'
 import type { ModelGatewaySnapshot } from '../../../shared/model-gateway'
 
-interface FeatureRequest { owner: ActiveFeature; retry: () => Promise<void>; cancel: () => void }
-const listeners = new Set<(request: FeatureRequest | null) => void>()
-let pending: FeatureRequest | null = null
-function publish(request: FeatureRequest | null) { pending = request; listeners.forEach(listener => listener(request)) }
-
-/** A conflict is a recoverable user choice; all other failures retain the caller's error path. */
-export async function requestFeatureStart<T>(action: () => Promise<T>, feature?: ActiveFeature): Promise<T | undefined> {
-  try {
-    const activity = feature ? await getBridge()?.activity?.snapshot() : undefined
-    if (activity?.owner && activity.owner !== feature) throw new Error(`FEATURE_CONFLICT:${activity.owner}`)
-    return await action()
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    const owner = /FEATURE_CONFLICT:(workbench|interpretation|browser-captions|model-gateway)/.exec(message)?.[1] as ActiveFeature | undefined
-    if (!owner) throw error
-    return new Promise<T | undefined>((resolve, reject) => {
-      pending?.cancel()
-      publish({ owner, cancel: () => { publish(null); resolve(undefined) }, retry: async () => {
-        const activity = getBridge()?.activity
-        if (!activity) { reject(new Error('Feature activity is unavailable')); publish(null); return }
-        try { await activity.stop(); const result = await action(); publish(null); resolve(result) }
-        catch (cause) { publish(null); reject(cause); throw cause }
-      } })
-    })
-  }
+/** Independent consumers share gateway capabilities without stopping another feature. */
+export async function requestFeatureStart<T>(action: () => Promise<T>, _feature?: ActiveFeature): Promise<T> {
+  return action()
 }
 
 export function FeatureActivityNotice() {
   const { t } = useI18n()
-  const [request, setRequest] = useState(pending)
   const [quit, setQuit] = useState(false)
   const [busy, setBusy] = useState(false)
-  useEffect(() => { listeners.add(setRequest); return () => { listeners.delete(setRequest) } }, [])
   useEffect(() => getBridge()?.onQuitRequested?.(() => setQuit(true)), [])
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('workspace') === '1') return
@@ -51,13 +27,15 @@ export function FeatureActivityNotice() {
     const receive = (snapshot: ModelGatewaySnapshot) => {
       received = true
       if (previous && document.visibilityState !== 'hidden') {
-        for (const kind of ['asr', 'mt', 'tts'] as const) {
+        for (const kind of ['asr', 'mt', 'tts', 'llm'] as const) {
           const service = snapshot.services[kind]
           const before = previous.services[kind]
           if (service.state === 'failed' && (before.state !== 'failed' || before.error !== service.error)) {
             console.error(`[gateway.${kind}]`, service.error)
             notifyError(t('gateway.capabilityFailed', { name: t(`gateway.${kind}`) }), {
-              description: t(/memory|oom|cuda.*alloc/i.test(service.error ?? '') ? 'gateway.memoryFailed' : 'gateway.serviceFailed'),
+              description: t(service.errorCode === 'model_disabled' ? 'modelsPolicy.modelDisabled'
+                : service.errorCode === 'model_not_loaded' || service.errorCode === 'model_not_found' ? 'modelsPolicy.modelNotLoaded'
+                  : /memory|oom|cuda.*alloc/i.test(service.error ?? '') ? 'gateway.memoryFailed' : 'gateway.serviceFailed'),
             })
           }
         }
@@ -74,17 +52,16 @@ export function FeatureActivityNotice() {
   const confirm = async () => {
     setBusy(true)
     try {
-      if (quit) { await getBridge()?.confirmQuit?.(); setQuit(false) }
-      else await request?.retry()
+      await getBridge()?.confirmQuit?.(); setQuit(false)
     } catch (error) { console.error('[feature-activity]', error); if (quit) notifyError(t('gateway.actionFailed')) }
     finally { setBusy(false) }
   }
-  return <Dialog open={!!request || quit} onOpenChange={open => { if (!open && !busy) { request?.cancel(); setQuit(false) } }}>
+  return <Dialog open={quit} onOpenChange={open => { if (!open && !busy) setQuit(false) }}>
     <DialogContent>
-      <DialogHeader><DialogTitle>{t(quit ? 'gateway.quitTitle' : 'gateway.conflictTitle')}</DialogTitle>
-        <DialogDescription>{quit ? t('gateway.quitDescription') : t('gateway.conflictDescription', { name: request ? t(`gateway.${request.owner}`) : '' })}</DialogDescription></DialogHeader>
-      <DialogFooter><Button variant="secondary" disabled={busy} onClick={() => { request?.cancel(); setQuit(false) }}>{t('common.cancel')}</Button>
-        <Button disabled={busy} onClick={() => void confirm()}>{t(quit ? 'gateway.quit' : 'gateway.switchFeature')}</Button></DialogFooter>
+      <DialogHeader><DialogTitle>{t('gateway.quitTitle')}</DialogTitle>
+        <DialogDescription>{t('gateway.quitDescription')}</DialogDescription></DialogHeader>
+      <DialogFooter><Button variant="secondary" disabled={busy} onClick={() => setQuit(false)}>{t('common.cancel')}</Button>
+        <Button disabled={busy} onClick={() => void confirm()}>{t('gateway.quit')}</Button></DialogFooter>
     </DialogContent>
   </Dialog>
 }

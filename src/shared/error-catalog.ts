@@ -27,6 +27,8 @@ interface SupportErrorEntry {
 }
 
 export const SUPPORT_ERROR_CATALOG = {
+  'MDL-024': { messageKey: 'modelsPolicy.modelDisabled', retryable: false, causes: ['MODELDISABLED'] },
+  'MDL-025': { messageKey: 'modelsPolicy.modelNotLoaded', retryable: false, causes: ['MODELNOTLOADED', 'MODELNOTFOUND'] },
   'ARG-001': { messageKey: 'errors.invalidArgument', retryable: false, causes: ['INVALID_ARGUMENT'] },
   'ARG-002': { messageKey: 'errors.meetingNameEmpty', retryable: false, causes: ['MEETING_NAME_EMPTY'] },
   'ARG-003': { messageKey: 'errors.meetingNotFound', retryable: false, causes: ['MEETING_NOT_FOUND'] },

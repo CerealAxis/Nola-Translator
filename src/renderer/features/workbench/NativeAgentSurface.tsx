@@ -1,3 +1,4 @@
+import { ModelAvailabilityLabel } from '@/features/workspace/ModelAvailabilityLabel'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AttachmentPrimitive, ComposerPrimitive, AuiIf, MessagePrimitive, ThreadPrimitive, useAui, useAuiState, useMessageTiming, type ToolCallMessagePart, type ToolCallMessagePartProps } from '@assistant-ui/react'
 import { Archive, BrainCircuit, ChevronLeft, ChevronRight, Ellipsis, Minus, PanelLeft, Pin, Plus, Search, Settings2, Square, X } from 'lucide-react'
@@ -437,10 +438,7 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
   const contextWindow = profile?.contextWindow ?? selected?.contextWindow ?? 0
   const send = () => { if (preparing || running) aui.thread.composer().cancel(); else if (props.config.model && (text.trim() || attachments.length)) aui.thread.composer().send() }
   const pick = (change: Partial<PlaygroundConfig>, closeMenu = true) => {
-    if ('model' in change || 'kind' in change) aui.thread.cancelRun()
-    if (change.model !== undefined && change.model !== props.config.model) {
-      void import('@/store').then(({ getBridge }) => getBridge()?.app.releaseDirectModel?.()).catch(() => undefined)
-    }
+    if (preparing || running) return
     const model = props.models.find(item => item.id === change.model)
     props.onChange({ ...props.config, ...change,
       ...(model?.sourceLanguages?.length && !model.sourceLanguages.includes(props.config.source) ? { source: model.sourceLanguages[0] } : {}),
@@ -459,7 +457,7 @@ function NativeComposer(props: NativeAgentSurfaceProps) {
   }
   return <Composer className="max-w-none" data-testid="native-composer">
     {!!savedDraft && !text && <DraftRestore draft={savedDraft} savedAt={t('workbench.nativeDraft')} onRestore={() => { aui.thread.composer().setText(savedDraft); setSavedDraft('') }} onDiscard={() => { setSavedDraft(''); try { localStorage.removeItem(`nola.native.draft:${threadId}`) } catch { /* Keep dismissing usable when storage is unavailable. */ } }} />}
-    {menu === 'models' && <ComposerMenu open anchor="models"><ComposerInput placeholder={t('workbench.searchModels')} value={modelQuery} onChange={event => setModelQuery(event.target.value)} />{(['llm', 'asr', 'mt', 'tts'] as const).map(kind => <div key={kind}><p className="px-2.5 py-2 text-xs text-muted-foreground">{t(`workbench.${kind}`)}</p>{props.models.filter(model => model.kind === kind && model.name.toLowerCase().includes(modelQuery.toLowerCase())).map(model => <ComposerModelItem key={model.id} entry={{ name: model.name, meta: t(`workbench.${kind}`) }} selected={props.config.model === model.id} onClick={() => pick({ model: model.id, kind: model.kind, images: model.images, voice: '' })} />)}</div>)}<ComposerMenuItem onClick={props.onConfigure}><Settings2 className="size-4" aria-hidden="true" />{t('nav.models')}</ComposerMenuItem></ComposerMenu>}
+    {menu === 'models' && <ComposerMenu open anchor="models"><p className="px-2.5 py-2 text-xs text-muted-foreground"><ModelAvailabilityLabel label={t('nav.models')} hint={t('gateway.modelNoneHint')} /></p><ComposerInput placeholder={t('workbench.searchModels')} value={modelQuery} onChange={event => setModelQuery(event.target.value)} />{(['llm', 'asr', 'mt', 'tts'] as const).map(kind => <div key={kind}><p className="px-2.5 py-2 text-xs text-muted-foreground">{t(`workbench.${kind}`)}</p>{props.models.filter(model => model.kind === kind && model.name.toLowerCase().includes(modelQuery.toLowerCase())).map(model => <ComposerModelItem key={model.id} entry={{ name: model.name, meta: t(`workbench.${kind}`) }} selected={props.config.model === model.id} onClick={() => pick({ model: model.id, kind: model.kind, images: model.images, voice: '' })} />)}</div>)}<ComposerMenuItem onClick={props.onConfigure}><Settings2 className="size-4" aria-hidden="true" />{t('nav.models')}</ComposerMenuItem></ComposerMenu>}
     {menu === 'effort' && <ComposerMenu open anchor="effort" className="w-80 gap-3 p-3"><ReasoningEffort variant="slider" levels={(['auto', 'low', 'medium', 'high'] as const).map(key => ({ key, label: t(key === 'auto' ? 'modelsSettingsUi.default' : `workbench.${key}`) }))} selectedKey={props.config.effort} title={t('workbench.reasoningTokens')} onSelect={effort => pick({ effort }, false)} /></ComposerMenu>}
     {menu === 'language' && <ComposerMenu open anchor="language">{(props.config.kind === 'mt' ? targetCodes : sourceCodes).map(code => <ComposerMenuItem key={code} onClick={() => pick(props.config.kind === 'mt' ? { target: code } : { source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}
     {menu === 'source' && <ComposerMenu open anchor="source">{sourceCodes.map(code => <ComposerMenuItem key={code} onClick={() => pick({ source: code })}>{code === 'auto' ? t('workbench.auto') : languageName(code, language)}</ComposerMenuItem>)}</ComposerMenu>}

@@ -6,7 +6,7 @@ import { z } from 'zod'
 import type { LanguageModelServices } from './language-model'
 import { runDirectModel } from './direct-model'
 import type { AgentProject } from '../shared/agent-workspace'
-import { customModelsOf } from '../shared/custom-models'
+import { defaultModelBinding, isModelEnabled } from '../shared/model-policy'
 
 export interface AgentToolContext {
   services: LanguageModelServices
@@ -25,24 +25,11 @@ export interface AgentToolContext {
 /** Resolve at execution time so a settings change never leaves tools using a stale model. */
 export function defaultAgentModel(services: LanguageModelServices, kind: 'asr' | 'mt' | 'tts'): string {
   const settings = services.getSettings()
-  if (kind === 'asr') {
-    const provider = settings.recognition.provider ?? 'local'
-    if (provider !== 'local') return `cloud:${provider}`
-    if (settings.recognition.modelId) return `resource:${settings.recognition.modelId}`
-  } else if (kind === 'tts') {
-    if (settings.synthesis.modelId) return `resource:${settings.synthesis.modelId}`
-  } else {
-    const translation = settings.translation
-    if (translation.targetLanguage === 'none') throw new Error('Translation is disabled in Model Management')
-    if (translation.provider === 'local' && translation.localModelId) return `resource:${translation.localModelId}`
-    if (translation.provider === 'cloud') {
-      const profile = customModelsOf(translation).find(item => item.id === (translation.customModelId || 'legacy'))
-      if (profile) return `mt-custom:${profile.id}`
-    } else if (translation.provider === 'recognition') {
-      throw new Error('The active translation provider only works during live recognition; enable an independent default translation model in Model Management')
-    } else if (translation.provider !== 'local') return `cloud:${translation.provider}`
-  }
-  throw new Error(`No default ${kind} model is enabled in Model Management`)
+  const binding = defaultModelBinding(settings, kind)
+  if (!binding) throw new Error(`No default ${kind} model is enabled in Model Management`)
+  if (!isModelEnabled(settings, kind, binding)) throw new Error(`The default ${kind} model is disabled in Model Management`)
+  if (binding === 'cloud:recognition') throw new Error('The active translation provider only works during live recognition; enable an independent default translation model in Model Management')
+  return binding
 }
 
 export async function nativeAgentTools(context: AgentToolContext): Promise<ToolSet> {

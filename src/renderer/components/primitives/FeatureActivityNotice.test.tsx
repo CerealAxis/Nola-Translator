@@ -10,32 +10,26 @@ vi.mock('./notify', () => ({ notifyError: vi.fn(), notifyInfo: vi.fn(), notifySu
 
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
-describe('feature conflict coordination', () => {
-  it('asks before stopping the owner and starts only after the stop completes', async () => {
+describe('independent feature activity', () => {
+  it('starts a consumer while the gateway runs without stopping it', async () => {
     const stop = vi.fn().mockResolvedValue(undefined)
     vi.spyOn(store, 'getBridge').mockReturnValue({ activity: { snapshot: async () => ({ owner: 'model-gateway', phase: 'running' }), stop } } as unknown as NolaBridge)
     render(<FeatureActivityNotice />)
     const start = vi.fn().mockResolvedValue('started')
     let result!: Promise<string | undefined>
     await act(async () => { result = requestFeatureStart(start, 'interpretation') })
-    expect(start).not.toHaveBeenCalled()
-    expect(stop).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '停止并启动' }))
     await expect(result).resolves.toBe('started')
-    expect(stop).toHaveBeenCalledOnce()
     expect(start).toHaveBeenCalledOnce()
-    expect(stop.mock.invocationCallOrder[0]).toBeLessThan(start.mock.invocationCallOrder[0])
+    expect(stop).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('cancels an atomic conflict without stopping or retrying', async () => {
+  it('preserves duplicate-start failures without stopping or retrying other tasks', async () => {
     const stop = vi.fn()
     vi.spyOn(store, 'getBridge').mockReturnValue({ activity: { stop } } as unknown as NolaBridge)
     render(<FeatureActivityNotice />)
     const start = vi.fn().mockRejectedValue(new Error('IPC: FEATURE_CONFLICT:workbench'))
-    let result!: Promise<unknown>
-    await act(async () => { result = requestFeatureStart(start) })
-    fireEvent.click(screen.getByRole('button', { name: '取消' }))
-    await expect(result).resolves.toBeUndefined()
+    await expect(requestFeatureStart(start)).rejects.toThrow('FEATURE_CONFLICT:workbench')
     expect(stop).not.toHaveBeenCalled()
     expect(start).toHaveBeenCalledOnce()
   })
@@ -58,7 +52,7 @@ describe('feature conflict coordination', () => {
 
   it('reports a failed capability once even while the other services stay running', async () => {
     const ready: ModelGatewaySnapshot = { state: 'running', address: '', port: 17860, connections: 0, activeRequests: 0, requests: [], services: {
-      asr: { state: 'ready', model: 'asr', name: 'ASR' }, mt: { state: 'ready', model: 'mt', name: 'MT' }, tts: { state: 'ready', model: 'tts', name: 'TTS' },
+      asr: { state: 'ready', model: 'asr', name: 'ASR' }, mt: { state: 'ready', model: 'mt', name: 'MT' }, tts: { state: 'ready', model: 'tts', name: 'TTS' }, llm: { state: 'ready', model: 'llm', name: 'LLM' },
     } }
     let receive!: (snapshot: ModelGatewaySnapshot) => void
     vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')

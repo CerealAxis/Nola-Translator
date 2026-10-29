@@ -75,6 +75,115 @@ def test_errors_do_not_expose_native_diagnostics():
     assert error_code(RuntimeError('private native diagnostics')) == ('inference_failed', True)
 
 
+def test_cloud_request_failure_does_not_kill_other_sessions():
+    import httpx
+    from nola_translator_engine.recognition.aliyun import CloudRecognitionError
+    assert error_code(httpx.ConnectError('private endpoint')) == ('network_unavailable', False)
+    assert error_code(CloudRecognitionError('recognitionRateLimited')) == ('rate_limited', False)
+    assert error_code(TimeoutError()) == ('request_timeout', False)
+    for status, expected in ((401, 'authentication_failed'), (429, 'rate_limited'), (504, 'request_timeout')):
+        request = httpx.Request('POST', 'https://private.example')
+        error = httpx.HTTPStatusError('private credential', request=request, response=httpx.Response(status, request=request))
+        assert error_code(error) == (expected, False)
+
+
+@run_async
+async def test_translation_stream_and_fallback_use_request_scoped_events():
+    from nola_translator_engine.translation.base import ProviderTranslation
+    events, calls = [], []
+    async def primary(text, source, target, on_text):
+        calls.append('primary')
+        on_text('partial')
+        return ProviderTranslation('complete', ('en', 'zh'))
+    async def fallback(text, source, target):
+        calls.append('fallback')
+        return ProviderTranslation('backup', ('en', 'ja'))
+    worker = GatewayWorker(events.append)
+    worker.kind = 'mt'
+    worker.runtime = SimpleNamespace(translation_provider=SimpleNamespace(translate_stream=primary))
+    worker.fallback_runtime = SimpleNamespace(translation_provider=SimpleNamespace(translate=fallback))
+    result = await worker.request({'id': 'first', 'op': 'infer', 'text': 'hello', 'source': 'en', 'target': 'zh', 'stream': True})
+    backup = await worker.request({'id': 'second', 'op': 'infer', 'text': 'hello', 'source': 'en', 'target': 'ja', 'fallback': True})
+    assert result == {'text': 'complete', 'path': ['en', 'zh']}
+    assert backup == {'text': 'backup', 'path': ['en', 'ja']}
+    assert events == [{'id': 'first', 'event': {'type': 'translation.delta', 'text': 'partial'}}]
+    assert calls == ['primary', 'fallback']
+
+
+@run_async
+async def test_native_fallback_reuses_primary_without_duplicate_runtime():
+    async def translate(text, source, target):
+        return SimpleNamespace(text='backup')
+    worker = GatewayWorker(lambda event: None)
+    worker.kind = 'mt'
+    worker.fallback_uses_primary = True
+    worker.runtime = SimpleNamespace(translation_provider=SimpleNamespace(translate=translate))
+    assert await worker.request({'op': 'infer', 'fallback': True, 'text': 'hello', 'target': 'zh'}) == {'text': 'backup'}
+
+
+@run_async
+async def test_local_translation_pair_is_validated_against_active_worker_model():
+    from nola_translator_engine.model_capabilities import translation_configuration
+    from nola_translator_engine.protocol import PrewarmConfig
+    looked_up = []
+    def configuration(model_id):
+        looked_up.append(model_id)
+        return translation_configuration(['en', 'zh'], 'llama')
+    async def translate(text, source, target):
+        return SimpleNamespace(text='你好')
+    worker = GatewayWorker(lambda event: None)
+    worker.kind = 'mt'
+    worker.config = PrewarmConfig(sourceLanguage='auto', targetLanguages=['zh'],
+        translationProvider='local', translationModelId='active-model')
+    worker.runtime = SimpleNamespace(resources=SimpleNamespace(configuration=configuration),
+        translation_provider=SimpleNamespace(translate=translate))
+    result = await worker.request({'op': 'infer', 'text': 'hello', 'source': 'en', 'target': 'zh'})
+    assert result == {'text': '你好'} and looked_up == ['active-model']
+    with pytest.raises(ValueError, match='language pair'):
+        await worker.request({'op': 'infer', 'text': 'hello', 'source': 'en', 'target': 'ja'})
+
+
+@run_async
+async def test_cloud_realtime_keeps_native_translation_revision_and_input_clock():
+    from nola_translator_engine.protocol import PrewarmConfig
+    from nola_translator_engine.recognition.base import NativeTranslation, RecognitionUpdate
+    events, frames = [], []
+    class Recognizer:
+        async def start(self):
+            pass
+
+        async def accept(self, frame):
+            frames.append(frame.started_at_ms)
+            return [RecognitionUpdate('segment', 5, frame.started_at_ms, frame.started_at_ms + 20,
+                'hello', 'en', True, NativeTranslation('zh', '你好', 'complete'))]
+
+        async def flush(self, end):
+            assert end == 1720
+            return []
+
+        async def close(self):
+            pass
+    worker = GatewayWorker(events.append)
+    worker.kind = 'asr'
+    worker.config = PrewarmConfig(recognitionProvider='aliyun', sourceLanguage='auto', targetLanguages=[])
+    config_calls = []
+    def create(config):
+        config_calls.append(config)
+        return Recognizer()
+    worker.remote_recognizer = create
+    await worker.realtime({'op': 'session.open', 'session': 'first', 'language': 'en',
+                           'targetLanguages': ['zh'], 'nativeTranslation': True})
+    await worker.realtime({'op': 'session.append', 'session': 'first', 'startedAtMs': 1700,
+                           'audio': base64.b64encode(bytes(640)).decode('ascii')})
+    await worker.realtime({'op': 'session.commit', 'session': 'first', 'endedAtMs': 1720})
+    assert frames == [1700]
+    assert config_calls[0].translationProvider == 'recognition'
+    assert config_calls[0].targetLanguages == ['zh']
+    assert events[0]['event']['revision'] == 5
+    assert events[0]['event']['native_translation']['text'] == '你好'
+    await worker.realtime({'op': 'session.close', 'session': 'first'})
+
+
 def test_malformed_wav_is_a_nonfatal_client_error():
     for raw in (b'R', b'RIFF\x10\0\0\0WAVEfmt \x10\0\0\0\x01'):
         with pytest.raises(Exception) as failure:
@@ -123,6 +232,127 @@ async def test_jsonl_waits_for_hydration_and_serves_repeated_requests_with_one_w
     assert output[0] == {'id': 'init', 'result': {'voices': ['Voice']}}
     assert [result['result']['text'] for result in output[1:]] == ['first', 'second']
     assert calls == ['construct', 'load', 'first', 'second', 'close']
+
+
+@run_async
+async def test_cancel_aborts_obsolete_cloud_request_without_affecting_another_request():
+    from nola_translator_engine.protocol import PrewarmConfig
+    inputs, output = asyncio.Queue(), []
+    stale_started, stale_cancelled, other_finished = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    class Worker(GatewayWorker):
+        async def initialize(self, request):
+            self.kind = 'mt'
+            self.config = PrewarmConfig(sourceLanguage='auto', targetLanguages=['zh'], translationProvider='mymemory')
+            async def translate(text, source, target):
+                if text == 'obsolete':
+                    stale_started.set()
+                    try:
+                        await asyncio.Event().wait()
+                    finally:
+                        stale_cancelled.set()
+                return SimpleNamespace(text='other result')
+            self.runtime = SimpleNamespace(translation_provider=SimpleNamespace(translate=translate))
+            return {}
+
+        async def close(self):
+            pass
+    def emit(message):
+        output.append(message)
+        if message.get('id') == 'other' and 'result' in message:
+            other_finished.set()
+    await inputs.put(json.dumps({'id': 'init', 'op': 'init'}))
+    running = asyncio.create_task(serve(inputs.get, emit, Worker))
+    await inputs.put(json.dumps({'id': 'stale', 'op': 'infer', 'text': 'obsolete', 'target': 'zh'}))
+    await asyncio.wait_for(stale_started.wait(), timeout=1)
+    await inputs.put(json.dumps({'id': 'other', 'op': 'infer', 'text': 'current', 'target': 'zh'}))
+    await inputs.put(json.dumps({'op': 'cancel', 'requestId': 'stale'}))
+    await asyncio.wait_for(stale_cancelled.wait(), timeout=1)
+    await asyncio.wait_for(other_finished.wait(), timeout=1)
+    await inputs.put('')
+    await running
+    assert not any(message.get('id') == 'stale' for message in output)
+    assert next(message['result'] for message in output if message.get('id') == 'other') == {'text': 'other result'}
+
+
+@run_async
+async def test_native_inference_cannot_be_cancelled_until_its_model_lock_is_released():
+    worker = GatewayWorker(lambda event: None)
+    request = {'id': 'native', 'op': 'infer'}
+    assert worker.can_cancel(request)
+    async with worker._inference_scope(False, 'native'):
+        assert not worker.can_cancel(request)
+        assert worker.can_cancel({'id': 'queued', 'op': 'infer'})
+        assert not worker.can_cancel({'id': 'append', 'op': 'session.append'})
+    assert worker.can_cancel(request)
+
+
+@run_async
+async def test_closing_sentence_waits_for_native_thread_before_releasing_shared_model():
+    import threading
+    from nola_translator_engine.protocol import PrewarmConfig
+    started, release = asyncio.Event(), threading.Event()
+    loop = asyncio.get_running_loop()
+    def transcribe(samples, **options):
+        loop.call_soon_threadsafe(started.set)
+        release.wait(timeout=5)
+        return 'hello', 'en'
+    worker = GatewayWorker(lambda event: None)
+    worker.config = PrewarmConfig(sourceLanguage='auto', targetLanguages=[])
+    worker.runtime = SimpleNamespace(_recognition_runtime=lambda: SimpleNamespace(transcribe=transcribe))
+    task = asyncio.create_task(worker.transcribe(np.zeros(320), request_id='native'))
+    try:
+        await asyncio.wait_for(started.wait(), timeout=1)
+        task.cancel()
+        await asyncio.sleep(0)
+        task.cancel()
+        await asyncio.sleep(0)
+        assert worker.inference.locked() and not task.done()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert not worker.inference.locked()
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
+
+
+@run_async
+async def test_session_reset_reuses_open_options_and_suppresses_old_generation_updates():
+    from nola_translator_engine.protocol import PrewarmConfig
+    from nola_translator_engine.recognition.base import RecognitionUpdate
+    events, recognizers, configs = [], [], []
+    class Recognizer:
+        def __init__(self):
+            self.closed = False
+
+        async def start(self):
+            pass
+
+        async def close(self):
+            self.closed = True
+    def create(config):
+        configs.append(config)
+        recognizer = Recognizer()
+        recognizers.append(recognizer)
+        return recognizer
+    worker = GatewayWorker(events.append)
+    worker.config = PrewarmConfig(sourceLanguage='auto', targetLanguages=[], recognitionProvider='aliyun')
+    worker.remote_recognizer = create
+    opening = {'op': 'session.open', 'session': 'pinned', 'language': 'en',
+        'targetLanguages': ['zh'], 'nativeTranslation': True, 'silenceMs': 900, 'maxSegmentMs': 12000}
+    await worker.realtime(opening)
+    first_generation = worker.sessions['pinned']['generation']
+    await worker.realtime({'op': 'session.reset', 'session': 'pinned', 'language': 'ja'})
+    assert recognizers[0].closed and not recognizers[1].closed
+    assert worker.sessions['pinned']['open_request'] == opening
+    assert worker.sessions['pinned']['generation'] is not first_generation
+    assert configs[1].sourceLanguage == 'en' and configs[1].targetLanguages == ['zh']
+    update = RecognitionUpdate('old', 0, 0, 20, 'old', 'en', True)
+    await recognizers[0].on_update(update)
+    assert not events
+    await recognizers[1].on_update(update)
+    assert len(events) == 1
+    await worker.realtime({'op': 'session.close', 'session': 'pinned'})
 
 
 @run_async
