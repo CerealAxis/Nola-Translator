@@ -20,8 +20,25 @@ function Assert-NativeSuccess([string]$Task) {
 
 # npm lifecycle policy can skip Electron's postinstall on a clean runner. The
 # package's own installer also handles an already-installed matching version.
-& node node_modules/electron/install.js
-Assert-NativeSuccess 'Prepare Electron binary'
+# GitHub-hosted runners occasionally reset long GitHub release downloads; retry
+# the download before failing the whole installer build.
+$electronInstallAttempts = 3
+$electronPrepared = $false
+for ($attempt = 1; $attempt -le $electronInstallAttempts; $attempt++) {
+    Write-Host "Preparing Electron binary (attempt $attempt/$electronInstallAttempts)"
+    & node node_modules/electron/install.js
+    $electronExitCode = $LASTEXITCODE
+    if ($electronExitCode -eq 0) {
+        $electronPrepared = $true
+        break
+    }
+    if ($attempt -lt $electronInstallAttempts) {
+        $delaySeconds = 5 * $attempt
+        Write-Warning "Electron download failed (exit $electronExitCode); retrying in $delaySeconds seconds"
+        Start-Sleep -Seconds $delaySeconds
+    }
+}
+if (-not $electronPrepared) { throw "Prepare Electron binary failed after $electronInstallAttempts attempts" }
 & node -e 'const fs=require("node:fs"); const p=require("electron/package.json"); const v=fs.readFileSync("node_modules/electron/dist/version","utf8").trim().replace(/^v/,""); if(v!==p.version || !fs.existsSync("node_modules/electron/dist/electron.exe")) throw new Error("Electron Windows binary is missing or has the wrong version"); console.log("Electron binary ready: "+v);'
 Assert-NativeSuccess 'Check Electron binary'
 
