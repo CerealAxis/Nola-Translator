@@ -81,7 +81,7 @@ export const SUPPORT_ERROR_CATALOG = {
   'MT-017': { messageKey: 'errors.translationUnsupportedLanguagePair', retryable: false, causes: ['TRANSLATIONUNSUPPORTEDLANGUAGEPAIR'] },
   'MT-018': { messageKey: 'errors.translationInputTooLong', retryable: false, causes: ['TRANSLATIONINPUTTOOLONG'] },
   'MT-019': { messageKey: 'errors.translationOutputTooLong', retryable: false, causes: ['TRANSLATIONOUTPUTTOOLONG'] },
-  'MT-020': { messageKey: 'errors.translationSourceLanguageRequired', retryable: false, causes: ['TRANSLATIONSOURCELANGUAGERQUIRED'] },
+  'MT-020': { messageKey: 'errors.translationSourceLanguageRequired', retryable: false, causes: ['TRANSLATIONSOURCELANGUAGEREQUIRED'] },
   'MT-021': { messageKey: 'errors.translationRejected', retryable: true, causes: ['TRANSLATIONREJECTED'] },
   'MT-022': { messageKey: 'errors.translationCancelled', retryable: true, causes: ['TRANSLATIONCANCELLED'] },
   'NET-006': { messageKey: 'errors.downloadFailed', retryable: true, causes: ['RESOURCEVERIFICATIONFAILED'], refines: { from: ['ENG-003', 'ERR-999'], operations: ['installHubRepo', 'manageResource:install', 'hub:install'] } },

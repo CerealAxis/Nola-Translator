@@ -56,11 +56,11 @@ function detail(options: NotifyOptions): string | undefined {
 /** A failure. Stays on screen and carries the way out. */
 export function notifyError(message: string, options: NotifyOptions = {}): string {
   if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('overlay') === '1' && !options.action) {
-    const bridge = getBridge()
-    if (bridge?.app.notifyMainError) {
-      bridge.app.notifyMainError(message, detail(options))
-      return 'main-window-error'
-    }
+    return createToast(message, {
+      variant: 'danger',
+      description: detail(options),
+      timeout: options.duration ?? NOTIFY_DURATION.error,
+    })
   }
   return createToast(message, {
     variant: 'danger',
@@ -145,7 +145,7 @@ export function notifyUpdate(id: string, message: string, options: NotifyOptions
   return updateToast(id, message, {
     description: detail(options),
     actionProps: actionProps(options.action),
-    // A missing duration leaves the running countdown alone, a duration of 0 keeps it open.
+    // A missing duration leaves the running countdown alone; zero disables automatic dismissal.
     timeout: options.duration,
     variant: options.variant,
   })

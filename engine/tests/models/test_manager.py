@@ -16,6 +16,7 @@ from nola_translator_engine.models.manager import (
     FileEntry,
     ModelIntegrityError,
     ModelManager,
+    ModelStorageError,
     ModelSpec,
 )
 from nola_translator_engine.protocol import NetworkSettings
@@ -27,6 +28,16 @@ class _Cancelled(RuntimeError):
 
 def _entry(path: str, data: bytes) -> FileEntry:
     return FileEntry(path, len(data), sha256(data).hexdigest())
+
+
+@pytest.mark.parametrize("path", ["a\\..\\..\\x", "C:\\x", "\\x", "../x"])
+def test_file_entry_rejects_paths_outside_model_directory(path: str) -> None:
+    with pytest.raises(ModelStorageError):
+        FileEntry(path, 1, "0" * 64)
+
+
+def test_file_entry_allows_nested_snapshot_paths() -> None:
+    assert FileEntry("a/b", 1, "0" * 64).path == "a/b"
 
 
 def _snapshot_spec() -> tuple[ModelSpec, dict[str, bytes]]:

@@ -306,6 +306,7 @@ export function useModelSelection(kind: GatewayCapability, options: readonly Ava
   settings: AppSettings, onSwitch?: (replaced: AvailableModel) => void, off = false): ModelSelection {
   const { t } = useI18n()
   const gatewaySnapshot = useGatewaySnapshot()
+  const resources = useStore(stores.models, state => state.resources)
   const active = useStore(sessionStore, state => !['idle', 'error'].includes(state.status))
   const browserActive = useStore(stores.settings, state => state.browser?.captionServiceActive === true || state.captionServiceBusy || state.captionService === 'loading')
   const locked = active || browserActive
@@ -326,6 +327,8 @@ export function useModelSelection(kind: GatewayCapability, options: readonly Ava
   const binding = locked ? saved : resolution.unavailable ? '' : resolution.binding
   useEffect(() => {
     if (locked || !replaced || replaced.binding === saved) return
+    if (replaced.origin === 'gateway'
+        && resources.some(resource => resource.resourceId === replaced.binding.slice(9) && resource.installed)) return
     const signature = `${saved}:${replaced.binding}`
     if (reported.current === signature) return
     reported.current = signature
@@ -333,7 +336,7 @@ export function useModelSelection(kind: GatewayCapability, options: readonly Ava
       reported.current = ''
       notifyError(t('errors.settingsSaveFailed'), { cause: error })
     })
-  }, [binding, replaced?.binding, saved, locked])
+  }, [binding, replaced?.binding, replaced?.origin, saved, locked, resources])
   return { binding, unavailable: resolution.unavailable,
     select: next => {
       if (locked) return

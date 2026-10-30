@@ -90,13 +90,18 @@ function useOverlayNavigation(): void {
  */
 function EngineDisconnectedNotice() {
   const { t } = useI18n()
-  const notified = useRef(false)
   useEffect(() => {
-    if (isEngineConnected() || notified.current) return
-    notified.current = true
-    notifyError(t('errors.engineNotConnected'), {
-      action: { label: t('errors.pageCrashedAction'), onPress: () => window.location.reload() },
-    })
+    if (isEngineConnected()) return
+    let timer: number | undefined
+    const report = () => {
+      if (isEngineConnected()) return
+      notifyError(t('errors.engineNotConnected'), {
+        action: { label: t('errors.pageCrashedAction'), onPress: () => window.location.reload() },
+      })
+      timer = window.setTimeout(report, 12000)
+    }
+    report()
+    return () => { if (timer !== undefined) window.clearTimeout(timer) }
   }, [t])
   return null
 }
@@ -126,7 +131,7 @@ function settingsFailureMessageKey(operation: SettingsCommand | null, error: str
 function SettingsErrorNotice() {
   const { t } = useI18n()
   /** The command failure this notice has already reported. */
-  const handledFailure = useRef<string | null>(null)
+  const handledFailure = useRef<{ key: string; at: number } | null>(null)
   /** The load failure this notice has already reported. */
   const handledLoad = useRef<string | null>(null)
   /** The notice carrying the load failure, taken off the screen once the settings arrive. */
@@ -162,8 +167,8 @@ function SettingsErrorNotice() {
       if (!failure) { handledFailure.current = null; return }
       const operation = state.errorOperation
       const key = `${operation ?? ''}\u0000${failure}`
-      if (handledFailure.current === key) return
-      handledFailure.current = key
+      if (handledFailure.current?.key === key && Date.now() - handledFailure.current.at < 12000) return
+      handledFailure.current = { key, at: Date.now() }
       /*
        * A settings feature that reports the failure on its own channel claims it right
        * after the call it made resolves. Reporting one task later gives that claim the
@@ -174,7 +179,7 @@ function SettingsErrorNotice() {
       reportTimer.current = window.setTimeout(() => {
         reportTimer.current = null
         if (isSettingsErrorClaimed(failure, operation)) return
-        notifyError(t(settingsFailureMessageKey(operation, failure)), { cause: failure })
+      notifyError(t(settingsFailureMessageKey(operation, failure)), { cause: failure })
       }, 0)
     }
     notify()

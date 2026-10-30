@@ -43,6 +43,7 @@ const initialState: MeetingsState = {
 export const meetingsStore = createStore<MeetingsState>(initialState)
 
 let bridge: NolaBridge | null = null
+let meetingDetailRequestId = 0
 let unsubscribe: (() => void) | null = null
 /** The list snapshot the engine confirmed. The rollback baseline. */
 let confirmed: MeetingMeta[] = []
@@ -90,6 +91,7 @@ export async function loadMeetings(): Promise<void> {
 /** Detail. Captions and audio URL are fetched together, so the page's loading state hangs off one promise. */
 export async function loadMeetingDetail(id: string): Promise<MeetingDetail | null> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
+  const requestId = ++meetingDetailRequestId
   meetingsStore.setState({ detailLoading: true, detail: null, error: null })
   try {
     const [meta, segments, audioUrl] = await Promise.all([
@@ -97,6 +99,7 @@ export async function loadMeetingDetail(id: string): Promise<MeetingDetail | nul
       bridge.meetings.read(id),
       bridge.meetings.audioUrl(id),
     ])
+    if (requestId !== meetingDetailRequestId) return null
     if (!meta) {
       meetingsStore.setState({ detailLoading: false })
       return null
@@ -105,6 +108,7 @@ export async function loadMeetingDetail(id: string): Promise<MeetingDetail | nul
     meetingsStore.setState({ detail, detailLoading: false })
     return detail
   } catch (error) {
+    if (requestId !== meetingDetailRequestId) return null
     meetingsStore.setState({ detailLoading: false, error: errorMessage(error) })
     throw error
   }

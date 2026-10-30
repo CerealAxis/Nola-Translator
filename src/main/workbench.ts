@@ -92,7 +92,7 @@ export function registerWorkbench(
     window.on('maximize', publish)
     window.on('unmaximize', publish)
     window.webContents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:\/\//i.test(url)) void shell.openExternal(url).catch(() => undefined)
+      if (url.startsWith('https://')) void shell.openExternal(url).catch(() => undefined)
       return { action: 'deny' }
     })
     window.webContents.on('will-navigate', (navigation, target) => {

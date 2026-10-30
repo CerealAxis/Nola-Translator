@@ -593,14 +593,6 @@ class ResourceManager:
                         shutil.rmtree(path, ignore_errors=True)
                     else:
                         path.unlink(missing_ok=True)
-            elif resource_id in (HYMT2_RESOURCE_ID, HYMT2_Q3_RESOURCE_ID, HYMT2_IQ2_RESOURCE_ID):
-                for variable in ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
-                    value = os.environ.get(variable)
-                    if not value:
-                        continue
-                    path = Path(value)
-                    if path.exists():
-                        shutil.rmtree(path, ignore_errors=True)
         except Exception:
             pass
 

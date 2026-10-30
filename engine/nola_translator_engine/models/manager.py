@@ -99,6 +99,12 @@ class FileEntry:
     modelscope_repo: str | None = None
     modelscope_revision: str | None = None
 
+    def __post_init__(self) -> None:
+        if (not self.path or "\\" in self.path or self.path.startswith("/")
+                or any(part in ("", ".", "..") for part in self.path.split("/"))
+                or re.match(r"^[A-Za-z]:", self.path)):
+            raise ModelStorageError("模型文件路径无效")
+
 
 @dataclass(frozen=True, slots=True)
 class ModelSpec:

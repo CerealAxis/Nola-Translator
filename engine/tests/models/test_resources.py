@@ -9,6 +9,7 @@ import pytest
 
 from nola_translator_engine import resources as resources_module
 from nola_translator_engine.models.manager import FileEntry, ModelSpec
+from nola_translator_engine.models.manager import ModelStorageError
 from nola_translator_engine.protocol import ResourceRecord
 from nola_translator_engine.resources import (
     HYMT2_RESOURCE_ID,
@@ -81,6 +82,16 @@ def _tiny_m2m100() -> tuple[ModelSpec, dict[str, bytes]]:
         ),
     )
     return spec, {spec.url_for(entry): payloads[entry.path] for entry in spec.files}
+
+
+@pytest.mark.parametrize("path", ["a\\..\\..\\x", "C:\\x", "\\x", "../x"])
+def test_file_entry_rejects_paths_outside_model_directory(path: str) -> None:
+    with pytest.raises(ModelStorageError):
+        FileEntry(path, 1, "0" * 64)
+
+
+def test_file_entry_allows_nested_snapshot_paths() -> None:
+    assert FileEntry("a/b", 1, "0" * 64).path == "a/b"
 
 
 def _fetcher(payloads: dict[str, bytes]):
@@ -231,6 +242,25 @@ async def test_install_m2m100_leaves_xdg_dirs_untouched(
     assert manager.is_installed(M2M100_RESOURCE_ID) is True
     assert (manager.model_path(M2M100_RESOURCE_ID) / "config.json").is_file()
     assert xdg_data.exists()
+
+
+async def test_install_hymt2_leaves_xdg_dirs_untouched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec, payloads = _tiny_hymt2()
+    monkeypatch.setattr(resources_module, "HYMT2_1_8B_Q4_K_M", spec)
+    xdg = tmp_path / "xdg-data"
+    unrelated = xdg / "another-app" / "settings.json"
+    unrelated.parent.mkdir(parents=True)
+    unrelated.write_text("keep", encoding="utf-8")
+    monkeypatch.setenv("XDG_DATA_HOME", str(xdg))
+
+    manager = ResourceManager(tmp_path / "models", lambda _event: None)
+    manager.models.fetcher = _fetcher(payloads)
+    await manager.manage(HYMT2_RESOURCE_ID, "install")
+    await manager.tasks[HYMT2_RESOURCE_ID]
+
+    assert unrelated.read_text(encoding="utf-8") == "keep"
 
 
 async def test_install_qwen_phases_progress_and_cleanup(

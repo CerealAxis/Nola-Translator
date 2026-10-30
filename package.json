@@ -72,7 +72,7 @@
     "tailwind-merge": "^3.7.0",
     "tw-shimmer": "^0.4.14",
     "ws": "^8.22.0",
-    "zod": "4.4.3",
+    "zod": "^4.6.7",
     "zustand": "^5.0.16"
   },
   "devDependencies": {

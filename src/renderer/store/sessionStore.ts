@@ -494,6 +494,10 @@ export function resetSessionError(): void {
  * so a null id remounts it and redraws the last line.
  */
 export function clearSessionTranscript(): void {
+  if (interimTimer !== null) {
+    clearTimeout(interimTimer)
+    interimTimer = null
+  }
   sessionStore.setState({ segments: [], interim: null })
 }
 export function attachSessionStore(next: NolaBridge): void {
