@@ -268,10 +268,13 @@
     z-index: var(--z-overlay);
     display: flex;
     flex-direction: column;
-    width: min(560px, calc(100vw - 32px));
+    width: min(560px, calc(100vw - var(--space-4)));
     max-height: min(82dvh, 760px);
-    overflow: auto;
-    padding: 24px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding: var(--space-3);
     transform: translate(-50%, -50%);
     border: 1px solid var(--nola-ui-border);
     border-radius: var(--nola-ui-radius-xl);
@@ -280,16 +283,22 @@
     box-shadow: var(--overlay-shadow);
   }
 
-  .nola-dialog-header { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
+  .nola-dialog-content::-webkit-scrollbar { display: none; }
+
+  .nola-dialog-header { display: flex; flex-direction: column; gap: calc(var(--space-1) / 2); margin-bottom: 0; padding-inline: 0; }
   .nola-dialog-header [data-slot='dialog-title'] { margin: 0; color: var(--nola-ui-foreground); font: var(--font-title); }
-  .nola-dialog-header [data-slot='dialog-description'] { margin: 0; color: var(--nola-ui-muted-foreground); font: var(--font-caption); }
-  .nola-dialog-footer { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+  .nola-dialog-header [data-slot='dialog-description'] { margin: 0; color: var(--nola-ui-muted-foreground); font: var(--font-body); }
+  .nola-dialog-footer { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: var(--space-1); margin-top: 0; }
 
   .nola-dialog-close {
     position: absolute;
     inset-block-start: var(--space-2);
     inset-inline-end: var(--space-2);
     z-index: var(--z-sticky);
+    width: var(--field-control-height);
+    min-width: var(--field-control-height);
+    height: var(--field-control-height);
+    min-height: var(--field-control-height);
     border-radius: var(--radius-xl);
   }
 
@@ -316,12 +325,16 @@
     position: absolute;
     inset: auto 0 0 auto;
     z-index: calc(var(--z-toast) - var(--toast-index));
+    display: block;
     transform: translateX(var(--toast-swipe-movement-x)) translateY(calc(var(--toast-swipe-movement-y) - var(--toast-index) * var(--nola-toast-peek) - var(--nola-toast-shrink) * var(--nola-toast-height))) scale(var(--nola-toast-scale));
     transform-origin: bottom;
     height: var(--nola-toast-height);
     width: 100%;
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
     border: 1px solid var(--nola-ui-border);
-    border-radius: var(--nola-ui-radius-lg);
+    border-radius: var(--nola-ui-radius-xl);
     color: var(--nola-ui-foreground);
     background: var(--nola-ui-popover);
     box-shadow: var(--overlay-shadow);
@@ -340,12 +353,12 @@
   .nola-toast[data-ending-style][data-swipe-direction='right'] { transform: translateX(calc(var(--toast-swipe-movement-x) + 150%)) translateY(var(--nola-toast-offset-y)); }
   .nola-toast[data-ending-style][data-swipe-direction='up'] { transform: translateY(calc(var(--toast-swipe-movement-y) - 150%)); }
 
-  .nola-toast-content { display: flex; height: 100%; align-items: center; gap: 12px; min-width: 0; overflow: hidden; padding: 14px 12px 14px 16px; transition: opacity 250ms cubic-bezier(0.22, 1, 0.36, 1); }
+  .nola-toast-content { display: flex; height: 100%; align-items: center; gap: var(--space-2); min-width: 0; overflow: hidden; padding: var(--space-2); transition: opacity 250ms cubic-bezier(0.22, 1, 0.36, 1); }
   .nola-toast-content[data-behind] { opacity: 0; }
   .nola-toast-content[data-expanded] { opacity: 1; }
   .nola-toast-copy { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
-  .nola-toast-title { color: var(--nola-ui-foreground); font: var(--font-body-strong); overflow-wrap: anywhere; }
-  .nola-toast-description { color: var(--nola-ui-muted-foreground); font: var(--font-caption); overflow-wrap: anywhere; }
+  .nola-toast-title { color: var(--nola-ui-foreground); font: var(--font-title); overflow-wrap: anywhere; }
+  .nola-toast-description { color: var(--nola-ui-muted-foreground); font: var(--font-body); overflow-wrap: anywhere; }
   .nola-toast-action { flex: none; }
   .nola-toast-icon { flex: none; width: 18px; height: 18px; color: var(--nola-ui-info); }
   .nola-toast[data-type='success'] .nola-toast-icon { color: var(--nola-ui-success); }
@@ -354,7 +367,7 @@
   .nola-toast[data-type='loading'] .nola-toast-icon { color: var(--nola-ui-primary); }
   .nola-toast-icon-loading { animation: nola-toast-spin 1s linear infinite; }
   @keyframes nola-toast-spin { to { transform: rotate(360deg); } }
-  .nola-toast-close.button { flex: none; width: 32px; min-width: 32px; height: 32px; min-height: 32px; border-radius: var(--radius-xl); border-color: transparent; background: transparent !important; color: var(--nola-ui-muted-foreground); }
+  .nola-toast-close.button { flex: none; width: var(--field-control-height); min-width: var(--field-control-height); height: var(--field-control-height); min-height: var(--field-control-height); border-radius: var(--radius-xl); color: var(--nola-ui-muted-foreground); }
   .nola-toast-close.button:hover:not(:disabled):not([aria-disabled='true']) { color: var(--nola-ui-foreground); background: transparent; }
 
   @media (max-width: 600px) {
@@ -362,6 +375,84 @@
     .nola-toast-content { align-items: flex-start; flex-wrap: wrap; }
     .nola-toast-action { margin-inline-start: auto; }
   }
+}
+
+.nola-dialog-content {
+  font: var(--font-body);
+  color: var(--nola-ui-card-foreground);
+  background: var(--nola-ui-card);
+  border-radius: var(--nola-ui-radius-xl);
+}
+
+.nola-dialog-content.card[data-slot='dialog-content'] {
+  --card-spacing: var(--space-2);
+  gap: var(--card-spacing);
+  padding: var(--card-spacing);
+}
+.nola-dialog-content.card[data-slot='dialog-content']:has(> .nola-dialog-footer) { padding-block-end: 0; }
+.nola-dialog-content.card > :is(.card__header, .card__content) { padding-inline: 0; }
+.nola-dialog-content.card > .nola-dialog-header { margin: 0; gap: var(--space-1); }
+.nola-dialog-content.card:has(> .nola-dialog-close) > :is(.nola-dialog-header, .card__header) { padding-inline-end: var(--field-control-height); }
+.nola-dialog-content.card p { margin-block: 0; }
+.nola-dialog-content.card .nola-dialog-header > p { color: var(--nola-ui-muted-foreground); font: var(--font-body); }
+
+.nola-dialog-content :is([data-slot='dialog-title'], .nola-title) {
+  margin: 0;
+  color: var(--nola-ui-card-foreground);
+  font: var(--font-title);
+}
+
+.nola-dialog-content [data-slot='dialog-description'] {
+  color: var(--nola-ui-muted-foreground);
+  font: var(--font-body);
+}
+
+.nola-toast .nola-toast-title { font: var(--font-title); }
+.nola-toast .nola-toast-description { font: var(--font-body); }
+
+.nola-dialog-content.card[data-slot='dialog-content'] > .nola-dialog-footer {
+  position: relative;
+  margin-inline: calc(var(--card-spacing) * -1);
+  margin-block-start: 0;
+  padding: var(--card-spacing);
+  border-top: 1px solid var(--nola-ui-border);
+  background: var(--surface-secondary);
+}
+
+.nola-dialog-close.button,
+.nola-dialog-close.button:hover:not(:disabled):not([aria-disabled='true']),
+.nola-dialog-close.button:active:not(:disabled):not([aria-disabled='true']),
+.nola-dialog-close.button[aria-expanded='true'] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.nola-toast-close.button,
+.nola-toast-close.button:hover:not(:disabled):not([aria-disabled='true']),
+.nola-toast-close.button:active:not(:disabled):not([aria-disabled='true']),
+.nola-toast-close.button[aria-expanded='true'] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.nola-dialog-content .button {
+  box-sizing: border-box;
+  height: var(--field-control-height);
+  min-height: var(--field-control-height);
+}
+
+.nola-dialog-content :is([data-slot='dialog-footer'], .nola-dialog-footer) .button {
+  padding-inline: var(--space-2);
+  border-radius: var(--nola-ui-radius-xl);
+  font: var(--font-body-strong);
+}
+
+.nola-toast .button {
+  box-sizing: border-box;
+  height: var(--field-control-height);
+  min-height: var(--field-control-height);
 }
 
 @layer components {

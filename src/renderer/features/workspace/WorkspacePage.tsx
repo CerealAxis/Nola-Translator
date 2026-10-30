@@ -213,7 +213,10 @@ export function WorkspacePage() {
         return
       }
     } catch (error) {
-      notifyError(t('errors.startFailed'), { cause: error })
+      notifyError(t('errors.startFailedTitle'), {
+        cause: error,
+        description: t('errors.startFailedDescription'),
+      })
       return
     }
     setDraft({

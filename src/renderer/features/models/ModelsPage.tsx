@@ -83,14 +83,17 @@ export function ModelsPage() {
         // Keep the migration available if browser storage is disabled; the in-memory guard
         // still prevents duplicate starts while this page remains mounted.
       }
-      notifyInfo(t('models.visionSupplementStarted', { name: record.name }), {
-        description: t('shellUi.actionHint'),
+      notifyInfo(t('models.visionSupplementStarted'), {
+        description: t('models.visionSupplementDescription', { name: record.name }),
         action: { label: t('models.viewProgress'), onPress: () => { window.location.hash = '#/models/downloads' } },
         duration: 12000,
       })
       suppressNextDownloadStartNotice(resourceId)
       void actions.models.manageResource(resourceId, 'install').catch((cause: unknown) => {
-        notifyError(t('models.downloadError', { name: record.name }), { cause })
+        notifyError(t('models.downloadFailed'), {
+          cause,
+          description: t('models.downloadFailedDescription'),
+        })
       })
     }
   }, [loaded, resources, t])
@@ -188,7 +191,7 @@ export function ModelsPage() {
   const install = (target: ResourceRecord, source: ModelDownloadSource) => {
     void actions.models.manageResource(target.resourceId, 'install', source).catch(() => {
       notifyModelDownloadFailure(
-        t('models.downloadError', { name: target.name }),
+        t('models.downloadFailed'),
         t('errors.downloadFailed'),
         t('errors.downloadFailedAction'),
         () => install(target, source),

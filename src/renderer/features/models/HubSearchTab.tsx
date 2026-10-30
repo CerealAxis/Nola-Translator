@@ -310,7 +310,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
     void actions.models.installHubModel(target.summary.repo, installSlotOf(target), source).catch((cause: unknown) => {
       console.error('[models] hub install failed', cause)
       notifyModelDownloadFailure(
-        t('models.downloadError', { name: target.summary.repo }),
+        t('models.downloadFailed'),
         t('errors.downloadFailed'),
         t('errors.downloadFailedAction'),
         () => installHub(target, source),

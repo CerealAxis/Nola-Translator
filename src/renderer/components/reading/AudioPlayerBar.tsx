@@ -54,7 +54,7 @@ export function AudioPlayerBar({
     if (playbackErrorReportedRef.current) return
     playbackErrorReportedRef.current = true
     notifyError(t('records.playerError'), {
-      description: t('shellUi.actionHint'),
+      description: t('records.playerErrorDescription'),
       action: {
         label: t('common.retry'),
         onPress: () => {

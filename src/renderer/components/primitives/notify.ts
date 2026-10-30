@@ -38,9 +38,13 @@ function toastType(variant: NotifyVariant): ToastType {
 function payload(message: string, variant: NotifyVariant, options: NotifyOptions): ToastPayload {
   const type = toastType(variant)
   const duration = options.duration
+  // A description explicitly opts into the CardHeader title + body layout. Without it,
+  // the message is intentionally a body-only notification, matching the shadcn Toast API.
   return options.action
     ? { type, title: message, description: options.description, actionProps: { children: options.action.label, onClick: options.action.onPress }, duration }
-    : { type, description: options.description ?? message, duration }
+    : options.description
+      ? { type, title: message, description: options.description, duration }
+      : { type, description: message, duration }
 }
 
 /** A failure notice that dismisses automatically. */

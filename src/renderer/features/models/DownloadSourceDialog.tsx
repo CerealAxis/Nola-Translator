@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import type { ModelDownloadSource, ResourceRecord } from '@/bridge'
-import { Dialog, DialogCloseButton, DialogContent, DialogFooter, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogCloseButton, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { downloadSourcesFor } from '../../../shared/model-download-sources'
@@ -31,12 +31,12 @@ export function DownloadSourceDialog({ record, onClose, onSelect }: DownloadSour
           className="nola-dialog-content models-source-dialog modal__dialog"
         >
           <DialogCloseButton aria-label={t('common.close')} />
-          <div className="models-source-dialog__header modal__header">
+          <DialogHeader className="models-source-dialog__header">
             <DialogTitle className="modal__heading">
               {t('models.downloadSources.title')}
             </DialogTitle>
-            <p className="models-source-dialog__model">{record.name}</p>
-          </div>
+            <DialogDescription>{record.name}</DialogDescription>
+          </DialogHeader>
           <div className="modal__body models-source-dialog__body">
             <DownloadSourceTabs
               options={options}

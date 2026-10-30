@@ -3,7 +3,7 @@ import { AlertDialog } from '@base-ui/react/alert-dialog'
 import { TabsRoot, TabsList, TabsTrigger, ToggleGroup, ToggleGroupItem } from '@/components/ui'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
-import { DialogHeader, DialogFooter } from '@/components/ui/dialog'
+import { AlertDialogContent, DialogHeader, DialogFooter } from '@/components/ui/dialog'
 import { Check, CircleHelp, LoaderCircle } from 'lucide-react'
 import { notifyError, notifyRetryableFailure, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
@@ -214,7 +214,7 @@ export function RuntimeComponents() {
     <AlertDialog.Root open={confirmKind !== null} onOpenChange={open => { if (!open) setConfirmKind(null) }}>
       <AlertDialog.Portal>
         <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
-          <AlertDialog.Popup className="nola-dialog-content max-w-md">
+          <AlertDialogContent className="max-w-md">
             <DialogHeader>
               <AlertDialog.Title className="nola-title text-foreground">{t('runtime.uninstallTitle')}</AlertDialog.Title>
             </DialogHeader>
@@ -227,7 +227,7 @@ export function RuntimeComponents() {
                 {t('runtime.uninstall')}
               </Button>
             </DialogFooter>
-          </AlertDialog.Popup>
+          </AlertDialogContent>
       </AlertDialog.Portal>
     </AlertDialog.Root>
     {local && (local.engine.managed || local.llama.managed || local.crisp?.managed) ? <SettingGroup legend={t('runtime.repair')} actions={<Button variant="secondary" size="sm" className="bg-surface-tertiary" disabled={busy || !Object.values(repairs).some(Boolean)} onClick={() => void install((['engine', 'llama', 'crisp'] as const).filter(kind => repairs[kind] && local[kind]?.managed).map(kind => local[kind]!.id!))}>{t('runtime.repairAction')}</Button>}>

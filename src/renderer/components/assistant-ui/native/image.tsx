@@ -25,6 +25,8 @@ import type {
   ImageMessagePartProps,
 } from "@assistant-ui/react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { hostOf, safeHref } from "../utils/href";
 
 export interface ImageLabels {
@@ -466,6 +468,7 @@ function ImageZoom({ src, alt, children, labels }: ImageZoomProps) {
     <>
       <div
         ref={triggerRef}
+        data-slot="image-zoom-trigger"
         onClick={handleOpen}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
@@ -490,34 +493,40 @@ function ImageZoom({ src, alt, children, labels }: ImageZoomProps) {
           <div
             ref={overlayRef}
             data-slot="image-zoom-overlay"
-            role="dialog"
-            aria-modal="true"
             className="aui-image-zoom-overlay fade-in animate-in fixed inset-0 z-overlay flex items-center justify-center bg-black/80 duration-200"
             onClick={handleClose}
-            aria-label={labels.zoomed}
           >
-            <img
+            <Card
               data-slot="image-zoom-content"
-              src={src}
-              alt={alt}
-              className="aui-image-zoom-content fade-in zoom-in-95 animate-in max-h-[90%] max-w-[90%] cursor-zoom-out object-contain duration-200"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleClose();
-              }}
-            />
-            <button
-              ref={closeRef}
-              type="button"
-              aria-label={labels.close}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleClose();
-              }}
-              className="text-muted-foreground hover:text-foreground bg-background/80 absolute end-4 top-4 cursor-pointer rounded-md p-2"
+              role="dialog"
+              aria-modal="true"
+              aria-label={labels.zoomed}
+              className="aui-image-zoom-card fade-in zoom-in-95 animate-in relative max-h-[90vh] max-w-[90vw] gap-0 overflow-hidden p-0 duration-200"
             >
-              <XIcon className="size-5" />
-            </button>
+              <img
+                src={src}
+                alt={alt}
+                className="max-h-[90vh] max-w-[90vw] cursor-zoom-out object-contain"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleClose();
+                }}
+              />
+              <Button
+                ref={closeRef}
+                type="button"
+                size="icon"
+                variant="tertiary"
+                aria-label={labels.close}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleClose();
+                }}
+                className="nola-dialog-close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent"
+              >
+                <XIcon aria-hidden="true" />
+              </Button>
+            </Card>
           </div>,
           document.body,
         )}

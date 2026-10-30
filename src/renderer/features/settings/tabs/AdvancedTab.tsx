@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AlertDialog } from '@base-ui/react/alert-dialog'
 import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { DialogHeader, DialogFooter } from '@/components/ui/dialog'
+import { AlertDialogContent, DialogHeader, DialogFooter } from '@/components/ui/dialog'
 
 import { DEFAULT_SETTINGS, PROTOCOL_VERSION } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
@@ -209,7 +209,7 @@ function ResetAll({ pending }: { pending: boolean }) {
       <AlertDialog.Root open={open} onOpenChange={next => { if (state !== 'pending') setOpen(next) }}>
         <AlertDialog.Portal>
           <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
-            <AlertDialog.Popup className="nola-dialog-content max-w-md">
+            <AlertDialogContent className="max-w-md">
               <DialogHeader>
                 <AlertDialog.Title className="nola-title text-foreground">
                   {t('settings.resetAllTitle')}
@@ -240,7 +240,7 @@ function ResetAll({ pending }: { pending: boolean }) {
                   {t('settings.resetAll')}
                 </Button>
               </DialogFooter>
-            </AlertDialog.Popup>
+            </AlertDialogContent>
         </AlertDialog.Portal>
       </AlertDialog.Root>
     </>

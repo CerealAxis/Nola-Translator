@@ -27,6 +27,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { CSSProperties, ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { Dialog as BaseDialog } from '@base-ui/react/dialog'
 import { Lock, Minus, Monitor, Pin, PinOff, SlidersHorizontal, Unlock, X } from 'lucide-react'
 
@@ -494,7 +495,7 @@ export function OverlayRoot() {
           <BaseDialog.Root open onOpenChange={open => { if (!closePending) setClosing(open) }}>
           <BaseDialog.Portal container={cardRef}>
           <BaseDialog.Popup className="nola-confirm-layer">
-            <div className="nola-confirm-dialog">
+            <Card className="nola-confirm-dialog">
               <BaseDialog.Title render={<p />} className="nola-confirm-title">{t('overlay.closeTitle')}</BaseDialog.Title>
               <BaseDialog.Description render={<p />} className="nola-confirm-text">{t('overlay.closeBody')}</BaseDialog.Description>
               <div className="nola-confirm-actions">
@@ -506,7 +507,7 @@ export function OverlayRoot() {
                   {t(closePending ? 'overlay.closing' : 'overlay.closeConfirm')}
                 </Button>
               </div>
-            </div>
+            </Card>
           </BaseDialog.Popup>
           </BaseDialog.Portal>
           </BaseDialog.Root>

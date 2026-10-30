@@ -17,6 +17,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export type MermaidDiagramProps = {
   labels: MermaidLabels;
@@ -330,17 +332,17 @@ function MermaidZoom({ svg, children, labels }: MermaidZoomProps) {
       </button>
       {isOpen &&
         createPortal(
-          <div
+          <Card
             ref={overlayRef}
             data-slot="mermaid-zoom-overlay"
             role="dialog"
             aria-modal="true"
             aria-label={labels.diagram}
-            className="aui-mermaid-zoom-overlay fade-in animate-in bg-background fixed inset-0 z-overlay duration-200"
+            className="aui-mermaid-zoom-overlay fade-in animate-in bg-background fixed inset-0 z-overlay flex h-dvh w-screen flex-col gap-0 overflow-hidden rounded-none border-0 p-0 duration-200"
           >
             <div
               ref={viewportRef}
-              className="aui-mermaid-zoom-viewport h-full w-full cursor-grab touch-none overflow-hidden active:cursor-grabbing"
+              className="aui-mermaid-zoom-viewport min-h-0 w-full flex-1 cursor-grab touch-none overflow-hidden active:cursor-grabbing"
               onWheel={onWheel}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
@@ -357,45 +359,51 @@ function MermaidZoom({ svg, children, labels }: MermaidZoomProps) {
                 svg={zoomSvg}
               />
             </div>
-            <div
+            <Card
               data-slot="mermaid-zoom-toolbar"
-              className="aui-mermaid-zoom-toolbar border-border bg-background absolute top-4 right-4 flex items-center gap-1 rounded-lg border p-1"
+              size="sm"
+              className="aui-mermaid-zoom-toolbar absolute top-4 right-4 flex-row items-center gap-1 p-1"
             >
-              <button
+              <Button
+                size="icon"
+                variant="outline"
                 type="button"
                 aria-label={labels.zoomIn}
                 onClick={() => zoomBy(1.25)}
-                className="text-muted-foreground hover:text-foreground cursor-pointer rounded-sm p-1.5"
               >
                 <Plus className="size-4" />
-              </button>
-              <button
+              </Button>
+              <Button
+                size="icon"
+                variant="outline"
                 type="button"
                 aria-label={labels.zoomOut}
                 onClick={() => zoomBy(0.8)}
-                className="text-muted-foreground hover:text-foreground cursor-pointer rounded-sm p-1.5"
               >
                 <Minus className="size-4" />
-              </button>
-              <button
+              </Button>
+              <Button
+                size="icon"
+                variant="outline"
                 type="button"
                 aria-label={labels.reset}
                 onClick={() => setTransform({ x: 0, y: 0, scale: 1 })}
-                className="text-muted-foreground hover:text-foreground cursor-pointer rounded-sm p-1.5"
               >
                 <RotateCcw className="size-4" />
-              </button>
-              <button
+              </Button>
+              <Button
+                size="icon"
+                variant="tertiary"
                 ref={closeRef}
                 type="button"
                 aria-label={labels.close}
                 onClick={handleClose}
-                className="text-muted-foreground hover:text-foreground cursor-pointer rounded-sm p-1.5"
+                className="aui-mermaid-zoom-close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent"
               >
                 <X className="size-4" />
-              </button>
-            </div>
-          </div>,
+              </Button>
+            </Card>
+          </Card>,
           document.body,
         )}
     </div>

@@ -1,0 +1,15 @@
+@layer theme, base, components, utilities;
+@import '../../../src/renderer/index.css';
+@source '../../../src/renderer';
+@import '../../../src/renderer/features/onboarding/onboarding.css';
+
+html, body, #root { min-height: 100%; }
+body { overflow: hidden; }
+.dialog-gallery { min-height: 100%; background: var(--background); }
+.dialog-gallery__page { display: grid; gap: var(--space-2); padding: var(--space-4); }
+.dialog-gallery__page > .card { width: min(100%, 720px); }
+.dialog-gallery__model { box-sizing: border-box; width: min(780px, calc(100vw - var(--space-4))); max-width: 780px; max-height: 80dvh; overflow: hidden; }
+.dialog-gallery__model-body { min-height: 0; max-height: min(48dvh, 460px); overflow: auto; }
+.dialog-gallery__overlay { display: flex; width: min(300px, calc(100% - var(--space-4))); flex-direction: column; gap: var(--space-1); padding: var(--space-2); border-radius: var(--radius-xl); background: #17181a; color: #f5f5f5; box-shadow: var(--overlay-shadow); }
+.dialog-gallery__overlay p { margin: 0; }
+.dialog-gallery__overlay-actions { display: flex; justify-content: flex-end; gap: var(--space-1); }

@@ -3,12 +3,14 @@
 import { Toast as BaseToast } from '@base-ui/react/toast'
 import { CheckCircle2, CircleX, Info, LoaderCircle, TriangleAlert, X } from 'lucide-react'
 import { Button } from './button'
+import { Card } from './card'
 import { useI18n } from '@/i18n'
 
 export type ToastType = 'success' | 'info' | 'warning' | 'error' | 'loading'
 export interface ToastAction { children: string; onClick: () => void }
 export type ToastPayload =
-  | { type: ToastType; description: string; duration?: number }
+  | { type: ToastType; description: string; title?: never; duration?: number }
+  | { type: ToastType; title: string; description: string; duration?: number }
   | { type: ToastType; title: string; description: string; actionProps: ToastAction; duration?: number }
 
 export interface ToastData {}
@@ -48,7 +50,7 @@ function ToastViewport() {
   const { toasts } = BaseToast.useToastManager<ToastData>()
   return <BaseToast.Portal>
     <BaseToast.Viewport className="nola-toast-viewport z-toast" data-slot="toast-viewport">
-      {toasts.map(toast => <BaseToast.Root key={toast.id} toast={toast} className="nola-toast" data-slot="toast" data-type={toast.type ?? 'info'}>
+      {toasts.map(toast => <BaseToast.Root key={toast.id} toast={toast} render={<Card size="sm" data-slot="toast" />} className="nola-toast" data-slot="toast" data-type={toast.type ?? 'info'}>
         <BaseToast.Content className="nola-toast-content">
           {toast.type === 'success' ? <CheckCircle2 className="nola-toast-icon" aria-hidden="true" /> : null}
           {toast.type === 'info' ? <Info className="nola-toast-icon" aria-hidden="true" /> : null}
@@ -59,8 +61,8 @@ function ToastViewport() {
             {toast.title ? <BaseToast.Title className="nola-toast-title" /> : null}
             {toast.description ? <BaseToast.Description className="nola-toast-description" /> : null}
           </div>
-          {toast.actionProps ? <BaseToast.Action className="nola-toast-action" render={<Button size="sm" variant="outline" />} /> : null}
-          <BaseToast.Close render={<Button size="icon" variant="link" className="nola-toast-close text-nola-ui-muted-foreground!" aria-label={t('common.close')}><X aria-hidden="true" /></Button>} />
+          {toast.actionProps ? <BaseToast.Action className="nola-toast-action" render={<Button variant="outline" />} /> : null}
+          <BaseToast.Close render={<Button size="icon" variant="tertiary" className="nola-toast-close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent text-nola-ui-muted-foreground!" aria-label={t('common.close')}><X aria-hidden="true" /></Button>} />
         </BaseToast.Content>
       </BaseToast.Root>)}
     </BaseToast.Viewport>

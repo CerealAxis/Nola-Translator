@@ -21,7 +21,7 @@ import type { StatusPillTone } from '@/components/primitives'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { AlertDialogContent, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { closeToast, showToast, updateToast } from '@/components/ui/toast'
 import type { ToastPayload, ToastType } from '@/components/ui/toast'
 import { useI18n } from '@/i18n'
@@ -255,8 +255,8 @@ function ToastGroup() {
         desc={t('dev.toastDownloadRetryDesc')}
         run={() => { raise({
           type: 'error',
-          title: t('models.downloadError', { name: 'SenseVoiceSmall' }),
-          description: t('errors.downloadFailed'),
+          title: t('models.downloadFailed'),
+          description: t('models.downloadFailedDescription'),
           actionProps: {
             children: t('errors.downloadFailedAction'),
             onClick: () => setDownloadTarget({ resourceId: 'sensevoice-small', name: 'SenseVoiceSmall' }),
@@ -346,7 +346,7 @@ function DialogTrigger({ label, desc, tone, pending, open, onOpenChange, title, 
       <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
         <AlertDialog.Portal>
           <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
-          <AlertDialog.Popup className="nola-dialog-content max-w-md">
+          <AlertDialogContent className="max-w-md">
             <DialogHeader>
               <AlertDialog.Title className="nola-title text-foreground">{title}</AlertDialog.Title>
             </DialogHeader>
@@ -368,7 +368,7 @@ function DialogTrigger({ label, desc, tone, pending, open, onOpenChange, title, 
                 {confirm}
               </Button>
             </DialogFooter>
-          </AlertDialog.Popup>
+          </AlertDialogContent>
         </AlertDialog.Portal>
       </AlertDialog.Root>
     </>

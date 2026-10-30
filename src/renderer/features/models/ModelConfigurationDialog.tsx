@@ -102,7 +102,7 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false }: 
       : record.provider === 'm2m100' ? M2M100_LANGUAGES : codes
   const slot = record.kind === 'recognitionModel' ? 'recognition' : 'translation'
   const selectedCodes = draft.slot === 'recognition' ? draft.languages : [...draft.sourceLanguages, ...draft.targetLanguages]
-  const recognitionCodes = ['auto', ...codes]
+  const recognitionCodes = [...new Set(['auto', ...codes])]
   const valid = modelConfigurationSchema.safeParse(draft).success && engines.includes(draft.engine)
     && draft.slot === slot && selectedCodes.every(code => (draft.slot === 'translation' && code === 'auto') || loaderCodes.includes(normalizeLanguage(code)))
   const engineLabel = (engine: typeof engines[number]) => engine === 'llama' ? 'llama.cpp' : engine === 'crisp' ? 'CrispASR' : 'PyTorch'

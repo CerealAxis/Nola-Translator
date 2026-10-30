@@ -2,8 +2,6 @@
   width: min(48rem, calc(100vw - var(--space-3) - var(--space-3)));
   max-width: none;
   max-height: calc(100dvh - var(--space-3) - var(--space-3));
-  padding: 0;
-  gap: 0;
   overflow: hidden;
   background: var(--surface);
   color: var(--foreground);
@@ -12,8 +10,7 @@
 .app-update-dialog .app-update-dialog-header {
   flex-shrink: 0;
   gap: var(--space-1);
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--separator);
+  padding: 0;
 }
 
 .app-update-dialog-meta {
@@ -26,7 +23,7 @@
 
 .app-update-dialog .app-update-dialog-body {
   min-height: 0;
-  padding: var(--space-3);
+  padding: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
@@ -35,7 +32,7 @@
   flex-shrink: 0;
   flex-wrap: wrap;
   gap: var(--space-1);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2);
   border-top: 1px solid var(--separator);
   background: var(--surface-secondary);
 }

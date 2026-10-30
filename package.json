@@ -22,6 +22,7 @@
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:ui": "electron tests/e2e/capture-ui.mjs",
+    "capture:dialogs": "electron tests/e2e/capture-dialogs.mjs",
     "test:layout": "electron tests/e2e/check-layout.mjs",
     "test:onboarding": "electron tests/e2e/check-onboarding.mjs",
     "test:overlay": "electron tests/e2e/capture-overlay.mjs",

@@ -58,7 +58,6 @@ function WelcomeDialog() {
   return <Dialog open onOpenChange={(open, details) => { if (details.reason === 'outside-press') { details.cancel(); return } if (!open) actions.settings.stopOnboarding() }}>
 
         <DialogContent className="onboarding-welcome onboarding-dialog" aria-modal="true" aria-describedby="onboarding-welcome-description">
-          <Card className="onboarding-dialog__card">
           <CardHeader>
             <CardAction><img ref={markPresented} className="onboarding-welcome__logo" src={nolaLogoUrl} alt="" aria-hidden="true" /></CardAction>
             <CardTitle><DialogTitle>{t('onboarding.welcomeTitle')}</DialogTitle></CardTitle>
@@ -70,7 +69,7 @@ function WelcomeDialog() {
             </ol>
             <p className="onboarding-welcome__support">{t('onboarding.starRequest')}</p>
           </CardContent>
-          <CardFooter><DialogFooter>
+          <DialogFooter>
             <Button variant="default" size="sm" autoFocus onClick={() => actions.settings.beginOnboarding()}>{t('onboarding.begin')}</Button>
             <Button variant="secondary" size="sm" onClick={() => actions.settings.stopOnboarding()}>{t('onboarding.later')}</Button>
             <a className="onboarding-welcome__link button button--sm button--secondary" href="https://nola.xaviermc.top" target="_blank" rel="noreferrer">
@@ -79,8 +78,7 @@ function WelcomeDialog() {
             <a className="onboarding-welcome__link button button--sm button--secondary" href="https://github.com/CerealAxis/Nola-Translator" target="_blank" rel="noreferrer">
               <Github aria-hidden="true" />{t('onboarding.github')}
             </a>
-          </DialogFooter></CardFooter>
-          </Card>
+          </DialogFooter>
         </DialogContent>
 
   </Dialog>
@@ -408,7 +406,7 @@ function TourSteps() {
         <CardHeader>
           <CardTitle id="onboarding-heading">{t(step.title)}</CardTitle>
           <CardDescription id="onboarding-body">{away ? t('onboarding.paused') : t(step.body)}</CardDescription>
-          <CardAction><Button variant="tertiary" size="icon-xs" className="onboarding-tour__close" aria-label={t('onboarding.exit')} onClick={() => actions.settings.stopOnboarding()}><X aria-hidden="true" /></Button></CardAction>
+          <CardAction><Button variant="tertiary" size="icon" className="onboarding-tour__close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent" aria-label={t('onboarding.exit')} onClick={() => actions.settings.stopOnboarding()}><X aria-hidden="true" /></Button></CardAction>
         </CardHeader>
         <CardContent key={step.id} className="onboarding-tour__lesson">
           <ol className="onboarding-tour__chapters" aria-label={t('onboarding.title')}>
@@ -449,16 +447,14 @@ function TourCompletion({ onExit }: TourCompletionProps) {
   return <Dialog open onOpenChange={(open, details) => { if (details.reason === 'outside-press') { details.cancel(); return } if (!open) actions.settings.stopOnboarding() }}>
 
       <DialogContent className="onboarding-dialog" data-onboarding="complete" aria-modal="true" aria-describedby="onboarding-complete-description">
-        <Card className="onboarding-dialog__card">
         <DialogCloseButton aria-label={t('onboarding.exit')} />
         <CardHeader className="onboarding-dialog__completion-header"><CardTitle><DialogTitle>{t('onboarding.finishTitle')}</DialogTitle></CardTitle><CardDescription id="onboarding-complete-description">{t('onboarding.finishBody')}</CardDescription></CardHeader>
-        <CardFooter><DialogFooter>
+        <DialogFooter>
       <a className="onboarding-welcome__link button button--sm button--secondary" href="https://github.com/CerealAxis/Nola-Translator" target="_blank" rel="noreferrer">
         <Github aria-hidden="true" />{t('onboarding.githubHome')}
       </a>
       <Button variant="default" size="sm" onClick={onExit}>{t('onboarding.finishExit')}</Button>
-        </DialogFooter></CardFooter>
-        </Card>
+        </DialogFooter>
       </DialogContent>
 
   </Dialog>

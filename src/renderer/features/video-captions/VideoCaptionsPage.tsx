@@ -136,7 +136,10 @@ export function VideoCaptionsPage() {
             const failure = stores.settings.getState().browserError
             if (failure) reportBrowserError(failure)
           }).catch((error: unknown) => {
-            notifyError(t('errors.browserServiceUnavailable'), { cause: error })
+            notifyError(t('errors.browserServiceUnavailable'), {
+              cause: error,
+              description: t('errors.browserReconnectDescription'),
+            })
           })
         },
       },
@@ -168,7 +171,10 @@ export function VideoCaptionsPage() {
       await browserConnectionAction('inspect')
       browsers = stores.settings.getState().browser?.browsers ?? []
     } catch (error) {
-      notifyError(t('errors.browserServiceUnavailable'), { cause: error })
+      notifyError(t('errors.browserServiceUnavailable'), {
+        cause: error,
+        description: t('errors.browserReconnectDescription'),
+      })
       return
     }
     const inspectFailure = stores.settings.getState().browserError
@@ -180,14 +186,14 @@ export function VideoCaptionsPage() {
     const detectedExtensions = availableBrowsers.filter(browser => browser.extensionStatus === 'installed' || browser.extensionStatus === 'disabled')
     if (availableBrowsers.length > 0 && detectedExtensions.length === 0 && availableBrowsers.every(browser => browser.extensionStatus === 'notInstalled')) {
       notifyWarning(t('videoCaptions.extensionSetupNotice'), {
-        description: t('shellUi.actionHint'),
+        description: t('videoCaptions.extensionSetupDescription'),
         action: { label: t('videoCaptions.browserSettings'), onPress: () => navigate(settingsPath('browser')) },
       })
       return
     }
     if (detectedExtensions.length > 0 && detectedExtensions.every(browser => browser.extensionCompatible === false)) {
       notifyWarning(t('videoCaptions.extensionVersionMismatchNotice'), {
-        description: t('shellUi.actionHint'),
+        description: t('videoCaptions.extensionVersionMismatchDescription'),
         action: { label: t('videoCaptions.browserSettings'), onPress: () => navigate(settingsPath('browser')) },
       })
       return

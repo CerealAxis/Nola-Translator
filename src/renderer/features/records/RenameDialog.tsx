@@ -10,7 +10,7 @@ import { useI18n } from '@/i18n'
 import { actions } from '@/store'
 import { notifyError } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
-import { DialogFooter, DialogHeader } from '@/components/ui/dialog'
+import { AlertDialogContent, DialogFooter, DialogHeader } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Spinner } from '@/components/ui/spinner'
@@ -66,7 +66,7 @@ export function RenameDialog({ meetingId, initialTitle = '', onClose }: RenameDi
     >
       <AlertDialog.Portal>
         <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
-        <AlertDialog.Popup className="nola-dialog-content max-w-md">
+        <AlertDialogContent className="max-w-md">
           <DialogHeader>
             <AlertDialog.Title className="nola-title text-foreground">
               {t('records.renameTitle')}
@@ -96,7 +96,7 @@ export function RenameDialog({ meetingId, initialTitle = '', onClose }: RenameDi
               {t('common.confirm')}
             </Button>
           </DialogFooter>
-        </AlertDialog.Popup>
+        </AlertDialogContent>
       </AlertDialog.Portal>
     </AlertDialog.Root>
   )

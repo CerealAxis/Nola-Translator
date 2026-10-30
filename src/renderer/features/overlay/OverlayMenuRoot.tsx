@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { actions, getBridge, stores, useStore } from '@/store'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { Dialog as BaseDialog } from '@base-ui/react/dialog'
 import { OverlayControls } from './OverlayControls'
 import { useI18n } from '@/i18n'
@@ -99,7 +100,7 @@ function OverlayCloseConfirmation({ id }: { id: number }) {
     <BaseDialog.Root open onOpenChange={open => { if (!open) cancel() }}>
       <BaseDialog.Portal>
         <BaseDialog.Popup className="nola-overlay-confirm-surface z-overlay">
-          <div className="nola-confirm-dialog">
+          <Card className="nola-confirm-dialog">
             <BaseDialog.Title render={<p />} className="nola-confirm-title">{t('overlay.closeTitle')}</BaseDialog.Title>
             <BaseDialog.Description render={<p />} className="nola-confirm-text">{t('overlay.closeBody')}</BaseDialog.Description>
             <div className="nola-confirm-actions">
@@ -110,7 +111,7 @@ function OverlayCloseConfirmation({ id }: { id: number }) {
                 {t(pending ? 'overlay.closing' : 'overlay.closeConfirm')}
               </Button>
             </div>
-          </div>
+          </Card>
         </BaseDialog.Popup>
       </BaseDialog.Portal>
     </BaseDialog.Root>

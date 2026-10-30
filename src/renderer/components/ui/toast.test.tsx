@@ -20,9 +20,9 @@ it('renders a simple toast as description only', () => {
   expect(within(viewport).getByText('请检查网络后重试。')).toBeVisible()
   expect(within(viewport).queryByText('重试')).not.toBeInTheDocument()
   const close = viewport.querySelector<HTMLButtonElement>('.nola-toast-close')
-  expect(close).toHaveAttribute('data-variant', 'link')
+  expect(close).toHaveAttribute('data-variant', 'outline')
   expect(close?.className).not.toContain('bg-surface-tertiary')
-  expect(close?.className).not.toContain('hover:bg-')
+  expect(close?.className).toContain('hover:bg-transparent')
 })
 
 it('renders an action toast with a title, description, and one action', () => {

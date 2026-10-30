@@ -43,13 +43,16 @@ export function DownloadsTab() {
         setDownloadTarget(null)
         if (target) void actions.models.manageResource(target.resourceId, 'install', source).catch(() => {
           notifyModelDownloadFailure(
-            t('models.downloadError', { name: target.name }),
+            t('models.downloadFailed'),
             t('errors.downloadFailed'),
             t('errors.downloadFailedAction'),
             // The retry reports its own failure: a task that stays failed is not announced
             // again, so a silent retry would leave the user with nothing.
             () => { void actions.models.manageResource(target.resourceId, 'install', source).catch((cause: unknown) => {
-              notifyRetryableFailure(t('models.installFailed'), { cause })
+              notifyRetryableFailure(t('models.installFailed'), {
+                cause,
+                description: t('models.downloadReasonInstall'),
+              })
             }) },
           )
         })

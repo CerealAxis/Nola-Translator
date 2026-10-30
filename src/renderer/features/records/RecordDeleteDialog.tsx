@@ -8,7 +8,7 @@ import { AlertDialog } from '@base-ui/react/alert-dialog'
 import { LoaderCircle } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import { DialogFooter, DialogHeader } from '@/components/ui/dialog'
+import { AlertDialogContent, DialogFooter, DialogHeader } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n'
 
 export interface RecordDeleteDialogProps {
@@ -36,7 +36,7 @@ export function RecordDeleteDialog({
     <AlertDialog.Root open={isOpen} onOpenChange={onOpenChange}>
       <AlertDialog.Portal>
         <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
-        <AlertDialog.Popup className="nola-dialog-content max-w-sm">
+        <AlertDialogContent className="max-w-sm">
           <DialogHeader>
             <AlertDialog.Title data-slot="dialog-title">
               {bulk ? t('records.deleteManyTitle', { count: selectedCount }) : t('records.deleteTitle')}
@@ -54,7 +54,7 @@ export function RecordDeleteDialog({
               {bulk ? t('records.deleteSelected', { count: selectedCount }) : t('records.delete')}
             </Button>
           </DialogFooter>
-        </AlertDialog.Popup>
+        </AlertDialogContent>
       </AlertDialog.Portal>
     </AlertDialog.Root>
   )

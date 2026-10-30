@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 
 import { AlertDialog } from '@base-ui/react/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { AlertDialogContent, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 import { actions } from '@/store'
 import type { SessionState } from '@/store'
@@ -29,14 +29,16 @@ export function StopSessionDialog({ isOpen, onOpenChange, onEnd }: StopSessionDi
     <AlertDialog.Root open={isOpen} onOpenChange={open => { if (!open) onOpenChange(false) }}>
       <AlertDialog.Portal>
         <AlertDialog.Backdrop className="fixed inset-0 z-overlay bg-nola-ui-backdrop" />
-        <AlertDialog.Popup className="nola-dialog-content max-w-sm">
-          <AlertDialog.Title className="nola-title text-foreground">{t('workspace.endConfirmTitle')}</AlertDialog.Title>
-          <AlertDialog.Description className="nola-body text-muted">{t('workspace.endConfirmBody')}</AlertDialog.Description>
-          <div className="nola-dialog-footer">
+        <AlertDialogContent className="max-w-sm">
+          <DialogHeader>
+            <AlertDialog.Title data-slot="dialog-title">{t('workspace.endConfirmTitle')}</AlertDialog.Title>
+            <AlertDialog.Description data-slot="dialog-description">{t('workspace.endConfirmBody')}</AlertDialog.Description>
+          </DialogHeader>
+          <DialogFooter>
             <AlertDialog.Close render={<Button variant="tertiary" size="sm" className="rounded-xl" />}>{t('workspace.keepGoing')}</AlertDialog.Close>
             <Button variant="danger" size="sm" className="rounded-xl" onClick={() => { onEnd(); onOpenChange(false) }}>{t('workspace.end')}</Button>
-          </div>
-        </AlertDialog.Popup>
+          </DialogFooter>
+        </AlertDialogContent>
       </AlertDialog.Portal>
     </AlertDialog.Root>
   )

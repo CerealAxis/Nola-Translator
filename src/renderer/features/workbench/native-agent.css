@@ -31,6 +31,7 @@
   --nola-ui-primary-foreground: var(--primary-foreground);
   --nola-ui-muted: var(--muted);
   --nola-ui-muted-foreground: var(--muted-foreground);
+  --backdrop: color-mix(in oklch, var(--foreground) 30%, transparent);
   --nola-ui-border: var(--border);
 }
 :root[data-theme='dark'], .native-agent-document.dark {
@@ -51,6 +52,7 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+  --backdrop: color-mix(in oklch, var(--background) 58%, transparent);
 }
 @theme inline {
   --color-background: var(--background);
@@ -68,6 +70,8 @@
   --color-nola-ui-popover-foreground: var(--popover-foreground);
   --color-nola-ui-muted: var(--muted);
   --color-nola-ui-muted-foreground: var(--muted-foreground);
+  --color-nola-ui-backdrop: var(--backdrop);
+  --color-nola-ui-ring: var(--ring);
   --color-nola-ui-border: var(--border);
   --color-muted-foreground: var(--muted-foreground, var(--muted));
   --color-card: var(--card, var(--surface));

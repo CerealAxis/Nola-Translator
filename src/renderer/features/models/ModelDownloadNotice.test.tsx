@@ -28,7 +28,7 @@ it('notifies on completion, failure with a reason, and cancellation', () => {
   const failureCalls = () => showToast.mock.calls.filter(([payload]) => payload.type === 'error' && 'actionProps' in payload)
   expect(failureCalls()).toHaveLength(1)
   expect(failureCalls()[0]?.[0]).toEqual(expect.objectContaining({
-    title: expect.stringContaining(record.name),
+    title: '模型下载失败',
     description: expect.stringContaining('网络连接失败'),
     actionProps: expect.objectContaining({ children: '重试下载', onClick: expect.any(Function) }),
     duration: NOTIFY_DURATION.retryable,

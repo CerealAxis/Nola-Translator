@@ -89,7 +89,7 @@ export function AppUpdateDialog({ result, isOpen, onOpenChange, onOpenRelease, i
             {!isCurrentVersion && <span>{t('appUpdate.currentVersion', { version: displayVersion(result.currentVersion) })}</span>}
           </div>
         </DialogHeader>
-        <div className="app-update-dialog-body nola-scrollbar mt-2 flex-1">
+        <div className="app-update-dialog-body nola-scrollbar flex-1">
           {result.releaseNotes.trim()
             ? (
               <div className="app-update-markdown">

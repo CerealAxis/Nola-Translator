@@ -64,8 +64,8 @@ export function ModelDownloadNotice() {
           record.state === 'running' && (record.phase === 'resolve' || record.phase === 'download')
         if (startedNow) {
           if (suppressedStartNotices.delete(record.resourceId)) continue
-          notifyInfo(t('models.downloadStarted', { name: record.name }), {
-            description: t('shellUi.actionHint'),
+          notifyInfo(t('models.downloadStarted'), {
+            description: t('models.downloadStartedDescription', { name: record.name }),
             action: { label: t('models.viewProgress'), onPress: () => { window.location.hash = '#/models/downloads' } },
             duration: 12000,
           })
@@ -112,14 +112,17 @@ function notifyFailure(record: Pick<ResourceRecord, 'resourceId' | 'name' | 'err
         : record.errorCode === 'integrityCheckFailed' ? 'models.downloadReasonIntegrity'
           : record.errorCode === 'installFailed' ? 'models.downloadReasonInstall' : null
   notifyModelDownloadFailure(
-    t('models.downloadError', { name: record.name }),
+    t('models.downloadFailed'),
     reasonKey ? t(reasonKey) : t('errors.downloadFailed'),
     t('errors.downloadFailedAction'),
     () => {
       // The retry reports its own failure: a record that stays in the failed state is
       // not announced again, so a silent retry would leave the user with nothing.
       void actions.models.manageResource(record.resourceId, 'install').catch((cause: unknown) => {
-        notifyRetryableFailure(t('models.installFailed'), { cause })
+        notifyRetryableFailure(t('models.installFailed'), {
+          cause,
+          description: t('models.downloadReasonInstall'),
+        })
       })
     },
   )

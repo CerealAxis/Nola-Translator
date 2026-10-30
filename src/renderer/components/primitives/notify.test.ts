@@ -23,6 +23,15 @@ it('gives loading notices a finite automatic duration', () => {
   expect(showToast).toHaveBeenCalledExactlyOnceWith({ type: 'loading', description: '正在准备运行组件', duration: 8000 })
 })
 
+it('uses the explicit title and description layout when requested', () => {
+  const showToast = vi.spyOn(toast, 'showToast')
+  notifyError('搜索失败', { description: '请检查网络后重试。' })
+  expect(showToast).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+    title: '搜索失败',
+    description: '请检查网络后重试。',
+  }))
+})
+
 it('keeps the actionable error in the overlay so only a user click can navigate away', () => {
   window.history.replaceState({}, '', '/?overlay=1')
   const showToast = vi.spyOn(toast, 'showToast')

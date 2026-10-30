@@ -70,11 +70,7 @@ export function ExportDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3">
-          <span className="nola-body-strong text-[14px] leading-[1.45] font-semibold text-foreground">
-            {t('records.export')}
-          </span>
-
+        <div className="flex flex-col gap-[var(--space-2)]">
           <TabsRoot value={format} onValueChange={value => { if (FORMATS.includes(value as ExportFormat)) setFormat(value as ExportFormat) }}>
             <TabsList className="nola-segmented" aria-label={t('records.export')}>
               {FORMATS.map(value => <TabsTrigger key={value} value={value} disabled={exporting} className="leading-[1.5] uppercase">{value}</TabsTrigger>)}

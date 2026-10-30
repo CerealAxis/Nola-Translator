@@ -70,7 +70,7 @@ function placeInUsable(target: TourRect | null, card: TourSize, usable: Onboardi
 function OnboardingCardWindow(): ReactNode {
   const { t } = useI18n()
   const state = useSyncExternalStore(subscribeState, () => cardState)
-  const [tip, setTip] = useState<{ x: number; y: number } | null>(null)
+  const [tip, setTip] = useState<{ x: number; y: number; maxHeight?: number } | null>(null)
   const cardRef = useRef<HTMLDivElement>(null)
   const api = getBridge()?.onboardingCard
 
@@ -86,10 +86,19 @@ function OnboardingCardWindow(): ReactNode {
         ? { x: state.spotlight.x + state.mainOffset.x, y: state.spotlight.y + state.mainOffset.y, width: state.spotlight.width, height: state.spotlight.height }
         : null
       const topInset = state.topInset + state.mainOffset.y
+      const sideRoom = spotlight
+        ? Math.max(spotlight.x - state.usable.x - gap * 2, state.usable.x + state.usable.width - spotlight.x - spotlight.width - gap * 2)
+        : state.usable.width
+      const verticalRoom = spotlight
+        ? Math.max(spotlight.y - Math.max(state.usable.y, topInset) - gap * 2, state.usable.y + state.usable.height - spotlight.y - spotlight.height - gap * 2)
+        : state.usable.height
+      const maxHeight = !state.away && spotlight && sideRoom < card.width && verticalRoom > space * 8 ? verticalRoom : undefined
+      const size = { width: card.width, height: Math.min(card.height, maxHeight ?? card.height) }
       const position = state.away
         ? { x: state.usable.x + (state.usable.width - card.width) / 2, y: state.usable.y + (state.usable.height - card.height) / 2 }
-        : placeInUsable(spotlight, { width: card.width, height: card.height }, state.usable, gap, topInset)
-      setTip(previous => previous && previous.x === position.x && previous.y === position.y ? previous : position)
+        : placeInUsable(spotlight, size, state.usable, gap, topInset)
+      const next = { ...position, maxHeight }
+      setTip(previous => previous && previous.x === next.x && previous.y === next.y && previous.maxHeight === next.maxHeight ? previous : next)
       api?.sendRect({ x: position.x, y: position.y, width: card.width, height: card.height })
     }
     measure()
@@ -118,11 +127,11 @@ function OnboardingCardWindow(): ReactNode {
     <Card size="sm" ref={cardRef} tabIndex={-1} role="dialog" aria-modal="false" aria-labelledby="onboarding-heading" aria-describedby="onboarding-body"
       className={['onboarding-tour__card', state.compact && 'onboarding-tour__card--compact'].filter(Boolean).join(' ')}
       data-ready={tip !== null}
-      style={tip ? { left: tip.x, top: tip.y } : undefined}>
+      style={tip ? { left: tip.x, top: tip.y, maxHeight: tip.maxHeight } : undefined}>
       <CardHeader>
         <CardTitle id="onboarding-heading">{step ? t(step.title) : t('onboarding.title')}</CardTitle>
         <CardDescription id="onboarding-body">{state.away ? t('onboarding.paused') : step ? t(step.body) : null}</CardDescription>
-        <CardAction><Button variant="tertiary" size="icon-xs" className="onboarding-tour__close" aria-label={t('onboarding.exit')} onClick={send('exit')}><X aria-hidden="true" /></Button></CardAction>
+        <CardAction><Button variant="tertiary" size="icon" className="onboarding-tour__close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent" aria-label={t('onboarding.exit')} onClick={send('exit')}><X aria-hidden="true" /></Button></CardAction>
       </CardHeader>
       <CardContent key={state.step} className="onboarding-tour__lesson">
         <ol className="onboarding-tour__chapters" aria-label={t('onboarding.title')}>
