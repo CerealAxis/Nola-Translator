@@ -47,10 +47,10 @@ export function OfflineFailureNotice() {
       }
       // One failure at a time: the notice that is on screen is replaced, not stacked on.
       if (announcedNotice) dismissNotice(announcedNotice)
-      if (failure === 'failed') { announcedNotice = notifyError(t('offline.failed'), { action: retry }); return }
+      if (failure === 'failed') { announcedNotice = notifyError(t('offline.failed'), { description: t('shellUi.actionHint'), action: retry }); return }
       const issue = preview && failure === preview ? preview.issues[0] : task?.issue
       announcedNotice = notifyError(t(`offline.${issue ?? 'failed'}`), {
-        description: task?.reason ?? preview?.items.find(item => item.reason)?.reason,
+        description: t('shellUi.actionHint'),
         action: retry,
       })
     }

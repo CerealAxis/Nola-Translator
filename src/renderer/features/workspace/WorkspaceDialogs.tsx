@@ -111,10 +111,7 @@ export function SessionErrorDialog({ state, onCopyDiagnostics, onReset, onViewRe
                 onReset()
                 navigate(pathOf('models'))
               } else if (target.kind === 'stop') {
-                void actions.session.stopSession().catch((error: unknown) => {
-                  onReset()
-                  notifyError(t('errors.engineOperationFailed'), { cause: error })
-                })
+                void actions.session.stopSession().catch(() => undefined)
               } else onReset()
             }}
           >

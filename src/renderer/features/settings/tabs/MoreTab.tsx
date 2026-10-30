@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Check, ExternalLink, Github, Heart, LoaderCircle, RefreshCw, UserRound } from 'lucide-react'
 
 import type { AppUpdateCheckResult } from '@/bridge'
-import { notifyError, notifySuccess } from '@/components/primitives/notify'
+import { notifyError, notifyInfo, notifyRetryableFailure, notifySuccess } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { actions } from '@/store'
@@ -28,6 +28,17 @@ const SHADCN_UI_URL = 'https://ui.shadcn.com/'
 const COPIED_HOLD_MS = 1500
 const TOOLTIP_CLASS = 'z-popup max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'
 
+function isReleaseUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  try {
+    const url = new URL(value)
+    const repo = new URL(REPOSITORY_URL)
+    const path = url.pathname.slice(repo.pathname.length)
+    return url.origin === repo.origin && !url.username && !url.password && url.pathname.startsWith(`${repo.pathname}/releases`) &&
+      (path === '/releases' || path === '/releases/latest' || /^\/releases\/tag\/[^/]+\/?$/.test(path))
+  } catch { return false }
+}
+
 export function MoreTab() {
   const { t } = useI18n()
   const updateChecking = useStore(stores.settings, state => state.appUpdateChecking)
@@ -45,27 +56,45 @@ export function MoreTab() {
       return
     }
     if (result.updateAvailable) {
-      notifySuccess(t('appUpdate.availableStatus', { version: result.latestVersion }))
+      const message = t('appUpdate.availableStatus', { version: result.latestVersion })
+      const releaseUrl = result.releaseUrl
+      notifyInfo(message, isReleaseUrl(releaseUrl) ? {
+        description: t('appUpdate.availableDescription'),
+        action: { label: t('appUpdate.openRelease'), onPress: () => { void openAnnouncement(releaseUrl) } },
+      } : {})
       return
     }
     notifySuccess(t('appUpdate.upToDateStatus', { version: result.latestVersion }))
-    if (!result.releaseUrl) {
-      notifyError(t('appUpdate.checkFailed'))
-      return
+    if (result.releaseUrl) {
+      setAnnouncement(result)
+      setAnnouncementOpen(true)
     }
-    setAnnouncement(result)
-    setAnnouncementOpen(true)
   }
 
   async function openAnnouncement(url: string) {
+    if (!isReleaseUrl(url)) { notifyError(t('appUpdate.openFailed')); return }
     setAnnouncementOpening(true)
     try {
       await actions.settings.openAppReleasePage(url)
       setAnnouncementOpen(false)
     } catch (error) {
-      notifyError(t('appUpdate.openFailed'), { cause: error })
+      notifyRetryableFailure(t('appUpdate.openFailed'), {
+        cause: error,
+        description: t('appUpdate.openFailedDescription'),
+        action: { label: t('appUpdate.copyReleaseLink'), onPress: () => { void copyReleaseUrl(url) } },
+      })
     } finally {
       setAnnouncementOpening(false)
+    }
+  }
+
+  async function copyReleaseUrl(url: string) {
+    if (!isReleaseUrl(url)) return
+    try {
+      await navigator.clipboard.writeText(url)
+      notifySuccess(t('common.copied'))
+    } catch (error) {
+      notifyError(t('errors.copyDiagnosticsFailed'), { cause: error })
     }
   }
 

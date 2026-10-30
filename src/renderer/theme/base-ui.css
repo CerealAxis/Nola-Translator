@@ -330,7 +330,6 @@
     will-change: transform;
     transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1), opacity 500ms, height 150ms;
   }
-
   .nola-toast::after { position: absolute; inset-block-start: 100%; inset-inline-start: 0; width: 100%; height: calc(var(--nola-toast-gap) + 1px); content: ''; }
   .nola-toast[data-expanded] { height: var(--toast-height); transform: translateX(var(--toast-swipe-movement-x)) translateY(var(--nola-toast-offset-y)); }
   .nola-toast[data-limited] { opacity: 0; }
@@ -348,11 +347,14 @@
   .nola-toast-title { color: var(--nola-ui-foreground); font: var(--font-body-strong); overflow-wrap: anywhere; }
   .nola-toast-description { color: var(--nola-ui-muted-foreground); font: var(--font-caption); overflow-wrap: anywhere; }
   .nola-toast-action { flex: none; }
-  .nola-toast-icon { flex: none; width: 18px; height: 18px; color: var(--nola-ui-muted-foreground); }
-  .nola-toast-icon-error { color: var(--nola-ui-destructive); }
+  .nola-toast-icon { flex: none; width: 18px; height: 18px; color: var(--nola-ui-info); }
+  .nola-toast[data-type='success'] .nola-toast-icon { color: var(--nola-ui-success); }
+  .nola-toast[data-type='warning'] .nola-toast-icon { color: var(--nola-ui-warning); }
+  .nola-toast[data-type='error'] .nola-toast-icon { color: var(--nola-ui-destructive); }
+  .nola-toast[data-type='loading'] .nola-toast-icon { color: var(--nola-ui-primary); }
   .nola-toast-icon-loading { animation: nola-toast-spin 1s linear infinite; }
   @keyframes nola-toast-spin { to { transform: rotate(360deg); } }
-  .nola-toast-close.button { flex: none; width: 32px; min-width: 32px; height: 32px; min-height: 32px; border-radius: var(--radius-xl); border-color: transparent; background: transparent; color: var(--nola-ui-muted-foreground); }
+  .nola-toast-close.button { flex: none; width: 32px; min-width: 32px; height: 32px; min-height: 32px; border-radius: var(--radius-xl); border-color: transparent; background: transparent !important; color: var(--nola-ui-muted-foreground); }
   .nola-toast-close.button:hover:not(:disabled):not([aria-disabled='true']) { color: var(--nola-ui-foreground); background: transparent; }
 
   @media (max-width: 600px) {

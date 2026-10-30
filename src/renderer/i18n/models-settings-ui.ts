@@ -1,6 +1,10 @@
 export const modelsSettingsZh = {
   removing: '正在移除…',
-  removeFailed: '移除失败',
+  removeFailed: '模型移除失败',
+  removeFailedDescription: '模型可能仍被使用，请停止相关服务后重试。',
+  retryRemove: '重试移除',
+  selectionUnavailable: '所选模型已不可用',
+  selectionUnavailableDescription: '模型列表可能已变化，请重新选择。',
   removeComplete: '已删除 {name}',
   modelsSubtitle: '管理本地与云端语音识别、翻译模型',
   currentRecognition: '默认 ASR 模型',
@@ -75,7 +79,11 @@ export const modelsSettingsZh = {
 
 export const modelsSettingsEn: Record<keyof typeof modelsSettingsZh, string> = {
   removing: 'Removing…',
-  removeFailed: 'Removal failed',
+  removeFailed: 'Model removal failed',
+  removeFailedDescription: 'The model may still be in use. Stop related services and retry.',
+  retryRemove: 'Retry removal',
+  selectionUnavailable: 'Selected model is unavailable',
+  selectionUnavailableDescription: 'The model list may have changed. Choose another model.',
   removeComplete: '{name} was deleted',
   modelsSubtitle: 'Manage local and cloud speech recognition and translation models',
   currentRecognition: 'Default ASR model',

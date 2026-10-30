@@ -12,7 +12,7 @@ import { BROWSER_EXTENSION_VERSION, type BrowserIntegrationInfo, type BrowserKin
 import chromeIcon from '@/assets/browsers/chrome.png'
 import edgeIcon from '@/assets/browsers/edge.png'
 import firefoxIcon from '@/assets/browsers/firefox.svg'
-import { notifyError } from '@/components/primitives/notify'
+import { notifyError, notifyRetryableFailure } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardDescription, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ColorPicker } from '@/components/ui/color-picker'
@@ -43,6 +43,12 @@ export function BrowserTab() {
   const appearance = settings.browserCaptions
   const [selectedBrowser, setSelectedBrowser] = useState<BrowserKind | null>(null)
   const reportedBrowserError = useRef<string | null>(null)
+  const downloadTarget = useRef<BrowserKind | null>(null)
+  async function downloadExtension(kind: BrowserKind) {
+    downloadTarget.current = kind
+    await browserConnectionAction('download', undefined, kind)
+    if (!stores.settings.getState().browserError) downloadTarget.current = null
+  }
   useEffect(() => {
     void browserConnectionAction('inspect')
   }, [])
@@ -55,9 +61,26 @@ export function BrowserTab() {
     }
     if (reportedBrowserError.current === browserError) return
     reportedBrowserError.current = browserError
-    notifyError(t('browser.connectionFailed'), {
+    const failedDownload = downloadTarget.current
+    if (failedDownload) {
+      downloadTarget.current = null
+      notifyRetryableFailure(t('browser.downloadFailedTitle'), {
+        cause: browserError,
+        description: t('browser.downloadFailedDescription'),
+        action: { label: t('browser.retryDownload'), onPress: () => {
+          reportedBrowserError.current = null
+          void downloadExtension(failedDownload)
+        } },
+      })
+      return
+    }
+    notifyRetryableFailure(t('browser.connectionFailed'), {
       cause: browserError,
-      action: { label: t('models.retry'), onPress: () => void browserConnectionAction('inspect') },
+      description: t('errors.browserReconnectDescription'),
+      action: { label: t('errors.browserReconnectAction'), onPress: () => {
+        reportedBrowserError.current = null
+        void browserConnectionAction('inspect')
+      } },
     })
   }, [browserError, t])
   const browserName = (kind: BrowserKind) => t(kind === 'firefox' ? 'browser.firefox' : kind === 'chrome' ? 'browser.chrome' : 'browser.edge')
@@ -77,14 +100,6 @@ export function BrowserTab() {
     <BrowserSwitch isSelected={info.enabled} isDisabled={browserBusy || !info.available || !hasExtension(info)}
       onChange={enabled => { void browserConnectionAction('browserEnable', enabled, info.browser) }} ariaLabel={enableLabel(info.browser)} />
   )
-  const downloadExtension = async (kind: BrowserKind) => {
-    await browserConnectionAction('download', undefined, kind)
-    const error = stores.settings.getState().browserError
-    if (error) {
-      reportedBrowserError.current = error
-      notifyError(t('browser.downloadFailed'))
-    }
-  }
   const selected = selectedBrowser ? getBrowser(selectedBrowser) : null
   const patchAppearance = (patch: Partial<typeof appearance>) => {
     void updateSettings({ browserCaptions: patch })

@@ -9,7 +9,7 @@ import { offlineZh } from './offline-ui'
  * - 标题与说明不复述，说明只写用户不知道的信息
  * - 占位符不充当 label，占位符只在能减少输入错误时出现
  * - 不用破折号
- * - The locale layer appends the stable support code from the shared catalog.
+ * - Support codes stay in diagnostics; user-facing copy stays readable.
  */
 
 import { shellZh } from './shell-ui'
@@ -78,10 +78,11 @@ export const zhCN = {
   appUpdate: {
     group: '软件更新', versionCheck: '版本检查',
     checkNow: '检查更新', availableStatus: '发现新版本 {version}', upToDateStatus: '已是最新版本 {version}',
-    checkFailed: '暂时无法从 GitHub 获取版本信息，请稍后重试。',
+    availableDescription: '新版本已发布，可以查看更新内容。',
+    checkFailed: '无法获取更新信息，请检查网络后重试。',
     title: '发现新版本', currentReleaseTitle: "当前版本公告", viewAnnouncement: "查看版本公告", version: '最新版本 {version}', currentVersion: '当前版本 {version}',
     notes: '更新内容', notesUnavailable: '此版本没有提供更新说明。',
-    openRelease: '查看 GitHub 下载页', later: '稍后提醒', openFailed: '无法打开 GitHub 发布页，请检查网络后重试。',
+    openRelease: '查看更新', later: '稍后提醒', openFailed: '无法打开发布页面', openFailedDescription: '可在 GitHub 项目的 Releases 页面查看版本。', copyReleaseLink: '复制链接',
   },
 
   nav: {
@@ -164,6 +165,8 @@ export const zhCN = {
      * 输入"就是把引擎故障说成硬件故障。真原因由 `errors.engineNotReady`（ENG-001）承担。
      */
     deviceCheckBlocked: '音频设备检测未能完成',
+    checkFailedTitle: '环境检查失败',
+    checkFailedDescription: '请重新检查；多次失败可复制诊断信息反馈。',
     modelMissing: '缺少模型：{name}',
     installNow: '现在安装',
     later: '稍后再说',
@@ -224,7 +227,7 @@ export const zhCN = {
     llamaEnvironmentFailed: 'llama.cpp 环境异常，字幕服务无法启动。请到设置检查或修复 llama.cpp 组件。',
     torchDeviceMismatch: 'PyTorch 环境与所选设备后端不匹配，字幕服务无法启动。请到设置选择匹配的 PyTorch 组件组合。',
     llamaDeviceMismatch: 'llama.cpp 环境与所选设备后端不匹配，字幕服务无法启动。请到设置选择匹配的 llama.cpp 组件组合。',
-    errorOpeningBrowser: '无法打开默认浏览器，请在系统里设置一个默认浏览器后重试。',
+    errorOpeningBrowser: '无法打开浏览器，请检查默认浏览器设置。',
     /*
      * 预览里的示例句：第一行原文、第二行译文，双语对照就长这样。
      * 用一句真实语料而不是 lorem —— 占位文本看不出换行与字号对不对。
@@ -314,8 +317,9 @@ export const zhCN = {
     deleteManyTitle: '删除这 {count} 条记录？',
     deleteManyBody: '这些记录的字幕、译文和录音会一起删除，不能恢复。',
     deletedMany: '已删除 {count} 条记录',
-    deletePartialFailed: '已删除 {removed} 条，{failed} 条失败',
-    deleteFailed: '未能删除记录，列表已恢复。请重试；若仍失败，请查看诊断日志。',
+    deletePartialFailed: '部分记录未删除',
+    deletePartialDescription: '已删除 {removed} 条，另有 {failed} 条仍可重试。',
+    deleteFailed: '记录未删除，原记录已恢复，请重试。',
     audioUnavailable: '这场同传的录音没有保存',
     playerPlay: '播放',
     playerPause: '暂停',
@@ -370,17 +374,20 @@ export const zhCN = {
     downloadComplete: '{name} 下载完成',
     downloadCancelled: '{name} 下载已取消',
     downloadError: '{name} 下载失败，可重试或更换下载源。',
+    downloadDiskSpaceTitle: '磁盘空间不足',
+    downloadDiskSpaceDescription: '请清理存储空间后重新下载模型。',
+    openStorageSettings: '打开存储设置',
     downloadReasonNetwork: '网络连接失败，请检查网络后重试。',
     downloadReasonNotFound: '找不到模型文件，请检查模型源或选择其他版本。',
     downloadReasonUnavailable: '模型源拒绝或暂时无法提供此文件，请检查访问权限或更换下载源。',
     downloadReasonIntegrity: '下载文件校验失败，请重试或更换下载源。',
     downloadReasonInstall: '文件已下载，但模型安装失败。请检查磁盘空间和目录权限后重试。',
-    downloadReasonWithCode: '下载失败，原因代码：{code}',
     installed: '已安装',
     recommended: '推荐',
     tryable: '可尝试',
     notRecommended: '不推荐',
     engineUnavailable: '需先安装该模型对应的 {engine} 加载器，才能使用。',
+    runtimeMissingTitle: '缺少模型运行组件',
     remove: '卸载',
     setDefault: '设为默认',
     notInstalled: '未安装',
@@ -444,6 +451,7 @@ export const zhCN = {
     noResults: '没有匹配的模型',
     loadMore: '加载更多',
     loadMoreFailed: '后续模型加载失败，请重试。',
+    loadMoreFailedDescription: '已显示的搜索结果仍可使用。',
     noMoreResults: '已加载全部结果',
     viewOnHub: '在 Hugging Face 查看完整介绍',
     installFailed: '无法安装此模型，请查看诊断信息。',
@@ -495,6 +503,8 @@ export const zhCN = {
 
   settings: {
     loadFailed: '无法读取设置',
+    loadFailedDescription: '请重新读取设置；未保存的更改可能丢失。',
+    retryLoad: '重试加载',
     title: '设置',
     groupAppearance: '外观',
     groupLanguage: '语言',
@@ -567,6 +577,7 @@ export const zhCN = {
     apiKey: 'API 密钥',
     apiKeyPlaceholder: '请输入 API KEY',
     apiKeyHint: '直接输入密钥，离开输入框后自动保存。',
+    translationCredentialSaveFailed: '翻译接口密钥未保存，请检查填写内容后重试。',
     deleteKey: '删除密钥',
     testing: '正在测试连接',
     /*
@@ -711,24 +722,24 @@ export const zhCN = {
   },
 
   errors: {
-    "invalidArgument": "操作参数无效，请检查输入。",
+    "invalidArgument": "操作请求无效，请重新尝试。",
     "meetingNameEmpty": "会议名称不能为空。",
     "meetingNotFound": "会议记录不存在，请刷新列表。",
-    "invalidCredential": "凭据内容或类型无效，请重新输入。",
+    "invalidCredential": "接口密钥无效，请重新填写。",
 
     errorCodeLabel: '错误码 {code}',
-    cloudRecognitionCredentialMissing: '请在设置 → 音频与识别中保存云端识别服务的 API Key，再启动字幕。',
+    cloudRecognitionCredentialMissing: '未配置云端识别密钥，请先完成设置。',
     configureCloudRecognitionAction: '去配置云端识别',
     // 余额与限流是两家云端都会遇到的事，所以文案不点名服务商，只说该做什么。
-    cloudRecognitionInsufficientBalance: '云端识别服务商账户余额不足，充值后才能继续识别。',
-    cloudRecognitionRateLimited: '云端识别请求过于频繁，稍后会自动重试。',
+    cloudRecognitionInsufficientBalance: '识别服务余额不足，请到服务商账户充值。',
+    cloudRecognitionRateLimited: '识别请求过于频繁，稍后自动重试。',
     cloudRecognitionNetworkUnavailable: '无法连接到云端识别服务，请检查网络后重试。',
     cloudRecognitionTimeout: '云端识别服务响应超时，稍后会自动重试。',
-    cloudRecognitionInvalidResponse: '云端识别服务返回了无法识别的响应，请稍后重试或联系服务商。',
+    cloudRecognitionInvalidResponse: '识别服务返回异常，请稍后重试。',
     cloudRecognitionClosed: '云端识别连接已关闭，请重新开始。',
     cloudRecognitionBufferOverflow: '云端识别缓冲区已满，请稍后重试。',
     // Keep the sentence self-contained; the locale layer appends its catalog code.
-    engineNotReady: '本地引擎没有运行，识别无法开始。',
+    engineNotReady: '本地引擎未启动，请检查运行组件。',
     // 预检状态不是失败：用户还没动手，所以不给错误码。
     // **当前没有界面在用这一条**：冷启动不再报「引擎没运行」（主进程在 app ready 时就启动
     // 引擎，应用刚打开那几秒是 `booting`，什么都没坏，报故障等于报一件没发生的事）；
@@ -736,39 +747,42 @@ export const zhCN = {
     // 留着是因为 `i18n.test.ts` 的 `noCodeByDesign` 点名了这一条，删掉会让那条断言的注释悬空。
     engineNotReadyPreflight: '本地引擎没有运行，识别暂时无法开始。',
     // Engine loss ends the session; finalized captions remain persisted in the meeting record.
-    engineLost: '本地引擎在同传中停止，这场同传已中断，已经识别到的字幕已保存。',
+    engineLost: '本地引擎意外停止，已识别的字幕已保存。',
     engineLostAction: '查看这场记录',
     engineNotReadyAction: '重试启动',
     engineTransportUnavailable: '引擎通信通道不可用，请重启应用后重试。',
     engineUnavailable: '引擎当前不可用，请稍后重试。',
-    engineProtocolMismatch: '引擎协议版本不兼容，请更新引擎后重试。',
+    engineProtocolMismatch: '引擎版本不兼容，请更新应用或相关组件。',
     updateEngineAction: '去更新引擎',
     engineProtocolInvalid: '引擎通信数据无效，请重试。',
     audioDeviceEnumerationFailed: '读取音频设备列表失败，请检查系统音频服务后重试。',
-    deviceNotFound: '没有找到可用的音频设备。',
+    deviceNotFound: '无法使用所选音频设备，请检查连接与权限。',
     deviceNotFoundAction: '检查系统声音设置',
     audioDeviceDisconnected: '音频设备已断开连接，请重新选择设备后重试。',
-    audioBufferOverflow: '音频数据积压，处理速度跟不上，请降低负载后重试。',
-    modelMissing: '识别模型还没有安装。',
+    audioBufferOverflow: '音频处理跟不上，请关闭占用资源的程序后重试。',
+    modelMissing: '识别模型不可用，请先安装或加载模型。',
     modelMissingAction: '去安装模型',
     modelLoadFailed: '模型已找到但加载失败，请检查运行环境或重新下载模型。',
     modelLoadFailedAction: '检查运行环境或重新下载',
-    modelDependencyMissing: '识别模型缺少必要的运行组件，请前往设置补齐。',
+    modelDependencyMissing: '模型缺少运行组件，请前往设置安装。',
     modelWeightsInvalid: '模型权重文件已损坏，请重新下载该模型。',
-    modelOutOfMemory: '显存或内存不足，请降低模型规格或改用 CPU。',
+    modelOutOfMemory: '内存或显存不足，请使用更小的模型。',
     chooseSmallerModelAction: '换用更小的模型',
     modelIntegrityCheckFailed: '模型文件校验未通过，请重新下载该模型。',
     modelInstallFailed: '模型安装未完成，请重新下载后重试。',
     modelRemoveFailed: '卸载模型失败，请稍后重试。',
     resourceNotFound: '找不到所需资源，请在模型管理中重新安装。',
-    startFailed: '同传未能启动，请检查所选模型、计算设备和运行环境。',
+    startFailed: '无法开始同传，请检查模型与音频设置。',
+    startFailedTitle: '同传启动失败',
+    startFailedDescription: '请检查模型和音频设备；仍失败可复制诊断信息反馈。',
     unsupportedRecognitionLanguage: '不支持此语言：{language}',
     startFailedAction: '重新开始同传',
-    downloadFailed: '模型下载中断，已保留部分文件。',
+    downloadFailed: '模型文件校验失败，请重新下载。',
     downloadFailedAction: '重试下载',
-    searchFailed: '模型搜索暂不可用，下面不是搜索结果，Hugging Face 上未必没有这个模型。',
+    searchFailed: '暂时无法搜索模型，请检查网络后重试。',
+    searchFailedDescription: '暂时无法获取搜索结果，请检查网络后重试。',
     searchFailedAction: '重试搜索',
-    translateFailed: '翻译服务没有响应，只显示原文。',
+    translateFailed: '翻译暂不可用，当前只显示原文。',
     translateFailedAction: '检查网络与服务状态',
     configureTranslationAction: '去配置翻译服务',
     // This failure comes from the LLM-backed and third-party translation APIs, where the
@@ -776,15 +790,15 @@ export const zhCN = {
     // points at configuration instead of telling the user to wait.
     translationProviderUnavailable: '云端翻译服务暂不可用，请检查服务商的密钥与额度后重试。',
     translationNetworkUnavailable: '无法连接翻译服务，请检查网络或代理设置。',
-    translationInvalidResponse: '翻译服务返回了无法解析的内容，请稍后重试。',
+    translationInvalidResponse: '翻译服务返回异常，请稍后重试。',
     translationUnsupportedLanguagePair: '暂不支持该语言组合，请更换语言后重试。',
     changeTranslationLanguageAction: '去更换翻译语言',
     translationInputTooLong: '待翻译内容过长，请缩短后重试。',
     translationOutputTooLong: '译文过长，无法显示，请缩短原文后重试。',
-    translationSourceLanguageRequired: '请先选择原文语言再开始翻译。',
+    translationSourceLanguageRequired: '请选择原文语言后再开始翻译。',
     translationRejected: '翻译服务拒绝了本次请求，请稍后重试。',
     translationCancelled: '本次翻译已取消。',
-    storageChanged: '保存位置已失效，字幕暂时写不进磁盘。',
+    storageChanged: '保存位置不可用，请重新选择存储文件夹。',
     storageChangedAction: '重新选择保存位置',
     checkStorageAction: '去检查存储位置',
     diskSpaceInsufficient: '磁盘空间不足，无法完成本次操作。',
@@ -793,32 +807,38 @@ export const zhCN = {
     // 设置保存失败的真实原因。主进程只有被文件系统拒绝写入时才会失败，所以界面按 errno 分派；
     // 认不出 errno 时只能说「没能保存」，不能像 `storageChanged` 那样断言保存位置已经失效。
     // Support IDs are owned by the shared error catalog and appended by the locale layer.
-    settingsWriteDenied: '没有写入设置的权限，这次改动没能保存。',
-    settingsFileLocked: '设置文件正被其他程序占用，这次改动没能保存。',
-    settingsDiskFull: '磁盘空间不足，这次改动没能保存。',
-    settingsSaveFailed: '这次改动没能保存，请重试。',
+    settingsWriteDenied: '没有写入权限，请检查保存文件夹。',
+    settingsFileLocked: '设置文件正在使用中，请稍后重试。',
+    settingsDiskFull: '磁盘空间不足，设置未保存。',
+    settingsSaveFailed: '设置未保存，请重试。',
     fileNotFound: '找不到需要的文件或目录，请检查路径后重试。',
     fileNotAccessible: '没有访问该文件的权限，请检查权限设置。',
     exportFailed: '导出失败，没有生成文件。',
-    notesSaveFailed: '笔记没能保存，请稍后重试。',
+    notesSaveFailed: '笔记保存失败，请重试。',
+    notesSaveFailedDescription: '本次修改可能未保存，请复制重要内容后重试。',
+    notesSaveFailedAction: '重试保存',
+    notesSaveRecovered: '笔记已重新保存。',
     // preload 没注入 = 这个窗口压根没接到引擎。给 UIP 而不是 ENG：引擎本身没坏，坏的是接线。
-    engineNotConnected: '没有连上本地引擎，设置、记录和模型都读不到。',
+    engineNotConnected: '本地引擎未连接，部分功能暂不可用。',
+    engineNotConnectedDescription: '识别、模型和记录暂不可用，请重新载入界面。',
     windowStateFailed: '窗口状态没能读取。',
     languageChangeFailed: '界面语言没能切换，请重试。',
-    meetingsLoadFailed: '记录没能加载，请稍后重试。',
-    modelsLoadFailed: '模型列表没能加载，请稍后重试。',
+    meetingsLoadFailed: '记录加载失败，请重试。',
+    modelsLoadFailed: '模型列表加载失败，请重试。',
     runtimeSettingsFailed: '运行组件设置没能打开，请重试。',
     browserServiceUnavailable: '无法连接浏览器字幕服务，请检查浏览器扩展后重试。',
-    pageCrashed: '界面渲染中断，同传仍在后台运行。',
-    engineOperationFailed: '引擎处理本次请求时出错，请重试；若反复出现，请复制诊断信息。',
+    browserReconnectDescription: '请确认浏览器扩展正在运行后重新连接。',
+    browserReconnectAction: '重新连接',
+    pageCrashed: '界面遇到问题，请重新打开当前页面。',
+    engineOperationFailed: '本地引擎处理失败，请重试。',
     sessionNotRunning: '字幕会话已结束，请重新开始。',
-    sessionStreamDesynced: '字幕数据流已失效，请重新开始会话。',
+    sessionStreamDesynced: '字幕数据流中断，请重新开始同传。',
     networkUnavailable: '无法连接网络，请检查网络、代理或服务地址。',
     requestTimeout: '请求超时，请稍后重试。',
-    unknownFailure: '操作未能完成，请复制诊断信息并反馈。',
-    torchRuntimeUnavailable: 'PyTorch 运行组件不可用，请前往设置检查或修复。',
-    llamaRuntimeUnavailable: 'llama.cpp 运行组件不可用，请前往设置检查或修复。',
-    crispRuntimeUnavailable: 'CrispASR 运行组件不可用，请前往设置检查或修复。',
+    unknownFailure: '操作失败，请重试；仍失败可复制诊断信息反馈。',
+    torchRuntimeUnavailable: 'PyTorch 运行组件不可用，请前往设置修复。',
+    llamaRuntimeUnavailable: 'llama.cpp 运行组件不可用，请前往设置修复。',
+    crispRuntimeUnavailable: 'CrispASR 运行组件不可用，请前往设置安装。',
     pageCrashedAction: '重新载入界面',
     copyDiagnosticsAction: '复制诊断信息',
     copyDiagnosticsFailed: '诊断信息没能复制，请重试。',
@@ -828,9 +848,9 @@ export const zhCN = {
      * 坏的是桌面端自己那条开关 / 停会话的调用，所以和 `engineNotConnected`、`errorOpeningBrowser`
      * 归在一起。具体支持码由共享错误目录分配。
      */
-    captionServiceToggleFailed: '字幕服务的开关没有切换成功，请重试。',
-    serviceConflict: '{running}服务正在运行中，请先关闭{running}服务。',
-    captionServiceStopFailed: '字幕服务已关闭，但有一场字幕会话没能结束，识别可能还在继续。',
+    captionServiceToggleFailed: '浏览器字幕状态切换失败，请重试。',
+    serviceConflict: '已有{running}正在运行，请先结束{running}后重试。',
+    captionServiceStopFailed: '字幕会话未完全结束，请重试停止。',
     settingsCaptionStopFailed: '字幕会话没能结束，请重试。',
 
     /*
@@ -840,9 +860,9 @@ export const zhCN = {
      * 这五条都是模型侧的拒绝，不是引擎进程本身的问题。
      */
     prewarm: {
-      modelUnavailable: '所需模型还没有下载，请先到模型管理里下载该模型。',
-      resourceUnavailable: '模型文件不完整或读取失败，请到模型管理里重新下载。',
-      invalidConfiguration: '当前的模型或语言设置无法用于字幕，请先到模型管理里完成模型配置。',
+      modelUnavailable: '需要的模型尚未加载，请打开模型网关检查。',
+      resourceUnavailable: '模型文件不完整，请重新下载。',
+      invalidConfiguration: '当前模型或语言设置不受支持，请更换后重试。',
       resourceBusy: '模型正在卸载或切换，请稍候再开启字幕服务。',
       sessionAlreadyRunning: '已有一场字幕会话在运行，请先结束它再开启字幕服务。',
     },

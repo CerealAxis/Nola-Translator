@@ -3,8 +3,10 @@ import type { ResourceRecord } from '@/bridge'
 import { actions, stores } from '@/store'
 import { useI18n } from '@/i18n'
 import { notifyInfo, notifyRetryableFailure, notifySuccess, notifyWarning } from '@/components/primitives/notify'
+import { settingsPath } from '@/routes'
 
 const suppressedStartNotices = new Set<string>()
+const reportedRemoveFailures = new Set<string>()
 
 export function suppressNextDownloadStartNotice(resourceId: string) {
   suppressedStartNotices.add(resourceId)
@@ -21,6 +23,24 @@ export function notifyModelDownloadFailure(title: string, description: string, a
   })
 }
 
+export function notifyModelRemoveFailure(record: Pick<ResourceRecord, 'resourceId' | 'name'>, t: ReturnType<typeof useI18n>['t'], cause?: unknown): void {
+  if (reportedRemoveFailures.has(record.resourceId)) return
+  reportedRemoveFailures.add(record.resourceId)
+  notifyRetryableFailure(t('modelsSettingsUi.removeFailed'), {
+    cause,
+    description: t('modelsSettingsUi.removeFailedDescription'),
+    action: {
+      label: t('modelsSettingsUi.retryRemove'),
+      onPress: () => {
+        reportedRemoveFailures.delete(record.resourceId)
+        void actions.models.manageResource(record.resourceId, 'remove').catch(error => {
+          notifyModelRemoveFailure(record, t, error)
+        })
+      },
+    },
+  })
+}
+
 /** Observe terminal transitions outside the models page so navigation cannot hide notifications. */
 export function ModelDownloadNotice() {
   const { t } = useI18n()
@@ -34,6 +54,7 @@ export function ModelDownloadNotice() {
       const after = new Map(current.map(record => [record.resourceId, record]))
       for (const prior of before.values()) {
         if (prior.state === 'running' && prior.phase === 'remove' && !after.has(prior.resourceId)) {
+          reportedRemoveFailures.delete(prior.resourceId)
           notifySuccess(t('modelsSettingsUi.removeComplete', { name: prior.name }))
         }
       }
@@ -44,6 +65,7 @@ export function ModelDownloadNotice() {
         if (startedNow) {
           if (suppressedStartNotices.delete(record.resourceId)) continue
           notifyInfo(t('models.downloadStarted', { name: record.name }), {
+            description: t('shellUi.actionHint'),
             action: { label: t('models.viewProgress'), onPress: () => { window.location.hash = '#/models/downloads' } },
             duration: 12000,
           })
@@ -57,8 +79,11 @@ export function ModelDownloadNotice() {
         const wasRemoving = prior?.state === 'running' && prior.phase === 'remove'
         if (wasRemoving) {
           if (record.state === 'failed') {
-            notifyRetryableFailure(t('modelsSettingsUi.removeFailed'), { description: record.errorCode ?? undefined })
-          } else if (record.state === 'idle' && !record.installed) notifySuccess(t('modelsSettingsUi.removeComplete', { name: record.name }))
+            notifyModelRemoveFailure(record, t)
+          } else if (record.state === 'idle' && !record.installed) {
+            reportedRemoveFailures.delete(record.resourceId)
+            notifySuccess(t('modelsSettingsUi.removeComplete', { name: record.name }))
+          }
           continue
         }
         const wasInstalling = (prior?.state === 'running' &&
@@ -74,6 +99,13 @@ export function ModelDownloadNotice() {
 }
 
 function notifyFailure(record: Pick<ResourceRecord, 'resourceId' | 'name' | 'errorCode'>, t: ReturnType<typeof useI18n>['t']) {
+  if (record.errorCode === 'diskSpaceInsufficient') {
+    notifyRetryableFailure(t('models.downloadDiskSpaceTitle'), {
+      description: t('models.downloadDiskSpaceDescription'),
+      action: { label: t('models.openStorageSettings'), onPress: () => { window.location.hash = settingsPath('storage') } },
+    })
+    return
+  }
   const reasonKey = record.errorCode === 'networkUnavailable' ? 'models.downloadReasonNetwork'
     : record.errorCode === 'resourceNotFound' ? 'models.downloadReasonNotFound'
       : record.errorCode === 'resourceUnavailable' ? 'models.downloadReasonUnavailable'
@@ -81,7 +113,7 @@ function notifyFailure(record: Pick<ResourceRecord, 'resourceId' | 'name' | 'err
           : record.errorCode === 'installFailed' ? 'models.downloadReasonInstall' : null
   notifyModelDownloadFailure(
     t('models.downloadError', { name: record.name }),
-    reasonKey ? t(reasonKey) : t('models.downloadReasonWithCode', { code: record.errorCode ?? 'unknown' }),
+    reasonKey ? t(reasonKey) : t('errors.downloadFailed'),
     t('errors.downloadFailedAction'),
     () => {
       // The retry reports its own failure: a record that stays in the failed state is

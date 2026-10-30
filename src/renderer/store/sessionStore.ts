@@ -1,8 +1,8 @@
 /**
  * Live session state machine: `idle | starting | running | paused | stopping | error`.
  *
- * Two invariants hold the file together: `engineStatus` is only ever observed,
- * never inferred, and every teardown path clears `sessionId` unconditionally.
+ * `engineStatus` is only ever observed, never inferred. A failed stop keeps its
+ * session id until a retry confirms that the engine ended the session.
  */
 
 import { DEFAULT_SETTINGS } from '@/bridge'
@@ -319,7 +319,8 @@ function appendFinal(segment: CaptionSegment): void {
  */
 export async function startSession(config: SessionConfig): Promise<void> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
-  const status = sessionStore.getState().status
+  const { status, sessionId } = sessionStore.getState()
+  if (status === 'error' && sessionId !== null) throw new Error('上一次会话还没收尾')
   if (status === 'starting' || status === 'stopping') {
     throw new Error('上一次会话还没收尾')
   }
@@ -416,10 +417,8 @@ export async function startSession(config: SessionConfig): Promise<void> {
 }
 
 /**
- * Ends the session. The `finally` clears the session id and the ticker
- * unconditionally: a retained id points the next `stopSession` at a dead
- * session, the engine answers `sessionNotRunning`, and no session can start
- * again.
+ * Keep the id after an uncertain stop failure so the user can retry; a confirmed
+ * `sessionNotRunning` response clears it on the next attempt.
  */
 export async function stopSession(): Promise<void> {
   if (!bridge) throw new Error('initStores 还没注入 bridge')
@@ -435,17 +434,21 @@ export async function stopSession(): Promise<void> {
   }
 
   sessionStore.setState({ status: 'stopping', error: null, errorCode: null, errorRequestId: null })
+  let ended = false
   try {
     await bridge.engine.stopSession(sessionId)
+    ended = true
     sessionStore.setState({ status: 'idle', error: null, errorCode: null, errorRequestId: null })
   } catch (error) {
     // Keep `ENGINE_LOST`: that edge told the truth, and a code guessed from the text inverts it.
     const engineLost = sessionStore.getState().errorCode === ENGINE_LOST_CODE
+    const errorCode = engineLost ? ENGINE_LOST_CODE : errorCodeOf(error)
+    ended = engineLost || errorCode === 'SESSIONNOTRUNNING'
     const priorErrorRequestId = sessionStore.getState().errorRequestId
     sessionStore.setState({
       status: 'error',
       error: errorMessage(error),
-      errorCode: engineLost ? ENGINE_LOST_CODE : errorCodeOf(error),
+      errorCode,
       errorRequestId: errorRequestIdOf(error) ?? (engineLost ? priorErrorRequestId : null),
       elapsedMs: elapsedNow(),
     })
@@ -455,9 +458,10 @@ export async function stopSession(): Promise<void> {
     stopTicker()
     pausedAtMs = null
     pausedTotalMs = 0
-    // Captions go too: this window considers the session over, and they would outlive it on screen.
-    clearSessionTranscript()
-    sessionStore.setState({ sessionId: null, meetingId: null, startedAtMs: null })
+    if (ended) {
+      clearSessionTranscript()
+      sessionStore.setState({ sessionId: null, meetingId: null, startedAtMs: null })
+    }
   }
 }
 
@@ -483,6 +487,11 @@ export function resumeSession(): void {
 
 export function resetSessionError(): void {
   if (sessionStore.getState().status !== 'error') return
+  if (sessionStore.getState().sessionId !== null) {
+    sessionStore.setState({ status: 'running', error: null, errorCode: null, errorRequestId: null })
+    startTicker()
+    return
+  }
   // `engineStatus` stays untouched: the guide's own ENG-001 alert owns it, and only the main process clears it.
   sessionStore.setState({ status: 'idle', error: null, errorCode: null, errorRequestId: null })
 }

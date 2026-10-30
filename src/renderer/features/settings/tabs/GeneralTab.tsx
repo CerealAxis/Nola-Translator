@@ -101,9 +101,8 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
                   notifyError(t('appUpdate.checkFailed'))
                   return
                 }
-                notifySuccess(t(result.updateAvailable ? 'appUpdate.availableStatus' : 'appUpdate.upToDateStatus', {
-                  version: result.latestVersion,
-                }))
+                const message = t(result.updateAvailable ? 'appUpdate.availableStatus' : 'appUpdate.upToDateStatus', { version: result.latestVersion })
+                if (!result.updateAvailable) notifySuccess(message)
               })
             }}
           >

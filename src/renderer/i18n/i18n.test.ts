@@ -185,16 +185,20 @@ describe('文案纪律（§1.5）', () => {
      * 两条**故意**不带错误码，都是"没发生故障"的情况：
      *   · engineNotReadyPreflight  冷启动预检。引擎没起来是一个状态，用户还没动手，
      *     摆一个 ENG-001 在那儿会让人以为出了事、还要去翻诊断。
-     *   · errorCodeLabel           由格式化器追加的固定标签，本身没有独立故障码。
+     *   · errorCodeLabel           供诊断界面需要时使用，不属于普通提示文案。
      * 其余支持错误都必须有稳定目录项；文案自身不再维护重复的编号。
      */
     const noCodeByDesign = new Set(['engineNotReadyPreflight', 'errorCodeLabel'])
     const errors = leaves((zhCN as Record<string, unknown>).errors)
     const withoutCatalogEntry = Object.entries(errors)
-      .filter(([k]) => !k.endsWith('Action'))
+      .filter(([k]) => !/(Action|Description|Title|Recovered)$/.test(k))
       .filter(([k]) => !noCodeByDesign.has(k))
       .filter(([k]) => !supportErrorCodeForMessage(`errors.${k}`))
       .map(([k]) => k)
     expect(withoutCatalogEntry).toEqual([])
+  })
+
+  it('本地化错误文案不自动追加支持码', () => {
+    expect(translate('errors.deviceNotFound', 'zh-CN')).toBe(zhCN.errors.deviceNotFound)
   })
 })

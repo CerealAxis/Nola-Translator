@@ -1,73 +1,52 @@
-import { closeToast, createToast, updateToast } from '../ui/toast'
+import { closeToast, showToast, updateToast } from '../ui/toast'
+import type { ToastPayload, ToastType } from '../ui/toast'
 import { getBridge } from '@/store'
 
-/**
- * How long each kind of notification stays on screen.
- *
- * Notifications stay visible long enough to read, then dismiss themselves. Callers may override
- * these defaults when an operation needs a different amount of time.
- */
 export const NOTIFY_DURATION = {
-  error: 12000,
+  error: 10000,
   retryable: 12000,
+  loading: 8000,
   success: 4000,
   info: 6000,
   warning: 8000,
 } as const
 
-export type NotifyActionVariant = 'primary' | 'secondary' | 'tertiary' | 'outline' | 'danger'
+export type NotifyVariant = ToastType | 'default' | 'accent' | 'danger'
 
-/** The look of a notice, matching the variants the toast queue understands. */
-export type NotifyVariant = 'default' | 'accent' | 'success' | 'warning' | 'danger'
+export interface NotifyAction { label: string; onPress: () => void }
 
-export interface NotifyAction {
-  label: string
-  onPress: () => void
-  variant?: NotifyActionVariant
-}
-
-export interface NotifyOptions {
-  /** Detail shown under the message. */
-  description?: string
-  /** The thrown value, when the failure reason is only available as one. */
+export type NotifyOptions = {
   cause?: unknown
-  /** The way out of the failure: retry, repair, dismiss. */
-  action?: NotifyAction
   duration?: number
-}
+} & (
+  | { description?: string; action?: never }
+  | { description: string; action: NotifyAction }
+)
 
-/** The text of a thrown value, for the detail line of a failure notice. */
 export function describeError(cause: unknown): string | undefined {
   if (cause === null || cause === undefined) return undefined
   if (typeof cause === 'string') return cause
-  if (cause instanceof Error) return cause.message
-  return String(cause)
+  return cause instanceof Error ? cause.message : String(cause)
 }
 
-function actionProps(action: NotifyAction | undefined): { children: string; onPress: () => void; variant: NotifyActionVariant } | undefined {
-  if (!action) return undefined
-  return { children: action.label, onPress: action.onPress, variant: action.variant ?? 'tertiary' }
+function toastType(variant: NotifyVariant): ToastType {
+  if (variant === 'default' || variant === 'accent') return 'info'
+  if (variant === 'danger') return 'error'
+  return variant
 }
 
-function detail(options: NotifyOptions): string | undefined {
-  return options.description ?? describeError(options.cause)
+function payload(message: string, variant: NotifyVariant, options: NotifyOptions): ToastPayload {
+  const type = toastType(variant)
+  const duration = options.duration
+  return options.action
+    ? { type, title: message, description: options.description, actionProps: { children: options.action.label, onClick: options.action.onPress }, duration }
+    : { type, description: options.description ?? message, duration }
 }
 
-/** A failure. Stays on screen and carries the way out. */
+/** A failure notice that dismisses automatically. */
 export function notifyError(message: string, options: NotifyOptions = {}): string {
-  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('overlay') === '1' && !options.action) {
-    return createToast(message, {
-      variant: 'danger',
-      description: detail(options),
-      timeout: options.duration ?? NOTIFY_DURATION.error,
-    })
-  }
-  return createToast(message, {
-    variant: 'danger',
-    description: detail(options),
-    actionProps: actionProps(options.action),
-    timeout: options.duration ?? NOTIFY_DURATION.error,
-  })
+  const duration = options.duration ?? NOTIFY_DURATION.error
+  return showToast(payload(message, 'error', { ...options, duration }))
 }
 
 /** An unavailable local model can be made usable by loading it in Model Gateway. */
@@ -85,68 +64,28 @@ export function notifyGatewayModelUnavailable(message: string, description: stri
   })
 }
 
-/**
- * A failure the user can repeat from the page. It reads as a failure, but unlike notifyError
- * it does not hold the screen: the page itself is the way out, so the notice can leave.
- */
 export function notifyRetryableFailure(message: string, options: NotifyOptions = {}): string {
-  return createToast(message, {
-    variant: 'danger',
-    description: detail(options),
-    actionProps: actionProps(options.action),
-    timeout: options.duration ?? NOTIFY_DURATION.retryable,
-  })
+  return showToast(payload(message, 'error', { ...options, duration: options.duration ?? NOTIFY_DURATION.retryable }))
 }
 
-/** An operation that finished. */
 export function notifySuccess(message: string, options: NotifyOptions = {}): string {
-  return createToast(message, {
-    variant: 'success',
-    description: detail(options),
-    actionProps: actionProps(options.action),
-    timeout: options.duration ?? NOTIFY_DURATION.success,
-  })
+  return showToast(payload(message, 'success', { ...options, duration: options.duration ?? NOTIFY_DURATION.success }))
 }
 
-/** A state change the user should know about but does not have to act on. */
 export function notifyInfo(message: string, options: NotifyOptions = {}): string {
-  return createToast(message, {
-    variant: 'default',
-    description: detail(options),
-    actionProps: actionProps(options.action),
-    timeout: options.duration ?? NOTIFY_DURATION.info,
-  })
+  return showToast(payload(message, 'info', { ...options, duration: options.duration ?? NOTIFY_DURATION.info }))
 }
 
-/** Something worth a second look before the user continues. */
+export function notifyLoading(message: string, options: NotifyOptions = {}): string {
+  return showToast(payload(message, 'loading', { ...options, duration: options.duration ?? NOTIFY_DURATION.loading }))
+}
+
 export function notifyWarning(message: string, options: NotifyOptions = {}): string {
-  return createToast(message, {
-    variant: 'warning',
-    description: detail(options),
-    actionProps: actionProps(options.action),
-    timeout: options.duration ?? NOTIFY_DURATION.warning,
-  })
+  return showToast(payload(message, 'warning', { ...options, duration: options.duration ?? NOTIFY_DURATION.warning }))
 }
 
-/** Takes a notice off the screen before its time is up. */
-export function dismissNotice(id: string): void {
-  closeToast(id)
-}
+export function dismissNotice(id: string): void { closeToast(id) }
 
-/**
- * Rewrites a notification that is already on screen, keeping its place in the stack. A long
- * running operation shows one notice and finishes it here instead of adding a second one.
- *
- * The queue replaces the whole content of a toast, so an update carries the description and
- * the action with it: leaving them out drops them, and leaving the variant out turns a
- * failure into a plain notice. The variant is therefore required.
- */
 export function notifyUpdate(id: string, message: string, options: NotifyOptions & { variant: NotifyVariant }): string {
-  return updateToast(id, message, {
-    description: detail(options),
-    actionProps: actionProps(options.action),
-    // A missing duration leaves the running countdown alone; zero disables automatic dismissal.
-    timeout: options.duration,
-    variant: options.variant,
-  })
+  return updateToast(id, payload(message, options.variant, options))
 }

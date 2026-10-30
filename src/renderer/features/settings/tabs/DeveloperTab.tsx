@@ -22,8 +22,8 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { closeToast, createToast, updateToast } from '@/components/ui/toast'
-import type { ToastOptions } from '@/components/ui/toast'
+import { closeToast, showToast, updateToast } from '@/components/ui/toast'
+import type { ToastPayload, ToastType } from '@/components/ui/toast'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
@@ -66,17 +66,14 @@ const TOAST_UPDATE_MS = 1200
 
 const TOAST_FLOOD = 6
 
-/**
- * Variants rotated by the flood trigger, so one press fills the queue with every tone instead of
- * six copies of the same card.
- */
-const FLOOD_VARIANTS: ReadonlyArray<'default' | 'accent' | 'success' | 'warning' | 'danger'> = [
-  'default',
-  'accent',
+/** Types rotated by the flood trigger, so one press shows every semantic tone. */
+const FLOOD_TYPES: ReadonlyArray<ToastType> = [
+  'info',
   'success',
   'warning',
-  'danger',
-  'accent',
+  'error',
+  'loading',
+  'info',
 ]
 
 /** Soft danger styling for secondary actions in the component gallery. */
@@ -200,8 +197,8 @@ function ToastGroup() {
    * in one go: the toast manager is shared with the rest of the app and only hands out the id
    * of a toast it has just created.
    */
-  const raise = useCallback((message: string, options: ToastOptions = {}): string => {
-    const id = createToast(message, options)
+  const raise = useCallback((payload: ToastPayload): string => {
+    const id = showToast(payload)
     raised.current.add(id)
     return id
   }, [])
@@ -212,20 +209,17 @@ function ToastGroup() {
   }, [])
 
   const rewrite = useCallback(() => {
-    const id = raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody') })
+    const id = raise({ type: 'info', description: t('dev.toastSampleBody') })
     if (updateTimer.current !== null) clearTimeout(updateTimer.current)
     updateTimer.current = setTimeout(() => {
       updateTimer.current = null
-      updateToast(id, t('dev.toastActionDone'), { description: t('dev.toastSampleBody'), variant: 'default' })
+      updateToast(id, { type: 'success', description: t('dev.toastActionDone') })
     }, TOAST_UPDATE_MS)
   }, [raise, t])
 
   const flood = useCallback(() => {
     for (let index = 0; index < TOAST_FLOOD; index += 1) {
-      raise(t('dev.toastSampleTitle'), {
-        variant: FLOOD_VARIANTS[index % FLOOD_VARIANTS.length],
-        description: t('dev.toastSampleBody'),
-      })
+      raise({ type: FLOOD_TYPES[index % FLOOD_TYPES.length], description: t('dev.toastSampleBody') })
     }
   }, [raise, t])
 
@@ -239,43 +233,33 @@ function ToastGroup() {
       <ToastTrigger
         label={t('dev.toastDefault')}
         desc={t('dev.toastDefaultDesc')}
-        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody') }) }}
-      />
-      <ToastTrigger
-        label={t('dev.toastAccent')}
-        desc={t('dev.toastAccentDesc')}
-        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), variant: 'accent' }) }}
+        run={() => { raise({ type: 'info', description: t('dev.toastSampleBody') }) }}
       />
       <ToastTrigger
         label={t('dev.toastSuccess')}
         desc={t('dev.toastSuccessDesc')}
-        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), variant: 'success' }) }}
+        run={() => { raise({ type: 'success', description: t('dev.toastSampleBody') }) }}
       />
       <ToastTrigger
         label={t('dev.toastWarning')}
         desc={t('dev.toastWarningDesc')}
-        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), variant: 'warning' }) }}
+        run={() => { raise({ type: 'warning', description: t('dev.toastSampleBody') }) }}
       />
       <ToastTrigger
         label={t('dev.toastDanger')}
         desc={t('dev.toastDangerDesc')}
-        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), variant: 'danger' }) }}
-      />
-      <ToastTrigger
-        label={t('dev.toastSticky')}
-        desc={t('dev.toastStickyDesc')}
-        run={() => { raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), timeout: 12000 }) }}
+        run={() => { raise({ type: 'error', description: t('dev.toastSampleBody') }) }}
       />
       <ToastTrigger
         label={t('dev.toastDownloadRetry')}
         desc={t('dev.toastDownloadRetryDesc')}
-        run={() => { raise(t('models.downloadError', { name: 'SenseVoiceSmall' }), {
-          variant: 'danger',
+        run={() => { raise({
+          type: 'error',
+          title: t('models.downloadError', { name: 'SenseVoiceSmall' }),
           description: t('errors.downloadFailed'),
           actionProps: {
             children: t('errors.downloadFailedAction'),
-            variant: 'tertiary',
-            onPress: () => setDownloadTarget({ resourceId: 'sensevoice-small', name: 'SenseVoiceSmall' }),
+            onClick: () => setDownloadTarget({ resourceId: 'sensevoice-small', name: 'SenseVoiceSmall' }),
           },
         }) }}
       />
@@ -286,9 +270,9 @@ function ToastGroup() {
           // The promise demo rides on this row rather than getting its own: its loading card is
           // the same render, and it exists to check the loading -> success hand-off. The promise
           // is already resolved, so the success card appears one frame later.
-          const id = raise(t('dev.toastSampleTitle'), { description: t('dev.toastSampleBody'), variant: 'loading' })
+          const id = raise({ type: 'loading', description: t('dev.toastSampleBody') })
           void Promise.resolve().then(() => {
-            updateToast(id, t('dev.toastLoadingDone'), { description: t('dev.toastSampleBody'), variant: 'success' })
+            updateToast(id, { type: 'success', description: t('dev.toastLoadingDone') })
           })
         }}
       />
@@ -296,12 +280,13 @@ function ToastGroup() {
         label={t('dev.toastAction')}
         desc={t('dev.toastActionDesc')}
         run={() => {
-          raise(t('dev.toastSampleTitle'), {
+          raise({
+            type: 'error',
+            title: t('dev.toastSampleTitle'),
             description: t('dev.toastSampleBody'),
             actionProps: {
               children: t('dev.toastActionLabel'),
-              variant: 'tertiary',
-              onPress: () => { raise(t('dev.toastActionDone'), { variant: 'success' }) },
+              onClick: () => { raise({ type: 'success', description: t('dev.toastActionDone') }) },
             },
           })
         }}
@@ -463,7 +448,7 @@ function DialogGroup() {
               variant="secondary"
               size="sm"
               onClick={() => {
-                createToast(t('dev.dialogPendingDone'), { variant: 'success' })
+                showToast({ type: 'success', description: t('dev.dialogPendingDone') })
               }}
             >
               {t('dev.run')}
@@ -578,13 +563,13 @@ function DialogGalleryGroup() {
     try {
       const result = await actions.settings.fetchLatestRelease(true)
       if (!result?.latestVersion || !result.releaseName) {
-        createToast(t('appUpdate.checkFailed'), { variant: 'danger' })
+        showToast({ type: 'error', description: t('appUpdate.checkFailed') })
         return
       }
       setAppUpdateResult(result)
       show('appUpdate')
     } catch {
-      createToast(t('appUpdate.checkFailed'), { variant: 'danger' })
+      showToast({ type: 'error', description: t('appUpdate.checkFailed') })
     } finally {
       setAppUpdateChecking(false)
     }
@@ -596,7 +581,7 @@ function DialogGalleryGroup() {
       await actions.settings.openAppReleasePage(url)
       hide('appUpdate')
     } catch {
-      createToast(t('appUpdate.openFailed'), { variant: 'danger' })
+      showToast({ type: 'error', description: t('appUpdate.openFailed') })
     } finally {
       setAppUpdateOpening(false)
     }

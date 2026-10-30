@@ -14,7 +14,6 @@ import { zhHK } from './i18n/zh-HK'
 import { ko } from './i18n/ko'
 import { ja } from './i18n/ja'
 import type { Dictionary, DictionaryKey } from './i18n/zh-CN'
-import { supportErrorCodeForMessage } from '../shared/error-catalog'
 import { resolveUiLanguage } from '../shared/languages'
 import type { UiLanguage, UiLanguagePreference } from '../shared/languages'
 
@@ -69,11 +68,7 @@ export function translate(key: string, language: UiLanguage, values: Translation
     console.warn(`[i18n] missing key "${key}" for locale "${language}"`)
     return interpolate(fallback ?? key, values)
   }
-  const message = interpolate(template, values)
-  const supportCode = supportErrorCodeForMessage(key)
-  if (!supportCode) return message
-  const codeLabel = lookup(dictionary, 'errors.errorCodeLabel')
-  return codeLabel ? `${message} ${interpolate(codeLabel, { code: supportCode })}` : message
+  return interpolate(template, values)
 }
 
 export interface I18nContextValue {

@@ -17,7 +17,7 @@ import type { HubModelSummary, HubSearchResult, ModelDownloadSource, ResourceRec
 import { actions, stores, useStore } from '@/store'
 import type { HubKind } from '@/store'
 import { useI18n } from '@/i18n'
-import { dismissNotice, notifyError, notifySuccess } from '@/components/primitives/notify'
+import { dismissNotice, notifyError, notifyRetryableFailure, notifySuccess } from '@/components/primitives/notify'
 import type { NotifyAction } from '@/components/primitives/notify'
 import { ModelCard, ModelCardSkeleton, formatBytes } from './ModelCard'
 import { notifyModelDownloadFailure } from './ModelDownloadNotice'
@@ -169,9 +169,9 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
    * own. The one that is on screen is taken down first, so a hub that stays unreachable
    * leaves one notice instead of a stack of them.
    */
-  const reportFailure = useCallback((message: string, cause: unknown, action: NotifyAction) => {
+  const reportFailure = useCallback((message: string, description: string, cause: unknown, action: NotifyAction) => {
     if (searchNotice) dismissNotice(searchNotice)
-    searchNotice = notifyError(message, { cause, action })
+    searchNotice = notifyRetryableFailure(message, { cause, description, action })
   }, [])
 
   /*
@@ -210,7 +210,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
         if (cancelled) return
         setHits([])
         setFailed(true)
-        reportFailure(translate.current('errors.searchFailed'), cause, {
+        reportFailure(translate.current('errors.searchFailed'), translate.current('errors.searchFailedDescription'), cause, {
           label: translate.current('errors.searchFailedAction'),
           onPress: () => { requested.current = true; setRefresh((value) => value + 1) },
         })
@@ -247,7 +247,7 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
     }).catch((cause: unknown) => {
       if (generation.current !== currentGeneration) return
       setMoreFailed(true)
-      reportFailure(translate.current('models.loadMoreFailed'), cause, {
+      reportFailure(translate.current('models.loadMoreFailed'), translate.current('models.loadMoreFailedDescription'), cause, {
         label: translate.current('models.retry'),
         onPress: () => loadMoreRef.current(),
       })

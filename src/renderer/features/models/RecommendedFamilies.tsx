@@ -20,7 +20,8 @@ import { Check, Download } from 'lucide-react'
 import { resourceStateOf } from '@/bridge'
 import type { ModelDownloadSource, ResourceRecord } from '@/bridge'
 import { useI18n } from '@/i18n'
-import { notifyWarning } from '@/components/primitives/notify'
+import { notifyError, notifyWarning } from '@/components/primitives/notify'
+import { actions } from '@/store'
 import { modelImportEntry } from '../../../shared/model-import-catalog'
 import { downloadSourcesFor } from '../../../shared/model-download-sources'
 import { modelEngines } from '../../../shared/model-engines'
@@ -233,7 +234,14 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
               : <Button disabled={(sources.length === 0) || (busyIds.includes(selected.resourceId))} aria-busy={busyIds.includes(selected.resourceId)}  onClick={() => {
                 if (!isEngineAvailable(engine, runtimes?.local ?? null)) {
                   // The loader is missing, so the download would only end in a second failure.
-                  notifyWarning(t('models.engineUnavailable', { engine: engineLabel(engine) }))
+                  notifyWarning(t('models.runtimeMissingTitle'), {
+                    description: t('models.engineUnavailable', { engine: engineLabel(engine) }),
+                    action: { label: t('runtime.install'), onPress: () => {
+                      void actions.settings.openRuntimeSettings(engine === 'pytorch' ? 'engine' : engine).catch((error: unknown) => {
+                        notifyError(t('errors.runtimeSettingsFailed'), { cause: error })
+                      })
+                    } },
+                  })
                   return
                 }
                 onClose()

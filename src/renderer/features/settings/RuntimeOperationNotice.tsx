@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
-import { notifyError, notifyInfo, notifySuccess } from '@/components/primitives/notify'
+import { notifyError, notifyLoading, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
-import { stores } from '@/store'
+import { actions, stores } from '@/store'
 import { isRuntimeFailureClaimed, isSessionConflictFailure } from './settingsErrorChannel'
+import { settingsPath } from '@/routes'
 
 /** Keep runtime operation feedback visible even when the user navigates away from settings. */
 export function RuntimeOperationNotice() {
@@ -23,7 +24,12 @@ export function RuntimeOperationNotice() {
       const pipTimeout = current.runtimeError?.startsWith('PYTORCH_DEPENDENCY_TIMEOUT:') ?? false
       const pipDetails = pipTimeout ? current.runtimeError!.slice('PYTORCH_DEPENDENCY_TIMEOUT:'.length).trim() : undefined
       if (!wasBusy && current.runtimeBusy) {
-        notifyInfo(t('runtime.operationStarted', { action }), { description: t('runtime.operationProgress') })
+        notifyLoading(t('runtime.operationStarted', { action }), {
+          description: t('runtime.operationProgress'),
+          action: { label: t('runtime.viewProgress'), onPress: () => {
+            void actions.settings.openMainPage(`${settingsPath('compute')}?component=engine`).catch(error => notifyError(t('errors.runtimeSettingsFailed'), { cause: error }))
+          } },
+        })
         return
       }
       if (wasBusy && !current.runtimeBusy) {

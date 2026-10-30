@@ -24,9 +24,17 @@ body { background: var(--background); color: var(--foreground); font-family: ui-
 @utility z-toast { z-index: 80; }
 
 .nola-toast-viewport { position: fixed; right: 1rem; bottom: 1rem; display: flex; width: min(24rem, calc(100vw - 2rem)); flex-direction: column; gap: .5rem; outline: none; }
-.nola-toast { border: 1px solid var(--border); border-radius: 1rem; background: var(--popover); color: var(--popover-foreground); padding: 1rem; }
+.nola-toast { border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--popover); color: var(--popover-foreground); padding: 1rem; box-shadow: var(--overlay-shadow); }
 .nola-toast-content { display: flex; align-items: start; gap: .75rem; }
 .nola-toast-copy { min-width: 0; flex: 1; }
 .nola-toast-title { font-size: .875rem; font-weight: 500; }
 .nola-toast-description { font-size: .8125rem; color: var(--muted-foreground); }
 .nola-toast-icon, .nola-toast-close svg { width: 1rem; height: 1rem; flex-shrink: 0; }
+.nola-toast-icon { color: var(--info); }
+.nola-toast[data-type='success'] .nola-toast-icon { color: var(--success); }
+.nola-toast[data-type='warning'] .nola-toast-icon { color: var(--warning); }
+.nola-toast[data-type='error'] .nola-toast-icon { color: var(--danger); }
+.nola-toast[data-type='loading'] .nola-toast-icon { color: var(--primary); animation: nola-toast-spin 1s linear infinite; }
+.nola-toast-close.button { border-color: transparent; border-radius: var(--radius-xl); background: transparent !important; color: var(--muted-foreground); }
+.nola-toast-close.button:hover:not(:disabled):not([aria-disabled='true']) { background: transparent; }
+@keyframes nola-toast-spin { to { transform: rotate(360deg); } }

@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react'
-import { useEffect, useRef } from 'react'
 import { Mic, Captions, Clock, SlidersHorizontal, Network, MessageSquareText } from 'lucide-react'
 import { ErrorBoundary } from '@/components/primitives'
 import { requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
-import { notifyError, notifySuccess } from '@/components/primitives/notify'
+import { notifyError } from '@/components/primitives/notify'
 import { HeroSection, FeatureCard } from '@/components/home'
 import { useI18n } from '@/i18n'
 import { pathOf, recordPath, useRoute } from '@/routes'
@@ -24,16 +23,6 @@ export function HomePage(): ReactNode {
    * the user, and the retry button lets them ask again.
    */
   const loadFailed = !loaded && !loading && loadError !== null
-  const reportedFailure = useRef<string | null>(null)
-  useEffect(() => {
-    if (!loadFailed) {
-      reportedFailure.current = null
-      return
-    }
-    if (reportedFailure.current === loadError) return
-    reportedFailure.current = loadError
-    notifyError(t('errors.meetingsLoadFailed'), { cause: loadError })
-  }, [loadFailed, loadError, t])
   const retryLoad = () => {
     /*
      * The store keeps the failure and the effect above reports it, so this call
@@ -42,11 +31,7 @@ export function HomePage(): ReactNode {
      * list that was never fetched.
      */
     if (stores.meetings.getState().loading) return
-    void actions.meetings.loadMeetings()
-      .then(() => {
-        notifySuccess(t('common.refreshed'))
-      })
-      .catch(() => undefined)
+    void actions.meetings.loadMeetings().catch(() => undefined)
   }
   const goWorkspace = () => navigate(pathOf('workspace'))
   const goRecords = () => navigate(pathOf('records'))

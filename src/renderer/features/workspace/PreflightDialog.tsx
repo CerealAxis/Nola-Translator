@@ -22,7 +22,7 @@ import type { SessionConfig } from '../../../shared/contracts'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
 import { actions, sessionStore, stores } from '@/store'
 import { useI18n } from '@/i18n'
-import { notifyError, notifySuccess, notifyWarning } from '@/components/primitives/notify'
+import { notifyError, notifyRetryableFailure, notifySuccess } from '@/components/primitives/notify'
 import { modelEngines, translationEngine as fallbackTranslationEngine } from '../../../shared/model-engines'
 import { NO_TRANSLATION_LANGUAGE } from '../../../shared/settings'
 import { DownloadSourceDialog } from '../models/DownloadSourceDialog'
@@ -84,6 +84,13 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
   const runCheck = useCallback((manual = false) => {
     const run = (runRef.current += 1)
     const alive = (): boolean => runRef.current === run
+    const reportCheckFailure = (cause: unknown): void => {
+      notifyError(t('preflight.checkFailedTitle'), {
+        cause,
+        description: t('preflight.checkFailedDescription'),
+        action: { label: t('runtime.recheck'), onPress: () => runCheck(true) },
+      })
+    }
 
     setStage('environment')
     setDeviceOk(false)
@@ -128,23 +135,6 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
             setMissingRuntime(missing)
             setFailureContext({ supportCode: environmentSupportCode })
             setStage('environmentFailed')
-            const title = missing === 'engine' ? t('errors.torchRuntimeUnavailable')
-              : missing === 'llama' ? t('errors.llamaRuntimeUnavailable')
-                : `${t('runtime.crisp')} · ${t('runtime.missing')}`
-            const action = missing === 'engine' ? t('runtime.goTorch')
-              : missing === 'llama' ? t('runtime.goLlama') : t('runtime.installCrisp')
-            notifyWarning(title, {
-              description: t('runtime.noticeBody'),
-              action: {
-                label: action,
-                onPress: () => {
-                  close(false)
-                  void actions.settings.openRuntimeSettings(missing).catch((error: unknown) => {
-                    notifyError(t('errors.runtimeSettingsFailed'), { cause: error })
-                  })
-                },
-              },
-            })
           }
           return
         }
@@ -152,10 +142,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
         if (alive()) {
           setFailureContext({ supportCode: environmentSupportCode })
           setStage('environmentFailed')
-          notifyError(t('errors.unknownFailure'), {
-            cause: error,
-            action: { label: t('runtime.recheck'), onPress: () => runCheck(true) },
-          })
+          reportCheckFailure(error)
         }
         return
       }
@@ -207,7 +194,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
          * `ensureReady()`.
          */
         setStage('engineFailed')
-        if (manual) notifyError(t('common.refreshFailed'), { cause: deviceFailureError })
+        if (manual) reportCheckFailure(deviceFailureError)
         return
       }
       setStage('models')
@@ -217,7 +204,7 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
           const engineUnavailable = sessionStore.getState().engineStatus !== 'ready'
           setFailureContext({ supportCode: engineUnavailable ? 'ENG-001' : 'ENG-003', correlationId: correlationIdOf(error) })
           setStage(engineUnavailable ? 'engineFailed' : 'modelCheckFailed')
-          if (manual) notifyError(t('common.refreshFailed'), { cause: error })
+          if (manual) reportCheckFailure(error)
         }
         return
       }
@@ -255,7 +242,11 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
       await actions.models.manageResource(missing.resourceId, 'install', source)
       await actions.models.loadModels({ includeDevices: false })
     } catch (error) {
-      notifyError(t('errors.downloadFailed'), { cause: error })
+      notifyRetryableFailure(t('models.installFailed'), {
+        cause: error,
+        description: t('models.downloadReasonInstall'),
+        action: { label: t('errors.downloadFailedAction'), onPress: () => { void install(source) } },
+      })
     } finally {
       setInstalling(false)
     }
@@ -354,6 +345,17 @@ export function PreflightDialog({ isOpen, onOpenChange, missing, config, onStart
           {failedStage ? (
             <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => runCheck(true)}>
               {t('runtime.recheck')}
+            </Button>
+          ) : null}
+          {environmentFailed && missingRuntime ? (
+            <Button variant="secondary" size="sm" className="rounded-xl" onClick={() => {
+              const component = missingRuntime
+              close(false)
+              void actions.settings.openRuntimeSettings(component).catch((error: unknown) => {
+                notifyError(t('errors.runtimeSettingsFailed'), { cause: error })
+              })
+            }}>
+              {missingRuntime === 'engine' ? t('runtime.goTorch') : missingRuntime === 'llama' ? t('runtime.goLlama') : t('runtime.installCrisp')}
             </Button>
           ) : null}
           <Button variant="tertiary" size="sm" className="rounded-xl" onClick={() => close(false)}>

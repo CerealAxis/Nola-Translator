@@ -1,6 +1,7 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { BrowserIntegrationInfo } from '../../../../shared/browser'
+import * as toast from '@/components/primitives/notify'
 import { settingsStore } from '@/store/settingsStore'
 import * as settingsActions from '@/store/settingsStore'
 import { BrowserTab } from './BrowserTab'
@@ -111,4 +112,32 @@ it('shows detecting only before the first status result', () => {
   act(() => settingsStore.setState({ browser: { enabled: true, registered: true, captionServiceActive: false, sessionActive: false, connections: 0, browsers: [{ ...chrome, extensionStatus: 'unknown' }, { ...edge, extensionStatus: 'unknown' }] } }))
   expect(screen.queryByText('正在检测')).not.toBeInTheDocument()
   expect(screen.getAllByText('无法确认扩展状态')).toHaveLength(3)
+})
+
+it('offers a real retry after a browser extension download fails without showing internal details', async () => {
+  const notifyRetryableFailure = vi.spyOn(toast, 'notifyRetryableFailure').mockReturnValue('toast')
+  vi.mocked(settingsActions.browserConnectionAction).mockImplementation(async action => {
+    if (action === 'download') {
+      settingsStore.setState({ browserError: null })
+      await new Promise(resolve => setTimeout(resolve, 0))
+      settingsStore.setState({ browserError: 'ENOENT: C:\\private\\extension.zip' })
+    }
+  })
+  render(<BrowserTab />)
+  vi.mocked(settingsActions.browserConnectionAction).mockClear()
+  const edgeRow = screen.getByRole('listitem', { name: 'Microsoft Edge' })
+
+  await act(async () => { fireEvent.click(within(edgeRow).getByRole('button', { name: '下载 Microsoft Edge 扩展' })) })
+  await waitFor(() => expect(notifyRetryableFailure).toHaveBeenCalledOnce())
+  expect(notifyRetryableFailure).toHaveBeenCalledWith('浏览器扩展下载失败', expect.objectContaining({
+    description: '请检查网络后重试；仍失败可从项目发布页获取。',
+    action: expect.objectContaining({ label: '重试下载' }),
+  }))
+  expect(notifyRetryableFailure.mock.calls[0]?.[0]).not.toContain('ENOENT')
+
+  const action = notifyRetryableFailure.mock.calls[0]?.[1]?.action
+  await act(async () => { action?.onPress() })
+  expect(settingsActions.browserConnectionAction).toHaveBeenCalledTimes(2)
+  expect(settingsActions.browserConnectionAction).toHaveBeenCalledWith('download', undefined, 'edge')
+  await waitFor(() => expect(notifyRetryableFailure).toHaveBeenCalledTimes(2))
 })

@@ -16,7 +16,6 @@ import { DialogHeader, DialogFooter } from '@/components/ui/dialog'
 import { DEFAULT_SETTINGS, PROTOCOL_VERSION } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
 import type { StatusPillTone } from '@/components/primitives'
-import { notifyError } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 import { actions, stores, updateSettings, useStore } from '@/store'
@@ -107,6 +106,7 @@ function DiagnosticsReport() {
   const { t } = useI18n()
   const [rows, setRows] = useState<Array<[string, string]> | null>(null)
   const [unavailable, setUnavailable] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -118,14 +118,20 @@ function DiagnosticsReport() {
       })
       .catch((cause: unknown) => {
         if (!active) return
+        console.error('[settings] diagnostics', cause)
         setUnavailable(true)
-        notifyError(t('settings.diagnosticsFailed'), { cause })
       })
     return () => { active = false }
-  }, [t])
+  }, [attempt])
 
   if (unavailable) {
-    return <SettingsRow label={t('settings.diagnosticsUnavailable')}><span className="nola-caption text-muted">-</span></SettingsRow>
+    return <SettingsRow label={t('settings.diagnosticsUnavailable')}>
+      <Button variant="secondary" size="sm" onClick={() => {
+        setUnavailable(false)
+        setRows(null)
+        setAttempt(value => value + 1)
+      }}>{t('common.retry')}</Button>
+    </SettingsRow>
   }
   if (rows === null) {
     return <SettingsRow label={t('settings.diagnosticsLoading')}><LoaderCircle className="animate-spin" aria-hidden="true" /></SettingsRow>

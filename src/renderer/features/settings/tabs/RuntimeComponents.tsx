@@ -5,11 +5,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Button } from '@/components/ui/button'
 import { DialogHeader, DialogFooter } from '@/components/ui/dialog'
 import { Check, CircleHelp, LoaderCircle } from 'lucide-react'
-import { notifySuccess } from '@/components/primitives/notify'
+import { notifyError, notifyRetryableFailure, notifySuccess } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
 import { CRISP_RUNTIME_ID, type LocalRuntime, type RuntimeSnapshot } from '../../../../shared/compute'
-import { reportSettingsFailure } from '../settingsErrorChannel'
+import { claimRuntimeFailure, releaseRuntimeFailure, reportSettingsFailure } from '../settingsErrorChannel'
 import { SettingsRow } from '../SettingsRow'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 
@@ -102,15 +102,40 @@ export function RuntimeComponents() {
     const recipe = kind === 'engine' ? runtimes?.recipes.find(r => r.id === component.id) : runtimes?.packages.find(p => p.id === component.id)
     return recipe?.name ?? `${kind === 'engine' ? 'Torch' : 'llama.cpp'} ${component.version} (${component.backend === 'directml' ? 'DirectML' : component.backend.toUpperCase()})${component.xformersVersion ? ` + xFormers ${component.xformersVersion}` : ''}`
   }
+  const installOne = async (id: string, reinstall: boolean) => {
+    claimRuntimeFailure()
+    try {
+      await actions.settings.installRuntimeComponent(id, reinstall)
+      const error = stores.settings.getState().runtimeError
+      if (error) notifyRetryableFailure(t('runtime.operationFailed', { action: t('runtime.install') }), {
+        cause: error,
+        description: error.startsWith('PYTORCH_DEPENDENCY_TIMEOUT:') ? t('runtime.pipDependencyTimeout') : t('runtime.operationFailedDescription'),
+        action: { label: t('runtime.retryOperation'), onPress: () => { void installOne(id, reinstall) } },
+      })
+    } finally {
+      releaseRuntimeFailure()
+    }
+  }
   const install = async (ids: string[]) => {
     for (const id of ids) {
-      await actions.settings.installRuntimeComponent(id, true)
+      await installOne(id, true)
       if (stores.settings.getState().runtimeError) break
     }
   }
   const uninstall = async (kind: RuntimeKind) => {
     setConfirmKind(null)
-    await actions.settings.uninstallRuntimeComponent(kind)
+    claimRuntimeFailure()
+    try {
+      await actions.settings.uninstallRuntimeComponent(kind)
+      const error = stores.settings.getState().runtimeError
+      if (error) notifyRetryableFailure(t('runtime.operationFailed', { action: t('runtime.uninstall') }), {
+        cause: error,
+        description: t('runtime.operationFailedDescription'),
+        action: { label: t('runtime.retryOperation'), onPress: () => { void uninstall(kind) } },
+      })
+    } finally {
+      releaseRuntimeFailure()
+    }
   }
   const cancelInstallation = async () => {
     try {
@@ -182,7 +207,7 @@ export function RuntimeComponents() {
             onChange={value => setForce(previous => ({ ...previous, [kind]: value }))} /></SettingsRow>
           <div className="runtime-actions gap-2">{uninstallable ? <Button variant="danger" size="sm" disabled={busy}
             onClick={() => setConfirmKind(kind)}>{t('runtime.uninstall')}</Button> : null}<Button variant="default" size="sm" disabled={busy || !selected[kind] || selected[kind] === 'current' || (same && !force[kind])}
-            onClick={() => void actions.settings.installRuntimeComponent(selected[kind], force[kind])}>{same && !force[kind] ? <><Check aria-hidden="true" />{t('runtime.installed')}</> : force[kind] ? t('runtime.reinstall') : t('runtime.install')}</Button></div>
+            onClick={() => void installOne(selected[kind], force[kind])}>{same && !force[kind] ? <><Check aria-hidden="true" />{t('runtime.installed')}</> : force[kind] ? t('runtime.reinstall') : t('runtime.install')}</Button></div>
         </div>
       })}
     </SettingGroup>

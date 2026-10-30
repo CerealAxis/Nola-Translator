@@ -8,7 +8,7 @@
  * columns eat the remaining height.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ChevronRight, Download, Minus, Plus } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
@@ -19,7 +19,6 @@ import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import { AudioPlayerBar, DualColumnView } from '@/components/reading'
 import type { DualColumnSegment } from '@/components/reading'
 import { ErrorBoundary, PageHeader, StatusPill } from '@/components/primitives'
-import { notifyError, notifySuccess } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useI18n } from '@/i18n'
@@ -42,20 +41,6 @@ const SKELETON_PAIRS = 4
 export function RecordDetailPage(): ReactNode {
   const { t } = useI18n()
   const { id, navigate, path } = useRoute()
-  /*
-   * The translator changes with the interface language, and a load callback that depends on it
-   * would read the record again on every language switch: the reading pane falls back to a
-   * skeleton, the audio URL is fetched a second time and the playhead is lost. The callback
-   * reads the current language through a ref instead.
-   *
-   * The ref is filled in a layout effect rather than during the render: a render that React
-   * discards must not leave the ref holding a translator the committed tree never had.
-   */
-  const translate = useRef(t)
-  useLayoutEffect(() => {
-    translate.current = t
-  }, [t])
-
   const detail = useStore(stores.meetings, (state) => state.detail)
   const detailLoading = useStore(stores.meetings, (state) => state.detailLoading)
   const sourceLanguage = useStore(stores.settings, state => state.settings?.recognition.sourceLanguage ?? 'auto')
@@ -74,14 +59,11 @@ export function RecordDetailPage(): ReactNode {
    * `announce` is set when the user pressed the retry: the load that runs because the
    * page opened puts the record in plain sight, so it stays quiet.
    */
-  const load = useCallback((announce = false) => {
+  const load = useCallback(() => {
     if (!id) return
     setDetailFailed(false)
-    void actions.meetings.loadMeetingDetail(id).then((detail) => {
-      if (announce && detail) notifySuccess(translate.current('common.refreshed'))
-    }).catch((cause: unknown) => {
+    void actions.meetings.loadMeetingDetail(id).catch(() => {
       setDetailFailed(true)
-      notifyError(translate.current('errors.meetingsLoadFailed'), { cause })
     })
   }, [id])
 
@@ -214,8 +196,9 @@ export function RecordDetailPage(): ReactNode {
           {detailLoading && !detail ? (
             <DualSkeleton t={t} />
           ) : detailFailed ? (
-            <div className="flex justify-center p-6">
-              <Button size="sm" onClick={() => load(true)}>{t('common.retry')}</Button>
+            <div className="flex flex-col items-start gap-3 p-6">
+              <p className="nola-body text-muted">{t('errors.meetingsLoadFailed')}</p>
+              <Button size="sm" onClick={() => load()}>{t('common.retry')}</Button>
             </div>
           ) : segments.length === 0 ? (
             <div className="flex flex-col items-start gap-4 p-6">

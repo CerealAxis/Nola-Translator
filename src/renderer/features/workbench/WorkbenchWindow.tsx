@@ -9,6 +9,7 @@ import type { TranslationKey } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
 import { customModelsOf } from '../../../shared/custom-models'
 import { notifyError, notifyInfo } from '@/components/primitives/notify'
+import { Button } from '@/components/ui/button'
 import { AudioRecordingDictationAdapter } from './audio-dictation'
 import type { PlaygroundConfig } from './demo-runtime'
 import { createPlaygroundFetch } from './language-model-transport'
@@ -17,6 +18,7 @@ import { resolveModelBinding, savedBindingOf, selectModelBinding, useAvailableMo
 import { notifyGatewayModelUnavailable } from '@/components/primitives/notify'
 import { AudioAttachmentAdapter, VideoAttachmentAdapter } from './audio-attachment'
 import { getBridge } from '@/store'
+import { settingsPath, pathOf } from '@/routes'
 import type { AgentWorkspaceSnapshot, WorkspaceAction } from '../../../shared/agent-workspace'
 import { NativeAgentSurface } from './NativeAgentSurface'
 import { createGenerativePresentationTools, nativePresentationTools } from './native-agent-tools'
@@ -140,6 +142,8 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
   const [config, setConfig] = useState<PlaygroundConfig>({ model: '', kind: 'llm', effort: 'auto', source: 'auto', target: 'zh', voice: '', projectId: snapshot?.selectedProject ?? null })
   const [requestRunning, setRequestRunning] = useState(false)
   const [ttsVoices, setTtsVoices] = useState<{ model: string; names: string[] }>({ model: '', names: [] })
+  const [settingsLoadFailed, setSettingsLoadFailed] = useState(false)
+  const [modelsLoadFailed, setModelsLoadFailed] = useState(false)
 
   const [memories, setMemories] = useState<string[]>(() => { try { const saved: unknown = JSON.parse(localStorage.getItem('nola.playground.memories') || '[]'); return Array.isArray(saved) ? saved.filter((item): item is string => typeof item === 'string') : [] } catch { return [] } })
   const [renaming, setRenaming] = useState(false)
@@ -148,8 +152,8 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
   useEffect(() => {
     // This independent document skips main-window startup queries and needs its own first snapshot.
     const refresh = () => {
-      void actions.settings.loadSettings().catch(error => notifyError(t('workbench.actionFailed'), { cause: error }))
-      void actions.models.loadModels({ includeDevices: false }).catch(error => notifyError(t('errors.modelsLoadFailed'), { cause: error }))
+      void actions.settings.loadSettings().then(() => setSettingsLoadFailed(false)).catch(() => setSettingsLoadFailed(true))
+      void actions.models.loadModels({ includeDevices: false }).then(() => setModelsLoadFailed(false)).catch(() => setModelsLoadFailed(true))
     }
     refresh()
     window.addEventListener('focus', refresh)
@@ -178,7 +182,11 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
     const ready = modelsRef.current.find(model => model.kind === 'tts')
     return { modelId: ready?.id.startsWith('resource:') ? ready.id.slice(9) : '', voice: configRef.current.kind === 'tts' ? configRef.current.voice : settingsRef.current?.synthesis.voice ?? '' }
   }, t,
-  error => notifyError(t('workbench.readAloudError'), { cause: error })), [t])
+  error => notifyError(t('workbench.readAloudErrorTitle'), {
+    cause: error,
+    description: t('workbench.readAloudErrorDescription'),
+    action: { label: t('workbench.readAloudErrorAction'), onPress: () => { void actions.settings.openMainPage(pathOf('models')).catch(cause => notifyError(t('workbench.actionFailed'), { cause })) } },
+  })), [t])
   const feedback = useMemo(() => ({ submit() { /* LocalRuntime retains the preview feedback state. */ } }), [])
   const runtimeRef = useRef<ReturnType<typeof useChatRuntime> | null>(null)
   const dictationRequestId = useRef<string | null>(null)
@@ -193,7 +201,11 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
       finally { if (dictationRequestId.current === id) dictationRequestId.current = null }
     }
     runtimeRef.current?.thread.append({ role: 'user', content: [{ type: 'file', mimeType: data.mimeType, data: data.url, filename: `${t('workbench.recording')}.wav` }] })
-  }, error => notifyError(t('workbench.micError'), { cause: error }), () => {
+  }, error => notifyError(t('workbench.micErrorTitle'), {
+    cause: error,
+    description: t('workbench.micErrorDescription'),
+    action: { label: t('workbench.micErrorAction'), onPress: () => { void actions.settings.openMainPage(settingsPath('audio')).catch(cause => notifyError(t('workbench.actionFailed'), { cause })) } },
+  }), () => {
     if (dictationRequestId.current) void getBridge()?.app.cancelLanguageModel?.(dictationRequestId.current).catch(() => undefined)
     dictationRequestId.current = null
   }), [config.model, config.kind, settings, models, t])
@@ -213,6 +225,15 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
     : config.kind === 'mt' ? config.images ? 'workbench.imagePrompt' : 'workbench.mtPrompt' : 'workbench.prompt')
   const openConfiguration = () => { void actions.settings.openMainPage('#/model-gateway').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) }
   return <AssistantRuntimeProvider runtime={runtime} config={agentConfig}>
+    <div className="flex h-full min-h-0 flex-col">
+      {settingsLoadFailed ? <div role="alert" className="flex items-center justify-between gap-3 border-b border-border bg-muted px-4 py-2 text-foreground">
+        <span>{t('settings.loadFailed')}</span>
+        <Button variant="outline" size="sm" onClick={() => { void actions.settings.loadSettings().then(() => setSettingsLoadFailed(false)).catch(() => setSettingsLoadFailed(true)) }}>{t('common.retry')}</Button>
+      </div> : null}
+      {modelsLoadFailed ? <div role="alert" className="flex items-center justify-between gap-3 border-b border-border bg-muted px-4 py-2 text-foreground">
+        <span>{t('errors.modelsLoadFailed')}</span>
+        <Button variant="outline" size="sm" onClick={() => { void actions.models.loadModels({ includeDevices: false }).then(() => setModelsLoadFailed(false)).catch(() => setModelsLoadFailed(true)) }}>{t('common.retry')}</Button>
+      </div> : null}
     <WorkbenchRequestLifecycle onRunningChange={setRequestRunning} />
     <AgentInstructions active={config.kind === 'llm'} />
     <DictationLifecycle adapter={audioDictation} />
@@ -228,6 +249,7 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
       voices={ttsVoices.model === config.model ? ttsVoices.names : []} onVoices={names => setTtsVoices({ model: config.model, names })}
       snapshot={snapshot} onAction={onAction} busy={busy} placeholder={config.model ? placeholder : t('workbench.noModels')}
       memories={memories} onMemories={next => { setMemories(next); try { localStorage.setItem('nola.playground.memories', JSON.stringify(next)) } catch (error) { notifyError(t('workbench.actionFailed'), { cause: error }) } }} />
+    </div>
   </AssistantRuntimeProvider>
 }
 

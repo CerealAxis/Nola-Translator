@@ -12,7 +12,7 @@ import { configurationOf, recognitionLanguages } from '../shared/model-capabilit
 import { INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { LANGUAGE_CODES } from '../shared/languages'
 import { defaultModelBinding, isModelEnabled, modelEnablePatch, modelPolicyOf, sceneModelBinding, sceneModelPatch } from '../shared/model-policy'
-import { notifyError, notifyGatewayModelUnavailable } from '@/components/primitives/notify'
+import { notifyError, notifyGatewayModelUnavailable, notifyWarning } from '@/components/primitives/notify'
 import { cloudModelsOf } from '../shared/cloud-models'
 
 const imageTranslationIds = new Set<string>([...INDEX_TRANSLATE_MODEL_IDS, ...INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS])
@@ -340,7 +340,17 @@ export function useModelSelection(kind: GatewayCapability, options: readonly Ava
   return { binding, unavailable: resolution.unavailable,
     select: next => {
       if (locked) return
-      if (!options.some(model => model.binding === next)) { notifyError(t('gateway.modelNone', { name: kind.toUpperCase() })); return }
+      if (!options.some(model => model.binding === next)) {
+        notifyWarning(t('modelsSettingsUi.selectionUnavailable'), {
+          description: t('modelsSettingsUi.selectionUnavailableDescription'),
+          action: { label: t('gateway.title'), onPress: () => {
+            const bridge = getBridge()
+            if (bridge?.app.openMainPage) void bridge.app.openMainPage('#/model-gateway').catch(error => notifyError(t('errors.unknownFailure'), { cause: error }))
+            else window.location.hash = '#/model-gateway'
+          } },
+        })
+        return
+      }
       void selectModelBinding(kind, next, settings).catch(error => notifyError(t('errors.settingsSaveFailed'), { cause: error }))
     } }
 }

@@ -33,7 +33,7 @@ import { ModelMark } from './modelBrand'
 import { RecommendedFamilyCard, RecommendedFamilyDialog } from './RecommendedFamilies'
 import { familyOf, type RecommendedFamily } from './modelFamily'
 import { isEngineAvailable } from './engine-availability'
-import { notifyModelDownloadFailure, suppressNextDownloadStartNotice } from './ModelDownloadNotice'
+import { notifyModelDownloadFailure, notifyModelRemoveFailure, suppressNextDownloadStartNotice } from './ModelDownloadNotice'
 import { CloudMark, CloudModelCard, CloudModelDialog, cloudModelsOf, type CloudModel, type CloudModelId } from './CloudModels'
 import './models.css'
 
@@ -84,6 +84,7 @@ export function ModelsPage() {
         // still prevents duplicate starts while this page remains mounted.
       }
       notifyInfo(t('models.visionSupplementStarted', { name: record.name }), {
+        description: t('shellUi.actionHint'),
         action: { label: t('models.viewProgress'), onPress: () => { window.location.hash = '#/models/downloads' } },
         duration: 12000,
       })
@@ -164,25 +165,10 @@ export function ModelsPage() {
    * tells the user, and the retry button lets them ask again.
    */
   const loadFailed = !loaded && !loading && error !== null
-  const reportedFailure = useRef<string | null>(null)
-  useEffect(() => {
-    if (!loadFailed) {
-      reportedFailure.current = null
-      return
-    }
-    if (reportedFailure.current === error) return
-    reportedFailure.current = error
-    notifyError(t('errors.modelsLoadFailed'), { cause: error })
-  }, [loadFailed, error, t])
   const retryLoad = useCallback(() => {
-    // The failure is the one the effect above reports: it watches the store's error field.
-    // A load that is already running resolves without reading anything, so the notice
-    // would announce a list that was never fetched.
     if (stores.models.getState().loading) return
-    void actions.models.loadModels().then(() => {
-      notifySuccess(t('common.refreshed'))
-    }).catch(() => undefined)
-  }, [t])
+    void actions.models.loadModels().catch(() => undefined)
+  }, [])
 
   const run = (record: ResourceRecord, action: 'install' | 'remove' | 'cancel') => () => {
     if (action === 'install') {
@@ -190,7 +176,8 @@ export function ModelsPage() {
       return
     }
     void actions.models.manageResource(record.resourceId, action).catch((cause: unknown) => {
-      notifyError(action === 'remove' ? t('modelsSettingsUi.removeFailed') : t('errors.engineOperationFailed'), { cause })
+      if (action === 'remove') notifyModelRemoveFailure(record, t, cause)
+      else notifyError(t('errors.engineOperationFailed'), { cause })
     })
   }
 
@@ -434,8 +421,7 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAc
 
 /**
  * A catalog that could not be read. The list it would show is unknown rather than empty, so
- * the way out is asking for it again. The failure is also raised as a notice, which is what
- * carries the reason; the line here says which state the page is in.
+ * the way out is asking for it again.
  */
 function FailedCatalog({ onRetry }: { onRetry: () => void }) {
   const { t } = useI18n()

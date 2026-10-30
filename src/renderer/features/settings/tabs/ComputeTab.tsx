@@ -90,6 +90,7 @@ export function ComputeTab({ settings }: SettingsPanelProps) {
     reportedComputeError.current = computeError
     notifyError(t('compute.deviceCheckFailed'), {
       cause: computeError,
+      description: t('shellUi.actionHint'),
       action: { label: t('models.retry'), onPress: () => void refresh() },
     })
   }, [computeError, refresh, t])

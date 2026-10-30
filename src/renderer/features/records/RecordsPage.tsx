@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { RecordSelection } from './RecordsTable'
 import { Mic, Search } from 'lucide-react'
 import { ErrorBoundary } from '@/components/primitives'
-import { notifyError, notifySuccess } from '@/components/primitives/notify'
+import { notifyError, notifySuccess, notifyWarning } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { pathOf, recordPath, useRoute } from '@/routes'
 import { actions, stores, useStore } from '@/store'
@@ -58,32 +58,11 @@ export function RecordsPage(): ReactNode {
    * tells the user, and the retry button lets them ask again.
    */
   const loadFailed = !loaded && !loading && loadError !== null
-  const reportedFailure = useRef<string | null>(null)
-  useEffect(() => {
-    /*
-     * The state is read again here instead of taken from the render: the effect above starts
-     * another attempt, and that attempt clears the error before it succeeds or fails. The
-     * snapshot this effect was scheduled with still holds the failure of the previous attempt,
-     * and reporting it would announce a failure the user never had.
-     */
-    const state = stores.meetings.getState()
-    if (state.loaded || state.loading || state.error === null) {
-      reportedFailure.current = null
-      return
-    }
-    if (reportedFailure.current === state.error) return
-    reportedFailure.current = state.error
-    notifyError(t('errors.meetingsLoadFailed'), { cause: state.error })
-  }, [loadFailed, loadError, t])
   const retryLoad = useCallback(() => {
-    // The failure is the one the effect above reports: it watches the store's error field.
-    // A load that is already running resolves without reading anything, so the notice
-    // would announce a list that was never fetched.
+    // A load already in progress resolves without reading anything.
     if (stores.meetings.getState().loading) return
-    void actions.meetings.loadMeetings().then(() => {
-      notifySuccess(t('common.refreshed'))
-    }).catch(() => undefined)
-  }, [t])
+    void actions.meetings.loadMeetings().catch(() => undefined)
+  }, [])
   const filtered = useMemo(() => {
     const text = filterText.trim().toLowerCase()
     const languageLabel = (code: string) => {
@@ -135,7 +114,32 @@ export function RecordsPage(): ReactNode {
       const removed = new Set(result.removed)
       setSelection(new Set(targets.filter((id) => !removed.has(id))))
       if (result.failed.length === 0) notifySuccess(t('records.deletedMany', { count: result.removed.length }))
-      else notifyError(t('records.deletePartialFailed', { removed: result.removed.length, failed: result.failed.length }))
+      else if (result.removed.length === 0) notifyError(t('records.deleteFailed'))
+      else {
+        const reportPartial = (removedCount: number, failed: readonly { id: string; error: string }[]): void => {
+          setSelection(new Set(failed.map(({ id }) => id)))
+          if (failed.length === 0) {
+            notifySuccess(t('records.deletedMany', { count: removedCount }))
+            return
+          }
+          if (removedCount === 0) {
+            notifyError(t('records.deleteFailed'))
+            return
+          }
+          notifyWarning(t('records.deletePartialFailed'), {
+            description: t('records.deletePartialDescription', { removed: removedCount, failed: failed.length }),
+            action: {
+              label: t('common.retry'),
+              onPress: () => {
+                void actions.meetings.removeMeetings(failed.map(({ id }) => id)).then(next => reportPartial(next.removed.length, next.failed)).catch(() => {
+                  notifyError(t('records.deleteFailed'))
+                })
+              },
+            },
+          })
+        }
+        reportPartial(result.removed.length, result.failed)
+      }
     }).catch((cause: unknown) => {
       notifyError(t('records.deleteFailed'), { cause })
     }).finally(() => {
@@ -161,7 +165,7 @@ export function RecordsPage(): ReactNode {
         </div>
         <Card className="nola-record-card">
           <CardContent className="flex flex-1 flex-col">
-            {loading && !loaded ? <div className="nola-record-loading">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} data-testid="skeleton-row" className="h-12 w-full rounded-lg" />)}</div> : loadFailed ? <div className="nola-record-empty"><Button variant="default" onClick={retryLoad}>{t('common.retry')}</Button></div> : filtered.length === 0 ? <Empty className="nola-record-empty"><EmptyHeader><EmptyTitle>{isSearching ? t('records.noResults') : t('records.noRecords')}</EmptyTitle><EmptyDescription>{isSearching ? t('records.noResultsHint') : t('records.noRecordsHint')}</EmptyDescription></EmptyHeader><EmptyContent><Button variant="default" onClick={isSearching ? () => setFilterText('') : startSession}>{isSearching ? t('records.clearSearch') : t('records.startFirst')}</Button></EmptyContent></Empty> : <>
+            {loading && !loaded ? <div className="nola-record-loading">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} data-testid="skeleton-row" className="h-12 w-full rounded-lg" />)}</div> : loadFailed ? <div className="nola-record-empty"><p className="nola-body text-muted">{t('errors.meetingsLoadFailed')}</p><Button variant="default" onClick={retryLoad}>{t('common.retry')}</Button></div> : filtered.length === 0 ? <Empty className="nola-record-empty"><EmptyHeader><EmptyTitle>{isSearching ? t('records.noResults') : t('records.noRecords')}</EmptyTitle><EmptyDescription>{isSearching ? t('records.noResultsHint') : t('records.noRecordsHint')}</EmptyDescription></EmptyHeader><EmptyContent><Button variant="default" onClick={isSearching ? () => setFilterText('') : startSession}>{isSearching ? t('records.clearSearch') : t('records.startFirst')}</Button></EmptyContent></Empty> : <>
               {selectedCount > 0 ? <div className="nola-record-page__bulk">
                 <span className="nola-record-page__bulk-count">{t('records.selectedCount', { count: selectedCount })}</span>
                 <Button variant="secondary" size="sm" onClick={() => setSelection(new Set())} className="nola-record-page__bulk-dismiss">{t('records.clearSelection')}</Button>

@@ -126,7 +126,21 @@ export function VideoCaptionsPage() {
     if (reason === null) { reportedBrowserError.current = null; return }
     if (reportedBrowserError.current === reason) return
     reportedBrowserError.current = reason
-    notifyError(t('errors.browserServiceUnavailable'), { description: reason })
+    notifyError(t('errors.browserServiceUnavailable'), {
+      description: t('errors.browserReconnectDescription'),
+      action: {
+        label: t('errors.browserReconnectAction'),
+        onPress: () => {
+          reportedBrowserError.current = null
+          void browserConnectionAction('inspect').then(() => {
+            const failure = stores.settings.getState().browserError
+            if (failure) reportBrowserError(failure)
+          }).catch((error: unknown) => {
+            notifyError(t('errors.browserServiceUnavailable'), { cause: error })
+          })
+        },
+      },
+    })
   }, [t])
   useEffect(() => {
     /*
@@ -166,12 +180,14 @@ export function VideoCaptionsPage() {
     const detectedExtensions = availableBrowsers.filter(browser => browser.extensionStatus === 'installed' || browser.extensionStatus === 'disabled')
     if (availableBrowsers.length > 0 && detectedExtensions.length === 0 && availableBrowsers.every(browser => browser.extensionStatus === 'notInstalled')) {
       notifyWarning(t('videoCaptions.extensionSetupNotice'), {
+        description: t('shellUi.actionHint'),
         action: { label: t('videoCaptions.browserSettings'), onPress: () => navigate(settingsPath('browser')) },
       })
       return
     }
     if (detectedExtensions.length > 0 && detectedExtensions.every(browser => browser.extensionCompatible === false)) {
       notifyWarning(t('videoCaptions.extensionVersionMismatchNotice'), {
+        description: t('shellUi.actionHint'),
         action: { label: t('videoCaptions.browserSettings'), onPress: () => navigate(settingsPath('browser')) },
       })
       return
@@ -181,6 +197,9 @@ export function VideoCaptionsPage() {
       if (result.state === 'failed') {
         if (result.code === 'sessionAlreadyRunning') {
           notifyConflict()
+        } else if (result.code === 'modelUnavailable' || result.code === 'resourceUnavailable'
+          || result.code === 'invalidConfiguration' || result.code === 'modelLoadFailed') {
+          notifyGatewayModelUnavailable(t('videoCaptions.serviceFailed'), prewarmDetail(result.code) ?? t('gateway.modelGatewayStartHint'), t('gateway.title'))
         } else notifyError(t('videoCaptions.serviceFailed'), { description: prewarmDetail(result.code) })
         return
       }
@@ -194,14 +213,22 @@ export function VideoCaptionsPage() {
         const key = torch
           ? mismatch ? 'videoCaptions.torchDeviceMismatch' : 'videoCaptions.torchEnvironmentFailed'
           : mismatch ? 'videoCaptions.llamaDeviceMismatch' : 'videoCaptions.llamaEnvironmentFailed'
-        reportSettingsFailure(t(key), error)
-        await actions.settings.openRuntimeSettings(torch ? 'engine' : 'llama').catch((openError: unknown) => {
-          notifyError(t('errors.runtimeSettingsFailed'), { cause: openError })
+        notifyError(t(key), {
+          description: t('videoCaptions.serviceFailed'),
+          action: { label: t('runtime.recheck'), onPress: () => {
+            void actions.settings.openRuntimeSettings(torch ? 'engine' : 'llama').catch((openError: unknown) => {
+              notifyError(t('errors.runtimeSettingsFailed'), { cause: openError })
+            })
+          } },
         })
       } else if (crisp) {
-        reportSettingsFailure(t('errors.crispRuntimeUnavailable'), error)
-        await actions.settings.openRuntimeSettings('crisp').catch((openError: unknown) => {
-          notifyError(t('errors.runtimeSettingsFailed'), { cause: openError })
+        notifyError(t('errors.crispRuntimeUnavailable'), {
+          description: t('videoCaptions.serviceFailed'),
+          action: { label: t('runtime.recheck'), onPress: () => {
+            void actions.settings.openRuntimeSettings('crisp').catch((openError: unknown) => {
+              notifyError(t('errors.runtimeSettingsFailed'), { cause: openError })
+            })
+          } },
         })
       } else reportSettingsFailure(t('videoCaptions.serviceFailed'), error)
       return

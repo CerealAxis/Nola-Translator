@@ -4,6 +4,7 @@ import { settingsStore } from '@/store/settingsStore'
 import { RuntimeOperationNotice } from './RuntimeOperationNotice'
 
 const notifyMocks = vi.hoisted(() => ({
+  notifyLoading: vi.fn(() => 'loading'),
   notifyInfo: vi.fn(() => 'info'),
   notifySuccess: vi.fn(() => 'success'),
   notifyError: vi.fn(() => 'error'),
@@ -22,7 +23,7 @@ it('announces runtime progress and completion', () => {
   render(<RuntimeOperationNotice />)
 
   act(() => settingsStore.setState({ runtimeBusy: true, runtimeAction: 'install', runtimeError: null }))
-  expect(notifyMocks.notifyInfo).toHaveBeenCalledWith('运行组件安装已开始', expect.objectContaining({ description: '操作进行中，可下滑查看进度。' }))
+  expect(notifyMocks.notifyLoading).toHaveBeenCalledWith('运行组件安装已开始', expect.objectContaining({ description: '操作进行中，可下滑查看进度。', action: expect.objectContaining({ label: '查看进度' }) }))
   act(() => settingsStore.setState({ runtimeBusy: false }))
   expect(notifyMocks.notifySuccess).toHaveBeenCalledWith('运行组件安装完成')
 })

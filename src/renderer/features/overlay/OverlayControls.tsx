@@ -321,7 +321,11 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
            * the start fails before the store records anything and the in-place
            * notice has nothing to show. A press that does nothing has to say so.
            */
-          notifyError(t('errors.startFailed'), { cause: error })
+          notifyError(t('errors.startFailedTitle'), {
+            cause: error,
+            description: t('errors.startFailedDescription'),
+            action: { label: t('errors.startFailedAction'), onPress: toggleMic },
+          })
         } else console.warn('[overlay] startSession failed', error)
       })
     }

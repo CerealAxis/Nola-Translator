@@ -28,7 +28,7 @@ import { PreflightDialog } from './PreflightDialog'
 import { SessionBar } from './SessionBar'
 import { SessionSetupDialog } from './SessionSetupDialog'
 import type { SetupDraft } from './SessionSetupDialog'
-import { errorCodeOfSession, errorCopyOf } from './error-copy'
+import { errorCopyOf } from './error-copy'
 import { isSessionAlreadyRunningError } from '../../../shared/ipc-error'
 import { SessionErrorDialog, StopSessionDialog } from './WorkspaceDialogs'
 import { WorkspaceToolbar } from './WorkspaceToolbar'
@@ -116,13 +116,34 @@ export function WorkspacePage() {
    * failure is enough to tell them apart.
    */
   const notesFailure = useRef<string | null>(null)
-  const reportNotesFailure = useCallback((error: unknown): void => {
+  const failedNotes = useRef<{ meetingId: string; value: string } | null>(null)
+  const reportNotesFailure = useCallback((error: unknown, failedMeetingId: string, value: string): void => {
     const text = describeError(error) ?? 'unknown'
+    failedNotes.current = { meetingId: failedMeetingId, value }
     if (notesFailure.current === text) return
     notesFailure.current = text
-    notifyError(t('errors.notesSaveFailed'), { cause: error })
+    notifyError(t('errors.notesSaveFailed'), {
+      cause: error,
+      description: t('errors.notesSaveFailedDescription'),
+      action: {
+        label: t('errors.notesSaveFailedAction'),
+        onPress: () => {
+          const failed = failedNotes.current
+          if (!failed) return
+          notesFailure.current = null
+          void actions.meetings.setMeetingNotes(failed.meetingId, failed.value).then(() => {
+            failedNotes.current = null
+            notifySuccess(t('errors.notesSaveRecovered'))
+          }).catch((retryError: unknown) => reportNotesFailure(retryError, failed.meetingId, failed.value))
+        },
+      },
+    })
   }, [t])
-  const clearNotesFailure = useCallback((): void => { notesFailure.current = null }, [])
+  const clearNotesFailure = useCallback((): void => {
+    if (notesFailure.current !== null) notifySuccess(t('errors.notesSaveRecovered'))
+    notesFailure.current = null
+    failedNotes.current = null
+  }, [t])
 
   // Flush a pending write first when the meeting changes, or it lands on
   // the next meeting.
@@ -134,7 +155,7 @@ export function WorkspacePage() {
     pendingNotes.current = null
     pendingMeetingId.current = null
     if (pendingValue !== null && pendingId !== null && pendingValue !== savedNotes.current) {
-      void actions.meetings.setMeetingNotes(pendingId, pendingValue).then(clearNotesFailure, reportNotesFailure)
+      void actions.meetings.setMeetingNotes(pendingId, pendingValue).then(clearNotesFailure).catch(error => reportNotesFailure(error, pendingId, pendingValue))
     }
     savedNotes.current = ''
     if (!meetingId) {
@@ -163,7 +184,7 @@ export function WorkspacePage() {
          * A lost note is the user's own writing, so it is worth interrupting
          * for: nothing else tells them the sentence they just typed is gone.
          */
-        void actions.meetings.setMeetingNotes(meetingId, value).then(clearNotesFailure, reportNotesFailure)
+        void actions.meetings.setMeetingNotes(meetingId, value).then(clearNotesFailure).catch(error => reportNotesFailure(error, meetingId, value))
       }, 800)
     },
     [clearNotesFailure, meetingId, reportNotesFailure],
@@ -178,7 +199,7 @@ export function WorkspacePage() {
       const id = pendingMeetingId.current
       if (value !== null && id !== null && value !== savedNotes.current) {
         savedNotes.current = value
-        void actions.meetings.setMeetingNotes(id, value).then(clearNotesFailure, reportNotesFailure)
+        void actions.meetings.setMeetingNotes(id, value).then(clearNotesFailure).catch(error => reportNotesFailure(error, id, value))
       }
     },
     [clearNotesFailure, reportNotesFailure],
@@ -188,7 +209,7 @@ export function WorkspacePage() {
   const openSetup = useCallback(async () => {
     try {
       if (!await actions.settings.canStartDesktopCaptions()) {
-        notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        notifyWarning(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
         return
       }
     } catch (error) {
@@ -267,9 +288,7 @@ export function WorkspacePage() {
       setNotes('')
       const meetingId = sessionStore.getState().meetingId
       if (meetingId) {
-        await actions.meetings.loadMeetings().catch((error: unknown) => {
-          notifyError(t('errors.meetingsLoadFailed'), { cause: error })
-        })
+        await actions.meetings.loadMeetings().catch(() => undefined)
         if (draft?.title.trim()) {
           await actions.meetings.renameMeeting(meetingId, draft.title.trim()).catch((error: unknown) => {
             notifyWarning(t('workspaceUi.titleFailed'), { cause: error })
@@ -280,7 +299,7 @@ export function WorkspacePage() {
       // SessionController is the final cross-client mutex. Turn its conflict into a
       // named toast instead of also opening the generic start-failure dialog.
       if (isSessionAlreadyRunningError(error)) {
-        notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        notifyWarning(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
       } else if (unsupportedRecognitionLanguageOf(error)) {
         notifyError(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
       } else if (sessionStore.getState().errorCode === 'AUDIODEVICEUNAVAILABLE') {
@@ -291,27 +310,28 @@ export function WorkspacePage() {
          * a missing model or a session that has not wound down, so the error
          * dialog never opens and nothing else says the session did not start.
          */
-        notifyError(t('errors.startFailed'), { cause: error })
+        notifyError(t('errors.startFailedTitle'), {
+          cause: error,
+          description: t('errors.startFailedDescription'),
+          action: { label: t('errors.startFailedAction'), onPress: () => { void start() } },
+        })
       }
     }
   }, [catalog, devices, draft, t])
 
   const stop = useCallback(async () => {
-    // Read before stopping: the store's `finally` clears it unconditionally.
+    // Read before stopping: a successful stop clears the id before the record route is opened.
     const meetingId = sessionStore.getState().meetingId
     setStopConfirmOpen(false)
     try {
       await actions.session.stopSession()
       if (meetingId && new URLSearchParams(window.location.search).get('workspace') !== '1') navigate(recordPath(meetingId))
-    } catch (error) {
-      notifyError(sessionErrorMessage(t, errorCodeOfSession(sessionStore.getState())))
+    } catch {
+      // SessionErrorDialog owns this failure and keeps the session available for another stop attempt.
     } finally {
-      // Back to the idle entry either way: the store cleared the session id in
-      // its `finally`, and leaving a "running" shell here would suggest the
-      // session can still be recorded.
-      setPendingConfig(null)
+      if (sessionStore.getState().sessionId === null) setPendingConfig(null)
     }
-  }, [navigate, t])
+  }, [navigate])
 
   const copyDiagnostics = useCallback(async (context?: DiagnosticCopyContext) => {
     try {
@@ -520,6 +540,7 @@ function IdleGuide({
     if (failureToastShown.current) return
     failureToastShown.current = true
     notifyError(t('errors.engineNotReady'), {
+      description: t('shellUi.actionHint'),
       action: { label: t('errors.engineNotReadyAction'), onPress: onStart },
     })
   }, [engineStatus, onStart, t])
@@ -532,7 +553,7 @@ function IdleGuide({
         <h2 className="nola-display text-foreground">{t('workspaceUi.idleTitle')}</h2>
         <p className="nola-body text-muted">{t('workspace.nothingYetHint')}</p>
         {/*
-         * A persistent Toast is only for an engine that cannot start.
+         * A Toast is only for an engine that cannot start.
          *
          * `engineStatus` is observed in the main process (`engine-process.ts`
          * emits `state`, `src/main/ipc.ts` forwards it as `engineStateChanged`,
@@ -580,8 +601,3 @@ function IdleGuide({
 }
 
 /** A ready-made line for a toast, from the same table. */
-function sessionErrorMessage(t: ReturnType<typeof useI18n>['t'], code: string | null): string {
-  const copy = errorCopyOf(code, 'stop')
-  return `${t(copy.message)} ${t(copy.action)}`
-}
-

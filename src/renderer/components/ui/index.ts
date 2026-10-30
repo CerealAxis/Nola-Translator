@@ -20,5 +20,5 @@ export { Tabs, TabsContent, TabsIndicator, TabsList, TabsRoot, TabsTrigger } fro
 export type { TabsContentProps, TabsIndicatorProps, TabsListProps, TabsRootProps, TabsTriggerProps } from './tabs'
 export { ToggleGroup, ToggleGroupItem } from './toggle-group'
 export type { ToggleGroupItemProps, ToggleGroupProps } from './toggle-group'
-export { ToastProvider, closeToast, createToast, updateToast } from './toast'
-export type { ToastAction, ToastData, ToastOptions, ToastVariant } from './toast'
+export { ToastProvider, closeToast, showToast, updateToast } from './toast'
+export type { ToastAction, ToastData, ToastPayload, ToastType } from './toast'

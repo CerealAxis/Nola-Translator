@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, replace
+import errno
 import os
 from pathlib import Path
 import shutil
@@ -775,6 +776,8 @@ class ResourceManager:
         mistyped repo name or a gated model ends up being debugged as a network problem; hub.py
         already maps the status codes onto the vocabulary, so reuse it.
         """
+        if isinstance(error, OSError) and error.errno in (errno.ENOSPC, getattr(errno, "EDQUOT", errno.ENOSPC)):
+            return "diskSpaceInsufficient"
         if str(error) == "downloadIntegrityFailed" or "Integrity" in type(error).__name__:
             return "integrityCheckFailed"
         hub_error = classify_hub_error(error)

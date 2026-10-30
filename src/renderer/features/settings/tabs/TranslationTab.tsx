@@ -148,8 +148,8 @@ export function ApiKeyRow({ provider, stored }: ApiKeyRowProps) {
         notifySuccess(t('common.saved'))
         return true
       })
-      .catch(() => {
-        notifyError(t('errors.translateFailed'))
+      .catch((cause: unknown) => {
+        notifyError(t('settings.translationCredentialSaveFailed'), { cause })
         return false
       })
       .finally(() => {

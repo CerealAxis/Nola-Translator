@@ -13,6 +13,8 @@ import { createIpcBridge, isIpcBridgeAvailable } from './bridge/ipc/ipcBridge'
 import { I18nProvider, useI18n } from './i18n'
 import type { TranslationKey } from './i18n'
 import { AppShell, ErrorBoundary, TitleBar } from './components/primitives'
+import { Alert, AlertDescription, AlertTitle } from './components/ui/alert'
+import { Button } from './components/ui/button'
 import { Routes, useRoute } from './routes'
 import { actions, disposeStores, initStores, isEngineConnected, stores, useStore } from './store'
 import type { SettingsCommand } from './store/settingsStore'
@@ -78,7 +80,7 @@ function useOverlayNavigation(): void {
 }
 
 /**
- * 没连上引擎时的持久 Toast。
+ * The toast reports the failure once; the inline alert keeps the disconnected state visible.
  *
  * 这个状态在正式版不存在（总有 preload），它真实存在的地方是 e2e 截图脚本、浏览器里开
  * `out/renderer/index.html`、以及打包漏掉 preload 的那一次。**正因为少见，它才必须自己会说话**：
@@ -92,18 +94,18 @@ function EngineDisconnectedNotice() {
   const { t } = useI18n()
   useEffect(() => {
     if (isEngineConnected()) return
-    let timer: number | undefined
-    const report = () => {
-      if (isEngineConnected()) return
-      notifyError(t('errors.engineNotConnected'), {
-        action: { label: t('errors.pageCrashedAction'), onPress: () => window.location.reload() },
-      })
-      timer = window.setTimeout(report, 12000)
-    }
-    report()
-    return () => { if (timer !== undefined) window.clearTimeout(timer) }
+    notifyError(t('errors.engineNotConnected'), {
+      description: t('errors.engineNotConnectedDescription'),
+      action: { label: t('errors.pageCrashedAction'), onPress: () => window.location.reload() },
+    })
   }, [t])
-  return null
+  return <Alert variant="danger" className="mb-3">
+    <AlertTitle>{t('errors.engineNotConnected')}</AlertTitle>
+    <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+      <span>{t('errors.engineNotConnectedDescription')}</span>
+      <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>{t('errors.pageCrashedAction')}</Button>
+    </AlertDescription>
+  </Alert>
 }
 
 /**
@@ -113,8 +115,7 @@ function EngineDisconnectedNotice() {
 function settingsFailureMessageKey(operation: SettingsCommand | null, error: string): TranslationKey {
   switch (operation) {
     case 'update':
-      // The errno in the failure text says why the write was refused, and each reason has its
-      // own copy and its own support code. The locale layer appends that code to the message.
+      // Map the stored system error to a stable user-facing reason.
       return SETTINGS_WRITE_FAILURE_KEYS[settingsWriteFailure(error)]
     case 'storage': return 'settings.storageRefreshFailed'
     case 'chooseStorage': return 'errors.settingsStoragePickFailed'
@@ -131,7 +132,7 @@ function settingsFailureMessageKey(operation: SettingsCommand | null, error: str
 function SettingsErrorNotice() {
   const { t } = useI18n()
   /** The command failure this notice has already reported. */
-  const handledFailure = useRef<{ key: string; at: number } | null>(null)
+  const handledFailure = useRef<string | null>(null)
   /** The load failure this notice has already reported. */
   const handledLoad = useRef<string | null>(null)
   /** The notice carrying the load failure, taken off the screen once the settings arrive. */
@@ -153,13 +154,18 @@ function SettingsErrorNotice() {
           if (loadNoticeId.current !== null) dismissNotice(loadNoticeId.current)
           loadNoticeId.current = notifyError(t('settings.loadFailed'), {
             cause: state.loadError,
-            action: { label: t('models.retry'), onPress: () => void actions.settings.loadSettings().catch(() => undefined) },
+            description: t('settings.loadFailedDescription'),
+            action: { label: t('settings.retryLoad'), onPress: () => {
+              handledLoad.current = null
+              if (loadNoticeId.current !== null) dismissNotice(loadNoticeId.current)
+              loadNoticeId.current = null
+              void actions.settings.loadSettings().catch(() => undefined)
+            } },
           })
         }
       } else handledLoad.current = null
       if (state.settings && loadNoticeId.current !== null) {
-        // The settings arrived, so the notice about a failure that no longer holds would
-        // stay on screen forever: an error notice never times out.
+        // The settings arrived, so remove the notice about a failure that no longer holds.
         dismissNotice(loadNoticeId.current)
         loadNoticeId.current = null
       }
@@ -167,8 +173,8 @@ function SettingsErrorNotice() {
       if (!failure) { handledFailure.current = null; return }
       const operation = state.errorOperation
       const key = `${operation ?? ''}\u0000${failure}`
-      if (handledFailure.current?.key === key && Date.now() - handledFailure.current.at < 12000) return
-      handledFailure.current = { key, at: Date.now() }
+      if (handledFailure.current === key) return
+      handledFailure.current = key
       /*
        * A settings feature that reports the failure on its own channel claims it right
        * after the call it made resolves. Reporting one task later gives that claim the

@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { createIpcBridge } from '@/bridge/ipc/ipcBridge'
 import type { SessionConfig } from '@/bridge'
-import { attachSessionStore, detachSessionStore, sessionStore, startSession } from './sessionStore'
+import { attachSessionStore, detachSessionStore, resetSessionError, sessionStore, startSession, stopSession } from './sessionStore'
 import { isSessionAlreadyRunningError } from '../../shared/ipc-error'
 
 const remoteConfig: SessionConfig = {
@@ -64,6 +64,23 @@ it('keeps a runtime failure code after the IPC layer sends it as a plain message
 
   await expect(startSession(remoteConfig)).rejects.toThrow('RUNTIME_TORCH')
   expect(sessionStore.getState()).toMatchObject({ status: 'error', errorCode: 'RUNTIME_TORCH' })
+})
+
+it('keeps a failed stop retryable until the engine confirms the session ended', async () => {
+  const bridge = createIpcBridge()
+  attachSessionStore(bridge)
+  vi.spyOn(bridge.engine, 'stopSession')
+    .mockRejectedValueOnce(new Error('temporary failure'))
+    .mockRejectedValueOnce(Object.assign(new Error('sessionNotRunning'), { code: 'sessionNotRunning' }))
+  sessionStore.setState({ status: 'running', sessionId: 'session-1', meetingId: 'meeting-1', startedAtMs: Date.now(), elapsedMs: 1000 })
+
+  await expect(stopSession()).rejects.toThrow('temporary failure')
+  expect(sessionStore.getState()).toMatchObject({ status: 'error', sessionId: 'session-1', meetingId: 'meeting-1' })
+
+  resetSessionError()
+  expect(sessionStore.getState()).toMatchObject({ status: 'running', sessionId: 'session-1', meetingId: 'meeting-1' })
+  await expect(stopSession()).rejects.toThrow('sessionNotRunning')
+  expect(sessionStore.getState()).toMatchObject({ status: 'error', sessionId: null, meetingId: null })
 })
 
 it('attaches a recording to an adopted session without resetting its transcript', () => {

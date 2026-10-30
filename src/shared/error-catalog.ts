@@ -101,7 +101,7 @@ export const SUPPORT_ERROR_CATALOG = {
   'STO-019': { messageKey: 'errors.settingsFileLocked', retryable: true, causes: [] },
   'STO-020': { messageKey: 'errors.settingsDiskFull', retryable: false, causes: [] },
   'STO-021': { messageKey: 'errors.settingsSaveFailed', retryable: true, causes: [] },
-  'STO-022': { messageKey: 'errors.diskSpaceInsufficient', retryable: false, causes: ['RESOURCEDISKSPACEINSUFFICIENT'] },
+  'STO-022': { messageKey: 'errors.diskSpaceInsufficient', retryable: false, causes: ['RESOURCEDISKSPACEINSUFFICIENT', 'DISKSPACEINSUFFICIENT'] },
   'STO-023': { messageKey: 'errors.fileNotFound', retryable: false, causes: ['FILE_NOT_FOUND'] },
   'STO-024': { messageKey: 'errors.fileNotAccessible', retryable: false, causes: ['FILE_NOT_ACCESSIBLE'] },
   'UIP-010': { messageKey: 'errors.pageCrashed', retryable: true, causes: [] },

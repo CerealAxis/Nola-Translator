@@ -1,6 +1,7 @@
 """ResourceManager directory layout, install flow, and legacy cleanup (fake fetcher, no network)."""
 
 import asyncio
+import errno
 from hashlib import sha256
 from pathlib import Path
 import threading
@@ -52,6 +53,11 @@ def _tiny_qwen() -> tuple[ModelSpec, dict[str, bytes]]:
         ),
     )
     return spec, {spec.url_for(entry): payloads[entry.path] for entry in spec.files}
+
+
+def test_resource_install_maps_full_disk_to_storage_error():
+    error = OSError(errno.ENOSPC, "no space left on device")
+    assert ResourceManager._error_code(error) == "diskSpaceInsufficient"
 
 
 def _tiny_hymt2() -> tuple[ModelSpec, dict[str, bytes]]:
