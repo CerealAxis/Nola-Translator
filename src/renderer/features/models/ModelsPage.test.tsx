@@ -38,7 +38,7 @@ it('shows the synthesis default and initializes its voice from discovered metada
     onChanged: () => () => undefined,
   } } as unknown as NolaBridge)
   render(<ModelsPage />)
-  const summary = screen.getByText('默认语音合成模型').closest('[data-slot="card"]')!
+  const summary = screen.getByText('默认 TTS 模型').closest('[data-slot="card"]')!
   expect(within(summary as HTMLElement).getByText('Installed synthesis')).toBeInTheDocument()
   await waitFor(() => expect(update).toHaveBeenCalledExactlyOnceWith({ synthesis: { voice: 'Discovered voice' } }))
 })
@@ -79,7 +79,7 @@ it('shows the active cloud translation capsule and the provider logo in the over
     translation: { ...DEFAULT_SETTINGS.translation, provider: 'index-translate', targetLanguage: 'en' },
   } })
   render(<ModelsPage />)
-  const card = screen.getByText('当前翻译模型').closest('[data-slot="card"]')!
+  const card = screen.getByText('默认 MT 模型').closest('[data-slot="card"]')!
   expect(within(card as HTMLElement).getByText('已启用')).toBeInTheDocument()
   expect(card.querySelector('[data-cloud-model="index-translate"] svg')).not.toBeNull()
   expect(within(card as HTMLElement).getByRole('button', { name: '更改' })).toBeInTheDocument()
@@ -171,11 +171,11 @@ const customModel = { id: 'custom-first', name: 'First model', endpoint: 'https:
 it('shows named saved models only in installed and leaves the recommended template available', () => {
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModels: [customModel, { ...customModel, id: 'custom-second', name: 'Second model' }] } } })
   render(<ModelsPage />)
-  expect(section('大语言模型（LLM）').getByRole('heading', { name: '大语言模型（LLM）' })).toBeInTheDocument()
+  expect(section('大语言模型').getByRole('heading', { name: '大语言模型' })).toBeInTheDocument()
   expect(screen.queryByText('First model')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
-  expect(section('大语言模型（LLM）').getByText('First model')).toBeInTheDocument()
-  expect(section('大语言模型（LLM）').getByText('Second model')).toBeInTheDocument()
+  expect(section('大语言模型').getByText('First model')).toBeInTheDocument()
+  expect(section('大语言模型').getByText('Second model')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '删除 First model' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '删除 MyMemory 免费翻译' })).not.toBeInTheDocument()
 })
@@ -185,7 +185,7 @@ it('offers a saved custom model as the default translation model once its key is
   stores.models.setState({ credentials: { ...initialModels.credentials, 'cloud-model:custom-first': true } })
   render(<ModelsPage />)
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
-  const card = section('大语言模型（LLM）').getByText('First model').closest('[data-slot="card"]') as HTMLElement
+  const card = section('大语言模型').getByText('First model').closest('[data-slot="card"]') as HTMLElement
   expect(within(card).getByText('已安装')).toBeInTheDocument()
   expect(within(card).getByRole('button', { name: '设置为默认翻译模型' })).toBeEnabled()
 })

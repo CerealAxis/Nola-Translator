@@ -1,0 +1,5 @@
+/* Dismiss icons stay unfilled in every state, including independent renderer themes. */
+:is(button, [role='button']):has(> svg.lucide-x) {
+  background: none !important;
+  border-color: transparent !important;
+}

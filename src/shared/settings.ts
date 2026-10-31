@@ -107,8 +107,11 @@ export type NetworkSettings = {
 
 export type AppSettings = {
   version: 2
-  /** Presentation is profile-scoped, so upgrades do not repeat the first-run tour. */
+  /** Legacy invitation marker; V2 progress and explicit completion are stored separately. */
   onboardingSeen: boolean
+  onboardingVersion: number
+  onboardingStep: string
+  onboardingCompletedVersion: number
   theme: 'system' | 'light' | 'dark'
   uiLanguage: 'auto' | 'zh-CN' | 'zh-TW' | 'zh-HK' | 'ko' | 'ja' | 'en'
   modelStoragePath: string
@@ -318,6 +321,9 @@ export const TARGET_LANGUAGE_OPTIONS: readonly string[] = [NO_TRANSLATION_LANGUA
 
 export const DEFAULT_SETTINGS: AppSettings = {
   onboardingSeen: false,
+  onboardingVersion: 0,
+  onboardingStep: 'W0',
+  onboardingCompletedVersion: 0,
   compute: { ...DEFAULT_COMPUTE_SETTINGS },
   browserConnection: { enabled: true },
   synthesis: { modelId: '', voice: '' },

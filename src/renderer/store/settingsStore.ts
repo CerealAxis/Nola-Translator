@@ -36,6 +36,7 @@ export type SettingsCommand =
 export interface SettingsState {
   overlayMenuOpen: boolean
   overlayMenu: OverlayMenuPresentation | null
+  onboardingRequired: boolean
   onboardingActive: boolean
   onboardingWelcome: boolean
   onboardingRun: number
@@ -77,6 +78,7 @@ export interface SettingsState {
 const initialState: SettingsState = {
   overlayMenuOpen: false,
   overlayMenu: null,
+  onboardingRequired: false,
   onboardingActive: false,
   onboardingWelcome: false,
   onboardingRun: 0,
@@ -104,16 +106,18 @@ const initialState: SettingsState = {
 
 export const settingsStore = createStore<SettingsState>(initialState)
 
-/** Automatic presentation is attempted once per launch, even before its disk write settles. */
+/** Legacy users keep their dismissed invitation; V2 first runs resume until explicitly completed. */
 export function startOnboarding(mode: 'automatic' | 'welcome' | 'tour' = 'tour'): boolean {
   const state = settingsStore.getState()
   if (state.onboardingActive || !state.settings) return false
-  if (mode === 'automatic' && (state.settings.onboardingSeen || state.onboardingAutoAttempted)) return false
-  settingsStore.setState({ onboardingActive: true, onboardingWelcome: mode !== 'tour', onboardingRun: state.onboardingRun + 1, onboardingAutoAttempted: true })
+  const settings = state.settings
+  if (mode === 'automatic' && (state.onboardingAutoAttempted || settings.onboardingCompletedVersion >= 2 || (settings.onboardingSeen && settings.onboardingVersion !== 2))) return false
+  settingsStore.setState({ onboardingActive: true, onboardingRequired: mode === 'automatic', onboardingWelcome: mode !== 'tour' && (mode !== 'automatic' || settings.onboardingStep === 'W0'), onboardingRun: state.onboardingRun + 1, onboardingAutoAttempted: true })
   return true
 }
 
 export function stopOnboarding(): void {
+  if (settingsStore.getState().onboardingRequired) return
   settingsStore.setState({ onboardingActive: false, onboardingWelcome: false })
 }
 
@@ -121,8 +125,16 @@ export function beginOnboarding(): void {
   if (settingsStore.getState().onboardingActive) settingsStore.setState({ onboardingWelcome: false })
 }
 
-export async function markOnboardingSeen(): Promise<void> {
-  if (!settingsStore.getState().settings?.onboardingSeen) await updateSettings({ onboardingSeen: true })
+export async function saveOnboardingStep(step: string): Promise<void> {
+  const state = settingsStore.getState()
+  if (state.onboardingRequired && (state.settings?.onboardingVersion !== 2 || state.settings.onboardingStep !== step)) {
+    await updateSettings({ onboardingSeen: true, onboardingVersion: 2, onboardingStep: step })
+  }
+}
+
+export async function completeOnboarding(): Promise<void> {
+  if (settingsStore.getState().onboardingRequired) await updateSettings({ onboardingSeen: true, onboardingVersion: 2, onboardingStep: 'Z0', onboardingCompletedVersion: 2 })
+  settingsStore.setState({ onboardingActive: false, onboardingWelcome: false, onboardingRequired: false })
 }
 
 let audioTestGeneration = 0
@@ -370,6 +382,9 @@ export function mergeSettings(base: AppSettings, patch: AppSettingsPatch): AppSe
     ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
     ...(patch.uiLanguage !== undefined ? { uiLanguage: patch.uiLanguage } : {}),
     ...(patch.onboardingSeen !== undefined ? { onboardingSeen: patch.onboardingSeen } : {}),
+    ...(patch.onboardingVersion !== undefined ? { onboardingVersion: patch.onboardingVersion } : {}),
+    ...(patch.onboardingStep !== undefined ? { onboardingStep: patch.onboardingStep } : {}),
+    ...(patch.onboardingCompletedVersion !== undefined ? { onboardingCompletedVersion: patch.onboardingCompletedVersion } : {}),
     ...(patch.closeBehavior !== undefined ? { closeBehavior: patch.closeBehavior } : {}),
     ...(patch.modelPolicy ? { modelPolicy: mergeModelPolicy(base, patch.modelPolicy) } : {}),
     synthesis: { ...base.synthesis, ...patch.synthesis },

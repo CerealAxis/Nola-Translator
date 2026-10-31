@@ -48,10 +48,10 @@ it('selects a saved cloud profile with its connection and restores disabled tran
 })
 
 
-it('hides configured cloud services after they are disabled', () => {
+it('keeps configured cloud services available without local model enablement', () => {
   const settings = stores.settings.getState().settings!
   stores.settings.setState({ settings: { ...settings, modelPolicy: { enabled: {}, defaults: {}, selections: {} } } })
   render(<OverlayPage />)
-  expect(within(screen.getByRole('combobox', { name: '翻译模型' })).queryByRole('option', { name: 'Saved cloud translator' })).toBeNull()
-  expect(within(screen.getByRole('combobox', { name: '识别模型' })).getByRole('option', { name: '暂无可用模型' })).toBeDisabled()
+  expect(within(screen.getByRole('combobox', { name: '翻译模型' })).getByRole('option', { name: 'Saved cloud translator' })).toBeEnabled()
+  expect(within(screen.getByRole('combobox', { name: '识别模型' })).getByRole('option', { name: /阿里云/ })).toBeEnabled()
 })

@@ -47,7 +47,7 @@ it('shows a toast when a gateway settings write fails', async () => {
   render(<ModelGatewayPage />)
   await screen.findByText('启动模型')
   const user = userEvent.setup()
-  await user.click(screen.getByRole('combobox', { name: '选择语音识别' }))
+  await user.click(screen.getByRole('combobox', { name: '选择ASR模型' }))
   await user.click(await screen.findByRole('option', { name: '不启用' }))
   await waitFor(() => expect(notifyError).toHaveBeenCalled())
   expect(notifyError).toHaveBeenCalledWith('操作失败，请检查本地服务和日志后重试。', expect.objectContaining({ cause: expect.any(Error) }))
@@ -58,7 +58,7 @@ it('shows five unified model rows and resets keys after confirmation', async () 
   await screen.findByText('启动模型')
   const card = document.querySelector<HTMLElement>('[data-onboarding="gateway-capabilities"]')!
   expect(within(card).getAllByRole('combobox').slice(0, 5).map(element => element.getAttribute('aria-label')))
-    .toEqual(['选择语音识别', '选择文本翻译', '备用翻译', '选择语言模型', '选择语音合成'])
+    .toEqual(['选择ASR模型', '选择MT模型', '备用翻译', '选择大语言模型', '选择TTS模型'])
   expect(screen.queryByRole('switch', { name: '语音识别' })).not.toBeInTheDocument()
   expect(screen.queryByText('对外 API 模型映射')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '重置密钥' }))
@@ -75,9 +75,9 @@ it('shows usable protocol examples with stable model aliases and one API prefix'
   expect(mt).toContain('http://127.0.0.1:17860/v1/chat/completions')
   expect(mt).not.toContain('/v1/v1')
   expect(mt).toContain('"model":"nola-mt"')
-  fireEvent.click(screen.getByRole('tab', { name: '语言模型' }))
+  fireEvent.click(screen.getByRole('tab', { name: '大语言模型' }))
   expect(screen.getByText(/"model":"nola-llm"/)).toHaveTextContent('"stream":true')
-  fireEvent.click(screen.getByRole('tab', { name: '语音合成' }))
+  fireEvent.click(screen.getByRole('tab', { name: 'TTS模型' }))
   expect(screen.getByText(/response_format/)).toHaveTextContent('"response_format":"wav"')
   fireEvent.click(screen.getByRole('tab', { name: '实时语音识别' }))
   const realtime = screen.getByText(/import WebSocket/).textContent!
@@ -90,15 +90,15 @@ it('selects an enabled loadable local model without changing business defaults',
   render(<ModelGatewayPage />)
   await screen.findByText('启动模型')
   const localCard = document.querySelector<HTMLElement>('[data-onboarding="gateway-capabilities"]')!
-  await userEvent.setup().click(within(localCard).getByRole('combobox', { name: '选择语音识别' }))
+  await userEvent.setup().click(within(localCard).getByRole('combobox', { name: '选择ASR模型' }))
   expect(await screen.findByRole('option', { name: 'Enabled local recognizer' })).toBeInTheDocument()
   expect(screen.queryByRole('option', { name: 'MyMemory 免费翻译' })).not.toBeInTheDocument()
   await userEvent.setup().click(screen.getByRole('option', { name: 'Enabled local recognizer' }))
-  await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { asrModel: 'resource:test-recognizer', asr: true } }))
+  await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { asrModel: 'resource:test-recognizer', asr: true }, modelPolicy: { enabled: { 'asr:resource:test-recognizer': true }, defaults: {}, selections: {} } }))
 })
 
 it.each([
-  ['语音识别', 'asr'], ['文本翻译', 'mt'], ['语言模型', 'llm'], ['语音合成', 'tts'],
+  ['ASR模型', 'asr'], ['MT模型', 'mt'], ['大语言模型', 'llm'], ['TTS模型', 'tts'],
 ] as const)('disables %s and clears its gateway binding', async (label, kind) => {
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue(undefined)
   render(<ModelGatewayPage />)
@@ -112,10 +112,10 @@ it('offers available cloud translations and persists the primary gateway binding
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue(undefined)
   render(<ModelGatewayPage />)
   const user = userEvent.setup()
-  await user.click(await screen.findByRole('combobox', { name: '选择文本翻译' }))
+  await user.click(await screen.findByRole('combobox', { name: '选择MT模型' }))
   await user.click(await screen.findByRole('option', { name: 'MyMemory 免费翻译' }))
-  await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { mtModel: 'cloud:mymemory', mt: true } }))
-  expect(update).not.toHaveBeenCalledWith(expect.objectContaining({ translation: expect.anything(), modelPolicy: expect.anything() }))
+  await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { mtModel: 'cloud:mymemory', mt: true }, modelPolicy: { enabled: { 'mt:cloud:mymemory': true }, defaults: {}, selections: {} } }))
+  expect(update.mock.calls[0][0]).not.toHaveProperty('translation')
 })
 
 it('controls external API access separately from internal capability flags', async () => {
@@ -148,9 +148,9 @@ it('binds a custom LLM without changing the translation default', async () => {
   render(<ModelGatewayPage />)
   await screen.findByText('启动模型')
   const user = userEvent.setup()
-  await user.click(screen.getByRole('combobox', { name: '选择语言模型' }))
+  await user.click(screen.getByRole('combobox', { name: '选择大语言模型' }))
   await user.click(await screen.findByRole('option', { name: 'Chat profile' }))
-  await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { llmModel: 'custom:chat', llm: true } }))
+  await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { llmModel: 'custom:chat', llm: true }, modelPolicy: { enabled: { 'llm:custom:chat': true }, defaults: {}, selections: {} } }))
   expect(update).not.toHaveBeenCalledWith(expect.objectContaining({ translation: expect.anything() }))
 })
 
@@ -175,7 +175,7 @@ it('offers unloaded local loading candidates but excludes unconfigured models', 
     { ...asrResource, resourceId: 'unconfigured', name: 'Unconfigured local', configuration: undefined }] })
   render(<ModelGatewayPage />)
   const user = userEvent.setup()
-  await user.click(await screen.findByRole('combobox', { name: '选择语音识别' }))
+  await user.click(await screen.findByRole('combobox', { name: '选择ASR模型' }))
   expect(await screen.findByRole('option', { name: 'Unloaded local' })).toBeInTheDocument()
   expect(screen.queryByRole('option', { name: 'Unconfigured local' })).not.toBeInTheDocument()
 })
@@ -191,9 +191,9 @@ it('starts and stops the service from the page', async () => {
 
 
 it.each([
-  ['mt', '文本翻译', 'hy-mt2-1.8b-q4-k-m', 'hymt2', 'translationModel'],
-  ['llm', '语言模型', 'qwen35-0.8b-q4-k-m', 'llama.cpp', 'translationModel'],
-  ['tts', '语音合成', 'voice', 'transformers-tts', 'ttsModel'],
+  ['mt', 'MT模型', 'hy-mt2-1.8b-q4-k-m', 'hymt2', 'translationModel'],
+  ['llm', '大语言模型', 'qwen35-0.8b-q4-k-m', 'llama.cpp', 'translationModel'],
+  ['tts', 'TTS模型', 'voice', 'transformers-tts', 'ttsModel'],
 ] as const)('binds a loadable local %s model and enables the capability', async (kind, label, id, provider, resourceKind) => {
   const settings = store.stores.settings.getState().settings!
   store.stores.settings.setState({ settings: { ...settings, modelPolicy: { ...settings.modelPolicy!, enabled: {
@@ -205,5 +205,5 @@ it.each([
   const user = userEvent.setup()
   await user.click(await screen.findByRole('combobox', { name: `选择${label}` }))
   await user.click(await screen.findByRole('option', { name: 'Local candidate' }))
-  await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { [`${kind}Model`]: `resource:${id}`, [kind]: true } }))
+  await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { [`${kind}Model`]: `resource:${id}`, [kind]: true }, modelPolicy: { enabled: { [`${kind}:resource:${id}`]: true }, defaults: {}, selections: {} } }))
 })

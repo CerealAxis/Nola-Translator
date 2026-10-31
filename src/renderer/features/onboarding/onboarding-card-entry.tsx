@@ -1,16 +1,13 @@
 import './onboarding-card-entry.css'
-import { StrictMode, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { StrictMode, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { I18nProvider, useI18n } from '@/i18n'
 import { createIpcBridge } from '@/bridge/ipc/ipcBridge'
 import { getBridge, initStores } from '@/store'
-import { Button } from '@/components/ui/button'
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress } from '@base-ui/react/progress'
-import { Spinner } from '@/components/ui/spinner'
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, MousePointer2, X } from 'lucide-react'
-import { TOUR_CHAPTERS, TOUR_STEPS } from './tourSteps'
+import { Card } from '@/components/ui/card'
+import { TOUR_STEPS } from './tourSteps'
+import { TourLesson } from './TourLesson'
 import { placeTourCard } from './tourLayout'
 import type { TourRect, TourSize } from './tourLayout'
 import type { OnboardingCardActionType, OnboardingCardPlacement, OnboardingCardState } from '../../../shared/onboarding-card'
@@ -70,7 +67,7 @@ function placeInUsable(target: TourRect | null, card: TourSize, usable: Onboardi
 function OnboardingCardWindow(): ReactNode {
   const { t } = useI18n()
   const state = useSyncExternalStore(subscribeState, () => cardState)
-  const [tip, setTip] = useState<{ x: number; y: number; maxHeight?: number } | null>(null)
+  const [tip, setTip] = useState<{ x: number; y: number; maxHeight?: number; maxWidth?: number } | null>(null)
   const cardRef = useRef<HTMLDivElement>(null)
   const api = getBridge()?.onboardingCard
 
@@ -85,20 +82,14 @@ function OnboardingCardWindow(): ReactNode {
       const spotlight: TourRect | null = state.spotlight
         ? { x: state.spotlight.x + state.mainOffset.x, y: state.spotlight.y + state.mainOffset.y, width: state.spotlight.width, height: state.spotlight.height }
         : null
-      const topInset = state.topInset + state.mainOffset.y
-      const sideRoom = spotlight
-        ? Math.max(spotlight.x - state.usable.x - gap * 2, state.usable.x + state.usable.width - spotlight.x - spotlight.width - gap * 2)
-        : state.usable.width
-      const verticalRoom = spotlight
-        ? Math.max(spotlight.y - Math.max(state.usable.y, topInset) - gap * 2, state.usable.y + state.usable.height - spotlight.y - spotlight.height - gap * 2)
-        : state.usable.height
-      const maxHeight = !state.away && spotlight && sideRoom < card.width && verticalRoom > space * 8 ? verticalRoom : undefined
+      // The physical work area bounds the card; the spotlight must never squeeze its contents.
+      const topInset = state.usable.y
+      const maxHeight = state.usable.height - gap * 2
       const size = { width: card.width, height: Math.min(card.height, maxHeight ?? card.height) }
-      const position = state.away
-        ? { x: state.usable.x + (state.usable.width - card.width) / 2, y: state.usable.y + (state.usable.height - card.height) / 2 }
-        : placeInUsable(spotlight, size, state.usable, gap, topInset)
-      const next = { ...position, maxHeight }
-      setTip(previous => previous && previous.x === next.x && previous.y === next.y && previous.maxHeight === next.maxHeight ? previous : next)
+      const position = placeInUsable(spotlight, size, state.usable, gap, topInset)
+      const maxWidth = state.usable.width - gap * 2
+      const next = { ...position, maxHeight, maxWidth }
+      setTip(previous => previous && previous.x === next.x && previous.y === next.y && previous.maxHeight === next.maxHeight && previous.maxWidth === next.maxWidth ? previous : next)
       api?.sendRect({ x: position.x, y: position.y, width: card.width, height: card.height })
     }
     measure()
@@ -107,59 +98,26 @@ function OnboardingCardWindow(): ReactNode {
     return () => resize.disconnect()
   }, [state, api])
 
-  useEffect(() => {
-    if (!api) return
-    // This window only sees the mouse while interactive; a move outside the card restores pass-through.
-    const move = (event: MouseEvent) => {
-      const card = cardRef.current?.getBoundingClientRect()
-      if (!card) return
-      const inside = event.clientX >= card.left && event.clientX <= card.right && event.clientY >= card.top && event.clientY <= card.bottom
-      if (!inside) api.sendHit(false)
-    }
-    window.addEventListener('mousemove', move)
-    return () => window.removeEventListener('mousemove', move)
-  }, [api])
 
   if (!state) return null
   const step = TOUR_STEPS.find(item => item.id === state.step)
-  const send = (action: OnboardingCardActionType) => () => api?.sendAction(action)
+  const send = (action: OnboardingCardActionType) => () => api?.sendAction({ step: state.step, action })
   return <div className="onboarding-card-window" data-main-offset={`${state.mainOffset.x},${state.mainOffset.y}`}>
     <Card size="sm" ref={cardRef} tabIndex={-1} role="dialog" aria-modal="false" aria-labelledby="onboarding-heading" aria-describedby="onboarding-body"
       className={['onboarding-tour__card', state.compact && 'onboarding-tour__card--compact'].filter(Boolean).join(' ')}
+      data-step={state.step}
       data-ready={tip !== null}
-      style={tip ? { left: tip.x, top: tip.y, maxHeight: tip.maxHeight } : undefined}>
-      <CardHeader>
-        <CardTitle id="onboarding-heading">{step ? t(step.title) : t('onboarding.title')}</CardTitle>
-        <CardDescription id="onboarding-body">{state.away ? t('onboarding.paused') : step ? t(step.body) : null}</CardDescription>
-        <CardAction><Button variant="tertiary" size="icon" className="onboarding-tour__close border-transparent bg-transparent hover:bg-transparent aria-expanded:bg-transparent" aria-label={t('onboarding.exit')} onClick={send('exit')}><X aria-hidden="true" /></Button></CardAction>
-      </CardHeader>
-      <CardContent key={state.step} className="onboarding-tour__lesson">
-        <ol className="onboarding-tour__chapters" aria-label={t('onboarding.title')}>
-          {TOUR_CHAPTERS.map((key, item) => <li key={key} aria-current={item === state.chapter ? 'step' : undefined} data-state={item < state.chapter ? 'complete' : item === state.chapter ? 'current' : 'upcoming'}>
-            <span aria-hidden="true">{item < state.chapter ? <Check /> : item + 1}</span><span>{t(key)}</span>
-          </li>)}
-        </ol>
-        <Progress.Root className="onboarding-tour__meter" aria-label={t('onboarding.title')} value={(state.index / state.total) * 100}>
-          <Progress.Track className="onboarding-tour__meter-track"><Progress.Indicator className="onboarding-tour__meter-fill" /></Progress.Track>
-        </Progress.Root>
-        {!state.away && state.missing ? <p className="onboarding-tour__status" role="status">{state.unavailable ? t('onboarding.targetMissing') : <><Spinner />{t('onboarding.loading')}</>}</p> : null}
-        {!state.away && !state.missing && step?.action ? <p className="onboarding-tour__instruction"><MousePointer2 aria-hidden="true" />{t('onboarding.actHint')}</p> : null}
-        {state.feedback ? <div className="onboarding-tour__feedback" role="status" aria-live="polite"><CheckCircle2 aria-hidden="true" />{t('onboarding.feedback')}</div> : null}
-      </CardContent>
-      <CardFooter className="onboarding-tour__footer">
-        <div className="onboarding-tour__navigation">
-          <span className="onboarding-tour__progress">{t('onboarding.chapterProgress', { current: state.chapter + 1, total: state.chapters })}<span>{t('onboarding.progress', { current: state.chapterIndex, total: state.chapterSteps })}</span></span>
-          <div className="onboarding-tour__actions">
-            <Button variant="secondary" size="sm" disabled={state.index === 0} onClick={send('back')}><ArrowLeft aria-hidden="true" />{t('onboarding.back')}</Button>
-            {state.away || (state.missing && state.unavailable) ? <Button variant="default" size="sm" onClick={send(state.away ? 'resume' : 'retry')}>{t(state.away ? 'onboarding.resume' : 'onboarding.retry')}</Button>
-              : step && !step.action ? <Button variant="default" size="sm" onClick={send('next')}>{t('onboarding.next')}<ArrowRight aria-hidden="true" /></Button> : null}
-          </div>
-        </div>
-        <div className="onboarding-tour__secondary">
-          <Button variant="tertiary" size="sm" onClick={send('skip-step')}>{t('onboarding.skipStep')}</Button>
-          <Button variant="tertiary" size="sm" onClick={send('skip-chapter')}>{t('onboarding.skipChapter')}</Button>
-        </div>
-      </CardFooter>
+      style={tip ? { left: tip.x, top: tip.y, maxHeight: tip.maxHeight, maxWidth: tip.maxWidth } : undefined}>
+      <TourLesson
+        title={step ? t(step.title) : t('onboarding.title')}
+        description={state.unavailable ? t('onboarding.targetMissing') : step ? t(step.body) : ''}
+        progress={t('onboarding.progress', { current: state.index + 1, total: state.total })}
+        nextLabel={t(state.unavailable ? 'onboarding.retry' : state.index === state.total - 1 ? 'onboarding.finishAction' : 'onboarding.next')}
+        busy={state.busy}
+        onNext={send('next')}
+        exitLabel={!state.required ? t('onboarding.exit') : undefined}
+        onExit={send('exit')}
+      />
     </Card>
   </div>
 }

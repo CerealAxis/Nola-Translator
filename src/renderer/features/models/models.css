@@ -21,12 +21,12 @@
 .model-configuration-dialog .settings-row { border-bottom:0; padding-block:0; min-height:0; }
 .model-configuration-dialog .model-configuration-dialog__language { grid-template-columns:minmax(0,1fr); align-items:stretch; gap:var(--space-1); padding-block:0; }
 .model-configuration-dialog__language .settings-row__control { display:block; }
-.models-source-dialog.modal__dialog { max-width:calc(var(--space-8) * 5); gap:var(--space-2); padding-block-start:var(--space-3); padding-inline:var(--space-3); border:1px solid var(--border); border-radius:var(--radius-xl); }
+.models-source-dialog.modal__dialog { width:min(calc(100vw - var(--space-4)), calc(var(--space-8) * 8)); max-width:calc(var(--space-8) * 8); gap:var(--space-2); padding-block-start:var(--space-3); padding-inline:var(--space-3); border:1px solid var(--border); border-radius:var(--radius-xl); }
 .models-source-dialog .modal__header + .modal__body { margin-top:0; }
 .models-source-dialog__header { gap:var(--space-1); padding-inline-end:var(--space-6); }
 .models-source-dialog__model { margin:0; font:var(--font-body); color:var(--muted); overflow-wrap:anywhere; }
 .models-source-dialog__body .models-family-dialog__sources { width:100%; }
-.models-source-dialog__body .models-family-dialog__sources .tabs__tab { flex:1; justify-content:center; min-width:0; }
+.models-source-dialog__body .models-family-dialog__sources .tabs__tab { flex:1; justify-content:center; min-width:max-content; }
 .models-overview { padding:20px; border-radius:16px; background:linear-gradient(120deg,var(--accent-soft),color-mix(in oklch,var(--surface) 65%,var(--accent-soft))); }
 .models-overview__heading { display:flex; align-items:center; gap:18px; margin-bottom:20px; }
 .models-overview__actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:var(--space-1); margin-inline-start:auto; }

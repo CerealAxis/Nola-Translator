@@ -22,6 +22,10 @@ export function placeTourCard(target: TourRect | null, card: TourSize, viewport:
     clamp(target.x - card.width - gap, target.y),
     clamp(target.x + target.width - card.width, target.y + target.height + gap),
     clamp(target.x, target.y - card.height - gap),
+    clamp(target.x - card.width - gap, target.y - card.height - gap),
+    clamp(target.x + target.width + gap, target.y - card.height - gap),
+    clamp(target.x - card.width - gap, target.y + target.height + gap),
+    clamp(target.x + target.width + gap, target.y + target.height + gap),
   ]
   const overlap = (position: { x: number; y: number }) =>
     Math.max(0, Math.min(position.x + card.width, target.x + target.width) - Math.max(position.x, target.x))

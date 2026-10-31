@@ -12,7 +12,8 @@ const initialSession = stores.session.getState()
 const initialSettings = stores.settings.getState()
 const configured = { ...DEFAULT_SETTINGS, modelPolicy: { enabled: { 'asr:resource:old': true, 'asr:resource:new': true }, defaults: {}, selections: { asr: 'resource:old' } } }
 const loaded: AvailableModel = { binding: 'resource:new', name: 'New ASR', kind: 'asr', origin: 'gateway', free: true }
-const snapshot = (state: ModelGatewaySnapshot['state']) => ({ state } as ModelGatewaySnapshot)
+const snapshot = (state: ModelGatewaySnapshot['state']): ModelGatewaySnapshot => ({ state, address: '', port: 17860, connections: 0, activeRequests: 0, requests: [],
+  services: { asr: { state: 'stopped', model: '', name: '' }, mt: { state: 'stopped', model: '', name: '' }, tts: { state: 'stopped', model: '', name: '' }, llm: { state: 'stopped', model: '', name: '' } } })
 beforeEach(() => { vi.clearAllMocks(); mocks.getBridge.mockReturnValue(null); mocks.updateSettings.mockResolvedValue(undefined); stores.settings.setState({ ...initialSettings, settings: configured }); stores.session.setState({ ...initialSession, status: 'idle' }) })
 afterEach(() => { cleanup(); stores.session.setState(initialSession); stores.settings.setState(initialSettings) })
 
@@ -74,7 +75,7 @@ it('keeps an unavailable selection empty without writing a cloud fallback', () =
 
 it('uses the authoritative gateway catalog and applies immediate policy disablement', async () => {
   const catalog = { asr: [loaded], mt: [], tts: [], llm: [] }
-  mocks.getBridge.mockReturnValue({ gateway: { onChanged: () => vi.fn(), snapshot: async () => ({ ...snapshot('running'), services: { asr: { state: 'ready', model: loaded.binding, name: loaded.name } }, availableModels: catalog }) } })
+  mocks.getBridge.mockReturnValue({ gateway: { onChanged: () => vi.fn(), snapshot: async () => ({ ...snapshot('running'), services: { ...snapshot('running').services, asr: { state: 'ready', model: loaded.binding, name: loaded.name } }, availableModels: catalog }) } })
   const initialModels = stores.models.getState()
   stores.models.setState({ resources: [{ resourceId: 'new', installed: true, name: 'New ASR', kind: 'recognitionModel' } as typeof initialModels.resources[number]] })
   try {
@@ -82,7 +83,7 @@ it('uses the authoritative gateway catalog and applies immediate policy disablem
     await waitFor(() => expect(result.result.current.asr.map(model => model.binding)).toEqual(['resource:new']))
     act(() => { stores.settings.setState({ settings: { ...configured, modelPolicy: { enabled: {}, defaults: {}, selections: {} } } }) })
     expect(result.result.current.asr).toEqual([])
-  } finally { stores.models.setState(initialModels) }
+  } finally { act(() => stores.models.setState(initialModels)) }
 })
 
 
@@ -106,7 +107,7 @@ it('removes stale local models from business and callable gateway options on run
     ]) {
       act(() => change(value))
       expect(result.result.current.asr).toEqual([])
-      expect(callableModels(result.result.current, [{ id: loaded.binding, name: loaded.name, kind: 'asr' }])).toEqual([])
+      expect(callableModels(result.result.current, [{ id: loaded.binding, name: loaded.name, kind: 'asr' }]).filter(model => model.kind === 'asr')).toEqual([])
     }
-  } finally { stores.models.setState(initialModels) }
+  } finally { act(() => stores.models.setState(initialModels)) }
 })

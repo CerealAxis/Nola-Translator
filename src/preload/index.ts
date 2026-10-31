@@ -123,9 +123,9 @@ const api: NolaTranslatorApi = {
       ipcRenderer.on('onboarding-card:placement', listener)
       return () => ipcRenderer.off('onboarding-card:placement', listener)
     },
-    sendAction: (action: import('../shared/onboarding-card').OnboardingCardActionType) => ipcRenderer.send('onboarding-card:action', action),
-    onAction: (callback: (action: import('../shared/onboarding-card').OnboardingCardActionType) => void) => {
-      const listener = (_event: Electron.IpcRendererEvent, value: import('../shared/onboarding-card').OnboardingCardActionType) => callback(value)
+    sendAction: (action: import('../shared/onboarding-card').OnboardingCardAction) => ipcRenderer.send('onboarding-card:action', action),
+    onAction: (callback: (action: import('../shared/onboarding-card').OnboardingCardAction) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: import('../shared/onboarding-card').OnboardingCardAction) => callback(value)
       ipcRenderer.on('onboarding-tour:action', listener)
       return () => ipcRenderer.off('onboarding-tour:action', listener)
     },

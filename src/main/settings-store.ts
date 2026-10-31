@@ -237,6 +237,9 @@ export class SettingsStore {
         ...raw,
         version: 2,
         onboardingSeen: raw.onboardingSeen === true,
+        onboardingVersion: settingsPatchSchema.safeParse({ onboardingVersion: raw.onboardingVersion }).data?.onboardingVersion ?? 0,
+        onboardingStep: settingsPatchSchema.safeParse({ onboardingStep: raw.onboardingStep }).data?.onboardingStep ?? 'W0',
+        onboardingCompletedVersion: settingsPatchSchema.safeParse({ onboardingCompletedVersion: raw.onboardingCompletedVersion }).data?.onboardingCompletedVersion ?? 0,
         modelPolicy: raw.modelPolicy === undefined ? undefined : (modelPolicySchema.safeParse(raw.modelPolicy).data ?? { enabled: {}, defaults: {}, selections: {} }),
         closeBehavior: raw.closeBehavior === 'quit' ? 'quit' : 'tray',
         synthesis: {

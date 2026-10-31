@@ -5,6 +5,7 @@
 @layer theme, base, components, utilities;
 @import 'tailwindcss' source(none);
 @source './onboarding-card-entry.tsx';
+@source './TourLesson.tsx';
 @source '../../components/ui/button.tsx';
 @source '../../components/ui/card.tsx';
 @source '../../components/ui/spinner.tsx';
@@ -29,3 +30,5 @@ body,
   inset: 0;
   pointer-events: none;
 }
+
+.onboarding-card-window .onboarding-tour__card { transition: none; }

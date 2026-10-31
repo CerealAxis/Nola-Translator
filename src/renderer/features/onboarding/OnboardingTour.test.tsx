@@ -1,30 +1,41 @@
 import { StrictMode, useState } from 'react'
-import { Button } from '@/components/ui/button'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
+import { createIpcBridge } from '@/bridge/ipc/ipcBridge'
 import { sessionStore } from '@/store/sessionStore'
-import { detachSettingsStore, settingsStore, startOnboarding } from '@/store/settingsStore'
-import * as settingsActions from '@/store/settingsStore'
+import { attachSettingsStore, detachSettingsStore, mergeSettings, settingsStore, startOnboarding } from '@/store/settingsStore'
+import * as appStore from '@/store'
 import { useRoute } from '@/routes'
 import { OnboardingTour } from './OnboardingTour'
+import { TOUR_STEPS } from './tourSteps'
+import type { OnboardingCardAction } from '../../../shared/onboarding-card'
 
+let saved = structuredClone(DEFAULT_SETTINGS)
+let rejectWrite = false
+const harmfulAction = vi.fn()
 beforeEach(() => {
   window.location.hash = '#/'
-  settingsStore.setState({ settings: structuredClone(DEFAULT_SETTINGS), loaded: true, runtimeBusy: false, browser: null, captionService: 'idle' })
+  saved = structuredClone(DEFAULT_SETTINGS)
+  rejectWrite = false
+  harmfulAction.mockClear()
+  const bridge = createIpcBridge()
+  vi.spyOn(bridge.settings, 'update').mockImplementation(async patch => {
+    if (rejectWrite) throw new Error('disk unavailable')
+    saved = mergeSettings(saved, patch)
+    return saved
+  })
+  attachSettingsStore(bridge, false)
+  settingsStore.setState({ settings: saved, loaded: true, runtimeBusy: false, browser: null, captionService: 'idle' })
+  appStore.stores.models.setState({ loaded: true, loading: false, error: null })
   sessionStore.setState({ status: 'idle', engineStatus: 'ready' })
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} unobserve() {} })
-  vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, media: '', onchange: null, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() })))
+  vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
     const width = this.classList.contains('onboarding-tour__card') ? 400 : 180
     return { x: 80, y: 100, left: 80, top: 100, right: 80 + width, bottom: 280, width, height: 180, toJSON: () => ({}) }
   })
-  HTMLElement.prototype.scrollIntoView = vi.fn()
-  vi.spyOn(settingsActions, 'markOnboardingSeen').mockImplementation(async () => {
-    settingsStore.setState({ settings: { ...DEFAULT_SETTINGS, onboardingSeen: true } })
-  })
 })
-
 afterEach(() => {
   cleanup()
   detachSettingsStore()
@@ -34,172 +45,113 @@ afterEach(() => {
 })
 
 function TutorialApp() {
-  const { navigate } = useRoute()
-  const [model, setModel] = useState<string | null>(null)
+  const { path, navigate } = useRoute()
+  const [detail, setDetail] = useState<string | null>(null)
+  const [list, setList] = useState(false)
+  const targets = [...new Set(TOUR_STEPS.filter(step => step.path === path && !step.scene).map(step => step.target.match(/"(.+)"/)![1]))]
   return <div className="nola-app-shell">
     <div className="nola-app-body" />
-    {Object.entries({ models: '#/models', workspace: '#/workspace', 'video-captions': '#/video-captions', 'model-gateway': '#/model-gateway' }).map(([id, path]) =>
-      <Button key={id} data-onboarding={`nav-${id}`} onClick={() => navigate(path)}>{id}</Button>)}
-    {/* The workbench opens a separate window, so its sidebar entry never navigates the main window. */}
-    <Button data-onboarding="nav-workbench">workbench</Button>
-    <Button data-onboarding="models-runtime-setup" onClick={() => navigate('#/settings/compute?component=engine')}>runtime-setup</Button>
-    <div data-onboarding="models-active" />
-    <div data-onboarding="models-tabs" />
-    <div id="runtime-engines-section" />
-    <Button data-onboarding="model-family-recognitionModel" onClick={() => setModel('recognitionModel')}>recognition-details</Button>
-    {model ? <div data-onboarding="model-detail" data-model-kind={model}>
-      <Button data-onboarding="model-detail-close" onClick={() => setModel(null)}>close-details</Button>
+    {targets.map(target => <div key={target} data-onboarding={target}>
+      {target === 'home-models' ? <button onClick={() => navigate('#/models')}>manage</button> : null}
+      {target === 'models-translation-catalog' ? <button data-onboarding="model-family-hymt2" onClick={() => setDetail('hymt2')}>configure translation</button> : null}
+      {target === 'models-recognition-catalog' ? <button data-onboarding="model-family-sensevoice" onClick={() => setDetail('sensevoice')}>configure recognition</button> : null}
+      <button onClick={harmfulAction}>start service</button>
+    </div>)}
+    {detail ? <div data-onboarding="model-detail" data-model-family={detail}>
+      <button data-onboarding="model-detail-close" onClick={() => { setList(false); setDetail(null) }}>close</button>
+      <section data-onboarding="model-engine">engine</section>
+      <section data-onboarding="model-scale">scale</section>
+      <section data-onboarding="model-version"><button aria-haspopup="listbox" aria-expanded={list} onClick={() => setList(value => !value)}>files</button></section>
+      {list ? <div data-onboarding="model-file-options" onKeyDown={event => { if (event.key === 'Escape') setList(false) }}>recommended file</div> : null}
+      <section data-onboarding="model-sources">sources</section>
+      <section data-onboarding="model-download-actions"><button onClick={harmfulAction}>download</button></section>
     </div> : null}
-    <div data-onboarding="quick-settings" />
-    <Button data-onboarding="open-overlay">open-overlay</Button>
-    <div data-onboarding="caption-preview" />
-    <div className="nola-video-service" />
-    <div data-onboarding="gateway-service" />
-    <div data-onboarding="gateway-capabilities" />
   </div>
 }
-
-function fixture() {
-  return render(<StrictMode><TutorialApp /><OnboardingTour /></StrictMode>)
-}
-
+function fixture() { return render(<StrictMode><TutorialApp /><OnboardingTour /></StrictMode>) }
 async function expectStep(id: string) {
-  await waitFor(() => expect(document.querySelector('.onboarding-tour')).toHaveAttribute('data-step', id))
-  await waitFor(() => expect(document.querySelector('.onboarding-tour__card')).toHaveAttribute('data-ready', 'true'))
+  await waitFor(() => {
+    expect(document.querySelector('.onboarding-tour')).toHaveAttribute('data-step', id)
+    expect(document.querySelector('.onboarding-tour')).toHaveAttribute('data-busy', 'false')
+  })
 }
-
 async function start() {
   fixture()
-  fireEvent.click(await screen.findByRole('button', { name: '开始指引' }))
-  await expectStep('models')
+  fireEvent.click(await screen.findByRole('button', { name: '开始了解' }))
+  await expectStep('H1')
 }
+async function next() { fireEvent.click(screen.getByRole('button', { name: /下一步|完成|重新定位/ })) }
 
-async function skipSection() {
-  fireEvent.click(screen.getByRole('button', { name: '跳过本节' }))
-  await waitFor(() => expect(document.querySelector('.onboarding-tour__card[data-ready="true"], [data-onboarding="complete"]')).toBeInTheDocument())
-}
-
-it('preserves the original welcome content, starts at home, and saves the invitation once', async () => {
-  window.location.hash = '#/settings/more'
-  fixture()
-  expect(await screen.findByRole('dialog', { name: 'Nola Translator 新手指引' })).toBeInTheDocument()
-  expect(window.location.hash).toBe('#/')
-  expect(screen.getByText(/给本项目点一个 Star/)).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: '帮助文档' })).toHaveAttribute('href', 'https://nola.xaviermc.top')
-  expect(screen.getByRole('link', { name: 'GitHub' })).toHaveAttribute('href', 'https://github.com/CerealAxis/Nola-Translator')
-  expect(settingsActions.markOnboardingSeen).toHaveBeenCalledTimes(1)
-  fireEvent.click(screen.getByRole('button', { name: '稍后再看' }))
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  act(() => { startOnboarding('welcome') })
-  expect(await screen.findByRole('dialog', { name: 'Nola Translator 新手指引' })).toBeInTheDocument()
-  expect(settingsActions.markOnboardingSeen).toHaveBeenCalledTimes(1)
-})
-
-it('walks the region-first tour, opening and closing the model dialog', async () => {
+it('requires first-run viewing and shows only a title, description, count and Next', async () => {
   await start()
-  expect(document.querySelector('.nola-app-shell')).not.toHaveAttribute('inert')
-  fireEvent.click(screen.getByRole('button', { name: 'models' }))
-  await expectStep('runtime-setup')
-  fireEvent.click(screen.getByRole('button', { name: 'runtime-setup' }))
-  await expectStep('runtime-engines')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('runtime-return')
-  fireEvent.click(screen.getByRole('button', { name: 'models' }))
-  await expectStep('models-active')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('models-tabs')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('recognition-model')
-  fireEvent.click(screen.getByRole('button', { name: 'recognition-details' }))
-  await expectStep('models-detail')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('quick-nav')
-  expect(document.querySelector('[data-onboarding="model-detail"]')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'workspace' }))
-  await expectStep('quick')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('overlay')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('browser-nav')
-  fireEvent.click(screen.getByRole('button', { name: 'video-captions' }))
-  await expectStep('browser')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('workbench')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('gateway-nav')
-  fireEvent.click(screen.getByRole('button', { name: 'model-gateway' }))
-  await expectStep('gateway-service')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('gateway-capabilities')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  const completion = await screen.findByRole('dialog', { name: '恭喜你完成新手指引' })
-  expect(completion).toHaveAttribute('data-slot', 'dialog-content')
-  expect(document.querySelector('.onboarding-tour__card')).not.toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'GitHub 主页' })).toHaveAttribute('href', 'https://github.com/CerealAxis/Nola-Translator')
-  fireEvent.click(screen.getByRole('button', { name: '退出' }))
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-})
-
-it('supports Back, including returning from the model dialog to its opener', async () => {
-  await start()
-  fireEvent.click(screen.getByRole('button', { name: 'models' }))
-  await expectStep('runtime-setup')
-  fireEvent.click(screen.getByRole('button', { name: '上一步' }))
-  await expectStep('models')
-  fireEvent.click(screen.getByRole('button', { name: 'models' }))
-  await expectStep('runtime-setup')
-  fireEvent.click(screen.getByRole('button', { name: 'runtime-setup' }))
-  await expectStep('runtime-engines')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('runtime-return')
-  fireEvent.click(screen.getByRole('button', { name: 'models' }))
-  await expectStep('models-active')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('models-tabs')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('recognition-model')
-  fireEvent.click(screen.getByRole('button', { name: 'recognition-details' }))
-  await expectStep('models-detail')
-  fireEvent.click(screen.getByRole('button', { name: '上一步' }))
-  await expectStep('recognition-model')
-  expect(document.querySelector('[data-onboarding="model-detail"]')).not.toBeInTheDocument()
-})
-
-it('introduces the overlay entry without opening a window', async () => {
-  await start()
-  await skipSection()
-  await skipSection()
-  await expectStep('quick-nav')
-  fireEvent.click(screen.getByRole('button', { name: 'workspace' }))
-  await expectStep('quick')
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('overlay')
-  const open = vi.fn()
-  screen.getByRole('button', { name: 'open-overlay' }).addEventListener('click', open)
-  fireEvent.click(screen.getByRole('button', { name: '下一步' }))
-  await expectStep('browser-nav')
-  expect(open).not.toHaveBeenCalled()
-  expect(window.location.hash).toBe('#/workspace')
-})
-
-it('pauses for exploration, returns on request, and exits with Escape', async () => {
-  await start()
-  act(() => { window.location.hash = '#/records'; window.dispatchEvent(new HashChangeEvent('hashchange')) })
-  expect(await screen.findByText('指引已暂停，你可以自由探索。')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: '回到当前步骤' }))
-  await waitFor(() => expect(window.location.hash).toBe('#/'))
+  expect(screen.queryByRole('button', { name: /上一步|退出/ })).not.toBeInTheDocument()
+  expect(document.querySelector('.onboarding-tour__chapters, .onboarding-tour__meter')).toBeNull()
+  expect(document.querySelector('.onboarding-tour__progress')).toHaveTextContent(`1 / ${TOUR_STEPS.length}`)
   fireEvent.keyDown(document, { key: 'Escape' })
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  expect(settingsStore.getState().settings?.onboardingSeen).toBe(true)
+  expect(document.querySelector('.onboarding-tour')).toBeInTheDocument()
 })
 
-it('does not interrupt a running desktop or browser service', async () => {
-  sessionStore.setState({ status: 'running' })
-  const app = fixture()
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  app.unmount()
-  sessionStore.setState({ status: 'idle' })
-  settingsStore.setState({ captionService: 'loading' })
+it('demonstrates every scene with Next alone without downloads, recording or service starts', async () => {
+  await start()
+  for (const step of TOUR_STEPS) {
+    await expectStep(step.id)
+    expect(window.location.hash).toBe(step.path)
+    expect(document.querySelector(step.target)).toBeInTheDocument()
+    if (step.scene) expect(document.querySelector('[data-onboarding="model-detail"]')).toHaveAttribute('data-model-family', step.scene)
+    if (step.list) expect(document.querySelector('[data-onboarding="model-file-options"]')).toBeInTheDocument()
+    if (!step.scene) expect(document.querySelector('[data-onboarding="model-detail"]')).toBeNull()
+    await next()
+  }
+  await waitFor(() => expect(saved.onboardingCompletedVersion).toBe(2))
+  expect(document.querySelector('.onboarding-tour')).toBeNull()
+  expect(window.location.hash).toBe('#/')
+  expect(harmfulAction).not.toHaveBeenCalled()
+})
+
+it('reconstructs the configuration scene when resuming a saved file-selection lesson', async () => {
+  saved = { ...saved, onboardingSeen: true, onboardingVersion: 2, onboardingStep: 'T3' }
+  settingsStore.setState({ settings: saved })
   fixture()
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  await expectStep('T3')
+  expect(window.location.hash).toBe('#/models')
+  expect(document.querySelector('[data-onboarding="model-file-options"]')).toBeInTheDocument()
+})
+
+it('cleans up its configuration and list when a replay exits', async () => {
+  saved = { ...saved, onboardingSeen: true, onboardingCompletedVersion: 2, onboardingStep: 'Z0' }
+  settingsStore.setState({ settings: saved })
+  fixture()
+  act(() => startOnboarding('tour'))
+  await expectStep('H1')
+  for (const step of TOUR_STEPS.slice(0, 6)) { await expectStep(step.id); await next() }
+  await expectStep('T3')
+  fireEvent.click(screen.getByRole('button', { name: '退出教程' }))
+  await waitFor(() => expect(document.querySelector('[data-onboarding="model-detail"]')).toBeNull())
+  expect(saved.onboardingStep).toBe('Z0')
+})
+
+it('ignores repeated native-card actions during a transition and stale previous-step messages', async () => {
+  let receive!: (message: OnboardingCardAction) => void
+  const sendState = vi.fn()
+  const show = vi.fn()
+  const hide = vi.fn()
+  vi.spyOn(appStore, 'getBridge').mockReturnValue({ ...createIpcBridge(), onboardingCard: {
+    available: () => true, show, hide, sendState, sendAction: vi.fn(), sendRect: vi.fn(), sendHit: vi.fn(),
+    onState: () => () => {}, onPlacement: () => () => {}, onRect: () => () => {},
+    onAction: listener => { receive = listener; return () => {} },
+  } })
+  await start()
+  act(() => { receive({ step: 'H1', action: 'next' }); receive({ step: 'H1', action: 'next' }) })
+  await expectStep('M1')
+  act(() => receive({ step: 'H1', action: 'next' }))
+  expect(document.querySelector('.onboarding-tour')).toHaveAttribute('data-step', 'M1')
+  act(() => receive({ step: 'M1', action: 'next' }))
+  await expectStep('U6')
+  act(() => receive({ step: 'U6', action: 'next' }))
+  await expectStep('H2')
+  act(() => receive({ step: 'H2', action: 'next' }))
+  await expectStep('T1')
+  expect(sendState.mock.lastCall?.[0]).toMatchObject({ step: 'T1', busy: false, missing: false })
+  // StrictMode replays setup once; moving between scenes must keep the native window alive.
+  expect(show.mock.calls.length - hide.mock.calls.length).toBe(1)
 })

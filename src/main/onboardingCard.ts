@@ -50,6 +50,8 @@ export function registerOnboardingCard(
   let lastState: ReturnType<typeof parseOnboardingCardState> = null
   let cardRect: { x: number; y: number; width: number; height: number } | null = null
   let interactive = false
+  let ownerThrottling: boolean | null = null
+  let hitTimer: ReturnType<typeof setInterval> | null = null
   // Listeners this module attached to the main window, so a rebuilt card never doubles them up.
   const mainListeners: { event: string; listener: () => void }[] = []
 
@@ -101,7 +103,7 @@ export function registerOnboardingCard(
   const setInteractive = (value: boolean) => {
     if (interactive === value || !cardWindow || cardWindow.isDestroyed()) return
     interactive = value
-    cardWindow.setIgnoreMouseEvents(!value)
+    cardWindow.setIgnoreMouseEvents(!value, { forward: true })
   }
 
   const replayState = () => {
@@ -110,7 +112,21 @@ export function registerOnboardingCard(
     }
   }
 
+  const updateCursorHit = () => {
+    if (!cardRect || !cardWindow || cardWindow.isDestroyed()) return
+    const bounds = cardWindow.getBounds()
+    const cursor = screen.getCursorScreenPoint()
+    const x = cursor.x - bounds.x
+    const y = cursor.y - bounds.y
+    setInteractive(x >= cardRect.x && x <= cardRect.x + cardRect.width && y >= cardRect.y && y <= cardRect.y + cardRect.height)
+  }
+
   const destroyCard = () => {
+    if (hitTimer) clearInterval(hitTimer)
+    hitTimer = null
+    const owner = getMainWindow()
+    if (owner && !owner.isDestroyed() && ownerThrottling !== null) owner.webContents.setBackgroundThrottling(ownerThrottling)
+    ownerThrottling = null
     detachFromMain()
     if (cardWindow && !cardWindow.isDestroyed()) cardWindow.destroy()
     cardWindow = null
@@ -123,10 +139,15 @@ export function registerOnboardingCard(
   const showCard = async () => {
     const main = getMainWindow()
     if (!main || main.isDestroyed()) return
+    // A transparent child can occlude its owner on Windows; keep scene paints and RAF active.
+    if (ownerThrottling === null) ownerThrottling = main.webContents.getBackgroundThrottling()
+    main.webContents.setBackgroundThrottling(false)
+    // Native cursor coordinates keep hit testing correct even when the card moves under a stationary pointer.
+    if (!hitTimer) hitTimer = setInterval(updateCursorHit, 16)
     if (cardWindow && !cardWindow.isDestroyed()) {
       // A previously hidden card may have missed nothing, but pass-through state is window-local.
       interactive = false
-      cardWindow.setIgnoreMouseEvents(true)
+      cardWindow.setIgnoreMouseEvents(true, { forward: true })
       syncBounds()
       replayState()
       cardWindow.showInactive()
@@ -157,7 +178,7 @@ export function registerOnboardingCard(
     })
     cardWindow = window
     // The card only ever floats above its parent; every other region forwards clicks through.
-    window.setIgnoreMouseEvents(true)
+    window.setIgnoreMouseEvents(true, { forward: true })
     for (const event of ['move', 'resize', 'maximize', 'unmaximize', 'restore', 'enter-full-screen', 'leave-full-screen'] as const) {
       // Electron types each event overload separately; the loop variable widens past them all.
       main.on(event as never, syncBounds as never)
@@ -204,7 +225,7 @@ export function registerOnboardingCard(
   })
   ipcMain.on('onboarding-card:hide', event => {
     if (!trustedDocument(event.senderFrame?.url ?? '', false)) return
-    if (cardWindow && !cardWindow.isDestroyed()) cardWindow.hide()
+    destroyCard()
   })
   ipcMain.on('onboarding-card:state', (event, raw) => {
     if (!trustedDocument(event.senderFrame?.url ?? '', false)) return
@@ -217,6 +238,7 @@ export function registerOnboardingCard(
   ipcMain.on('onboarding-card:rect', (event, raw) => {
     if (!isCardWindow(senderWindow(event.sender)) || !trustedDocument(event.senderFrame?.url ?? '', true)) return
     cardRect = parseOnboardingCardRect(raw)
+    updateCursorHit()
     // The main window maps its own cursor position onto the card rect; it needs both pieces.
     if (placement) getMainWindow()?.webContents.send('onboarding-card:rect-forward', { rect: cardRect, mainOffset: placement.mainOffset })
   })

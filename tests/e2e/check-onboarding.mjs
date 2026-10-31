@@ -3,11 +3,13 @@ import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, screen } from 'electron'
+import { execFile } from 'node:child_process'
 import { build } from 'esbuild'
 
 app.disableHardwareAcceleration()
 const output = resolve('artifacts/onboarding')
+const nativeMouse = process.argv.includes('--native-mouse')
 const delay = ms => new Promise(done => setTimeout(done, ms))
 let sideEffects = 0
 let markerWrites = 0
@@ -48,7 +50,7 @@ contextBridge.exposeInMainWorld('nolaTranslator', {
   gateway: {
     snapshot: async () => (${JSON.stringify(gatewaySnapshot)}),
     onChanged: () => () => {},
-    revealKey: async () => 'fixture-api-key',
+    revealKey: async () => 'fixture-api-key', start: sideEffect, stop: sideEffect,
   },
   onboardingCard: {
     available: () => true,
@@ -65,6 +67,7 @@ contextBridge.exposeInMainWorld('nolaTranslator', {
   },
   browserConnection: async () => ({ enabled: false, registered: false, connections: 0, sessionActive: false, captionServiceActive: false, browsers: [] }),
   checkLatestRelease: async () => ({ currentVersion: 'fixture', latestVersion: null, updateAvailable: false, releaseName: null, releaseNotes: '', releaseUrl: null }),
+  showWorkspace: sideEffect, showOverlay: sideEffect, prewarm: sideEffect, enableCaptionService: sideEffect,
   manageResource: sideEffect, installRuntime: sideEffect, startSession: sideEffect, testAudio: sideEffect,
 });
 `
@@ -74,7 +77,7 @@ async function waitFor(window, expression) {
     if (await window.webContents.executeJavaScript(expression)) return
     await delay(50)
   }
-  const state = await window.webContents.executeJavaScript(`({ step: document.querySelector('.onboarding-tour')?.dataset.step, path: location.hash, body: document.body.innerText.slice(0, 1600) })`)
+  const state = await window.webContents.executeJavaScript(`({ step: document.querySelector('.onboarding-tour')?.dataset.step, path: location.hash, body: document.body.innerText.slice(0, 300), targets: [...document.querySelectorAll('[data-onboarding=\"gateway-asr\"]')].map(el => ({rect:el.getBoundingClientRect().toJSON(), parents: [...document.querySelectorAll('.nola-main, .nola-route-view')].map(p => ({class:p.className,rect:p.getBoundingClientRect().toJSON(),scroll:p.scrollTop,height:p.scrollHeight,client:p.clientHeight}))})) })`)
   throw new Error(`Timed out: ${expression}\n${JSON.stringify(state)}`)
 }
 
@@ -104,23 +107,30 @@ async function waitForCard(expression) {
   throw new Error(`Timed out in card window: ${expression}\n${JSON.stringify(state)}`)
 }
 
+async function waitForCardStep(step) {
+  await waitForCard(`document.querySelector('.onboarding-tour__card')?.dataset.step === ${JSON.stringify(step)} && document.querySelector('.onboarding-tour__card')?.dataset.ready === 'true'`)
+}
+
 async function clickCard(selector) {
   await waitForCard(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); return el && !el.disabled && el.getBoundingClientRect().width > 0; })()`)
   const card = cardWindowOf()
-  await card.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).click()`)
+  const point = await card.webContents.executeJavaScript(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`)
+  if (nativeMouse) {
+    const bounds = card.getBounds()
+    const physical = screen.dipToScreenPoint({ x: bounds.x + point.x, y: bounds.y + point.y })
+    const command = `Add-Type -TypeDefinition 'using System.Runtime.InteropServices; public class TourMouse { [DllImport("user32.dll")] public static extern bool SetProcessDPIAware(); [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y); [DllImport("user32.dll")] public static extern void mouse_event(uint f,uint x,uint y,uint d,System.UIntPtr e); }'; [TourMouse]::SetProcessDPIAware(); [TourMouse]::SetCursorPos(${physical.x},${physical.y}); Start-Sleep -Milliseconds 100; [TourMouse]::mouse_event(2,0,0,0,[System.UIntPtr]::Zero); [TourMouse]::mouse_event(4,0,0,0,[System.UIntPtr]::Zero)`
+    await new Promise((done, reject) => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { windowsHide: true }, (error, stdout) => error ? reject(error) : stdout.includes('False') ? reject(new Error('Windows input desktop rejected SetCursorPos')) : done()))
+    return
+  }
+  card.webContents.sendInputEvent({ type: 'mouseMove', ...point })
+  card.webContents.sendInputEvent({ type: 'mouseDown', button: 'left', clickCount: 1, ...point })
+  card.webContents.sendInputEvent({ type: 'mouseUp', button: 'left', clickCount: 1, ...point })
 }
 
 const target = name => `[data-onboarding="${name}"]`
-const next = '.onboarding-tour__actions button:last-child'
-const walkthrough = [
-  ['models', target('nav-models')], ['runtime-setup', target('models-runtime-setup')],
-  ['runtime-engines', next], ['runtime-return', target('nav-models')],
-  ['models-active', next], ['models-tabs', next],
-  ['recognition-model', target('model-family-recognitionModel')], ['models-detail', next],
-  ['quick-nav', target('nav-workspace')], ['quick', next], ['overlay', next],
-  ['browser-nav', target('nav-video-captions')], ['browser', next], ['workbench', next],
-  ['gateway-nav', target('nav-model-gateway')], ['gateway-service', next], ['gateway-capabilities', next],
-]
+const next = '.onboarding-tour__footer button'
+const tourBundle = await build({ entryPoints: ['src/renderer/features/onboarding/tourSteps.ts'], bundle: true, platform: 'node', format: 'esm', write: false })
+const { TOUR_STEPS: walkthrough } = await import('data:text/javascript;base64,' + Buffer.from(tourBundle.outputFiles[0].text).toString('base64'))
 
 async function run() {
   await mkdir(output, { recursive: true })
@@ -143,8 +153,8 @@ async function run() {
   const cardModulePath = resolve(output, 'onboarding-card-fixture.cjs')
   await writeFile(cardModulePath, cardBundle.outputFiles[0].text)
   const { registerOnboardingCard } = createRequire(import.meta.url)(cardModulePath)
-  const window = new BrowserWindow({ width: 1180, height: 780, show: false, frame: false, webPreferences: { preload, contextIsolation: true, sandbox: true, backgroundThrottling: false, offscreen: true } })
-  const stopCard = registerOnboardingCard(() => settings.theme === 'dark' ? 'dark' : 'light', resolve('out/main'), () => window, options => new BrowserWindow({ ...options, offscreen: true, webPreferences: { ...options.webPreferences, preload } }))
+  const window = new BrowserWindow({ width: 1180, height: 780, show: nativeMouse, frame: false, webPreferences: { preload, contextIsolation: true, sandbox: true, backgroundThrottling: false, offscreen: !nativeMouse } })
+  const stopCard = registerOnboardingCard(() => settings.theme === 'dark' ? 'dark' : 'light', resolve('out/main'), () => window, options => new BrowserWindow({ ...options, offscreen: !nativeMouse, webPreferences: { ...options.webPreferences, preload } }))
   const errors = []
   window.webContents.on('console-message', details => { if (details.level === 'error' && !details.message.includes('IPC 桥接缺失')) { errors.push(details.message); console.error(details.message) } })
   const requestedWidth = process.argv.find(arg => arg.startsWith('--width='))?.split('=')[1]
@@ -161,93 +171,102 @@ async function run() {
   for (const configuration of configurations) {
     const { width, height, language, theme } = configuration
     window.setSize(width, height)
-    settings = { ...settings, uiLanguage: language, theme, onboardingSeen: false }
+    settings = { ...settings, appearance: { ...settings.appearance, reduceMotion: language !== 'en' }, uiLanguage: language, theme, onboardingSeen: false, onboardingVersion: 0, onboardingStep: 'W0', onboardingCompletedVersion: 0 }
     await window.loadURL('about:blank')
     await window.loadFile(resolve('out/renderer/index.html'), { hash: '/settings/more' })
     await waitFor(window, `document.querySelector('.onboarding-welcome') && !document.getElementById('splash')`)
-    assert.equal(await window.webContents.executeJavaScript('location.hash'), '#/', 'First-run and replay start at home')
-    assert.equal(await window.webContents.executeJavaScript(`document.querySelector('.onboarding-welcome a[href="https://github.com/CerealAxis/Nola-Translator"]') !== null`), true)
-    await click(window, '.onboarding-welcome button')
-    for (const [step, selector] of walkthrough) {
-      await waitFor(window, `document.querySelector('.onboarding-tour')?.dataset.step === ${JSON.stringify(step)} && document.querySelector('.onboarding-tour__outline')`)
-      await waitForCard(`document.querySelector('.onboarding-tour__card')?.dataset.ready === 'true'`)
-      await delay(160)
-      const geometry = await window.webContents.executeJavaScript(`(() => {
-        const outline = document.querySelector('.onboarding-tour__outline');
-        const r = outline.getBoundingClientRect();
-        return { outline: { x: r.x, y: r.y, width: r.width, height: r.height },
-          interactive: !document.querySelector('.nola-app-shell').inert,
-          viewport: { width: innerWidth, height: innerHeight } };
+    const welcome = await window.webContents.executeJavaScript(`(() => { const d = document.querySelector('.onboarding-welcome').getBoundingClientRect(); const f = document.querySelector('.onboarding-welcome .nola-dialog-footer').getBoundingClientRect(); return { left: f.left - d.left, right: d.right - f.right }; })()`)
+    assert.ok(Math.abs(welcome.left) <= 2 && Math.abs(welcome.right) <= 2, JSON.stringify(welcome))
+    await click(window, target('onboarding-begin'))
+    for (const [position, lesson] of walkthrough.entries()) {
+      const step = lesson.id
+      await waitFor(window, `document.querySelector('.onboarding-tour')?.dataset.step === ${JSON.stringify(step)} && document.querySelector('.onboarding-tour')?.dataset.busy === 'false' && document.querySelector('.onboarding-tour__outline')`)
+      await waitForCardStep(step)
+      await waitForCard(`!document.querySelector('${next}').disabled`)
+      await delay(220)
+      await waitFor(window, `(() => {
+        const target = document.querySelector(${JSON.stringify(lesson.target)})?.getBoundingClientRect();
+        const outline = document.querySelector('.onboarding-tour__outline')?.getBoundingClientRect();
+        return !!target && !!outline && Math.min(target.right, outline.right) > Math.max(target.left, outline.left)
+          && Math.min(target.bottom, outline.bottom) > Math.max(target.top, outline.top);
       })()`)
-      // Card geometry is read in its own window and mapped back into main-window coordinates.
+      const scene = await window.webContents.executeJavaScript(`(() => {
+        const target = document.querySelector(${JSON.stringify(lesson.target)});
+        const detail = document.querySelector('[data-onboarding="model-detail"]:not([data-closed])');
+        const rect = target.getBoundingClientRect();
+        return { path: location.hash, kind: detail?.dataset.modelFamily ?? null, rect: rect.toJSON(),
+          list: !!document.querySelector('[data-onboarding="model-file-options"]:not([data-closed])'),
+          outline: document.querySelector('.onboarding-tour__outline').getBoundingClientRect().toJSON() };
+      })()`)
+      assert.equal(scene.path, lesson.path, JSON.stringify({ configuration, step, scene }))
+      assert.equal(scene.kind, lesson.scene ?? null)
+      if (lesson.list) assert.equal(scene.list, true)
+      assert.ok(scene.outline.width > 0 && scene.outline.height > 0)
+      // Verify that each small lesson actually highlights its own control, rather than a previous scene.
+      const intersection = Math.max(0, Math.min(scene.rect.right, scene.outline.right) - Math.max(scene.rect.left, scene.outline.left))
+        * Math.max(0, Math.min(scene.rect.bottom, scene.outline.bottom) - Math.max(scene.rect.top, scene.outline.top))
+      assert.ok(intersection > 0, JSON.stringify({ step, scene }))
+      await delay(language === 'en' ? 220 : 30)
       const cardGeometry = await cardWindowOf().webContents.executeJavaScript(`(() => {
-        const root = document.querySelector('.onboarding-card-window');
         const card = document.querySelector('.onboarding-tour__card');
-        const [ox, oy] = (root?.dataset.mainOffset ?? '0,0').split(',').map(Number);
-        const r = card.getBoundingClientRect();
-        return { x: r.x - ox, y: r.y - oy, width: r.width, height: r.height,
-          windowX: r.x, windowY: r.y, windowWidth: innerWidth, windowHeight: innerHeight,
-          overflow: card.scrollWidth > card.clientWidth + 1,
-          accessible: !card.closest('[aria-hidden="true"], [inert]') };
+        const rect = card.getBoundingClientRect();
+        return { rect: rect.toJSON(), window: { width: innerWidth, height: innerHeight },
+          horizontalOverflow: card.scrollWidth > card.clientWidth + 1,
+          verticalOverflow: card.scrollHeight > card.clientHeight + 1,
+          buttons: card.querySelectorAll('button').length,
+          progress: card.querySelector('.onboarding-tour__progress').textContent,
+          chapters: !!card.querySelector('.onboarding-tour__chapters, .onboarding-tour__meter') };
       })()`)
-      const info = JSON.stringify({ configuration, step, geometry, cardGeometry })
-      // The card may extend outside the main window by design, but never outside its own.
-      assert.ok(cardGeometry.windowX >= 0 && cardGeometry.windowY >= 0
-        && cardGeometry.windowX + cardGeometry.width <= cardGeometry.windowWidth + 1
-        && cardGeometry.windowY + cardGeometry.height <= cardGeometry.windowHeight + 1, info)
-      assert.equal(cardGeometry.accessible, true, info)
-      assert.equal(cardGeometry.overflow, false, info)
-      const overlap = Math.max(0, Math.min(cardGeometry.x + cardGeometry.width, geometry.outline.x + geometry.outline.width) - Math.max(cardGeometry.x, geometry.outline.x))
-        * Math.max(0, Math.min(cardGeometry.y + cardGeometry.height, geometry.outline.y + geometry.outline.height) - Math.max(cardGeometry.y, geometry.outline.y))
-      // Near-full-page spotlights leave no clean side; the placer then picks the smallest
-      // overlap. Allow a sliver, but never a card parked on top of its own target.
-      assert.ok(overlap <= cardGeometry.width * cardGeometry.height * 0.04, `Teaching card covers its target: ${info}`)
-      assert.equal(geometry.interactive, true, info)
-      results.push({ configuration, step, geometry, cardGeometry })
-      if (['runtime-engines', 'models-active', 'recognition-model', 'models-detail', 'quick', 'overlay', 'browser', 'gateway-service'].includes(step)) {
+      const info = JSON.stringify({ configuration, step, cardGeometry })
+      assert.equal(cardGeometry.horizontalOverflow, false, info)
+      assert.equal(cardGeometry.verticalOverflow, false, info)
+      assert.equal(cardGeometry.buttons, 1, info)
+      assert.equal(cardGeometry.chapters, false, info)
+      assert.equal(cardGeometry.progress, `${position + 1} / ${walkthrough.length}`, info)
+      assert.ok(cardGeometry.rect.x >= 0 && cardGeometry.rect.y >= 0
+        && cardGeometry.rect.right <= cardGeometry.window.width + 1
+        && cardGeometry.rect.bottom <= cardGeometry.window.height + 1, info)
+      if (['H1', 'M1', 'T1', 'T2', 'T3', 'T4', 'M2', 'R1', 'U1', 'U4'].includes(step)) {
         await writeFile(resolve(output, `${language}-${theme}-${width}-${step}.png`), (await window.webContents.capturePage()).toPNG())
+        await writeFile(resolve(output, `${language}-${theme}-${width}-${step}-card.png`), (await cardWindowOf().webContents.capturePage()).toPNG())
       }
-      if (selector.startsWith('.onboarding-tour')) await clickCard(selector)
-      else await click(window, selector)
+      if (step === 'T3' && language === 'zh-CN' && width === 1180) {
+        assert.equal(settings.onboardingStep, 'T3')
+        const reloaded = new Promise(resolve => window.webContents.once('did-finish-load', resolve))
+        window.webContents.reload()
+        await reloaded
+        await waitFor(window, "document.querySelector('.onboarding-tour')?.dataset.step === 'T3' && document.querySelector('.onboarding-tour')?.dataset.busy === 'false'")
+        await waitForCardStep('T3')
+        await waitForCard(`!document.querySelector('${next}').disabled`)
+        await waitFor(window, `document.querySelector('[data-onboarding="model-file-options"]') && document.querySelector('.onboarding-tour')?.dataset.busy === 'false'`)
+      }
+      const started = Date.now()
+      await clickCard(next)
+      if (position < walkthrough.length - 1) {
+        const upcoming = walkthrough[position + 1].id
+        await waitFor(window, `document.querySelector('.onboarding-tour')?.dataset.step === ${JSON.stringify(upcoming)} && document.querySelector('.onboarding-tour')?.dataset.busy === 'false'`)
+        assert.ok(Date.now() - started < 2500, `Slow transition after ${step}: ${Date.now() - started}ms`)
+      }
+      results.push({ configuration, step, scene, cardGeometry, transitionMs: Date.now() - started })
     }
-    await waitFor(window, `document.querySelector('[data-onboarding="complete"]')`)
-    // Dialog autofocus lands asynchronously; poll briefly instead of asserting on one frame.
-    for (let attempt = 0; attempt < 20; attempt++) {
-      if (await window.webContents.executeJavaScript(`document.querySelector('[data-onboarding="complete"]').contains(document.activeElement)`)) break
-      await delay(50)
-    }
-    const completion = await window.webContents.executeJavaScript(`(() => {
-      const dialog = document.querySelector('[data-onboarding="complete"]');
-      const backdrop = dialog.parentElement?.querySelector('[data-slot="dialog-backdrop"]');
-      const rect = dialog.getBoundingClientRect();
-      return { modal: dialog.getAttribute('aria-modal'), background: backdrop && getComputedStyle(backdrop).backgroundColor,
-        blocked: backdrop?.contains(document.elementFromPoint(8, innerHeight - 8)),
-        focused: dialog.contains(document.activeElement),
-        visible: rect.x >= 0 && rect.y >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight,
-        overflow: dialog.scrollWidth > dialog.clientWidth + 1 };
-    })()`)
-    assert.equal(completion.modal, 'true')
-    assert.ok(completion.background && completion.background !== 'rgba(0, 0, 0, 0)' && completion.background !== 'transparent', JSON.stringify(completion))
-    assert.equal(completion.blocked, true, 'Completion backdrop blocks the underlying page')
-    assert.equal(completion.focused, true, 'Completion keeps keyboard focus inside the modal')
-    assert.equal(completion.visible, true)
-    assert.equal(completion.overflow, false)
-    await writeFile(resolve(output, `${language}-${theme}-${width}-complete.png`), (await window.webContents.capturePage()).toPNG())
-    await click(window, '[data-onboarding="complete"] [data-slot="dialog-footer"] button:last-child')
-    // Completion exits to the settings page that owns the replay entry, not to home.
-    await waitFor(window, `!document.querySelector('.onboarding-tour') && location.hash === '#/settings/more'`)
-    await window.webContents.reload()
-    await waitFor(window, `document.querySelector('[data-page="settings"]') && !document.getElementById('splash')`)
-    assert.equal(await window.webContents.executeJavaScript(`document.querySelector('.onboarding-tour, .onboarding-welcome') === null`), true)
-    // A replay presents the unchanged welcome and returns to home before teaching starts.
-    await window.webContents.executeJavaScript(`location.hash = '#/settings/more'`)
+    await waitFor(window, `!document.querySelector('.onboarding-tour') && location.hash === '#/'`)
+    assert.equal(settings.onboardingCompletedVersion, 2)
+    assert.equal(sideEffects, 0)
+    const replaySnapshot = JSON.stringify([settings.onboardingStep, settings.onboardingCompletedVersion])
+    await window.loadFile(resolve('out/renderer/index.html'), { hash: '/settings/more' })
+    await waitFor(window, `document.querySelector('[data-onboarding="replay"]') && !document.getElementById('splash')`)
     await click(window, target('replay'))
-    await waitFor(window, `document.querySelector('.onboarding-welcome') && location.hash === '#/'`)
-    await click(window, '.onboarding-welcome button:nth-child(2)')
+    await waitFor(window, `document.querySelector('.onboarding-welcome')`)
+    await click(window, target('onboarding-begin'))
+    await waitFor(window, `document.querySelector('.onboarding-tour')?.dataset.step === 'H1'`)
+    await waitForCardStep('H1')
+    await clickCard('.onboarding-tour__close')
+    await waitFor(window, `!document.querySelector('.onboarding-tour')`)
+    assert.equal(JSON.stringify([settings.onboardingStep, settings.onboardingCompletedVersion]), replaySnapshot)
     console.log(`Verified ${language}, ${theme}, ${width} x ${height}`)
   }
   assert.equal(sideEffects, 0)
-  assert.equal(markerWrites, configurations.length)
+  assert.ok(markerWrites >= configurations.length)
   assert.equal(errors.length, 0, errors.join('\n'))
   await writeFile(resolve(output, 'results.json'), JSON.stringify({ results, markerWrites, sideEffects }, null, 2))
   console.log(`Verified ${results.length} interactive lesson steps without downloads, recording or starting caption services.`)

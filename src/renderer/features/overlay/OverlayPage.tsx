@@ -87,7 +87,7 @@ export function OverlayPage() {
     <div className="nola-overlay-page">
       <PageHeader className="nola-page-heading" title={t('home.quickStart')}
         actions={<div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => {
+          <Button data-onboarding="open-workspace" variant="secondary" onClick={() => {
             void actions.settings.showWorkspace().catch(error => notifyError(t('workspaceUi.windowFailed'), { cause: error }))
           }}><ExternalLink aria-hidden="true" />{t('home.quickStart')}</Button>
           <Button data-onboarding="open-overlay" onClick={() => void open()} disabled={opening} aria-busy={opening}>{opening ? <Spinner /> : <ExternalLink aria-hidden="true" />}{t('shellUi.openOverlay')}</Button>
@@ -139,12 +139,12 @@ export function OverlayPage() {
       <Card className="nola-section-card" data-onboarding="quick-settings">
         <CardHeader><CardTitle>{t('settings.title')}</CardTitle></CardHeader>
         <CardContent className="nola-overlay-fields">
-          <div className="nola-overlay-field">
+          <div className="nola-overlay-field" data-onboarding="quick-asr">
             <span className="text-sm text-muted"><ModelAvailabilityLabel label={t('session.recognitionModel')} hint={t('gateway.modelNoneHint')} /></span>
             <SettingSelect value={asr.binding} ariaLabel={t('session.recognitionModel')} isDisabled={sessionActive}
               options={asrOptions} onChange={value => asr.select(value)} />
           </div>
-          <div className="nola-overlay-field">
+          <div className="nola-overlay-field" data-onboarding="quick-mt">
             <span className="text-sm text-muted"><ModelAvailabilityLabel label={t('session.translationModel')} hint={t('gateway.modelNoneHint')} /></span>
             <SettingSelect value={translationValue} ariaLabel={t('session.translationModel')} isDisabled={sessionActive}
               options={translationChoices} onChange={value => {
@@ -152,13 +152,13 @@ export function OverlayPage() {
                 else mt.select(value)
               }} />
           </div>
-          <div className="nola-overlay-field">
+          <div className="nola-overlay-field" data-onboarding="quick-audio">
             <span className="text-sm text-muted">{t('shellUi.audioSource')}</span>
             <SettingSelect value={settings.recognition.audioSource} ariaLabel={t('shellUi.audioSource')} isDisabled={sessionActive}
               options={[{ value: 'defaultOutput', label: t('shellUi.audioSystem') }, ...devices.map(device => ({ value: device.deviceId, label: device.name }))]}
               onChange={audioSource => patch({ recognition: { audioSource } })} />
           </div>
-          <div className="nola-overlay-field">
+          <div className="nola-overlay-field" data-onboarding="quick-language">
             <span className="text-sm text-muted">{t('shellUi.languageDirection')}</span>
             <Popover.Root>
               <Popover.Trigger render={<Button variant="tertiary" />} className="nola-overlay-language-trigger" disabled={sessionActive}

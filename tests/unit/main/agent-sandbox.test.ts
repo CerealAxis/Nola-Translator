@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -16,7 +16,7 @@ async function createCliFixture(withHelper = true) {
   const cliPath = join(directory, 'codex.exe')
   await writeFile(cliPath, '')
   if (withHelper) await writeFile(join(directory, 'codex-code-mode-host.exe'), '')
-  return { directory, cliPath }
+  return { directory, cliPath: await realpath(cliPath) }
 }
 
 describe('agent sandbox', () => {
@@ -87,9 +87,10 @@ describe('agent sandbox', () => {
     const controller = new AbortController()
     const { runSandboxCommand } = await import('../../../src/main/agent-sandbox')
     const result = runSandboxCommand(process.cwd(), 'echo work', controller.signal)
+    const rejection = expect(result).rejects.toThrow('cancelled')
     await vi.waitFor(() => expect(commandCallback).toBeTypeOf('function'))
     controller.abort(new Error('cancelled'))
-    await expect(result).rejects.toThrow('cancelled')
+    await rejection
 
     const taskkillCall = execFileMock.mock.calls.find(([file]) => String(file).endsWith('taskkill.exe'))
     expect(taskkillCall?.[1]).toEqual(['/PID', '4321', '/T', '/F'])

@@ -39,9 +39,9 @@ export function HomePage(): ReactNode {
     <ErrorBoundary resetKey={path}>
       <div className="nola-home">
         <HeroSection />
-        <div className="nola-home__entries">
+        <div className="nola-home__entries" data-onboarding="home-entries">
           <FeatureCard variant="tertiary" icon={<Network aria-hidden="true" />} title={t('homeRecordsUi.gatewayTitle')} description={t('homeRecordsUi.gatewayDescription')} buttonText={t('homeRecordsUi.openGateway')} onButtonClick={() => navigate(pathOf('model-gateway'))} />
-          <FeatureCard variant="quaternary" icon={<SlidersHorizontal aria-hidden="true" />} title={t('home.models')} description={t('homeRecordsUi.modelsDescription')} buttonText={t('homeRecordsUi.openModels')} onButtonClick={() => navigate(pathOf('models'))} />
+          <FeatureCard onboardingTarget="home-models" variant="quaternary" icon={<SlidersHorizontal aria-hidden="true" />} title={t('home.models')} description={t('homeRecordsUi.modelsDescription')} buttonText={t('homeRecordsUi.openModels')} onButtonClick={() => navigate(pathOf('models'))} />
           <FeatureCard onboardingTarget="home-quick" variant="primary" icon={<Mic aria-hidden="true" />} title={t('home.quickStart')} description={t('homeRecordsUi.quickDescription')} buttonText={t('workspace.start')} onButtonClick={goWorkspace} />
           <FeatureCard onboardingTarget="home-overlay" variant="secondary" className="nola-entry--browser" icon={<Captions aria-hidden="true" />} title={t('home.overlayCaptions')} description={t('homeRecordsUi.overlayDescription')} buttonText={t('homeRecordsUi.openOverlay')} onButtonClick={() => navigate('#/video-captions')} />
           <FeatureCard variant="secondary" className="nola-entry--workbench" icon={<MessageSquareText aria-hidden="true" />} title={t('workbench.title')} description={t('homeRecordsUi.workbenchDescription')} buttonText={t('homeRecordsUi.openWorkbench')} onButtonClick={() => { void requestFeatureStart(async () => getBridge()?.app.openWorkbench?.('chat'), 'workbench').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) }} />

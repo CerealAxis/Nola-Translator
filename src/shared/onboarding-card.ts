@@ -19,16 +19,15 @@ export interface OnboardingSpotlight {
   height: number
 }
 
-export type OnboardingCardActionType = 'next' | 'back' | 'skip-step' | 'skip-chapter' | 'exit' | 'resume' | 'retry'
+export type OnboardingCardActionType = 'next' | 'exit'
+
+export interface OnboardingCardAction { step: string; action: OnboardingCardActionType }
 
 /** Everything the card window needs to paint one lesson. */
 export interface OnboardingCardState {
   /** Tour step id, used only for diagnostics; the card renders copy keys, not step data. */
+  required: boolean
   step: string
-  chapter: number
-  chapters: number
-  chapterIndex: number
-  chapterSteps: number
   index: number
   total: number
   /** Main-window viewport size; the compact rule mirrors it without re-measuring there. */
@@ -36,12 +35,11 @@ export interface OnboardingCardState {
   /** Distance from the main viewport top to the first usable row (below the title bar). */
   topInset: number
   spotlight: OnboardingSpotlight | null
-  away: boolean
   missing: boolean
-  /** The target never appeared; the card offers retry instead of next. */
+  /** The scene could not be prepared; Next retries the same scene. */
   unavailable: boolean
-  /** The previous guided action completed; shown briefly as confirmation. */
-  feedback: boolean
+  /** A scene transition is running; Next is disabled until its target is ready. */
+  busy: boolean
   /** Mirrors the in-document compact rule (model dialogs and short viewports). */
   compact: boolean
   theme: 'light' | 'dark'
@@ -67,8 +65,8 @@ export interface OnboardingCardApi {
   /** Main process → card window: the window moved, so only the placement changed. */
   onPlacement(callback: (placement: OnboardingCardPlacement) => void): () => void
   /** Card window → main window: a footer control was activated. */
-  sendAction(action: OnboardingCardActionType): void
-  onAction(callback: (action: OnboardingCardActionType) => void): () => void
+  sendAction(action: OnboardingCardAction): void
+  onAction(callback: (action: OnboardingCardAction) => void): () => void
   /** Card window → main window: where the card is painted, for mouse pass-through hit testing. */
   sendRect(rect: { x: number; y: number; width: number; height: number } | null): void
   /** Main process → main window: the card rect (card-window coordinates) plus the viewport offset. */
@@ -88,8 +86,8 @@ export function parseOnboardingCardState(raw: unknown): OnboardingCardState | nu
   const viewport = value.viewport as Record<string, unknown> | undefined
   const spotlight = value.spotlight as Record<string, unknown> | null | undefined
   if (!theme || !step) return null
-  const flags = ['away', 'missing', 'unavailable', 'compact', 'feedback']
-  const numbers = ['chapter', 'chapters', 'chapterIndex', 'chapterSteps', 'index', 'total', 'topInset']
+  const flags = ['required', 'missing', 'unavailable', 'compact', 'busy']
+  const numbers = ['index', 'total', 'topInset']
   if (numbers.some(key => !number(value[key]))) return null
   if (flags.some(key => typeof value[key] !== 'boolean')) return null
   if (spotlight !== null && spotlight !== undefined) {
@@ -98,27 +96,26 @@ export function parseOnboardingCardState(raw: unknown): OnboardingCardState | nu
   if (!viewport || !number(viewport.width) || !number(viewport.height)) return null
   return {
     step,
+    required: value.required as boolean,
     theme,
     viewport: { width: viewport.width as number, height: viewport.height as number },
     spotlight: spotlight ? spotlight as unknown as OnboardingSpotlight : null,
-    away: value.away as boolean,
     missing: value.missing as boolean,
     unavailable: value.unavailable as boolean,
     compact: value.compact as boolean,
-    feedback: value.feedback as boolean,
-    chapter: value.chapter as number,
-    chapters: value.chapters as number,
-    chapterIndex: value.chapterIndex as number,
-    chapterSteps: value.chapterSteps as number,
+    busy: value.busy as boolean,
     index: value.index as number,
     total: value.total as number,
     topInset: value.topInset as number,
   }
 }
 
-export function parseOnboardingCardAction(raw: unknown): OnboardingCardActionType | null {
-  const actions: readonly OnboardingCardActionType[] = ['next', 'back', 'skip-step', 'skip-chapter', 'exit', 'resume', 'retry']
-  return actions.includes(raw as OnboardingCardActionType) ? (raw as OnboardingCardActionType) : null
+export function parseOnboardingCardAction(raw: unknown): OnboardingCardAction | null {
+  if (!raw || typeof raw !== 'object') return null
+  const { step, action } = raw as Record<string, unknown>
+  const actions: readonly string[] = ['next', 'exit']
+  return typeof step === 'string' && step.length > 0 && step.length <= 64 && typeof action === 'string' && actions.includes(action)
+    ? { step, action: action as OnboardingCardActionType } : null
 }
 
 /** Card rect in card-window coordinates; null when the card is not placed yet. */

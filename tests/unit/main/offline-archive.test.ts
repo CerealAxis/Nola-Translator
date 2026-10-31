@@ -32,11 +32,12 @@ it('streams a ZIP64 round trip with Unicode paths and byte progress', async () =
   expect(progress).toHaveBeenCalledWith('extract', data.length + 2, data.length + 2, '')
 }, 15000)
 
+// Python startup needs the same integration-test budget as the round trip under parallel runs.
 it.each(['../escape', '/absolute', 'C:/outside', 'a\\escape', 'x:stream', 'CON.txt', 'trailing. /file'])('rejects unsafe ZIP entry %s before extraction', async name => {
   const { archive, destination, signal } = await fixture()
   await run('python', ['-I', '-c', "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1],'w'); i=zipfile.ZipInfo('safe'); i.filename=sys.argv[2]; z.writestr(i,b'bad'); z.close()", archive, name], { windowsHide: true })
   await expect(offlineArchive('python', 'extract', archive, destination, signal, vi.fn())).rejects.toMatchObject({ issue: 'invalidPackage' })
-})
+}, 15000)
 
 it('rejects case-insensitive duplicate paths and symbolic links', async () => {
   const { archive, destination, signal } = await fixture()
@@ -47,4 +48,4 @@ it('rejects case-insensitive duplicate paths and symbolic links', async () => {
     await run('python', ['-I', '-c', `import sys,zipfile; z=zipfile.ZipFile(sys.argv[1],'w'); ${script}; z.close()`, archive], { windowsHide: true })
     await expect(offlineArchive('python', 'extract', archive, destination, signal, vi.fn())).rejects.toMatchObject({ issue: 'invalidPackage' })
   }
-})
+}, 15000)

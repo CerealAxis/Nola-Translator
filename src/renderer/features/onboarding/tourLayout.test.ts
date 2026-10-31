@@ -1,5 +1,10 @@
 import { placeTourCard } from './tourLayout'
 
+it('uses a corner to preserve the full card beside a large dialog', () => {
+  const tip = placeTourCard({ x: 200, y: 160, width: 800, height: 500 }, { width: 400, height: 285 }, { width: 1180, height: 780 }, 16, 0)
+  expect(tip).toEqual({ x: 16, y: 16 })
+})
+
 it('places the tip beside a small target without covering it', () => {
   const target = { x: 80, y: 120, width: 180, height: 160 }
   const tip = placeTourCard(target, { width: 320, height: 200 }, { width: 1180, height: 780 }, 16, 64)

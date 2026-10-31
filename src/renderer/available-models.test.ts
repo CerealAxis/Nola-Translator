@@ -77,12 +77,12 @@ it('lists a loaded translation model when recognition is stopped', () => {
 })
 
 
-it('excludes disabled models even when they are loaded or configured', () => {
+it('requires enablement for local models while configured cloud services remain callable', () => {
   const configured = settings({ modelPolicy: { enabled: {}, defaults: {}, selections: {} } })
   const catalog = buildAvailableModels({ settings: configured, resources: [asrRecord], credentials: credentials(['aliyun-asr']),
     snapshot: snapshotWith('asr', 'resource:sense-voice-small', 'SenseVoice') })
-  expect(catalog.asr).toEqual([])
-  expect(catalog.mt).toEqual([])
+  expect(catalog.asr.map(model => model.binding)).toEqual(['cloud:aliyun'])
+  expect(catalog.mt.map(model => model.binding)).toEqual(['cloud:mymemory', 'cloud:index-translate'])
 })
 
 it('excludes a removed resource even if an old snapshot still reports it ready', () => {
@@ -118,7 +118,8 @@ it('excludes enabled cloud profiles whose required configuration is missing', ()
   const configured = settings({ translation: { ...DEFAULT_SETTINGS.translation, customModels: [profile] }, modelPolicy: { enabled: { 'llm:custom:invalid': true, 'mt:mt-custom:invalid': true }, defaults: {}, selections: {} } })
   const catalog = buildAvailableModels({ settings: configured, resources: [], credentials: credentials([]), snapshot: null })
   expect(catalog.llm).toEqual([])
-  expect(catalog.mt).toEqual([])
+  expect(catalog.mt.map(model => model.binding)).not.toContain('mt-custom:invalid')
+  expect(catalog.mt.map(model => model.binding)).toEqual(['cloud:mymemory', 'cloud:index-translate'])
 })
 
 

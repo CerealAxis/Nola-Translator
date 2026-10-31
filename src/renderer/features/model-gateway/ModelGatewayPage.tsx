@@ -168,7 +168,7 @@ socket.on('open', async () => {
   socket.send(JSON.stringify({ type: 'session.finish' }));
 });`
   return <div className="model-gateway-page">
-    <PageHeader className="nola-page-heading" title={t('gateway.title')} actions={<Button variant={running ? 'danger' : 'default'} disabled={changing || (!running && config.externalEnabled === false && !CAPABILITIES.some(kind => config[kind]))} onClick={() => void perform(async () => {
+    <PageHeader className="nola-page-heading" title={t('gateway.title')} actions={<Button data-onboarding="gateway-start" variant={running ? 'danger' : 'default'} disabled={changing || (!running && config.externalEnabled === false && !CAPABILITIES.some(kind => config[kind]))} onClick={() => void perform(async () => {
       const result = running ? await api.stop() : await requestFeatureStart(() => api.start(), 'model-gateway')
       if (result) setSnapshot(result)
     }, 'runtime')}>{t(running ? 'gateway.stop' : 'gateway.start')}</Button>} />
@@ -182,7 +182,7 @@ socket.on('open', async () => {
         const label = t(fallback ? 'gateway.fallbackModel' : `gateway.${kind}`)
         const hint = t(fallback ? 'gateway.fallbackHint' : `gateway.${kind}Hint`)
         const empty = fallback ? 'none' : '__disabled__'
-        return <Field key={row} className="model-gateway-capability-row">
+        return <Field key={row} data-onboarding={`gateway-${row}`} className="model-gateway-capability-row">
           <div className="model-gateway-capability-title">
             <Tooltip><TooltipTrigger render={<FieldLabel htmlFor={`gateway-model-${row}`} />}>{label}</TooltipTrigger><TooltipContent className="z-popup max-w-96 whitespace-normal">{hint}</TooltipContent></Tooltip>
             {!fallback && config[kind] ? <Badge variant={snapshot.services[kind].state === 'ready' ? 'success' : snapshot.services[kind].state === 'failed' ? 'danger' : 'secondary'}>{t(`gateway.${snapshot.services[kind].state}`)}</Badge> : null}

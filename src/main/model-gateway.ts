@@ -840,14 +840,13 @@ export class ModelGateway {
     response.once('close', abort)
     try {
       const origin = request.headers.origin
-      if (request.method === 'OPTIONS') {
-        this.authorize(request)
-        response.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Max-Age': '600' }); response.end(); return
-      }
       this.authorize(request)
       if (origin === 'http://localhost' || origin === 'http://127.0.0.1') {
         response.setHeader('Access-Control-Allow-Origin', origin)
         response.setHeader('Vary', 'Origin')
+      }
+      if (request.method === 'OPTIONS') {
+        response.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Max-Age': '600' }); response.end(); return
       }
       const path = new URL(request.url ?? '/', 'http://localhost').pathname
       if (request.method === 'POST' && path === '/v1/realtime/sessions') {

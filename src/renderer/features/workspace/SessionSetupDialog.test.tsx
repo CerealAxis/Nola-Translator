@@ -46,7 +46,7 @@ it('submits an explicitly selected enabled cloud translation binding and provide
 it('blocks session start when the saved local model has no loaded replacement', () => {
   state.catalog.asr = []
   const submit = renderDialog()
-  expect(within(screen.getByRole('combobox', { name: '识别模型' })).getByRole('option', { name: '暂无可用模型' })).toBeDisabled()
+  expect(within(screen.getByRole('combobox', { name: '识别模型' })).getByRole('option', { name: '请选择模型' })).toBeDisabled()
   expect(screen.getByRole('button', { name: '开始' })).toBeDisabled()
   expect(submit).not.toHaveBeenCalled()
 })

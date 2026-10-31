@@ -16,6 +16,8 @@ export default defineConfig({
     }
   },
   test: {
+    // JSDOM and Tailwind workers are heavy; avoid contention-driven timeouts in full runs.
+    maxWorkers: 4,
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],

@@ -65,6 +65,9 @@ describe('local gateway', () => {
     test.settings.translation.provider = 'index-translate'
     await test.gateway.start()
     expect(test.gateway.snapshot().services.mt.state).toBe('ready')
+    expect(initialized).toHaveLength(0)
+    const lease = await test.gateway.leaseCapability('mt')
+    lease.release()
     expect(initialized[0]).toMatchObject({ kind: 'mt', config: { translationProvider: 'index-translate' } })
     const models = await fetch(test.base + '/v1/models', { headers: await test.headers() }).then(response => response.json())
     expect(models.data.map((model: { id: string }) => model.id)).toEqual(['nola-mt'])
@@ -98,6 +101,8 @@ describe('local gateway', () => {
     enable(test.settings, 'mt', 'cloud:google')
     enable(test.settings, 'mt', 'cloud:mymemory')
     await test.gateway.start()
+    const lease = await test.gateway.leaseCapability('mt')
+    lease.release()
     expect(initialized[0]).toMatchObject({ config: { translationProvider: 'google' }, fallbackConfig: { translationProvider: 'mymemory' } })
     expect(initialized[0].fallbackUsesPrimary).not.toBe(true)
   })
@@ -159,6 +164,7 @@ describe('local gateway', () => {
   it('authenticates routes, supports browser preflight, and returns OpenAI translation responses', async () => {
     const test = await fixture(); await test.gateway.start()
     expect((await fetch(test.base + '/v1/models')).status).toBe(401)
+    expect((await fetch(test.base + '/v1/chat/completions', { method: 'OPTIONS', headers: { Origin: 'http://localhost' } })).status).toBe(401)
     const auth = await test.headers()
     const preflight = await fetch(test.base + '/v1/chat/completions', { method: 'OPTIONS', headers: { ...auth, Origin: 'http://localhost', 'Access-Control-Request-Headers': 'authorization,content-type' } })
     expect(preflight.status).toBe(204); expect(preflight.headers.get('access-control-allow-origin')).toBe('http://localhost')
@@ -319,24 +325,28 @@ describe('local gateway', () => {
     await vi.waitFor(() => { expect(oldAsr.close).toHaveBeenCalledOnce(); expect(oldMt.close).toHaveBeenCalledOnce() })
   })
 
-  it('owns LLM lifecycle independently and keeps active requests pinned until released', async () => {
+  it('owns loaded local LLM lifecycle independently and keeps active requests pinned until released', async () => {
     const runtimes: Array<{ close: ReturnType<typeof vi.fn> }> = []
     const test = await fixture(undefined, async (_services, binding) => {
-      const runtime = { close: vi.fn(async () => {}), local: false, name: binding,
+      const runtime = { close: vi.fn(async () => {}), local: true, name: binding,
         profile: { id: binding, model: 'chat', endpoint: 'https://fixture.invalid/v1', apiFormat: 'chat-completions' as const, contextWindow: 4096, maxOutputTokens: 512 },
         model: () => 'fixture', redact: (value: string) => value }
       runtimes.push(runtime)
       return runtime
     })
+    for (const id of ['first', 'second']) {
+      test.resources.push({ resourceId: id, kind: 'translationModel', installed: true, name: id } as ResourceRecord)
+      enable(test.settings, 'llm', `resource:${id}`)
+    }
     test.settings.modelGateway.llm = true
-    test.settings.modelGateway.llmModel = 'custom:first'
+    test.settings.modelGateway.llmModel = 'resource:first'
     await test.gateway.start()
-    const first = test.gateway.languageModel('custom:first')
-    test.settings.modelGateway.llmModel = 'custom:second'
+    const first = test.gateway.languageModel('resource:first')
+    test.settings.modelGateway.llmModel = 'resource:second'
     await test.gateway.reconfigure()
     expect(runtimes[0].close).not.toHaveBeenCalled()
     expect(first.signal.aborted).toBe(false)
-    const second = test.gateway.languageModel('custom:second')
+    const second = test.gateway.languageModel('resource:second')
     test.settings.modelGateway.llm = false
     await test.gateway.reconfigure()
     expect(first.signal.aborted).toBe(true)
@@ -369,8 +379,11 @@ describe('local gateway', () => {
     test.settings.translation.customModelId = 'unrelated-primary'
     test.settings.translation.fallback.provider = provider
     test.settings.translation.fallback.cloudEndpoint = 'https://fallback.invalid/v1'
+    test.settings.translation.fallback.cloudModel = 'backup-model'
     enable(test.settings, 'mt', provider === 'cloud' ? 'mt-custom:legacy-fallback' : 'cloud:google')
     await test.gateway.start()
+    const lease = await test.gateway.leaseCapability('mt')
+    lease.release()
     const config = initialized.find(init => init.kind === 'mt')!
     expect(config.fallbackUsesPrimary).toBe(true)
     expect((config.config as any).translationOptions.apiKey).toBe(`secret-for-fallback-${provider}`)
@@ -415,15 +428,17 @@ describe('local gateway', () => {
 })
 
 describe('independent cloud consumers', () => {
-  it('rejects a disabled cloud binding server-side, including one disabled after an active lease', async () => {
+  it('leases a configured cloud service without enablement and rejects it after its connection becomes invalid', async () => {
     const test = await fixture()
     test.settings.modelPolicy = { enabled: {}, defaults: {}, selections: {} }
-    await expect(test.gateway.leaseCapability('mt', 'cloud:mymemory')).rejects.toMatchObject({ code: 'model_disabled' })
-    expect(test.workers).toHaveLength(0)
-    enable(test.settings, 'mt', 'cloud:mymemory')
     const lease = await test.gateway.leaseCapability('mt', 'cloud:mymemory')
     Object.assign(test.settings, modelEnablePatch(test.settings, 'mt', 'cloud:mymemory', false))
-    await expect(test.gateway.leaseCapability('mt', 'cloud:mymemory')).rejects.toMatchObject({ code: 'model_disabled' })
+    const shared = await test.gateway.leaseCapability('mt', 'cloud:mymemory')
+    expect(shared.worker).toBe(lease.worker)
+    shared.release()
+    test.settings.translation.mymemoryEndpoint = 'file:///private'
+    await expect(test.gateway.leaseCapability('mt', 'cloud:mymemory')).rejects.toMatchObject({ code: 'invalid_configuration' })
+    expect(lease.worker.close).not.toHaveBeenCalled()
     lease.release()
   })
 
@@ -462,14 +477,14 @@ describe('independent cloud consumers', () => {
     expect(response.status).toBe(200)
     expect((await response.json()).choices[0].message.content).toBe('zh:Hello')
     expect(test.workers.map(worker => worker.kind)).toEqual(['mt'])
-    Object.assign(test.settings, modelEnablePatch(test.settings, 'mt', 'cloud:mymemory', false))
+    test.settings.modelGateway.externalCapabilities!.mt = false
     const rejected = await fetch(test.base + '/v1/chat/completions', { method: 'POST', headers: await test.headers(),
       body: JSON.stringify({ model: 'nola-mt', messages: [{ role: 'user', content: 'Hello' }] }) })
     expect(rejected.status).toBe(503)
-    expect(await rejected.json()).toMatchObject({ error: { code: 'model_disabled' } })
+    expect(await rejected.json()).toMatchObject({ error: { code: 'capability_disabled' } })
   })
 
-  it('acquires a saved enabled cloud LLM without starting or rebinding local services', async () => {
+  it('acquires a saved configured cloud LLM without starting or rebinding local services', async () => {
     const close = vi.fn(async () => {})
     const create = vi.fn<typeof createGatewayLanguageModel>(async (_services, binding) => ({ close, local: false, name: binding,
       profile: { id: 'scene', model: 'fixture', endpoint: 'https://fixture.invalid/v1', apiFormat: 'chat-completions', contextWindow: 4096, maxOutputTokens: 512 },
@@ -488,8 +503,10 @@ describe('independent cloud consumers', () => {
     expect(close).toHaveBeenCalledOnce()
     expect(test.gateway.snapshot().activeRequests).toBe(0)
     Object.assign(test.settings, modelEnablePatch(test.settings, 'llm', 'custom:scene', false))
-    await expect(test.gateway.acquireLanguageModel('custom:scene')).rejects.toMatchObject({ code: 'model_disabled' })
-    expect(create).toHaveBeenCalledOnce()
+    const second = await test.gateway.acquireLanguageModel('custom:scene')
+    expect(create).toHaveBeenCalledTimes(2)
+    second.release()
+    expect(close).toHaveBeenCalledTimes(2)
   })
 })
 

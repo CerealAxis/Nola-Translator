@@ -280,13 +280,13 @@ export function VideoCaptionsPage() {
     <div className="nola-overlay-page">
       <PageHeader className="nola-page-heading" title={t('videoCaptions.title')}
         actions={<>
-          <Button variant={gateActive ? 'danger' : 'default'} disabled={captionServiceBusy || prewarming}
+          <Button data-onboarding="video-caption-service" variant={gateActive ? 'danger' : 'default'} disabled={captionServiceBusy || prewarming}
             onClick={() => void (gateActive ? close() : requestFeatureStart(open, 'browser-captions')).catch(error => notifyError(t('videoCaptions.serviceFailed'), { cause: error }))}>
             {captionServiceBusy || prewarming ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
             {prewarming ? t('videoCaptions.serviceLoading') : gateActive ? t('videoCaptions.disableService') : t('videoCaptions.enableService')}
           </Button>
         </>} />
-      <Card className="nola-overlay-preview">
+      <Card className="nola-overlay-preview" data-onboarding="browser-preview">
         <CardHeader>
           <CardTitle>{t('videoCaptions.captionPreview')}</CardTitle>
         </CardHeader>
@@ -302,22 +302,22 @@ export function VideoCaptionsPage() {
           </div>
         </CardContent>
       </Card>
-      <Card className="nola-section-card">
+      <Card className="nola-section-card" data-onboarding="video-caption-settings">
         <CardHeader><CardTitle>{t('videoCaptions.settings')}</CardTitle></CardHeader>
-        <CardContent className="nola-overlay-fields">
-          <div className="nola-overlay-field">
+        <CardContent className="nola-overlay-fields" data-onboarding="browser-model-settings">
+          <div className="nola-overlay-field" data-onboarding="browser-asr">
             <span className="text-sm text-muted"><ModelAvailabilityLabel label={t('session.recognitionModel')} hint={t('gateway.modelNoneHint')} /></span>
             <SettingSelect value={asrValue} isDisabled={sessionActive || browserStatus?.captionServiceActive === true || captionServiceBusy || captionService === 'loading'} ariaLabel={t('session.recognitionModel')} options={asrOptions}
               onChange={value => asr.select(value)} />
           </div>
-          <div className="nola-overlay-field">
+          <div className="nola-overlay-field" data-onboarding="browser-mt">
             <span className="text-sm text-muted"><ModelAvailabilityLabel label={t('session.translationModel')} hint={t('gateway.modelNoneHint')} /></span>
             <SettingSelect value={mtValue} isDisabled={sessionActive || browserStatus?.captionServiceActive === true || captionServiceBusy || captionService === 'loading'} ariaLabel={t('session.translationModel')} options={mtOptions}
               onChange={value => value === NO_TRANSLATION_LANGUAGE
                 ? void updateSettings(targetLanguagePatch(value, targetLanguage)).catch(error => notifyError(t('errors.settingsSaveFailed'), { cause: error }))
                 : mt.select(value)} />
           </div>
-          <div className="nola-overlay-field">
+          <div className="nola-overlay-field" data-onboarding="browser-audio">
             <span className="text-sm text-muted">{t('videoCaptions.audioSource')}</span>
             {/*
              * System output is the default; the tab capture stays last because it requires a browser
@@ -333,7 +333,7 @@ export function VideoCaptionsPage() {
               ]}
               onChange={next => patch(audioSourcePatch(next))} />
           </div>
-          <div className="nola-overlay-field">
+          <div className="nola-overlay-field" data-onboarding="browser-language">
             <span className="text-sm text-muted">{t('shellUi.languageDirection')}</span>
             <Popover.Root>
               <Popover.Trigger render={<Button variant="tertiary" className="nola-overlay-language-trigger"
@@ -393,7 +393,7 @@ export function VideoCaptionsPage() {
           </div>
         </CardContent>
         <CardFooter className="nola-overlay-footer">
-          <Button variant="secondary" onClick={() => navigate(settingsPath('browser'))}><Settings aria-hidden="true" />{t('videoCaptions.browserSettings')}<ArrowRight aria-hidden="true" /></Button>
+          <Button data-onboarding="browser-settings" variant="secondary" onClick={() => navigate(settingsPath('browser'))}><Settings aria-hidden="true" />{t('videoCaptions.browserSettings')}<ArrowRight aria-hidden="true" /></Button>
         </CardFooter>
       </Card>
     </div>

@@ -66,20 +66,18 @@ it('leaves recognition model choice to Model Gateway and keeps only the source l
   // connection is configured in model management and the loaded model is chosen in Model Gateway.
   expect(group.queryByRole('combobox', { name: '服务商' })).not.toBeInTheDocument()
   expect(screen.queryByDisplayValue('workspace-123')).not.toBeInTheDocument()
-  expect(group.getByText(/模型网关/)).toBeInTheDocument()
+  expect(group.queryByRole('button')).not.toBeInTheDocument()
 })
 
-it('keeps translation behavior here and routes connection setup to Model Management', async () => {
+it('keeps translation behavior here without the retired model-management shortcut or connection fields', () => {
   const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'mymemory' as const, mymemoryEmail: 'test@example.com', translateIntermediate: true } }
   settingsStore.setState({ settings })
   render(<TranslationTab settings={settings} />)
-  expect(screen.getByRole('button', { name: '模型启用与默认模型' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '默认模型供新场景和工具调用使用；不会改变运行中的任务。' })).toBeInTheDocument()
+  expect(screen.getByRole('switch', { name: '翻译未定稿字幕' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '模型启用与默认模型' })).not.toBeInTheDocument()
   expect(screen.queryByDisplayValue('https://api.mymemory.translated.net/get')).not.toBeInTheDocument()
   expect(screen.queryByDisplayValue('test@example.com')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('API 密钥')).not.toBeInTheDocument()
-  await fireEvent.click(screen.getByRole('button', { name: '模型启用与默认模型' }))
-  expect(window.location.hash).toBe('#/models')
 })
 
 it('keeps translation intermediate behavior available without connection fields', () => {
@@ -89,15 +87,4 @@ it('keeps translation intermediate behavior available without connection fields'
   expect(screen.getByRole('switch', { name: '翻译未定稿字幕' })).toBeInTheDocument()
   expect(screen.queryByLabelText('API 密钥')).not.toBeInTheDocument()
   expect(screen.queryByText('https://translation.googleapis.com/language/translate/v2')).not.toBeInTheDocument()
-})
-
-it('routes ASR connection setup to Model Management while preserving recognition behavior controls', async () => {
-  const settings = { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, provider: 'aliyun' as const, aliyunWorkspaceId: 'workspace-123' } }
-  settingsStore.setState({ settings })
-  render(<AudioTab settings={settings} />)
-  expect(screen.getByRole('button', { name: '模型启用与默认模型' })).toBeInTheDocument()
-  expect(screen.queryByDisplayValue('workspace-123')).not.toBeInTheDocument()
-  expect(screen.getByText('原文语言')).toBeInTheDocument()
-  await fireEvent.click(screen.getByRole('button', { name: '模型启用与默认模型' }))
-  expect(window.location.hash).toBe('#/models')
 })

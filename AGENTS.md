@@ -101,7 +101,7 @@ Key patterns:
 ### 样式
 
 - 需要变更 UI 时阅读 [DESIGN.MD](./DESIGN.MD)；颜色、间距、圆角和字号以 `src/renderer/theme/` 的 token 为准，不引入任意字面值。
-- 按钮统一使用 `--radius-xl`，禁止 `ghost` 变体；图标按钮必须有区别于背景的可见底色，标题栏控件除外。
+- 按钮统一使用 `--radius-xl`，禁止 `ghost` 变体；图标按钮可使用透明背景。
 - 非按钮圆角按语义选 token；主题中没有 `rounded-pill` 档位。
 - shadcn/ui 组件使用 Nola 语义 token，不使用默认黑白主题；同名语义变量须经独立映射，避免与既有全局 token 冲突。原子组件覆盖字阶时可在 utilities 层使用任意值类（例如 `text-[11px]`）；这仅是字号规则的特定例外。
 - z-index 只使用 `DESIGN.MD` 第 8 节规定的 `.z-*` 类，禁止写 `z-50` 等字面层级。

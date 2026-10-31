@@ -54,6 +54,8 @@ function engineLabel(engine: InferenceEngine): string {
   return engine === 'llama' ? 'llama.cpp' : engine === 'crisp' ? 'CrispASR' : 'PyTorch'
 }
 
+const ENGINE_ORDER: readonly InferenceEngine[] = ['llama', 'crisp', 'pytorch']
+
 export interface RecommendedFamilyCardProps {
   family: RecommendedFamily
   records: readonly ResourceRecord[]
@@ -63,8 +65,8 @@ export interface RecommendedFamilyCardProps {
 export function RecommendedFamilyCard({ family, records, onOpen }: RecommendedFamilyCardProps) {
   const { t } = useI18n()
   const first = records[0]
-  const engines = [...new Set(records.flatMap(modelEngines))]
-  return <Card className="models-card models-family-card h-full">
+  const engines = ENGINE_ORDER.filter(engine => records.some(record => modelEngines(record).includes(engine)))
+  return <Card className="models-card models-family-card h-full" data-onboarding={`model-family-card-${family}`}>
     <CardHeader>
       <CardAction><span aria-hidden="true" className={`models-card__icon models-card__icon--${first.kind === 'translationModel' ? 'translation' : 'recognition'}`}>
         <ModelMark record={first} kind={first.kind} />
@@ -77,7 +79,7 @@ export function RecommendedFamilyCard({ family, records, onOpen }: RecommendedFa
       {engines.map(engine => <Badge key={engine} >{engine === 'llama' ? 'llama.cpp' : engine === 'crisp' ? 'CrispASR' : 'PyTorch'}</Badge>)}
       {records.some(record => record.installed) ? <Badge  variant="success">{t('models.installed')}</Badge> : null}
     </div></CardContent>
-    <CardFooter className="card__footer"><Button data-onboarding={`model-family-${first.kind}`} onClick={onOpen}>{t('modelsSettingsUi.startConfiguration')}</Button></CardFooter>
+    <CardFooter className="card__footer"><Button data-onboarding={`model-family-${family}`} onClick={onOpen}>{t('modelsSettingsUi.startConfiguration')}</Button></CardFooter>
   </Card>
 }
 
@@ -130,11 +132,13 @@ function PublisherAvatar({ record }: { record: ResourceRecord }) {
 
 export function RecommendedFamilyDialog({ family, records, compute, computeSnapshot, runtimes, busyIds, onClose, onInstall, onCancel, onManualDownload }: RecommendedFamilyDialogProps) {
   const { t } = useI18n()
-  const [engine, setEngine] = useState(modelEngines(records[0])[0])
-  const [parameters, setParameters] = useState(paramsOf(records[0]) ?? '')
-  const [selectedId, setSelectedId] = useState(records[0]?.resourceId ?? '')
+  const engines = ENGINE_ORDER.filter(engine => records.some(record => modelEngines(record).includes(engine)))
+  const initialEngine = engines.find(option => isEngineAvailable(option, runtimes?.local ?? null)) ?? engines[0]
+  const initialRecord = records.find(record => modelEngines(record).includes(initialEngine))!
+  const [engine, setEngine] = useState(initialEngine)
+  const [parameters, setParameters] = useState(paramsOf(initialRecord) ?? '')
+  const [selectedId, setSelectedId] = useState(initialRecord.resourceId)
   const [source, setSource] = useState<ModelDownloadSource>('huggingface')
-  const engines = [...new Set(records.flatMap(modelEngines))]
   const engineRecords = records.filter(record => modelEngines(record).includes(engine))
   const parameterOptions = [...new Set(engineRecords.map(record => paramsOf(record) ?? ''))]
   const filtered = engineRecords.filter(record => (paramsOf(record) ?? '') === parameters)
@@ -158,7 +162,7 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
 
   return <Dialog open onOpenChange={open => { if (!open) onClose() }}>
 
-      <DialogContent className="models-family-dialog modal__dialog" data-onboarding="model-detail" data-model-kind={records[0].kind}>
+      <DialogContent className="models-family-dialog modal__dialog" data-onboarding="model-detail" data-model-family={family}>
         <DialogCloseButton data-onboarding="model-detail-close" aria-label={t('common.close')} />
         <DialogHeader>
           <DialogTitle>{FAMILY_NAMES[family]}</DialogTitle>
@@ -174,10 +178,11 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
               }}><TabsList className="models-family-dialog__choices">
                 {engines.map(option => {
                   const available = isEngineAvailable(option, runtimes?.local ?? null)
+                  const status = (option === 'llama' ? runtimes?.local.llama : option === 'crisp' ? runtimes?.local.crisp : runtimes?.local.engine)?.status
                   const button = <TabsTrigger value={option}>{engineLabel(option)}</TabsTrigger>
-                  return available ? button : <Tooltip key={option}>
+                  return <Tooltip key={option}>
                     <TooltipTrigger delay={250} render={button} />
-                    <TooltipContent role="tooltip" className="settings-row__tooltip z-popup whitespace-normal">{t('models.engineUnavailable', { engine: engineLabel(option) })}</TooltipContent>
+                    <TooltipContent role="tooltip" className="settings-row__tooltip z-popup whitespace-normal">{!runtimes?.local ? t('common.loading') : t(available ? 'models.engineInstalled' : !status || status === 'missing' ? 'models.engineUnavailable' : 'models.engineNotReady', { engine: engineLabel(option) })}</TooltipContent>
                   </Tooltip>
                 })}
               </TabsList></TabsRoot>
@@ -195,7 +200,7 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
           <div className="select models-family-dialog__model-select" data-onboarding="model-version"><Select value={selected.resourceId} onValueChange={key => { if (typeof key === 'string') { setSelectedId(key); setSource('huggingface') } }} aria-label={t('offline.modelChoice')}>
             <Label>{t('offline.modelChoice')}</Label>
             <SelectTrigger className="w-full" aria-label={t('offline.modelChoice')}><SelectValue><span className="models-family-dialog__selected-model"><PublisherAvatar record={selected} /><span>{modelDisplayName(selected)}</span><small>{formatBytes(selected.downloadBytes ?? selected.installedBytes)}</small><span className="models-family-dialog__selected-model-badges">{selected.installed ? <Badge variant="success" >{t('models.installed')}</Badge> : null}{family === 'tts' ? null : <FitChip record={selected} engine={engine} compute={compute} computeSnapshot={computeSnapshot} />}</span></span></SelectValue></SelectTrigger>
-            <SelectContent alignItemWithTrigger={false} align="start"><SelectGroup className="models-family-dialog__model-list">{filtered.map(record => <SelectItem key={record.resourceId} value={record.resourceId} disabled={record.installed} label={modelDisplayName(record)}>
+            <SelectContent data-onboarding="model-file-options" alignItemWithTrigger={false} align="start"><SelectGroup className="models-family-dialog__model-list">{filtered.map(record => <SelectItem key={record.resourceId} value={record.resourceId} disabled={record.installed} label={modelDisplayName(record)}>
               <PublisherAvatar record={record} />
               <span className="models-family-dialog__model-text"><span>{modelDisplayName(record)}</span><small>{formatBytes(record.downloadBytes ?? record.installedBytes)}</small></span>
               <span className="models-family-dialog__model-badges">{record.installed ? <Badge variant="success" >{t('models.installed')}</Badge> : null}{family === 'tts' ? null : <FitChip record={record} engine={engine} compute={compute} computeSnapshot={computeSnapshot} />}</span>

@@ -1,3 +1,4 @@
+import { ONBOARDING_STEP_IDS } from '../shared/onboarding-tour'
 import { z } from 'zod'
 import { modelGatewaySettingsSchema } from '../shared/model-gateway'
 import { modelPolicySchema } from '../shared/model-policy'
@@ -50,6 +51,9 @@ export const settingsPatchSchema = z.object({
   modelGateway: modelGatewaySettingsSchema.partial().optional(),
   modelPolicy: modelPolicySchema.optional(),
   onboardingSeen: z.boolean().optional(),
+  onboardingVersion: z.number().int().min(0).max(2).optional(),
+  onboardingStep: z.enum(['W0', ...ONBOARDING_STEP_IDS, 'U3', 'U9', 'B3', 'B4', 'U5', 'Z0']).optional(),
+  onboardingCompletedVersion: z.number().int().min(0).max(2).optional(),
   compute: computeSettingsPatchSchema.optional(),
   theme: z.enum(['system', 'light', 'dark']).optional(),
   uiLanguage: z.enum(['auto', 'zh-CN', 'zh-TW', 'zh-HK', 'ko', 'ja', 'en']).optional(),

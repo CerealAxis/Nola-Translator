@@ -47,7 +47,7 @@ export function ModelsPage() {
   const { t } = useI18n()
   const { modelsTab, navigate } = useRoute()
   const [tab, setTab] = useState<ModelsTab>('recommended')
-  useEffect(() => { if (modelsTab === 'downloads') setTab('downloads') }, [modelsTab])
+  useEffect(() => { setTab(modelsTab === 'downloads' ? 'downloads' : 'recommended') }, [modelsTab])
   const [configuring, setConfiguring] = useState<{ record: ResourceRecord; readOnly: boolean } | null>(null)
   const [downloadTarget, setDownloadTarget] = useState<ResourceRecord | null>(null)
   const [openFamily, setOpenFamily] = useState<RecommendedFamily | null>(null)
@@ -260,7 +260,7 @@ export function ModelsPage() {
         if (target) install(target, source)
       }} />
       {cloudDetail ? <CloudModelDialog id={cloudDetail} onClose={() => setCloudDetail(null)} /> : null}
-      {openFamily ? <RecommendedFamilyDialog
+      {openFamily && openFamilyRecords.length > 0 ? <RecommendedFamilyDialog
         key={openFamilyKey}
         family={openFamily}
         records={openFamilyRecords}
@@ -276,7 +276,7 @@ export function ModelsPage() {
         onManualDownload={record => { setOpenFamily(null); offlineActions.openDownloads(record.resourceId) }}
       /> : null}
       <section className="models-overview">
-        <header className="models-overview__heading">
+        <header className="models-overview__heading" data-onboarding="models-page-heading">
           <span className="models-overview__icon"><Box aria-hidden="true" /></span>
           <div><h1>{t('models.title')}</h1><p>{t('modelsSettingsUi.modelsSubtitle')}</p></div>
           <div className="models-overview__actions">
@@ -340,7 +340,7 @@ export function ModelsPage() {
         <TabsContent className="tabs__panel" value="search">
           <HubSearchTab onGoRecommended={() => setTab('recommended')} />
         </TabsContent>
-        <TabsContent className="tabs__panel" value="downloads"><DownloadsTab /></TabsContent>
+        <TabsContent className="tabs__panel" value="downloads" data-onboarding="models-downloads-panel"><DownloadsTab /></TabsContent>
       </TabsRoot>
     </div>
   )
@@ -355,7 +355,7 @@ interface CountTabProps {
 
 function CountTab({ id, label, count }: CountTabProps) {
   return (
-    <TabsTrigger value={id} className="nola-body-strong">
+    <TabsTrigger data-onboarding={id === 'downloads' ? 'models-downloads-tab' : undefined} value={id} className="nola-body-strong">
       <span className="flex items-center gap-2">
         {label}
         {count === null ? null : (
@@ -398,21 +398,21 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAc
     if (family === 'kokoro' || family === 'piper') continue
     groups.set(family, [...(groups.get(family) ?? []), record])
   }
-  const sections: { title: string; hint: string; kind: ResourceRecord['kind']; families: RecommendedFamily[]; language?: boolean }[] = [
-    { title: t('models.asrModels'), hint: t('models.asrModelsHint'), kind: 'recognitionModel', families: ['qwen', 'sensevoice', 'funasr', 'vibevoice', 'mimo'] },
-    { title: t('models.mtModels'), hint: t('models.mtModelsHint'), kind: 'translationModel', families: ['hymt2', 'index', 'other'] },
+  const sections: { title: string; hint: string; kind: ResourceRecord['kind']; families: RecommendedFamily[]; language?: boolean; onboardingTarget?: string }[] = [
+    { title: t('models.asrModels'), hint: t('models.asrModelsHint'), kind: 'recognitionModel', families: ['qwen', 'sensevoice', 'funasr', 'vibevoice', 'mimo'], onboardingTarget: 'models-recognition-catalog' },
+    { title: t('models.mtModels'), hint: t('models.mtModelsHint'), kind: 'translationModel', families: ['hymt2', 'index', 'other'], onboardingTarget: 'models-translation-catalog' },
     { title: t('models.ttsModels'), hint: t('models.ttsModelsHint'), kind: 'ttsModel', families: ['tts', 'kokoro', 'piper', 'cosyvoice3'] },
     { title: t('models.llmModels'), hint: t('models.llmModelsHint'), kind: 'translationModel', families: ['qwen35'], language: true },
   ]
   return <div className="flex flex-col gap-6">
     {failed ? <FailedCatalog onRetry={onRetry} /> : null}
     {loading ? <div className={GRID}>{[0, 1, 2].map(index => <ModelCardSkeleton key={index} />)}</div> : null}
-    {sections.filter(section => section.families.some(family => groups.has(family)) || cloudModels.some(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language))).map(section => {
+    {sections.filter(section => loading || section.families.some(family => groups.has(family)) || cloudModels.some(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language))).map(section => {
       const sectionCloudModels = cloudModels.filter(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language))
       const indexTranslation = section.kind === 'translationModel' ? sectionCloudModels.find(model => model.id === 'index-translate') : undefined
       const otherCloudModels = indexTranslation ? sectionCloudModels.filter(model => model !== indexTranslation) : sectionCloudModels
       const renderCloudModel = (model: CloudModel) => <CloudModelCard key={model.id} model={model} onOpen={onOpenCloud} />
-      return <section key={section.title} className="flex flex-col gap-3">
+      return <section key={section.title} className="flex flex-col gap-3" data-onboarding={section.onboardingTarget}>
     <ModelSectionHeading title={section.title} hint={section.hint} />
     <div className={GRID}>{section.families.map(family => {
       const familyRecords = groups.get(family)
