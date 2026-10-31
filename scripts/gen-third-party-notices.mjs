@@ -28,7 +28,8 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 
 const ROOT = resolve(import.meta.dirname, '..')
-const SITE_PACKAGES = join(ROOT, '.venv', 'Lib', 'site-packages')
+const SITE_PACKAGES = resolve(process.env.NOLA_NOTICES_SITE_PACKAGES ?? join(ROOT, '.venv', 'Lib', 'site-packages'))
+const PYINSTALLER_SITE_PACKAGES = resolve(process.env.NOLA_NOTICES_PYINSTALLER_SITE_PACKAGES ?? SITE_PACKAGES)
 const OUTPUT = join(ROOT, 'THIRD_PARTY_NOTICES.md')
 
 /**
@@ -1245,7 +1246,7 @@ function collectPlatformRuntime() {
 
   // 浏览器宿主由 `PyInstaller --onefile` 打包，bootloader 随 EXE 进入安装包（extraResources）。
   // 版本从 .venv 的 dist-info 读，跟随 build-browser-host.ps1 实际使用的解释器。
-  const pyinstallerDist = readDistInfo('pyinstaller')
+  const pyinstallerDist = readDistInfo('pyinstaller', PYINSTALLER_SITE_PACKAGES)
   const pyinstallerMetadata = pyinstallerDist ? readText(join(pyinstallerDist.dir, 'METADATA')) : null
   const pyinstallerVersion = pyinstallerMetadata?.match(/^Version:\s*(.+)$/m)?.[1]?.trim()
   if (pyinstallerVersion) {
@@ -1343,18 +1344,18 @@ function markerApplies(marker) {
  * `pyinstaller-6.21.0` 与 `pyinstaller-hooks-contrib-2026.6`、`torch-2.3.1` 与 `torch-complex-0.4.4`
  * 都是这种关系，取错目录会直接把一个包的许可证标到另一个包头上。
  */
-function readDistInfo(name) {
+function readDistInfo(name, sitePackages = SITE_PACKAGES) {
   const wanted = name.toLowerCase().replace(/[-_.]+/g, '-')
   let entries
   try {
-    entries = readdirSync(SITE_PACKAGES, { withFileTypes: true })
+    entries = readdirSync(sitePackages, { withFileTypes: true })
   } catch {
     report('unresolved', name, `.venv/Lib/site-packages 不可读：${SITE_PACKAGES}`)
     return null
   }
   for (const entry of [...entries].sort((a, b) => (a.name < b.name ? -1 : 1))) {
     if (!entry.isDirectory() || !entry.name.endsWith('.dist-info')) continue
-    const dir = join(SITE_PACKAGES, entry.name)
+    const dir = join(sitePackages, entry.name)
     const metadata = readText(join(dir, 'METADATA'))
     const declared = metadata?.match(/^Name:\s*(.+)$/m)?.[1]?.trim().toLowerCase().replace(/[-_.]+/g, '-')
     if (declared === wanted) {

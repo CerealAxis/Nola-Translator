@@ -58,3 +58,5 @@ describe('resolvePreloadPath', () => {
     expect(resolvePreloadPath('C:\\app\\out\\main')).toBe('C:\\app\\out\\preload\\index.cjs')
   })
 })
+
+

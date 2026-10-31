@@ -206,9 +206,10 @@ function createOverlayWindow(theme: AppSettings['theme'], overlay: OverlaySettin
   window.setFocusable(true)
   window.setBounds(computeOverlayBounds('bottom', display.workArea, window.getBounds()))
   const publishVisibility = (): void => {
+    if (quitting || window.isDestroyed()) return
     const visible = window.isVisible()
     for (const target of BrowserWindow.getAllWindows()) {
-      if (!target.isDestroyed() && target !== window) target.webContents.send('overlay:visibility-changed', visible)
+      if (!target.isDestroyed() && !target.webContents.isDestroyed() && target !== window) target.webContents.send('overlay:visibility-changed', visible)
     }
   }
   window.on('show', publishVisibility)
@@ -285,7 +286,21 @@ const hasSingleInstanceLock = app.requestSingleInstanceLock()
 if (!hasSingleInstanceLock) {
   app.quit()
 } else {
-  app.setAppUserModelId('com.nola-translator.app')
+  const appId = app.isPackaged ? 'com.nola-translator.app' : 'com.nola-translator.app.dev'
+  app.setAppUserModelId(appId)
+  // Give the taskbar group a product icon even when the executable is electron.exe.
+  app.on('browser-window-created', (_event, window) => {
+    if (process.platform !== 'win32') return
+    const icon = app.isPackaged
+      ? join(process.resourcesPath, 'icon.ico')
+      : join(app.getAppPath(), 'build', 'icon.ico')
+    window.setAppDetails({
+      appId,
+      appIconPath: icon,
+      relaunchCommand: app.isPackaged ? `"${process.execPath}"` : `"${process.execPath}" "${app.getAppPath()}"`,
+      relaunchDisplayName: 'Nola Translator',
+    })
+  })
 
   app.on('second-instance', () => {
     if (migrationWindow && !migrationWindow.isDestroyed()) { migrationWindow.focus(); return }

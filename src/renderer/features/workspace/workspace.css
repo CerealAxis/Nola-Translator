@@ -66,8 +66,11 @@
   .nola-workspace-notes-heading { padding: var(--card-spacing); display: flex; flex-direction: row; justify-content: space-between; align-items: center; gap: 10px; flex: none; text-align: left; }
   .nola-workspace-notes-heading .card__title { font: var(--font-title); }
   .nola-workspace-notes-state { color: var(--muted); font-size: 12px; white-space: nowrap; }
-  .nola-workspace-notes-tools { display: flex; flex: none; gap: 8px; padding: var(--space-1) var(--card-spacing); border-block: 1px solid var(--border); background: var(--surface-secondary); flex-wrap: wrap; }
+  .nola-workspace-notes-tools { display: flex; flex: none; gap: var(--space-1); padding: var(--space-1) var(--card-spacing); border-block: 1px solid var(--border); flex-wrap: wrap; }
   .nola-workspace-notes-tools :is(.button, .toggle-button) { border-radius: var(--radius-xl); }
+  .nola-workspace-notes-tools .button { background: transparent; }
+  .nola-workspace-notes-tools .button:hover,
+  .nola-workspace-notes-tools .button[aria-pressed="true"] { background: var(--surface-tertiary); color: var(--accent); }
   .nola-workspace-notes-tools .toggle-button { background: var(--surface-secondary); color: var(--foreground); }
   .nola-workspace-notes-tools .toggle-button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
   .nola-workspace-notes-content { display: flex; flex: 1; min-height: 0; padding: var(--card-spacing); }

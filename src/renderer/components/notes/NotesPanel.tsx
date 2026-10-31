@@ -95,7 +95,7 @@ export function NotesPanel({ value, onChange, collapsed = false, onToggleCollaps
       </CardHeader>
       <div className="nola-workspace-notes-tools" role="toolbar" aria-label={t('notes.title')}>
         {MARKS.map(({ key, icon: Icon, labelKey }) => (
-          <Button key={key} variant="secondary" size="icon" aria-label={t(labelKey)}
+          <Button key={key} variant="nav" size="icon-xs" aria-label={t(labelKey)}
             aria-pressed={state?.[key] ?? false} disabled={!editor}
             onClick={() => editor?.chain().focus().toggleMark(key).run()}><Icon aria-hidden="true" /></Button>
         ))}

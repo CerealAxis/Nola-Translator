@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { app } from 'electron'
 
 import type { BrowserWindowConstructorOptions } from 'electron'
 
@@ -38,13 +39,12 @@ export function resolvePreloadPath(mainDirectory: string): string {
  * `electron-vite` bundles the main process to `out/main/index.js`, so the project root that
  * holds `build/icon.ico` is two levels up from the directory handed in here.
  *
- * A packaged build has no `build/` directory: `package.json` ships only the bundled `out` tree
- * and `package.json` itself, and electron-builder stamps the icon into the executable. Probing
- * for the file — rather than catching an exception — is what lets the caller get `undefined` and
- * omit the option entirely.
+ * Packaged builds place the same icon in the resources directory as an extra resource.
  */
 export function resolveWindowIconPath(mainDirectory: string): string | undefined {
-  const icon = join(mainDirectory, '..', '..', 'build', 'icon.ico')
+  const icon = app.isPackaged
+    ? join(process.resourcesPath, 'icon.ico')
+    : join(mainDirectory, '..', '..', 'build', 'icon.ico')
   return existsSync(icon) ? icon : undefined
 }
 
@@ -65,10 +65,8 @@ export function createMainWindowOptions(
     resizable: true,
     show: false,
     autoHideMenuBar: true,
-    // Without this, dev shows the Electron atom logo: the running process really is `electron.exe`
-    // there, and Windows has no way to know which product is asking. A packaged build is unaffected
-    // either way, because there the icon is compiled into the exe by electron-builder.
-    ...(icon ? { icon } : {}),
+    // Decode the PNG directly; the ICO is reserved for Windows shell metadata.
+    ...(icon ? { icon: join(dirname(icon), 'tray.png') } : {}),
     // Only a definite preference can pick a colour; 'system' has to wait for the renderer to
     // resolve it, and guessing light here is exactly the white flash this is meant to avoid.
     backgroundColor: theme === 'light' || theme === 'dark' ? SURFACE[theme] : '#00000000',
