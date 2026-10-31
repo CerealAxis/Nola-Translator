@@ -10,7 +10,7 @@ it('injects the selected custom model key without accepting caller-supplied cred
   const getCredential = vi.fn(async () => 'selected-model-secret')
   const settings = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, customModelId: 'second-model' } }
   const controller = new SessionController({ engine: { currentState: 'ready', request } as unknown as EngineProcess, meetings: null,
-    getSettings: () => settings, getCredential, whenReady: async () => {}, prepare: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+    getSettings: () => settings, getCredential, whenReady: async () => {}, prepare: async () => {}, startingChanged: () => {}, hideOverlay: () => {},
   })
   await controller.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: ['zh'], translationProvider: 'cloud', translationOptions: { endpoint: 'https://second.example/v1', model: 'second', apiKey: 'untrusted-secret' } }, 'desktop')
   expect(getCredential).toHaveBeenCalledExactlyOnceWith('cloud-model:second-model')
@@ -27,7 +27,7 @@ it('pins a custom connection and its credential to the same settings snapshot du
   })
   const controller = new SessionController({ engine: { currentState: 'ready', request } as unknown as EngineProcess, meetings: null,
     getSettings: () => current, getCredential, whenReady: async () => {},
-    prepare: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+    prepare: async () => {}, startingChanged: () => {}, hideOverlay: () => {},
   })
   await controller.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', recognitionProvider: 'aliyun', sourceLanguage: 'auto', targetLanguages: ['zh'], translationProvider: 'cloud', translationOptions: { endpoint: first.translation.cloudEndpoint, model: first.translation.cloudModel } }, 'desktop')
   expect(getCredential).toHaveBeenNthCalledWith(2, 'cloud-model:first')
@@ -39,7 +39,7 @@ it('uses persisted VAD timing when a session starts', async () => {
   const settings = { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, max_segment_ms: 15000, silence_end_ms: 1200 } }
   const sessions = new SessionController({ engine: { currentState: 'ready', start: vi.fn(), request } as unknown as EngineProcess, meetings: null,
     getSettings: () => settings, getCredential: async () => '', whenReady: async () => {}, prepare: async () => {},
-    startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+    startingChanged: () => {}, hideOverlay: () => {},
   })
   await sessions.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: [], max_segment_ms: 6000, silence_end_ms: 600 }, 'desktop')
   expect(request).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ max_segment_ms: 15000, silence_end_ms: 1200 }) }), 'sessionStarted', expect.any(Number))
@@ -54,7 +54,7 @@ it('reserves a two-second audio preview without preparing models, recording or o
   const overlay = vi.fn()
   const sessions = new SessionController({ engine: engine as unknown as EngineProcess, meetings: null,
     getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', whenReady: async () => {},
-    prepare, startingChanged: () => {}, showOverlay: overlay, hideOverlay: () => {},
+    prepare, startingChanged: () => {}, hideOverlay: () => {},
   })
   const preview = sessions.testAudio({ kind: 'microphone', deviceId: 'selected' })
   await vi.waitFor(() => expect(engine.request).toHaveBeenCalledOnce())
@@ -79,7 +79,7 @@ it('reserves model loading across both clients and uses the resolved compute con
   const sessions = new SessionController({ engine: engine as unknown as EngineProcess, meetings: null,
     getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', whenReady: async () => {},
     prepare: async config => { config.compute = { ...(config.compute ?? DEFAULT_SETTINGS.compute), recognitionDevice: 'cpu' } },
-    startingChanged, showOverlay: () => {}, hideOverlay: () => {},
+    startingChanged, hideOverlay: () => {},
   })
   const config: PrewarmConfig = { compute: DEFAULT_SETTINGS.compute, recognitionModelId: 'sensevoice-small', sourceLanguage: 'auto', targetLanguages: [] }
   const work = sessions.prewarm(config)
@@ -99,7 +99,7 @@ it('injects the encrypted ASR credential and removes caller-supplied translation
   const engine = { currentState: 'ready', start: vi.fn(), request }
   const getCredential = vi.fn(async () => 'stored-aliyun-key')
   const sessions = new SessionController({ engine: engine as unknown as EngineProcess, meetings: null,
-    getSettings: () => DEFAULT_SETTINGS, getCredential, whenReady: async () => {}, prepare: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+    getSettings: () => DEFAULT_SETTINGS, getCredential, whenReady: async () => {}, prepare: async () => {}, startingChanged: () => {}, hideOverlay: () => {},
   })
   const config: SessionConfig = { audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: ['zh'], recognitionProvider: 'aliyun',
     recognitionOptions: { workspaceId: 'workspace', apiKey: 'caller-asr-key' }, translationProvider: 'mymemory', translationOptions: { apiKey: 'caller-translation-key', email: 'test@example.com' } }
@@ -113,7 +113,7 @@ it('rejects a missing ASR credential before runtime preparation or capture', asy
   const prepare = vi.fn()
   const request = vi.fn()
   const sessions = new SessionController({ engine: { currentState: 'ready', request } as unknown as EngineProcess, meetings: null,
-    getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', whenReady: async () => {}, prepare, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+    getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', whenReady: async () => {}, prepare, startingChanged: () => {}, hideOverlay: () => {},
   })
   await expect(sessions.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: [], recognitionProvider: 'aliyun' }, 'desktop')).rejects.toThrow('CLOUD_RECOGNITION_CREDENTIAL_MISSING')
   expect(prepare).not.toHaveBeenCalled()
@@ -125,7 +125,7 @@ it('starts the public Index-Translate service without reading or forwarding a cl
   const request = vi.fn(async () => ({ sessionId: 'public-session' }))
   const getCredential = vi.fn(async () => 'saved-cloud-secret')
   const sessions = new SessionController({ engine: { currentState: 'ready', start: vi.fn(), request } as unknown as EngineProcess, meetings: null,
-    getSettings: () => DEFAULT_SETTINGS, getCredential, whenReady: async () => {}, prepare: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+    getSettings: () => DEFAULT_SETTINGS, getCredential, whenReady: async () => {}, prepare: async () => {}, startingChanged: () => {}, hideOverlay: () => {},
   })
   await sessions.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: ['zh'], translationProvider: 'index-translate', translationOptions: { apiKey: 'caller-cloud-secret' } }, 'desktop')
   expect(getCredential).not.toHaveBeenCalled()
@@ -136,7 +136,7 @@ it('injects a stored Google Translate key and removes caller-supplied credential
   const request = vi.fn(async () => ({ sessionId: 'google-session' }))
   const getCredential = vi.fn(async () => 'stored-google-key')
   const sessions = new SessionController({ engine: { currentState: 'ready', request } as unknown as EngineProcess, meetings: null,
-    getSettings: () => DEFAULT_SETTINGS, getCredential, whenReady: async () => {}, prepare: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+    getSettings: () => DEFAULT_SETTINGS, getCredential, whenReady: async () => {}, prepare: async () => {}, startingChanged: () => {}, hideOverlay: () => {},
   })
   await sessions.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: ['zh'], translationProvider: 'google', translationOptions: { apiKey: 'caller-google-key' } }, 'desktop')
   expect(getCredential).toHaveBeenCalledExactlyOnceWith('google')

@@ -47,6 +47,8 @@ const channels = {
   openMainPage: 'app:open-main-page', mainPageRequested: 'app:main-page-requested',
   showOverlay: 'overlay:show',
   hideOverlay: 'overlay:hide',
+  getOverlayVisibility: 'overlay:is-visible',
+  overlayVisibilityChanged: 'overlay:visibility-changed',
   closeOverlay: 'overlay:close',
   minimizeOverlay: 'overlay:minimize',
   resizeOverlay: 'overlay:resize',
@@ -66,6 +68,9 @@ const channels = {
   setCaptionService: 'browser:caption-service',
   openDefaultBrowser: 'app:open-default-browser',
   notifyMainError: 'app:overlay-error', mainErrorNotification: 'app:main-error-notification',
+  previewOverlayToast: 'app:overlay-toast-preview',
+  dismissOverlayToast: 'app:overlay-toast-dismissed',
+  overlayToastAction: 'app:overlay-toast-action',
   checkLatestRelease: 'app:check-latest-release', openReleasePage: 'app:open-release-page',
 } as const
 
@@ -232,8 +237,9 @@ const api: NolaTranslatorApi = {
     ipcRenderer.on(channels.mainErrorNotification, listener)
     return () => ipcRenderer.off(channels.mainErrorNotification, listener)
   },
-  showOverlay: () => invoke(channels.showOverlay),
+  showOverlay: (mode?: 'standalone' | 'workspace') => invoke(channels.showOverlay, mode),
   hideOverlay: () => invoke(channels.hideOverlay),
+  getOverlayVisibility: () => invoke(channels.getOverlayVisibility),
   closeOverlay: () => invoke(channels.closeOverlay),
   minimizeOverlay: () => invoke(channels.minimizeOverlay),
   resizeOverlay: (width, height) => invoke(channels.resizeOverlay, width, height),
@@ -242,6 +248,11 @@ const api: NolaTranslatorApi = {
     const wrapped = (_event: Electron.IpcRendererEvent, locked: boolean): void => listener(locked)
     ipcRenderer.on(channels.overlayLockChanged, wrapped)
     return () => ipcRenderer.off(channels.overlayLockChanged, wrapped)
+  },
+  onOverlayVisibilityChanged: (listener) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, visible: boolean): void => listener(visible)
+    ipcRenderer.on(channels.overlayVisibilityChanged, wrapped)
+    return () => ipcRenderer.off(channels.overlayVisibilityChanged, wrapped)
   },
   openAppearance: (page?: OverlayTargetPage) => invoke(channels.openAppearance, page),
   onOpenAppearance: (listener) => {
@@ -274,7 +285,15 @@ const api: NolaTranslatorApi = {
   setTranslationCredential: (provider, value) => invoke(channels.setTranslationCredential, provider, value),
   setCaptionService: (active) => invoke(channels.setCaptionService, active),
   openDefaultBrowser: () => invoke(channels.openDefaultBrowser),
-  notifyMainError: (message, description) => ipcRenderer.send(channels.notifyMainError, { message, description }),
+  notifyMainError: notification => ipcRenderer.send(channels.notifyMainError, notification),
+  previewOverlayToast: notification => ipcRenderer.send(channels.previewOverlayToast, notification),
+  dismissOverlayToast: () => ipcRenderer.send(channels.dismissOverlayToast),
+  triggerOverlayToastAction: actionId => ipcRenderer.send(channels.overlayToastAction, actionId),
+  onOverlayToastAction: listener => {
+    const wrapped = (_event: Electron.IpcRendererEvent, actionId: Parameters<typeof listener>[0]): void => listener(actionId)
+    ipcRenderer.on(channels.overlayToastAction, wrapped)
+    return () => ipcRenderer.off(channels.overlayToastAction, wrapped)
+  },
   checkLatestRelease: (force?: boolean) => invoke(channels.checkLatestRelease, force),
   openReleasePage: (url: string) => invoke(channels.openReleasePage, url),
 }

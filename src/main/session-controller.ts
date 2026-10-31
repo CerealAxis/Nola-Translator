@@ -47,7 +47,6 @@ export interface SessionControllerOptions {
   prepare(config: SessionConfig, cancelled?: () => boolean): Promise<void>
   whenReady(): Promise<void>
   startingChanged(starting: boolean): void
-  showOverlay(): void
   hideOverlay(): void
   /** The browser caption gate reserves the caption service even before an extension connects. */
   isBrowserCaptionServiceActive?(): boolean
@@ -266,7 +265,6 @@ export class SessionController {
       this.activeSessionId = response.sessionId
       if (owner === 'browser') this.rememberBrowser(response.sessionId)
       if (meetingId) this.options.meetings?.attach(meetingId, response.sessionId)
-      if (owner === 'desktop') this.options.showOverlay()
       logDiagnostic('session.started', { owner, sessionId: response.sessionId, meetingId })
       return { sessionId: response.sessionId, meetingId }
     } catch (error) {

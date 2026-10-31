@@ -24,6 +24,10 @@ body {
   overflow: hidden;
 }
 
+html[data-overlay-toast='true'] body,
+html[data-overlay-toast='true'] #root { background: transparent; }
+html[data-overlay-toast='true'] #splash { display: none; }
+
 /* Desktop app: the window itself never scrolls, only the content areas. */
 #root {
   display: flex;

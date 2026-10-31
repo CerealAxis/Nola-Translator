@@ -52,10 +52,13 @@ export function failedTranslations(caption?: CaptionSegment | null): Translation
 
 /** Full text for one failed translation, e.g. "Translation failed · network unreachable". */
 export function translationErrorLabel(t: Translate, translation: Translation): string {
+  return t('shellUi.translationFailed', { reason: translationErrorReason(t, translation) })
+}
+
+export function translationErrorReason(t: Translate, translation: Translation): string {
   const code = translation.errorCode ?? ''
   const key = ERROR_KEYS[code]
-  const reason = key ? t(key) : t('shellUi.unknownReason')
-  return t('shellUi.translationFailed', { reason })
+  return key ? t(key) : t('shellUi.unknownReason')
 }
 
 /**

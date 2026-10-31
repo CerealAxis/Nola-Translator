@@ -1,7 +1,7 @@
 import { ModelAvailabilityLabel } from '@/features/workspace/ModelAvailabilityLabel'
 import { useModelOptions } from '@/model-options'
 import { translationLanguages } from '../../../shared/model-capabilities'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
@@ -14,10 +14,10 @@ import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridg
 import type { AppSettingsPatch } from '@/bridge'
 import { useI18n } from '@/i18n'
 import { useRoute } from '@/routes'
-import { actions, sessionStore, stores, updateSettings, useStore } from '@/store'
+import { actions, getBridge, sessionStore, stores, updateSettings, useStore } from '@/store'
 import { swappedLanguagesOf, targetLanguagePatch, translationModelPatch } from '@/session-config'
 import { PageHeader } from '@/components/primitives'
-import { notifyError, notifyInfo } from '@/components/primitives/notify'
+import { notifyGatewayModelUnavailable, notifyOverlayError, notifyOverlayInfo } from '@/components/primitives/notify'
 import { useAvailableModels, useModelSelection, type AvailableModel } from '@/available-models'
 import { SettingSelect } from '../settings/SettingsPage'
 import { captionScrimColor } from './scrimColor'
@@ -32,7 +32,7 @@ export function OverlayPage() {
   // The overlay follows what is callable now: the model the gateway loaded, plus configured cloud
   // interfaces. A stale local selection moves on its own instead of failing when captions start.
   const catalog = useAvailableModels()
-  const reportSwitch = (model: AvailableModel) => notifyInfo(t('gateway.modelSwitched', { name: model.name }),
+  const reportSwitch = (model: AvailableModel) => notifyOverlayInfo(t('gateway.modelSwitched', { name: model.name }),
     { description: t(model.origin === 'gateway' ? 'gateway.modelSwitchedLoaded' : 'gateway.modelSwitchedCloud') })
   const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch)
   const translationDisabled = settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE
@@ -50,19 +50,53 @@ export function OverlayPage() {
   const browserActive = useStore(stores.settings, state => state.browser?.captionServiceActive === true || state.captionServiceBusy)
   const sessionActive = !['idle', 'error'].includes(session.status) || browserActive
   const [opening, setOpening] = useState(false)
+  const [overlayVisible, setOverlayVisible] = useState(false)
   const config = settings.overlay
   const display = translationDisabled ? 'source' : config.showSource && config.showTranslation ? 'both' : config.showSource ? 'source' : 'translation'
   const label = (code: string) => languageName(code, language)
-  const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch(() => undefined) }
+  const patch = (value: AppSettingsPatch) => { void updateSettings(value).catch(() => notifyOverlayError(t('errors.settingsSaveFailed'))) }
+  useEffect(() => {
+    const bridge = getBridge()
+    if (!bridge) return
+    let changed = false
+    const unsubscribe = bridge.events.onOverlayVisibilityChanged(visible => {
+      changed = true
+      setOverlayVisible(visible)
+    })
+    void bridge.overlay.getVisibility().then(visible => {
+      if (!changed) setOverlayVisible(visible)
+    }).catch(() => undefined)
+    return () => { changed = true; unsubscribe() }
+  }, [])
   const open = async () => {
     setOpening(true)
     try {
+      const bridge = getBridge()
+      if (!bridge) throw new Error('Overlay bridge unavailable')
+      if (overlayVisible) {
+        await bridge.overlay.close()
+        setOverlayVisible(false)
+        return
+      }
+      const gateway = await getBridge()?.gateway?.snapshot()
+      if (gateway?.state !== 'running') {
+        notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.asr') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
+        return
+      }
+      if (asr.unavailable) {
+        notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.asr') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
+        return
+      }
+      if (!translationDisabled && mt.unavailable) {
+        notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.mt') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
+        return
+      }
       const opened = await actions.settings.showOverlay()
       if (opened === false) {
-        notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
-      }
+        notifyOverlayError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+      } else setOverlayVisible(true)
     } catch (error) {
-      notifyError(t('workspaceUi.overlayFailed'), { cause: error })
+      notifyOverlayError(t('workspaceUi.overlayFailed'), { cause: error })
     }
     finally { setOpening(false) }
   }
@@ -88,9 +122,9 @@ export function OverlayPage() {
       <PageHeader className="nola-page-heading" title={t('home.quickStart')}
         actions={<div className="flex flex-wrap gap-2">
           <Button data-onboarding="open-workspace" variant="secondary" onClick={() => {
-            void actions.settings.showWorkspace().catch(error => notifyError(t('workspaceUi.windowFailed'), { cause: error }))
+            void actions.settings.showWorkspace().catch(error => notifyOverlayError(t('workspaceUi.windowFailed'), { cause: error }))
           }}><ExternalLink aria-hidden="true" />{t('home.quickStart')}</Button>
-          <Button data-onboarding="open-overlay" onClick={() => void open()} disabled={opening} aria-busy={opening}>{opening ? <Spinner /> : <ExternalLink aria-hidden="true" />}{t('shellUi.openOverlay')}</Button>
+          <Button data-onboarding="open-overlay" onClick={() => void open()} disabled={opening} aria-busy={opening}>{opening ? <Spinner /> : <ExternalLink aria-hidden="true" />}{t(overlayVisible ? 'overlay.close' : 'shellUi.openOverlay')}</Button>
         </div>} />
       <Card className="nola-overlay-preview" data-onboarding="caption-preview">
         <CardHeader>

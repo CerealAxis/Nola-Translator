@@ -46,7 +46,7 @@ async function fixture(integrations?: BrowserIntegrations, activity?: FeatureAct
   vi.stubEnv('LOCALAPPDATA', directory)
   const engine = new TestEngine()
   const typed = engine as unknown as EngineProcess
-  const sessions = new SessionController({ activity, engine: typed, meetings: null, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', prepare: async () => {}, whenReady: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {} })
+  const sessions = new SessionController({ activity, engine: typed, meetings: null, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', prepare: async () => {}, whenReady: async () => {}, startingChanged: () => {}, hideOverlay: () => {} })
   engine.on('state', () => sessions.releaseOnLoss())
   const connection = new BrowserConnection({ activity, engine: typed, sessions, integrations, getSettings: () => DEFAULT_SETTINGS, setEnabled: async () => {} })
   disposers.push(async () => { await connection.dispose(); await rm(directory, { recursive: true, force: true }) })

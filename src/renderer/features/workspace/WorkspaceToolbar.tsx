@@ -25,7 +25,8 @@ export interface WorkspaceToolbarProps {
   audioSource: string
   devices: readonly AudioDevice[]
   onAudioSourceChange: (value: string) => void
-  onOpenOverlay: () => void
+  overlayVisible: boolean
+  onOverlayVisibleChange: (visible: boolean) => void
   sourceLanguage: string
   targetLanguage: string
   onSourceLanguageChange: (code: string) => void
@@ -126,7 +127,6 @@ export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
               </Popover.Popup></Popover.Positioner></Popover.Portal>
             </Popover.Root>
           </div>
-          <Button variant="outline" className="nola-workspace-overlay" onClick={props.onOpenOverlay}><Captions aria-hidden="true" />{t('workspaceUi.openOverlay')}</Button>
         </div>}
         <div className="nola-workspace-view-controls">
           <TabsRoot value={props.displayMode} onValueChange={value => { if (value) props.onDisplayModeChange(value as CaptionDisplayMode) }}>
@@ -149,6 +149,11 @@ export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
               </TabsList>
             </TabsRoot>
           </div>
+          <Switch checked={props.overlayVisible} onCheckedChange={props.onOverlayVisibleChange} className="nola-workspace-notes-switch nola-workspace-overlay-switch">
+            <Captions aria-hidden="true" />
+            <span className="nola-workspace-notes-switch__label">{t('workspaceUi.openOverlay')}</span>
+            <span className="switch__control"><SwitchThumb className="switch__thumb" /></span>
+          </Switch>
           <Switch checked={props.notesOpen} onCheckedChange={props.onToggleNotes} className="nola-workspace-notes-switch">
             <StickyNote aria-hidden="true" />
             <span className="nola-workspace-notes-switch__label">{t('workspace.notes')}</span>

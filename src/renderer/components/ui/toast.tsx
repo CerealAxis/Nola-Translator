@@ -2,6 +2,7 @@
 
 import { Toast as BaseToast } from '@base-ui/react/toast'
 import { CheckCircle2, CircleX, Info, LoaderCircle, TriangleAlert, X } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { Button } from './button'
 import { Card } from './card'
 import { useI18n } from '@/i18n'
@@ -11,6 +12,7 @@ export interface ToastAction { children: string; onClick: () => void }
 export type ToastPayload =
   | { type: ToastType; description: string; title?: never; duration?: number }
   | { type: ToastType; title: string; description: string; duration?: number }
+  | { type: ToastType; title: string; actionProps: ToastAction; description?: never; duration?: number }
   | { type: ToastType; title: string; description: string; actionProps: ToastAction; duration?: number }
 
 export interface ToastData {}
@@ -45,9 +47,14 @@ export function updateToast(id: string, payload: ToastPayload): string {
 
 export function closeToast(id: string): void { manager.close(id) }
 
-function ToastViewport() {
+function ToastViewport({ onEmpty }: { onEmpty?: () => void }) {
   const { t } = useI18n()
   const { toasts } = BaseToast.useToastManager<ToastData>()
+  const previousCount = useRef(toasts.length)
+  useEffect(() => {
+    if (previousCount.current > 0 && toasts.length === 0) onEmpty?.()
+    previousCount.current = toasts.length
+  }, [onEmpty, toasts.length])
   return <BaseToast.Portal>
     <BaseToast.Viewport className="nola-toast-viewport z-toast" data-slot="toast-viewport">
       {toasts.map(toast => <BaseToast.Root key={toast.id} toast={toast} render={<Card size="sm" data-slot="toast" />} className="nola-toast" data-slot="toast" data-type={toast.type ?? 'info'}>
@@ -69,6 +76,6 @@ function ToastViewport() {
   </BaseToast.Portal>
 }
 
-export function ToastProvider() {
-  return <BaseToast.Provider toastManager={manager}><ToastViewport /></BaseToast.Provider>
+export function ToastProvider({ onEmpty }: { onEmpty?: () => void } = {}) {
+  return <BaseToast.Provider toastManager={manager}><ToastViewport onEmpty={onEmpty} /></BaseToast.Provider>
 }

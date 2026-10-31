@@ -36,6 +36,7 @@
    * row and keeps the track itself in a switch__control child.
    */
   .switch.nola-workspace-notes-switch { display: flex; align-items: center; gap: 10px; width: auto; height: auto; margin-inline-start: auto; border-radius: var(--radius-xl); background: transparent; }
+  .switch.nola-workspace-overlay-switch { margin-inline-start: 0; }
   .switch.nola-workspace-notes-switch[data-checked], .switch.nola-workspace-notes-switch[aria-checked='true'] { background: transparent; }
   .switch.nola-workspace-notes-switch .switch__control { flex: none; width: 32px; height: 18.4px; border-radius: 9999px; background: var(--nola-ui-input); }
   .switch.nola-workspace-notes-switch[data-checked] .switch__control, .switch.nola-workspace-notes-switch[aria-checked='true'] .switch__control { background: var(--nola-ui-primary); }

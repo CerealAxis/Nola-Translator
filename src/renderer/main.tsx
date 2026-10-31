@@ -6,7 +6,8 @@ import './theme/cjk-fonts.css'
 import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
-import { ToastProvider } from './components/ui/toast'
+import { showToast, ToastProvider } from './components/ui/toast'
+import type { ToastPayload } from './components/ui/toast'
 import { APPLICATION_PAGES, useApplicationNavigation } from './application'
 import { dismissNotice, notifyError } from './components/primitives/notify'
 import { createIpcBridge, isIpcBridgeAvailable } from './bridge/ipc/ipcBridge'
@@ -45,10 +46,36 @@ import { DataMigrationDialog } from './features/settings/DataMigrationDialog'
 const isWorkspaceDocument = new URLSearchParams(window.location.search).get('workspace') === '1'
 const isOverlayDocument = new URLSearchParams(window.location.search).get('overlay') === '1'
 const isOverlayMenuDocument = new URLSearchParams(window.location.search).get('overlayMenu') === '1'
+const isOverlayToastDocument = new URLSearchParams(window.location.search).get('overlayToast') === '1'
 const isMigrationDocument = new URLSearchParams(window.location.search).get('migration') === '1'
+if (isOverlayToastDocument) document.documentElement.dataset.overlayToast = 'true'
 const bridge = createIpcBridge()
+const onOverlayToastEmpty = isOverlayToastDocument ? () => bridge.app.dismissOverlayToast?.() : undefined
 // Migration owns the data files before stores or engine IPC can safely start.
-if (!isMigrationDocument) initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument && !isWorkspaceDocument, overlayMenu: isOverlayMenuDocument, offline: !isOverlayDocument && !isWorkspaceDocument })
+if (!isMigrationDocument && !isOverlayToastDocument) initStores(bridge, { engineConnected: isIpcBridgeAvailable(), backgroundChecks: !isOverlayDocument && !isWorkspaceDocument, overlayMenu: isOverlayMenuDocument, offline: !isOverlayDocument && !isWorkspaceDocument })
+
+function OverlayToastWindow() {
+  useEffect(() => bridge.events.onMainErrorNotification?.(notification => {
+    const type = notification.type ?? 'error'
+    const action = notification.actionLabel && (notification.actionPage || notification.actionId)
+      ? { children: notification.actionLabel, onClick: () => {
+          if (notification.actionPage) void bridge.app.openMainPage?.(notification.actionPage).catch(error => console.error('[overlay-toast.action]', error))
+          else if (notification.actionId === 'runtime-engine') void bridge.runtimes.openSettings('engine').catch(error => console.error('[overlay-toast.action]', error))
+          else if (notification.actionId === 'runtime-llama') void bridge.runtimes.openSettings('llama').catch(error => console.error('[overlay-toast.action]', error))
+          else if (notification.actionId) bridge.app.triggerOverlayToastAction?.(notification.actionId)
+        } }
+      : undefined
+    const toast: ToastPayload = notification.description
+      ? action
+        ? { type, title: notification.message, description: notification.description, actionProps: action, duration: notification.duration }
+        : { type, title: notification.message, description: notification.description, duration: notification.duration }
+      : action
+        ? { type, title: notification.message, actionProps: action, duration: notification.duration }
+        : { type, description: notification.message, duration: notification.duration }
+    showToast(toast)
+  }), [])
+  return null
+}
 
 function MigrationWindow() {
   const [percent, setPercent] = useState(0)
@@ -205,21 +232,12 @@ function Shell() {
 
   return (
     <AppShell navigation={navigation}>
-      <MainWindowErrorNotifications />
       {isEngineConnected() ? null : <EngineDisconnectedNotice />}
       <SettingsErrorNotice />
       <Routes pages={APPLICATION_PAGES} />
       <OnboardingTour />
     </AppShell>
   )
-}
-
-/** Receives errors raised by the transparent caption window so they never cover its controls. */
-function MainWindowErrorNotifications() {
-  useEffect(() => bridge.events.onMainErrorNotification?.(notification => {
-    notifyError(notification.message, { description: notification.description })
-  }), [])
-  return null
 }
 
 /**
@@ -336,7 +354,7 @@ flushSync(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <I18nProvider readSettings={!isMigrationDocument}>
-        {isMigrationDocument ? <MigrationWindow /> : <><ToastProvider /><Root /></>}
+        {isMigrationDocument ? <MigrationWindow /> : <><ToastProvider onEmpty={onOverlayToastEmpty} />{isOverlayToastDocument ? <OverlayToastWindow /> : <Root />}</>}
       </I18nProvider>
     </StrictMode>
   )

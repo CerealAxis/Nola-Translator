@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import * as toast from '../ui/toast'
-import { notifyError, notifyLoading } from './notify'
+import { notifyError, notifyGatewayModelUnavailable, notifyLoading } from './notify'
 
 afterEach(() => { vi.restoreAllMocks(); window.history.replaceState({}, '', '/') })
 
@@ -29,6 +29,17 @@ it('uses the explicit title and description layout when requested', () => {
   expect(showToast).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
     title: '搜索失败',
     description: '请检查网络后重试。',
+  }))
+})
+
+it('shows a local-model availability toast in the app with a gateway action', () => {
+  const showToast = vi.spyOn(toast, 'showToast')
+  notifyGatewayModelUnavailable('没有可用的ASR模型', '请先启动模型网关。', '模型网关')
+  expect(showToast).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+    type: 'error',
+    title: '没有可用的ASR模型',
+    description: '请先启动模型网关。',
+    actionProps: { children: '模型网关', onClick: expect.any(Function) },
   }))
 })
 

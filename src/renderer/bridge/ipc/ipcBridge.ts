@@ -186,12 +186,14 @@ export function createIpcBridge(): NolaBridge {
       openMenu: request => call('openOverlayMenu', injected => injected.openOverlayMenu(request)),
       presentMenu: id => call('presentOverlayMenu', injected => injected.presentOverlayMenu(id)),
       closeMenu: id => call('closeOverlayMenu', injected => injected.closeOverlayMenu(id)),
-      show: () => call('showOverlay', (injected) => injected.showOverlay()),
+      show: mode => call('showOverlay', (injected) => injected.showOverlay(mode)),
       hide: () => call('hideOverlay', (injected) => injected.hideOverlay()),
+      getVisibility: () => call('getOverlayVisibility', (injected) => injected.getOverlayVisibility()),
       close: () => call('closeOverlay', (injected) => injected.closeOverlay()),
       minimize: () => call('minimizeOverlay', (injected) => injected.minimizeOverlay()),
       resize: (width, height) => call('resizeOverlay', (injected) => injected.resizeOverlay(width, height)),
       setLocked: (locked) => call('setOverlayLocked', (injected) => injected.setOverlayLocked(locked)),
+      onVisibilityChanged: cb => subscribe('onOverlayVisibilityChanged', injected => injected.onOverlayVisibilityChanged, cb),
     },
     settings: {
       browserConnection: (action, enabled, browser) => call('browserConnection', api => api.browserConnection ? api.browserConnection(action, enabled, browser) : Promise.reject(new MissingIpcApiError('browserConnection'))),
@@ -261,7 +263,10 @@ export function createIpcBridge(): NolaBridge {
       // No payload and no translation: the main process resolves the user's default browser
       // itself, so nothing about *which* browser crosses this boundary.
       openDefaultBrowser: () => call('openDefaultBrowser', (injected) => injected.openDefaultBrowser()),
-      notifyMainError: (message, description) => injectedApi()?.notifyMainError?.(message, description),
+      notifyMainError: notification => injectedApi()?.notifyMainError?.(notification),
+      previewOverlayToast: notification => injectedApi()?.previewOverlayToast?.(notification),
+      dismissOverlayToast: () => injectedApi()?.dismissOverlayToast?.(),
+      triggerOverlayToastAction: actionId => injectedApi()?.triggerOverlayToastAction?.(actionId),
       checkLatestRelease: (force) => call('checkLatestRelease', (injected) => injected.checkLatestRelease(force)),
       openReleasePage: (url) => call('openReleasePage', (injected) => injected.openReleasePage(url)),
     },
@@ -272,6 +277,7 @@ export function createIpcBridge(): NolaBridge {
     events: {
       onMainPageRequested: cb => injectedApi()?.onMainPageRequested?.(cb) ?? (() => undefined),
       onMainErrorNotification: cb => injectedApi()?.onMainErrorNotification?.(cb) ?? (() => undefined),
+      onOverlayToastAction: cb => injectedApi()?.onOverlayToastAction?.(cb) ?? (() => undefined),
       onDataMigrationProgress: cb => injectedApi()?.onDataMigrationProgress?.(cb) ?? (() => undefined),
       onOverlayMenuChanged: cb => subscribe('onOverlayMenuChanged', injected => injected.onOverlayMenuChanged, cb),
       onEngineEvent: (cb) => subscribe('onEngineEvent', (injected) => injected.onEngineEvent, cb),
@@ -287,6 +293,7 @@ export function createIpcBridge(): NolaBridge {
         cb(target.route, target.path)
       }),
       onOverlayLockChanged: (cb) => subscribe('onOverlayLockChanged', (injected) => injected.onOverlayLockChanged, cb),
+      onOverlayVisibilityChanged: cb => subscribe('onOverlayVisibilityChanged', injected => injected.onOverlayVisibilityChanged, cb),
     },
     models: {
       configureModel: (resourceId, configuration) => call('configureModel', injected => injected.configureModel(resourceId, configuration)),

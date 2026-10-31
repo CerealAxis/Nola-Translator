@@ -28,7 +28,6 @@ import type { CSSProperties, ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Dialog as BaseDialog } from '@base-ui/react/dialog'
 import { Lock, Minus, Monitor, Pin, PinOff, SlidersHorizontal, Unlock, X } from 'lucide-react'
 
 import { DEFAULT_SETTINGS } from '@/bridge'
@@ -36,7 +35,7 @@ import { formatChineseCaption } from '@/chinese-script'
 import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
 import { notifyError } from '@/components/primitives/notify'
-import { translationErrorSummary } from '@/translation-status'
+import { failedTranslations, translationErrorReason } from '@/translation-status'
 
 import { CaptionTrack } from './CaptionTrack'
 import type { TrackLine } from './CaptionTrack'
@@ -66,39 +65,29 @@ export function OverlayRoot() {
    */
   const [locked, setLocked] = useState(false)
   const [captionTextSelected, setCaptionTextSelected] = useState(false)
-  const [closing, setClosing] = useState(false)
-  const [closePending, setClosePending] = useState(false)
-  const [detachedConfirmation, setDetachedConfirmation] = useState(false)
   const closeRequest = useRef(false)
+  const reportedTranslationErrors = useRef({ sessionId: null as string | null, at: new Map<string, number>(), initialized: false })
 
   /*
-   * 「−」 really minimizes to the taskbar, 「✕」 closes and ends the session.
+   * 「−」 minimizes to the taskbar; 「✕」 hides this window and leaves the session running.
    *
    * Real minimizing has a hard prerequisite: the caption window must be
    * `skipTaskbar: false`, or a minimized window has no taskbar entry to bring
    * it back.
    *
-   * Closing ends recognition. `hideOverlay` is a pure hide for a caller that
-   * only wants the window out of the way; here the user means the session is
-   * over, and leaving the engine running would have them believe it is still
-   * recording.
    */
-  // The main process owns stop + hide. Sending stopSession as well races two teardown requests.
   const closeOverlay = async (): Promise<void> => {
     if (closeRequest.current) return
     closeRequest.current = true
-    setClosePending(true)
     try {
       const bridge = getBridge()
       if (!bridge) throw new Error('Overlay bridge unavailable')
       await bridge.overlay.close()
-      setClosing(false)
     } catch (error) {
       console.error('[overlay] close failed', error)
       notifyError(t('overlay.closeFailed'), { cause: error })
     } finally {
       closeRequest.current = false
-      setClosePending(false)
     }
   }
 
@@ -118,30 +107,6 @@ export function OverlayRoot() {
   const openAppearanceSettings = (): void => {
     void window.nolaTranslator?.openAppearance('appearance').catch((error: unknown) => {
       notifyError(t('overlay.appearanceFailed'), { cause: error })
-    })
-  }
-
-  const requestCloseConfirmation = (): void => {
-    setClosing(true)
-    const card = cardRef.current
-    const openMenu = getBridge()?.overlay.openMenu
-    if (!card || !openMenu) {
-      setDetachedConfirmation(false)
-      return
-    }
-    const rect = card.getBoundingClientRect()
-    setDetachedConfirmation(true)
-    void actions.settings.openOverlayMenu({
-      kind: 'confirm',
-      anchor: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-      modality: 'pointer',
-    }).then(opened => {
-      if (opened) setClosing(false)
-      else setDetachedConfirmation(false)
-    }).catch((error: unknown) => {
-      console.warn('[overlay] close confirmation failed', error)
-      notifyError(t('overlay.menuFailed'), { cause: error })
-      setDetachedConfirmation(false)
     })
   }
 
@@ -174,32 +139,33 @@ export function OverlayRoot() {
     ...(session.interim ? [session.interim] : []),
   ]
     .sort((left, right) => left.startedAtMs - right.startedAtMs)
-  const translationCurrent = [...orderedSegments]
-    .reverse()
-    .find((segment) => segment.translations.some((entry) => entry.state !== 'failed' && Boolean(entry.text))
-      || (segment.translations.length > 0 && segment.translations.every((entry) => entry.state === 'failed')))
-  const translated = translationCurrent?.translations.find((entry) => entry.state !== 'failed' && entry.text)
+  const failed = orderedSegments.flatMap(segment => failedTranslations(segment).map(translation => ({ translation, segmentId: segment.segmentId })))
+  const failedSignature = failed.map(({ translation, segmentId }) => `${segmentId}:${translation.errorCode ?? 'unknown'}`).join('|')
+  useEffect(() => {
+    if (reportedTranslationErrors.current.sessionId !== session.sessionId) {
+      reportedTranslationErrors.current = { sessionId: session.sessionId, at: new Map(), initialized: false }
+    }
+    if (!reportedTranslationErrors.current.initialized) {
+      for (const { translation } of failed) reportedTranslationErrors.current.at.set(translation.errorCode ?? 'unknown', Date.now())
+      reportedTranslationErrors.current.initialized = true
+      return
+    }
+    const now = Date.now()
+    for (const { translation } of failed) {
+      const code = translation.errorCode ?? 'unknown'
+      const previous = reportedTranslationErrors.current.at.get(code) ?? 0
+      if (now - previous < 15000) continue
+      reportedTranslationErrors.current.at.set(code, now)
+      notifyError(t('shellUi.translationFailed', { reason: translationErrorReason(t, translation) }))
+    }
+  }, [failedSignature, session.sessionId, t])
   const sourceTrackLines = orderedSegments.flatMap((segment): TrackLine[] =>
     segment.sourceText ? [{ key: segment.segmentId, text: formatChineseCaption(segment.sourceText, sourceLanguage) }] : [])
   const translatedTrackLines = orderedSegments.map((segment): TrackLine => {
     const entry = segment.translations.find((item) => item.state !== 'failed' && item.text)
     if (entry?.text) return { key: segment.segmentId, text: entry.text, stableText: entry.stableText }
-    if (segment.segmentId === translationCurrent?.segmentId && !translated?.text) {
-      const reason = translationErrorSummary(t, segment)
-      return { key: segment.segmentId, text: reason ?? '' }
-    }
     return { key: segment.segmentId, text: '' }
   })
-
-  /*
-   * A translation failure must show its reason. Drawing only `complete`
-   * translations makes "offline / expired key / model not ready" look exactly
-   * like "still translating", and the user can act on neither.
-   *
-   * Shown only when there is genuinely no usable translation: a `pending`
-   * segment gets no failure copy, because translation lagging is normal and a
-   * flashing error is noisier than an empty line.
-   */
   const originalOnly = !!current && current.translations.length === 0
   const effectiveTranslationTrackLines = originalOnly && !config.showSource ? sourceTrackLines : translatedTrackLines
 
@@ -333,7 +299,6 @@ export function OverlayRoot() {
         data-slot="caption-surface"
         data-scheme={scheme}
         data-locked={locked ? 'true' : 'false'}
-        data-confirm-open={closing ? 'true' : 'false'}
         data-hover={hovered || menuOpen ? 'true' : 'false'}
         data-text-selected={locked && captionTextSelected ? 'true' : 'false'}
         data-layout={config.layout}
@@ -469,49 +434,13 @@ export function OverlayRoot() {
           >
             <Minus aria-hidden="true" />
           </GhostButton>
-          {/*
-           * Closing confirms first: it also stops recognition and is not
-           * reversible, since restarting reloads several GB of weights.
-           */}
-          <GhostButton label={t('overlay.close')} onClick={requestCloseConfirmation} color={palette.chrome}>
+          <GhostButton label={t('overlay.close')} onClick={() => void closeOverlay()} color={palette.chrome}>
             <X aria-hidden="true" />
           </GhostButton>
         </div>
 
         <OverlayControls active={active} locked={locked} />
 
-        {/*
-         * Not `AlertDialog`: its backdrop is `position: fixed; inset: 0`, which
-         * covers the whole viewport of this short transparent window and buries
-         * the confirm button under itself. Drawn in-window instead.
-         *
-         * Inside `<section>` on purpose, so `position: absolute; inset: 0` resolves
-         * against the card (`position: relative`) and covers the glass without
-         * spilling past it. The outer `main` fills the window, so covering that
-         * would cover the viewport.
-         */}
-        {closing ? (
-          detachedConfirmation ? <div className="nola-confirm-layer" aria-hidden="true" /> :
-          <BaseDialog.Root open onOpenChange={open => { if (!closePending) setClosing(open) }}>
-          <BaseDialog.Portal container={cardRef}>
-          <BaseDialog.Popup className="nola-confirm-layer">
-            <Card className="nola-confirm-dialog">
-              <BaseDialog.Title render={<p />} className="nola-confirm-title">{t('overlay.closeTitle')}</BaseDialog.Title>
-              <BaseDialog.Description render={<p />} className="nola-confirm-text">{t('overlay.closeBody')}</BaseDialog.Description>
-              <div className="nola-confirm-actions">
-                <Button variant="secondary" size="sm" disabled={closePending} onClick={() => setClosing(false)}>
-                  {t('common.cancel')}
-                </Button>
-
-                <Button variant="danger" size="sm" disabled={closePending} aria-busy={closePending} onClick={() => void closeOverlay()}>
-                  {t(closePending ? 'overlay.closing' : 'overlay.closeConfirm')}
-                </Button>
-              </div>
-            </Card>
-          </BaseDialog.Popup>
-          </BaseDialog.Portal>
-          </BaseDialog.Root>
-        ) : null}
       </section>
     </main>
   )

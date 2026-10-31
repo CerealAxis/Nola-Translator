@@ -38,7 +38,7 @@ it('allows desktop preparation alongside the gateway and releases only the faile
   const prepare = vi.fn(async () => { throw new Error('model unavailable') })
   const controller = new SessionController({ activity, engine: { currentState: 'ready' } as EngineProcess,
     meetings: null, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', prepare,
-    whenReady: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+    whenReady: async () => {}, startingChanged: () => {}, hideOverlay: () => {},
   })
   const lease = activity.acquire('model-gateway', async () => {})
   await expect(controller.start({ audioSource: { kind: 'defaultOutput' }, sourceLanguage: 'auto', targetLanguages: [], recognitionMode: 'realtime' }, 'desktop')).rejects.toThrow('model unavailable')
@@ -69,7 +69,7 @@ it('waits for preparation cancellation before releasing a starting interpretatio
   const engine = { currentState: 'ready', stop: vi.fn(async () => {}) }
   const controller = new SessionController({ activity, engine: engine as unknown as EngineProcess,
     meetings: null, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '',
-    prepare: async () => gate, whenReady: async () => {}, startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {},
+    prepare: async () => gate, whenReady: async () => {}, startingChanged: () => {}, hideOverlay: () => {},
   })
   const started = controller.start({ audioSource: { kind: 'defaultOutput' }, sourceLanguage: 'auto', targetLanguages: [], recognitionMode: 'realtime' }, 'desktop')
   const rejected = expect(started).rejects.toThrow('sessionStartCancelled')

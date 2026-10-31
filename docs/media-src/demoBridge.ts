@@ -25,16 +25,22 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
   const settingListeners = new Set<(settings: AppSettings) => void>()
   const engineListeners = new Set<(event: EngineChannelEvent) => void>()
   const lockListeners = new Set<(locked: boolean) => void>()
+  const overlayVisibilityListeners = new Set<(visible: boolean) => void>()
   let overlayLock = false
+  let overlayVisible = false
   const publish = (event: EngineChannelEvent) => {
     engineListeners.forEach(listener => listener(event))
   }
   const openOverlay = async () => {
+    overlayVisible = true
     onOverlay(true)
+    overlayVisibilityListeners.forEach(listener => listener(true))
     return true
   }
   const closeOverlay = () => {
+    overlayVisible = false
     onOverlay(false)
+    overlayVisibilityListeners.forEach(listener => listener(false))
   }
   const subscribe = <T,>(listeners: Set<(value: T) => void>, listener: (value: T) => void) => {
     listeners.add(listener)
@@ -90,7 +96,9 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
       setCaptionService: async active => { browser.captionServiceActive = active; return { ...browser } },
     },
     overlay: {
-      show: openOverlay, hide: async () => closeOverlay(), close: async () => closeOverlay(), minimize: async () => closeOverlay(), resize: done,
+      show: openOverlay, hide: async () => closeOverlay(), getVisibility: async () => overlayVisible,
+      close: async () => closeOverlay(), minimize: async () => closeOverlay(), resize: done,
+      onVisibilityChanged: listener => subscribe(overlayVisibilityListeners, listener),
       // Session-scoped like the desktop: the demo keeps it in memory for the lifetime of the scene.
       setLocked: async (locked: boolean) => {
         const changed = locked !== overlayLock
@@ -179,6 +187,7 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
       onSettingsChanged: listener => subscribe(settingListeners, listener),
       onOverlayRequest: () => noop,
       onOverlayLockChanged: listener => subscribe(lockListeners, listener),
+      onOverlayVisibilityChanged: listener => subscribe(overlayVisibilityListeners, listener),
     },
   }
   // The title bar and locale provider use this limited facade; stores use the typed bridge above.

@@ -52,14 +52,8 @@
     // 冒烟测试靠这个标记确认"预涂真的在 CSP 下执行了"，而不是被静默拦掉。
     root.setAttribute('data-theme-booted', '1')
 
-    /*
-     * 悬浮字幕是独立文档分叉（?overlay=1），走的是另一套窗口几何：940x218 的窄条、
-     * 独立加载、ready-to-show 才显示。启动画面在那种比例下只会莫名其妙，
-     * 这里给 <html> 打标记，让 index.html 里的 #splash 用纯 CSS 隐藏。
-     * 判据用 location.search 而不是读主进程传下来的变量：这个文件必须保持零依赖、零 IPC，
-     * 且要在 <body> 解析之前跑完。
-     */
-    if (window.location.search.indexOf('overlay=1') !== -1) {
+    /* Overlay and notification documents are transparent native surfaces. */
+    if (window.location.search.indexOf('overlay=1') !== -1 || window.location.search.indexOf('overlayToast=1') !== -1) {
       root.classList.add('is-overlay')
     }
   } catch (e) {

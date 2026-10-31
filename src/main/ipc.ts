@@ -36,6 +36,7 @@ export const IPC_CHANNELS = {
   getEngineState: 'engine:get-state',
   showOverlay: 'overlay:show',
   hideOverlay: 'overlay:hide',
+  getOverlayVisibility: 'overlay:is-visible',
   closeOverlay: 'overlay:close',
   minimizeOverlay: 'overlay:minimize',
   resizeOverlay: 'overlay:resize',
@@ -84,11 +85,10 @@ export function registerEngineIpc(
   prepareCaptionService?: (config: PrewarmConfig) => Promise<PrewarmResult>,
   resourceInUse: (resourceId: string) => boolean = () => false,
 ): () => void {
-  const controller = sharedController ?? new SessionController({ engine, meetings, getSettings, getCredential: getTranslationCredential, prepare: prepareEnvironment, whenReady: whenRuntimeReady, startingChanged: onStartingChanged, showOverlay: () => getOverlayWindow()?.showInactive(), hideOverlay: () => getOverlayWindow()?.hide() })
-  let closingOverlay: Promise<void> | null = null
+  const controller = sharedController ?? new SessionController({ engine, meetings, getSettings, getCredential: getTranslationCredential, prepare: prepareEnvironment, whenReady: whenRuntimeReady, startingChanged: onStartingChanged, hideOverlay: () => getOverlayWindow()?.hide() })
+  let overlayCloseStopsSession = false
   const sessionEngine = controller.engine
   const ensureReady = async () => { await whenRuntimeReady(); if (engine.currentState !== 'ready') await engine.start() }
-  const stopActiveSession = (id: string) => controller.stop(id)
   const releaseSessionOnEngineLoss = () => controller.releaseOnLoss()
   /**
    * The engine never confirmed the stop, so the session is over from the app's point of view.
@@ -313,45 +313,23 @@ export function registerEngineIpc(
     return prepareCaptionService ? prepareCaptionService(config) : controller.prewarm(config)
   })
 
-  loggedHandle(IPC_CHANNELS.showOverlay, () => {
+  loggedHandle(IPC_CHANNELS.showOverlay, (_event, mode: unknown) => {
     if (!controller.canShowOverlay()) return false
     const window = getOverlayWindow()
     if (!window) throw new Error('overlayWindowUnavailable')
+    overlayCloseStopsSession = mode !== 'workspace'
     window.show()
     return true
   })
   loggedHandle(IPC_CHANNELS.hideOverlay, () => getOverlayWindow()?.hide())
-  // Closing the caption window ends the session, so recognition stops first and recordAudio
-  // stops writing a file nobody can see. hideOverlay stays a pure hide for a caller that only
-  // wants it out of the way.
-  loggedHandle(IPC_CHANNELS.closeOverlay, () => {
-    if (closingOverlay) return closingOverlay
-    const request = (async () => {
-      const sessionId = controller.browserActive ? null : controller.activeSessionId
-      if (sessionId) {
-        // A dead engine cannot own a live session; don't restart it just to stop a stale id.
-        if (sessionEngine.currentState !== 'ready') {
-          console.error('[overlay] engine is unavailable during overlay close; stopping engine process')
-          await sessionEngine.stop()
-          notifySessionStopped(sessionId)
-        } else {
-          try {
-            await stopActiveSession(sessionId)
-          } catch (error) {
-            // The controller stops the engine process itself when the teardown request fails,
-            // so the failure already released the session.
-            console.error('[overlay] session stop failed; the engine process was stopped with it', error)
-            notifySessionStopped(sessionId)
-          }
-        }
-      }
-      getOverlayWindow()?.hide()
-    })()
-    closingOverlay = request
-    void request.finally(() => {
-      if (closingOverlay === request) closingOverlay = null
-    }).catch(() => undefined)
-    return request
+  loggedHandle(IPC_CHANNELS.getOverlayVisibility, () => {
+    const window = getOverlayWindow()
+    return !!window && !window.isDestroyed() && window.isVisible()
+  })
+  loggedHandle(IPC_CHANNELS.closeOverlay, async () => {
+    if (overlayCloseStopsSession) await controller.stopCurrent()
+    else getOverlayWindow()?.hide()
+    overlayCloseStopsSession = false
   })
   loggedHandle(IPC_CHANNELS.minimizeOverlay, () => {
     const window = getOverlayWindow()

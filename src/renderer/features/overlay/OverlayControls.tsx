@@ -21,12 +21,11 @@ import { featureConflictOwner } from '../../../shared/feature-activity'
  * seconds to load weights, so `starting` shows a spinner rather than the mic
  * icon — an unchanged icon reads as "the press did not register".
  *
- * Failures are shown in place: preflight refusals and engine errors both land in
- * `sessionStore` (`missing` / `errorCode`) and render as a notice line here
- * rather than sending the user to the main window.
+ * Preflight refusals and engine errors use the independent notification window,
+ * keeping transient messages out of the caption track and control bar.
  */
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -41,7 +40,7 @@ import {
 import type { AppSettings, AudioDevice, AudioSourceOption, RecognitionModelId, SessionConfig } from '@/bridge'
 import { audioSourceFrom } from '@/features/workspace/SessionSetupDialog'
 import { errorCopyOf } from '@/features/workspace/WorkspacePage'
-import { actions, sessionStore, stores, useStore } from '@/store'
+import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
 import { audioDeviceNameOf, targetLanguagePatch, translationFieldsOf } from '@/session-config'
 import { useI18n } from '@/i18n'
@@ -72,9 +71,6 @@ const CAPSULE = 'nola-caption-pill'
 const MENU_ROW_MIN = 30
 /** Popover corner radius plus the gap to the trigger, deducted from the measured room. */
 const MENU_CHROME = 12
-
-/** The notice's id, referenced by the mic's `aria-describedby`. The text changes; the id does not. */
-const FAILURE_NOTICE_ID = 'overlay-start-failure'
 
 export interface OverlayControlsProps {
   /*
@@ -244,33 +240,34 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
     })
   }
 
-  /*
-   * Two local values behind the failure notice. The error itself is not stored
-   * here: `sessionStore` is the single source, and this only records which
-   * button was last pressed and which failure the user has already seen.
-   *
-   * `lastIntent` is the `context` for `errorCopyOf`, so a session that dies
-   * mid-run reports "stopped" rather than "could not start". An error pushed
-   * asynchronously by the engine has no matching press, so it reuses the last
-   * value, which is close enough for a one-line notice.
-   *
-   * `dismissedFailure` holds a signature (error code plus missing resource id)
-   * rather than the code, so the same failure recurring after an intervening
-   * success is reported again. It exists because `errorCode` is cleared when the
-   * next session starts, and the mic is disabled for the duration of that call,
-   * which would leave the notice on screen with no way to clear it. Every press
-   * rearms it, so "press again" always works.
-   */
+  /* `lastIntent` lets a late engine error keep the right start/stop wording. */
   const [lastIntent, setLastIntent] = useState<'start' | 'stop'>('start')
-  const [dismissedFailure, setDismissedFailure] = useState<string | null>(null)
 
   const failureSignature = errorCode === null ? null : `${errorCode}|${missing?.resourceId ?? ''}`
+  const reportedFailure = useRef<string | null>(failureSignature)
   const failureMessage =
-    failureSignature === null || failureSignature === dismissedFailure
+    failureSignature === null
       ? null
       : missing
         ? t('preflight.modelMissing', { name: missing.name })
         : t(errorCopyOf(errorCode, lastIntent).message)
+
+  useEffect(() => {
+    if (failureSignature === null) {
+      reportedFailure.current = null
+      return
+    }
+    if (reportedFailure.current === failureSignature || !failureMessage) return
+    reportedFailure.current = failureSignature
+    if (runtimeComponent) {
+      const label = t(runtimeComponent === 'engine' ? 'runtime.goTorch' : 'runtime.goLlama')
+      notifyError(failureMessage, { action: {
+        label,
+        actionId: runtimeComponent === 'engine' ? 'runtime-engine' : 'runtime-llama',
+        onPress: () => { void actions.settings.openRuntimeSettings(runtimeComponent).catch(error => console.error('[overlay.runtime-settings]', error)) },
+      } })
+    } else notifyError(failureMessage)
+  }, [failureMessage, failureSignature, runtimeComponent, t])
 
   /**
    * The mic starts an idle session; while a session is active it toggles
@@ -280,9 +277,8 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
    * unloading weights, so another press could neither stop nor switch anything
    * and would only suggest the button is broken.
    *
-   * A failure the session store recorded is rendered in place by
-   * `StartFailureNotice`, so the catch reports only what the store could not
-   * record: a window with no session bridge fails before the record exists.
+   * Store errors are announced by the effect above. The catch reports only
+   * failures that happened before the session store could record them.
    */
   const toggleMic = (): void => {
     if (status === 'running') {
@@ -303,7 +299,6 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
         return
       }
       setLastIntent('start')
-      setDismissedFailure(null)
       const config = { ...startConfigOf(settings, devices), recognitionBinding: asr.binding, ...(translationDisabled ? {} : { translationBinding: mt.binding }) }
       void actions.session.startSession(config).catch((error: unknown) => {
         const owner = featureConflictOwner(error)
@@ -317,19 +312,22 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
           notifyError(t('overlay.audioDeviceOpenFailed', { device: audioDeviceNameOf(config.audioSource, devices, t('overlay.selectedAudioDevice')) }))
         } else if (sessionStore.getState().errorCode === null) {
           /*
-           * The native menu surface renders this bar but has no session bridge, so
-           * the start fails before the store records anything and the in-place
-           * notice has nothing to show. A press that does nothing has to say so.
+           * This failure happens before the session store records it, so report
+           * it directly and let the user retry from the notification.
            */
           notifyError(t('errors.startFailedTitle'), {
             cause: error,
             description: t('errors.startFailedDescription'),
-            action: { label: t('errors.startFailedAction'), onPress: toggleMic },
+            action: { label: t('errors.startFailedAction'), onPress: toggleMic, actionId: 'retry-session' },
           })
         } else console.warn('[overlay] startSession failed', error)
       })
     }
   }
+
+  useEffect(() => getBridge()?.events.onOverlayToastAction?.(actionId => {
+    if (actionId === 'retry-session') toggleMic()
+  }), [toggleMic])
 
   /*
    * Three looks, one button, with colour left to the `[data-*]` CSS:
@@ -362,10 +360,6 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
               disabled={status === 'starting' || status === 'stopping'}
               aria-label={micLabel}
               aria-busy={starting || undefined}
-              // Point the button at the notice below so a screen reader announces
-              // why the press did nothing, instead of the user having to find the
-              // line on screen.
-              aria-describedby={failureMessage ? FAILURE_NOTICE_ID : undefined}
               // `.nola-caption-mic` in `caption-card.css` paints the recording
               // state; this only supplies it.
               className="nola-caption-mic"
@@ -403,37 +397,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
         </div>
       )}
 
-      <StartFailureNotice message={failureMessage} action={runtimeComponent ? t(runtimeComponent === 'engine' ? 'runtime.goTorch' : 'runtime.goLlama') : undefined}
-        onAction={runtimeComponent ? () => {
-          void actions.settings.openRuntimeSettings(runtimeComponent).catch((error: unknown) => {
-            notifyError(t('errors.runtimeSettingsFailed'), { cause: error })
-          })
-        } : undefined} />
     </>
-  )
-}
-
-/**
- * The one-line start/stop failure notice, shown in place rather than by
- * sending the user to the main window.
- *
- * A sibling of the control bar rather than a child: the bar is `opacity: 0`
- * with `pointer-events: none` until the card is hovered or focused
- * (`caption-card.css`), and a failure lands exactly when the pointer has
- * just left the mic, so the notice would fade out with it.
- */
-function StartFailureNotice({ message, action, onAction }: { message: string | null; action?: string; onAction?: () => void }) {
-  if (message === null) return null
-  return (
-    <div
-      id={FAILURE_NOTICE_ID}
-      role="status"
-      data-slot="overlay-failure"
-      className="nola-caption-notice"
-    >
-      <p className="nola-caption-notice__text">{message}</p>
-      {action ? <Button size="sm" variant="secondary" onClick={onAction}>{action}</Button> : null}
-    </div>
   )
 }
 

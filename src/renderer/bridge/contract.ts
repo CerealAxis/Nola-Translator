@@ -95,9 +95,7 @@ export interface NolaBridge {
   }
   /*
    * Window-level actions for the caption window. `minimize` is a real taskbar
-   * minimize, which is why the main process keeps `skipTaskbar: false` so the
-   * taskbar icon can bring it back. `close` stops recognition first and then
-   * hides the window: hiding alone would leave the engine recording behind it.
+   * minimize, while `close` hides the window and leaves the session running.
    */
   overlay: {
     /** Desktop-only surface; embedded demos retain their local Base UI portals. */
@@ -105,13 +103,15 @@ export interface NolaBridge {
     presentMenu?(id: number): Promise<void>
     closeMenu?(id: number): Promise<void>
     /** False means the browser-caption service is reserved; show a conflict toast. */
-    show(): Promise<boolean>
+    show(mode?: 'standalone' | 'workspace'): Promise<boolean>
     hide(): Promise<void>
+    getVisibility(): Promise<boolean>
     close(): Promise<void>
     minimize(): Promise<void>
     resize(width: number, height: number): Promise<void>
     /** Session-scoped: the lock is never written to the settings file. Returns the value in force. */
     setLocked(locked: boolean): Promise<boolean>
+    onVisibilityChanged(cb: (visible: boolean) => void): () => void
   }
   settings: {
     get(): Promise<AppSettings>
@@ -163,7 +163,10 @@ export interface NolaBridge {
     showWorkspace?(): Promise<void>
     openMainPage?(path: string): Promise<void>
     openDefaultBrowser(): Promise<void>
-    notifyMainError?(message: string, description?: string): void
+    notifyMainError?(notification: MainErrorNotification): void
+    previewOverlayToast?(notification: MainErrorNotification): void
+    dismissOverlayToast?(): void
+    triggerOverlayToastAction?(actionId: MainErrorNotification['actionId']): void
     checkLatestRelease(force?: boolean): Promise<AppUpdateCheckResult>
     openReleasePage(url: string): Promise<void>
   }
@@ -172,6 +175,7 @@ export interface NolaBridge {
     onDataMigrationProgress?(cb: (percent: number) => void): () => void
     onMainPageRequested?(cb: (path: string) => void): () => void
     onMainErrorNotification?(cb: (notification: MainErrorNotification) => void): () => void
+    onOverlayToastAction?(cb: (actionId: NonNullable<MainErrorNotification['actionId']>) => void): () => void
     onOverlayMenuChanged?(cb: (menu: import('../../shared/overlay-menu').OverlayMenuPresentation | null) => void): () => void
     /**
      * Engine events. The payload is `EngineChannelEvent` = the engine's
@@ -189,6 +193,7 @@ export interface NolaBridge {
     onOverlayRequest(cb: (route: RouteId, path: string) => void): () => void
     /** The caption lock moving, so every window showing the overlay draws the same lock state. */
     onOverlayLockChanged(cb: (locked: boolean) => void): () => void
+    onOverlayVisibilityChanged(cb: (visible: boolean) => void): () => void
   }
   /**
    * Hugging Face metadata search, filtered by PyTorch/GGUF. The README loads
@@ -263,9 +268,13 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'app.openMainPage': 'ipc',
   'events.onMainPageRequested': 'ipc',
   'events.onMainErrorNotification': 'ipc',
+  'events.onOverlayToastAction': 'ipc',
   'events.onDataMigrationProgress': 'ipc',
   'app.openDefaultBrowser': 'ipc',
   'app.notifyMainError': 'ipc',
+  'app.previewOverlayToast': 'ipc',
+  'app.dismissOverlayToast': 'ipc',
+  'app.triggerOverlayToastAction': 'ipc',
   'app.checkLatestRelease': 'ipc',
   'app.openReleasePage': 'ipc',
   'translation.hasCredential': 'ipc',
@@ -314,7 +323,7 @@ export const BRIDGE_ADAPTER_NOTES: Record<string, string> = {
   'engine.getEngineState': 'preload: getEngineState() · engine:get-state — 只读，名字与语义都与主进程一致，适配器不做任何翻译（主进程那条处理器刻意不调 ensureReady，否则「问引擎在不在」会变成「启动引擎」）',
   'events.onEngineEvent':
     'preload: onEngineEvent(listener) · engine:event — 载荷是 EngineChannelEvent（协议事件 ∪ 主进程发的 engineStateChanged）。适配器原样透传，**不做**类型筛除：把生命周期事件滤掉就等于把「引擎崩了」重新变回界面看不见，而它靠推断已经猜错过三次。状态机归 sessionStore（ENGINE_PROCESS_STATE_TO_UI）',
-  'overlay.close': 'preload: closeOverlay() · overlay:close（连带停识别，与 hideOverlay 语义不同）',
+  'overlay.close': 'preload: closeOverlay() · overlay:close（仅隐藏悬浮字幕，快速同传继续运行）',
   'overlay.minimize': 'preload: minimizeOverlay() · overlay:minimize（真最小化到任务栏）',
   'meetings.remove': 'preload: deleteMeeting(meetingId) · meeting:delete（bridge 上叫 remove：delete 是保留字）',
   'meetings.export': 'preload: exportMeeting(meetingId, format) · meeting:export（返回写好的文件路径，不是文本）',
@@ -330,8 +339,12 @@ export const BRIDGE_ADAPTER_NOTES: Record<string, string> = {
     'preload: installHuggingFaceModel(repo, slot?) · hub:install（返回的是注册后的 ResourceRecord，之后的进度/取消/卸载与内置模型同一条路）',
   'feedback.submit': 'NO CHANNEL — 主进程必须新增 app:feedback',
   'app.openDefaultBrowser': 'preload: openDefaultBrowser() · app:open-default-browser — 不带 URL，适配器原样透传；选哪个浏览器是主进程读注册表决定的，不是这里，也不是渲染进程',
-  'app.notifyMainError': 'preload: notifyMainError(message, description?) · app:overlay-error — 只允许悬浮字幕窗口发起，由主进程验证来源并转发到主窗口 Toast',
-  'events.onMainErrorNotification': 'preload: onMainErrorNotification(listener) · app:main-error-notification — 悬浮窗错误通知只在主窗口订阅并展示',
+  'app.notifyMainError': 'preload: notifyMainError(notification) · app:overlay-error — 悬浮字幕窗口发送通知，由主进程验证来源并显示在独立通知窗',
+  'app.previewOverlayToast': 'preload: previewOverlayToast(notification) · app:overlay-toast-preview — 仅开发构建的主窗口可触发独立通知窗预览',
+  'app.dismissOverlayToast': 'preload: dismissOverlayToast() · app:overlay-toast-dismissed — 独立通知窗关闭最后一条 Toast 时隐藏窗口',
+  'app.triggerOverlayToastAction': 'preload: triggerOverlayToastAction(actionId) · app:overlay-toast-action — 独立通知窗将有限操作转交给悬浮字幕',
+  'events.onMainErrorNotification': 'preload: onMainErrorNotification(listener) · app:main-error-notification — 独立通知窗订阅悬浮字幕相关通知',
+  'events.onOverlayToastAction': 'preload: onOverlayToastAction(listener) · app:overlay-toast-action — 悬浮字幕处理独立通知窗发来的操作',
   'events.onDataMigrationProgress': 'preload: onDataMigrationProgress(listener) · app:data-migration-progress',
   'settings.setCaptionService':
     'preload: setCaptionService(active) · browser:caption-service — 字幕服务闸门，不是 engine:prewarm-models 的加载态；返回 BrowserConnectionStatus 而非 boolean，页面挂载时用 browserConnection(\'status\') 读初值，两者读的是同一个字段 captionServiceActive',

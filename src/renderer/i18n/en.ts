@@ -146,26 +146,10 @@ export const en: Dictionary = {
     keepAudioHint: 'Without audio you cannot replay or export the session. Audio is kept on this machine and stays replayable from the record afterwards.',
     cancel: 'Cancel',
     start: 'Start',
-    stepPreflight: 'Check',
   },
 
   preflight: {
-    title: 'Pre-flight check',
-    checkingDevices: 'Detecting audio devices',
-    checkingModels: 'Verifying models',
-    deviceUnavailable: 'No usable audio device found',
-    deviceCheckWarning: 'The device list could not be confirmed. You can still try to start; the selected audio source will be checked again.',
-    // The device row when the engine never answered. Deliberately says nothing about devices:
-    // the probe also boots the engine, so a device verdict here would misreport an engine
-    // failure as a hardware one. `errors.engineNotReady` carries the real cause.
-    deviceCheckBlocked: 'Audio device check could not complete',
-    checkFailedTitle: 'Environment check failed',
-    checkFailedDescription: 'Run the check again. If it keeps failing, copy diagnostics for support.',
     modelMissing: 'Missing model: {name}',
-    installNow: 'Install now',
-    later: 'Later',
-    allReady: 'All checks passed',
-    start: 'Start session',
   },
 
   workspace: {
@@ -876,6 +860,7 @@ export const en: Dictionary = {
     buttonSegmented: 'Segmented selection', buttonSegmentedDesc: 'Single selection style used in places such as the workspace; selection is fixed for display.', buttonSelected: 'Selected', buttonUnselected: 'Unselected',
 
     sectionToast: 'Toasts',
+    sectionOverlayToast: 'Floating notification preview',
     sectionDialog: 'Dialogs',
     sectionAppDialogs: 'Real app dialogs',
     sectionStatus: 'Status and feedback',
@@ -883,6 +868,9 @@ export const en: Dictionary = {
     sectionMotion: 'Motion',
 
     toastDefault: 'Plain toast', toastDefaultDesc: 'The default style, gone after a few seconds.',
+    toastWindowSimple: 'Simple notification', toastWindowSimpleDesc: 'Preview a one-line toast in the separate window at the bottom-right of the screen.',
+    toastWindowComplex: 'Detailed error notification', toastWindowComplexDesc: 'Preview a title, explanation, and a button that opens Model Gateway.',
+    toastWindowSample: 'This is a floating notification preview.',
     toastAccent: 'Accent toast', toastAccentDesc: 'Accent colour, for a message that should be noticed but is not urgent.',
     toastSuccess: 'Success toast', toastSuccessDesc: 'The action went through.',
     toastWarning: 'Warning toast', toastWarningDesc: 'It worked, but one thing deserves a second look.',
@@ -917,7 +905,6 @@ export const en: Dictionary = {
     dialogModalClose: 'Got it',
 
     dialogSessionSetup: 'New session dialog', dialogSessionSetupDesc: 'The largest form in the app: six fields and a footer.',
-    dialogPreflight: 'Preflight dialog', dialogPreflightDesc: 'Opening it really checks the runtime, starts the engine process and probes devices.',
     dialogRename: 'Rename dialog', dialogRenameDesc: 'A confirmation with a text field. Saving against a meeting that does not exist fails quietly.',
     dialogExport: 'Export dialog', dialogExportDesc: 'Three export formats to switch between. Opening it clears the stale error on the records page.',
     dialogModelConfig: 'Model configuration dialog', dialogModelConfigDesc: 'A scrolling body with the slot, engine picker and language multi selects.',

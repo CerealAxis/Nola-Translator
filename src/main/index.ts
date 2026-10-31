@@ -20,6 +20,7 @@ import { app, BrowserWindow, ipcMain, safeStorage, screen, session, shell, type 
 import type { AppSettings, OverlaySettings } from '../shared/settings'
 import { NO_TRANSLATION_LANGUAGE } from '../shared/settings'
 import type { SessionConfig } from '../shared/contracts'
+import type { MainErrorNotification } from '../shared/bridge'
 import { randomUUID } from 'node:crypto'
 import { handleMeetingAudio, MEETING_AUDIO_SCHEME, registerMeetingAudioScheme } from './audio-protocol'
 import { registerAppIpc, resetOverlayLock } from './app-ipc'
@@ -50,6 +51,10 @@ let mainWindow: BrowserWindow | null = null
 let migrationWindow: BrowserWindow | null = null
 let migrationProgress = -1
 let overlayWindow: BrowserWindow | null = null
+let overlayToastWindow: BrowserWindow | null = null
+let overlayToastTimer: NodeJS.Timeout | null = null
+const pendingOverlayToasts: MainErrorNotification[] = []
+let overlayToastReady = false
 let workspaceWindow: BrowserWindow | null = null
 let workspaceReady: Promise<void> = Promise.resolve()
 let engine: EngineProcess | null = null
@@ -200,11 +205,22 @@ function createOverlayWindow(theme: AppSettings['theme'], overlay: OverlaySettin
   window.setAlwaysOnTop(overlay.alwaysOnTop, 'screen-saver')
   window.setFocusable(true)
   window.setBounds(computeOverlayBounds('bottom', display.workArea, window.getBounds()))
+  const publishVisibility = (): void => {
+    const visible = window.isVisible()
+    for (const target of BrowserWindow.getAllWindows()) {
+      if (!target.isDestroyed() && target !== window) target.webContents.send('overlay:visibility-changed', visible)
+    }
+  }
+  window.on('show', publishVisibility)
+  window.on('hide', publishVisibility)
+  window.on('minimize', publishVisibility)
+  window.on('restore', publishVisibility)
   // The lock belongs to the window that carried it, so a rebuilt one starts unlocked; the reset
   // also re-applies the window flags through `applyOverlay` instead of leaving them stale.
   resetOverlayLock()
   window.on('closed', () => {
     if (overlayWindow === window) overlayWindow = null
+    publishVisibility()
   })
   if (process.env.ELECTRON_RENDERER_URL) {
     const url = new URL(process.env.ELECTRON_RENDERER_URL)
@@ -214,6 +230,51 @@ function createOverlayWindow(theme: AppSettings['theme'], overlay: OverlaySettin
   } else {
     void window.loadFile(join(__dirname, '../renderer/index.html'), { query: { overlay: '1', theme } })
   }
+}
+
+function showOverlayToast(notification: MainErrorNotification, source: BrowserWindow): void {
+  const bounds = screen.getDisplayMatching(source.getBounds()).workArea
+  const width = 460
+  const height = 190
+  if (!overlayToastWindow || overlayToastWindow.isDestroyed()) {
+    const window = new BrowserWindow({
+      x: bounds.x + bounds.width - width - 20, y: bounds.y + bounds.height - height - 20,
+      width, height, frame: false, transparent: true, backgroundColor: '#00000000',
+      hasShadow: false, resizable: false, movable: false, minimizable: false, maximizable: false,
+      skipTaskbar: true, show: false, focusable: true, alwaysOnTop: true,
+      webPreferences: { preload: resolvePreloadPath(__dirname), contextIsolation: true, sandbox: true, nodeIntegration: false },
+    })
+    overlayToastWindow = window
+    overlayToastReady = false
+    window.setAlwaysOnTop(true, 'floating')
+    window.on('closed', () => { if (overlayToastWindow === window) { overlayToastWindow = null; overlayToastReady = false } })
+    window.once('ready-to-show', () => {
+      overlayToastReady = true
+      if (pendingOverlayToasts.length && !window.isDestroyed()) {
+        for (const notification of pendingOverlayToasts.splice(0)) window.webContents.send('app:main-error-notification', notification)
+      }
+    })
+    if (process.env.ELECTRON_RENDERER_URL) {
+      const url = new URL(process.env.ELECTRON_RENDERER_URL)
+      url.searchParams.set('overlayToast', '1')
+      url.searchParams.set('theme', 'system')
+      void window.loadURL(url.toString())
+    } else {
+      void window.loadFile(join(__dirname, '../renderer/index.html'), { query: { overlayToast: '1', theme: 'system' } })
+    }
+  }
+  const window = overlayToastWindow
+  if (!window || window.isDestroyed()) return
+  window.setBounds({ x: bounds.x + bounds.width - width - 20, y: bounds.y + bounds.height - height - 20, width, height })
+  if (!overlayToastReady) pendingOverlayToasts.push(notification)
+  else window.webContents.send('app:main-error-notification', notification)
+  window.showInactive()
+  if (overlayToastTimer) clearTimeout(overlayToastTimer)
+  overlayToastTimer = setTimeout(() => {
+    if (overlayToastWindow && !overlayToastWindow.isDestroyed()) overlayToastWindow.hide()
+    pendingOverlayToasts.length = 0
+    overlayToastTimer = null
+  }, 13000)
 }
 
 // Must run before the app is ready: privileged schemes are frozen afterwards.
@@ -625,11 +686,11 @@ if (!hasSingleInstanceLock) {
       }
       if (cancelled()) throw new Error('sessionStartCancelled')
     }
-    const sessions = new SessionController({ engine: desktopEngine, audioTestEngine: engine, meetings, activity, useGateway: true, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareSession(config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, showOverlay: () => getOverlayWindow().showInactive(), hideOverlay: () => { if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide() }, isOverlayVisible })
+    const sessions = new SessionController({ engine: desktopEngine, audioTestEngine: engine, meetings, activity, useGateway: true, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareSession(config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, hideOverlay: () => { if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide() }, isOverlayVisible })
     const browserSessions = new SessionController({ engine: browserEngine, meetings: null, activity, useGateway: true,
       getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
       prepare: (config, cancelled) => prepareSession(config, cancelled), whenReady: whenRuntimeReady,
-      startingChanged: () => {}, showOverlay: () => {}, hideOverlay: () => {} })
+      startingChanged: () => {}, hideOverlay: () => {} })
     browserEngine.on('event', event => browserSessions.handleEvent(event))
     browserEngine.on('state', state => { if (state === 'failed' || state === 'recovering') browserSessions.releaseOnLoss() })
     stopSessions = async () => {
@@ -784,6 +845,7 @@ if (!hasSingleInstanceLock) {
     createMainWindow(initialSettings.theme)
     disposeAppIpc = registerAppIpc({
       isDevelopmentWindow: isWorkbenchWindow,
+      isDevelopmentBuild: !app.isPackaged,
       settings,
       initialSettings,
       beforeSettingsChange: patch => gateway?.assertSettingsChange(patch),
@@ -800,6 +862,18 @@ if (!hasSingleInstanceLock) {
       engine,
       getOverlayWindow,
       getMainWindow: () => mainWindow,
+      showOverlayToast,
+      dismissOverlayToast: source => {
+        if (source !== overlayToastWindow) return
+        if (overlayToastTimer) clearTimeout(overlayToastTimer)
+        overlayToastTimer = null
+        pendingOverlayToasts.length = 0
+        if (!source.isDestroyed()) source.hide()
+      },
+      triggerOverlayToastAction: (source, actionId) => {
+        if (source !== overlayToastWindow || actionId !== 'retry-session') return
+        if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.webContents.send('app:overlay-toast-action', actionId)
+      },
       getWorkspaceWindow: () => workspaceWindow,
       showWorkspace: async () => {
         if (!workspaceWindow || workspaceWindow.isDestroyed()) createWorkspaceWindow(settings.current().theme)

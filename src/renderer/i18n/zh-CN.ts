@@ -150,28 +150,10 @@ export const zhCN = {
     keepAudioHint: '关闭后不保存音频，无法回放与导出。录音会随这场会议保存在本机，结束后可以在记录详情里回放。',
     cancel: '取消',
     start: '开始',
-    stepPreflight: '检查',
   },
 
   preflight: {
-    title: '开始前检查',
-    checkingDevices: '正在检测音频设备',
-    checkingModels: '正在校验模型',
-    deviceUnavailable: '没有检测到可用的音频设备',
-    deviceCheckWarning: '暂时无法确认设备列表，仍可尝试开始；启动时会重新检查所选音频源。',
-    /**
-     * 设备行在"引擎没答上话"时的读法。**这一条故意不写任何设备相关的结论**：
-     * 探设备那一次调用同时兼着启动引擎，引擎起不来时它没能探成，报"没有检测到可用的音频
-     * 输入"就是把引擎故障说成硬件故障。真原因由 `errors.engineNotReady`（ENG-001）承担。
-     */
-    deviceCheckBlocked: '音频设备检测未能完成',
-    checkFailedTitle: '环境检查失败',
-    checkFailedDescription: '请重新检查；多次失败可复制诊断信息反馈。',
     modelMissing: '缺少模型：{name}',
-    installNow: '现在安装',
-    later: '稍后再说',
-    allReady: '检查通过',
-    start: '开始同传',
   },
 
   workspace: {
@@ -900,6 +882,7 @@ export const zhCN = {
     buttonSegmented: '分段选择', buttonSegmentedDesc: '工作区等位置使用的单选切换样式，当前状态固定用于展示。', buttonSelected: '已选', buttonUnselected: '未选',
 
     sectionToast: '通知',
+    sectionOverlayToast: '悬浮通知窗预览',
     sectionDialog: '弹窗',
     sectionAppDialogs: '应用真实弹窗',
     sectionStatus: '状态与反馈',
@@ -907,6 +890,9 @@ export const zhCN = {
     sectionMotion: '动效',
 
     toastDefault: '普通通知', toastDefaultDesc: '默认样式，几秒后自动消失。',
+    toastWindowSimple: '简单通知', toastWindowSimpleDesc: '在屏幕右下角的独立窗口中预览单行通知。',
+    toastWindowComplex: '复杂错误通知', toastWindowComplexDesc: '预览标题、问题说明和打开模型网关的操作按钮。',
+    toastWindowSample: '这是一条悬浮通知窗预览。',
     toastAccent: '强调通知', toastAccentDesc: '强调色，适合要被人看见但不紧急的消息。',
     toastSuccess: '成功通知', toastSuccessDesc: '操作已经完成。',
     toastWarning: '警告通知', toastWarningDesc: '事情办成了，但有一处值得留意。',
@@ -941,7 +927,6 @@ export const zhCN = {
     dialogModalClose: '知道了',
 
     dialogSessionSetup: '新建同传弹窗', dialogSessionSetupDesc: '应用里最大的表单，六个字段加底部操作栏。',
-    dialogPreflight: '开始前检查弹窗', dialogPreflightDesc: '打开时会真的检查运行组件、拉起引擎子进程并探测设备。',
     dialogRename: '重命名弹窗', dialogRenameDesc: '带输入框的确认框，确定后对不存在的记录静默失败。',
     dialogExport: '导出弹窗', dialogExportDesc: '三种导出格式可切换。打开时会清掉记录页残留的错误提示。',
     dialogModelConfig: '模型配置弹窗', dialogModelConfigDesc: '正文内部滚动，含槽位、引擎选择和语言多选。',

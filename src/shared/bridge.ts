@@ -28,8 +28,16 @@ export type DiagnosticCopyContext = {
 }
 
 export type SessionStartResult = { sessionId: string; meetingId: string | null }
-/** A plain-text error raised by the caption window and rendered in the main app. */
-export type MainErrorNotification = { message: string; description?: string }
+/** A caption-related toast sent to the independent desktop notification surface. */
+export type MainErrorNotification = {
+  message: string
+  description?: string
+  type?: 'success' | 'info' | 'warning' | 'error' | 'loading'
+  actionLabel?: string
+  actionPage?: '#/model-gateway'
+  actionId?: 'retry-session' | 'runtime-engine' | 'runtime-llama'
+  duration?: number
+}
 
 /**
  * Where models are stored, plus one number measured from that folder.
@@ -158,9 +166,10 @@ export type NolaTranslatorApi = {
   onMainPageRequested?(listener: (path: string) => void): () => void
   onDataMigrationProgress?(listener: (percent: number) => void): () => void
   onMainErrorNotification?(listener: (notification: MainErrorNotification) => void): () => void
-  showOverlay(): Promise<boolean>
+  showOverlay(mode?: 'standalone' | 'workspace'): Promise<boolean>
   hideOverlay(): Promise<void>
-  /** Stops recognition and then hides the window. Distinct from hideOverlay, which only hides. */
+  getOverlayVisibility(): Promise<boolean>
+  /** Hides the floating captions window without stopping the active session. */
   closeOverlay(): Promise<void>
   minimizeOverlay(): Promise<void>
   resizeOverlay(width: number, height: number): Promise<void>
@@ -170,6 +179,7 @@ export type NolaTranslatorApi = {
    */
   setOverlayLocked(locked: boolean): Promise<boolean>
   onOverlayLockChanged(listener: (locked: boolean) => void): () => void
+  onOverlayVisibilityChanged(listener: (visible: boolean) => void): () => void
   openAppearance(page?: OverlayTargetPage): Promise<void>
   onOpenAppearance(listener: (page: OverlayTargetPage) => void): () => void
   getSettings(): Promise<AppSettings>
@@ -204,7 +214,11 @@ export type NolaTranslatorApi = {
    * main process resolves the registered handler itself; see `open-default-browser.ts`.
    */
   openDefaultBrowser(): Promise<void>
-  notifyMainError?(message: string, description?: string): void
+  notifyMainError?(notification: MainErrorNotification): void
+  previewOverlayToast?(notification: MainErrorNotification): void
+  dismissOverlayToast?(): void
+  triggerOverlayToastAction?(actionId: MainErrorNotification['actionId']): void
+  onOverlayToastAction?(listener: (actionId: NonNullable<MainErrorNotification['actionId']>) => void): () => void
   checkLatestRelease(force?: boolean): Promise<AppUpdateCheckResult>
   openReleasePage(url: string): Promise<void>
 }

@@ -18,7 +18,7 @@ it('isolates inventory failures and reports a business process crash as its own 
   const business = Object.assign(new EventEmitter(), { currentState: 'ready', request: vi.fn(async () => ({ sessionId: 'desktop-session' })), supports: () => true }) as unknown as EngineProcess
   const controller = new SessionController({ engine: business, meetings: null, useGateway: true,
     getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', prepare: async () => {}, whenReady: async () => {},
-    startingChanged: () => {}, showOverlay: () => {}, hideOverlay: vi.fn() })
+    startingChanged: () => {}, hideOverlay: vi.fn() })
   const dispose = registerEngineIpc(inventory, () => null, async () => '', null, () => DEFAULT_SETTINGS,
     async () => {}, () => {}, async () => {}, () => {}, controller)
   try {

@@ -684,11 +684,11 @@ export async function showWorkspace(): Promise<void> {
   await bridge.app.showWorkspace()
 }
 
-export async function showOverlay(): Promise<boolean> {
+export async function showOverlay(mode: 'standalone' | 'workspace' = 'standalone'): Promise<boolean> {
   if (!bridge) throw new Error('Bridge unavailable')
   if (!await canStartDesktopCaptions()) return false
   try {
-    return await bridge.overlay.show()
+    return await bridge.overlay.show(mode)
   } catch (error) {
     // A reservation can change after the status query. Main-process rejection is
     // the same expected conflict as a false result, including older running IPC handlers.

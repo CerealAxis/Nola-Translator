@@ -1,7 +1,10 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import * as storeApi from '@/store'
 import { stores } from '@/store'
+import type { NolaBridge } from '@/bridge'
 import * as settingsActions from '@/store/settingsStore'
+import * as notify from '@/components/primitives/notify'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import { OverlayPage } from './OverlayPage'
 
@@ -54,4 +57,43 @@ it('keeps configured cloud services available without local model enablement', (
   render(<OverlayPage />)
   expect(within(screen.getByRole('combobox', { name: '翻译模型' })).getByRole('option', { name: 'Saved cloud translator' })).toBeEnabled()
   expect(within(screen.getByRole('combobox', { name: '识别模型' })).getByRole('option', { name: /阿里云/ })).toBeEnabled()
+})
+
+it('shows an app toast when the model gateway is stopped', async () => {
+  const gateway = {
+    snapshot: vi.fn().mockResolvedValue({ state: 'stopped' }),
+    onChanged: vi.fn(() => () => undefined),
+  }
+  vi.spyOn(storeApi, 'getBridge').mockReturnValue({ gateway,
+    overlay: { getVisibility: vi.fn().mockResolvedValue(false) },
+    events: { onOverlayVisibilityChanged: vi.fn(() => () => undefined) },
+    app: { notifyMainError: vi.fn() },
+  } as unknown as NolaBridge)
+  const showOverlay = vi.spyOn(settingsActions, 'showOverlay').mockResolvedValue(true)
+  const notice = vi.spyOn(notify, 'notifyGatewayModelUnavailable')
+
+  render(<OverlayPage />)
+  fireEvent.click(screen.getByRole('button', { name: '打开悬浮字幕' }))
+
+  await waitFor(() => expect(notice).toHaveBeenCalledWith('没有可用的ASR模型', expect.any(String), '模型网关'))
+  expect(showOverlay).not.toHaveBeenCalled()
+})
+
+it('uses the floating-caption action as a toggle and closes without checking models', async () => {
+  const close = vi.fn().mockResolvedValue(undefined)
+  const gateway = { snapshot: vi.fn().mockResolvedValue({ state: 'stopped' }), onChanged: vi.fn(() => () => undefined) }
+  vi.spyOn(storeApi, 'getBridge').mockReturnValue({
+    gateway,
+    overlay: { getVisibility: vi.fn().mockResolvedValue(true), close },
+    events: { onOverlayVisibilityChanged: vi.fn(() => () => undefined) },
+    app: { notifyMainError: vi.fn() },
+  } as unknown as NolaBridge)
+
+  render(<OverlayPage />)
+  const toggle = await screen.findByRole('button', { name: '关闭悬浮窗' })
+  const gatewayReads = gateway.snapshot.mock.calls.length
+  fireEvent.click(toggle)
+
+  await waitFor(() => expect(close).toHaveBeenCalledOnce())
+  expect(gateway.snapshot).toHaveBeenCalledTimes(gatewayReads)
 })

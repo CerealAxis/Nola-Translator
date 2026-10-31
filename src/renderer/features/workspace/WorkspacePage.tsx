@@ -8,9 +8,8 @@ import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/u
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Captions } from 'lucide-react'
 
-import { findMissingResource } from '@/store'
 import { savedBindingOf, useAvailableModels } from '@/available-models'
-import type { MissingResource, SessionState } from '@/store'
+import type { SessionState } from '@/store'
 import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
 import { CaptionStage } from '@/components/caption'
@@ -24,7 +23,6 @@ import { NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { DiagnosticCopyContext } from '@/bridge'
 import { audioDeviceNameOf, targetLanguagePatch, translationModelPatch } from '@/session-config'
 
-import { PreflightDialog } from './PreflightDialog'
 import { SessionBar } from './SessionBar'
 import { SessionSetupDialog } from './SessionSetupDialog'
 import type { SetupDraft } from './SessionSetupDialog'
@@ -49,7 +47,6 @@ export function WorkspacePage() {
   const session = useStore(sessionStore, (state) => state)
   const settings = useStore(stores.settings, (state) => state.settings)
   const devices = useStore(stores.models, (state) => state.devices)
-  const resources = useStore(stores.models, (state) => state.resources)
   const catalog = useAvailableModels()
   const meetings = useStore(stores.meetings, (state) => state.meetings)
 
@@ -57,7 +54,6 @@ export function WorkspacePage() {
   const [draft, setDraft] = useState<SetupDraft | null>(null)
   const [pendingConfig, setPendingConfig] = useState<Parameters<typeof actions.session.startSession>[0] | null>(null)
   const [setupOpen, setSetupOpen] = useState(false)
-  const [preflightOpen, setPreflightOpen] = useState(false)
   const [stopConfirmOpen, setStopConfirmOpen] = useState(false)
   const [notes, setNotes] = useState('')
   const [notesCollapsed, setNotesCollapsed] = useState(false)
@@ -74,6 +70,7 @@ export function WorkspacePage() {
   const [layout, setLayout] = useState<CaptionLayout>('split')
   const [fontStep, setFontStep] = useState(1)
   const [notesOpen, setNotesOpen] = useState(true)
+  const [overlayVisible, setOverlayVisible] = useState(false)
 
   const status = session.status
   /**
@@ -95,6 +92,20 @@ export function WorkspacePage() {
     sync()
     query.addEventListener('change', sync)
     return () => query.removeEventListener('change', sync)
+  }, [])
+
+  useEffect(() => {
+    const bridge = getBridge()
+    if (!bridge) return
+    let changed = false
+    const unsubscribe = bridge.events.onOverlayVisibilityChanged(visible => {
+      changed = true
+      setOverlayVisible(visible)
+    })
+    void bridge.overlay.getVisibility().then(visible => {
+      if (!changed) setOverlayVisible(visible)
+    }).catch(() => undefined)
+    return () => { changed = true; unsubscribe() }
   }, [])
 
   // -- Notes: follow the meeting, auto-saved with an 800ms debounce --------
@@ -234,28 +245,11 @@ export function WorkspacePage() {
     setSetupOpen(true)
   }, [settings, t])
 
-  const submitSetup = useCallback((config: Parameters<typeof actions.session.startSession>[0]) => {
-    setPendingConfig(config)
-    setSetupOpen(false)
-    setPreflightOpen(true)
-  }, [])
-
-  const missing: MissingResource | null = useMemo(() => {
-    if (!pendingConfig) return null
-    // The whole `pendingConfig`, not just the two model ids: `findMissingResource`
-    // also needs `targetLanguages` and `translationProvider` to decide whether a
-    // local translation model is required. A cloud provider's model id is not on
-    // this machine and stays out of preflight. `pendingConfig` is already a
-    // complete SessionConfig, since that is what `onSubmit` passes.
-    return findMissingResource({ storagePath: '', resources }, pendingConfig)
-  }, [pendingConfig, resources])
-
   // -- Start / pause / resume / end ----------------------------------------
   const configRef = useRef(pendingConfig)
   configRef.current = pendingConfig
 
-  const start = useCallback(async () => {
-    const config = configRef.current
+  const start = useCallback(async (config = configRef.current) => {
     if (config === null) return
     const missingGatewayModel = config.recognitionBinding?.startsWith('resource:')
       && !catalog.asr.some(model => model.binding === config.recognitionBinding && model.origin === 'gateway')
@@ -265,11 +259,9 @@ export function WorkspacePage() {
         ? 'mt'
         : null
     if (missingGatewayModel) {
-      setPreflightOpen(false)
       notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t(`gateway.${missingGatewayModel}`) }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
       return
     }
-    setPreflightOpen(false)
     if (draft) {
       /*
        * The recording toggle is a global preference rather than part of this
@@ -321,6 +313,13 @@ export function WorkspacePage() {
       }
     }
   }, [catalog, devices, draft, t])
+
+  const submitSetup = useCallback((config: Parameters<typeof actions.session.startSession>[0]) => {
+    setPendingConfig(config)
+    setSetupOpen(false)
+    configRef.current = config
+    void start(config)
+  }, [start])
 
   const stop = useCallback(async () => {
     // Read before stopping: a successful stop clears the id before the record route is opened.
@@ -391,12 +390,20 @@ export function WorkspacePage() {
         audioSource={audioSource}
         devices={devices}
         onAudioSourceChange={(next) => { void actions.settings.updateSettings({ recognition: { audioSource: next } }).catch(() => undefined) }}
-        onOpenOverlay={() => {
-          void actions.settings.showOverlay().then(opened => {
-            if (opened === false) {
-              notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
-            }
-          }).catch((error: unknown) => { notifyError(t('workspaceUi.overlayFailed'), { cause: error }) })
+        overlayVisible={overlayVisible}
+        onOverlayVisibleChange={visible => {
+          if (visible) {
+            void actions.settings.showOverlay('workspace').then(opened => {
+              if (opened === false) notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+              else setOverlayVisible(true)
+            }).catch((error: unknown) => { notifyError(t('workspaceUi.overlayFailed'), { cause: error }) })
+            return
+          }
+          const bridge = getBridge()
+          if (!bridge) return
+          void bridge.overlay.hide().then(() => setOverlayVisible(false)).catch((error: unknown) => {
+            notifyError(t('workspaceUi.overlayFailed'), { cause: error })
+          })
         }}
         sourceLanguage={sourceLanguage}
         targetLanguage={targetLanguage}
@@ -489,15 +496,6 @@ export function WorkspacePage() {
         language={language}
         onSubmit={submitSetup}
       />
-      <PreflightDialog
-        isOpen={preflightOpen}
-        onOpenChange={setPreflightOpen}
-        missing={missing}
-        config={pendingConfig ?? undefined}
-        onStart={() => void start()}
-        onCopyDiagnostics={copyDiagnostics}
-      />
-
       <StopSessionDialog isOpen={stopConfirmOpen} onOpenChange={setStopConfirmOpen} onEnd={() => void stop()} />
 
       {/* Session failure: copy comes from the errorCode table; the diagnostic reason remains visible alongside the translated action. */}

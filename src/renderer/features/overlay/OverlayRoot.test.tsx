@@ -18,49 +18,35 @@ function setup(close: () => Promise<void>) {
   } as unknown as NolaBridge)
   const stop = vi.spyOn(store.actions.session, 'stopSession').mockResolvedValue(undefined)
   render(<OverlayRoot />)
-  fireEvent.click(screen.getByRole('button', { name: '关闭悬浮窗' }))
-  return { stop, confirm: screen.getByRole('button', { name: '关闭并停止' }) }
+  return { stop, closeButton: screen.getByRole('button', { name: '关闭悬浮窗' }) }
 }
 
-it('uses one main-process close request and disables dragging while confirmation is open', async () => {
+it('hides the overlay directly without stopping the active session', async () => {
   const close = vi.fn().mockResolvedValue(undefined)
-  const { stop, confirm } = setup(close)
-  expect(document.querySelector('.nola-caption-card')).toHaveAttribute('data-confirm-open', 'true')
-  fireEvent.click(confirm)
+  const { stop, closeButton } = setup(close)
+  fireEvent.click(closeButton)
   await waitFor(() => expect(close).toHaveBeenCalledTimes(1))
   expect(stop).not.toHaveBeenCalled()
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 
-it('focuses cancel and dismisses the confirmation with Escape', async () => {
-  const close = vi.fn().mockResolvedValue(undefined)
-  setup(close)
-  await waitFor(() => expect(screen.getByRole('button', { name: '取消' })).toHaveFocus())
-  fireEvent.keyDown(screen.getByRole('button', { name: '取消' }), { key: 'Escape' })
-  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-  expect(close).not.toHaveBeenCalled()
-})
-
-it('keeps a pending confirmation visible and prevents repeated close requests', async () => {
+it('prevents repeated close requests while hiding is pending', async () => {
   let finish!: () => void
   const close = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
-  const { confirm } = setup(close)
-  fireEvent.click(confirm)
-  fireEvent.click(confirm)
+  const { closeButton } = setup(close)
+  fireEvent.click(closeButton)
+  fireEvent.click(closeButton)
   expect(close).toHaveBeenCalledTimes(1)
-  expect(screen.getByRole('dialog')).toBeInTheDocument()
   await act(async () => { finish() })
-  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })
 
-it('reports a failed close and allows retrying instead of silently dismissing confirmation', async () => {
+it('reports a failed hide and allows retrying', async () => {
   const close = vi.fn().mockRejectedValueOnce(new Error('IPC unavailable')).mockResolvedValueOnce(undefined)
   const failureToast = vi.spyOn(notify, 'notifyError').mockImplementation(() => 'toast')
   vi.spyOn(console, 'error').mockImplementation(() => {})
-  const { confirm } = setup(close)
-  fireEvent.click(confirm)
+  const { closeButton } = setup(close)
+  fireEvent.click(closeButton)
   await waitFor(() => expect(failureToast).toHaveBeenCalledWith('关闭失败，请重试。', expect.objectContaining({ cause: expect.objectContaining({ message: 'IPC unavailable' }) })))
-  fireEvent.click(screen.getByRole('button', { name: '关闭并停止' }))
-  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-  expect(close).toHaveBeenCalledTimes(2)
+  fireEvent.click(closeButton)
+  await waitFor(() => expect(close).toHaveBeenCalledTimes(2))
 })

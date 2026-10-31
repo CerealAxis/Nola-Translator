@@ -3,7 +3,7 @@
  * app really ships. Most use fabricated data; the update notice fetches the latest real release.
  *
  * Every dialog here is handed made-up ids, so confirming one lands on its failure state instead of
- * writing to a real record. Preflight probes the runtime, export clears the meetings error, and the
+ * writing to a real record. Export clears the meetings error, and the
  * update notice trigger fetches release metadata from GitHub.
  */
 
@@ -26,16 +26,15 @@ import { closeToast, showToast, updateToast } from '@/components/ui/toast'
 import type { ToastPayload, ToastType } from '@/components/ui/toast'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
-import { actions, stores, useStore } from '@/store'
+import { actions, getBridge, stores, useStore } from '@/store'
 import type { SessionState } from '@/store'
-import type { AppUpdateCheckResult } from '@/bridge'
+import type { AppUpdateCheckResult, MainErrorNotification } from '@/bridge'
 import { ModelConfigurationDialog } from '../../models/ModelConfigurationDialog'
 import { DetailDrawer } from '../../models/HubSearchTab'
 import { TranslationCompatibilityDialog } from '../../models/TranslationCompatibilityDialog'
 import { ExportDialog } from '../../records/ExportDialog'
 import { RecordDeleteDialog } from '../../records/RecordDeleteDialog'
 import { RenameDialog } from '../../records/RenameDialog'
-import { PreflightDialog } from '../../workspace/PreflightDialog'
 import { SessionSetupDialog } from '../../workspace/SessionSetupDialog'
 import type { SetupDraft } from '../../workspace/SessionSetupDialog'
 import { SessionErrorDialog, StopSessionDialog } from '../../workspace/WorkspaceDialogs'
@@ -54,7 +53,6 @@ import {
   DEMO_HUB_DESCRIPTION,
   DEMO_HUB_HIT,
   DEMO_MEETING_ID,
-  DEMO_MISSING,
   DEMO_MT_RECORD,
   DEMO_TITLE,
 } from '../developer-demo-data'
@@ -110,6 +108,7 @@ export function DeveloperTab() {
 
       <ButtonGroup />
       <ToastGroup />
+      <OverlayToastPreviewGroup />
       <DialogGroup />
       <DialogGalleryGroup />
       <StatusGroup />
@@ -315,6 +314,40 @@ function ToastGroup() {
   )
 }
 
+function OverlayToastPreviewGroup() {
+  const { t } = useI18n()
+  const preview = (notification: MainErrorNotification): void => getBridge()?.app.previewOverlayToast?.(notification)
+  const simpleTypes: { type: NonNullable<MainErrorNotification['type']>; label: string }[] = [
+    { type: 'info', label: t('dev.toastDefault') },
+    { type: 'success', label: t('dev.toastSuccess') },
+    { type: 'warning', label: t('dev.toastWarning') },
+    { type: 'error', label: t('dev.toastDanger') },
+  ]
+
+  return (
+    <SettingGroup legend={t('dev.sectionOverlayToast')}>
+      <SettingsRow label={t('dev.toastWindowSimple')} desc={t('dev.toastWindowSimpleDesc')} descriptionTooltip>
+        <div className="dev-strip">
+          {simpleTypes.map(({ type, label }) => <Button key={type} variant="tertiary" size="sm" onClick={() => {
+            preview({ type, message: t('dev.toastWindowSample') })
+          }}>{label}</Button>)}
+        </div>
+      </SettingsRow>
+      <ToastTrigger
+        label={t('dev.toastWindowComplex')}
+        desc={t('dev.toastWindowComplexDesc')}
+        run={() => preview({
+          type: 'error',
+          message: t('gateway.modelNone', { name: t('gateway.asr') }),
+          description: t('gateway.modelGatewayStartHint'),
+          actionLabel: t('gateway.title'),
+          actionPage: '#/model-gateway',
+        })}
+      />
+    </SettingGroup>
+  )
+}
+
 /**
  * One trigger button plus the dialog it opens.
  *
@@ -484,7 +517,6 @@ function DialogGroup() {
 /** Every dialog the gallery can open, one trigger row each. */
 type GalleryDialog =
   | 'sessionSetup'
-  | 'preflight'
   | 'rename'
   | 'export'
   | 'modelConfig'
@@ -499,7 +531,6 @@ type GalleryDialog =
 
 const ALL_CLOSED: Record<GalleryDialog, boolean> = {
   sessionSetup: false,
-  preflight: false,
   rename: false,
   export: false,
   modelConfig: false,
@@ -593,9 +624,6 @@ function DialogGalleryGroup() {
         <GalleryRow label={t('dev.dialogSessionSetup')} desc={t('dev.dialogSessionSetupDesc')}>
           <RunButton onClick={() => show('sessionSetup')} />
         </GalleryRow>
-        <GalleryRow label={t('dev.dialogPreflight')} desc={t('dev.dialogPreflightDesc')}>
-          <RunButton onClick={() => show('preflight')} />
-        </GalleryRow>
         <GalleryRow label={t('dev.dialogRename')} desc={t('dev.dialogRenameDesc')}>
           <RunButton onClick={() => setRenameId(DEMO_MEETING_ID)} />
         </GalleryRow>
@@ -642,12 +670,6 @@ function DialogGalleryGroup() {
         devices={DEMO_DEVICES}
         language={language}
         onSubmit={inert}
-      />
-      <PreflightDialog
-        isOpen={open.preflight}
-        onOpenChange={track('preflight')}
-        missing={DEMO_MISSING}
-        onStart={inert}
       />
       <RenameDialog meetingId={renameId} initialTitle={DEMO_TITLE} onClose={() => setRenameId(null)} />
       <ExportDialog meetingId={DEMO_MEETING_ID} isOpen={open.export} onOpenChange={track('export')} />

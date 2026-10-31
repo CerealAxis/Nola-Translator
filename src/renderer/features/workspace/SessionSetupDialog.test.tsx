@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { stores } from '@/store'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
@@ -26,11 +26,9 @@ const renderDialog = (value = draft) => {
   return onSubmit
 }
 
-it('offers only callable recognition choices and submits the loaded local replacement', () => {
+it('hides repeated configuration and submits the loaded local replacement', () => {
   const submit = renderDialog()
-  const recognition = within(screen.getByRole('combobox', { name: '识别模型' }))
-  expect(recognition.getAllByRole('option')).toHaveLength(1)
-  expect(recognition.getByRole('option', { name: 'Loaded recognition' })).toBeEnabled()
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '开始' }))
   expect(submit).toHaveBeenCalledWith(expect.objectContaining({ recognitionBinding: 'resource:new', recognitionModelId: 'new', targetLanguages: [] }))
 })
@@ -38,7 +36,7 @@ it('offers only callable recognition choices and submits the loaded local replac
 it('submits an explicitly selected enabled cloud translation binding and provider', () => {
   state.catalog.mt = [{ binding: 'cloud:mymemory', name: 'MyMemory', kind: 'mt', origin: 'cloud', free: true, targetLanguages: ['zh', 'en'] }]
   const submit = renderDialog({ ...draft, translate: true, translationBinding: 'cloud:mymemory' })
-  expect(within(screen.getByRole('combobox', { name: '翻译模型' })).getByRole('option', { name: 'MyMemory' })).toBeEnabled()
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '开始' }))
   expect(submit).toHaveBeenCalledWith(expect.objectContaining({ translationBinding: 'cloud:mymemory', translationProvider: 'mymemory', targetLanguages: ['zh'] }))
 })
@@ -46,7 +44,7 @@ it('submits an explicitly selected enabled cloud translation binding and provide
 it('blocks session start when the saved local model has no loaded replacement', () => {
   state.catalog.asr = []
   const submit = renderDialog()
-  expect(within(screen.getByRole('combobox', { name: '识别模型' })).getByRole('option', { name: '请选择模型' })).toBeDisabled()
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: '开始' })).toBeDisabled()
   expect(submit).not.toHaveBeenCalled()
 })

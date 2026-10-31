@@ -16,7 +16,7 @@ import { computeOverlayBounds, getOverlayInteractionPolicy, overlayMinimumHeight
 import type { AppSettings, AppSettingsPatch, CredentialProvider } from '../shared/settings'
 import { isCredentialProvider, RECOGNITION_MODEL_LABELS } from '../shared/settings'
 import { resolveUiLanguage } from '../shared/languages'
-import type { ModelStorageInfo } from '../shared/bridge'
+import type { MainErrorNotification, ModelStorageInfo } from '../shared/bridge'
 import { modelStorageEnvironment, readEngineStatus, validateModelStorageDirectory } from './model-storage'
 import { settingsPatchSchema } from './settings-schema'
 import { diagnosticCopyContextSchema } from '../shared/schemas'
@@ -112,23 +112,59 @@ export function registerAppIpc(options: {
   getMainWindow: () => BrowserWindow | null
   getWorkspaceWindow?: () => BrowserWindow | null
   isDevelopmentWindow?: (window: BrowserWindow) => boolean
+  isDevelopmentBuild?: boolean
   showWorkspace?: () => Promise<void>
+  showOverlayToast: (notification: MainErrorNotification, source: BrowserWindow) => void
+  dismissOverlayToast: (source: BrowserWindow) => void
+  triggerOverlayToastAction: (source: BrowserWindow, actionId: NonNullable<MainErrorNotification['actionId']>) => void
 }): () => void {
-  const onOverlayError = (event: Electron.IpcMainEvent, payload: unknown): void => {
-    const overlay = options.getOverlayWindow()
-    if (!overlay || overlay.isDestroyed() || event.sender !== overlay.webContents) return
-    if (typeof payload !== 'object' || payload === null || !('message' in payload) || typeof payload.message !== 'string') return
+  const notificationOf = (payload: unknown): MainErrorNotification | null => {
+    if (typeof payload !== 'object' || payload === null || !('message' in payload) || typeof payload.message !== 'string') return null
     const message = payload.message.trim()
     const description = 'description' in payload && typeof payload.description === 'string' ? payload.description.trim() : ''
-    if (!message || message.length > 500 || description.length > 1500) return
-    const window = options.getMainWindow()
-    if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return
-    if (window.isMinimized()) window.restore()
-    window.show()
-    window.focus()
-    window.webContents.send(channels.mainErrorNotification, { message, ...(description ? { description } : {}) })
+    const type = 'type' in payload && ['success', 'info', 'warning', 'error', 'loading'].includes(String(payload.type)) ? payload.type as MainErrorNotification['type'] : 'error'
+    const actionLabel = 'actionLabel' in payload && typeof payload.actionLabel === 'string' ? payload.actionLabel.trim() : ''
+    const actionPage = 'actionPage' in payload && payload.actionPage === '#/model-gateway' ? payload.actionPage : undefined
+    const actionId = 'actionId' in payload && ['retry-session', 'runtime-engine', 'runtime-llama'].includes(String(payload.actionId)) ? payload.actionId as MainErrorNotification['actionId'] : undefined
+    const duration = 'duration' in payload && typeof payload.duration === 'number' && Number.isFinite(payload.duration) ? Math.max(1000, Math.min(12000, payload.duration)) : undefined
+    if (!message || message.length > 500 || description.length > 1500 || actionLabel.length > 80) return null
+    return { message, ...(description ? { description } : {}), type,
+      ...(actionLabel && actionPage ? { actionLabel, actionPage } : {}), ...(actionLabel && actionId ? { actionLabel, actionId } : {}), ...(duration ? { duration } : {}) }
+  }
+  const onOverlayError = (event: Electron.IpcMainEvent, payload: unknown): void => {
+    const source = BrowserWindow.fromWebContents(event.sender)
+    if (!source || source.isDestroyed() || event.sender !== source.webContents) return
+    let query: URLSearchParams
+    try { query = new URL(source.webContents.getURL()).searchParams } catch { return }
+    if (query.get('overlay') !== '1' && query.get('overlayMenu') !== '1') return
+    const notification = notificationOf(payload)
+    if (notification) options.showOverlayToast(notification, source)
   }
   ipcMain.on(channels.notifyMainError, onOverlayError)
+  const onOverlayToastPreview = (event: Electron.IpcMainEvent, payload: unknown): void => {
+    const source = BrowserWindow.fromWebContents(event.sender)
+    if (!options.isDevelopmentBuild || !source || source.isDestroyed() || source !== options.getMainWindow()) return
+    const notification = notificationOf(payload)
+    if (notification) options.showOverlayToast(notification, source)
+  }
+  ipcMain.on('app:overlay-toast-preview', onOverlayToastPreview)
+  const onOverlayToastDismissed = (event: Electron.IpcMainEvent): void => {
+    const source = BrowserWindow.fromWebContents(event.sender)
+    if (!source || source.isDestroyed()) return
+    try {
+      if (new URL(event.sender.getURL()).searchParams.get('overlayToast') === '1') options.dismissOverlayToast(source)
+    } catch { /* Ignore messages from a document without an application URL. */ }
+  }
+  ipcMain.on('app:overlay-toast-dismissed', onOverlayToastDismissed)
+  const onOverlayToastAction = (event: Electron.IpcMainEvent, value: unknown): void => {
+    const source = BrowserWindow.fromWebContents(event.sender)
+    if (!source || source.isDestroyed()) return
+    try {
+      if (new URL(event.sender.getURL()).searchParams.get('overlayToast') !== '1') return
+    } catch { return }
+    if (value === 'retry-session' || value === 'runtime-engine' || value === 'runtime-llama') options.triggerOverlayToastAction(source, value)
+  }
+  ipcMain.on('app:overlay-toast-action', onOverlayToastAction)
   loggedHandle(channels.showWorkspace, () => options.showWorkspace?.())
   loggedHandle(channels.openMainPage, (_event, path: unknown) => {
     if (typeof path !== 'string' || !/^#\/(?:models|model-gateway|settings\/[a-z-]+|records\/[a-zA-Z0-9-]+)$/.test(path)) throw new Error('Invalid main page')
@@ -399,6 +435,9 @@ export function registerAppIpc(options: {
 
   return () => {
     ipcMain.off(channels.notifyMainError, onOverlayError)
+    ipcMain.off('app:overlay-toast-preview', onOverlayToastPreview)
+    ipcMain.off('app:overlay-toast-dismissed', onOverlayToastDismissed)
+    ipcMain.off('app:overlay-toast-action', onOverlayToastAction)
     mainWindow?.off('maximize', onMaximize)
     mainWindow?.off('unmaximize', onUnmaximize)
     overlayLockListeners.delete(onOverlayLock)

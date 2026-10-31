@@ -12,20 +12,18 @@ function fixture(prepare = async () => {}) {
   const request = vi.fn(async (command: { type: string }) => ({ sessionId: 'session', type: command.type === 'startSession' ? 'sessionStarted' : 'sessionStopped' }))
   const begin = vi.fn(async () => ({ meetingId: 'meeting' }))
   const finish = vi.fn(async () => {})
-  const overlay = vi.fn()
   const engine = { currentState: 'ready', request, supports: () => true } as unknown as EngineProcess
   const meetings = { begin, finish, attach: vi.fn(), abandon: vi.fn(), recordingPathFor: () => 'private.wav' } as unknown as MeetingStore
-  const controller = new SessionController({ engine, meetings, prepare, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => 'secret', whenReady: async () => {}, startingChanged: () => {}, showOverlay: overlay, hideOverlay: () => {} })
-  return { controller, request, begin, finish, overlay }
+  const controller = new SessionController({ engine, meetings, prepare, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => 'secret', whenReady: async () => {}, startingChanged: () => {}, hideOverlay: () => {} })
+  return { controller, request, begin, finish }
 }
 const config: SessionConfig = { audioSource: { kind: 'browserTab', streamId: 'stream' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: ['en'], browserTimeline: { epoch: 0, videoTimeMs: 45000, playbackRate: 1 } }
 
 describe('browser session boundary', () => {
-  it('never creates a meeting, recording or overlay and injects credentials privately', async () => {
+  it('never creates a meeting or recording and injects credentials privately', async () => {
     const f = fixture()
     await f.controller.start({ ...config, recordingPath: 'forbidden.wav', translationProvider: 'cloud' }, 'browser')
     expect(f.begin).not.toHaveBeenCalled()
-    expect(f.overlay).not.toHaveBeenCalled()
     expect(f.request.mock.calls[0][0]).toMatchObject({ config: { translationOptions: { apiKey: 'secret' } } })
     expect(f.request.mock.calls[0][0]).not.toHaveProperty('config.recordingPath')
     await f.controller.stop('session')
@@ -45,7 +43,6 @@ describe('browser session boundary', () => {
     const f = fixture()
     const result = await f.controller.start({ ...config, audioSource: { kind: 'defaultOutput' }, browserTimeline: undefined }, 'desktop')
     expect(result.meetingId).toBe('meeting')
-    expect(f.overlay).toHaveBeenCalledOnce()
     expect(f.request.mock.calls[0][0]).toHaveProperty('config.recordingPath', 'private.wav')
   })
   it('validates the restricted public protocol and fixed development identity', () => {

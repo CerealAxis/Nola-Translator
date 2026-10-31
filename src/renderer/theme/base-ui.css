@@ -374,6 +374,9 @@
     .nola-toast-viewport { inset: auto 12px 12px; width: auto; }
     .nola-toast-content { align-items: flex-start; flex-wrap: wrap; }
     .nola-toast-action { margin-inline-start: auto; }
+    html[data-overlay-toast='true'] .nola-toast-viewport { inset: auto 20px 20px auto; width: min(420px, calc(100vw - 32px)); }
+    html[data-overlay-toast='true'] .nola-toast-content { align-items: center; flex-wrap: nowrap; }
+    html[data-overlay-toast='true'] .nola-toast-action { margin-inline-start: 0; }
   }
 }
 
