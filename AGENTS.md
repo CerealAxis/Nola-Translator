@@ -1,6 +1,6 @@
 # AGENTS.md
 
-本文件约束 Nola Translator 仓库中的 AI 编程助手。优先完成用户当前任务，遵守项目既有架构与明确的操作边界。视觉规范见 [DESIGN.MD](./DESIGN.MD)，shadcn-ui文档见 [./llms.txt]
+本文件约束 Nola Translator 仓库中的 AI 编程助手。优先完成用户当前任务，遵守项目既有架构与明确的操作边界。视觉规范见 [DESIGN.MD](./DESIGN.MD)，shadcn-ui文档见 [./llms.txt]，Assistant-ui 文档见 [ https://www.assistant-ui.com/llms-full.txt]
 
 ## 1. 工作原则
 
@@ -9,6 +9,7 @@
 - **控制范围**：优先做最小且完整的改动，沿用现有抽象；不借机重构无关模块、增加依赖或改变用户未要求的行为。保留工作区已有修改，不覆盖其他人或 Agent 的成果。
 - **按风险验证**：运行与改动有关的检查；失败则定位并修复本次改动引入的问题。通过后无需无理由重复全套测试。可能下载模型、使用云服务、覆盖用户数据或产生高成本的操作，先核实影响。
 - **说明结果**：结束时简述变更内容、验证结果及未验证事项，不把未执行的检查描述为已通过。
+- **项目skills**：./skills/
 
 ## 2. 技术栈与代码入口
 
@@ -69,27 +70,7 @@ assets/brand/             App Logo 与 GitHub 官方头像
 scripts/                  PowerShell 构建与运行时管理脚本
 ```
 
-### assistant-ui
-
-This project uses assistant-ui for chat interfaces.
-
-Documentation: https://www.assistant-ui.com/llms-full.txt
-
-Key patterns:
-- Use AssistantRuntimeProvider at the app root
-- Thread component for full chat interface
-- AssistantModal for floating chat widget
-- useChatRuntime hook with AI SDK transport
-
-## 3. React、i18n 与视觉规范
-
-### 组件和事件
-
-- 统一使用具名导出，禁止 `default export`；组件 Props 用 `export interface XProps`，变体联合用 `export type`。
-- shadcn/ui（Base UI）原生按钮使用 `onClick`；复合控件按其实际 `onValueChange` 等接口处理。不要把旧 `onPress`、`selectedKeys`、`isPending` 机械替换；逐项映射禁用、键盘与异步状态。
-- 装饰性图标添加 `aria-hidden="true"`。
-- 可复用组件内不写用户可见文本字面量；由调用方通过 `t(...)` 生成后以 `label: ReactNode` 等 Prop 传入。
-- 拼接多个 `className` 使用 `[...].filter(Boolean).join(' ')`。
+## 3. i18n 与视觉规范
 
 ### 国际化
 
@@ -103,8 +84,6 @@ Key patterns:
 - 需要变更 UI 时阅读 [DESIGN.MD](./DESIGN.MD)；颜色、间距、圆角和字号以 `src/renderer/theme/` 的 token 为准，不引入任意字面值。
 - 按钮统一使用 `--radius-xl`，禁止 `ghost` 变体；图标按钮可使用透明背景。
 - 非按钮圆角按语义选 token；主题中没有 `rounded-pill` 档位。
-- shadcn/ui 组件使用 Nola 语义 token，不使用默认黑白主题；同名语义变量须经独立映射，避免与既有全局 token 冲突。原子组件覆盖字阶时可在 utilities 层使用任意值类（例如 `text-[11px]`）；这仅是字号规则的特定例外。
-- z-index 只使用 `DESIGN.MD` 第 8 节规定的 `.z-*` 类，禁止写 `z-50` 等字面层级。
 
 ## 4. 注释规范
 
