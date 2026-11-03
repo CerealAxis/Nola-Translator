@@ -2,7 +2,7 @@
 
 import asyncio
 from collections import OrderedDict, deque
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from time import monotonic
 from uuid import uuid4
 
@@ -14,15 +14,25 @@ from ..recognition.volume_gate import SileroVadSegmenter
 from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, Operation
 from .gateway.gateway import MatchRequest
 from .gateway.operations import AsrObservation
+from .latency import unix_ms
 from .source_agreement import SourceAgreement
 
 
+@dataclass
+class _CloudSegment:
+    segment_id: str
+    index: int
+    agreement: SourceAgreement = field(default_factory=SourceAgreement)
+    boundary_reported: bool = False
+
+
 class CloudAsrPipeline:
-    def __init__(self, session, config, emit):
+    def __init__(self, session, config, emit, *, latency_detection=False):
         self.session = session
         self.emit = emit
         self.final_only = config.recognitionProvider == "minimax"
-        self.recognizer = create_cloud_recognizer(config)
+        self.latency_detection = latency_detection
+        self.recognizer = create_cloud_recognizer(config, latency_detection=latency_detection)
         self.recognizer.on_update = self._update
         self.recognizer.on_error = self._on_error
         self.error = None
@@ -61,15 +71,20 @@ class CloudAsrPipeline:
             return
         segment = self.segments.get(update.segment_id)
         if segment is None:
-            segment = (str(uuid4()), self.index, SourceAgreement())
+            segment = _CloudSegment(str(uuid4()), self.index)
             self.segments[update.segment_id] = segment
             self.index += 1
             if len(self.segments) > 512:
                 self.segments.popitem(last=False)
-        segment_id, index, agreement = segment
+        segment_id, agreement = segment.segment_id, segment.agreement
         before = agreement.snapshot
         if before.committed:
             return
+        if self.latency_detection and update.boundary_at_ms is not None and not segment.boundary_reported:
+            segment.boundary_reported = True
+            self.emit("latency_observation", {
+                "kind": "segment_boundary", "at_ms": update.boundary_at_ms, "segment_id": segment_id,
+            })
         after = agreement.commit(update.source_text) if update.is_final else agreement.observe(
             AsrObservation(update.source_text), self.end_sample,
         )
@@ -78,7 +93,7 @@ class CloudAsrPipeline:
         start = max(0, round(update.started_at_ms * 16))
         end = max(start, self.end_sample if update.ended_at_ms is None else round(update.ended_at_ms * 16))
         payload = {
-            "segment_id": segment_id, "utterance_id": segment_id, "segment_index": index,
+            "segment_id": segment_id, "utterance_id": segment_id, "segment_index": segment.index,
             "source_revision": after.revision, "text": after.text,
             "language": update.language or self.session.config.source_language,
             "audio_span": {"start_sample": start, "end_sample": end},
@@ -123,10 +138,11 @@ class _PreviewJob:
 
 
 class AsrPipeline:
-    def __init__(self, session, gateway, emit, *, segmenter=None):
+    def __init__(self, session, gateway, emit, *, segmenter=None, latency_detection=False):
         self.session = session
         self.gateway = gateway
         self.emit = emit
+        self.latency_detection = latency_detection
         self.gate = segmenter or SileroVadSegmenter(
             silence_end_ms=session.config.silence_end_ms, max_segment_ms=session.config.max_segment_ms,
             min_voiced_ms=120,
@@ -166,16 +182,15 @@ class AsrPipeline:
         instance, lease, _, _ = await self.gateway.acquire(self._request())
         try:
             await asyncio.to_thread(self.gate.load)
-            if self.session.config.speaker_detection.enabled:
-                from ..recognition.speaker import SpeakerEmbedder, SpeakerInstallationError
+            from ..recognition.speaker import SpeakerEmbedder, SpeakerInstallationError
 
-                try:
-                    self.speaker_embedder = await asyncio.to_thread(SpeakerEmbedder)
-                except SpeakerInstallationError as error:
-                    raise GatewayError(
-                        GatewayErrorCode.MODEL_INTEGRITY, stage="speaker",
-                        message="Bundled speaker detector could not be initialized",
-                    ) from error
+            try:
+                self.speaker_embedder = await asyncio.to_thread(SpeakerEmbedder)
+            except SpeakerInstallationError as error:
+                raise GatewayError(
+                    GatewayErrorCode.MODEL_INTEGRITY, stage="speaker",
+                    message="Bundled speaker detector could not be initialized",
+                ) from error
         finally:
             await self.gateway.release(instance, lease)
 
@@ -316,6 +331,10 @@ class AsrPipeline:
             language=self.language,
             epoch=self.session.epoch,
         ))
+        if self.latency_detection:
+            self.emit("latency_observation", {
+                "kind": "segment_boundary", "at_ms": unix_ms(), "segment_id": self.segment_id,
+            })
         self.segment_index += 1
         self._reset_segment(continue_utterance=reason == "forced_duration")
         self._wake_worker()

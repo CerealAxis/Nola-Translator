@@ -78,7 +78,7 @@ it('hides the supported-model block and keeps explanations inside a tooltip', as
 it('selects a model and download source, then starts the download to the chosen path', async () => {
   const user = userEvent.setup()
   const download = vi.spyOn(offlineActions, 'downloadModel').mockResolvedValue()
-  offlineStore.setState({ mode: 'model', downloadModelId: 'hy-mt2-7b-q4-k-m' })
+  offlineStore.setState({ mode: 'model', downloadModelId: 'tts-qwen3-tts-pytorch-1.7b-base-bf16' })
   render(<OfflineDialog scope="model" />)
   expect(screen.getByRole('combobox', { name: '模型' })).toBeInTheDocument()
   const source = screen.getByRole('combobox', { name: '下载来源' })
@@ -88,7 +88,7 @@ it('selects a model and download source, then starts the download to the chosen 
   expect(source).toHaveTextContent('ModelScope')
   await user.type(screen.getByRole('textbox', { name: '保存位置' }), 'G:\\Models')
   await user.click(screen.getByRole('button', { name: '下载模型' }))
-  expect(download).toHaveBeenCalledWith('hy-mt2-7b-q4-k-m', 'modelscope', 'G:\\Models')
+  expect(download).toHaveBeenCalledWith('tts-qwen3-tts-pytorch-1.7b-base-bf16', 'modelscope', 'G:\\Models')
   expect(screen.queryByRole('link')).not.toBeInTheDocument()
 })
 

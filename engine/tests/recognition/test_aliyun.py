@@ -53,13 +53,14 @@ async def wait_for(predicate):
     assert predicate()
 
 
-async def connected(settings=None):
+async def connected(settings=None, *, latency_detection=False):
     socket = FakeSocket()
     connection = []
     async def connector(url, headers):
         connection.append((url, headers))
         return socket
-    recognizer = AliyunRecognizer(settings or config(), connector=connector, finish_timeout=1)
+    recognizer = AliyunRecognizer(settings or config(), connector=connector, finish_timeout=1,
+                                  latency_detection=latency_detection)
     updates = []
     async def update(item):
         updates.append(item)
@@ -109,6 +110,25 @@ async def test_versioned_source_updates_and_native_translation_join(model, asr_k
         await wait_for(lambda: updates[-1].native_translation.state == "complete")
         assert updates[-1].native_translation.text == "你好世界。"
         assert updates[-1].revision > final_source.revision
+    finally:
+        await recognizer.close()
+
+
+async def test_latency_boundary_is_observed_at_speech_stop_even_before_first_text(monkeypatch):
+    recognizer, socket, updates, _ = await connected(latency_detection=True)
+    try:
+        now_ns = 1_234_000_000
+        monkeypatch.setattr(aliyun_module, "time_ns", lambda: now_ns)
+        socket.event("input_audio_buffer.speech_started", item_id="source", audio_start_ms=0)
+        socket.event("input_audio_buffer.speech_stopped", item_id="source", audio_end_ms=20)
+        await wait_for(lambda: "source" in recognizer._items and recognizer._items["source"].boundary_at_ms is not None)
+        assert not updates
+        now_ns = 2_345_000_000
+        socket.event("input_audio_buffer.speech_stopped", item_id="source", audio_end_ms=20)
+        socket.event("conversation.item.input_audio_transcription.completed", item_id="source", transcript="One")
+        socket.event("conversation.item.input_audio_transcription.completed", item_id="no-boundary", transcript="Two")
+        await wait_for(lambda: len(updates) == 2)
+        assert [item.boundary_at_ms for item in updates] == [1234, None]
     finally:
         await recognizer.close()
     assert socket.closed

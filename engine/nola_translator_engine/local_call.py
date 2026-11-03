@@ -20,6 +20,26 @@ import numpy as np
 _TTS_CACHE = {}
 
 
+def load_qwen3_tts(root: Path, device: str):
+    try:
+        from qwen_tts import Qwen3TTSModel
+    except ImportError as error:
+        raise ValueError('Qwen3-TTS requires the qwen-tts Python runtime; install the TTS runtime first') from error
+    return Qwen3TTSModel.from_pretrained(str(root), device_map=device, local_files_only=True)
+
+
+def generate_qwen3_tts(model, mode: str | None, text: str, voice: str | None = None):
+    if mode == 'custom_voice':
+        voices = model.get_supported_speakers() or []
+        speaker = voice or (voices[0] if voices else None)
+        if not speaker:
+            raise ValueError('This Qwen3-TTS model does not expose a selectable speaker')
+        return model.generate_custom_voice(text=text, speaker=speaker, language='Auto')
+    if mode == 'voice_design':
+        return model.generate_voice_design(text=text, language='Auto', instruct='A clear, neutral speaking voice.')
+    raise ValueError('This Base model needs a reference voice. Select a CustomVoice or VoiceDesign model.')
+
+
 def torch_device_for_tts(compute, devices) -> str:
     requested = compute.recognitionDevice
     if requested == 'auto':
@@ -205,29 +225,17 @@ def synthesize(resources, request, compute):
         raise ValueError('Qwen3-TTS GGUF models using llama.cpp are not supported for speech synthesis yet; select a CrispASR TTS model')
     config = json.loads((root / 'config.json').read_text(encoding='utf8'))
     if config.get('model_type') == 'qwen3_tts':
-        try:
-            from qwen_tts import Qwen3TTSModel
-        except ImportError as error:
-            raise ValueError('Qwen3-TTS requires the qwen-tts Python runtime; install the TTS runtime first') from error
         from .compute import probe_devices
         devices, _, _ = probe_devices(None)
         device = torch_device_for_tts(compute, devices)
         model = _TTS_CACHE.get(cache_key)
         if model is None:
-            model = Qwen3TTSModel.from_pretrained(str(root), device_map=device, local_files_only=True)
+            model = load_qwen3_tts(root, device)
             _TTS_CACHE[cache_key] = model
         voices = model.get_supported_speakers() or []
         if request.get('inspect'):
             return {'text': '', 'voices': voices}
-        if config.get('tts_model_type') == 'custom_voice':
-            speaker = request.get('voice') or (voices[0] if voices else None)
-            if not speaker:
-                raise ValueError('This Qwen3-TTS model does not expose a selectable speaker')
-            wavs, rate = model.generate_custom_voice(text=request['text'], speaker=speaker, language='Auto')
-        elif config.get('tts_model_type') == 'voice_design':
-            wavs, rate = model.generate_voice_design(text=request['text'], language='Auto', instruct='A clear, neutral speaking voice.')
-        else:
-            raise ValueError('This Base model needs a reference voice. Select a CustomVoice or VoiceDesign model.')
+        wavs, rate = generate_qwen3_tts(model, config.get('tts_model_type'), request['text'], request.get('voice'))
         return {'text': request['text'], 'audio': encode_audio(wavs[0], rate), 'voices': voices}
     from transformers import AutoConfig, AutoModelForTextToWaveform, AutoModelForTextToSpectrogram, pipeline
     from .translation.transformers_causal import load_verified_model

@@ -1,4 +1,5 @@
 import { modelPolicyTw } from './model-policy-ui'
+import { latencyTw } from './latency-ui'
 import { gatewayTw } from './gateway-ui'
 import { workbenchTw } from './workbench-ui'
 import { offlineTw } from './offline-ui'
@@ -7,6 +8,7 @@ import { onboardingTW } from './onboarding-ui'
 
 /** Complete Traditional Chinese dictionary for Taiwan. */
 export const zhTW: Dictionary = {
+  latency: latencyTw,
   gateway: gatewayTw,
   modelsPolicy: modelPolicyTw,
   workbench: workbenchTw,
@@ -607,8 +609,6 @@ export const zhTW: Dictionary = {
     "outputSource": "僅原文",
     "outputTranslation": "原文與譯文",
     "outputSpeech": "字幕與語音",
-    "speakerDetection": "辨識說話者",
-    "speakerDetectionHint": "在辨識結果中標記不同說話者；目前模型不支援時不會產生標記。",
     "speechModel": "語音合成模型",
     "speechVoice": "語音音色",
     "speechDefaultVoice": "模型預設音色",
@@ -1391,7 +1391,7 @@ export const zhTW: Dictionary = {
     "dialogModalBody": "譯文由模型生成，重要場合請先核對再用。",
     "dialogModalClose": "知道了",
     "dialogSessionSetup": "新建口譯彈窗",
-    "dialogSessionSetupDesc": "應用裡最大的表單，六個欄位加底部操作欄。",
+    "dialogSessionSetupDesc": "設定名稱和是否儲存錄音。",
     "dialogRename": "重新命名彈窗",
     "dialogRenameDesc": "帶輸入框的確認框，確定後對不存在的記錄靜默失敗。",
     "dialogExport": "匯出彈窗",

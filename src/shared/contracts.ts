@@ -32,7 +32,6 @@ export interface AudioTestResult {
 export type SessionConfig = {
   outputMode?: 'source' | 'translation' | 'speech'
   s2sModel?: import('./settings').RealtimeS2sModel | null
-  speakerDetection?: boolean
   speechOutputDeviceId?: string
   speechVoice?: string
   speechModelId?: string

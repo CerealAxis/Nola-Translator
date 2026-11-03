@@ -19,7 +19,7 @@ import { useRoute } from '@/routes'
 import { actions, getBridge, sessionStore, stores, updateSettings, useStore } from '@/store'
 import { swappedLanguagesOf, targetLanguagePatch, translationModelPatch } from '@/session-config'
 import { PageHeader } from '@/components/primitives'
-import { notifyGatewayModelUnavailable, notifyOverlayError, notifyOverlayInfo } from '@/components/primitives/notify'
+import { notifyGatewayStartIssue, notifyOverlayError, notifyOverlayInfo } from '@/components/primitives/notify'
 import { modelBindingPatch, savedBindingOf, useAvailableModels, useModelSelection, type AvailableModel } from '@/available-models'
 import { SettingSelect, SettingSwitch } from '../settings/SettingsPage'
 import { useSpeechOutputDevices } from '../workspace/SessionSetupDialog'
@@ -43,9 +43,10 @@ export function OverlayPage() {
   const catalog = useAvailableModels()
   const reportSwitch = (model: AvailableModel) => notifyOverlayInfo(t('gateway.modelSwitched', { name: model.name }),
     { description: t(model.origin === 'gateway' ? 'gateway.modelSwitchedLoaded' : 'gateway.modelSwitchedCloud') })
-  const s2sModel = settings.realtime?.quickS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.quickS2sModel
-  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch, !!s2sModel)
   const translationDisabled = settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE
+  const s2sModel = translationDisabled ? null
+    : settings.realtime?.quickS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.quickS2sModel
+  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch, !!s2sModel)
   // With translation switched off there is nothing to repair: replacing its model would re-enable it.
   const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationDisabled || !!s2sModel)
   const asrOptions: { value: string; label: string; isDisabled?: boolean }[] = catalog.asr.length
@@ -102,22 +103,12 @@ export function OverlayPage() {
         setOverlayVisible(false)
         return
       }
-      const gateway = await getBridge()?.gateway?.snapshot()
-      if (gateway?.state !== 'running' && !gateway?.realtime) {
-        notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.asr') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
-        return
-      }
-      if (asr.unavailable) {
-        notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.asr') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
-        return
-      }
-      if (!translationDisabled && mt.unavailable) {
-        notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.mt') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
-        return
-      }
+      const missing = !s2sModel && asr.unavailable ? 'asr'
+        : !s2sModel && !translationDisabled && mt.unavailable ? 'mt' : undefined
+      if (await notifyGatewayStartIssue(t, missing)) return
       const opened = await actions.settings.showOverlay()
       if (opened === false) {
-        notifyOverlayError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        if (!await notifyGatewayStartIssue(t)) notifyOverlayError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
       } else setOverlayVisible(true)
     } catch (error) {
       notifyOverlayError(t('workspaceUi.overlayFailed'), { cause: error })
@@ -289,6 +280,19 @@ export function OverlayPage() {
                   options={outputOptions} onChange={value => patch({ realtime: { speechOutputDeviceId: value === 'default' ? '' : value } })} />
               </div>
             </> : null}
+          </FieldGroup>
+          <FieldGroup className="nola-overlay-fields grid">
+            <div className="nola-overlay-field">
+              <ModelAvailabilityLabel label={t('latency.title')} hint={t('latency.toggleHint')} />
+              <div className="flex flex-wrap items-center gap-2">
+                <SettingSwitch ariaLabel={t('latency.title')} isSelected={settings.realtime?.latencyDetection === true}
+                  isDisabled={sessionActive} onChange={latencyDetection => patch({ realtime: { latencyDetection } })} />
+                {settings.realtime?.latencyDetection && session.sessionId && <Button variant="secondary" size="sm"
+                  onClick={() => { void window.nolaTranslator?.openLatencyWindow?.().catch(error => notifyOverlayError(t('latency.openFailed'), { cause: error })) }}>
+                  {t('latency.reopen')}
+                </Button>}
+              </div>
+            </div>
           </FieldGroup>
         </CardContent>
       </Card>

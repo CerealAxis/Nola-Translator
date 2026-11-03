@@ -9,12 +9,11 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "engine"))
 
-from nola_translator_engine.models import catalog
 from nola_translator_engine.models.crisp_catalog import (ADDITIONAL_TTS_NAMES, ADDITIONAL_TTS_SPECS,
     CRISP_ASR_SPECS, QWEN3_TTS_NAMES, QWEN3_TTS_SPECS)
 from nola_translator_engine.models.qwen_gguf_catalog import QWEN3_ASR_GGUF_SPECS
-from nola_translator_engine.models.qwen35_catalog import QWEN35_NAMES, QWEN35_SPECS
-from nola_translator_engine.models.manager import ModelSpec
+from nola_translator_engine.models.qwen35_catalog import QWEN35_NAMES
+from nola_translator_engine.offline_models import catalog_specs
 
 NAMES = {
     "qwen3-asr-1.7b-hf": "Qwen3-ASR 1.7B",
@@ -69,12 +68,7 @@ TTS_IDS = {spec.model_id for spec in QWEN3_TTS_SPECS + ADDITIONAL_TTS_SPECS}
 
 
 def generate() -> str:
-    specs = {spec.model_id: spec for spec in vars(catalog).values() if isinstance(spec, ModelSpec)}
-    specs.update({spec.model_id: spec for spec in CRISP_ASR_SPECS})
-    specs.update({spec.model_id: spec for spec in QWEN3_TTS_SPECS})
-    specs.update({spec.model_id: spec for spec in ADDITIONAL_TTS_SPECS})
-    specs.update({spec.model_id: spec for spec in QWEN35_SPECS})
-    specs.update({spec.model_id: spec for spec in QWEN3_ASR_GGUF_SPECS})
+    specs = catalog_specs()
     if specs.keys() != NAMES.keys():
         raise ValueError("Update manual-download product names for the engine model catalog")
     entries = []

@@ -8,7 +8,7 @@ from collections.abc import Callable
 from contextlib import suppress
 from uuid import uuid4
 
-from ..audio.resample import TARGET_SAMPLE_RATE
+from ..audio.resample import AudioFrame, TARGET_SAMPLE_RATE
 from .contracts import InputConfig
 from .ingestion import AudioIngestion, InputAudioFrame, StreamFormat
 from .routing import (
@@ -55,12 +55,14 @@ def _desktop_backend(config: InputConfig) -> CaptureBackend | None:
 
 
 class DesktopCapture:
-    def __init__(self, backend: CaptureBackend, ingestion: AudioIngestion, epoch: int) -> None:
+    def __init__(self, backend: CaptureBackend, ingestion: AudioIngestion, epoch: int, *,
+                 observe: Callable[[AudioFrame, int], None] | None = None) -> None:
         self._backend = backend
         self._ingestion = ingestion
         self._epoch = epoch
         self._stream_id = f"desktop-{uuid4().hex}"
         self._stopped = False
+        self._observe = observe
 
     async def pump(self) -> None:
         sample_start = 0
@@ -83,6 +85,8 @@ class DesktopCapture:
                 ))
                 if outcome.status == "rejected":
                     raise RuntimeError(f"desktop audio rejected: {outcome.reason}")
+                if self._observe is not None and outcome.ack is not None and outcome.frames_produced == 1:
+                    self._observe(frame, outcome.ack.through_canonical_sample)
                 seq += 1
                 sample_start += samples.size
             if not self._stopped:
@@ -106,11 +110,12 @@ async def start_desktop_capture(
     epoch: int,
     *,
     backend_factory: Callable[[InputConfig], CaptureBackend | None] = _desktop_backend,
+    observe: Callable[[AudioFrame, int], None] | None = None,
 ) -> DesktopCapture | None:
     backend = backend_factory(config)
     if backend is None:
         return None
-    capture = DesktopCapture(backend, ingestion, epoch)
+    capture = DesktopCapture(backend, ingestion, epoch, observe=observe)
     startup = asyncio.create_task(backend.start())
     try:
         # A native activation running in a thread may outlive a cancelled await.

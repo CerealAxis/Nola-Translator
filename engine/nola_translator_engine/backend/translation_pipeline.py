@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, Operation
 from .gateway.gateway import MatchRequest, ModelGateway
+from .latency import unix_ms
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,7 @@ class TranslationScheduler:
         preview_max_wait_ms: int = 1000,
         preview_deadline_s: float = 3.0,
         final_deadline_s: float = 10.0,
+        latency_detection: bool = False,
     ) -> None:
         self.gateway = gateway
         self.session_id = session_id
@@ -89,6 +91,7 @@ class TranslationScheduler:
         self.preview_max_wait = max(self.preview_interval, preview_max_wait_ms / 1000)
         self.preview_deadline_s = preview_deadline_s
         self.final_deadline_s = final_deadline_s
+        self.latency_detection = latency_detection
         self._segments: dict[tuple[str, int, str], _Segment] = {}
         self._finals: deque[_Task] = deque()
         self._wake = asyncio.Event()
@@ -325,6 +328,7 @@ class TranslationScheduler:
             }
             try:
                 try:
+                    started = unix_ms() if final and self.latency_detection else None
                     result = await self.gateway.translate(ctx, **arguments)
                 except GatewayError as error:
                     delay = max(0.1, (error.retry_after_ms or 0) / 1000)
@@ -333,6 +337,7 @@ class TranslationScheduler:
                     await asyncio.sleep(delay)
                     if not self._current(task, state):
                         return
+                    started = unix_ms() if self.latency_detection else None
                     result = await self.gateway.translate(ctx, **arguments)
                 if not result.text.strip() or not result.is_final:
                     raise ValueError("empty or incomplete translation")
@@ -340,6 +345,7 @@ class TranslationScheduler:
                 if not final or not self.fallback_model_id or not self._current(task, state):
                     raise
                 arguments["request"] = replace(request, model_id=self.fallback_model_id)
+                started = unix_ms() if self.latency_detection else None
                 result = await self.gateway.translate(replace(
                     ctx, deadline=time.monotonic() + self.final_deadline_s, provider_options=self.fallback_provider_options,
                 ), **arguments)
@@ -356,6 +362,11 @@ class TranslationScheduler:
         if not self._current(task, state):
             return
         if task.task_class == "final":
+            if started is not None:
+                ready = unix_ms()
+                fields = {"segment_id": task.key[2], "provider": arguments["request"].model_id}
+                await self._emit("latency_observation", {**fields, "kind": "translation_started", "at_ms": started})
+                await self._emit("latency_observation", {**fields, "kind": "translation_ready", "at_ms": ready})
             await self._commit(task, result.text.strip())
         else:
             assert state is not None

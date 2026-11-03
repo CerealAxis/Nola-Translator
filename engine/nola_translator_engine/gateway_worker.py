@@ -124,16 +124,15 @@ class PersistentSynthesizer:
         if adapter == 'llama.cpp' or self.model_id.startswith('tts-qwen3-tts-llama-'):
             raise ValueError('The llama.cpp TTS adapter does not support synthesis')
         from .compute import probe_devices
-        from .local_call import torch_device_for_tts
+        from .local_call import load_qwen3_tts, torch_device_for_tts
         devices, _, _ = probe_devices(None)
         device = torch_device_for_tts(self.compute, devices)
         metadata = json.loads((root / 'config.json').read_text(encoding='utf8'))
         if metadata.get('model_type') == 'qwen3_tts':
-            from qwen_tts import Qwen3TTSModel
             self.mode = metadata.get('tts_model_type', '')
             if self.mode not in ('custom_voice', 'voice_design'):
                 raise ValueError('A reference voice is required by this TTS model')
-            self.model = Qwen3TTSModel.from_pretrained(str(root), device_map=device, local_files_only=True)
+            self.model = load_qwen3_tts(root, device)
             self.voices = list(self.model.get_supported_speakers() or [])
             return
         from transformers import AutoConfig, AutoModelForTextToWaveform, AutoModelForTextToSpectrogram, pipeline

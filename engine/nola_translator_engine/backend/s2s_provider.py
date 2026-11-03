@@ -43,6 +43,7 @@ class S2SObservation:
     started_at_ms: int | None = None
     ended_at_ms: int | None = None
     language: str | None = None
+    speech_stopped: bool = False
 
 
 @dataclass
@@ -281,7 +282,8 @@ class QwenS2SSession:
         return S2SObservation("source", item_id, text=item.text, final=final,
                               status="incomplete" if failed else "", speaker_id=item.speaker,
                               started_at_ms=item.start, ended_at_ms=item.end,
-                              language=language if isinstance(language, str) and len(language) <= 32 else None)
+                              language=language if isinstance(language, str) and len(language) <= 32 else None,
+                              speech_stopped=suffix == "speech_stopped")
 
     def _source_ids(self, item_id: str) -> tuple[str, ...]:
         source_id = self._links.get(item_id)

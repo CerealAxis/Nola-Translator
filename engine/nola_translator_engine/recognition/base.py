@@ -29,6 +29,8 @@ class RecognitionUpdate:
     language: str | None
     is_final: bool
     native_translation: NativeTranslation | None = None
+    # The observed boundary's Unix clock, separate from the audio timeline.
+    boundary_at_ms: float | None = None
 
 
 class ModelUnavailable(RuntimeError):
@@ -58,13 +60,13 @@ class Transcriber(Protocol):
     ) -> tuple[str, str | None]: ...
 
 
-def create_cloud_recognizer(config):
+def create_cloud_recognizer(config, *, latency_detection: bool = False):
     if config.recognitionProvider == "minimax":
         from .minimax import MiniMaxRecognizer
 
-        return MiniMaxRecognizer(config)
+        return MiniMaxRecognizer(config, latency_detection=latency_detection)
     from .aliyun import AliyunRecognizer, AliyunInferenceRecognizer, INFERENCE_ASR_MODELS
 
     if config.recognitionOptions and config.recognitionOptions.model in INFERENCE_ASR_MODELS:
         return AliyunInferenceRecognizer(config)
-    return AliyunRecognizer(config)
+    return AliyunRecognizer(config, latency_detection=latency_detection)

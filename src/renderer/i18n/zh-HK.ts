@@ -1,4 +1,5 @@
 import { modelPolicyHk } from './model-policy-ui'
+import { latencyHk } from './latency-ui'
 import { gatewayHk } from './gateway-ui'
 import { workbenchHk } from './workbench-ui'
 import { offlineHk } from './offline-ui'
@@ -7,6 +8,7 @@ import { onboardingHK } from './onboarding-ui'
 
 /** Complete Traditional Chinese dictionary for Hong Kong. */
 export const zhHK: Dictionary = {
+  latency: latencyHk,
   gateway: gatewayHk,
   modelsPolicy: modelPolicyHk,
   workbench: workbenchHk,
@@ -607,8 +609,6 @@ export const zhHK: Dictionary = {
     "outputSource": "僅原文",
     "outputTranslation": "原文與譯文",
     "outputSpeech": "字幕與語音",
-    "speakerDetection": "辨識說話者",
-    "speakerDetectionHint": "在辨識結果中標記不同說話者；目前模型不支援時不會產生標記。",
     "speechModel": "語音合成模型",
     "speechVoice": "語音音色",
     "speechDefaultVoice": "模型預設音色",
@@ -1391,7 +1391,7 @@ export const zhHK: Dictionary = {
     "dialogModalBody": "譯文由模型生成，重要場合請先核對再用。",
     "dialogModalClose": "知道了",
     "dialogSessionSetup": "新建傳譯對話方塊",
-    "dialogSessionSetupDesc": "應用程式中最大的表單，共有六個欄位和底部操作列。",
+    "dialogSessionSetupDesc": "設定名稱及是否儲存錄音。",
     "dialogRename": "重新命名對話方塊",
     "dialogRenameDesc": "附有輸入框的確認視窗；如果紀錄不存在，確認後會靜默失敗。",
     "dialogExport": "匯出對話方塊",

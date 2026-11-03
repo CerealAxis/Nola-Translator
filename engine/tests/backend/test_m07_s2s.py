@@ -45,6 +45,7 @@ def test_live_translate_profiles_normalize_audio_text_and_terminal_status(model)
             event("session.created", session={"id": "session"}),
             event("session.updated", session={"id": "session", modality_key: ["text", "audio"], **formats}),
             event("input_audio_buffer.speech_started", item_id="source", speaker_id=2, audio_start_ms=3),
+            event("input_audio_buffer.speech_stopped", item_id="source", audio_end_ms=20),
             event("conversation.item.input_audio_transcription.completed", item_id="source", transcript="Bonjour"),
             event("response.audio_transcript.delta" if delta else "response.audio_transcript.text",
                   event_id="one", response_id="r", item_id="target", delta="Hel", text="H", stash="el"),
@@ -85,6 +86,9 @@ def test_live_translate_profiles_normalize_audio_text_and_terminal_status(model)
         assert socket.closed
         source = next(item for item in observations if item.kind == "source" and item.final)
         assert (source.text, source.speaker_id, source.started_at_ms) == ("Bonjour", 2, 3)
+        assert not source.speech_stopped
+        (speech_stopped,) = [item for item in observations if item.speech_stopped]
+        assert speech_stopped.item_id == source.item_id and speech_stopped.ended_at_ms == 20
         target = [item for item in observations if item.kind == "target"]
         assert [item.text for item in target] == ["Hel", "Hello", "Hello", "Hello", "Partial", "Partial"]
         assert target[3].final and target[3].source_ids == ("source",)

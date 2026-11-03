@@ -1,6 +1,6 @@
 import { ALIYUN_S2S_SPEECH_LANGUAGES, recognitionFieldsOf, remoteSourceLanguages } from '../../../shared/cloud-config'
 
-import { useModelSelection, useAvailableModels, type AvailableModel } from '@/available-models'
+import { useModelSelection, useAvailableModels, savedBindingOf, type AvailableModel } from '@/available-models'
 import { featureConflictOwner } from '../../../shared/feature-activity'
 /**
  * Control bar at the bottom of the caption window.
@@ -39,7 +39,7 @@ import { checkCredential } from '@/store/modelStore'
 import { audioDeviceNameOf, translationFieldsOf } from '@/session-config'
 import { useI18n } from '@/i18n'
 import { aliyunConnectionReady } from '../../../shared/cloud-models'
-import { notifyError, notifyInfo, notifyGatewayModelUnavailable } from '@/components/primitives/notify'
+import { notifyError, notifyInfo, notifyGatewayStartIssue } from '@/components/primitives/notify'
 
 import { OverlayDisplayMenu, OverlayLayoutMenu } from './OverlayDisplayMenu'
 import { LANGUAGE_MENU_MAX_HEIGHT, LANGUAGE_MENU_SCREEN_FRACTION } from '../../../shared/overlay-menu'
@@ -109,7 +109,6 @@ function startConfigOf(settings: AppSettings, devices: readonly AudioDevice[], o
     ...(s2sModel ? { targetLanguages: [targetLanguage], translationProvider: 'recognition' as const } : translationFieldsOf(settings.translation, { enabled: outputMode !== 'source', targetLanguage })),
     outputMode,
     s2sModel: s2sModel ?? null,
-    speakerDetection: settings.realtime?.speakerDetection ?? true,
     ...(outputMode === 'speech' ? { speechOutputDeviceId: settings.realtime?.speechOutputDeviceId } : {}),
     ...(outputMode === 'speech' && !s2sModel ? {
       speechModelId: speechModelId.startsWith('resource:') ? speechModelId.slice(9) : speechModelId,
@@ -211,8 +210,6 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
   const outputMode = translationDisabled ? 'source' : settings.realtime?.outputMode === 'speech' ? 'speech' : 'translation'
   const devices = useStore(stores.models, (state) => state.devices)
   const status = useStore(sessionStore, (state) => state.status)
-  const playbackPhase = useStore(sessionStore, state => state.playbackPhase)
-  const waitingSpeechCount = useStore(sessionStore, state => state.waitingSpeechCount)
   const playbackJob = useStore(sessionStore, state => state.playbackJob)
   const errorCode = useStore(sessionStore, (state) => state.errorCode)
   const runtimeComponent = errorCode === 'RUNTIME_TORCH' ? 'engine' : errorCode === 'RUNTIME_LLAMA' ? 'llama' : null
@@ -221,7 +218,8 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
   const catalog = useAvailableModels()
   const reportSwitch = (model: AvailableModel) => notifyInfo(t('gateway.modelSwitched', { name: model.name }),
     { description: t('gateway.modelSwitchedLoaded') })
-  const s2sModel = settings.realtime?.quickS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.quickS2sModel
+  const s2sModel = translationDisabled ? null
+    : settings.realtime?.quickS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.quickS2sModel
   const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch, !!s2sModel)
   const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationDisabled || !!s2sModel)
   const tts = useModelSelection('tts', catalog.tts, settings, reportSwitch, outputMode !== 'speech' || !!s2sModel)
@@ -229,10 +227,6 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
   const asrUnavailable = asr.unavailable
   const mtUnavailable = mt.unavailable
   const ttsUnavailable = tts.unavailable
-  const playbackCopy = playbackPhase === 'waiting' ? 'session.playbackWaiting'
-    : playbackPhase === 'synthesizing' ? 'session.playbackSynthesizing'
-      : playbackPhase === 'playing' ? 'session.playbackPlaying'
-        : playbackPhase === 'failed' ? 'session.playbackFailed' : null
 
   /* `lastIntent` lets a late engine error keep the right start/stop wording. */
   const [lastIntent, setLastIntent] = useState<'start' | 'stop'>('start')
@@ -284,12 +278,12 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
       return
     }
     if (status === 'idle' || status === 'error') {
-      if (s2sModel && !translationDisabled && !aliyunConnectionReady(settings, await checkCredential('aliyun-asr').catch(() => false))) {
+      if (s2sModel && !aliyunConnectionReady(settings, await checkCredential('aliyun-asr').catch(() => false))) {
         notifyError(t('session.s2sSetupHint'))
         return
       }
-      if (s2sModel && (translationDisabled || outputMode === 'speech' && !ALIYUN_S2S_SPEECH_LANGUAGES.includes(target))) {
-        notifyError(t('modelConfig.needsConfiguration'), { description: t('session.targetLanguage') })
+      if (s2sModel && outputMode === 'speech' && !ALIYUN_S2S_SPEECH_LANGUAGES.includes(target)) {
+        notifyError(t('session.speechLanguageUnavailable'))
         return
       }
       const virtualInput = settings.realtime?.virtualInputDeviceId || devices.some(device => device.deviceId === settings.recognition.audioSource && device.kind === 'microphone' && vbCablePair(device.name, 'Output'))
@@ -298,16 +292,11 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
         notifyError(t('session.explicitSpeechOutput'))
         return
       }
-      if (!s2sModel && asrUnavailable) {
-        notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.asr') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
-        return
-      }
-      if (needsMt && mtUnavailable) {
-        notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.mt') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
-        return
-      }
-      if (outputMode === 'speech' && !s2sModel && ttsUnavailable) {
-        notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.tts') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
+      const needsTts = outputMode === 'speech' && !s2sModel
+      const missing = !s2sModel && asrUnavailable ? 'asr'
+        : needsMt && mtUnavailable ? 'mt' : needsTts && ttsUnavailable ? 'tts' : undefined
+      if (missing) {
+        await notifyGatewayStartIssue(t, missing, savedBindingOf(missing, settings))
         return
       }
       setLastIntent('start')
@@ -381,7 +370,6 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
               {starting ? <Spinner /> : running ? <Pause aria-hidden="true" /> : status === 'paused' ? <Play aria-hidden="true" /> : <Mic aria-hidden="true" />}
             </Button>
 
-            {active && playbackCopy ? <span className="nola-caption-menu-trigger nola-caption-pill" aria-live="polite">{t(playbackCopy)}{waitingSpeechCount ? ` · ${t('session.playbackQueueCount', { count: waitingSpeechCount })}` : ''}</span> : null}
             {active && playbackJob ? <>
               {playbackJob.state === 'failed' ? <Button variant="secondary" size="sm" className="rounded-xl" aria-label={t('session.retryPlayback')} onClick={() => { void actions.session.resolvePlayback(playbackJob.jobId, 'retry').catch(error => notifyError(t('session.playbackActionFailed'), { cause: error })) }}>{t('session.retryPlayback')}</Button> : null}
               <Button variant="outline" size="sm" className="rounded-xl" aria-label={t('session.skipPlayback')} onClick={() => { void actions.session.resolvePlayback(playbackJob.jobId, 'skip').catch(error => notifyError(t('session.playbackActionFailed'), { cause: error })) }}>{t('session.skipPlayback')}</Button>

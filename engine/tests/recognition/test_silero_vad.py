@@ -216,3 +216,30 @@ def test_minimax_uses_configured_segmentation():
     recognizer = MiniMaxRecognizer(config)
     assert recognizer._segmenter.max_segment_ms == 12000
     assert recognizer._segmenter.silence_end_ms == 1000
+
+
+async def test_minimax_latency_boundary_is_stamped_when_segment_is_dispatched(monkeypatch):
+    from nola_translator_engine.protocol import ModelSelection
+    from nola_translator_engine.recognition import minimax
+    from nola_translator_engine.recognition.volume_gate import VolumeGateSegment
+
+    config = ModelSelection(sourceLanguage='en', targetLanguages=[],
+        recognitionProvider='minimax', recognitionOptions={'apiKey': 'test'})
+    recognizer = minimax.MiniMaxRecognizer(config, latency_detection=True)
+    now_ns = 1_234_000_000
+    monkeypatch.setattr(minimax, 'time_ns', lambda: now_ns)
+
+    async def request(state):
+        state.text = 'Hello'
+        await recognizer._publish(state, True)
+
+    monkeypatch.setattr(recognizer, '_request', request)
+    recognizer._dispatch(VolumeGateSegment(0, 100, np.ones(1600, dtype=np.float32)), 100)
+    now_ns = 2_345_000_000
+    try:
+        await recognizer._wait_tasks()
+        (update,) = recognizer._drain()
+        assert update.boundary_at_ms == 1234
+        assert update.ended_at_ms == 100
+    finally:
+        await recognizer.close()

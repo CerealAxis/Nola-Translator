@@ -12,6 +12,7 @@ from .desktop_capture import start_desktop_capture
 from .gateway.adapters import MIMO_TTS_MODEL
 from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, Operation
 from .gateway.gateway import MatchRequest, ModelGateway
+from .latency import LatencyCapture
 from .playback_queue import PlaybackQueue
 from .s2s_audio import S2SAudioOutput
 from .s2s_pipeline import S2SPipeline
@@ -32,6 +33,18 @@ class RealtimePipelines:
         self.reconnected = set()
         self.recorders = {}
         self.translation_contexts = {}
+
+    @staticmethod
+    def _latency_enabled(session):
+        return session.owner == "quick_interpret" and session.config.latency_detection
+
+    async def _start_capture(self, session, latency_detection):
+        observe = None
+        if latency_detection and "audio" in session.config.required_outputs:
+            observe = LatencyCapture(session._log.submit).observe
+        return await start_desktop_capture(
+            session.config.input, self.ingestion(session), session.epoch, observe=observe,
+        )
 
     def _prepare_recording(self, session):
         path = session.config.recording_path
@@ -89,6 +102,7 @@ class RealtimePipelines:
             if config.kind == "s2s":
                 return await self._start_s2s(session)
             pending_source = []
+            latency_detection = self._latency_enabled(session)
 
             def emit(event, payload):
                 session._log.submit(event, payload)
@@ -115,6 +129,7 @@ class RealtimePipelines:
                     provider_options=connection.get("mt_options"),
                     fallback_model_id=config.fallback_translation_model,
                     fallback_provider_options=connection.get("fallback_mt_options"),
+                    latency_detection=latency_detection,
                 )
             try:
                 if config.asr_model in ("aliyun", "minimax"):
@@ -125,9 +140,9 @@ class RealtimePipelines:
                     provider_config = provider_config.model_copy(update={
                         "max_segment_ms": session.config.max_segment_ms, "silence_end_ms": session.config.silence_end_ms,
                     })
-                    pipeline = CloudAsrPipeline(session, provider_config, emit)
+                    pipeline = CloudAsrPipeline(session, provider_config, emit, latency_detection=latency_detection)
                 else:
-                    pipeline = AsrPipeline(session, self.gateway, emit)
+                    pipeline = AsrPipeline(session, self.gateway, emit, latency_detection=latency_detection)
                 await pipeline.prepare()
                 if config.translation_model and isinstance(self.gateway, ModelGateway):
                     for target in session.config.target_languages:
@@ -154,9 +169,10 @@ class RealtimePipelines:
                         pipeline_id=str(session.pipeline_id), epoch=session.epoch,
                         model_id=config.tts_model, voice=config.tts_voice, event_sink=session._log.submit,
                         provider_options={"api_key": tts_key} if tts_key else None,
+                        latency_detection=latency_detection,
                     )
                     self.playbacks[key] = playback
-                capture = await start_desktop_capture(session.config.input, self.ingestion(session), session.epoch)
+                capture = await self._start_capture(session, latency_detection)
             except (GatewayError, OSError, RuntimeError, ImportError, ValueError) as error:
                 try:
                     if pipeline is not None:
@@ -185,6 +201,7 @@ class RealtimePipelines:
     async def _start_s2s(self, session):
         config = session.config
         key = session.session_id
+        latency_detection = self._latency_enabled(session)
         connection = self.provider_connections.get(key)
         outputs = set(config.required_outputs)
         if not connection or connection.get("provider") != "aliyun" or len(config.target_languages) != 1:
@@ -220,7 +237,7 @@ class RealtimePipelines:
             provider = await provider_context.__aenter__()
             try:
                 self._prepare_recording(session)
-                capture = await start_desktop_capture(config.input, self.ingestion(session), session.epoch)
+                capture = await self._start_capture(session, latency_detection)
             except BaseException:
                 await provider_context.__aexit__(None, None, None)
                 raise
@@ -229,12 +246,16 @@ class RealtimePipelines:
             self._report(session, error)
             session._log.submit("error", {"error": session.last_error.model_dump(mode="json")})
             return "failed"
-        playback = S2SAudioOutput(session, event_sink=session._log.submit) if "audio" in outputs else None
+        playback = S2SAudioOutput(
+            session, event_sink=session._log.submit, latency_detection=latency_detection,
+        ) if "audio" in outputs else None
         if playback is not None:
             self.playbacks[key] = playback
+
         pipeline = S2SPipeline(
             session, provider, session._log.submit,
             on_audio=playback.accept if playback is not None else None,
+            latency_detection=latency_detection,
         )
         if capture is not None:
             self.captures[key] = capture

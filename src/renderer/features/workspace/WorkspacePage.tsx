@@ -8,14 +8,14 @@ import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/u
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Captions } from 'lucide-react'
 
-import { savedBindingOf, useAvailableModels } from '@/available-models'
+import { useAvailableModels } from '@/available-models'
 import type { SessionState } from '@/store'
 import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
 import { CaptionStage } from '@/components/caption'
 import type { CaptionDisplayMode, CaptionLayout } from '@/components/caption'
 import { NotesPanel } from '@/components/notes'
-import { notifyError, notifyGatewayModelUnavailable, notifySuccess, notifyWarning, describeError } from '@/components/primitives/notify'
+import { notifyError, notifyGatewayStartIssue, notifySuccess, notifyWarning, describeError } from '@/components/primitives/notify'
 import { FeatureActivityNotice, requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
 import { useI18n } from '@/i18n'
 import { recordPath, useRoute } from '@/routes'
@@ -27,6 +27,7 @@ import { SessionBar } from './SessionBar'
 import { SessionSetupDialog } from './SessionSetupDialog'
 import type { SetupDraft } from './SessionSetupDialog'
 import { errorCopyOf } from './error-copy'
+import { bindingIsLocal, normalizeModelBinding } from '../../../shared/model-gateway'
 import { isSessionAlreadyRunningError } from '../../../shared/ipc-error'
 import { SessionErrorDialog, StopSessionDialog } from './WorkspaceDialogs'
 import { WorkspaceToolbar } from './WorkspaceToolbar'
@@ -216,7 +217,7 @@ export function WorkspacePage() {
     [clearNotesFailure, reportNotesFailure],
   )
 
-  // -- Open the dialog seeded from current settings, not a separate draft ---
+  // -- Open the session details dialog ------------------------------------
   const openSetup = useCallback(async () => {
     try {
       if (!await actions.settings.canStartDesktopCaptions()) {
@@ -230,24 +231,7 @@ export function WorkspacePage() {
       })
       return
     }
-    setDraft({
-      title: '',
-      audioSource: settings?.recognition.audioSource ?? 'defaultOutput',
-      sourceLanguage: settings?.recognition.sourceLanguage ?? 'auto',
-      recognitionModelId: settings?.recognition.modelId ?? 'qwen3-asr-1.7b-hf',
-      recognitionBinding: settings ? savedBindingOf('asr', settings) : '',
-      outputMode: settings?.realtime?.outputMode ?? (settings?.translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? 'source' : 'translation'),
-      speakerDetection: settings?.realtime?.speakerDetection ?? true,
-      speechModelId: settings?.synthesis.modelId ?? '',
-      speechVoice: settings?.synthesis.voice ?? '',
-      speechOutputDeviceId: settings?.realtime?.speechOutputDeviceId ?? '',
-      s2sModel: settings?.realtime?.workspaceS2sModel,
-      virtualInputDeviceId: settings?.realtime?.virtualInputDeviceId ?? '',
-      targetLanguage: settings?.translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? 'zh' : settings?.translation.targetLanguage ?? 'zh',
-      translationModelId: settings?.translation.localModelId ?? '',
-      translationBinding: settings ? savedBindingOf('mt', settings) : '',
-      keepAudio: settings?.recording.keepAudio ?? true,
-    })
+    setDraft({ title: '', keepAudio: settings?.recording.keepAudio ?? true })
     setSetupOpen(true)
   }, [settings, t])
 
@@ -257,15 +241,18 @@ export function WorkspacePage() {
 
   const start = useCallback(async (config = configRef.current) => {
     if (config === null) return
+    const speechBinding = normalizeModelBinding('tts', config.speechModelId)
     const missingGatewayModel = config.recognitionBinding?.startsWith('resource:')
       && !catalog.asr.some(model => model.binding === config.recognitionBinding && model.origin === 'gateway')
       ? 'asr'
       : config.targetLanguages.length > 0 && config.translationBinding?.startsWith('resource:')
         && !catalog.mt.some(model => model.binding === config.translationBinding && model.origin === 'gateway')
         ? 'mt'
-        : null
+        : bindingIsLocal(speechBinding) && !catalog.tts.some(model => model.binding === speechBinding && model.origin === 'gateway')
+          ? 'tts'
+          : null
     if (missingGatewayModel) {
-      notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t(`gateway.${missingGatewayModel}`) }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
+      await notifyGatewayStartIssue(t, missingGatewayModel)
       return
     }
     if (draft) {
@@ -277,13 +264,7 @@ export function WorkspacePage() {
        * sessions.
        */
       try {
-        await actions.settings.updateSettings({
-          recording: { keepAudio: draft.keepAudio },
-          realtime: { outputMode: draft.outputMode, speakerDetection: draft.speakerDetection,
-            speechOutputDeviceId: draft.speechOutputDeviceId, workspaceS2sModel: draft.s2sModel,
-            virtualInputDeviceId: draft.virtualInputDeviceId ?? '' },
-          ...(config.speechModelId ? { synthesis: { modelId: config.speechModelId, voice: config.speechVoice ?? '' } } : {}),
-        })
+        await actions.settings.updateSettings({ recording: { keepAudio: draft.keepAudio } })
       } catch (error) {
         notifyError(t('workspaceUi.recordingPreferenceFailed'), { cause: error })
         return
@@ -406,10 +387,13 @@ export function WorkspacePage() {
         overlayVisible={overlayVisible}
         onOverlayVisibleChange={visible => {
           if (visible) {
-            void actions.settings.showOverlay('workspace').then(opened => {
-              if (opened === false) notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
-              else setOverlayVisible(true)
-            }).catch((error: unknown) => { notifyError(t('workspaceUi.overlayFailed'), { cause: error }) })
+            void (async () => {
+              if (await notifyGatewayStartIssue(t)) return
+              const opened = await actions.settings.showOverlay('workspace')
+              if (opened === false) {
+                if (!await notifyGatewayStartIssue(t)) notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+              } else setOverlayVisible(true)
+            })().catch((error: unknown) => { notifyError(t('workspaceUi.overlayFailed'), { cause: error }) })
             return
           }
           const bridge = getBridge()
@@ -475,6 +459,7 @@ export function WorkspacePage() {
                 paused={status === 'paused'}
                 showTimestamps
                 sourceLanguage={settings?.recognition.sourceLanguage ?? 'auto'}
+                latencySessionId={settings?.realtime?.latencyDetection && currentConfig?.outputMode !== 'speech' ? session.sessionId ?? undefined : undefined}
                 emptyState={<Empty className="nola-workspace-empty"><EmptyHeader><EmptyTitle>{t('workspace.nothingYet')}</EmptyTitle><EmptyDescription>{t('workspace.nothingYetHint')}</EmptyDescription></EmptyHeader></Empty>}
               />
             </>
@@ -517,20 +502,7 @@ export function WorkspacePage() {
   )
 }
 
-const EMPTY_DRAFT: SetupDraft = {
-  title: '',
-  audioSource: 'defaultOutput',
-  sourceLanguage: 'auto',
-  recognitionModelId: 'qwen3-asr-1.7b-hf',
-  outputMode: 'translation',
-  speakerDetection: true,
-  speechModelId: '',
-  speechVoice: '',
-  speechOutputDeviceId: '',
-  targetLanguage: 'zh',
-  translationModelId: '',
-  keepAudio: true,
-}
+const EMPTY_DRAFT: SetupDraft = { title: '', keepAudio: true }
 
 /**
  * The centred idle guide, and the only primary CTA on this screen.

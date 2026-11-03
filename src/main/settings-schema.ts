@@ -50,7 +50,7 @@ export const settingsPatchSchema = z.object({
   synthesis: z.object({ modelId: z.string().max(512), voice: z.string().max(256) }).partial().optional(),
   realtime: z.object({
     outputMode: z.enum(['source', 'translation', 'speech']),
-    speakerDetection: z.boolean(),
+    latencyDetection: z.boolean(),
     speechOutputDeviceId: z.string().max(512),
     s2sModel: z.enum(REALTIME_S2S_MODELS).nullable(),
     quickS2sModel: z.enum(REALTIME_S2S_MODELS).nullable(),

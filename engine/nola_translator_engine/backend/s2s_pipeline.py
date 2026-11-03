@@ -13,10 +13,11 @@ from uuid import uuid4
 import numpy as np
 
 from ..audio.resample import AudioFrame, TARGET_SAMPLE_RATE
+from .latency import unix_ms
 from .s2s_provider import LANGUAGE_ALIASES, QwenS2SSession, S2SObservation, S2SProtocolError
 from .sessions import Session
 
-AudioSink = Callable[[S2SObservation, str | None], Awaitable[None]]
+AudioSink = Callable[[S2SObservation, str | None, str | None], Awaitable[None]]
 EventSink = Callable[[str, dict], object]
 PROVIDER_LANGUAGE_ALIASES = {value: key for key, value in LANGUAGE_ALIASES.items()}
 
@@ -27,6 +28,7 @@ class SourceSegment:
     index: int = 0
     revision: int = 0
     speaker_id: str | None = None
+    boundary_reported: bool = False
 
 
 @dataclass
@@ -37,11 +39,12 @@ class TargetSegment:
 
 class S2SPipeline:
     def __init__(self, session: Session, provider: QwenS2SSession, emit: EventSink, *,
-                 on_audio: AudioSink | None = None) -> None:
+                 on_audio: AudioSink | None = None, latency_detection: bool = False) -> None:
         self.session = session
         self.provider = provider
         self.emit = emit
         self.on_audio = on_audio
+        self.latency_detection = latency_detection
         self._epoch = session.epoch
         self._pipeline_id = session.pipeline_id
         self._closed = False
@@ -100,11 +103,12 @@ class S2SPipeline:
                 if observation.kind == "target":
                     self._target(observation, target)
                 elif self.on_audio:
-                    await self.on_audio(observation, target.translation_id)
+                    source = self._sources.get(observation.source_ids[0]) if len(observation.source_ids) == 1 else None
+                    await self.on_audio(observation, target.translation_id, source.segment_id if source else None)
             elif observation.kind == "response":
                 self._targets.pop(observation.response_id, None)
                 if self.on_audio:
-                    await self.on_audio(observation, None)
+                    await self.on_audio(observation, None, None)
 
     def _source(self, observation: S2SObservation) -> None:
         segment = self._sources.get(observation.item_id)
@@ -114,6 +118,11 @@ class S2SPipeline:
             self._sources[observation.item_id] = segment
             if len(self._sources) > 2048:
                 self._sources.popitem(last=False)
+        if self.latency_detection and observation.speech_stopped and not segment.boundary_reported:
+            segment.boundary_reported = True
+            self.emit("latency_observation", {
+                "kind": "segment_boundary", "at_ms": unix_ms(), "segment_id": segment.segment_id,
+            })
         if observation.speaker_id is not None:
             speaker_id = f"provider:{observation.speaker_id}"
             if speaker_id != segment.speaker_id:

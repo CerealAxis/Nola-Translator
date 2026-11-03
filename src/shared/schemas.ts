@@ -76,7 +76,6 @@ export const sessionConfigSchema = z
   .object({
     outputMode: z.enum(['source', 'translation', 'speech']).optional(),
     s2sModel: z.enum(REALTIME_S2S_MODELS).nullable().optional(),
-    speakerDetection: z.boolean().optional(),
     speechOutputDeviceId: z.string().max(512).optional(),
     speechVoice: z.string().max(256).optional(),
     speechModelId: z.string().max(256).optional(),

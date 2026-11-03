@@ -50,13 +50,16 @@ def new_session():
 def test_s2s_maps_provider_events_and_sends_silence_without_vad():
     async def run():
         provider = Provider([
+            S2SObservation("source", "source", ended_at_ms=20, speech_stopped=True),
+            S2SObservation("source", "source", ended_at_ms=20, speech_stopped=True),
             S2SObservation("source", "source", text="Salut", final=True, speaker_id=1,
                            started_at_ms=0, ended_at_ms=20, language="fr"),
-            S2SObservation("audio", "target", "response", pcm=b"\0\0", sample_rate=24000),
+            S2SObservation("audio", "target", "response", source_ids=("source",), pcm=b"\0\0", sample_rate=24000),
             S2SObservation("target", "target", "response", text="Hel"),
             S2SObservation("target", "target", "response", text="Hello", final=True, source_ids=("source",)),
             S2SObservation("response", response_id="response", status="completed"),
             S2SObservation("target", "another-target", "another-response", text="No source", final=True),
+            S2SObservation("source", "another-source", text="No separate stop", final=True),
         ])
         events = []
         audio = []
@@ -64,22 +67,26 @@ def test_s2s_maps_provider_events_and_sends_silence_without_vad():
         def emit(kind, payload):
             events.append((kind, EVENT_TYPE_TO_PAYLOAD[kind].model_validate(payload)))
 
-        async def on_audio(observation, translation_id):
-            audio.append((observation, translation_id))
+        async def on_audio(observation, translation_id, segment_id):
+            audio.append((observation, translation_id, segment_id))
 
-        pipeline = S2SPipeline(new_session(), provider, emit, on_audio=on_audio)
+        pipeline = S2SPipeline(new_session(), provider, emit, on_audio=on_audio, latency_detection=True)
         await pipeline.accept(AudioFrame(np.zeros(320, dtype=np.float32), 10), 160)
         await pipeline.finish()
         await pipeline.close()
 
         assert provider.input == [bytes(640)] and provider.closed
         committed_source = next(payload for kind, payload in events if kind == "source_committed")
+        (boundary,) = [payload for kind, payload in events if kind == "latency_observation"]
+        assert events[0][1] is boundary
+        assert boundary.kind == "segment_boundary" and boundary.segment_id == committed_source.segment_id
         assert committed_source.cutoff_sample == 480
         assert committed_source.speaker_id == "provider:1"
         target, no_source = (payload for kind, payload in events if kind == "translation_committed")
         assert target.source_refs == (committed_source.segment_id,)
         assert target.based_on_source_revision == 1
         assert target.translation_id == audio[0][1]
+        assert audio[0][2] == committed_source.segment_id
         assert audio[1][0].status == "completed"
         assert no_source.source_refs == ()
         assert no_source.based_on_source_revision == 0

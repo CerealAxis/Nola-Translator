@@ -11,11 +11,12 @@ from fastapi.testclient import TestClient
 
 from nola_translator_engine.backend.app import create_app
 from nola_translator_engine.audio.resample import AudioFrame, StreamingAudioNormalizer
-from nola_translator_engine.backend.asr_pipeline import AsrPipeline, SileroVadSegmenter
+from nola_translator_engine.backend.asr_pipeline import AsrPipeline, CloudAsrPipeline, SileroVadSegmenter
 from nola_translator_engine.backend.contracts import SessionConfig
 from nola_translator_engine.backend.gateway.bootstrap import BUNDLED_ASR_ID, build_default_gateway
 from nola_translator_engine.backend.gateway.capabilities import GatewayError, GatewayErrorCode
 from nola_translator_engine.backend.gateway.operations import AsrObservation
+from nola_translator_engine.recognition.base import RecognitionUpdate
 from nola_translator_engine.recognition.volume_gate import SegmentSnapshot, VolumeGateSegment
 from nola_translator_engine.backend.source_agreement import SourceAgreement
 
@@ -30,6 +31,8 @@ from test_m05_translation import FakeGateway
 ])
 async def test_stable_punctuation_shortens_silero_silence(monkeypatch, text, reason, silence_ms):
     monkeypatch.setattr(SileroVadSegmenter, "_speech_probability", lambda self, samples: float(samples.any()))
+    observed_ms = 0
+    monkeypatch.setattr("nola_translator_engine.backend.asr_pipeline.unix_ms", lambda: observed_ms)
 
     class Gateway:
         async def transcribe(self, *args, **kwargs):
@@ -40,19 +43,49 @@ async def test_stable_punctuation_shortens_silero_silence(monkeypatch, text, rea
         config=SessionConfig.model_validate(cascade_config()),
     )
     events = []
-    pipeline = AsrPipeline(session, Gateway(), lambda kind, payload: events.append((kind, payload)))
+    pipeline = AsrPipeline(session, Gateway(), lambda kind, payload: events.append((kind, payload)),
+                           latency_detection=True)
     voiced_frames = 100
     for index in range(voiced_frames + silence_ms // 20):
+        observed_ms = (index + 1) * 20
         samples = np.full(320, 0.25 if index < voiced_frames else 0, dtype=np.float32)
         await pipeline.accept(AudioFrame(samples, index * 20), index * 320)
         await asyncio.sleep(0)
         if index == voiced_frames - 1 and text == "Ready?":
             assert any(kind == "source_text" and payload["text_state"] == "stable" for kind, payload in events)
+        if observed_ms < voiced_frames * 20 + silence_ms:
+            assert all(kind != "latency_observation" for kind, _ in events)
+    (boundary,) = [payload for kind, payload in events if kind == "latency_observation"]
     await pipeline.finish()
     commits = [payload for kind, payload in events if kind == "source_committed"]
     assert [(commit["boundary_reason"], commit["cutoff_sample"]) for commit in commits] == [
         (reason, voiced_frames * 320),
     ]
+    assert boundary == {
+        "kind": "segment_boundary", "at_ms": voiced_frames * 20 + silence_ms,
+        "segment_id": commits[0]["segment_id"],
+    }
+
+
+async def test_cloud_boundary_uses_observed_timestamp_once_and_never_uses_final_as_boundary(monkeypatch):
+    def recognizer(config, *, latency_detection):
+        assert latency_detection
+        return SimpleNamespace()
+
+    monkeypatch.setattr("nola_translator_engine.backend.asr_pipeline.create_cloud_recognizer", recognizer)
+    config = SimpleNamespace(source_language="en", recognitionProvider="aliyun")
+    session = SimpleNamespace(config=config, source_revision_watermark=0)
+    events = []
+    pipeline = CloudAsrPipeline(session, config, lambda kind, payload: events.append((kind, payload)),
+                                latency_detection=True)
+    await pipeline._update(RecognitionUpdate("cloud1", 1, 0, None, "Hel", "en", False))
+    await pipeline._update(RecognitionUpdate("cloud1", 2, 0, 100, "Hel", "en", False, boundary_at_ms=1234))
+    await pipeline._update(RecognitionUpdate("cloud1", 3, 0, 100, "Hello", "en", True, boundary_at_ms=1234))
+    await pipeline._update(RecognitionUpdate("cloud2", 1, 100, 200, "Next", "en", True))
+    (boundary,) = [payload for kind, payload in events if kind == "latency_observation"]
+    committed = [payload for kind, payload in events if kind == "source_committed"]
+    assert boundary == {"kind": "segment_boundary", "at_ms": 1234, "segment_id": committed[0]["segment_id"]}
+    assert len(committed) == 2
 
 
 def test_agreement_rolls_back_and_commit_is_immutable():
@@ -291,7 +324,7 @@ def test_production_asr_pipeline_commits_accepted_pcm_on_eof_or_pause(monkeypatc
     gateway = Gateway()
     app = create_app(control_token=TOKEN, gateway=gateway, enable_gateway=True)
     with TestClient(app) as client:
-        config = cascade_config(input={"kind": "microphone"}, speaker_detection={"enabled": False})
+        config = cascade_config(input={"kind": "microphone"})
         recording = tmp_path / "audio.mp3"
         config["recording_path"] = str(recording)
         if output != "asr":
@@ -369,10 +402,16 @@ def test_production_asr_pipeline_commits_accepted_pcm_on_eof_or_pause(monkeypatc
             assert target.payload["segment_id"] == commit.payload["segment_id"]
 
 
-async def test_speaker_cut_keeps_both_sides_of_short_pause(monkeypatch):
+async def test_speaker_cut_keeps_both_sides_of_short_pause_with_legacy_opt_out(monkeypatch):
     monkeypatch.setattr(SileroVadSegmenter, "_speech_probability", lambda _, pcm: float(pcm.any()))
 
     class Gateway:
+        async def acquire(self, request):
+            return None, None, None, None
+
+        async def release(self, instance, lease):
+            pass
+
         async def transcribe(self, *args, **kwargs):
             return AsrObservation("Speech.", language="en", is_final=True)
 
@@ -380,12 +419,16 @@ async def test_speaker_cut_keeps_both_sides_of_short_pause(monkeypatch):
         def embed(self, pcm):
             return np.array([1, 0]) if pcm.mean() > 0 else np.array([0, 1])
 
-    config = SessionConfig.model_validate(cascade_config(silence_end_ms=800))
+    monkeypatch.setattr(SileroVadSegmenter, "load", lambda self: None)
+    monkeypatch.setattr("nola_translator_engine.recognition.speaker.SpeakerEmbedder", Embedder)
+    config = SessionConfig.model_validate(cascade_config(
+        silence_end_ms=800, speaker_detection={"enabled": False},
+    ))
     session = SimpleNamespace(session_id=UUID(int=2), pipeline_id="speaker", epoch=0,
                               config=config, source_revision_watermark=0)
     commits = []
     pipeline = AsrPipeline(session, Gateway(), lambda kind, data: commits.append(data) if kind == "source_committed" else None)
-    pipeline.speaker_embedder = Embedder()
+    await pipeline.prepare()
     for index, amplitude in enumerate([1] * 90 + [0] * 10 + [-1] * 90):
         await pipeline.accept(AudioFrame(np.full(320, amplitude, dtype=np.float32), index * 20), index * 320)
     await pipeline.finish()

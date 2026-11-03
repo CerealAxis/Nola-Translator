@@ -9,6 +9,7 @@ import re
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from time import time_ns
 from typing import Protocol
 from urllib.parse import urlencode, urlsplit
 from urllib.request import getproxies, proxy_bypass
@@ -116,6 +117,7 @@ class _Item:
     language: str | None = None
     started: float = 0.0
     ended: float | None = None
+    boundary_at_ms: float | None = None
     final: bool = False
     revision: int = -1
     translated: str = ""
@@ -124,13 +126,14 @@ class _Item:
 
 class AliyunRecognizer:
     def __init__(self, config: ModelSelection, *, connector: Connector = connect_websocket,
-                 timeout: float = 10, finish_timeout: float = 15) -> None:
+                 timeout: float = 10, finish_timeout: float = 15, latency_detection: bool = False) -> None:
         self.url, self.model, self.api_key, self.target = resolve_aliyun(config)
         self.language = config.sourceLanguage
         self.native_translation = config.translationProvider == "recognition" and bool(config.targetLanguages)
         self.connector = connector
         self.timeout = timeout
         self.finish_timeout = finish_timeout
+        self.latency_detection = latency_detection
         self.on_update: UpdateSink | None = None
         self.on_error: Callable[[CloudRecognitionError], None] | None = None
         self._ws: WebSocketTransport | None = None
@@ -373,7 +376,7 @@ class AliyunRecognizer:
             "translationUnavailable" if item.translation_state == "failed" else None) if self.native_translation else None
         await self.on_update(RecognitionUpdate(f"{self._prefix}-{self._session_serial}-{item_id}"[:128], item.revision,
             self._timestamp(item.started), self._timestamp(item.ended) if item.ended is not None else None,
-            item.text, item.language, item.final, translation))
+            item.text, item.language, item.final, translation, boundary_at_ms=item.boundary_at_ms))
 
     def _timestamp(self, offset: float) -> float:
         for sent, captured in reversed(self._anchors):
@@ -423,6 +426,8 @@ class AliyunRecognizer:
                 item.started = float(value)
             else:
                 item.ended = max(item.started, float(value))
+                if self.latency_detection and item.boundary_at_ms is None:
+                    item.boundary_at_ms = time_ns() / 1_000_000
             await self._publish(item_id)
         elif kind.startswith("conversation.item.input_audio_transcription."):
             item = self._item(item_id)

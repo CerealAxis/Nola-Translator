@@ -27,7 +27,7 @@ import { requestFeatureStart } from '@/components/primitives/FeatureActivityNoti
 import { Button } from '@/components/ui/button'
 import { FieldGroup } from '@/components/ui/field'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { notifyError, notifyGatewayModelUnavailable, notifyInfo, notifySuccess, notifyWarning } from '@/components/primitives/notify'
+import { notifyError, notifyGatewayModelUnavailable, notifyGatewayStartIssue, notifyInfo, notifySuccess, notifyWarning } from '@/components/primitives/notify'
 import { reportSettingsFailure } from '@/features/settings/settingsErrorChannel'
 import { SettingSelect } from '../settings/SettingsPage'
 import { isSessionAlreadyRunningError } from '../../../shared/ipc-error'
@@ -169,14 +169,9 @@ export function VideoCaptionsPage() {
    * leaves the extension shut out rather than let in by a service with no weights in memory.
    */
   const open = async () => {
-    if (!s2sModel && asrUnavailable) {
-      notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.asr') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
-      return
-    }
-    if (!s2sModel && !translationDisabled && mtUnavailable) {
-      notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.mt') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
-      return
-    }
+    const missing = !s2sModel && asrUnavailable ? 'asr'
+      : !s2sModel && !translationDisabled && mtUnavailable ? 'mt' : undefined
+    if (await notifyGatewayStartIssue(t, missing)) return
     let browsers: NonNullable<BrowserConnectionStatus['browsers']> = []
     try {
       await browserConnectionAction('inspect')
@@ -212,15 +207,17 @@ export function VideoCaptionsPage() {
     try {
       const result = await enableCaptionService()
       if (result.state === 'failed') {
+        if (await notifyGatewayStartIssue(t)) return
         if (result.code === 'sessionAlreadyRunning') {
           notifyConflict()
         } else if (result.code === 'modelUnavailable' || result.code === 'resourceUnavailable'
           || result.code === 'invalidConfiguration' || result.code === 'modelLoadFailed') {
-          notifyGatewayModelUnavailable(t('videoCaptions.serviceFailed'), prewarmDetail(result.code) ?? t('gateway.modelGatewayStartHint'), t('gateway.title'))
+          notifyGatewayModelUnavailable(t('videoCaptions.serviceFailed'), prewarmDetail(result.code) ?? t('gateway.modelNoneHint'), t('gateway.title'))
         } else notifyError(t('videoCaptions.serviceFailed'), { description: prewarmDetail(result.code) })
         return
       }
     } catch (error) {
+      if (await notifyGatewayStartIssue(t)) return
       const message = String(error)
       const torch = /RUNTIME_TORCH/.test(message)
       const llama = /RUNTIME_LLAMA/.test(message)
@@ -254,6 +251,7 @@ export function VideoCaptionsPage() {
       await setCaptionServiceActive(true)
       notifySuccess(t('videoCaptions.serviceStarted'))
     } catch (error) {
+      if (await notifyGatewayStartIssue(t)) return
       if (isSessionAlreadyRunningError(error)) {
         notifyConflict(error)
       } else reportSettingsFailure(t('errors.captionServiceToggleFailed'), error)

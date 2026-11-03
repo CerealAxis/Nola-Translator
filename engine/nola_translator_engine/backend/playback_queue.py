@@ -45,7 +45,7 @@ class PlaybackClaim:
 
 
 class PlaybackQueue:
-    """Only the oldest unfinished job can synthesize or own playback audio."""
+    """Track synthesis separately from the single ordered playback claim."""
 
     def __init__(self, path: Path | str, pipeline_id: str, *, initial_generation: int = 0) -> None:
         self.pipeline_id = pipeline_id
@@ -75,17 +75,21 @@ class PlaybackQueue:
             CREATE INDEX IF NOT EXISTS playback_job_order
             ON playback_job(pipeline_id, order_index)
             WHERE state NOT IN ('finished', 'interrupted', 'cancelled');
-            CREATE UNIQUE INDEX IF NOT EXISTS playback_job_active
+            CREATE UNIQUE INDEX IF NOT EXISTS playback_job_synthesizing
             ON playback_job(pipeline_id)
-            WHERE state IN ('running', 'claimed', 'playing');
+            WHERE state = 'running';
+            CREATE UNIQUE INDEX IF NOT EXISTS playback_job_playing
+            ON playback_job(pipeline_id)
+            WHERE state IN ('claimed', 'playing');
+            DROP INDEX IF EXISTS playback_job_active;
         """)
         with self._write():
             self._db.execute("INSERT OR IGNORE INTO playback_pipeline(pipeline_id, generation) VALUES (?, ?)",
                              (pipeline_id, initial_generation))
             # A persisted grant may already have reached the device before a crash.
             self._db.execute("""
-                UPDATE playback_job SET state = CASE WHEN state = 'running' THEN 'queued' ELSE 'unknown' END
-                WHERE pipeline_id = ? AND state IN ('running', 'claimed', 'playing')
+                UPDATE playback_job SET state = CASE WHEN state IN ('running', 'ready') THEN 'queued' ELSE 'unknown' END
+                WHERE pipeline_id = ? AND state IN ('running', 'ready', 'claimed', 'playing')
             """, (pipeline_id,))
 
     @contextmanager
@@ -122,13 +126,13 @@ class PlaybackQueue:
                 return None
             row = self._db.execute("""
                 SELECT * FROM playback_job
-                WHERE pipeline_id = ? AND state NOT IN ('finished', 'interrupted', 'cancelled')
+                WHERE pipeline_id = ? AND state = 'queued'
                 ORDER BY order_index, rowid LIMIT 1
             """, (self.pipeline_id,)).fetchone()
-            if row is None or row["state"] != "queued":
+            if row is None:
                 return None
             if self._db.execute("""
-                SELECT 1 FROM playback_job WHERE pipeline_id = ? AND state IN ('running', 'claimed', 'playing')
+                SELECT 1 FROM playback_job WHERE pipeline_id = ? AND state = 'running'
                 LIMIT 1
             """, (self.pipeline_id,)).fetchone():
                 return None
@@ -147,30 +151,44 @@ class PlaybackQueue:
             LIMIT 1
         """, (self.pipeline_id,)).fetchone() is not None
 
-    def blocked_job(self) -> tuple[str, TtsJob] | None:
-        row = self._db.execute("""
-            SELECT state, payload, attempt FROM playback_job
+    def _head(self) -> sqlite3.Row | None:
+        return self._db.execute("""
+            SELECT job_id, state, payload, attempt FROM playback_job
             WHERE pipeline_id = ? AND state NOT IN ('finished', 'interrupted', 'cancelled')
             ORDER BY order_index, rowid LIMIT 1
         """, (self.pipeline_id,)).fetchone()
+
+    def ready_job_id(self) -> str | None:
+        row = self._head()
+        return row["job_id"] if row is not None and row["state"] == "ready" else None
+
+    def blocked_job(self) -> tuple[str, TtsJob] | None:
+        row = self._head()
         if row is None or row["state"] not in ("failed", "unknown"):
             return None
         payload = json.loads(row["payload"])
         payload["synthesis_attempt"] = row["attempt"]
         return row["state"], TtsJob(**payload)
 
+    def mark_ready(self, job_id: str, attempt: int) -> bool:
+        with self._write():
+            return self._db.execute("""
+                UPDATE playback_job SET state = 'ready'
+                WHERE pipeline_id = ? AND job_id = ? AND state = 'running' AND attempt = ?
+            """, (self.pipeline_id, job_id, attempt)).rowcount == 1
+
     def claim(self, job_id: str, owner_id: str, sample_count: int, *, attempt: int | None = None) -> PlaybackClaim | None:
         if not owner_id or sample_count <= 0:
             raise ValueError("playback claim requires an owner and positive sample count")
         with self._write():
             pipeline = self._pipeline()
-            if pipeline["paused"] or pipeline["stopped"]:
+            if pipeline["paused"] or pipeline["stopped"] or self.ready_job_id() != job_id:
                 return None
             claim = PlaybackClaim(job_id, owner_id, uuid4().hex, pipeline["generation"], sample_count)
             changed = self._db.execute("""
                 UPDATE playback_job SET state = 'claimed', owner_id = ?, claim_id = ?,
                     generation = ?, sample_count = ?, played = 0
-                WHERE pipeline_id = ? AND job_id = ? AND state = 'running'
+                WHERE pipeline_id = ? AND job_id = ? AND state = 'ready'
                     AND (? IS NULL OR attempt = ?)
             """, (owner_id, claim.claim_id, claim.generation, sample_count, self.pipeline_id, job_id, attempt, attempt))
             return claim if changed.rowcount else None

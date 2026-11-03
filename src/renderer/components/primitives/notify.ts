@@ -2,6 +2,8 @@ import { closeToast, showToast, updateToast } from '../ui/toast'
 import type { ToastPayload, ToastType } from '../ui/toast'
 import { getBridge } from '@/store'
 import type { MainErrorNotification } from '@/bridge'
+import type { I18nContextValue } from '@/i18n'
+import { bindingIsLocal, type GatewayCapability } from '../../../shared/model-gateway'
 
 export const NOTIFY_DURATION = {
   error: 10000,
@@ -69,7 +71,7 @@ export function notifyError(message: string, options: NotifyOptions = {}): strin
   return showToast(payload(message, 'error', { ...options, duration }))
 }
 
-/** An unavailable local model can be made usable by loading it in Model Gateway. */
+/** Show an error with a shortcut to Model Gateway. */
 export function notifyGatewayModelUnavailable(message: string, description: string, actionLabel: string): string {
   if (overlayDocument()) return sendOverlayToast({ message, description, type: 'error', actionLabel, actionPage: '#/model-gateway' })
   return notifyError(message, {
@@ -83,6 +85,22 @@ export function notifyGatewayModelUnavailable(message: string, description: stri
       },
     },
   })
+}
+
+/** Returns whether startup is blocked. Explicit cloud bindings can run without the local gateway. */
+export async function notifyGatewayStartIssue(t: I18nContextValue['t'], missing?: GatewayCapability, binding?: string): Promise<boolean> {
+  if (!binding || bindingIsLocal(binding)) {
+    const gateway = await getBridge()?.gateway?.snapshot().catch(() => undefined)
+    if (gateway?.state !== 'running') {
+      const stopped = gateway?.state === 'stopped'
+      notifyGatewayModelUnavailable(t(stopped ? 'gateway.notStarted' : 'gateway.title'),
+        t(stopped ? 'gateway.notStartedHint' : gateway ? `gateway.${gateway.state}` : 'gateway.requestFailed'), t('gateway.title'))
+      return true
+    }
+  }
+  if (!missing) return false
+  notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t(`gateway.${missing}`) }), t('gateway.modelNoneHint'), t('gateway.title'))
+  return true
 }
 
 export function notifyRetryableFailure(message: string, options: NotifyOptions = {}): string {

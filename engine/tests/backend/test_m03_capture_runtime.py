@@ -7,6 +7,7 @@ from nola_translator_engine.audio.resample import FRAME_SAMPLES, AudioFrame
 from nola_translator_engine.backend import desktop_capture
 from nola_translator_engine.backend.contracts import InputConfig
 from nola_translator_engine.backend.ingestion import AudioIngestion
+from nola_translator_engine.backend.latency import LatencyCapture
 
 
 class DummyCapture:
@@ -37,8 +38,10 @@ async def test_pumps_canonical_samples_and_stops_once(eof):
     backend = DummyCapture()
     backend.ready.set()
     ingestion = AudioIngestion("session")
+    observed = []
     capture = await desktop_capture.start_desktop_capture(
-        InputConfig(kind="microphone"), ingestion, 3, backend_factory=lambda _: backend
+        InputConfig(kind="microphone"), ingestion, 3, backend_factory=lambda _: backend,
+        observe=lambda frame, end: observed.append((frame.started_at_ms, end)),
     )
     task = asyncio.create_task(capture.pump())
     await asyncio.wait_for(backend.emitted.wait(), 1)
@@ -50,6 +53,7 @@ async def test_pumps_canonical_samples_and_stops_once(eof):
     assert ingestion.input_finished is eof
     frames = ingestion.consume_frames()
     assert [start for _, start in frames] == [0, FRAME_SAMPLES]
+    assert observed == [(50_000, FRAME_SAMPLES), (50_000, 2 * FRAME_SAMPLES)]
     np.testing.assert_array_equal(frames[0][0].samples, np.full(FRAME_SAMPLES, 0.25, dtype=np.float32))
     np.testing.assert_array_equal(frames[1][0].samples, np.full(FRAME_SAMPLES, -0.5, dtype=np.float32))
 
@@ -117,3 +121,16 @@ async def test_selected_application_gap_keeps_a_discontinuous_sample_clock(monke
 @pytest.mark.parametrize("kind", ["microphone", "browser_tab"])
 async def test_unspecified_mic_and_browser_use_external_pcm(kind):
     assert await desktop_capture.start_desktop_capture(InputConfig(kind=kind), AudioIngestion("session"), 0) is None
+
+
+def test_latency_waveform_bins_use_capture_clock_without_bridging_gaps():
+    observations = []
+    capture = LatencyCapture(lambda _, payload: observations.append(payload))
+    capture.wall_offset_ms = 1_700_000_000_000
+    capture.observe(AudioFrame(np.ones(FRAME_SAMPLES, dtype=np.float32), 60), FRAME_SAMPLES)
+    for index, amplitude in enumerate((0.1, -0.5, 0.25, 0.5, -0.25)):
+        frame = AudioFrame(np.full(FRAME_SAMPLES, amplitude, dtype=np.float32), 100 + index * 20)
+        capture.observe(frame, (index + 3) * FRAME_SAMPLES)
+    assert observations == [{
+        "kind": "input", "at_ms": 1_700_000_000_100, "duration_ms": 100, "min": -0.5, "max": 0.5,
+    }]

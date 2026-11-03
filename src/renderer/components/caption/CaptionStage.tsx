@@ -18,6 +18,7 @@ import { formatChineseCaption } from '@/chinese-script'
 import { CaptionLine } from './CaptionLine'
 import { splitTranslationText } from './translationText'
 import type { TranslationTextParts } from './translationText'
+import { useCaptionLatency } from './use-caption-latency'
 
 export type CaptionLayout = 'split' | 'sentence'
 export type CaptionDisplayMode = 'both' | 'source' | 'translation'
@@ -37,6 +38,7 @@ export interface CaptionStageProps {
   /** The workspace shows timestamps; the floating window keeps the compact caption. */
   showTimestamps?: boolean
   sourceLanguage?: string
+  latencySessionId?: string
 }
 
 /** Pixels from the bottom that still count as "at the bottom", about one line of body text. */
@@ -96,9 +98,11 @@ export function CaptionStage({
   className,
   showTimestamps = false,
   sourceLanguage = 'auto',
+  latencySessionId,
 }: CaptionStageProps) {
   const { t } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
+  useCaptionLatency(scrollRef, latencySessionId)
   const stickRef = useRef(true)
   /** Last segment to have played its entrance; a ref so StrictMode's double run cannot replay it. */
   const enteredRef = useRef<string | null>(null)
@@ -248,6 +252,7 @@ function Block({
             paused={paused}
             entering={entering}
             data-testid={`caption-source-${segment.segmentId}`}
+            latencySegmentId={segment.sourceText.trim() ? segment.segmentId : undefined}
           />
         ) : null}
         {showTranslation ? (
@@ -261,6 +266,7 @@ function Block({
             paused={paused}
             entering={entering}
             data-testid={`caption-target-${segment.segmentId}`}
+            latencySegmentId={parts ? segment.segmentId : undefined}
           />
         ) : null}
       </div>
@@ -281,6 +287,7 @@ function Block({
           entering={entering}
           className="nola-measure"
           data-testid={`caption-source-${segment.segmentId}`}
+          latencySegmentId={segment.sourceText.trim() ? segment.segmentId : undefined}
         />
       ) : null}
       {showTranslation ? (
@@ -295,6 +302,7 @@ function Block({
           entering={entering}
           className="nola-measure"
           data-testid={`caption-target-${segment.segmentId}`}
+          latencySegmentId={parts ? segment.segmentId : undefined}
         />
       ) : null}
     </div>

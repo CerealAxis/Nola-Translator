@@ -56,21 +56,9 @@ export type TranslationFields = Pick<
 export interface TranslationFieldOptions {
   /** 界面上把译文关掉了。此时 `targetLanguages` 是空数组，其余字段整个缺席。 */
   enabled: boolean
-  /**
-   * 本次会话要翻成的语言。省略时用 `translation.targetLanguage`（设置里的值）。
-   * 会话设置弹窗有自己的语言选择器，所以它会传进来。
-   */
+  /** Target language for this session. Defaults to the saved target. */
   targetLanguage?: string
-  /**
-   * 本次会话临时换用的**本地**模型 id。**缺席或空白时**用 `translation.localModelId`。
-   *
-   * 空白要算"没有覆盖"，不是"覆盖成空串"：`SetupDraft.translationModelId` 是必填 `string`，
-   * 设置 store 还没加载出来时弹窗那边只能填空串（见下面 `modelOverride` 的注释）。
-   *
-   * 只有 `provider === 'local'` 时才会被读（见下面的三元）：云端与 Microsoft 没有
-   * "本地模型 id"这个概念，所以弹窗在服务商不是本地时也不会给出这个选择器。
-   * 这是用户当场做的显式选择，与"写死一个默认值"是两回事 —— 下面第 3 条禁的是后者。
-   */
+  /** Optional local model override. Blank values use the saved model. */
   modelId?: string
 }
 
@@ -91,16 +79,7 @@ export function translationFieldsOf(
 
   const targetLanguages = [targetLanguage]
 
-  /*
-   * "没有覆盖"要同时认 `undefined` 与**空白**。`SessionSetupDialog` 那侧的
-   * `SetupDraft.translationModelId` 是必填 `string`，而 `WorkspacePage.openSetup` 在设置 store
-   * 还没加载完（`settings` 仍是 `null`）时只能填 `settings?.translation.localModelId ?? ''`。
-   * 那个 `''` 原样发出去会卡在协议边界上：`sessionConfigSchema` 的 `translationModelId` 是
-   * 四个字面量 id 加 `hub:` 前缀的**闭集**，`''` 不在里面，`startSession` 的 handler 直接抛错，
-   * 这一场根本开不起来 —— 而且预检查不出毛病（预检只在"字段缺失"时回落，字段在场）。
-   * `trim()` 之后判真，纯空格也一并挡掉；用 trim 后的值而不是原串，顺带把误粘的空格摘掉。
-   * 口径与 `store/sessionStore.ts` 的预检回落（`config.translationModelId?.trim() || …`）一致。
-   */
+  // Match preflight and keep blank IDs out of the session protocol.
   const modelOverride = options.modelId?.trim() || undefined
 
   return {

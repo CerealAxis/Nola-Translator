@@ -195,7 +195,6 @@ export class SessionController {
     const startSettings = this.options.getSettings()
     if (owner === 'desktop') {
       parsed.outputMode ??= startSettings.realtime?.outputMode
-      parsed.speakerDetection ??= startSettings.realtime?.speakerDetection
       parsed.speechOutputDeviceId ??= startSettings.realtime?.speechOutputDeviceId
     }
     if (parsed.outputMode === 'source') parsed.targetLanguages = []

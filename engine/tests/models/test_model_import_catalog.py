@@ -4,10 +4,8 @@ from pathlib import Path
 import subprocess
 import sys
 
-from nola_translator_engine.models import catalog
-from nola_translator_engine.models.crisp_catalog import CRISP_ASR_SPECS
-from nola_translator_engine.models.qwen_gguf_catalog import QWEN3_ASR_GGUF_SPECS
-from nola_translator_engine.models.manager import ModelSpec
+from nola_translator_engine.models.crisp_catalog import ADDITIONAL_TTS_SPECS, QWEN3_TTS_SPECS
+from nola_translator_engine.offline_models import catalog_specs
 
 ROOT = Path(__file__).resolve().parents[3]
 OUTPUT = ROOT / "src/shared/model-import-catalog.json"
@@ -15,13 +13,12 @@ OUTPUT = ROOT / "src/shared/model-import-catalog.json"
 
 def test_manual_catalog_matches_every_supported_source_and_file():
     entries = {entry["id"]: entry for entry in json.loads(OUTPUT.read_text("utf-8"))}
-    specs = {spec.model_id: spec for spec in vars(catalog).values() if isinstance(spec, ModelSpec)}
-    specs.update({spec.model_id: spec for spec in CRISP_ASR_SPECS})
-    specs.update({spec.model_id: spec for spec in QWEN3_ASR_GGUF_SPECS})
+    specs = catalog_specs()
+    tts_ids = {spec.model_id for spec in QWEN3_TTS_SPECS + ADDITIONAL_TTS_SPECS}
     assert entries.keys() == specs.keys()
     for model_id, spec in specs.items():
         assert entries[model_id]["name"]
-        assert entries[model_id]["family"] in ("recognition", "translation")
+        assert entries[model_id]["family"] in (("tts",) if model_id in tts_ids else ("recognition", "translation"))
         expected_sources = {"huggingface", "hf-mirror"}
         if spec.modelscope_repo:
             expected_sources.add("modelscope")

@@ -78,6 +78,10 @@ export type EngineChannelEvent = EngineEvent | EngineLifecycleEvent
 export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'translation' | 'torch' | 'llama' | 'crisp'
 
 export type NolaTranslatorApi = {
+  getLatencySnapshot?(): Promise<import('./latency').LatencySnapshot | undefined>
+  openLatencyWindow?(): Promise<void>
+  onLatencySnapshot?(listener: (snapshot: import('./latency').LatencySnapshot) => void): () => void
+  reportLatencyPaint?(sessionId: string, segmentId: string, kind: 'source' | 'translation', at: number): Promise<boolean>
   gateway?: import('./model-gateway').ModelGatewayApi
   activity?: import('./feature-activity').FeatureActivityApi
   onboardingCard?: import('./onboarding-card').OnboardingCardApi

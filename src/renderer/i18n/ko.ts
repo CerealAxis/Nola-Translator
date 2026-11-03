@@ -1,4 +1,5 @@
 import { modelPolicyKo, modelPolicyEntries } from './model-policy-ui'
+import { latencyEntries, latencyKo } from './latency-ui'
 import { gatewayKo, gatewayEntries } from './gateway-ui'
 import { workbenchKo, workbenchEntries } from './workbench-ui'
 import { offlineKo, offlineEntries } from './offline-ui'
@@ -7,6 +8,7 @@ import { onboardingEntries, onboardingKo } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const koMessages: Record<DictionaryKey, string> = {
+  ...latencyEntries(latencyKo),
   'browser.desktopApplicationAudio': '데스크톱에서 선택한 앱',
   'browser.stepSpeechTranslation': '단계별 인식',
   'browser.directSpeechTranslation': '직접 음성 인식',
@@ -581,8 +583,6 @@ const koMessages: Record<DictionaryKey, string> = {
   'session.outputSource': '원문만',
   'session.outputTranslation': '원문과 번역',
   'session.outputSpeech': '자막과 음성',
-  'session.speakerDetection': '화자 인식',
-  'session.speakerDetectionHint': '선택한 모델이 지원하면 인식 결과에 화자를 표시합니다.',
   'session.speechModel': '음성 합성 모델',
   'session.speechVoice': '음성',
   'session.speechDefaultVoice': '모델 기본 음성',
@@ -1325,7 +1325,7 @@ const koMessages: Record<DictionaryKey, string> = {
   'dev.dialogModalBody': '번역은 모델이 생성했습니다. 중요한 용도라면 먼저 확인하세요.',
   'dev.dialogModalClose': '확인',
   'dev.dialogSessionSetup': '새 세션 대화상자',
-  'dev.dialogSessionSetupDesc': '필드 6개와 하단 작업 영역이 있는 앱에서 가장 큰 양식입니다.',
+  'dev.dialogSessionSetupDesc': '세션 이름과 녹음 저장 여부를 설정합니다.',
   'dev.dialogRename': '이름 변경 대화상자',
   'dev.dialogRenameDesc': '입력란이 있는 확인 창입니다. 존재하지 않는 기록에 저장하면 아무 동작도 하지 않습니다.',
   'dev.dialogExport': '내보내기 대화상자',

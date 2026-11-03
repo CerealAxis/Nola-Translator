@@ -110,6 +110,7 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
   }
   const asrLoaded = loaded('asr')
   const realtime = (kind: GatewayCapability): AvailableModel[] => {
+    if (snapshot?.state !== 'running') return []
     const operation = { asr: 'transcribe', mt: 'translate', tts: 'synthesize', llm: 'generate' }[kind]
     return (snapshot?.realtime?.models ?? []).flatMap(model => {
       if (!model.enabled || !model.operations.includes(operation)) return []
@@ -342,7 +343,7 @@ export function useModelSelection(kind: GatewayCapability, options: readonly Ava
     if (!hadAvailable.current || gatewaySnapshot?.state !== 'running' || gatewaySnapshot.services?.[kind]?.state !== 'failed') return
     hadAvailable.current = false
     const label = kind === 'asr' ? t('session.recognitionModel') : kind === 'mt' ? t('session.translationModel') : t(`gateway.${kind}`)
-    notifyGatewayModelUnavailable(t('gateway.modelNone', { name: label }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
+    notifyGatewayModelUnavailable(t('gateway.modelNone', { name: label }), t('gateway.modelNoneHint'), t('gateway.title'))
   }, [resolution.unavailable, locked, off, kind, t, gatewaySnapshot])
   // Do not leak a stale saved binding into the UI when nothing can serve it.
   const binding = locked ? saved : resolution.unavailable ? '' : resolution.binding

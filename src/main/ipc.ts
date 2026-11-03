@@ -89,6 +89,7 @@ export function registerEngineIpc(
   prepareCaptionService?: (config: PrewarmConfig) => Promise<PrewarmResult>,
   resourceInUse: (resourceId: string) => boolean = () => false,
   listProcessSources: () => Promise<AudioDevice[]> = async () => [],
+  canOpenOverlay: () => boolean = () => true,
 ): () => void {
   const controller = sharedController ?? new SessionController({ engine, meetings, getSettings, getCredential: getTranslationCredential, prepare: prepareEnvironment, whenReady: whenRuntimeReady, startingChanged: onStartingChanged, hideOverlay: () => getOverlayWindow()?.hide() })
   let overlayCloseStopsSession = false
@@ -326,7 +327,7 @@ export function registerEngineIpc(
   })
 
   loggedHandle(IPC_CHANNELS.showOverlay, (_event, mode: unknown) => {
-    if (!controller.canShowOverlay()) return false
+    if (!controller.canShowOverlay() || !canOpenOverlay()) return false
     const window = getOverlayWindow()
     if (!window) throw new Error('overlayWindowUnavailable')
     overlayCloseStopsSession = mode !== 'workspace'

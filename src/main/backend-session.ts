@@ -17,7 +17,6 @@ export interface BackendSessionOptions {
   output?: 'source' | 'translation' | 'speech'
   speechLanguage?: string
   outputDeviceId?: string
-  speakerDetection?: boolean
   s2sModel?: string
   ttsApiKey?: string
 }
@@ -38,10 +37,10 @@ export interface MappedBackendSession {
     target_languages: string[]
     required_outputs: ('source_text' | 'translated_text' | 'audio')[]
     speech_target_language?: string
-    speaker_detection?: { enabled: boolean }
     max_segment_ms?: number
     silence_end_ms?: number
     translation_preview?: boolean
+    latency_detection?: boolean
   }
   headers: Record<string, string>
   outputDeviceId?: string
@@ -153,7 +152,6 @@ export function mapSessionConfig(
       },
       source_language: config.sourceLanguage, target_languages: targets, required_outputs: required,
       ...(speech ? { speech_target_language: speechLanguage } : {}),
-      ...(options.speakerDetection !== undefined ? { speaker_detection: { enabled: options.speakerDetection } } : {}),
       max_segment_ms: config.max_segment_ms, silence_end_ms: config.silence_end_ms,
       translation_preview: config.allowIntermediateTranslation,
     },
@@ -164,6 +162,7 @@ export function mapSessionConfig(
 
 interface BackendSessionCallbacks {
   onEvent: (event: EngineEvent) => void
+  onLatencyEvent?: (kind: string | undefined, payload: unknown, epoch: number, at?: number) => void
   preparePlayback?: (inputCable?: string) => Promise<void>
   onClose?: () => void
   onChunk?: (chunk: PlaybackChunk) => void
@@ -201,7 +200,7 @@ const incoming = z.object({
   resync_required: z.boolean().optional(),
   snapshot: z.object({ snapshot_seq: count }).optional(),
   event_type: z.string().optional(), event_seq: count.optional(), payload: z.unknown().optional(),
-  epoch: count.optional(),
+  epoch: count.optional(), emitted_at_unix_ms: count.optional(),
 })
 const statusCodes = { running: 'listening', paused: 'paused', stopping: 'stopping' } as const
 const MAX_BUFFERED_EVENTS = 512
@@ -563,7 +562,9 @@ export class BackendSession {
             resolve()
           } else if (event.event_seq && event.event_seq > this.eventCursor) {
             this.eventCursor = event.event_seq
-            this.receiveEvent(sessionId, event.event_type, event.payload, event.epoch ?? 0)
+            const epoch = event.epoch ?? 0
+            this.callbacks.onLatencyEvent?.(event.event_type, event.payload, epoch, event.emitted_at_unix_ms)
+            this.receiveEvent(sessionId, event.event_type, event.payload, epoch)
           }
         } catch {
           socket.terminate()

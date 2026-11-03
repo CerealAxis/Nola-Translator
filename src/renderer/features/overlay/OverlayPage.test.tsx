@@ -1,11 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as storeApi from '@/store'
 import { stores } from '@/store'
 import type { NolaBridge } from '@/bridge'
 import * as settingsActions from '@/store/settingsStore'
-import * as notify from '@/components/primitives/notify'
+import * as toast from '@/components/ui/toast'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import { OverlayPage } from './OverlayPage'
 
@@ -33,6 +32,15 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); stores.settings.setState(initialSettings); stores.models.setState(initialModels) })
 
+it('keeps latency detection off by default and saves the opt-in', () => {
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
+  render(<OverlayPage />)
+  const toggle = screen.getByRole('switch', { name: '延迟检测' })
+  expect(toggle).toHaveAttribute('aria-checked', 'false')
+  fireEvent.click(toggle)
+  expect(update).toHaveBeenCalledWith({ realtime: { latencyDetection: true } })
+})
+
 it('lists enabled configured cloud translators and recognition services before they are selected', () => {
   render(<OverlayPage />)
   const translation = within(screen.getByRole('combobox', { name: '翻译模型' }))
@@ -51,17 +59,14 @@ it('hides all model pickers when following the gateway', () => {
   expect(screen.queryByRole('combobox', { name: /识别模型|翻译模型|语音合成模型|S2S模型/ })).not.toBeInTheDocument()
 })
 
-it('separates the direct processing mode, S2S model and playback switch', async () => {
+it('separates the direct processing mode, S2S model and playback switch', () => {
   const settings = stores.settings.getState().settings!
   stores.settings.setState({ settings: { ...settings, realtime: {
     ...settings.realtime, outputMode: 'speech', quickS2sModel: 'qwen3.5-livetranslate-flash-realtime',
   } } })
   render(<OverlayPage />)
   const processing = screen.getByRole('combobox', { name: '处理方式' })
-  const user = userEvent.setup()
-  await user.click(processing)
-  expect(within(await screen.findByRole('listbox')).getAllByRole('option').map(option => option.textContent)).toEqual(['跟随网关', '分步识别', '直接语音识别'])
-  await user.keyboard('{Escape}')
+  expect(within(processing).getAllByRole('option').map(option => option.textContent)).toEqual(['跟随网关', '分步识别', '直接语音识别'])
   expect(screen.getByRole('combobox', { name: 'S2S 模型' })).toHaveTextContent('Qwen3.5 LiveTranslate')
   expect(screen.getByRole('switch', { name: '播报译音' })).toHaveAttribute('aria-checked', 'true')
   expect(screen.getByRole('combobox', { name: '输出设备' })).toBeEnabled()
@@ -77,7 +82,7 @@ it('toggles speech independently of model and device selection', async () => {
   stores.models.setState({ resources: [{ resourceId, kind: 'ttsModel', provider: 'crisp-tts', name: 'Local speech', description: '', languages: [], installed: true, installedBytes: 1, state: 'idle', cancellable: false }] })
   vi.spyOn(storeApi, 'getBridge').mockReturnValue({
     overlay: { getVisibility: async () => false }, events: { onOverlayVisibilityChanged: () => () => undefined },
-    gateway: { onChanged: () => () => undefined, snapshot: async () => ({ state: 'stopped', realtime: { models: [{ enabled: true, operations: ['synthesize'], model_id: resourceId }] } }) },
+    gateway: { onChanged: () => () => undefined, snapshot: async () => ({ state: 'running', services: { asr: { state: 'stopped' }, mt: { state: 'stopped' }, tts: { state: 'stopped' }, llm: { state: 'stopped' } }, realtime: { models: [{ enabled: true, operations: ['synthesize'], model_id: resourceId }] } }) },
   } as unknown as NolaBridge)
   const mediaDevices = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices')
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: {
@@ -144,12 +149,12 @@ it('shows an app toast when the model gateway is stopped', async () => {
     app: { notifyMainError: vi.fn() },
   } as unknown as NolaBridge)
   const showOverlay = vi.spyOn(settingsActions, 'showOverlay').mockResolvedValue(true)
-  const notice = vi.spyOn(notify, 'notifyGatewayModelUnavailable')
+  const notice = vi.spyOn(toast, 'showToast')
 
   render(<OverlayPage />)
   fireEvent.click(screen.getByRole('button', { name: '打开悬浮字幕' }))
 
-  await waitFor(() => expect(notice).toHaveBeenCalledWith('没有可用的ASR模型', expect.any(String), '模型网关'))
+  await waitFor(() => expect(notice).toHaveBeenCalledWith(expect.objectContaining({ title: '模型网关未启动', description: '请先前往模型网关启动服务，然后重试。' })))
   expect(showOverlay).not.toHaveBeenCalled()
 })
 

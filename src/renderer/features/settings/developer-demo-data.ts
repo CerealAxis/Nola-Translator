@@ -6,31 +6,12 @@
  * touching a real meeting, file or model.
  */
 
-import type { AudioDevice, ResourceRecord } from '@/bridge'
+import type { ResourceRecord } from '@/bridge'
 import type { MissingResource, SessionState } from '@/store'
 import type { HubHit } from '../models/HubSearchTab'
 import type { SetupDraft } from '../workspace/SessionSetupDialog'
 
-/** The setup dialog prepends a synthetic `defaultOutput` option, so it is not in this list. */
-export const DEMO_DEVICES: AudioDevice[] = [
-  { deviceId: 'demo-speakers', name: 'Demo Speakers (Simulated Output)', kind: 'systemOutput', isDefault: true },
-  { deviceId: 'demo-mic', name: 'Demo Microphone (Simulated Input)', kind: 'microphone', isDefault: false },
-]
-
-export const DEMO_DRAFT: SetupDraft = {
-  title: '',
-  audioSource: 'defaultOutput',
-  sourceLanguage: 'zh',
-  recognitionModelId: 'qwen3-asr-1.7b-hf',
-  outputMode: 'translation',
-  speakerDetection: true,
-  speechModelId: '',
-  speechVoice: '',
-  speechOutputDeviceId: '',
-  targetLanguage: 'en',
-  translationModelId: 'hy-mt2-1.8b-q3-k-m',
-  keepAudio: true,
-}
+export const DEMO_DRAFT: SetupDraft = { title: '', keepAudio: true }
 
 /** `qwen3-asr` maps to the PyTorch engine, which is what keeps the configuration dialog's save button usable. */
 export const DEMO_ASR_RECORD: ResourceRecord = {

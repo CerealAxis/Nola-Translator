@@ -1,4 +1,4 @@
-"""Serialize committed sentence synthesis and grant audio to one playback owner."""
+"""Synthesize committed sentences ahead of ordered playback."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from typing import Any, Awaitable, Callable
 from .gateway.capabilities import CallContext, Operation
 from .gateway.gateway import MatchRequest, ModelGateway
 from .gateway.operations import SynthesisResult
+from .latency import unix_ms
 from .playback_queue import PlaybackClaim, PlaybackQueue, TtsJob
 
 
@@ -38,19 +39,24 @@ class TtsPipeline:
         event_sink: EventSink | None = None,
         deadline_s: float = 30.0,
         provider_options: dict[str, str] | None = None,
+        latency_detection: bool = False,
     ) -> None:
         self.gateway, self.queue = gateway, queue
         self.pipeline_id, self.epoch = pipeline_id, epoch
         self.model_id, self.voice = model_id, voice
         self.event_sink, self.deadline_s = event_sink, deadline_s
         self.provider_options = provider_options or {}
+        self.latency_detection = latency_detection
         self._owner_id: str | None = None
         self._sink: PlaybackSink | None = None
-        self._wake = asyncio.Event()
+        self._synth_wake = asyncio.Event()
+        self._play_wake = asyncio.Event()
         self._idle = asyncio.Event()
         self._idle.set()
-        self._ack = asyncio.Event()
-        self._task: asyncio.Task | None = None
+        self._synth_task: asyncio.Task | None = None
+        self._play_task: asyncio.Task | None = None
+        # shortcut: keep pending audio in memory; spool it if long playback backlogs become common.
+        self._ready: dict[str, tuple[TtsJob, SynthesisResult, int]] = {}
         self._order = 0
         self._closed = False
         self._attachment = 0
@@ -60,25 +66,17 @@ class TtsPipeline:
             return False
         self._owner_id, self._sink = owner_id, playback_sink
         self._attachment += 1
-        self._wake.set()
+        self._play_wake.set()
         self._start()
-        blocked = self.queue.blocked_job()
-        if blocked:
-            state, job = blocked
-            asyncio.create_task(self._emit("synthesis_state" if state == "failed" else "playback_state",
-                                            self._state(job, state)))
         return True
 
     def detach(self, owner_id: str) -> bool:
         if self._closed or self._owner_id != owner_id:
             return False
         self.queue.owner_lost(owner_id)
-        blocked = self.queue.blocked_job()
-        if blocked:
-            asyncio.create_task(self._emit("playback_state", self._state(blocked[1], blocked[0])))
         self._owner_id = self._sink = None
         self._attachment += 1
-        self._ack.set()
+        self._play_wake.set()
         return True
 
     def translation_committed(self, payload: dict[str, Any]) -> bool:
@@ -106,34 +104,26 @@ class TtsPipeline:
                 if inspect.isawaitable(notified):
                     asyncio.ensure_future(notified)
             self._idle.clear()
-            self._wake.set()
+            self._synth_wake.set()
+            self._play_wake.set()
             self._start()
         return accepted
 
     def _start(self) -> None:
-        if not self._closed and self._owner_id and (self._task is None or self._task.done()):
-            self._task = asyncio.create_task(self._run())
+        if self._synth_task is None:
+            self._synth_task = asyncio.create_task(self._synthesize())
+            self._play_task = asyncio.create_task(self._play())
 
-    async def _run(self) -> None:
+    async def _synthesize(self) -> None:
         while not self._closed:
-            self._wake.clear()
-            owner, sink = self._owner_id, self._sink
-            if owner is None or sink is None:
-                if not self.queue.has_unfinished() or self.queue.blocked_job():
-                    self._idle.set()
-                await self._wake.wait()
-                continue
+            self._synth_wake.clear()
             job = self.queue.begin_next()
             if job is None:
-                if not self.queue.has_unfinished() or self.queue.blocked_job():
-                    self._idle.set()
-                await self._wake.wait()
+                await self._synth_wake.wait()
                 continue
-            self._idle.clear()
-            attachment = self._attachment
-            generation = self.queue.generation
             try:
                 await self._emit("synthesis_state", self._state(job, "running"))
+                started = unix_ms() if self.latency_detection and job.origin_epoch == self.epoch else None
                 result = await asyncio.wait_for(self.gateway.synthesize(
                     CallContext(operation=Operation.SYNTHESIZE, task_id=job.job_id,
                                 pipeline_id=self.pipeline_id, epoch=self.epoch,
@@ -142,34 +132,56 @@ class TtsPipeline:
                     request=MatchRequest(operation=Operation.SYNTHESIZE, model_id=job.model_id,
                                          target_language=job.target_language, required_outputs=["speech"]),
                 ), timeout=self.deadline_s)
-                if attachment != self._attachment or owner != self._owner_id or generation != self.queue.generation:
-                    if self.queue.fail(job.job_id, attempt=job.synthesis_attempt):
-                        self.queue.retry(job.job_id)
-                    continue
                 samples = sum(len(chunk.pcm) // (2 * chunk.channels) for chunk in result.chunks)
-                claim = self.queue.claim(job.job_id, owner, samples, attempt=job.synthesis_attempt)
-                if claim is None:
-                    continue
-                await self._emit("synthesis_state", self._state(job, "complete"))
-                self._ack.clear()
-                await sink(PlaybackGrant(job, claim, result))
-                await self._ack.wait()
-            except asyncio.CancelledError:
-                raise
+                if samples <= 0:
+                    raise ValueError("Synthesis returned no audio")
             except Exception:
-                if self.queue.fail(job.job_id, attempt=job.synthesis_attempt):
-                    if job.synthesis_attempt < 2:
-                        self.queue.retry(job.job_id)
-                    else:
-                        await self._emit("synthesis_state", self._state(job, "failed"))
+                if self.queue.fail(job.job_id, attempt=job.synthesis_attempt) and job.synthesis_attempt < 2:
+                    self.queue.retry(job.job_id)
+                self._play_wake.set()
+                continue
+            if self.queue.mark_ready(job.job_id, job.synthesis_attempt):
+                self._ready[job.job_id] = (job, result, samples)
+                if started is not None and job.origin_epoch == self.epoch:
+                    ready = unix_ms()
+                    fields = {"segment_id": job.segment_id, "provider": job.model_id, "audio_stream_id": job.job_id}
+                    await self._emit("latency_observation", {**fields, "kind": "synthesis_started", "at_ms": started})
+                    await self._emit("latency_observation", {**fields, "kind": "audio_ready", "at_ms": ready})
+                await self._emit("synthesis_state", self._state(job, "complete"))
+                self._play_wake.set()
+
+    async def _play(self) -> None:
+        last_blocked = None
+        while not self._closed:
+            self._play_wake.clear()
+            blocked = self.queue.blocked_job()
+            if blocked:
+                state, job = blocked
+                key = (state, job.job_id, job.synthesis_attempt, self._attachment)
+                if key != last_blocked:
+                    await self._emit("synthesis_state" if state == "failed" else "playback_state",
+                                     self._state(job, state))
+                    last_blocked = key
                     continue
-                if owner == self._owner_id:
-                    if self.queue.owner_lost(owner):
-                        blocked = self.queue.blocked_job()
-                        if blocked:
-                            await self._emit("playback_state", self._state(blocked[1], blocked[0]))
-                self._ack.set()
-        self._idle.set()
+            else:
+                last_blocked = None
+            if blocked or not self.queue.has_unfinished():
+                self._idle.set()
+            owner, sink = self._owner_id, self._sink
+            ready_id = self.queue.ready_job_id()
+            if owner is not None and sink is not None and ready_id is not None:
+                job, result, samples = self._ready[ready_id]
+                claim = self.queue.claim(ready_id, owner, samples, attempt=job.synthesis_attempt)
+                if claim is not None:
+                    del self._ready[ready_id]
+                    attachment = self._attachment
+                    try:
+                        await sink(PlaybackGrant(job, claim, result))
+                    except Exception:
+                        if attachment == self._attachment:
+                            self.queue.owner_lost(owner)
+                    continue
+            await self._play_wake.wait()
 
     def ack(self, job_id: str, owner_id: str, claim_id: str, generation: int,
             state: str, played_sample_offset: int = 0) -> bool:
@@ -177,18 +189,18 @@ class TtsPipeline:
             return False
         accepted = self.queue.ack(job_id, owner_id, claim_id, generation, state, played_sample_offset)
         if accepted and state in ("finished", "interrupted", "unknown"):
-            self._ack.set()
-            self._wake.set()
+            self._play_wake.set()
         return accepted
 
     def pause(self) -> int:
         generation = self.queue.pause()
-        self._ack.set()
+        self._play_wake.set()
         return generation
 
     def resume(self) -> None:
         self.queue.resume()
-        self._wake.set()
+        self._synth_wake.set()
+        self._play_wake.set()
 
     def resolve_failure(self, job_id: str, *, retry: bool) -> bool:
         if self._closed:
@@ -203,18 +215,19 @@ class TtsPipeline:
                 self._idle.clear()
             else:
                 self._idle.set()
-            self._wake.set()
+            self._synth_wake.set()
+            self._play_wake.set()
             self._start()
         return accepted
 
     def stop(self) -> int:
         self._closed = True
         generation = self.queue.stop()
-        self._ack.set()
-        self._wake.set()
+        self._ready.clear()
         self._idle.set()
-        if self._task:
-            self._task.cancel()
+        for task in (self._synth_task, self._play_task):
+            if task:
+                task.cancel()
         return generation
 
     async def wait_idle(self) -> None:
@@ -233,9 +246,11 @@ class TtsPipeline:
 
     async def close(self) -> None:
         self.stop()
-        if self._task:
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
-        self.queue.close()
+        try:
+            outcomes = await asyncio.gather(*(task for task in (self._synth_task, self._play_task) if task),
+                                            return_exceptions=True)
+            for outcome in outcomes:
+                if isinstance(outcome, BaseException) and not isinstance(outcome, asyncio.CancelledError):
+                    raise outcome
+        finally:
+            self.queue.close()

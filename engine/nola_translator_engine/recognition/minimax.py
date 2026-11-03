@@ -16,6 +16,7 @@ import ssl
 import struct
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from time import time_ns
 from urllib.parse import urlsplit
 from urllib.request import getproxies, proxy_bypass
 from uuid import uuid4
@@ -88,6 +89,7 @@ class _Segment:
     started_at_ms: float
     ended_at_ms: float
     samples: NDArray[np.float32]
+    boundary_at_ms: float | None = None
     chunks: dict[int, str] = field(default_factory=dict)
     text: str = ""
     published: str = ""
@@ -96,11 +98,13 @@ class _Segment:
 
 class MiniMaxRecognizer:
     def __init__(self, config: ModelSelection, *, timeout: float = REQUEST_TIMEOUT_SECONDS,
-                 finish_timeout: float = FLUSH_TIMEOUT_SECONDS, max_inflight: int = MAX_INFLIGHT) -> None:
+                 finish_timeout: float = FLUSH_TIMEOUT_SECONDS, max_inflight: int = MAX_INFLIGHT,
+                 latency_detection: bool = False) -> None:
         self.url, self.model, self.api_key, self.language = resolve_minimax(config)
         self.timeout = timeout
         self.finish_timeout = finish_timeout
         self.max_inflight = max_inflight
+        self.latency_detection = latency_detection
         self.on_update: UpdateSink | None = None
         self.on_error: Callable[[CloudRecognitionError], None] | None = None
         self._segmenter = SileroVadSegmenter(max_segment_ms=config.max_segment_ms, silence_end_ms=config.silence_end_ms)
@@ -203,7 +207,10 @@ class MiniMaxRecognizer:
             self._fail(CloudRecognitionError("recognitionBufferOverflow"))
             return
         self._serial += 1
-        state = _Segment(f"{self._prefix}-{self._serial}", segment.start_ms, ended_at_ms, segment.samples)
+        state = _Segment(
+            f"{self._prefix}-{self._serial}", segment.start_ms, ended_at_ms, segment.samples,
+            boundary_at_ms=time_ns() / 1_000_000 if self.latency_detection else None,
+        )
         task = asyncio.create_task(self._transcribe(state), name=f"minimax-asr-{self._serial}")
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
@@ -324,6 +331,7 @@ class MiniMaxRecognizer:
         update = RecognitionUpdate(
             state.segment_id, state.revision, state.started_at_ms,
             state.ended_at_ms if is_final else None, clean, self.language, is_final,
+            boundary_at_ms=state.boundary_at_ms,
         )
         if self.on_update is None:
             # Only finals are worth queuing: an interim revision with no sink has nothing to

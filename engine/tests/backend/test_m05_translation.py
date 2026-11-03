@@ -81,12 +81,17 @@ async def test_failed_committed_translation_uses_separate_fallback_credentials()
 
     events = []
     scheduler = make_scheduler(Gateway(), events, fallback_model_id="fallback",
-                               fallback_provider_options={"api_key": "backup-key"})
+                               fallback_provider_options={"api_key": "backup-key"}, latency_detection=True)
     try:
         await scheduler.source_final(source("s1", 1, "Hello"))
         await asyncio.wait_for(scheduler.wait_idle(), 1)
         commits = [payload["text"] for event, payload in events if event == "translation_committed"]
         assert commits == ["zh:Hello"]
+        start, ready = [payload for event, payload in events if event == "latency_observation"]
+        assert (start["kind"], ready["kind"]) == ("translation_started", "translation_ready")
+        assert start["provider"] == ready["provider"] == "fallback"
+        assert start["segment_id"] == ready["segment_id"] == "s1"
+        assert ready["at_ms"] >= start["at_ms"]
     finally:
         await scheduler.close()
 

@@ -12,7 +12,7 @@ and WS payloads must round-trip through the same models.
 from __future__ import annotations
 
 import struct
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal, Self, Union
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -191,6 +191,7 @@ class SessionConfig(ContractModel):
     optional_outputs: tuple[OutputModality, ...] = ()
     #: Single speech language for TTS/S2S audio; distinct from caption targets.
     speech_target_language: str | None = Field(default=None, max_length=32)
+    # Accept this field from older v2 clients. Local ASR always uses speaker-assisted segmentation.
     speaker_detection: SpeakerDetectionConfig = Field(
         default_factory=SpeakerDetectionConfig
     )
@@ -199,6 +200,7 @@ class SessionConfig(ContractModel):
     max_segment_ms: int = Field(default=10_000, ge=3000, le=30000)
     silence_end_ms: int = Field(default=900, ge=300, le=2000)
     translation_preview: bool = True
+    latency_detection: bool = False
 
     @model_validator(mode="after")
     def _coherent(self) -> "SessionConfig":
@@ -463,6 +465,29 @@ class ErrorEventPayload(ContractModel):
     error: ErrorPayload
 
 
+class LatencyObservationPayload(ContractModel):
+    kind: Literal["input", "segment_boundary", "translation_started", "translation_ready", "synthesis_started", "audio_ready"]
+    at_ms: float = Field(ge=0, allow_inf_nan=False)
+    segment_id: str | None = Field(default=None, min_length=1, max_length=128)
+    audio_stream_id: str | None = Field(default=None, min_length=1, max_length=128)
+    duration_ms: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    min: float | None = Field(default=None, ge=-1, le=1)
+    max: float | None = Field(default=None, ge=-1, le=1)
+    provider: str | None = Field(default=None, min_length=1, max_length=256)
+
+    @model_validator(mode="after")
+    def _required_observation_fields(self) -> Self:
+        if self.kind == "input":
+            if self.duration_ms is None or self.min is None or self.max is None or self.min > self.max:
+                raise ValueError("Input observation requires an ordered amplitude range and duration")
+        elif self.kind == "audio_ready":
+            if self.audio_stream_id is None:
+                raise ValueError("Audio readiness requires a stream ID")
+        elif self.segment_id is None:
+            raise ValueError("Stage timing requires a segment ID")
+        return self
+
+
 EventPayload = Annotated[
     Union[
         SourceTextPayload,
@@ -478,6 +503,7 @@ EventPayload = Annotated[
         AudioGapPayload,
         CursorAdvancedPayload,
         ErrorEventPayload,
+        LatencyObservationPayload,
     ],
     Field(discriminator=None),
 ]
@@ -496,6 +522,7 @@ EventType = Literal[
     "audio_gap",
     "cursor_advanced",
     "error",
+    "latency_observation",
 ]
 
 #: Which event_type each payload class belongs to; the envelope carries the
@@ -514,12 +541,13 @@ EVENT_TYPE_TO_PAYLOAD: dict[str, type[ContractModel]] = {
     "audio_gap": AudioGapPayload,
     "cursor_advanced": CursorAdvancedPayload,
     "error": ErrorEventPayload,
+    "latency_observation": LatencyObservationPayload,
 }
 
 #: Output mask mapping: which event types a consumer subscribed to a given
 #: output modality receives. State/error/pipeline events always pass.
 OUTPUT_EVENT_TYPES: dict[str, frozenset[str]] = {
-    "source_text": frozenset({"source_text", "source_committed", "speaker_changed"}),
+    "source_text": frozenset({"source_text", "source_committed", "speaker_changed", "latency_observation"}),
     "translated_text": frozenset(
         {"translated_text", "translation_committed"}
     ),

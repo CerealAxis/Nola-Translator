@@ -8,14 +8,13 @@ import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 import { actions, stores, useStore } from '@/store'
 import { customModelsOf } from '../../../shared/custom-models'
-import { notifyError, notifyInfo } from '@/components/primitives/notify'
+import { notifyError, notifyGatewayStartIssue, notifyInfo } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { AudioRecordingDictationAdapter } from './audio-dictation'
 import type { PlaygroundConfig } from './demo-runtime'
 import { createPlaygroundFetch } from './language-model-transport'
 import { callableModels, installedPlaygroundModels } from './installed-models'
 import { resolveModelBinding, savedBindingOf, selectModelBinding, useAvailableModels, useGatewaySnapshot } from '@/available-models'
-import { notifyGatewayModelUnavailable } from '@/components/primitives/notify'
 import { AudioAttachmentAdapter, VideoAttachmentAdapter } from './audio-attachment'
 import { getBridge } from '@/store'
 import { settingsPath, pathOf } from '@/routes'
@@ -166,7 +165,7 @@ function WorkbenchChat({ snapshot, onAction, busy }: WorkbenchChatProps) {
     const selected = models.find(model => model.kind === config.kind && model.id === resolution.binding)
     if (config.model !== (selected?.id ?? '') || config.images !== selected?.images) {
       setConfig(previous => ({ ...previous, model: selected?.id ?? '', images: selected?.images }))
-      if (resolution.unavailable && config.model) notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t(`gateway.${config.kind}`) }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
+      if (resolution.unavailable && config.model) void notifyGatewayStartIssue(t, config.kind, config.model)
       if (resolution.replaced && config.model) notifyInfo(t('gateway.modelSwitched', { name: resolution.replaced.name }),
         { description: t('gateway.modelSwitchedLoaded') })
     }

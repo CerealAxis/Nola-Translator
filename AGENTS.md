@@ -161,3 +161,8 @@ node scripts/check-installer-paths.mjs [makensis.exe] # NSIS 安装目录回归�
 
 - 正式工作台 Agent 对话窗口使用 `src/renderer/workbench.html`、`workbench-entry.tsx` 和 `workbench-entry.css`，不加载主页面的 `index.css` 或 Nola 产品主题。窗口由 `src/main/workbench.ts` 注册，开发环境与正式构建均可打开。
 - 官方 Elements 源码位于 `src/renderer/components/assistant-ui/native/`；实际界面组合、原生卡片工具和渲染状态分别位于 `features/workbench/NativeAgentSurface.tsx`、`native-agent-tools.tsx` 和 `NativeAgentSettings.tsx`。旧聊天组件、旧侧栏和旧工作区组件已移除。
+
+### 延迟检测窗口入口
+
+- 快速同传的延迟检测窗口由 `src/main/latency-window.ts` 管理，入口为 `src/renderer/latency.html` 和 `latency-entry.tsx`，界面位于 `src/renderer/features/latency/`。
+- 后端采集位于 `engine/nola_translator_engine/backend/latency.py`，主进程在 `src/main/latency-session.ts` 按会话汇总采集点。

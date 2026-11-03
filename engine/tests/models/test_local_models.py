@@ -23,6 +23,38 @@ def tensor():
     return struct.pack('<Q', len(header)) + header + struct.pack('<f', 1)
 
 
+@pytest.mark.parametrize('mode', ['base', 'custom_voice', 'voice_design'])
+def test_qwen3_tts_probe_uses_local_tts_loader(tmp_path, monkeypatch, mode):
+    import sys
+    from types import SimpleNamespace
+    from nola_translator_engine import compute, local_models
+
+    (tmp_path / 'config.json').write_text(json.dumps({'model_type': 'qwen3_tts', 'tts_model_type': mode}))
+    (tmp_path / 'model.safetensors').write_bytes(tensor())
+    _, entry = inspect_local(tmp_path)
+    assert (entry.adapter_id, entry.slot) == ('qwen3-tts', 'synthesis')
+
+    calls = []
+
+    def load(path, *, device_map, local_files_only):
+        assert (path, device_map, local_files_only) == (str(tmp_path), 'cpu', True)
+        calls.append('load')
+        return SimpleNamespace(
+            get_supported_speakers=lambda: ['Vivian'],
+            generate_custom_voice=lambda **kwargs: synthesize('custom_voice'),
+            generate_voice_design=lambda **kwargs: synthesize('voice_design'),
+        )
+
+    def synthesize(kind):
+        calls.append(kind)
+        return [[0.5]], 24000
+
+    monkeypatch.setitem(sys.modules, 'qwen_tts', SimpleNamespace(Qwen3TTSModel=SimpleNamespace(from_pretrained=load)))
+    monkeypatch.setattr(compute, 'probe_devices', lambda _: ([SimpleNamespace(torchDevice='cpu', recognition=True, score=0)], None, None))
+    assert local_models._probe_runtime(tmp_path, entry, entry.adapter_id) == ('qwen3-tts', 'synthesis')
+    assert calls == (['load'] if mode == 'base' else ['load', mode])
+
+
 def snapshot(tmp_path):
     path = tmp_path / 'custom-asr'
     path.mkdir()

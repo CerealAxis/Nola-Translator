@@ -261,12 +261,14 @@ describe('设置存储', () => {
         version: 2,
         recognition: { provider: 'aliyun', aliyunModel, aliyunWorkspaceId: 'kept-workspace', aliyunRegion: 'ap-southeast-1' },
         translation: { provider: 'mymemory', targetLanguage: 'ja', mymemoryEmail: 'kept@example.test' },
+        realtime: { speakerDetection: false },
         customUserField: { keep: true },
       }))
 
       const store = new SettingsStore(path)
       const migrated = await store.load()
-      expect(migrated).toMatchObject({ version: 3, realtime: { outputMode: 'speech', speakerDetection: true, s2sModel: expectedModel } })
+      expect(migrated).toMatchObject({ version: 3, realtime: { outputMode: 'speech', s2sModel: expectedModel } })
+      expect(migrated.realtime).not.toHaveProperty('speakerDetection')
       expect(migrated.recognition).toMatchObject({ provider: 'aliyun', aliyunModel, aliyunWorkspaceId: 'kept-workspace', aliyunRegion: 'ap-southeast-1' })
       expect(migrated.translation).toMatchObject({ provider: 'mymemory', targetLanguage: 'ja', mymemoryEmail: 'kept@example.test' })
       expect(JSON.parse(await readFile(path, 'utf8')).customUserField).toEqual({ keep: true })

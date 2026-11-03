@@ -1,4 +1,5 @@
 import { modelPolicyZh } from './model-policy-ui'
+import { latencyZh } from './latency-ui'
 import { gatewayZh } from './gateway-ui'
 import { workbenchZh } from './workbench-ui'
 import { offlineZh } from './offline-ui'
@@ -22,6 +23,7 @@ import { browserZh } from './browser-ui'
 import { runtimeZh } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const zhCN = {
+  latency: latencyZh,
   gateway: gatewayZh,
   modelsPolicy: modelPolicyZh,
   workbench: workbenchZh,
@@ -150,8 +152,6 @@ export const zhCN = {
     outputSource: '仅原文',
     outputTranslation: '原文与译文',
     outputSpeech: '字幕与语音',
-    speakerDetection: '识别说话人',
-    speakerDetectionHint: '为识别结果标注不同说话人；当前模型不支持时不会产生说话人标记。',
     speechModel: '语音合成模型',
     speechVoice: '语音音色',
     speechDefaultVoice: '模型默认音色',
@@ -987,7 +987,7 @@ export const zhCN = {
     dialogModalBody: '译文由模型生成，重要场合请先核对再用。',
     dialogModalClose: '知道了',
 
-    dialogSessionSetup: '新建同传弹窗', dialogSessionSetupDesc: '应用里最大的表单，六个字段加底部操作栏。',
+    dialogSessionSetup: '新建同传弹窗', dialogSessionSetupDesc: '设置名称和是否保存录音。',
     dialogRename: '重命名弹窗', dialogRenameDesc: '带输入框的确认框，确定后对不存在的记录静默失败。',
     dialogExport: '导出弹窗', dialogExportDesc: '三种导出格式可切换。打开时会清掉记录页残留的错误提示。',
     dialogModelConfig: '模型配置弹窗', dialogModelConfigDesc: '正文内部滚动，含槽位、引擎选择和语言多选。',

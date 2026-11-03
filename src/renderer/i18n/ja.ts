@@ -1,4 +1,5 @@
 import { modelPolicyJa, modelPolicyEntries } from './model-policy-ui'
+import { latencyEntries, latencyJa } from './latency-ui'
 import { gatewayJa, gatewayEntries } from './gateway-ui'
 import { workbenchJa, workbenchEntries } from './workbench-ui'
 import { offlineJa, offlineEntries } from './offline-ui'
@@ -7,6 +8,7 @@ import { onboardingEntries, onboardingJa } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const jaMessages: Record<DictionaryKey, string> = {
+  ...latencyEntries(latencyJa),
   'browser.desktopApplicationAudio': 'デスクトップで選択したアプリ',
   'browser.stepSpeechTranslation': '段階式認識',
   'browser.directSpeechTranslation': '直接音声認識',
@@ -581,8 +583,6 @@ const jaMessages: Record<DictionaryKey, string> = {
   'session.outputSource': '原文のみ',
   'session.outputTranslation': '原文と翻訳',
   'session.outputSpeech': '字幕と音声',
-  'session.speakerDetection': '話者を識別',
-  'session.speakerDetectionHint': '選択したモデルが対応している場合、認識結果に話者を表示します。',
   'session.speechModel': '音声合成モデル',
   'session.speechVoice': '音声',
   'session.speechDefaultVoice': 'モデル既定の音声',
@@ -1325,7 +1325,7 @@ const jaMessages: Record<DictionaryKey, string> = {
   'dev.dialogModalBody': '翻訳はモデルが生成しています。重要な用途では事前に確認してください。',
   'dev.dialogModalClose': '了解',
   'dev.dialogSessionSetup': '新規セッションダイアログ',
-  'dev.dialogSessionSetupDesc': '6つの項目とフッター操作を備えた、アプリで最も大きなフォームです。',
+  'dev.dialogSessionSetupDesc': 'セッション名と録音を保存するかどうかを設定します。',
   'dev.dialogRename': '名前変更ダイアログ',
   'dev.dialogRenameDesc': '入力欄付きの確認画面です。存在しない記録への保存は何も起こさずに失敗します。',
   'dev.dialogExport': 'エクスポートダイアログ',

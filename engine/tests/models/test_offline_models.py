@@ -1,8 +1,12 @@
 """Offline imports trust pinned manifests, not user-supplied package metadata."""
+from dataclasses import replace
 from hashlib import sha256
+from io import BytesIO
 import json
 from pathlib import Path
 import subprocess
+import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -100,23 +104,37 @@ def test_prepare_downloads_without_installing_into_local_root(sample, tmp_path, 
     assert offline.inspect(package, root)["compatible"]
 
 
-def test_exported_model_folder_can_be_imported(sample, tmp_path, monkeypatch):
+@pytest.mark.parametrize('variant, host', [('huggingface', 'huggingface.co'), ('hf-mirror', 'hf-mirror.com'),
+                                           ('modelscope', 'www.modelscope.cn')])
+def test_exported_model_folder_can_be_imported(sample, tmp_path, monkeypatch, capsys, variant, host):
     spec, source, root = sample
+    if variant == 'modelscope':
+        spec = replace(spec, modelscope_repo=spec.repo, modelscope_revision='a' * 40, modelscope_files=spec.files)
+        monkeypatch.setattr(offline, 'catalog_specs', lambda: {spec.model_id: spec})
     def downloader(_manager, _network):
         class Download:
             def download(self, url, part, entry, progress):
-                assert url.endswith(f"/{entry.path}")
+                assert url.startswith(f"https://{host}/") and url.endswith(f"/{entry.path}")
                 part.write_bytes((source / entry.path).read_bytes())
                 progress(entry.size, entry.size)
         return Download()
     monkeypatch.setattr(offline.ModelManager, "_downloader_for", downloader)
     destination = tmp_path / "export.partial"
-    offline.prepare([spec.model_id], root, destination, model_source="hf-mirror", export_model=True)
+    result = offline.prepare([spec.model_id], root, destination,
+                             network=offline.NetworkSettings(useHuggingFaceMirror=variant == 'huggingface'),
+                             model_source=variant, export_model=True)
+    assert result["compatible"]
     assert not root.exists()
     manifest = json.loads((destination / "models" / spec.directory / "model-manifest.json").read_text())
-    assert manifest["source"] == "huggingface"
+    assert manifest["source"] == variant
     assert offline.inspect(destination / "models" / spec.directory, root)["compatible"]
-    offline.install(destination / "models" / spec.directory, root)
+    from nola_translator_engine import local_models
+    monkeypatch.setattr(local_models, 'inspect_local', lambda *_: pytest.fail('An app export should not need a loader'))
+    request = {"operation": "install", "localImport": True,
+               "source": str(destination / "models"), "modelRoot": str(root)}
+    monkeypatch.setattr(sys, 'stdin', SimpleNamespace(buffer=BytesIO(json.dumps(request).encode())))
+    offline.main()
+    assert json.loads(capsys.readouterr().out.splitlines()[-1])["result"]["compatible"]
     assert (root / spec.directory / "model.gguf").read_bytes() == b"weights"
 
 

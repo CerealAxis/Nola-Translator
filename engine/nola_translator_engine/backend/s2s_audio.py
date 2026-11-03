@@ -9,6 +9,7 @@ from typing import Any, Awaitable, Callable, Literal
 from uuid import uuid4
 
 from .contracts import ErrorPayload
+from .latency import unix_ms
 from .s2s_provider import S2SObservation
 
 
@@ -51,9 +52,10 @@ class _Stream:
 
 
 class S2SAudioOutput:
-    def __init__(self, session: object, event_sink: EventSink | None = None) -> None:
+    def __init__(self, session: object, event_sink: EventSink | None = None, *, latency_detection: bool = False) -> None:
         self.session = session
         self.event_sink = event_sink
+        self.latency_detection = latency_detection
         self.generation = int(getattr(session, "playback_generation", 0))
         self.owner_id: str | None = None
         self.sink: AudioSink | None = None
@@ -84,15 +86,17 @@ class S2SAudioOutput:
         self._report("PLAYBACK_DEVICE_LOST", "s2sAudioOwnerDetached", {"owner_id": owner_id})
         return True
 
-    async def accept(self, observation: S2SObservation, translation_id: str | None) -> None:
+    async def accept(self, observation: S2SObservation, translation_id: str | None,
+                     segment_id: str | None = None) -> None:
         if self._stopped:
             return
         if observation.kind == "audio":
-            await self._audio(observation, translation_id)
+            await self._audio(observation, translation_id, segment_id)
         elif observation.kind == "response":
             await self._response_done(observation)
 
-    async def _audio(self, observation: S2SObservation, translation_id: str | None) -> None:
+    async def _audio(self, observation: S2SObservation, translation_id: str | None, segment_id: str | None) -> None:
+        arrived_at = unix_ms() if self.latency_detection and observation.chunk_seq == 0 else None
         response_id = observation.response_id
         if not response_id or not observation.item_id or observation.sample_rate <= 0:
             self._report("PROTOCOL_ERROR", "s2sAudioObservationInvalid", {"response_id": response_id})
@@ -143,6 +147,13 @@ class S2SAudioOutput:
             self._drop_all()
             self._report("PROTOCOL_ERROR", "s2sAudioPcmInvalid", {"response_id": response_id, "item_id": observation.item_id})
             return
+        if arrived_at is not None and observation.pcm and self.event_sink:
+            notification = self.event_sink("latency_observation", {
+                "kind": "audio_ready", "at_ms": arrived_at,
+                "audio_stream_id": stream.stream_id, "segment_id": segment_id,
+            })
+            if inspect.isawaitable(notification):
+                await notification
         is_last = observation.audio_done
         await self._send(stream, observation, is_last)
 

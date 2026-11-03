@@ -38,6 +38,18 @@ it('leaves an installed but unloaded local model out of the catalog', () => {
   expect(catalog.asr).toEqual([])
 })
 
+it('hides realtime local models while the Model Gateway is stopped', () => {
+  const configured = settings({ modelPolicy: { enabled: { 'asr:resource:sense-voice-small': true, 'llm:resource:qwen35-0.8b': true }, defaults: {}, selections: {} } })
+  const catalog = buildAvailableModels({ settings: configured, credentials: credentials([]),
+    resources: [asrRecord, { ...asrRecord, resourceId: 'qwen35-0.8b', name: 'Qwen' }],
+    snapshot: { ...snapshotWith('asr', '', ''), state: 'stopped', realtime: { models: [
+      { model_id: 'sense-voice-small', enabled: true, kinds: ['asr'], operations: ['transcribe'] },
+      { model_id: 'llm:qwen35-0.8b', enabled: true, kinds: ['llm'], operations: ['generate'] },
+    ], instances: [] } } })
+  expect(catalog.asr).toEqual([])
+  expect(catalog.llm).toEqual([])
+})
+
 describe('resolveModelBinding', () => {
   const loaded: AvailableModel = { binding: 'resource:qwen-asr', name: 'Qwen ASR', kind: 'asr', origin: 'gateway', free: true }
   const paid: AvailableModel = { binding: 'cloud:aliyun', name: 'Aliyun', kind: 'asr', origin: 'cloud', free: false }

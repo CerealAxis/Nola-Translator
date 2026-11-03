@@ -1,32 +1,5 @@
 import type { ModelDownloadSource } from './contracts'
-
-const MODELSCOPE_MODELS = new Set([
-  'qwen3-asr-1.7b-hf',
-  'qwen3-asr-0.6b-hf',
-  'sensevoice-small',
-  'hy-mt2-1.8b-q4-k-m',
-  'hy-mt2-1.8b-q3-k-m',
-  'hy-mt2-7b-q4-k-m',
-  'm2m100-418m',
-  'index-translate-2b-q4-k-m',
-  'index-translate-9b-q4-k-m',
-  'index-translate-35b-a3b-q4-k-m',
-  'index-translate-2b-bf16',
-  'index-translate-2b-fp8',
-  'index-translate-2b-fp4',
-  'index-translate-9b-bf16',
-  'index-translate-9b-fp8',
-  'index-translate-9b-fp4',
-  'index-translate-35b-a3b-preview-bf16',
-  'index-translate-35b-a3b-preview-fp8',
-  'index-translate-35b-a3b-preview-fp4',
-  'tts-kokoro-crisp-q8-0',
-  'tts-piper-crisp-en-gb-cori-medium',
-  'tts-cosyvoice3-crisp-0.5b-q4-k',
-  'qwen35-0.8b-q4-k-m',
-  'qwen35-2b-q4-k-m',
-  'qwen35-4b-q4-k-m',
-])
+import { modelImportEntry } from './model-import-catalog'
 
 export type DownloadSourceOption = {
   source: ModelDownloadSource
@@ -41,6 +14,6 @@ const SOURCES: readonly DownloadSourceOption[] = [
 ]
 
 export function downloadSourcesFor(resourceId: string): readonly DownloadSourceOption[] {
-  const sources = SOURCES.filter(option => option.source !== 'modelscope' || MODELSCOPE_MODELS.has(resourceId))
-  return resourceId.startsWith('hub:') ? sources.filter(option => option.source !== 'modelscope') : sources
+  const entry = modelImportEntry(resourceId)
+  return SOURCES.filter(({ source }) => entry ? Boolean(entry.sources[source]) : source !== 'modelscope')
 }

@@ -9,7 +9,10 @@ import time
 from typing import Callable
 
 from .models import catalog
+from .models.crisp_catalog import ADDITIONAL_TTS_SPECS, CRISP_ASR_SPECS, QWEN3_TTS_SPECS
 from .models.manager import ModelIntegrityError, ModelManager, ModelSpec
+from .models.qwen35_catalog import QWEN35_SPECS
+from .models.qwen_gguf_catalog import QWEN3_ASR_GGUF_SPECS
 from .protocol import NetworkSettings
 
 Progress = Callable[[dict], None]
@@ -24,8 +27,11 @@ class OfflineError(RuntimeError):
 
 
 def catalog_specs() -> dict[str, ModelSpec]:
-    return {value.model_id: value for value in vars(catalog).values()
-            if isinstance(value, ModelSpec)}
+    specs = {value.model_id: value for value in vars(catalog).values() if isinstance(value, ModelSpec)}
+    specs.update((spec.model_id, spec) for spec in (
+        CRISP_ASR_SPECS + QWEN3_TTS_SPECS + ADDITIONAL_TTS_SPECS + QWEN35_SPECS + QWEN3_ASR_GGUF_SPECS
+    ))
+    return specs
 
 
 def _local(path: Path, root: Path) -> bool:
@@ -49,8 +55,7 @@ def _record(spec: ModelSpec, source: str) -> dict:
             "files": [asdict(entry) for entry in spec.files_for(source)]}
 
 
-def _selections(source: Path) -> list[tuple[ModelSpec, str, Path]]:
-    specs = catalog_specs()
+def _model_manifest(source: Path) -> Path | None:
     model_manifest = source / "model-manifest.json" if source.is_dir() else None
     if source.is_dir() and (model_manifest is None or not model_manifest.exists()):
         try:
@@ -59,7 +64,13 @@ def _selections(source: Path) -> list[tuple[ModelSpec, str, Path]]:
                 model_manifest = children[0] / "model-manifest.json"
         except OSError:
             pass
-    if model_manifest is not None and model_manifest.exists():
+    return model_manifest if model_manifest is not None and model_manifest.exists() else None
+
+
+def _selections(source: Path) -> list[tuple[ModelSpec, str, Path]]:
+    specs = catalog_specs()
+    model_manifest = _model_manifest(source)
+    if model_manifest is not None:
         try:
             if not _local(model_manifest, source) or model_manifest.stat().st_size > MAX_REQUEST_BYTES:
                 raise ValueError()
@@ -237,6 +248,7 @@ def prepare(model_ids: list[str], model_root: Path, destination: Path,
     package_root = destination / "models"
     if not _local(package_root, destination):
         raise OfflineError("invalidPackage")
+    export_single = export_model and len(set(model_ids)) == 1
     records = []
     for model_id in dict.fromkeys(model_ids):
         spec = specs[model_id]
@@ -254,17 +266,14 @@ def prepare(model_ids: list[str], model_root: Path, destination: Path,
             manager.cleanup_stale([spec])
             if _check(spec, catalog_source, package_root / spec.directory)[0]:
                 manager.is_installed = lambda _: False
-            selected_network = network
-            if variant == "hf-mirror":
-                selected_network = NetworkSettings.model_validate({**(network.model_dump() if network else {}), "huggingFaceEndpoint": "https://hf-mirror.com"})
-            manager.ensure(spec, network=selected_network, source="modelscope" if variant == "modelscope" else None,
+            manager.ensure(spec, network=network, source=model_source,
                            progress=lambda current, total: progress({"type": "progress",
                                "phase": "download", "current": current, "total": total,
                                "detail": model_id}))
-        catalog_source = "modelscope" if variant == "modelscope" else "huggingface"
-        issue, _ = _check(spec, catalog_source, package_root / spec.directory, progress)
-        if issue:
-            raise OfflineError(issue)
+        if not export_single:
+            issue, _ = _check(spec, catalog_source, package_root / spec.directory, progress)
+            if issue:
+                raise OfflineError(issue)
         records.append(_record(spec, catalog_source))
     inventory = destination / "models.json"
     if not _local(inventory, destination):
@@ -274,14 +283,17 @@ def prepare(model_ids: list[str], model_root: Path, destination: Path,
         raise OfflineError("invalidPackage")
     temporary.write_text(json.dumps({"version": 1, "models": records}, indent=2), encoding="utf-8")
     temporary.replace(inventory)
-    if export_model and len(records) == 1:
+    if export_single:
         record = records[0]
-        source_name = "modelscope" if model_source == "modelscope" else "huggingface"
-        catalog_source = "modelscope" if source_name == "modelscope" else "huggingface"
+        source_name = model_source or record["source"]
         model_manifest = destination / "models" / specs[record["id"]].directory / "model-manifest.json"
         model_manifest.write_text(json.dumps({"version": 1, "id": record["id"], "source": source_name,
-            "files": [asdict(entry) for entry in specs[record["id"]].files_for(catalog_source)]}, indent=2), encoding="utf-8")
+            "files": record["files"]}, indent=2), encoding="utf-8")
         (destination / "models.json").unlink(missing_ok=True)
+        result = inspect(model_manifest.parent, model_root, progress)
+        if result["issues"]:
+            raise OfflineError(result["issues"][0])
+        return result
     return inspect(destination, model_root)
 
 
@@ -304,7 +316,10 @@ def main() -> None:
         request = json.loads(contents)
         root = Path(request["modelRoot"])
         operation = request["operation"]
-        if request.get("localImport") and operation in ("inspect", "install"):
+        # A Nola export follows the same trusted catalog checks as an offline bundle.
+        # Loader trials are for loose files whose compatibility is otherwise unknown.
+        if (request.get("localImport") and operation in ("inspect", "install")
+                and _model_manifest(Path(request["source"])) is None):
             from .local_models import inspect_local, import_local, probe_local, LocalModelError
             source = Path(request["source"])
             network = NetworkSettings.model_validate(request["network"]) if request.get("network") else None

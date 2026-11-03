@@ -1,4 +1,5 @@
 import { modelPolicyEn } from './model-policy-ui'
+import { latencyEn } from './latency-ui'
 import { gatewayEn } from './gateway-ui'
 import { workbenchEn } from './workbench-ui'
 import { offlineEn } from './offline-ui'
@@ -18,6 +19,7 @@ import { browserEn } from './browser-ui'
 import { runtimeEn } from './runtime-ui'
 import { computeUi } from '../features/settings/compute-ui'
 export const en: Dictionary = {
+  latency: latencyEn,
   gateway: gatewayEn,
   modelsPolicy: modelPolicyEn,
   workbench: workbenchEn,
@@ -146,8 +148,6 @@ export const en: Dictionary = {
     outputSource: 'Source only',
     outputTranslation: 'Source and translation',
     outputSpeech: 'Captions and speech',
-    speakerDetection: 'Identify speakers',
-    speakerDetectionHint: 'Label speakers in recognition results when the selected model supports it.',
     speechModel: 'Speech synthesis model',
     speechVoice: 'Voice',
     speechDefaultVoice: 'Model default',
@@ -965,7 +965,7 @@ export const en: Dictionary = {
     dialogModalBody: 'The translation is machine generated, read it before you rely on it.',
     dialogModalClose: 'Got it',
 
-    dialogSessionSetup: 'New session dialog', dialogSessionSetupDesc: 'The largest form in the app: six fields and a footer.',
+    dialogSessionSetup: 'New session dialog', dialogSessionSetupDesc: 'Set the session name and choose whether to save the recording.',
     dialogRename: 'Rename dialog', dialogRenameDesc: 'A confirmation with a text field. Saving against a meeting that does not exist fails quietly.',
     dialogExport: 'Export dialog', dialogExportDesc: 'Three export formats to switch between. Opening it clears the stale error on the records page.',
     dialogModelConfig: 'Model configuration dialog', dialogModelConfigDesc: 'A scrolling body with the slot, engine picker and language multi selects.',

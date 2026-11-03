@@ -36,6 +36,7 @@ import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
 import { notifyError } from '@/components/primitives/notify'
 import { failedTranslations, translationErrorReason } from '@/translation-status'
+import { useCaptionLatency } from '@/components/caption/use-caption-latency'
 
 import { CaptionTrack } from './CaptionTrack'
 import type { TrackLine } from './CaptionTrack'
@@ -56,6 +57,7 @@ export function OverlayRoot() {
   const overlay = useStore(stores.settings, (state) => state.settings?.overlay)
   const sourceOnly = useStore(stores.settings, state => state.settings?.translation.targetLanguage === NO_TRANSLATION_LANGUAGE)
   const sourceLanguage = useStore(stores.settings, state => state.settings?.recognition.sourceLanguage ?? DEFAULT_SETTINGS.recognition.sourceLanguage)
+  const latency = useStore(stores.settings, state => state.settings?.realtime?.latencyDetection === true)
   const session = useStore(sessionStore, (state) => state)
   const [hovered, setHovered] = useState(false)
   /*
@@ -177,6 +179,7 @@ export function OverlayRoot() {
    * the pointer land on the wrapper, so both drop the synthetic events.
    */
   const cardRef = useRef<HTMLDivElement>(null)
+  useCaptionLatency(cardRef, latency ? session.sessionId ?? undefined : undefined)
   useEffect(() => {
     if (!locked) {
       window.getSelection()?.removeAllRanges()
@@ -339,6 +342,7 @@ export function OverlayRoot() {
                   <CaptionTrack
                     key={`translation-${session.sessionId ?? 'idle'}-${config.layout}`}
                     kind="translation"
+                    latencyKind={originalOnly && !config.showSource ? 'source' : 'translation'}
                     lines={effectiveTranslationTrackLines}
                     maxLines={translationLines}
                     layout={config.layout}

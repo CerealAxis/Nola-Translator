@@ -41,7 +41,8 @@
           "pipeline_state",
           "audio_gap",
           "cursor_advanced",
-          "error"
+          "error",
+          "latency_observation"
         ],
         "title": "Event Type",
         "type": "string"

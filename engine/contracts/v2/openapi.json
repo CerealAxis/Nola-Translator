@@ -465,7 +465,7 @@
     "/api/v2/gateway/instances": {
       "get": {
         "summary": "Gateway Instances",
-        "description": "Live instance states for the desktop model page. This is a private\nmanagement surface: it is behind the same control token as the realtime\nAPI and is never exposed on the public /v1-compatible space.",
+        "description": "Live instance states for the desktop model page. This is a private\nmanagement surface: it is behind the same control token as the realtime\nAPI and is never exposed on the public /v2 listener.",
         "operationId": "gateway_instances_api_v2_gateway_instances_get",
         "responses": {
           "200": {
@@ -1143,6 +1143,11 @@
             "type": "boolean",
             "title": "Translation Preview",
             "default": true
+          },
+          "latency_detection": {
+            "type": "boolean",
+            "title": "Latency Detection",
+            "default": false
           }
         },
         "additionalProperties": false,

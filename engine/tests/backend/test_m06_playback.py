@@ -33,9 +33,12 @@ def test_only_valid_drained_ack_advances_order(queue):
 
     assert queue.begin_next().job_id == first.job_id
     assert queue.begin_next() is None
+    assert queue.mark_ready(first.job_id, 1)
     claim = queue.claim(first.job_id, "owner", 100, attempt=1)
     assert queue.claim(first.job_id, "other", 100, attempt=1) is None
-    assert queue.begin_next() is None
+    assert queue.begin_next().job_id == second.job_id
+    assert queue.mark_ready(second.job_id, 1)
+    assert queue.claim(second.job_id, "owner", 100, attempt=1) is None
 
     def ack(state, played, owner="owner"):
         return queue.ack(first.job_id, owner, claim.claim_id, claim.generation, state, played)
@@ -46,10 +49,10 @@ def test_only_valid_drained_ack_advances_order(queue):
     assert ack("progress", 90)
     assert not ack("progress", 89)
     assert not ack("finished", 99)
-    assert queue.begin_next() is None
+    assert queue.claim(second.job_id, "owner", 100, attempt=1) is None
     assert ack("finished", 100)
     assert ack("finished", 100)
-    assert queue.begin_next().job_id == second.job_id
+    assert queue.claim(second.job_id, "owner", 100, attempt=1)
 
 
 def test_pause_fences_old_attempt_but_keeps_waiting_jobs(queue):
@@ -61,6 +64,8 @@ def test_pause_fences_old_attempt_but_keeps_waiting_jobs(queue):
     assert queue.begin_next() is None
     queue.resume()
     assert queue.begin_next().synthesis_attempt == 2
+    assert not queue.mark_ready(first.job_id, 1)
+    assert queue.mark_ready(first.job_id, 2)
     assert queue.claim(first.job_id, "owner", 100, attempt=1) is None
     assert not queue.fail(first.job_id, attempt=1)
     claim = queue.claim(first.job_id, "owner", 100, attempt=2)
@@ -81,7 +86,7 @@ def test_failure_waits_for_user_retry_or_skip(queue):
     queue.enqueue(second)
     assert queue.begin_next().job_id == first.job_id
     assert queue.fail(first.job_id, attempt=1)
-    assert queue.begin_next() is None
+    assert queue.ready_job_id() is None
     assert queue.retry(first.job_id)
     assert queue.begin_next().synthesis_attempt == 2
     assert queue.fail(first.job_id, attempt=2)
@@ -97,15 +102,18 @@ def test_reopen_does_not_replay_grant(tmp_path):
         initial.enqueue(first)
         initial.enqueue(second)
         assert initial.begin_next().job_id == first.job_id
+        assert initial.mark_ready(first.job_id, 1)
         claim = initial.claim(first.job_id, "owner", 100, attempt=1)
         assert initial.ack(first.job_id, "owner", claim.claim_id, claim.generation, "started")
+        assert initial.begin_next().job_id == second.job_id
+        assert initial.mark_ready(second.job_id, 1)
     finally:
         initial.close()
 
     recovered = PlaybackQueue(path, "pipeline")
     try:
         assert not recovered.enqueue(first)
-        assert recovered.begin_next() is None
+        assert recovered.ready_job_id() is None
         assert not recovered.retry(first.job_id)
         assert not recovered.ack(first.job_id, "owner", claim.claim_id, claim.generation, "finished", 100)
         assert recovered.skip(first.job_id)
@@ -119,10 +127,11 @@ def test_lost_owner_blocks_next_sentence(queue):
     queue.enqueue(first)
     queue.enqueue(second)
     queue.begin_next()
+    assert queue.mark_ready(first.job_id, 1)
     claim = queue.claim(first.job_id, "owner", 100, attempt=1)
     assert not queue.owner_lost("other")
     assert queue.owner_lost("owner")
-    assert queue.begin_next() is None
+    assert queue.ready_job_id() is None
     assert not queue.ack(first.job_id, "owner", claim.claim_id, claim.generation, "started")
     assert queue.skip(first.job_id)
     assert queue.begin_next().job_id == second.job_id

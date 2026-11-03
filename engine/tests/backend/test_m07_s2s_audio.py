@@ -12,7 +12,8 @@ from nola_translator_engine.backend.s2s_provider import S2SObservation
 def test_audio_chunks_preserve_offsets_and_emit_one_terminal_packet():
     async def run():
         session = SimpleNamespace(playback_generation=3)
-        output = S2SAudioOutput(session)
+        events = []
+        output = S2SAudioOutput(session, lambda name, payload: events.append((name, payload)), latency_detection=True)
         packets = []
 
         async def sink(packet):
@@ -20,7 +21,7 @@ def test_audio_chunks_preserve_offsets_and_emit_one_terminal_packet():
 
         assert output.attach("owner", sink)
         await output.accept(S2SObservation("audio", "item", "response", pcm=b"\0\0" * 2,
-                                           chunk_seq=0, sample_rate=24000), "translation")
+                                           chunk_seq=0, sample_rate=24000), "translation", "source")
         await output.accept(S2SObservation("audio", "item", "response", pcm=b"\0\0",
                                            chunk_seq=1, sample_rate=24000), "translation")
         await output.accept(S2SObservation("audio", "item", "response", chunk_seq=2,
@@ -28,6 +29,11 @@ def test_audio_chunks_preserve_offsets_and_emit_one_terminal_packet():
         assert [(p.chunk_seq, p.sample_start, p.is_last, p.pcm) for p in packets] == [
             (0, 0, False, b"\0\0" * 2), (1, 2, False, b"\0\0"), (2, 3, True, b"")]
         last = packets[-1]
+        (name, readiness), = events
+        assert name == "latency_observation"
+        assert readiness["kind"] == "audio_ready"
+        assert readiness["audio_stream_id"] == last.audio_stream_id
+        assert readiness["segment_id"] == "source"
         assert output.ack(last.audio_stream_id, "owner", last.claim_id, last.generation, "finished", 3)
         await output.accept(S2SObservation("response", response_id="response", status="completed"), None)
         await asyncio.wait_for(output.wait_idle(), 1)

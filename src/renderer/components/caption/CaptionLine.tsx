@@ -52,6 +52,7 @@ export interface CaptionLineProps {
   paused?: boolean
   className?: string
   'data-testid'?: string
+  latencySegmentId?: string
 }
 
 /**
@@ -76,6 +77,7 @@ export function CaptionLine({
   paused = false,
   className,
   'data-testid': testId,
+  latencySegmentId,
 }: CaptionLineProps) {
   const current = distance <= 0 && !interim
   const opacity = lineOpacity(distance) * (interim ? INTERIM_FADE : 1)
@@ -100,6 +102,8 @@ export function CaptionLine({
       data-current={current ? 'true' : 'false'}
       data-interim={interim ? 'true' : 'false'}
       data-testid={testId}
+      data-latency-segment={latencySegmentId}
+      data-latency-kind={latencySegmentId ? kind : undefined}
       // The 12px left slot holds the marker bar, which sits in the slot rather than over
       // the first stroke. `entering && !interim` is a hard condition: the engine revises
       // interim every 100-200ms, and replaying a 120ms animation at that rate is flicker.

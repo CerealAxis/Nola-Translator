@@ -218,7 +218,8 @@ def test_cloud_asr_uses_final_source_text_and_keeps_runtime_until_worker_shutdow
 
     recognizer_instances = []
 
-    def create_recognizer(config):
+    def create_recognizer(config, *, latency_detection=False):
+        assert not latency_detection
         recognizer = FakeRecognizer(config)
         recognizer_instances.append(recognizer)
         return recognizer

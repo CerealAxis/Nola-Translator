@@ -49,6 +49,7 @@ __pycache__/
 /settings.json
 /credentials.json
 /history.jsonl
+/session-journal/
 /meetings/
 /cache/
 /runtimes/

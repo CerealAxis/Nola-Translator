@@ -18,6 +18,18 @@ function setup() {
 }
 afterEach(() => { dispose?.(); vi.useRealTimers(); offlineStore.setState({ mode: null, task: null, preview: null, busy: false, failed: false }) })
 describe('offline task lifecycle', () => {
+  it('discards an inspection result after its preview is cleared', async () => {
+    const { api } = setup()
+    let finish!: (preview: OfflinePreview) => void
+    vi.mocked(api.selectModel).mockImplementation(() => new Promise(resolve => { finish = resolve }))
+
+    const inspection = offlineActions.selectModel('directory')
+    offlineActions.clearPreview()
+    finish({ token: 'old', compatible: true, issues: [], items: [], totalBytes: 0 })
+    await inspection
+
+    expect(offlineStore.getState()).toMatchObject({ preview: null, busy: false })
+  })
   it('resolves a typed destination before preparing and refuses an invalid directory', async () => {
     const { api } = setup()
     await Promise.resolve()

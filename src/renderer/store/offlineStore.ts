@@ -19,6 +19,7 @@ let bridge: NolaBridge | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
 let generation = 0
 let taskRevision = 0
+let previewRevision = 0
 let completed: (() => void) | undefined
 
 function accept(task: OfflineTask): void {
@@ -53,22 +54,40 @@ export function initOfflineStore(next: NolaBridge, onCompleted?: () => void): ()
   void next.offline?.snapshot().then(task => { if (generation === current) accept(task) }).catch(() => undefined)
   return () => { generation++; if (timer) clearTimeout(timer); timer = null; bridge = null }
 }
-async function run<T>(operation: () => Promise<T>, success: (value: T) => void): Promise<void> {
+async function run<T>(operation: () => Promise<T>, success: (value: T) => void, isCurrent = () => true): Promise<void> {
   if (offlineStore.getState().busy) return
   offlineStore.setState({ busy: true, failed: false })
-  try { success(await operation()) } catch { offlineStore.setState({ failed: true }) }
+  try {
+    const value = await operation()
+    if (isCurrent()) success(value)
+  } catch {
+    if (isCurrent()) offlineStore.setState({ failed: true })
+  }
   finally { offlineStore.setState({ busy: false }) }
 }
 export const offlineActions = {
-  open(mode: OfflineMode): void { offlineStore.setState({ mode, preview: null, failed: false, downloadModelId: undefined, destination: null }) },
+  open(mode: OfflineMode): void {
+    previewRevision++
+    offlineStore.setState({ mode, preview: null, failed: false, downloadModelId: undefined, destination: null })
+  },
   openDownloads(modelId: string): void {
     offlineActions.reset()
     offlineStore.setState({ mode: 'model', preview: null, failed: false, downloadModelId: modelId, destination: null })
   },
-  close(): void { offlineStore.setState({ mode: null }) },
-  clearPreview(): void { offlineStore.setState({ preview: null }) },
+  close(): void {
+    previewRevision++
+    offlineStore.setState({ mode: null })
+  },
+  clearPreview(): void {
+    previewRevision++
+    offlineStore.setState({ preview: null })
+  },
   selectModel(kind: 'file' | 'directory', repo?: string, path?: string): Promise<void> {
-    return run(async () => bridge?.offline?.selectModel(kind, repo, path) ?? null, preview => { if (preview) offlineStore.setState({ preview }) })
+    const revision = previewRevision
+    const current = generation
+    return run(async () => bridge?.offline?.selectModel(kind, repo, path) ?? null,
+      preview => { if (preview) offlineStore.setState({ preview }) },
+      () => revision === previewRevision && current === generation)
   },
   selectBundle(): Promise<void> {
     return run(async () => bridge?.offline?.selectBundle() ?? null, preview => { if (preview) offlineStore.setState({ preview }) })
@@ -128,5 +147,9 @@ export const offlineActions = {
     catch { offlineStore.setState({ failed: true }) }
   },
   openOutput(): Promise<void> { return run(async () => bridge?.offline?.openOutput(), () => undefined) },
-  reset(): void { if (offlineStore.getState().task?.state !== 'running') offlineStore.setState({ task: null, preview: null, failed: false, workflow: undefined }) },
+  reset(): void {
+    if (offlineStore.getState().task?.state === 'running') return
+    previewRevision++
+    offlineStore.setState({ task: null, preview: null, failed: false, workflow: undefined })
+  },
 }

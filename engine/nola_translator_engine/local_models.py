@@ -229,6 +229,8 @@ def _local_adapter(config: dict, metadata: dict, names: set[str]) -> tuple[str, 
     model_type = config.get('model_type')
     if model_type == 'qwen3_asr':
         return 'qwen3-asr', 'recognition'
+    if model_type == 'qwen3_tts':
+        return 'qwen3-tts', 'synthesis'
     if model_type == 'm2m_100':
         return 'm2m100', 'translation'
     if 'config.yaml' in names and any(name.endswith(('.pt', '.pth')) for name in names):
@@ -577,6 +579,17 @@ def _probe_runtime(root: Path, entry: CustomModelEntry, adapter: str) -> tuple[s
     devices, _, _ = probe_devices(None)
     device = max((item for item in devices if item.torchDevice and item.recognition),
                  key=lambda item: item.score, default=devices[0]).torchDevice
+    if adapter == 'qwen3-tts':
+        from .local_call import generate_qwen3_tts, load_qwen3_tts
+
+        mode = _json(root / 'config.json').get('tts_model_type')
+        model = load_qwen3_tts(root, device or 'cpu')
+        # Base requires reference speech, so only verify that its local snapshot loads.
+        if mode != 'base':
+            wavs, rate = generate_qwen3_tts(model, mode, 'Hello.')
+            if rate <= 0 or not len(wavs) or not np.asarray(wavs[0]).size or not np.isfinite(wavs[0]).all():
+                raise ValueError('Qwen3-TTS returned no valid synthesized audio')
+        return adapter, 'synthesis'
     if adapter not in ('qwen3-asr', 'sensevoice', 'funasr', 'm2m100'):
         adapter = _transformers_adapter(root, adapter)
     if adapter == 'transformers-tts':

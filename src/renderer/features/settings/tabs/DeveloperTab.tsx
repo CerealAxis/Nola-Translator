@@ -47,7 +47,6 @@ import { DownloadSourceDialog } from '../../models/DownloadSourceDialog'
 import {
   DEMO_ASR_RECORD,
   DEMO_BULK_COUNT,
-  DEMO_DEVICES,
   DEMO_DRAFT,
   DEMO_ERROR_SESSION,
   DEMO_HUB_DESCRIPTION,
@@ -338,8 +337,8 @@ function OverlayToastPreviewGroup() {
         desc={t('dev.toastWindowComplexDesc')}
         run={() => preview({
           type: 'error',
-          message: t('gateway.modelNone', { name: t('gateway.asr') }),
-          description: t('gateway.modelGatewayStartHint'),
+          message: t('gateway.notStarted'),
+          description: t('gateway.notStartedHint'),
           actionLabel: t('gateway.title'),
           actionPage: '#/model-gateway',
         })}
@@ -667,7 +666,7 @@ function DialogGalleryGroup() {
         onOpenChange={track('sessionSetup')}
         draft={draft}
         onDraftChange={setDraft}
-        devices={DEMO_DEVICES}
+        devices={[]}
         language={language}
         onSubmit={inert}
       />

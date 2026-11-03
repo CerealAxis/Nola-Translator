@@ -39,13 +39,18 @@ it('uses the explicit title and description layout when requested', () => {
 
 it('shows a local-model availability toast in the app with a gateway action', () => {
   const showToast = vi.spyOn(toast, 'showToast')
-  notifyGatewayModelUnavailable('没有可用的ASR模型', '请先启动模型网关。', '模型网关')
+  const openMainPage = vi.fn().mockResolvedValue(undefined)
+  vi.spyOn(store, 'getBridge').mockReturnValue({ app: { openMainPage } } as unknown as NolaBridge)
+  notifyGatewayModelUnavailable('模型网关未启动', '请先前往模型网关启动服务，然后重试。', '模型网关')
   expect(showToast).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
     type: 'error',
-    title: '没有可用的ASR模型',
-    description: '请先启动模型网关。',
+    title: '模型网关未启动',
+    description: '请先前往模型网关启动服务，然后重试。',
     actionProps: { children: '模型网关', onClick: expect.any(Function) },
   }))
+  const notice = showToast.mock.calls[0][0]
+  if ('actionProps' in notice) notice.actionProps.onClick()
+  expect(openMainPage).toHaveBeenCalledExactlyOnceWith('#/model-gateway')
 })
 
 it('sends only an approved action identifier for an overlay error', () => {
