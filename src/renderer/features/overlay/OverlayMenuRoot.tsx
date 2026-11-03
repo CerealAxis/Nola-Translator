@@ -36,24 +36,17 @@ export function OverlayMenuRoot() {
   useEffect(() => {
     if (!menu) return
     const id = menu.id
-    let frame = 0
-    let painted = false
-    const present = (): void => {
+    // A preloaded, hidden Electron window may not receive animation frames.
+    const timer = window.setInterval(() => {
       const content = document.querySelector(menu.kind === 'confirm' ? '.nola-confirm-dialog' : '.nola-caption-menu')
-      if (content && content.getBoundingClientRect().height > 0) {
-        if (painted) {
-          void actions.settings.presentOverlayMenu(id).catch((error: unknown) => {
-            console.warn('[overlay] menu show failed', error)
-            notifyError(t('overlay.menuFailed'), { cause: error })
-          })
-          return
-        }
-        painted = true
-      }
-      frame = requestAnimationFrame(present)
-    }
-    frame = requestAnimationFrame(present)
-    return () => cancelAnimationFrame(frame)
+      if (!content || content.getBoundingClientRect().height <= 0) return
+      window.clearInterval(timer)
+      void actions.settings.presentOverlayMenu(id).catch((error: unknown) => {
+        console.warn('[overlay] menu show failed', error)
+        notifyError(t('overlay.menuFailed'), { cause: error })
+      })
+    }, 16)
+    return () => window.clearInterval(timer)
   }, [menu?.id])
 
   if (!menu) return null

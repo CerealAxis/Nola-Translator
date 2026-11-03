@@ -47,6 +47,7 @@ export const SUPPORT_ERROR_CATALOG = {
   'AUD-002': { messageKey: 'errors.deviceNotFound', retryable: false, causes: ['AUDIODEVICEUNAVAILABLE'] },
   'AUD-003': { messageKey: 'errors.audioDeviceDisconnected', retryable: false, causes: ['AUDIODEVICEDISCONNECTED'] },
   'AUD-004': { messageKey: 'errors.audioBufferOverflow', retryable: true, causes: ['AUDIOBUFFEROVERFLOW'] },
+  'AUD-005': { messageKey: 'errors.systemAudioSpeechUnavailable', retryable: false, causes: ['SYSTEMAUDIOSPEECHUNAVAILABLE'] },
   'ENG-001': { messageKey: 'errors.engineNotReady', retryable: true, causes: ['ENGINENOTREADY'], aliases: ['preflight.deviceCheckBlocked'] },
   'ENG-002': { messageKey: 'errors.engineLost', retryable: false, causes: ['ENGINELOST'] },
   'ENG-003': { messageKey: 'errors.engineOperationFailed', retryable: true, causes: ['INTERNALERROR'] },

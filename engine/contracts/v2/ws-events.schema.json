@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Session events WS: server-to-client envelopes",
+  "envelope": {
+    "additionalProperties": false,
+    "description": "Unified envelope; event_seq is assigned by the single session reducer.",
+    "properties": {
+      "schema_version": {
+        "const": 2,
+        "default": 2,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "server_instance_id": {
+        "maxLength": 128,
+        "minLength": 1,
+        "title": "Server Instance Id",
+        "type": "string"
+      },
+      "event_id": {
+        "format": "uuid",
+        "title": "Event Id",
+        "type": "string"
+      },
+      "event_seq": {
+        "minimum": 1,
+        "title": "Event Seq",
+        "type": "integer"
+      },
+      "event_type": {
+        "enum": [
+          "source_text",
+          "source_committed",
+          "translated_text",
+          "translation_committed",
+          "speaker_changed",
+          "audio_stream_opened",
+          "audio_chunk",
+          "synthesis_state",
+          "playback_state",
+          "pipeline_state",
+          "audio_gap",
+          "cursor_advanced",
+          "error"
+        ],
+        "title": "Event Type",
+        "type": "string"
+      },
+      "session_id": {
+        "format": "uuid",
+        "title": "Session Id",
+        "type": "string"
+      },
+      "pipeline_id": {
+        "anyOf": [
+          {
+            "format": "uuid",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Pipeline Id"
+      },
+      "epoch": {
+        "minimum": 0,
+        "title": "Epoch",
+        "type": "integer"
+      },
+      "emitted_at_unix_ms": {
+        "minimum": 0,
+        "title": "Emitted At Unix Ms",
+        "type": "integer"
+      },
+      "trace_id": {
+        "default": "",
+        "maxLength": 128,
+        "title": "Trace Id",
+        "type": "string"
+      },
+      "payload": {
+        "additionalProperties": true,
+        "title": "Payload",
+        "type": "object"
+      }
+    },
+    "required": [
+      "server_instance_id",
+      "event_id",
+      "event_seq",
+      "event_type",
+      "session_id",
+      "epoch",
+      "emitted_at_unix_ms"
+    ],
+    "title": "EventEnvelope",
+    "type": "object"
+  },
+  "binary_audio_header": {
+    "struct_format": "<4sBBHIIQQII",
+    "header_bytes": 40,
+    "byte_order": "little-endian"
+  }
+}

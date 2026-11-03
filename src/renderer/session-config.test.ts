@@ -50,6 +50,10 @@ describe('translation language choices', () => {
     const fields = translationFieldsOf({ ...DEFAULT_SETTINGS.translation, provider: 'mymemory', translateIntermediate: true, mymemoryEmail: 'test@example.com' }, { enabled: true })
     expect(fields).toMatchObject({ translationProvider: 'mymemory', allowIntermediateTranslation: false, translationOptions: { endpoint: 'https://api.mymemory.translated.net/get', email: 'test@example.com' } })
     expect(fields.translationModelId).toBeUndefined()
+    for (const provider of ['google', 'microsoft'] as const) {
+      expect(translationFieldsOf({ ...DEFAULT_SETTINGS.translation, provider, translateIntermediate: true }, { enabled: true }))
+        .toMatchObject({ translationProvider: provider, allowIntermediateTranslation: false })
+    }
   })
 
   it('allows a session to explicitly re-enable translation with a concrete language', () => {

@@ -7,14 +7,14 @@ import type { NolaBridge } from '@/bridge'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import type { ModelGatewayApi, ModelGatewaySnapshot } from '../../../shared/model-gateway'
 import { ModelGatewayPage } from './ModelGatewayPage'
-import { notifyError } from '@/components/primitives/notify'
+import { notifyError, notifyWarning } from '@/components/primitives/notify'
 
-vi.mock('@/components/primitives/notify', () => ({ notifyError: vi.fn(), notifySuccess: vi.fn() }))
+vi.mock('@/components/primitives/notify', () => ({ notifyError: vi.fn(), notifySuccess: vi.fn(), notifyWarning: vi.fn() }))
 const initialSettings = store.stores.settings.getState()
 const initialModels = store.stores.models.getState()
 const asrResource = { resourceId: 'test-recognizer', kind: 'recognitionModel' as const, provider: 'sensevoice', name: 'Enabled local recognizer', description: '', configuration: { slot: 'recognition' as const, engine: 'pytorch' as const, languages: ['zh', 'en'], supportsAutoDetection: true, sourceLanguages: [], targetLanguages: [] }, languages: ['zh', 'en'], installed: true, installedBytes: 100, state: 'idle' as const, cancellable: false }
 const snapshot: ModelGatewaySnapshot = {
-  state: 'running', address: 'http://127.0.0.1:17860/v1', port: 17860, connections: 0, activeRequests: 0, requests: [],
+  state: 'running', address: 'http://127.0.0.1:17860/v2', port: 17860, connections: 0, activeRequests: 0, requests: [],
   services: { asr: { state: 'ready', model: 'resource:test-recognizer', name: 'Enabled local recognizer' }, mt: { state: 'stopped', model: 'model-mt', name: 'Default translator' }, tts: { state: 'stopped', model: '', name: '' }, llm: { state: 'stopped', model: '', name: '' } },
 }
 let api: ModelGatewayApi
@@ -47,18 +47,20 @@ it('shows a toast when a gateway settings write fails', async () => {
   render(<ModelGatewayPage />)
   await screen.findByText('启动模型')
   const user = userEvent.setup()
-  await user.click(screen.getByRole('combobox', { name: '选择ASR模型' }))
+  await user.click(screen.getByRole('combobox', { name: '选择 ASR 模型' }))
   await user.click(await screen.findByRole('option', { name: '不启用' }))
   await waitFor(() => expect(notifyError).toHaveBeenCalled())
   expect(notifyError).toHaveBeenCalledWith('操作失败，请检查本地服务和日志后重试。', expect.objectContaining({ cause: expect.any(Error) }))
 })
 
-it('shows five unified model rows and resets keys after confirmation', async () => {
+it('shows the six model rows in order and resets keys after confirmation', async () => {
   render(<ModelGatewayPage />)
   await screen.findByText('启动模型')
   const card = document.querySelector<HTMLElement>('[data-onboarding="gateway-capabilities"]')!
-  expect(within(card).getAllByRole('combobox').slice(0, 5).map(element => element.getAttribute('aria-label')))
-    .toEqual(['选择ASR模型', '选择MT模型', '备用翻译', '选择大语言模型', '选择TTS模型'])
+  const table = within(within(card).getByRole('table'))
+  expect(table.getAllByRole('combobox').map(element => element.getAttribute('aria-label')))
+    .toEqual(['选择 ASR 模型', '选择 MT 模型', '选择 TTS 模型', 'S2S 模型', '选择大语言模型', '备用 MT 模型'])
+  expect(within(table.getByRole('row', { name: /^TTS 模型/ })).getByRole('button', { name: '复制模型 ID：nola-tts' })).toBeInTheDocument()
   expect(screen.queryByRole('switch', { name: '语音识别' })).not.toBeInTheDocument()
   expect(screen.queryByText('对外 API 模型映射')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '重置密钥' }))
@@ -68,20 +70,76 @@ it('shows five unified model rows and resets keys after confirmation', async () 
   expect(screen.queryByDisplayValue('new-private-key')).not.toBeInTheDocument()
 })
 
+it('puts speech translation mode first and changes the S2S model without changing the mode', async () => {
+  const settings = store.stores.settings.getState().settings!
+  store.stores.settings.setState({ settings: { ...settings, recognition: { ...settings.recognition, aliyunWorkspaceId: 'workspace' } } })
+  store.stores.models.setState({ credentials: { ...initialModels.credentials, 'aliyun-asr': true } })
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue(undefined)
+  render(<ModelGatewayPage />)
+  const user = userEvent.setup()
+  const mode = await screen.findByRole('combobox', { name: '处理方式' })
+  expect(screen.getAllByRole('combobox')[0]).toBe(mode)
+  await user.hover(screen.getByRole('button', { name: '处理方式' }))
+  expect(await screen.findByText(/先识别语音/)).toBeInTheDocument()
+  await user.click(screen.getByRole('combobox', { name: 'S2S 模型' }))
+  await user.click(await screen.findByRole('option', { name: 'Qwen3.5 LiveTranslate' }))
+  expect(update).toHaveBeenCalledWith({ realtime: { s2sModel: 'qwen3.5-livetranslate-flash-realtime', defaultPipeline: 'cascade' } })
+  await user.click(mode)
+  await user.click(await screen.findByRole('option', { name: '直接语音识别' }))
+  expect(update).toHaveBeenCalledWith({ realtime: { defaultPipeline: 's2s' } })
+})
+
+it('confirms disabling the active default S2S model before reverting to step-by-step recognition', async () => {
+  const settings = store.stores.settings.getState().settings!
+  store.stores.models.setState({ credentials: { ...initialModels.credentials, 'aliyun-asr': true } })
+  store.stores.settings.setState({ settings: { ...settings, recognition: { ...settings.recognition, aliyunWorkspaceId: 'workspace' }, realtime: {
+    ...settings.realtime, s2sModel: 'qwen3.5-livetranslate-flash-realtime', defaultPipeline: 's2s',
+  } } })
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue(undefined)
+  render(<ModelGatewayPage />)
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('combobox', { name: 'S2S 模型' }))
+  await user.click(await screen.findByRole('option', { name: '不启用' }))
+  const confirmation = await screen.findByRole('dialog', { name: '停用网关默认 S2S 模型？' })
+  expect(update).not.toHaveBeenCalled()
+  await user.click(within(confirmation).getByRole('button', { name: '不启用' }))
+  expect(update).toHaveBeenCalledWith({ realtime: { s2sModel: null, defaultPipeline: 'cascade' } })
+})
+
+it('blocks unconfigured S2S choices and stops a saved direct mode from starting the gateway', async () => {
+  const settings = store.stores.settings.getState().settings!
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue(undefined)
+  vi.mocked(api.snapshot).mockResolvedValue({ ...snapshot, state: 'stopped' })
+  render(<ModelGatewayPage />)
+
+  const mode = await screen.findByRole('combobox', { name: '处理方式' })
+  expect(screen.queryByText('请先在模型管理中配置阿里云工作空间和 API 密钥。')).not.toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: 'S2S 模型' })).toBeDisabled()
+  await userEvent.click(mode)
+  await userEvent.click(await screen.findByRole('option', { name: '直接语音识别' }))
+  expect(notifyWarning).toHaveBeenCalledWith('请先配置一个可用的 S2S 模型。')
+  expect(mode).toHaveTextContent('分步识别')
+  expect(update).not.toHaveBeenCalled()
+
+  act(() => store.stores.settings.setState({ settings: { ...settings, realtime: { ...settings.realtime, defaultPipeline: 's2s' } } }))
+  expect(screen.getByRole('button', { name: '启动服务' })).toBeDisabled()
+  expect(api.start).not.toHaveBeenCalled()
+})
+
 it('shows usable protocol examples with stable model aliases and one API prefix', async () => {
   render(<ModelGatewayPage />)
   await screen.findByText('启动模型')
   const mt = screen.getByText(/translation_options/).textContent!
-  expect(mt).toContain('http://127.0.0.1:17860/v1/chat/completions')
-  expect(mt).not.toContain('/v1/v1')
+  expect(mt).toContain('http://127.0.0.1:17860/v2/chat/completions')
+  expect(mt).not.toContain('/v2/v2')
   expect(mt).toContain('"model":"nola-mt"')
-  fireEvent.click(screen.getByRole('tab', { name: '大语言模型' }))
-  expect(screen.getByText(/"model":"nola-llm"/)).toHaveTextContent('"stream":true')
-  fireEvent.click(screen.getByRole('tab', { name: 'TTS模型' }))
+  expect(screen.queryByRole('tab', { name: '大语言模型' })).not.toBeInTheDocument()
+  expect(screen.queryByText('nola-llm')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('tab', { name: 'TTS 模型' }))
   expect(screen.getByText(/response_format/)).toHaveTextContent('"response_format":"wav"')
   fireEvent.click(screen.getByRole('tab', { name: '实时语音识别' }))
   const realtime = screen.getByText(/import WebSocket/).textContent!
-  expect(realtime).toContain('ws://127.0.0.1:17860/v1/realtime?model=nola-asr')
+  expect(realtime).toContain('ws://127.0.0.1:17860/v2/realtime?model=nola-asr')
   expect(realtime).toContain('session.finish')
 })
 
@@ -90,7 +148,7 @@ it('selects an enabled loadable local model without changing business defaults',
   render(<ModelGatewayPage />)
   await screen.findByText('启动模型')
   const localCard = document.querySelector<HTMLElement>('[data-onboarding="gateway-capabilities"]')!
-  await userEvent.setup().click(within(localCard).getByRole('combobox', { name: '选择ASR模型' }))
+  await userEvent.setup().click(within(localCard).getByRole('combobox', { name: '选择 ASR 模型' }))
   expect(await screen.findByRole('option', { name: 'Enabled local recognizer' })).toBeInTheDocument()
   expect(screen.queryByRole('option', { name: 'MyMemory 免费翻译' })).not.toBeInTheDocument()
   await userEvent.setup().click(screen.getByRole('option', { name: 'Enabled local recognizer' }))
@@ -98,12 +156,12 @@ it('selects an enabled loadable local model without changing business defaults',
 })
 
 it.each([
-  ['ASR模型', 'asr'], ['MT模型', 'mt'], ['大语言模型', 'llm'], ['TTS模型', 'tts'],
+  ['ASR 模型', 'asr'], ['MT 模型', 'mt'], ['大语言模型', 'llm'], ['TTS 模型', 'tts'],
 ] as const)('disables %s and clears its gateway binding', async (label, kind) => {
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue(undefined)
   render(<ModelGatewayPage />)
   const user = userEvent.setup()
-  await user.click(await screen.findByRole('combobox', { name: `选择${label}` }))
+  await user.click(await screen.findByRole('combobox', { name: `选择 ${label}` }))
   await user.click(await screen.findByRole('option', { name: '不启用' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { [`${kind}Model`]: '', [kind]: false } }))
 })
@@ -112,7 +170,7 @@ it('offers available cloud translations and persists the primary gateway binding
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue(undefined)
   render(<ModelGatewayPage />)
   const user = userEvent.setup()
-  await user.click(await screen.findByRole('combobox', { name: '选择MT模型' }))
+  await user.click(await screen.findByRole('combobox', { name: '选择 MT 模型' }))
   await user.click(await screen.findByRole('option', { name: 'MyMemory 免费翻译' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { mtModel: 'cloud:mymemory', mt: true }, modelPolicy: { enabled: { 'mt:cloud:mymemory': true }, defaults: {}, selections: {} } }))
   expect(update.mock.calls[0][0]).not.toHaveProperty('translation')
@@ -133,7 +191,7 @@ it('binds the translation backup in the gateway rather than in the business sett
   render(<ModelGatewayPage />)
   await screen.findByText('启动模型')
   const user = userEvent.setup()
-  await user.click(screen.getByRole('combobox', { name: '备用翻译' }))
+  await user.click(screen.getByRole('combobox', { name: '备用 MT 模型' }))
   await user.click(await screen.findByRole('option', { name: 'MyMemory 免费翻译' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { mtFallbackModel: 'cloud:mymemory' } }))
   expect(update).not.toHaveBeenCalledWith(expect.objectContaining({ translation: expect.anything() }))
@@ -161,8 +219,8 @@ it('clears backup translation in the gateway even with a legacy business fallbac
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue(undefined)
   render(<ModelGatewayPage />)
   const user = userEvent.setup()
-  await user.click(await screen.findByRole('combobox', { name: '备用翻译' }))
-  await user.click(await screen.findByRole('option', { name: '不使用备用翻译' }))
+  await user.click(await screen.findByRole('combobox', { name: '备用 MT 模型' }))
+  await user.click(await screen.findByRole('option', { name: '不启用' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { mtFallbackModel: '' } }))
 })
 
@@ -175,7 +233,7 @@ it('offers unloaded local loading candidates but excludes unconfigured models', 
     { ...asrResource, resourceId: 'unconfigured', name: 'Unconfigured local', configuration: undefined }] })
   render(<ModelGatewayPage />)
   const user = userEvent.setup()
-  await user.click(await screen.findByRole('combobox', { name: '选择ASR模型' }))
+  await user.click(await screen.findByRole('combobox', { name: '选择 ASR 模型' }))
   expect(await screen.findByRole('option', { name: 'Unloaded local' })).toBeInTheDocument()
   expect(screen.queryByRole('option', { name: 'Unconfigured local' })).not.toBeInTheDocument()
 })
@@ -191,9 +249,9 @@ it('starts and stops the service from the page', async () => {
 
 
 it.each([
-  ['mt', 'MT模型', 'hy-mt2-1.8b-q4-k-m', 'hymt2', 'translationModel'],
+  ['mt', 'MT 模型', 'hy-mt2-1.8b-q4-k-m', 'hymt2', 'translationModel'],
   ['llm', '大语言模型', 'qwen35-0.8b-q4-k-m', 'llama.cpp', 'translationModel'],
-  ['tts', 'TTS模型', 'voice', 'transformers-tts', 'ttsModel'],
+  ['tts', 'TTS 模型', 'voice', 'transformers-tts', 'ttsModel'],
 ] as const)('binds a loadable local %s model and enables the capability', async (kind, label, id, provider, resourceKind) => {
   const settings = store.stores.settings.getState().settings!
   store.stores.settings.setState({ settings: { ...settings, modelPolicy: { ...settings.modelPolicy!, enabled: {
@@ -203,7 +261,7 @@ it.each([
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue(undefined)
   render(<ModelGatewayPage />)
   const user = userEvent.setup()
-  await user.click(await screen.findByRole('combobox', { name: `选择${label}` }))
+  await user.click(await screen.findByRole('combobox', { name: `选择 ${label}` }))
   await user.click(await screen.findByRole('option', { name: 'Local candidate' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { [`${kind}Model`]: `resource:${id}`, [kind]: true }, modelPolicy: { enabled: { [`${kind}:resource:${id}`]: true }, defaults: {}, selections: {} } }))
 })

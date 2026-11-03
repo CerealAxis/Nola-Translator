@@ -230,14 +230,9 @@ class GatewayWorker:
         return request.get('op') == 'infer' and request.get('id') not in self._native_requests
 
     def remote_recognizer(self, config=None):
-        config = config or self.config
-        if config.recognitionProvider == 'minimax':
-            from .recognition.minimax import MiniMaxRecognizer
-            return MiniMaxRecognizer(config)
-        from .recognition.aliyun import AliyunRecognizer, AliyunInferenceRecognizer, INFERENCE_ASR_MODELS
-        if config.recognitionOptions and config.recognitionOptions.model in INFERENCE_ASR_MODELS:
-            return AliyunInferenceRecognizer(config)
-        return AliyunRecognizer(config)
+        from .recognition.base import create_cloud_recognizer
+
+        return create_cloud_recognizer(config or self.config)
 
     async def initialize(self, request):
         from .runtime import EngineRuntime
@@ -421,7 +416,7 @@ class GatewayWorker:
                 result['path'] = list(translated.path)
             return result
 
-    async def realtime(self, request):
+    async def realtime(self, request, *, infer=None):
         from .audio.resample import AudioFrame
         from .recognition.streaming import StreamingRecognizer
         from .recognition.volume_gate import SileroVadSegmenter
@@ -434,7 +429,7 @@ class GatewayWorker:
                 raise ValueError('Unknown realtime session')
             opening = state['open_request']
             await self.realtime({'op': 'session.close', 'session': session_id})
-            return await self.realtime(opening)
+            return await self.realtime(opening, infer=infer)
         if op == 'session.open':
             if session_id in self.sessions or len(self.sessions) >= 8:
                 raise ValueError('Session limit reached')
@@ -494,13 +489,13 @@ class GatewayWorker:
                 if state is not None:
                     state['inflight_samples'] = job.samples.size
                 try:
-                    return await self.transcribe(job.samples, job.language, job.prefix, realtime=True)
+                    return await (infer or self.transcribe)(job.samples, job.language, job.prefix, realtime=True)
                 finally:
                     if state is not None:
                         state['inflight_samples'] = 0
             segmenter = SileroVadSegmenter(silence_end_ms=int(request.get('silenceMs', 800)),
                 max_segment_ms=int(request.get('maxSegmentMs', self.config.max_segment_ms if self.config else 10000)))
-            recognizer = StreamingRecognizer(self.runtime._recognition_runtime(), segmenter=segmenter,
+            recognizer = StreamingRecognizer(self.runtime._recognition_runtime() if infer is None else None, segmenter=segmenter,
                 source_language=language, block_ms=1000, first_block_ms=500,
                 run_transcribe=transcribe, on_update=update)
             await asyncio.to_thread(recognizer.prepare)
@@ -537,7 +532,7 @@ class GatewayWorker:
                 return {}
             raise ValueError('Unknown realtime operation')
         if recognizer is None:
-            return await self.manual_realtime(request, state)
+            return await self.manual_realtime(request, state, infer=infer)
         if op == 'session.append':
             raw = base64.b64decode(request['audio'], validate=True)
             if not raw or len(raw) % 2 or len(raw) > 768 * 1024:
@@ -583,7 +578,7 @@ class GatewayWorker:
             return {}
         raise ValueError('Unknown realtime operation')
 
-    async def manual_realtime(self, request, state):
+    async def manual_realtime(self, request, state, *, infer=None):
         session_id, op = request['session'], request['op']
         if op == 'session.append':
             raw = base64.b64decode(request['audio'], validate=True)
@@ -605,7 +600,7 @@ class GatewayWorker:
         final = op != 'session.append'
         if state['samples']:
             language = state['language'] if state['language'] not in (None, '', 'auto') else None
-            transcript, detected = await self.transcribe(np.concatenate(state['audio']), language, realtime=True)
+            transcript, detected = await (infer or self.transcribe)(np.concatenate(state['audio']), language, realtime=True)
             self.emit({'session': session_id, 'event': {
                 'type': 'conversation.item.input_audio_transcription.completed' if final else 'conversation.item.input_audio_transcription.text',
                 'item_id': state['item_id'], 'content_index': 0, 'transcript': transcript, 'text': transcript, 'language': detected}})

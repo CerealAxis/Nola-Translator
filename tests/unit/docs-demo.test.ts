@@ -10,7 +10,7 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-describe('shared documentation and Toy demo', () => {
+describe('documentation site demo', () => {
   it('starts idle for exploration and seeds configured demo models', () => {
     prepareDemo('zh-CN', 'home')
     expect(stores.session.getState().status).toBe('idle')

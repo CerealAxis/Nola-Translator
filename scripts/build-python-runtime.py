@@ -110,18 +110,28 @@ def main() -> None:
         missing_vc = [name for name in required_vc if not (staging / name).is_file()]
         if missing_vc:
             raise RuntimeError(f"Microsoft VC++ x64 runtime is incomplete: {', '.join(missing_vc)}")
+        speaker_resources = engine / "recognition"
+        speaker_manifest = json.loads((speaker_resources / "speaker_campplus.json").read_text(encoding="utf-8"))
+        if not (speaker_resources / speaker_manifest["license_file"]).is_file():
+            raise RuntimeError("Bundled CAM++ model license is missing")
         # Exercise the packaged interpreter, not the build venv: source-only imports
-        # cannot catch a missing native VAD runtime in the actual desktop environment.
+        # cannot catch missing native audio dependencies in the actual desktop environment.
         subprocess.run([str(staging / "python.exe"), "-I", "-c",
             "import numpy as np, lameenc; "
             "from nola_translator_engine.recognition.volume_gate import SileroVadSegmenter; "
+            "from nola_translator_engine.recognition.speaker import SpeakerEmbedder; "
             "from nola_translator_engine.audio.resample import AudioFrame; "
             "vad = SileroVadSegmenter(); vad.load(); "
             "assert vad.accept(AudioFrame(np.zeros(320, dtype=np.float32), 0)) == []; "
-            "assert vad.accept(AudioFrame(np.zeros(320, dtype=np.float32), 20)) == []"], check=True)
+            "assert vad.accept(AudioFrame(np.zeros(320, dtype=np.float32), 20)) == []; "
+            "speaker = SpeakerEmbedder().embed(np.sin(np.arange(24000) / 15).astype(np.float32)); "
+            "assert speaker.shape == (192,) and np.isclose(np.linalg.norm(speaker), 1)"], check=True)
         versions = sorted(f"{d.metadata['Name']}=={d.version}" for d in importlib.metadata.distributions())
         digest = hashlib.sha256(json.dumps({"python": sys.version, "dependencies": versions}, sort_keys=True).encode())
-        for source in sorted(path for path in engine.rglob("*") if path.suffix in (".py", ".onnx", ".LICENSE")):
+        for source in sorted(
+            path for path in engine.rglob("*")
+            if path.suffix in (".py", ".onnx", ".LICENSE") or path.name == "speaker_campplus.json"
+        ):
             digest.update(source.relative_to(engine).as_posix().encode())
             digest.update(source.read_bytes())
         (staging / "runtime-base.json").write_text(json.dumps({

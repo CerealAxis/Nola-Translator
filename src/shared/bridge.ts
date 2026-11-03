@@ -152,6 +152,7 @@ export type NolaTranslatorApi = {
   ensureEngineReady(): Promise<EngineProcessState>
   stopSession(sessionId: string): Promise<void>
   setSessionPaused(sessionId: string, paused: boolean): Promise<void>
+  resolvePlayback(sessionId: string, jobId: string, action: 'retry' | 'skip'): Promise<void>
   onEngineEvent(listener: (event: EngineChannelEvent) => void): () => void
   /**
    * The engine subprocess's current state. Read-only, and never starts the engine — asking whether
@@ -214,6 +215,8 @@ export type NolaTranslatorApi = {
    * main process resolves the registered handler itself; see `open-default-browser.ts`.
    */
   openDefaultBrowser(): Promise<void>
+  installVirtualCable?(): Promise<void>
+  getVirtualCableDriverVersion?(): Promise<string | null>
   notifyMainError?(notification: MainErrorNotification): void
   previewOverlayToast?(notification: MainErrorNotification): void
   dismissOverlayToast?(): void

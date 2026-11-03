@@ -236,8 +236,14 @@ export function WorkspacePage() {
       sourceLanguage: settings?.recognition.sourceLanguage ?? 'auto',
       recognitionModelId: settings?.recognition.modelId ?? 'qwen3-asr-1.7b-hf',
       recognitionBinding: settings ? savedBindingOf('asr', settings) : '',
-      translate: settings?.translation.targetLanguage !== NO_TRANSLATION_LANGUAGE,
-      targetLanguage: settings?.translation.targetLanguage ?? 'zh',
+      outputMode: settings?.realtime?.outputMode ?? (settings?.translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? 'source' : 'translation'),
+      speakerDetection: settings?.realtime?.speakerDetection ?? true,
+      speechModelId: settings?.synthesis.modelId ?? '',
+      speechVoice: settings?.synthesis.voice ?? '',
+      speechOutputDeviceId: settings?.realtime?.speechOutputDeviceId ?? '',
+      s2sModel: settings?.realtime?.workspaceS2sModel,
+      virtualInputDeviceId: settings?.realtime?.virtualInputDeviceId ?? '',
+      targetLanguage: settings?.translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? 'zh' : settings?.translation.targetLanguage ?? 'zh',
       translationModelId: settings?.translation.localModelId ?? '',
       translationBinding: settings ? savedBindingOf('mt', settings) : '',
       keepAudio: settings?.recording.keepAudio ?? true,
@@ -271,7 +277,13 @@ export function WorkspacePage() {
        * sessions.
        */
       try {
-        await actions.settings.updateSettings({ recording: { keepAudio: draft.keepAudio } })
+        await actions.settings.updateSettings({
+          recording: { keepAudio: draft.keepAudio },
+          realtime: { outputMode: draft.outputMode, speakerDetection: draft.speakerDetection,
+            speechOutputDeviceId: draft.speechOutputDeviceId, workspaceS2sModel: draft.s2sModel,
+            virtualInputDeviceId: draft.virtualInputDeviceId ?? '' },
+          ...(config.speechModelId ? { synthesis: { modelId: config.speechModelId, voice: config.speechVoice ?? '' } } : {}),
+        })
       } catch (error) {
         notifyError(t('workspaceUi.recordingPreferenceFailed'), { cause: error })
         return
@@ -374,9 +386,10 @@ export function WorkspacePage() {
   const currentConfig = !['idle', 'error'].includes(status) ? pendingConfig : null
   const sourceLanguage = currentConfig?.sourceLanguage ?? settings?.recognition.sourceLanguage ?? 'auto'
   const targetLanguage = currentConfig ? currentConfig.targetLanguages[0] ?? NO_TRANSLATION_LANGUAGE : settings?.translation.targetLanguage ?? 'zh'
-  const audioSource = currentConfig?.audioSource.kind === 'defaultOutput' ? 'defaultOutput' : currentConfig && 'deviceId' in currentConfig.audioSource ? currentConfig.audioSource.deviceId : settings?.recognition.audioSource ?? 'defaultOutput'
-  const audioLabel = audioSource === 'defaultOutput' ? t('workspaceUi.systemAudio') : devices.find((device) => device.deviceId === audioSource)?.name ?? audioSource
-  const timer = <SessionBar status={status} elapsedMs={session.elapsedMs} audioLabel={audioLabel} onPause={() => actions.session.pauseSession()} onResume={() => actions.session.resumeSession()} onStop={() => setStopConfirmOpen(true)} />
+  const audioSource = currentConfig?.audioSource.kind === 'defaultOutput' ? 'defaultOutput' : currentConfig && 'deviceId' in currentConfig.audioSource ? currentConfig.audioSource.deviceId : settings?.realtime?.virtualInputDeviceId || settings?.recognition.audioSource || 'defaultOutput'
+  const audioLabel = audioSource === 'defaultOutput' ? t('workspaceUi.systemAudio')
+    : devices.find(device => device.deviceId === audioSource)?.name ?? (audioSource.startsWith('process:') ? t('session.applicationAudioUnavailable') : audioSource)
+  const timer = <SessionBar status={status} elapsedMs={session.elapsedMs} audioLabel={audioLabel} playbackPhase={session.playbackPhase} waitingSpeechCount={session.waitingSpeechCount} playbackJob={session.playbackJob} onResolvePlayback={(jobId, action) => { void actions.session.resolvePlayback(jobId, action).catch(error => notifyError(t('session.playbackActionFailed'), { cause: error })) }} onPause={() => actions.session.pauseSession()} onResume={() => actions.session.resumeSession()} onStop={() => setStopConfirmOpen(true)} />
 
   return (
     <div
@@ -389,7 +402,7 @@ export function WorkspacePage() {
       <WorkspaceToolbar readerOnly
         audioSource={audioSource}
         devices={devices}
-        onAudioSourceChange={(next) => { void actions.settings.updateSettings({ recognition: { audioSource: next } }).catch(() => undefined) }}
+        onAudioSourceChange={(next) => { void actions.settings.updateSettings({ recognition: { audioSource: next }, realtime: { virtualInputDeviceId: '' } }).catch(() => undefined) }}
         overlayVisible={overlayVisible}
         onOverlayVisibleChange={visible => {
           if (visible) {
@@ -509,7 +522,11 @@ const EMPTY_DRAFT: SetupDraft = {
   audioSource: 'defaultOutput',
   sourceLanguage: 'auto',
   recognitionModelId: 'qwen3-asr-1.7b-hf',
-  translate: true,
+  outputMode: 'translation',
+  speakerDetection: true,
+  speechModelId: '',
+  speechVoice: '',
+  speechOutputDeviceId: '',
   targetLanguage: 'zh',
   translationModelId: '',
   keepAudio: true,

@@ -66,6 +66,7 @@ export interface NolaBridge {
     manageResource(resourceId: string, action: 'install' | 'remove' | 'cancel' | 'pause' | 'resume', source?: ModelDownloadSource): Promise<ResourceRecord>
     startSession(config: SessionConfig): Promise<SessionStartResult>
     stopSession(sessionId: string): Promise<void>
+    resolvePlayback?(sessionId: string, jobId: string, action: 'retry' | 'skip'): Promise<void>
     /**
      * Loads the configured recognition and translation weights and answers once
      * they are resident. Progress arrives as `type: 'modelsPrewarmed'` events with
@@ -163,6 +164,8 @@ export interface NolaBridge {
     showWorkspace?(): Promise<void>
     openMainPage?(path: string): Promise<void>
     openDefaultBrowser(): Promise<void>
+    installVirtualCable?(): Promise<void>
+    getVirtualCableDriverVersion?(): Promise<string | null>
     notifyMainError?(notification: MainErrorNotification): void
     previewOverlayToast?(notification: MainErrorNotification): void
     dismissOverlayToast?(): void
@@ -271,6 +274,8 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'events.onOverlayToastAction': 'ipc',
   'events.onDataMigrationProgress': 'ipc',
   'app.openDefaultBrowser': 'ipc',
+  'app.installVirtualCable': 'ipc',
+  'app.getVirtualCableDriverVersion': 'ipc',
   'app.notifyMainError': 'ipc',
   'app.previewOverlayToast': 'ipc',
   'app.dismissOverlayToast': 'ipc',

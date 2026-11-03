@@ -72,7 +72,7 @@ it('saves the main-window close preference independently of service settings', a
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
   render(<GeneralTab settings={DEFAULT_SETTINGS} />)
   const user = userEvent.setup()
-  await user.click(screen.getByRole('combobox', { name: '关闭主窗口时' }))
+  await user.click(screen.getByRole('combobox', { name: '关闭窗口' }))
   await user.click(await screen.findByRole('option', { name: '退出应用' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith({ closeBehavior: 'quit' }))
 })

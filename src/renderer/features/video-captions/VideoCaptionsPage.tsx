@@ -4,12 +4,17 @@ import type { CSSProperties } from 'react'
 import { Popover } from '@base-ui/react/popover'
 
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { ArrowRight, ArrowRightLeft, ChevronDown, Languages, LoaderCircle, Settings } from 'lucide-react'
+import { ArrowRightLeft, ChevronDown, Languages, LoaderCircle } from 'lucide-react'
 import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { AppSettingsPatch, PrewarmErrorCode } from '@/bridge'
 import { useModelOptions } from '@/model-options'
+import { useAudioSourceOptions } from '@/audio-source-options'
+import { defaultRealtimeS2s } from '../../../shared/settings'
+import { ALIYUN_LANGUAGES, remoteSourceLanguages } from '../../../shared/cloud-config'
+import { RealtimePipelineFields } from '../workspace/RealtimePipelineSelect'
 import { useModelSelection, useAvailableModels, type AvailableModel } from '@/available-models'
 import { useI18n } from '@/i18n'
+import { aliyunConnectionReady } from '../../../shared/cloud-models'
 import type { TranslationKey } from '@/i18n'
 import { settingsPath, useRoute } from '@/routes'
 import { actions, enableCaptionService, isEngineConnected, sessionStore, stores, updateSettings, useStore } from '@/store'
@@ -20,7 +25,8 @@ import type { BrowserConnectionStatus } from '../../../shared/browser'
 import { PageHeader } from '@/components/primitives'
 import { requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { FieldGroup } from '@/components/ui/field'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { notifyError, notifyGatewayModelUnavailable, notifyInfo, notifySuccess, notifyWarning } from '@/components/primitives/notify'
 import { reportSettingsFailure } from '@/features/settings/settingsErrorChannel'
 import { SettingSelect } from '../settings/SettingsPage'
@@ -57,6 +63,7 @@ export function VideoCaptionsPage() {
   const { t, language } = useI18n()
   const { navigate } = useRoute()
   const settings = useStore(stores.settings, state => state.settings) ?? DEFAULT_SETTINGS
+  const s2sReady = aliyunConnectionReady(settings, useStore(stores.models, state => state.credentials['aliyun-asr']))
   const modelOptions = useModelOptions()
   const catalog = useAvailableModels()
   const sessionActive = useStore(sessionStore, state => !['idle', 'error'].includes(state.status))
@@ -75,13 +82,16 @@ export function VideoCaptionsPage() {
     return () => clearInterval(timer)
   }, [])
   const config = settings.videoCaptions
-  const sourceLanguage = settings.recognition.sourceLanguage
+  const s2sModel = settings.realtime?.browserS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.browserS2sModel
+  const sourceLanguages = s2sModel ? remoteSourceLanguages({ ...settings.recognition, provider: 'aliyun', aliyunModel: s2sModel }) : modelOptions.sourceLanguages
+  const sourceLanguage = s2sModel && !sourceLanguages.includes(settings.recognition.sourceLanguage) ? 'auto' : settings.recognition.sourceLanguage
   const targetLanguage = settings.translation.targetLanguage
+  const targetLanguages = s2sModel ? ALIYUN_LANGUAGES : modelOptions.targetLanguages
   const translationDisabled = targetLanguage === NO_TRANSLATION_LANGUAGE
   const reportSwitch = (model: AvailableModel) => notifyInfo(t('gateway.modelSwitched', { name: model.name }),
     { description: t('gateway.modelSwitchedLoaded') })
-  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch)
-  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationDisabled)
+  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch, !!s2sModel)
+  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationDisabled || !!s2sModel)
   const asrUnavailable = asr.unavailable
   const mtUnavailable = mt.unavailable
   const asrOptions = catalog.asr.length ? catalog.asr.map(model => ({ value: model.binding, label: model.name }))
@@ -102,6 +112,7 @@ export function VideoCaptionsPage() {
    * switches the kind to `system`; picking the tab entry drops the device, which no longer applies.
    */
   const audioSourceValue = config.audioSource === 'system' ? config.audioDeviceId ?? SYSTEM_DEFAULT_OUTPUT : TAB_AUDIO_VALUE
+  const audioSourceOptions = useAudioSourceOptions(devices.filter(device => device.kind !== 'microphone' && device.deviceId !== SYSTEM_DEFAULT_OUTPUT), audioSourceValue)
   const audioSourcePatch = (value: string): AppSettingsPatch => value === TAB_AUDIO_VALUE
     ? { videoCaptions: { audioSource: 'tab', audioDeviceId: undefined } }
     : value === SYSTEM_DEFAULT_OUTPUT
@@ -158,11 +169,11 @@ export function VideoCaptionsPage() {
    * leaves the extension shut out rather than let in by a service with no weights in memory.
    */
   const open = async () => {
-    if (asrUnavailable) {
+    if (!s2sModel && asrUnavailable) {
       notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.asr') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
       return
     }
-    if (!translationDisabled && mtUnavailable) {
+    if (!s2sModel && !translationDisabled && mtUnavailable) {
       notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.mt') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
       return
     }
@@ -261,7 +272,7 @@ export function VideoCaptionsPage() {
     if (!status.sessionActive || !status.sessionId) return
     try { await stopCaptionSession(status.sessionId) } catch (error) { reportSettingsFailure(t('errors.captionServiceStopFailed'), error) }
   }
-  const swappedLanguages = swappedLanguagesOf(sourceLanguage, targetLanguage, modelOptions.sourceLanguages, modelOptions.translation ? translationLanguages(modelOptions.translation, targetLanguage) : modelOptions.targetLanguages)
+  const swappedLanguages = swappedLanguagesOf(sourceLanguage, targetLanguage, sourceLanguages, s2sModel ? targetLanguages : modelOptions.translation ? translationLanguages(modelOptions.translation, targetLanguage) : targetLanguages)
   /*
    * The line the caption block's bottom edge rests on, as a percentage of the stage height. CSS
    * `top` places the block's *top* edge there, so the stylesheet pairs it with
@@ -279,13 +290,14 @@ export function VideoCaptionsPage() {
   return (
     <div className="nola-overlay-page">
       <PageHeader className="nola-page-heading" title={t('videoCaptions.title')}
-        actions={<>
-          <Button data-onboarding="video-caption-service" variant={gateActive ? 'danger' : 'default'} disabled={captionServiceBusy || prewarming}
+        actions={<div className="flex flex-wrap gap-2">
+          <Button data-onboarding="browser-settings" variant="secondary" onClick={() => navigate(settingsPath('browser'))}>{t('videoCaptions.browserSettings')}</Button>
+          <Button data-onboarding="video-caption-service" variant={gateActive ? 'danger' : 'default'} disabled={captionServiceBusy || prewarming || (!gateActive && !!s2sModel && !s2sReady)}
             onClick={() => void (gateActive ? close() : requestFeatureStart(open, 'browser-captions')).catch(error => notifyError(t('videoCaptions.serviceFailed'), { cause: error }))}>
             {captionServiceBusy || prewarming ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
             {prewarming ? t('videoCaptions.serviceLoading') : gateActive ? t('videoCaptions.disableService') : t('videoCaptions.enableService')}
           </Button>
-        </>} />
+        </div>} />
       <Card className="nola-overlay-preview" data-onboarding="browser-preview">
         <CardHeader>
           <CardTitle>{t('videoCaptions.captionPreview')}</CardTitle>
@@ -304,97 +316,102 @@ export function VideoCaptionsPage() {
       </Card>
       <Card className="nola-section-card" data-onboarding="video-caption-settings">
         <CardHeader><CardTitle>{t('videoCaptions.settings')}</CardTitle></CardHeader>
-        <CardContent className="nola-overlay-fields" data-onboarding="browser-model-settings">
-          <div className="nola-overlay-field" data-onboarding="browser-asr">
-            <span className="text-sm text-muted"><ModelAvailabilityLabel label={t('session.recognitionModel')} hint={t('gateway.modelNoneHint')} /></span>
-            <SettingSelect value={asrValue} isDisabled={sessionActive || browserStatus?.captionServiceActive === true || captionServiceBusy || captionService === 'loading'} ariaLabel={t('session.recognitionModel')} options={asrOptions}
-              onChange={value => asr.select(value)} />
-          </div>
-          <div className="nola-overlay-field" data-onboarding="browser-mt">
-            <span className="text-sm text-muted"><ModelAvailabilityLabel label={t('session.translationModel')} hint={t('gateway.modelNoneHint')} /></span>
-            <SettingSelect value={mtValue} isDisabled={sessionActive || browserStatus?.captionServiceActive === true || captionServiceBusy || captionService === 'loading'} ariaLabel={t('session.translationModel')} options={mtOptions}
-              onChange={value => value === NO_TRANSLATION_LANGUAGE
-                ? void updateSettings(targetLanguagePatch(value, targetLanguage)).catch(error => notifyError(t('errors.settingsSaveFailed'), { cause: error }))
-                : mt.select(value)} />
-          </div>
-          <div className="nola-overlay-field" data-onboarding="browser-audio">
-            <span className="text-sm text-muted">{t('videoCaptions.audioSource')}</span>
-            {/*
-             * System output is the default; the tab capture stays last because it requires a browser
-             * sharing prompt, while system capture uses the configured desktop output directly.
-             * A tab capture is taken inside the page and needs the extension's own confirmation,
-             * while a system capture is taken by the desktop and starts without one.
-             */}
-            <SettingSelect value={audioSourceValue} ariaLabel={t('videoCaptions.audioSource')}
-              options={[
-                { value: SYSTEM_DEFAULT_OUTPUT, label: t('shellUi.audioSystem') },
-                ...devices.filter(device => device.deviceId !== SYSTEM_DEFAULT_OUTPUT).map(device => ({ value: device.deviceId, label: device.name })),
-                { value: TAB_AUDIO_VALUE, label: t('videoCaptions.tabAudio') },
-              ]}
-              onChange={next => patch(audioSourcePatch(next))} />
-          </div>
-          <div className="nola-overlay-field" data-onboarding="browser-language">
-            <span className="text-sm text-muted">{t('shellUi.languageDirection')}</span>
-            <Popover.Root>
-              <Popover.Trigger render={<Button variant="tertiary" className="nola-overlay-language-trigger"
-                aria-label={`${t('shellUi.languageDirection')}: ${label(sourceLanguage)} → ${label(targetLanguage)}`}>
-                <Languages aria-hidden="true" />
-                <span>{label(sourceLanguage)} → {label(targetLanguage)}</span>
-                <ChevronDown aria-hidden="true" />
-              </Button>} />
-              <Popover.Portal>
-                <Popover.Positioner side="top" align="end" sideOffset={8} className="z-dropdown">
-                  <Popover.Popup aria-label={t('shellUi.languageDirection')} className="nola-overlay-languages rounded-xl border border-border bg-overlay text-overlay-foreground shadow-overlay">
-                    <Button variant="tertiary" className="self-start" disabled={!swappedLanguages}
-                      onClick={() => {
-                        if (swappedLanguages) patch({ recognition: { sourceLanguage: swappedLanguages.sourceLanguage }, translation: { targetLanguage: swappedLanguages.targetLanguage } })
-                      }}>
-                      <ArrowRightLeft aria-hidden="true" />{t('session.swapLanguages')}
-                    </Button>
-                    <div className="nola-overlay-language-field">
-                      <span className="label">{t('session.sourceLanguage')}</span>
-                      <SettingSelect value={sourceLanguage} ariaLabel={t('session.sourceLanguage')}
-                        options={modelOptions.sourceLanguages.map(code => ({ value: code, label: label(code) }))}
-                        onChange={sourceLanguage => patch({ recognition: { sourceLanguage } })} />
-                    </div>
-                    <div className="nola-overlay-language-field">
-                      <span className="label">{t('session.targetLanguage')}</span>
-                      <SettingSelect value={targetLanguage} ariaLabel={t('session.targetLanguage')}
-                        options={modelOptions.targetLanguages.map(code => ({ value: code, label: label(code) }))}
-                        onChange={value => patch(targetLanguagePatch(value, targetLanguage))} />
-                    </div>
-                  </Popover.Popup>
-                </Popover.Positioner>
-              </Popover.Portal>
-            </Popover.Root>
-          </div>
-          <div className="nola-overlay-field">
-            <span className="text-sm text-muted">{t('shellUi.showContent')}</span>
-            <ToggleGroup className="nola-segmented" value={[display]} aria-label={t('shellUi.showContent')} onValueChange={values => {
-              const next = values[0]; if (next) patch({ videoCaptions: { showSource: next !== 'translation', showTranslation: next !== 'source' } })
-            }}>
-              {!translationDisabled && <ToggleGroupItem value="both" className="toggle-button" data-selected={display === 'both' ? 'true' : undefined}>{t('workspace.modeBoth')}</ToggleGroupItem>}
-              <ToggleGroupItem value="source" className="toggle-button" data-selected={display === 'source' ? 'true' : undefined}>{t('workspace.modeSource')}</ToggleGroupItem>
-              {!translationDisabled && <ToggleGroupItem value="translation" className="toggle-button" data-selected={display === 'translation' ? 'true' : undefined}>{t('workspace.modeTranslation')}</ToggleGroupItem>}
-            </ToggleGroup>
-          </div>
-          {/*
-           * `layout` is a single-member union: the video overlay always pairs each
-           * segment with its translation, so the group shows the one arrangement
-           * rather than offering a choice that cannot be made.
-           */}
-          <div className="nola-overlay-field">
-            <span className="text-sm text-muted">{t('shellUi.layout')}</span>
-            <ToggleGroup className="nola-segmented" value={[config.layout]} aria-label={t('shellUi.layout')} onValueChange={values => {
-              const next = values[0]; if (next === 'sentence') patch({ videoCaptions: { layout: next } })
-            }}>
-              <ToggleGroupItem value="sentence" className="toggle-button" data-selected={config.layout === 'sentence' ? 'true' : undefined}>{t('workspace.layoutSentence')}</ToggleGroupItem>
-            </ToggleGroup>
-          </div>
+        <CardContent className="nola-realtime-settings" data-onboarding="browser-model-settings">
+          <FieldGroup className="nola-overlay-fields grid">
+            <h3 className="nola-realtime-settings__heading">{t('session.processingGroup')}</h3>
+            <RealtimePipelineFields hideInheritedModel className="nola-overlay-field" model={settings.realtime?.browserS2sModel} gatewayModel={defaultRealtimeS2s(settings)}
+              disabled={sessionActive || browserStatus?.captionServiceActive || captionServiceBusy}
+              s2sReady={s2sReady} onChange={browserS2sModel => patch({ realtime: { browserS2sModel } })} />
+            {settings.realtime?.browserS2sModel === null ? <>
+            <div className="nola-overlay-field" data-onboarding="browser-asr">
+              <span><ModelAvailabilityLabel label={t('session.recognitionModel')} hint={t('gateway.modelNoneHint')} /></span>
+              <SettingSelect value={asrValue} isDisabled={sessionActive || browserStatus?.captionServiceActive === true || captionServiceBusy || captionService === 'loading'} ariaLabel={t('session.recognitionModel')} options={asrOptions}
+                onChange={value => asr.select(value)} />
+            </div>
+            <div className="nola-overlay-field" data-onboarding="browser-mt">
+              <span><ModelAvailabilityLabel label={t('session.translationModel')} hint={t('gateway.modelNoneHint')} /></span>
+              <SettingSelect value={mtValue} isDisabled={sessionActive || browserStatus?.captionServiceActive === true || captionServiceBusy || captionService === 'loading'} ariaLabel={t('session.translationModel')} options={mtOptions}
+                onChange={value => value === NO_TRANSLATION_LANGUAGE
+                  ? void updateSettings(targetLanguagePatch(value, targetLanguage)).catch(error => notifyError(t('errors.settingsSaveFailed'), { cause: error }))
+                  : mt.select(value)} />
+            </div>
+            </> : null}
+          </FieldGroup>
+          <FieldGroup className="nola-overlay-fields grid">
+            <h3 className="nola-realtime-settings__heading">{t('session.audioLanguageGroup')}</h3>
+            <div className="nola-overlay-field" data-onboarding="browser-audio">
+              <span>{t('videoCaptions.audioSource')}</span>
+              {/*
+               * System output is the default; the tab capture stays last because it requires a browser
+               * sharing prompt, while system capture uses the configured desktop output directly.
+               * A tab capture is taken inside the page and needs the extension's own confirmation,
+               * while a system capture is taken by the desktop and starts without one.
+               */}
+              <SettingSelect value={audioSourceValue} ariaLabel={t('videoCaptions.audioSource')}
+                options={[
+                  { value: SYSTEM_DEFAULT_OUTPUT, label: t('shellUi.audioSystem') },
+                  ...audioSourceOptions,
+                  { value: TAB_AUDIO_VALUE, label: t('videoCaptions.tabAudio') },
+                ]}
+                onChange={next => patch(audioSourcePatch(next))} />
+            </div>
+            {audioSourceValue.startsWith('process:') ? <p className="nola-caption text-muted">{t('session.applicationAudioHint')}</p> : null}
+            <div className="nola-overlay-field" data-onboarding="browser-language">
+              <span>{t('shellUi.languageDirection')}</span>
+              <Popover.Root>
+                <Popover.Trigger render={<Button variant="tertiary" className="nola-overlay-language-trigger"
+                  aria-label={`${t('shellUi.languageDirection')}: ${label(sourceLanguage)} → ${label(targetLanguage)}`}>
+                  <Languages aria-hidden="true" />
+                  <span>{label(sourceLanguage)} → {label(targetLanguage)}</span>
+                  <ChevronDown aria-hidden="true" />
+                </Button>} />
+                <Popover.Portal>
+                  <Popover.Positioner side="top" align="end" sideOffset={8} className="z-dropdown">
+                    <Popover.Popup aria-label={t('shellUi.languageDirection')} className="nola-overlay-languages rounded-xl border border-border bg-overlay text-overlay-foreground shadow-overlay">
+                      <Button variant="tertiary" className="self-start" disabled={!swappedLanguages}
+                        onClick={() => {
+                          if (swappedLanguages) patch({ recognition: { sourceLanguage: swappedLanguages.sourceLanguage }, translation: { targetLanguage: swappedLanguages.targetLanguage } })
+                        }}>
+                        <ArrowRightLeft aria-hidden="true" />{t('session.swapLanguages')}
+                      </Button>
+                      <div className="nola-overlay-language-field">
+                        <span className="label">{t('session.sourceLanguage')}</span>
+                        <SettingSelect value={sourceLanguage} ariaLabel={t('session.sourceLanguage')}
+                          options={sourceLanguages.map(code => ({ value: code, label: label(code) }))}
+                          onChange={sourceLanguage => patch({ recognition: { sourceLanguage } })} />
+                      </div>
+                      <div className="nola-overlay-language-field">
+                        <span className="label">{t('session.targetLanguage')}</span>
+                        <SettingSelect value={targetLanguage} ariaLabel={t('session.targetLanguage')}
+                          options={targetLanguages.map(code => ({ value: code, label: label(code) }))}
+                          onChange={value => patch(targetLanguagePatch(value, targetLanguage))} />
+                      </div>
+                    </Popover.Popup>
+                  </Popover.Positioner>
+                </Popover.Portal>
+              </Popover.Root>
+            </div>
+          </FieldGroup>
+          <FieldGroup className="nola-overlay-fields grid">
+            <h3 className="nola-realtime-settings__heading">{t('session.captionGroup')}</h3>
+            <div className="nola-overlay-field">
+              <span>{t('shellUi.showContent')}</span>
+              <ToggleGroup className="nola-segmented" value={[display]} aria-label={t('shellUi.showContent')} onValueChange={values => {
+                const next = values[0]; if (next) patch({ videoCaptions: { showSource: next !== 'translation', showTranslation: next !== 'source' } })
+              }}>
+                {!translationDisabled && <ToggleGroupItem value="both" className="toggle-button" data-selected={display === 'both' ? 'true' : undefined}>{t('workspace.modeBoth')}</ToggleGroupItem>}
+                <ToggleGroupItem value="source" className="toggle-button" data-selected={display === 'source' ? 'true' : undefined}>{t('workspace.modeSource')}</ToggleGroupItem>
+                {!translationDisabled && <ToggleGroupItem value="translation" className="toggle-button" data-selected={display === 'translation' ? 'true' : undefined}>{t('workspace.modeTranslation')}</ToggleGroupItem>}
+              </ToggleGroup>
+            </div>
+            <div className="nola-overlay-field">
+              <span>{t('shellUi.layout')}</span>
+              <div className="nola-segmented">
+                <span className="toggle-button" data-selected="true">{t('workspace.layoutSentence')}</span>
+              </div>
+            </div>
+          </FieldGroup>
         </CardContent>
-        <CardFooter className="nola-overlay-footer">
-          <Button data-onboarding="browser-settings" variant="secondary" onClick={() => navigate(settingsPath('browser'))}><Settings aria-hidden="true" />{t('videoCaptions.browserSettings')}<ArrowRight aria-hidden="true" /></Button>
-        </CardFooter>
       </Card>
     </div>
   )

@@ -1,3 +1,4 @@
+import { supportsRealtimeCompute } from '../shared/compute'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { Socket } from 'node:net'
@@ -12,15 +13,15 @@ import { fallbackTranslationFieldsOf, recognitionFieldsOf, supportsRecognitionNa
 import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { customCredentialSlot, customModelsOf } from '../shared/custom-models'
 import type { AppSettings, AppSettingsPatch, CredentialProvider, TranslationProvider } from '../shared/settings'
+import { MIMO_TTS_BINDING, MIMO_TTS_NAME } from '../shared/settings'
 import { DEFAULT_MODEL_GATEWAY, bindingIsLocal, modelGatewaySettingsSchema, normalizeModelBinding, type AvailableGatewayModel, type GatewayCapability, type GatewayRequestSnapshot, type ModelGatewaySettings, type ModelGatewaySnapshot } from '../shared/model-gateway'
 import type { EngineLaunchSpec } from './engine-process'
 import { createGatewayWorker, GatewayWorkerError, type GatewayWorker, type GatewayWorkerFactory, type GatewayWorkerResult } from './model-gateway-worker'
 import { GatewayInternalServer, type GatewayCapabilityLease } from './gateway-internal-server'
 import { createGatewayLanguageModel, type GatewayLanguageModel } from './gateway-language-model'
-import type { DirectModelRequest, DirectModelResult } from '../shared/agent-workspace'
+import { directModelRequestSchema, type DirectModelRequest, type DirectModelResult } from '../shared/agent-workspace'
+import { backendCloudAsr, backendCloudMt, type BackendInferenceOptions, type openBackendAsrStream } from './backend-direct-model'
 import type { DirectModelServices } from './direct-model'
-import { gatewayChat } from './gateway-chat'
-import { ZodError } from 'zod'
 
 const WORKER_KINDS = ['asr', 'mt', 'tts'] as const
 type WorkerKind = typeof WORKER_KINDS[number]
@@ -28,6 +29,7 @@ const KINDS: GatewayCapability[] = [...WORKER_KINDS, 'llm']
 const RESOURCE_KIND = { asr: 'recognitionModel', mt: 'translationModel', tts: 'ttsModel' } as const
 const MAX_BODY = 24 * 1024 * 1024
 const MAX_TEXT = 64_000
+const PUBLIC_HTTP_PATHS = new Set(['/v2/models', '/v2/realtime/sessions', '/v2/chat/completions', '/v2/audio/speech', '/v2/audio/transcriptions'])
 /** A cloud instance costs no weights, so it is kept warm for a while after its last request. */
 const LAZY_IDLE_MS = 10 * 60_000
 interface WorkerSlot {
@@ -60,6 +62,8 @@ export interface ModelGatewayOptions {
   onChanged?(snapshot: ModelGatewaySnapshot): void
   createWorker?: GatewayWorkerFactory
   createLanguageModel?: typeof createGatewayLanguageModel
+  inferBackend?(request: DirectModelRequest, signal: AbortSignal, options?: BackendInferenceOptions): Promise<DirectModelResult | undefined>
+  openBackendAsr?(binding: string, signal: AbortSignal, emit: (event: GatewayWorkerResult) => void): Promise<Awaited<ReturnType<typeof openBackendAsrStream>> | undefined>
 }
 class GatewayError extends Error { constructor(readonly status: number, message: string, readonly code = 'invalid_request_error') { super(message) } }
 const clientError = (error: unknown): unknown => {
@@ -115,7 +119,7 @@ export class ModelGateway {
   private readonly requests: GatewayRequestSnapshot[] = []
   private key = ''
   private keyLoading?: Promise<string>
-  private readonly tickets = new Map<string, number>()
+  private readonly tickets = new Map<string, { expires: number; path: string }>()
   private lifecycle: Promise<unknown> = Promise.resolve()
   private host = DEFAULT_MODEL_GATEWAY.host
   private port = DEFAULT_MODEL_GATEWAY.port
@@ -139,7 +143,8 @@ export class ModelGateway {
   }
 
   resourceInUse(resourceId: string): boolean {
-    return [...this.slots.values(), ...this.retiring].some(slot => slot.resources.includes(resourceId) || slot.binding === `resource:${resourceId}`)
+    return this.requests.some(request => request.status === 'running' && request.model === `resource:${resourceId}`)
+      || [...this.slots.values(), ...this.retiring].some(slot => slot.resources.includes(resourceId) || slot.binding === `resource:${resourceId}`)
       || [...this.retiredLanguageModels, ...(this.llm ? [this.llm] : [])].some(slot => slot.runtime.profile.id === `resource:${resourceId}`)
   }
 
@@ -149,7 +154,8 @@ export class ModelGateway {
     for (const kind of KINDS) {
       const binding = this.services[kind].model
       const slot = kind === 'llm' ? this.llm : this.slots.get(`${kind}:${binding}`)
-      if (!slot?.refs || !bindingIsLocal(binding)) continue
+      const active = this.requests.some(request => request.kind === kind && request.model === binding && request.status === 'running')
+      if ((!slot?.refs && !active) || !bindingIsLocal(binding)) continue
       const changed = patch.modelGateway?.[`${kind}Model`] ?? (!settings.modelGateway[`${kind}Model`] ? patch.modelPolicy?.defaults[kind] : undefined)
       const disabled = patch.modelPolicy && !isModelEnabled({ ...settings, modelPolicy: mergeModelPolicy(settings, patch.modelPolicy) }, kind, binding)
       if (disabled || patch.compute || patch.modelGateway?.[kind] === false || changed !== undefined && normalizeModelBinding(kind, changed) !== binding) throw new GatewayError(409, 'RESOURCE_IN_USE', 'resource_in_use')
@@ -171,8 +177,20 @@ export class ModelGateway {
 
   async infer(request: DirectModelRequest, signal: AbortSignal, inspect = false): Promise<DirectModelResult> {
     const kind = request.kind as WorkerKind
-    const slot = await this.ensureSlot(kind, normalizeModelBinding(kind, request.model))
-    if (inspect) return { text: '', voices: this.voicesOf(slot) }
+    const binding = normalizeModelBinding(kind, request.model)
+    const settings = this.options.getSettings()
+    const cloudMt = kind === 'mt' && backendCloudMt(binding)
+    if ((!inspect || kind === 'tts' && this.usesBackend(kind, binding, settings))
+      && (cloudMt || kind === 'asr' && backendCloudAsr(binding) || binding.startsWith('resource:') || kind === 'tts' && binding === MIMO_TTS_BINDING) && isModelEnabled(settings, kind, binding)) {
+      const result = await this.options.inferBackend?.({ ...request, model: binding }, signal, inspect ? { inspect: true } : undefined)
+      if (result) return result
+    }
+    if (kind === 'tts' && binding === MIMO_TTS_BINDING) throw new GatewayError(503, 'MiMo TTS is unavailable.', 'model_unavailable')
+    const slot = await this.ensureSlot(kind, binding)
+    if (inspect) {
+      const ready = await slot.worker.ready
+      return { text: '', voices: Array.isArray(ready.voices) ? ready.voices.filter((voice): voice is string => typeof voice === 'string') : [] }
+    }
     const entry = this.begin(kind, slot.binding)
     slot.refs++
     this.clearIdle(slot)
@@ -188,11 +206,6 @@ export class ModelGateway {
       if (entry.status === 'running') this.finish(entry)
       this.unhold(slot)
     }
-  }
-
-  private voicesOf(slot: WorkerSlot): string[] {
-    const eager = this.eager.get(slot.kind)
-    return eager === slot.binding ? this.services[slot.kind].voices ?? [] : []
   }
 
   languageModel(binding?: string) {
@@ -211,7 +224,7 @@ export class ModelGateway {
   }
 
   snapshot(): ModelGatewaySnapshot {
-    return { state: this.state, address: `http://${this.host}:${this.port}/v1`, port: this.port, connections: this.clients.size,
+    return { state: this.state, address: `http://${this.host}:${this.port}/v2`, port: this.port, connections: this.clients.size,
       activeRequests: this.requests.filter(request => request.status === 'running').length,
       services: structuredClone(this.services), availableModels: this.availableModels(), requests: this.requests.map(request => ({ ...request })), ...(this.error ? { error: this.error } : {}) }
   }
@@ -245,7 +258,7 @@ export class ModelGateway {
   }
   private async credentialPresence(settings: AppSettings): Promise<Record<CredentialProvider, boolean>> {
     const slots: CredentialProvider[] = ['aliyun-asr', 'minimax-asr', 'microsoft', 'google', 'cloud',
-      'fallback-cloud', 'fallback-google',
+      'fallback-cloud', 'fallback-google', 'mimo-tts',
       ...customModelsOf(settings.translation).map(profile => customCredentialSlot(profile.id))]
     return Object.fromEntries(await Promise.all(slots.map(async slot => [slot, !!await this.options.getCredential?.(slot)]))) as Record<CredentialProvider, boolean>
   }
@@ -393,10 +406,15 @@ export class ModelGateway {
       this.webSockets = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024, perMessageDeflate: false })
       this.server.on('upgrade', (request, socket, head) => {
         try {
-          const ticket = new URL(request.url ?? '/', 'http://localhost').searchParams.get('ticket')
-          if (ticket) { const expires = this.tickets.get(ticket) ?? 0; this.tickets.delete(ticket); if (expires < Date.now()) throw new GatewayError(401, 'Invalid realtime ticket') }
+          const url = new URL(request.url ?? '/', 'http://localhost')
+          if (url.pathname !== '/v2/realtime' && url.pathname !== '/v1/realtime') throw new GatewayError(404, 'Unknown endpoint')
+          const ticket = url.searchParams.get('ticket')
+          if (ticket) {
+            const grant = this.tickets.get(ticket)
+            if (!grant || grant.path !== url.pathname || grant.expires < Date.now()) throw new GatewayError(401, 'Invalid realtime ticket')
+            this.tickets.delete(ticket)
+          }
           else this.authorize(request)
-          if (new URL(request.url ?? '/', 'http://localhost').pathname !== '/v1/realtime') throw new GatewayError(404, 'Unknown endpoint')
           if (this.state !== 'running') throw new GatewayError(503, 'Gateway is loading')
           if (this.clients.size >= 8) throw new GatewayError(429, 'Too many realtime sessions')
           this.webSockets!.handleUpgrade(request, socket, head, client => this.realtime(client, request))
@@ -424,7 +442,7 @@ export class ModelGateway {
       const provider = settings.recognition.provider ?? 'local'
       return provider === 'local' ? `resource:${settings.recognition.modelId}` : `cloud:${provider}`
     }
-    if (kind === 'tts') return `resource:${settings.synthesis.modelId}`
+    if (kind === 'tts') return normalizeModelBinding(kind, settings.synthesis.modelId)
     const translation = nativeFallback ? { ...settings.translation, ...settings.translation.fallback } : settings.translation
     const provider = translation.provider
     if (provider === 'local') return `resource:${settings.translation.localModelId}`
@@ -447,7 +465,7 @@ export class ModelGateway {
     return normalizeModelBinding('mt', config.mtFallbackModel)
   }
 
-  private publicBinding(kind: GatewayCapability): string {
+  private publicBinding(kind: WorkerKind): string {
     const settings = this.options.getSettings()
     const config = settings.modelGateway
     const legacy = normalizeModelBinding(kind, config.externalModels?.[kind])
@@ -485,7 +503,7 @@ export class ModelGateway {
       : kind === 'asr' ? (binding === 'cloud:aliyun' ? settings.recognition.aliyunModel ?? 'Aliyun' : settings.recognition.minimaxModel ?? 'MiniMax')
         : binding.startsWith('mt-custom:') ? customModelsOf(settings.translation).find(item => item.id === binding.slice(10))?.name ?? 'Custom API'
           : kind === 'mt' ? backupSettings.cloudName || backupSettings.cloudModel || translationProvider
-            : binding.slice(6)
+            : binding === MIMO_TTS_BINDING ? MIMO_TTS_NAME : binding.slice(6)
     if (kind === 'mt' && binding === 'cloud:recognition') throw new GatewayError(400, 'The native translation provider returns translation with audio. Select a text translation model for nola-mt.')
     if (!local) {
       if (kind === 'asr') {
@@ -584,9 +602,9 @@ export class ModelGateway {
       this.services[kind] = { state: 'failed', model: binding, name: '', error: message, errorCode: error instanceof GatewayError ? error.code : 'inference_failed' }
       this.changed(); return
     }
-    if (!bindingIsLocal(binding)) {
+    if (!bindingIsLocal(binding) || this.usesBackend(kind, binding, stored)) {
       const existing = this.slots.get(`${kind}:${binding}`)
-      if (existing && !existing.retired && existing.signature !== plan.signature) {
+      if (existing && !existing.retired && (existing.signature !== plan.signature || (bindingIsLocal(binding) && !existing.lazy))) {
         this.slots.delete(`${kind}:${binding}`); this.retire(existing)
       }
       if (previous && previous !== binding) {
@@ -595,11 +613,12 @@ export class ModelGateway {
       }
       if (this.stopping) return
       this.services[kind] = { state: 'ready', model: binding, name: plan.name,
+        ...(bindingIsLocal(binding) ? { providerName: 'local' } : {}),
         ...(kind === 'asr' ? { nativeTranslation: binding === 'cloud:aliyun' && supportsRecognitionNativeTranslation({ ...stored.recognition, provider: 'aliyun' }) } : {}) }
       this.changed(); return
     }
     const existing = this.slots.get(`${kind}:${binding}`)
-    if (existing && !existing.retired && existing.signature === plan.signature && this.services[kind].state === 'ready') return
+    if (existing && !existing.retired && !existing.lazy && existing.signature === plan.signature && this.services[kind].state === 'ready') return
     if (existing && !existing.retired) { this.slots.delete(`${kind}:${binding}`); this.retire(existing) }
     if (previous && previous !== binding) {
       const stale = this.slots.get(`${kind}:${previous}`)
@@ -666,33 +685,52 @@ export class ModelGateway {
     const config = modelGatewaySettingsSchema.parse(stored.modelGateway)
     const wanted = binding || this.eager.get(kind) || this.bindingFor(kind, config, stored)
     if (!wanted) throw new GatewayError(503, `${kind.toUpperCase()} has no model bound in Model Gateway.`, 'model_unavailable')
-    if (bindingIsLocal(wanted) && !isModelEnabled(stored, kind, wanted === 'native:cloud' ? 'mt-custom:legacy-fallback' : wanted.startsWith('native:') ? `cloud:${wanted.slice(7)}` : wanted)) throw new GatewayError(503, 'Enable this model in Model Management before using it.', 'model_disabled')
-    if (bindingIsLocal(wanted) && (this.state !== 'running' || this.stopping || !config[kind])) throw new GatewayError(503, `${kind.toUpperCase()} is not loaded in Model Gateway.`, 'model_not_loaded')
+    if (bindingIsLocal(wanted)) this.requireLocalBinding(kind, wanted, stored)
     const key = `${kind}:${wanted}`
     const ready = (slot?: WorkerSlot) => slot && !slot.retired && this.services[slot.kind].model === slot.binding
       ? this.services[slot.kind].state === 'ready' : slot && !slot.retired
-    const found = this.slots.get(key)
-    if (bindingIsLocal(wanted) && ready(found)) { this.clearIdle(found!); return found! }
-    if (bindingIsLocal(wanted) && wanted !== (this.eager.get(kind) ?? '')) {
-      // Not found rather than unavailable: a public client named a model this gateway does not
-      // serve, and an internal session gets the same text through its `model_unavailable` code.
-      throw new GatewayError(404, 'This local model is not loaded in Model Gateway. Load it there or pick a cloud interface.', 'model_not_found')
-    }
     const pending = this.creating.get(key)
     if (pending) return pending.then(slot => { if (!ready(slot)) throw new GatewayError(503, `${kind.toUpperCase()} instance stopped.`, 'model_unavailable'); return slot })
+    const found = this.slots.get(key)
+    if (bindingIsLocal(wanted) && found && ready(found)) return found
     const task = (async () => {
       const resources = bindingIsLocal(wanted) ? await this.options.listResources() : []
       const plan = await this.plan(kind, wanted, resources, stored, config)
       if (JSON.stringify(stored) !== JSON.stringify(this.options.getSettings())) throw new GatewayError(409, 'Model configuration changed during initialization. Retry the request.', 'configuration_changed')
       if (found && !found.retired && found.signature === plan.signature) return found
       if (found) { this.slots.delete(key); this.retire(found) }
-      const slot = await this.createSlot(kind, wanted, plan, !bindingIsLocal(wanted) || wanted !== (this.eager.get(kind) ?? ''))
-      await slot.worker.ready
+      const slot = await this.createSlot(kind, wanted, plan, !bindingIsLocal(wanted) || this.usesBackend(kind, wanted, stored))
+      try { await slot.worker.ready }
+      catch (error) {
+        if (this.slots.get(key) === slot) { this.slots.delete(key); await this.closeSlot(slot) }
+        throw error
+      }
       if ((bindingIsLocal(wanted) && this.stopping) || this.slots.get(key) !== slot) throw new GatewayError(503, `${kind.toUpperCase()} instance stopped.`, 'model_unavailable')
+      slot.refs++
+      this.unhold(slot)
       return slot
     })()
     this.creating.set(key, task)
     try { return await task } finally { if (this.creating.get(key) === task) this.creating.delete(key) }
+  }
+
+  private usesBackend(kind: WorkerKind, binding: string, settings: AppSettings): boolean {
+    if (kind === 'tts' && binding === MIMO_TTS_BINDING) return !!this.options.inferBackend
+    if (!this.options.inferBackend) return false
+    if (kind === 'asr' && backendCloudAsr(binding)) return true
+    if (kind === 'mt' && backendCloudMt(binding)) return true
+    return binding.startsWith('resource:') && supportsRealtimeCompute(settings.compute)
+  }
+
+  private requireLocalBinding(kind: WorkerKind, binding: string, settings: AppSettings): void {
+    const policyBinding = binding === 'native:cloud' ? 'mt-custom:legacy-fallback' : binding.startsWith('native:') ? `cloud:${binding.slice(7)}` : binding
+    if (!isModelEnabled(settings, kind, policyBinding)) throw new GatewayError(503, 'Enable this model in Model Management before using it.', 'model_disabled')
+    if (this.state !== 'running' || this.stopping || !settings.modelGateway[kind]) throw new GatewayError(503, `${kind.toUpperCase()} is not loaded in Model Gateway.`, 'model_not_loaded')
+    if (binding !== this.eager.get(kind)) throw new GatewayError(404, 'This local model is not loaded in Model Gateway. Load it there or pick a cloud interface.', 'model_not_found')
+    const service = this.services[kind]
+    if (this.usesBackend(kind, binding, settings) && (service.model !== binding || service.state !== 'ready')) {
+      throw new GatewayError(503, service.error ?? 'Model configuration is unavailable.', service.errorCode ?? 'model_unavailable')
+    }
   }
 
   private unhold(slot: WorkerSlot): void {
@@ -841,6 +879,11 @@ export class ModelGateway {
     try {
       const origin = request.headers.origin
       this.authorize(request)
+      const requestedPath = new URL(request.url ?? '/', 'http://localhost').pathname
+      // shortcut: retain the previous public prefix until live provider parity is verified.
+      const legacy = requestedPath.startsWith('/v1/')
+      const path = legacy ? '/v2/' + requestedPath.slice(4) : requestedPath
+      if (!PUBLIC_HTTP_PATHS.has(path)) throw new GatewayError(404, 'Unknown endpoint')
       if (origin === 'http://localhost' || origin === 'http://127.0.0.1') {
         response.setHeader('Access-Control-Allow-Origin', origin)
         response.setHeader('Vary', 'Origin')
@@ -848,50 +891,56 @@ export class ModelGateway {
       if (request.method === 'OPTIONS') {
         response.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Max-Age': '600' }); response.end(); return
       }
-      const path = new URL(request.url ?? '/', 'http://localhost').pathname
-      if (request.method === 'POST' && path === '/v1/realtime/sessions') {
-        await this.ensureSlot('asr', this.publicBinding('asr'))
-        for (const [ticket, expires] of this.tickets) if (expires < Date.now()) this.tickets.delete(ticket)
-        if (this.tickets.size >= 64) throw new GatewayError(429, 'Too many unused realtime tickets')
-        const ticket = randomBytes(24).toString('base64url'); const expires = Date.now() + 30_000; this.tickets.set(ticket, expires)
-        this.json(response, 200, { client_secret: { value: ticket, expires_at: Math.floor(expires / 1000) }, url: `/v1/realtime?ticket=${ticket}` }); return
-      }
-      if (request.method === 'GET' && path === '/v1/models') {
-        const catalog = (await this.snapshotWithCatalog()).availableModels!
-      this.json(response, 200, { object: 'list', data: KINDS.filter(kind => {
+      if (request.method === 'POST' && path === '/v2/realtime/sessions') {
+        const binding = this.publicBinding('asr')
         const settings = this.options.getSettings()
-        if (settings.modelGateway.externalCapabilities?.[kind] === false
-          || (!settings.modelGateway[kind] && !normalizeModelBinding(kind, settings.modelGateway.externalModels?.[kind]))) return false
-        const binding = this.publicBinding(kind)
-        return binding !== 'cloud:recognition' && catalog[kind].some(model => model.binding === binding)
-      }).map(kind => ({ id: `nola-${kind}`, object: 'model', created: 0, owned_by: 'nola', capabilities: [kind], ...(kind === 'tts' ? { voices: this.services[kind].voices ?? [] } : {}) })) }); return
+        if (this.options.openBackendAsr && this.usesBackend('asr', binding, settings)) {
+          if (bindingIsLocal(binding)) this.requireLocalBinding('asr', binding, settings)
+          else await this.plan('asr', binding, [], settings, settings.modelGateway)
+        } else await this.ensureSlot('asr', binding)
+        for (const [ticket, grant] of this.tickets) if (grant.expires < Date.now()) this.tickets.delete(ticket)
+        if (this.tickets.size >= 64) throw new GatewayError(429, 'Too many unused realtime tickets')
+        const realtimePath = legacy ? '/v1/realtime' : '/v2/realtime'
+        const ticket = randomBytes(24).toString('base64url'); const expires = Date.now() + 30_000
+        this.tickets.set(ticket, { expires, path: realtimePath })
+        this.json(response, 200, { client_secret: { value: ticket, expires_at: Math.floor(expires / 1000) }, url: `${realtimePath}?ticket=${ticket}` }); return
       }
-      if (request.method !== 'POST' || !['/v1/chat/completions', '/v1/audio/speech', '/v1/audio/transcriptions'].includes(path)) throw new GatewayError(404, 'Unknown endpoint')
+      if (request.method === 'GET' && path === '/v2/models') {
+        const catalog = (await this.snapshotWithCatalog()).availableModels!
+        const settings = this.options.getSettings()
+        const models = await Promise.all(WORKER_KINDS.filter(kind => {
+          if (settings.modelGateway.externalCapabilities?.[kind] === false
+            || (!settings.modelGateway[kind] && !normalizeModelBinding(kind, settings.modelGateway.externalModels?.[kind]))) return false
+          const binding = this.publicBinding(kind)
+          return binding !== 'cloud:recognition' && catalog[kind].some(model => model.binding === binding)
+        }).map(async kind => {
+          const model = { id: `nola-${kind}`, object: 'model', created: 0, owned_by: 'nola', capabilities: [kind] }
+          if (kind !== 'tts') return model
+          const binding = this.publicBinding(kind)
+          const service = this.services.tts
+          let voices = service.model === binding ? service.voices : undefined
+          if (!voices && service.state === 'ready' && service.model === binding && this.usesBackend(kind, binding, settings)) {
+            const inspected = await this.infer({ kind, model: binding, id: randomUUID() }, controller.signal, true).catch(() => undefined)
+            if (inspected?.voices && this.services.tts === service) service.voices = inspected.voices
+            voices = inspected?.voices
+          }
+          return { ...model, voices: voices ?? [] }
+        }))
+        this.json(response, 200, { object: 'list', data: models }); return
+      }
+      if (request.method !== 'POST' || !['/v2/chat/completions', '/v2/audio/speech', '/v2/audio/transcriptions'].includes(path)) throw new GatewayError(404, 'Unknown endpoint')
       if (this.state !== 'running') throw new GatewayError(503, 'Gateway is loading')
       const bytes = await this.body(request)
       let data: Record<string, unknown>
-      if (path === '/v1/audio/transcriptions') data = await parseMultipart(request.headers['content-type'] ?? '', bytes)
+      if (path === '/v2/audio/transcriptions') data = await parseMultipart(request.headers['content-type'] ?? '', bytes)
       else {
         if (!request.headers['content-type']?.toLowerCase().startsWith('application/json')) throw new GatewayError(415, 'Expected application/json')
         try { data = object(JSON.parse(bytes.toString('utf8'))) } catch { throw new GatewayError(400, 'Invalid JSON') }
       }
-      if (path === '/v1/chat/completions' && data.model === 'nola-llm') {
-        const lease = await this.acquireLanguageModel(this.publicBinding('llm'))
-        let error: unknown
-        try { await gatewayChat(lease, data, response, AbortSignal.any([controller.signal, lease.signal])) }
-        catch (cause) { error = cause; if (cause instanceof ZodError || cause instanceof SyntaxError) throw new GatewayError(400, 'Invalid LLM request'); throw cause }
-        finally { lease.release(error) }
-        return
-      }
-      const kind: WorkerKind = path === '/v1/chat/completions' ? 'mt' : path === '/v1/audio/speech' ? 'tts' : 'asr'
+      const kind: WorkerKind = path === '/v2/chat/completions' ? 'mt' : path === '/v2/audio/speech' ? 'tts' : 'asr'
       const requested = normalizeModelBinding(kind, data.model)
       const publicBinding = this.publicBinding(kind)
       if (requested && requested !== publicBinding) throw new GatewayError(404, 'The public API only serves its configured model alias', 'model_not_found')
-      const slot = await this.ensureSlot(kind, publicBinding)
-      slot.refs++; this.clearIdle(slot)
-      const held = slot
-      release = () => this.unhold(held)
-      entry = this.begin(kind, slot.binding)
       let payload: GatewayWorkerResult
       if (kind === 'mt') payload = translationRequest(data, this.options.getSettings().modelGateway.targetLanguage)
       else if (kind === 'tts') {
@@ -902,9 +951,31 @@ export class ModelGateway {
         if (!['json', 'text', undefined].includes(data.response_format as string | undefined)) throw new GatewayError(400, 'Supported transcription formats are json and text')
         payload = { op: 'infer', audio: data.audio, source: data.language === undefined ? 'auto' : text(data.language, 'language', 32) }
       }
-      const result = await slot.worker.request(payload, controller.signal)
+      const settings = this.options.getSettings()
+      let result: GatewayWorkerResult | DirectModelResult | undefined
+      entry = this.begin(kind, publicBinding)
+      if (this.options.inferBackend && this.usesBackend(kind, publicBinding, settings)) {
+        if (bindingIsLocal(publicBinding)) this.requireLocalBinding(kind, publicBinding, settings)
+        else await this.plan(kind, publicBinding, [], settings, settings.modelGateway)
+        const direct = directModelRequestSchema.safeParse({ ...payload, kind, model: publicBinding, id: randomUUID() })
+        if (direct.success) {
+          result = await this.options.inferBackend(direct.data, controller.signal, {
+            batchAsr: kind === 'asr', mp3: kind === 'tts' && payload.response_format === 'mp3',
+          })
+        }
+      }
+      if (!result) {
+        if (kind === 'tts' && publicBinding === MIMO_TTS_BINDING) throw new GatewayError(503, 'MiMo TTS is unavailable.', 'model_unavailable')
+        const slot = await this.ensureSlot(kind, publicBinding)
+        slot.refs++; this.clearIdle(slot)
+        release = () => this.unhold(slot)
+        result = await slot.worker.request(payload, controller.signal)
+      }
       if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError')
       if (kind === 'tts') {
+        if (Array.isArray(result.voices) && this.services.tts.model === publicBinding) {
+          this.services.tts.voices = result.voices.filter((voice): voice is string => typeof voice === 'string')
+        }
         const format = data.response_format ?? 'mp3'; const prefix = format === 'mp3' ? 'data:audio/mpeg;base64,' : 'data:audio/wav;base64,'
         if (typeof result.audio !== 'string' || !result.audio.startsWith(prefix)) throw new Error('Invalid speech response')
         const bytes = Buffer.from(result.audio.slice(prefix.length), 'base64')
@@ -933,6 +1004,8 @@ export class ModelGateway {
 
   private realtime(client: WebSocket, request: IncomingMessage): void {
     const id = randomUUID(); let slot: WorkerSlot | undefined
+    const controller = new AbortController()
+    let backend: Awaited<ReturnType<typeof openBackendAsrStream>> | undefined
     let entry: GatewayRequestSnapshot | undefined; let unsubscribe: (() => void) | undefined
     let opened = false; let finished = false; let queuedBytes = 0; let queue = Promise.resolve()
     const send = (event: Record<string, unknown>) => { if (client.readyState === WebSocket.OPEN) { if (client.bufferedAmount > MAX_BODY) { client.terminate(); return }; client.send(JSON.stringify({ event_id: `event_${randomUUID()}`, ...event })) } }
@@ -944,17 +1017,36 @@ export class ModelGateway {
       const binding = this.publicBinding('asr')
       const wanted = normalizeModelBinding('asr', session.model)
       if (wanted && wanted !== binding) throw new GatewayError(404, 'The public API only serves its configured model alias', 'model_not_found')
-      slot = await this.ensureSlot('asr', binding)
-      slot.refs++; this.clearIdle(slot)
-      entry = this.begin('asr', slot.binding)
-      unsubscribe = slot.worker.subscribe(event => {
-        if (event.fatal) { error('ASR worker is unavailable'); client.close(1011, 'ASR worker failed'); return }
-        if (event.session !== id || !event.event) return
-        send(object(event.event))
-      })
-      await slot.worker.request({ op: 'session.open', session: id, language: session.input_audio_transcription.language, silenceMs: session.turn_detection?.silence_duration_ms ?? 800, manual: session.turn_detection === null })
+      const settings = this.options.getSettings()
+      if (this.options.openBackendAsr && this.usesBackend('asr', binding, settings)) {
+        if (bindingIsLocal(binding)) this.requireLocalBinding('asr', binding, settings)
+        else await this.plan('asr', binding, [], settings, settings.modelGateway)
+        backend = await this.options.openBackendAsr(binding, controller.signal, send)
+        void backend?.closed.then(() => {
+          if (controller.signal.aborted || finished) return
+          finished = true
+          const reason = new GatewayError(503, 'Realtime recognition disconnected', 'network_unavailable')
+          if (entry) this.finish(entry, reason)
+          error(reason.message)
+          client.close(1011, 'Recognition disconnected')
+        })
+      }
+      if (!backend) {
+        slot = await this.ensureSlot('asr', binding)
+        slot.refs++; this.clearIdle(slot)
+        unsubscribe = slot.worker.subscribe(event => {
+          if (event.fatal) { error('ASR worker is unavailable'); client.close(1011, 'ASR worker failed'); return }
+          if (event.session === id && event.event) send(object(event.event))
+        })
+      }
+      controller.signal.throwIfAborted()
+      entry = this.begin('asr', binding)
+      await call('session.open', { language: session.input_audio_transcription.language, silenceMs: session.turn_detection?.silence_duration_ms ?? 800,
+        manual: session.turn_detection === null, ...(backend ? { maxSegmentMs: settings.recognition.max_segment_ms ?? 10000 } : {}) })
       opened = true
     }
+    const call = (op: string, fields: GatewayWorkerResult = {}) =>
+      (backend ?? slot!.worker).request({ op, session: id, ...fields })
     client.on('message', (raw, binary) => {
       if (finished) { error('Session is finished'); return }
       const bytes = Array.isArray(raw) ? Buffer.concat(raw) : raw instanceof ArrayBuffer ? Buffer.from(raw) : raw
@@ -987,21 +1079,26 @@ export class ModelGateway {
         if (message.type === 'input_audio_buffer.append') {
           const audio = text(message.audio, 'audio', 1024 * 1024)
           if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(audio) || Buffer.from(audio, 'base64').length % 2) throw new GatewayError(400, 'Invalid PCM16 audio')
-          await slot!.worker.request({ op: 'session.append', session: id, audio })
+          await call('session.append', { audio })
         } else if (message.type === 'input_audio_buffer.commit') {
-          await slot!.worker.request({ op: 'session.commit', session: id }); send({ type: 'input_audio_buffer.committed' })
+          await call('session.commit'); send({ type: 'input_audio_buffer.committed' })
         } else if (message.type === 'session.finish') {
-          await slot!.worker.request({ op: 'session.finish', session: id }); finished = true; this.finish(entry!); send({ type: 'session.finished', session }); client.close(1000, 'Finished')
+          await call('session.finish'); finished = true; this.finish(entry!); send({ type: 'session.finished', session }); client.close(1000, 'Finished')
         } else throw new GatewayError(400, 'Unknown realtime event')
       }).catch(reason => {
+        if (finished || controller.signal.aborted) return
         const cause = clientError(reason)
         error(cause instanceof GatewayError ? cause.message : 'Realtime transcription failed')
-        if (!(cause instanceof GatewayError)) { finished = true; if (entry) this.finish(entry, cause); client.close(1011, 'Transcription failed') }
+        if (!(cause instanceof GatewayError) || backend && reason instanceof GatewayWorkerError) {
+          finished = true; if (entry) this.finish(entry, cause); client.close(1011, 'Transcription failed')
+        }
       }).finally(() => { queuedBytes -= length })
     })
     client.once('close', () => {
+      controller.abort()
+      backend?.close()
       this.clients.delete(client); unsubscribe?.()
-      void queue.finally(async () => { if (opened) await slot?.worker.request({ op: 'session.close', session: id }).catch(() => undefined); if (slot) this.unhold(slot) })
+      void queue.finally(async () => { if (slot) { await slot.worker.request({ op: 'session.close', session: id }).catch(() => undefined); this.unhold(slot) } })
       if (entry && !finished) this.finish(entry, new Error('Session closed'), true)
       this.changed()
     })

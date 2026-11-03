@@ -215,6 +215,49 @@ class SileroVadSegmenter:
             samples=np.concatenate([f.samples for f in self._active]),
         )
 
+    def close_on_silence(self, minimum_ms: int) -> VolumeGateSegment | None:
+        """Close the active segment only when the requested silence has accumulated."""
+        if self._active and self._silence_samples >= minimum_ms * TARGET_SAMPLE_RATE // 1000:
+            return self._finalize_silence()
+        return None
+
+    def speaker_boundary(self, after_ms: float) -> tuple[int, float, NDArray[np.float32], NDArray[np.float32]] | None:
+        """Find a short pause flanked by enough voiced PCM for CAM++."""
+        if self._active_samples < 2 * 24_000 + 2_880 or not self._gate_open:
+            return None
+        last = self._active[-1]
+        end_ms = last.start_ms + last.samples.size / 16
+        silence_start = None
+        for index, frame in enumerate(self._active):
+            if not frame.voiced:
+                if silence_start is None:
+                    silence_start = index
+                continue
+            if silence_start is None:
+                continue
+            gap_start = self._active[silence_start].start_ms
+            before_end, silence_start = silence_start, None
+            if frame.start_ms <= after_ms or frame.start_ms - gap_start < 180:
+                continue
+            if gap_start - self._active_start_ms < 1500 or end_ms - frame.start_ms < 1500:
+                continue
+            before = [item for item in self._active[:before_end] if item.start_ms >= gap_start - 1520]
+            after = [item for item in self._active[index:] if item.start_ms < frame.start_ms + 1500]
+            if min(sum(item.samples.size for item in side if item.voiced) for side in (before, after)) < 18_000:
+                continue
+            previous = np.concatenate([item.samples for item in before])[-24_000:]
+            current = np.concatenate([item.samples for item in after])[:24_000]
+            if min(previous.size, current.size) >= 24_000:
+                return index, frame.start_ms, previous, current
+        return None
+
+    def split_at_frame(self, index: int) -> VolumeGateSegment:
+        left, right = self._active[:index], self._active[index:]
+        segment = VolumeGateSegment(self._active_start_ms, right[0].start_ms, np.concatenate([f.samples for f in left]))
+        self.segments_emitted += 1
+        self._rebase_after_split(right)
+        return segment
+
     def current_bounds(self) -> tuple[float, float] | None:
         """Read the active segment's time bounds without copying its audio every frame."""
         if not self._active:
@@ -288,6 +331,7 @@ class SileroVadSegmenter:
                 end_ms,
                 np.concatenate([f.samples for f in left]),
             )
+            self.segments_emitted += 1
         self._rebase_after_split(right)
         return segment
 

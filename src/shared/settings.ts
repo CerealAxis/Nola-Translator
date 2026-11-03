@@ -106,7 +106,7 @@ export type NetworkSettings = {
 }
 
 export type AppSettings = {
-  version: 2
+  version: 3
   /** Legacy invitation marker; V2 progress and explicit completion are stored separately. */
   onboardingSeen: boolean
   onboardingVersion: number
@@ -126,9 +126,31 @@ export type AppSettings = {
   compute: ComputeSettings
   browserConnection: { enabled: boolean }
   synthesis: { modelId: string; voice: string }
+  realtime?: RealtimeSettings
   modelGateway: ModelGatewaySettings
   modelPolicy?: ModelPolicy
   closeBehavior: 'tray' | 'quit'
+}
+
+export const REALTIME_S2S_MODELS = ['qwen3.8-livetranslate-flash-realtime', 'qwen3.5-livetranslate-flash-realtime'] as const
+export type RealtimeS2sModel = typeof REALTIME_S2S_MODELS[number]
+
+export type RealtimeSettings = {
+  outputMode?: 'source' | 'translation' | 'speech'
+  speakerDetection?: boolean
+  speechOutputDeviceId?: string
+  s2sModel?: RealtimeS2sModel | null
+  quickS2sModel?: RealtimeS2sModel | null
+  workspaceS2sModel?: RealtimeS2sModel | null
+  browserS2sModel?: RealtimeS2sModel | null
+  defaultPipeline?: 'cascade' | 's2s'
+  virtualInputDeviceId?: string
+}
+
+export function defaultRealtimeS2s(settings: AppSettings): RealtimeS2sModel | null {
+  const realtime = settings.realtime
+  if (realtime?.defaultPipeline === 'cascade' || realtime?.s2sModel === null) return null
+  return realtime?.s2sModel ?? (realtime?.defaultPipeline === 's2s' ? REALTIME_S2S_MODELS[0] : null)
 }
 
 /** `keepAudio: false` stops the engine from being handed a recording path, so no WAV is written. */
@@ -170,8 +192,9 @@ export type RecognitionSettings = {
 
 /** Cloud recognition selects its remote model independently of the saved local model id. */
 export type RecognitionProvider = 'local' | 'aliyun' | 'minimax'
-export type AliyunRecognitionModel = 'qwen3.8-livetranslate-flash-realtime' | 'qwen3.5-livetranslate-flash-realtime' | 'qwen3-asr-flash-realtime' | 'fun-asr-realtime' | 'qwen-audio-3.1-asr-flash-streaming'
-export const ALIYUN_RECOGNITION_MODELS: readonly AliyunRecognitionModel[] = ['qwen3.8-livetranslate-flash-realtime', 'qwen3.5-livetranslate-flash-realtime', 'qwen3-asr-flash-realtime', 'fun-asr-realtime', 'qwen-audio-3.1-asr-flash-streaming']
+export const ALIYUN_ASR_MODELS = ['qwen3-asr-flash-realtime', 'fun-asr-realtime', 'qwen-audio-3.1-asr-flash-streaming'] as const
+export type AliyunRecognitionModel = typeof REALTIME_S2S_MODELS[number] | typeof ALIYUN_ASR_MODELS[number]
+export const ALIYUN_RECOGNITION_MODELS: readonly AliyunRecognitionModel[] = [...ALIYUN_ASR_MODELS, ...REALTIME_S2S_MODELS]
 /** `asr-1.0` is the only model the endpoint enumerates. */
 export type MinimaxRecognitionModel = 'asr-1.0'
 export const MINIMAX_RECOGNITION_MODELS: readonly MinimaxRecognitionModel[] = ['asr-1.0']
@@ -193,8 +216,11 @@ export type CloudApiFormat = 'chat-completions' | 'chat-responses' | 'anthropic'
  * the Authorization header when the key is empty, while the Anthropic, Microsoft, and Google
  * shapes refuse without one.
  */
-export type CredentialProvider = 'cloud' | 'fallback-cloud' | 'microsoft' | 'google' | 'fallback-google' | 'aliyun-asr' | 'minimax-asr' | `cloud-model:${string}`
-export const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'fallback-cloud', 'microsoft', 'google', 'fallback-google', 'aliyun-asr', 'minimax-asr']
+export const MIMO_TTS_MODEL = 'mimo-v2.5-tts'
+export const MIMO_TTS_BINDING = `cloud:${MIMO_TTS_MODEL}`
+export const MIMO_TTS_NAME = 'MiMo V2.5 TTS'
+export type CredentialProvider = 'cloud' | 'fallback-cloud' | 'microsoft' | 'google' | 'fallback-google' | 'aliyun-asr' | 'minimax-asr' | 'mimo-tts' | `cloud-model:${string}`
+export const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'fallback-cloud', 'microsoft', 'google', 'fallback-google', 'aliyun-asr', 'minimax-asr', 'mimo-tts']
 
 export function isCredentialProvider(value: unknown): value is CredentialProvider {
   return typeof value === 'string' && (CREDENTIAL_PROVIDERS.includes(value as CredentialProvider) || /^cloud-model:[a-zA-Z0-9_-]{1,64}$/.test(value))
@@ -267,8 +293,9 @@ export type CloudFormatDefaults = {
   cloudModel: string
 }
 
-export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recording' | 'appearance' | 'overlay' | 'videoCaptions' | 'browserCaptions' | 'translation' | 'compute' | 'network' | 'modelStoragePath' | 'version' | 'browserConnection' | 'synthesis' | 'modelGateway'> & {
+export type AppSettingsPatch = Omit<Partial<AppSettings>, 'recognition' | 'recording' | 'appearance' | 'overlay' | 'videoCaptions' | 'browserCaptions' | 'translation' | 'compute' | 'network' | 'modelStoragePath' | 'version' | 'browserConnection' | 'synthesis' | 'modelGateway' | 'realtime'> & {
   synthesis?: Partial<AppSettings['synthesis']>
+  realtime?: Partial<RealtimeSettings>
   modelGateway?: Partial<ModelGatewaySettings>
   network?: Partial<NetworkSettings>
   compute?: Partial<ComputeSettings>
@@ -327,9 +354,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   compute: { ...DEFAULT_COMPUTE_SETTINGS },
   browserConnection: { enabled: true },
   synthesis: { modelId: '', voice: '' },
+  realtime: { outputMode: 'translation', speakerDetection: true, speechOutputDeviceId: '' },
   modelGateway: { ...DEFAULT_MODEL_GATEWAY },
   closeBehavior: 'tray',
-  version: 2,
+  version: 3,
   theme: 'system',
   uiLanguage: 'auto',
   modelStoragePath: '',
@@ -351,7 +379,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     provider: 'local',
     aliyunWorkspaceId: '',
     aliyunRegion: 'cn-beijing',
-    aliyunModel: 'qwen3.8-livetranslate-flash-realtime',
+    aliyunModel: ALIYUN_ASR_MODELS[0],
     minimaxEndpoint: 'https://api.minimax.cn/v1/speech_to_text',
     minimaxModel: 'asr-1.0',
     modelId: 'qwen3-asr-1.7b-hf',

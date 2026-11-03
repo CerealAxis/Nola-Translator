@@ -1,4 +1,4 @@
-import { lstat, mkdir, mkdtemp, readFile, rmdir, rm } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, readdir, rename, rmdir, rm } from 'node:fs/promises'
 import { isAbsolute, join, normalize } from 'node:path'
 
 import { RECOGNITION_MODEL_IDS, type RecognitionModelId } from '../shared/settings'
@@ -15,7 +15,27 @@ export async function cleanupStorageCaches(root: string): Promise<void> {
         const entry = await lstat(target)
         if (entry.isSymbolicLink() || !entry.isDirectory()) { target = ''; break }
       }
-      if (target) await rm(target, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 })
+      if (!target) continue
+      const remove = (path: string) => rm(path, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 })
+      if (parts[0] === 'cache') {
+        const entries = await readdir(target, { withFileTypes: true })
+        const legacyJournal = entries.find(entry => entry.name === 'session-journal')
+        if (legacyJournal) {
+          const durable = join(root, 'session-journal')
+          const existing = await lstat(durable).catch(error => {
+            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+          })
+          if (!existing && legacyJournal.isDirectory() && !legacyJournal.isSymbolicLink()) {
+            await rename(join(target, legacyJournal.name), durable)
+          } else {
+            for (const entry of entries) {
+              if (entry.name !== legacyJournal.name) await remove(join(target, entry.name))
+            }
+            continue
+          }
+        }
+      }
+      await remove(target)
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.warn('storage cache cleanup failed', target, error)
     }

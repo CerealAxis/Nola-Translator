@@ -97,7 +97,6 @@ function DemoApp() {
     return () => window.removeEventListener('message', receive)
   }, [navigate])
   return <>
-    {import.meta.env.MODE === 'toy' ? <div className="docs-demo-label z-toast" role="note">{demoCopy[language].label}</div> : null}
     <div className="docs-desktop-surface z-base" inert={overlayOpen}>
     {page.endsWith('-scene') ? <Scene browser={page === 'browser-scene'} /> : <AppShell navigation={navigation}>
       <Routes pages={{ ...APPLICATION_PAGES, workspace: workspaceOpen ? () => <WorkspacePage /> : APPLICATION_PAGES.workspace }} />

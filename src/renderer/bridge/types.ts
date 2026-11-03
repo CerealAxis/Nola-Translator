@@ -5,7 +5,7 @@
  */
 
 import type { NolaTranslatorApi } from '../../shared/bridge'
-import type { ResourceRecord, ResourceSnapshot } from '../../shared/contracts'
+import type { AudioDevice, ResourceRecord, ResourceSnapshot } from '../../shared/contracts'
 
 // Re-exported verbatim from src/shared/.
 
@@ -105,7 +105,7 @@ export type AudioSourceOption =
   | { value: 'defaultOutput'; kind: 'defaultOutput'; deviceId: null; name: string; isDefault: true }
   | {
       value: string
-      kind: 'systemOutput' | 'microphone'
+      kind: AudioDevice['kind']
       deviceId: string
       name: string
       isDefault: boolean

@@ -8,23 +8,32 @@ import { registerWorkbench, isWorkbenchWindow } from './workbench'
 import { registerOnboardingCard } from './onboardingCard'
 import { closeDirectModelWorker } from './direct-model'
 import { AgentWorkspace } from './agent-workspace'
-import { customModelsOf } from '../shared/custom-models'
+import { customCredentialSlot, customModelsOf } from '../shared/custom-models'
 import { captureMainConsole, initializeSessionLog, logActivityTotals, logDiagnostic, relocateSessionLogs } from './session-log'
 import { resolveDeviceIntent } from '../shared/device-selection'
 import { join } from 'node:path'
 import { mkdir } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 
 import { app, BrowserWindow, ipcMain, safeStorage, screen, session, shell, type IpcMainInvokeEvent } from 'electron'
 
 import type { AppSettings, OverlaySettings } from '../shared/settings'
-import { NO_TRANSLATION_LANGUAGE } from '../shared/settings'
+import { defaultRealtimeS2s, MIMO_TTS_BINDING, NO_TRANSLATION_LANGUAGE } from '../shared/settings'
+import { z } from 'zod'
+import { isModelEnabled } from '../shared/model-policy'
 import type { SessionConfig } from '../shared/contracts'
 import type { MainErrorNotification } from '../shared/bridge'
 import { randomUUID } from 'node:crypto'
 import { handleMeetingAudio, MEETING_AUDIO_SCHEME, registerMeetingAudioScheme } from './audio-protocol'
 import { registerAppIpc, resetOverlayLock } from './app-ipc'
 import { createEngineLaunchSpec, EngineProcess } from './engine-process'
+import { BackendSupervisor, backendLaunchSpec } from './backend-supervisor'
+import { BackendSession, mapBrowserSessionConfig, mapSessionConfig } from './backend-session'
+import { backendAsrHeaders, backendCloudAsr, backendCloudMt, inferBackendModel, openBackendAsrStream, openBackendLanguageModel } from './backend-direct-model'
+import { createGatewayLanguageModel } from './gateway-language-model'
+import { supportsRealtimeCompute } from '../shared/compute'
+import { fallbackTranslationFieldsOf, recognitionFieldsOf, translationOptionsFor } from '../shared/cloud-config'
+import { aliyunConnectionReady } from '../shared/cloud-models'
 import { clearDataRootPointer, clearPendingDataMigration, defaultDataRoot, fallbackDataRoot, legacyDefaultDataRoot, readDataRootPointer, readPendingDataMigration, resolveDataRoot, setSessionDataRoot, writeDataRootPointer, writePendingDataMigration } from './data-root'
 import { freeBytesForDirectory } from './disk-usage'
 import { dataRootEntries, migrateDataRoot, planDataRootMigration } from './data-migration'
@@ -42,7 +51,7 @@ import { registerOfflineIpc } from './offline-ipc'
 import { runOfflineModelWorker } from './offline-worker'
 import { SettingsStore } from './settings-store'
 import { SecureCredentialStore } from './secure-store'
-import { createMainWindowOptions, isAllowedRendererPermission, isTrustedRendererUrl, resolvePreloadPath } from './window-options'
+import { createMainWindowOptions, isAllowedRendererPermission, isTrustedRendererUrl, resolvePreloadPath, resolveWindowIconPath } from './window-options'
 import { computeOverlayBounds, createOverlayWindowOptions, suppressSystemMenuOnRightClick } from './windows'
 import { prepareOverlayMenu } from './overlay-menu'
 import { resolveModelNetwork } from './network-region'
@@ -58,6 +67,8 @@ let overlayToastReady = false
 let workspaceWindow: BrowserWindow | null = null
 let workspaceReady: Promise<void> = Promise.resolve()
 let engine: EngineProcess | null = null
+let backend: BackendSupervisor | null = null
+let backendInitialization: Promise<void> | null = null
 let disposeIpc: (() => void) | null = null
 let disposeAppIpc: (() => void) | null = null
 let disposeRuntimeIpc: (() => void) | null = null
@@ -73,7 +84,7 @@ let closeBehavior: () => AppSettings['closeBehavior'] = () => 'tray'
 let requestQuit: () => void = () => app.quit()
 const activity = new FeatureActivity(snapshot => {
   for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('feature-activity:changed', snapshot)
-  tray?.activityChanged(snapshot)
+  tray?.activityChanged()
 })
 function assertFeatureSender(event: IpcMainInvokeEvent, mainOnly = false): void {
   const window = BrowserWindow.fromWebContents(event.sender)
@@ -98,7 +109,7 @@ function createMainWindow(theme: AppSettings['theme']): void {
     if (quitting) return
     event.preventDefault()
     if (closeBehavior() === 'quit') requestQuit()
-    else { window.hide(); tray?.hidden() }
+    else window.hide()
   })
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null
@@ -195,7 +206,7 @@ function createOverlayWindow(theme: AppSettings['theme'], overlay: OverlaySettin
   // derived from the caption font sizes, so a previously saved large font would otherwise
   // start out in a window too short to render it.
   const window = new BrowserWindow(
-    createOverlayWindowOptions(preload, display.workArea.width, overlay, display.workArea.height),
+    { ...createOverlayWindowOptions(preload, display.workArea.width, overlay, display.workArea.height), icon: resolveWindowIconPath(__dirname) },
   )
   overlayWindow = window
   window.webContents.once('did-finish-load', () => {
@@ -281,22 +292,32 @@ function showOverlayToast(notification: MainErrorNotification, source: BrowserWi
 // Must run before the app is ready: privileged schemes are frozen afterwards.
 registerMeetingAudioScheme()
 
+const isDevLaunch = !app.isPackaged && !!process.env.ELECTRON_RENDERER_URL
+if (isDevLaunch) {
+  // Chromium locks userData before the first window opens.
+  const devProfile = join(app.getPath('appData'), 'Nola Translator Dev')
+  mkdirSync(devProfile, { recursive: true })
+  app.setPath('userData', devProfile)
+}
+
 const hasSingleInstanceLock = app.requestSingleInstanceLock()
 
 if (!hasSingleInstanceLock) {
-  app.quit()
+  if (isDevLaunch) {
+    console.error('[nola dev] The Electron profile is in use. Close the previous Nola dev instance (including its tray icon) and retry npm run dev.')
+    app.exit(1)
+  } else {
+    app.quit()
+  }
 } else {
   const appId = app.isPackaged ? 'com.nola-translator.app' : 'com.nola-translator.app.dev'
   app.setAppUserModelId(appId)
   // Give the taskbar group a product icon even when the executable is electron.exe.
   app.on('browser-window-created', (_event, window) => {
     if (process.platform !== 'win32') return
-    const icon = app.isPackaged
-      ? join(process.resourcesPath, 'icon.ico')
-      : join(app.getAppPath(), 'build', 'icon.ico')
     window.setAppDetails({
       appId,
-      appIconPath: icon,
+      appIconPath: resolveWindowIconPath(__dirname),
       relaunchCommand: app.isPackaged ? `"${process.execPath}"` : `"${process.execPath}" "${app.getAppPath()}"`,
       relaunchDisplayName: 'Nola Translator',
     })
@@ -535,6 +556,37 @@ if (!hasSingleInstanceLock) {
       await runtimeInitialization
       if (quitting) throw new Error('应用正在退出')
     }
+    // Start after runtime selection so workers inherit the active model and runtime paths.
+    backendInitialization = (async () => {
+      await runtimeInitialization
+      if (quitting) return
+      const directories = runtimes.selectedDirectories(settings.current().compute)
+      backend = new BackendSupervisor({
+        spec: backendLaunchSpec({
+          isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath,
+          managedEngineDirectory: directories.engine, managedCrispDirectory: directories.crisp,
+        }),
+        env: { ...resourceEnvironment, NOLA_TRANSLATOR_LLAMA_DIR: directories.llama ?? bundledLlamaDirectory },
+        journalDir: join(dataRoot, 'session-journal'),
+      })
+      backend.on('exit', info => logDiagnostic('backend.exit', info))
+      try {
+        const frame = await backend.start()
+        logDiagnostic('backend.started', { address: frame.address })
+      } catch (error) {
+        logDiagnostic('backend.start.failed', { error })
+      }
+    })().catch(error => logDiagnostic('backend.init.failed', { error }))
+    let backendRestart: Promise<void> | undefined
+    const ensureRealtimeBackend = async (): Promise<void> => {
+      await backendInitialization
+      if (!backend || backend.ready || quitting) return
+      backendRestart ??= backend.start().then(
+        () => undefined,
+        error => { logDiagnostic('backend.restart.failed', { error }) },
+      ).finally(() => { backendRestart = undefined })
+      await backendRestart
+    }
     engine = new EngineProcess({
       resolveLaunchSpec: () => {
         const compute = launchCompute
@@ -565,7 +617,7 @@ if (!hasSingleInstanceLock) {
     let sessionActive = false
     engine.on('protocolError', (error: unknown) => console.error('engine protocol failed', error))
     engine.on('state', state => logDiagnostic('engine.state', { state }))
-    engine.on('crash', error => { logDiagnostic('engine.crash', error); tray?.failure() })
+    engine.on('crash', error => { logDiagnostic('engine.crash', error) })
     let componentInstalling = false
     let sessionStarting = false
     let preparation: Promise<void> | null = null
@@ -701,11 +753,171 @@ if (!hasSingleInstanceLock) {
       }
       if (cancelled()) throw new Error('sessionStartCancelled')
     }
-    const sessions = new SessionController({ engine: desktopEngine, audioTestEngine: engine, meetings, activity, useGateway: true, getSettings: () => settings.current(), getCredential: provider => credentials.get(provider), prepare: (config, cancelled) => prepareSession(config, cancelled), whenReady: whenRuntimeReady, startingChanged: starting => { sessionStarting = starting }, hideOverlay: () => { if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide() }, isOverlayVisible })
-    const browserSessions = new SessionController({ engine: browserEngine, meetings: null, activity, useGateway: true,
+    let playbackEndpoint: { token: string; target: Electron.WebContents; client: BackendSession; ready: (available: boolean) => void } | undefined
+    loggedHandle('realtime:playback-ready', (event, token: unknown, available: unknown) => {
+      const endpoint = playbackEndpoint
+      if (endpoint && event.sender === endpoint.target && token === endpoint.token) endpoint.ready(available === true)
+    })
+    loggedHandle('realtime:playback-ack', (event, token: unknown, ack: unknown) => {
+      const endpoint = playbackEndpoint
+      if (!endpoint || event.sender !== endpoint.target || token !== endpoint.token) return
+      endpoint.client.acknowledge(ack as Parameters<BackendSession['acknowledge']>[0])
+    })
+    loggedHandle('realtime:playback-device-lost', (event, token: unknown) => {
+      const endpoint = playbackEndpoint
+      if (!endpoint || event.sender !== endpoint.target || token !== endpoint.token) return
+      desktopEngine.emit('event', { protocolVersion: 1, type: 'error', requestId: 'realtime-playback-device-lost', code: 'audioDeviceDisconnected', recoverable: false })
+      return endpoint.client.stop()
+    })
+    const prepareRealtimeCredentials = async (config: SessionConfig, current: AppSettings, s2sModel?: string) => {
+      const resolved = { ...config }
+      if (s2sModel) {
+        const apiKey = await credentials.get('aliyun-asr')
+        if (!aliyunConnectionReady(current, !!apiKey.trim())) throw new Error('S2S_CONFIGURATION_MISSING')
+        const recognition = recognitionFieldsOf({ ...current.recognition, provider: 'aliyun' }).recognitionOptions
+        resolved.recognitionOptions = { ...recognition, model: s2sModel, apiKey }
+        return resolved
+      }
+      const recognition = config.recognitionProvider
+      if (recognition === 'aliyun' || recognition === 'minimax') {
+        const options = recognitionFieldsOf({ ...current.recognition, provider: recognition }).recognitionOptions
+        resolved.recognitionOptions = { ...options, apiKey: await credentials.get(`${recognition}-asr`) }
+      }
+      const provider = config.translationProvider ?? 'local'
+      if (provider === 'cloud' && config.translationBinding?.startsWith('mt-custom:')) {
+        const id = config.translationBinding.slice('mt-custom:'.length)
+        const translation = translationOptionsFor(current.translation, 'cloud', id)
+        if (translation) resolved.translationOptions = { ...translation, apiKey: await credentials.get(customCredentialSlot(id)) }
+      }
+      if (provider === 'google' || provider === 'microsoft' || provider === 'mymemory') {
+        resolved.translationOptions = translationOptionsFor(current.translation, provider)
+        if (provider !== 'mymemory') resolved.translationOptions = {
+          ...resolved.translationOptions, apiKey: await credentials.get(provider),
+        }
+      }
+      const fallback = fallbackTranslationFieldsOf(current.translation)
+      if (config.fallbackTranslationProvider && config.fallbackTranslationProvider === fallback.fallbackTranslationProvider) {
+        resolved.fallbackTranslationOptions = fallback.fallbackTranslationOptions
+        const kind = fallback.fallbackTranslationProvider
+        const slot = kind === 'cloud' ? 'fallback-cloud' : kind === 'google' ? 'fallback-google' : kind === 'microsoft' ? 'microsoft' : undefined
+        if (slot) resolved.fallbackTranslationOptions = { ...resolved.fallbackTranslationOptions, apiKey: await credentials.get(slot) }
+      }
+      return resolved
+    }
+    const sessions: SessionController = new SessionController({
+      engine: desktopEngine, audioTestEngine: engine, meetings, activity, useGateway: true,
       getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
       prepare: (config, cancelled) => prepareSession(config, cancelled), whenReady: whenRuntimeReady,
-      startingChanged: () => {}, hideOverlay: () => {} })
+      startingChanged: starting => { sessionStarting = starting },
+      hideOverlay: () => { if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide() },
+      isOverlayVisible,
+      prepareBackend: async (config, current) => {
+        const speech = config.outputMode === 'speech'
+        if (speech && config.audioSource.kind === 'systemOutput') throw new Error('systemAudioSpeechUnavailable')
+        const s2sModel = config.outputMode === 'source' ? undefined
+          : (config.s2sModel === undefined ? defaultRealtimeS2s(current) : config.s2sModel) ?? undefined
+        const directConfig = s2sModel ? await prepareRealtimeCredentials(config, current, s2sModel) : undefined
+        const requiresBackend = !!s2sModel || config.audioSource.kind === 'virtualInput' || config.audioSource.kind === 'processAudio'
+        await ensureRealtimeBackend()
+        if (!backend?.ready) {
+          if (requiresBackend) throw new Error('realtimeBackendUnavailable')
+          return
+        }
+        const target = (workspaceWindow && !workspaceWindow.isDestroyed() ? workspaceWindow : mainWindow)?.webContents
+        if (speech && (!target || target.isDestroyed())) return
+        const token = randomUUID()
+        let configured = false
+        const send = (channel: string, value?: unknown) => {
+          if (target && !target.isDestroyed()) target.send(channel, token, value)
+        }
+        const resetPlayback = () => {
+          if (playbackEndpoint?.token === token) {
+            playbackEndpoint.ready(false)
+            playbackEndpoint = undefined
+          }
+          target?.removeListener('destroyed', playbackLost)
+          if (configured) {
+            configured = false
+            send('realtime:playback-close')
+          }
+        }
+        const playbackLost = () => {
+          if (playbackEndpoint?.token !== token) return
+          resetPlayback()
+          void client.stop().catch(() => sessions.releaseOnLoss(true))
+        }
+        const client = new BackendSession(backend, {
+          onEvent: event => {
+            desktopEngine.emit('event', event)
+            if (event.type === 'sessionStopped') resetPlayback()
+          },
+          preparePlayback: inputCable => new Promise<void>((resolve, reject) => {
+            if (!target || target.isDestroyed()) { reject(new Error('audioRouteConflict')); return }
+            const timeout = setTimeout(() => ready(false), 5_000)
+            const ready = (available: boolean) => {
+              clearTimeout(timeout)
+              if (available) resolve()
+              else reject(new Error('audioRouteConflict'))
+            }
+            try {
+              configured = true
+              playbackEndpoint = { token, target, client, ready }
+              target.once('destroyed', playbackLost)
+              send('realtime:playback-configure', { device: config.speechOutputDeviceId, inputCable })
+            } catch {
+              ready(false)
+            }
+          }).catch(error => { resetPlayback(); throw error }),
+          onChunk: chunk => send('realtime:playback-chunk', chunk),
+          onFence: generation => send('realtime:playback-fence', generation),
+          onClose: resetPlayback,
+          onLoss: () => { resetPlayback(); sessions.releaseOnLoss(true) },
+        })
+        const resolved = directConfig ?? await prepareRealtimeCredentials(config, current)
+        const speechModel = config.speechModelId?.replace(/^resource:/, '') || current.synthesis.modelId
+        const mapped = mapSessionConfig(resolved, {
+          ...current, synthesis: { ...current.synthesis,
+            modelId: speechModel,
+            voice: config.speechVoice ?? current.synthesis.voice },
+        }, await client.models(), {
+          output: config.outputMode, outputDeviceId: config.speechOutputDeviceId,
+          speakerDetection: config.speakerDetection, s2sModel,
+          ...(speech && !s2sModel && speechModel === MIMO_TTS_BINDING && isModelEnabled(current, 'tts', speechModel)
+            ? { ttsApiKey: await credentials.get('mimo-tts') } : {}),
+        })
+        if (!mapped) {
+          client.close()
+          if (requiresBackend) throw new Error('realtimeBackendUnavailable')
+          return
+        }
+        return { client, mapped }
+      },
+    })
+    const browserSessions: SessionController = new SessionController({ engine: browserEngine, meetings: null, activity, useGateway: true,
+      getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
+      prepare: (config, cancelled) => prepareSession(config, cancelled), whenReady: whenRuntimeReady,
+      startingChanged: () => {}, hideOverlay: () => {},
+      prepareBackend: async (config, current) => {
+        await ensureRealtimeBackend()
+        if (!backend?.ready) {
+          if (config.s2sModel || config.audioSource.kind === 'processAudio') throw new Error('realtimeBackendUnavailable')
+          return
+        }
+        const client = new BackendSession(backend, {
+          onEvent: event => browserEngine.emit('event', event),
+          onLoss: () => browserSessions.releaseOnLoss(true),
+        })
+        const s2sModel = config.s2sModel ?? undefined
+        const resolved = await prepareRealtimeCredentials(config, current, s2sModel)
+        const mapped = mapBrowserSessionConfig(resolved, current, await client.models(), { s2sModel })
+        if (!mapped) {
+          client.close()
+          if (s2sModel || config.audioSource.kind === 'processAudio') throw new Error('realtimeBackendUnavailable')
+          return
+        }
+        return { client, mapped }
+      },
+    })
     browserEngine.on('event', event => browserSessions.handleEvent(event))
     browserEngine.on('state', state => { if (state === 'failed' || state === 'recovering') browserSessions.releaseOnLoss() })
     stopSessions = async () => {
@@ -762,9 +974,32 @@ if (!hasSingleInstanceLock) {
       () => { sessionActive = false },
       sessions,
       config => browserConnection!.prepareCaptionService(config),
-      resourceId => gateway?.resourceInUse(resourceId) ?? false,
+      resourceId => sessions.usesBackendResource(resourceId) || browserSessions.usesBackendResource(resourceId)
+        || (gateway?.resourceInUse(resourceId) ?? false),
+      async () => {
+        await ensureRealtimeBackend()
+        if (!backend?.ready) return []
+        const response = await fetch(new URL('/api/v2/audio/processes', backend.baseUrl), {
+          headers: backend.authorizationHeader(), signal: AbortSignal.timeout(5_000),
+        })
+        if (!response.ok) return []
+        const { processes } = z.object({ processes: z.array(z.object({ name: z.string(), pid: z.number().int().positive(), selection_id: z.string().nullable() })) }).parse(await response.json())
+        return processes.flatMap(item => item.selection_id ? [{
+          name: `${item.name} (${item.pid})`, deviceId: `process:${item.selection_id}`, kind: 'processAudio' as const, isDefault: false,
+        }] : [])
+      },
     )
-    browserConnection = new BrowserConnection({ engine: browserEngine, sessions: browserSessions, activity, useGateway: true, integrations: new BrowserIntegrations({ localAppData: process.env.LOCALAPPDATA ?? app.getPath('userData'), userData: app.getPath('userData') }), getSettings: () => settings.current(), setEnabled: async enabled => {
+    browserConnection = new BrowserConnection({ engine: browserEngine, sessions: browserSessions, activity, useGateway: true,
+      prepareS2s: async model => {
+        const current = settings.current()
+        if (!aliyunConnectionReady(current, await credentials.has('aliyun-asr'))) return { state: 'failed', code: 'modelUnavailable' }
+        if (current.translation.targetLanguage === NO_TRANSLATION_LANGUAGE) return { state: 'failed', code: 'invalidConfiguration' }
+        await ensureRealtimeBackend()
+        if (!backend?.ready) return { state: 'failed', code: 'modelUnavailable' }
+        const client = new BackendSession(backend, { onEvent: () => {} })
+        try { return (await client.models()).has(model) ? { state: 'ready' } : { state: 'failed', code: 'modelUnavailable' } }
+        finally { client.close() }
+      }, integrations: new BrowserIntegrations({ localAppData: process.env.LOCALAPPDATA ?? app.getPath('userData'), userData: app.getPath('userData') }), getSettings: () => settings.current(), setEnabled: async enabled => {
       const saved = await settings.update({ browserConnection: { enabled } })
       for (const window of BrowserWindow.getAllWindows()) window.webContents.send('settings:changed', saved)
     } })
@@ -819,8 +1054,50 @@ if (!hasSingleInstanceLock) {
       gatewayLease?.release()
       gatewayLease = null
     }
-    const failedServices = new Set<string>()
     gateway = new ModelGateway({
+      openBackendAsr: async (binding, signal, emit) => {
+        await ensureRealtimeBackend()
+        if (!backend?.ready) return
+        const provider = backendCloudAsr(binding)
+        const options = provider ? recognitionFieldsOf({ ...settings.current().recognition, provider }).recognitionOptions : undefined
+        const headers = provider ? backendAsrHeaders({ ...options, apiKey: await credentials.get(`${provider}-asr`) }) : {}
+        return openBackendAsrStream(backend, binding, signal, emit, headers)
+      },
+      inferBackend: async (request, signal, options) => {
+        await ensureRealtimeBackend()
+        const mimo = request.kind === 'tts' && request.model === MIMO_TTS_BINDING
+        const provider = request.kind === 'mt' ? backendCloudMt(request.model) : undefined
+        const asr = request.kind === 'asr' ? backendCloudAsr(request.model) : undefined
+        const current = settings.current()
+        if (backend?.ready && (mimo || provider || asr || supportsRealtimeCompute(current.compute))) {
+          if (asr) {
+            const recognition = recognitionFieldsOf({ ...current.recognition, provider: asr }).recognitionOptions
+            return inferBackendModel(backend, request, signal, options, undefined, undefined,
+              backendAsrHeaders({ ...recognition, apiKey: await credentials.get(`${asr}-asr`) }))
+          }
+          if (provider === 'custom-mt') {
+            const id = request.model.slice('mt-custom:'.length)
+            const translation = translationOptionsFor(current.translation, 'cloud', id)
+            if (!translation) return
+            return inferBackendModel(backend, request, signal, options, undefined,
+              { ...translation, apiKey: await credentials.get(customCredentialSlot(id)) })
+          }
+          const translation = provider ? translationOptionsFor(current.translation, provider) : undefined
+          if (provider === 'google' || provider === 'microsoft') {
+            const apiKey = await credentials.get(provider)
+            if (!apiKey) return
+            return inferBackendModel(backend, request, signal, options, undefined, { ...translation, apiKey })
+          }
+          return inferBackendModel(backend, request, signal, options, mimo ? await credentials.get('mimo-tts') : undefined, translation)
+        }
+      },
+      createLanguageModel: (services, binding, signal) => createGatewayLanguageModel({
+        ...services,
+        openLocalLanguageModel: async (resourceId, localSignal) => {
+          await ensureRealtimeBackend()
+          return backend?.ready ? openBackendLanguageModel(backend, resourceId, localSignal) : undefined
+        },
+      }, binding, signal),
       getSettings: () => settings.current(), directLaunch,
       listResources: async () => {
         await whenRuntimeReady()
@@ -832,20 +1109,32 @@ if (!hasSingleInstanceLock) {
       onChanged: snapshot => {
         for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('model-gateway:changed', snapshot)
         if (snapshot.state === 'failed' || snapshot.state === 'stopped') { gatewayLease?.release(); gatewayLease = null }
-        let serviceFailed = false
-        for (const [kind, service] of Object.entries(snapshot.services)) {
-          if (service.state === 'failed') { if (!failedServices.has(kind)) serviceFailed = true; failedServices.add(kind) }
-          else failedServices.delete(kind)
-        }
-        if (snapshot.state === 'failed' || serviceFailed) tray?.failure()
       },
     })
     loggedHandle('feature-activity:snapshot', event => { assertFeatureSender(event); return activity.snapshot() })
     loggedHandle('feature-activity:stop', event => { assertFeatureSender(event); return activity.stop() })
-    loggedHandle('model-gateway:status', () => gateway!.snapshotWithCatalog())
+    loggedHandle('model-gateway:status', async () => {
+      const snapshot = await gateway!.snapshotWithCatalog()
+      const supervisor = backend
+      if (!supervisor?.ready) return snapshot
+      const requests = await Promise.allSettled(['capabilities', 'instances'].map(async route => {
+        const response = await fetch(new URL(`/api/v2/gateway/${route}`, supervisor.baseUrl), {
+          headers: supervisor.authorizationHeader(), signal: AbortSignal.timeout(2000),
+        })
+        if (!response.ok) throw new Error('Realtime gateway unavailable')
+        return response.json()
+      }))
+      const [models, instances] = requests
+      if (models.status !== 'fulfilled' || instances.status !== 'fulfilled') return snapshot
+      return { ...snapshot, realtime: { models: models.value.models, instances: instances.value.instances } }
+    })
     loggedHandle('model-gateway:start', async event => {
       assertFeatureSender(event, true)
       if (activity.has('model-gateway') && gateway!.snapshot().state === 'running') return gateway!.snapshot()
+      const current = settings.current()
+      if (defaultRealtimeS2s(current) && !aliyunConnectionReady(current, await credentials.has('aliyun-asr'))) {
+        throw new Error('S2S_CONFIGURATION_MISSING')
+      }
       const lease = activity.acquire('model-gateway', stopGateway)
       gatewayLease = lease
       const task = gateway!.start()
@@ -933,7 +1222,7 @@ if (!hasSingleInstanceLock) {
       assertFeatureSender(event, true)
       if (mainWindow && event.sender === mainWindow.webContents) app.quit()
     })
-    tray = new NolaTray({ getSettings: () => settings.current(), getWindow: () => mainWindow, getActivity: () => activity.snapshot(), show: showMainWindow, stop: () => activity.stop(), quit: () => requestQuit() })
+    tray = new NolaTray({ getSettings: () => settings.current(), getActivity: () => activity.snapshot(), show: showMainWindow, stop: () => activity.stop(), quit: () => requestQuit() })
     await tray.initialize()
     createOverlayWindow(initialSettings.theme, initialSettings.overlay)
     void whenRuntimeReady().then(() => engine!.start()).catch((error) => {
@@ -959,11 +1248,15 @@ app.on('before-quit', (event) => {
   event.preventDefault()
   quitting = true
   disposeIpc?.()
+  ipcMain.removeHandler('realtime:playback-ack')
+  ipcMain.removeHandler('realtime:playback-ready')
+  ipcMain.removeHandler('realtime:playback-device-lost')
   disposeAppIpc?.()
   disposeRuntimeIpc?.()
   tray?.dispose()
   stopOnboardingCard?.()
   void Promise.allSettled([gateway?.dispose(), stopWorkbench?.(), stopSessions?.(), browserConnection?.dispose(), disposeOfflineIpc?.()])
+    .then(() => backendInitialization?.then(() => backend?.stop()))
     .finally(() => engine!.stop())
     .catch((error) => console.error('engine shutdown failed', error))
     .finally(() => app.quit())

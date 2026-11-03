@@ -1,0 +1,1288 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Nola Translator realtime backend",
+    "version": "2"
+  },
+  "paths": {
+    "/api/v2/health/live": {
+      "get": {
+        "summary": "Health Live",
+        "operationId": "health_live_api_v2_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Live Api V2 Health Live Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/health/ready": {
+      "get": {
+        "summary": "Health Ready",
+        "operationId": "health_ready_api_v2_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Ready Api V2 Health Ready Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions": {
+      "post": {
+        "summary": "Create Session",
+        "operationId": "create_session_api_v2_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{session_id}": {
+      "get": {
+        "summary": "Get Session",
+        "operationId": "get_session_api_v2_sessions__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{session_id}/commands": {
+      "post": {
+        "summary": "Session Command",
+        "operationId": "session_command_api_v2_sessions__session_id__commands_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{session_id}/playback/{job_id}/{action}": {
+      "post": {
+        "summary": "Resolve Playback",
+        "operationId": "resolve_playback_api_v2_sessions__session_id__playback__job_id___action__post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "retry",
+                "skip"
+              ],
+              "type": "string",
+              "title": "Action"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaybackResolution"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{session_id}/input/end": {
+      "post": {
+        "summary": "Finish Native Input",
+        "operationId": "finish_native_input_api_v2_sessions__session_id__input_end_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{session_id}/subscriptions": {
+      "post": {
+        "summary": "Create Subscription",
+        "operationId": "create_subscription_api_v2_sessions__session_id__subscriptions_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sessions/{session_id}/subscriptions/{consumer_id}": {
+      "delete": {
+        "summary": "Delete Subscription",
+        "operationId": "delete_subscription_api_v2_sessions__session_id__subscriptions__consumer_id__delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "consumer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Consumer Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/gateway/infer": {
+      "post": {
+        "summary": "Gateway Infer",
+        "operationId": "gateway_infer_api_v2_gateway_infer_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectInferenceResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/gateway/language-models": {
+      "post": {
+        "summary": "Open Language Model",
+        "operationId": "open_language_model_api_v2_gateway_language_models_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LanguageModelOpenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/gateway/language-models/{lease_id}": {
+      "delete": {
+        "summary": "Close Language Model",
+        "operationId": "close_language_model_api_v2_gateway_language_models__lease_id__delete",
+        "parameters": [
+          {
+            "name": "lease_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lease Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/gateway/instances": {
+      "get": {
+        "summary": "Gateway Instances",
+        "description": "Live instance states for the desktop model page. This is a private\nmanagement surface: it is behind the same control token as the realtime\nAPI and is never exposed on the public /v1-compatible space.",
+        "operationId": "gateway_instances_api_v2_gateway_instances_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Gateway Instances Api V2 Gateway Instances Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/gateway/capabilities": {
+      "get": {
+        "summary": "Gateway Capabilities",
+        "operationId": "gateway_capabilities_api_v2_gateway_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Gateway Capabilities Api V2 Gateway Capabilities Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/audio/processes": {
+      "get": {
+        "summary": "Audio Processes",
+        "operationId": "audio_processes_api_v2_audio_processes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioProcessesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/audio/preflight": {
+      "post": {
+        "summary": "Audio Preflight",
+        "description": "Run routing.preflight_route against the real local topology so the\nsetup wizard can prove a route is loop-safe before a session starts.\n\nThe process-loopback capability probe activates COM off the event loop.\nVirtual input must resolve to a recording endpoint. Chromium playback\nIDs cannot identify the corresponding Windows endpoint.",
+        "operationId": "audio_preflight_api_v2_audio_preflight_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudioPreflightRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AudioPreflightRequest": {
+        "properties": {
+          "input_mode": {
+            "type": "string",
+            "title": "Input Mode"
+          },
+          "input_endpoint_id": {
+            "type": "string",
+            "title": "Input Endpoint Id",
+            "default": ""
+          },
+          "excluded_process_tree": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Excluded Process Tree"
+          },
+          "speech_output_endpoint_id": {
+            "type": "string",
+            "title": "Speech Output Endpoint Id",
+            "default": ""
+          },
+          "speech_output_endpoint_is_opaque": {
+            "type": "boolean",
+            "title": "Speech Output Endpoint Is Opaque",
+            "default": false
+          },
+          "monitor_original": {
+            "type": "boolean",
+            "title": "Monitor Original",
+            "default": false
+          },
+          "monitor_output_endpoint_id": {
+            "type": "string",
+            "title": "Monitor Output Endpoint Id",
+            "default": ""
+          },
+          "probe_target_pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe Target Pid"
+          },
+          "process_selection_id": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Process Selection Id",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_mode"
+        ],
+        "title": "AudioPreflightRequest",
+        "description": "Route description the setup wizard submits for a safety preflight.\n\nMirrors routing.AudioRoute; kept as a private management model so the core\nsession contract in contracts.py is untouched. `excluded_process_tree` MUST\ncarry the real Electron playback tree (not just the backend PID) for\nprocess_exclude, or preflight reports missing_exclude_tree."
+      },
+      "AudioProcess": {
+        "properties": {
+          "pid": {
+            "type": "integer",
+            "title": "Pid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "selection_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pid",
+          "name",
+          "active",
+          "selection_id",
+          "reason"
+        ],
+        "title": "AudioProcess"
+      },
+      "AudioProcessesResponse": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "processes": {
+            "items": {
+              "$ref": "#/components/schemas/AudioProcess"
+            },
+            "type": "array",
+            "title": "Processes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "processes"
+        ],
+        "title": "AudioProcessesResponse"
+      },
+      "CascadePipelineConfig": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "cascade",
+            "title": "Kind"
+          },
+          "asr_model": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Asr Model"
+          },
+          "translation_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Model"
+          },
+          "fallback_translation_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Translation Model"
+          },
+          "tts_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tts Model"
+          },
+          "tts_voice": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tts Voice"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "asr_model"
+        ],
+        "title": "CascadePipelineConfig"
+      },
+      "CreateSessionRequest": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Command Id"
+          },
+          "owner": {
+            "type": "string",
+            "enum": [
+              "quick_interpret",
+              "browser_captions"
+            ],
+            "title": "Owner"
+          },
+          "config": {
+            "$ref": "#/components/schemas/SessionConfig"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "owner",
+          "config"
+        ],
+        "title": "CreateSessionRequest"
+      },
+      "DirectInferenceResult": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "audio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio"
+          },
+          "voices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "DirectInferenceResult"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InputConfig": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "microphone",
+              "system_audio",
+              "process_audio",
+              "virtual_input",
+              "browser_tab"
+            ],
+            "title": "Kind"
+          },
+          "device_id": {
+            "type": "string",
+            "maxLength": 512,
+            "title": "Device Id",
+            "default": ""
+          },
+          "capture_backend": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "device",
+                  "windows_process_include",
+                  "windows_process_exclude",
+                  "virtual_input",
+                  "browser_tab"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Backend"
+          },
+          "process_selection_id": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Process Selection Id",
+            "default": ""
+          },
+          "browser_stream_id": {
+            "type": "string",
+            "maxLength": 128,
+            "title": "Browser Stream Id",
+            "default": ""
+          },
+          "excluded_process_tree": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Excluded Process Tree",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "InputConfig"
+      },
+      "LanguageModelOpenRequest": {
+        "properties": {
+          "lease_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Lease Id"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lease_id",
+          "model"
+        ],
+        "title": "LanguageModelOpenRequest"
+      },
+      "PlaybackResolution": {
+        "properties": {
+          "owner_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Owner Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "owner_id"
+        ],
+        "title": "PlaybackResolution"
+      },
+      "S2SPipelineConfig": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "s2s",
+            "title": "Kind"
+          },
+          "s2s_model": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "S2S Model"
+          },
+          "asr_model": {
+            "type": "null",
+            "title": "Asr Model"
+          },
+          "translation_model": {
+            "type": "null",
+            "title": "Translation Model"
+          },
+          "tts_model": {
+            "type": "null",
+            "title": "Tts Model"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "s2s_model"
+        ],
+        "title": "S2SPipelineConfig"
+      },
+      "SessionCommand": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Command Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "start",
+              "pause",
+              "resume",
+              "stop",
+              "reset_stream",
+              "switch_pipeline"
+            ],
+            "title": "Type"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SwitchPipelineParams"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "type"
+        ],
+        "title": "SessionCommand",
+        "description": "User command envelope. `finish_input`/drain deliberately does not exist."
+      },
+      "SessionConfig": {
+        "properties": {
+          "pipeline": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CascadePipelineConfig"
+              },
+              {
+                "$ref": "#/components/schemas/S2SPipelineConfig"
+              }
+            ],
+            "title": "Pipeline",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "cascade": "#/components/schemas/CascadePipelineConfig",
+                "s2s": "#/components/schemas/S2SPipelineConfig"
+              }
+            }
+          },
+          "input": {
+            "$ref": "#/components/schemas/InputConfig"
+          },
+          "source_language": {
+            "type": "string",
+            "maxLength": 32,
+            "title": "Source Language",
+            "default": "auto"
+          },
+          "target_languages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Languages",
+            "default": []
+          },
+          "required_outputs": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "source_text",
+                "translated_text",
+                "audio"
+              ]
+            },
+            "type": "array",
+            "title": "Required Outputs",
+            "default": []
+          },
+          "optional_outputs": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "source_text",
+                "translated_text",
+                "audio"
+              ]
+            },
+            "type": "array",
+            "title": "Optional Outputs",
+            "default": []
+          },
+          "speech_target_language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speech Target Language"
+          },
+          "speaker_detection": {
+            "$ref": "#/components/schemas/SpeakerDetectionConfig"
+          },
+          "audio_route_id": {
+            "type": "string",
+            "maxLength": 128,
+            "title": "Audio Route Id",
+            "default": ""
+          },
+          "recording_path": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Path"
+          },
+          "max_segment_ms": {
+            "type": "integer",
+            "maximum": 30000.0,
+            "minimum": 3000.0,
+            "title": "Max Segment Ms",
+            "default": 10000
+          },
+          "silence_end_ms": {
+            "type": "integer",
+            "maximum": 2000.0,
+            "minimum": 300.0,
+            "title": "Silence End Ms",
+            "default": 900
+          },
+          "translation_preview": {
+            "type": "boolean",
+            "title": "Translation Preview",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pipeline",
+          "input"
+        ],
+        "title": "SessionConfig",
+        "description": "Immutable create-time configuration for one realtime session."
+      },
+      "SpeakerDetectionConfig": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SpeakerDetectionConfig"
+      },
+      "SubscriptionRequest": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Command Id"
+          },
+          "consumer_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Consumer Id"
+          },
+          "outputs": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "source_text",
+                "translated_text",
+                "audio"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Outputs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "consumer_id",
+          "outputs"
+        ],
+        "title": "SubscriptionRequest"
+      },
+      "SwitchPipelineParams": {
+        "properties": {
+          "pipeline": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CascadePipelineConfig"
+              },
+              {
+                "$ref": "#/components/schemas/S2SPipelineConfig"
+              }
+            ],
+            "title": "Pipeline",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "cascade": "#/components/schemas/CascadePipelineConfig",
+                "s2s": "#/components/schemas/S2SPipelineConfig"
+              }
+            }
+          },
+          "speech_target_language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speech Target Language"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pipeline"
+        ],
+        "title": "SwitchPipelineParams"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

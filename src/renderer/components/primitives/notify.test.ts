@@ -1,18 +1,23 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import * as toast from '../ui/toast'
+import * as store from '@/store'
+import type { NolaBridge } from '@/bridge'
 import { notifyError, notifyGatewayModelUnavailable, notifyLoading } from './notify'
 
 afterEach(() => { vi.restoreAllMocks(); window.history.replaceState({}, '', '/') })
 
-it('keeps caption-window errors in the caption window', () => {
+it('routes caption-window errors to the dedicated overlay notification', () => {
   window.history.replaceState({}, '', '/?overlay=1')
   const showToast = vi.spyOn(toast, 'showToast')
+  const notifyMainError = vi.fn()
+  vi.spyOn(store, 'getBridge').mockReturnValue({ app: { notifyMainError } } as unknown as NolaBridge)
 
   notifyError('Audio device unavailable', { cause: new Error('device path and errno 5') })
 
-  expect(showToast).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+  expect(showToast).not.toHaveBeenCalled()
+  expect(notifyMainError).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
     type: 'error',
-    description: 'Audio device unavailable',
+    message: 'Audio device unavailable',
     duration: 10000,
   }))
 })
@@ -43,20 +48,24 @@ it('shows a local-model availability toast in the app with a gateway action', ()
   }))
 })
 
-it('keeps the actionable error in the overlay so only a user click can navigate away', () => {
+it('sends only an approved action identifier for an overlay error', () => {
   window.history.replaceState({}, '', '/?overlay=1')
-  const showToast = vi.spyOn(toast, 'showToast')
+  const notifyMainError = vi.fn()
+  const onPress = vi.fn()
+  vi.spyOn(store, 'getBridge').mockReturnValue({ app: { notifyMainError } } as unknown as NolaBridge)
 
   notifyError('本地引擎未连接', {
     description: '可点击下方按钮继续处理。',
-    action: { label: '重新载入', onPress: vi.fn() },
+    action: { label: '重新载入', onPress, actionId: 'retry-session' },
   })
 
-  expect(showToast).toHaveBeenCalledExactlyOnceWith({
+  expect(onPress).not.toHaveBeenCalled()
+  expect(notifyMainError).toHaveBeenCalledExactlyOnceWith({
     type: 'error',
-    title: '本地引擎未连接',
+    message: '本地引擎未连接',
     description: '可点击下方按钮继续处理。',
-    actionProps: { children: '重新载入', onClick: expect.any(Function) },
+    actionLabel: '重新载入',
+    actionId: 'retry-session',
     duration: 10000,
   })
 })

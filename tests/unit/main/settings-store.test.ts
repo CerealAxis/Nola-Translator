@@ -82,7 +82,7 @@ describe('设置存储', () => {
       expect((await store.load()).overlay.mode).toBe('bottom')
       const updated = await store.update({ uiLanguage: 'en' })
       expect(updated.uiLanguage).toBe('en')
-      expect(JSON.parse(await readFile(path, 'utf8')).version).toBe(2)
+      expect(JSON.parse(await readFile(path, 'utf8')).version).toBe(3)
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
@@ -124,7 +124,7 @@ describe('设置存储', () => {
       }), 'utf8')
 
       const migrated = await new SettingsStore(path).load()
-      expect(migrated.version).toBe(2)
+      expect(migrated.version).toBe(3)
       expect(migrated.network).toMatchObject({
         usePypiMirror: true,
         pypiMirrorUrl: PYPI_MIRROR_AUTO,
@@ -248,6 +248,81 @@ describe('设置存储', () => {
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
+  })
+
+  it.each([
+    ['qwen3.8-livetranslate-flash-realtime', 'qwen3.8-livetranslate-flash-realtime'],
+    ['qwen3.5-livetranslate-flash-realtime', 'qwen3.5-livetranslate-flash-realtime'],
+  ] as const)('将 v2 Aliyun LiveTranslate %s 迁移为原生语音输出', async (aliyunModel, expectedModel) => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-realtime-migration-'))
+    const path = join(directory, 'settings.json')
+    try {
+      await writeFile(path, JSON.stringify({
+        version: 2,
+        recognition: { provider: 'aliyun', aliyunModel, aliyunWorkspaceId: 'kept-workspace', aliyunRegion: 'ap-southeast-1' },
+        translation: { provider: 'mymemory', targetLanguage: 'ja', mymemoryEmail: 'kept@example.test' },
+        customUserField: { keep: true },
+      }))
+
+      const store = new SettingsStore(path)
+      const migrated = await store.load()
+      expect(migrated).toMatchObject({ version: 3, realtime: { outputMode: 'speech', speakerDetection: true, s2sModel: expectedModel } })
+      expect(migrated.recognition).toMatchObject({ provider: 'aliyun', aliyunModel, aliyunWorkspaceId: 'kept-workspace', aliyunRegion: 'ap-southeast-1' })
+      expect(migrated.translation).toMatchObject({ provider: 'mymemory', targetLanguage: 'ja', mymemoryEmail: 'kept@example.test' })
+      expect(JSON.parse(await readFile(path, 'utf8')).customUserField).toEqual({ keep: true })
+      expect(await readFile(`${path}.migration-v3.bak`).catch(() => '')).toBe('')
+
+      const again = await new SettingsStore(path).load()
+      expect(again.realtime).toEqual(migrated.realtime)
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+
+  it('keeps source-only and pure-ASR configurations out of speech migration', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-realtime-migration-'))
+    const path = join(directory, 'settings.json')
+    try {
+      await writeFile(path, JSON.stringify({ version: 2, recognition: { provider: 'aliyun', aliyunModel: 'qwen3.8-livetranslate-flash-realtime' }, translation: { targetLanguage: 'none' } }))
+      expect((await new SettingsStore(path).load()).realtime?.outputMode).toBe('source')
+
+      await writeFile(path, JSON.stringify({ version: 2, recognition: { provider: 'aliyun', aliyunModel: 'qwen3-asr-flash-realtime' }, translation: { provider: 'mymemory', targetLanguage: 'ja' } }))
+      expect((await new SettingsStore(path).load()).realtime).toMatchObject({ outputMode: 'translation' })
+      expect((await new SettingsStore(path).load()).realtime).not.toHaveProperty('s2sModel')
+
+      await writeFile(path, JSON.stringify({ version: 2, recognition: { provider: 'aliyun', aliyunModel: 'unknown-live-model' }, translation: { targetLanguage: 'ja' } }))
+      expect((await new SettingsStore(path).load()).realtime?.outputMode).toBe('translation')
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+
+  it('preserves implicit LiveTranslate selection and a later explicit cascade choice', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-realtime-selection-'))
+    const path = join(directory, 'settings.json')
+    try {
+      await writeFile(path, JSON.stringify({
+        version: 3,
+        recognition: { provider: 'aliyun', aliyunModel: 'qwen3.5-livetranslate-flash-realtime' },
+        realtime: { outputMode: 'speech' },
+      }))
+      const store = new SettingsStore(path)
+      expect((await store.load()).realtime?.s2sModel).toBe('qwen3.5-livetranslate-flash-realtime')
+      await store.update({ realtime: { s2sModel: null } })
+      expect((await new SettingsStore(path).load()).realtime?.s2sModel).toBeNull()
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+
+  it('restores the byte-for-byte backup after an interrupted settings migration', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-realtime-recovery-'))
+    const path = join(directory, 'settings.json')
+    const legacy = JSON.stringify({ version: 2, uiLanguage: 'ja', extra: 'preserve' })
+    try {
+      await writeFile(path, JSON.stringify({ version: 3, uiLanguage: 'en' }))
+      await writeFile(`${path}.migration-v3.bak`, legacy)
+      await writeFile(`${path}.migration-v3.json`, JSON.stringify({ from: 2, to: 3 }))
+      const recovered = await new SettingsStore(path).load()
+      expect(recovered.uiLanguage).toBe('ja')
+      expect(JSON.parse(await readFile(path, 'utf8'))).toMatchObject({ version: 3, extra: 'preserve' })
+      await expect(readFile(`${path}.migration-v3.json`, 'utf8')).rejects.toThrow()
+      await expect(readFile(`${path}.migration-v3.bak`, 'utf8')).rejects.toThrow()
+    } finally { await rm(directory, { recursive: true, force: true }) }
   })
 
   it.each(['fr', 'none'])('preserves the saved source and %s target language after reloading', async targetLanguage => {

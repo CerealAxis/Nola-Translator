@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as storeApi from '@/store'
 import { stores } from '@/store'
@@ -24,6 +25,7 @@ const initialModels = stores.models.getState()
 const profile = { id: 'saved', name: 'Saved cloud translator', endpoint: 'https://example.com/v1', model: 'translator', apiFormat: 'chat-completions' as const, contextWindow: 32768, maxOutputTokens: 1024, languages: ['zh', 'en'] }
 beforeEach(() => {
   stores.settings.setState({ settings: { ...structuredClone(DEFAULT_SETTINGS), uiLanguage: 'zh-CN',
+    realtime: { ...DEFAULT_SETTINGS.realtime, quickS2sModel: null },
     modelPolicy: { enabled: { 'mt:mt-custom:saved': true, 'mt:cloud:microsoft': true, 'asr:cloud:aliyun': true }, defaults: {}, selections: {} },
     recognition: { ...DEFAULT_SETTINGS.recognition, aliyunWorkspaceId: 'workspace' },
     translation: { ...DEFAULT_SETTINGS.translation, customModels: [profile] } } })
@@ -37,6 +39,78 @@ it('lists enabled configured cloud translators and recognition services before t
   expect(translation.getByRole('option', { name: 'Saved cloud translator' })).toBeEnabled()
   expect(translation.getByRole('option', { name: /Microsoft/ })).toBeEnabled()
   expect(within(screen.getByRole('combobox', { name: '识别模型' })).getByRole('option', { name: /阿里云/ })).toBeEnabled()
+})
+
+it('hides all model pickers when following the gateway', () => {
+  const settings = stores.settings.getState().settings!
+  stores.settings.setState({ settings: { ...settings, realtime: {
+    ...settings.realtime, quickS2sModel: undefined, outputMode: 'speech',
+  } } })
+  render(<OverlayPage />)
+  expect(screen.getByRole('combobox', { name: '处理方式' })).toHaveValue('default')
+  expect(screen.queryByRole('combobox', { name: /识别模型|翻译模型|语音合成模型|S2S模型/ })).not.toBeInTheDocument()
+})
+
+it('separates the direct processing mode, S2S model and playback switch', async () => {
+  const settings = stores.settings.getState().settings!
+  stores.settings.setState({ settings: { ...settings, realtime: {
+    ...settings.realtime, outputMode: 'speech', quickS2sModel: 'qwen3.5-livetranslate-flash-realtime',
+  } } })
+  render(<OverlayPage />)
+  const processing = screen.getByRole('combobox', { name: '处理方式' })
+  const user = userEvent.setup()
+  await user.click(processing)
+  expect(within(await screen.findByRole('listbox')).getAllByRole('option').map(option => option.textContent)).toEqual(['跟随网关', '分步识别', '直接语音识别'])
+  await user.keyboard('{Escape}')
+  expect(screen.getByRole('combobox', { name: 'S2S 模型' })).toHaveTextContent('Qwen3.5 LiveTranslate')
+  expect(screen.getByRole('switch', { name: '播报译音' })).toHaveAttribute('aria-checked', 'true')
+  expect(screen.getByRole('combobox', { name: '输出设备' })).toBeEnabled()
+  expect(screen.queryByRole('combobox', { name: '语音合成模型' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('combobox', { name: '输出模式' })).not.toBeInTheDocument()
+})
+
+it('toggles speech independently of model and device selection', async () => {
+  const resourceId = 'tts-qwen3-tts-crisp-0.6b-base-q8-0'
+  const settings = stores.settings.getState().settings!
+  const policy = settings.modelPolicy!
+  stores.settings.setState({ settings: { ...settings, modelPolicy: { ...policy, enabled: { ...policy.enabled, [`tts:resource:${resourceId}`]: true } } } })
+  stores.models.setState({ resources: [{ resourceId, kind: 'ttsModel', provider: 'crisp-tts', name: 'Local speech', description: '', languages: [], installed: true, installedBytes: 1, state: 'idle', cancellable: false }] })
+  vi.spyOn(storeApi, 'getBridge').mockReturnValue({
+    overlay: { getVisibility: async () => false }, events: { onOverlayVisibilityChanged: () => () => undefined },
+    gateway: { onChanged: () => () => undefined, snapshot: async () => ({ state: 'stopped', realtime: { models: [{ enabled: true, operations: ['synthesize'], model_id: resourceId }] } }) },
+  } as unknown as NolaBridge)
+  const mediaDevices = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices')
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: {
+    enumerateDevices: async () => [{ kind: 'audiooutput', deviceId: 'speakers', label: 'Speakers' }],
+  } })
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockImplementation(async patch => {
+    const current = stores.settings.getState().settings!
+    stores.settings.setState({ settings: { ...current, modelPolicy: patch.modelPolicy ? { ...policy, ...patch.modelPolicy } : current.modelPolicy,
+      synthesis: { ...current.synthesis, ...patch.synthesis }, realtime: { ...current.realtime, ...patch.realtime } } })
+  })
+  try {
+    render(<OverlayPage />)
+    const playback = screen.getByRole('switch', { name: '播报译音' })
+    expect(screen.queryByRole('combobox', { name: '输出设备' })).not.toBeInTheDocument()
+    fireEvent.click(playback)
+    expect(update).toHaveBeenLastCalledWith({ realtime: { outputMode: 'speech' } })
+    const model = screen.getByRole('combobox', { name: '语音合成模型' })
+    const output = screen.getByRole('combobox', { name: '输出设备' })
+    const option = await within(model).findByRole('option', { name: 'Local speech' })
+    fireEvent.change(model, { target: { value: (option as HTMLOptionElement).value } })
+    expect(update).toHaveBeenLastCalledWith(expect.objectContaining({ synthesis: { modelId: resourceId, voice: '' } }))
+    expect(output).toBeEnabled()
+    fireEvent.change(output, { target: { value: 'speakers' } })
+    expect(update).toHaveBeenLastCalledWith({ realtime: { speechOutputDeviceId: 'speakers' } })
+    fireEvent.click(playback)
+    expect(update).toHaveBeenLastCalledWith({ realtime: { outputMode: 'translation' } })
+    expect(output).not.toBeInTheDocument()
+    fireEvent.click(playback)
+    expect(screen.getByRole('combobox', { name: '输出设备' })).toHaveValue('speakers')
+  } finally {
+    if (mediaDevices) Object.defineProperty(navigator, 'mediaDevices', mediaDevices)
+    else Reflect.deleteProperty(navigator, 'mediaDevices')
+  }
 })
 it('selects a saved cloud profile with its connection and restores disabled translation', () => {
   const settings = stores.settings.getState().settings!

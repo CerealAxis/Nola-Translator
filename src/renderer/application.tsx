@@ -14,7 +14,7 @@ import { SettingsPage } from './features/settings'
 import type { RoutesProps } from './routes'
 import type { AppShellNavigationItem } from './components/primitives/AppShell'
 
-/** Desktop, documentation and Toy share page registration so UI changes ship together. */
+/** The documentation demo uses the same page registry as the desktop app. */
 export const APPLICATION_PAGES = {
   home: () => <HomePage />,
   workspace: () => <OverlayPage />,

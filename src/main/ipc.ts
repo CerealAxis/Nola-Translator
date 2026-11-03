@@ -1,3 +1,4 @@
+import { installVirtualCable, readVirtualCableDriverVersion } from './virtual-cable-installer'
 import { loggedHandle } from './logged-ipc'
 import { sceneModelBinding } from '../shared/model-policy'
 import { modelConfigurationSchema } from '../shared/model-capabilities'
@@ -20,6 +21,8 @@ import { openDefaultBrowser as launchDefaultBrowser } from './open-default-brows
 export const IPC_CHANNELS = {
   listComputeDevices: 'engine:list-compute-devices',
   listDevices: 'engine:list-devices',
+  installVirtualCable: 'app:install-virtual-cable',
+  getVirtualCableDriverVersion: 'app:get-virtual-cable-driver-version',
   testAudio: 'engine:test-audio',
   listResources: 'engine:list-resources',
   manageResource: 'engine:manage-resource',
@@ -32,6 +35,7 @@ export const IPC_CHANNELS = {
   ensureEngineReady: 'engine:ensure-ready',
   stopSession: 'engine:stop-session',
   setSessionPaused: 'engine:set-session-paused',
+  resolvePlayback: 'engine:resolve-playback',
   event: 'engine:event',
   getEngineState: 'engine:get-state',
   showOverlay: 'overlay:show',
@@ -84,6 +88,7 @@ export function registerEngineIpc(
   sharedController?: SessionController,
   prepareCaptionService?: (config: PrewarmConfig) => Promise<PrewarmResult>,
   resourceInUse: (resourceId: string) => boolean = () => false,
+  listProcessSources: () => Promise<AudioDevice[]> = async () => [],
 ): () => void {
   const controller = sharedController ?? new SessionController({ engine, meetings, getSettings, getCredential: getTranslationCredential, prepare: prepareEnvironment, whenReady: whenRuntimeReady, startingChanged: onStartingChanged, hideOverlay: () => getOverlayWindow()?.hide() })
   let overlayCloseStopsSession = false
@@ -108,7 +113,7 @@ export function registerEngineIpc(
         { protocolVersion: 1, type: 'listDevices', requestId: `devices-${randomUUID()}` },
         'devices'
       )
-      return response.devices
+      return [...response.devices, ...await listProcessSources().catch(() => [])]
     })()
     listingDevices = request
     try { return await request } finally { if (listingDevices === request) listingDevices = null }
@@ -297,6 +302,13 @@ export function registerEngineIpc(
     controller.assertOwner(sessionId, 'desktop')
     await controller.pause(sessionId, paused)
   })
+  loggedHandle(IPC_CHANNELS.resolvePlayback, async (_event, sessionId: unknown, jobId: unknown, action: unknown) => {
+    if (typeof sessionId !== 'string' || typeof jobId !== 'string' || !/^tts-[a-f0-9]{32}$/.test(jobId) || (action !== 'retry' && action !== 'skip')) throw new Error('INVALID_ARGUMENT')
+    controller.assertOwner(sessionId, 'desktop')
+    const session = controller.getBackendSession(sessionId)
+    if (!session) throw new Error('playbackActionUnavailable')
+    await session.resolvePlayback(jobId, action)
+  })
   loggedHandle(IPC_CHANNELS.getEngineState, () => engine.currentState)
 
   // Starting the engine process is not loading weights: it is here for a caller that needs the
@@ -356,6 +368,8 @@ export function registerEngineIpc(
   loggedHandle(IPC_CHANNELS.closeOverlayMenu, (event, id: unknown) => closeOverlayMenu(BrowserWindow.fromWebContents(event.sender), id))
   // "Open the browser", with no URL. `shell.openExternal` cannot express it, so the main process
   // resolves the user's own handler instead; see open-default-browser.ts for why.
+  loggedHandle(IPC_CHANNELS.installVirtualCable, () => installVirtualCable())
+  loggedHandle(IPC_CHANNELS.getVirtualCableDriverVersion, () => readVirtualCableDriverVersion())
   loggedHandle(IPC_CHANNELS.openDefaultBrowser, () => launchDefaultBrowser())
 
   const broadcast = (event: EngineEvent): void => {

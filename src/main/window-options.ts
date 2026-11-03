@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { app } from 'electron'
 
@@ -25,6 +25,7 @@ export function isTrustedRendererUrl(raw: string, mainDirectory: string, rendere
 /** Copy controls need sanitized writes; clipboard reads and non-audio capture stay denied. */
 export function isAllowedRendererPermission(permission: string, trustedMainFrame: boolean, mediaTypes: readonly string[] = []): boolean {
   return trustedMainFrame && (permission === 'clipboard-sanitized-write'
+    || permission === 'speaker-selection'
     || permission === 'media' && mediaTypes.length > 0 && mediaTypes.every(type => type === 'audio'))
 }
 
@@ -65,8 +66,7 @@ export function createMainWindowOptions(
     resizable: true,
     show: false,
     autoHideMenuBar: true,
-    // Decode the PNG directly; the ICO is reserved for Windows shell metadata.
-    ...(icon ? { icon: join(dirname(icon), 'tray.png') } : {}),
+    ...(icon ? { icon } : {}),
     // Only a definite preference can pick a colour; 'system' has to wait for the renderer to
     // resolve it, and guessing light here is exactly the white flash this is meant to avoid.
     backgroundColor: theme === 'light' || theme === 'dark' ? SURFACE[theme] : '#00000000',

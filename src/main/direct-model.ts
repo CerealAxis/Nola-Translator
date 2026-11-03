@@ -11,6 +11,9 @@ export interface DirectModelServices {
   getCredential(provider: CredentialProvider): Promise<string>
   directLaunch?(model: string, options?: { requiresImages?: boolean }): Promise<EngineLaunchSpec>
   inferModel?(request: DirectModelRequest, signal: AbortSignal, inspect?: boolean): Promise<DirectModelResult>
+  openLocalLanguageModel?(resourceId: string, signal: AbortSignal): Promise<{
+    endpoint: string; contextWindow: number; release(): Promise<void>
+  } | undefined>
 }
 
 let workerQueue: Promise<unknown> = Promise.resolve()

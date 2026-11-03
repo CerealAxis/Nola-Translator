@@ -67,6 +67,7 @@ const ERROR_ACTIONS: Record<SupportErrorCode, { target: ErrorActionTarget; label
   'AUD-002': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.deviceNotFoundAction' },
   'AUD-003': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.deviceNotFoundAction' },
   'AUD-004': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
+  'AUD-005': { target: { kind: 'settings', tab: 'audio' }, label: 'modelsSettingsUi.audio' },
 
   // Engine: the runtime components live in the engine settings, a protocol mismatch needs the
   // matching engine version, and a lost engine leaves a record behind instead of a retry.
@@ -192,6 +193,9 @@ const START_ONLY_CODES: ReadonlySet<SupportErrorCode> = new Set<SupportErrorCode
  * component has to be installed, and a lost engine leaves captions worth reading.
  */
 export function errorCopyOf(cause: string | null, context: 'start' | 'stop'): ErrorCopy {
+  if (cause === 'S2S_CONFIGURATION_MISSING' && context === 'start') {
+    return { message: 'session.s2sSetupHint', detail: null, action: 'errors.startFailedAction', target: { kind: 'reset' } }
+  }
   const code = supportErrorCodeForCause(cause)
   const entry = ERROR_ACTIONS[code]
   const message: TranslationKey = SUPPORT_ERROR_CATALOG[code].messageKey

@@ -29,9 +29,9 @@ const zh = {
   useCpu: '使用 CPU 继续',
   saveError: '无法保存设置',
   recognitionTask: '语音识别', translationTask: '本地翻译',
-  engineChanged: '已将{task}引擎切换为 {engine}',
+  engineChanged: '已将 {task} 引擎切换为 {engine}',
   modelChanged: '模型已由 {previousModel} 自动更换为 {nextModel}。',
-  noCompatibleModel: '没有已安装且兼容 {engine} 的{task}模型，未更改引擎。',
+  noCompatibleModel: '没有已安装且兼容 {engine} 的 {task} 模型，未更改引擎。',
 }
 const en: typeof zh = {
   devices: 'Compute devices', performance: 'Performance & memory', memoryCpu: 'VRAM and CPU', automatic: 'Automatic', cpu: 'CPU', bundled: 'Bundled runtime',

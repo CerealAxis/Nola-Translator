@@ -79,7 +79,7 @@ export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status
       {brand ? <div className="nola-brand">
         <img className="nola-brand__mark" src={nolaLogoUrl} alt={t('app.name')} />
       </div> : null}
-      {variant === 'session' ? <div className="nola-no-drag flex min-w-0 items-center gap-3">{leading}{sessionTitle}{status}{timer}</div> : null}
+      {variant === 'session' ? <div className="nola-no-drag flex min-w-0 items-center gap-3">{leading}{sessionTitle}{status}{timer}</div> : leading}
       <div className={`nola-titlebar-tools nola-no-drag${windowsShell ? ' nola-titlebar-tools--windows' : ''}`}>
         {actions}
         <Menu.Root>

@@ -48,10 +48,18 @@ export interface SessionBarProps {
   onStop: () => void
   className?: string
   audioLabel?: string
+  playbackPhase?: 'waiting' | 'synthesizing' | 'playing' | 'idle' | 'failed'
+  waitingSpeechCount?: number
+  playbackJob?: { jobId: string; state: 'failed' | 'unknown' }
+  onResolvePlayback?: (jobId: string, action: 'retry' | 'skip') => void
 }
 
-export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, className, audioLabel }: SessionBarProps) {
+export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, className, audioLabel, playbackPhase, waitingSpeechCount, playbackJob, onResolvePlayback }: SessionBarProps) {
   const { t } = useI18n()
+  const playbackCopy = playbackPhase === 'waiting' ? 'session.playbackWaiting'
+    : playbackPhase === 'synthesizing' ? 'session.playbackSynthesizing'
+      : playbackPhase === 'playing' ? 'session.playbackPlaying'
+        : playbackPhase === 'failed' ? 'session.playbackFailed' : null
   const running = status === 'running'
   const paused = status === 'paused'
   const busy = status === 'starting' || status === 'stopping'
@@ -64,6 +72,11 @@ export function SessionBar({ status, elapsedMs, onPause, onResume, onStop, class
         .join(' ')}
     >
       {audioLabel ? <div className="nola-workspace-audio-status"><span className="nola-workspace-mic"><Mic aria-hidden="true" /></span><span>{audioLabel}</span></div> : null}
+      {playbackCopy ? <span className="nola-caption text-muted" aria-live="polite">{t(playbackCopy)}{waitingSpeechCount ? ` · ${t('session.playbackQueueCount', { count: waitingSpeechCount })}` : ''}</span> : null}
+      {playbackJob && onResolvePlayback ? <div className="flex shrink-0 items-center gap-1">
+        {playbackJob.state === 'failed' ? <Button variant="secondary" size="sm" className="rounded-xl" disabled={busy} onClick={() => onResolvePlayback(playbackJob.jobId, 'retry')}>{t('session.retryPlayback')}</Button> : null}
+        <Button variant="outline" size="sm" className="rounded-xl" disabled={busy} onClick={() => onResolvePlayback(playbackJob.jobId, 'skip')}>{t('session.skipPlayback')}</Button>
+      </div> : null}
       <div className="nola-workspace-wave" title={t('workspaceUi.noLevel')} aria-hidden="true">
         {[8, 12, 8, 16, 24, 16, 30, 38, 24, 18, 30, 20, 34, 42, 32, 20, 24, 36, 28, 16, 24, 18, 26, 32, 16, 12, 18, 24, 12, 16, 8, 12].map((height, index) => <span key={index} style={{ height }} />)}
       </div>

@@ -4,15 +4,17 @@ import { createMainWindowOptions, isAllowedRendererPermission, isTrustedRenderer
 import { pathToFileURL } from 'node:url'
 import { join } from 'node:path'
 
-it('allows only trusted microphone capture and sanitized clipboard writes', () => {
+it('allows trusted microphone capture, speaker selection and sanitized clipboard writes', () => {
   expect(isAllowedRendererPermission('media', true, ['audio'])).toBe(true)
   expect(isAllowedRendererPermission('clipboard-sanitized-write', true)).toBe(true)
+  expect(isAllowedRendererPermission('speaker-selection', true)).toBe(true)
   for (const [permission, types] of [
     ['media', []], ['media', ['video']], ['media', ['audio', 'video']], ['media', ['unknown']],
     ['clipboard-read', []], ['geolocation', []], ['notifications', []],
   ] as const) expect(isAllowedRendererPermission(permission, true, types)).toBe(false)
   expect(isAllowedRendererPermission('media', false, ['audio'])).toBe(false)
   expect(isAllowedRendererPermission('clipboard-sanitized-write', false)).toBe(false)
+  expect(isAllowedRendererPermission('speaker-selection', false)).toBe(false)
 })
 
 it('trusts only application entry documents, including queries and hash routes', () => {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogCloseButton, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -13,7 +13,6 @@ import { SettingSelect } from '../settings/SettingsPage'
 import { SettingsRow } from '../settings/SettingsRow'
 import { NumberRow } from '../settings/tabs/TranslationTab'
 import { ModelLanguageSelect } from './ModelConfigurationDialog'
-import { defaultModelPatch } from '../../../shared/model-policy'
 
 export interface CustomModelDialogProps { modelId?: string; onClose: () => void }
 
@@ -34,7 +33,7 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
   const slot = customCredentialSlot(draft.id)
   const stored = !!credentials[slot]
   const valid = customModelSchema.safeParse(draft).success && (draft.apiFormat !== 'anthropic' || stored || !!key.trim())
-  const save = async (activate: boolean) => {
+  const save = async () => {
     if (!valid || saving || !settings) return
     setSaving(true)
     try {
@@ -45,12 +44,28 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
       const customModels = current.some(item => item.id === model.id) ? current.map(item => item.id === model.id ? model : item) : [...current, model]
       const selected = translation.customModelId === model.id || (model.id === 'legacy' && !translation.customModelId && translation.provider === 'cloud')
       const activePatch = selected ? customModelPatch(translation, model) : {}
-      await updateSettings({ ...(activate ? defaultModelPatch(stores.settings.getState().settings!, 'mt', `mt-custom:${model.id}`) : {}), translation: { customModels, ...activePatch,
+      await updateSettings({ translation: { customModels, ...activePatch,
         provider: translation.provider, targetLanguage: translation.targetLanguage,
       } })
       notifySuccess(t('modelConfig.saved'))
       onClose()
     } catch (cause) { notifyError(t('modelConfig.saveFailed'), { cause }) }
+    finally { setSaving(false) }
+  }
+  const remove = async () => {
+    if (!modelId || saving || !settings) return
+    setSaving(true)
+    try {
+      const translation = stores.settings.getState().settings!.translation
+      const selected = translation.customModelId === draft.id || (draft.id === 'legacy' && !translation.customModelId && translation.provider === 'cloud')
+      await updateSettings({ translation: { customModels: customModelsOf(translation).filter(item => item.id !== draft.id),
+        ...(selected ? { customModelId: '', cloudName: '', cloudModel: DEFAULT_SETTINGS.translation.cloudModel, cloudEndpoint: DEFAULT_SETTINGS.translation.cloudEndpoint,
+          cloudLanguages: [...LANGUAGE_CODES], cloudSourceLanguages: [...SOURCE_LANGUAGE_OPTIONS], ...(translation.provider === 'cloud' ? { provider: 'mymemory' as const } : {}) } : {}),
+      } })
+      await actions.models.setTranslationCredential(slot, '')
+      notifySuccess(t('common.done'))
+      onClose()
+    } catch (cause) { notifyError(t('modelsSettingsUi.removeFailed'), { cause }) }
     finally { setSaving(false) }
   }
   const formats = {
@@ -66,7 +81,7 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
         <SettingsRow label={t('settings.endpoint')}><Input aria-label={t('settings.endpoint')} className="settings-control-field" value={draft.endpoint} onValueChange={endpoint => patch({ endpoint })} /></SettingsRow>
         <SettingsRow label={t('settings.apiKey')}><div className="model-api-key-field">
           <Input aria-label={t('settings.apiKey')} type={keyVisible ? 'text' : 'password'} autoComplete="off" className="settings-control-field" value={key} onValueChange={setKey} placeholder={stored ? t('modelsSettingsUi.savedKeyPlaceholder') : t('settings.apiKeyPlaceholder')} />
-          <Button type="button" variant="secondary" size="icon" className="model-api-key-field__toggle" aria-label={t(keyVisible ? 'modelsSettingsUi.hideApiKey' : 'modelsSettingsUi.showApiKey')} aria-pressed={keyVisible} onClick={() => setKeyVisible(visible => !visible)}>
+          <Button type="button" variant="bare" size="icon" className="model-api-key-field__toggle" aria-label={t(keyVisible ? 'modelsSettingsUi.hideApiKey' : 'modelsSettingsUi.showApiKey')} aria-pressed={keyVisible} onClick={() => setKeyVisible(visible => !visible)}>
             {keyVisible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
           </Button>
         </div></SettingsRow>
@@ -86,9 +101,10 @@ export function CustomModelDialog({ modelId, onClose }: CustomModelDialogProps) 
         </div>
         </details>
       </div>
-      <DialogFooter><Button variant="secondary" disabled={saving} onClick={onClose}>{t('session.cancel')}</Button>
-        <Button variant="secondary" disabled={!valid || saving} aria-busy={saving} onClick={() => void save(false)}>{t('modelConfig.save')}</Button>
-        <Button disabled={!valid || saving} aria-busy={saving} onClick={() => void save(true)}>{t('workbench.useForTranslation')}</Button>
+      <DialogFooter>
+        {modelId ? <Button variant="danger" disabled={saving} aria-busy={saving} onClick={() => void remove()}><Trash2 aria-hidden="true" />{t('modelsSettingsUi.deleteModel')}</Button> : null}
+        <Button variant="secondary" disabled={saving} onClick={onClose}>{t('session.cancel')}</Button>
+        <Button disabled={!valid || saving} aria-busy={saving} onClick={() => void save()}>{t('modelConfig.save')}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

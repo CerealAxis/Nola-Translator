@@ -20,6 +20,7 @@ import { createStore } from './createStore'
 import { isSessionAlreadyRunningError } from '../../shared/ipc-error'
 import { configurationOf, recognitionLanguages } from '../../shared/model-capabilities'
 import { normalizeLanguage } from '../../shared/languages'
+import { resolveSessionModelBindings } from '../../shared/model-gateway'
 
 /** Cap on finalized segments. Two to three hours of speech fits, and memory stays bounded. */
 export const MAX_FINALIZED_SEGMENTS = 2048
@@ -68,6 +69,9 @@ const ENGINE_PROCESS_STATE_TO_UI: Record<EngineProcessState, EngineStatus> = {
 
 export interface SessionState {
   status: SessionStatus
+  playbackPhase?: 'waiting' | 'synthesizing' | 'playing' | 'idle' | 'failed'
+  waitingSpeechCount?: number
+  playbackJob?: { jobId: string; state: 'failed' | 'unknown' }
   sessionId: string | null
   meetingId: string | null
   startedAtMs: number | null
@@ -240,6 +244,10 @@ export function findMissingResource(
   snapshot: { readonly resources: readonly { resourceId: string; name: string; installed: boolean; kind?: string }[]; storagePath?: string },
   config: SessionConfig,
 ): MissingResource | null {
+  return findMissingSessionResource(snapshot, resolveSessionModelBindings(config))
+}
+
+function findMissingSessionResource(snapshot: Parameters<typeof findMissingResource>[0], config: SessionConfig): MissingResource | null {
   // No target language, or not a local provider: no local model to preflight.
   const translationResourceId = config.targetLanguages.length === 0 || config.translationProvider !== 'local' && config.fallbackTranslationProvider !== 'local'
     ? null
@@ -344,15 +352,15 @@ export async function startSession(config: SessionConfig): Promise<void> {
   let missing: MissingResource | null
   try {
     const snapshot = await bridge.engine.listResources()
-    let effectiveConfig = config
-    if ((config.recognitionProvider ?? 'local') === 'local') {
-      const model = snapshot.resources.find(item => item.resourceId === config.recognitionModelId)
+    let effectiveConfig = resolveSessionModelBindings(config)
+    if ((effectiveConfig.recognitionProvider ?? 'local') === 'local') {
+      const model = snapshot.resources.find(item => item.resourceId === effectiveConfig.recognitionModelId)
       const capability = configurationOf(model)
       if (capability?.slot === 'recognition') {
         const supported = recognitionLanguages(model)
         const selected = normalizeLanguage(config.sourceLanguage)
         if (!supported.map(normalizeLanguage).includes(selected)) {
-          if (capability.supportsAutoDetection) effectiveConfig = { ...config, sourceLanguage: 'auto' }
+          if (capability.supportsAutoDetection) effectiveConfig = { ...effectiveConfig, sourceLanguage: 'auto' }
           else {
             sessionStore.setState({ status: 'idle', error: null, errorCode: null, errorRequestId: null })
             throw new UnsupportedRecognitionLanguageError(config.sourceLanguage)
@@ -360,7 +368,7 @@ export async function startSession(config: SessionConfig): Promise<void> {
         }
       }
     }
-    missing = findMissingResource(snapshot, effectiveConfig)
+    missing = findMissingSessionResource(snapshot, effectiveConfig)
     config = effectiveConfig
   } catch (error) {
     if (error instanceof UnsupportedRecognitionLanguageError) {
@@ -465,6 +473,15 @@ export async function stopSession(): Promise<void> {
   }
 }
 
+export async function resolvePlayback(jobId: string, action: 'retry' | 'skip'): Promise<void> {
+  const { sessionId, playbackJob } = sessionStore.getState()
+  if (!sessionId || playbackJob?.jobId !== jobId) throw new Error('playbackActionUnavailable')
+  if (action === 'retry' && playbackJob.state !== 'failed') throw new Error('playbackActionUnavailable')
+  if (!bridge) throw new Error('bridgeNotReady')
+  if (!bridge.engine.resolvePlayback) throw new Error('playbackActionUnavailable')
+  await bridge.engine.resolvePlayback(sessionId, jobId, action)
+}
+
 export function pauseSession(): void {
   const { status, sessionId } = sessionStore.getState()
   if (status !== 'running' || sessionId === null) return
@@ -555,6 +572,9 @@ export function attachSessionStore(next: NolaBridge): void {
             sessionId: event.sessionId,
             startedAtMs: Date.now(),
             elapsedMs: 0,
+            playbackPhase: undefined,
+            waitingSpeechCount: undefined,
+            playbackJob: undefined,
             segments: [],
             interim: null,
           }
@@ -581,9 +601,12 @@ export function attachSessionStore(next: NolaBridge): void {
         }
         break
       }
+      case 'realtimePlayback':
+        if (event.sessionId === sessionStore.getState().sessionId) sessionStore.setState({ playbackPhase: event.phase, waitingSpeechCount: event.waitingCount, playbackJob: event.playbackJob })
+        break
       case 'error':
         sessionStore.setState({
-          status: sessionStore.getState().sessionId === null ? sessionStore.getState().status : 'error',
+          status: (event.recoverable && event.details?.scope === 'task') || sessionStore.getState().sessionId === null ? sessionStore.getState().status : 'error',
           error: event.code,
           errorCode: event.code.toUpperCase(),
           errorRequestId: event.requestId,
@@ -624,7 +647,7 @@ export function attachSessionStore(next: NolaBridge): void {
         stopTicker()
         // The main process stopped the session, so this window never ran `stopSession` and clears captions itself.
         clearSessionTranscript()
-        sessionStore.setState({ status: 'idle', sessionId: null, meetingId: null, startedAtMs: null })
+        sessionStore.setState({ status: 'idle', sessionId: null, meetingId: null, startedAtMs: null, playbackPhase: undefined, waitingSpeechCount: undefined, playbackJob: undefined })
         pausedAtMs = null
         pausedTotalMs = 0
         break

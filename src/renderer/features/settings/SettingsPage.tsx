@@ -8,7 +8,7 @@ import type { AppSettings } from '@/bridge'
 import { Button } from '@/components/ui/button'
 import { Switch, SwitchThumb, TabsContent, TabsIndicator, TabsList, TabsRoot, TabsTrigger } from '@/components/ui'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
 import { DEFAULT_SETTINGS_TAB, SETTINGS_TABS, settingsPath, useRoute } from '@/routes'
 import type { SettingsTab } from '@/routes'
@@ -148,21 +148,28 @@ export function SettingGroup({ legend, legendHint, actions, children, onboarding
   )
 }
 
-export interface PickerOption { value: string; label: string; isDisabled?: boolean }
-export interface SettingSelectProps { value: string; options: readonly PickerOption[]; onChange: (value: string) => void; ariaLabel: string; className?: string; isDisabled?: boolean }
+export interface PickerOption { value: string; label: string; isDisabled?: boolean; group?: string }
+export interface SettingSelectProps { value: string; options: readonly PickerOption[]; onChange: (value: string) => void; ariaLabel: string; className?: string; isDisabled?: boolean; id?: string }
 
-export function SettingSelect({ value, options, onChange, ariaLabel, className, isDisabled }: SettingSelectProps) {
+export function SettingSelect({ value, options, onChange, ariaLabel, className, isDisabled, id }: SettingSelectProps) {
+  const groups = new Map<string | undefined, PickerOption[]>()
+  for (const option of options) {
+    const group = groups.get(option.group)
+    if (group) group.push(option)
+    else groups.set(option.group, [option])
+  }
   /* The wrapper is the field-sized box; the shared shadcn select owns its trigger and popup. */
   return (
     <div className={['select', 'settings-control-field', className].filter(Boolean).join(' ')}>
       <Select value={value} disabled={isDisabled} onValueChange={(next) => { if (typeof next === 'string') onChange(next) }}>
-        <SelectTrigger className="settings-select-trigger" aria-label={ariaLabel}>
+        <SelectTrigger id={id} className="settings-select-trigger" aria-label={ariaLabel}>
           <SelectValue>{(current) => options.find((option) => option.value === current)?.label ?? String(current ?? '')}</SelectValue>
         </SelectTrigger>
         <SelectContent className="settings-select-content" align="start" alignItemWithTrigger={false}>
-          <SelectGroup>
-          {options.map((option) => <SelectItem key={option.value} value={option.value} disabled={option.isDisabled} className="settings-select-item">{option.label}</SelectItem>)}
-          </SelectGroup>
+          {[...groups].map(([group, items]) => <SelectGroup key={group ?? ''}>
+            {group ? <SelectLabel>{group}</SelectLabel> : null}
+            {items.map(option => <SelectItem key={option.value} value={option.value} disabled={option.isDisabled} className="settings-select-item">{option.label}</SelectItem>)}
+          </SelectGroup>)}
         </SelectContent>
       </Select>
     </div>

@@ -12,9 +12,12 @@ import { dirname, join, resolve, sep } from 'node:path'
  */
 export const DATA_ROOT_ENTRIES: readonly string[] = [
   'settings.json',
+  'settings.json.migration-v3.json',
+  'settings.json.migration-v3.bak',
   'credentials.json',
   'history.jsonl',
   'meetings',
+  'session-journal',
   'models',
   'cache',
   'runtimes',

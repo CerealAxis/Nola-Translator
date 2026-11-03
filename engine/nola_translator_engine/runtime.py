@@ -115,17 +115,11 @@ from .translation.m2m100 import (
     validate_session_languages as validate_m2m100_languages,
 )
 from .translation.network import (
-    DEFAULT_ANTHROPIC_ENDPOINT,
     DEFAULT_CONTEXT_WINDOW,
+    custom_translation_provider,
     DEFAULT_MAX_OUTPUT_TOKENS,
     DEFAULT_MICROSOFT_ENDPOINT,
-    DEFAULT_OLLAMA_ENDPOINT,
-    DEFAULT_OPENAI_ENDPOINT,
-    AnthropicMessagesProvider,
     MicrosoftTranslatorProvider,
-    OllamaTranslationProvider,
-    OpenAICompatibleProvider,
-    OpenAIResponsesProvider,
 )
 from .translation.scheduler import TranslationScheduler
 from .translation.mymemory import DEFAULT_MYMEMORY_ENDPOINT, MyMemoryTranslationProvider
@@ -1201,43 +1195,11 @@ class EngineRuntime:
             # Public API configuration is fixed and never consumes a cloud credential.
             provider = IndexTranslatePublicProvider()
         elif provider_name == "cloud":
-            limits = {
-                "context_window": context_window,
-                "max_output_tokens": max_output_tokens,
-                "api_key": api_key,
-            }
-            # Same for `model`: the settings default is non-empty, so an empty value reaches the
-            # provider, which refuses it by naming the field instead of substituting a model.
-            if api_format == "chat-completions":
-                provider = OpenAICompatibleProvider(
-                    endpoint=resolved(endpoint, DEFAULT_OPENAI_ENDPOINT),
-                    model=resolved(model, "gpt-4.1-mini"),
-                    **limits,
-                )
-            elif api_format == "chat-responses":
-                provider = OpenAIResponsesProvider(
-                    endpoint=resolved(endpoint, DEFAULT_OPENAI_ENDPOINT),
-                    model=resolved(model, "gpt-4.1-mini"),
-                    **limits,
-                )
-            elif api_format == "anthropic":
-                # Bare origin, not a versioned base: /v1/messages is appended by the provider.
-                provider = AnthropicMessagesProvider(
-                    endpoint=resolved(endpoint, DEFAULT_ANTHROPIC_ENDPOINT),
-                    model=resolved(model, "claude-haiku-4-5"),
-                    **limits,
-                )
-            elif api_format == "ollama":
-                provider = OllamaTranslationProvider(
-                    endpoint=resolved(endpoint, DEFAULT_OLLAMA_ENDPOINT),
-                    model=resolved(model, "qwen3:4b"),
-                    **limits,
-                )
-            else:
-                raise ValueError(
-                    f"未知的翻译接口格式 apiFormat：{api_format}。"
-                    "可选：chat-completions、chat-responses、anthropic、ollama"
-                )
+            provider = custom_translation_provider(
+                api_format, endpoint=endpoint if options is not None else None,
+                model=model if options is not None else None, api_key=api_key,
+                context_window=context_window, max_output_tokens=max_output_tokens,
+            )
         else:
             raise ValueError(
                 f"未知翻译 Provider: {provider_name}"
@@ -1718,8 +1680,7 @@ class EngineRuntime:
             while segment_id in self.translation_requests:
                 request = self.translation_requests[segment_id]
                 if not request.update.is_final and (not request.allow_intermediate
-                        or self.translation_scheduler.provider.name == "mymemory"):
-                    # only final captions get translated by default; intermediates need the user to opt in.
+                        or self.translation_scheduler.provider.name in {"google", "microsoft", "mymemory"}):
                     self.translation_requests.pop(segment_id, None)
                     continue
                 jobs = self.translation_jobs.get(segment_id, set())

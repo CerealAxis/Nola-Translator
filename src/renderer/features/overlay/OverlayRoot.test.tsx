@@ -3,6 +3,7 @@ import * as notify from '@/components/primitives/notify'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as store from '@/store'
 import type { NolaBridge } from '@/bridge'
+import { DEFAULT_SETTINGS } from '@/bridge'
 import { OverlayRoot } from './OverlayRoot'
 
 beforeEach(() => {
@@ -49,4 +50,17 @@ it('reports a failed hide and allows retrying', async () => {
   await waitFor(() => expect(failureToast).toHaveBeenCalledWith('关闭失败，请重试。', expect.objectContaining({ cause: expect.objectContaining({ message: 'IPC unavailable' }) })))
   fireEvent.click(closeButton)
   await waitFor(() => expect(close).toHaveBeenCalledTimes(2))
+})
+
+it('keeps only display and layout menus in the floating toolbar', () => {
+  const previous = store.stores.settings.getState()
+  store.sessionStore.setState({ status: 'idle', sessionId: null })
+  store.stores.settings.setState({ settings: DEFAULT_SETTINGS })
+  try {
+    const { container } = render(<OverlayRoot />)
+    expect(Array.from(container.querySelectorAll<HTMLElement>('[data-menu-kind]'), node => node.dataset.menuKind)).toEqual(['display', 'layout'])
+  } finally {
+    cleanup()
+    store.stores.settings.setState(previous)
+  }
 })

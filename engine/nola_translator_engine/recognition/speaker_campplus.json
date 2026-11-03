@@ -1,0 +1,21 @@
+{
+  "model": "FunASR CAM++",
+  "source": "https://huggingface.co/funasr/campplus",
+  "source_revision": "e4b6ede7ce16997aff4ae69fbca1f0175e2afede",
+  "source_file": "campplus_cn_common.bin",
+  "source_sha256": "3388cf5fd3493c9ac9c69851d8e7a8badcfb4f3dc631020c4961371646d5ada8",
+  "license": "Apache-2.0",
+  "license_file": "speaker_campplus.LICENSE",
+  "artifact": "speaker_campplus.onnx",
+  "artifact_sha256": "5d623e283b10fe27cd356e62868f567471c8071a177fb7549becaca97ebe2262",
+  "modification": "Exported to ONNX with equivalent single-segment CAM pooling for fixed 1.5-second input.",
+  "export_script": "scripts/export-speaker-campplus.py",
+  "export_versions": {
+    "funasr": "1.4.16",
+    "torch": "2.13.0+cpu",
+    "onnx": "1.20.1"
+  },
+  "input_window_samples": 24000,
+  "input_sample_rate": 16000,
+  "embedding_size": 192
+}

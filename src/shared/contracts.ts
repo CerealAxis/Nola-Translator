@@ -18,9 +18,11 @@ export type AudioSource =
   | { kind: 'defaultOutput' }
   | { kind: 'systemOutput'; deviceId: string }
   | { kind: 'microphone'; deviceId: string }
+  | { kind: 'virtualInput'; deviceId: string }
+  | { kind: 'processAudio'; deviceId: string }
   | { kind: 'browserTab'; streamId: string }
 
-export type AudioTestSource = Exclude<AudioSource, { kind: 'browserTab' }>
+export type AudioTestSource = Exclude<AudioSource, { kind: 'browserTab' | 'virtualInput' | 'processAudio' }>
 export interface AudioTestResult {
   audioBase64: string
   durationMs: 2000
@@ -28,6 +30,12 @@ export interface AudioTestResult {
 }
 
 export type SessionConfig = {
+  outputMode?: 'source' | 'translation' | 'speech'
+  s2sModel?: import('./settings').RealtimeS2sModel | null
+  speakerDetection?: boolean
+  speechOutputDeviceId?: string
+  speechVoice?: string
+  speechModelId?: string
   max_segment_ms?: number
   silence_end_ms?: number
   recognitionProvider?: RecognitionProvider
@@ -192,6 +200,8 @@ export type CaptionSegment = {
   startedAtMs: number
   endedAtMs?: number
   sourceLanguage?: string
+  speakerId?: string
+  speakerMetadataRevision?: number
   sourceText: string
   isFinal: boolean
   translations: Translation[]
@@ -236,7 +246,7 @@ export type EngineCommand =
 export type AudioDevice = {
   deviceId: string
   name: string
-  kind: 'systemOutput' | 'microphone'
+  kind: 'systemOutput' | 'microphone' | 'processAudio'
   isDefault: boolean
 }
 
@@ -400,6 +410,7 @@ export type EngineEvent =
     })
   | (Envelope<'modelsReleased'> & { deferred: boolean })
   | (Envelope<'sessionStopped'> & { sessionId: string })
+  | (Envelope<'realtimePlayback'> & { sessionId: string; phase: 'waiting' | 'synthesizing' | 'playing' | 'idle' | 'failed'; waitingCount?: number; playbackJob?: { jobId: string; state: 'failed' | 'unknown' } })
   | (Envelope<'caption'> & { sessionId: string; segment: CaptionSegment; streamEpoch?: number; videoStartedAtMs?: number; videoEndedAtMs?: number })
   | (Envelope<'audioAccepted'> & { sessionId: string; epoch: number; sequence: number })
   | (Envelope<'streamReset'> & { sessionId: string; epoch: number })

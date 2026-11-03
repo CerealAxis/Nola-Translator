@@ -3,11 +3,15 @@ import { recognitionLabel, remoteSourceLanguages } from './cloud-config'
 import { INDEX_TRANSLATE_LANGUAGES } from './index-translate'
 import { LANGUAGE_CODES } from './languages'
 import type { AvailableGatewayModel, GatewayCapability } from './model-gateway'
-import type { AppSettings, CredentialProvider } from './settings'
+import { MIMO_TTS_BINDING, MIMO_TTS_NAME, type AppSettings, type CredentialProvider } from './settings'
+import { isModelEnabled } from './model-policy'
 
 /** The main process supplies credential presence; this catalog never reads or returns secrets. */
 export function buildConfiguredCloudModels(settings: AppSettings, credentials: Readonly<Record<CredentialProvider, boolean>>): Record<GatewayCapability, AvailableGatewayModel[]> {
   const result: Record<GatewayCapability, AvailableGatewayModel[]> = { asr: [], mt: [], tts: [], llm: [] }
+  if (credentials['mimo-tts'] && isModelEnabled(settings, 'tts', MIMO_TTS_BINDING)) {
+    result.tts.push({ binding: MIMO_TTS_BINDING, name: MIMO_TTS_NAME, kind: 'tts', origin: 'cloud', free: false, targetLanguages: ['zh', 'en'] })
+  }
   const providers: Record<string, string> = { microsoft: 'Microsoft Translator', google: 'Google Translate', mymemory: 'MyMemory', 'index-translate': 'Index Translate', recognition: 'Aliyun LiveTranslate' }
   const add = (model: AvailableGatewayModel) => {
     result[model.kind].push(model)

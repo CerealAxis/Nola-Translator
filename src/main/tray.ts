@@ -1,4 +1,4 @@
-import { app, Menu, nativeImage, Notification, Tray, type BrowserWindow } from 'electron'
+import { app, Menu, nativeImage, Tray, type BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import type { AppSettings } from '../shared/settings'
 import type { FeatureActivitySnapshot } from '../shared/feature-activity'
@@ -7,7 +7,6 @@ import { gatewayEn, gatewayJa, gatewayKo, gatewayHk, gatewayTw, gatewayZh } from
 
 export interface NolaTrayOptions {
   getSettings(): AppSettings
-  getWindow(): BrowserWindow | null
   getActivity(): FeatureActivitySnapshot
   show(): void
   stop(): Promise<void>
@@ -16,8 +15,6 @@ export interface NolaTrayOptions {
 
 export class NolaTray {
   private tray: Tray | null = null
-  private hiddenOnce = false
-  private readonly notifications = new Set<Notification>()
   constructor(private readonly options: NolaTrayOptions) {}
   private dictionary() {
     const language = resolveUiLanguage(this.options.getSettings().uiLanguage, app.getLocale())
@@ -46,31 +43,8 @@ export class NolaTray {
       { label: t.trayExit, click: () => this.options.quit() },
     ]))
   }
-  hidden(): void {
-    if (this.hiddenOnce) return
-    this.hiddenOnce = true
-    const t = this.dictionary()
-    this.notify(t.trayHiddenTitle, t.trayHiddenBody)
-  }
-  activityChanged(snapshot: FeatureActivitySnapshot): void {
-    this.refresh()
-    const t = this.dictionary()
-    if (snapshot.phase === 'running' || snapshot.phase === 'idle') this.notify(t.trayStateTitle, snapshot.owner ? `${t[snapshot.owner]} · ${t.running}` : t.trayStoppedBody)
-  }
-  failure(): void { const t = this.dictionary(); this.notify(t.trayStateTitle, t.failed) }
-  private notify(title: string, body: string): void {
-    const window = this.options.getWindow()
-    if (window && !window.isDestroyed() && window.isVisible() && !window.isMinimized()) return
-    if (!Notification.isSupported()) return
-    const notification = new Notification({ title, body })
-    this.notifications.add(notification)
-    notification.on('click', () => this.options.show())
-    notification.on('close', () => this.notifications.delete(notification))
-    notification.show()
-  }
+  activityChanged(): void { this.refresh() }
   dispose(): void {
-    for (const notification of this.notifications) notification.close()
-    this.notifications.clear()
     this.tray?.destroy()
     this.tray = null
   }

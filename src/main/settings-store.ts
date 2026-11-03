@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute } from 'node:path'
 import { computeSettingsSchema, DEFAULT_COMPUTE_SETTINGS } from '../shared/compute'
 
@@ -13,7 +13,87 @@ import { LANGUAGE_CODES } from '../shared/languages'
 import { mergeModelPolicy, modelPolicyOf, modelPolicySchema } from '../shared/model-policy'
 
 // Store-internal patches may also touch fields the IPC schema exposes only through their own channels.
-export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 2; browserConnection?: { enabled: boolean } }
+export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 3; browserConnection?: { enabled: boolean } }
+
+const SETTINGS_MIGRATION_JOURNAL = '.migration-v3.json'
+const SETTINGS_MIGRATION_BACKUP = '.migration-v3.bak'
+const SETTINGS_TEMPORARY = '.tmp'
+class SettingsMigrationError extends Error {}
+
+/** Roll back an interrupted single-file migration before any session writer can start. */
+async function recoverSettingsMigration(path: string): Promise<void> {
+  const journalPath = `${path}${SETTINGS_MIGRATION_JOURNAL}`
+  const backupPath = `${path}${SETTINGS_MIGRATION_BACKUP}`
+  try {
+    await readFile(journalPath, 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      await rm(backupPath, { force: true }).catch(() => undefined)
+      await rm(`${path}${SETTINGS_TEMPORARY}`, { force: true }).catch(() => undefined)
+      return
+    }
+    throw error
+  }
+  try {
+    await readFile(backupPath)
+    await rm(path, { force: true })
+    await rename(backupPath, path)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    // The backup is removed only after the new file is installed, so its absence means commit finished.
+    try {
+      await readFile(path)
+    } catch {
+      await rename(`${path}.migration-v3.old`, path)
+    }
+  }
+  await rm(`${path}${SETTINGS_TEMPORARY}`, { force: true }).catch(() => undefined)
+  await rm(`${path}.migration-v3.old`, { force: true }).catch(() => undefined)
+  await rm(backupPath, { force: true }).catch(() => undefined)
+  await rm(journalPath, { force: true })
+}
+
+/** Stage, back up, and switch settings as one recoverable startup transaction. */
+async function commitSettingsMigration(path: string, contents: string): Promise<void> {
+  const journalPath = `${path}${SETTINGS_MIGRATION_JOURNAL}`
+  const backupPath = `${path}${SETTINGS_MIGRATION_BACKUP}`
+  const temporaryPath = `${path}${SETTINGS_TEMPORARY}`
+  await mkdir(dirname(path), { recursive: true })
+  await copyFile(path, backupPath)
+  await writeFile(journalPath, JSON.stringify({ from: 2, to: 3 }), 'utf8')
+  try {
+    await writeFile(temporaryPath, contents, 'utf8')
+    await rename(path, `${path}.migration-v3.old`)
+    try {
+      await rename(temporaryPath, path)
+    } catch (error) {
+      await rename(`${path}.migration-v3.old`, path).catch(() => undefined)
+      throw error
+    }
+    await rm(`${path}.migration-v3.old`, { force: true })
+    await rm(backupPath, { force: true })
+    await rm(journalPath, { force: true })
+  } catch (error) {
+    await recoverSettingsMigration(path).catch(() => undefined)
+    await rm(`${path}.migration-v3.old`, { force: true }).catch(() => undefined)
+    throw error
+  }
+}
+
+function realtimeSettings(value: unknown): NonNullable<AppSettings['realtime']> {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+  const { s2sModel, virtualInputDeviceId, ...other } = source
+  return {
+    ...other,
+    outputMode: ['source', 'translation', 'speech'].includes(source.outputMode as string) ? source.outputMode as 'source' | 'translation' | 'speech' : 'translation',
+    speakerDetection: typeof source.speakerDetection === 'boolean' ? source.speakerDetection : true,
+    speechOutputDeviceId: typeof source.speechOutputDeviceId === 'string' && source.speechOutputDeviceId.length <= 512 ? source.speechOutputDeviceId : '',
+    virtualInputDeviceId: typeof virtualInputDeviceId === 'string' && virtualInputDeviceId.length <= 512 ? virtualInputDeviceId : '',
+    ...(s2sModel === null || s2sModel === 'qwen3.5-livetranslate-flash-realtime' || s2sModel === 'qwen3.8-livetranslate-flash-realtime'
+      ? { s2sModel }
+      : {}),
+  }
+}
 
 /** Must be a dropdown entry; anything else falls back to auto-detect. */
 function sanitizeSourceLanguage(value: unknown): string {
@@ -205,8 +285,11 @@ export class SettingsStore {
   }
 
   async load(): Promise<AppSettings> {
+    await recoverSettingsMigration(this.path)
     try {
       const raw = JSON.parse(await readFile(this.path, 'utf8')) as Partial<AppSettings> & {
+        version?: unknown
+        realtime?: unknown
         translation?: Partial<AppSettings['translation']> & {
           allowIntermediate?: unknown
           /** The pre-single-select multi-select field; migrated to targetLanguage on load. */
@@ -222,11 +305,28 @@ export class SettingsStore {
         /** The pre-`network` top-level mirror toggle; migrated into `network` on load. */
         useHuggingFaceMirror?: unknown
       }
+      if (typeof raw.version === 'number' && raw.version > 3) throw new SettingsMigrationError('Settings require a newer Nola version')
       // The legacy Argos relay toggle meant something else, so drop it rather than mapping it onto translateIntermediate.
       const rawTranslation = migrateTranslation({ ...(raw.translation ?? {}) })
       delete rawTranslation.allowIntermediate
       const legacyTargets = rawTranslation.targetLanguages
       delete rawTranslation.targetLanguages
+      const realtime = realtimeSettings(raw.realtime)
+      const legacyAliyunModel = raw.recognition?.aliyunModel
+      const knownLiveTranslate = legacyAliyunModel === 'qwen3.8-livetranslate-flash-realtime'
+        || legacyAliyunModel === 'qwen3.5-livetranslate-flash-realtime'
+      const legacyTarget = rawTranslation.targetLanguage ?? (Array.isArray(legacyTargets) ? legacyTargets.find(value => typeof value === 'string') : undefined)
+      if (raw.version !== 3 && legacyTarget === 'none' && raw.realtime?.outputMode === undefined) {
+        realtime.outputMode = 'source'
+      }
+      if (raw.version !== 3 && raw.realtime?.s2sModel === undefined && raw.recognition?.provider === 'aliyun' && knownLiveTranslate && rawTranslation.provider !== 'recognition') {
+        realtime.s2sModel = legacyAliyunModel
+        if (realtime.outputMode === 'translation') realtime.outputMode = legacyTarget === 'none' ? 'source' : 'speech'
+      } else if (raw.realtime?.s2sModel === undefined && raw.recognition?.provider === 'aliyun' &&
+        (knownLiveTranslate || legacyAliyunModel === undefined) && realtime.outputMode !== 'source' &&
+        (realtime.outputMode === 'speech' || rawTranslation.provider === 'recognition')) {
+        realtime.s2sModel = legacyAliyunModel ?? 'qwen3.8-livetranslate-flash-realtime'
+      }
       // The two retired line-count settings; the rolling overlay derives its budget from the stage height.
       const rawOverlay = { ...(raw.overlay ?? {}) }
       delete rawOverlay.maxLines
@@ -235,7 +335,8 @@ export class SettingsStore {
       this.settings = {
         ...structuredClone(DEFAULT_SETTINGS),
         ...raw,
-        version: 2,
+        version: 3,
+        realtime,
         onboardingSeen: raw.onboardingSeen === true,
         onboardingVersion: settingsPatchSchema.safeParse({ onboardingVersion: raw.onboardingVersion }).data?.onboardingVersion ?? 0,
         onboardingStep: settingsPatchSchema.safeParse({ onboardingStep: raw.onboardingStep }).data?.onboardingStep ?? 'W0',
@@ -275,10 +376,10 @@ export class SettingsStore {
             : {}),
           // A legacy file with a non-empty address predates the explicit switch, so preserve its
           // implied enabled state; files without the address use the current default.
-          ...migrateGithubAccelerate(raw.network, raw.version !== 2),
+          ...migrateGithubAccelerate(raw.network, typeof raw.version !== 'number' || raw.version < 2),
           // Version 2 makes automatic mirror routing the default for every existing installation.
           // This migration runs once; subsequent user-selected nodes and disabled switches persist.
-          ...(raw.version !== 2 ? {
+          ...(typeof raw.version !== 'number' || raw.version < 2 ? {
             usePypiMirror: true,
             pypiMirrorUrl: PYPI_MIRROR_AUTO,
             pytorchWheelMirrorUrl: PYTORCH_WHEEL_MIRROR_AUTO,
@@ -287,7 +388,10 @@ export class SettingsStore {
             githubAccelerateUrl: GITHUB_PROXY_AUTO,
           } : {}),
         },
-        recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}) },
+        recognition: { ...DEFAULT_SETTINGS.recognition, ...(raw.recognition ?? {}),
+          ...(raw.recognition?.provider === 'aliyun' && raw.recognition.aliyunModel === undefined
+            ? { aliyunModel: 'qwen3.8-livetranslate-flash-realtime' } : {}),
+        },
         recording: { ...DEFAULT_SETTINGS.recording, ...(raw.recording ?? {}) },
         appearance: { ...DEFAULT_SETTINGS.appearance, ...(raw.appearance ?? {}) },
         browserConnection: {
@@ -370,7 +474,16 @@ export class SettingsStore {
           overlay.translationColor = DEFAULT_SETTINGS.overlay.translationColor
         }
       }
-    } catch {
+      if (raw.version !== 3) {
+        const { videoCaptions: _runScopedVideoCaptions, ...persisted } = this.settings
+        try {
+          await commitSettingsMigration(this.path, JSON.stringify(persisted, null, 2))
+        } catch (error) {
+          throw new SettingsMigrationError('Settings migration did not commit', { cause: error })
+        }
+      }
+    } catch (error) {
+      if (error instanceof SettingsMigrationError) throw error
       this.settings = structuredClone(DEFAULT_SETTINGS)
     }
     this.settings.modelPolicy = modelPolicyOf(this.settings)
@@ -389,7 +502,8 @@ export class SettingsStore {
       ...this.settings,
       ...patch,
       modelPolicy: mergeModelPolicy(this.settings, patch.modelPolicy),
-      version: 2,
+      version: 3,
+      realtime: realtimeSettings({ ...this.settings.realtime, ...patch.realtime }),
       synthesis: { ...this.settings.synthesis, ...patch.synthesis },
       modelGateway: { ...this.settings.modelGateway, ...patch.modelGateway },
       recognition: { ...this.settings.recognition, ...(patch.recognition ?? {}) },

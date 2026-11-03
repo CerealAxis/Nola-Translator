@@ -15,7 +15,8 @@ it('preserves custom VAD timing through the session schema', () => {
 
 it('builds credential-free Aliyun configuration without replacing the saved local model', () => {
   const recognition = { ...DEFAULT_SETTINGS.recognition, provider: 'aliyun' as const, aliyunWorkspaceId: 'workspace-123', aliyunRegion: 'ap-southeast-1' as const }
-  expect(recognitionFieldsOf(recognition)).toEqual({ max_segment_ms: 10000, silence_end_ms: 800, recognitionProvider: 'aliyun', recognitionOptions: { workspaceId: 'workspace-123', region: 'ap-southeast-1', model: 'qwen3.8-livetranslate-flash-realtime' } })
+  expect(recognitionFieldsOf(recognition)).toEqual({ max_segment_ms: 10000, silence_end_ms: 800, recognitionProvider: 'aliyun', recognitionOptions: { workspaceId: 'workspace-123', region: 'ap-southeast-1', model: 'qwen3-asr-flash-realtime' } })
+  expect(supportsRecognitionNativeTranslation(recognition)).toBe(false)
   expect(remoteSourceLanguages(recognition)).toEqual(['auto'])
   expect(remoteSourceLanguages({ ...recognition, aliyunModel: 'qwen3.5-livetranslate-flash-realtime' })).toContain('ja')
   expect(recognitionFieldsOf(DEFAULT_SETTINGS.recognition)).toEqual({ max_segment_ms: 10000, silence_end_ms: 800, recognitionProvider: 'local' })

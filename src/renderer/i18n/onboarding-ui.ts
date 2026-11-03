@@ -65,9 +65,9 @@ export const onboardingJa: OnboardingMessages = {
 
 export const onboardingKo: OnboardingMessages = {
   ...lessonsKo,
-  welcomeTitle: 'Nola Translator에 오신 것을 환영합니다',
+  welcomeTitle: 'Nola Translator 에 오신 것을 환영합니다',
   welcomeIntro: '모델 선택, 모델 게이트웨이, 실시간 통역과 브라우저 자막을 소개합니다.',
-  starRequest: '앱이 마음에 드신다면 GitHub에서 Star를 눌러 주세요. 감사합니다😊',
+  starRequest: '앱이 마음에 드신다면 GitHub 에서 Star 를 눌러 주세요. 감사합니다😊',
   later: '나중에 보기', begin: '튜토리얼 시작', helpDocs: '도움말 문서', github: 'GitHub',
   title: '시작 안내', replay: '다시 보기', replayHint: '기능 위치와 설정 방법을 다시 확인합니다.',
   next: '다음', progress: '{current} / {total}',

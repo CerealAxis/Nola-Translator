@@ -5,10 +5,11 @@ import { sessionConfigSchema } from '../shared/schemas'
 import { NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider, type RecognitionProvider } from '../shared/settings'
 import { supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'
 import { customCredentialSlot } from '../shared/custom-models'
-import { bindingIsLocal, normalizeModelBinding } from '../shared/model-gateway'
+import { resolveSessionModelBindings } from '../shared/model-gateway'
 import type { FeatureActivity, FeatureLease } from './feature-activity'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
+import type { BackendSession, MappedBackendSession } from './backend-session'
 
 /**
  * Each cloud recognition provider owns one slot of `credentials.json`. A provider absent here has
@@ -53,6 +54,7 @@ export interface SessionControllerOptions {
   isOverlayVisible?(): boolean
   useGateway?: boolean
   audioTestEngine?: EngineProcess
+  prepareBackend?(config: SessionConfig, settings: AppSettings): Promise<{ client: BackendSession; mapped: MappedBackendSession } | undefined>
 }
 
 /** One reservation covers runtime preparation as well as inference, across both clients. */
@@ -68,9 +70,17 @@ export class SessionController {
   private featureLease: FeatureLease | null = null
   private localModelsInUse = false
   private readonly inFlight = new Set<Promise<unknown>>()
+  private backendSession?: BackendSession
   constructor(private readonly options: SessionControllerOptions) {}
   get engine(): EngineProcess { return this.options.engine }
+  getBackendSession(id: string): BackendSession | undefined {
+    return this.activeSessionId === id ? this.backendSession : undefined
+  }
   get usesLocalModels(): boolean { return (this.starting || !!this.activeSessionId) && this.localModelsInUse }
+
+  usesBackendResource(resourceId: string): boolean {
+    return this.backendSession?.usesResource(resourceId) ?? false
+  }
 
   testAudio(audioSource: AudioTestSource): Promise<AudioTestResult> {
     return this.withActivity('interpretation', false, () => this.testAudioInternal(audioSource))
@@ -100,7 +110,8 @@ export class SessionController {
     const pending = [...this.inFlight]
     if (this.starting) {
       this.operation++
-      await this.options.engine.stop()
+      if (this.backendSession) await this.backendSession.stop().catch(() => {})
+      else await this.options.engine.stop()
       await Promise.allSettled(pending)
       this.starting = false
       this.browserPreparing = false
@@ -173,29 +184,21 @@ export class SessionController {
     logDiagnostic('session.start.requested', { owner })
     if (owner === 'desktop' && !this.canShowOverlay()) throw new Error('sessionAlreadyRunning')
     if (this.busy) throw new Error('sessionAlreadyRunning')
-    const parsed = sessionConfigSchema.parse(raw) as SessionConfig
-    if (this.options.useGateway) {
-      // Bindings are authoritative; renderer settings persistence may still be in flight after fallback.
-      const asr = normalizeModelBinding('asr', parsed.recognitionBinding)
-      if (asr) {
-        parsed.recognitionBinding = asr
-        if (bindingIsLocal(asr)) { parsed.recognitionProvider = 'local'; parsed.recognitionModelId = asr.slice(9) }
-        else parsed.recognitionProvider = asr.slice(6) as RecognitionProvider
-      }
-      const mt = normalizeModelBinding('mt', parsed.translationBinding)
-      if (mt) {
-        parsed.translationBinding = mt
-        if (bindingIsLocal(mt)) { parsed.translationProvider = 'local'; parsed.translationModelId = mt.slice(9) }
-        else parsed.translationProvider = mt.startsWith('mt-custom:') ? 'cloud' : mt.slice(6) as SessionConfig['translationProvider']
-      }
-    }
+    const config = sessionConfigSchema.parse(raw) as SessionConfig
+    const parsed = this.options.useGateway ? resolveSessionModelBindings(config) : config
     this.localModelsInUse = (parsed.recognitionProvider ?? 'local') === 'local' || parsed.targetLanguages.length > 0 && (parsed.translationProvider ?? 'local') === 'local'
     // The provider gate lives in `supportsIntermediateTranslation`. Re-applying it here keeps a
     // stale or hand-assembled config from carrying a preference the chosen provider cannot act on.
     if (parsed.translationProvider && !supportsIntermediateTranslation(parsed.translationProvider)) parsed.allowIntermediateTranslation = false
     if (owner === 'desktop' && (parsed.audioSource.kind === 'browserTab' || parsed.browserTimeline)) throw new Error('invalidConfiguration')
-    if (owner === 'browser' && (!parsed.browserTimeline || parsed.audioSource.kind === 'microphone')) throw new Error('invalidConfiguration')
+    if (owner === 'browser' && (!parsed.browserTimeline || parsed.audioSource.kind === 'microphone' || parsed.audioSource.kind === 'virtualInput')) throw new Error('invalidConfiguration')
     const startSettings = this.options.getSettings()
+    if (owner === 'desktop') {
+      parsed.outputMode ??= startSettings.realtime?.outputMode
+      parsed.speakerDetection ??= startSettings.realtime?.speakerDetection
+      parsed.speechOutputDeviceId ??= startSettings.realtime?.speechOutputDeviceId
+    }
+    if (parsed.outputMode === 'source') parsed.targetLanguages = []
     parsed.compute = { ...startSettings.compute }
     parsed.max_segment_ms = startSettings.recognition.max_segment_ms ?? 10000
     parsed.silence_end_ms = startSettings.recognition.silence_end_ms ?? 800
@@ -249,9 +252,15 @@ export class SessionController {
         checkCancelled()
         if (apiKey) parsed.fallbackTranslationOptions = { ...parsed.fallbackTranslationOptions, apiKey }
       }
-      await this.options.prepare(parsed, () => operation !== this.operation)
+      const backend = await this.options.prepareBackend?.(parsed, startSettings)
       checkCancelled()
-      await this.ensureReady()
+      if (!backend && parsed.outputMode === 'speech') throw new Error('realtimeSpeechUnavailable')
+      if (backend) this.backendSession = backend.client
+      else {
+        await this.options.prepare(parsed, () => operation !== this.operation)
+        checkCancelled()
+        await this.ensureReady()
+      }
       checkCancelled()
       if (owner === 'browser' && !this.options.engine.supports('browserAudio')) throw new Error('engineUpdateRequired')
       const keepAudio = this.options.getSettings().recording.keepAudio
@@ -260,14 +269,23 @@ export class SessionController {
         meetingId = meeting.meetingId
         if (keepAudio) parsed.recordingPath = this.options.meetings.recordingPathFor(meetingId)
       }
-      const response = await this.options.engine.request({ protocolVersion: 1, type: 'startSession', requestId: `start-${randomUUID()}`, config: parsed }, 'sessionStarted', 30 * 60_000)
+      const response = backend
+        ? { sessionId: await backend.client.start(backend.mapped, parsed.recordingPath) }
+        : await this.options.engine.request({ protocolVersion: 1, type: 'startSession', requestId: `start-${randomUUID()}`, config: parsed }, 'sessionStarted', 30 * 60_000)
       checkCancelled()
       this.activeSessionId = response.sessionId
       if (owner === 'browser') this.rememberBrowser(response.sessionId)
       if (meetingId) this.options.meetings?.attach(meetingId, response.sessionId)
+      if (backend && owner === 'desktop') {
+        this.options.engine.emit('event', { protocolVersion: 1, type: 'sessionStarted', requestId: `backend-${randomUUID()}`, sessionId: response.sessionId, meetingId })
+        backend.client.activate()
+      }
       logDiagnostic('session.started', { owner, sessionId: response.sessionId, meetingId })
       return { sessionId: response.sessionId, meetingId }
     } catch (error) {
+      const backend = this.backendSession
+      this.backendSession = undefined
+      if (backend) await backend.stop().catch(() => {})
       logDiagnostic('session.start.failed', { owner, error })
       if (meetingId) await this.options.meetings?.abandon(meetingId).catch(() => undefined)
       if (operation === this.operation) this.owner = null
@@ -289,7 +307,7 @@ export class SessionController {
     this.starting = false
     this.owner = null
     this.options.startingChanged(false)
-    const task = this.options.engine.stop()
+    const task = this.backendSession ? this.backendSession.stop() : this.options.engine.stop()
     this.cancelling = task
     void task.finally(() => { if (this.cancelling === task) this.cancelling = null }).catch(() => undefined)
     return task
@@ -299,15 +317,25 @@ export class SessionController {
     if (this.stopping?.id === id) return this.stopping.task
     if (id !== this.activeSessionId) return Promise.resolve()
     const browser = this.browserSessions.has(id)
+    const backend = this.backendSession
     this.featureLease?.stopping()
     const task = (async () => {
       try {
-        await this.ensureReady()
-        await this.options.engine.request({ protocolVersion: 1, type: 'stopSession', requestId: `stop-${randomUUID()}`, sessionId: id }, 'sessionStopped', 60_000)
+        if (backend) await backend.stop()
+        else if (this.options.engine.currentState !== 'ready') {
+          await this.options.engine.stop()
+          this.notifyLegacyStopped(id)
+        }
+        else {
+          await this.ensureReady()
+          await this.options.engine.request({ protocolVersion: 1, type: 'stopSession', requestId: `stop-${randomUUID()}`, sessionId: id }, 'sessionStopped', 60_000)
+        }
       } catch (error) {
+        if (backend) throw error
         await this.options.engine.stop()
-        throw error
+        this.notifyLegacyStopped(id)
       } finally {
+        if (this.backendSession === backend) this.backendSession = undefined
         if (this.activeSessionId === id) this.activeSessionId = null
         this.owner = null
         this.featureLease?.release()
@@ -319,7 +347,13 @@ export class SessionController {
     void task.finally(() => { if (this.stopping?.task === task) this.stopping = null }).catch(() => undefined)
     return task
   }
+  private notifyLegacyStopped(id: string): void {
+    if (this.activeSessionId === id) this.options.engine.emit('event', {
+      protocolVersion: 1, type: 'sessionStopped', requestId: `stopped-${randomUUID()}`, sessionId: id,
+    })
+  }
   async pause(id: string, paused: boolean): Promise<void> {
+    if (this.backendSession && this.activeSessionId === id) return this.backendSession.pause(paused)
     logDiagnostic('session.pause.requested', { sessionId: id, paused })
     await this.ensureReady()
     await this.options.engine.request({ protocolVersion: 1, type: 'setSessionPaused', requestId: `pause-${randomUUID()}`, sessionId: id, paused }, 'status', 30_000)
@@ -327,14 +361,23 @@ export class SessionController {
   handleEvent(event: EngineEvent): void {
     if (event.type === 'sessionStarted' && this.browserActive) this.rememberBrowser(event.sessionId)
     if (event.type === 'sessionStopped') {
-      if (this.activeSessionId === event.sessionId) this.activeSessionId = null
+      if (this.activeSessionId === event.sessionId) {
+        this.activeSessionId = null
+        this.backendSession?.close()
+        this.backendSession = undefined
+      }
       if (!this.starting) {
         this.owner = null
         if (!this.stopping) { this.featureLease?.release(); this.featureLease = null }
       }
     }
   }
-  releaseOnLoss(): void {
+  releaseOnLoss(backend = false): void {
+    if (this.backendSession && !backend) return
+    if (backend) {
+      this.backendSession?.close()
+      this.backendSession = undefined
+    }
     if (this.starting && !this.activeSessionId) return
     const id = this.activeSessionId
     const browser = this.browserActive

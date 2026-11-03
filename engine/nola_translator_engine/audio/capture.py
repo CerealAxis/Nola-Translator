@@ -26,6 +26,7 @@ from ..debug_log import exception_fields, write as write_debug
 class RawAudioChunk:
     data: bytes
     captured_at_ms: float
+    discontinuity: bool = False
 
 
 class RawAudioQueue:
@@ -37,6 +38,7 @@ class RawAudioQueue:
         self.capacity = capacity
         self._queue: Queue[RawAudioChunk] = Queue(maxsize=capacity)
         self.dropped_chunks = 0
+        self.dropped_bytes = 0
 
     def put_from_callback(self, chunk: RawAudioChunk) -> bool:
         try:
@@ -44,7 +46,7 @@ class RawAudioQueue:
             return True
         except Full:
             try:
-                self._queue.get_nowait()
+                self.dropped_bytes += len(self._queue.get_nowait().data)
                 self.dropped_chunks += 1
             except Empty:
                 pass
@@ -53,6 +55,7 @@ class RawAudioQueue:
                 return True
             except Full:
                 self.dropped_chunks += 1
+                self.dropped_bytes += len(chunk.data)
                 return False
 
     def get_nowait(self) -> RawAudioChunk:
@@ -260,7 +263,7 @@ class PortAudioCapture:
         _time_info: dict[str, float],
         _status_flags: int,
     ) -> tuple[None, int]:
-        self.queue.put_from_callback(RawAudioChunk(bytes(in_data), monotonic() * 1000))
+        self.queue.put_from_callback(RawAudioChunk(bytes(in_data), monotonic() * 1000, bool(_status_flags & pyaudio.paInputOverflow)))
         return (None, pyaudio.paContinue)
 
     def start(self) -> None:
@@ -365,6 +368,7 @@ class PortAudioCapture:
         old_queue = self.queue
         self.queue = RawAudioQueue(old_queue.capacity)
         self.queue.dropped_chunks = old_queue.dropped_chunks
+        self.queue.dropped_bytes = old_queue.dropped_bytes
         self.normalizer = StreamingAudioNormalizer(self.device.sample_rate, self.device.channels)
         self._finishing = False
 
@@ -377,6 +381,8 @@ class PortAudioCapture:
         # silence lookback window: pad with zero frames only once a full frame length has
         # elapsed, so sub-frame jitter doesn't allocate arrays.
         last_seen_ms = monotonic() * 1000
+        seen_drops = self.queue.dropped_bytes
+        pending_gap = 0
         while (self.running or not self.queue.empty()) and not (self._finishing and self.queue.empty()):
             try:
                 chunk = await asyncio.to_thread(self.queue.get, 0.1)
@@ -401,6 +407,12 @@ class PortAudioCapture:
                     raise AudioDeviceDisconnectedError(self.device.device_id)
                 continue
             last_seen_ms = monotonic() * 1000
+            drops = self.queue.dropped_bytes
+            if drops != seen_drops or chunk.discontinuity:
+                width = 2 if self._sample_format == pyaudio.paInt16 else 4
+                pending_gap += max(1, round((drops - seen_drops) * TARGET_SAMPLE_RATE / (width * self.device.channels * self.device.sample_rate)))
+                seen_drops = drops
+                self.normalizer = StreamingAudioNormalizer(self.device.sample_rate, self.device.channels)
             if self.recording_sink is not None and not self.paused:
                 sample_format: Literal["int16", "float32"] = (
                     "int16" if self._sample_format == pyaudio.paInt16 else "float32"
@@ -410,6 +422,9 @@ class PortAudioCapture:
                        if self._sample_format == pyaudio.paInt16 else
                        self.normalizer.accept_float32(np.frombuffer(chunk.data, dtype="<f4"), chunk.captured_at_ms))
             for frame in samples:
+                if pending_gap:
+                    frame = replace(frame, lost_samples_before=pending_gap)
+                    pending_gap = 0
                 yield frame
         if self._finishing:
             for frame in self.normalizer.finish():

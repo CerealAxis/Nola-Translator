@@ -201,6 +201,8 @@ contextBridge.exposeInMainWorld('nolaTranslator', {
   onEngineEvent: fn => { eventListeners.add(fn); return () => eventListeners.delete(fn) },
   onOverlayMenuChanged: () => () => {},
   onOverlayLockChanged: () => () => {},
+  onOverlayVisibilityChanged: () => () => {},
+  getOverlayVisibility: async () => false,
   onOpenAppearance: () => () => {},
   getEngineState: async () => 'ready',
   browserConnection: async () => ({ enabled: false, registered: false, connections: 0, sessionActive: false, captionServiceActive: false, browsers: [] }),
@@ -232,6 +234,10 @@ contextBridge.exposeInMainWorld('nolaTranslator', {
   startSession: async () => ({ sessionId: 'layout', meetingId: 'm-live' }),
   stopSession: async () => {},
   setSessionPaused: async () => {},
+  gateway: {
+    snapshot: async () => ({ state: 'stopped', address: '', port: 0, connections: 0, activeRequests: 0, services: {}, requests: [] }),
+    onChanged: () => () => {},
+  },
 });
 contextBridge.exposeInMainWorld('layoutFixture', { emit });
 `
@@ -324,7 +330,7 @@ async function main() {
         min: group.min,
         found: elements.length,
         overflows: elements
-          .filter((el) => el.scrollWidth > el.clientWidth + 2)
+          .filter((el) => !el.classList.contains('sr-only') && el.scrollWidth > el.clientWidth + 2)
           .map((el) => ({ className: String(el.className).slice(0, 90), clientWidth: el.clientWidth, scrollWidth: el.scrollWidth })),
       }
     })

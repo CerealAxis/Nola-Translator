@@ -56,3 +56,15 @@ class Transcriber(Protocol):
         prefix: str | None = None,
         language: str | None = None,
     ) -> tuple[str, str | None]: ...
+
+
+def create_cloud_recognizer(config):
+    if config.recognitionProvider == "minimax":
+        from .minimax import MiniMaxRecognizer
+
+        return MiniMaxRecognizer(config)
+    from .aliyun import AliyunRecognizer, AliyunInferenceRecognizer, INFERENCE_ASR_MODELS
+
+    if config.recognitionOptions and config.recognitionOptions.model in INFERENCE_ASR_MODELS:
+        return AliyunInferenceRecognizer(config)
+    return AliyunRecognizer(config)

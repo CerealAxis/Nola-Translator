@@ -82,8 +82,8 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
       </SettingGroup>
 
       <SettingGroup legend={t('gateway.closeBehavior')}>
-        <SettingsRow label={t('gateway.closeBehavior')} desc={t('gateway.closeHint')}>
-          <SettingSelect value={settings.closeBehavior ?? 'tray'} ariaLabel={t('gateway.closeBehavior')}
+        <SettingsRow label={t('titleBar.closeWindow')} desc={t('gateway.closeHint')} descriptionTooltip>
+          <SettingSelect value={settings.closeBehavior ?? 'tray'} ariaLabel={t('titleBar.closeWindow')}
             options={[{ value: 'tray', label: t('gateway.closeTray') }, { value: 'quit', label: t('gateway.closeQuit') }]}
             onChange={value => { if (value === 'tray' || value === 'quit') void updateSettings({ closeBehavior: value }).catch(() => undefined) }} />
         </SettingsRow>

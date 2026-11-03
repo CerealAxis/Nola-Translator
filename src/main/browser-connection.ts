@@ -12,7 +12,7 @@ import { FIREFOX_EXTENSION_ID, BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, 
 import type { FeatureActivity, FeatureLease } from './feature-activity'
 import type { BrowserIntegrations } from './browser-integrations'
 import type { AudioDevice, SessionConfig, EngineEvent, EngineProcessState, PrewarmConfig, PrewarmResult } from '../shared/contracts'
-import { NO_TRANSLATION_LANGUAGE, type AppSettings } from '../shared/settings'
+import { defaultRealtimeS2s, NO_TRANSLATION_LANGUAGE, type AppSettings } from '../shared/settings'
 import type { EngineProcess } from './engine-process'
 import type { SessionController } from './session-controller'
 import { resolveDataRoot } from './data-root'
@@ -67,6 +67,7 @@ function publicErrorCode(error: unknown): BrowserWireErrorCode {
 interface Client { socket: Socket; browser: BrowserKind; extensionVersion?: string; helloReceived: boolean; authenticated: boolean; sessionId: string | null; starting: boolean; closed: boolean; pending: number; pendingAudioMs: number; epoch: number; paused: boolean; audioGeneration: number; audioRequestPrefix: string; audioWindow: AudioWindow }
 interface AudioWindow { count: number; lastBytes: number; lastAudioMs: number; loggedAtMs: number }
 export interface BrowserConnectionOptions {
+  prepareS2s?: (model: string) => Promise<PrewarmResult>
   engine: EngineProcess
   activity?: FeatureActivity
   sessions: SessionController
@@ -79,10 +80,13 @@ export interface BrowserConnectionOptions {
 
 /** The desktop's independent browser caption appearance and session audio source. */
 export function browserCaptionConfig(settings: AppSettings): BrowserCaptionConfig {
+  const s2s = settings.realtime?.browserS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.browserS2sModel
   return {
     appearance: settings.browserCaptions,
+    pipeline: s2s ? 's2s' : 'cascade',
+    desktopApplicationAudio: settings.videoCaptions.audioSource === 'system' && settings.videoCaptions.audioDeviceId?.startsWith('process:'),
     audioSource: settings.videoCaptions.audioSource ?? 'system',
-    audioDeviceId: settings.videoCaptions.audioDeviceId,
+    audioDeviceId: settings.videoCaptions.audioDeviceId?.startsWith('process:') ? undefined : settings.videoCaptions.audioDeviceId,
     sourceLanguage: settings.recognition.sourceLanguage,
     targetLanguage: settings.translation.targetLanguage,
   }
@@ -90,17 +94,24 @@ export function browserCaptionConfig(settings: AppSettings): BrowserCaptionConfi
 
 export function browserSessionConfig(settings: AppSettings, request: Extract<BrowserRequest, { type: 'start' }>): SessionConfig {
   const translation = settings.translation
+  const s2sModel = settings.realtime?.browserS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.browserS2sModel
+  const recognition = s2sModel ? { ...settings.recognition, provider: 'aliyun' as const, aliyunModel: s2sModel } : settings.recognition
   // `defaultOutput` is a UI sentinel, not a WASAPI loopback device id. Older settings may still
   // carry it from the browser caption picker, so resolve it as the live system default.
   const deviceId = request.deviceId === 'defaultOutput' ? undefined : request.deviceId
+  const processId = settings.videoCaptions.audioSource === 'system' && settings.videoCaptions.audioDeviceId?.startsWith('process:')
+    ? settings.videoCaptions.audioDeviceId : undefined
   return {
+    s2sModel,
     recognitionBinding: sceneModelBinding(settings, 'asr'), translationBinding: sceneModelBinding(settings, 'mt'),
-    audioSource: request.source === 'tab' ? { kind: 'browserTab', streamId: request.streamId } : deviceId ? { kind: 'systemOutput', deviceId } : { kind: 'defaultOutput' },
+    audioSource: request.source === 'tab' ? { kind: 'browserTab', streamId: request.streamId }
+      : processId ? { kind: 'processAudio', deviceId: processId }
+        : deviceId ? { kind: 'systemOutput', deviceId } : { kind: 'defaultOutput' },
     recognitionMode: 'realtime', recognitionModelId: settings.recognition.modelId,
-    ...recognitionFieldsOf(settings.recognition),
-    sourceLanguage: settings.recognition.sourceLanguage,
+    ...recognitionFieldsOf(recognition),
+    sourceLanguage: s2sModel && !remoteSourceLanguages(recognition).includes(recognition.sourceLanguage) ? 'auto' : recognition.sourceLanguage,
     targetLanguages: translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? [] : [translation.targetLanguage],
-    translationProvider: translation.provider, translationModelId: translation.localModelId,
+    translationProvider: s2sModel ? 'recognition' : translation.provider, translationModelId: translation.localModelId,
     allowIntermediateTranslation: supportsIntermediateTranslation(translation.provider) && translation.translateIntermediate,
     intermediateTranslationIntervalMs: translation.intermediateTranslationIntervalMs,
     translationOptions: translationOptionsOf(translation),
@@ -217,7 +228,11 @@ export class BrowserConnection {
     const generation = this.captionGeneration
     const task = (async (): Promise<PrewarmResult> => {
       try {
-        const result = await this.options.sessions.prewarm(config)
+        const settings = this.options.getSettings()
+        const model = settings.realtime?.browserS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.browserS2sModel
+        const result: PrewarmResult = model
+          ? await this.options.prepareS2s?.(model) ?? { state: 'failed', code: 'modelUnavailable' }
+          : await this.options.sessions.prewarm(config)
         if (result.state === 'ready' && generation === this.captionGeneration && !this.disposing && !this.captionServiceClosing) {
           this.setCaptionServiceActive(true)
           return result
@@ -532,26 +547,34 @@ export class BrowserConnection {
           // drop the id too — otherwise status() advertises a session that no longer exists.
           if (client.closed || !this.enabled || this.options.integrations?.allows(client.browser) === false) { client.sessionId = null; await sessions.stop(started.sessionId); return }
           this.send(client, { type: 'result', id: request.id, value: { sessionId: started.sessionId } })
+          sessions.getBackendSession(started.sessionId)?.activate()
         } finally { clearTimeout(budget); client.starting = false }
         return
       }
       if (client.sessionId !== request.sessionId) throw new Error('sessionNotRunning')
       sessions.assertOwner(request.sessionId, 'browser')
+      const backend = sessions.getBackendSession(request.sessionId)
       if (request.type === 'stop') { this.debugLog('stop', { sessionId: request.sessionId }); await sessions.stop(request.sessionId); client.sessionId = null }
-      else if (request.type === 'finish') { this.debugLog('finish', { epoch: request.epoch }); await engine.request({ protocolVersion: 1, type: 'finishStream', requestId: request.id, sessionId: request.sessionId, epoch: request.epoch }, 'streamFinished', 10_000) }
+      else if (request.type === 'finish') {
+        this.debugLog('finish', { epoch: request.epoch })
+        if (backend) await backend.finishBrowser(request.epoch)
+        else await engine.request({ protocolVersion: 1, type: 'finishStream', requestId: request.id, sessionId: request.sessionId, epoch: request.epoch }, 'streamFinished', 10_000)
+      }
       else if (request.type === 'pause') { if (request.paused) client.audioGeneration++; client.paused = request.paused; this.debugLog('pause', { paused: request.paused }); await sessions.pause(request.sessionId, request.paused) }
       else if (request.type === 'reset') {
         client.audioGeneration++
         client.epoch = request.epoch
         client.pendingAudioMs = 0
         this.debugLog('reset', { epoch: request.epoch, videoTimeMs: request.videoTimeMs, playbackRate: request.playbackRate })
-        await engine.request({ protocolVersion: 1, type: 'resetStream', requestId: request.id, sessionId: request.sessionId, epoch: request.epoch, videoTimeMs: request.videoTimeMs, playbackRate: request.playbackRate }, 'streamReset', 30_000)
+        if (backend) await backend.resetBrowser({ epoch: request.epoch, videoTimeMs: request.videoTimeMs, playbackRate: request.playbackRate })
+        else await engine.request({ protocolVersion: 1, type: 'resetStream', requestId: request.id, sessionId: request.sessionId, epoch: request.epoch, videoTimeMs: request.videoTimeMs, playbackRate: request.playbackRate }, 'streamReset', 30_000)
       } else {
         const { id: _id, type: _type, ...audio } = request
         // PushAudio errors are answered by this request, not broadcast as session failures.
         const engineRequestId = `${client.audioRequestPrefix}${randomUUID()}`
         try {
-          await engine.request({ protocolVersion: 1, type: 'pushAudio', requestId: engineRequestId, ...audio }, 'audioAccepted', 2000)
+          if (backend) await backend.pushBrowserAudio(audio)
+          else await engine.request({ protocolVersion: 1, type: 'pushAudio', requestId: engineRequestId, ...audio }, 'audioAccepted', 2000)
           this.debugLog('audioAccepted', { sequence: audio.sequence, ok: true })
         } catch (error) {
           const code = publicErrorCode(error)
@@ -590,4 +613,4 @@ export class BrowserConnection {
     if (['failed', 'recovering', 'stopped'].includes(state)) for (const client of this.clients) if (client.sessionId) client.socket.destroy()
   }
 }
-import { fallbackTranslationFieldsOf, recognitionFieldsOf, supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'
+import { fallbackTranslationFieldsOf, recognitionFieldsOf, remoteSourceLanguages, supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'

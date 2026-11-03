@@ -2,39 +2,37 @@ import { Button } from '@/components/ui/button'
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui'
 import { Empty, EmptyTitle } from '@/components/ui/empty'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardAction, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { LocalModelImport } from '../offline/OfflineResources'
 import { offlineActions } from '@/store/offlineStore'
 import { modelImportEntry } from '../../../shared/model-import-catalog'
-import { configurationOf, isModelReady } from '../../../shared/model-capabilities'
 import { ModelConfigurationDialog } from './ModelConfigurationDialog'
 import { modelEngines, supportsSelectedEngine } from '../../../shared/model-engines'
 import { DEFAULT_COMPUTE_SETTINGS } from '../../../shared/compute'
-import { defaultModelBinding, defaultModelPatch } from '../../../shared/model-policy'
-import { ModelPolicyPanel } from './ModelPolicyPanel'
 /** Model catalog and download manager. The router owns the page padding. */
 
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Box, CircleHelp, Cpu } from 'lucide-react'
+import { CircleHelp } from 'lucide-react'
 import { getBridge } from '@/store'
 
 import { useI18n } from '@/i18n'
 import { settingsPath, useRoute } from '@/routes'
 import { actions, stores, updateSettings, useStore } from '@/store'
-import { notifyError, notifyInfo, notifySuccess } from '@/components/primitives/notify'
+import { notifyError, notifyInfo } from '@/components/primitives/notify'
+import { PageHeader } from '@/components/primitives'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ModelDownloadSource, ResourceRecord, ResourceRecordWithRate } from '@/bridge'
 import { DownloadsTab } from './DownloadsTab'
 import { HubSearchTab } from './HubSearchTab'
-import { ModelCard, ModelCardSkeleton, defaultTargetOf, isDefaultOf } from './ModelCard'
+import { ModelCard, ModelCardSkeleton } from './ModelCard'
 import { DownloadSourceDialog } from './DownloadSourceDialog'
-import { ModelMark } from './modelBrand'
 import { RecommendedFamilyCard, RecommendedFamilyDialog } from './RecommendedFamilies'
 import { familyOf, type RecommendedFamily } from './modelFamily'
 import { isEngineAvailable } from './engine-availability'
-import { notifyModelDownloadFailure, notifyModelRemoveFailure, suppressNextDownloadStartNotice } from './ModelDownloadNotice'
-import { CloudMark, CloudModelCard, CloudModelDialog, cloudModelsOf, type CloudModel, type CloudModelId } from './CloudModels'
+import { notifyModelDownloadFailure, suppressNextDownloadStartNotice } from './ModelDownloadNotice'
+import { CloudModelCard, CloudModelDialog, cloudModelsOf, type CatalogCloudModel, type CatalogCloudModelId } from './CloudModels'
+import { MIMO_TTS_MODEL, REALTIME_S2S_MODELS } from '../../../shared/settings'
+import type { ModelGatewaySnapshot } from '../../../shared/model-gateway'
 import './models.css'
 
 export type ModelsTab = 'recommended' | 'installed' | 'search' | 'downloads'
@@ -52,7 +50,8 @@ export function ModelsPage() {
   const [downloadTarget, setDownloadTarget] = useState<ResourceRecord | null>(null)
   const [openFamily, setOpenFamily] = useState<RecommendedFamily | null>(null)
   const [voiceMetadata, setVoiceMetadata] = useState<{ modelId: string; voices: string[] }>({ modelId: '', voices: [] })
-  const [cloudDetail, setCloudDetail] = useState<CloudModelId | null>(null)
+  const [realtime, setRealtime] = useState<ModelGatewaySnapshot['realtime']>()
+  const [cloudDetail, setCloudDetail] = useState<CatalogCloudModelId | null>(null)
 
   const resources = useStore(stores.models, (state) => state.resources)
   const loaded = useStore(stores.models, (state) => state.loaded)
@@ -100,27 +99,25 @@ export function ModelsPage() {
 
   const credentials = useStore(stores.models, state => state.credentials)
   const cloudModels = cloudModelsOf(settings, credentials)
-  const installedCloudModels = cloudModels.filter(model => model.ready || model.profile)
-  const openCloudModel = (id: CloudModelId) => {
-    if (id !== 'recognition') { setCloudDetail(id); return }
-    const current = stores.settings.getState().settings
-    const ready = cloudModelsOf(current, stores.models.getState().credentials).some(model => model.id === 'recognition' && model.ready)
-    if (!current || !ready) { setCloudDetail('aliyun'); return }
-    void updateSettings(defaultModelPatch(current, 'mt', 'cloud:recognition')).then(() => notifySuccess(t('modelsSettingsUi.cloudProviderEnabled', { name: t('settings.providerRecognitionTranslation') })))
-      .catch((cause: unknown) => notifyError(t('modelsSettingsUi.saveError'), { cause }))
+  const aliyunReady = cloudModels.some(model => model.id === 'aliyun' && model.ready)
+  const runtimeState = (ids: readonly string[]): CatalogCloudModel['runtimeState'] => {
+    const instances = realtime?.instances.filter(instance => ids.includes(instance.model_id)) ?? []
+    if (instances.some(instance => instance.active_leases > 0)) return 'running'
+    for (const state of ['loading', 'ready', 'failed'] as const) {
+      if (instances.some(instance => instance.state === state)) return state
+    }
   }
+  const catalogCloudModels: CatalogCloudModel[] = [
+    ...cloudModels.filter(model => model.id !== 'recognition'),
+    { id: 'aliyun-s2s', kind: 's2sModel', free: false, ready: aliyunReady,
+      runtimeState: runtimeState(REALTIME_S2S_MODELS) },
+    { id: MIMO_TTS_MODEL, kind: 'ttsModel', free: false, ready: credentials['mimo-tts'],
+      runtimeState: runtimeState([MIMO_TTS_MODEL]) },
+  ]
+  const installedCloudModels = catalogCloudModels.filter(model => model.ready || model.profile)
 
   const installed = useMemo(() => resources.filter((item) => item.installed), [resources])
   const activeCount = useMemo(() => countActive(resources), [resources])
-  const asrDefault = settings ? defaultModelBinding(settings, 'asr') : ''
-  const mtDefault = settings ? defaultModelBinding(settings, 'mt') : ''
-  const ttsDefault = settings ? defaultModelBinding(settings, 'tts') : ''
-  const recognition = resources.find(item => item.resourceId === asrDefault.replace(/^resource:/, '') && asrDefault.startsWith('resource:'))
-  const synthesis = resources.find(item => item.resourceId === ttsDefault.replace(/^resource:/, '') && ttsDefault.startsWith('resource:'))
-  const translation = resources.find(item => item.resourceId === mtDefault.replace(/^resource:/, '') && mtDefault.startsWith('resource:'))
-  const currentRecognitionCloud = cloudModels.find(model => model.kind === 'recognitionModel' && model.active)
-  const currentTranslationCloud = cloudModels.find(model => model.kind === 'translationModel' && model.active)
-  const currentTranslationCloudReady = currentTranslationCloud?.ready ?? false
   const voices = voiceMetadata.modelId === settings?.synthesis?.modelId ? voiceMetadata.voices : []
   useEffect(() => {
     const gateway = getBridge()?.gateway
@@ -128,29 +125,16 @@ export function ModelsPage() {
     const receive = (snapshot: Awaited<ReturnType<typeof gateway.snapshot>>) => setVoiceMetadata({ modelId: snapshot.services.tts.model.replace(/^resource:/, ''), voices: snapshot.services.tts.voices ?? [] })
     let alive = true
     const off = gateway.onChanged(receive)
-    void gateway.snapshot().then(snapshot => { if (alive) receive(snapshot) }).catch(() => undefined)
-    return () => { alive = false; off() }
+    const refresh = () => { void gateway.snapshot().then(snapshot => { if (alive) { receive(snapshot); setRealtime(snapshot.realtime) } }).catch(() => undefined) }
+    refresh()
+    const interval = window.setInterval(refresh, 3000)
+    return () => { alive = false; off(); window.clearInterval(interval) }
   }, [settings?.synthesis?.modelId])
   useEffect(() => {
     if (voices.length && settings?.synthesis && !voices.includes(settings.synthesis.voice)) {
       void updateSettings({ synthesis: { voice: voices[0] } }).catch(() => undefined)
     }
   }, [voices, settings?.synthesis?.voice])
-  const localTranslation = mtDefault.startsWith('resource:')
-  const remoteRecognition = !!currentRecognitionCloud
-  const currentRecognition = currentRecognitionCloud
-    ? currentRecognitionCloud.id === 'aliyun' ? t('modelsSettingsUi.aliyunAsr') : t('settings.providerMiniMax')
-    : recognition?.installed ? recognition.name : t('modelsSettingsUi.noModelSelected')
-  const providerNames = {
-    cloud: t('settings.providerCloud'), microsoft: t('settings.providerMicrosoft'), mymemory: t('settings.providerMyMemory'),
-    google: t('settings.providerGoogle'), 'index-translate': t('settings.providerIndexTranslate'),
-    recognition: t('settings.providerRecognitionTranslation'),
-  }
-  const currentTranslation = localTranslation
-    ? translation?.installed ? translation.name : t('modelsSettingsUi.noModelSelected')
-    : currentTranslationCloud?.profile?.name ?? (currentTranslationCloud?.id === 'cloud'
-      ? settings?.translation.cloudModel?.trim() || providerNames.cloud
-      : currentTranslationCloud ? providerNames[currentTranslationCloud.id as keyof typeof providerNames] : t('modelsSettingsUi.noModelSelected'))
   const openFamilyRecords = openFamily
     ? resources.filter(record => !record.resourceId.startsWith('hub:') && familyOf(record) === openFamily)
     : []
@@ -173,15 +157,12 @@ export function ModelsPage() {
     void actions.models.loadModels().catch(() => undefined)
   }, [])
 
-  const run = (record: ResourceRecord, action: 'install' | 'remove' | 'cancel') => () => {
+  const run = (record: ResourceRecord, action: 'install' | 'cancel') => () => {
     if (action === 'install') {
       setDownloadTarget(record)
       return
     }
-    void actions.models.manageResource(record.resourceId, action).catch((cause: unknown) => {
-      if (action === 'remove') notifyModelRemoveFailure(record, t, cause)
-      else notifyError(t('errors.engineOperationFailed'), { cause })
-    })
+    void actions.models.manageResource(record.resourceId, action).catch((cause: unknown) => notifyError(t('errors.engineOperationFailed'), { cause }))
   }
 
   /*
@@ -199,54 +180,27 @@ export function ModelsPage() {
     })
   }
 
-  // Capability defaults and scene selections are independent, including for local language models.
-  const setDefault = (record: ResourceRecord) => {
-    const patch = defaultTargetOf(record)
-    if (!(record.kind === 'ttsModel' ? record.installed : isModelReady(record)) || !patch || !supportsSelectedEngine(record, settings?.compute ?? DEFAULT_COMPUTE_SETTINGS, record.resourceId)) return
-    if (!settings) return
-    const kind = record.kind === 'recognitionModel' ? 'asr' : record.kind === 'ttsModel' ? 'tts' : familyOf(record) === 'qwen35' ? 'llm' : 'mt'
-    void updateSettings(defaultModelPatch(settings, kind, `resource:${record.resourceId}`)).catch((cause: unknown) => notifyError(t('modelsSettingsUi.saveError'), { cause }))
-  }
-
-  /*
-   * 卡片底部的第二个动作分两种：
-   *   · Hub 装来的（含本地导入）模型，配置是用户自己存下来的，可以改，弹窗可编辑；
-   *   · 推荐列表里下下来的模型用的是内置配置，只给一个「查看配置」的只读弹窗。
-   */
   const footerOf = (record: ResourceRecord) => {
-    if (record.resourceId.startsWith('hub:') && record.installed && record.kind !== 'ttsModel') {
-      return <Button variant="secondary" onClick={() => setConfiguring({ record, readOnly: false })}>{t(configurationOf(record) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button>
+    if (record.installed) {
+      const readOnly = !record.resourceId.startsWith('hub:') || record.kind === 'ttsModel'
+      return <Button onClick={() => setConfiguring({ record, readOnly })}>{t('models.openDetails')}</Button>
     }
     if (!modelImportEntry(record.resourceId)) return undefined
-    if (record.installed && record.kind !== 'ttsModel') {
-      return <Button variant="secondary" size="sm" onClick={() => setConfiguring({ record, readOnly: true })}>{t('modelConfig.view')}</Button>
-    }
     return <Button variant="secondary" size="sm" onClick={() => offlineActions.openDownloads(record.resourceId)}>{t('offline.manualDownload')}</Button>
   }
 
   const card = (record: ResourceRecord) => {
-    const compute = settings?.compute ?? DEFAULT_COMPUTE_SETTINGS
-    const ready = (record.kind === 'ttsModel' ? record.installed : isModelReady(record)) && defaultTargetOf(record) !== null
-    const compatible = supportsSelectedEngine(record, compute, record.resourceId)
     const engine = modelEngines(record)[0]
     const loaderUnavailableReason = engine && runtimes?.local && !isEngineAvailable(engine, runtimes.local)
       ? t('models.engineUnavailable', { engine: engine === 'llama' ? 'llama.cpp' : engine === 'crisp' ? 'CrispASR' : 'PyTorch' })
       : undefined
-    const defaultDisabledReason = record.kind !== 'ttsModel' && record.installed && !configurationOf(record)
-      ? t('modelsSettingsUi.configureBeforeDefault')
-      : loaderUnavailableReason
     return <ModelCard
       key={record.resourceId}
       record={record}
       busy={busyIds.includes(record.resourceId)}
-      isDefault={isDefaultOf(record, settings)}
-      canBeDefault={ready && compatible && !loaderUnavailableReason}
-      defaultDisabledReason={defaultDisabledReason}
       loaderUnavailableReason={loaderUnavailableReason}
       onInstall={run(record, 'install')}
       onCancel={run(record, 'cancel')}
-      onRemove={run(record, 'remove')}
-      onSetDefault={() => setDefault(record)}
       footer={footerOf(record)}
     />
   }
@@ -275,25 +229,19 @@ export function ModelsPage() {
         }) }}
         onManualDownload={record => { setOpenFamily(null); offlineActions.openDownloads(record.resourceId) }}
       /> : null}
-      <section className="models-overview">
-        <header className="models-overview__heading" data-onboarding="models-page-heading">
-          <span className="models-overview__icon"><Box aria-hidden="true" /></span>
-          <div><h1>{t('models.title')}</h1><p>{t('modelsSettingsUi.modelsSubtitle')}</p></div>
-          <div className="models-overview__actions">
+      <div data-onboarding="models-page-heading">
+        <PageHeader
+          className="nola-page-heading"
+          title={t('models.title')}
+          actions={<>
             <Button variant="secondary" data-onboarding="models-runtime-setup" onClick={() => navigate(`${settingsPath('compute')}?component=engine`)}>
-              <Cpu aria-hidden="true" />{t('modelsSettingsUi.runtimeSetup')}
+              {t('modelsSettingsUi.runtimeSetup')}
             </Button>
             <LocalModelImport />
-          </div>
-        </header>
-        <div className="models-overview__summaries" data-onboarding="models-active">
-          <CurrentModel label={t('modelsSettingsUi.currentRecognition')} name={currentRecognition} record={remoteRecognition || !recognition?.installed ? null : recognition ?? null} installed={remoteRecognition ? null : recognition?.installed ?? false} kind="recognitionModel" onChange={() => setTab('installed')} />
-          <CurrentModel label={t('modelsSettingsUi.currentTranslation')} name={currentTranslation} record={localTranslation && translation?.installed ? translation : null} cloudId={localTranslation ? undefined : currentTranslationCloud?.id} installed={localTranslation ? translation?.installed ?? false : settings ? currentTranslationCloudReady : null} kind="translationModel" onChange={() => setTab('installed')} />
-          <CurrentModel label={t('gateway.synthesisDefault')} name={synthesis?.installed ? synthesis.name : t('modelsSettingsUi.noModelSelected')} record={synthesis?.installed ? synthesis : null} installed={synthesis?.installed ?? false} kind="ttsModel" onChange={() => setTab('installed')} />
-        </div>
-      </section>
+          </>}
+        />
+      </div>
 
-      <ModelPolicyPanel />
 
       <TabsRoot
 
@@ -317,8 +265,8 @@ export function ModelsPage() {
             failed={loadFailed}
             onRetry={retryLoad}
             onOpen={setOpenFamily}
-            cloudModels={cloudModels.filter(model => !model.profile)}
-            onOpenCloud={openCloudModel}
+            cloudModels={catalogCloudModels.filter(model => !model.profile)}
+            onOpenCloud={setCloudDetail}
             emptyAction={<Button variant="tertiary" size="sm" onClick={() => setTab('search')}>{t('models.tabSearch')}</Button>}
           />
         </TabsContent>
@@ -327,7 +275,7 @@ export function ModelsPage() {
           <Catalog
             records={installed}
             cloudModels={installedCloudModels}
-            onOpenCloud={openCloudModel}
+            onOpenCloud={setCloudDetail}
             loading={loading && !loaded}
             failed={loadFailed}
             onRetry={retryLoad}
@@ -375,8 +323,8 @@ function CountTab({ id, label, count }: CountTabProps) {
 }
 
 interface CatalogProps {
-  cloudModels: readonly CloudModel[]
-  onOpenCloud: (id: CloudModelId) => void
+  cloudModels: readonly CatalogCloudModel[]
+  onOpenCloud: (id: CatalogCloudModelId) => void
   records: readonly ResourceRecordWithRate[]
   loading: boolean
   /** The catalog could not be read, so the list it would show is unknown rather than empty. */
@@ -398,11 +346,12 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAc
     if (family === 'kokoro' || family === 'piper') continue
     groups.set(family, [...(groups.get(family) ?? []), record])
   }
-  const sections: { title: string; hint: string; kind: ResourceRecord['kind']; families: RecommendedFamily[]; language?: boolean; onboardingTarget?: string }[] = [
+  const sections: { title: string; hint: string; kind: ResourceRecord['kind'] | 's2sModel'; families: RecommendedFamily[]; language?: boolean; onboardingTarget?: string }[] = [
     { title: t('models.asrModels'), hint: t('models.asrModelsHint'), kind: 'recognitionModel', families: ['qwen', 'sensevoice', 'funasr', 'vibevoice', 'mimo'], onboardingTarget: 'models-recognition-catalog' },
     { title: t('models.mtModels'), hint: t('models.mtModelsHint'), kind: 'translationModel', families: ['hymt2', 'index', 'other'], onboardingTarget: 'models-translation-catalog' },
     { title: t('models.ttsModels'), hint: t('models.ttsModelsHint'), kind: 'ttsModel', families: ['tts', 'kokoro', 'piper', 'cosyvoice3'] },
     { title: t('models.llmModels'), hint: t('models.llmModelsHint'), kind: 'translationModel', families: ['qwen35'], language: true },
+    { title: t('models.s2sModels'), hint: t('models.s2sModelsHint'), kind: 's2sModel', families: [] },
   ]
   return <div className="flex flex-col gap-6">
     {failed ? <FailedCatalog onRetry={onRetry} /> : null}
@@ -411,7 +360,7 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAc
       const sectionCloudModels = cloudModels.filter(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language))
       const indexTranslation = section.kind === 'translationModel' ? sectionCloudModels.find(model => model.id === 'index-translate') : undefined
       const otherCloudModels = indexTranslation ? sectionCloudModels.filter(model => model !== indexTranslation) : sectionCloudModels
-      const renderCloudModel = (model: CloudModel) => <CloudModelCard key={model.id} model={model} onOpen={onOpenCloud} />
+      const renderCloudModel = (model: CatalogCloudModel) => <CloudModelCard key={model.id} model={model} onOpen={onOpenCloud} />
       return <section key={section.title} className="flex flex-col gap-3" data-onboarding={section.onboardingTarget}>
     <ModelSectionHeading title={section.title} hint={section.hint} />
     <div className={GRID}>{section.families.map(family => {
@@ -462,8 +411,9 @@ function Catalog({ records, loading, failed, onRetry, card, emptyAction, compute
       {failed ? <FailedCatalog onRetry={onRetry} /> : null}
       <Section title={t('models.asrModels')} hint={t('models.asrModelsHint')} records={recognition} card={card}>{cloudModels.filter(model => model.kind === 'recognitionModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.mtModels')} hint={t('models.mtModelsHint')} records={mtModels} card={card}>{cloudModels.filter(model => model.kind === 'translationModel' && !model.profile && model.id !== 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
-      <Section title={t('models.ttsModels')} hint={t('models.ttsModelsHint')} records={ordered.filter(record => record.kind === 'ttsModel')} card={card} />
+      <Section title={t('models.ttsModels')} hint={t('models.ttsModelsHint')} records={ordered.filter(record => record.kind === 'ttsModel')} card={card}>{cloudModels.filter(model => model.kind === 'ttsModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.llmModels')} hint={t('models.llmModelsHint')} records={languageModels} card={card}>{cloudModels.filter(model => model.profile || model.id === 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
+      <Section title={t('models.s2sModels')} hint={t('models.s2sModelsHint')} records={[]} card={card}>{cloudModels.filter(model => model.kind === 's2sModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
     </div>
   )
 }
@@ -502,23 +452,6 @@ function ModelSectionHeading({ title, hint }: { title: string; hint: string }) {
       </Tooltip>
     </h2>
   )
-}
-
-function CurrentModel({ label, name, record, cloudId, installed, kind, onChange }: { label:string; name:string; record:ResourceRecord | null; cloudId?: CloudModelId; installed:boolean | null; kind:'recognitionModel' | 'translationModel' | 'ttsModel'; onChange: () => void }) {
-  const { t } = useI18n()
-  const pending = kind !== 'ttsModel' && installed && record && !configurationOf(record)
-  return <Card size="sm" className="models-current">
-    <CardHeader className="models-current__header">
-      <div className="models-current__copy"><CardTitle>{name}</CardTitle><CardDescription>{label}</CardDescription></div>
-      <CardAction>
-        <span aria-hidden="true" className={`models-card__icon models-card__icon--${kind === 'recognitionModel' ? 'recognition' : 'translation'}`} data-cloud-model={cloudId}>{cloudId ? <CloudMark id={cloudId} /> : <ModelMark record={record} kind={kind} />}</span>
-      </CardAction>
-    </CardHeader>
-    <CardContent className="models-current__footer">
-      {installed === null ? <span /> : <Badge variant={installed && !pending ? 'success' : 'warning'}>{pending ? t('modelConfig.pending') : installed ? t('modelsSettingsUi.active') : t('modelsSettingsUi.unavailable')}</Badge>}
-      <Button variant="secondary" size="sm" onClick={onChange}>{t('gateway.change')}</Button>
-    </CardContent>
-  </Card>
 }
 
 /** 在飞 + 失败。失败的留在表里是为了让"重试"有个落点。 */

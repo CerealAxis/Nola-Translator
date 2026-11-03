@@ -161,6 +161,7 @@ export function createIpcBridge(): NolaBridge {
       prewarmModels: () => call('prewarmModels', (injected) => injected.prewarmModels()),
       ensureEngineReady: () => call('ensureEngineReady', (injected) => injected.ensureEngineReady()),
       stopSession: (sessionId) => call('stopSession', (injected) => injected.stopSession(sessionId)),
+      resolvePlayback: (sessionId, jobId, action) => call('resolvePlayback', injected => injected.resolvePlayback(sessionId, jobId, action)),
       /**
        * Pause/resume goes through preload's `setSessionPaused` and returns a
        * synchronous void: the UI's pause means "stop the clock now", and waiting
@@ -262,6 +263,8 @@ export function createIpcBridge(): NolaBridge {
       openMainPage: path => call('openMainPage', injected => injected.openMainPage(path)),
       // No payload and no translation: the main process resolves the user's default browser
       // itself, so nothing about *which* browser crosses this boundary.
+      ...(injectedApi()?.installVirtualCable ? { installVirtualCable: () => call('installVirtualCable', api => api.installVirtualCable!()) } : {}),
+      ...(injectedApi()?.getVirtualCableDriverVersion ? { getVirtualCableDriverVersion: () => call('getVirtualCableDriverVersion', api => api.getVirtualCableDriverVersion!()) } : {}),
       openDefaultBrowser: () => call('openDefaultBrowser', (injected) => injected.openDefaultBrowser()),
       notifyMainError: notification => injectedApi()?.notifyMainError?.(notification),
       previewOverlayToast: notification => injectedApi()?.previewOverlayToast?.(notification),

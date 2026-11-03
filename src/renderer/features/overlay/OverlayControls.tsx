@@ -1,5 +1,5 @@
-import { recognitionFieldsOf } from '../../../shared/cloud-config'
-import { useModelOptions } from '@/model-options'
+import { ALIYUN_S2S_SPEECH_LANGUAGES, recognitionFieldsOf, remoteSourceLanguages } from '../../../shared/cloud-config'
+
 import { useModelSelection, useAvailableModels, type AvailableModel } from '@/available-models'
 import { featureConflictOwner } from '../../../shared/feature-activity'
 /**
@@ -9,13 +9,6 @@ import { featureConflictOwner } from '../../../shared/feature-activity'
  * sibling, so the caption line positions do not shift while the pointer passes.
  * Geometry and the hover reveal live in `caption-card.css`
  * (`.nola-caption-controls`); this file owns the contents.
- *
- * Every pill writes the same settings store the workspace writes
- * (`recognition.sourceLanguage`,
- * `translation.targetLanguage`), so language choices also apply to the next
- * workspace session. Language pills are disabled while a session
- * is active: `startSession` has already fixed them, so a mid-session change
- * would only edit settings and look like it did something.
  *
  * The mic is the only entry point that starts recognition, and the engine takes
  * seconds to load weights, so `starting` shows a spinner rather than the mic
@@ -29,35 +22,28 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import { Menu } from '@base-ui/react/menu'
-import { Check, Mic, Pause, Play } from 'lucide-react'
+import { Mic, Pause, Play } from 'lucide-react'
 
 import {
   DEFAULT_SETTINGS,
-  languageName,
   NO_TRANSLATION_LANGUAGE,
 } from '@/bridge'
 import type { AppSettings, AudioDevice, AudioSourceOption, RecognitionModelId, SessionConfig } from '@/bridge'
 import { audioSourceFrom } from '@/features/workspace/SessionSetupDialog'
+import { defaultRealtimeS2s } from '../../../shared/settings'
+import { vbCablePair } from '../../../shared/virtual-audio'
 import { errorCopyOf } from '@/features/workspace/WorkspacePage'
 import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
-import { audioDeviceNameOf, targetLanguagePatch, translationFieldsOf } from '@/session-config'
+import { checkCredential } from '@/store/modelStore'
+import { audioDeviceNameOf, translationFieldsOf } from '@/session-config'
 import { useI18n } from '@/i18n'
+import { aliyunConnectionReady } from '../../../shared/cloud-models'
 import { notifyError, notifyInfo, notifyGatewayModelUnavailable } from '@/components/primitives/notify'
 
 import { OverlayDisplayMenu, OverlayLayoutMenu } from './OverlayDisplayMenu'
-import { OverlayDropdown } from './OverlayDropdown'
 import { LANGUAGE_MENU_MAX_HEIGHT, LANGUAGE_MENU_SCREEN_FRACTION } from '../../../shared/overlay-menu'
 import { isSessionAlreadyRunningError } from '../../../shared/ipc-error'
-
-/**
- * Geometry and colour live in `.nola-caption-pill` (`caption-card.css`).
- *
- * The pill sets `white-space: nowrap` and no max-width: a long language name
- * widens the pill instead of truncating.
- */
-const CAPSULE = 'nola-caption-pill'
 
 /**
  * Measured room above and below the trigger, minus one row.
@@ -107,17 +93,28 @@ export function useMenuMaxHeight(): number {
  * assembled by hand: the audio source goes through `audioSourceFrom` and the
  * translation fields through `translationFieldsOf`, which own the rules.
  */
-function startConfigOf(settings: AppSettings, devices: readonly AudioDevice[]): SessionConfig {
+function startConfigOf(settings: AppSettings, devices: readonly AudioDevice[], outputMode: 'source' | 'translation' | 'speech', speechModelId: string, targetLanguage: string): SessionConfig {
+  const s2sModel = outputMode === 'source' ? null : settings.realtime?.quickS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.quickS2sModel
+  const recognition = s2sModel ? { ...settings.recognition, provider: 'aliyun' as const, aliyunModel: s2sModel } : settings.recognition
+  const virtualInputDeviceId = settings.realtime?.virtualInputDeviceId
   return {
-    audioSource: audioSourceFrom(optionOf(settings.recognition.audioSource, devices), settings.recognition.audioSource),
+    audioSource: virtualInputDeviceId ? { kind: 'virtualInput', deviceId: virtualInputDeviceId } : audioSourceFrom(optionOf(settings.recognition.audioSource, devices), settings.recognition.audioSource),
     // Kept for protocol compatibility; realtime is the only mode the app runs.
     recognitionMode: 'realtime',
     recognitionModelId: settings.recognition.modelId,
-    ...recognitionFieldsOf(settings.recognition),
-    sourceLanguage: settings.recognition.sourceLanguage,
+    ...recognitionFieldsOf(recognition),
+    sourceLanguage: s2sModel && !remoteSourceLanguages(recognition).includes(recognition.sourceLanguage) ? 'auto' : recognition.sourceLanguage,
     // No target language: the setting's `translation.targetLanguage` applies,
     // and the pill is what edits it.
-    ...translationFieldsOf(settings.translation, { enabled: true }),
+    ...(s2sModel ? { targetLanguages: [targetLanguage], translationProvider: 'recognition' as const } : translationFieldsOf(settings.translation, { enabled: outputMode !== 'source', targetLanguage })),
+    outputMode,
+    s2sModel: s2sModel ?? null,
+    speakerDetection: settings.realtime?.speakerDetection ?? true,
+    ...(outputMode === 'speech' ? { speechOutputDeviceId: settings.realtime?.speechOutputDeviceId } : {}),
+    ...(outputMode === 'speech' && !s2sModel ? {
+      speechModelId: speechModelId.startsWith('resource:') ? speechModelId.slice(9) : speechModelId,
+      ...(settings.synthesis.voice ? { speechVoice: settings.synthesis.voice } : {}),
+    } : {}),
   }
 }
 
@@ -197,8 +194,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
     observe()
     return () => { resize.disconnect(); children.disconnect() }
   }, [locked])
-  const { t, language } = useI18n()
-  const menuMaxHeight = useMenuMaxHeight()
+  const { t } = useI18n()
   /**
    * The whole settings object rather than one subscription per field.
    *
@@ -210,35 +206,33 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
    * better a default than a session that cannot start.
    */
   const settings = useStore(stores.settings, (state) => state.settings) ?? DEFAULT_SETTINGS
+  const target = settings.translation.targetLanguage
+  const translationDisabled = target === NO_TRANSLATION_LANGUAGE
+  const outputMode = translationDisabled ? 'source' : settings.realtime?.outputMode === 'speech' ? 'speech' : 'translation'
   const devices = useStore(stores.models, (state) => state.devices)
   const status = useStore(sessionStore, (state) => state.status)
+  const playbackPhase = useStore(sessionStore, state => state.playbackPhase)
+  const waitingSpeechCount = useStore(sessionStore, state => state.waitingSpeechCount)
+  const playbackJob = useStore(sessionStore, state => state.playbackJob)
   const errorCode = useStore(sessionStore, (state) => state.errorCode)
   const runtimeComponent = errorCode === 'RUNTIME_TORCH' ? 'engine' : errorCode === 'RUNTIME_LLAMA' ? 'llama' : null
   const missing = useStore(sessionStore, (state) => state.missing)
 
-  const modelOptions = useModelOptions()
   const catalog = useAvailableModels()
-  const translationDisabled = settings.translation.targetLanguage === NO_TRANSLATION_LANGUAGE
   const reportSwitch = (model: AvailableModel) => notifyInfo(t('gateway.modelSwitched', { name: model.name }),
     { description: t('gateway.modelSwitchedLoaded') })
-  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch)
-  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationDisabled)
+  const s2sModel = settings.realtime?.quickS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.quickS2sModel
+  const asr = useModelSelection('asr', catalog.asr, settings, reportSwitch, !!s2sModel)
+  const mt = useModelSelection('mt', catalog.mt, settings, reportSwitch, translationDisabled || !!s2sModel)
+  const tts = useModelSelection('tts', catalog.tts, settings, reportSwitch, outputMode !== 'speech' || !!s2sModel)
+  const needsMt = !translationDisabled && !s2sModel
   const asrUnavailable = asr.unavailable
   const mtUnavailable = mt.unavailable
-  const source = settings.recognition.sourceLanguage
-  const target = settings.translation.targetLanguage
-
-  const label = (code: string): string => languageName(code, language)
-
-  /*
-   * This window renders no settings-error notice, so a write the main process
-   * refused has to be reported here or the pill silently reverts.
-   */
-  const patch = (next: Parameters<typeof actions.settings.updateSettings>[0]): void => {
-    void actions.settings.updateSettings(next).catch((error: unknown) => {
-      notifyError(t('errors.settingsSaveFailed'), { cause: error })
-    })
-  }
+  const ttsUnavailable = tts.unavailable
+  const playbackCopy = playbackPhase === 'waiting' ? 'session.playbackWaiting'
+    : playbackPhase === 'synthesizing' ? 'session.playbackSynthesizing'
+      : playbackPhase === 'playing' ? 'session.playbackPlaying'
+        : playbackPhase === 'failed' ? 'session.playbackFailed' : null
 
   /* `lastIntent` lets a late engine error keep the right start/stop wording. */
   const [lastIntent, setLastIntent] = useState<'start' | 'stop'>('start')
@@ -280,7 +274,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
    * Store errors are announced by the effect above. The catch reports only
    * failures that happened before the session store could record them.
    */
-  const toggleMic = (): void => {
+  const toggleMic = async (): Promise<void> => {
     if (status === 'running') {
       actions.session.pauseSession()
       return
@@ -290,16 +284,34 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
       return
     }
     if (status === 'idle' || status === 'error') {
-      if (asrUnavailable) {
+      if (s2sModel && !translationDisabled && !aliyunConnectionReady(settings, await checkCredential('aliyun-asr').catch(() => false))) {
+        notifyError(t('session.s2sSetupHint'))
+        return
+      }
+      if (s2sModel && (translationDisabled || outputMode === 'speech' && !ALIYUN_S2S_SPEECH_LANGUAGES.includes(target))) {
+        notifyError(t('modelConfig.needsConfiguration'), { description: t('session.targetLanguage') })
+        return
+      }
+      const virtualInput = settings.realtime?.virtualInputDeviceId || devices.some(device => device.deviceId === settings.recognition.audioSource && device.kind === 'microphone' && vbCablePair(device.name, 'Output'))
+      if (outputMode === 'speech' && virtualInput &&
+        (!settings.realtime?.speechOutputDeviceId || settings.realtime.speechOutputDeviceId === 'default')) {
+        notifyError(t('session.explicitSpeechOutput'))
+        return
+      }
+      if (!s2sModel && asrUnavailable) {
         notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.asr') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
         return
       }
-      if (mtUnavailable) {
+      if (needsMt && mtUnavailable) {
         notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.mt') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
         return
       }
+      if (outputMode === 'speech' && !s2sModel && ttsUnavailable) {
+        notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t('gateway.tts') }), t('gateway.modelGatewayStartHint'), t('gateway.title'))
+        return
+      }
       setLastIntent('start')
-      const config = { ...startConfigOf(settings, devices), recognitionBinding: asr.binding, ...(translationDisabled ? {} : { translationBinding: mt.binding }) }
+      const config = { ...startConfigOf(settings, devices, outputMode, tts.binding, target), ...(!s2sModel ? { recognitionBinding: asr.binding } : {}), ...(needsMt ? { translationBinding: mt.binding } : {}) }
       void actions.session.startSession(config).catch((error: unknown) => {
         const owner = featureConflictOwner(error)
         if (owner) {
@@ -369,95 +381,20 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
               {starting ? <Spinner /> : running ? <Pause aria-hidden="true" /> : status === 'paused' ? <Play aria-hidden="true" /> : <Mic aria-hidden="true" />}
             </Button>
 
-            <LanguagePill
-              kind="source"
-              caption={t('session.sourceLanguage')}
-              value={source}
-              options={modelOptions.sourceLanguages}
-              labelOf={label}
-              isDisabled={active}
-              maxHeight={menuMaxHeight}
-              onChange={next => patch({ recognition: { sourceLanguage: next } })}
-            />
-            {!translationDisabled ? <>
-              <LanguagePill
-                kind="target"
-                caption={t('session.targetLanguage')}
-                value={target}
-                options={modelOptions.targetLanguages}
-                labelOf={label}
-                isDisabled={active}
-                maxHeight={menuMaxHeight}
-                onChange={next => patch(targetLanguagePatch(next, target))}
-              />
-              <OverlayDisplayMenu />
+            {active && playbackCopy ? <span className="nola-caption-menu-trigger nola-caption-pill" aria-live="polite">{t(playbackCopy)}{waitingSpeechCount ? ` · ${t('session.playbackQueueCount', { count: waitingSpeechCount })}` : ''}</span> : null}
+            {active && playbackJob ? <>
+              {playbackJob.state === 'failed' ? <Button variant="secondary" size="sm" className="rounded-xl" aria-label={t('session.retryPlayback')} onClick={() => { void actions.session.resolvePlayback(playbackJob.jobId, 'retry').catch(error => notifyError(t('session.playbackActionFailed'), { cause: error })) }}>{t('session.retryPlayback')}</Button> : null}
+              <Button variant="outline" size="sm" className="rounded-xl" aria-label={t('session.skipPlayback')} onClick={() => { void actions.session.resolvePlayback(playbackJob.jobId, 'skip').catch(error => notifyError(t('session.playbackActionFailed'), { cause: error })) }}>{t('session.skipPlayback')}</Button>
             </> : null}
-            <OverlayLayoutMenu />
+
+            {!translationDisabled ? <>
+              <OverlayDisplayMenu />
+              <OverlayLayoutMenu />
+            </> : null}
           </div>
         </div>
       )}
 
     </>
-  )
-}
-
-/**
- * One side of a language pair: a pill and a Dropdown.
- *
- * `Dropdown` rather than `Select`, whose trigger and ListBox carry enough
- * padding to weigh heavily on top of the captions, and whose rows do not
- * match the pill's.
- *
- * The list is long enough to need the thin scrollbar in
- * `.nola-caption-menu-list`. Desktop menus reuse this tree in a separate native
- * surface; embedded demos keep the local portal.
- */
-function LanguagePill({
-  kind,
-  caption,
-  value,
-  options,
-  labelOf,
-  isDisabled,
-  maxHeight,
-  onChange,
-}: {
-  kind: 'source' | 'target'
-  caption: string
-  value: string
-  options: readonly string[]
-  labelOf: (code: string) => string
-  isDisabled: boolean
-  maxHeight: number
-  onChange: (code: string) => void
-}) {
-  return (
-    <OverlayDropdown kind={kind}>
-      <Menu.Trigger disabled={isDisabled} className={CAPSULE} aria-label={caption}>
-        <span>{labelOf(value)}</span>
-      </Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Positioner className="z-dropdown" style={{ maxHeight }}>
-          <Menu.Popup className="nola-caption-menu">
-            <Menu.List className="nola-caption-menu-list" style={{ maxHeight }}>
-              {options.map(code => (
-                <Menu.Item
-                  key={code}
-                  id={code}
-                  label={labelOf(code)}
-                  className="nola-menu-item"
-                  aria-checked={code === value}
-                  data-selected={code === value ? 'true' : undefined}
-                  onClick={() => onChange(code)}
-                >
-                  {labelOf(code)}
-                  {code === value ? <Check aria-hidden="true" /> : null}
-                </Menu.Item>
-              ))}
-            </Menu.List>
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </OverlayDropdown>
   )
 }

@@ -1,14 +1,15 @@
 import { createServer } from 'node:net'
+import { randomUUID } from 'node:crypto'
 import { File as NodeFile } from 'node:buffer'
 import { once } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WebSocket } from 'ws'
-import { DEFAULT_SETTINGS } from '../../src/shared/settings'
+import { DEFAULT_SETTINGS, MIMO_TTS_BINDING } from '../../src/shared/settings'
 import { mergeModelPolicy, modelEnablePatch } from '../../src/shared/model-policy'
 import type { GatewayCapability } from '../../src/shared/model-gateway'
 import type { AppSettings, CredentialProvider } from '../../src/shared/settings'
 import type { ResourceRecord } from '../../src/shared/contracts'
-import { ModelGateway, translationRequest } from '../../src/main/model-gateway'
+import { ModelGateway, translationRequest, type ModelGatewayOptions } from '../../src/main/model-gateway'
 import { createGatewayWorker, GatewayWorkerError, type GatewayWorker, type GatewayWorkerFactory, type GatewayWorkerResult } from '../../src/main/model-gateway-worker'
 import type { createGatewayLanguageModel } from '../../src/main/gateway-language-model'
 
@@ -27,7 +28,14 @@ function wav(): Buffer {
   const output = Buffer.alloc(48); output.write('RIFF'); output.writeUInt32LE(40, 4); output.write('WAVEfmt ', 8); output.writeUInt32LE(16, 16)
   output.writeUInt16LE(1, 20); output.writeUInt16LE(1, 22); output.writeUInt32LE(16000, 24); output.writeUInt32LE(32000, 28); output.writeUInt16LE(2, 32); output.writeUInt16LE(16, 34); output.write('data', 36); output.writeUInt32LE(4, 40); return output
 }
-async function fixture(factory?: GatewayWorkerFactory, createLanguageModel?: typeof createGatewayLanguageModel, getCredential?: (provider: CredentialProvider) => Promise<string>) {
+function postTranscription(base: string, authorization: string, audio = wav()) {
+  const boundary = 'nola-test-boundary'
+  const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nnola-asr\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.wav"\r\nContent-Type: audio/wav\r\n\r\n`), audio, Buffer.from(`\r\n--${boundary}--\r\n`)])
+  return fetch(base + '/v2/audio/transcriptions', {
+    method: 'POST', headers: { Authorization: authorization, 'Content-Type': `multipart/form-data; boundary=${boundary}` }, body,
+  })
+}
+async function fixture(factory?: GatewayWorkerFactory, createLanguageModel?: typeof createGatewayLanguageModel, getCredential?: (provider: CredentialProvider) => Promise<string>, inferBackend?: ModelGatewayOptions['inferBackend'], openBackendAsr?: ModelGatewayOptions['openBackendAsr']) {
   const settings = structuredClone(DEFAULT_SETTINGS)
   settings.modelGateway = { host: '127.0.0.1', port: await freePort(), asr: true, mt: true, tts: true, targetLanguage: 'zh' }
   settings.recognition.provider = 'local'; settings.recognition.modelId = 'asr-test'; settings.translation.provider = 'local'; settings.translation.localModelId = 'mt-test'; settings.synthesis = { modelId: 'tts-test', voice: 'Voice' }
@@ -47,14 +55,137 @@ async function fixture(factory?: GatewayWorkerFactory, createLanguageModel?: typ
     }
     workers.push(worker); return worker
   })
-  const gateway = new ModelGateway({ getSettings: () => settings, listResources: async () => resources, directLaunch: async () => ({ command: 'unused', args: [], cwd: process.cwd() }), getKey: async () => key, setKey: async value => { key = value }, createWorker: create, createLanguageModel, getCredential })
+  const gateway = new ModelGateway({ getSettings: () => settings, listResources: async () => resources, directLaunch: async () => ({ command: 'unused', args: [], cwd: process.cwd() }), getKey: async () => key, setKey: async value => { key = value }, createWorker: create, createLanguageModel, getCredential, inferBackend, openBackendAsr })
   gateways.push(gateway)
   const base = `http://127.0.0.1:${settings.modelGateway.port}`
   const headers = async () => ({ Authorization: `Bearer ${await gateway.revealKey()}`, 'Content-Type': 'application/json' })
   return { gateway, settings, resources, workers, base, headers }
 }
 
+it('routes public realtime PCM through the backend without a legacy ASR worker', async () => {
+  const requests: GatewayWorkerResult[] = []
+  const backendClosed = deferred<void>()
+  const close = vi.fn(() => backendClosed.resolve(undefined))
+  const test = await fixture(undefined, undefined, undefined, async () => undefined, async (binding, _signal, emit) => {
+    expect(binding).toBe('resource:asr-test')
+    return { close, closed: backendClosed.promise, request: async payload => {
+      requests.push(payload)
+      if (payload.op === 'session.commit') emit({ type: 'conversation.item.input_audio_transcription.completed', transcript: 'backend' })
+    } }
+  })
+  await test.gateway.start()
+  const response = await fetch(test.base + '/v2/realtime/sessions', { method: 'POST', headers: await test.headers() })
+  const { url } = await response.json()
+  const client = new WebSocket(test.base.replace('http:', 'ws:') + url)
+  const events: GatewayWorkerResult[] = []
+  client.on('message', raw => events.push(JSON.parse(raw.toString())))
+  await once(client, 'open')
+  const audio = Buffer.alloc(640).toString('base64')
+  client.send(JSON.stringify({ type: 'session.update', session: { turn_detection: null } }))
+  client.send(JSON.stringify({ type: 'input_audio_buffer.append', audio }))
+  client.send(JSON.stringify({ type: 'input_audio_buffer.commit' }))
+  client.send(JSON.stringify({ type: 'session.finish' }))
+  await once(client, 'close')
+  expect(requests.map(payload => payload.op)).toEqual(['session.open', 'session.append', 'session.commit', 'session.finish'])
+  expect(requests[0].manual).toBe(true)
+  expect(requests[1].audio).toBe(audio)
+  expect(events.some(event => event.transcript === 'backend')).toBe(true)
+  expect(test.workers).toHaveLength(0)
+  expect(close).toHaveBeenCalled()
+})
+
+it('excludes workbench LLMs from both public API versions', async () => {
+  const test = await fixture()
+  test.settings.translation.customModels = [{ id: 'scene', name: 'Scene', model: 'fixture', endpoint: 'https://fixture.invalid/v1',
+    apiFormat: 'chat-completions', contextWindow: 4096, maxOutputTokens: 512, languages: ['en'] }]
+  Object.assign(test.settings.modelGateway, { llm: true, llmModel: 'custom:scene' })
+  enable(test.settings, 'llm', 'custom:scene')
+  await test.gateway.start()
+  expect(test.gateway.snapshot().services.llm.state).toBe('ready')
+  for (const version of ['v1', 'v2']) {
+    const models = await fetch(`${test.base}/${version}/models`, { headers: await test.headers() }).then(response => response.json())
+    expect(models.data.map((model: { id: string }) => model.id)).not.toContain('nola-llm')
+    const response = await fetch(`${test.base}/${version}/chat/completions`, {
+      method: 'POST', headers: await test.headers(),
+      body: JSON.stringify({ model: 'nola-llm', messages: [{ role: 'user', content: 'Hello' }] }),
+    })
+    expect(response.status).toBe(404)
+  }
+})
+
 describe('local gateway', () => {
+  it('routes the enabled MiMo default through the backend without a local TTS worker', async () => {
+    const audio = `data:audio/wav;base64,${wav().toString('base64')}`
+    const infer = vi.fn<NonNullable<ModelGatewayOptions['inferBackend']>>().mockResolvedValue({ text: '', audio })
+    const test = await fixture(undefined, undefined, async slot => slot === 'mimo-tts' ? 'test-mimo-key' : '', infer)
+    test.settings.modelGateway.asr = false
+    test.settings.modelGateway.mt = false
+    test.settings.synthesis = { modelId: MIMO_TTS_BINDING, voice: '' }
+    enable(test.settings, 'tts', MIMO_TTS_BINDING)
+    await test.gateway.start()
+    const speech = await fetch(`${test.base}/v2/audio/speech`, {
+      method: 'POST', headers: await test.headers(),
+      body: JSON.stringify({ model: 'nola-tts', input: 'Hello', response_format: 'wav' }),
+    })
+    expect(speech.status).toBe(200)
+    expect(Buffer.from(await speech.arrayBuffer())).toEqual(wav())
+    expect(infer).toHaveBeenCalledWith(expect.objectContaining({ kind: 'tts', model: MIMO_TTS_BINDING }), expect.any(AbortSignal), { batchAsr: false, mp3: false })
+    expect(test.workers).toHaveLength(0)
+  })
+
+  it('shares backend inference with the workbench while keeping public response formats', async () => {
+    vi.stubGlobal('File', NodeFile)
+    const mp3 = Buffer.from([0xff, 0xfb, 0x90, 0])
+    const infer = vi.fn<NonNullable<ModelGatewayOptions['inferBackend']>>(async (request, _signal, options) => {
+      if (options?.inspect) return { text: '', voices: ['Voice'] }
+      if (request.kind === 'tts') return { text: '', audio: options?.mp3
+        ? `data:audio/mpeg;base64,${mp3.toString('base64')}`
+        : `data:audio/wav;base64,${wav().toString('base64')}` }
+      return { text: request.kind === 'asr' ? 'backend transcript' : 'backend translation' }
+    })
+    const test = await fixture(undefined, undefined, undefined, infer)
+    await test.gateway.start()
+    const post = async (path: string, data: unknown) => fetch(test.base + path, {
+      method: 'POST', headers: await test.headers(), body: JSON.stringify(data),
+    })
+    const translation = { model: 'nola-mt', messages: [{ role: 'user', content: 'Hello' }] }
+    const translated = await post('/v2/chat/completions', translation)
+    expect((await translated.json()).choices[0].message.content).toBe('backend translation')
+
+    const catalog = await fetch(test.base + '/v2/models', { headers: await test.headers() }).then(response => response.json())
+    expect(catalog.data).toContainEqual(expect.objectContaining({ id: 'nola-tts', voices: ['Voice'] }))
+    expect(test.gateway.snapshot().address).toBe(test.base + '/v2')
+    expect(await fetch(test.base + '/v1/models', { headers: await test.headers() }).then(response => response.json())).toEqual(catalog)
+    await expect(test.gateway.infer({ kind: 'tts', id: randomUUID(), model: 'resource:tts-test' },
+      new AbortController().signal, true)).resolves.toEqual({ text: '', voices: ['Voice'] })
+    expect(infer).toHaveBeenCalledWith(expect.objectContaining({ kind: 'tts' }),
+      expect.any(AbortSignal), { inspect: true })
+
+    const speech = await post('/v2/audio/speech', { model: 'nola-tts', input: 'Hello' })
+    expect(speech.headers.get('content-type')).toBe('audio/mpeg')
+    expect(Buffer.from(await speech.arrayBuffer())).toEqual(mp3)
+    expect(infer).toHaveBeenCalledWith(expect.objectContaining({ kind: 'tts', voice: 'Voice' }),
+      expect.any(AbortSignal), { batchAsr: false, mp3: true })
+    const pcm = await post('/v2/audio/speech', { model: 'nola-tts', input: 'Hello', response_format: 'pcm' })
+    expect(Buffer.from(await pcm.arrayBuffer())).toEqual(wav().subarray(44))
+
+    const transcription = await postTranscription(test.base, (await test.headers()).Authorization)
+    expect(await transcription.json()).toEqual({ text: 'backend transcript' })
+    expect(infer).toHaveBeenCalledWith(expect.objectContaining({ kind: 'asr' }), expect.any(AbortSignal), { batchAsr: true, mp3: false })
+
+    const request = { kind: 'mt' as const, id: randomUUID(), model: 'resource:mt-test', text: 'Hello', target: 'zh' }
+    await expect(test.gateway.infer(request, new AbortController().signal)).resolves.toEqual({ text: 'backend translation' })
+    infer.mockRejectedValueOnce(new Error('Backend inference failed'))
+    expect((await post('/v2/chat/completions', translation)).status).toBe(500)
+    expect(test.workers).toHaveLength(0)
+
+    infer.mockResolvedValueOnce(undefined)
+    const legacy = await post('/v2/chat/completions', translation)
+    expect((await legacy.json()).choices[0].message.content).toBe('zh:Hello')
+    expect(test.workers.map(worker => worker.kind)).toEqual(['mt'])
+    expect(test.gateway.snapshot().activeRequests).toBe(0)
+  })
+
   it('internally routes cloud translation while keeping public model IDs fixed', async () => {
     const initialized: GatewayWorkerResult[] = []
     const test = await fixture((_launch, init) => {
@@ -69,9 +200,9 @@ describe('local gateway', () => {
     const lease = await test.gateway.leaseCapability('mt')
     lease.release()
     expect(initialized[0]).toMatchObject({ kind: 'mt', config: { translationProvider: 'index-translate' } })
-    const models = await fetch(test.base + '/v1/models', { headers: await test.headers() }).then(response => response.json())
+    const models = await fetch(test.base + '/v2/models', { headers: await test.headers() }).then(response => response.json())
     expect(models.data.map((model: { id: string }) => model.id)).toEqual(['nola-mt'])
-    const result = await fetch(test.base + '/v1/chat/completions', { method: 'POST', headers: await test.headers(), body: JSON.stringify({ model: 'nola-mt', messages: [{ role: 'user', content: 'hello' }] }) }).then(response => response.json())
+    const result = await fetch(test.base + '/v2/chat/completions', { method: 'POST', headers: await test.headers(), body: JSON.stringify({ model: 'nola-mt', messages: [{ role: 'user', content: 'hello' }] }) }).then(response => response.json())
     expect(result.model).toBe('nola-mt')
     expect(result.choices[0].message.content).toBe('translated')
   })
@@ -163,19 +294,19 @@ describe('local gateway', () => {
 
   it('authenticates routes, supports browser preflight, and returns OpenAI translation responses', async () => {
     const test = await fixture(); await test.gateway.start()
-    expect((await fetch(test.base + '/v1/models')).status).toBe(401)
-    expect((await fetch(test.base + '/v1/chat/completions', { method: 'OPTIONS', headers: { Origin: 'http://localhost' } })).status).toBe(401)
+    expect((await fetch(test.base + '/v2/models')).status).toBe(401)
+    expect((await fetch(test.base + '/v2/chat/completions', { method: 'OPTIONS', headers: { Origin: 'http://localhost' } })).status).toBe(401)
     const auth = await test.headers()
-    const preflight = await fetch(test.base + '/v1/chat/completions', { method: 'OPTIONS', headers: { ...auth, Origin: 'http://localhost', 'Access-Control-Request-Headers': 'authorization,content-type' } })
+    const preflight = await fetch(test.base + '/v2/chat/completions', { method: 'OPTIONS', headers: { ...auth, Origin: 'http://localhost', 'Access-Control-Request-Headers': 'authorization,content-type' } })
     expect(preflight.status).toBe(204); expect(preflight.headers.get('access-control-allow-origin')).toBe('http://localhost')
-    const hostilePreflight = await fetch(test.base + '/v1/chat/completions', { method: 'OPTIONS', headers: { ...auth, Origin: 'https://evil.example' } })
+    const hostilePreflight = await fetch(test.base + '/v2/chat/completions', { method: 'OPTIONS', headers: { ...auth, Origin: 'https://evil.example' } })
     expect(hostilePreflight.status).toBe(204); expect(hostilePreflight.headers.get('access-control-allow-origin')).toBeNull()
-    const response = await fetch(test.base + '/v1/chat/completions', { method: 'POST', headers: { ...await test.headers(), Origin: 'chrome-extension://translator' }, body: JSON.stringify({ model: 'nola-mt', messages: [{ role: 'user', content: 'Hello' }], translation_options: { target_lang: 'ja' } }) })
+    const response = await fetch(test.base + '/v2/chat/completions', { method: 'POST', headers: { ...await test.headers(), Origin: 'chrome-extension://translator' }, body: JSON.stringify({ model: 'nola-mt', messages: [{ role: 'user', content: 'Hello' }], translation_options: { target_lang: 'ja' } }) })
     expect(response.headers.get('access-control-allow-origin')).toBeNull()
     expect((await response.json()).choices[0].message.content).toBe('ja:Hello')
-    const stream = await fetch(test.base + '/v1/chat/completions', { method: 'POST', headers: await test.headers(), body: JSON.stringify({ stream: true, messages: [{ role: 'user', content: 'Hi' }] }) })
+    const stream = await fetch(test.base + '/v2/chat/completions', { method: 'POST', headers: await test.headers(), body: JSON.stringify({ stream: true, messages: [{ role: 'user', content: 'Hi' }] }) })
     expect(await stream.text()).toContain('data: [DONE]')
-    const wrong = await fetch(test.base + '/v1/chat/completions', { method: 'POST', headers: await test.headers(), body: JSON.stringify({ model: 'nola-asr', messages: [{ role: 'user', content: 'Hi' }] }) })
+    const wrong = await fetch(test.base + '/v2/chat/completions', { method: 'POST', headers: await test.headers(), body: JSON.stringify({ model: 'nola-asr', messages: [{ role: 'user', content: 'Hi' }] }) })
     expect(wrong.status).toBe(404)
   })
 
@@ -183,22 +314,20 @@ describe('local gateway', () => {
     vi.stubGlobal('File', NodeFile)
     const test = await fixture(); await test.gateway.start()
     for (const [format, type, length] of [[undefined, 'audio/mpeg', 4], ['wav', 'audio/wav', 48], ['pcm', 'application/octet-stream', 4]] as const) {
-      const response = await fetch(test.base + '/v1/audio/speech', { method: 'POST', headers: await test.headers(), body: JSON.stringify({ input: 'Hello', response_format: format }) })
+      const response = await fetch(test.base + '/v2/audio/speech', { method: 'POST', headers: await test.headers(), body: JSON.stringify({ input: 'Hello', response_format: format }) })
       expect(response.status).toBe(200); expect(response.headers.get('content-type')).toBe(type)
       const output = Buffer.from(await response.arrayBuffer()); expect(output.length).toBe(length)
       if (format === 'wav') expect(output.toString('ascii', 0, 4)).toBe('RIFF')
       if (!format) expect(output[0]).toBe(0xff)
     }
-    const boundary = 'nola-test-boundary'
-    const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nnola-asr\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.wav"\r\nContent-Type: audio/wav\r\n\r\n`), wav(), Buffer.from(`\r\n--${boundary}--\r\n`)])
-    const response = await fetch(test.base + '/v1/audio/transcriptions', { method: 'POST', headers: { ...await test.headers(), 'Content-Type': `multipart/form-data; boundary=${boundary}` }, body })
+    const response = await postTranscription(test.base, (await test.headers()).Authorization)
     expect(await response.json()).toEqual({ text: 'recognized' })
   })
 
   it('issues single-use realtime tickets and invalidates them and old keys upon rotation', async () => {
     const test = await fixture(); await test.gateway.start()
     const oldHeaders = await test.headers()
-    const ticketResponse = await fetch(test.base + '/v1/realtime/sessions', { method: 'POST', headers: oldHeaders })
+    const ticketResponse = await fetch(test.base + '/v2/realtime/sessions', { method: 'POST', headers: oldHeaders })
     const ticket = await ticketResponse.json()
     expect(ticket.client_secret.value).not.toBe(await test.gateway.revealKey())
     const client = new WebSocket(test.base.replace('http:', 'ws:') + ticket.url)
@@ -213,8 +342,8 @@ describe('local gateway', () => {
     const reuseError = await new Promise<Error>(resolve => reused.once('error', resolve))
     expect(reuseError.message).toContain('401')
     const closed = once(client, 'close'); await test.gateway.rotateKey(); await closed
-    expect((await fetch(test.base + '/v1/models', { headers: oldHeaders })).status).toBe(401)
-    expect((await fetch(test.base + '/v1/models', { headers: await test.headers() })).status).toBe(200)
+    expect((await fetch(test.base + '/v2/models', { headers: oldHeaders })).status).toBe(401)
+    expect((await fetch(test.base + '/v2/models', { headers: await test.headers() })).status).toBe(200)
   })
 
   it('reconfigures only affected models, pins running requests, and supports cloud defaults', async () => {
@@ -222,7 +351,7 @@ describe('local gateway', () => {
     const mt = test.workers.find(worker => worker.kind === 'mt')!
     const answer = deferred<GatewayWorkerResult>()
     vi.mocked(mt.request).mockImplementationOnce(() => answer.promise)
-    const pending = fetch(test.base + '/v1/chat/completions', { method: 'POST', headers: await test.headers(), body: JSON.stringify({ messages: [{ role: 'user', content: 'Hi' }] }) })
+    const pending = fetch(test.base + '/v2/chat/completions', { method: 'POST', headers: await test.headers(), body: JSON.stringify({ messages: [{ role: 'user', content: 'Hi' }] }) })
     await vi.waitFor(() => expect(test.gateway.snapshot().activeRequests).toBe(1))
     test.resources.push({ ...test.resources.find(resource => resource.resourceId === 'mt-test')!, resourceId: 'mt-next' })
     test.settings.translation.localModelId = 'mt-next'; await test.gateway.reconfigure()
@@ -265,11 +394,11 @@ describe('local gateway', () => {
     const address = environment.NOLA_GATEWAY_ADDRESS!
     expect((await fetch(address + '/internal/status', { headers })).status).toBe(200)
     expect((await fetch(address + '/internal/status', { headers: await test.headers() })).status).not.toBe(200)
-    await expect(fetch(test.base + '/v1/models', { headers: await test.headers() })).rejects.toThrow()
+    await expect(fetch(test.base + '/v2/models', { headers: await test.headers() })).rejects.toThrow()
     expect(await test.gateway.infer({ id: crypto.randomUUID(), model: 'nola-mt', kind: 'mt', text: 'Hello', target: 'ja' }, new AbortController().signal)).toMatchObject({ text: 'ja:Hello' })
     test.settings.modelGateway.externalEnabled = true
     await test.gateway.reconfigure()
-    expect((await fetch(test.base + '/v1/models', { headers: await test.headers() })).status).toBe(200)
+    expect((await fetch(test.base + '/v2/models', { headers: await test.headers() })).status).toBe(200)
     expect(test.gateway.sessionEnvironment()).toEqual(environment)
     expect(test.workers).toHaveLength(3)
     await test.gateway.rotateKey()
@@ -466,19 +595,19 @@ describe('independent cloud consumers', () => {
   it('exposes a cloud-only API binding independently of local loading switches and defaults', async () => {
     const test = await fixture()
     test.settings.modelGateway = { ...test.settings.modelGateway, asr: false, mt: false, tts: false, llm: false,
-      externalModels: { mt: 'cloud:mymemory' }, externalCapabilities: { asr: false, mt: true, tts: false, llm: false } }
+      externalModels: { mt: 'cloud:mymemory' }, externalCapabilities: { asr: false, mt: true, tts: false } }
     enable(test.settings, 'mt', 'cloud:mymemory')
     await test.gateway.start()
     expect(test.workers).toHaveLength(0)
-    const models = await fetch(test.base + '/v1/models', { headers: await test.headers() }).then(response => response.json())
+    const models = await fetch(test.base + '/v2/models', { headers: await test.headers() }).then(response => response.json())
     expect(models.data.map((model: { id: string }) => model.id)).toEqual(['nola-mt'])
-    const response = await fetch(test.base + '/v1/chat/completions', { method: 'POST', headers: await test.headers(),
+    const response = await fetch(test.base + '/v2/chat/completions', { method: 'POST', headers: await test.headers(),
       body: JSON.stringify({ model: 'nola-mt', messages: [{ role: 'user', content: 'Hello' }] }) })
     expect(response.status).toBe(200)
     expect((await response.json()).choices[0].message.content).toBe('zh:Hello')
     expect(test.workers.map(worker => worker.kind)).toEqual(['mt'])
     test.settings.modelGateway.externalCapabilities!.mt = false
-    const rejected = await fetch(test.base + '/v1/chat/completions', { method: 'POST', headers: await test.headers(),
+    const rejected = await fetch(test.base + '/v2/chat/completions', { method: 'POST', headers: await test.headers(),
       body: JSON.stringify({ model: 'nola-mt', messages: [{ role: 'user', content: 'Hello' }] }) })
     expect(rejected.status).toBe(503)
     expect(await rejected.json()).toMatchObject({ error: { code: 'capability_disabled' } })
@@ -584,26 +713,32 @@ it('maps public realtime ASR to its independent cloud binding and refuses disabl
   const test = await fixture(undefined, undefined, async () => 'fixture-key')
   test.settings.recognition.aliyunWorkspaceId = 'fixture-workspace'
   test.settings.modelGateway = { ...test.settings.modelGateway, asr: false, mt: false, tts: false,
-    externalModels: { asr: 'cloud:aliyun' }, externalCapabilities: { asr: true, mt: false, tts: false, llm: false } }
+    externalModels: { asr: 'cloud:aliyun' }, externalCapabilities: { asr: true, mt: false, tts: false } }
   enable(test.settings, 'asr', 'cloud:aliyun')
   await test.gateway.start()
-  const response = await fetch(test.base + '/v1/realtime/sessions', { method: 'POST', headers: await test.headers() })
+  const response = await fetch(test.base + '/v2/realtime/sessions', { method: 'POST', headers: await test.headers() })
   expect(response.status).toBe(200)
   const ticket = await response.json()
   const client = new WebSocket(test.base.replace('http:', 'ws:') + ticket.url)
   const events: Array<Record<string, unknown>> = []
   client.on('message', bytes => events.push(JSON.parse(bytes.toString())))
   await once(client, 'open')
-  client.send(JSON.stringify({ type: 'session.update', session: { model: 'nola-asr' } }))
+  client.send(JSON.stringify({ type: 'session.update', session: { model: 'nola-asr', turn_detection: null } }))
   await vi.waitFor(() => expect(events.some(event => event.type === 'session.updated')).toBe(true))
   expect(test.workers).toHaveLength(1)
   const asr = test.workers[0]
-  expect(asr.request).toHaveBeenCalledWith(expect.objectContaining({ op: 'session.open' }))
+  expect(asr.request).toHaveBeenCalledWith(expect.objectContaining({ op: 'session.open', manual: true }))
+  const audio = Buffer.alloc(640).toString('base64')
+  client.send(JSON.stringify({ type: 'input_audio_buffer.append', audio }))
+  client.send(JSON.stringify({ type: 'input_audio_buffer.commit' }))
+  await vi.waitFor(() => expect(events.some(event => event.type === 'input_audio_buffer.committed')).toBe(true))
+  expect(asr.request).toHaveBeenCalledWith(expect.objectContaining({ op: 'session.append', audio }))
+  expect(asr.request).toHaveBeenCalledWith(expect.objectContaining({ op: 'session.commit' }))
   client.close(); await once(client, 'close')
   test.settings.modelGateway.externalCapabilities = { ...test.settings.modelGateway.externalCapabilities, asr: false }
-  const rejected = await fetch(test.base + '/v1/realtime/sessions', { method: 'POST', headers: await test.headers() })
+  const rejected = await fetch(test.base + '/v2/realtime/sessions', { method: 'POST', headers: await test.headers() })
   expect(rejected.status).toBe(503)
-  const unauthorized = new WebSocket(test.base.replace('http:', 'ws:') + '/v1/realtime', { headers: await test.headers() })
+  const unauthorized = new WebSocket(test.base.replace('http:', 'ws:') + '/v2/realtime', { headers: await test.headers() })
   const errors: Array<Record<string, unknown>> = []
   unauthorized.on('message', bytes => errors.push(JSON.parse(bytes.toString())))
   await once(unauthorized, 'open')
@@ -620,9 +755,9 @@ it('uses the gateway binding for public aliases before the model management defa
   test.settings.modelPolicy!.defaults.mt = 'cloud:index-translate'
   test.settings.modelGateway.mtModel = 'cloud:mymemory'
   await test.gateway.start()
-  const models = await fetch(test.base + '/v1/models', { headers: await test.headers() }).then(response => response.json())
+  const models = await fetch(test.base + '/v2/models', { headers: await test.headers() }).then(response => response.json())
   expect(models.data.map((model: { id: string }) => model.id)).toContain('nola-mt')
-  const response = await fetch(test.base + '/v1/chat/completions', { method: 'POST', headers: await test.headers(),
+  const response = await fetch(test.base + '/v2/chat/completions', { method: 'POST', headers: await test.headers(),
     body: JSON.stringify({ model: 'nola-mt', messages: [{ role: 'user', content: 'Hello' }] }) })
   expect(response.status).toBe(200)
   expect((await response.json()).choices[0].message.content).toBe('zh:Hello')
@@ -636,9 +771,9 @@ it('does not expose a disabled capability through its cloud default', async () =
   test.settings.modelGateway.mt = false
   test.settings.modelGateway.mtModel = ''
   await test.gateway.start()
-  const models = await fetch(test.base + '/v1/models', { headers: await test.headers() }).then(response => response.json())
+  const models = await fetch(test.base + '/v2/models', { headers: await test.headers() }).then(response => response.json())
   expect(models.data.map((model: { id: string }) => model.id)).not.toContain('nola-mt')
-  const response = await fetch(test.base + '/v1/chat/completions', { method: 'POST', headers: await test.headers(),
+  const response = await fetch(test.base + '/v2/chat/completions', { method: 'POST', headers: await test.headers(),
     body: JSON.stringify({ model: 'nola-mt', messages: [{ role: 'user', content: 'Hello' }] }) })
   expect(response.status).toBe(503)
   expect(await response.json()).toMatchObject({ error: { code: 'capability_disabled' } })

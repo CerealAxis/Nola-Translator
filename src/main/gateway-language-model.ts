@@ -28,8 +28,11 @@ export async function createGatewayLanguageModel(services: DirectModelServices, 
   const failures = new Set<() => void>()
   const fail = () => { if (!closed && !failed) { failed = true; for (const listener of failures) listener() } }
   let unsubscribe: (() => void) | undefined
+  let backendConnection: Awaited<ReturnType<NonNullable<DirectModelServices['openLocalLanguageModel']>>>
   try {
-    const connection = local ? await prepareLocalLanguageModel(services, owner, binding.slice(9), signal) : undefined
+    if (local) backendConnection = await services.openLocalLanguageModel?.(binding.slice(9), signal)
+    const legacyConnection = local && !backendConnection ? await prepareLocalLanguageModel(services, owner, binding.slice(9), signal) : undefined
+    const connection = backendConnection ?? legacyConnection
     const profile = connection ? { id: binding, model: binding.slice(9), endpoint: connection.endpoint,
       apiFormat: 'chat-completions' as const, contextWindow: connection.contextWindow,
       maxOutputTokens: Math.min(4096, Math.floor(connection.contextWindow / 2)) } : saved
@@ -37,7 +40,7 @@ export async function createGatewayLanguageModel(services: DirectModelServices, 
     const apiKey = local ? '' : await services.getCredential(customCredentialSlot(profile.id))
     signal.throwIfAborted()
     const baseURL = profile.endpoint.replace(/\/+$/, '')
-    unsubscribe = connection?.onStopped(fail)
+    unsubscribe = legacyConnection?.onStopped(fail)
     return { profile, local, name: saved?.name ?? profile.model, redact: message => (apiKey ? message.replaceAll(apiKey, '[redacted]') : message).slice(0, 1000),
       onFailed: listener => { failures.add(listener); if (failed) queueMicrotask(listener); return () => { failures.delete(listener) } },
       model: effort => {
@@ -51,10 +54,17 @@ export async function createGatewayLanguageModel(services: DirectModelServices, 
         if (profile.apiFormat === 'ollama') return createOpenAICompatible({ name: 'ollama', baseURL: `${baseURL}/v1`, apiKey: apiKey || 'no-key' }).chatModel(profile.model)
         const provider = createOpenAI({ apiKey: apiKey || 'no-key', baseURL })
         return profile.apiFormat === 'chat-responses' ? provider.responses(profile.model) : provider.chat(profile.model)
-      }, close: async () => { closed = true; unsubscribe?.(); failures.clear(); if (local) await closeDirectModelWorker(owner) } }
+      }, close: async () => {
+        closed = true
+        unsubscribe?.()
+        failures.clear()
+        if (backendConnection) await backendConnection.release()
+        else if (local) await closeDirectModelWorker(owner)
+      } }
   } catch (error) {
     unsubscribe?.()
-    if (local) await closeDirectModelWorker(owner)
+    if (backendConnection) await backendConnection.release()
+    else if (local) await closeDirectModelWorker(owner)
     throw error
   }
 }

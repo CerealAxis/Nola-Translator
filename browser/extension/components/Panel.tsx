@@ -22,6 +22,7 @@ export function Panel({ store }: PanelProps) {
       <Button data-slot="button" variant="secondary" className="button button--secondary nola-panel-close" aria-label={t('close')} onClick={store.closePanel}><X aria-hidden="true" /></Button>
     </header>
     <p className="nola-status" role="status" data-state={running ? 'recognizing' : state.connected && compatible && state.captionServiceActive ? 'ready' : 'unavailable'}>{t(status)}</p>
+    {state.connected && state.config.pipeline ? <p>{t(state.config.pipeline === 's2s' ? 'directSpeechTranslation' : 'stepSpeechTranslation')} · {t(state.config.desktopApplicationAudio ? 'desktopApplicationAudio' : tabAudio ? 'tabAudio' : 'systemAudio')}</p> : null}
     {state.error === 'tabAudioSilent'
       ? <p role="status" className="nola-warning">{t(errorKey(state.error))}</p>
       : state.error ? <p role="alert" className="nola-error">{t(errorKey(state.error))}</p> : null}

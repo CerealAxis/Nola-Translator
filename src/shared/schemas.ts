@@ -4,7 +4,7 @@ import { PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_NODES } from './pypi-mirrors'
 import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from './index-translate'
 import { computeSettingsSchema, computeSnapshotSchema } from './compute'
 import { SUPPORT_ERROR_CODES } from './error-catalog'
-import { RECOGNITION_MODEL_IDS } from './settings'
+import { REALTIME_S2S_MODELS, RECOGNITION_MODEL_IDS } from './settings'
 
 import type { EngineCommand, EngineEvent } from './contracts'
 
@@ -33,6 +33,8 @@ const audioSourceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('defaultOutput') }).strip(),
   z.object({ kind: z.literal('systemOutput'), deviceId: z.string().min(1).max(512) }).strip(),
   z.object({ kind: z.literal('microphone'), deviceId: z.string().min(1).max(512) }).strip(),
+  z.object({ kind: z.literal('virtualInput'), deviceId: z.string().min(1).max(512) }).strip(),
+  z.object({ kind: z.literal('processAudio'), deviceId: z.string().regex(/^process:[A-Za-z0-9_-]{32}$/) }).strip(),
   z.object({ kind: z.literal('browserTab'), streamId: z.string().min(1).max(128) }).strip(),
 ])
 
@@ -72,6 +74,12 @@ const networkSettingsSchema = z.object({
 
 export const sessionConfigSchema = z
   .object({
+    outputMode: z.enum(['source', 'translation', 'speech']).optional(),
+    s2sModel: z.enum(REALTIME_S2S_MODELS).nullable().optional(),
+    speakerDetection: z.boolean().optional(),
+    speechOutputDeviceId: z.string().max(512).optional(),
+    speechVoice: z.string().max(256).optional(),
+    speechModelId: z.string().max(256).optional(),
     audioSource: audioSourceSchema,
     compute: computeSettingsSchema.optional(),
     recognitionMode: z.enum(['realtime', 'accurate']),
@@ -174,6 +182,8 @@ const captionSegmentSchema = z
     endedAtMs: z.number().nonnegative().optional(),
     sourceLanguage: z.string().min(1).max(32).optional(),
     sourceText: z.string().max(16_384),
+    speakerId: z.string().min(1).max(128).optional(),
+    speakerMetadataRevision: z.number().int().nonnegative().optional(),
     isFinal: z.boolean(),
     translations: z.array(translationSchema).max(8),
   })

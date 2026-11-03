@@ -18,6 +18,11 @@ export const computeSettingsSchema = z.object({
 export type ComputeSettings = z.infer<typeof computeSettingsSchema>
 export const DEFAULT_COMPUTE_SETTINGS: ComputeSettings = computeSettingsSchema.parse({})
 
+export function supportsRealtimeCompute(compute: Partial<ComputeSettings> = {}): boolean {
+  return Object.entries(compute).every(([key, value]) =>
+    key === 'recognitionEngine' || value === DEFAULT_COMPUTE_SETTINGS[key as keyof ComputeSettings])
+}
+
 // Patches must not fill omitted fields with defaults (including through Zod optional fields).
 const computeFields = computeSettingsSchema.shape
 export const computeSettingsPatchSchema = z.object({

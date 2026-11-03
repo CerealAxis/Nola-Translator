@@ -3,6 +3,80 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { NolaTranslatorApi, EngineChannelEvent, OverlayTargetPage } from '../shared/bridge'
 import type { EngineProcessState, HubInspectResult, HubSearchResult, PrewarmResult, ResourceRecord, SessionConfig } from '../shared/contracts'
 import { stripIpcErrorMessage } from '../shared/ipc-error'
+import { RealtimePlaybackOwner, type PlaybackChunk } from '../renderer/bridge/realtime-playback'
+import { vbCablePair } from '../shared/virtual-audio'
+
+let realtimePlayback: {
+  token: string
+  owner: RealtimePlaybackOwner
+  pending: Promise<void>
+  removeDeviceListener?: () => void
+} | undefined
+
+function closeRealtimePlayback(): void {
+  const playback = realtimePlayback
+  realtimePlayback = undefined
+  if (playback) {
+    playback.removeDeviceListener?.()
+    void playback.owner.close().catch(() => {})
+  }
+}
+
+ipcRenderer.on('realtime:playback-configure', (_event, token: string, { device, inputCable }: { device?: string; inputCable?: string }) => {
+  closeRealtimePlayback()
+  const owner = new RealtimePlaybackOwner(ack => ipcRenderer.invoke('realtime:playback-ack', token, ack))
+  const pending = (async () => {
+    if (!device || device === 'default') return
+    if (inputCable) {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const sink = devices.find(endpoint => endpoint.kind === 'audiooutput' && endpoint.deviceId === device)
+      if (!sink?.label || vbCablePair(sink.label, 'Input') === inputCable) throw new Error('audioRouteConflict')
+    }
+    await owner.setSinkId(device)
+  })()
+  const playback: NonNullable<typeof realtimePlayback> = { token, owner, pending }
+  realtimePlayback = playback
+  const report = (available: boolean) => {
+    if (realtimePlayback?.token === token) void ipcRenderer.invoke('realtime:playback-ready', token, available).catch(() => {})
+  }
+  void pending.then(() => {
+    if (realtimePlayback !== playback) return
+    report(true)
+    const media = navigator.mediaDevices
+    if (!device || device === 'default' || !media?.addEventListener) return
+    const verifySink = () => {
+      void media.enumerateDevices().then(devices => {
+        if (realtimePlayback !== playback || devices.some(endpoint => endpoint.kind === 'audiooutput' && endpoint.deviceId === device)) return
+        closeRealtimePlayback()
+        void ipcRenderer.invoke('realtime:playback-device-lost', token).catch(() => {})
+      }).catch(() => {})
+    }
+    media.addEventListener('devicechange', verifySink)
+    playback.removeDeviceListener = () => media.removeEventListener('devicechange', verifySink)
+  }, () => report(false))
+})
+ipcRenderer.on('realtime:playback-chunk', (_event, token: string, chunk: PlaybackChunk) => {
+  const playback = realtimePlayback
+  if (playback?.token !== token) return
+  playback.pending = playback.pending.then(async () => {
+    if (realtimePlayback === playback) await playback.owner.accept(chunk)
+  })
+  void playback.pending.catch(() => {
+    if (realtimePlayback !== playback) return
+    void ipcRenderer.invoke('realtime:playback-ack', token, {
+      claimId: chunk.claimId, generation: chunk.generation, audioStreamId: chunk.audioStreamId,
+      state: 'unknown', chunkSeq: -1, playedSampleOffset: 0,
+    }).catch(() => {})
+    closeRealtimePlayback()
+  })
+})
+ipcRenderer.on('realtime:playback-fence', (_event, token: string, generation: number) => {
+  if (realtimePlayback?.token === token) realtimePlayback.owner.stop(generation)
+})
+ipcRenderer.on('realtime:playback-close', (_event, token: string) => {
+  if (realtimePlayback?.token === token) closeRealtimePlayback()
+})
+window.addEventListener('unload', closeRealtimePlayback)
 
 // Observe structural UI activity in the isolated world; never read labels, page text or form values.
 window.addEventListener('DOMContentLoaded', () => {
@@ -41,6 +115,7 @@ const channels = {
   ensureEngineReady: 'engine:ensure-ready',
   stopSession: 'engine:stop-session',
   setSessionPaused: 'engine:set-session-paused',
+  resolvePlayback: 'engine:resolve-playback',
   event: 'engine:event',
   getEngineState: 'engine:get-state',
   showWorkspace: 'app:show-workspace',
@@ -67,6 +142,8 @@ const channels = {
   hasTranslationCredential: 'translation:has-credential', setTranslationCredential: 'translation:set-credential',
   setCaptionService: 'browser:caption-service',
   openDefaultBrowser: 'app:open-default-browser',
+  installVirtualCable: 'app:install-virtual-cable',
+  getVirtualCableDriverVersion: 'app:get-virtual-cable-driver-version',
   notifyMainError: 'app:overlay-error', mainErrorNotification: 'app:main-error-notification',
   previewOverlayToast: 'app:overlay-toast-preview',
   dismissOverlayToast: 'app:overlay-toast-dismissed',
@@ -208,6 +285,8 @@ const api: NolaTranslatorApi = {
   stopSession: (sessionId: string) => invoke(channels.stopSession, sessionId),
   setSessionPaused: (sessionId: string, paused: boolean) =>
     invoke(channels.setSessionPaused, sessionId, paused),
+  resolvePlayback: (sessionId: string, jobId: string, action: 'retry' | 'skip') =>
+    invoke(channels.resolvePlayback, sessionId, jobId, action),
   /*
    * The payload is `EngineChannelEvent`, not `EngineEvent`: this one channel also carries
    * `engineStateChanged` from the main process. Deliberately not split into two listeners —
@@ -284,6 +363,8 @@ const api: NolaTranslatorApi = {
   hasTranslationCredential: (provider) => invoke(channels.hasTranslationCredential, provider),
   setTranslationCredential: (provider, value) => invoke(channels.setTranslationCredential, provider, value),
   setCaptionService: (active) => invoke(channels.setCaptionService, active),
+  ...(process.platform === 'win32' && process.arch === 'x64' ? { installVirtualCable: () => invoke<void>(channels.installVirtualCable) } : {}),
+  ...(process.platform === 'win32' && process.arch === 'x64' ? { getVirtualCableDriverVersion: () => invoke<string | null>(channels.getVirtualCableDriverVersion) } : {}),
   openDefaultBrowser: () => invoke(channels.openDefaultBrowser),
   notifyMainError: notification => ipcRenderer.send(channels.notifyMainError, notification),
   previewOverlayToast: notification => ipcRenderer.send(channels.previewOverlayToast, notification),

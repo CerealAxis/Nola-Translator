@@ -165,6 +165,7 @@ export async function testAudio(source: string): Promise<boolean> {
   try {
     if (!bridge) throw new Error('engineNotReady')
     const selected = modelsStore.getState().devices.find(device => device.deviceId === source)
+    if (selected?.kind === 'processAudio') throw new Error('audioDeviceUnavailable')
     const legacyKind = source.startsWith('wasapi:systemOutput:') ? 'systemOutput'
       : source.startsWith('wasapi:microphone:') ? 'microphone' : undefined
     if (source !== 'defaultOutput' && !selected && !legacyKind) throw new Error('audioDeviceUnavailable')

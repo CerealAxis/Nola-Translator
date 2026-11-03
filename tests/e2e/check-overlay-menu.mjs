@@ -71,8 +71,10 @@ app.whenReady().then(async () => {
       win.setSize(width, 230)
       win.webContents.send('settings:changed', settings)
       await pause(100)
-      await click(win, '[data-menu-kind="layout"] > button')
+      const kind = width === 720 ? 'display' : 'layout'
+      await click(win, `[data-menu-kind="${kind}"] > button`)
       const menu = await menuWindow()
+      assert.equal(await evaluate(menu, 'document.querySelectorAll(".nola-caption-menu [role=menuitem]").length'), kind === 'display' ? 3 : 2)
       const style = await evaluate(menu, `(() => {
         const element = document.querySelector('.nola-caption-menu'); const s = getComputedStyle(element);
         const r = element.getBoundingClientRect();

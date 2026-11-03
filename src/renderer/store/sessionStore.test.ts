@@ -33,6 +33,44 @@ it('continues desktop startup when the advisory browser status query rejects', a
   expect(sessionStore.getState()).toMatchObject({ status: 'running', sessionId: 'session-1', errorCode: null })
 })
 
+it.each(['resource:index-translate-2b-q4-k-m', 'cloud:index-translate'])(
+  'starts with the selected ASR and %s when the saved local defaults are not installed',
+  async translationBinding => {
+    const bridge = createIpcBridge()
+    const recognitionModelId = 'qwen3-asr-0.6b-crisp-q4-k'
+    const translationModelId = 'index-translate-2b-q4-k-m'
+    const localTranslation = translationBinding.startsWith('resource:')
+    const installed = { description: '', languages: [], installed: true, installedBytes: 1, state: 'idle', cancellable: false } as const
+    vi.spyOn(bridge.settings, 'browserConnection').mockRejectedValue(new Error('status IPC unavailable'))
+    vi.spyOn(bridge.engine, 'getEngineState').mockResolvedValue('ready')
+    vi.spyOn(bridge.engine, 'listResources').mockResolvedValue({
+      storagePath: '',
+      resources: [
+        { ...installed, languages: [], provider: 'crisp-asr', resourceId: recognitionModelId, name: 'Qwen3-ASR', kind: 'recognitionModel' },
+        ...(localTranslation ? [{ ...installed, languages: [], provider: 'index-translate', resourceId: translationModelId, name: 'Index Translate', kind: 'translationModel' as const }] : []),
+      ],
+    })
+    const start = vi.spyOn(bridge.engine, 'startSession').mockResolvedValue({ sessionId: 'session-1', meetingId: null })
+    attachSessionStore(bridge)
+
+    await startSession({
+      ...remoteConfig,
+      recognitionProvider: 'local',
+      translationProvider: 'local',
+      translationModelId: 'hy-mt2-1.8b-q3-k-m',
+      recognitionBinding: `resource:${recognitionModelId}`,
+      translationBinding,
+    })
+
+    expect(start).toHaveBeenCalledWith(expect.objectContaining({
+      recognitionModelId,
+      translationProvider: localTranslation ? 'local' : 'index-translate',
+      ...(localTranslation ? { translationModelId } : {}),
+      translationBinding,
+    }))
+  },
+)
+
 it('still rejects a browser session reservation before starting the engine session', async () => {
   const bridge = createIpcBridge()
   vi.spyOn(bridge.settings, 'browserConnection').mockResolvedValue({

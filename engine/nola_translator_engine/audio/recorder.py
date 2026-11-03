@@ -148,7 +148,7 @@ class Mp3Recorder:
     BIT_RATE_STEREO = 128
     BIT_RATE_MONO = 64
 
-    def __init__(self, path: str | Path, sample_rate: int, channels: int) -> None:
+    def __init__(self, path: str | Path, sample_rate: int, channels: int, *, exclusive: bool = False) -> None:
         if sample_rate < 8000 or channels not in (1, 2):
             raise ValueError("MP3 recording requires at least 8 kHz and one or two channels")
         import lameenc
@@ -173,7 +173,7 @@ class Mp3Recorder:
         self._encoder.set_channels(channels)
         self._encoder.set_quality(5)
         self._encoder_started = False
-        self._file: BinaryIO | None = open(self.path, "wb", buffering=1 << 20)
+        self._file: BinaryIO | None = open(self.path, "xb" if exclusive else "wb", buffering=1 << 20)
 
     @property
     def closed(self) -> bool:

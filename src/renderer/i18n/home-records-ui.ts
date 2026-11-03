@@ -1,12 +1,12 @@
 export const homeRecordsZh = {
   tagline: '高效、稳定、易用的实时翻译与同传工具',
   speech: '实时语音识别', multilingual: '多语言互译', meetings: '会议与学习', live: '直播场景',
-  quickDescription: '实时语音识别与翻译\n支持多语言互译',
-  gatewayTitle: '模型网关', gatewayDescription: '启动并管理本地模型服务\n为翻译与识别提供能力', openGateway: '管理网关',
-  workbenchDescription: '调用本地已配置的模型\n支持 ASR、MT、TTS 与 LLM', openWorkbench: '打开工作台',
-  overlayDescription: '通过浏览器扩展获取视频音频\n实时识别并显示翻译字幕',
-  recordsDescription: '查看、编辑\n导出历史记录',
-  modelsDescription: '管理和切换\n翻译与识别模型',
+  quickDescription: '实时语音识别与翻译\n 支持多语言互译',
+  gatewayTitle: '模型网关', gatewayDescription: '启动并管理本地模型服务\n 为翻译与识别提供能力', openGateway: '管理网关',
+  workbenchDescription: '调用本地已配置的模型\n 支持 ASR、MT、TTS 与 LLM', openWorkbench: '打开工作台',
+  overlayDescription: '通过浏览器扩展获取视频音频\n 实时识别并显示翻译字幕',
+  recordsDescription: '查看、编辑\n 导出历史记录',
+  modelsDescription: '管理和切换\n 翻译与识别模型',
   openOverlay: '打开浏览器字幕', openRecords: '查看记录', openModels: '进入管理',
   allRecords: '查看全部记录', language: '语言方向', status: '状态', completed: '已完成', interrupted: '已中断',
   time: '时间', moreActions: '更多操作：{name}',
@@ -16,9 +16,9 @@ export const homeRecordsZh = {
    * 时长文案。`daySequence` 的自动标题规则（`2026年10月01日_记录_1`）是**渲染时算出来的**，
    * 不落盘，所以切界面语言会给每一条记录重新起名而一个文件都不动。
    */
-  durationMinutes: '{minutes}分钟',
-  durationHoursMinutes: '{hours}小时{minutes}分钟',
-  durationHours: '{hours}小时',
+  durationMinutes: '{minutes} 分钟',
+  durationHoursMinutes: '{hours} 小时 {minutes} 分钟',
+  durationHours: '{hours} 小时',
 }
 export const homeRecordsEn: Record<keyof typeof homeRecordsZh, string> = {
   tagline: 'Live captions and translation, wherever you need them',

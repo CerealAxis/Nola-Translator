@@ -1,7 +1,7 @@
 import type { AppSettings } from './settings'
 import type { ResourceRecord } from './contracts'
 
-export const OVERLAY_MENU_KINDS = ['model', 'source', 'target', 'display', 'layout', 'confirm'] as const
+export const OVERLAY_MENU_KINDS = ['model', 'display', 'layout', 'confirm'] as const
 export type OverlayMenuKind = typeof OVERLAY_MENU_KINDS[number]
 
 export interface OverlayMenuRequest {

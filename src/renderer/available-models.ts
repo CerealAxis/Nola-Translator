@@ -6,7 +6,7 @@ import { installedPlaygroundModels } from './features/workbench/installed-models
 import { bindingIsLocal, normalizeModelBinding, type GatewayCapability, type ModelGatewaySnapshot } from '../shared/model-gateway'
 import { ALIYUN_LANGUAGES, recognitionLabel, remoteSourceLanguages, supportsRecognitionNativeTranslation } from '../shared/cloud-config'
 import { customModelPatch, customModelsOf } from '../shared/custom-models'
-import { DEFAULT_SETTINGS, NO_TRANSLATION_LANGUAGE, type AppSettings, type AppSettingsPatch, type CredentialProvider, type RecognitionModelId, type TranslationProvider } from '../shared/settings'
+import { DEFAULT_SETTINGS, MIMO_TTS_BINDING, MIMO_TTS_NAME, NO_TRANSLATION_LANGUAGE, type AppSettings, type AppSettingsPatch, type CredentialProvider, type RecognitionModelId, type TranslationProvider } from '../shared/settings'
 import type { ResourceRecord } from '../shared/contracts'
 import { configurationOf, recognitionLanguages } from '../shared/model-capabilities'
 import { INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
@@ -22,7 +22,7 @@ export interface AvailableModel {
   binding: string
   name: string
   kind: GatewayCapability
-  /** `gateway` means the model gateway has this local model loaded right now. */
+  /** `gateway` means the configured local model can be called through a gateway. */
   origin: 'gateway' | 'cloud'
   /** Whether the configured interface can be called without paid credentials. */
   free: boolean
@@ -49,7 +49,9 @@ export function useGatewaySnapshot(): ModelGatewaySnapshot | null {
       let receivedEvent = false
       stopGatewayTracking = api.onChanged(snapshot => {
         receivedEvent = true
-        if (generation === gatewayGeneration) gatewayStore.setState({ snapshot })
+        if (generation === gatewayGeneration) gatewayStore.setState(state => ({
+          snapshot: { ...snapshot, realtime: snapshot.realtime ?? state.snapshot?.realtime },
+        }))
       })
       void api.snapshot().then(snapshot => {
         // An earlier read must not overwrite a newer gateway event or a remounted subscription.
@@ -107,6 +109,23 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
       images: record ? imageTranslationIds.has(record.resourceId) : false }
   }
   const asrLoaded = loaded('asr')
+  const realtime = (kind: GatewayCapability): AvailableModel[] => {
+    const operation = { asr: 'transcribe', mt: 'translate', tts: 'synthesize', llm: 'generate' }[kind]
+    return (snapshot?.realtime?.models ?? []).flatMap(model => {
+      if (!model.enabled || !model.operations.includes(operation)) return []
+      const id = kind === 'llm' ? model.model_id.replace(/^llm:/, '') : model.model_id
+      const binding = `resource:${id}`
+      const record = resources.find(resource => resource.resourceId === id && resource.installed)
+      if (!record || !isModelEnabled(settings, kind, binding)) return []
+      const capability = configurationOf(record)
+      return [{
+        binding, name: displayName(binding, record.name), kind, origin: 'gateway' as const, free: true,
+        sourceLanguages: kind === 'asr' ? recognitionLanguages(record) : capability?.sourceLanguages,
+        targetLanguages: capability?.targetLanguages,
+        images: imageTranslationIds.has(id),
+      }]
+    })
+  }
   const clouds = cloudModelsOf(settings, credentials).filter(model => model.ready)
   const cloudAsr = clouds.filter(model => model.kind === 'recognitionModel').map(model => {
     const binding = `cloud:${model.id}`
@@ -116,7 +135,7 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
       sourceLanguages: remoteSourceLanguages({ ...DEFAULT_SETTINGS.recognition, ...settings.recognition, provider: model.id as 'aliyun' | 'minimax' }),
     }
   })
-  const asrOptions = [...(asrLoaded ? [asrLoaded] : []), ...cloudAsr]
+  const asrOptions = [...(asrLoaded ? [asrLoaded] : []), ...realtime('asr'), ...cloudAsr]
   const effectiveAsr = resolveModelBinding('asr', sceneModelBinding(settings, 'asr'), asrOptions)
   const nativeTranslation = !effectiveAsr.unavailable && (effectiveAsr.binding === 'cloud:aliyun'
     ? supportsRecognitionNativeTranslation({ ...settings.recognition, provider: 'aliyun' })
@@ -139,10 +158,12 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
     return lists.flat().filter(model => model.kind === kind && !seen.has(model.binding) && !!seen.add(model.binding))
   }
   return {
-    asr: merge('asr', asrLoaded ? [asrLoaded] : [], cloudAsr),
-    mt: merge('mt', (loaded('mt') ? [loaded('mt')!] : []), cloudMt),
-    tts: merge('tts', loaded('tts') ? [loaded('tts')!] : []),
-    llm: merge('llm', loaded('llm') ? [loaded('llm')!] : [], llmClouds),
+    asr: merge('asr', asrOptions),
+    mt: merge('mt', loaded('mt') ? [loaded('mt')!] : [], realtime('mt'), cloudMt),
+    tts: merge('tts', loaded('tts') ? [loaded('tts')!] : [], realtime('tts'), credentials['mimo-tts'] && isModelEnabled(settings, 'tts', MIMO_TTS_BINDING) ? [
+      { binding: MIMO_TTS_BINDING, name: MIMO_TTS_NAME, kind: 'tts', origin: 'cloud', free: false, targetLanguages: ['zh', 'en'] },
+    ] : []),
+    llm: merge('llm', loaded('llm') ? [loaded('llm')!] : [], realtime('llm'), llmClouds),
   }
 }
 
@@ -180,7 +201,7 @@ export function useAvailableModels(): AvailableModels {
       .map(model => ({ ...model, name: names[model.binding] || model.name }))
     const cloud = buildAvailableModels({ settings, resources, credentials, snapshot, names })
     const combine = (kind: GatewayCapability) => {
-      const models = [...forKind(kind), ...cloud[kind].filter(model => model.origin === 'cloud')]
+      const models = [...forKind(kind), ...cloud[kind]]
       const seen = new Set<string>()
       return models.filter(model => !seen.has(model.binding) && !!seen.add(model.binding))
     }
@@ -236,7 +257,7 @@ function legacyModelBindingPatch(kind: GatewayCapability, binding: string, setti
   const normalized = normalizeModelBinding(kind, binding)
   if (!normalized) return {}
   if (kind === 'llm') return sceneModelPatch(settings, kind, normalized)
-  if (kind === 'tts') return { synthesis: { modelId: normalized.slice(9), voice: '' } }
+  if (kind === 'tts') return { synthesis: { modelId: bindingIsLocal(normalized) ? normalized.slice(9) : normalized, voice: '' } }
   if (kind === 'asr') {
     return bindingIsLocal(normalized)
       ? { recognition: { provider: 'local', modelId: normalized.slice(9) as RecognitionModelId } }

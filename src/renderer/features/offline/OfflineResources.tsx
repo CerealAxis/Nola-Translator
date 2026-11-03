@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FolderInput, LoaderCircle } from 'lucide-react'
+import { LoaderCircle } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { stores, useStore } from '@/store'
 import { offlineActions, offlineStore } from '@/store/offlineStore'
@@ -30,7 +30,7 @@ function BusyIcon({ busy }: { busy: boolean }) {
 
 export function LocalModelImport() {
   const { t } = useI18n()
-  return <><Button className="offline-import-button" variant="secondary" onClick={() => { offlineActions.reset(); offlineActions.open('model') }}><FolderInput aria-hidden="true" />{t('offline.modelImport')}</Button><OfflineDialog scope="model" /></>
+  return <><Button className="offline-import-button" variant="secondary" onClick={() => { offlineActions.reset(); offlineActions.open('model') }}>{t('offline.modelImport')}</Button><OfflineDialog scope="model" /></>
 }
 export function OfflineResources() {
   const { t } = useI18n()

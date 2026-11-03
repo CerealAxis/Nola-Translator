@@ -1,0 +1,633 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Control frames for input/audio/events WS",
+  "client_frame": {
+    "$defs": {
+      "WsHello": {
+        "additionalProperties": false,
+        "properties": {
+          "frame": {
+            "const": "hello",
+            "default": "hello",
+            "title": "Frame",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 2,
+            "default": 2,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "consumer_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Consumer Id",
+            "type": "string"
+          },
+          "outputs": {
+            "default": [],
+            "items": {
+              "enum": [
+                "source_text",
+                "translated_text",
+                "audio"
+              ],
+              "type": "string"
+            },
+            "title": "Outputs",
+            "type": "array"
+          },
+          "resume_cursor": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Resume Cursor",
+            "type": "integer"
+          },
+          "request_playback_owner": {
+            "default": false,
+            "title": "Request Playback Owner",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "consumer_id"
+        ],
+        "title": "WsHello",
+        "type": "object"
+      },
+      "WsPing": {
+        "additionalProperties": false,
+        "properties": {
+          "frame": {
+            "const": "ping",
+            "default": "ping",
+            "title": "Frame",
+            "type": "string"
+          }
+        },
+        "title": "WsPing",
+        "type": "object"
+      },
+      "WsPlaybackAck": {
+        "additionalProperties": false,
+        "properties": {
+          "frame": {
+            "const": "playback_ack",
+            "default": "playback_ack",
+            "title": "Frame",
+            "type": "string"
+          },
+          "owner_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Owner Id",
+            "type": "string"
+          },
+          "claim_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Claim Id",
+            "type": "string"
+          },
+          "playback_generation": {
+            "minimum": 0,
+            "title": "Playback Generation",
+            "type": "integer"
+          },
+          "audio_stream_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Audio Stream Id",
+            "type": "string"
+          },
+          "chunk_seq": {
+            "default": -1,
+            "minimum": -1,
+            "title": "Chunk Seq",
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "started",
+              "progress",
+              "finished",
+              "interrupted",
+              "unknown"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "played_sample_offset": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Played Sample Offset",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "owner_id",
+          "claim_id",
+          "playback_generation",
+          "audio_stream_id",
+          "state"
+        ],
+        "title": "WsPlaybackAck",
+        "type": "object"
+      },
+      "WsStreamClose": {
+        "additionalProperties": false,
+        "properties": {
+          "frame": {
+            "const": "stream_close",
+            "default": "stream_close",
+            "title": "Frame",
+            "type": "string"
+          },
+          "stream_handle": {
+            "minimum": 0,
+            "title": "Stream Handle",
+            "type": "integer"
+          },
+          "eof": {
+            "default": false,
+            "title": "Eof",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stream_handle"
+        ],
+        "title": "WsStreamClose",
+        "type": "object"
+      },
+      "WsStreamOpen": {
+        "additionalProperties": false,
+        "description": "Negotiates an input audio stream; frames then flow as binary.",
+        "properties": {
+          "frame": {
+            "const": "stream_open",
+            "default": "stream_open",
+            "title": "Frame",
+            "type": "string"
+          },
+          "stream_handle": {
+            "minimum": 0,
+            "title": "Stream Handle",
+            "type": "integer"
+          },
+          "epoch": {
+            "minimum": 0,
+            "title": "Epoch",
+            "type": "integer"
+          },
+          "encoding": {
+            "default": "pcm_s16le",
+            "enum": [
+              "pcm_s16le",
+              "pcm_f32le"
+            ],
+            "title": "Encoding",
+            "type": "string"
+          },
+          "sample_rate": {
+            "exclusiveMinimum": 0,
+            "title": "Sample Rate",
+            "type": "integer"
+          },
+          "channels": {
+            "default": 1,
+            "minimum": 1,
+            "title": "Channels",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stream_handle",
+          "epoch",
+          "sample_rate"
+        ],
+        "title": "WsStreamOpen",
+        "type": "object"
+      }
+    },
+    "discriminator": {
+      "mapping": {
+        "hello": "#/$defs/WsHello",
+        "ping": "#/$defs/WsPing",
+        "playback_ack": "#/$defs/WsPlaybackAck",
+        "stream_close": "#/$defs/WsStreamClose",
+        "stream_open": "#/$defs/WsStreamOpen"
+      },
+      "propertyName": "frame"
+    },
+    "oneOf": [
+      {
+        "$ref": "#/$defs/WsHello"
+      },
+      {
+        "$ref": "#/$defs/WsPing"
+      },
+      {
+        "$ref": "#/$defs/WsStreamOpen"
+      },
+      {
+        "$ref": "#/$defs/WsStreamClose"
+      },
+      {
+        "$ref": "#/$defs/WsPlaybackAck"
+      }
+    ]
+  },
+  "server_frame": {
+    "oneOf_note": "WsServerFrame union incl. EventEnvelope; see ws-events.schema.json",
+    "hello_ack": {
+      "$defs": {
+        "ErrorPayload": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "INVALID_CONFIG",
+                "CAPABILITY_MISMATCH",
+                "OUTPUT_UNSUPPORTED",
+                "AUTH_REQUIRED",
+                "MODEL_NOT_READY",
+                "RESOURCE_BUSY",
+                "RESOURCE_EXHAUSTED",
+                "AUDIO_GAP",
+                "AUDIO_SOURCE_UNAVAILABLE",
+                "SOURCE_FINALIZE_TIMEOUT",
+                "TRANSLATION_TIMEOUT",
+                "SYNTHESIS_FAILED",
+                "PLAYBACK_DEVICE_LOST",
+                "PLAYBACK_UNKNOWN",
+                "PROVIDER_DISCONNECTED",
+                "RESYNC_REQUIRED",
+                "SESSION_NOT_FOUND",
+                "SESSION_SLOT_BUSY",
+                "COMMAND_CONFLICT",
+                "PROTOCOL_ERROR",
+                "INTERNAL_ERROR"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "stage": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Stage",
+              "type": "string"
+            },
+            "scope": {
+              "default": "session",
+              "enum": [
+                "session",
+                "pipeline",
+                "task",
+                "consumer",
+                "instance"
+              ],
+              "title": "Scope",
+              "type": "string"
+            },
+            "retryable": {
+              "default": false,
+              "title": "Retryable",
+              "type": "boolean"
+            },
+            "fatal": {
+              "default": false,
+              "title": "Fatal",
+              "type": "boolean"
+            },
+            "message_key": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Message Key",
+              "type": "string"
+            },
+            "message_args": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Message Args",
+              "type": "object"
+            },
+            "correlation_id": {
+              "default": "",
+              "maxLength": 128,
+              "title": "Correlation Id",
+              "type": "string"
+            },
+            "provider_code": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Provider Code"
+            },
+            "retry_after_ms": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Retry After Ms"
+            },
+            "safe_details": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ]
+              },
+              "title": "Safe Details",
+              "type": "object"
+            },
+            "related_task_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Related Task Id"
+            },
+            "segment_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Segment Id"
+            },
+            "model_instance_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Model Instance Id"
+            }
+          },
+          "required": [
+            "code",
+            "stage",
+            "message_key"
+          ],
+          "title": "ErrorPayload",
+          "type": "object"
+        },
+        "SessionSnapshot": {
+          "additionalProperties": false,
+          "description": "Complete server-side view returned by GET /sessions/{id} and by the\nevents WS hello. Snapshot + tail registration happen in one reducer step\nso no event can be missed between them.",
+          "properties": {
+            "schema_version": {
+              "const": 2,
+              "default": 2,
+              "title": "Schema Version",
+              "type": "integer"
+            },
+            "server_instance_id": {
+              "title": "Server Instance Id",
+              "type": "string"
+            },
+            "session_id": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            },
+            "pipeline_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pipeline Id"
+            },
+            "config_revision": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Config Revision",
+              "type": "integer"
+            },
+            "state": {
+              "default": "created",
+              "enum": [
+                "created",
+                "preparing",
+                "running",
+                "pausing",
+                "paused",
+                "recovering",
+                "draining",
+                "stopping",
+                "closed",
+                "failed"
+              ],
+              "title": "State",
+              "type": "string"
+            },
+            "epoch": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Epoch",
+              "type": "integer"
+            },
+            "owner": {
+              "enum": [
+                "quick_interpret",
+                "browser_captions"
+              ],
+              "title": "Owner",
+              "type": "string"
+            },
+            "snapshot_seq": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Snapshot Seq",
+              "type": "integer"
+            },
+            "source_revision_watermark": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Source Revision Watermark",
+              "type": "integer"
+            },
+            "target_revision_watermark": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Target Revision Watermark",
+              "type": "integer"
+            },
+            "playback_generation": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Playback Generation",
+              "type": "integer"
+            },
+            "subscriptions": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/SubscriptionInfo"
+              },
+              "title": "Subscriptions",
+              "type": "array"
+            },
+            "last_error": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ErrorPayload"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "updated_at_unix_ms": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Updated At Unix Ms",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "server_instance_id",
+            "session_id",
+            "owner"
+          ],
+          "title": "SessionSnapshot",
+          "type": "object"
+        },
+        "SubscriptionInfo": {
+          "additionalProperties": false,
+          "properties": {
+            "consumer_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Consumer Id",
+              "type": "string"
+            },
+            "outputs": {
+              "default": [],
+              "items": {
+                "enum": [
+                  "source_text",
+                  "translated_text",
+                  "audio"
+                ],
+                "type": "string"
+              },
+              "title": "Outputs",
+              "type": "array"
+            }
+          },
+          "required": [
+            "consumer_id"
+          ],
+          "title": "SubscriptionInfo",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "frame": {
+          "const": "hello_ack",
+          "default": "hello_ack",
+          "title": "Frame",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 2,
+          "default": 2,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "server_instance_id": {
+          "title": "Server Instance Id",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "consumer_id": {
+          "title": "Consumer Id",
+          "type": "string"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/SessionSnapshot"
+        },
+        "replay_from_seq": {
+          "default": 0,
+          "minimum": -1,
+          "title": "Replay From Seq",
+          "type": "integer"
+        },
+        "resync_required": {
+          "default": false,
+          "title": "Resync Required",
+          "type": "boolean"
+        },
+        "playback_owner_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Playback Owner Id"
+        }
+      },
+      "required": [
+        "server_instance_id",
+        "session_id",
+        "consumer_id",
+        "snapshot"
+      ],
+      "title": "WsHelloAck",
+      "type": "object"
+    }
+  }
+}

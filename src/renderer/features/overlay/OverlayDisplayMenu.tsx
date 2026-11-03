@@ -1,8 +1,7 @@
 import { Menu } from '@base-ui/react/menu'
 import { Check, ChevronDown } from 'lucide-react'
 
-import type { OverlaySettings } from '@/bridge'
-import { NO_TRANSLATION_LANGUAGE } from '@/bridge'
+import type { AppSettingsPatch, OverlaySettings } from '@/bridge'
 
 import { useMenuMaxHeight } from './OverlayControls'
 import { OverlayDropdown } from './OverlayDropdown'
@@ -35,28 +34,24 @@ const DISPLAY_PATCH: Record<DisplayKey, Pick<OverlaySettings, 'showSource' | 'sh
 export function OverlayDisplayMenu({ isDisabled = false }: { isDisabled?: boolean }) {
   const { t } = useI18n()
   const overlay = useStore(stores.settings, (state) => state.settings?.overlay)
-  const translationDisabled = useStore(stores.settings, (state) => state.settings?.translation.targetLanguage === NO_TRANSLATION_LANGUAGE)
 
   const showSource = overlay?.showSource ?? true
   const showTranslation = overlay?.showTranslation ?? true
-  const display: DisplayKey = translationDisabled ? 'source' : showSource && showTranslation ? 'both' : showSource ? 'source' : 'translation'
+  const display: DisplayKey = showSource && showTranslation ? 'both' : showSource ? 'source' : 'translation'
 
   return (
     <OverlayPill kind="display" label={t('overlay.displayMode')} value={t(DISPLAY_LABELS[display])} isDisabled={isDisabled} options={[
-      { id: 'display:both', label: t('workspace.modeBoth'), active: display === 'both', patch: DISPLAY_PATCH.both },
-      { id: 'display:source', label: t('workspace.modeSource'), active: display === 'source', patch: DISPLAY_PATCH.source },
-      { id: 'display:translation', label: t('workspace.modeTranslation'), active: display === 'translation', patch: DISPLAY_PATCH.translation },
-    ].filter(option => !translationDisabled || option.id === 'display:source')} />
+      { id: 'display:both', label: t('workspace.modeBoth'), active: display === 'both', patch: { overlay: DISPLAY_PATCH.both } },
+      { id: 'display:source', label: t('workspace.modeSource'), active: display === 'source', patch: { overlay: DISPLAY_PATCH.source } },
+      { id: 'display:translation', label: t('workspace.modeTranslation'), active: display === 'translation', patch: { overlay: DISPLAY_PATCH.translation } },
+    ]} />
   )
 }
 
 export function OverlayLayoutMenu({ isDisabled = false }: { isDisabled?: boolean }) {
   const { t } = useI18n()
   const overlay = useStore(stores.settings, (state) => state.settings?.overlay)
-  const translationDisabled = useStore(stores.settings, (state) => state.settings?.translation.targetLanguage === NO_TRANSLATION_LANGUAGE)
   const layout: LayoutKey = overlay?.layout === 'sentence' ? 'sentence' : 'rolling'
-
-  if (translationDisabled) return null
 
   return (
     <OverlayPill kind="layout" label={t('overlay.layout')} value={t(LAYOUT_LABELS[layout])} isDisabled={isDisabled} options={[
@@ -65,8 +60,8 @@ export function OverlayLayoutMenu({ isDisabled = false }: { isDisabled?: boolean
         heading, and using it on a single item would label the row "layout"
         instead of naming the option.
       */
-      { id: 'layout:rolling', label: t('workspace.layoutSplit'), active: layout === 'rolling', patch: { layout: 'rolling' } },
-      { id: 'layout:sentence', label: t('workspace.layoutSentence'), active: layout === 'sentence', patch: { layout: 'sentence' } },
+      { id: 'layout:rolling', label: t('workspace.layoutSplit'), active: layout === 'rolling', patch: { overlay: { layout: 'rolling' } } },
+      { id: 'layout:sentence', label: t('workspace.layoutSentence'), active: layout === 'sentence', patch: { overlay: { layout: 'sentence' } } },
     ]} />
   )
 }
@@ -101,7 +96,7 @@ function OverlayPill({ kind, label, value, options, isDisabled = false }: { kind
                   aria-checked={option.active}
                   data-selected={option.active ? 'true' : undefined}
                   onClick={() => {
-                    void actions.settings.updateSettings({ overlay: option.patch }).catch((error: unknown) => {
+                    void actions.settings.updateSettings(option.patch).catch((error: unknown) => {
                       notifyError(t('errors.settingsSaveFailed'), { cause: error })
                     })
                   }}
@@ -119,11 +114,10 @@ function OverlayPill({ kind, label, value, options, isDisabled = false }: { kind
 }
 
 interface OptionSpec {
-  /** Unique within the Menu. Prefixed `display:` / `layout:` so an id is readable across
-   *  both pills even while they are separate Menus. */
+  /** Prefixed with the menu kind to distinguish items in diagnostics. */
   id: string
   label: string
   /** Whether this is the active option, which drives the pill text and the checkmark. */
   active: boolean
-  patch: Partial<OverlaySettings>
+  patch: AppSettingsPatch
 }

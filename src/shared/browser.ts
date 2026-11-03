@@ -72,6 +72,8 @@ export type BrowserWireErrorCode =
  */
 export interface BrowserCaptionConfig {
   appearance: BrowserCaptionStyleSettings
+  pipeline?: 'cascade' | 's2s'
+  desktopApplicationAudio?: boolean
   audioSource: VideoCaptionAudioSource
   audioDeviceId?: string
   sourceLanguage: string

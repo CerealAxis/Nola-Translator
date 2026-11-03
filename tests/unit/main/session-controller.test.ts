@@ -4,6 +4,36 @@ import type { EngineProcess } from '../../../src/main/engine-process'
 import type { PrewarmConfig, PrewarmResult } from '../../../src/shared/contracts'
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
 import type { SessionConfig } from '../../../src/shared/contracts'
+import type { BackendSession, MappedBackendSession } from '../../../src/main/backend-session'
+
+it('opens a mapped desktop session on v2 and uses its pause and stop commands', async () => {
+  const legacy = { currentState: 'ready', request: vi.fn(), emit: vi.fn() }
+  const prepare = vi.fn()
+  const backend = {
+    start: vi.fn(async () => 'v2-session'), activate: vi.fn(),
+    pause: vi.fn(async () => {}), stop: vi.fn(async () => {}),
+  }
+  const mapped = { config: {}, headers: {} } as MappedBackendSession
+  const sessions = new SessionController({
+    engine: legacy as unknown as EngineProcess, meetings: null,
+    getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '',
+    whenReady: async () => {}, prepare, startingChanged: () => {}, hideOverlay: () => {},
+    prepareBackend: async () => ({ client: backend as unknown as BackendSession, mapped }),
+  })
+  const result = await sessions.start({
+    audioSource: { kind: 'microphone', deviceId: 'test-microphone' }, recognitionMode: 'realtime',
+    sourceLanguage: 'en', targetLanguages: [], outputMode: 'source',
+  }, 'desktop')
+  expect(result.sessionId).toBe('v2-session')
+  expect(backend.start).toHaveBeenCalledWith(mapped, undefined)
+  expect(backend.activate).toHaveBeenCalledOnce()
+  await sessions.pause(result.sessionId, true)
+  await sessions.stop(result.sessionId)
+  expect(backend.pause).toHaveBeenCalledWith(true)
+  expect(backend.stop).toHaveBeenCalledOnce()
+  expect(legacy.request).not.toHaveBeenCalled()
+  expect(prepare).not.toHaveBeenCalled()
+})
 
 it('injects the selected custom model key without accepting caller-supplied credentials', async () => {
   const request = vi.fn(async () => ({ sessionId: 'custom-session' }))

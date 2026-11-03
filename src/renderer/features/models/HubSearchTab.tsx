@@ -366,14 +366,10 @@ export function HubSearchTab({ onGoRecommended }: HubSearchTabProps) {
           descriptionFallback={t('models.noDescription')}
           metadata={`${summary.author ?? summary.repo.split('/')[0]} · ${summary.formats?.includes('gguf') || summary.hasGguf ? 'GGUF' : 'PyTorch'}`}
           busy={busyIds.includes(liveId) || busyIds.includes(summary.repo)}
-          isDefault={false} canBeDefault={false} onInstall={() => install(hit)}
+          onInstall={() => install(hit)}
           onCancel={() => { void actions.models.manageResource(liveId, 'cancel').catch((cause: unknown) => {
             notifyError(t('errors.engineOperationFailed'), { cause })
           }) }}
-          onRemove={() => { void actions.models.manageResource(liveId, 'remove').catch((cause: unknown) => {
-            notifyError(t('modelsSettingsUi.removeFailed'), { cause })
-          }) }}
-          onSetDefault={() => undefined}
           footer={<div className="flex flex-wrap gap-[var(--space-1)]">{live?.installed ? <Button variant="secondary" onClick={() => setConfiguring(live)}>{t(configurationOf(live) ? 'modelConfig.edit' : 'modelConfig.configure')}</Button> : null}<Button variant="secondary" size="sm" onClick={() => setDetail(hit)}>
             {t('models.openDetails')}
           </Button></div>} />

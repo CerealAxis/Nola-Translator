@@ -9,7 +9,7 @@ export interface Caption extends CaptionSegment { videoStartedAtMs: number; vide
  * Caption presentation owned by the desktop application. The extension only reads it; `bottomOffset`
  * is the percent of video height reserved between the caption block and the bottom edge.
  */
-export type CaptionConfig = BrowserCaptionStyleSettings & { audioSource: VideoCaptionAudioSource; audioDeviceId?: string; sourceLanguage: string; targetLanguage: string }
+export type CaptionConfig = BrowserCaptionStyleSettings & { audioSource: VideoCaptionAudioSource; audioDeviceId?: string; sourceLanguage: string; targetLanguage: string; pipeline?: 'cascade' | 's2s'; desktopApplicationAudio?: boolean }
 /** Mirrors the desktop defaults so a desktop without the config field still renders as configured there. */
 const DEFAULT_CAPTION_CONFIG: CaptionConfig = { showSource: true, showTranslation: true, colorScheme: 'dark', fontFamily: 'Segoe UI Variable', sourceFontSize: 20, translationFontSize: 16, lineHeight: 1.3, sourceColor: '#F7F7F7', translationColor: '#D7DEE8', backgroundColor: '#0D0E10', backgroundOpacity: 0.85, bottomOffset: 5, sourceLanguage: 'auto', targetLanguage: 'none', audioSource: 'system' }
 /**
@@ -91,6 +91,8 @@ function mergeDesktopConfig(previous: CaptionConfig, incoming: unknown): Caption
     backgroundOpacity: measure(appearance?.backgroundOpacity, 0, 1, previous.backgroundOpacity),
     bottomOffset: measure(appearance?.bottomOffset, 0, 30, previous.bottomOffset),
     audioSource: root.audioSource === 'tab' ? 'tab' : 'system',
+    pipeline: root.pipeline === 's2s' ? 's2s' : 'cascade',
+    desktopApplicationAudio: root.desktopApplicationAudio === true,
     audioDeviceId: device(root.audioDeviceId, previous.audioDeviceId),
     sourceLanguage: code(root.sourceLanguage, previous.sourceLanguage),
     targetLanguage: code(root.targetLanguage, previous.targetLanguage),

@@ -29,17 +29,47 @@ import { notifyError, notifySuccess, notifyWarning } from '@/components/primitiv
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { errorCopyOf } from '@/features/workspace/error-copy'
-import { actions, stores, updateSettings, useStore } from '@/store'
+import { actions, getBridge, stores, updateSettings, useStore } from '@/store'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
 import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
-import { DEFAULT_SETTINGS, ALIYUN_RECOGNITION_MODELS, MINIMAX_RECOGNITION_MODELS, type AliyunRecognitionModel, type MinimaxRecognitionModel, type RecognitionSettings } from '../../../../shared/settings'
+import { DEFAULT_SETTINGS, ALIYUN_ASR_MODELS, MINIMAX_RECOGNITION_MODELS, type MinimaxRecognitionModel, type RecognitionSettings } from '../../../../shared/settings'
 import { ApiKeyRow, TextRow } from './TranslationTab'
-import { supportsRecognitionNativeTranslation } from '../../../../shared/cloud-config'
+import { speechOutputOptions, useAudioSourceOptions } from '@/audio-source-options'
+import { useSpeechOutputDevices } from '@/features/workspace/SessionSetupDialog'
+import { probeAudioDevices } from '@/store/modelStore'
+import { vbCablePair } from '../../../../shared/virtual-audio'
 
 const DEFAULT_OUTPUT = 'defaultOutput'
 
 export function AudioTab({ settings }: SettingsPanelProps) {
   const { t, language } = useI18n()
+  const [installingCable, setInstallingCable] = useState(false)
+  const installCable = getBridge()?.app.installVirtualCable
+  const readCableDriverVersion = getBridge()?.app.getVirtualCableDriverVersion
+  const [cableDriverVersion, setCableDriverVersion] = useState<string | null>(null)
+  const [checkingCableDriver, setCheckingCableDriver] = useState(Boolean(readCableDriverVersion))
+  const refreshCableStatus = useCallback(async () => {
+    const tasks: Promise<unknown>[] = [probeAudioDevices().catch(() => undefined)]
+    if (readCableDriverVersion) {
+      setCheckingCableDriver(true)
+      tasks.push(readCableDriverVersion().then(setCableDriverVersion).catch(() => setCableDriverVersion(null)).finally(() => setCheckingCableDriver(false)))
+    }
+    await Promise.all(tasks)
+  }, [readCableDriverVersion])
+  useEffect(() => { void refreshCableStatus() }, [refreshCableStatus])
+  async function runCableInstaller() {
+    if (!installCable) return
+    setInstallingCable(true)
+    try {
+      await installCable()
+      await refreshCableStatus()
+      notifySuccess(t('session.virtualCableSetupClosed'))
+    } catch (cause) {
+      notifyError(t('session.virtualCableSetupFailed'), { cause })
+    } finally {
+      setInstallingCable(false)
+    }
+  }
   const modelChoices = useModelOptions()
   const devices = useStore(stores.models, (state) => state.devices)
   const provider = settings.recognition.provider ?? 'local'
@@ -54,13 +84,40 @@ export function AudioTab({ settings }: SettingsPanelProps) {
 
   // The sentinel is a protocol value rather than a device id, so the option carrying it is
   // built here; the enumerated devices follow as the pinned choices.
-  const deviceOptions = useMemo<PickerOption[]>(
-    () => [
-      { value: DEFAULT_OUTPUT, label: t('settings.audioSourceSystem') },
-      ...devices.map((device) => ({ value: device.deviceId, label: device.name })),
-    ],
-    [devices, t],
-  )
+  const selectedSource = settings.realtime?.virtualInputDeviceId || settings.recognition.audioSource
+  const deviceOptions = [{ value: DEFAULT_OUTPUT, label: t('settings.audioSourceSystem') }, ...useAudioSourceOptions(devices, selectedSource)]
+  const speechOutputs = useSpeechOutputDevices()
+  const cableCaptureEnds = new Set(devices.filter(device => device.kind === 'microphone').map(device => vbCablePair(device.name, 'Output')))
+  const cableRenderEnds = new Set(speechOutputs.map(device => vbCablePair(device.label, 'Input')))
+  const standardCablePresent = cableCaptureEnds.has('standard') || cableRenderEnds.has('standard')
+    || devices.some(device => device.kind === 'systemOutput' && vbCablePair(device.name, 'Input') === 'standard')
+  const selectedOutput = settings.realtime?.speechOutputDeviceId
+  const realtimeActive = useStore(stores.session, state => !['idle', 'error'].includes(state.status))
+  const [testingOutput, setTestingOutput] = useState(false)
+  const testSpeechOutput = async () => {
+    if (!selectedOutput || testingOutput || realtimeActive) return
+    setTestingOutput(true)
+    let context: (AudioContext & { setSinkId?: (id: string) => Promise<void> }) | undefined
+    try {
+      context = new AudioContext()
+      if (!context.setSinkId) throw new Error('Output selection is unavailable')
+      await context.setSinkId(selectedOutput)
+      await context.resume()
+      const signal = context.createOscillator()
+      const volume = context.createGain()
+      volume.gain.value = 0.05
+      signal.connect(volume).connect(context.destination)
+      const ended = new Promise<void>(resolve => { signal.onended = () => resolve() })
+      signal.start()
+      signal.stop(context.currentTime + 0.15)
+      await ended
+    } catch (cause) {
+      notifyError(t('errors.audioDeviceDisconnected'), { cause })
+    } finally {
+      await context?.close().catch(() => undefined)
+      setTestingOutput(false)
+    }
+  }
 
   const languageOptions = useMemo<PickerOption[]>(
     () =>
@@ -73,19 +130,45 @@ export function AudioTab({ settings }: SettingsPanelProps) {
 
   return (
     <div className="settings-panel" data-onboarding="recognition-settings">
-      <SettingGroup legend={t('settings.groupInput')}>
-        <SettingsRow onboardingTarget="audio-source" label={t('settings.audioSource')}>
-          <SettingSelect
-            value={settings.recognition.audioSource}
-            options={deviceOptions}
-            ariaLabel={t('settings.audioSource')}
-            onChange={(value) => {
-              void updateSettings({ recognition: { audioSource: value } }).catch(() => undefined)
-            }}
-          />
+      <SettingGroup legend={t('settings.audioDevicesGroup')}>
+        <SettingsRow onboardingTarget="audio-source" label={t('settings.inputDevice')}
+          desc={selectedSource.startsWith('process:') ? t('session.applicationAudioHint') : t('settings.audioTestHint')} descriptionTooltip>
+          <div className="flex w-full min-w-0 items-center gap-2">
+            <SettingSelect className="min-w-0 flex-1" value={selectedSource} options={deviceOptions}
+              ariaLabel={t('settings.inputDevice')}
+              onChange={(value) => {
+                void updateSettings({ recognition: { audioSource: value }, realtime: { virtualInputDeviceId: '' } }).catch(() => undefined)
+              }} />
+            {!selectedSource.startsWith('process:') ? <DeviceTest expect={selectedSource} /> : null}
+          </div>
         </SettingsRow>
-        <SettingsRow label={t('settings.testAudio')} descriptionTooltip desc={t('settings.audioTestHint')}>
-          <DeviceTest expect={settings.recognition.audioSource} />
+        <SettingsRow label={t('session.speechOutputDevice')}>
+          <div className="flex w-full min-w-0 items-center gap-2">
+            <SettingSelect className="min-w-0 flex-1" value={selectedOutput || 'default'} ariaLabel={t('session.speechOutputDevice')}
+              options={speechOutputOptions(speechOutputs, selectedOutput || 'default', t)}
+              onChange={value => { void updateSettings({ realtime: { speechOutputDeviceId: value === 'default' ? '' : value } }).catch(() => undefined) }} />
+            <Button variant="tertiary" size="sm" disabled={realtimeActive || testingOutput || !speechOutputs.some(device => device.deviceId === selectedOutput)} onClick={() => void testSpeechOutput()}>{t('settings.testAudio')}</Button>
+          </div>
+        </SettingsRow>
+      </SettingGroup>
+
+      <SettingGroup legend={t('session.virtualCable')} actions={
+        <Button variant="secondary" size="sm" onClick={() => { void refreshCableStatus() }}>{t('gateway.refresh')}</Button>
+      }>
+        {installCable && !standardCablePresent ? <SettingsRow label={t('session.virtualCableInstall')} desc={t('session.virtualCableInstallHint')} descriptionTooltip>
+          <Button size="sm" disabled={installingCable || realtimeActive} onClick={() => void runCableInstaller()}>
+            {installingCable ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
+            {t('session.virtualCableInstall')}
+          </Button>
+        </SettingsRow> : null}
+        <SettingsRow label={t('session.virtualCableRouting')} desc={t('session.virtualCableHint')} descriptionTooltip>
+          <Button nativeButton={false} role="link" variant="secondary" size="sm"
+            render={<a href="https://vb-audio.com/Cable/" target="_blank" rel="noreferrer" />}>
+            {t('session.virtualCableGuide')}
+          </Button>
+        </SettingsRow>
+        <SettingsRow label={t('session.virtualCableDriverVersion')}>
+          <span className="text-sm text-muted">{checkingCableDriver ? t('gateway.loading') : cableDriverVersion || t('session.virtualCableMissing')}</span>
         </SettingsRow>
       </SettingGroup>
 
@@ -152,23 +235,27 @@ export function AudioTab({ settings }: SettingsPanelProps) {
 }
 
 export interface CloudConnectionProps { recognition: RecognitionSettings; stored: boolean; onUpdate?: (patch: AppSettingsPatch) => Promise<void>; credentialField?: ReactNode; showNotice?: boolean }
-export interface AliyunConnectionProps extends CloudConnectionProps { nativeTranslationSelected: boolean }
+export interface AliyunConnectionProps extends CloudConnectionProps { nativeTranslationSelected: boolean; showModel?: boolean }
 
 /**
  * Aliyun streams over a persistent WebSocket, so it carries the region and workspace its socket
  * is opened against in addition to the model.
  */
-export function AliyunConnection({ recognition, stored, nativeTranslationSelected, onUpdate = updateSettings, credentialField }: AliyunConnectionProps) {
+export function AliyunConnection({ recognition, stored, nativeTranslationSelected, showModel = true, onUpdate = updateSettings, credentialField }: AliyunConnectionProps) {
   const { t } = useI18n()
+  const model = recognition.aliyunModel ?? ALIYUN_ASR_MODELS[0]
+  const models = ALIYUN_ASR_MODELS.map(value => ({ value, label: value }))
+  const options = models.some(option => option.value === model) ? models : [...models, { value: model, label: model, isDisabled: true }]
   return <>
-    <SettingsRow onboardingTarget="recognition-model" label={t('settings.recognitionModel')} desc={t('settings.aliyunHint')} descriptionTooltip>
-      <SettingSelect value={recognition.aliyunModel ?? ALIYUN_RECOGNITION_MODELS[0]} ariaLabel={t('settings.recognitionModel')} options={ALIYUN_RECOGNITION_MODELS.map(value => ({ value, label: value }))} onChange={value => {
-        const aliyunModel = value as AliyunRecognitionModel
+    {showModel ? <SettingsRow onboardingTarget="recognition-model" label={t('settings.recognitionModel')} desc={t('settings.aliyunHint')} descriptionTooltip>
+      <SettingSelect value={model} ariaLabel={t('settings.recognitionModel')} options={options} onChange={value => {
+        const aliyunModel = ALIYUN_ASR_MODELS.find(model => model === value)
+        if (!aliyunModel) return
         void onUpdate({ recognition: { aliyunModel, sourceLanguage: 'auto' },
-          ...(!supportsRecognitionNativeTranslation({ ...recognition, provider: 'aliyun', aliyunModel }) && nativeTranslationSelected ? { translation: { provider: 'mymemory' as const } } : {}),
+          ...(nativeTranslationSelected ? { translation: { provider: 'mymemory' as const } } : {}),
         }).catch(() => undefined)
       }} />
-    </SettingsRow>
+    </SettingsRow> : null}
     <SettingsRow label={t('settings.region')}>
       <SettingSelect value={recognition.aliyunRegion ?? 'cn-beijing'} ariaLabel={t('settings.region')} options={[
         { value: 'cn-beijing', label: t('settings.aliyunBeijing') },

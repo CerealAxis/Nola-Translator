@@ -7,7 +7,7 @@ import { LANGUAGE_CODES } from '../shared/languages'
 import { PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_NODES } from '../shared/pypi-mirrors'
 import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { computeSettingsPatchSchema } from '../shared/compute'
-import { RECOGNITION_MODEL_IDS } from '../shared/settings'
+import { REALTIME_S2S_MODELS, RECOGNITION_MODEL_IDS } from '../shared/settings'
 
 /**
  * The runtime half of the settings contract.
@@ -48,6 +48,17 @@ const localModelIdSchema = z.union([
 export const settingsPatchSchema = z.object({
   closeBehavior: z.enum(['tray', 'quit']).optional(),
   synthesis: z.object({ modelId: z.string().max(512), voice: z.string().max(256) }).partial().optional(),
+  realtime: z.object({
+    outputMode: z.enum(['source', 'translation', 'speech']),
+    speakerDetection: z.boolean(),
+    speechOutputDeviceId: z.string().max(512),
+    s2sModel: z.enum(REALTIME_S2S_MODELS).nullable(),
+    quickS2sModel: z.enum(REALTIME_S2S_MODELS).nullable(),
+    workspaceS2sModel: z.enum(REALTIME_S2S_MODELS).nullable(),
+    browserS2sModel: z.enum(REALTIME_S2S_MODELS).nullable(),
+    defaultPipeline: z.enum(['cascade', 's2s']),
+    virtualInputDeviceId: z.string().max(512),
+  }).partial().optional(),
   modelGateway: modelGatewaySettingsSchema.partial().optional(),
   modelPolicy: modelPolicySchema.optional(),
   onboardingSeen: z.boolean().optional(),

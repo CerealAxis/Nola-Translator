@@ -1,7 +1,7 @@
 import { Spinner } from '@/components/ui/spinner'
 import { Combobox } from '@base-ui/react/combobox'
 import { SettingSwitch } from '../settings/SettingsPage'
-import { ChevronDown, Check, X } from 'lucide-react'
+import { ChevronDown, Check, Trash2, X } from 'lucide-react'
 import { Dialog, DialogCloseButton, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem } from '@/components/ui/select'
@@ -92,6 +92,7 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false }: 
     }
   })
   const [saving, setSaving] = useState(false)
+  const [removing, setRemoving] = useState(false)
   const [pairSource, setPairSource] = useState('')
   const [pairTarget, setPairTarget] = useState('')
   const patch = (value: Partial<ModelConfiguration>) => { setDraft(previous => ({ ...previous, ...value })) }
@@ -120,11 +121,22 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false }: 
     }
     finally { setSaving(false) }
   }
-  return <Dialog open onOpenChange={open => { if (!open && !saving) onClose() }}>
+  const remove = async () => {
+    if (!record.installed || saving || removing) return
+    setRemoving(true)
+    try {
+      await actions.models.manageResource(record.resourceId, 'remove')
+      notifySuccess(t('common.done'))
+      onClose()
+    } catch (cause) {
+      notifyError(t('modelsSettingsUi.removeFailed'), { cause })
+    } finally { setRemoving(false) }
+  }
+  return <Dialog open onOpenChange={open => { if (!open && !saving && !removing) onClose() }}>
     <DialogContent className="model-configuration-dialog modal__dialog modal__dialog--lg">
-      <DialogCloseButton disabled={saving} />
+      <DialogCloseButton disabled={saving || removing} />
       <DialogHeader><div className="settings-row__title"><DialogTitle>{t(readOnly ? 'modelConfig.viewTitle' : 'modelConfig.title')}</DialogTitle><Tooltip><TooltipTrigger delay={300} render={<Button variant="secondary" size="sm" className="settings-row__help" aria-label={t(readOnly ? 'modelConfig.viewTitle' : 'modelConfig.title')}><CircleHelp aria-hidden="true" /></Button>} /><TooltipContent  role="tooltip" className="settings-row__tooltip z-popup">{t(readOnly ? 'modelConfig.viewDescription' : 'modelConfig.description')}</TooltipContent></Tooltip></div></DialogHeader>
-      <div className="model-configuration-dialog__body flex flex-col gap-[var(--space-2)]">
+      {record.kind === 'ttsModel' ? null : <div className="model-configuration-dialog__body flex flex-col gap-[var(--space-2)]">
         {readOnly ? <p className="nola-caption text-muted">{t('modelConfig.viewDescription')}</p> : null}
         {draft.slot === 'recognition' ? <ModelLanguageSelect
           label={t('modelConfig.languages')}
@@ -167,8 +179,12 @@ export function ModelConfigurationDialog({ record, onClose, readOnly = false }: 
             </div>)}
           </> : null}
         </> : null}
-      </div>
-      {readOnly ? null : <DialogFooter><Button variant="tertiary" disabled={saving} onClick={onClose}>{t('session.cancel')}</Button><Button disabled={(!valid) || (saving)} aria-busy={saving}  onClick={() => void save()}>{saving ? <Spinner /> : null}{t('modelConfig.save')}</Button></DialogFooter>}
+      </div>}
+      <DialogFooter>
+        {record.installed ? <Button variant="danger" disabled={saving || removing} aria-busy={removing} onClick={() => void remove()}>{removing ? <Spinner /> : <Trash2 aria-hidden="true" />}{t('modelsSettingsUi.deleteModel')}</Button> : null}
+        <Button variant="tertiary" disabled={saving || removing} onClick={onClose}>{t('session.cancel')}</Button>
+        {readOnly ? null : <Button disabled={!valid || saving || removing} aria-busy={saving} onClick={() => void save()}>{saving ? <Spinner /> : null}{t('modelConfig.save')}</Button>}
+      </DialogFooter>
     </DialogContent>
   </Dialog>
 }

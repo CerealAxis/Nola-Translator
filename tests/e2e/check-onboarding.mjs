@@ -29,7 +29,7 @@ const resources = [
 const runtime = { packages: [], recipes: [], hardware: { adapters: [], nvidiaDriver: null, notes: [] }, recommendation: { engineId: null, llamaId: null, reasons: [] },
   python: { status: 'ready', reason: '' }, local: { engine: { path: 'fixture', status: 'ready', backend: 'cpu', version: 'fixture' }, llama: { path: 'fixture', status: 'ready', backend: 'cpu', version: 'fixture' }, crisp: { path: 'fixture', status: 'ready', backend: 'vulkan', version: 'fixture' } }, operation: null, directory: '', lastError: null }
 // The gateway lesson only reads the snapshot; starting or rotating must never happen from the tour.
-const gatewaySnapshot = { state: 'stopped', address: 'http://127.0.0.1:8717/v1', connections: 0, activeRequests: 0, requests: [],
+const gatewaySnapshot = { state: 'stopped', address: 'http://127.0.0.1:8717/v2', connections: 0, activeRequests: 0, requests: [],
   services: { asr: { state: 'stopped', name: '', model: '' }, mt: { state: 'stopped', name: '', model: '' }, tts: { state: 'stopped', name: '', model: '' } } }
 const preloadSource = `
 const { contextBridge, ipcRenderer } = require('electron');

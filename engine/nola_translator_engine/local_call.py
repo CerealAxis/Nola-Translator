@@ -304,6 +304,14 @@ def create_runtime():
 
     # The caption process owns this shared status file even though models run in a separate process.
     class LocalCallRuntime(EngineRuntime):
+        gateway_device = None
+
+        async def _probe_compute_inventory(self, *, refresh: bool = False):
+            devices, notes, version = await super()._probe_compute_inventory(refresh=refresh)
+            if self.gateway_device is not None:
+                devices = [device for device in devices if device.id in ("cpu", self.gateway_device)]
+            return devices, notes, version
+
         def _write_engine_status(self):
             pass
 
@@ -313,10 +321,29 @@ def create_runtime():
     return LocalCallRuntime(Path(os.environ['NOLA_TRANSLATOR_MODEL_DIR']), lambda _event: None)
 
 
+async def _start_qwen_server(runtime, model_id: str, compute) -> None:
+    from .compute import choose_devices, model_memory_mb
+
+    key = (model_id, compute.model_dump_json())
+    if getattr(runtime, '_local_call_language_model', None) != key:
+        weights = runtime.resources.translation_gguf_path(model_id)
+        devices, _, _ = await runtime._probe_compute_inventory()
+        options = compute.model_copy(update={"recognitionDevice": "cpu"})
+        _, device, _ = choose_devices(devices, options, 0, model_memory_mb(weights, "llama.cpp", options), "llama.cpp")
+        runtime.llama_manager.switch_gguf(weights)
+        runtime.llama_manager.chat_template = None
+        runtime.llama_manager.model_alias = model_id
+        runtime.llama_manager.configure_compute(device, compute)
+        runtime._local_call_language_model = key
+    await runtime.llama_manager.start()
+
+
 async def infer(request, runtime):
     from .protocol import PrewarmConfig, PrewarmModelsCommand
 
     config = PrewarmConfig.model_validate(request['config'])
+    # A gateway worker may fall back to CPU, but may only allocate on its reserved GPU.
+    runtime.gateway_device = request.get('gatewayDevice')
     command = PrewarmModelsCommand(protocolVersion=1, requestId='direct', type='prewarmModels', config=config)
     if request['kind'] == 'llm':
         from .models.qwen35_catalog import QWEN35_SPECS
@@ -326,14 +353,7 @@ async def infer(request, runtime):
         record = runtime.resources.record(model_id)
         if not record.installed or record.kind != 'translationModel' or config.translationModelId != model_id:
             raise ValueError('Selected language model is not installed')
-        # Language-model workers are separate from direct ASR/MT/TTS tool workers.
-        # The desktop AI SDK owns chat history, streaming and tool execution over loopback.
-        if getattr(runtime, '_local_call_language_model', None) != model_id:
-            await runtime._configure_device_plan(command)
-            runtime._configure_translation(command)
-            runtime.llama_manager.model_alias = model_id
-            runtime._local_call_language_model = model_id
-        await runtime._ensure_translation_server(command)
+        await _start_qwen_server(runtime, model_id, config.compute)
         return {'text': '', 'endpoint': runtime.llama_manager.api_base_url,
                 'contextWindow': config.compute.contextSize}
     if request.get('resourceId'):
@@ -349,6 +369,28 @@ async def infer(request, runtime):
             raise ValueError('Selected model is not installed or has the wrong task type')
     if request['kind'] == 'tts':
         return await asyncio.to_thread(synthesize, runtime.resources, request, config.compute)
+    if request['kind'] == 'mt':
+        from .models.qwen35_catalog import QWEN35_SPECS
+
+        model_id = config.translationModelId
+        if (
+            'history' in request and not request.get('image')
+            and model_id == request.get('resourceId')
+            and any(spec.model_id == model_id for spec in QWEN35_SPECS)
+        ):
+            from contextlib import aclosing
+            from .translation.network import LocalQwenTranslationProvider
+
+            await _start_qwen_server(runtime, model_id, config.compute)
+            async with aclosing(LocalQwenTranslationProvider(
+                endpoint=runtime.llama_manager.api_base_url,
+                model=model_id,
+                context_window=config.compute.contextSize,
+                max_output_tokens=512,
+                history=request['history'],
+            )) as provider:
+                translated = await provider.translate(request['text'], request['source'], request['target'])
+            return {'text': translated.text}
     await runtime._configure_device_plan(command)
     if request['kind'] == 'mt':
         translation_key = (runtime._local_translation_model_id(config), config.compute.model_dump_json())
@@ -363,9 +405,9 @@ async def infer(request, runtime):
     if config.recognitionProvider == 'local':
         if runtime.active_model_id != request['resourceId'] or runtime._active_recognition_runtime is None:
             await runtime._create_recognizer(command)
-        text, _language = await asyncio.to_thread(runtime._recognition_runtime().transcribe, samples,
+        text, language = await asyncio.to_thread(runtime._recognition_runtime().transcribe, samples,
             language=None if config.sourceLanguage == 'auto' else config.sourceLanguage)
-        return {'text': text}
+        return {'text': text, 'language': language}
     from .recognition.minimax import MiniMaxRecognizer
     from .recognition.aliyun import AliyunRecognizer
     from .audio.resample import AudioFrame

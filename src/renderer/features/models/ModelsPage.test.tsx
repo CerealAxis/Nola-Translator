@@ -1,7 +1,8 @@
 import { cleanup, fireEvent, render, renderHook, screen, within, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { actions, stores } from '@/store'
-import { DEFAULT_SETTINGS } from '../../../shared/settings'
+import { DEFAULT_SETTINGS, MIMO_TTS_BINDING } from '../../../shared/settings'
 import { ModelsPage } from './ModelsPage'
 import { CloudModelDialog, cloudModelsOf, removeCloudModel } from './CloudModels'
 import { LANGUAGE_CODES } from '../../../shared/languages'
@@ -10,6 +11,8 @@ import { useModelOptions } from '../../model-options'
 import * as settingsActions from '@/store/settingsStore'
 import * as storeModule from '@/store'
 import type { NolaBridge } from '@/bridge'
+import { mergeModelPolicy } from '../../../shared/model-policy'
+import { OverlayPage } from '../overlay/OverlayPage'
 
 // Publisher avatars pull in an emoji picker with browser-only JSON imports.
 vi.mock('@lobehub/icons/es/features/IconAvatar', () => ({ default: () => null }))
@@ -57,6 +60,11 @@ it('groups remote and local cards by capability with icons inside their headers'
   const card = translation.getByText('MyMemory 免费翻译').closest('[data-slot="card"]')!
   expect(card.querySelector('[data-slot="card-header"] [data-slot="card-action"] svg')).not.toBeNull()
   expect(within(card as HTMLElement).getByRole('button', { name: '开始配置' })).toBeInTheDocument()
+  const speech = section('S2S模型')
+  expect(speech.getByText('阿里云 S2S')).toBeInTheDocument()
+  expect(speech.getAllByRole('button', { name: '开始配置' })).toHaveLength(1)
+  expect(recognition.queryByText('阿里云 S2S')).not.toBeInTheDocument()
+  expect(translation.queryByText('阿里云 S2S')).not.toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: '云端模型' })).not.toBeInTheDocument()
 })
 
@@ -92,7 +100,68 @@ it('keeps configured inactive providers installed and excludes providers missing
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
   expect(section('MT模型').getByText('Google 翻译')).toBeInTheDocument()
   expect(section('ASR模型').getByText('阿里云ASR')).toBeInTheDocument()
+  expect(section('S2S模型').getByText('阿里云 S2S')).toBeInTheDocument()
   expect(screen.queryByText('MiniMax 语音识别')).not.toBeInTheDocument()
+})
+
+it('configures MiMo as a cloud speech synthesis model with its own credential', async () => {
+  const credential = vi.spyOn(actions.models, 'setTranslationCredential').mockResolvedValue()
+  render(<ModelsPage />)
+  const card = section('TTS模型').getByText('MiMo V2.5 TTS').closest<HTMLElement>('[data-slot="card"]')!
+  fireEvent.click(within(card).getByRole('button', { name: '开始配置' }))
+  const dialog = within(screen.getByRole('dialog', { name: 'MiMo V2.5 TTS' }))
+  expect(dialog.getByRole('button', { name: '保存配置' })).toBeDisabled()
+  fireEvent.change(dialog.getByLabelText('API 密钥', { selector: 'input' }), { target: { value: 'test-mimo-key' } })
+  fireEvent.click(dialog.getByRole('button', { name: '保存配置' }))
+  await waitFor(() => expect(credential).toHaveBeenCalledExactlyOnceWith('mimo-tts', 'test-mimo-key'))
+})
+
+it('sets configured MiMo as the default and selects it for quick interpretation', async () => {
+  stores.models.setState({ credentials: { ...initialModels.credentials, 'mimo-tts': true } })
+  const settings = stores.settings.getState().settings!
+  stores.settings.setState({ settings: { ...settings, realtime: { ...settings.realtime, quickS2sModel: null } } })
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockImplementation(async patch => {
+    const current = stores.settings.getState().settings!
+    stores.settings.setState({ settings: { ...current, modelPolicy: mergeModelPolicy(current, patch.modelPolicy),
+      synthesis: { ...current.synthesis, ...patch.synthesis }, realtime: { ...current.realtime, ...patch.realtime } } })
+  })
+  const { unmount } = render(<ModelsPage />)
+  fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
+  const card = section('TTS模型').getByText('MiMo V2.5 TTS').closest<HTMLElement>('[data-slot="card"]')!
+  fireEvent.click(within(card).getByRole('button', { name: '设为默认' }))
+  await waitFor(() => expect(within(card).getByRole('button', { name: '当前使用' })).toBeDisabled())
+  expect(update).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ synthesis: { modelId: MIMO_TTS_BINDING, voice: '' }, realtime: { outputMode: 'speech' } }))
+  expect(screen.getByText('默认 TTS 模型').closest('[data-slot="card"]')).toHaveTextContent('MiMo V2.5 TTS')
+  unmount()
+  render(<OverlayPage />)
+  expect(screen.getByRole('combobox', { name: '语音合成模型' })).toHaveTextContent('MiMo V2.5 TTS')
+  expect(screen.getByRole('combobox', { name: '输出设备' })).toBeEnabled()
+})
+
+it.each(['保存配置', '设为默认'])('persists the selected S2S model with %s without changing the ASR or MT selection', async (action) => {
+  const user = userEvent.setup()
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
+  const credential = vi.spyOn(actions.models, 'setTranslationCredential').mockResolvedValue()
+  render(<ModelsPage />)
+  fireEvent.click(section('S2S模型').getByRole('button', { name: '开始配置' }))
+  const dialog = within(screen.getByRole('dialog', { name: '阿里云 S2S' }))
+  const model = dialog.getByRole('combobox', { name: '模型' })
+  expect(model).toHaveTextContent('qwen3.8-livetranslate-flash-realtime')
+  await user.click(model)
+  await user.click(await screen.findByRole('option', { name: 'qwen3.5-livetranslate-flash-realtime' }))
+  expect(model).toHaveTextContent('qwen3.5-livetranslate-flash-realtime')
+  expect(dialog.queryByLabelText('识别模型')).not.toBeInTheDocument()
+  const workspace = dialog.getByLabelText('百炼业务空间 ID')
+  fireEvent.focus(workspace)
+  fireEvent.change(workspace, { target: { value: 's2s-workspace' } })
+  fireEvent.blur(workspace)
+  fireEvent.change(dialog.getByLabelText('API 密钥', { selector: 'input' }), { target: { value: 's2s-key' } })
+  fireEvent.click(dialog.getByRole('button', { name: action }))
+  await waitFor(() => expect(update).toHaveBeenCalledExactlyOnceWith({
+    recognition: { aliyunWorkspaceId: 's2s-workspace' },
+    realtime: { ...(action === '设为默认' ? { defaultPipeline: 's2s' } : {}), s2sModel: 'qwen3.5-livetranslate-flash-realtime' },
+  }))
+  expect(credential).toHaveBeenCalledExactlyOnceWith('aliyun-asr', 's2s-key')
 })
 
 it('requires credentials for paid services even if selected, and supports keyless Ollama', () => {
@@ -144,10 +213,10 @@ it('saves an Aliyun connection explicitly without selecting it as the default', 
   expect(close).toHaveBeenCalledOnce()
 })
 
-it('sets the native translation default without changing the selected scene', async () => {
+it('sets the legacy native translation default without changing the selected scene', async () => {
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
   stores.models.setState({ credentials: { ...initialModels.credentials, 'aliyun-asr': true } })
-  stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, aliyunWorkspaceId: 'workspace', provider: 'minimax' }, translation: { ...DEFAULT_SETTINGS.translation, targetLanguage: 'none' } } })
+  stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, aliyunWorkspaceId: 'workspace', aliyunModel: 'qwen3.8-livetranslate-flash-realtime', provider: 'minimax' }, translation: { ...DEFAULT_SETTINGS.translation, targetLanguage: 'none' } } })
   render(<CloudModelDialog id="recognition" onClose={() => undefined} />)
   fireEvent.click(screen.getByRole('button', { name: '设为默认' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith(expect.objectContaining({
@@ -176,8 +245,10 @@ it('shows named saved models only in installed and leaves the recommended templa
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
   expect(section('大语言模型').getByText('First model')).toBeInTheDocument()
   expect(section('大语言模型').getByText('Second model')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '删除 First model' })).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: '删除 MyMemory 免费翻译' })).not.toBeInTheDocument()
+  const firstCard = screen.getByText('First model').closest<HTMLElement>('[data-slot="card"]')!
+  fireEvent.click(within(firstCard).getByRole('button', { name: '查看详情' }))
+  const dialog = within(screen.getByRole('dialog', { name: 'First model' }))
+  expect(dialog.getByRole('button', { name: '删除模型' })).toBeInTheDocument()
 })
 
 it('offers a saved custom model as the default translation model once its key is stored', () => {

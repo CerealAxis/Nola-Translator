@@ -46,6 +46,24 @@ describe('model storage', () => {
     expect(env).not.toHaveProperty('ARGOS_CHUNK_TYPE')
     expect(env).not.toHaveProperty('ARGOS_DEVICE_TYPE')
   })
+  it('preserves the realtime journal and playback ledger across cache cleanup and retries', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nola-journal-'))
+    try {
+      const old = join(root, 'cache', 'session-journal')
+      const current = join(root, 'session-journal')
+      await mkdir(old, { recursive: true })
+      await writeFile(join(old, 'playback.sqlite3'), 'unacknowledged')
+      await cleanupStorageCaches(root)
+      expect(await readFile(join(current, 'playback.sqlite3'), 'utf8')).toBe('unacknowledged')
+      await mkdir(old, { recursive: true })
+      await writeFile(join(old, 'session-journal.jsonl'), 'legacy')
+      await writeFile(join(root, 'cache', 'temporary'), 'remove')
+      await cleanupStorageCaches(root)
+      expect(await readdir(join(root, 'cache'))).toEqual(['session-journal'])
+      expect(await readFile(join(old, 'session-journal.jsonl'), 'utf8')).toBe('legacy')
+      expect(await readFile(join(current, 'playback.sqlite3'), 'utf8')).toBe('unacknowledged')
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
 
   it('puts models and large temporary/cache files on the selected drive', () => {
     const root = join(tmpdir(), 'custom-models')

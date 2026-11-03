@@ -23,7 +23,7 @@ function setup() {
     currentState: 'ready', start: vi.fn(), stop: vi.fn().mockResolvedValue(undefined),
     request: vi.fn().mockImplementation(async (command) => ({ sessionId: 'session-1', type: command.type === 'startSession' ? 'sessionStarted' : 'sessionStopped' })),
   })
-  const window = { hide: vi.fn(), showInactive: vi.fn(), isDestroyed: () => false }
+  const window = { hide: vi.fn(), show: vi.fn(), isDestroyed: () => false }
   dispose = registerEngineIpc(engine as unknown as EngineProcess, () => window as any)
   const invoke = (channel: string, ...args: unknown[]) => electron.handlers.get(channel)!({}, ...args)
   const start = () => invoke(IPC_CHANNELS.startSession, {
@@ -84,6 +84,7 @@ it('shares the stop request when closing and stopping concurrently', async () =>
 
 it('closes after the engine died without restarting it for a stale session', async () => {
   const { engine, window, invoke, start } = setup()
+  await invoke(IPC_CHANNELS.showOverlay)
   await start()
   engine.currentState = 'failed'
   engine.start.mockRejectedValue(new Error('engine unavailable'))
@@ -97,6 +98,7 @@ it('closes after the engine died without restarting it for a stale session', asy
 
 it('stops the process and hides the window when session teardown rejects', async () => {
   const { engine, window, invoke, start } = setup()
+  await invoke(IPC_CHANNELS.showOverlay)
   await start()
   engine.request.mockRejectedValueOnce(new Error('engine disconnected'))
   vi.spyOn(console, 'error').mockImplementation(() => {})

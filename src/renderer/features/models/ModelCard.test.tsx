@@ -1,11 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { render, screen } from '@testing-library/react'
 import type { ReactElement } from 'react'
 
-import { DEFAULT_SETTINGS } from '@/bridge'
 import type { ResourceRecord } from '@/bridge'
 import { I18nProvider } from '@/i18n'
-import { ModelCard, defaultTargetOf, formatBytes, isDefaultOf, paramsOf, quantizationOf } from './ModelCard'
+import { ModelCard, formatBytes, paramsOf, quantizationOf } from './ModelCard'
 
 function record(partial: Partial<ResourceRecord> & Pick<ResourceRecord, 'resourceId'>): ResourceRecord {
   return {
@@ -66,48 +65,14 @@ describe('事实格式化（只写事实，不写形容词）', () => {
   })
 })
 
-describe('默认模型的可设范围', () => {
-  it('stores a synthesis default in its own slot and clears voices from the previous model', () => {
-    const model = record({ resourceId: 'tts-qwen3-tts-crisp-0.6b-base-q8-0', kind: 'ttsModel', provider: 'crisp-tts', installed: true })
-    expect(defaultTargetOf(model)).toEqual({ synthesis: { modelId: model.resourceId, voice: '' } })
-    expect(isDefaultOf(model, { ...DEFAULT_SETTINGS, synthesis: { modelId: model.resourceId, voice: '' } })).toBe(true)
-    expect(isDefaultOf(model, DEFAULT_SETTINGS)).toBe(false)
-  })
-  it('识别模型只认资源表里的 id，翻译模型任何 id 都有槽位', () => {
-    expect(defaultTargetOf(record({ resourceId: 'qwen3-asr-1.7b-hf' }))).toEqual({
-      recognition: { modelId: 'qwen3-asr-1.7b-hf', provider: 'local' },
-    })
-    // Every translation model lands on localModelId + provider:'local', one route for all.
-    expect(
-      defaultTargetOf(record({ resourceId: 'hy-mt2-1.8b-q4-k-m', kind: 'translationModel' })),
-    ).toEqual({ translation: { localModelId: 'hy-mt2-1.8b-q4-k-m', provider: 'local' } })
-    expect(defaultTargetOf(record({ resourceId: 'm2m100-418m', kind: 'translationModel' }))).toEqual({
-      translation: { localModelId: 'm2m100-418m', provider: 'local' },
-    })
-    // Recognition stays filtered: an id outside the engine's resource table would not load.
-    expect(defaultTargetOf(record({ resourceId: 'hub:openai/whisper-large-v3' }))).toBeNull()
-  })
-
-  it('isDefaultOf 对两处槽位都成立', () => {
-    const base = DEFAULT_SETTINGS
-    expect(isDefaultOf(record({ resourceId: 'qwen3-asr-1.7b-hf' }), base)).toBe(true)
-    expect(isDefaultOf(record({ resourceId: 'sensevoice-small' }), base)).toBe(false)
-    expect(isDefaultOf(record({ resourceId: 'qwen3-asr-1.7b-hf' }), null)).toBe(false)
-  })
-})
-
 describe('ModelCard 三态', () => {
   it('未安装给主 CTA 安装', () => {
     renderWithI18n(
       <ModelCard
         record={record({ resourceId: 'qwen3-asr-1.7b-hf', name: 'Qwen3-ASR 1.7B', downloadBytes: 4_087_646_324 })}
         busy={false}
-        isDefault={false}
-        canBeDefault
         onInstall={noop}
         onCancel={noop}
-        onRemove={noop}
-        onSetDefault={noop}
       />,
     )
     expect(screen.getByRole('button', { name: '安装' })).toBeInTheDocument()
@@ -127,12 +92,8 @@ describe('ModelCard 三态', () => {
           cancellable: true,
         })}
         busy={false}
-        isDefault={false}
-        canBeDefault
         onInstall={noop}
         onCancel={noop}
-        onRemove={noop}
-        onSetDefault={noop}
       />,
     )
     expect(screen.getByRole('button', { name: '取消下载' })).toBeInTheDocument()
@@ -140,38 +101,19 @@ describe('ModelCard 三态', () => {
     expect(screen.getByText('42%')).toBeInTheDocument()
   })
 
-  it('已安装给状态胶囊与移除，且移除按钮默认不是红的', () => {
+  it('已安装时保留状态，不显示默认或卸载操作', () => {
     renderWithI18n(
       <ModelCard
         record={record({ resourceId: 'sensevoice-small', name: 'SenseVoice', installed: true, installedBytes: 941_208_233 })}
         busy={false}
-        isDefault={false}
-        canBeDefault
         onInstall={noop}
         onCancel={noop}
-        onRemove={noop}
-        onSetDefault={noop}
       />,
     )
     expect(screen.getByText('已安装')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '卸载' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '卸载' }).className).not.toContain('text-danger ')
-  })
-
-  it('已经是默认模型时不再给"设为默认"', () => {
-    renderWithI18n(
-      <ModelCard
-        record={record({ resourceId: 'qwen3-asr-1.7b-hf', installed: true })}
-        busy={false}
-        isDefault
-        canBeDefault
-        onInstall={noop}
-        onCancel={noop}
-        onRemove={noop}
-        onSetDefault={noop}
-      />,
-    )
     expect(screen.queryByRole('button', { name: '设为默认' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '当前使用' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '卸载' })).not.toBeInTheDocument()
   })
 
   it('Hub 装不了的条目：安装按钮禁用，并显示数据层带来的理由', () => {
@@ -183,13 +125,9 @@ describe('ModelCard 三态', () => {
           description: '没有这个仓库的流式识别适配器。',
         })}
         busy={false}
-        isDefault={false}
-        canBeDefault={false}
         installable={false}
         onInstall={noop}
         onCancel={noop}
-        onRemove={noop}
-        onSetDefault={noop}
       />,
     )
     expect(screen.getByRole('button', { name: '安装' })).toBeDisabled()
@@ -199,30 +137,3 @@ describe('ModelCard 三态', () => {
 
 
 
-it('does not present removal of an unconfigured model as a download', () => {
-  renderWithI18n(<ModelCard
-    record={record({ resourceId: 'hub:local/example', installed: true, state: 'running', phase: 'remove' })}
-    busy={false} isDefault={false} canBeDefault={false}
-    onInstall={noop} onCancel={noop} onRemove={noop} onSetDefault={noop}
-    footer={<span>Configure model</span>}
-  />)
-  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
-  expect(screen.queryByText('Configure model')).not.toBeInTheDocument()
-  expect(screen.getAllByText('正在移除…').length).toBeGreaterThan(0)
-})
-
-
-it('retries removal rather than downloading after a removal failure', () => {
-  const remove = vi.fn()
-  const install = vi.fn()
-  renderWithI18n(<ModelCard
-    record={record({ resourceId: 'hub:local/example', installed: true, state: 'failed', phase: 'remove' })}
-    busy={false} isDefault={false} canBeDefault={false}
-    onInstall={install} onCancel={noop} onRemove={remove} onSetDefault={noop}
-  />)
-  expect(screen.queryByText('移除失败')).not.toBeInTheDocument()
-  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: '卸载' }))
-  expect(remove).toHaveBeenCalledOnce()
-  expect(install).not.toHaveBeenCalled()
-})

@@ -22,13 +22,36 @@ class WindowsPipe:
         self.handle = _winapi.CreateFile(name, _winapi.GENERIC_READ | _winapi.GENERIC_WRITE,
                                         0, _winapi.NULL, _winapi.OPEN_EXISTING,
                                         _winapi.FILE_FLAG_OVERLAPPED, _winapi.NULL)
+        self.read_stopped = threading.Event()
+        self._read_lock = threading.Lock()
+        self._pending_read = None
 
     def read(self, size: int) -> bytes:
-        operation, _ = self.api.ReadFile(self.handle, size, overlapped=True)
-        count, error = operation.GetOverlappedResult(True)
-        if error:
-            raise OSError(error, "Native pipe read failed")
-        return operation.getbuffer()[:count]
+        try:
+            with self._read_lock:
+                if self.read_stopped.is_set():
+                    return b""
+                operation, _ = self.api.ReadFile(self.handle, size, overlapped=True)
+                self._pending_read = operation
+            count, error = operation.GetOverlappedResult(True)
+            if error == self.api.ERROR_BROKEN_PIPE or self.read_stopped.is_set():
+                return b""
+            if error:
+                raise OSError(error, "Native pipe read failed")
+            return operation.getbuffer()[:count]
+        except OSError as error:
+            if self.read_stopped.is_set() or getattr(error, "winerror", None) == self.api.ERROR_BROKEN_PIPE:
+                return b""
+            raise
+        finally:
+            with self._read_lock:
+                self._pending_read = None
+
+    def cancel_read(self) -> None:
+        with self._read_lock:
+            self.read_stopped.set()
+            if self._pending_read is not None:
+                self._pending_read.cancel()
 
     def write(self, data: bytes) -> None:
         offset = 0
@@ -117,24 +140,37 @@ def main() -> int:
                         if not chunk:
                             break
                         buffer.extend(chunk)
-                        while b"\n" in buffer:
+                        while not pipe.read_stopped.is_set() and b"\n" in buffer:
                             payload, _, rest = buffer.partition(b"\n")
                             buffer = bytearray(rest)
                             write_message(sys.stdout.buffer, payload)
                 except (OSError, ValueError) as error:
+                    if pipe.read_stopped.is_set():
+                        return
                     # The browser collects the host's stderr, so a failure is named there instead
                     # of ending the process as if it had closed normally.
                     print(f"Nola native host stopped: {error}", file=sys.stderr)
                     sys.stderr.flush()
                     os._exit(1)
                 # Browser stdin may remain open after the desktop exits.
-                os._exit(0)
+                if not pipe.read_stopped.is_set():
+                    os._exit(0)
 
-            threading.Thread(target=receive, daemon=True).start()
-            while True:
-                pipe.write(read_message(sys.stdin.buffer) + b"\n")
-    except EOFError:
-        return 0
+            receiver = threading.Thread(target=receive, daemon=True)
+            receiver.start()
+            exit_code = 1
+            try:
+                while True:
+                    pipe.write(read_message(sys.stdin.buffer) + b"\n")
+            except EOFError:
+                exit_code = 0
+                return exit_code
+            finally:
+                pipe.cancel_read()
+                receiver.join(timeout=2)
+                # A browser that stopped reading stdout can keep the receiver blocked there.
+                if receiver.is_alive():
+                    os._exit(exit_code)
     except (OSError, ValueError, KeyError) as error:
         print(f"Nola native connection failed: {error}", file=sys.stderr)
         return 1

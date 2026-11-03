@@ -1,7 +1,13 @@
 import io
+import os
 import struct
+import threading
+import time
 import unittest
-from host import read_message, write_message, MAX_MESSAGE_BYTES, authorized_caller, FIREFOX_EXTENSION_ID, EXTENSION_ID
+from multiprocessing.connection import Listener
+from uuid import uuid4
+
+from host import WindowsPipe, read_message, write_message, MAX_MESSAGE_BYTES, authorized_caller, FIREFOX_EXTENSION_ID, EXTENSION_ID
 
 
 class NativeFramingTests(unittest.TestCase):
@@ -27,6 +33,27 @@ class NativeFramingTests(unittest.TestCase):
         self.assertEqual(read_message(io.BytesIO(frame)), b'{"id":"hello","text":"line\\nbreak"}')
 
 
+
+
+@unittest.skipUnless(os.name == "nt", "Windows named pipes required")
+class NativePipeTests(unittest.TestCase):
+    def test_cancel_releases_overlapped_read_before_handle_close(self):
+        address = rf"\\.\pipe\nola-browser-{uuid4()}"
+        with Listener(address, family="AF_PIPE") as listener, WindowsPipe(address) as pipe, listener.accept():
+            results = []
+            receiver = threading.Thread(target=lambda: results.append(pipe.read(4096)), daemon=True)
+            receiver.start()
+            try:
+                deadline = time.monotonic() + 2
+                while pipe._pending_read is None and time.monotonic() < deadline:
+                    time.sleep(0.001)
+                self.assertIsNotNone(pipe._pending_read)
+            finally:
+                pipe.cancel_read()
+                receiver.join(timeout=2)
+            self.assertFalse(receiver.is_alive())
+            self.assertEqual(results, [b""])
+            self.assertEqual(pipe.read(4096), b"")
 
 
 class CallerTests(unittest.TestCase):

@@ -11,6 +11,7 @@ const preloadSource = `
 const { contextBridge } = require('electron');
 let settings = {
   version: 1, onboardingSeen: true, theme: 'light', uiLanguage: 'zh-CN', modelStoragePath: '',
+  realtime: { quickS2sModel: null },
   recognition: { modelId: 'sensevoice-small', sourceLanguage: 'auto', audioSource: 'defaultOutput' },
   recording: { keepAudio: true }, appearance: { reduceMotion: true },
   compute: { recognitionEngine: 'pytorch', translationEngine: 'auto' },

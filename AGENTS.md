@@ -18,10 +18,11 @@
 | 桌面端 | Electron + React + TypeScript；`electron-vite` 构建 |
 | UI | Tailwind CSS v4 + shadcn/ui（Base UI）；`src/renderer/components/ui/` 为基础组件源码入口，独立透明子窗口承载悬浮字幕 |
 | 状态与通信 | `NolaBridge`、5 个领域 Store、`useSyncExternalStore`、IPC |
-| 引擎 | 内置 Python 3.12；PyTorch / llama.cpp / CrispASR 组件按需安装或复用 |
+| 实时后端 | Electron 监督内置 Python 3.12 的 FastAPI 服务，私有 v2 REST / WebSocket 管理音频、会话和事件 |
+| 模型运行时 | Python 模型网关管理能力匹配、模型租约和本地 Worker；PyTorch / llama.cpp / CrispASR 按需安装或复用 |
 | 本地识别 | PyTorch、llama.cpp 或 CrispASR；根据已安装加载器选择 |
 | 本地翻译 | PyTorch 或 llama.cpp；支持 Index-Translate 官方权重及独立免费 API |
-| 云端能力 | 阿里云 WebSocket 流式识别与译文；MiniMax VAD 分段上传 WAV；MyMemory REST 翻译 |
+| 云端能力 | 阿里云 LiveTranslate 独立 S2S；兼容阿里云、MiniMax 识别及传统云端定稿翻译 |
 | 浏览器扩展 | Chrome / Edge / Firefox MV3；Python Native Messaging 连接桌面程序 |
 | 文档与演示 | VitePress 多语言站；Vue 容器挂载 React，复用桌面 UI、主题及演示入口 |
 | 质量保障 | Vitest + Testing Library；JSONL 诊断日志 |
@@ -31,11 +32,17 @@
 ```
 src/
   main/                   Electron 主进程：IPC、窗口、设置、引擎与会话、工作台、模型网关、托盘和功能互斥
+    backend-supervisor.ts 私有 v2 后端启动、鉴权和退出
+    backend-session.ts    快速同传和浏览器字幕的 v2 会话客户端
+    backend-browser-input.ts 浏览器音频接入
+    backend-playback.ts   单播放所有者、音频帧和播放确认
+    backend-direct-model.ts v2 单次推理与本地 LLM 租约客户端
+    model-gateway.ts      公开 v1 协议及仍依赖旧 Worker 的兼容入口
   preload/                单文件 contextBridge → window.nolaTranslator
   shared/                 跨进程类型、Zod 校验、默认值和浏览器契约
   renderer/
     available-models.ts   业务可调用模型目录、绑定选择与失效选择回退
-    application.tsx       桌面、文档站、Toy 共用的页面及导航注册
+    application.tsx       桌面与文档站共用的页面及导航注册
     bridge/               渲染进程唯一数据出口（NolaBridge）
     store/                5 个领域 Store 与 useSyncExternalStore 实现
     components/
@@ -52,7 +59,12 @@ src/
     theme/                设计 token 唯一来源及 CJK 字体样式
     assets/browsers/      Chrome / Edge / Firefox 图标
     assets/fonts/         随应用打包的 Noto CJK 区域可变字体
-engine/nola_translator_engine/   Python 翻译引擎
+engine/
+  nola_translator_engine/ Python 翻译引擎、模型资源和旧运行时
+    backend/             FastAPI v2、音频接入、双流水线、事件与历史
+      gateway/           模型能力、Provider、资源准入和 Worker 生命周期
+  contracts/v2/           生成的 v2 协议快照
+  tests/backend/          v2 后端、流水线和模型网关回归测试
 browser/
   version.json            扩展版本信息
   CHANGELOG.md            扩展发布记录
@@ -62,7 +74,7 @@ browser/
 docs/
   nola-docs/              终端用户文档及多语言首页
   .vitepress/             站点配置、主题和语言入口
-  media-src/              演示环境与 Toy 共用素材
+  media-src/              文档站演示环境与截图素材
   scripts/                构建演示、生成素材及截图的脚本
   public/                 静态资源与文档配图
   PRD/                    内部需求与架构文档，不参与站点构建
@@ -101,8 +113,7 @@ npm run dev              # Electron 开发环境
 npm run typecheck        # tsc --noEmit
 npm test                 # vitest run
 npm run build            # typecheck + electron-vite build
-npm run build:toy        # 真实 UI 的 Toy 演示构建 → artifacts/toy
-npm run test:demo        # Toy 子路径、17 页面、三种尺寸、会话、六语言深色 UI
+npm run test:demo        # 文档站演示、侧栏切换、主题、语言与窗口尺寸
 npm run test:onboarding  # 首次引导、再次查看、六语言、双主题、三种尺寸
 npm run build:browser    # MV3 浏览器扩展
 npm run package:browser  # release/Nola-Browser-Extension.zip

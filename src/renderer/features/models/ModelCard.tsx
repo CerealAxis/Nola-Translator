@@ -9,16 +9,15 @@ import { configurationOf } from '../../../shared/model-capabilities'
 import { modelEngines, type InferenceEngine } from '../../../shared/model-engines'
 
 import type { ReactNode } from 'react'
-import { Check, Download, Trash2, X } from 'lucide-react'
+import { Download, X } from 'lucide-react'
 import './models.css'
 
 import { resourceStateOf } from '@/bridge'
-import type { AppSettings, AppSettingsPatch, ResourceRecord, ResourceState } from '@/bridge'
+import type { ResourceRecord, ResourceState } from '@/bridge'
 import { StatusPill } from '@/components/primitives'
 import { useI18n } from '@/i18n'
 import type { TranslationKey } from '@/i18n'
 import { ModelMark } from './modelBrand'
-import { defaultModelBinding } from '../../../shared/model-policy'
 
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
 
@@ -109,38 +108,6 @@ export function factsOf(record: ResourceRecord): string[] {
   return facts
 }
 
-/**
- * The settings patch that makes this record the default, or `null` when it cannot be one.
- *
- * Both tasks require saved capabilities. Installation and engine compatibility are checked
- * by the caller before offering the default action.
- */
-export function defaultTargetOf(record: ResourceRecord): AppSettingsPatch | null {
-  const id = record.resourceId
-  if (record.kind === 'ttsModel') return { synthesis: { modelId: id, voice: '' } }
-  if (record.kind === 'recognitionModel') {
-    if (!configurationOf(record)) return null
-    return { recognition: { modelId: id, provider: 'local' } }
-  }
-  if (!configurationOf(record)) return null
-  // Also pin provider to 'local': becoming the default means this is the one running locally.
-  return { translation: { localModelId: id, provider: 'local' } }
-}
-
-export function isDefaultOf(record: ResourceRecord, settings: AppSettings | null): boolean {
-  if (!settings) return false
-  if (settings.modelPolicy) {
-    const kind = record.kind === 'recognitionModel' ? 'asr' : record.kind === 'ttsModel' ? 'tts' : record.resourceId.startsWith('qwen35-') ? 'llm' : 'mt'
-    return defaultModelBinding(settings, kind) === `resource:${record.resourceId}`
-  }
-  if (record.kind === 'ttsModel') return settings.synthesis?.modelId === record.resourceId
-  if (!configurationOf(record)) return false
-  return (
-    (settings.recognition.provider === 'local' && settings.recognition.modelId === record.resourceId) ||
-    (settings.translation.provider === 'local' && settings.translation.localModelId === record.resourceId)
-  )
-}
-
 function isOneOf(value: string, allowed: readonly string[]): boolean {
   return allowed.some((item) => item === value)
 }
@@ -150,20 +117,12 @@ export interface ModelCardProps {
   record: ResourceRecord
   /** The engine is installing, removing or cancelling this record. */
   busy: boolean
-  /** Already the default for recognition or translation, which is why no "set default" is offered. */
-  isDefault: boolean
-  /** Whether the selected inference engine can use this ready model as the default. */
-  canBeDefault: boolean;
-  /** Shown beside a disabled default action when the selected loader cannot load this model. */
-  defaultDisabledReason?: string;
   /** A confirmed missing loader prevents this installed model from being enabled. */
   loaderUnavailableReason?: string;
   /** Hub result: whether it can be installed. False disables the install button. */
   installable?: boolean
   onInstall: () => void
   onCancel: () => void
-  onRemove: () => void
-  onSetDefault: () => void
   /** Secondary action for the whole card (the hub result's "view details"). */
   footer?: ReactNode
   className?: string
@@ -176,15 +135,10 @@ export interface ModelCardProps {
 export function ModelCard({
   record,
   busy,
-  isDefault,
-  canBeDefault,
-  defaultDisabledReason,
   loaderUnavailableReason,
   installable = true,
   onInstall,
   onCancel,
-  onRemove,
-  onSetDefault,
   footer,
   className = '',
   metadata,
@@ -218,7 +172,6 @@ export function ModelCard({
       <CardContent className="card__content">
       <div className="models-card__status">
         <Badge>{t('modelsSettingsUi.localModels')}</Badge>
-        {isDefault && record.installed ? <Badge  variant="accent">{t('modelsSettingsUi.default')}</Badge> : null}
         {removal && state === 'removing' ? <StatusPill label={t('modelsSettingsUi.removing')} tone="accent" /> : record.kind !== 'ttsModel' && record.installed && !configurationOf(record) ? <StatusPill label={t('modelConfig.pending')} tone="warning" /> : <StatePill state={state} installed={record.installed} />}
         {(supportedEngines ?? modelEngines(record)).map(engine => <Badge key={engine} >{engine === 'pytorch' ? 'PyTorch' : engine === 'crisp' ? 'CrispASR' : 'llama.cpp'}</Badge>)}
         {record.resourceId.startsWith('hub:local/') ? <Badge >{t('modelsSettingsUi.localImport')}</Badge> : null}
@@ -234,13 +187,8 @@ export function ModelCard({
           busy={busy}
           installable={installable}
           cancellable={record.cancellable}
-          isDefault={isDefault}
-          canBeDefault={canBeDefault}
-          defaultDisabledReason={defaultDisabledReason}
           onInstall={onInstall}
           onCancel={onCancel}
-          onRemove={onRemove}
-          onSetDefault={onSetDefault}
         />
         {footer && !removal ? <div className="models-card__details">{footer}</div> : null}
       </CardFooter>
@@ -308,13 +256,8 @@ interface ActionsProps {
   busy: boolean
   installable: boolean
   cancellable: boolean
-  isDefault: boolean
-  canBeDefault: boolean
-  defaultDisabledReason?: string
   onInstall: () => void
   onCancel: () => void
-  onRemove: () => void
-  onSetDefault: () => void
 }
 
 function Actions({
@@ -323,21 +266,12 @@ function Actions({
   busy,
   installable,
   cancellable,
-  isDefault,
-  canBeDefault,
-  defaultDisabledReason,
   onInstall,
   onCancel,
-  onRemove,
-  onSetDefault,
 }: ActionsProps) {
   const { t } = useI18n()
 
-  if (removal) {
-    return <Button variant="danger" disabled={busy || state === 'removing'} aria-busy={busy || state === 'removing'}  onClick={onRemove}>{busy || state === 'removing' ? <Spinner /> : null}
-      {t(state === 'removing' ? 'modelsSettingsUi.removing' : 'models.remove')}
-    </Button>
-  }
+  if (removal) return null
 
   if (state === 'failed') {
     return (
@@ -368,45 +302,7 @@ function Actions({
   }
 
   if (state === 'installed') {
-    return (
-      <>
-        {isDefault ? <Button variant="secondary" disabled><Check aria-hidden="true" className="size-4" />{t('modelsSettingsUi.current')}</Button> : null}
-        {canBeDefault && !isDefault ? (
-          <Button disabled={busy} aria-busy={busy}
-            variant="default"
-            size="sm"
-
-            onClick={onSetDefault}
-          >{busy ? <Spinner /> : null}
-            {t('models.setDefault')}
-          </Button>
-        ) : null}
-        {!canBeDefault && !isDefault && defaultDisabledReason ? (
-          <Tooltip>
-            <TooltipTrigger delay={250} render={<div />} className="block min-w-0 flex-1" tabIndex={0}>
-              <Button variant="secondary" size="sm" className="h-10 w-full rounded-xl" disabled>
-                {t('models.setDefault')}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent  role="tooltip" className="settings-row__tooltip z-popup max-w-96 whitespace-normal">
-              {defaultDisabledReason}
-            </TooltipContent>
-          </Tooltip>
-        ) : null}
-        {/* Destructive removal stays visibly identifiable through its soft-danger fill. */}
-        <Button disabled={busy} aria-busy={busy}
-          variant="danger"
-
-          aria-label={t('models.remove')}
-          size="icon"
-          className="models-card__remove"
-
-          onClick={onRemove}
-        >{busy ? <Spinner /> : null}
-          <Trash2 aria-hidden="true" className="size-4" />
-        </Button>
-      </>
-    )
+    return null
   }
 
   return (

@@ -67,7 +67,7 @@ class StreamingRecognizer:
 
     def __init__(
         self,
-        runtime: Transcriber,
+        runtime: Transcriber | None,
         *,
         source_language: str | None = None,
         segmenter: SileroVadSegmenter | None = None,

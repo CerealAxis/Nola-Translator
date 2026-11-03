@@ -30,7 +30,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Lock, Minus, Monitor, Pin, PinOff, SlidersHorizontal, Unlock, X } from 'lucide-react'
 
-import { DEFAULT_SETTINGS } from '@/bridge'
+import { DEFAULT_SETTINGS, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import { formatChineseCaption } from '@/chinese-script'
 import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
@@ -54,6 +54,7 @@ export function OverlayRoot() {
   const menuOpen = useStore(stores.settings, state => state.overlayMenuOpen)
   const { t } = useI18n()
   const overlay = useStore(stores.settings, (state) => state.settings?.overlay)
+  const sourceOnly = useStore(stores.settings, state => state.settings?.translation.targetLanguage === NO_TRANSLATION_LANGUAGE)
   const sourceLanguage = useStore(stores.settings, state => state.settings?.recognition.sourceLanguage ?? DEFAULT_SETTINGS.recognition.sourceLanguage)
   const session = useStore(sessionStore, (state) => state)
   const [hovered, setHovered] = useState(false)
@@ -91,7 +92,8 @@ export function OverlayRoot() {
     }
   }
 
-  const config = overlay ?? DEFAULT_SETTINGS.overlay
+  const appearance = overlay ?? DEFAULT_SETTINGS.overlay
+  const config = sourceOnly ? { ...appearance, showSource: true, showTranslation: false } : appearance
   const scheme: CaptionScheme = config.colorScheme === 'light' ? 'light' : 'dark'
   const palette = { ...CAPTION_SCHEMES[scheme], bg: config.backgroundColor, source: config.sourceColor, target: config.translationColor }
   const opacity = clamp(config.backgroundOpacity, 0, 1)

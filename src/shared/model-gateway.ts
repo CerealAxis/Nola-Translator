@@ -1,6 +1,8 @@
 import { z } from 'zod'
+import type { SessionConfig } from './contracts'
 
 export type GatewayCapability = 'asr' | 'mt' | 'tts' | 'llm'
+type PublicGatewayCapability = Exclude<GatewayCapability, 'llm'>
 export type GatewayServiceState = 'stopped' | 'loading' | 'ready' | 'failed'
 export interface ModelGatewaySettings {
   host: '127.0.0.1' | '0.0.0.0'
@@ -22,8 +24,8 @@ export interface ModelGatewaySettings {
   mtFallbackModel?: string
   externalEnabled?: boolean
   /** Public aliases are independent of the local weights selected for loading. */
-  externalModels?: Partial<Record<GatewayCapability, string>>
-  externalCapabilities?: Partial<Record<GatewayCapability, boolean>>
+  externalModels?: Partial<Record<PublicGatewayCapability, string>>
+  externalCapabilities?: Partial<Record<PublicGatewayCapability, boolean>>
   targetLanguage: string
 }
 export const DEFAULT_MODEL_GATEWAY: ModelGatewaySettings = {
@@ -35,8 +37,8 @@ export const modelGatewaySettingsSchema = z.object({
   host: z.enum(['127.0.0.1', '0.0.0.0']), port: z.number().int().min(1024).max(65535),
   asr: z.boolean(), mt: z.boolean(), tts: z.boolean(), targetLanguage: z.string().min(1).max(32),
   llm: z.boolean().optional(), externalEnabled: z.boolean().optional(),
-  externalModels: z.object({ asr: binding, mt: binding, tts: binding, llm: binding }).optional(),
-  externalCapabilities: z.object({ asr: z.boolean().optional(), mt: z.boolean().optional(), tts: z.boolean().optional(), llm: z.boolean().optional() }).optional(),
+  externalModels: z.object({ asr: binding, mt: binding, tts: binding }).optional(),
+  externalCapabilities: z.object({ asr: z.boolean().optional(), mt: z.boolean().optional(), tts: z.boolean().optional() }).optional(),
   asrModel: binding, mtModel: binding, ttsModel: binding, llmModel: binding, mtFallbackModel: binding,
 })
 
@@ -48,13 +50,13 @@ export const modelGatewaySettingsSchema = z.object({
  * records used as a chat model. The public aliases (`nola-asr`, `asr`) mean "whatever the gateway
  * capability is bound to" and normalize to the empty string.
  */
-export const GATEWAY_MODEL_ALIAS = { asr: 'nola-asr', mt: 'nola-mt', tts: 'nola-tts', llm: 'nola-llm' } as const
+const GATEWAY_MODEL_ALIAS = { asr: 'nola-asr', mt: 'nola-mt', tts: 'nola-tts' } as const
 const CLOUD_RECOGNITION = new Set(['aliyun', 'minimax'])
 const CLOUD_TRANSLATION = new Set(['microsoft', 'google', 'mymemory', 'index-translate', 'recognition'])
 
 export function normalizeModelBinding(kind: GatewayCapability, value: unknown): string {
   const raw = typeof value === 'string' ? value.trim() : ''
-  if (!raw || raw === GATEWAY_MODEL_ALIAS[kind] || raw === kind) return ''
+  if (!raw || raw === kind || (kind !== 'llm' && raw === GATEWAY_MODEL_ALIAS[kind])) return ''
   if (raw.startsWith('resource:')) return raw.slice(9) ? raw : ''
   if (raw.startsWith('fallback:')) return kind === 'mt' && CLOUD_TRANSLATION.has(raw.slice(9)) ? `cloud:${raw.slice(9)}` : ''
   if (raw.startsWith('mt-custom:')) return kind === 'mt' && raw.slice(10) ? raw : ''
@@ -74,6 +76,32 @@ export function normalizeModelBinding(kind: GatewayCapability, value: unknown): 
 }
 
 export const bindingIsLocal = (value: string): boolean => value.startsWith('resource:')
+
+/** Explicit session bindings take precedence over provider fields copied from saved settings. */
+export function resolveSessionModelBindings(config: SessionConfig): SessionConfig {
+  const resolved = { ...config }
+  const asr = normalizeModelBinding('asr', config.recognitionBinding)
+  if (asr) {
+    resolved.recognitionBinding = asr
+    if (bindingIsLocal(asr)) {
+      resolved.recognitionProvider = 'local'
+      resolved.recognitionModelId = asr.slice(9)
+    } else {
+      resolved.recognitionProvider = asr.slice(6) as SessionConfig['recognitionProvider']
+    }
+  }
+  const mt = normalizeModelBinding('mt', config.translationBinding)
+  if (mt) {
+    resolved.translationBinding = mt
+    if (bindingIsLocal(mt)) {
+      resolved.translationProvider = 'local'
+      resolved.translationModelId = mt.slice(9)
+    } else {
+      resolved.translationProvider = mt.startsWith('mt-custom:') ? 'cloud' : mt.slice(6) as SessionConfig['translationProvider']
+    }
+  }
+  return resolved
+}
 
 export interface GatewayServiceSnapshot {
   state: GatewayServiceState
@@ -117,6 +145,10 @@ export interface ModelGatewaySnapshot {
   services: Record<GatewayCapability, GatewayServiceSnapshot>
   requests: GatewayRequestSnapshot[]
   availableModels?: Record<GatewayCapability, AvailableGatewayModel[]>
+  realtime?: {
+    models: { model_id: string; enabled: boolean; kinds: string[]; operations: string[] }[]
+    instances: { instance_id: string; model_id: string; state: string; active_leases: number }[]
+  }
   error?: string
 }
 export interface ModelGatewayApi {

@@ -13,7 +13,7 @@ const done = async () => undefined
 export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => void, onWorkspace: () => void = noop) {
   let settings = initial
   const gatewaySnapshot = (): ModelGatewaySnapshot => ({
-    state: 'running', port: 8717, address: 'http://127.0.0.1:8717/v1', connections: 0, activeRequests: 0, requests: [],
+    state: 'running', port: 8717, address: 'http://127.0.0.1:8717/v2', connections: 0, activeRequests: 0, requests: [],
     services: {
       asr: { state: 'ready', model: `resource:${settings.recognition.modelId}`, name: 'Demo ASR' },
       mt: { state: 'ready', model: `resource:${settings.translation.localModelId}`, name: 'Demo MT' },

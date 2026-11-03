@@ -7,10 +7,10 @@ import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { BrowserConnection } from '../../../src/main/browser-connection'
+import { BrowserConnection, browserCaptionConfig, browserSessionConfig } from '../../../src/main/browser-connection'
 import { FeatureActivity } from '../../../src/main/feature-activity'
 import { SessionController } from '../../../src/main/session-controller'
-import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
+import { DEFAULT_SETTINGS, REALTIME_S2S_MODELS } from '../../../src/shared/settings'
 import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, type BrowserResponse } from '../../../src/shared/browser'
 import type { EngineProcess } from '../../../src/main/engine-process'
 import type { EngineCommand } from '../../../src/shared/contracts'
@@ -19,6 +19,17 @@ import { BrowserIntegrations } from '../../../src/main/browser-integrations'
 import { configureIpcSenderValidation } from '../../../src/main/logged-ipc'
 
 beforeEach(() => { configureIpcSenderValidation(() => undefined) })
+
+it('uses the browser S2S and application audio choices without exposing the process token', () => {
+  const [model] = REALTIME_S2S_MODELS
+  const deviceId = 'process:' + 'a'.repeat(32)
+  const settings = { ...DEFAULT_SETTINGS, realtime: { defaultPipeline: 'cascade' as const, browserS2sModel: model },
+    videoCaptions: { ...DEFAULT_SETTINGS.videoCaptions, audioSource: 'system' as const, audioDeviceId: deviceId } }
+  expect(browserCaptionConfig(settings)).toMatchObject({ pipeline: 's2s', desktopApplicationAudio: true, audioDeviceId: undefined })
+  expect(browserSessionConfig(settings, { id: 'start', type: 'start', source: 'system', streamId: 'stream', epoch: 0, videoTimeMs: 0, playbackRate: 1 })).toMatchObject({
+    s2sModel: model, audioSource: { kind: 'processAudio', deviceId }, translationProvider: 'recognition',
+  })
+})
 
 vi.mock('electron', () => ({ app: { isPackaged: false, getPath: () => tmpdir(), getAppPath: () => resolve('.') }, dialog: { showSaveDialog: vi.fn() }, ipcMain: { handle: vi.fn(), removeHandler: vi.fn() } }))
 const disposers: Array<() => Promise<void>> = []

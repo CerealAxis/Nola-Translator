@@ -19,6 +19,7 @@ FRAME_SAMPLES = TARGET_SAMPLE_RATE * FRAME_DURATION_MS // 1000
 class AudioFrame:
     samples: NDArray[np.float32]
     started_at_ms: float
+    lost_samples_before: int = 0
 
 
 class StreamingAudioNormalizer:

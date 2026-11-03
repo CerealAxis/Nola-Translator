@@ -9,7 +9,7 @@ const credentials = (stored: CredentialProvider[]): Readonly<Record<CredentialPr
   Object.fromEntries(stored.map(slot => [slot, true])) as Record<CredentialProvider, boolean>
 
 const snapshotWith = (kind: keyof ModelGatewaySnapshot['services'], model: string, name: string): ModelGatewaySnapshot => ({
-  state: 'running', address: 'http://127.0.0.1:17860/v1', port: 17860, connections: 0, activeRequests: 0, requests: [],
+  state: 'running', address: 'http://127.0.0.1:17860/v2', port: 17860, connections: 0, activeRequests: 0, requests: [],
   services: {
     ...({ asr: { state: 'stopped', model: '', name: '' }, mt: { state: 'stopped', model: '', name: '' },
       tts: { state: 'stopped', model: '', name: '' }, llm: { state: 'stopped', model: '', name: '' } } as ModelGatewaySnapshot['services']),
@@ -101,8 +101,11 @@ it('keeps scene selections separate from gateway loading configuration', () => {
 })
 
 
-it('offers native cloud translation with enabled Aliyun ASR without a loaded gateway service', () => {
-  const configured = settings({ modelPolicy: { enabled: { 'asr:cloud:aliyun': true, 'mt:cloud:recognition': true }, defaults: {}, selections: { asr: 'cloud:aliyun' } } })
+it('preserves native cloud translation for a legacy LiveTranslate binding without a loaded gateway service', () => {
+  const configured = settings({
+    recognition: { ...DEFAULT_SETTINGS.recognition, aliyunWorkspaceId: 'workspace', aliyunModel: 'qwen3.8-livetranslate-flash-realtime' },
+    modelPolicy: { enabled: { 'asr:cloud:aliyun': true, 'mt:cloud:recognition': true }, defaults: {}, selections: { asr: 'cloud:aliyun' } },
+  })
   const catalog = buildAvailableModels({ settings: configured, resources: [], credentials: credentials(['aliyun-asr']), snapshot: null })
   expect(catalog.mt.map(model => model.binding)).toContain('cloud:recognition')
 })

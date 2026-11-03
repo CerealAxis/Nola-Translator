@@ -350,8 +350,10 @@ function Root() {
  * 那一刻文档已经画完了。同步渲染不引入额外工作，只是把这 310ms 从 load 之后挪到之前 ——
  * 没有输入需要响应、整棵树只渲染一次、这段时间里用户看到的仍然是启动画面。
  */
+const rendererRoot = createRoot(document.getElementById('root')!)
+import.meta.hot?.dispose(() => rendererRoot.unmount())
 flushSync(() => {
-  createRoot(document.getElementById('root')!).render(
+  rendererRoot.render(
     <StrictMode>
       <I18nProvider readSettings={!isMigrationDocument}>
         {isMigrationDocument ? <MigrationWindow /> : <><ToastProvider onEmpty={onOverlayToastEmpty} />{isOverlayToastDocument ? <OverlayToastWindow /> : <Root />}</>}
