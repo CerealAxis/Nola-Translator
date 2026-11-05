@@ -17,7 +17,7 @@
 .browser-settings__icon { width: var(--space-4); height: var(--space-4); flex: none; object-fit: contain; }
 .browser-settings__row-actions { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; flex: none; }
 .browser-settings__row-actions .button,
-.browser-settings__detail-actions .button { font: var(--font-body-strong); border-radius: var(--radius-lg); }
+.browser-settings__detail-actions .button { font: var(--font-body-strong); border-radius: var(--radius-xl); }
 .browser-settings__back.button { align-self: flex-start; padding-inline: 0; color: var(--muted); font: var(--font-body); }
 .browser-settings__back svg,
 .browser-settings__detail-actions svg { width: var(--space-2); height: var(--space-2); }

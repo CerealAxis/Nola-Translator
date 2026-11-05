@@ -1,13 +1,14 @@
 import { ModelGatewayPage } from './features/model-gateway/ModelGatewayPage'
 import { requestFeatureStart } from './components/primitives/FeatureActivityNotice'
-import { Home, Mic, Clock, SlidersHorizontal, Settings, Video, MessagesSquare, Network } from 'lucide-react'
+import { Home, Mic, PanelsTopLeft, Clock, SlidersHorizontal, Settings, MessagesSquare, Network, Headphones, ScanText } from 'lucide-react'
 import { getBridge } from './store'
 import { notifyError } from './components/primitives/notify'
 import { useI18n } from './i18n'
 import { useRoute } from './routes'
 import { HomePage } from './features/home'
 import { OverlayPage } from './features/overlay/OverlayPage'
-import { VideoCaptionsPage } from './features/video-captions/VideoCaptionsPage'
+import { MeetingModePage } from './features/meeting/MeetingModePage'
+import { ScreenTranslationPage } from './features/screen/ScreenTranslationPage'
 import { RecordsPage, RecordDetailPage } from './features/records'
 import { ModelsPage } from './features/models'
 import { SettingsPage } from './features/settings'
@@ -19,7 +20,8 @@ export const APPLICATION_PAGES = {
   home: () => <HomePage />,
   workspace: () => <OverlayPage />,
   overlay: () => <OverlayPage />,
-  'video-captions': () => <VideoCaptionsPage />,
+  meeting: () => <MeetingModePage />,
+  'screen-translation': () => <ScreenTranslationPage />,
   'model-gateway': () => <ModelGatewayPage />,
   records: () => <RecordsPage />,
   record: () => <RecordDetailPage />,
@@ -29,22 +31,26 @@ export const APPLICATION_PAGES = {
 
 export function useApplicationNavigation(): AppShellNavigationItem[] {
   const { t } = useI18n()
-  const { route, navigate } = useRoute()
+  const { route, tab, navigate } = useRoute()
   const entries = [
     ['home', 'nav.home', Home, '#/'],
     ['model-gateway', 'nav.modelGateway', Network, '#/model-gateway'],
     ['models', 'nav.models', SlidersHorizontal, '#/models'],
     ['workspace', 'nav.workspace', Mic, '#/workspace'],
-    ['video-captions', 'videoCaptions.title', Video, '#/video-captions'],
+    ['meeting', 'meeting.navTitle', Headphones, '#/meeting'],
+    ['screen-translation', 'screen.navTitle', ScanText, '#/screen-translation'],
     ['records', 'nav.records', Clock, '#/records'],
-    ['settings', 'nav.settings', Settings, '#/settings/appearance'],
+    ['settings', 'nav.settings', Settings, '#/settings/general'],
   ] as const
   const navigation: AppShellNavigationItem[] = entries.map(([id, key, icon, path]) => ({
     id, label: t(key), icon, path,
     active: route === id || id === 'workspace' && route === 'overlay' || id === 'records' && route === 'record',
     onPress: () => navigate(path),
   }))
-  navigation.splice(5, 0, {
+  const settingsIndex = navigation.findIndex(item => item.id === 'settings')
+  if (route === 'settings' && tab === 'browser') navigation[settingsIndex].active = false
+  navigation.splice(4, 0, { id: 'browser', label: t('browser.title'), icon: PanelsTopLeft, path: '#/settings/browser', active: route === 'settings' && tab === 'browser', onPress: () => navigate('#/settings/browser') })
+  navigation.splice(navigation.length - 1, 0, {
       id: 'workbench', label: t('workbench.title'), icon: MessagesSquare, path: '#workbench',
       onPress: () => { void requestFeatureStart(async () => getBridge()?.app.openWorkbench?.('chat'), 'workbench').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) },
   })

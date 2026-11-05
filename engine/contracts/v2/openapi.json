@@ -167,6 +167,198 @@
         }
       }
     },
+    "/api/v2/meetings/audio-test": {
+      "post": {
+        "summary": "Meeting Audio Test",
+        "operationId": "meeting_audio_test_api_v2_meetings_audio_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeetingAudioTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/meetings": {
+      "post": {
+        "summary": "Create Meeting",
+        "operationId": "create_meeting_api_v2_meetings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeetingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/meetings/{meeting_id}": {
+      "get": {
+        "summary": "Get Meeting",
+        "operationId": "get_meeting_api_v2_meetings__meeting_id__get",
+        "parameters": [
+          {
+            "name": "meeting_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meeting Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Pause Meeting",
+        "operationId": "pause_meeting_api_v2_meetings__meeting_id__patch",
+        "parameters": [
+          {
+            "name": "meeting_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meeting Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeetingPauseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Stop Meeting",
+        "operationId": "stop_meeting_api_v2_meetings__meeting_id__delete",
+        "parameters": [
+          {
+            "name": "meeting_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Meeting Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/sessions/{session_id}/playback/{job_id}/{action}": {
       "post": {
         "summary": "Resolve Playback",
@@ -938,6 +1130,130 @@
           "model"
         ],
         "title": "LanguageModelOpenRequest"
+      },
+      "MeetingAudioTestRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "microphone",
+              "headphones",
+              "cable",
+              "application"
+            ],
+            "title": "Kind"
+          },
+          "device_id": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Device Id"
+          },
+          "playback_device_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Playback Device Id"
+          },
+          "recording_device_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Device Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "device_id"
+        ],
+        "title": "MeetingAudioTestRequest"
+      },
+      "MeetingPauseRequest": {
+        "properties": {
+          "paused": {
+            "type": "boolean",
+            "title": "Paused"
+          }
+        },
+        "type": "object",
+        "required": [
+          "paused"
+        ],
+        "title": "MeetingPauseRequest"
+      },
+      "MeetingRequest": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Command Id"
+          },
+          "uplink": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "downlink": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "uplink_output_id": {
+            "type": "string",
+            "maxLength": 512,
+            "title": "Uplink Output Id",
+            "default": ""
+          },
+          "downlink_output_id": {
+            "type": "string",
+            "maxLength": 512,
+            "title": "Downlink Output Id",
+            "default": ""
+          },
+          "duck_volume": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Duck Volume"
+          },
+          "passthrough_key": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Passthrough Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "command_id",
+          "duck_volume",
+          "passthrough_key"
+        ],
+        "title": "MeetingRequest"
       },
       "PlaybackResolution": {
         "properties": {

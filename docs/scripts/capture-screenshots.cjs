@@ -13,7 +13,7 @@ const locales = readmeOnly || guideOnly ? ['zh-CN'] : ['zh-CN', 'zh-TW', 'zh-HK'
 const pages = guideOnly ? ['home', 'workspace', 'session-setup', 'session-check', 'models', 'download-source', 'compute-environment', 'compute-components', 'crisp-loader', 'llama-cuda', 'llama-vulkan', 'llm-configuration', 'audio', 'browser'] : readmeOnly
   ? ['home', 'overlay-scene', 'browser-scene', 'models', 'compute-environment', 'dark-mode', 'llm-configuration']
   : ['home', 'workspace', 'models', 'overlay-scene', 'browser-scene']
-const routes = { home: '#/', workspace: '#/workspace', models: '#/models', 'overlay-scene': '#/', 'browser-scene': '#/', 'compute-environment': '#/settings/compute', 'dark-mode': '#/', 'llm-configuration': '#/settings/translation' }
+const routes = { home: '#/', workspace: '#/workspace', models: '#/models', 'overlay-scene': '#/', 'browser-scene': '#/', 'compute-environment': '#/settings/engine', 'dark-mode': '#/', 'llm-configuration': '#/settings/audio' }
 const sourceComponents = {
   'session-setup': ['src/renderer/features/workspace/SessionSetupDialog.tsx', 'src/renderer/features/workspace/WorkspacePage.tsx'],
   'session-check': ['src/renderer/features/workspace/PreflightDialog.tsx', 'src/renderer/features/workspace/WorkspacePage.tsx'],
@@ -52,7 +52,7 @@ const capturePath = (locale, page, theme) => {
   const guideName = ({ 'compute-environment': 'compute', 'llm-configuration': 'translation', 'crisp-loader': 'crispasr-loader-settings', 'llama-cuda': 'llama-cpp-cuda-version-selection', 'llama-vulkan': 'llama-cpp-vulkan-version-selection' }[page] ?? page)
   return `screenshots/${locale}/${guideOnly ? `guide/${guideName}` : name}${theme === 'dark' ? '-dark' : ''}.png`
 }
-if (guideOnly) Object.assign(routes, { audio: '#/settings/audio', browser: '#/settings/browser', 'compute-components': '#/settings/compute', 'crisp-loader': '#/settings/compute', 'llama-cuda': '#/settings/compute', 'llama-vulkan': '#/settings/compute', 'session-setup': '#/workspace', 'session-check': '#/workspace', 'download-source': '#/models' })
+if (guideOnly) Object.assign(routes, { audio: '#/settings/audio', browser: '#/settings/browser', 'compute-components': '#/settings/engine', 'crisp-loader': '#/settings/engine', 'llama-cuda': '#/settings/engine', 'llama-vulkan': '#/settings/engine', 'session-setup': '#/workspace', 'session-check': '#/workspace', 'download-source': '#/models' })
 
 async function pressGuideButton(win, label) {
   await win.webContents.executeJavaScript(`(() => {

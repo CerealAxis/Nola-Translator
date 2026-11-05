@@ -1,8 +1,11 @@
-import { browserEn, browserZh } from '../../src/renderer/i18n/browser-ui'
-import { browserJa, browserKo, browserZhHK, browserZhTW } from '../../src/renderer/i18n/browser-locales'
+import { browserEn, browserZh } from './locale-base'
+import { browserJa, browserKo, browserZhHK, browserZhTW } from './locale-regions'
 import { resolveUiLanguage } from '../../src/shared/languages'
 import type { UiLanguage, UiLanguagePreference } from '../../src/shared/languages'
-export type BrowserKey = keyof typeof browserZh
+import { extensionCopy, extensionLocales } from './extension-copy'
+type SharedBrowserKey = keyof typeof browserZh
+type ExtensionKey = keyof typeof extensionCopy
+export type BrowserKey = SharedBrowserKey | ExtensionKey
 /**
  * An unrecognised code remains in store diagnostics while the UI uses actionable fallback copy.
  */
@@ -24,6 +27,7 @@ const ERROR_ALIASES: Record<string, BrowserKey> = {
   browserExtensionVersionMismatch: 'extensionVersionMismatch',
   browserProtocolMismatch: 'updateRequired',
   browserCaptureUnsupported: 'captureUnsupported',
+  browserTabCapturePermission: 'chromiumCapture',
   browserCaptureTargetMismatch: 'wrongCapture',
   browserCaptureCancelled: 'captureCancelled',
   browserAudioSilent: 'tabAudioSilent',
@@ -32,13 +36,15 @@ const ERROR_ALIASES: Record<string, BrowserKey> = {
   browserSessionNotRunning: 'sessionNotRunning',
   browserCaptionServiceDisabled: 'captionServiceOff',
   browserIntegrationDisabled: 'appUnavailable',
+  s2sConfigurationMissing: 'browserS2sUnavailable',
+  translationTimeout: 'browserTranslationTimeout',
 }
 function isDictionaryKey(key: BrowserTextKey): key is BrowserKey {
   return !(key as string).startsWith(UNKNOWN_PREFIX)
 }
 export type BrowserUiLanguage = UiLanguagePreference
 
-const dictionaries: Record<UiLanguage, Record<BrowserKey, string>> = {
+const dictionaries: Record<UiLanguage, Record<SharedBrowserKey, string>> = {
   'zh-CN': browserZh,
   'zh-TW': browserZhTW,
   'zh-HK': browserZhHK,
@@ -51,7 +57,10 @@ export function browserText(language: BrowserUiLanguage = 'en') {
   const locale = resolveUiLanguage(language, navigator.language)
   const dictionary = dictionaries[locale]
   return (key: BrowserTextKey): string => {
-    if (isDictionaryKey(key) && Object.hasOwn(dictionary, key)) return dictionary[key]
+    if (isDictionaryKey(key)) {
+      if (Object.hasOwn(extensionCopy, key)) return extensionCopy[key as ExtensionKey][extensionLocales.indexOf(locale)]
+      if (Object.hasOwn(dictionary, key)) return dictionary[key as SharedBrowserKey]
+    }
     return dictionary.unknownError
   }
 }
@@ -62,5 +71,5 @@ export function browserText(language: BrowserUiLanguage = 'en') {
 export function errorKey(code: string): BrowserTextKey {
   const alias = Object.hasOwn(ERROR_ALIASES, code) ? ERROR_ALIASES[code] : undefined
   if (alias) return alias
-  return Object.hasOwn(browserZh, code) ? code as BrowserKey : `${UNKNOWN_PREFIX}${code}`
+  return Object.hasOwn(browserZh, code) || Object.hasOwn(extensionCopy, code) ? code as BrowserKey : `${UNKNOWN_PREFIX}${code}`
 }

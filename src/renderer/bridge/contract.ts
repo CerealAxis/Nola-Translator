@@ -48,11 +48,14 @@ export type { HubCompatibility, HubInspectResult, HubModelSummary, HubSearchResu
 export type { PrewarmErrorCode, PrewarmResult } from '../../shared/contracts'
 
 /** Route id for this app's multi-window UI; `routes.tsx` holds the hash mapping. */
-export type RouteId = 'home' | 'workspace' | 'overlay' | 'video-captions' | 'model-gateway' | 'records' | 'record' | 'models' | 'settings'
+export type RouteId = 'home' | 'workspace' | 'overlay' | 'meeting' | 'screen-translation' | 'model-gateway' | 'records' | 'record' | 'models' | 'settings'
 
 export interface NolaBridge {
+  screenTranslation?: import('../../shared/screen-translation').ScreenTranslationBridge
+  workspaceView?: import('../../shared/workspace-view').WorkspaceViewApi
   gateway?: import('../../shared/model-gateway').ModelGatewayApi
   activity?: import('../../shared/feature-activity').FeatureActivityApi
+  meetingMode?: import('../../shared/meeting-mode').MeetingModeApi
   onboardingCard?: import('../../shared/onboarding-card').OnboardingCardApi
   requestQuit?(): Promise<void>
   confirmQuit?(): Promise<void>
@@ -93,6 +96,7 @@ export interface NolaBridge {
      * subscribing to catch an already-ready engine, then keep listening.
      */
     getEngineState(): Promise<EngineProcessState>
+    getSessionSnapshot?(): Promise<import('../../shared/session-reader').SessionReaderSnapshot | null>
   }
   /*
    * Window-level actions for the caption window. `minimize` is a real taskbar
@@ -245,6 +249,7 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'engine.stopSession': 'ipc',
   'engine.setPaused': 'ipc',
   'engine.getEngineState': 'ipc',
+  'engine.getSessionSnapshot': 'ipc',
   'overlay.show': 'ipc',
   'overlay.hide': 'ipc',
   'overlay.close': 'ipc',
@@ -294,6 +299,22 @@ export const BRIDGE_TIERS: Record<string, 'ipc' | 'ipc-new'> = {
   'models.getHuggingFaceModelCard': 'ipc',
   'models.installHuggingFaceModel': 'ipc',
   'feedback.submit': 'ipc-new',
+  'meetingMode.snapshot': 'ipc',
+  'meetingMode.start': 'ipc',
+  'meetingMode.stop': 'ipc',
+  'meetingMode.setPaused': 'ipc',
+  'meetingMode.testAudio': 'ipc',
+  'meetingMode.cancelAudioTest': 'ipc',
+  'meetingMode.onChanged': 'ipc',
+  'screenTranslation.snapshot': 'ipc',
+  'screenTranslation.sources': 'ipc',
+  'screenTranslation.command': 'ipc',
+  'screenTranslation.onChanged': 'ipc',
+  'screenTranslation.windowBootstrap': 'ipc',
+  'screenTranslation.frame': 'ipc',
+  'screenTranslation.captureError': 'ipc',
+  'workspaceView.read': 'ipc',
+  'workspaceView.update': 'ipc',
   'onboardingCard.available': 'ipc',
   'onboardingCard.show': 'ipc',
   'onboardingCard.hide': 'ipc',

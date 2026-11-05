@@ -1,3 +1,5 @@
+import { OfflineResources } from '../../offline'
+import { ResetSettingsGroup } from './AdvancedTab'
 /**
  * Storage and downloads: data folder, how much of it is in use, restart prompt.
  *
@@ -19,13 +21,13 @@ import { notifySuccess, notifyWarning } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
-import { actions, stores, useStore } from '@/store'
+import { actions, stores, updateSettings, useStore } from '@/store'
 import { reportSettingsFailure } from '../settingsErrorChannel'
 import { formatBytes } from '../../models/ModelCard'
-import { SettingGroup } from '../SettingsPage'
+import { SettingGroup, SettingSwitch } from '../SettingsPage'
 import type { SettingsPanelProps } from '../SettingsPage'
 
-export function StorageTab(_props: SettingsPanelProps) {
+export function StorageTab({ settings }: SettingsPanelProps) {
   const { t } = useI18n()
   const storage = useStore(stores.settings, (state) => state.storage)
   const busy = useStore(stores.settings, (state) => state.storageBusy)
@@ -108,6 +110,14 @@ export function StorageTab(_props: SettingsPanelProps) {
           </div>
         </SettingGroup>
       ) : null}
+      <SettingGroup legend={t('settings.groupRecording')}>
+        <SettingsRow label={t('settings.keepAudio')} descriptionTooltip desc={t('settings.keepAudioHint')}>
+          <SettingSwitch isSelected={settings.recording?.keepAudio ?? true} ariaLabel={t('settings.keepAudio')}
+            onChange={keepAudio => { void updateSettings({ recording: { keepAudio } }).catch(() => undefined) }} />
+        </SettingsRow>
+      </SettingGroup>
+      <OfflineResources />
+      <ResetSettingsGroup />
     </div>
   )
 }

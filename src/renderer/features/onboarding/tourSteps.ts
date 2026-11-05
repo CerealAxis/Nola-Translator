@@ -39,7 +39,4 @@ export const TOUR_STEPS: readonly TourStep[] = [
   step('G2', '#/model-gateway', 'gateway-start', 'onboarding.G2Title', 'onboarding.G2Body'),
   step('U1', '#/workspace', 'quick-settings', 'onboarding.U1Title', 'onboarding.U1Body', { via: tourTarget('nav-workspace') }),
   step('U2', '#/workspace', 'open-workspace', 'onboarding.U2Title', 'onboarding.U2Body'),
-  step('U4', '#/video-captions', 'browser-settings', 'onboarding.U4Title', 'onboarding.U4Body', { via: tourTarget('nav-video-captions') }),
-  step('B1', '#/video-captions', 'browser-model-settings', 'onboarding.B1Title', 'onboarding.B1Body'),
-  step('B2', '#/video-captions', 'video-caption-service', 'onboarding.B2Title', 'onboarding.B2Body'),
 ]

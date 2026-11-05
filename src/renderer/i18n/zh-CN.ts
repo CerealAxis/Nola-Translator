@@ -1,5 +1,8 @@
 import { modelPolicyZh } from './model-policy-ui'
+import { screenLocales } from './screen-ui'
+import { shortcutLocales } from './shortcuts-ui'
 import { latencyZh } from './latency-ui'
+import { meetingZh } from './meeting-ui'
 import { gatewayZh } from './gateway-ui'
 import { workbenchZh } from './workbench-ui'
 import { offlineZh } from './offline-ui'
@@ -25,7 +28,10 @@ import { computeUi } from '../features/settings/compute-ui'
 export const zhCN = {
   latency: latencyZh,
   gateway: gatewayZh,
+  meeting: meetingZh,
   modelsPolicy: modelPolicyZh,
+  screen: screenLocales['zh-CN'],
+  shortcuts: shortcutLocales['zh-CN'],
   workbench: workbenchZh,
   offline: offlineZh,
   onboarding: onboardingZh,
@@ -900,7 +906,7 @@ export const zhCN = {
      * 归在一起。具体支持码由共享错误目录分配。
      */
     captionServiceToggleFailed: '浏览器字幕状态切换失败，请重试。',
-    serviceConflict: '已有 {running} 正在运行，请先结束 {running} 后重试。',
+    serviceConflict: '{running}正在运行，请结束后再试。',
     captionServiceStopFailed: '字幕会话未完全结束，请重试停止。',
     settingsCaptionStopFailed: '字幕会话没能结束，请重试。',
 

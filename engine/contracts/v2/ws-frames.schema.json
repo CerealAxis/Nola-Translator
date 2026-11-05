@@ -473,7 +473,8 @@
             "owner": {
               "enum": [
                 "quick_interpret",
-                "browser_captions"
+                "browser_captions",
+                "meeting"
               ],
               "title": "Owner",
               "type": "string"

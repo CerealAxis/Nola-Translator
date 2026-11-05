@@ -1,5 +1,8 @@
 import { modelPolicyEn } from './model-policy-ui'
+import { screenLocales } from './screen-ui'
+import { shortcutLocales } from './shortcuts-ui'
 import { latencyEn } from './latency-ui'
+import { meetingEn } from './meeting-ui'
 import { gatewayEn } from './gateway-ui'
 import { workbenchEn } from './workbench-ui'
 import { offlineEn } from './offline-ui'
@@ -21,7 +24,10 @@ import { computeUi } from '../features/settings/compute-ui'
 export const en: Dictionary = {
   latency: latencyEn,
   gateway: gatewayEn,
+  meeting: meetingEn,
   modelsPolicy: modelPolicyEn,
+  screen: screenLocales['en'],
+  shortcuts: shortcutLocales['en'],
   workbench: workbenchEn,
   offline: offlineEn,
   onboarding: onboardingEn,
@@ -878,7 +884,7 @@ export const en: Dictionary = {
      * stop call is what failed, which is the same family as `engineNotConnected`.
      */
     captionServiceToggleFailed: 'The caption service switch did not flip. Try again.',
-    serviceConflict: 'The {running} service is running. Please close the {running} service first.',
+    serviceConflict: '{running} is running. End it before trying again.',
     captionServiceStopFailed: 'The caption service is off, but a caption session did not end. Recognition may still be running.',
     settingsCaptionStopFailed: 'The caption session could not be ended. Please try again.',
 

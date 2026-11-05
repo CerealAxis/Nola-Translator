@@ -1,6 +1,7 @@
 import { createUIMessageStream, createUIMessageStreamResponse, type UIMessage } from 'ai'
 import { getBridge } from '@/store'
 import type { TranslationKey } from '@/i18n'
+import { SUPPORT_ERROR_CATALOG, supportErrorCodeForCause } from '../../../shared/error-catalog'
 import type { PlaygroundModel } from './installed-models'
 import type { PlaygroundConfig } from './demo-runtime'
 import { extractVideoAudio, pcmWavData } from './audio-attachment'
@@ -18,6 +19,10 @@ export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key
   getMemories: () => readonly string[], getModels?: () => readonly PlaygroundModel[]): typeof fetch {
   return async (_input, init) => {
     const config = { ...getConfig() }
+    const inferenceError = (error: unknown) => {
+      const code = supportErrorCodeForCause(error instanceof Error ? error.message : undefined)
+      return new Error(t(code === 'ERR-999' ? fallbackErrorKey(config) : SUPPORT_ERROR_CATALOG[code].messageKey))
+    }
     if (getModels && !getModels().some(model => model.id === config.model && model.kind === config.kind)) {
       throw new Error(t('workbench.noModels'))
     }
@@ -64,7 +69,7 @@ export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key
             text: user?.parts.filter(part => part.type === 'text').map(part => part.text).join('\n') ?? '',
             source: config.source, target: config.target, voice: config.voice,
             ...(recognitionAudio ? { audio: recognitionAudio } : {}), ...(image?.type === 'file' ? { image: image.url } : {}),
-          })
+          }).catch(error => { throw inferenceError(error) })
           signal?.throwIfAborted()
           if (config.kind === 'tts' && !result.audio) throw new Error(t('workbench.noAudioResult'))
           finishStep(t(config.kind === 'asr' ? 'workbench.transcriptionCompleted' : config.kind === 'mt' ? 'workbench.translationCompleted' : 'workbench.synthesisCompleted'))
@@ -129,7 +134,7 @@ export function createPlaygroundFetch(getConfig: () => PlaygroundConfig, t: (key
         signal?.addEventListener('abort', abort, { once: true })
         void app.streamLanguageModel!({ id, source: local ? 'local' : 'custom', modelId: config.model.slice(local ? 9 : 7), body, projectId: config.projectId ?? null,
           effort: ['low', 'medium', 'high'].includes(config.effort) ? config.effort as 'low' | 'medium' | 'high' : 'auto',
-        }).catch(error => finish(error instanceof Error ? error : new Error(t(fallbackErrorKey(config)))))
+        }).catch(error => finish(inferenceError(error)))
       },
       cancel() { closed = true; unsubscribe?.(); cancel() },
     })

@@ -56,6 +56,9 @@ def test_response_failure_fences_and_missing_owner_is_reported():
         old_generation = output.generation
         await output.accept(S2SObservation("response", response_id="r2", status="incomplete"), None)
         assert output.generation == old_generation + 1
+        assert [name for name, _ in events] == ["error", "playback_state", "error"]
+        assert events[-2][1]["state"] == "cancelled"
+        assert events[-1][1]["error"]["code"] == "SYNTHESIS_FAILED"
         assert not output.ack("r:i", "owner", "anything", old_generation, "started")
         await output.wait_idle()
 

@@ -13,6 +13,20 @@ import { registerEngineIpc } from '../../../src/main/ipc'
 
 afterEach(() => { send.mockClear(); handlers.clear() })
 
+it('routes OCR resource management to its active backend without starting a second model manager', async () => {
+  const engine = new EventEmitter() as unknown as EngineProcess
+  const request = vi.fn()
+  Object.assign(engine, { currentState: 'stopped', request })
+  const resource = { resourceId: 'pp-ocrv5-mobile-onnx', kind: 'ocrModel' as const, provider: 'onnx', name: 'OCR', description: 'Local OCR', languages: ['en'], installed: false, installedBytes: 0, state: 'running' as const, cancellable: true }
+  const manage = vi.fn(async () => resource)
+  const dispose = registerEngineIpc(engine, () => null, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, manage)
+  try {
+    await expect(handlers.get('engine:manage-resource')!({}, resource.resourceId, 'install')).resolves.toEqual(resource)
+    expect(manage).toHaveBeenCalledWith(resource.resourceId, 'install')
+    expect(request).not.toHaveBeenCalled()
+  } finally { dispose() }
+})
+
 it('isolates inventory failures and reports a business process crash as its own stopped session', async () => {
   const inventory = Object.assign(new EventEmitter(), { currentState: 'ready', start: vi.fn() }) as unknown as EngineProcess
   const business = Object.assign(new EventEmitter(), { currentState: 'ready', request: vi.fn(async () => ({ sessionId: 'desktop-session' })), supports: () => true }) as unknown as EngineProcess

@@ -1,3 +1,4 @@
+import { WorkspaceViewControls } from './WorkspaceViewControls'
 import { ModelAvailabilityLabel } from '@/features/workspace/ModelAvailabilityLabel'
 import { useModelOptions } from '@/model-options'
 import { Select, SelectContent, SelectFieldLabel, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -8,7 +9,7 @@ import { Switch, SwitchThumb } from '@/components/ui/switch'
 import { translationLanguages } from '../../../shared/model-capabilities'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Captions, ChevronDown, Languages, Minus, Plus, SlidersHorizontal, StickyNote, Volume2 } from 'lucide-react'
+import { Captions, ChevronDown, Languages, Minus, Plus, SlidersHorizontal, Volume2 } from 'lucide-react'
 
 import { DEFAULT_SETTINGS, languageName, NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { AudioDevice } from '@/bridge'
@@ -38,8 +39,6 @@ export interface WorkspaceToolbarProps {
   onLayoutChange: (layout: CaptionLayout) => void
   fontSize: number
   onFontSizeChange: (fontSize: number) => void
-  notesOpen: boolean
-  onToggleNotes: () => void
   sessionLocked: boolean
   language: UiLanguage
 }
@@ -149,16 +148,13 @@ export function WorkspaceToolbar(props: WorkspaceToolbarProps) {
               </TabsList>
             </TabsRoot>
           </div>
+          <WorkspaceViewControls />
           <Switch checked={props.overlayVisible} onCheckedChange={props.onOverlayVisibleChange} className="nola-workspace-notes-switch nola-workspace-overlay-switch">
             <Captions aria-hidden="true" />
             <span className="nola-workspace-notes-switch__label">{t('workspaceUi.openOverlay')}</span>
             <span className="switch__control"><SwitchThumb className="switch__thumb" /></span>
           </Switch>
-          <Switch checked={props.notesOpen} onCheckedChange={props.onToggleNotes} className="nola-workspace-notes-switch">
-            <StickyNote aria-hidden="true" />
-            <span className="nola-workspace-notes-switch__label">{t('workspace.notes')}</span>
-            <span className="switch__control"><SwitchThumb className="switch__thumb" /></span>
-          </Switch>
+
         </div>
       </CardContent>
     </Card>

@@ -1,9 +1,7 @@
-"""Render the actual MV3 bundle in a disposable Chromium/Edge profile.
-
-Only the generic fixture's host permission is added to a temporary extension copy.
-Native host/ASR, sharing picker and real-site DOM acceptance remain separate checks.
-"""
+"""Exercise the actual MV3 bundle with a fixture site and a simulated native transport."""
 import argparse
+import base64
+import hashlib
 import json
 import shutil
 import tempfile
@@ -16,7 +14,7 @@ def main():
     parser.add_argument('--executable', required=True)
     parser.add_argument('--name', default='chromium')
     parser.add_argument('--cdp-load', action='store_true', help='Use Extensions.loadUnpacked for branded Chrome')
-    parser.add_argument('--pipeline', action='store_true', help='Capture real fixture audio with a test native transport; no ASR service is called')
+    parser.add_argument('--pipeline', action='store_true', help='Also exercise the legacy sharing fallback with real fixture PCM and simulated captions')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     output = root / 'artifacts' / 'browser-smoke' / args.name
@@ -27,6 +25,9 @@ def main():
         shutil.copytree(root / 'browser/extension/dist', extension)
         manifest_path = extension / 'manifest.json'
         manifest = json.loads(manifest_path.read_text())
+        digest = hashlib.sha256(base64.b64decode(manifest['key'])).hexdigest()[:32]
+        extension_id = digest.translate(str.maketrans('0123456789abcdef', 'abcdefghijklmnop'))
+        worker_url = f'chrome-extension://{extension_id}/background.js'
         manifest['host_permissions'].append('https://nola.test/*')
         for script in manifest['content_scripts']:
             script['matches'].append('https://nola.test/*')
@@ -46,16 +47,18 @@ def main():
                     session = context.browser.new_browser_cdp_session()
                     session.send('Extensions.loadUnpacked', {'path': str(extension)})
                     session.detach()
-                worker = context.service_workers[0] if context.service_workers else context.wait_for_event('serviceworker')
-                if args.pipeline:
-                    worker.evaluate('''() => {
+                worker = next((candidate for candidate in context.service_workers if candidate.url == worker_url), None)
+                if worker is None:
+                    worker = context.wait_for_event('serviceworker', predicate=lambda candidate: candidate.url == worker_url)
+                worker.evaluate('''legacy => {
                       self.pipeline = {chunks: 0, peak: 0, epoch: 0, configs: []};
                       chrome.runtime.connectNative = () => {
                         const listeners = [];
                         const emit = value => listeners.forEach(listener => listener(value));
                         return {onMessage: {addListener: listener => listeners.push(listener)}, onDisconnect: {addListener: () => {}}, disconnect: () => {}, postMessage: request => {
                           let value;
-                          if (request.type === 'hello') value = {protocolVersion: 1, extensionVersion: chrome.runtime.getManifest().version, extensionCompatible: true, uiLanguage: 'en', sourceLanguage: 'en', targetLanguage: 'zh', devices: [], browserAudio: true, captionServiceActive: true, config: {audioSource: 'tab', sourceLanguage: 'en', targetLanguage: 'zh', appearance: {showSource: true, showTranslation: true}}};
+                          if (request.type === 'hello') value = {protocolVersion: 2, extensionVersion: chrome.runtime.getManifest().version, extensionCompatible: true, textTranslation: true, realtimeTranslation: !legacy, uiLanguage: 'ko', sourceLanguage: 'en', targetLanguage: 'zh', devices: [], browserAudio: true, captionServiceActive: legacy, config: {audioSource: 'tab', sourceLanguage: 'en', targetLanguage: 'zh', appearance: {showSource: true, showTranslation: true}}};
+                          if (request.type === 'translate') value = {text: 'Fixture translation: ' + request.text};
                           if (request.type === 'start') value = {sessionId: 'fixture'};
                           if (request.type === 'reset') self.pipeline.epoch = request.epoch;
                           if (request.type === 'debug' && request.event === 'ext.capture') self.pipeline.configs.push(request.data.settings);
@@ -68,7 +71,8 @@ def main():
                           setTimeout(() => emit({type: 'result', id: request.id, value}), 0);
                         }};
                       };
-                    }''')
+                      return chrome.storage.local.set({uiLanguage: 'en', theme: 'dark', autoSites: ['https://nola.test']});
+                    }''', args.pipeline)
                 page.route('https://nola.test/**', lambda route: route.fulfill(content_type='text/html', body=fixture))
                 page.goto('https://nola.test/player')
                 page.wait_for_load_state('networkidle')
@@ -82,17 +86,31 @@ def main():
                 page.screenshot(path=str(output / 'player.png'))
                 trigger.get_by_role('button').click()
                 panel.wait_for(state='visible')
-                assert panel.get_by_role('button', name='Start', exact=True).count() == 1
+                start_label = 'Start' if args.pipeline else 'Start live translation'
+                panel.get_by_role('button', name=start_label, exact=True).wait_for()
                 assert panel.get_by_role('button', name='Refresh', exact=True).count() == 1
                 assert panel.get_by_role('button', name='Close', exact=True).count() == 1
                 assert panel.get_by_text('Font size', exact=True).count() == 0
                 bounds = panel.bounding_box()
                 assert bounds and bounds['x'] >= 0 and bounds['x'] + bounds['width'] <= 1280
+                assert panel.get_attribute('data-theme') == 'dark'
+                assert panel.evaluate("(host) => getComputedStyle(host).getPropertyValue('--surface').trim()").startswith('oklch(27%')
                 page.screenshot(path=str(output / 'panel.png'))
+                page.locator('#sample-paragraph').get_by_text('Fixture translation: A fixture paragraph for translation.', exact=True).wait_for()
+                panel.get_by_role('button', name='Translate existing subtitles', exact=True).click()
+                overlay = page.locator('[data-nola-extension="overlay"]')
+                overlay.get_by_text('Fixture translation: A fixture subtitle.', exact=True).wait_for()
+                panel.get_by_role('button', name='Stop subtitle translation', exact=True).click()
+                overlay.wait_for(state='hidden')
+                options = context.new_page()
+                options.goto(worker.url.rsplit('/', 1)[0] + '/options.html')
+                options.get_by_role('heading', name='Extension settings', exact=True).wait_for()
+                options.get_by_role('tab', name='Video subtitles', exact=True).click()
+                options.get_by_text('This is a subtitle preview.', exact=True).wait_for()
+                options.close()
                 if args.pipeline:
                     page.locator('#tone').click()
                     panel.get_by_role('button', name='Start', exact=True).click()
-                    overlay = page.locator('[data-nola-extension="overlay"]')
                     overlay.get_by_text('Audio reaches the caption pipeline', exact=True).wait_for(state='visible')
                     assert worker.evaluate('self.pipeline.peak') > 100, 'Real PCM audio must be nonzero'
                     settings = worker.evaluate('self.pipeline.configs.at(-1)')
@@ -108,7 +126,7 @@ def main():
                 # Dynamic discovery must keep one trigger and need no extra settings UI.
                 page.evaluate("const video = document.querySelector('video').cloneNode(); video.removeAttribute('id'); document.body.append(video)")
                 trigger.get_by_role('button').click()
-                assert panel.get_by_role('button', name='Start', exact=True).count() == 1
+                assert panel.get_by_role('button', name=start_label, exact=True).count() == 1
                 assert trigger.count() == 1
                 page.evaluate("document.querySelector('video:last-of-type').remove()")
                 page.reload()
@@ -116,7 +134,7 @@ def main():
                 page.locator('[data-nola-extension="trigger"]').wait_for(state='visible')
                 assert page.locator('[data-nola-extension="trigger"]').count() == 1
                 assert not errors, errors
-                checks = ['MV3 load', 'capture handle marker', 'single injection', 'hidden panel/empty captions', 'automatic video selection', 'minimal controls', 'viewport layout', 'panel close', 'reload cleanup']
+                checks = ['MV3 load', 'capture handle marker', 'single injection', 'hidden panel/empty captions', 'automatic video selection', 'viewport layout', 'panel close', 'reload cleanup', 'protocol v2 webpage and HTML5 subtitle translation', 'independent UI language', 'dark theme', 'options preview']
                 if args.pipeline:
                     checks.extend(['real nonzero tab PCM', 'voice processing disabled', 'test transport captions rendered', 'website rem isolation'])
                 (output / 'result.json').write_text(json.dumps({'passed': True, 'browser': args.name, 'worker': worker.url, 'checks': checks, 'pageErrors': errors}, indent=2))

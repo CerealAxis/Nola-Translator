@@ -17,6 +17,11 @@ describe('normalizeThrownError', () => {
       code: 'RUNTIME_LLAMA', supportCode: 'RNT-002',
     })
   })
+  it('preserves a known cause before free-form details', () => {
+    expect(normalizeThrownError(new Error('CLOUD_RECOGNITION_CREDENTIAL_MISSING: API key is required'))).toMatchObject({
+      code: 'CLOUD_RECOGNITION_CREDENTIAL_MISSING', supportCode: 'ASR-001',
+    })
+  })
 })
 
 describe('stripIpcErrorMessage', () => {

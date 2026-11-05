@@ -39,6 +39,8 @@ class RealtimePipelines:
         return session.owner == "quick_interpret" and session.config.latency_detection
 
     async def _start_capture(self, session, latency_detection):
+        if session.owner == "meeting":
+            return None
         observe = None
         if latency_detection and "audio" in session.config.required_outputs:
             observe = LatencyCapture(session._log.submit).observe
@@ -68,7 +70,8 @@ class RealtimePipelines:
             playback = self.playbacks.get(key)
             retain_playback = command == "pause" and isinstance(playback, TtsPipeline)
             if playback is not None:
-                session.playback_generation = playback.pause() if retain_playback else playback.stop()
+                generation = playback.pause() if retain_playback else playback.stop()
+                session.playback_generation = max(session.playback_generation, generation)
                 session._log.submit("playback_state", {
                     "state": "interrupted" if command == "pause" else "cancelled",
                     "playback_generation": session.playback_generation,
@@ -120,6 +123,13 @@ class RealtimePipelines:
                 if playback is not None and event == "translation_committed" and payload["target_language"] == speech_language:
                     playback.translation_committed(payload)
 
+            def emit_playback(event, payload):
+                session._log.submit(event, payload)
+                if session.owner == "meeting" and event == "synthesis_state" and payload["state"] == "failed":
+                    session.last_error = ErrorPayload(
+                        code="SYNTHESIS_FAILED", stage="tts", message_key="gateway.synthesisFailed",
+                    )
+
             connection = self.provider_connections.get(key, {})
             if config.translation_model:
                 mt = TranslationScheduler(
@@ -167,13 +177,13 @@ class RealtimePipelines:
                             initial_generation=session.playback_generation,
                         ),
                         pipeline_id=str(session.pipeline_id), epoch=session.epoch,
-                        model_id=config.tts_model, voice=config.tts_voice, event_sink=session._log.submit,
+                        model_id=config.tts_model, voice=config.tts_voice, event_sink=emit_playback,
                         provider_options={"api_key": tts_key} if tts_key else None,
                         latency_detection=latency_detection,
                     )
                     self.playbacks[key] = playback
                 capture = await self._start_capture(session, latency_detection)
-            except (GatewayError, OSError, RuntimeError, ImportError, ValueError) as error:
+            except (asyncio.CancelledError, GatewayError, OSError, RuntimeError, ImportError, ValueError) as error:
                 try:
                     if pipeline is not None:
                         await pipeline.close()
@@ -186,6 +196,8 @@ class RealtimePipelines:
                 if playback is not None:
                     self.playbacks.pop(key, None)
                     await playback.close()
+                if isinstance(error, asyncio.CancelledError):
+                    raise
                 self._report(session, error)
                 session._log.submit("error", {"error": session.last_error.model_dump(mode="json")})
                 return "failed"
@@ -241,8 +253,10 @@ class RealtimePipelines:
             except BaseException:
                 await provider_context.__aexit__(None, None, None)
                 raise
-        except (GatewayError, OSError, RuntimeError, ValueError) as error:
+        except (asyncio.CancelledError, GatewayError, OSError, RuntimeError, ValueError) as error:
             await self._close_recording(key)
+            if isinstance(error, asyncio.CancelledError):
+                raise
             self._report(session, error)
             session._log.submit("error", {"error": session.last_error.model_dump(mode="json")})
             return "failed"
@@ -282,7 +296,7 @@ class RealtimePipelines:
                 })
             self._report(session, error)
             reconnect = (
-                provider_context is not None and session.state == "running"
+                session.owner != "meeting" and provider_context is not None and session.state == "running"
                 and session.last_error.code == "PROVIDER_DISCONNECTED"
                 and session.session_id not in self.reconnected
             )
@@ -414,6 +428,26 @@ class RealtimePipelines:
             session.last_error = ErrorPayload(
                 code="RESOURCE_EXHAUSTED", stage="asr", scope="session", fatal=True,
                 message_key="pipeline.finalRecognitionQueueFull", correlation_id=error.correlation_id,
+            )
+            return
+        if isinstance(error, GatewayError):
+            code = {
+                GatewayErrorCode.INVALID_INPUT: "INVALID_CONFIG",
+                GatewayErrorCode.CAPABILITY_MISMATCH: "CAPABILITY_MISMATCH",
+                GatewayErrorCode.MODEL_NOT_INSTALLED: "MODEL_NOT_READY",
+                GatewayErrorCode.MODEL_INTEGRITY: "MODEL_NOT_READY",
+                GatewayErrorCode.RESOURCE_EXHAUSTED: "RESOURCE_EXHAUSTED",
+                GatewayErrorCode.LOAD_FAILED: "MODEL_NOT_READY",
+                GatewayErrorCode.WORKER_EXITED: "MODEL_NOT_READY",
+                GatewayErrorCode.WORKER_OOM: "RESOURCE_EXHAUSTED",
+                GatewayErrorCode.LEASE_CONFLICT: "RESOURCE_BUSY",
+                GatewayErrorCode.PROVIDER_ERROR: "PROVIDER_DISCONNECTED",
+                GatewayErrorCode.NOT_SUPPORTED: "CAPABILITY_MISMATCH",
+            }.get(error.code, "INTERNAL_ERROR")
+            session.last_error = ErrorPayload(
+                code=code, stage=error.stage, message_key=f"gateway.{error.code.value}",
+                correlation_id=error.correlation_id, provider_code=error.provider_code,
+                retryable=error.retryable, retry_after_ms=error.retry_after_ms,
             )
             return
         session.last_error = ErrorPayload(

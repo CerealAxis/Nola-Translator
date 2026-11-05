@@ -72,7 +72,7 @@ describe('desktop backend session', () => {
     })
   })
 
-  it.each(['desktop', 'system-speech', 'system-speech-blocked', 'cascade-speech', 's2s', 'virtual-s2s', 'browser-tab', 'browser-system'])('drives the %s lifecycle over private sockets', async mode => {
+  it.each(['desktop', 'system-speech', 'system-speech-blocked', 'cascade-speech', 's2s', 'virtual-s2s', 'browser-tab', 'browser-system', 'gateway-disabled', 'asr-unauthorized'])('drives the %s lifecycle over private sockets', async mode => {
     const virtual = mode === 'virtual-s2s'
     const systemSpeech = mode === 'system-speech' || mode === 'system-speech-blocked'
     const s2sAudio = mode === 's2s' || virtual
@@ -99,8 +99,16 @@ describe('desktop backend session', () => {
       const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {}
       requests.push({ url: request.url, headers: request.headers, body })
       let result: object = { session_id: sessionId }
+      const unauthorized = { code: 'MODEL_NOT_READY', stage: 'asr', scope: 'session', retryable: false,
+        fatal: false, message_key: 'pipeline.recognitionUnauthorized', correlation_id: 'provider-failure' }
       if (request.url?.endsWith('/gateway/capabilities')) {
         result = { models: [...models].map(model_id => ({ model_id, enabled: true })) }
+        if (mode === 'gateway-disabled') {
+          response.statusCode = 503
+          result = { error: { ...unauthorized, code: 'RESOURCE_BUSY', stage: 'gateway', message_key: 'backend.gatewayDisabled' } }
+        }
+      } else if (mode === 'asr-unauthorized' && request.url?.endsWith(sessionId)) {
+        result = { last_error: unauthorized }
       } else if (request.url?.endsWith('/audio/preflight')) {
         result = { safe: mode === 'system-speech', feedback_status: 'unknown', issues: [] }
       } else if (request.url?.endsWith('/input/end')) {
@@ -108,6 +116,7 @@ describe('desktop backend session', () => {
       } else if (request.url?.endsWith('/commands')) {
         const states: Record<string, string> = { start: 'running', pause: 'paused', resume: 'running', stop: 'closed', reset_stream: 'running' }
         if (body.type === 'start') {
+          if (mode === 'asr-unauthorized') states.start = 'failed'
           event('source_text', { segment_id: 'segment', source_revision: 1, text: 'hel' })
           event('source_committed', {
             segment_id: 'segment', source_revision: 2, text: 'hello', audio_span: { start_sample: 0, end_sample: 1600 },
@@ -177,6 +186,10 @@ describe('desktop backend session', () => {
       authorizationHeader: () => ({ Authorization: 'Bearer control' }),
     }, { onEvent, onFence, onChunk: vi.fn(), preparePlayback })
     try {
+      if (mode === 'gateway-disabled') {
+        await expect(client.models()).rejects.toMatchObject({ engineCode: 'gatewayNotRunning', backendCode: 'RESOURCE_BUSY' })
+        return
+      }
       const available = await client.models()
       const mapped = browser ? mapBrowserSessionConfig({
         ...config, audioSource: browserTab ? { kind: 'browserTab', streamId: 'tab' } : { kind: 'systemOutput', deviceId: 'loopback' },
@@ -188,6 +201,10 @@ describe('desktop backend session', () => {
           ? { ...config, audioSource: { kind: 'virtualInput', deviceId: 'recording-endpoint' } } : config,
         DEFAULT_SETTINGS, available, { outputDeviceId: virtual ? 'chromium-sink' : undefined })
       if (!mapped) throw new Error('Expected compatible config')
+      if (mode === 'asr-unauthorized') {
+        await expect(client.start(mapped)).rejects.toMatchObject({ engineCode: 'invalidCredential', correlationId: 'provider-failure' })
+        return
+      }
       if (s2sAudio) {
         mapped.config.pipeline = { kind: 's2s', s2s_model: 's2s' }
         mapped.config.required_outputs.push('audio')

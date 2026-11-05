@@ -11,7 +11,7 @@ import pytest
 
 from nola_translator_engine.audio.resample import AudioFrame
 from nola_translator_engine.gateway_client import (
-    GatewayRecognizer, GatewayTranslationProvider, gateway_status, private_gateway_address,
+    GatewayRecognizer, GatewayTranslationError, GatewayTranslationProvider, gateway_status, private_gateway_address,
 )
 from nola_translator_engine.protocol import PrewarmConfig, PrewarmModelsCommand
 from nola_translator_engine.recognition.base import ModelUnavailable
@@ -59,6 +59,27 @@ def test_translation_does_not_report_truncated_stream_as_success():
         with pytest.raises(RuntimeError, match='without a final result'):
             await provider.translate('hello', 'en', 'zh')
         await provider.aclose()
+    run(check)
+
+
+@pytest.mark.parametrize(("status", "wire_code", "error_code"), [
+    (401, None, "engineTransportUnavailable"),
+    (200, "authentication_failed", "translationUnauthorized"),
+    (200, "gateway_not_running", "gatewayNotRunning"),
+    (200, "model_not_loaded", "modelNotLoaded"),
+])
+def test_translation_distinguishes_control_connection_and_model_errors(status, wire_code, error_code):
+    async def check():
+        provider = GatewayTranslationProvider('http://127.0.0.1:1234', 'private')
+        provider._http = httpx.AsyncClient(transport=httpx.MockTransport(lambda request:
+            httpx.Response(status, headers={'content-type': 'application/x-ndjson'},
+                           content=json.dumps({'error': {'code': wire_code}}) + '\n')))
+        try:
+            with pytest.raises(GatewayTranslationError) as failure:
+                await provider.translate('hello', 'en', 'zh')
+            assert failure.value.error_code == error_code
+        finally:
+            await provider.aclose()
     run(check)
 
 
@@ -226,7 +247,13 @@ def test_business_runtime_prewarm_checks_gateway_without_loading_weights(monkeyp
         assert runtime._active_recognition_runtime is None
         status['services']['mt']['state'] = 'stopped'
         result = await runtime._prewarm(command)
-        assert result[0].type == 'error' and result[0].code == 'modelUnavailable'
+        assert result[0].type == 'error' and result[0].code == 'modelNotLoaded'
+        status['state'] = 'stopped'
+        assert (await runtime._prewarm(command))[0].code == 'gatewayNotRunning'
+        cloud_config = command.config.model_copy(update={
+            'recognitionBinding': 'cloud:aliyun', 'translationBinding': 'cloud:google',
+        })
+        assert (await runtime._prewarm(command.model_copy(update={'config': cloud_config})))[0].state == 'ready'
         await runtime.close()
     run(check)
 

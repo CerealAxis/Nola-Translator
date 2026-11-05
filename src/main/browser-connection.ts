@@ -1,3 +1,4 @@
+import { once } from 'node:events'
 import { loggedHandle } from './logged-ipc'
 import { sceneModelBinding } from '../shared/model-policy'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
@@ -8,11 +9,11 @@ import { mkdir, writeFile, access, rm, copyFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { FIREFOX_EXTENSION_ID, BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, BROWSER_HOST_NAME, browserRequestSchema, type BrowserCaptionConfig, type BrowserConnectionStatus, type BrowserRequest, type BrowserResponse, type BrowserKind, type BrowserWireErrorCode } from '../shared/browser'
+import { FIREFOX_EXTENSION_ID, BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, BROWSER_HOST_NAME, BROWSER_PROTOCOL_VERSION, browserRequestSchema, type BrowserCapabilityRequest, type BrowserCapabilityResult, type BrowserCaptionConfig, type BrowserConnectionStatus, type BrowserRequest, type BrowserResponse, type BrowserKind, type BrowserWireErrorCode } from '../shared/browser'
 import type { FeatureActivity, FeatureLease } from './feature-activity'
 import type { BrowserIntegrations } from './browser-integrations'
 import type { AudioDevice, SessionConfig, EngineEvent, EngineProcessState, PrewarmConfig, PrewarmResult } from '../shared/contracts'
-import { defaultRealtimeS2s, NO_TRANSLATION_LANGUAGE, type AppSettings } from '../shared/settings'
+import { defaultRealtimeS2s, NO_TRANSLATION_LANGUAGE, REALTIME_S2S_MODELS, type AppSettings } from '../shared/settings'
 import type { EngineProcess } from './engine-process'
 import type { SessionController } from './session-controller'
 import { resolveDataRoot } from './data-root'
@@ -40,6 +41,16 @@ const LEGACY_BROWSER_ERROR_CODES: Readonly<Record<string, BrowserWireErrorCode>>
   captureCancelled: 'browserCaptureCancelled',
   tabAudioSilent: 'browserAudioSilent',
   slowAudio: 'browserAudioBacklog',
+  S2S_CONFIGURATION_MISSING: 'browserS2sUnavailable',
+  model_not_loaded: 'modelNotLoaded',
+  model_disabled: 'modelDisabled',
+  resource_busy: 'resourceBusy',
+  model_unavailable: 'modelUnavailable',
+  authentication_failed: 'invalidCredential',
+  request_timeout: 'translationTimeout',
+  rate_limited: 'browserTranslationRateLimited',
+  network_unavailable: 'translationNetworkUnavailable',
+  gateway_not_running: 'gatewayNotRunning',
 }
 const PUBLIC_ERRORS = new Set<BrowserWireErrorCode>([
   'browserConnectionUnavailable', 'browserConnectionLost', 'browserPermissionDenied',
@@ -47,26 +58,35 @@ const PUBLIC_ERRORS = new Set<BrowserWireErrorCode>([
   'browserCaptureTargetMismatch', 'browserCaptureCancelled', 'browserAudioSilent',
   'browserAudioBacklog', 'browserSessionAlreadyRunning', 'browserSessionNotRunning',
   'browserCaptionServiceDisabled', 'browserIntegrationDisabled', 'internalError',
+  'browserTextModelUnavailable', 'browserTranslationTimeout', 'browserTranslationRateLimited', 'browserS2sUnavailable', 'browserS2sTargetUnsupported',
+  'gatewayNotRunning', 'realtimeBackendUnavailable', 'modelNotLoaded', 'modelDisabled',
+  'invalidCredential', 'translationTimeout', 'translationNetworkUnavailable', 's2sConfigurationMissing', 's2sConnectionLost',
   'torchUnavailable', 'llamaUnavailable',
   'modelOutOfMemory', 'modelDependencyMissing', 'modelWeightsInvalid',
   'invalidMessage', 'unsupportedProtocol', 'invalidConfiguration', 'audioDeviceUnavailable',
-  'modelUnavailable', 'resourceUnavailable', 'resourceBusy', 'lineTooLarge',
+  'modelUnavailable', 'modelMissing', 'resourceUnavailable', 'resourceBusy', 'engineTransportUnavailable', 'lineTooLarge',
 ])
 
 function publicErrorCode(error: unknown): BrowserWireErrorCode {
   const message = error instanceof Error ? error.message : ''
   if (message.startsWith('FEATURE_CONFLICT:')) return 'browserSessionAlreadyRunning'
-  const legacy = LEGACY_BROWSER_ERROR_CODES[message]
-  if (legacy) return legacy
+  const code = error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : undefined
+  const legacy = [message, code].find(value => value && Object.hasOwn(LEGACY_BROWSER_ERROR_CODES, value))
+  if (legacy) return LEGACY_BROWSER_ERROR_CODES[legacy]
   if (message.startsWith('RUNTIME_TORCH:')) return 'torchUnavailable'
   if (message.startsWith('RUNTIME_LLAMA:')) return 'llamaUnavailable'
   if (PUBLIC_ERRORS.has(message as BrowserWireErrorCode)) return message as BrowserWireErrorCode
   console.error('browser request failed with an unmapped error', error)
   return 'internalError'
 }
-interface Client { socket: Socket; browser: BrowserKind; extensionVersion?: string; helloReceived: boolean; authenticated: boolean; sessionId: string | null; starting: boolean; closed: boolean; pending: number; pendingAudioMs: number; epoch: number; paused: boolean; audioGeneration: number; audioRequestPrefix: string; audioWindow: AudioWindow }
+interface Client { socket: Socket; browser: BrowserKind; extensionVersion?: string; protocolVersion?: number; helloReceived: boolean; authenticated: boolean; sessionId: string | null; starting: boolean; closed: boolean; pending: number; pendingAudioMs: number; epoch: number; paused: boolean; audioGeneration: number; audioRequestPrefix: string; audioWindow: AudioWindow; translations: Map<string, AbortController> }
 interface AudioWindow { count: number; lastBytes: number; lastAudioMs: number; loggedAtMs: number }
 export interface BrowserConnectionOptions {
+  inferCapability?(request: BrowserCapabilityRequest, signal: AbortSignal): Promise<BrowserCapabilityResult>
+  openAsrStream?(request: Extract<BrowserRequest, { type: 'streamStart' }>, signal: AbortSignal, emit: (data: Record<string, unknown>) => void): Promise<{ request(data: Record<string, unknown>): Promise<unknown>; close(): void }>
+
+  translateText?(request: { text: string; sourceLanguage: string; targetLanguage: string }, signal: AbortSignal): Promise<string>
+  textTranslationAvailable?(): true | 'gatewayNotRunning' | 'browserTextModelUnavailable'
   prepareS2s?: (model: string) => Promise<PrewarmResult>
   engine: EngineProcess
   activity?: FeatureActivity
@@ -94,7 +114,11 @@ export function browserCaptionConfig(settings: AppSettings): BrowserCaptionConfi
 
 export function browserSessionConfig(settings: AppSettings, request: Extract<BrowserRequest, { type: 'start' }>): SessionConfig {
   const translation = settings.translation
-  const s2sModel = settings.realtime?.browserS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.browserS2sModel
+  const configuredS2s = settings.realtime?.browserS2sModel === undefined ? defaultRealtimeS2s(settings) : settings.realtime.browserS2sModel
+  const s2sModel = request.pipeline === 'cascade' ? undefined : request.model ?? configuredS2s ?? (request.pipeline === 's2s' ? settings.realtime?.s2sModel ?? REALTIME_S2S_MODELS[0] : undefined)
+  const sourceLanguage = request.pipeline ? request.sourceLanguage ?? settings.recognition.sourceLanguage : settings.recognition.sourceLanguage
+  const targetLanguage = request.pipeline ? request.targetLanguage ?? translation.targetLanguage : translation.targetLanguage
+  if (s2sModel && request.pipeline && !ALIYUN_S2S_SPEECH_LANGUAGES.includes(targetLanguage)) throw new Error('browserS2sTargetUnsupported')
   const recognition = s2sModel ? { ...settings.recognition, provider: 'aliyun' as const, aliyunModel: s2sModel } : settings.recognition
   // `defaultOutput` is a UI sentinel, not a WASAPI loopback device id. Older settings may still
   // carry it from the browser caption picker, so resolve it as the live system default.
@@ -109,8 +133,8 @@ export function browserSessionConfig(settings: AppSettings, request: Extract<Bro
         : deviceId ? { kind: 'systemOutput', deviceId } : { kind: 'defaultOutput' },
     recognitionMode: 'realtime', recognitionModelId: settings.recognition.modelId,
     ...recognitionFieldsOf(recognition),
-    sourceLanguage: s2sModel && !remoteSourceLanguages(recognition).includes(recognition.sourceLanguage) ? 'auto' : recognition.sourceLanguage,
-    targetLanguages: translation.targetLanguage === NO_TRANSLATION_LANGUAGE ? [] : [translation.targetLanguage],
+    sourceLanguage: s2sModel && !remoteSourceLanguages(recognition).includes(sourceLanguage) ? 'auto' : sourceLanguage,
+    targetLanguages: targetLanguage === NO_TRANSLATION_LANGUAGE ? [] : [targetLanguage],
     translationProvider: s2sModel ? 'recognition' : translation.provider, translationModelId: translation.localModelId,
     allowIntermediateTranslation: supportsIntermediateTranslation(translation.provider) && translation.translateIntermediate,
     intermediateTranslationIntervalMs: translation.intermediateTranslationIntervalMs,
@@ -142,6 +166,7 @@ export class BrowserConnection {
   private readonly cleanup = new Set<Promise<void>>()
   private error: string | undefined
   private devices: AudioDevice[] = []
+  private readonly streams = new Map<string, { client: Client; controller: AbortController; stream: { request(data: Record<string, unknown>): Promise<unknown>; close(): void } }>()
   private readonly audioRequestPrefix = `browser-audio-${randomUUID()}-`
   constructor(private readonly options: BrowserConnectionOptions) {
     options.engine.on('event', this.onEvent)
@@ -287,8 +312,8 @@ export class BrowserConnection {
     const browsers = this.options.integrations?.snapshot.map(row => {
       const live = connected.filter(client => client.browser === row.browser && client.helloReceived)
       // A live old tab can outlast reloading an unpacked extension; its handshake outranks the disk manifest.
-      const client = live.find(item => item.extensionVersion !== BROWSER_EXTENSION_VERSION) ?? live[0]
-      return { ...row, available: row.available || !!client, connected: connected.some(item => item.browser === row.browser), ...(client ? { extensionStatus: 'installed' as const, extensionVersion: client.extensionVersion, extensionCompatible: client.extensionVersion === BROWSER_EXTENSION_VERSION } : {}) }
+      const client = live.find(item => (item.protocolVersion ?? 2) < 2 || (item.protocolVersion ?? 2) > BROWSER_PROTOCOL_VERSION) ?? live[0]
+      return { ...row, available: row.available || !!client, connected: connected.some(item => item.browser === row.browser), ...(client ? { extensionStatus: 'installed' as const, extensionVersion: client.extensionVersion, extensionCompatible: (client.protocolVersion ?? 2) >= 2 && (client.protocolVersion ?? 2) <= BROWSER_PROTOCOL_VERSION } : {}) }
     })
     return { enabled: this.enabled, registered: this.registered, connections: connected.length, captionServiceActive: this.captionServiceActive, sessionActive: sessionId !== undefined, sessionStarting: this.options.sessions.browserServiceStarting || this.captionServiceClosing !== null, overlayActive: !this.options.useGateway && (this.options.isOverlayVisible?.() ?? false), ...(sessionId ? { sessionId } : {}), ...(browsers ? { browsers } : {}), ...(this.error ? { error: this.error } : {}) }
   }
@@ -369,7 +394,7 @@ export class BrowserConnection {
     await this.setEnabled(false)
   }
   private accept(socket: Socket): void {
-    const client: Client = { socket, browser: 'chrome', helloReceived: false, authenticated: false, sessionId: null, starting: false, closed: false, pending: 0, pendingAudioMs: 0, epoch: 0, paused: false, audioGeneration: 0, audioRequestPrefix: `${this.audioRequestPrefix}${randomUUID()}-`, audioWindow: { count: 0, lastBytes: 0, lastAudioMs: 0, loggedAtMs: 0 } }
+    const client: Client = { socket, browser: 'chrome', helloReceived: false, authenticated: false, sessionId: null, starting: false, closed: false, pending: 0, pendingAudioMs: 0, epoch: 0, paused: false, audioGeneration: 0, audioRequestPrefix: `${this.audioRequestPrefix}${randomUUID()}-`, audioWindow: { count: 0, lastBytes: 0, lastAudioMs: 0, loggedAtMs: 0 }, translations: new Map() }
     this.clients.add(client)
     let buffer = Buffer.alloc(0)
     const authenticationDeadline = setTimeout(() => socket.destroy(), 5000)
@@ -377,6 +402,8 @@ export class BrowserConnection {
     socket.on('close', () => {
       clearTimeout(authenticationDeadline)
       client.closed = true
+      for (const [id, active] of this.streams) if (active.client === client) { active.controller.abort(); active.stream.close(); this.streams.delete(id) }
+      for (const controller of client.translations.values()) controller.abort()
       client.audioGeneration++
       client.pendingAudioMs = 0
       this.clients.delete(client)
@@ -430,7 +457,7 @@ export class BrowserConnection {
             if (client.sessionId) void this.options.sessions.stop(client.sessionId).catch(() => undefined)
             continue
           }
-        } else if (client.pending >= 24 && request.type !== 'stop' && request.type !== 'reset' && request.type !== 'debug') { socket.destroy(); return }
+        } else if (client.pending >= 24 && request.type !== 'stop' && request.type !== 'reset' && request.type !== 'debug' && request.type !== 'cancelTranslation') { socket.destroy(); return }
         client.pending++
         client.pendingAudioMs += audioMs
         const queuedEpoch = client.epoch
@@ -466,6 +493,7 @@ export class BrowserConnection {
       if (request.type === 'hello') {
         client.browser = request.browser ?? 'chrome'
         client.extensionVersion = request.extensionVersion
+        client.protocolVersion = request.protocolVersion ?? 2
         client.helloReceived = true
       }
       /*
@@ -506,19 +534,114 @@ export class BrowserConnection {
          * loads the extension would otherwise leave a Python process behind on a desktop whose
          * caption service is off.
          */
-        if (this.captionServiceActive) await sessions.ensureReady()
+        const compatible = (client.protocolVersion ?? 2) >= 2 && (client.protocolVersion ?? 2) <= BROWSER_PROTOCOL_VERSION
+        if (this.captionServiceActive && !compatible) await sessions.ensureReady()
         const settings = this.options.getSettings()
-        this.send(client, { type: 'result', id: request.id, value: { protocolVersion: 1, extensionVersion: BROWSER_EXTENSION_VERSION, extensionCompatible: client.extensionVersion === BROWSER_EXTENSION_VERSION, uiLanguage: settings.uiLanguage, sourceLanguage: settings.recognition.sourceLanguage, targetLanguage: settings.translation.targetLanguage, devices: this.devices, browserAudio: engine.supports('browserAudio'), captionServiceActive: this.captionServiceActive, config: browserCaptionConfig(settings) } })
+        const textTranslation = this.options.textTranslationAvailable?.() ?? (this.options.translateText ? true : 'browserTextModelUnavailable')
+        this.send(client, { type: 'result', id: request.id, value: {
+          protocolVersion: compatible ? Math.min(client.protocolVersion ?? 2, BROWSER_PROTOCOL_VERSION) as 2 | typeof BROWSER_PROTOCOL_VERSION : 1,
+          capabilities: { mt: textTranslation === true, asr: Boolean(this.options.inferCapability), tts: Boolean(this.options.inferCapability), llm: Boolean(this.options.inferCapability), s2s: Boolean(this.options.useGateway) },
+          extensionVersion: BROWSER_EXTENSION_VERSION, extensionCompatible: compatible,
+          textTranslation: textTranslation === true,
+          ...(textTranslation === true ? {} : { textTranslationError: textTranslation }),
+          realtimeTranslation: Boolean(this.options.useGateway),
+          uiLanguage: settings.uiLanguage, sourceLanguage: settings.recognition.sourceLanguage, targetLanguage: settings.translation.targetLanguage,
+          devices: this.devices, browserAudio: Boolean(this.options.useGateway) || engine.supports('browserAudio'), captionServiceActive: this.options.useGateway || this.captionServiceActive, config: browserCaptionConfig(settings),
+        } })
+        return
+      }
+      if ((client.protocolVersion ?? 2) < 2 || (client.protocolVersion ?? 2) > BROWSER_PROTOCOL_VERSION) throw new Error('browserProtocolMismatch')
+      if (request.type === 'cancel') {
+        client.translations.get(request.requestId)?.abort()
+        this.send(client, { type: 'result', id: request.id })
+        return
+      }
+      if (request.type === 'streamStart') {
+        if (!this.options.openAsrStream) throw new Error('modelUnavailable')
+        if ([...this.streams.values()].some(value => value.client === client)) throw new Error('resourceBusy')
+        const controller = new AbortController()
+        client.translations.set(request.id, controller)
+        try {
+          const stream = await this.options.openAsrStream(request, controller.signal, data => this.send(client, { type: 'capabilityEvent', id: request.id, event: { type: 'asr', data } }))
+          if (client.closed || controller.signal.aborted) { stream.close(); throw new Error('connectionLost') }
+          this.streams.set(request.id, { client, controller, stream })
+          this.send(client, { type: 'result', id: request.id, value: { streamId: request.id } })
+        } catch (error) { client.translations.delete(request.id); controller.abort(); throw error }
+        return
+      }
+      if (request.type === 'streamAudio' || request.type === 'streamFinish' || request.type === 'streamStop') {
+        const active = this.streams.get(request.streamId)
+        if (!active || active.client !== client) throw new Error('sessionNotRunning')
+        try {
+          if (request.type === 'streamAudio') {
+            if (Buffer.from(request.pcmBase64, 'base64').length % 2) throw new Error('invalidMessage')
+            await active.stream.request({ op: 'session.append', session: request.streamId, audio: request.pcmBase64 })
+          }
+          else if (request.type === 'streamFinish') await active.stream.request({ op: 'session.finish', session: request.streamId })
+        } finally {
+          if (request.type !== 'streamAudio') { active.controller.abort(); active.stream.close(); this.streams.delete(request.streamId); client.translations.delete(request.streamId) }
+        }
+        this.send(client, { type: 'result', id: request.id })
+        return
+      }
+      if (request.type === 'generate' || request.type === 'synthesize' || request.type === 'voices' || request.type === 'transcribe') {
+        if (!this.options.inferCapability) throw new Error('modelUnavailable')
+        if (client.translations.size >= 4 || client.translations.has(request.id)) throw new Error('resourceBusy')
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 120000)
+        client.translations.set(request.id, controller)
+        try {
+          let value = await this.options.inferCapability(request, controller.signal)
+          controller.signal.throwIfAborted()
+          if ('audio' in value && value.audio) {
+            const match = /^data:([^;,]+);base64,(.*)$/.exec(value.audio)
+            if (!match || match[2].length > 32 * 1024 * 1024) throw new Error('invalidMessage')
+            const chunks = Math.ceil(match[2].length / 64000)
+            for (let index = 0; index < chunks; index++) {
+              controller.signal.throwIfAborted()
+              if (client.socket.writableNeedDrain) await once(client.socket, 'drain', { signal: controller.signal })
+              this.send(client, { type: 'capabilityEvent', id: request.id, event: { type: 'audio', index, data: match[2].slice(index * 64000, (index + 1) * 64000) } })
+            }
+            value = { audioChunks: chunks, format: match[1] }
+          }
+          this.send(client, { type: 'result', id: request.id, value })
+        } finally { clearTimeout(timer); client.translations.delete(request.id) }
+        return
+      }
+      if (request.type === 'translate' || request.type === 'cancelTranslation') {
+        if (((client.protocolVersion ?? 2) < 2 || (client.protocolVersion ?? 2) > BROWSER_PROTOCOL_VERSION)) throw new Error('browserExtensionVersionMismatch')
+        if (request.type === 'cancelTranslation') {
+          client.translations.get(request.requestId)?.abort()
+          this.send(client, { type: 'result', id: request.id })
+          return
+        }
+        if (!this.options.translateText) throw new Error('browserTextModelUnavailable')
+        if (client.translations.size >= 4) throw new Error('resourceBusy')
+        if (client.translations.has(request.id)) throw new Error('invalidMessage')
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(new Error('browserTranslationTimeout')), 28_000)
+        client.translations.set(request.id, controller)
+        try {
+          const result = await this.options.translateText(request, controller.signal)
+          controller.signal.throwIfAborted()
+          this.send(client, { type: 'result', id: request.id, value: { text: result } })
+        } catch (error) {
+          if (!controller.signal.aborted) throw error
+          if (controller.signal.reason instanceof Error && controller.signal.reason.message === 'browserTranslationTimeout') throw controller.signal.reason
+        } finally {
+          clearTimeout(timer)
+          client.translations.delete(request.id)
+        }
         return
       }
       if (request.type === 'start') {
-        if (client.extensionVersion !== BROWSER_EXTENSION_VERSION) {
+        if (((client.protocolVersion ?? 2) < 2 || (client.protocolVersion ?? 2) > BROWSER_PROTOCOL_VERSION)) {
           this.send(client, { type: 'error', id: request.id, code: 'browserExtensionVersionMismatch', message: 'browserExtensionVersionMismatch' })
           return
         }
         // Checked before the busy check: a closed gate admits no session at all, so reporting
         // "already running" would name a fault the extension cannot have.
-        if (!this.captionServiceActive) throw new Error('captionServiceOff')
+        if (!this.options.useGateway && !this.captionServiceActive) throw new Error('captionServiceOff')
         if (client.starting || client.sessionId) throw new Error('sessionAlreadyRunning')
         client.starting = true
         this.debugLog('start', { source: request.source, streamId: request.streamId, epoch: request.epoch })
@@ -613,4 +736,4 @@ export class BrowserConnection {
     if (['failed', 'recovering', 'stopped'].includes(state)) for (const client of this.clients) if (client.sessionId) client.socket.destroy()
   }
 }
-import { fallbackTranslationFieldsOf, recognitionFieldsOf, remoteSourceLanguages, supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'
+import { ALIYUN_S2S_SPEECH_LANGUAGES, fallbackTranslationFieldsOf, recognitionFieldsOf, remoteSourceLanguages, supportsIntermediateTranslation, translationOptionsOf } from '../shared/cloud-config'

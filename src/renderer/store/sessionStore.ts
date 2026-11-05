@@ -17,6 +17,7 @@ import type {
   SessionStatus,
 } from '@/bridge'
 import { createStore } from './createStore'
+import type { MeetingModeSnapshot } from '../../shared/meeting-mode'
 import { isSessionAlreadyRunningError } from '../../shared/ipc-error'
 import { configurationOf, recognitionLanguages } from '../../shared/model-capabilities'
 import { normalizeLanguage } from '../../shared/languages'
@@ -68,6 +69,7 @@ const ENGINE_PROCESS_STATE_TO_UI: Record<EngineProcessState, EngineStatus> = {
 
 
 export interface SessionState {
+  meeting?: MeetingModeSnapshot
   status: SessionStatus
   playbackPhase?: 'waiting' | 'synthesizing' | 'playing' | 'idle' | 'failed'
   waitingSpeechCount?: number
@@ -119,6 +121,8 @@ export const sessionStore = createStore<SessionState>(initialState)
 
 let bridge: NolaBridge | null = null
 let unsubscribe: (() => void) | null = null
+let unsubscribeMeeting: (() => void) | null = null
+let attachmentVersion = 0
 
 /**
 * Whether an `engineStateChanged` has arrived since the last attach.
@@ -527,9 +531,21 @@ export function clearSessionTranscript(): void {
   sessionStore.setState({ segments: [], interim: null })
 }
 export function attachSessionStore(next: NolaBridge): void {
+  const version = ++attachmentVersion
   bridge = next
+  unsubscribeMeeting?.()
+  let meetingChanged = false
+  unsubscribeMeeting = next.meetingMode?.onChanged(meeting => {
+    meetingChanged = true
+    sessionStore.setState({ meeting })
+  }) ?? null
+  void next.meetingMode?.snapshot().then(meeting => {
+    if (bridge === next && !meetingChanged) sessionStore.setState({ meeting })
+  }).catch(() => undefined)
   unsubscribe?.()
-  unsubscribe = next.events.onEngineEvent((event: EngineChannelEvent) => {
+  let hydrating = !!next.engine.getSessionSnapshot
+  const buffered: EngineChannelEvent[] = []
+  const applyEvent = (event: EngineChannelEvent) => {
     switch (event.type) {
       /*
       * Engine process lifecycle: the only source of `engineStatus`. The main
@@ -606,10 +622,10 @@ export function attachSessionStore(next: NolaBridge): void {
         break
       case 'error':
         sessionStore.setState({
-          status: (event.recoverable && event.details?.scope === 'task') || sessionStore.getState().sessionId === null ? sessionStore.getState().status : 'error',
+          status: (event.recoverable && (event.details?.scope === 'task' || event.details?.scope === 'consumer')) || sessionStore.getState().sessionId === null ? sessionStore.getState().status : 'error',
           error: event.code,
           errorCode: event.code.toUpperCase(),
-          errorRequestId: event.requestId,
+          errorRequestId: typeof event.details?.correlationId === 'string' && event.details.correlationId ? event.details.correlationId : event.requestId,
         })
         break
       /*
@@ -654,7 +670,31 @@ export function attachSessionStore(next: NolaBridge): void {
       default:
         break
     }
+  }
+  unsubscribe = next.events.onEngineEvent(event => {
+    if (hydrating) buffered.push(event)
+    else applyEvent(event)
   })
+  if (hydrating) {
+    void next.engine.getSessionSnapshot!().then(snapshot => {
+      if (bridge !== next || attachmentVersion !== version || !snapshot) return
+      // Status events have no session id; a new-session edge fences earlier buffered state.
+      let anchor = -1
+      buffered.forEach((event, index) => { if (event.type === 'sessionStarted' && event.sessionId === snapshot.sessionId) anchor = index })
+      if (anchor > 0) buffered.splice(0, anchor)
+      sessionStore.setState({ sessionId: snapshot.sessionId, meetingId: snapshot.meetingId, status: snapshot.status,
+        startedAtMs: snapshot.startedAtMs, elapsedMs: snapshot.elapsedMs,
+        segments: snapshot.segments.filter(segment => segment.isFinal), interim: snapshot.segments.filter(segment => !segment.isFinal).at(-1) ?? null })
+      pausedTotalMs = Math.max(0, Date.now() - snapshot.startedAtMs - snapshot.elapsedMs)
+      pausedAtMs = snapshot.status === 'paused' ? Date.now() : null
+      if (snapshot.status === 'running') startTicker()
+    }).catch(() => undefined).finally(() => {
+      if (bridge !== next || attachmentVersion !== version) return
+      hydrating = false
+      for (const event of buffered) applyEvent(event)
+      buffered.length = 0
+    })
+  }
 
   /*
    * Read the level once, after subscribing. Events carry edges only, and a reload
@@ -675,6 +715,9 @@ export function attachSessionStore(next: NolaBridge): void {
 }
 
 export function detachSessionStore(): void {
+  attachmentVersion++
+  unsubscribeMeeting?.()
+  unsubscribeMeeting = null
   unsubscribe?.()
   unsubscribe = null
   bridge = null

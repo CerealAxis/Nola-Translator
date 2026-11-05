@@ -8,6 +8,7 @@ import { PYPI_MIRROR_NODES, PYTORCH_WHEEL_MIRROR_NODES } from '../shared/pypi-mi
 import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { computeSettingsPatchSchema } from '../shared/compute'
 import { REALTIME_S2S_MODELS, RECOGNITION_MODEL_IDS } from '../shared/settings'
+import { meetingModeSettingsSchema } from '../shared/meeting-mode'
 
 /**
  * The runtime half of the settings contract.
@@ -46,6 +47,7 @@ const localModelIdSchema = z.union([
 ])
 
 export const settingsPatchSchema = z.object({
+  meetingMode: meetingModeSettingsSchema.optional(),
   closeBehavior: z.enum(['tray', 'quit']).optional(),
   synthesis: z.object({ modelId: z.string().max(512), voice: z.string().max(256) }).partial().optional(),
   realtime: z.object({

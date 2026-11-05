@@ -1,0 +1,579 @@
+"""Bounded local screen OCR with explicit, verified model installation."""
+
+from __future__ import annotations
+
+import asyncio
+import base64
+import binascii
+import json
+import math
+import os
+import re
+from pathlib import Path
+import struct
+import threading
+from typing import Literal
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, ConfigDict, Field
+
+from ..models.manager import ModelIntegrityError, ModelManager
+from ..models.ocr_catalog import OCR_DETECTOR, OCR_RECOGNIZERS, PP_OCRV5_MOBILE, OCR_SPECS, OCR_LANGUAGES, OCR_RESOURCE_ID
+from ..protocol import NetworkSettings, ResourceRecord
+from ..debug_log import exception_fields, write as write_diagnostic
+
+MAX_IMAGE_BYTES = 12 * 1024 * 1024
+MAX_IMAGE_PIXELS = 12_000_000
+MAX_BLOCKS = 256
+STATE_FILE = ".screen-ocr-state.json"
+
+
+class OcrRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    image: str = Field(min_length=24, max_length=MAX_IMAGE_BYTES * 4 // 3 + 64)
+    appearance: bool = False
+    language: str = Field(default="auto", min_length=1, max_length=32, pattern=r"^[a-zA-Z][a-zA-Z0-9-]*$")
+
+
+class OcrInstallRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    network: NetworkSettings | None = None
+
+
+def _process_running(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if os.name != "nt":
+        os.kill(pid, 0)
+        return True
+    # os.kill(pid, 0) generates a console event on Windows; query the process instead.
+    import ctypes
+    from ctypes import wintypes
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = kernel.OpenProcess(0x1000, False, pid)
+    if not handle:
+        return False
+    try:
+        code = wintypes.DWORD()
+        return bool(kernel.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == 259
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def read_ocr_state(model_root: Path, resource_id: str = OCR_RESOURCE_ID) -> dict:
+    """Share operation progress with the existing model-resource process."""
+    try:
+        state_file = STATE_FILE if resource_id == OCR_RESOURCE_ID else f".screen-ocr-{resource_id}-state.json"
+        state = json.loads((model_root / state_file).read_text(encoding="utf-8"))
+        if not isinstance(state, dict):
+            return {}
+        pid = int(state.pop("pid"))
+        if pid != os.getpid() and not _process_running(pid):
+            return {}
+        return state
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+
+
+def decode_image(data_url: str):
+    import cv2
+    import numpy as np
+
+    prefix = "data:image/png;base64,"
+    if not data_url.startswith(prefix):
+        raise ValueError("invalidImage")
+    try:
+        raw = base64.b64decode(data_url[len(prefix):], validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("invalidImage") from exc
+    # Check dimensions before decoding to reject PNG decompression bombs.
+    if len(raw) > MAX_IMAGE_BYTES or len(raw) < 33 or raw[:8] != b"\x89PNG\r\n\x1a\n" or raw[12:16] != b"IHDR":
+        raise ValueError("invalidImage")
+    width, height = struct.unpack(">II", raw[16:24])
+    if not width or not height or width * height > MAX_IMAGE_PIXELS or max(width, height) > 8192:
+        raise ValueError("imageTooLarge")
+    image = cv2.imdecode(np.frombuffer(raw, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None or image.shape[:2] != (height, width):
+        raise ValueError("invalidImage")
+    return image
+
+
+def screen_text_appearance(image, quad: list) -> dict:
+    """Repair glyph pixels with OpenCV Telea inpainting; preserve the surrounding screenshot."""
+    import cv2
+    import numpy as np
+
+    image_height, image_width = image.shape[:2]
+    points = np.asarray(quad, dtype=np.float32)
+    x, y, width, height = cv2.boundingRect(points)
+    margin = max(3, min(12, min(width, height) // 4))
+    left, top = max(0, x - margin), max(0, y - margin)
+    right, bottom = min(image_width, x + width + margin), min(image_height, y + height + margin)
+    crop = image[top:bottom, left:right].copy()
+    h, w = crop.shape[:2]
+    polygon = np.zeros((h, w), np.uint8)
+    cv2.fillConvexPoly(polygon, np.rint(points - [left, top]).astype(np.int32), 255)
+    ring = crop[polygon == 0]
+    sample = ring if len(ring) else crop.reshape(-1, 3)
+    # Coarse color bins resist anti-aliasing and isolated artwork pixels in the sampling ring.
+    bins = (sample.astype(np.int32) // 16)
+    keys = bins[:, 0] * 256 + bins[:, 1] * 16 + bins[:, 2]
+    dominant = np.bincount(keys, minlength=4096).argmax()
+    background = np.median(sample[keys == dominant], axis=0)
+    distance = np.linalg.norm(crop.astype(np.float32) - background, axis=2)
+    inside = distance[polygon > 0]
+    threshold = float(np.clip(np.percentile(inside, 98) * .45, 25, 60)) if len(inside) else 60
+    ink = (distance > threshold) & (polygon > 0)
+    pixels = crop[ink]
+    color = np.median(pixels, axis=0) if len(pixels) else (255 - background)
+    def luminance(bgr):
+        rgb = np.asarray(bgr, dtype=np.float32)[::-1] / 255
+        linear = np.where(rgb <= .04045, rgb / 12.92, ((rgb + .055) / 1.055) ** 2.4)
+        return float(linear @ [.2126, .7152, .0722])
+    bg_luma, fg_luma = luminance(background), luminance(color)
+    if (max(bg_luma, fg_luma) + .05) / (min(bg_luma, fg_luma) + .05) < 4.5:
+        color = np.array([0, 0, 0] if bg_luma > .179 else [255, 255, 255])
+    mask = cv2.dilate(ink.astype(np.uint8) * 255, np.ones((5, 5), np.uint8))
+    if np.count_nonzero(ink) > np.count_nonzero(polygon) * .65:
+        kernel = max(7, min(51, height // 2) | 1)
+        repaired = cv2.GaussianBlur(crop, (kernel, kernel), 0)
+    else:
+        repaired = cv2.inpaint(crop, mask, 3, cv2.INPAINT_TELEA)
+    yy, xx = np.indices((h, w))
+    edge = np.minimum.reduce([xx + 1, yy + 1, w - xx, h - yy])
+    alpha = np.minimum(1, edge / max(1, margin)) * 255
+    patch = cv2.cvtColor(repaired, cv2.COLOR_BGR2BGRA)
+    patch[:, :, 3] = alpha.astype(np.uint8)
+    ok, encoded = cv2.imencode('.png', patch)
+    def hex_color(bgr):
+        return '#' + ''.join(f'{int(v):02x}' for v in np.clip(bgr, 0, 255)[::-1])
+    return {"color": hex_color(color), "background": hex_color(background), "patches": [{
+        "image": "data:image/png;base64," + base64.b64encode(encoded).decode('ascii'),
+        "x": left / image_width, "y": top / image_height,
+        "width": w / image_width, "height": h / image_height,
+    }] if ok else []}
+
+
+def ctc_decode(prediction, characters: list[str]) -> tuple[str, float]:
+    import numpy as np
+
+    values = np.asarray(prediction)[0]
+    if values.ndim != 2 or values.shape[1] != len(characters) or not np.isfinite(values).all():
+        raise ValueError("modelCorrupt")
+    indices = values.argmax(axis=1)
+    scores = values.max(axis=1)
+    keep = (indices != 0)
+    keep[1:] &= indices[1:] != indices[:-1]
+    text = "".join(characters[int(index)] for index in indices[keep])
+    return text, float(scores[keep].mean()) if keep.any() else 0.0
+
+
+def arabic_logical_order(text: str) -> str:
+    # PaddleOCR's Arabic decoder preserves Latin/number runs while reversing visual output.
+    return "".join(reversed(re.findall(r"[a-zA-Z0-9 :*./%+\-]+|.", text, flags=re.DOTALL)))
+
+
+def recognition_quality(result: tuple[str, float]) -> float:
+    # An unsupported recognizer can confidently retain only the digits in a line.
+    return result[1] * math.sqrt(sum(not char.isspace() for char in result[0]))
+
+
+def detected_quads(probability, width: int, height: int):
+    import cv2
+    import numpy as np
+
+    probability = np.asarray(probability).squeeze()
+    if probability.ndim != 2 or not np.isfinite(probability).all():
+        raise ValueError("modelCorrupt")
+    binary = (probability > 0.3).astype(np.uint8)
+    contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    quads = []
+    scale = np.array([width / probability.shape[1], height / probability.shape[0]])
+    for contour in sorted(contours, key=cv2.contourArea, reverse=True)[:MAX_BLOCKS * 4]:
+        rect = cv2.minAreaRect(contour)
+        (cx, cy), (bw, bh), angle = rect
+        if min(bw, bh) < 3:
+            continue
+        x, y, box_width, box_height = cv2.boundingRect(contour)
+        mask = np.zeros((box_height, box_width), dtype=np.uint8)
+        cv2.drawContours(mask, [contour - [x, y]], -1, 1, -1)
+        if cv2.mean(probability[y:y + box_height, x:x + box_width], mask)[0] < 0.5:
+            continue
+        # DB detection shrinks text; expand the fitted rectangle by its area/perimeter.
+        expand = bw * bh * 1.5 / max(bw + bh, 1)
+        points = cv2.boxPoints(((cx, cy), (bw + expand, bh + expand), angle)) * scale
+        center = points.mean(axis=0)
+        order = np.argsort(np.arctan2(points[:, 1] - center[1], points[:, 0] - center[0]))
+        points = points[order]
+        points = np.roll(points, -int(np.argmin(points.sum(axis=1))), axis=0)
+        points[:, 0] = points[:, 0].clip(0, width - 1)
+        points[:, 1] = points[:, 1].clip(0, height - 1)
+        quads.append(points.astype(np.float32))
+        if len(quads) >= MAX_BLOCKS:
+            break
+    return sorted(quads, key=lambda p: (round(float(p[:, 1].mean()) / 12), float(p[:, 0].min())))
+
+
+class ScreenOcr:
+    def __init__(self, model_root: Path, manager: ModelManager | None = None, spec=None) -> None:
+        self.spec = spec or PP_OCRV5_MOBILE
+        self.languages = OCR_LANGUAGES[self.spec.model_id]
+        self._variants: dict[str, ScreenOcr] = {}
+        self.models = manager or ModelManager(model_root)
+        self.root = self.models.model_root
+        # Only the OCR owner cleans its staging folders; listing models in the other
+        # engine process must never remove a currently downloading OCR snapshot.
+        self.models.cleanup_stale([self.spec])
+        self._lock = asyncio.Lock()
+        self._cancel = threading.Event()
+        self._install: asyncio.Task | None = None
+        self._state: dict = {}
+        self._sessions: dict = {}
+        self._verified = None
+        self._closed = False
+        self._loaded = False
+
+    def status(self) -> dict:
+        installed = self.models.is_installed(self.spec)
+        state = dict(self._state)
+        if installed and not self._lock.locked():
+            try:
+                self._verify()
+            except ValueError as exc:
+                installed = False
+                state = {"state": "failed", "error": str(exc)}
+                if state != self._state:
+                    self._publish(**state)
+        snapshot = {
+            "installed": installed,
+            "state": "idle", "downloadBytes": self.spec.total_bytes,
+            "languages": ["auto", *self.languages], **state,
+        }
+        from ..resources import RESOURCE_BY_ID
+
+        definition = RESOURCE_BY_ID[self.spec.model_id]
+        directory = self.models.model_path(self.spec)
+        installed_bytes = sum((directory / entry.path).stat().st_size for entry in self.spec.files
+                              if (directory / entry.path).is_file())
+        snapshot["resource"] = ResourceRecord(
+            resourceId=definition.resource_id, kind="ocrModel", provider=definition.provider,
+            name=definition.name, description=definition.description, languages=list(definition.languages),
+            installed=installed, installedBytes=installed_bytes, downloadBytes=self.spec.total_bytes,
+            state=snapshot["state"], phase=snapshot.get("phase"), progress=snapshot.get("progress"),
+            errorCode=snapshot.get("error"), cancellable=snapshot["state"] == "running",
+        ).model_dump()
+        return snapshot
+
+    def _publish(self, **state) -> None:
+        self._state = state
+        self.root.mkdir(parents=True, exist_ok=True)
+        target = self.root / (STATE_FILE if self.spec.model_id == OCR_RESOURCE_ID else f".screen-ocr-{self.spec.model_id}-state.json")
+        staging = target.with_suffix(".tmp")
+        staging.write_text(json.dumps({"pid": os.getpid(), **state}), encoding="utf-8")
+        staging.replace(target)
+
+    def _verify(self) -> Path:
+        directory = self.models.model_path(self.spec)
+        if not directory.exists():
+            raise ValueError("modelMissing")
+        if not self.models._owned_directory(directory) or any(
+            not (directory / entry.path).resolve().is_relative_to(directory)
+            for entry in self.spec.files
+        ):
+            raise ValueError("modelCorrupt")
+        try:
+            fingerprint = tuple((path.stat().st_size, path.stat().st_mtime_ns) for path in
+                                (directory / entry.path for entry in self.spec.files))
+        except OSError as exc:
+            raise ValueError("modelMissing") from exc
+        if fingerprint != self._verified:
+            self._sessions.clear()
+            if self._loaded:
+                self._loaded = False
+                raise ValueError("modelCorrupt")
+            try:
+                for entry in self.spec.files:
+                    self.models._verify_file(directory / entry.path, entry)
+            except ModelIntegrityError as exc:
+                raise ValueError("modelCorrupt") from exc
+            self._verified = fingerprint
+        return directory
+
+    async def install(self, network=None) -> dict:
+        if self._closed or self._loaded or self._lock.locked() or (self._install and not self._install.done()):
+            raise ValueError("resourceBusy")
+        self._cancel.clear()
+        self._publish(state="running", phase="verify", progress=0)
+        self._install = asyncio.create_task(self._run_install(network))
+        return self.status()
+
+    async def _run_install(self, network) -> None:
+        async with self._lock:
+            loop = asyncio.get_running_loop()
+            phase = "verify"
+
+            def progress(current, total):
+                if self._cancel.is_set():
+                    raise InterruptedError("cancelled")
+                current_phase = phase
+                loop.call_soon_threadsafe(lambda: self._publish(
+                    state="cancelling" if self._cancel.is_set() else "running",
+                    phase=current_phase, progress=min(1, current / max(total, 1))))
+
+            def on_phase(value):
+                nonlocal phase
+                phase = value
+                progress(0, 1)
+
+            def run():
+                self._sessions.clear()
+                self._verified = None
+                # ensure() checks sizes at startup; remove only digest-invalid files to repair
+                # same-size corruption without downloading the valid sibling weights again.
+                directory = self.models.model_path(self.spec)
+                if directory.exists() and (not self.models._owned_directory(directory) or any(
+                    not (directory / entry.path).resolve().is_relative_to(directory)
+                    for entry in self.spec.files
+                )):
+                    raise ModelIntegrityError("Model directory contains external links")
+                for entry in self.spec.files:
+                    path = directory / entry.path
+                    if path.exists():
+                        try:
+                            self.models._verify_file(path, entry, lambda: progress(0, 1))
+                        except ModelIntegrityError:
+                            path.unlink()
+                self.models.ensure(self.spec, progress=progress, on_phase=on_phase, network=network)
+
+            try:
+                await asyncio.to_thread(run)
+            except InterruptedError:
+                self._publish(state="idle")
+            except Exception as exc:
+                write_diagnostic("engine", "screen.ocr.install.failed", exception_fields(exc))
+                self._publish(state="failed", error="modelCorrupt" if isinstance(exc, ModelIntegrityError) else "installFailed")
+            else:
+                self._publish(state="idle")
+
+    async def cancel_install(self) -> dict:
+        self._cancel.set()
+        if self._install:
+            await self._install
+        return self.status()
+
+    async def remove(self) -> dict:
+        if self._loaded or self._lock.locked() or (self._install and not self._install.done()):
+            raise ValueError("resourceBusy")
+        async with self._lock:
+            self._sessions.clear()
+            self._verified = None
+            directory = self.models.model_path(self.spec)
+            if directory.exists():
+                if not self.models._owned_directory(directory):
+                    raise ValueError("modelCorrupt")
+                # model_path and _owned_directory constrain deletion to the model root.
+                import shutil
+                await asyncio.to_thread(shutil.rmtree, directory)
+            self._publish(state="idle")
+        return self.status()
+
+    def _session(self, path: Path):
+        import onnxruntime as ort
+
+        key = str(path)
+        if key not in self._sessions:
+            options = ort.SessionOptions()
+            options.intra_op_num_threads = min(2, os.cpu_count() or 1)
+            options.inter_op_num_threads = 1
+            options.log_severity_level = 3
+            self._sessions[key] = ort.InferenceSession(key, options, providers=["CPUExecutionProvider"])
+        return self._sessions[key]
+
+    @staticmethod
+    def _recognize(crop, recognizer) -> tuple[str, float]:
+        import cv2
+        import numpy as np
+
+        metadata = recognizer.get_modelmeta().custom_metadata_map
+        if not metadata.get("character"):
+            raise ValueError("modelCorrupt")
+        characters = [""] + metadata["character"].splitlines() + [" "]
+        shape = recognizer.get_inputs()[0].shape
+        height = shape[2] if isinstance(shape[2], int) else 48
+        width = shape[3] if isinstance(shape[3], int) else min(2048, max(320, math.ceil(crop.shape[1] * height / crop.shape[0])))
+        resized_width = min(width, math.ceil(crop.shape[1] * height / crop.shape[0]))
+
+        def recognize(image):
+            tensor = np.zeros((1, 3, height, width), dtype=np.float32)
+            resized = cv2.resize(image, (resized_width, height)).astype(np.float32) / 127.5 - 1
+            tensor[0, :, :, :resized_width] = resized.transpose(2, 0, 1)
+            prediction = recognizer.run(None, {recognizer.get_inputs()[0].name: tensor})[0]
+            return ctc_decode(prediction, characters)
+
+        result = recognize(crop)
+        if result[1] < 0.7:
+            # Retry uncertain text upside-down without loading a separate orientation model.
+            result = max(result, recognize(np.rot90(crop, 2)), key=recognition_quality)
+        return result
+
+    def _infer(self, request: OcrRequest) -> dict:
+        import cv2
+        import numpy as np
+
+        cv2.setNumThreads(1)
+        directory = self._verify()
+        image = decode_image(request.image)
+        height, width = image.shape[:2]
+        ratio = min(1, 960 / max(height, width))
+        size = (max(32, round(width * ratio / 32) * 32), max(32, round(height * ratio / 32) * 32))
+        tensor = cv2.resize(image, size).astype(np.float32) / 255
+        tensor = ((tensor - np.array([0.485, 0.456, 0.406], dtype=np.float32)) /
+                  np.array([0.229, 0.224, 0.225], dtype=np.float32)).transpose(2, 0, 1)[None]
+        detector = self._session(directory / OCR_DETECTOR)
+        prediction = detector.run(None, {detector.get_inputs()[0].name: tensor})[0]
+        if self.spec.model_id == OCR_RESOURCE_ID:
+            languages = ("ch", "ko") if request.language == "auto" else ("ko" if request.language == "ko" else "ch",)
+            paths = [OCR_RECOGNIZERS[language] for language in languages]
+        else:
+            paths = [entry.path for entry in self.spec.files if "_rec_" in entry.path]
+        recognizers = [self._session(directory / path) for path in paths]
+        blocks = []
+        for quad in detected_quads(prediction, width, height):
+            crop_width = max(1, round(max(np.linalg.norm(quad[0] - quad[1]), np.linalg.norm(quad[2] - quad[3]))))
+            crop_height = max(1, round(max(np.linalg.norm(quad[0] - quad[3]), np.linalg.norm(quad[1] - quad[2]))))
+            target = np.array([[0, 0], [crop_width - 1, 0], [crop_width - 1, crop_height - 1], [0, crop_height - 1]], dtype=np.float32)
+            crop = cv2.warpPerspective(image, cv2.getPerspectiveTransform(quad, target), (crop_width, crop_height), borderMode=cv2.BORDER_REPLICATE)
+            if crop_height > crop_width * 1.5:
+                crop = np.rot90(crop)
+            text, confidence = max((self._recognize(crop, recognizer) for recognizer in recognizers), key=recognition_quality)
+            if self.spec.model_id == "pp-ocrv5-mobile-arabic-onnx":
+                text = arabic_logical_order(text)
+            if text.strip() and confidence >= 0.5:
+                blocks.append({"id": str(len(blocks)), "text": text, "confidence": round(confidence, 5), "quad": quad.round(2).tolist()})
+        if request.appearance:
+            for block in blocks:
+                block["appearance"] = screen_text_appearance(image, block["quad"])
+        return {"blocks": blocks, "width": width, "height": height}
+
+    async def infer(self, request: OcrRequest) -> dict:
+        if request.language != "auto" and request.language not in self.languages:
+            raise ValueError("unsupportedLanguage")
+        if not self._loaded:
+            raise ValueError("modelNotLoaded")
+        if self._closed or self._lock.locked() or (self._install and not self._install.done()):
+            raise ValueError("resourceBusy")
+        async with self._lock:
+            # Shield keeps the slot occupied until native inference finishes after disconnect.
+            task = asyncio.create_task(asyncio.to_thread(self._infer, request))
+            try:
+                return await asyncio.shield(task)
+            except asyncio.CancelledError:
+                await task
+                raise
+
+    async def close(self) -> None:
+        self._closed = True
+        await asyncio.gather(*(variant.close() for variant in self._variants.values()))
+        await self.cancel_install()
+        await self.release()
+
+    async def release(self) -> dict:
+        async with self._lock:
+            self._loaded = False
+            self._sessions.clear()
+        return self.status()
+
+    async def load(self) -> dict:
+        if self._closed or self._lock.locked() or (self._install and not self._install.done()):
+            raise ValueError("resourceBusy")
+        async with self._lock:
+            def load_weights():
+                import cv2
+
+                cv2.setNumThreads(1)
+                directory = self._verify()
+                self._session(directory / OCR_DETECTOR)
+                for entry in self.spec.files:
+                    if "_rec_" not in entry.path:
+                        continue
+                    recognizer = self._session(directory / entry.path)
+                    if not recognizer.get_modelmeta().custom_metadata_map.get("character"):
+                        raise ValueError("modelCorrupt")
+
+            task = asyncio.create_task(asyncio.to_thread(load_weights))
+            try:
+                await asyncio.shield(task)
+                self._loaded = True
+            except BaseException:
+                # Keep the native load fenced even when its HTTP client disconnects.
+                try:
+                    await task
+                finally:
+                    self._loaded = False
+                    self._sessions.clear()
+                raise
+        return self.status()
+
+
+    def variant(self, resource_id: str) -> ScreenOcr:
+        if resource_id == self.spec.model_id:
+            return self
+        if resource_id not in OCR_SPECS:
+            raise HTTPException(422, detail="invalidModel")
+        if resource_id not in self._variants:
+            self._variants[resource_id] = ScreenOcr(self.root, spec=OCR_SPECS[resource_id])
+        return self._variants[resource_id]
+
+
+def build_screen_ocr_router(service: ScreenOcr) -> APIRouter:
+    router = APIRouter(prefix="/screen/ocr")
+
+    async def invoke(action):
+        try:
+            return await action
+        except ValueError as exc:
+            code = str(exc)
+            raise HTTPException(409 if code == "resourceBusy" else 422, detail=code) from exc
+        except ImportError as exc:
+            raise HTTPException(503, detail="runtimeUnavailable") from exc
+        except Exception as exc:
+            raise HTTPException(503, detail="ocrFailed") from exc
+
+    @router.get("")
+    async def status(resource_id: str = OCR_RESOURCE_ID):
+        return service.variant(resource_id).status()
+
+    @router.post("")
+    async def infer(body: OcrRequest, resource_id: str = OCR_RESOURCE_ID):
+        return await invoke(service.variant(resource_id).infer(body))
+
+    @router.post("/install")
+    async def install(body: OcrInstallRequest | None = None, resource_id: str = OCR_RESOURCE_ID):
+        return await invoke(service.variant(resource_id).install(body.network if body else None))
+
+    @router.delete("/install")
+    async def cancel(resource_id: str = OCR_RESOURCE_ID):
+        return await invoke(service.variant(resource_id).cancel_install())
+
+    @router.delete("")
+    async def remove(resource_id: str = OCR_RESOURCE_ID):
+        return await invoke(service.variant(resource_id).remove())
+
+    @router.post("/release")
+    async def release(resource_id: str = OCR_RESOURCE_ID):
+        return await invoke(service.variant(resource_id).release())
+
+    @router.post("/load")
+    async def load(resource_id: str = OCR_RESOURCE_ID):
+        target = service.variant(resource_id)
+        for other in (service, *service._variants.values()):
+            if other is not target and other._loaded:
+                await invoke(other.release())
+        return await invoke(target.load())
+
+    return router

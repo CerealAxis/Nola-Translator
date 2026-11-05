@@ -9,7 +9,11 @@ import { RuntimeComponents } from './tabs/RuntimeComponents'
 import { GeneralTab } from './tabs/GeneralTab'
 import { SettingsPage } from './SettingsPage'
 import { MoreTab } from './tabs/MoreTab'
-import { AdvancedTab } from './tabs/AdvancedTab'
+import { EngineDiagnostics, ResetSettingsGroup } from './tabs/AdvancedTab'
+
+import { parseRoute, SETTINGS_TABS } from '@/routes'
+import { StorageTab } from './tabs/StorageTab'
+import { AudioTab } from './tabs/AudioTab'
 
 beforeEach(() => {
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })))
@@ -31,7 +35,7 @@ it('reuses device results when the compute tab is opened again', () => {
 it('scrolls the main settings viewport to the inference engine section', () => {
   const frames: FrameRequestCallback[] = []
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { frames.push(callback); return frames.length })
-  window.history.replaceState(null, '', '#/settings/compute?component=engine')
+  window.history.replaceState(null, '', '#/settings/engine?component=engine')
   const main = document.createElement('main')
   main.className = 'nola-main'
   Object.assign(main, { scrollTop: 120, scrollTo: vi.fn() })
@@ -55,14 +59,14 @@ it('shows a retry action instead of a spinner when saved settings cannot be read
   expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument()
 })
 
-it('starts a forced version check from General settings', () => {
+it('starts a forced version check from Help and About', () => {
   const check = vi.spyOn(settingsActions, 'checkForAppUpdate').mockResolvedValue({
     currentVersion: '1.0.3', latestVersion: '1.1.0', updateAvailable: true,
     releaseName: 'Release 1.1.0', releaseNotes: '',
     releaseUrl: 'https://github.com/CerealAxis/Nola-Translator/releases/tag/v1.1.0',
   })
 
-  render(<GeneralTab settings={DEFAULT_SETTINGS} />)
+  render(<MoreTab />)
   fireEvent.click(screen.getByRole('button', { name: '检查更新' }))
 
   expect(check).toHaveBeenCalledWith(true)
@@ -77,15 +81,18 @@ it('saves the main-window close preference independently of service settings', a
   await waitFor(() => expect(update).toHaveBeenCalledWith({ closeBehavior: 'quit' }))
 })
 
-it('keeps reset in Advanced and moves licenses and feedback to More', async () => {
+it('separates engine diagnostics, data reset and help content', async () => {
   vi.spyOn(settingsActions, 'readDiagnostics').mockResolvedValue({ version: '1.0.7' })
   settingsStore.setState({ settings: DEFAULT_SETTINGS, loaded: true })
-  const advanced = render(<AdvancedTab settings={DEFAULT_SETTINGS} />)
-  expect(screen.getByRole('button', { name: '恢复出厂设置' })).toBeInTheDocument()
+  const advanced = render(<EngineDiagnostics />)
+  expect(screen.queryByRole('button', { name: '恢复出厂设置' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '复制诊断信息' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '查看' })).not.toBeInTheDocument()
   await waitFor(() => expect(screen.getByText('version')).toBeInTheDocument())
   advanced.unmount()
+  const reset = render(<ResetSettingsGroup />)
+  expect(screen.getByRole('button', { name: '恢复出厂设置' })).toBeInTheDocument()
+  reset.unmount()
 
   render(<MoreTab />)
   expect(screen.queryByRole('button', { name: '恢复出厂设置' })).not.toBeInTheDocument()
@@ -104,4 +111,34 @@ it('confirms copying diagnostics only after the store action succeeds', async ()
   fireEvent.click(screen.getByRole('button', { name: '复制诊断信息' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '已复制' })).toBeInTheDocument())
   expect(copy).toHaveBeenCalledOnce()
+})
+
+
+it('lists the eight user settings in the approved order and removes retired routes', () => {
+  expect(SETTINGS_TABS.filter(tab => tab !== 'developer')).toEqual([
+    'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'help',
+  ])
+  for (const tab of ['translation', 'compute', 'performance', 'advanced', 'more']) {
+    expect(parseRoute(`#/settings/${tab}`).tab).toBe('general')
+  }
+  settingsStore.setState({ settings: DEFAULT_SETTINGS, loaded: true })
+  window.history.replaceState(null, '', '#/settings/general')
+  render(<SettingsPage />)
+  const tabs = screen.getAllByRole('tab').filter(tab => tab.closest('.settings-nav'))
+  expect(tabs.slice(0, 8).map(tab => tab.textContent)).toEqual([
+    '常规', '音频与翻译', '悬浮字幕', '浏览器插件', '快捷键', '引擎与性能', '数据与存储', '帮助与关于',
+  ])
+})
+
+it('keeps translation with audio and moves recording retention to data settings', async () => {
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
+  const audio = render(<AudioTab settings={DEFAULT_SETTINGS} />)
+  expect(screen.getByRole('switch', { name: '翻译未定稿字幕' })).toBeInTheDocument()
+  expect(screen.queryByRole('switch', { name: '保存录音' })).not.toBeInTheDocument()
+  audio.unmount()
+  render(<StorageTab settings={DEFAULT_SETTINGS} />)
+  const retention = screen.getByRole('switch', { name: '保存录音' })
+  fireEvent.click(retention)
+  await waitFor(() => expect(update).toHaveBeenCalledWith({ recording: { keepAudio: false } }))
+  expect(screen.getByRole('button', { name: '恢复出厂设置' })).toBeInTheDocument()
 })

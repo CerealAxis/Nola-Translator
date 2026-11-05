@@ -29,14 +29,15 @@ it('detects an installed extension version from the Chromium manifest record', a
   const f = await fixture()
   await preferences(f.root, 'Chrome', 'Secure Preferences', { extensions: { settings: { [BROWSER_EXTENSION_ID]: { state: 1, manifest: { version: '1.0.2' } } } } })
   await f.integrations.inspect()
-  expect(f.integrations.snapshot[0]).toMatchObject({ extensionStatus: 'installed', extensionVersion: '1.0.2', extensionCompatible: false })
+  expect(f.integrations.snapshot[0]).toMatchObject({ extensionStatus: 'installed', extensionVersion: '1.0.2' })
+  expect(f.integrations.snapshot[0].extensionCompatible).toBeUndefined()
 })
 it('reads an unpacked manifest when Chromium omits its cached copy', async () => {
   const f = await fixture(); const unpacked = join(f.root, 'extension')
   await mkdir(unpacked); await writeFile(join(unpacked, 'manifest.json'), JSON.stringify({ version: BROWSER_EXTENSION_VERSION }))
   await preferences(f.root, 'Chrome', 'Secure Preferences', { extensions: { settings: { [BROWSER_EXTENSION_ID]: { path: unpacked, location: 4, disable_reasons: [] } } } })
   await f.integrations.inspect()
-  expect(f.integrations.snapshot[0]).toMatchObject({ extensionStatus: 'installed', extensionVersion: BROWSER_EXTENSION_VERSION, extensionCompatible: true })
+  expect(f.integrations.snapshot[0]).toMatchObject({ extensionStatus: 'installed', extensionVersion: BROWSER_EXTENSION_VERSION })
 })
 it('uses secure state ahead of stale preferences and treats corrupt data as unknown', async () => {
   const f = await fixture()

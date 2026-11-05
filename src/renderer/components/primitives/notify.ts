@@ -2,8 +2,10 @@ import { closeToast, showToast, updateToast } from '../ui/toast'
 import type { ToastPayload, ToastType } from '../ui/toast'
 import { getBridge } from '@/store'
 import type { MainErrorNotification } from '@/bridge'
-import type { I18nContextValue } from '@/i18n'
+import type { I18nContextValue, TranslationKey } from '@/i18n'
 import { bindingIsLocal, type GatewayCapability } from '../../../shared/model-gateway'
+import { SUPPORT_ERROR_CATALOG, supportErrorCodeForCause } from '../../../shared/error-catalog'
+import { featureConflictOwner } from '../../../shared/feature-activity'
 
 export const NOTIFY_DURATION = {
   error: 10000,
@@ -30,6 +32,13 @@ export function describeError(cause: unknown): string | undefined {
   if (cause === null || cause === undefined) return undefined
   if (typeof cause === 'string') return cause
   return cause instanceof Error ? cause.message : String(cause)
+}
+
+export function sessionConflictMessage(t: I18nContextValue['t'], cause: unknown): string {
+  const owner = featureConflictOwner(cause)
+  if (!owner) return t('gateway.realtimeSessionBusy')
+  const name = t(owner === 'meeting' ? 'meeting.title' : owner === 'screen-translation' ? 'screen.title' : `gateway.${owner}`)
+  return t('errors.serviceConflict', { running: name })
 }
 
 function toastType(variant: NotifyVariant): ToastType {
@@ -89,17 +98,37 @@ export function notifyGatewayModelUnavailable(message: string, description: stri
 
 /** Returns whether startup is blocked. Explicit cloud bindings can run without the local gateway. */
 export async function notifyGatewayStartIssue(t: I18nContextValue['t'], missing?: GatewayCapability, binding?: string): Promise<boolean> {
+  const name = missing ? t(`gateway.${missing}`) : ''
   if (!binding || bindingIsLocal(binding)) {
     const gateway = await getBridge()?.gateway?.snapshot().catch(() => undefined)
     if (gateway?.state !== 'running') {
-      const stopped = gateway?.state === 'stopped'
-      notifyGatewayModelUnavailable(t(stopped ? 'gateway.notStarted' : 'gateway.title'),
-        t(stopped ? 'gateway.notStartedHint' : gateway ? `gateway.${gateway.state}` : 'gateway.requestFailed'), t('gateway.title'))
+      const state = gateway?.state
+      const title: TranslationKey = state === 'stopped' ? 'gateway.notStarted'
+        : state === 'failed' ? 'gateway.startupFailed'
+          : state ? `gateway.${state}` : 'gateway.startupStatusUnavailable'
+      const hint = state === 'stopped' ? 'gateway.notStartedHint'
+        : state === 'starting' || state === 'stopping' ? 'gateway.startupWaitHint' : 'gateway.startupRetryHint'
+      notifyGatewayModelUnavailable(t(title), t(hint), t('gateway.title'))
+      return true
+    }
+    const service = missing ? gateway.services?.[missing] : undefined
+    if (service?.state === 'failed' && (!binding || service.model === binding)) {
+      const code = supportErrorCodeForCause(service.errorCode)
+      const hint = code === 'ERR-999' ? 'gateway.serviceFailed' : SUPPORT_ERROR_CATALOG[code].messageKey
+      notifyGatewayModelUnavailable(t('gateway.selectedModelUnavailable', { name }), t(hint), t('gateway.title'))
       return true
     }
   }
   if (!missing) return false
-  notifyGatewayModelUnavailable(t('gateway.modelNone', { name: t(`gateway.${missing}`) }), t('gateway.modelNoneHint'), t('gateway.title'))
+  if (binding && !bindingIsLocal(binding)) {
+    notifyError(t('gateway.selectedModelUnavailable', { name }), { description: t('gateway.selectedCloudHint'),
+      action: { label: t('nav.models'), onPress: () => {
+        const bridge = getBridge()
+        if (bridge?.app.openMainPage) void bridge.app.openMainPage('#/models').catch(error => console.error('[models.navigation]', error))
+        else window.location.hash = '#/models'
+      } },
+    })
+  } else notifyGatewayModelUnavailable(t('gateway.modelNone', { name }), t('gateway.modelNoneHint'), t('gateway.title'))
   return true
 }
 

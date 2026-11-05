@@ -1,7 +1,7 @@
 import { access, readFile, readdir, writeFile, mkdir } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { spawn } from 'node:child_process'
-import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, type BrowserIntegrationInfo, type BrowserKind } from '../shared/browser'
+import { BROWSER_EXTENSION_ID, type BrowserIntegrationInfo, type BrowserKind } from '../shared/browser'
 
 export interface BrowserIntegrationsOptions {
   localAppData: string
@@ -86,8 +86,7 @@ export class BrowserIntegrations {
           // Unpacked installs may omit the cached manifest. Read their registered path without editing preferences.
           const manifest = object(entry.manifest) ?? (typeof entry.path === 'string' ? await json(join(isAbsolute(entry.path) ? entry.path : join(root, profile, 'Extensions', entry.path), 'manifest.json')) : null)
           const version = typeof manifest?.version === 'string' ? manifest.version : undefined
-          const found = { extensionStatus: 'installed' as const, ...(version ? { extensionVersion: version, extensionCompatible: version === BROWSER_EXTENSION_VERSION } : {}) }
-          if (found.extensionCompatible) return found
+          const found = { extensionStatus: 'installed' as const, ...(version ? { extensionVersion: version } : {}) }
           installed ??= found
         }
         else unknown = true

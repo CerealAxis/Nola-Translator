@@ -105,7 +105,7 @@ export function OverlayPage() {
       }
       const missing = !s2sModel && asr.unavailable ? 'asr'
         : !s2sModel && !translationDisabled && mt.unavailable ? 'mt' : undefined
-      if (await notifyGatewayStartIssue(t, missing)) return
+      if (await notifyGatewayStartIssue(t, missing, missing && savedBindingOf(missing, settings))) return
       const opened = await actions.settings.showOverlay()
       if (opened === false) {
         if (!await notifyGatewayStartIssue(t)) notifyOverlayError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))

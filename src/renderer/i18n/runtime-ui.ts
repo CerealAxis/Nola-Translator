@@ -6,11 +6,11 @@ export const runtimeZh = {
   versionHelpLink: '加载器版本选择参考',
   force: '强制重新安装', install: '安装', reinstall: '重新安装', uninstall: '卸载', uninstallTitle: '卸载当前运行组件？', uninstallBody: '将从可用运行环境中移除当前组件；随包提供的文件仍保留在应用中，供离线重新安装。模型和设置不会受影响。', cancel: '取消', cancelFailed: '取消安装失败，请重试。', repair: '环境修复', repairAction: '修复',
   repairTorch: '重新安装当前 PyTorch 组合', repairLlama: '重新安装当前 llama.cpp 组合', repairCrisp: '重新安装当前 CrispASR 组件',
-  noticeTitle: '需要安装运行组件', noticeBody: '请前往计算设备中的推理引擎安装缺少的组件，安装完成后即可开始同传。',
+  noticeTitle: '需要安装运行组件', noticeBody: '请在“引擎与性能”的推理引擎中安装缺少的组件，完成后即可开始同传。',
   torchMissing: '尚未安装 PyTorch，语音识别功能无法启动。', llamaMissing: '尚未安装 llama.cpp，GGUF 本地翻译功能无法启动。',
   goTorch: '前往设置安装 PyTorch', goLlama: '前往设置安装 llama.cpp', goCrisp: '前往设置安装 CrispASR', later: '稍后', busy: '请先结束同传，再安装或修复组件。',
   engines: '推理引擎', enginesHint: '安装该组件后即可启用适配此引擎的模型，建议安装 llama.cpp 和 CrispASR，PyTorch 可不安装。', recognitionEngine: '语音识别引擎', translationEngine: '本地翻译引擎', checking: '检查运行组件',
-  elapsed: '已用 {time}', speed: '速度 {speed}', operationStarted: '运行组件 {action} 已开始', operationProgress: '操作进行中，可下滑查看进度。', viewProgress: '查看进度', operationComplete: '运行组件 {action} 完成', operationFailed: '运行组件 {action} 失败', operationFailedDescription: '请检查网络及磁盘空间后重试。', retryOperation: '重试操作', pipDependencyTimeout: 'PyTorch 依赖安装超时，安装失败。请检查网络后重试。',
+  elapsed: '已用 {time}', speed: '速度 {speed}', operationStarted: '运行组件{action}已开始', viewProgress: '查看进度', operationComplete: '运行组件{action}完成', operationFailed: '运行组件{action}失败', operationFailedDescription: '请检查网络及磁盘空间后重试。', retryOperation: '重试操作', pipDependencyTimeout: '安装 PyTorch 依赖超时。请检查网络后重试。',
 }
 export const runtimeEn: typeof runtimeZh = {
   components: 'Runtime components', python: 'Python', pytorch: 'PyTorch', llama: 'llama.cpp', crisp: 'CrispASR', builtInPython: 'Built-in Python 3.12', installed: 'Installed', external: 'External environment', externalHint: 'This runtime was found outside the app-managed directory, usually from another installation on your computer or from PATH. It is not managed by the app, so the app cannot uninstall it. To change versions, install a version provided by the app or install another version manually.', missing: 'Not installed',
@@ -20,9 +20,9 @@ export const runtimeEn: typeof runtimeZh = {
   versionHelpLink: 'Runtime version selection guide',
   force: 'Force reinstall', install: 'Install', reinstall: 'Reinstall', uninstall: 'Uninstall', uninstallTitle: 'Uninstall the current runtime?', uninstallBody: 'The current component will be removed from the available runtimes. Bundled files remain in the app for offline reinstallation. Models and settings are unaffected.', cancel: 'Cancel', cancelFailed: 'Could not cancel the installation. Please try again.', repair: 'Repair components', repairAction: 'Repair',
   repairTorch: 'Reinstall the current PyTorch setup', repairLlama: 'Reinstall the current llama.cpp setup', repairCrisp: 'Reinstall the current CrispASR components',
-  noticeTitle: 'Runtime components need attention', noticeBody: 'Open Inference Engines under Compute Devices to install the missing components, then start captions.',
+  noticeTitle: 'Runtime components need attention', noticeBody: 'Install the missing components in Inference Engines under Engine & performance, then start captions.',
   torchMissing: 'PyTorch is not installed. Speech recognition cannot start.', llamaMissing: 'llama.cpp is not installed. Local GGUF translation cannot start.',
   goTorch: 'Install PyTorch in settings', goLlama: 'Install llama.cpp in settings', goCrisp: 'Install CrispASR in settings', later: 'Later', busy: 'End the caption session before installing or repairing components.',
   engines: 'Inference engines', enginesHint: 'Install a component to enable models compatible with its engine. llama.cpp and CrispASR are recommended; PyTorch is optional.', recognitionEngine: 'Speech recognition engine', translationEngine: 'Local translation engine', checking: 'Check runtime components',
-  elapsed: 'Elapsed {time}', speed: 'Speed {speed}', operationStarted: 'Runtime {action} started', operationProgress: 'The operation is in progress. Scroll down to view its progress.', viewProgress: 'View progress', operationComplete: 'Runtime {action} completed', operationFailed: 'Runtime {action} failed', operationFailedDescription: 'Check your connection and available disk space, then retry.', retryOperation: 'Retry operation', pipDependencyTimeout: 'PyTorch dependency installation timed out and failed. Check your connection and try again.',
+  elapsed: 'Elapsed {time}', speed: 'Speed {speed}', operationStarted: 'Runtime {action} started', viewProgress: 'View progress', operationComplete: 'Runtime {action} completed', operationFailed: 'Runtime {action} failed', operationFailedDescription: 'Check your connection and available disk space, then retry.', retryOperation: 'Retry operation', pipDependencyTimeout: 'PyTorch dependency installation timed out. Check your connection and try again.',
 }

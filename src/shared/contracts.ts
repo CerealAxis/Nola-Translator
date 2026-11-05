@@ -127,7 +127,8 @@ export type PrewarmConfig = {
  * `invalidConfiguration` carrying a per-language `details.reason` (`unsupportedRecognitionLanguage`
  * or `unsupportedTranslationLanguage` on the prewarm path).
  */
-export const PREWARM_ERROR_CODES = ['resourceBusy', 'sessionAlreadyRunning', 'invalidConfiguration', 'resourceUnavailable', 'modelUnavailable', 'modelLoadFailed'] as const
+export const PREWARM_ERROR_CODES = ['resourceBusy', 'sessionAlreadyRunning', 'invalidConfiguration', 'resourceUnavailable', 'modelUnavailable', 'modelLoadFailed',
+  'modelNotLoaded', 'gatewayNotRunning', 'engineTransportUnavailable', 's2sConfigurationMissing', 'realtimeBackendUnavailable'] as const
 export type PrewarmErrorCode = (typeof PREWARM_ERROR_CODES)[number]
 
 /** The settled answer of a prewarm; the `loading` state stays on the event channel. */
@@ -251,7 +252,7 @@ export type AudioDevice = {
 
 export type ResourceRecord = {
   resourceId: string
-  kind: 'recognitionModel' | 'translationModel' | 'ttsModel'
+  kind: 'recognitionModel' | 'translationModel' | 'ttsModel' | 'ocrModel'
   /**
    * Names the loader that will run this model, and two vocabularies reach it: built-in models
    * report the provider in `resources.py` (`qwen3-asr`, `sensevoice`, `m2m100`, `hymt2`) while a
@@ -343,6 +344,7 @@ export type EngineErrorCode =
   | 'invalidMessage'
   | 'unsupportedProtocol'
   | 'invalidConfiguration'
+  | 'invalidCredential'
   | 'protocolValidationFailed'
   | 'sessionNotRunning'
   | 'sessionAlreadyRunning'
@@ -353,6 +355,10 @@ export type EngineErrorCode =
   | 'audioDeviceUnavailable'
   | 'audioDeviceDisconnected'
   | 'audioBufferOverflow'
+  | 'audioPlaybackUnavailable'
+  | 'gatewayNotRunning'
+  | 'modelNotLoaded'
+  | 'modelMissing'
   | 'modelUnavailable'
   | 'modelLoadFailed'
   | 'modelDependencyMissing'
@@ -368,6 +374,7 @@ export type EngineErrorCode =
   | 'recognitionBufferOverflow'
   | 'translationProviderUnavailable'
   | 'translationNetworkUnavailable'
+  | 'translationTimeout'
   | 'translationInvalidResponse'
   | 'translationUnsupportedLanguagePair'
   | 'resourceVerificationFailed'
@@ -382,6 +389,10 @@ export type EngineErrorCode =
   | 'integrityCheckFailed'
   | 'installFailed'
   | 'lineTooLarge'
+  | 's2sConfigurationMissing'
+  | 's2sConnectionLost'
+  | 'synthesisFailed'
+  | 'playbackUnconfirmed'
   | 'internalError'
 
 export type EngineEvent =

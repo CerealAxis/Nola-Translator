@@ -26,7 +26,7 @@ import { DownloadsTab } from './DownloadsTab'
 import { HubSearchTab } from './HubSearchTab'
 import { ModelCard, ModelCardSkeleton } from './ModelCard'
 import { DownloadSourceDialog } from './DownloadSourceDialog'
-import { RecommendedFamilyCard, RecommendedFamilyDialog } from './RecommendedFamilies'
+import { OcrFamilyCard, OcrFamilyDialog, RecommendedFamilyCard, RecommendedFamilyDialog } from './RecommendedFamilies'
 import { familyOf, type RecommendedFamily } from './modelFamily'
 import { isEngineAvailable } from './engine-availability'
 import { notifyModelDownloadFailure, suppressNextDownloadStartNotice } from './ModelDownloadNotice'
@@ -48,6 +48,7 @@ export function ModelsPage() {
   useEffect(() => { setTab(modelsTab === 'downloads' ? 'downloads' : 'recommended') }, [modelsTab])
   const [configuring, setConfiguring] = useState<{ record: ResourceRecord; readOnly: boolean } | null>(null)
   const [downloadTarget, setDownloadTarget] = useState<ResourceRecord | null>(null)
+  const [ocrOpen, setOcrOpen] = useState<string | null>(null)
   const [openFamily, setOpenFamily] = useState<RecommendedFamily | null>(null)
   const [voiceMetadata, setVoiceMetadata] = useState<{ modelId: string; voices: string[] }>({ modelId: '', voices: [] })
   const [realtime, setRealtime] = useState<ModelGatewaySnapshot['realtime']>()
@@ -159,6 +160,10 @@ export function ModelsPage() {
 
   const run = (record: ResourceRecord, action: 'install' | 'cancel') => () => {
     if (action === 'install') {
+      if (record.kind === 'ocrModel') {
+        void actions.models.manageResource(record.resourceId, 'install').catch((cause: unknown) => notifyError(t('models.downloadFailed'), { cause }))
+        return
+      }
       setDownloadTarget(record)
       return
     }
@@ -181,6 +186,7 @@ export function ModelsPage() {
   }
 
   const footerOf = (record: ResourceRecord) => {
+    if (record.kind === 'ocrModel') return <Button onClick={() => setOcrOpen(record.resourceId)}>{t('modelsSettingsUi.startConfiguration')}</Button>
     if (record.installed) {
       const readOnly = !record.resourceId.startsWith('hub:') || record.kind === 'ttsModel'
       return <Button onClick={() => setConfiguring({ record, readOnly })}>{t('models.openDetails')}</Button>
@@ -213,6 +219,9 @@ export function ModelsPage() {
         setDownloadTarget(null)
         if (target) install(target, source)
       }} />
+      {ocrOpen !== null ? <OcrFamilyDialog key={ocrOpen} initialResourceId={ocrOpen} records={resources.filter(record => record.kind === 'ocrModel' && (record.resourceId !== 'pp-ocrv5-mobile-onnx' || record.installed))}
+        busyIds={busyIds} onClose={() => setOcrOpen(null)}
+        onInstall={record => install(record, 'modelscope')} onCancel={record => run(record, 'cancel')()} /> : null}
       {cloudDetail ? <CloudModelDialog id={cloudDetail} onClose={() => setCloudDetail(null)} /> : null}
       {openFamily && openFamilyRecords.length > 0 ? <RecommendedFamilyDialog
         key={openFamilyKey}
@@ -234,7 +243,7 @@ export function ModelsPage() {
           className="nola-page-heading"
           title={t('models.title')}
           actions={<>
-            <Button variant="secondary" data-onboarding="models-runtime-setup" onClick={() => navigate(`${settingsPath('compute')}?component=engine`)}>
+            <Button variant="secondary" data-onboarding="models-runtime-setup" onClick={() => navigate(`${settingsPath('engine')}?component=engine`)}>
               {t('modelsSettingsUi.runtimeSetup')}
             </Button>
             <LocalModelImport />
@@ -260,11 +269,12 @@ export function ModelsPage() {
 
         <TabsContent className="tabs__panel" value="recommended" data-onboarding="model-downloads">
           <RecommendedCatalog
-            records={resources.filter(record => !record.resourceId.startsWith('hub:'))}
+            records={resources.filter(record => !record.resourceId.startsWith('hub:') && (record.resourceId !== 'pp-ocrv5-mobile-onnx' || record.installed))}
             loading={loading && !loaded}
             failed={loadFailed}
             onRetry={retryLoad}
             onOpen={setOpenFamily}
+            onOpenOcr={() => setOcrOpen('')}
             cloudModels={catalogCloudModels.filter(model => !model.profile)}
             onOpenCloud={setCloudDetail}
             emptyAction={<Button variant="tertiary" size="sm" onClick={() => setTab('search')}>{t('models.tabSearch')}</Button>}
@@ -335,13 +345,13 @@ interface CatalogProps {
   emptyAction: ReactNode
 }
 
-function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAction, cloudModels, onOpenCloud }: Pick<CatalogProps, 'records' | 'loading' | 'failed' | 'onRetry' | 'emptyAction' | 'cloudModels' | 'onOpenCloud'> & { onOpen: (family: RecommendedFamily) => void }) {
+function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, onOpenOcr, emptyAction, cloudModels, onOpenCloud }: Pick<CatalogProps, 'records' | 'loading' | 'failed' | 'onRetry' | 'emptyAction' | 'cloudModels' | 'onOpenCloud'> & { onOpen: (family: RecommendedFamily) => void; onOpenOcr(): void }) {
   const { t } = useI18n()
   if (!loading && !failed && records.length === 0 && cloudModels.length === 0) return <Empty className="flex flex-col items-start gap-4 py-8"><EmptyTitle>{t('models.notInstalled')}</EmptyTitle>{emptyAction}</Empty>
   const groups = new Map<RecommendedFamily, ResourceRecord[]>()
   for (const record of records) {
     // Keep legacy M2M100 installations available in Installed, but stop recommending it.
-    if (record.resourceId === 'm2m100-418m') continue
+    if (record.resourceId === 'm2m100-418m' || record.kind === 'ocrModel') continue
     const family = familyOf(record)
     if (family === 'kokoro' || family === 'piper') continue
     groups.set(family, [...(groups.get(family) ?? []), record])
@@ -352,18 +362,19 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, emptyAc
     { title: t('models.ttsModels'), hint: t('models.ttsModelsHint'), kind: 'ttsModel', families: ['tts', 'kokoro', 'piper', 'cosyvoice3'] },
     { title: t('models.llmModels'), hint: t('models.llmModelsHint'), kind: 'translationModel', families: ['qwen35'], language: true },
     { title: t('models.s2sModels'), hint: t('models.s2sModelsHint'), kind: 's2sModel', families: [] },
+    { title: t('screen.ocrTitle'), hint: t('screen.ocrDescription'), kind: 'ocrModel', families: [] },
   ]
-  return <div className="flex flex-col gap-6">
+  return <div className="models-catalog-sections">
     {failed ? <FailedCatalog onRetry={onRetry} /> : null}
     {loading ? <div className={GRID}>{[0, 1, 2].map(index => <ModelCardSkeleton key={index} />)}</div> : null}
-    {sections.filter(section => loading || section.families.some(family => groups.has(family)) || cloudModels.some(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language))).map(section => {
+    {sections.filter(section => loading || section.kind === 'ocrModel' && records.some(record => record.kind === 'ocrModel') || section.families.some(family => groups.has(family)) || cloudModels.some(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language))).map(section => {
       const sectionCloudModels = cloudModels.filter(model => model.kind === section.kind && Boolean(model.profile || model.id === 'cloud') === Boolean(section.language))
       const indexTranslation = section.kind === 'translationModel' ? sectionCloudModels.find(model => model.id === 'index-translate') : undefined
       const otherCloudModels = indexTranslation ? sectionCloudModels.filter(model => model !== indexTranslation) : sectionCloudModels
       const renderCloudModel = (model: CatalogCloudModel) => <CloudModelCard key={model.id} model={model} onOpen={onOpenCloud} />
-      return <section key={section.title} className="flex flex-col gap-3" data-onboarding={section.onboardingTarget}>
+      return <section key={section.title} className="models-catalog-section" data-onboarding={section.onboardingTarget}>
     <ModelSectionHeading title={section.title} hint={section.hint} />
-    <div className={GRID}>{section.families.map(family => {
+    <div className={GRID}>{section.kind === 'ocrModel' ? <OcrFamilyCard records={records.filter(record => record.kind === 'ocrModel')} onOpen={onOpenOcr} /> : null}{section.families.map(family => {
       const familyRecords = groups.get(family)
       return <Fragment key={family}>{familyRecords ? <RecommendedFamilyCard family={family} records={familyRecords} onOpen={() => onOpen(family)} /> : null}{family === 'index' && indexTranslation ? renderCloudModel(indexTranslation) : null}</Fragment>
     })}{otherCloudModels.map(renderCloudModel)}</div>
@@ -412,6 +423,7 @@ function Catalog({ records, loading, failed, onRetry, card, emptyAction, compute
       <Section title={t('models.asrModels')} hint={t('models.asrModelsHint')} records={recognition} card={card}>{cloudModels.filter(model => model.kind === 'recognitionModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.mtModels')} hint={t('models.mtModelsHint')} records={mtModels} card={card}>{cloudModels.filter(model => model.kind === 'translationModel' && !model.profile && model.id !== 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.ttsModels')} hint={t('models.ttsModelsHint')} records={ordered.filter(record => record.kind === 'ttsModel')} card={card}>{cloudModels.filter(model => model.kind === 'ttsModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
+      <Section title={t('screen.ocrTitle')} hint={t('screen.ocrDescription')} records={ordered.filter(record => record.kind === 'ocrModel')} card={card} />
       <Section title={t('models.llmModels')} hint={t('models.llmModelsHint')} records={languageModels} card={card}>{cloudModels.filter(model => model.profile || model.id === 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.s2sModels')} hint={t('models.s2sModelsHint')} records={[]} card={card}>{cloudModels.filter(model => model.kind === 's2sModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
     </div>

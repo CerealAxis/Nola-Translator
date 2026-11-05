@@ -17,6 +17,13 @@ interface InternalServerOptions {
   acquire(kind: 'asr' | 'mt', binding?: string): Promise<GatewayCapabilityLease>
 }
 
+function capabilityFailureCode(error: unknown): string {
+  if (error instanceof GatewayWorkerError) return error.code
+  const code = error instanceof Error && 'code' in error ? error.code : undefined
+  if (typeof code === 'string' && ['gateway_not_running', 'model_disabled', 'model_not_loaded', 'model_not_found', 'model_unavailable', 'resource_in_use', 'invalid_configuration'].includes(code)) return code
+  return 'inference_failed'
+}
+
 /** Private process-to-process transport. Its random key is never exposed through renderer IPC. */
 export class GatewayInternalServer {
   private readonly key = randomBytes(32).toString('base64url')
@@ -74,7 +81,7 @@ export class GatewayInternalServer {
           else { response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify(result)) }
         } catch (error) {
           if (!response.destroyed) {
-            const body = JSON.stringify({ error: { code: error instanceof GatewayWorkerError ? error.code : 'model_unavailable', message: 'Model gateway capability unavailable' } })
+            const body = JSON.stringify({ error: { code: capabilityFailureCode(error), message: 'Model gateway request failed' } })
             if (streaming) {
               if (!response.headersSent) response.writeHead(200, { 'Content-Type': 'application/x-ndjson' })
               response.end(body + '\n')
@@ -143,7 +150,7 @@ export class GatewayInternalServer {
           if (!asr || data.session !== session) throw new Error('Session not open')
           const result = await asr.worker.request(data)
           send({ id, result })
-        } catch (error) { send({ id, error: { code: error instanceof GatewayWorkerError ? error.code : 'model_unavailable', message: 'Model gateway session unavailable' } }); client.close(1011, 'Session failed') }
+        } catch (error) { send({ id, error: { code: capabilityFailureCode(error), message: 'Model gateway session failed' } }); client.close(1011, 'Session failed') }
         finally { pendingBytes -= length }
       })
     })

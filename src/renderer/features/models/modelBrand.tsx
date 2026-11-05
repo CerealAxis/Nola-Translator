@@ -11,7 +11,7 @@ import Meta from '@lobehub/icons/es/Meta/components/Mono'
 import Microsoft from '@lobehub/icons/es/Microsoft/components/Mono'
 import Qwen from '@lobehub/icons/es/Qwen/components/Mono'
 import XiaomiMiMo from '@lobehub/icons/es/XiaomiMiMo/components/Mono'
-import { AudioLines, Globe } from 'lucide-react'
+import { AudioLines, Globe, ScanText } from 'lucide-react'
 import type { ComponentType, SVGProps } from 'react'
 
 export type ModelBrand = 'qwen' | 'alibaba' | 'hunyuan' | 'bilibili' | 'meta' | 'microsoft' | 'xiaomi-mimo' | 'unknown'
@@ -89,7 +89,7 @@ export interface ModelMarkProps {
   /** `null` when the slot holds no local model, which falls back to the generic per-kind icon. */
   record: { resourceId: string; provider: string } | null
   /** Only used when no brand matches: falls back to the generic icon for `kind`. */
-  kind: 'recognitionModel' | 'translationModel' | 'ttsModel'
+  kind: 'recognitionModel' | 'translationModel' | 'ttsModel' | 'ocrModel'
   size?: number
 }
 
@@ -98,7 +98,7 @@ export function ModelMark({ record, kind, size = 30 }: ModelMarkProps) {
   const Mark = brand === 'unknown' ? null : MARK_BY_BRAND[brand]
 
   if (!Mark) {
-    return kind === 'translationModel' ? <Globe aria-hidden="true" /> : <AudioLines aria-hidden="true" />
+    return kind === 'ocrModel' ? <ScanText aria-hidden="true" /> : kind === 'translationModel' ? <Globe aria-hidden="true" /> : <AudioLines aria-hidden="true" />
   }
 
   return (

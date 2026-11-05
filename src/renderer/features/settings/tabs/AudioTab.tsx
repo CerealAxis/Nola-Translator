@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react'
 import type { AppSettingsPatch } from '@/bridge'
-import { useModelOptions } from '@/model-options'
 /**
- * Audio and recognition: source device, source language, VAD segmentation and audio retention.
+ * Audio and translation defaults: devices, virtual audio, translation behavior and segmentation.
  *
  * The recognition model itself is no longer chosen here. The model gateway decides which local
  * model or cloud interface is loaded, and a caption session picks among those per session, so a
@@ -18,22 +17,21 @@ import { useModelOptions } from '@/model-options'
  * volume, so a moving `Meter` could only invent its numbers.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
 import { LoaderCircle } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
-import { languageName } from '@/bridge'
 import { SettingsRow } from '../SettingsRow'
 import { notifyError, notifySuccess, notifyWarning } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { errorCopyOf } from '@/features/workspace/error-copy'
 import { actions, getBridge, stores, updateSettings, useStore } from '@/store'
-import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
-import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
+import { SettingGroup, SettingSelect } from '../SettingsPage'
+import type { SettingsPanelProps } from '../SettingsPage'
 import { DEFAULT_SETTINGS, ALIYUN_ASR_MODELS, MINIMAX_RECOGNITION_MODELS, type MinimaxRecognitionModel, type RecognitionSettings } from '../../../../shared/settings'
-import { ApiKeyRow, TextRow } from './TranslationTab'
+import { ApiKeyRow, TextRow, TranslationTab } from './TranslationTab'
 import { speechOutputOptions, useAudioSourceOptions } from '@/audio-source-options'
 import { useSpeechOutputDevices } from '@/features/workspace/SessionSetupDialog'
 import { probeAudioDevices } from '@/store/modelStore'
@@ -70,18 +68,8 @@ export function AudioTab({ settings }: SettingsPanelProps) {
       setInstallingCable(false)
     }
   }
-  const modelChoices = useModelOptions()
   const devices = useStore(stores.models, (state) => state.devices)
   const provider = settings.recognition.provider ?? 'local'
-  // Retention is on by default: with it off nothing can be replayed or exported, and
-  // `ipc.ts` reads the flag to decide both `recordAudio` and the `recordingPath` it injects,
-  // so a toggle that only looked saved would leave audio nobody can play back.
-  const keepAudio = settings.recording?.keepAudio ?? true
-
-  const onKeepAudio = useCallback((next: boolean) => {
-    void updateSettings({ recording: { keepAudio: next } }).catch(() => undefined)
-  }, [])
-
   // The sentinel is a protocol value rather than a device id, so the option carrying it is
   // built here; the enumerated devices follow as the pinned choices.
   const selectedSource = settings.realtime?.virtualInputDeviceId || settings.recognition.audioSource
@@ -118,15 +106,6 @@ export function AudioTab({ settings }: SettingsPanelProps) {
       setTestingOutput(false)
     }
   }
-
-  const languageOptions = useMemo<PickerOption[]>(
-    () =>
-      modelChoices.sourceLanguages.map((code) => ({
-        value: code,
-        label: languageName(code, language),
-      })),
-    [language, modelChoices.sourceLanguages],
-  )
 
   return (
     <div className="settings-panel" data-onboarding="recognition-settings">
@@ -172,18 +151,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
         </SettingsRow>
       </SettingGroup>
 
-      <SettingGroup onboardingTarget="recognition-service" legend={t('settings.groupRecognition')}>
-        <SettingsRow label={t('settings.sourceLanguage')}>
-          <SettingSelect
-            value={settings.recognition.sourceLanguage}
-            options={languageOptions}
-            ariaLabel={t('settings.sourceLanguage')}
-            onChange={(value) => {
-              void updateSettings({ recognition: { sourceLanguage: value } }).catch(() => undefined)
-            }}
-          />
-        </SettingsRow>
-      </SettingGroup>
+      <TranslationTab settings={settings} />
 
       {provider !== 'aliyun' ? <SettingGroup legend={t('settings.vadGroup')} actions={
         <Button variant="secondary" size="sm" className="bg-surface-tertiary" onClick={() => {
@@ -221,15 +189,7 @@ export function AudioTab({ settings }: SettingsPanelProps) {
         ))}
       </SettingGroup> : null}
 
-      <SettingGroup legend={t('settings.groupRecording')}>
-        <SettingsRow label={t('settings.keepAudio')} descriptionTooltip desc={t('settings.keepAudioHint')}>
-          <SettingSwitch
-            isSelected={keepAudio}
-            ariaLabel={t('settings.keepAudio')}
-            onChange={onKeepAudio}
-          />
-        </SettingsRow>
-      </SettingGroup>
+
     </div>
   )
 }

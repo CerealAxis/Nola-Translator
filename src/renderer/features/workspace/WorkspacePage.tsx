@@ -14,14 +14,13 @@ import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { unsupportedRecognitionLanguageOf } from '@/store/sessionStore'
 import { CaptionStage } from '@/components/caption'
 import type { CaptionDisplayMode, CaptionLayout } from '@/components/caption'
-import { NotesPanel } from '@/components/notes'
-import { notifyError, notifyGatewayStartIssue, notifySuccess, notifyWarning, describeError } from '@/components/primitives/notify'
+import { notifyError, notifyGatewayStartIssue, notifySuccess, notifyWarning, sessionConflictMessage } from '@/components/primitives/notify'
 import { FeatureActivityNotice, requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
 import { useI18n } from '@/i18n'
 import { recordPath, useRoute } from '@/routes'
 import { NO_TRANSLATION_LANGUAGE } from '@/bridge'
 import type { DiagnosticCopyContext } from '@/bridge'
-import { audioDeviceNameOf, targetLanguagePatch, translationModelPatch } from '@/session-config'
+import { audioDeviceNameOf, targetLanguagePatch } from '@/session-config'
 
 import { SessionBar } from './SessionBar'
 import { SessionSetupDialog } from './SessionSetupDialog'
@@ -31,6 +30,7 @@ import { bindingIsLocal, normalizeModelBinding } from '../../../shared/model-gat
 import { isSessionAlreadyRunningError } from '../../../shared/ipc-error'
 import { SessionErrorDialog, StopSessionDialog } from './WorkspaceDialogs'
 import { WorkspaceToolbar } from './WorkspaceToolbar'
+import { MeetingReader } from '../meeting/MeetingReader'
 import './workspace.css'
 
 export { errorCopyOf } from './error-copy'
@@ -38,10 +38,15 @@ export { errorCopyOf } from './error-copy'
 /** Default reading size, one step smaller or larger. */
 const FONT_STEPS = [14, 16, 18] as const
 
-/** Below this the notes panel collapses to a handle (DESIGN section 3). */
-const NOTES_COLLAPSE_PX = 1000
-
 export function WorkspacePage() {
+  const meeting = useStore(sessionStore, state => state.meeting)
+  const quick = useStore(sessionStore, state => state.status)
+  if (meeting && (['starting', 'running', 'stopping', 'unknown'].includes(meeting.state)
+      || !!meeting.segments?.length && quick === 'idle')) return <MeetingReader snapshot={meeting} />
+  return <QuickWorkspacePage />
+}
+
+function QuickWorkspacePage() {
   const { t, language } = useI18n()
   const { navigate } = useRoute()
 
@@ -49,15 +54,12 @@ export function WorkspacePage() {
   const settings = useStore(stores.settings, (state) => state.settings)
   const devices = useStore(stores.models, (state) => state.devices)
   const catalog = useAvailableModels()
-  const meetings = useStore(stores.meetings, (state) => state.meetings)
 
   // -- Session config: the draft exists only while the dialog is open ------
   const [draft, setDraft] = useState<SetupDraft | null>(null)
   const [pendingConfig, setPendingConfig] = useState<Parameters<typeof actions.session.startSession>[0] | null>(null)
   const [setupOpen, setSetupOpen] = useState(false)
   const [stopConfirmOpen, setStopConfirmOpen] = useState(false)
-  const [notes, setNotes] = useState('')
-  const [notesCollapsed, setNotesCollapsed] = useState(false)
   // -- View preferences: display mode is a setting (the overlay follows it),
   //    while layout and size belong to the workspace alone ----------------
   const overlay = settings?.overlay
@@ -68,12 +70,20 @@ export function WorkspacePage() {
     if (source && target) return 'both'
     return source ? 'source' : 'translation'
   }, [overlay?.showSource, overlay?.showTranslation, settings?.translation.targetLanguage])
-  const [layout, setLayout] = useState<CaptionLayout>('split')
+  const [layout, setLayout] = useState<CaptionLayout>('sentence')
   const [fontStep, setFontStep] = useState(1)
-  const [notesOpen, setNotesOpen] = useState(true)
   const [overlayVisible, setOverlayVisible] = useState(false)
 
   const status = session.status
+  const { errorCode, errorRequestId } = session
+  const lastPlaybackNotice = useRef(errorRequestId)
+  useEffect(() => {
+    if (errorRequestId === lastPlaybackNotice.current || status !== 'running') return
+    lastPlaybackNotice.current = errorRequestId
+    if (!overlayVisible && (errorCode === 'AUDIOPLAYBACKUNAVAILABLE' || errorCode === 'PLAYBACKUNCONFIRMED' || errorCode === 'SYNTHESISFAILED')) {
+      notifyWarning(t(errorCopyOf(errorCode, 'stop').message))
+    }
+  }, [errorCode, errorRequestId, overlayVisible, status, t])
   /**
    * `starting` is not active: the engine is still handshaking, so the guide
    * block stays and its CTA becomes pending. Switching to the transcript here
@@ -84,16 +94,6 @@ export function WorkspacePage() {
    * not interruptible.
    */
   const active = status === 'running' || status === 'paused' || status === 'stopping'
-
-  // -- Window width: the notes panel collapses in a narrow window ---------
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const query = window.matchMedia(`(max-width: ${NOTES_COLLAPSE_PX - 1}px)`)
-    const sync = (): void => setNotesCollapsed(query.matches)
-    sync()
-    query.addEventListener('change', sync)
-    return () => query.removeEventListener('change', sync)
-  }, [])
 
   useEffect(() => {
     const bridge = getBridge()
@@ -108,114 +108,6 @@ export function WorkspacePage() {
     }).catch(() => undefined)
     return () => { changed = true; unsubscribe() }
   }, [])
-
-  // -- Notes: follow the meeting, auto-saved with an 800ms debounce --------
-  //
-  // The debounce is required, not an optimisation: in the main process a notes
-  // write reads the whole meeting.json, changes one field and rewrites it, so
-  // per-keystroke calls mean continuous small-file IO for a two-hour meeting.
-  // 800ms is imperceptible and short enough to land before the user navigates
-  // away.
-  const meetingId = session.meetingId
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const savedNotes = useRef('')
-  // A write still in flight, so unmount can land it without waiting out the 800ms.
-  const pendingNotes = useRef<string | null>(null)
-  const pendingMeetingId = useRef<string | null>(null)
-  /*
-   * The save runs after every pause in typing, so a write that keeps failing
-   * would otherwise stack one notice per pause. The text of the last reported
-   * failure is enough to tell them apart.
-   */
-  const notesFailure = useRef<string | null>(null)
-  const failedNotes = useRef<{ meetingId: string; value: string } | null>(null)
-  const reportNotesFailure = useCallback((error: unknown, failedMeetingId: string, value: string): void => {
-    const text = describeError(error) ?? 'unknown'
-    failedNotes.current = { meetingId: failedMeetingId, value }
-    if (notesFailure.current === text) return
-    notesFailure.current = text
-    notifyError(t('errors.notesSaveFailed'), {
-      cause: error,
-      description: t('errors.notesSaveFailedDescription'),
-      action: {
-        label: t('errors.notesSaveFailedAction'),
-        onPress: () => {
-          const failed = failedNotes.current
-          if (!failed) return
-          notesFailure.current = null
-          void actions.meetings.setMeetingNotes(failed.meetingId, failed.value).then(() => {
-            failedNotes.current = null
-            notifySuccess(t('errors.notesSaveRecovered'))
-          }).catch((retryError: unknown) => reportNotesFailure(retryError, failed.meetingId, failed.value))
-        },
-      },
-    })
-  }, [t])
-  const clearNotesFailure = useCallback((): void => {
-    if (notesFailure.current !== null) notifySuccess(t('errors.notesSaveRecovered'))
-    notesFailure.current = null
-    failedNotes.current = null
-  }, [t])
-
-  // Flush a pending write first when the meeting changes, or it lands on
-  // the next meeting.
-  useEffect(() => {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = null
-    const pendingValue = pendingNotes.current
-    const pendingId = pendingMeetingId.current
-    pendingNotes.current = null
-    pendingMeetingId.current = null
-    if (pendingValue !== null && pendingId !== null && pendingValue !== savedNotes.current) {
-      void actions.meetings.setMeetingNotes(pendingId, pendingValue).then(clearNotesFailure).catch(error => reportNotesFailure(error, pendingId, pendingValue))
-    }
-    savedNotes.current = ''
-    if (!meetingId) {
-      setNotes('')
-      return
-    }
-    const existing = meetings.find((meeting) => meeting.meetingId === meetingId)?.notes ?? ''
-    savedNotes.current = existing
-    setNotes(existing)
-  }, [meetingId])
-
-  const editNotes = useCallback(
-    (value: string) => {
-      setNotes(value)
-      if (!meetingId) return
-      if (saveTimer.current) clearTimeout(saveTimer.current)
-      pendingNotes.current = value
-      pendingMeetingId.current = meetingId
-      saveTimer.current = setTimeout(() => {
-        saveTimer.current = null
-        pendingNotes.current = null
-        pendingMeetingId.current = null
-        if (value === savedNotes.current) return
-        savedNotes.current = value
-        /*
-         * A lost note is the user's own writing, so it is worth interrupting
-         * for: nothing else tells them the sentence they just typed is gone.
-         */
-        void actions.meetings.setMeetingNotes(meetingId, value).then(clearNotesFailure).catch(error => reportNotesFailure(error, meetingId, value))
-      }, 800)
-    },
-    [clearNotesFailure, meetingId, reportNotesFailure],
-  )
-
-  // Land a pending write on unmount, or closing the window right after typing
-  // the last character loses it.
-  useEffect(
-    () => () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current)
-      const value = pendingNotes.current
-      const id = pendingMeetingId.current
-      if (value !== null && id !== null && value !== savedNotes.current) {
-        savedNotes.current = value
-        void actions.meetings.setMeetingNotes(id, value).then(clearNotesFailure).catch(error => reportNotesFailure(error, id, value))
-      }
-    },
-    [clearNotesFailure, reportNotesFailure],
-  )
 
   // -- Open the session details dialog ------------------------------------
   const openSetup = useCallback(async () => {
@@ -252,7 +144,9 @@ export function WorkspacePage() {
           ? 'tts'
           : null
     if (missingGatewayModel) {
-      await notifyGatewayStartIssue(t, missingGatewayModel)
+      const binding = missingGatewayModel === 'asr' ? config.recognitionBinding
+        : missingGatewayModel === 'mt' ? config.translationBinding : speechBinding
+      await notifyGatewayStartIssue(t, missingGatewayModel, binding)
       return
     }
     if (draft) {
@@ -273,7 +167,6 @@ export function WorkspacePage() {
     try {
       await requestFeatureStart(() => actions.session.startSession(config), 'interpretation')
       if (sessionStore.getState().status !== 'running') return
-      setNotes('')
       const meetingId = sessionStore.getState().meetingId
       if (meetingId) {
         await actions.meetings.loadMeetings().catch(() => undefined)
@@ -287,7 +180,7 @@ export function WorkspacePage() {
       // SessionController is the final cross-client mutex. Turn its conflict into a
       // named toast instead of also opening the generic start-failure dialog.
       if (isSessionAlreadyRunningError(error)) {
-        notifyWarning(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        notifyWarning(sessionConflictMessage(t, error))
       } else if (unsupportedRecognitionLanguageOf(error)) {
         notifyError(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
       } else if (sessionStore.getState().errorCode === 'AUDIODEVICEUNAVAILABLE') {
@@ -423,8 +316,6 @@ export function WorkspacePage() {
         onLayoutChange={setLayout}
         fontSize={FONT_STEPS[fontStep]}
         onFontSizeChange={(size) => setFontStep(Math.max(0, FONT_STEPS.indexOf(size as (typeof FONT_STEPS)[number])))}
-        notesOpen={notesOpen}
-        onToggleNotes={() => setNotesOpen((open) => !open)}
         // The engine fixes the model when the session starts, so a later change
         // to settings does not affect the running session.
         sessionLocked={status !== 'idle' && status !== 'error'}
@@ -441,7 +332,7 @@ export function WorkspacePage() {
         </div>
       ) : null}
 
-      <div className="nola-workspace-body" data-notes-open={notesOpen && !notesCollapsed}>
+      <div className="nola-workspace-body" data-notes-open={false}>
         <Card className="nola-workspace-transcript">
           {active ? (
             <>
@@ -458,6 +349,7 @@ export function WorkspacePage() {
                 fontSize={FONT_STEPS[fontStep]}
                 paused={status === 'paused'}
                 showTimestamps
+                showSpeaker
                 sourceLanguage={settings?.recognition.sourceLanguage ?? 'auto'}
                 latencySessionId={settings?.realtime?.latencyDetection && currentConfig?.outputMode !== 'speech' ? session.sessionId ?? undefined : undefined}
                 emptyState={<Empty className="nola-workspace-empty"><EmptyHeader><EmptyTitle>{t('workspace.nothingYet')}</EmptyTitle><EmptyDescription>{t('workspace.nothingYetHint')}</EmptyDescription></EmptyHeader></Empty>}
@@ -475,12 +367,6 @@ export function WorkspacePage() {
           )}
         </Card>
 
-        {notesOpen && !notesCollapsed ? (
-          <NotesPanel key={meetingId ?? 'draft'} value={notes} onChange={editNotes} />
-        ) : null}
-        {notesOpen && notesCollapsed ? (
-          <NotesPanel key={meetingId ?? 'draft'} value={notes} onChange={editNotes} collapsed onToggleCollapsed={() => setNotesCollapsed(false)} />
-        ) : null}
       </div>
 
       {active ? timer : null}

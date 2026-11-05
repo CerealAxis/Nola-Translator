@@ -19,6 +19,8 @@ import { CaptionLine } from './CaptionLine'
 import { splitTranslationText } from './translationText'
 import type { TranslationTextParts } from './translationText'
 import { useCaptionLatency } from './use-caption-latency'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 export type CaptionLayout = 'split' | 'sentence'
 export type CaptionDisplayMode = 'both' | 'source' | 'translation'
@@ -39,6 +41,8 @@ export interface CaptionStageProps {
   showTimestamps?: boolean
   sourceLanguage?: string
   latencySessionId?: string
+  showSpeaker?: boolean
+  speakerLabels?: Readonly<Record<string, string>>
 }
 
 /** Pixels from the bottom that still count as "at the bottom", about one line of body text. */
@@ -99,11 +103,14 @@ export function CaptionStage({
   showTimestamps = false,
   sourceLanguage = 'auto',
   latencySessionId,
+  showSpeaker = false,
+  speakerLabels,
 }: CaptionStageProps) {
   const { t } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
   useCaptionLatency(scrollRef, latencySessionId)
   const stickRef = useRef(true)
+  const [following, setFollowing] = useState(true)
   /** Last segment to have played its entrance; a ref so StrictMode's double run cannot replay it. */
   const enteredRef = useRef<string | null>(null)
   const [enteringId, setEnteringId] = useState<string | null>(null)
@@ -130,6 +137,7 @@ export function CaptionStage({
     const element = scrollRef.current
     if (!element) return
     stickRef.current = isStuckToBottom(element.scrollTop, element.scrollHeight, element.clientHeight)
+    setFollowing(stickRef.current)
   }
 
   /*
@@ -179,6 +187,7 @@ export function CaptionStage({
                 paused={paused}
                 entering={enteringId === row.segment.segmentId}
                 baselineStyle={baselineStyle}
+                speakerLabel={speakerLabels?.[row.segment.segmentId] ?? (showSpeaker && row.segment.speakerId ? t('meeting.speaker', { number: [...new Set(entries.map(entry => entry.segment.speakerId).filter(Boolean))].indexOf(row.segment.speakerId) + 1 }) : undefined)}
                 showTimestamps={showTimestamps}
                 translate={failureText}
               />
@@ -188,6 +197,12 @@ export function CaptionStage({
           emptyState ?? null
         )}
       </div>
+      {!following ? <Button variant="secondary" size="sm" className="self-center" onClick={() => {
+        const element = scrollRef.current
+        if (element) element.scrollTop = element.scrollHeight
+        stickRef.current = true
+        setFollowing(true)
+      }}>{t('meeting.latest')}</Button> : null}
     </div>
   )
 }
@@ -210,6 +225,7 @@ function Block({
   entering,
   baselineStyle,
   showTimestamps,
+  speakerLabel,
   translate,
 }: {
   segment: CaptionSegment
@@ -224,6 +240,7 @@ function Block({
   entering: boolean
   baselineStyle: CSSProperties
   showTimestamps: boolean
+  speakerLabel?: string
   translate: (segment: CaptionSegment) => string
 }) {
   const translation = translationTextOf(segment, translate)
@@ -238,14 +255,16 @@ function Block({
   const untranslated = segment.translations.length === 0
   if (untranslated && showTranslation) { showSource = true; showTranslation = false }
 
+  const metadata = <div className="flex min-w-0 flex-col items-start gap-1">{speakerLabel ? <Badge variant="secondary">{speakerLabel}</Badge> : null}{showTimestamps ? <time className="nola-caption-timestamp">{captionTime(segment.startedAtMs)}</time> : null}</div>
+
   if (layout === 'split') {
     return (
       <div className="nola-baseline-pair nola-baseline-row py-1" data-bilingual={showSource && showTranslation} data-latest={distance === 0} style={baselineStyle}>
-        {showTimestamps ? <time className="nola-caption-timestamp">{captionTime(segment.startedAtMs)}</time> : null}
+        {metadata}
         {showSource ? (
           <CaptionLine
             kind="source"
-            text={formatChineseCaption(segment.sourceText, sourceLanguage)}
+            text={formatChineseCaption(segment.sourceText, segment.sourceLanguage ?? sourceLanguage)}
             distance={distance}
             interim={interim}
             fontSize={fontSize}
@@ -275,11 +294,11 @@ function Block({
 
   return (
     <div className="nola-caption-sentence flex flex-col gap-1 py-2" data-latest={distance === 0}>
-      {showTimestamps ? <time className="nola-caption-timestamp">{captionTime(segment.startedAtMs)}</time> : null}
+      {metadata}
       {showSource ? (
         <CaptionLine
           kind="source"
-          text={formatChineseCaption(segment.sourceText, sourceLanguage)}
+          text={formatChineseCaption(segment.sourceText, segment.sourceLanguage ?? sourceLanguage)}
           distance={distance}
           interim={interim}
           fontSize={fontSize}

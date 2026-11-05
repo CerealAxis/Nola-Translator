@@ -15,7 +15,7 @@ import HunyuanAvatar from '@lobehub/icons/es/Hunyuan/components/Avatar'
 import UnslothAvatar from '@lobehub/icons/es/Unsloth/components/Avatar'
 import BilibiliAvatar from '@lobehub/icons/es/Bilibili/components/Avatar'
 import MetaAvatar from '@lobehub/icons/es/Meta/components/Avatar'
-import { Check, Download } from 'lucide-react'
+import { Check, Download, Trash2 } from 'lucide-react'
 
 import { resourceStateOf } from '@/bridge'
 import type { ModelDownloadSource, ResourceRecord } from '@/bridge'
@@ -33,6 +33,7 @@ import { estimatedVramMb, modelFit, type ModelFit } from './model-fit'
 import { type RecommendedFamily } from './modelFamily'
 import { ModelMark } from './modelBrand'
 import { DownloadSourceTabs } from './DownloadSourceTabs'
+import { ModelLanguageSelect } from './ModelConfigurationDialog'
 
 const FAMILY_NAMES: Record<RecommendedFamily, string> = {
   qwen: 'Qwen3-ASR',
@@ -255,5 +256,67 @@ export function RecommendedFamilyDialog({ family, records, compute, computeSnaps
         </DialogFooter>
       </DialogContent>
 
+  </Dialog>
+}
+
+
+export function OcrFamilyCard({ records, onOpen }: { records: readonly ResourceRecord[]; onOpen(): void }) {
+  const { t } = useI18n()
+  if (!records.length) return null
+  return <Card className="models-card models-family-card h-full" data-model-family="ocr">
+    <CardHeader><CardAction><span aria-hidden="true" className="models-card__icon models-card__icon--recognition"><ModelMark record={records[0]} kind="ocrModel" /></span></CardAction>
+      <CardTitle>PP-OCRv5 mobile</CardTitle><CardDescription>{t('screen.ocrDescription')}</CardDescription>
+    </CardHeader>
+    <CardContent><div className="models-card__status"><Badge>{t('modelsSettingsUi.localModels')}</Badge><Badge>ONNX Runtime</Badge>
+      {records.some(record => record.installed) && <Badge variant="success">{t('models.installed')}</Badge>}
+    </div></CardContent>
+    <CardFooter><Button onClick={onOpen}>{t('modelsSettingsUi.startConfiguration')}</Button></CardFooter>
+  </Card>
+}
+
+export function OcrFamilyDialog({ records, initialResourceId, busyIds, onClose, onInstall, onCancel }: {
+  records: readonly ResourceRecord[]; initialResourceId?: string; busyIds: readonly string[]; onClose(): void;
+  onInstall(record: ResourceRecord): void; onCancel(record: ResourceRecord): void;
+}) {
+  const { t } = useI18n()
+  const [selectedId, setSelectedId] = useState(initialResourceId || records.find(record => record.installed)?.resourceId || records[0]?.resourceId || '')
+  const [removing, setRemoving] = useState(false)
+  const selected = records.find(record => record.resourceId === selectedId) ?? records[0]
+  if (!selected) return null
+  const state = resourceStateOf(selected)
+  const inFlight = ['queued', 'downloading', 'verifying'].includes(state)
+  const busy = removing || busyIds.includes(selected.resourceId)
+  const remove = async () => {
+    setRemoving(true)
+    try { await actions.models.manageResource(selected.resourceId, 'remove') }
+    catch (cause) { notifyError(t('modelsSettingsUi.removeFailed'), { cause }) }
+    finally { setRemoving(false) }
+  }
+  return <Dialog open onOpenChange={open => { if (!open && !removing) onClose() }}>
+    <DialogContent className="models-family-dialog modal__dialog" data-model-family="ocr">
+      <DialogCloseButton aria-label={t('common.close')} disabled={removing} />
+      <DialogHeader><DialogTitle>PP-OCRv5 mobile</DialogTitle><p className="models-family-dialog__intro">{t('screen.ocrDescription')}</p></DialogHeader>
+      <div className="models-family-dialog__body">
+        <section className="models-family-dialog__model-select">
+          <Label htmlFor="ocr-variant">{t('offline.modelChoice')}</Label>
+          <Select value={selected.resourceId} disabled={removing} onValueChange={value => { if (value) setSelectedId(value) }}>
+            <SelectTrigger id="ocr-variant"><SelectValue>{selected.name}</SelectValue></SelectTrigger>
+            <SelectContent><SelectGroup>{records.map(record => <SelectItem key={record.resourceId} value={record.resourceId}>
+              <span>{record.name}</span><span>{formatBytes(record.downloadBytes ?? record.installedBytes)}</span>
+              {record.installed && <Badge variant="success">{t('models.installed')}</Badge>}
+            </SelectItem>)}</SelectGroup></SelectContent>
+          </Select>
+        </section>
+        <ModelLanguageSelect label={t('modelConfig.languages')} value={selected.languages} codes={selected.languages} onChange={() => undefined} readOnly />
+        <section className="models-family-dialog__selection"><Label className="models-family-dialog__label">{t('models.details')}</Label>
+          <p>{selected.name} · {formatBytes(selected.downloadBytes ?? selected.installedBytes)} · ONNX Runtime</p>
+        </section>
+      </div>
+      <DialogFooter>
+        {inFlight ? <Button variant="outline" disabled={!selected.cancellable || busy} onClick={() => onCancel(selected)}>{t('models.cancel')}</Button>
+          : selected.installed ? <><Button variant="danger" disabled={busy} onClick={() => void remove()}><Trash2 />{t('modelsSettingsUi.deleteModel')}</Button><Button variant="secondary" disabled><Check />{t('models.installed')}</Button></>
+            : <Button disabled={busy} onClick={() => onInstall(selected)}>{busy ? <Spinner /> : <Download />}{t(state === 'failed' ? 'models.retry' : 'models.install')}</Button>}
+      </DialogFooter>
+    </DialogContent>
   </Dialog>
 }

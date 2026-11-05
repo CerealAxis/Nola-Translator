@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { createScreenPreload } from './screen-translation'
 
 import type { NolaTranslatorApi, EngineChannelEvent, OverlayTargetPage } from '../shared/bridge'
 import type { EngineProcessState, HubInspectResult, HubSearchResult, PrewarmResult, ResourceRecord, SessionConfig } from '../shared/contracts'
@@ -31,14 +32,15 @@ ipcRenderer.on('realtime:playback-configure', (_event, token: string, { device, 
     if (inputCable) {
       const devices = await navigator.mediaDevices.enumerateDevices()
       const sink = devices.find(endpoint => endpoint.kind === 'audiooutput' && endpoint.deviceId === device)
-      if (!sink?.label || vbCablePair(sink.label, 'Input') === inputCable) throw new Error('audioRouteConflict')
+      if (!sink?.label) throw new Error('audioPlaybackUnavailable')
+      if (vbCablePair(sink.label, 'Input') === inputCable) throw new Error('audioRouteConflict')
     }
     await owner.setSinkId(device)
   })()
   const playback: NonNullable<typeof realtimePlayback> = { token, owner, pending }
   realtimePlayback = playback
-  const report = (available: boolean) => {
-    if (realtimePlayback?.token === token) void ipcRenderer.invoke('realtime:playback-ready', token, available).catch(() => {})
+  const report = (result: true | 'audioRouteConflict' | 'audioPlaybackUnavailable') => {
+    if (realtimePlayback?.token === token) void ipcRenderer.invoke('realtime:playback-ready', token, result).catch(() => {})
   }
   void pending.then(() => {
     if (realtimePlayback !== playback) return
@@ -54,7 +56,7 @@ ipcRenderer.on('realtime:playback-configure', (_event, token: string, { device, 
     }
     media.addEventListener('devicechange', verifySink)
     playback.removeDeviceListener = () => media.removeEventListener('devicechange', verifySink)
-  }, () => report(false))
+  }, error => report(error instanceof Error && error.message === 'audioRouteConflict' ? 'audioRouteConflict' : 'audioPlaybackUnavailable'))
 })
 ipcRenderer.on('realtime:playback-chunk', (_event, token: string, chunk: PlaybackChunk) => {
   const playback = realtimePlayback
@@ -163,6 +165,11 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 }
 
 const api: NolaTranslatorApi = {
+  screenTranslation: createScreenPreload(ipcRenderer),
+  workspaceView: {
+    read: () => invoke('workspace:view'),
+    update: patch => invoke('workspace:view', patch),
+  },
   getLatencySnapshot: () => ipcRenderer.invoke('latency:snapshot'),
   openLatencyWindow: () => invoke('latency:open'),
   onLatencySnapshot: listener => {
@@ -197,6 +204,19 @@ const api: NolaTranslatorApi = {
       const listener = (_event: Electron.IpcRendererEvent, value: import('../shared/feature-activity').FeatureActivitySnapshot) => callback(value)
       ipcRenderer.on('feature-activity:changed', listener)
       return () => ipcRenderer.off('feature-activity:changed', listener)
+    },
+  },
+  meetingMode: {
+    snapshot: () => invoke('meeting-mode:snapshot'),
+    start: settings => invoke('meeting-mode:start', settings),
+    stop: () => invoke('meeting-mode:stop'),
+    setPaused: paused => invoke('meeting-mode:set-paused', paused),
+    testAudio: request => invoke('meeting-mode:test-audio', request),
+    cancelAudioTest: () => invoke('meeting-mode:cancel-test'),
+    onChanged: callback => {
+      const listener = (_event: Electron.IpcRendererEvent, value: Parameters<typeof callback>[0]) => callback(value)
+      ipcRenderer.on('meeting-mode:changed', listener)
+      return () => ipcRenderer.off('meeting-mode:changed', listener)
     },
   },
   onboardingCard: {
@@ -308,6 +328,7 @@ const api: NolaTranslatorApi = {
     return () => ipcRenderer.off(channels.event, wrapped)
   },
   getEngineState: () => invoke<EngineProcessState>(channels.getEngineState),
+  getSessionSnapshot: () => invoke('engine:session-snapshot'),
   onDataMigrationProgress: callback => {
     const listener = (_event: Electron.IpcRendererEvent, percent: number) => callback(percent)
     ipcRenderer.on('app:data-migration-progress', listener)

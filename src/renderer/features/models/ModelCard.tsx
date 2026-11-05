@@ -22,6 +22,7 @@ import { ModelMark } from './modelBrand'
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
 
 export const BUILTIN_DESCRIPTION_KEYS: Readonly<Record<string, TranslationKey>> = {
+  'pp-ocrv5-mobile-onnx': 'screen.ocrDescription',
   'qwen3-asr-1.7b-hf': 'models.descriptions.qwenAsr17',
   'qwen3-asr-0.6b-hf': 'models.descriptions.qwenAsr06',
   'sensevoice-small': 'models.descriptions.senseVoice',
@@ -45,6 +46,7 @@ export const BUILTIN_DESCRIPTION_KEYS: Readonly<Record<string, TranslationKey>> 
 }
 
 export function descriptionKeyOf(record: ResourceRecord): TranslationKey | undefined {
+  if (record.kind === 'ocrModel') return 'screen.ocrDescription'
   const builtIn = BUILTIN_DESCRIPTION_KEYS[record.resourceId]
   if (builtIn) return builtIn
   if (record.kind !== 'ttsModel') return undefined
@@ -172,7 +174,7 @@ export function ModelCard({
       <CardContent className="card__content">
       <div className="models-card__status">
         <Badge>{t('modelsSettingsUi.localModels')}</Badge>
-        {removal && state === 'removing' ? <StatusPill label={t('modelsSettingsUi.removing')} tone="accent" /> : record.kind !== 'ttsModel' && record.installed && !configurationOf(record) ? <StatusPill label={t('modelConfig.pending')} tone="warning" /> : <StatePill state={state} installed={record.installed} />}
+        {removal && state === 'removing' ? <StatusPill label={t('modelsSettingsUi.removing')} tone="accent" /> : (record.kind === 'recognitionModel' || record.kind === 'translationModel') && record.installed && !configurationOf(record) ? <StatusPill label={t('modelConfig.pending')} tone="warning" /> : <StatePill state={state} installed={record.installed} />}
         {(supportedEngines ?? modelEngines(record)).map(engine => <Badge key={engine} >{engine === 'pytorch' ? 'PyTorch' : engine === 'crisp' ? 'CrispASR' : 'llama.cpp'}</Badge>)}
         {record.resourceId.startsWith('hub:local/') ? <Badge >{t('modelsSettingsUi.localImport')}</Badge> : null}
       </div>

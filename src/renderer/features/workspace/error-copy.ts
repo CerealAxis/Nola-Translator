@@ -15,6 +15,7 @@ export type ErrorActionTarget =
   | { kind: 'record' } // open this session's record
   | { kind: 'settings'; tab: SettingsTab } // jump to one tab of the settings page
   | { kind: 'models' } // jump to model management
+  | { kind: 'gateway' }
   | { kind: 'runtime'; component: 'engine' | 'llama' | 'crisp' } // open the runtime component settings
 
 export interface ErrorCopy {
@@ -63,11 +64,14 @@ const ERROR_ACTIONS: Record<SupportErrorCode, { target: ErrorActionTarget; label
   'ASR-008': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
 
   // Audio devices: the capture device is picked in the audio settings.
-  'AUD-001': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.deviceNotFoundAction' },
-  'AUD-002': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.deviceNotFoundAction' },
-  'AUD-003': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.deviceNotFoundAction' },
+  'AUD-001': { target: { kind: 'settings', tab: 'audio' }, label: 'modelsSettingsUi.audio' },
+  'AUD-002': { target: { kind: 'settings', tab: 'audio' }, label: 'modelsSettingsUi.audio' },
+  'AUD-003': { target: { kind: 'settings', tab: 'audio' }, label: 'modelsSettingsUi.audio' },
   'AUD-004': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'AUD-005': { target: { kind: 'settings', tab: 'audio' }, label: 'modelsSettingsUi.audio' },
+  'AUD-006': { target: { kind: 'settings', tab: 'audio' }, label: 'modelsSettingsUi.audio' },
+  'AUD-007': { target: { kind: 'settings', tab: 'audio' }, label: 'modelsSettingsUi.audio' },
+  'AUD-008': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
 
   // Engine: the runtime components live in the engine settings, a protocol mismatch needs the
   // matching engine version, and a lost engine leaves a record behind instead of a retry.
@@ -81,6 +85,10 @@ const ERROR_ACTIONS: Record<SupportErrorCode, { target: ErrorActionTarget; label
 
   'ERR-999': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'EXP-009': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
+  'GTW-001': { target: { kind: 'gateway' }, label: 'gateway.title', detail: 'gateway.notStartedHint' },
+  'S2S-001': { target: { kind: 'models' }, label: 'nav.models' },
+  'S2S-002': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
+  'TTS-001': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
 
   // Models: a missing or broken weight is fixed in model management, a busy resource is
   // transient, and a missing dependency is a runtime component the engine needs.
@@ -96,25 +104,25 @@ const ERROR_ACTIONS: Record<SupportErrorCode, { target: ErrorActionTarget; label
   'MDL-021': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'MDL-022': { target: { kind: 'models' }, label: 'errors.modelLoadFailedAction' },
   'MDL-023': { target: { kind: 'models' }, label: 'errors.modelMissingAction' },
-  'MDL-024': { target: { kind: 'models' }, label: 'modelsPolicy.modelDisabled' },
-  'MDL-025': { target: { kind: 'models' }, label: 'modelsPolicy.modelNotLoaded' },
+  'MDL-024': { target: { kind: 'models' }, label: 'nav.models' },
+  'MDL-025': { target: { kind: 'gateway' }, label: 'gateway.title' },
 
   // Translation: the hosted providers (LLM translation, Microsoft, Google, MyMemory) need the
   // service's key and credit, which is configured in the translation settings.
-  'MT-007': { target: { kind: 'settings', tab: 'translation' }, label: 'errors.translateFailedAction' },
+  'MT-007': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.translateFailedAction' },
   'MT-008': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'MT-009': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'MT-010': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'MT-011': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'MT-012': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
-  'MT-013': { target: { kind: 'settings', tab: 'translation' }, label: 'errors.translateFailedAction' },
-  'MT-014': { target: { kind: 'settings', tab: 'translation' }, label: 'errors.configureTranslationAction' },
-  'MT-015': { target: { kind: 'settings', tab: 'translation' }, label: 'errors.translateFailedAction' },
-  'MT-016': { target: { kind: 'settings', tab: 'translation' }, label: 'errors.translateFailedAction' },
-  'MT-017': { target: { kind: 'settings', tab: 'translation' }, label: 'errors.changeTranslationLanguageAction' },
-  'MT-018': { target: { kind: 'settings', tab: 'translation' }, label: 'errors.configureTranslationAction' },
-  'MT-019': { target: { kind: 'settings', tab: 'translation' }, label: 'errors.configureTranslationAction' },
-  'MT-020': { target: { kind: 'settings', tab: 'translation' }, label: 'errors.configureTranslationAction' },
+  'MT-013': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.translateFailedAction' },
+  'MT-014': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.configureTranslationAction' },
+  'MT-015': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.translateFailedAction' },
+  'MT-016': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.translateFailedAction' },
+  'MT-017': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.changeTranslationLanguageAction' },
+  'MT-018': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.configureTranslationAction' },
+  'MT-019': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.configureTranslationAction' },
+  'MT-020': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.configureTranslationAction' },
   'MT-021': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'MT-022': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
 
@@ -193,9 +201,6 @@ const START_ONLY_CODES: ReadonlySet<SupportErrorCode> = new Set<SupportErrorCode
  * component has to be installed, and a lost engine leaves captions worth reading.
  */
 export function errorCopyOf(cause: string | null, context: 'start' | 'stop'): ErrorCopy {
-  if (cause === 'S2S_CONFIGURATION_MISSING' && context === 'start') {
-    return { message: 'session.s2sSetupHint', detail: null, action: 'errors.startFailedAction', target: { kind: 'reset' } }
-  }
   const code = supportErrorCodeForCause(cause)
   const entry = ERROR_ACTIONS[code]
   const message: TranslationKey = SUPPORT_ERROR_CATALOG[code].messageKey

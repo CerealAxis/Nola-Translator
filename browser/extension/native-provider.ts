@@ -1,0 +1,58 @@
+import { BROWSER_EXTENSION_VERSION, BROWSER_HOST_NAME, BROWSER_PROTOCOL_VERSION, type BrowserResponse } from '../../src/shared/browser'
+
+export async function nativeRequest(payload: Record<string, unknown>, signal: AbortSignal): Promise<Record<string, unknown>> {
+  signal.throwIfAborted()
+  return new Promise((resolve, reject) => {
+    const port = chrome.runtime.connectNative(BROWSER_HOST_NAME)
+    const hello = crypto.randomUUID(), id = crypto.randomUUID()
+    const chunks: Uint8Array[] = []
+    let audioBytes = 0
+    let done = false
+    const close = () => { done = true; clearTimeout(timer); signal.removeEventListener('abort', abort); try { port.disconnect() } catch { /* Cleanup must also settle a failed transport. */ } }
+    const fail = (error: Error) => { if (!done) { close(); reject(error) } }
+    const abort = () => { try { port.postMessage({ type: 'cancel', id: crypto.randomUUID(), requestId: id }) } catch { /* Disconnect still cancels the owner. */ } finally { fail(new DOMException('Aborted', 'AbortError')) } }
+    const timer = setTimeout(() => fail(new Error('providerTimeout')), 180000)
+    signal.addEventListener('abort', abort, { once: true })
+    port.onDisconnect.addListener(() => { void chrome.runtime.lastError; fail(new Error('browserConnectionUnavailable')) })
+    port.onMessage.addListener(raw => {
+      if (done) return
+      try {
+        if (!raw || typeof raw !== 'object') throw new Error('providerInvalid')
+        const message = raw as BrowserResponse
+        if (message.type === 'error') { fail(new Error(message.code)); return }
+        if (message.type === 'capabilityEvent' && message.id === id && message.event.type === 'audio') {
+          const data = message.event.data
+          if (message.event.index !== chunks.length || chunks.length >= 2048 || typeof data !== 'string' || data.length > 128000
+              || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(data)) throw new Error('providerInvalid')
+          const bytes = Uint8Array.from(atob(data), character => character.charCodeAt(0))
+          audioBytes += bytes.length
+          if (audioBytes > 32 * 1024 * 1024) { fail(new Error('providerResponseSize')); return }
+          chunks.push(bytes)
+        }
+        if (message.type !== 'result') return
+        if (message.id === hello) {
+          if (payload.type === 'hello') { close(); resolve(message.value as unknown as Record<string, unknown>); return }
+          port.postMessage({ ...payload, id })
+        } else if (message.id === id) {
+          const value = (message.value ?? {}) as Record<string, unknown>
+          if ('audioChunks' in value) {
+            if (value.audioChunks !== chunks.length) { fail(new Error('providerInvalid')); return }
+            const combined = new Uint8Array(audioBytes)
+            let offset = 0
+            for (const chunk of chunks) { combined.set(chunk, offset); offset += chunk.length }
+            value.audioBase64 = encodeBase64(combined)
+            value.contentType = typeof value.format === 'string' && value.format.startsWith('audio/') ? value.format : value.format === 'wav' ? 'audio/wav' : value.format === 'pcm' ? 'audio/pcm' : 'audio/mpeg'
+          }
+          close(); resolve(value)
+        }
+      } catch { fail(new Error('providerInvalid')) }
+    })
+    try { port.postMessage({ type: 'hello', id: hello, protocolVersion: BROWSER_PROTOCOL_VERSION, extensionVersion: BROWSER_EXTENSION_VERSION, browser: navigator.userAgent.includes('Firefox/') ? 'firefox' : navigator.userAgent.includes('Edg/') ? 'edge' : 'chrome' }) }
+    catch { fail(new Error('browserConnectionUnavailable')) }
+  })
+}
+export function encodeBase64(bytes: Uint8Array): string {
+  let result = ''
+  for (let offset = 0; offset < bytes.length; offset += 8192) result += String.fromCharCode(...bytes.subarray(offset, offset + 8192))
+  return btoa(result)
+}

@@ -1,5 +1,8 @@
 import { modelPolicyKo, modelPolicyEntries } from './model-policy-ui'
+import { screenEntries, screenLocales } from './screen-ui'
+import { shortcutEntries, shortcutLocales } from './shortcuts-ui'
 import { latencyEntries, latencyKo } from './latency-ui'
+import { meetingKo, meetingEntries } from './meeting-ui'
 import { gatewayKo, gatewayEntries } from './gateway-ui'
 import { workbenchKo, workbenchEntries } from './workbench-ui'
 import { offlineKo, offlineEntries } from './offline-ui'
@@ -8,12 +11,15 @@ import { onboardingEntries, onboardingKo } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const koMessages: Record<DictionaryKey, string> = {
+  ...screenEntries(screenLocales.ko),
+  ...shortcutEntries(shortcutLocales.ko),
   ...latencyEntries(latencyKo),
   'browser.desktopApplicationAudio': '데스크톱에서 선택한 앱',
   'browser.stepSpeechTranslation': '단계별 인식',
   'browser.directSpeechTranslation': '직접 음성 인식',
   ...modelPolicyEntries(modelPolicyKo),
   ...gatewayEntries(gatewayKo),
+  ...meetingEntries(meetingKo),
   ...workbenchEntries(workbenchKo),
   "settings.restoreVadDefaults": "기본값 복원",
   "settings.vadGroup": "음성 분할",
@@ -50,15 +56,15 @@ const koMessages: Record<DictionaryKey, string> = {
   'browser.audioCaptured': '오디오 트랙이 연결되었습니다',
   'browser.extensionVersionMismatch': '확장 프로그램 버전이 일치하지 않습니다. 현재 버전을 다시 설치하고 동영상 페이지를 새로고침하세요.',
   'browser.extensionVersion': '확장 프로그램 버전 {version}',
-  'browser.expectedExtensionVersion': '필요한 버전 {version}',
+  'browser.expectedExtensionVersion': '포함된 플러그인 버전 {version}',
   'browser.torchUnavailable': 'PyTorch 가 설치되지 않았거나 사용할 수 없습니다. Nola 설정에서 설치하세요.',
   'browser.llamaUnavailable': 'llama.cpp 가 설치되지 않았거나 사용할 수 없습니다. Nola 설정에서 설치하세요.',
   'browser.runtimeSettings': '설정에서 설치',
   'browser.firefox': 'Mozilla Firefox',
   'browser.chrome': 'Google Chrome',
   'browser.edge': 'Microsoft Edge',
-  'browser.browserList': '브라우저 확장 프로그램',
-  'browser.settingsDescription': '브라우저에서 Nola 자막을 사용합니다.',
+  'browser.browserList': '브라우저 플러그인',
+  'browser.settingsDescription': '브라우저 플러그인을 설치하고 관리하며 Nola와의 연결을 제어합니다.',
   'browser.extensionInstalled': '설치됨',
   'browser.extensionNotInstalled': '설치되지 않음',
   'browser.extensionDisabled': '사용 중지됨',
@@ -79,8 +85,8 @@ const koMessages: Record<DictionaryKey, string> = {
   'browser.allowConnection': '연결 허용',
   'browser.connectionStatus': '연결 상태',
   'browser.connectionWaiting': '연결 대기 중',
-  'browser.title': '브라우저 자막',
-  'browser.enable': '브라우저 자막 사용',
+  'browser.title': '브라우저 플러그인',
+  'browser.enable': '브라우저 플러그인 활성화',
   'browser.repair': '네이티브 호스트 등록 및 복구',
   'browser.appearance': '자막 스타일',
   'browser.preview': '자막 미리보기',
@@ -213,7 +219,7 @@ const koMessages: Record<DictionaryKey, string> = {
   'runtime.repairLlama': '현재 llama.cpp 조합 다시 설치',
   'runtime.repairCrisp': '현재 CrispASR 구성 요소 다시 설치',
   'runtime.noticeTitle': '실행 구성 요소 확인 필요',
-  'runtime.noticeBody': '컴퓨팅 장치의 추론 엔진에서 누락된 구성 요소를 설치한 다음 동시 통역을 시작하세요.',
+  'runtime.noticeBody': '엔진 및 성능의 추론 엔진에서 누락된 구성 요소를 설치한 다음 동시 통역을 시작하세요.',
   'runtime.torchMissing': 'PyTorch 가 설치되지 않아 음성 인식을 시작할 수 없습니다.',
   'runtime.llamaMissing': 'llama.cpp 가 설치되지 않아 GGUF 로컬 번역을 시작할 수 없습니다.',
   'runtime.goTorch': '설정에서 PyTorch 설치',
@@ -229,7 +235,6 @@ const koMessages: Record<DictionaryKey, string> = {
   'runtime.elapsed': '경과 시간 {time}',
   'runtime.speed': '속도 {speed}',
   'runtime.operationStarted': '실행 구성 요소 {action} 시작',
-  'runtime.operationProgress': '작업이 진행 중입니다. 아래로 스크롤하여 진행 상황을 확인하세요.',
   'runtime.viewProgress': '진행 상황 보기',
   'runtime.operationComplete': '실행 구성 요소 {action} 완료',
   'runtime.operationFailed': '실행 구성 요소 {action} 실패',
@@ -456,11 +461,14 @@ const koMessages: Record<DictionaryKey, string> = {
   'modelsSettingsUi.configureBeforeDefault': '기본 모델로 설정하기 전에 이 모델을 먼저 구성하세요.',
   'modelsSettingsUi.defaultSaveFailed': '기본 모델을 설정할 수 없습니다. 다시 시도하세요',
   'modelsSettingsUi.settingsSubtitle': '앱 설정과 자막 표시 사용자 지정',
+  'modelsSettingsUi.engine': '엔진 및 성능',
+  'modelsSettingsUi.help': '도움말 및 정보',
+  'modelsSettingsUi.shortcuts': '단축키',
   'modelsSettingsUi.general': '일반',
-  'modelsSettingsUi.audio': '오디오 및 인식',
+  'modelsSettingsUi.audio': '오디오 및 번역',
   'modelsSettingsUi.translation': '번역',
   'modelsSettingsUi.appearance': '플로팅 자막',
-  'modelsSettingsUi.storage': '저장 공간',
+  'modelsSettingsUi.storage': '데이터 및 저장 공간',
   'modelsSettingsUi.advanced': '고급',
   'modelsSettingsUi.preview': '자막 미리보기',
   'modelsSettingsUi.previewSource': '여기는 자막 스타일 미리보기입니다.',
@@ -898,7 +906,7 @@ const koMessages: Record<DictionaryKey, string> = {
   'errors.copyDiagnosticsAction': '진단 정보 복사',
   'errors.copyDiagnosticsFailed': '진단 정보를 복사하지 못했습니다. 다시 시도하세요.',
   'errors.captionServiceToggleFailed': '자막 서비스를 전환하지 못했습니다. 다시 시도하세요.',
-  'errors.serviceConflict': '{running} 서비스가 실행 중입니다. 먼저 {running} 서비스를 종료하세요.',
+  'errors.serviceConflict': '{running}이(가) 실행 중입니다. 종료한 뒤 다시 시도하세요.',
   'errors.captionServiceStopFailed': '자막 서비스는 꺼졌지만 자막 세션을 종료하지 못했습니다. 음성 인식이 계속될 수 있습니다.',
   'errors.settingsCaptionStopFailed': '자막 세션을 종료하지 못했습니다. 다시 시도하세요.',
   'errors.prewarm.modelUnavailable': '필요한 모델을 아직 다운로드하지 않았습니다. 먼저 모델 관리에서 다운로드하세요.',

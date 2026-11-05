@@ -15,3 +15,6 @@ if (window === window.top && location.protocol === 'https:' && !document.documen
     }
   } catch { /* An absent marker makes verification fail closed in the content world. */ }
 }
+import { installSiteTracks } from './site-tracks-main'
+
+if (window === window.top && location.protocol === 'https:') installSiteTracks()

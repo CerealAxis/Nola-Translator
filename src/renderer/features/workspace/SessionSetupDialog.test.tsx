@@ -8,7 +8,7 @@ import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import { SessionSetupDialog, type SetupDraft } from './SessionSetupDialog'
 import type { AvailableModels } from '@/available-models'
 
-const state = vi.hoisted(() => ({ catalog: { asr: [], mt: [], tts: [], llm: [] } as AvailableModels }))
+const state = vi.hoisted(() => ({ catalog: { asr: [], mt: [], tts: [], ocr: [], llm: [] } as AvailableModels }))
 vi.mock('@/available-models', async importOriginal => ({ ...await importOriginal<typeof import('@/available-models')>(), useAvailableModels: () => state.catalog }))
 vi.mock('../settings/SettingsPage', () => ({
   SettingSwitch: ({ ariaLabel, isSelected, onChange }: { ariaLabel: string; isSelected: boolean; onChange(value: boolean): void }) =>
@@ -18,7 +18,7 @@ const initialSettings = stores.settings.getState()
 const initialModels = stores.models.getState()
 const draft: SetupDraft = { title: '', keepAudio: false }
 beforeEach(() => {
-  state.catalog = { asr: [{ binding: 'resource:new', name: 'Loaded recognition', kind: 'asr', origin: 'gateway', free: true, sourceLanguages: ['auto', 'en'] }], mt: [], tts: [], llm: [] }
+  state.catalog = { asr: [{ binding: 'resource:new', name: 'Loaded recognition', kind: 'asr', origin: 'gateway', free: true, sourceLanguages: ['auto', 'en'] }], mt: [], tts: [], ocr: [], llm: [] }
   stores.settings.setState({ settings: {
     ...DEFAULT_SETTINGS,
     uiLanguage: 'zh-CN',
@@ -85,7 +85,7 @@ it('submits speech settings only for the speech output mode', () => {
 })
 
 it('uses explicitly selected LiveTranslate speech without separate ASR, MT, or TTS models', () => {
-  state.catalog = { asr: [], mt: [], tts: [], llm: [] }
+  state.catalog = { asr: [], mt: [], tts: [], ocr: [], llm: [] }
   const settings = stores.settings.getState().settings!
   stores.settings.setState({ settings: {
     ...settings,
@@ -122,7 +122,8 @@ it('blocks an inherited S2S mode when Alibaba Cloud is not configured', () => {
 
 it.each([
   ['stopped', '模型网关未启动', '请先前往模型网关启动服务，然后重试。'],
-  ['starting', '模型网关', '正在启动'],
+  ['starting', '正在启动', '等待网关切换状态后重试。'],
+  ['failed', '模型网关启动失败', '打开模型网关查看状态并重试。'],
   ['running', '没有可用的 ASR 模型', '请配置可用的云端接口，或启用本地模型后在模型网关加载。'],
 ])('uses the current gateway state (%s) to report an unavailable local model', async (stateName, title, description) => {
   state.catalog.asr = []

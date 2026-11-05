@@ -23,20 +23,10 @@ import { Spinner } from '@/components/ui/spinner'
 import type { RouteId } from '@/bridge'
 import { useI18n } from '@/i18n'
 
-export type SettingsTab = 'general' | 'audio' | 'translation' | 'compute' | 'performance' | 'appearance' | 'storage' | 'advanced' | 'more' | 'browser' | 'developer'
+export type SettingsTab = 'general' | 'audio' | 'appearance' | 'browser' | 'shortcuts' | 'engine' | 'storage' | 'help' | 'developer'
 
 const ALL_SETTINGS_TABS: readonly SettingsTab[] = [
-  'general',
-  'audio',
-  'translation',
-  'compute',
-  'performance',
-  'appearance',
-  'browser',
-  'storage',
-  'advanced',
-  'more',
-  'developer',
+  'general', 'audio', 'appearance', 'browser', 'shortcuts', 'engine', 'storage', 'help', 'developer',
 ]
 
 /**
@@ -82,8 +72,10 @@ export function pathOf(route: RouteId, options?: { tab?: SettingsTab; id?: strin
       return '#/workspace'
     case 'overlay':
       return '#/overlay'
-    case 'video-captions':
-      return '#/video-captions'
+    case 'meeting':
+      return '#/meeting'
+    case 'screen-translation':
+      return '#/screen-translation'
     case 'model-gateway':
       return '#/model-gateway'
     case 'records':
@@ -112,7 +104,8 @@ const PARENT_ROUTES: Record<RouteId, RouteId | null> = {
   home: null,
   workspace: 'home',
   overlay: 'home',
-  'video-captions': 'home',
+  meeting: 'home',
+  'screen-translation': 'home',
   'model-gateway': 'home',
   records: 'home',
   record: 'records',
@@ -144,7 +137,11 @@ export function parseRoute(hash: string): Route {
     case 'overlay':
       return { route: 'overlay', path: '#/overlay' }
     case 'video-captions':
-      return { route: 'video-captions', path: '#/video-captions' }
+      return { route: 'settings', tab: 'browser', path: settingsPath('browser') }
+    case 'meeting':
+      return { route: 'meeting', path: '#/meeting' }
+    case 'screen-translation':
+      return { route: 'screen-translation', path: '#/screen-translation' }
     case 'model-gateway':
       return { route: 'model-gateway', path: '#/model-gateway' }
     case 'records': {
@@ -240,11 +237,12 @@ export function useRoute(): UseRoute {
 // -- 渲染 ---------------------------------------------------------------------
 
 /** 路由 id 到页面标题。文案是页面自己的名字，不是"占位"两个字。 */
-const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.modelGateway' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay' | 'videoCaptions.title'> = {
+const ROUTE_TITLES: Record<RouteId, 'nav.home' | 'nav.workspace' | 'nav.modelGateway' | 'nav.records' | 'nav.models' | 'nav.settings' | 'shellUi.overlay' | 'videoCaptions.title' | 'meeting.title' | 'screen.title'> = {
   home: 'nav.home',
   workspace: 'nav.workspace',
   overlay: 'shellUi.overlay',
-  'video-captions': 'videoCaptions.title',
+  meeting: 'meeting.title',
+  'screen-translation': 'screen.title',
   'model-gateway': 'nav.modelGateway',
   records: 'nav.records',
   record: 'nav.records',

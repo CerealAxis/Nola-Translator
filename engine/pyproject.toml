@@ -17,6 +17,7 @@ dependencies = [
   "lameenc==1.8.4",
   "numpy==1.26.4",
   "onnxruntime==1.23.2",
+  "opencv-python-headless==4.11.0.86",
   "pydantic==2.13.4",
   "PyAudioWPatch==0.2.12.8",
   "scipy==1.15.3",

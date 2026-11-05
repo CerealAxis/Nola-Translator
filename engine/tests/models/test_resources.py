@@ -21,6 +21,10 @@ from nola_translator_engine.resources import (
     INDEX_TRANSLATE_TRANSFORMERS_IDS,
     CRISP_ASR_SPECS,
     QWEN3_ASR_GGUF_SPECS,
+    QWEN3_TTS_SPECS,
+    ADDITIONAL_TTS_SPECS,
+    QWEN35_SPECS,
+    OCR_RESOURCE_ID,
     INDEX_TRANSLATE_SPECS,
     M2M100_RESOURCE_ID,
     QWEN_06B_RESOURCE_ID,
@@ -133,6 +137,10 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
         *(spec.model_id for spec in QWEN3_ASR_GGUF_SPECS),
         *(spec.model_id for spec in CRISP_ASR_SPECS),
         HYMT2_7B_RESOURCE_ID,
+        *(spec.model_id for spec in QWEN3_TTS_SPECS),
+        *(spec.model_id for spec in ADDITIONAL_TTS_SPECS),
+        *(spec.model_id for spec in QWEN35_SPECS),
+        OCR_RESOURCE_ID,
     ]
     assert QWEN_RESOURCE_ID == "qwen3-asr-1.7b-hf"
     assert QWEN_06B_RESOURCE_ID == "qwen3-asr-0.6b-hf"

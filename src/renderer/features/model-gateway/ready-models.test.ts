@@ -6,7 +6,7 @@ const model = (binding: string, kind: AvailableModel['kind'], name: string, orig
   ({ binding, kind, name, origin, free: origin === 'gateway' })
 
 const catalog: AvailableModels = {
-  llm: [model('custom:chat', 'llm', 'Gateway chat', 'gateway')],
+  ocr: [], llm: [model('custom:chat', 'llm', 'Gateway chat', 'gateway')],
   asr: [model('resource:sense-voice', 'asr', 'SenseVoice', 'gateway'), model('cloud:aliyun', 'asr', 'Aliyun ASR', 'cloud')],
   mt: [model('mt-custom:deepl', 'mt', 'DeepL proxy', 'cloud')],
   tts: [],
@@ -27,7 +27,7 @@ it('lists gateway-loaded models and configured cloud interfaces, keeping catalog
 })
 
 it('drops a capability once the gateway no longer loads it and nothing is configured', () => {
-  const stopped: AvailableModels = { ...catalog, llm: [], tts: [] }
+  const stopped: AvailableModels = { ...catalog, ocr: [], llm: [], tts: [] }
   expect(callableModels(stopped, playground).filter(item => item.kind === 'llm')).toEqual([])
-  expect(callableModels({ llm: [], asr: [], mt: [], tts: [] }, playground)).toEqual([])
+  expect(callableModels({ ocr: [], llm: [], asr: [], mt: [], tts: [] }, playground)).toEqual([])
 })

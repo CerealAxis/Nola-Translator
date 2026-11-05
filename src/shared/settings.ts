@@ -127,6 +127,7 @@ export type AppSettings = {
   browserConnection: { enabled: boolean }
   synthesis: { modelId: string; voice: string }
   realtime?: RealtimeSettings
+  meetingMode?: import('./meeting-mode').MeetingModeSettings
   modelGateway: ModelGatewaySettings
   modelPolicy?: ModelPolicy
   closeBehavior: 'tray' | 'quit'

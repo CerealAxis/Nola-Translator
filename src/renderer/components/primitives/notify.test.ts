@@ -2,7 +2,10 @@ import { afterEach, expect, it, vi } from 'vitest'
 import * as toast from '../ui/toast'
 import * as store from '@/store'
 import type { NolaBridge } from '@/bridge'
-import { notifyError, notifyGatewayModelUnavailable, notifyLoading } from './notify'
+import { translate, type TranslationKey } from '@/i18n'
+import { notifyError, notifyGatewayModelUnavailable, notifyGatewayStartIssue, notifyLoading, sessionConflictMessage } from './notify'
+
+const t = (key: TranslationKey, variables?: Parameters<typeof translate>[2]) => translate(key, 'zh-CN', variables)
 
 afterEach(() => { vi.restoreAllMocks(); window.history.replaceState({}, '', '/') })
 
@@ -73,4 +76,23 @@ it('sends only an approved action identifier for an overlay error', () => {
     actionId: 'retry-session',
     duration: 10000,
   })
+})
+
+it('reports a failed model even while Model Gateway is running', async () => {
+  const showToast = vi.spyOn(toast, 'showToast')
+  const model = 'resource:asr'
+  vi.spyOn(store, 'getBridge').mockReturnValue({ gateway: { snapshot: async () => ({
+    state: 'running', services: { asr: { state: 'failed', model, errorCode: 'model_out_of_memory' } },
+  }) } } as unknown as NolaBridge)
+
+  await expect(notifyGatewayStartIssue(t, 'asr', model)).resolves.toBe(true)
+  expect(showToast).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+    title: t('gateway.selectedModelUnavailable', { name: t('gateway.asr') }),
+    description: t('errors.modelOutOfMemory'),
+  }))
+})
+
+it('only names a busy feature when the refusal identifies it', () => {
+  expect(sessionConflictMessage(t, new Error('FEATURE_CONFLICT:meeting'))).toContain(t('meeting.title'))
+  expect(sessionConflictMessage(t, new Error('sessionAlreadyRunning'))).toBe(t('gateway.realtimeSessionBusy'))
 })

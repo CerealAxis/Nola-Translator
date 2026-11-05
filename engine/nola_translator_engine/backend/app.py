@@ -50,6 +50,8 @@ class BackendContext:
     #: delegates frame validation/continuity here and the M04 pipeline consumes
     #: normalized frames + VAD windows from the same instance.
     ingestions: dict = field(default_factory=dict)
+    meetings: dict = field(default_factory=dict)
+    meeting_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
 class AuthError(Exception):
@@ -78,9 +80,14 @@ def create_app(
     command_effect=None,
     gateway=None,
     enable_gateway: bool = False,
+    screen_ocr=None,
 ) -> FastAPI:
     token = control_token or os.environ.get(CONTROL_TOKEN_ENV) or secrets.token_urlsafe(32)
     server_instance_id = instance_id or os.environ.get(INSTANCE_ID_ENV) or str(uuid4())
+    if screen_ocr is None and os.environ.get("NOLA_TRANSLATOR_MODEL_DIR"):
+        from .screen_ocr import ScreenOcr
+
+        screen_ocr = ScreenOcr(Path(os.environ["NOLA_TRANSLATOR_MODEL_DIR"]))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -129,6 +136,9 @@ def create_app(
             # stop inputs, cancel/drain, close providers, terminate workers,
             # journal terminal state, flush diagnostics.
             ctx.accepting_sessions = False
+            if screen_ocr is not None:
+                await screen_ocr.close()
+            await asyncio.gather(*(meeting.close() for meeting in ctx.meetings.values()), return_exceptions=True)
             if registry is not None:
                 await registry.shutdown()
             openings = tuple(ctx.language_model_openings.values())
@@ -157,6 +167,11 @@ def create_app(
     # the same token during their handshake because a WebSocket scope has no
     # injectable Request.
     app.include_router(api.build_router(), dependencies=[Depends(_auth_dependency)])
+    if screen_ocr is not None:
+        from .screen_ocr import build_screen_ocr_router
+
+        app.include_router(build_screen_ocr_router(screen_ocr), prefix=api.API_PREFIX,
+                           dependencies=[Depends(_auth_dependency)])
 
     def _ws_authorized(websocket: WebSocket) -> bool:
         """WS handshake auth uses the Electron-held bearer token."""

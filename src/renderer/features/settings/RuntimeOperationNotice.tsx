@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { notifyError, notifyLoading, notifySuccess } from '@/components/primitives/notify'
+import { notifyError, notifyLoading, notifySuccess, sessionConflictMessage } from '@/components/primitives/notify'
 import { useI18n } from '@/i18n'
 import { actions, stores } from '@/store'
 import { isRuntimeFailureClaimed, isSessionConflictFailure } from './settingsErrorChannel'
@@ -25,15 +25,14 @@ export function RuntimeOperationNotice() {
       const pipDetails = pipTimeout ? current.runtimeError!.slice('PYTORCH_DEPENDENCY_TIMEOUT:'.length).trim() : undefined
       if (!wasBusy && current.runtimeBusy) {
         notifyLoading(t('runtime.operationStarted', { action }), {
-          description: t('runtime.operationProgress'),
           action: { label: t('runtime.viewProgress'), onPress: () => {
-            void actions.settings.openMainPage(`${settingsPath('compute')}?component=engine`).catch(error => notifyError(t('errors.runtimeSettingsFailed'), { cause: error }))
+            void actions.settings.openMainPage(`${settingsPath('engine')}?component=engine`).catch(error => notifyError(t('errors.runtimeSettingsFailed'), { cause: error }))
           } },
         })
         return
       }
       if (wasBusy && !current.runtimeBusy) {
-        if (conflict) notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        if (conflict) notifyError(sessionConflictMessage(t, current.runtimeError))
         else if (current.runtimeError) notifyError(
           pipTimeout ? t('runtime.pipDependencyTimeout') : t('runtime.operationFailed', { action }),
           { cause: pipDetails ?? current.runtimeError },
@@ -45,7 +44,7 @@ export function RuntimeOperationNotice() {
         // A page that reported this failure in its own words claimed it before the call
         // that caused it, so the message here would be a second one for the same failure.
         if (isRuntimeFailureClaimed()) return
-        if (conflict) notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        if (conflict) notifyError(sessionConflictMessage(t, current.runtimeError))
         else notifyError(
           pipTimeout ? t('runtime.pipDependencyTimeout') : t('runtime.operationFailed', { action: t('runtime.recheck') }),
           { cause: pipDetails ?? current.runtimeError },

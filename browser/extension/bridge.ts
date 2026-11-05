@@ -1,8 +1,9 @@
-import { BROWSER_EXTENSION_VERSION, type BrowserRequest, type BrowserResponse, type BrowserWireErrorCode } from '../../src/shared/browser'
+import { requestId } from './id'
+import { BROWSER_EXTENSION_VERSION, BROWSER_PROTOCOL_VERSION, type BrowserRequest, type BrowserResponse, type BrowserWireErrorCode } from '../../src/shared/browser'
 
 export type RequestInput = BrowserRequest extends infer T ? T extends BrowserRequest ? Omit<T, 'id'> : never : never
 export interface ExtensionBridge {
-  request(request: RequestInput): Promise<Extract<BrowserResponse, { type: 'result' }>['value']>
+  request(request: RequestInput, signal?: AbortSignal): Promise<Extract<BrowserResponse, { type: 'result' }>['value']>
   subscribe(listener: (response: BrowserResponse) => void): () => void
   close(): void
 }
@@ -53,17 +54,33 @@ export function createBridge(name = 'nola-captions'): ExtensionBridge {
     return connected
   }
   return {
-    request(input) {
+    request(input, signal) {
       if (disposed) return Promise.reject(new BrowserFailure('browserConnectionLost'))
+      if (signal?.aborted) return Promise.reject(signal.reason)
       // Retry hello creates a fresh content port after a service-worker/content disconnect.
       if (!port && input.type !== 'hello') return Promise.reject(new BrowserFailure('browserConnectionLost'))
-      const id = crypto.randomUUID()
+      const id = requestId()
       return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => { pending.delete(id); reject(new BrowserFailure(input.type === 'audio' ? 'browserAudioBacklog' : 'browserConnectionUnavailable')) }, input.type === 'start' ? 180000 : input.type === 'audio' ? 2000 : input.type === 'finish' ? 11000 : 10000)
-        pending.set(id, { resolve, reject, timer })
+        const cancel = () => {
+          if (input.type !== 'translate') return
+          try { port?.postMessage({ type: 'cancelTranslation', requestId: id, id: requestId() }) } catch { /* The disconnected desktop cancels its own requests. */ }
+        }
+        const abort = () => { clearTimeout(timer); pending.delete(id); cancel(); reject(signal?.reason) }
+        const finish = () => signal?.removeEventListener('abort', abort)
+        const timer = setTimeout(() => {
+          finish(); pending.delete(id); cancel()
+          reject(new BrowserFailure(input.type === 'audio' ? 'browserAudioBacklog' : input.type === 'translate' ? 'browserTranslationTimeout' : 'browserConnectionUnavailable'))
+        }, input.type === 'start' ? 180000 : input.type === 'audio' ? 2000 : input.type === 'finish' ? 11000 : input.type === 'translate' ? 30000 : 10000)
+        pending.set(id, { resolve: value => { finish(); resolve(value) }, reject: error => {
+          finish()
+          if (input.type === 'hello' && error instanceof BrowserFailure && (error.code === 'invalidMessage' || error.code === 'unsupportedProtocol')) {
+            reject(new BrowserFailure('browserProtocolMismatch'))
+          } else reject(error)
+        }, timer })
+        signal?.addEventListener('abort', abort, { once: true })
         // Compile the content bundle's release into hello: getManifest() can already describe a
         // reloaded background while an old page still runs its previous content script.
-        try { (port ?? connect()).postMessage({ ...input, ...(input.type === 'hello' ? { extensionVersion: BROWSER_EXTENSION_VERSION } : {}), id }) } catch { port = null; clearTimeout(timer); pending.delete(id); reject(new BrowserFailure('browserConnectionUnavailable')) }
+        try { (port ?? connect()).postMessage({ ...input, ...(input.type === 'hello' ? { extensionVersion: BROWSER_EXTENSION_VERSION, protocolVersion: BROWSER_PROTOCOL_VERSION } : {}), id }) } catch { port = null; finish(); clearTimeout(timer); pending.delete(id); reject(new BrowserFailure('browserConnectionUnavailable')) }
       })
     },
     subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener) } },

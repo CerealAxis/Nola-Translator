@@ -142,7 +142,7 @@ LoadResult = TypeVar('LoadResult')
 #: Cloud recognition reasons retain provider-specific compatibility while mapping transport
 #: and response failures to stable engine codes.
 CLOUD_RECOGNITION_ERROR_CODES: dict[str, str] = {
-    "recognitionUnauthorized": "cloudRecognitionCredentialMissing",
+    "recognitionUnauthorized": "invalidCredential",
     "recognitionInsufficientBalance": "cloudRecognitionInsufficientBalance",
     "recognitionRateLimited": "cloudRecognitionRateLimited",
     "recognitionNetworkError": "recognitionNetworkUnavailable",
@@ -153,10 +153,19 @@ CLOUD_RECOGNITION_ERROR_CODES: dict[str, str] = {
     "recognitionRejected": "recognitionInvalidResponse",
     "recognitionClosed": "recognitionClosed",
     "recognitionBufferOverflow": "recognitionBufferOverflow",
+    "gatewayNotRunning": "gatewayNotRunning",
+    "modelDisabled": "modelDisabled",
+    "modelNotLoaded": "modelNotLoaded",
+    "modelUnavailable": "modelUnavailable",
+    "modelOutOfMemory": "modelOutOfMemory",
+    "resourceBusy": "resourceBusy",
+    "invalidConfiguration": "invalidConfiguration",
 }
 
 
 def _model_load_error_code(error: Exception) -> str:
+    if isinstance(error, CloudRecognitionError):
+        return CLOUD_RECOGNITION_ERROR_CODES.get(error.reason, "recognitionInvalidResponse")
     text = f"{type(error).__name__} {error}".lower()
     if any(token in text for token in ("out of memory", "outofmemory", "cuda error", "memoryerror")) or isinstance(error, MemoryError):
         return "modelOutOfMemory"

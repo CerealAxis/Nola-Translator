@@ -8,7 +8,7 @@ describe('inline choice field', () => {
     const action = vi.fn()
     const { container } = render(<ChoiceField label="Audio source" value="tab" options={[{ value: 'tab', label: 'Tab audio' }, { value: 'system', label: 'System audio' }]} onChange={action} />)
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Audio source' }))
+    await user.click(screen.getByRole('combobox', { name: 'Audio source' }))
     const option = screen.getByRole('option', { name: 'System audio' })
     expect(container.contains(option)).toBe(true)
     await user.click(option)
@@ -19,7 +19,7 @@ describe('inline choice field', () => {
   it('locks the selection control while the session is starting or active', async () => {
     const action = vi.fn()
     render(<ChoiceField label="Language" value="en" options={[{ value: 'en', label: 'English' }]} disabled onChange={action} />)
-    expect(screen.getByRole('button', { name: 'Language' })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Language' })).toBeDisabled()
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   })
 })

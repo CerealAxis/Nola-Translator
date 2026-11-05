@@ -11,6 +11,7 @@ import pytest
 from nola_translator_engine.backend.app import create_app
 from nola_translator_engine.backend.gateway.adapters import MIMO_TTS_MODEL
 from nola_translator_engine.backend.gateway.bootstrap import build_default_gateway
+from nola_translator_engine.backend.gateway.capabilities import GatewayError, GatewayErrorCode
 from nola_translator_engine.backend.gateway.operations import AsrObservation, SynthesisChunk, SynthesisResult, TranslationResult
 
 
@@ -144,6 +145,46 @@ def test_direct_workbench_inference_is_private_and_rejects_invalid_payload_witho
             "audio": "data:audio/wav;base64,not-a-wav",
         })
         assert malformed_wav.status_code == 400
+
+
+@pytest.mark.parametrize(("cause", "status", "code"), [
+    (GatewayErrorCode.MODEL_NOT_INSTALLED, 404, "MODEL_NOT_READY"),
+    (GatewayErrorCode.RESOURCE_EXHAUSTED, 429, "RESOURCE_EXHAUSTED"),
+    (GatewayErrorCode.WORKER_OOM, 503, "RESOURCE_EXHAUSTED"),
+    (GatewayErrorCode.TIMEOUT, 504, "INTERNAL_ERROR"),
+])
+def test_direct_inference_reports_the_actual_failure(cause, status, code):
+    class Gateway:
+        async def translate(self, *args, **kwargs):
+            raise GatewayError(cause, stage="mt", message="private provider detail")
+
+        async def shutdown(self):
+            pass
+
+    with TestClient(create_app(control_token="local-control", gateway=Gateway())) as client:
+        response = client.post("/api/v2/gateway/infer", headers={"Authorization": "Bearer local-control"}, json=translation())
+        assert response.status_code == status
+        error = response.json()["error"]
+        assert (error["code"], error["message_key"], error["stage"]) == (code, f"gateway.{cause.value}", "mt")
+        assert "private provider detail" not in response.text
+
+
+def test_gateway_asr_stream_reports_an_unavailable_model_before_closing():
+    class Gateway:
+        def match(self, request):
+            raise GatewayError(GatewayErrorCode.MODEL_NOT_INSTALLED, stage="asr", message="private model path")
+
+        async def shutdown(self):
+            pass
+
+    with TestClient(create_app(control_token="local-control", gateway=Gateway())) as client:
+        with client.websocket_connect("/api/v2/gateway/asr-stream?model=local-asr",
+                                      headers={"Authorization": "Bearer local-control"}) as socket:
+            socket.send_json({"op": "session.open", "language": "en"})
+            frame = socket.receive_json()
+            assert frame["status"] == 404
+            assert frame["error"]["message_key"] == "gateway.MODEL_NOT_INSTALLED"
+            assert "private model path" not in str(frame)
 
 
 def test_workbench_lease_is_held_until_explicit_release(monkeypatch):

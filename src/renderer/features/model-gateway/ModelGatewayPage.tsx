@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Activity, CircleHelp, Copy, Eye, EyeOff, Mic, Languages, RotateCcw, Volume2, Bot } from 'lucide-react'
+import { Activity, CircleHelp, Copy, Eye, EyeOff, Mic, Languages, RotateCcw, Volume2, Bot, ScanText } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { getBridge, stores, updateSettings, useStore } from '@/store'
 import { requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
@@ -35,9 +35,9 @@ import { supportsSelectedEngine, modelEngines } from '../../../shared/model-engi
 import { isEngineAvailable } from '../models/engine-availability'
 import './model-gateway.css'
 
-const CAPABILITIES: GatewayCapability[] = ['asr', 'mt', 'tts', 'llm']
+const CAPABILITIES: GatewayCapability[] = ['asr', 'mt', 'tts', 'llm', 'ocr']
 const PUBLIC_CAPABILITIES = ['asr', 'mt', 'tts'] as const
-const REQUEST_ICONS = { asr: Mic, mt: Languages, tts: Volume2, llm: Bot }
+const REQUEST_ICONS = { asr: Mic, mt: Languages, tts: Volume2, llm: Bot, ocr: ScanText }
 
 export function ModelGatewayPage() {
   const { t, language } = useI18n()
@@ -112,6 +112,7 @@ export function ModelGatewayPage() {
   const choices = CAPABILITIES.flatMap(kind => {
     const options = [
       ...localChoices.filter(model => model.kind === kind),
+      ...(kind === 'ocr' ? resources.filter(resource => resource.kind === 'ocrModel' && resource.installed).map(resource => ({ id: `resource:${resource.resourceId}`, name: resource.name, kind: 'ocr' as const })) : []),
       ...cloudChoices.filter(model => model.kind === kind),
     ]
     const seen = new Set<string>()
@@ -122,7 +123,7 @@ export function ModelGatewayPage() {
    * The binding the gateway loads for a capability. An empty stored field falls back to what the
    * business settings name, so a profile written before the gateway owned loading keeps working.
    */
-  const gatewayBinding = (kind: GatewayCapability) => normalizeModelBinding(kind, kind === 'llm' ? config.llmModel
+  const gatewayBinding = (kind: GatewayCapability) => normalizeModelBinding(kind, kind === 'ocr' ? config.ocrModel : kind === 'llm' ? config.llmModel
     : kind === 'asr' ? config.asrModel : kind === 'tts' ? config.ttsModel : config.mtModel)
     || defaultModelBinding(settings, kind)
   const fallbackBinding = () => normalizeModelBinding('mt', config.mtFallbackModel)
@@ -138,7 +139,7 @@ export function ModelGatewayPage() {
         return
       }
       const current = operation === 'runtime' ? await api.snapshot().catch(() => null) : null
-      if (operation === 'settings' || !current || (current.state !== 'failed' && !Object.values(current.services).some(service => service.state === 'failed'))) notifyError(t('gateway.actionFailed'), { cause: error })
+      if (operation === 'settings' || !current || (current.state !== 'failed' && !Object.values(current.services).some(service => service?.state === 'failed'))) notifyError(t('gateway.actionFailed'), { cause: error })
     }
     finally { setBusy(false) }
   }
@@ -180,7 +181,7 @@ export function ModelGatewayPage() {
   const modelStatus = (kind: GatewayCapability | 'fallback') => {
     if (kind === 'fallback') return <span className="text-muted">—</span>
     if (!config[kind]) return <Badge variant="outline" className="text-muted">{t('gateway.proxyDisabled')}</Badge>
-    const { state } = snapshot.services[kind]
+    const { state } = snapshot.services[kind] ?? { state: 'stopped' }
     const binding = gatewayBinding(kind)
     return <div className="flex flex-col items-start gap-1">
       <Badge variant={state === 'ready' ? 'success' : state === 'failed' ? 'danger' : 'secondary'}>{t(`gateway.${state}`)}</Badge>
@@ -249,7 +250,7 @@ socket.on('open', async () => {
       <div className="model-gateway-table-scroll">
         <table className="model-gateway-table" aria-label={t('gateway.capabilities')}>
           <thead><tr><th scope="col">{t('gateway.capabilityColumn')}</th><th scope="col">{t('gateway.modelColumn')}</th><th scope="col">{t('gateway.stateColumn')}</th><th scope="col">{t('gateway.modelId')}</th></tr></thead>
-          <tbody>{(['asr', 'mt', 'tts', 's2s', 'llm', 'fallback'] as const).map(row => <tr key={row} data-onboarding={`gateway-${row}`}>
+          <tbody>{(['asr', 'mt', 'tts', 's2s', 'llm', 'ocr', 'fallback'] as const).map(row => <tr key={row} data-onboarding={`gateway-${row}`}>
             <th scope="row" className="font-normal"><Tooltip><TooltipTrigger type="button" className="cursor-help text-start">{modelLabel(row)}</TooltipTrigger><TooltipContent>{t(row === 's2s' ? 'models.s2sModelsHint' : row === 'fallback' ? 'gateway.fallbackHint' : `gateway.${row}Hint`)}</TooltipContent></Tooltip></th>
             <td>{row === 's2s'
               ? <SettingSelect ariaLabel={modelLabel(row)} isDisabled={changing || !s2sReady} value={s2sReady ? configuredS2sModel ?? 'off' : 'off'} options={[

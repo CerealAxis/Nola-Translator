@@ -10,6 +10,7 @@ import type { FeatureActivity, FeatureLease } from './feature-activity'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
 import type { BackendSession, MappedBackendSession } from './backend-session'
+import type { SessionReaderSnapshot } from '../shared/session-reader'
 
 /**
  * Each cloud recognition provider owns one slot of `credentials.json`. A provider absent here has
@@ -71,7 +72,14 @@ export class SessionController {
   private localModelsInUse = false
   private readonly inFlight = new Set<Promise<unknown>>()
   private backendSession?: BackendSession
+  private reader: SessionReaderSnapshot | null = null
+  private readerPausedAt: number | null = null
+  private readerPausedMs = 0
   constructor(private readonly options: SessionControllerOptions) {}
+  readerSnapshot(): SessionReaderSnapshot | null {
+    if (!this.reader || this.owner !== 'desktop' || this.reader.sessionId !== this.activeSessionId) return null
+    return structuredClone({ ...this.reader, elapsedMs: Math.max(0, (this.readerPausedAt ?? Date.now()) - this.reader.startedAtMs - this.readerPausedMs) })
+  }
   get engine(): EngineProcess { return this.options.engine }
   getBackendSession(id: string): BackendSession | undefined {
     return this.activeSessionId === id ? this.backendSession : undefined
@@ -208,6 +216,7 @@ export class SessionController {
     const operation = ++this.operation
     const checkCancelled = () => { if (operation !== this.operation) throw new Error('sessionStartCancelled') }
     this.owner = owner
+    this.reader = null
     this.options.startingChanged(true)
     let meetingId: string | null = null
     try {
@@ -273,6 +282,13 @@ export class SessionController {
         : await this.options.engine.request({ protocolVersion: 1, type: 'startSession', requestId: `start-${randomUUID()}`, config: parsed }, 'sessionStarted', 30 * 60_000)
       checkCancelled()
       this.activeSessionId = response.sessionId
+      if (owner === 'desktop') {
+        const cached = this.readerSnapshot()
+        this.reader = { sessionId: response.sessionId, meetingId, status: 'running', startedAtMs: cached?.startedAtMs ?? Date.now(),
+          segments: cached?.segments ?? [], elapsedMs: 0 }
+        this.readerPausedAt = null
+        this.readerPausedMs = 0
+      }
       if (owner === 'browser') this.rememberBrowser(response.sessionId)
       if (meetingId) this.options.meetings?.attach(meetingId, response.sessionId)
       if (backend && owner === 'desktop') {
@@ -358,10 +374,29 @@ export class SessionController {
     await this.options.engine.request({ protocolVersion: 1, type: 'setSessionPaused', requestId: `pause-${randomUUID()}`, sessionId: id, paused }, 'status', 30_000)
   }
   handleEvent(event: EngineEvent): void {
+    if (event.type === 'sessionStarted' && this.owner === 'desktop' && this.starting && !this.reader) {
+      this.reader = { sessionId: event.sessionId, meetingId: event.meetingId ?? null, startedAtMs: Date.now(),
+        status: 'running', segments: [], elapsedMs: 0 }
+    }
+    if (this.reader && this.owner === 'desktop') {
+      if (event.type === 'caption' && event.sessionId === this.reader.sessionId) {
+        const index = this.reader.segments.findIndex(segment => segment.segmentId === event.segment.segmentId)
+        if (index < 0) this.reader.segments.push(event.segment)
+        else if (this.reader.segments[index].revision < event.segment.revision) this.reader.segments[index] = event.segment
+        this.reader.segments.sort((left, right) => left.startedAtMs - right.startedAtMs)
+        if (this.reader.segments.length > 2048) this.reader.segments.splice(0, this.reader.segments.length - 2048)
+      } else if (event.type === 'status' && (event.code === 'paused' || event.code === 'listening')) {
+        const paused = event.code === 'paused'
+        if (paused && this.readerPausedAt === null) this.readerPausedAt = Date.now()
+        else if (!paused && this.readerPausedAt !== null) { this.readerPausedMs += Date.now() - this.readerPausedAt; this.readerPausedAt = null }
+        this.reader.status = paused ? 'paused' : 'running'
+      }
+    }
     if (event.type === 'sessionStarted' && this.browserActive) this.rememberBrowser(event.sessionId)
     if (event.type === 'sessionStopped') {
       if (this.activeSessionId === event.sessionId) {
         this.activeSessionId = null
+        this.reader = null
         this.backendSession?.close()
         this.backendSession = undefined
       }
@@ -381,6 +416,7 @@ export class SessionController {
     const id = this.activeSessionId
     const browser = this.browserActive
     this.activeSessionId = null
+    this.reader = null
     this.owner = null
     if (id && !browser) void this.options.meetings?.finish(id).catch(error => console.error('meeting finalize failed', error))
     this.featureLease?.release()

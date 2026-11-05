@@ -42,11 +42,11 @@ const KNOWN_ERROR_CODES: Readonly<Record<string, string>> = {
 const RUNTIME_PREFIX_PATTERN = /^RUNTIME_(TORCH|LLAMA|CRISP):/i
 
 /**
- * A message that is nothing but an identifier names the failure exactly, so it is looked up
+ * A message beginning with a known identifier names the failure exactly, so it is looked up
  * before the text recognisers below get a chance to read a different meaning into it. The catalog
  * decides whether the identifier is one it claims; an identifier nobody claims falls through.
  */
-const IDENTIFIER_PATTERN = /^[a-z][a-z0-9_]*$/i
+const IDENTIFIER_PATTERN = /^([a-z][a-z0-9_]*)(?:$|:\s)/i
 
 /**
  * The remaining recognisers key on identifiers that survive a copy of the failure text. The
@@ -93,8 +93,8 @@ export function normalizeThrownError(
   const message = typeof source?.message === 'string' ? source.message : ''
   const normalizedMessage = message.toUpperCase().replace(/[^A-Z0-9]+/g, '_')
   const runtime = RUNTIME_PREFIX_PATTERN.exec(message)
-  const identifierSupportCode = IDENTIFIER_PATTERN.test(message) ? supportErrorCodeForCause(message) : undefined
-  const knownIdentifier = identifierSupportCode !== undefined && identifierSupportCode !== 'ERR-999' ? message : undefined
+  const identifier = IDENTIFIER_PATTERN.exec(message)?.[1]
+  const knownIdentifier = identifier && supportErrorCodeForCause(identifier) !== 'ERR-999' ? identifier : undefined
   /*
    * A system failure names itself, and Node writes that name in `code` while `errno` holds the
    * number, so the name is the only part the table can be asked about. The engine names itself

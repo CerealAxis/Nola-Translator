@@ -1,46 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { NumberField } from '@base-ui/react/number-field'
-import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
 import { Switch, SwitchThumb } from '@/components/ui/switch'
-
-import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
-import { ArrowLeft, CheckSquare, CircleAlert, ExternalLink, LoaderCircle } from 'lucide-react'
-
-import { DEFAULT_SETTINGS } from '@/bridge'
-import { BROWSER_EXTENSION_VERSION, type BrowserIntegrationInfo, type BrowserKind } from '../../../../shared/browser'
+import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '@/components/ui/slider'
+import { ArrowLeft, ExternalLink } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ColorPicker } from '@/components/ui/color-picker'
+import { useI18n } from '@/i18n'
+import { browserConnectionAction } from '@/store/settingsStore'
+import { stores, useStore } from '@/store'
+import { notifyRetryableFailure } from '@/components/primitives/notify'
+import { BROWSER_EXTENSION_VERSION, type BrowserKind, type BrowserIntegrationInfo } from '../../../../shared/browser'
 import chromeIcon from '@/assets/browsers/chrome.png'
 import edgeIcon from '@/assets/browsers/edge.png'
 import firefoxIcon from '@/assets/browsers/firefox.svg'
-import { notifyError, notifyRetryableFailure } from '@/components/primitives/notify'
-import { Button } from '@/components/ui/button'
-import { Card, CardAction, CardDescription, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ColorPicker } from '@/components/ui/color-picker'
-import { useI18n } from '@/i18n'
-import { stores, updateSettings, useStore } from '@/store'
-import { browserConnectionAction } from '@/store/settingsStore'
-import { reportSettingsFailure } from '../settingsErrorChannel'
-import { SettingsRow } from '../SettingsRow'
-import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
-import '../../video-captions/video-captions.css'
 import './browserSettings.css'
 
 const BROWSERS: readonly BrowserKind[] = ['chrome', 'edge', 'firefox']
 const BROWSER_ICONS: Record<BrowserKind, string> = { chrome: chromeIcon, edge: edgeIcon, firefox: firefoxIcon }
-const FONT_FAMILIES = ['Segoe UI Variable', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans SC', 'Cascadia Mono', 'Source Han Sans SC']
 const PRESET_COLORS = ['#F7F7F7', '#D7DEE8', '#87D5FF', '#0D0E10', '#FFFFFF', '#4C9AFF']
 
 export function BrowserTab() {
   const { t } = useI18n()
-  const { browser, browserBusy, browserError, settings: savedSettings, pending } = useStore(stores.settings, state => state)
-  /*
-   * The store keeps one error field for every command it runs, so a failure from another
-   * page (a storage read, a caption session) would light this tab's save indicator even
-   * though nothing written here failed. The indicator follows this tab's own writes.
-   */
-  const [saveError, setSaveError] = useState(false)
-  const settings = savedSettings ?? DEFAULT_SETTINGS
-  const appearance = settings.browserCaptions
+  const { browser, browserBusy, browserError } = useStore(stores.settings, state => state)
   const [selectedBrowser, setSelectedBrowser] = useState<BrowserKind | null>(null)
   const reportedBrowserError = useRef<string | null>(null)
   const downloadTarget = useRef<BrowserKind | null>(null)
@@ -97,32 +79,10 @@ export function BrowserTab() {
   }
   const enableLabel = (kind: BrowserKind) => t('browser.allowBrowserConnection', { browser: browserName(kind) })
   const extensionSwitch = (info: BrowserIntegrationInfo) => (
-    <BrowserSwitch isSelected={info.enabled} isDisabled={browserBusy || !info.available || !hasExtension(info)}
+    <BrowserSwitch isSelected={info.enabled} isDisabled={browserBusy || !browser || !info.available || (!hasExtension(info) && info.enabled)}
       onChange={enabled => { void browserConnectionAction('browserEnable', enabled, info.browser) }} ariaLabel={enableLabel(info.browser)} />
   )
   const selected = selectedBrowser ? getBrowser(selectedBrowser) : null
-  const patchAppearance = (patch: Partial<typeof appearance>) => {
-    void updateSettings({ browserCaptions: patch })
-      .then(() => setSaveError(false))
-      .catch(() => setSaveError(true))
-  }
-  const restoreAppearance = () => {
-    void updateSettings({ browserCaptions: DEFAULT_SETTINGS.browserCaptions })
-      .then(() => setSaveError(false))
-      .catch((error: unknown) => {
-        setSaveError(true)
-        reportSettingsFailure(t('settings.resetAppearanceFailed'), error)
-      })
-  }
-  const previewFrameStyle = {
-    '--video-caption-top': `${100 - appearance.bottomOffset}%`,
-    fontFamily: appearance.fontFamily,
-    lineHeight: appearance.lineHeight,
-    background: `color-mix(in oklab, ${appearance.backgroundColor} ${appearance.backgroundOpacity * 100}%, transparent)`,
-  } as CSSProperties
-  const previewSourceStyle = { color: appearance.sourceColor, fontSize: appearance.sourceFontSize }
-  const previewTranslationStyle = { color: appearance.translationColor, fontSize: appearance.translationFontSize }
-
   return (
     <div className="settings-panel browser-settings">
       {selected ? (
@@ -189,7 +149,7 @@ export function BrowserTab() {
                       {hasExtension(info) ? <Button variant="secondary" size="sm" disabled={browserBusy || !info.available}
                         aria-label={t('browser.manageBrowserExtension', { browser: browserName(kind) })}
                         onClick={() => setSelectedBrowser(kind)}>{t('browser.manage')}</Button> : null}
-                      {hasExtension(info) ? extensionSwitch(info) : null}
+                      {hasExtension(info) || browser && !info.enabled ? extensionSwitch(info) : null}
                     </div>
                   </li>
                 )
@@ -198,57 +158,6 @@ export function BrowserTab() {
           </CardContent>
         </Card>
       )}
-      <Card className="nola-overlay-preview">
-        <CardHeader><CardTitle>{t('browser.preview')}</CardTitle></CardHeader>
-        <CardContent className="card__content nola-overlay-stage nola-video-stage">
-          <div className="nola-video-frame" style={previewFrameStyle} aria-hidden="true">
-            {appearance.showSource ? <p className="nola-video-caption-line" style={previewSourceStyle}>{t('videoCaptions.previewSource')}</p> : null}
-            {appearance.showTranslation ? <p className="nola-video-caption-line" data-role="translation" style={previewTranslationStyle}>{t('videoCaptions.previewTranslation')}</p> : null}
-          </div>
-        </CardContent>
-      </Card>
-      <SettingGroup legend={t('modelsSettingsUi.layoutDisplay')}>
-        <SettingsRow label={t('browser.colorScheme')}>
-          <TabsRoot value={appearance.colorScheme} onValueChange={next => {
-            if (next === 'dark' || next === 'light') {
-              const palette = next === 'dark'
-                ? { backgroundColor: '#0D0E10', sourceColor: '#F7F7F7', translationColor: '#D7DEE8' }
-                : { backgroundColor: '#F7F7F7', sourceColor: '#1A1C22', translationColor: '#4A5160' }
-              patchAppearance({ colorScheme: next, ...palette })
-            }
-          }}>
-            <TabsList className="nola-segmented" aria-label={t('browser.colorScheme')}>
-              <TabsTrigger value="dark">{t('settings.schemeDark')}</TabsTrigger>
-              <TabsTrigger value="light">{t('settings.schemeLight')}</TabsTrigger>
-            </TabsList>
-          </TabsRoot>
-        </SettingsRow>
-        <SettingsRow label={t('settings.showSource')}><SettingSwitch isSelected={appearance.showSource} ariaLabel={t('settings.showSource')} onChange={showSource => patchAppearance({ showSource })} /></SettingsRow>
-        <SettingsRow label={t('settings.showTranslation')}><SettingSwitch isSelected={appearance.showTranslation} ariaLabel={t('settings.showTranslation')} onChange={showTranslation => patchAppearance({ showTranslation })} /></SettingsRow>
-        <SettingsRow label={t('browser.bottomOffset')} desc={t('browser.bottomOffsetHint')} descriptionTooltip><StyleSliderRow label={t('browser.bottomOffset')} value={appearance.bottomOffset} min={0} max={30} step={1} unit="%" onChange={bottomOffset => patchAppearance({ bottomOffset })} /></SettingsRow>
-      </SettingGroup>
-      <SettingGroup legend={t('modelsSettingsUi.fontColors')}>
-        <SettingsRow label={t('settings.fontFamily')}><SettingSelect value={appearance.fontFamily} options={FONT_FAMILIES.map(value => ({ value, label: value }))} ariaLabel={t('settings.fontFamily')} onChange={fontFamily => patchAppearance({ fontFamily })} /></SettingsRow>
-        <SettingsRow label={t('settings.sourceFontSize')}><StyleSliderRow label={t('settings.sourceFontSize')} value={appearance.sourceFontSize} min={10} max={48} step={1} unit="px" onChange={sourceFontSize => patchAppearance({ sourceFontSize })} /></SettingsRow>
-        <SettingsRow label={t('settings.translationFontSize')}><StyleSliderRow label={t('settings.translationFontSize')} value={appearance.translationFontSize} min={10} max={48} step={1} unit="px" onChange={translationFontSize => patchAppearance({ translationFontSize })} /></SettingsRow>
-        <SettingsRow label={t('settings.lineHeight')}><StyleSliderRow label={t('settings.lineHeight')} value={appearance.lineHeight} min={1} max={2.5} step={0.05} onChange={lineHeight => patchAppearance({ lineHeight })} /></SettingsRow>
-        <SettingsRow label={t('settings.backgroundOpacity')}><StyleSliderRow label={t('settings.backgroundOpacity')} value={Math.round(appearance.backgroundOpacity * 100)} min={0} max={100} step={1} unit="%" onChange={value => patchAppearance({ backgroundOpacity: value / 100 })} /></SettingsRow>
-        <div className="settings-colors">
-          <StyleColorControl label={t('settings.sourceColor')} value={appearance.sourceColor} onChange={sourceColor => patchAppearance({ sourceColor })} />
-          <StyleColorControl label={t('settings.translationColor')} value={appearance.translationColor} onChange={translationColor => patchAppearance({ translationColor })} />
-          <StyleColorControl label={t('settings.backgroundColor')} value={appearance.backgroundColor} onChange={backgroundColor => patchAppearance({ backgroundColor })} />
-        </div>
-      </SettingGroup>
-      <div className="settings-save">
-        <span className="settings-save__state" role="status" data-error={saveError}>
-          {saveError ? <CircleAlert aria-hidden="true" /> : <CheckSquare aria-hidden="true" />}
-          {saveError ? t('modelsSettingsUi.saveError') : pending ? t('modelsSettingsUi.saving') : t('modelsSettingsUi.automaticSave')}
-        </span>
-        <Button variant="outline" size="sm" disabled={pending} onClick={restoreAppearance}>
-          {pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
-          {t('modelsSettingsUi.resetAppearance')}
-        </Button>
-      </div>
     </div>
   )
 }
@@ -267,7 +176,7 @@ export interface BrowserSwitchProps {
 function BrowserSwitch({ isSelected, isDisabled, ariaLabel, onChange }: BrowserSwitchProps) {
   return (
     <Switch nativeButton render={<button type="button" />} className="switch"
-      checked={isSelected} onCheckedChange={onChange} disabled={isDisabled} aria-label={ariaLabel}>
+      checked={isSelected} onCheckedChange={onChange} disabled={isDisabled} aria-label={ariaLabel} title={ariaLabel}>
       <span className="switch__control"><SwitchThumb className="switch__thumb" /></span>
     </Switch>
   )

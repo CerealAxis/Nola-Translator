@@ -84,6 +84,9 @@ export type NolaTranslatorApi = {
   reportLatencyPaint?(sessionId: string, segmentId: string, kind: 'source' | 'translation', at: number): Promise<boolean>
   gateway?: import('./model-gateway').ModelGatewayApi
   activity?: import('./feature-activity').FeatureActivityApi
+  meetingMode?: import('./meeting-mode').MeetingModeApi
+  screenTranslation?: import('./screen-translation').ScreenTranslationBridge
+  workspaceView?: import('./workspace-view').WorkspaceViewApi
   onboardingCard?: import('./onboarding-card').OnboardingCardApi
   requestQuit?(): Promise<void>
   confirmQuit?(): Promise<void>
@@ -165,6 +168,7 @@ export type NolaTranslatorApi = {
    * up emits nothing at all.
    */
   getEngineState(): Promise<EngineProcessState>
+  getSessionSnapshot?(): Promise<import('./session-reader').SessionReaderSnapshot | null>
   /** False is a browser-caption service conflict; the window was not shown. */
   showWorkspace(): Promise<void>
   openMainPage(path: string): Promise<void>

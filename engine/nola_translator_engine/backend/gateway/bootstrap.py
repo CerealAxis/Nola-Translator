@@ -30,7 +30,7 @@ from .adapters import (
     MIMO_TTS_ENDPOINT, MIMO_TTS_MODEL, AdapterRegistry, GoogleMtAdapter, IndexPublicMtAdapter,
     CloudAsrAdapter, CustomMtAdapter, LocalWorkerAdapter, MicrosoftMtAdapter, MiMoTtsAdapter, MyMemoryMtAdapter,
 )
-from .capabilities import ContextCapabilities, LanguageCapabilities, ModelCapabilities, ModelKind, Operation, OperationProfile
+from .capabilities import ConcurrencyCapabilities, ContextCapabilities, LanguageCapabilities, ModelCapabilities, ModelKind, Operation, OperationProfile
 from .definitions import ModelDefinition, ProviderConfiguration
 from .gateway import ModelGateway, ModelRegistry, RegistryEntry
 from .languages import (
@@ -389,6 +389,7 @@ def register_s2s(registry: ModelRegistry, adapters: AdapterRegistry) -> None:
                 speech_output_available=True, auto_detection=True,
             ),
             context=ContextCapabilities(mode="session_context"),
+            concurrency=ConcurrencyCapabilities(max_active_requests=2, max_streams=2),
         )
         registry.register(
             ModelDefinition(model, [ModelKind.S2S], capabilities, family="livetranslate"),

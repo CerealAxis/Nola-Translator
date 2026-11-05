@@ -172,3 +172,22 @@ it('injects a stored Google Translate key and removes caller-supplied credential
   expect(getCredential).toHaveBeenCalledExactlyOnceWith('google')
   expect(request).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ translationProvider: 'google', translationOptions: { apiKey: 'stored-google-key' } }) }), 'sessionStarted', expect.any(Number))
 })
+
+
+it('provides a late reader the current caption revisions without claiming playback', async () => {
+  const sessions = new SessionController({ engine: { currentState: 'ready', request: vi.fn(async () => ({ sessionId: 'reader' })) } as unknown as EngineProcess,
+    meetings: null, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', whenReady: async () => {}, prepare: async () => {}, startingChanged: () => {}, hideOverlay: () => {} })
+  await sessions.start({ audioSource: { kind: 'microphone', deviceId: 'mic' }, recognitionMode: 'realtime', sourceLanguage: 'en', targetLanguages: [], outputMode: 'source' }, 'desktop')
+  const segment = { segmentId: 'one', revision: 2, startedAtMs: 20, sourceText: 'Current', isFinal: true, translations: [] }
+  sessions.handleEvent({ protocolVersion: 1, requestId: 'caption', type: 'caption', sessionId: 'reader', segment })
+  sessions.handleEvent({ protocolVersion: 1, requestId: 'stale', type: 'caption', sessionId: 'reader', segment: { ...segment, revision: 1, sourceText: 'Old' } })
+  sessions.handleEvent({ protocolVersion: 1, requestId: 'foreign', type: 'caption', sessionId: 'old-reader', segment: { ...segment, sourceText: 'Foreign' } })
+  expect(sessions.readerSnapshot()).toMatchObject({ sessionId: 'reader', segments: [segment], status: 'running' })
+  const copy = sessions.readerSnapshot()!
+  copy.segments[0].sourceText = 'Mutated'
+  expect(sessions.readerSnapshot()?.segments[0].sourceText).toBe('Current')
+  sessions.handleEvent({ protocolVersion: 1, requestId: 'pause', type: 'status', code: 'paused' })
+  expect(sessions.readerSnapshot()?.status).toBe('paused')
+  sessions.handleEvent({ protocolVersion: 1, requestId: 'stop', type: 'sessionStopped', sessionId: 'reader' })
+  expect(sessions.readerSnapshot()).toBeNull()
+})

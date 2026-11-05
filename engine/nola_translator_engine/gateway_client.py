@@ -23,6 +23,13 @@ from .translation.network import HTTP_REQUEST_TIMEOUT_SECONDS, MAX_CHUNKS
 # The proxy cannot inspect the owner's tokenizer/chunk plan. Preserve the maximum
 # supported sequential cloud translation budget rather than timing it out early.
 GATEWAY_TRANSLATION_TIMEOUT_SECONDS = MAX_CHUNKS * HTTP_REQUEST_TIMEOUT_SECONDS
+MODEL_FAILURES = {
+    'gateway_not_running': 'gatewayNotRunning', 'model_disabled': 'modelDisabled',
+    'model_not_loaded': 'modelNotLoaded', 'model_not_found': 'modelNotLoaded',
+    'model_unavailable': 'modelUnavailable', 'resource_in_use': 'resourceBusy',
+    'invalid_configuration': 'invalidConfiguration', 'out_of_memory': 'modelOutOfMemory',
+    'gateway_auth_failed': 'engineTransportUnavailable',
+}
 
 
 def private_gateway_address(address: str) -> str:
@@ -52,7 +59,7 @@ class GatewayTranslationError(RuntimeError):
     def __init__(self, code: str):
         self.error_code = {'authentication_failed': 'translationUnauthorized',
             'rate_limited': 'translationRateLimited', 'network_unavailable': 'URLError',
-            'request_timeout': 'translationTimeout', 'model_unavailable': 'modelUnavailable'}.get(code, 'RuntimeError')
+            'request_timeout': 'translationTimeout'}.get(code, MODEL_FAILURES.get(code, 'RuntimeError'))
         super().__init__('The model gateway translation request failed')
 
 
@@ -94,7 +101,7 @@ class GatewayTranslationProvider:
         result = None
         async with self._client().stream('POST', self.address + '/internal/mt', json=payload) as response:
             if response.status_code in (401, 403):
-                raise GatewayTranslationError('authentication_failed')
+                raise GatewayTranslationError('gateway_auth_failed')
             response.raise_for_status()
             if 'application/x-ndjson' not in response.headers.get('content-type', ''):
                 result = json.loads(await response.aread())
@@ -221,7 +228,8 @@ class GatewayRecognizer:
                         code = error.get('code') if isinstance(error, dict) else str(error)
                         reason = {'authentication_failed': 'recognitionUnauthorized',
                             'rate_limited': 'recognitionRateLimited',
-                            'request_timeout': 'recognitionTimeout'}.get(code, 'recognitionNetworkError')
+                            'request_timeout': 'recognitionTimeout',
+                            'network_unavailable': 'recognitionNetworkError'}.get(code, MODEL_FAILURES.get(code, 'recognitionInvalidResponse'))
                         future.set_exception(CloudRecognitionError(reason))
                     else:
                         future.set_result(message.get('result', {}))

@@ -12,6 +12,7 @@ import { BackendBrowserInput } from './backend-browser-input'
 import type { BackendSupervisor } from './backend-supervisor'
 import { vbCablePair } from '../shared/virtual-audio'
 import { backendAsrHeaders, backendMtHeaders } from './backend-direct-model'
+import { backendError, backendErrorCode, backendFailure, readBackendFailure } from './backend-error'
 
 export interface BackendSessionOptions {
   output?: 'source' | 'translation' | 'speech'
@@ -179,17 +180,6 @@ const sourceText = z.object({
 const speakerChange = z.object({
   segment_id: z.string(), speaker_id: z.string().max(128), speaker_metadata_revision: count,
 })
-const backendError = z.object({
-  code: z.string(), stage: z.string(), scope: z.string(), retryable: z.boolean(), fatal: z.boolean(),
-  message_key: z.string(), correlation_id: z.string().optional(),
-})
-const errorCodes: Partial<Record<string, Extract<EngineEvent, { type: 'error' }>['code']>> = {
-  INVALID_CONFIG: 'invalidConfiguration', CAPABILITY_MISMATCH: 'modelUnavailable',
-  MODEL_NOT_READY: 'modelUnavailable', RESOURCE_BUSY: 'resourceBusy', RESOURCE_EXHAUSTED: 'modelOutOfMemory',
-  AUDIO_GAP: 'audioBufferOverflow', AUDIO_SOURCE_UNAVAILABLE: 'audioDeviceDisconnected', PROVIDER_DISCONNECTED: 'recognitionClosed',
-  SOURCE_FINALIZE_TIMEOUT: 'recognitionTimeout', TRANSLATION_TIMEOUT: 'translationNetworkUnavailable',
-  PLAYBACK_DEVICE_LOST: 'audioDeviceDisconnected', RESYNC_REQUIRED: 'engineTransportUnavailable',
-}
 const targetText = z.object({
   segment_id: z.string().min(1), target_language: z.string(), target_revision: count, text: z.string(),
   state: z.enum(['draft', 'provisional', 'committed']).optional(),
@@ -263,6 +253,13 @@ export class BackendSession {
     return new Set(result.models.filter(model => model.enabled).map(model => model.model_id))
   }
 
+  async preflightProcess(selectionId: string): Promise<void> {
+    const route = z.object({ safe: z.boolean() }).parse(await this.request('/audio/preflight', {
+      input_mode: 'process_include', process_selection_id: selectionId,
+    }))
+    if (!route.safe) throw new Error('audioDeviceUnavailable')
+  }
+
   async start(mapped: MappedBackendSession, recordingPath?: string): Promise<string> {
     const pipeline = mapped.config.pipeline
     if (pipeline.kind === 'cascade') {
@@ -286,16 +283,18 @@ export class BackendSession {
       const route = z.object({ safe: z.boolean(), issues: z.array(z.object({ code: z.string() })) }).parse(await this.request('/audio/preflight', {
         input_mode: 'process_include', process_selection_id: input.process_selection_id,
       }))
-      if (!route.safe) throw new Error(`audioDeviceDisconnected: ${route.issues[0]?.code ?? 'process_capture_unavailable'}`)
+      if (!route.safe) throw Object.assign(new Error('audioDeviceUnavailable'), { backendCode: route.issues[0]?.code })
     } else if (input.capture_backend === 'virtual_input') {
       const virtualSpeech = input.capture_backend === 'virtual_input' && mapped.config.required_outputs.includes('audio')
-      if (virtualSpeech && (!mapped.outputDeviceId || mapped.outputDeviceId === 'default')) throw new Error('audioRouteConflict')
+      if (virtualSpeech && (!mapped.outputDeviceId || mapped.outputDeviceId === 'default')) throw new Error('audioPlaybackUnavailable')
       const route = z.object({ safe: z.boolean(), feedback_status: z.string().optional(), issues: z.array(z.object({ code: z.string() })).optional(), recording_device_name: z.string().nullish() }).parse(await this.request('/audio/preflight', {
         input_mode: 'virtual_input', input_endpoint_id: input.device_id, speech_output_endpoint_id: mapped.outputDeviceId ?? '',
         speech_output_endpoint_is_opaque: virtualSpeech,
       }))
-      if (route.issues?.some(issue => issue.code === 'input_endpoint_missing')) throw new Error('AUDIODEVICEUNAVAILABLE')
-      if (!route.safe && !(virtualSpeech && route.feedback_status === 'unknown' && route.issues?.length === 0)) throw new Error('audioRouteConflict')
+      if (route.issues?.some(issue => issue.code === 'input_endpoint_missing' || issue.code === 'missing_input_endpoint')) throw new Error('audioDeviceUnavailable')
+      if (!route.safe && !(virtualSpeech && route.feedback_status === 'unknown' && route.issues?.length === 0)) {
+        throw new Error(route.issues?.some(issue => issue.code === 'feedback_loop') ? 'audioRouteConflict' : 'audioPlaybackUnavailable')
+      }
       if (route.recording_device_name) inputCable = vbCablePair(route.recording_device_name, 'Output')
     }
     if (mapped.config.required_outputs.includes('audio')) await this.callbacks.preparePlayback?.(inputCable)
@@ -512,7 +511,12 @@ export class BackendSession {
       body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(body ? COMMAND_TIMEOUT_MS : 10_000),
     })
-    if (!response.ok) throw new Error(`Backend request failed (${response.status})`)
+    if (!response.ok) {
+      const failure = await readBackendFailure(response)
+      if (failure) throw backendFailure(failure)
+      if (response.status === 422) throw new Error('invalidConfiguration')
+      throw new Error('engineTransportUnavailable')
+    }
     return response.json()
   }
 
@@ -523,7 +527,11 @@ export class BackendSession {
       session_id: z.literal(this.id), result_state: z.string() }).parse(
       await this.request(`/sessions/${this.id}/commands`, { command_id: commandId, type }, headers),
     )
-    if (result.result_state !== expected) throw new Error('Backend could not ' + type + ' the session')
+    if (result.result_state === 'failed') {
+      const state = z.object({ last_error: backendError.nullish() }).safeParse(await this.request(`/sessions/${this.id}`))
+      if (state.success && state.data.last_error) throw backendFailure(state.data.last_error)
+    }
+    if (result.result_state !== expected) throw new Error('sessionError')
   }
 
   private connectEvents(sessionId: string): Promise<void> {
@@ -667,8 +675,9 @@ export class BackendSession {
     }
     if (kind === 'error') {
       const { error } = z.object({ error: backendError }).parse(payload)
-      this.emit({ ...envelope, type: 'error', code: errorCodes[error.code] ?? 'internalError',
-        recoverable: !error.fatal && (error.retryable || error.scope === 'task'),
+      if (error.message_key === 's2sPlaybackFenced') return
+      this.emit({ ...envelope, type: 'error', code: backendErrorCode(error),
+        recoverable: !error.fatal && (error.retryable || error.scope === 'task' || error.scope === 'consumer'),
         details: { backendCode: error.code, stage: error.stage, scope: error.scope,
           messageKey: error.message_key, correlationId: error.correlation_id } })
       return

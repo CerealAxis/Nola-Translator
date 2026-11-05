@@ -273,7 +273,7 @@ SessionState = Literal[
     "failed",
 ]
 
-SessionOwner = Literal["quick_interpret", "browser_captions"]
+SessionOwner = Literal["quick_interpret", "browser_captions", "meeting"]
 
 
 class SubscriptionInfo(ContractModel):
@@ -588,7 +588,7 @@ class EventEnvelope(ContractModel):
 
 class CreateSessionRequest(ContractModel):
     command_id: str = Field(min_length=1, max_length=128)
-    owner: SessionOwner
+    owner: Literal["quick_interpret", "browser_captions"]
     config: SessionConfig
 
 

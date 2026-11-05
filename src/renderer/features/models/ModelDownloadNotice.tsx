@@ -87,7 +87,7 @@ export function ModelDownloadNotice() {
           continue
         }
         const wasInstalling = (prior?.state === 'running' &&
-          (prior.phase === 'download' || prior.phase === 'verify' || prior.phase === 'install')) || prior?.state === 'cancelling'
+          (prior.phase === 'resolve' || prior.phase === 'download' || prior.phase === 'verify' || prior.phase === 'install')) || prior?.state === 'cancelling'
         if (!wasInstalling) continue
         if (record.state === 'failed') notifyFailure(record, t)
         if (record.state === 'idle' && record.installed) notifySuccess(t('models.downloadComplete', { name: record.name }))
@@ -99,7 +99,7 @@ export function ModelDownloadNotice() {
 }
 
 function notifyFailure(record: Pick<ResourceRecord, 'resourceId' | 'name' | 'errorCode'>, t: ReturnType<typeof useI18n>['t']) {
-  if (record.errorCode === 'diskSpaceInsufficient') {
+  if (record.errorCode === 'diskSpaceInsufficient' || record.errorCode === 'resourceDiskSpaceInsufficient') {
     notifyRetryableFailure(t('models.downloadDiskSpaceTitle'), {
       description: t('models.downloadDiskSpaceDescription'),
       action: { label: t('models.openStorageSettings'), onPress: () => { window.location.hash = settingsPath('storage') } },

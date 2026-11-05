@@ -1,45 +1,75 @@
-import { BrowserFailure, createBridge } from './bridge'
-import type { BrowserUiLanguage } from './i18n'
-export interface PopupState { language: BrowserUiLanguage; enabled: boolean; pending: boolean; error?: string; origin?: string; tabId?: number }
+import { BrowserFailure } from './bridge'
+
+interface TabStatus {
+  pageActive?: boolean
+  pageError?: string
+  video?: boolean
+  realtime?: boolean
+  liveError?: string
+  subtitles?: boolean
+  subtitleError?: string
+}
+type TabAction = 'pageStatus' | 'startPageTranslation' | 'stopPageTranslation' | 'toggleSubtitles' | 'toggleRealtime'
+export interface PopupState extends TabStatus { availability?: 'loading' | 'ready' | 'restricted' | 'unavailable'; enabled: boolean; pending: boolean; error?: string; origin?: string; url?: string; tabId?: number }
 export function createPopupStore() {
-  let state: PopupState = { language: 'auto', enabled: false, pending: false }
+  let state: PopupState = { enabled: false, pending: false, availability: 'loading' }
+  let revision = 0
   const listeners = new Set<() => void>()
   const set = (patch: Partial<PopupState>) => { state = { ...state, ...patch }; for (const listener of listeners) listener() }
+  async function send(type: TabAction) {
+    if (!state.enabled || state.tabId === undefined) return
+    const tabId = state.tabId, requested = revision
+    try {
+      const response = await chrome.tabs.sendMessage(tabId, { type }) as TabStatus | undefined
+      if (response && requested === revision) set({ ...response, error: undefined })
+    } catch { if (requested === revision && type !== 'pageStatus') set({ error: 'permissionFailed' }) }
+  }
+  async function inject(tabId: number) {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['capture-handle.js'], world: 'MAIN' })
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] })
+  }
   return {
     getSnapshot: () => state,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
     async init() {
-      const bridge = createBridge('nola-popup')
-      void bridge.request({ type: 'hello' }).then(summary => { if (summary && 'uiLanguage' in summary) set({ language: summary.uiLanguage }) }).catch(() => undefined).finally(() => bridge.close())
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-      if (!tab?.url?.startsWith('https://') || tab.id === undefined) { set({ error: 'permissionFailed' }); return }
-      const origin = new URL(tab.url).origin
-      set({ origin, tabId: tab.id, enabled: await chrome.permissions.contains({ origins: [`${origin}/*`] }) })
+      const requested = ++revision
+      state = { enabled: false, pending: false, availability: 'loading' }; set({})
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+        if (requested !== revision) return
+        if (tab?.id === undefined || !tab.url) { set({ enabled: false, tabId: tab?.id, availability: 'unavailable', error: undefined }); return }
+        if (!/^https?:\/\//.test(tab.url)) { set({ enabled: false, tabId: tab.id, url: tab.url, availability: 'restricted', error: undefined }); return }
+        const origin = new URL(tab.url).origin
+        const enabled = await chrome.permissions.contains({ origins: [origin + '/*'] })
+        if (requested !== revision) return
+        set({ origin, url: tab.url, tabId: tab.id, enabled, availability: 'ready', error: undefined })
+        if (enabled) {
+          try {
+            // Existing tabs need a one-time injection after installation or an extension reload.
+            let response: TabStatus | undefined
+            try { response = await chrome.tabs.sendMessage(tab.id, { type: 'pageStatus' }) as TabStatus | undefined }
+            catch { await inject(tab.id); response = await chrome.tabs.sendMessage(tab.id, { type: 'pageStatus' }) as TabStatus | undefined }
+            if (response && requested === revision) set({ ...response, error: undefined })
+          } catch { if (requested === revision) set({ enabled: false, availability: 'restricted', error: undefined }) }
+        }
+      } catch { if (requested === revision) set({ enabled: false, availability: 'unavailable', error: undefined }) }
     },
     enable() {
       if (!state.origin || state.tabId === undefined || state.pending) return
       const { origin, tabId } = state
-      // Permission UI also requires the original user gesture.
-      const permission = chrome.permissions.request({ origins: [`${origin}/*`] })
+      const requested = revision
+      const permission = chrome.permissions.request({ origins: [origin + '/*'] })
       set({ pending: true, error: undefined })
       void permission.then(async granted => {
         if (!granted) throw new BrowserFailure('permissionFailed')
-        await chrome.scripting.executeScript({ target: { tabId, allFrames: false }, files: ['capture-handle.js'], world: 'MAIN' })
-        await chrome.scripting.executeScript({ target: { tabId, allFrames: false }, files: ['content.js'] })
-        // Registered scripts make the permission durable across reload and future navigation.
-        await registerCurrentSites()
-        set({ enabled: true })
-      }).catch(() => set({ error: 'permissionFailed' })).finally(() => set({ pending: false }))
+        await inject(tabId)
+        const registered = await chrome.runtime.sendMessage({ type: 'registerSites' }) as { ok?: boolean } | undefined
+        if (!registered?.ok) throw new BrowserFailure('permissionFailed')
+        if (requested !== revision) return
+        set({ enabled: true, availability: 'ready' })
+        await send('pageStatus')
+      }).catch(() => { if (requested === revision) set({ error: 'permissionFailed' }) }).finally(() => { if (requested === revision) set({ pending: false }) })
     },
-  }
-}
-async function registerCurrentSites(): Promise<void> {
-  const permissions = await chrome.permissions.getAll()
-  const matches = (permissions.origins ?? []).filter(origin => origin.startsWith('https://') && !['https://www.youtube.com/*', 'https://www.bilibili.com/*'].includes(origin))
-  if (!matches.length) return
-  const registered = await chrome.scripting.getRegisteredContentScripts()
-  for (const script of [{ id: 'nola-main', matches, js: ['capture-handle.js'], runAt: 'document_start' as const, world: 'MAIN' as const, persistAcrossSessions: true }, { id: 'nola-content', matches, js: ['content.js'], runAt: 'document_idle' as const, persistAcrossSessions: true }]) {
-    if (registered.some(item => item.id === script.id)) await chrome.scripting.updateContentScripts([script])
-    else await chrome.scripting.registerContentScripts([script])
+    send,
   }
 }

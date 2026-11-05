@@ -62,8 +62,8 @@ export function TitleBar({ variant = 'brand', brand = true, sessionTitle, status
   ]
   const help = helpItems ?? [
     { key: 'settings', label: t('nav.settings'), onSelect: () => navigate('#/settings/general') },
-    { key: 'advanced', label: t('modelsSettingsUi.advanced'), onSelect: () => navigate('#/settings/advanced') },
-    { key: 'more', label: t('more.tabLabel'), onSelect: () => navigate('#/settings/more') },
+    { key: 'engine', label: t('modelsSettingsUi.engine'), onSelect: () => navigate('#/settings/engine') },
+    { key: 'help', label: t('modelsSettingsUi.help'), onSelect: () => navigate('#/settings/help') },
   ]
   const selectLanguage = (value: string) => {
     const option = options.find(item => item.id === value)

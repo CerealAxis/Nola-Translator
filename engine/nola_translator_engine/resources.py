@@ -40,6 +40,7 @@ from .models.catalog import (
     SENSEVOICE_SMALL,
 )
 from .models.manager import ModelManager, ModelSpec
+from .models.ocr_catalog import OCR_RESOURCE_ID, PP_OCRV5_MOBILE, OCR_SPECS, OCR_LANGUAGES, OCR_NAMES
 from .models.crisp_catalog import (ADDITIONAL_TTS_NAMES, ADDITIONAL_TTS_SPECS, CRISP_ASR_SPECS,
                                    QWEN3_TTS_NAMES, QWEN3_TTS_SPECS)
 from .models.qwen35_catalog import QWEN35_NAMES, QWEN35_SPECS
@@ -113,7 +114,7 @@ class ResourceOperationCancelled(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class ResourceDefinition:
     resource_id: str
-    kind: Literal["recognitionModel", "translationModel", "ttsModel"]
+    kind: Literal["recognitionModel", "translationModel", "ttsModel", "ocrModel"]
     # Free-form, because a hub-installed model passes its adapter id straight through: the
     # built-ins below write `qwen3-asr`/`sensevoice`/`hymt2`/`m2m100`, and `llama.cpp` joins them
     # for a GGUF installed from the hub.
@@ -260,7 +261,10 @@ RESOURCE_DEFINITIONS = _definitions() + tuple(
         "Qwen3.5 小型多语言语言模型，使用 Q4_K_M GGUF 并由 llama.cpp 本地运行。",
         tuple(normalize(code) for code in FLORES_LANGUAGES), spec.total_bytes,
     ) for spec in QWEN35_SPECS
-)
+) + tuple(ResourceDefinition(
+    spec.model_id, "ocrModel", "pp-ocrv5", OCR_NAMES[spec.model_id],
+    "PP-OCRv5 mobile multilingual OCR model.", OCR_LANGUAGES[spec.model_id], spec.total_bytes,
+) for spec in OCR_SPECS.values())
 RESOURCE_BY_ID = {item.resource_id: item for item in RESOURCE_DEFINITIONS}
 
 
@@ -303,7 +307,7 @@ class ResourceManager:
                 continue
             if languages:
                 self.registry.put(replace(entry, languages=languages))
-        specs = [self._spec(item.resource_id) for item in RESOURCE_DEFINITIONS]
+        specs = [self._spec(item.resource_id) for item in RESOURCE_DEFINITIONS if item.kind != "ocrModel"]
         specs.extend(entry.spec() for entry in self.registry.all())
         self.models.cleanup_stale(specs)
 
@@ -415,7 +419,7 @@ class ResourceManager:
         installed_bytes = _directory_size(self.models.model_path(spec))
 
         operation = self.operations.get(resource_id)
-        return ResourceRecord(
+        record = ResourceRecord(
             resourceId=resource_id,
             kind=definition.kind,
             provider=definition.provider,
@@ -434,6 +438,17 @@ class ResourceManager:
             cancellable=operation.cancellable if operation else False,
             errorCode=operation.error_code if operation else None,
         )
+        if resource_id in OCR_SPECS:
+            from .backend.screen_ocr import read_ocr_state
+
+            state = read_ocr_state(self.model_root, resource_id)
+            if state:
+                record = record.model_copy(update={
+                    "state": state.get("state", "idle"), "phase": state.get("phase"),
+                    "progress": state.get("progress"), "errorCode": state.get("error"),
+                    "cancellable": state.get("state") == "running",
+                })
+        return record
 
     async def manage(
         self, resource_id: str, action: Literal["install", "remove", "cancel", "pause", "resume"],
@@ -441,6 +456,9 @@ class ResourceManager:
         download_source: str | None = None,
     ) -> ResourceRecord:
         self._definition(resource_id)
+        if resource_id in OCR_SPECS:
+            # The private backend owns OCR leases and operations across both processes.
+            raise ResourceActionError("invalidConfiguration", {"reason": "ocrManagedByBackend"})
         if action == "cancel":
             operation = self.operations.get(resource_id)
             if operation is not None and operation.state == "failed" and resource_id not in self.tasks:
@@ -680,7 +698,7 @@ class ResourceManager:
         languages = list(definition.languages)
         if definition.kind == "recognitionModel":
             return recognition_configuration(languages, "crisp" if definition.provider == "crisp-asr" else "llama" if definition.provider == "llama-asr" else "pytorch")
-        if definition.kind == "ttsModel":
+        if definition.kind in ("ttsModel", "ocrModel"):
             return None
         return translation_configuration(languages, "pytorch" if definition.provider in ("m2m100", "index-translate-transformers") else "llama")
 
@@ -746,6 +764,8 @@ class ResourceManager:
         self._definition(resource_id)
         # read from the module-level constants at call time so tests can swap the catalog spec.
         builtin = {
+            **OCR_SPECS,
+            OCR_RESOURCE_ID: PP_OCRV5_MOBILE,
             QWEN_RESOURCE_ID: QWEN3_ASR_1_7B_HF,
             QWEN_06B_RESOURCE_ID: QWEN3_ASR_0_6B_HF,
             SENSEVOICE_RESOURCE_ID: SENSEVOICE_SMALL,

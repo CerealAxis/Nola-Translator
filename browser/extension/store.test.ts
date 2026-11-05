@@ -1,3 +1,4 @@
+import { DEFAULT_PREFERENCES } from './preferences'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserResponse, BrowserSummary } from '../../src/shared/browser'
 import { BrowserFailure, type ExtensionBridge, type RequestInput } from './bridge'
@@ -324,4 +325,41 @@ it('starts Firefox system capture without requesting tab sharing', async () => {
     expect(f.getDisplayMedia).not.toHaveBeenCalled()
     expect(f.requests.find(input => input.type === 'start')).toMatchObject({ source: 'system' })
   } finally { await f.store.destroy(); agent.mockRestore() }
+})
+
+
+it('renders realtime captions from independent extension language and subtitle appearance settings', async () => {
+  const fixture = setup()
+  await fixture.store.init()
+  const preferences = { ...DEFAULT_PREFERENCES, pipeline: 'desktop' as const, sourceLanguage: 'ja', videoLanguage: 'ko',
+    subtitleFont: 'serif', subtitleColor: '#123456', subtitleBackground: '#654321', subtitleBackgroundOpacity: 0.42,
+    subtitleSize: 24, subtitleOffset: 8, subtitleSourceFont: 'serif', subtitleTranslationFont: 'serif', subtitleSourceColor: '#123456', subtitleTranslationColor: '#123456', subtitleSourceSize: 24, subtitleTranslationSize: 24 }
+  fixture.store.setPreferences({ ...preferences, videoDisplay: 'source' })
+  expect(fixture.store.getSnapshot().config).toMatchObject({ sourceLanguage: 'ja', targetLanguage: 'ko', showSource: true, showTranslation: false,
+    fontFamily: 'serif', sourceColor: '#123456', translationColor: '#123456', backgroundColor: '#654321', backgroundOpacity: 0.42,
+    sourceFontSize: 24, translationFontSize: 24, bottomOffset: 8 })
+  fixture.store.setPreferences({ ...preferences, videoDisplay: 'translation' })
+  expect(fixture.store.getSnapshot().config).toMatchObject({ showSource: false, showTranslation: true })
+  fixture.store.setPreferences({ ...preferences, videoDisplay: 'bilingual' })
+  expect(fixture.store.getSnapshot().config).toMatchObject({ showSource: true, showTranslation: true })
+  await fixture.store.destroy()
+})
+
+it('keeps independent source and translation typography in the realtime config', async () => {
+  const fixture = setup(); await fixture.store.init()
+  fixture.store.setPreferences({ ...DEFAULT_PREFERENCES, subtitleSourceFont: 'Arial', subtitleTranslationFont: 'Verdana', subtitleSourceSize: 22, subtitleTranslationSize: 30, subtitleSourceColor: '#112233', subtitleTranslationColor: '#aabbcc', subtitleTranslationFirst: true, subtitleBold: true })
+  expect(fixture.store.getSnapshot().config).toMatchObject({ sourceFontFamily: 'Arial', translationFontFamily: 'Verdana', sourceFontSize: 22, translationFontSize: 30, sourceColor: '#112233', translationColor: '#aabbcc', translationFirst: true, bold: true })
+  await fixture.store.destroy()
+})
+
+it('distinguishes startup diagnostics from an explicitly attempted realtime failure', async () => {
+  const fixture = setup()
+  vi.mocked(fixture.bridge.request).mockRejectedValue(new BrowserFailure('appUnavailable'))
+  await fixture.store.init()
+  expect(fixture.store.getSnapshot()).toMatchObject({ error: 'appUnavailable', liveAttempted: false })
+  fixture.store.pressStart()
+  await vi.waitFor(() => expect(fixture.store.getSnapshot()).toMatchObject({ status: 'idle', error: 'appUnavailable', liveAttempted: true }))
+  await fixture.store.stop()
+  expect(fixture.store.getSnapshot().liveAttempted).toBe(false)
+  await fixture.store.destroy()
 })

@@ -95,11 +95,12 @@
 .nola-record-page__header h1 { margin: 0 0 6px; color: var(--foreground); font-size: 32px; font-weight: 700; line-height: 1.25; }
 .nola-record-page__header p { color: var(--muted); font-size: 14px; margin: 0; }
 .nola-record-page__start { flex-shrink: 0; border-radius: 12px; min-height: 44px; padding-inline: 20px; }
-.nola-record-page__search { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
-.nola-record-page__search > .search-field { width: min(380px, 100%); }
+.nola-record-page__search { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
+.nola-record-page__search-summary { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.nola-record-page__search-summary > span { white-space: nowrap; }
 .nola-record-page__search-field { width: min(380px, 100%); }
 .nola-record-page__search .search-field__group { border: 1px solid var(--border); border-radius: 12px; min-height: 44px; background: var(--surface); }
-.nola-record-page__search > span, .nola-record-page__footer > span { font-size: 13px; color: var(--muted); }
+.nola-record-page__search-summary > span, .nola-record-page__footer > span { font-size: 13px; color: var(--muted); }
 .nola-record-page__footer { justify-content: space-between; flex-wrap: wrap; }
 .nola-record-page__footer > span { white-space: nowrap; flex-shrink: 0; }
 .nola-record-page__paging { display: flex; align-items: center; gap: 12px; margin-left: auto; }
@@ -154,12 +155,8 @@
 /* Selection wins over hover because it is the state the user is acting on. */
 .nola-records-table .table__row[data-selected='true'] .table__cell { background: color-mix(in oklab, var(--accent) 9%, var(--surface)); }
 
-.nola-record-page__bulk { display: flex; align-items: center; gap: 8px; padding: 0 12px 14px; flex-wrap: wrap; }
+.nola-record-page__bulk { display: flex; align-items: center; gap: var(--space-1); }
 .nola-record-page__bulk > .button { flex-shrink: 0; }
-.nola-record-page__bulk-count { font-size: 13px; font-weight: 550; color: var(--foreground); white-space: nowrap; }
-/* Pushes the dismiss and delete pair to the far end, so "select all" stays next
-   to the count it widens. */
-.nola-record-page__bulk-dismiss { margin-left: auto; }
 .nola-record-notes-markdown > :first-child { margin-top: 0; }
 .nola-record-notes-markdown > :last-child { margin-bottom: 0; }
 .nola-record-notes-markdown :is(p, ul, ol, blockquote, pre, table) { margin-block: 0 12px; }

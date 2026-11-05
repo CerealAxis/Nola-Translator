@@ -112,6 +112,9 @@ export function SessionErrorDialog({ state, onCopyDiagnostics, onReset, onViewRe
               } else if (target.kind === 'models') {
                 onReset()
                 navigate(pathOf('models'))
+              } else if (target.kind === 'gateway') {
+                onReset()
+                navigate(pathOf('model-gateway'))
               } else if (target.kind === 'stop') {
                 void actions.session.stopSession().catch(() => undefined)
               } else onReset()

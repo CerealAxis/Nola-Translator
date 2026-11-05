@@ -1,15 +1,18 @@
-import type { BrowserResponse, BrowserSummary } from '../../src/shared/browser'
+import { createTabAudioCapture } from './tab-audio-client'
+import { createSpeechBridge, usesSpeechRuntime } from './speech-client'
+import { BROWSER_PROTOCOL_VERSION, type BrowserResponse, type BrowserSummary } from '../../src/shared/browser'
 import type { BrowserCaptionStyleSettings, VideoCaptionAudioSource } from '../../src/shared/settings'
 import type { CaptionSegment } from '../../src/shared/contracts'
 import { BrowserFailure, type ExtensionBridge } from './bridge'
-import { CAPTURE_OPTIONS, createAudioCapture, pcmBase64, releaseTracks, validateCapture, type AudioCapture, type AudioChunk } from './capture'
+import { CAPTURE_OPTIONS, capturePlayerAudio, createAudioCapture, pcmBase64, releaseTracks, validateCapture, type AudioCapture, type AudioChunk } from './capture'
+import type { Preferences } from './preferences'
 
 export interface Caption extends CaptionSegment { videoStartedAtMs: number; videoEndedAtMs?: number }
 /**
- * Caption presentation owned by the desktop application. The extension only reads it; `bottomOffset`
+ * Effective caption presentation, with extension preferences applied over legacy desktop fallbacks. `bottomOffset`
  * is the percent of video height reserved between the caption block and the bottom edge.
  */
-export type CaptionConfig = BrowserCaptionStyleSettings & { audioSource: VideoCaptionAudioSource; audioDeviceId?: string; sourceLanguage: string; targetLanguage: string; pipeline?: 'cascade' | 's2s'; desktopApplicationAudio?: boolean }
+export type CaptionConfig = BrowserCaptionStyleSettings & { sourceFontFamily?: string; translationFontFamily?: string; translationFirst?: boolean; bold?: boolean; audioSource: VideoCaptionAudioSource; audioDeviceId?: string; sourceLanguage: string; targetLanguage: string; pipeline?: 'cascade' | 's2s'; desktopApplicationAudio?: boolean }
 /** Mirrors the desktop defaults so a desktop without the config field still renders as configured there. */
 const DEFAULT_CAPTION_CONFIG: CaptionConfig = { showSource: true, showTranslation: true, colorScheme: 'dark', fontFamily: 'Segoe UI Variable', sourceFontSize: 20, translationFontSize: 16, lineHeight: 1.3, sourceColor: '#F7F7F7', translationColor: '#D7DEE8', backgroundColor: '#0D0E10', backgroundOpacity: 0.85, bottomOffset: 5, sourceLanguage: 'auto', targetLanguage: 'none', audioSource: 'system' }
 /**
@@ -30,9 +33,11 @@ export interface ExtensionState {
   audioCaptured: boolean
   panelOpen: boolean
   summary?: BrowserSummary
+  preferences?: Preferences
   /** Mirrors the desktop's caption-service gate. A closed gate admits no session, so the panel cannot offer to start. */
   captionServiceActive: boolean
   error?: string
+  liveAttempted: boolean
   config: CaptionConfig
   videos: HTMLVideoElement[]
   selectedVideo: HTMLVideoElement | null
@@ -43,6 +48,8 @@ export interface StoreDependencies {
   bridge: ExtensionBridge
   getDisplayMedia?: (options: DisplayMediaStreamOptions) => Promise<MediaStream>
   audioCapture?: typeof createAudioCapture
+  capturePlayerAudio?: typeof capturePlayerAudio
+  tabAudioCapture?: typeof createTabAudioCapture
 }
 /** How often an open panel re-reads the desktop's caption-service gate, which the desktop never pushes. */
 const GATE_REFRESH_MS = 2000
@@ -108,8 +115,22 @@ function mergeDesktopConfig(previous: CaptionConfig, incoming: unknown): Caption
 function readSummary(value: unknown): BrowserSummary | null {
   if (!value || typeof value !== 'object' || !('uiLanguage' in value)) return null
   const summary = value as BrowserSummary
-  if (summary.protocolVersion !== 1 || typeof summary.browserAudio !== 'boolean') return null
+  if ((summary.protocolVersion !== 1 && summary.protocolVersion !== 2 && summary.protocolVersion !== BROWSER_PROTOCOL_VERSION) || typeof summary.browserAudio !== 'boolean') return null
   return { ...summary, captionServiceActive: flag(summary.captionServiceActive, false) }
+}
+function configuredCaption(previous: CaptionConfig, summary: BrowserSummary | undefined, preferences?: Preferences): CaptionConfig {
+  const config = mergeDesktopConfig(previous, summary?.config)
+  if (!preferences) return config
+  return {
+    ...config,
+    sourceLanguage: preferences.sourceLanguage, targetLanguage: preferences.videoLanguage,
+    pipeline: preferences.pipeline === 'desktop' ? config.pipeline : preferences.pipeline,
+    audioSource: 'tab', desktopApplicationAudio: false,
+    showSource: preferences.videoDisplay !== 'translation', showTranslation: preferences.videoDisplay !== 'source',
+    fontFamily: preferences.subtitleSourceFont, sourceFontFamily: preferences.subtitleSourceFont, translationFontFamily: preferences.subtitleTranslationFont, sourceColor: preferences.subtitleSourceColor, translationColor: preferences.subtitleTranslationColor, translationFirst: preferences.subtitleTranslationFirst, bold: preferences.subtitleBold,
+    backgroundColor: preferences.subtitleBackground, backgroundOpacity: preferences.subtitleBackgroundOpacity,
+    sourceFontSize: preferences.subtitleSourceSize, translationFontSize: preferences.subtitleTranslationSize, bottomOffset: preferences.subtitleOffset,
+  }
 }
 /** The packaged manifest version, which is what tells two loaded builds apart in a log. */
 function manifestVersion(): string | null {
@@ -130,12 +151,14 @@ function energyOf(buffer: ArrayBuffer): number {
   return total
 }
 export function createExtensionStore(dependencies: StoreDependencies) {
-  let state: ExtensionState = { status: 'idle', playbackPaused: false, connected: false, capturePending: false, audioCaptured: false, panelOpen: false, captionServiceActive: false, config: DEFAULT_CAPTION_CONFIG, videos: [], selectedVideo: null, epoch: 0, captions: [] }
+  let state: ExtensionState = { status: 'idle', playbackPaused: false, connected: false, capturePending: false, audioCaptured: false, panelOpen: false, captionServiceActive: false, liveAttempted: false, config: DEFAULT_CAPTION_CONFIG, videos: [], selectedVideo: null, epoch: 0, captions: [] }
+  dependencies = { ...dependencies, bridge: createSpeechBridge(dependencies.bridge, () => state.preferences) }
   const listeners = new Set<() => void>()
   let sessionId: string | null = null
   let streamId = ''
   let media: MediaStream | null = null
   let audio: AudioCapture | null = null
+  let captureController: AbortController | null = null
   let generation = 0
   let epochSamples = 0
   let sequence = 0
@@ -185,7 +208,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
   }
   const fence = (): void => { setAccepting(false, 'fence'); audio?.enable(false, state.epoch) }
   const closeResources = async (): Promise<void> => {
-    fence(); videoCleanup?.(); videoCleanup = null
+    fence(); captureController?.abort(); captureController = null; videoCleanup?.(); videoCleanup = null
     if (endingTimer) { clearTimeout(endingTimer); endingTimer = null }
     if (media) { releaseTracks(media); media = null }
     const previousAudio = audio; audio = null
@@ -196,7 +219,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     const stopGeneration = ++generation; fence()
     transition = Promise.resolve()
     const id = sessionId; sessionId = null
-    set({ status: 'stopping', error })
+    set({ status: 'stopping', error, liveAttempted: error ? state.liveAttempted : false })
     await closeResources()
     try { if (id) await dependencies.bridge.request({ type: 'stop', sessionId: id }) } catch { /* Cleanup must survive a disconnected desktop. */ }
     if (generation === stopGeneration) set({ status: 'idle', captions: [], error })
@@ -347,14 +370,19 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     const requestEpoch = state.epoch
     void dependencies.bridge.request({ type: 'audio', sessionId, streamId, epoch: requestEpoch, sequence: sequence++, sampleRate: chunk.sampleRate, capturedAtMs, pcmBase64: pcmBase64(chunk.buffer) }).catch(error => { if (requestGeneration === generation && requestEpoch === state.epoch && accepting) { debug('ext.audioFailed', { code: failCode(error) }); void stop(failCode(error)) } }).finally(() => { if (requestGeneration === generation && requestEpoch === state.epoch) pendingMs = Math.max(0, pendingMs - duration) })
   }
-  const start = async (capturePromise: Promise<MediaStream> | null, startGeneration: number): Promise<void> => {
+  const start = async (capturePromise: Promise<MediaStream> | null, startGeneration: number, tabCapturePromise?: Promise<AudioCapture>): Promise<void> => {
+    const enhanced = state.summary?.realtimeTranslation && state.preferences
     try {
-      // A null capture promise is a desktop-side system capture; the tab path always brings a stream.
+      if (tabCapturePromise) {
+        const created = await tabCapturePromise
+        if (startGeneration !== generation) { await created.close(); return }
+        audio = created; set({ audioCaptured: true })
+      }
       if (capturePromise) {
         const stream = await capturePromise
         if (startGeneration !== generation) { releaseTracks(stream); return }
         media = stream
-        validateCapture(stream, document.documentElement.dataset.nolaCaptureHandle, location.origin)
+        if (!enhanced) validateCapture(stream, document.documentElement.dataset.nolaCaptureHandle, location.origin)
         set({ audioCaptured: true })
         // The audio track's own settings and mute state are the only place a wrong or silent
         // track shows up before any sample reaches the worklet.
@@ -365,9 +393,9 @@ export function createExtensionStore(dependencies: StoreDependencies) {
         } catch { /* A track that cannot be described is not a capture failure. */ }
         for (const track of stream.getTracks()) {
           track.addEventListener('ended', () => { if (startGeneration === generation) void stop('captureCancelled') }, { once: true })
-          track.addEventListener('capturehandlechange', () => { try { validateCapture(stream, document.documentElement.dataset.nolaCaptureHandle, location.origin) } catch { void stop('wrongCapture') } })
+          if (!enhanced) track.addEventListener('capturehandlechange', () => { try { validateCapture(stream, document.documentElement.dataset.nolaCaptureHandle, location.origin) } catch { void stop('wrongCapture') } })
         }
-        const createdAudio = await (dependencies.audioCapture ?? createAudioCapture)(stream, onAudio, (event, data) => debug(event, data))
+        const createdAudio = await (dependencies.audioCapture ?? createAudioCapture)(stream, onAudio, (event, data) => debug(event, data), false)
         if (startGeneration !== generation) { await createdAudio.close(); releaseTracks(stream); return }
         audio = createdAudio
       }
@@ -379,7 +407,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
       // by the protocol either way.
       const source = captionAudioSource(state.config)
       const deviceId = source === 'system' ? state.config.audioDeviceId : undefined
-      const result = await dependencies.bridge.request({ type: 'start', source, ...(deviceId ? { deviceId } : {}), streamId, epoch: 0, ...anchor() })
+      const result = await dependencies.bridge.request({ type: 'start', source, ...(deviceId ? { deviceId } : {}), ...(enhanced ? { pipeline: enhanced.pipeline, targetLanguage: enhanced.videoLanguage, sourceLanguage: enhanced.sourceLanguage } : {}), streamId, epoch: 0, ...anchor() })
       if (!result || !('sessionId' in result)) throw new BrowserFailure('error')
       if (startGeneration !== generation) { await dependencies.bridge.request({ type: 'stop', sessionId: result.sessionId }); return }
       sessionId = result.sessionId
@@ -436,7 +464,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
       // before, while the errors of a running session are left to the session.
       const derived = summary.extensionCompatible === false ? 'extensionVersionMismatch'
         : summary.captionServiceActive && !summary.browserAudio ? 'updateRequired' : undefined
-      set({ summary, connected: true, captionServiceActive: summary.captionServiceActive, config: mergeDesktopConfig(state.config, summary.config), ...(derived ? { error: derived } : SUMMARY_ERRORS.has(state.error ?? '') ? { error: undefined } : {}) })
+      set({ summary, connected: true, captionServiceActive: summary.captionServiceActive, config: configuredCaption(state.config, summary, state.preferences), ...(derived ? { error: derived } : SUMMARY_ERRORS.has(state.error ?? '') ? { error: undefined } : {}) })
     } catch { /* A hello that times out or loses a race with a disconnect says nothing about the session. */ }
     finally { refreshingSummary = false }
   }
@@ -458,9 +486,16 @@ export function createExtensionStore(dependencies: StoreDependencies) {
         if (!summary) throw new BrowserFailure('updateRequired')
         // A desktop that is not serving captions yet has no engine running, and a missing
         // browser-audio capability only means the engine is too old once the gate is open.
-        set({ summary, connected: true, captionServiceActive: summary.captionServiceActive, config: mergeDesktopConfig(state.config, summary.config), error: summary.extensionCompatible === false ? 'extensionVersionMismatch' : summary.captionServiceActive && !summary.browserAudio ? 'updateRequired' : undefined })
+        set({ summary, connected: true, captionServiceActive: summary.captionServiceActive, config: configuredCaption(state.config, summary, state.preferences), error: summary.extensionCompatible === false ? 'extensionVersionMismatch' : summary.captionServiceActive && !summary.browserAudio ? 'updateRequired' : undefined })
       } catch (error) { set({ connected: false, error: failCode(error) }) }
       if (state.panelOpen) scheduleSummaryRefresh()
+    },
+    setPreferences(preferences: Preferences) {
+      if (state.preferences && (state.preferences.sourceLanguage !== preferences.sourceLanguage || state.preferences.videoLanguage !== preferences.videoLanguage || state.preferences.pipeline !== preferences.pipeline || state.preferences.asrProvider !== preferences.asrProvider || state.preferences.s2sProvider !== preferences.s2sProvider || state.preferences.subtitleProvider !== preferences.subtitleProvider)) void stop()
+      const external = usesSpeechRuntime(preferences)
+      const summary = external ? { ...state.summary, realtimeTranslation: true } as BrowserSummary : state.summary
+      set({ preferences, config: configuredCaption(state.config, summary, preferences), ...(external ? { connected: true, captionServiceActive: true, error: undefined } : {}) })
+      if (external) void refreshSummary()
     },
     async openRuntimeSettings() {
       await dependencies.bridge.request({ type: 'runtimeSettings', component: state.error === 'llamaUnavailable' ? 'llama' : 'engine' })
@@ -476,6 +511,7 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     async refresh() { await this.init(); if (state.status === 'active') reset() },
     pressCapture() {
       if (state.status !== 'idle' || state.capturePending || captionAudioSource(state.config) !== 'tab') return
+      set({ liveAttempted: true })
       if (navigator.userAgent.includes('Firefox/')) { set({ error: 'captureUnsupported' }); return }
       const captureGeneration = ++generation
       let promise: Promise<MediaStream>
@@ -506,7 +542,12 @@ export function createExtensionStore(dependencies: StoreDependencies) {
       })[0]
       if (!state.selectedVideo) { if (preferred) bind(preferred); return }
       if (!videos.includes(state.selectedVideo)) {
-        if (preferred) { bind(preferred); if (endingTimer) { clearTimeout(endingTimer); endingTimer = null }; reset() }
+        if (preferred) {
+          bind(preferred)
+          if (endingTimer) { clearTimeout(endingTimer); endingTimer = null }
+          if (state.summary?.realtimeTranslation && navigator.userAgent.includes('Firefox/')) void stop()
+          else reset()
+        }
         else if (state.status !== 'idle') { fence(); endingTimer ??= setTimeout(() => { endingTimer = null; if (!state.videos.length) void stop() }, 1000) }
         else bind(null)
       }
@@ -514,19 +555,27 @@ export function createExtensionStore(dependencies: StoreDependencies) {
     timelineChanged: reset,
     pressStart() {
       if (state.status !== 'idle' || state.capturePending || !state.selectedVideo || state.summary?.extensionCompatible === false) return
+      set({ liveAttempted: true })
       debug('ext.pressStart', { source: captionAudioSource(state.config) })
       if (!videoCleanup) bind(state.selectedVideo)
       // getDisplayMedia must run in the original onPress stack, before any await or desktop request.
       // A system capture needs neither the picker nor a gesture: the desktop owns the capture.
       let capturePromise: Promise<MediaStream> | null = null
-      if (captionAudioSource(state.config) === 'tab') {
+      let tabCapturePromise: Promise<AudioCapture> | undefined
+      const startGeneration = generation + 1
+      if (state.summary?.realtimeTranslation && state.preferences) {
+        if (!navigator.userAgent.includes('Firefox/') && !dependencies.capturePlayerAudio) {
+          captureController = new AbortController()
+          tabCapturePromise = (dependencies.tabAudioCapture ?? createTabAudioCapture)(onAudio, debug, code => { if (startGeneration === generation) void stop(code) }, captureController.signal)
+        } else capturePromise = (dependencies.capturePlayerAudio ?? capturePlayerAudio)(state.selectedVideo)
+      } else if (captionAudioSource(state.config) === 'tab') {
         // Firefox lacks Capture Handle and verified tab audio (MDN Screen Capture compatibility).
         if (navigator.userAgent.includes('Firefox/')) { set({ error: 'captureUnsupported' }); return }
         try { capturePromise = media ? Promise.resolve(media) : (dependencies.getDisplayMedia ?? (options => navigator.mediaDevices.getDisplayMedia(options)))(CAPTURE_OPTIONS) }
         catch (error) { set({ error: failCode(error) }); return }
       }
       set({ status: 'starting', error: undefined })
-      void start(capturePromise, ++generation)
+      void start(capturePromise, ++generation, tabCapturePromise)
     },
     stop,
     async destroy() { stopSummaryRefresh(); await stop(); unsubscribe(); dependencies.bridge.close(); listeners.clear() },

@@ -56,17 +56,14 @@ it('bounds the sliders and restores only speech segmentation defaults', async ()
   await waitFor(() => expect(update).toHaveBeenCalledExactlyOnceWith({ recognition: { max_segment_ms: 10000, silence_end_ms: 800 } }))
 })
 
-it('leaves recognition model choice to Model Gateway and keeps only the source language here', () => {
+it('keeps source language and recognition configuration out of global audio settings', () => {
   const settings = { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, provider: 'aliyun' as const, aliyunWorkspaceId: 'workspace-123' } }
   settingsStore.setState({ settings })
   render(<AudioTab settings={settings} />)
-  const group = within(screen.getByRole('group', { name: '识别' }))
-  expect(group.getByText('原文语言')).toBeInTheDocument()
-  // The provider picker, the recognition model and the Aliyun workspace fields all moved: the
-  // connection is configured in model management and the loaded model is chosen in Model Gateway.
-  expect(group.queryByRole('combobox', { name: '服务商' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('group', { name: '识别' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('combobox', { name: '原文语言' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('combobox', { name: '服务商' })).not.toBeInTheDocument()
   expect(screen.queryByDisplayValue('workspace-123')).not.toBeInTheDocument()
-  expect(group.queryByRole('button')).not.toBeInTheDocument()
 })
 
 it('keeps translation behavior here without the retired model-management shortcut or connection fields', () => {

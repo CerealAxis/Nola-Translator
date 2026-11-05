@@ -274,6 +274,7 @@ const errorCodes = [
   'invalidMessage',
   'unsupportedProtocol',
   'invalidConfiguration',
+  'invalidCredential',
   'protocolValidationFailed',
   'sessionNotRunning',
   'sessionAlreadyRunning',
@@ -284,6 +285,10 @@ const errorCodes = [
   'audioDeviceUnavailable',
   'audioDeviceDisconnected',
   'audioBufferOverflow',
+  'audioPlaybackUnavailable',
+  'gatewayNotRunning',
+  'modelNotLoaded',
+  'modelMissing',
   'modelUnavailable',
   'modelLoadFailed',
   'modelDependencyMissing',
@@ -299,6 +304,7 @@ const errorCodes = [
   'recognitionBufferOverflow',
   'translationProviderUnavailable',
   'translationNetworkUnavailable',
+  'translationTimeout',
   'translationInvalidResponse',
   'translationUnsupportedLanguagePair',
   'resourceVerificationFailed',
@@ -313,6 +319,10 @@ const errorCodes = [
   'integrityCheckFailed',
   'installFailed',
   'lineTooLarge',
+  's2sConfigurationMissing',
+  's2sConnectionLost',
+  'synthesisFailed',
+  'playbackUnconfirmed',
   'internalError',
 ] as const
 
@@ -321,10 +331,10 @@ export const diagnosticCopyContextSchema = z.object({
   correlationId: z.string().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/).optional(),
 }).strip()
 
-const resourceSchema = z
+export const resourceSchema = z
   .object({
     resourceId: z.string().min(1).max(256),
-    kind: z.enum(['recognitionModel', 'translationModel', 'ttsModel']),
+    kind: z.enum(['recognitionModel', 'translationModel', 'ttsModel', 'ocrModel']),
     // The loader that will run this model, in either vocabulary: built-ins report the provider
     // from resources.py, a hub repo passes through its adapter id. It cannot be a closed union —
     // and a value this schema rejects kills the engine, because an unparseable event is treated

@@ -2,28 +2,39 @@ import { z } from 'zod'
 import extensionRelease from '../../browser/version.json'
 import type { AudioDevice, EngineErrorCode, EngineEvent } from './contracts'
 import type { SupportErrorCode } from './error-catalog'
+import { REALTIME_S2S_MODELS } from './settings'
 import type { BrowserCaptionStyleSettings, VideoCaptionAudioSource } from './settings'
 
 export const FIREFOX_EXTENSION_ID = 'captions@nola-translator.app'
 export const BROWSER_HOST_NAME = 'com.nola.captions'
 export const BROWSER_EXTENSION_ID = 'cgbjfdpkcoapeiefeflikdolennbdcbe'
 export const BROWSER_EXTENSION_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoiJ7hfz9nPxIe4Iax2PF+o4Dtq8w1y2X/HGa6aPZRTZWBOYzr13mdqzCC+UfJKpAzeGIPL2V0xNvkCXoxCjUBCOduL36uaXwmSSUpNcg1wcob05ZTDod6XIxAOXViMcJKd+wLronqx9gy6bDigQm7J1c5f6Z7Iw9xmOdPS7n01LTqCQINrpEzU/DzAzFTTv9JUKd6Oy/PyzQg6BHzhIAhyBYhYJOsuhGIMQTE+pd/1xL/NKYAmrbNWOOYvrUxlcgk7TwORkdx/NpeA4E5R8dB4CtX14GL/Ktc7R9gAVptQH524j2ZUszKA/WrQU1CmRneS2bIyjOE0idJt1Xd3O9iQIDAQAB'
-export const BROWSER_PROTOCOL_VERSION = 1
-/** Exact release matching prevents a stale unpacked bundle from silently using obsolete capture code. */
+export const BROWSER_PROTOCOL_VERSION = 3
+/** Extension releases are independent; compatibility is negotiated by protocol version. */
 export const BROWSER_EXTENSION_VERSION = extensionRelease.version
 
 const identity = { id: z.string().min(1).max(128) }
 const session = { ...identity, sessionId: z.string().min(1).max(128) }
 const timeline = { epoch: z.number().int().nonnegative(), videoTimeMs: z.number().nonnegative().finite(), playbackRate: z.number().positive().max(16) }
-/**
- * The languages are accepted but never read: the desktop settings decide both, so an extension
- * that still sends them stays compatible while a newer one that omits them parses unchanged.
- */
-const legacyLanguages = { sourceLanguage: z.string().min(1).max(32).optional(), targetLanguage: z.string().min(1).max(32).optional() }
+const language = z.string().min(1).max(32).regex(/^[a-z]+(?:-[a-z0-9]+)*$/i)
+const languages = { sourceLanguage: language.optional(), targetLanguage: language.optional() }
+const model = z.string().min(1).max(512).optional()
+const audio = z.string().min(4).max(102400).regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/)
 export const browserRequestSchema = z.discriminatedUnion('type', [
-  z.object({ ...identity, type: z.literal('hello'), browser: z.enum(['chrome', 'edge', 'firefox']).optional(), extensionVersion: z.string().min(1).max(32).optional() }).strict(),
+  z.object({ ...identity, type: z.literal('hello'), browser: z.enum(['chrome', 'edge', 'firefox']).optional(), extensionVersion: z.string().min(1).max(32).optional(), protocolVersion: z.number().int().min(1).max(100).optional() }).strict(),
+  z.object({ ...identity, type: z.literal('generate'), model, messages: z.array(z.object({ role: z.enum(['system', 'user', 'assistant']), content: z.string().max(16000) }).strict()).min(1).max(32) }).strict(),
+  z.object({ ...identity, type: z.literal('synthesize'), model, text: z.string().trim().min(1).max(4000), voice: z.string().max(256).optional() }).strict(),
+  z.object({ ...identity, type: z.literal('voices'), model }).strict(),
+  z.object({ ...identity, type: z.literal('transcribe'), model, audio, sourceLanguage: language.optional() }).strict(),
+  z.object({ ...identity, type: z.literal('cancel'), requestId: identity.id }).strict(),
+  z.object({ ...identity, type: z.literal('streamStart'), model, sourceLanguage: language.optional() }).strict(),
+  z.object({ ...identity, type: z.literal('streamAudio'), streamId: identity.id, pcmBase64: audio, sampleRate: z.literal(16000) }).strict(),
+  z.object({ ...identity, type: z.literal('streamFinish'), streamId: identity.id }).strict(),
+  z.object({ ...identity, type: z.literal('streamStop'), streamId: identity.id }).strict(),
   z.object({ ...identity, type: z.literal('runtimeSettings'), component: z.enum(['engine', 'llama']) }).strict(),
-  z.object({ ...identity, type: z.literal('start'), ...timeline, source: z.enum(['tab', 'system']), streamId: z.string().min(1).max(128), deviceId: z.string().min(1).max(512).optional(), ...legacyLanguages }).strict(),
+  z.object({ ...identity, type: z.literal('translate'), text: z.string().trim().min(1).max(4000), sourceLanguage: language, targetLanguage: language }).strict(),
+  z.object({ ...identity, type: z.literal('cancelTranslation'), requestId: identity.id }).strict(),
+  z.object({ ...identity, type: z.literal('start'), ...timeline, source: z.enum(['tab', 'system']), streamId: z.string().min(1).max(128), deviceId: z.string().min(1).max(512).optional(), ...languages, pipeline: z.enum(['desktop', 'cascade', 's2s']).optional(), model: z.enum(REALTIME_S2S_MODELS).optional() }).strict(),
   z.object({ ...session, type: z.literal('stop') }).strict(),
   z.object({ ...session, type: z.literal('finish'), epoch: timeline.epoch }).strict(),
   z.object({ ...session, type: z.literal('pause'), paused: z.boolean() }).strict(),
@@ -52,6 +63,18 @@ export type BrowserWireErrorCode =
   | 'browserSessionNotRunning'
   | 'browserCaptionServiceDisabled'
   | 'browserIntegrationDisabled'
+  | 'browserTextModelUnavailable'
+  | 'browserTranslationTimeout'
+  | 'browserTranslationRateLimited'
+  | 'browserS2sUnavailable'
+  | 'browserS2sTargetUnsupported'
+  | 'browserSubtitleReadFailed'
+  | 'browserSubtitleLoginRequired'
+  | 'browserTabCapturePermission'
+  | 'gatewayNotRunning'
+  | 'realtimeBackendUnavailable'
+  | 'modelNotLoaded'
+  | 'modelDisabled'
   | 'torchUnavailable'
   | 'llamaUnavailable'
   | 'internalError'
@@ -80,7 +103,11 @@ export interface BrowserCaptionConfig {
   targetLanguage: string
 }
 export interface BrowserSummary {
-  protocolVersion: 1
+  protocolVersion: 1 | 2 | typeof BROWSER_PROTOCOL_VERSION
+  capabilities?: Record<'asr' | 'mt' | 'tts' | 's2s' | 'llm', boolean>
+  textTranslation?: boolean
+  textTranslationError?: 'gatewayNotRunning' | 'browserTextModelUnavailable'
+  realtimeTranslation?: boolean
   extensionVersion?: string
   extensionCompatible?: boolean
   uiLanguage: 'auto' | 'zh-CN' | 'zh-TW' | 'zh-HK' | 'ko' | 'ja' | 'en'
@@ -92,10 +119,13 @@ export interface BrowserSummary {
   captionServiceActive: boolean
   config: BrowserCaptionConfig
 }
+export type BrowserCapabilityRequest = Extract<BrowserRequest, { type: 'generate' | 'synthesize' | 'voices' | 'transcribe' }>
+export type BrowserCapabilityResult = { text: string; voices?: string[]; audio?: string } | { audioChunks: number; format: string } | { streamId: string }
 export type BrowserResponse =
-  | { type: 'result'; id: string; value?: BrowserSummary | { sessionId: string } }
+  | { type: 'result'; id: string; value?: BrowserSummary | { sessionId: string } | BrowserCapabilityResult }
   | { type: 'error'; id: string; code: BrowserWireErrorCode; message: string }
   | { type: 'event'; event: EngineEvent }
+  | { type: 'capabilityEvent'; id: string; event: { type: 'audio'; index: number; data: string } | { type: 'asr'; data: Record<string, unknown> } }
 export type BrowserKind = 'chrome' | 'edge' | 'firefox'
 export interface BrowserIntegrationInfo {
   browser: BrowserKind

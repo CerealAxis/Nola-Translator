@@ -49,10 +49,11 @@ from .contracts import (
 class PlaybackResolution(BaseModel):
     owner_id: str = Field(min_length=1, max_length=128)
 from .sessions import Session, SessionError
-from .direct_inference import DirectInferenceRequest, DirectInferenceResult, run_direct_inference
+from .direct_inference import PUBLIC_PROVIDER_CODES, DirectInferenceRequest, DirectInferenceResult, run_direct_inference
 from .gateway.adapters import MIMO_TTS_MODEL
 from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, Operation
 from .gateway.gateway import MatchRequest
+from .meeting import Meeting, MeetingRequest, MeetingAudioTestRequest, MeetingPauseRequest, _error as meeting_error, _key_reader, validate_route
 
 #: WsClientFrame is an Annotated union alias, not a model class.
 _CLIENT_FRAME = TypeAdapter(WsClientFrame)
@@ -86,6 +87,30 @@ def cloud_mt_options(headers, prefix="x-nola-provider-"):
     return options
 
 
+def _configure_realtime_provider(registry, session, headers):
+    pipeline = session.config.pipeline
+    if pipeline.kind == "s2s":
+        api_key = headers.get("x-nola-provider-key", "")
+        workspace = headers.get("x-nola-provider-workspace", "")
+        region = headers.get("x-nola-provider-region", "")
+        if 0 < len(api_key) <= 4096 and 0 < len(workspace) <= 128 and len(region) <= 32:
+            registry.provider_connections.setdefault(session.session_id, {
+                "provider": "aliyun", "api_key": api_key, "workspace_id": workspace, "region": region,
+            })
+        return
+    connection = registry.provider_connections.setdefault(session.session_id, {})
+    if pipeline.translation_model in ("google", "microsoft", "mymemory", "custom-mt"):
+        connection.setdefault("mt_options", cloud_mt_options(headers))
+    if pipeline.fallback_translation_model in ("google", "microsoft", "mymemory", "custom-mt"):
+        connection.setdefault("fallback_mt_options", cloud_mt_options(headers, "x-nola-fallback-"))
+    if pipeline.asr_model in ("aliyun", "minimax"):
+        connection.setdefault("asr_options", cloud_asr_options(headers))
+    if pipeline.tts_model == MIMO_TTS_MODEL:
+        tts_key = headers.get("x-nola-tts-key", "")
+        if 0 < len(tts_key) <= 4096:
+            connection["tts_api_key"] = tts_key
+
+
 async def _run_while_connected(request: Request, operation):
     async def disconnected():
         while (await request.receive())["type"] != "http.disconnect":
@@ -98,7 +123,7 @@ async def _run_while_connected(request: Request, operation):
         return await task if task.done() else None
     finally:
         disconnect.cancel()
-        if not task.done():
+        if not task.done() and not task.cancelling():
             task.cancel()
         with suppress(asyncio.CancelledError):
             await disconnect
@@ -214,35 +239,101 @@ def build_router() -> APIRouter:
     async def session_command(request: Request, session_id: UUID, body: SessionCommand):
         ctx = backend(request)
         try:
-            if ctx.realtime_enabled and body.type == "start":
-                session = ctx.session_manager.get(session_id)
-                pipeline = session.config.pipeline
-                if session.state == "created" and pipeline.kind == "s2s":
-                    api_key = request.headers.get("x-nola-provider-key", "")
-                    workspace = request.headers.get("x-nola-provider-workspace", "")
-                    region = request.headers.get("x-nola-provider-region", "")
-                    if 0 < len(api_key) <= 4096 and 0 < len(workspace) <= 128 and len(region) <= 32:
-                        ctx.pipeline_registry.provider_connections.setdefault(session_id, {
-                            "provider": "aliyun", "api_key": api_key, "workspace_id": workspace, "region": region,
-                        })
-                elif session.state == "created" and pipeline.kind == "cascade":
-                    connection = ctx.pipeline_registry.provider_connections.setdefault(session_id, {})
-                    if pipeline.translation_model in ("google", "microsoft", "mymemory", "custom-mt"):
-                        connection.setdefault("mt_options", cloud_mt_options(request.headers))
-                    if pipeline.fallback_translation_model in ("google", "microsoft", "mymemory", "custom-mt"):
-                        connection.setdefault("fallback_mt_options", cloud_mt_options(request.headers, "x-nola-fallback-"))
-                    if pipeline.asr_model in ("aliyun", "minimax"):
-                        connection.setdefault("asr_options", cloud_asr_options(request.headers))
-                if session.state == "created" and pipeline.kind == "cascade" and pipeline.tts_model == MIMO_TTS_MODEL:
-                    tts_key = request.headers.get("x-nola-tts-key", "")
-                    if 0 < len(tts_key) <= 4096:
-                        ctx.pipeline_registry.provider_connections.setdefault(session_id, {})["tts_api_key"] = tts_key
+            session = ctx.session_manager.get(session_id)
+            if session.owner == "meeting":
+                return _error_response(400, meeting_error("INVALID_CONFIG", "routing", "invalidRoute"), ctx.server_instance_id)
+            if ctx.realtime_enabled and body.type == "start" and session.state == "created":
+                _configure_realtime_provider(ctx.pipeline_registry, session, request.headers)
             ack = await ctx.session_manager.command(session_id, body)
         except SessionError as error:
             return _error_response(error.status, error.payload, ctx.server_instance_id)
         if ctx.realtime_enabled and ack.result_state in ("closed", "failed"):
             ctx.pipeline_registry.provider_connections.pop(session_id, None)
         return JSONResponse(status_code=202, content=ack.model_dump(mode="json"))
+
+    @router.post("/meetings/audio-test")
+    async def meeting_audio_test(request: Request, body: MeetingAudioTestRequest):
+        from .meeting_audio import test_meeting_audio
+
+        ctx = backend(request)
+        if not ctx.accepting_sessions:
+            return _error_response(503, meeting_error("RESOURCE_BUSY", "session", "backendUnavailable"), ctx.server_instance_id)
+        try:
+            async with ctx.meeting_lock, ctx.session_manager.audio_test_slot():
+                return await _run_while_connected(request, test_meeting_audio(body))
+        except SessionError as error:
+            return _error_response(error.status, error.payload, ctx.server_instance_id)
+
+    @router.post("/meetings", status_code=201)
+    async def create_meeting(request: Request, body: MeetingRequest):
+        ctx = backend(request)
+        if not ctx.realtime_enabled or not ctx.accepting_sessions:
+            return _error_response(503, meeting_error("RESOURCE_BUSY", "session", "backendUnavailable"), ctx.server_instance_id)
+        try:
+            async with ctx.meeting_lock:
+                meeting = ctx.meetings.get(body.command_id)
+                if meeting is None:
+                    validate_route(body, ctx.gateway)
+                    try:
+                        read_key = _key_reader(body.passthrough_key) if body.uplink is not None else lambda: False
+                    except (AttributeError, OSError) as exc:
+                        raise SessionError(meeting_error("INVALID_CONFIG", "input", "shortcutUnavailable")) from exc
+                    sessions = await ctx.session_manager.reserve_meeting(body.uplink, body.downlink)
+                    meeting = ctx.meetings[body.command_id] = Meeting(ctx, body, sessions, read_key)
+                    for session in sessions:
+                        _configure_realtime_provider(ctx.pipeline_registry, session, request.headers)
+                    while len(ctx.meetings) > 32:
+                        expired_id = next(
+                            (key for key, value in ctx.meetings.items() if value.state in ("closed", "failed")), None,
+                        )
+                        if expired_id is None:
+                            break
+                        expired = ctx.meetings.pop(expired_id)
+                        ctx.session_manager.forget_meeting(tuple(route.session for route in expired.routes))
+                elif meeting.config != body:
+                    raise SessionError(ErrorPayload(
+                        code="COMMAND_CONFLICT", stage="session", message_key="session.commandIdReuse",
+                        correlation_id=str(body.command_id),
+                    ))
+            try:
+                await _run_while_connected(request, meeting.start())
+            except asyncio.CancelledError:
+                if meeting.state != "closed":
+                    raise
+            if meeting.last_error is not None:
+                raise SessionError(meeting.last_error)
+        except SessionError as error:
+            return _error_response(error.status, error.payload, ctx.server_instance_id)
+        return meeting.snapshot()
+
+    @router.get("/meetings/{meeting_id}")
+    async def get_meeting(request: Request, meeting_id: UUID):
+        ctx = backend(request)
+        meeting = ctx.meetings.get(meeting_id)
+        if meeting is None:
+            return _error_response(404, meeting_error("SESSION_NOT_FOUND", "session", "notFound"), ctx.server_instance_id)
+        return meeting.snapshot()
+
+    @router.patch("/meetings/{meeting_id}")
+    async def pause_meeting(request: Request, meeting_id: UUID, body: MeetingPauseRequest):
+        ctx = backend(request)
+        meeting = ctx.meetings.get(meeting_id)
+        if meeting is None:
+            return _error_response(404, meeting_error("SESSION_NOT_FOUND", "session", "notFound"), ctx.server_instance_id)
+        try:
+            await meeting.set_paused(body.paused)
+        except SessionError as exc:
+            return _error_response(exc.status, exc.payload, ctx.server_instance_id)
+        return meeting.snapshot()
+
+    @router.delete("/meetings/{meeting_id}")
+    async def stop_meeting(request: Request, meeting_id: UUID):
+        ctx = backend(request)
+        meeting = ctx.meetings.get(meeting_id)
+        if meeting is None:
+            return _error_response(404, meeting_error("SESSION_NOT_FOUND", "session", "notFound"), ctx.server_instance_id)
+        await meeting.close()
+        return meeting.snapshot()
 
     @router.post("/sessions/{session_id}/playback/{job_id}/{action}", status_code=202)
     async def resolve_playback(request: Request, session_id: UUID, job_id: str, action: Literal["retry", "skip"], body: PlaybackResolution):
@@ -349,17 +440,7 @@ def build_router() -> APIRouter:
             ))
             return result if result is not None else JSONResponse(status_code=499, content={})
         except GatewayError as error:
-            if error.code is GatewayErrorCode.INVALID_INPUT:
-                return _error_response(400, ErrorPayload(
-                    code="INVALID_CONFIG", stage="gateway", message_key="gateway.invalidInference",
-                ), ctx.server_instance_id)
-            capacity = error.code in (GatewayErrorCode.RESOURCE_EXHAUSTED, GatewayErrorCode.LEASE_CONFLICT)
-            return _error_response(409 if capacity else 422, ErrorPayload(
-                code="RESOURCE_BUSY" if capacity else "CAPABILITY_MISMATCH",
-                stage="gateway", message_key="gateway.directInferenceFailed",
-                retryable=error.retryable, correlation_id=error.correlation_id,
-                provider_code=error.provider_code,
-            ), ctx.server_instance_id)
+            return _gateway_error_response(error, ctx.server_instance_id)
 
     @router.post("/gateway/language-models")
     async def open_language_model(request: Request, body: LanguageModelOpenRequest):
@@ -390,10 +471,7 @@ def build_router() -> APIRouter:
                 return JSONResponse(status_code=499, content={})
             raise
         except GatewayError as error:
-            return _error_response(409, ErrorPayload(
-                code="RESOURCE_BUSY", stage="gateway", message_key="gateway.languageModelUnavailable",
-                retryable=error.retryable, correlation_id=error.correlation_id,
-            ), ctx.server_instance_id)
+            return _gateway_error_response(error, ctx.server_instance_id)
         finally:
             ctx.language_model_openings.pop(token, None)
         if lease is None:
@@ -554,6 +632,37 @@ def build_router() -> APIRouter:
     return router
 
 
+_GATEWAY_FAILURES = {
+    GatewayErrorCode.INVALID_INPUT: (400, "INVALID_CONFIG"),
+    GatewayErrorCode.CAPABILITY_MISMATCH: (422, "CAPABILITY_MISMATCH"),
+    GatewayErrorCode.NOT_SUPPORTED: (422, "CAPABILITY_MISMATCH"),
+    GatewayErrorCode.MODEL_NOT_INSTALLED: (404, "MODEL_NOT_READY"),
+    GatewayErrorCode.MODEL_INTEGRITY: (409, "MODEL_NOT_READY"),
+    GatewayErrorCode.LOAD_FAILED: (503, "MODEL_NOT_READY"),
+    GatewayErrorCode.RESOURCE_EXHAUSTED: (429, "RESOURCE_EXHAUSTED"),
+    GatewayErrorCode.LEASE_CONFLICT: (409, "RESOURCE_BUSY"),
+    GatewayErrorCode.WORKER_EXITED: (503, "INTERNAL_ERROR"),
+    GatewayErrorCode.WORKER_OOM: (503, "RESOURCE_EXHAUSTED"),
+    GatewayErrorCode.TIMEOUT: (504, "INTERNAL_ERROR"),
+    GatewayErrorCode.PROVIDER_ERROR: (502, "PROVIDER_DISCONNECTED"),
+    GatewayErrorCode.CANCELLED: (409, "COMMAND_CONFLICT"),
+}
+
+
+def _gateway_failure(error: GatewayError) -> tuple[int, ErrorPayload]:
+    status, code = _GATEWAY_FAILURES.get(error.code, (500, "INTERNAL_ERROR"))
+    return status, ErrorPayload(
+        code=code, stage=error.stage, message_key=f"gateway.{error.code.value}",
+        retryable=error.retryable, correlation_id=error.correlation_id,
+        provider_code=error.provider_code if error.provider_code in PUBLIC_PROVIDER_CODES else None,
+    )
+
+
+def _gateway_error_response(error: GatewayError, server_instance_id: str) -> JSONResponse:
+    status, payload = _gateway_failure(error)
+    return _error_response(status, payload, server_instance_id)
+
+
 def _error_response(status: int, payload: ErrorPayload, server_instance_id: str) -> JSONResponse:
     return JSONResponse(
         status_code=status,
@@ -631,13 +740,19 @@ async def gateway_asr_ws(ws: WebSocket, gateway, model: str) -> None:
             await ws.send_json(await outbound.get())
 
     tasks = [asyncio.create_task(fn()) for fn in (receive, dispatch, send)]
+    failure = None
     try:
-        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        completed, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        failure = next((task.exception() for task in completed if not task.cancelled() and task.exception()), None)
     finally:
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         try:
+            if isinstance(failure, GatewayError):
+                status, payload = _gateway_failure(failure)
+                with suppress(OSError, RuntimeError, WebSocketDisconnect):
+                    await ws.send_json({"error": payload.model_dump(mode="json"), "status": status})
             await worker.close()
         finally:
             await lease.aclose()
@@ -860,6 +975,9 @@ async def input_ws(ws: WebSocket, session_id: UUID, ctx) -> None:
     except SessionError:
         await ws.close(code=1008, reason="session not found")
         return
+    if session.owner == "meeting":
+        await ws.close(code=1008, reason="meeting uses native capture")
+        return
 
     writer = _ConnectionWriter(ws)
     await writer.start()
@@ -1004,6 +1122,9 @@ async def audio_ws(ws: WebSocket, session_id: UUID, ctx) -> None:
         session = ctx.session_manager.get(session_id)
     except SessionError:
         await ws.close(code=1008, reason="session not found")
+        return
+    if session.owner == "meeting":
+        await ws.close(code=1008, reason="meeting uses native playback")
         return
 
     ack = await _hello(ws, session, ctx.server_instance_id, want_owner=True)

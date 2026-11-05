@@ -4,6 +4,8 @@ import type { AppSettings } from '../shared/settings'
 import type { FeatureActivitySnapshot } from '../shared/feature-activity'
 import { resolveUiLanguage } from '../shared/languages'
 import { gatewayEn, gatewayJa, gatewayKo, gatewayHk, gatewayTw, gatewayZh } from '../renderer/i18n/gateway-ui'
+import { meetingLocales } from '../renderer/i18n/meeting-ui'
+import { screenLocales } from '../renderer/i18n/screen-ui'
 
 export interface NolaTrayOptions {
   getSettings(): AppSettings
@@ -11,6 +13,13 @@ export interface NolaTrayOptions {
   show(): void
   stop(): Promise<void>
   quit(): void
+  screenTranslation?: {
+    status(): string
+    open(): void
+    pause(): Promise<void>
+    resume(): Promise<void>
+    stop(): Promise<void>
+  }
 }
 
 export class NolaTray {
@@ -18,7 +27,8 @@ export class NolaTray {
   constructor(private readonly options: NolaTrayOptions) {}
   private dictionary() {
     const language = resolveUiLanguage(this.options.getSettings().uiLanguage, app.getLocale())
-    return ({ 'zh-CN': gatewayZh, 'zh-TW': gatewayTw, 'zh-HK': gatewayHk, en: gatewayEn, ja: gatewayJa, ko: gatewayKo })[language]
+    const gateway = ({ 'zh-CN': gatewayZh, 'zh-TW': gatewayTw, 'zh-HK': gatewayHk, en: gatewayEn, ja: gatewayJa, ko: gatewayKo })[language]
+    return { ...gateway, meeting: meetingLocales[language].title, 'screen-translation': screenLocales[language].title, screen: screenLocales[language] }
   }
   async initialize(): Promise<void> {
     // Use a bundled image instead of relying on Windows shell extraction or its icon cache.
@@ -35,6 +45,14 @@ export class NolaTray {
     const activity = this.options.getActivity()
     this.tray?.setContextMenu(Menu.buildFromTemplate([
       { label: t.trayOpen, click: () => this.options.show() },
+      ...(this.options.screenTranslation ? [
+        { label: t.screen.title, click: () => this.options.screenTranslation!.open() },
+        ...(['running', 'waiting', 'paused'].includes(this.options.screenTranslation.status()) ? [
+          { label: this.options.screenTranslation.status() === 'paused' ? t.screen.resume : t.screen.pause,
+            click: () => { const control = this.options.screenTranslation!; void (control.status() === 'paused' ? control.resume() : control.pause()).catch(error => console.error('screen translation control failed', error)) } },
+          { label: t.screen.stop, click: () => { void this.options.screenTranslation!.stop().catch(error => console.error('screen translation stop failed', error)) } },
+        ] : []),
+      ] : []),
       { type: 'separator' },
       ...((activity.activities?.length ? activity.activities : activity.owner ? [{ owner: activity.owner, phase: activity.phase }] : []).map(item => ({ label: `${t[item.owner]} · ${t[item.phase === 'idle' ? 'stopped' : item.phase]}`, enabled: false }))),
       ...(!activity.owner ? [{ label: t.trayIdle, enabled: false }] : []),

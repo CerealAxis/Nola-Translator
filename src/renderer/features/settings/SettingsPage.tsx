@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Fieldset } from '@base-ui/react/fieldset'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Captions, Cpu, CircleHelp, Gauge, Database, FlaskConical, Grid2X2, Languages, Mic, Monitor, Settings, SlidersHorizontal, LoaderCircle } from 'lucide-react'
+import { Captions, Cpu, CircleHelp, FolderOpen, FlaskConical, Keyboard, AudioLines, PanelsTopLeft, SlidersHorizontal, LoaderCircle } from 'lucide-react'
 
 import type { AppSettings } from '@/bridge'
 import { Button } from '@/components/ui/button'
@@ -15,20 +15,20 @@ import type { SettingsTab } from '@/routes'
 import { actions, isEngineConnected, stores, useStore } from '@/store'
 import { GeneralTab } from './tabs/GeneralTab'
 import { AudioTab } from './tabs/AudioTab'
-import { TranslationTab } from './tabs/TranslationTab'
 import { AppearanceTab } from './tabs/AppearanceTab'
 import { StorageTab } from './tabs/StorageTab'
-import { AdvancedTab } from './tabs/AdvancedTab'
+import { EngineDiagnostics } from './tabs/AdvancedTab'
 import { MoreTab } from './tabs/MoreTab'
 import { ComputeTab } from './tabs/ComputeTab'
 import { PerformanceTab } from './tabs/PerformanceTab'
 import { BrowserTab } from './tabs/BrowserTab'
 import { DeveloperTab } from './tabs/DeveloperTab'
+import { ShortcutsTab } from './tabs/ShortcutsTab'
 import './settings.css'
 
 export interface SettingsPanelProps { settings: AppSettings }
 
-const NAV_ICONS = { browser: Captions, general: Settings, audio: Mic, translation: Languages, compute: Cpu, performance: Gauge, appearance: Monitor, storage: Database, advanced: SlidersHorizontal, more: Grid2X2, developer: FlaskConical }
+const NAV_ICONS = { general: SlidersHorizontal, audio: AudioLines, appearance: Captions, browser: PanelsTopLeft, shortcuts: Keyboard, engine: Cpu, storage: FolderOpen, help: CircleHelp, developer: FlaskConical }
 
 /** The nav hint is a Base UI popup, so it carries the same surface tokens as the other tooltips. */
 const NAV_TOOLTIP_CLASS = 'settings-nav__tooltip z-popup max-w-96 whitespace-normal break-all rounded-nola-ui-xl bg-overlay p-2 text-xs text-overlay-foreground shadow-overlay'
@@ -74,20 +74,13 @@ export function SettingsPage() {
   )
 
   const labels: Record<SettingsTab, string> = {
-    browser: t('browser.title'),
-    compute: t('compute.devices'),
-    performance: t('compute.performance'),
     general: t('modelsSettingsUi.general'), audio: t('modelsSettingsUi.audio'),
-    translation: t('modelsSettingsUi.translation'), appearance: t('modelsSettingsUi.appearance'),
-    storage: t('modelsSettingsUi.storage'), advanced: t('modelsSettingsUi.advanced'),
-    more: t('more.tabLabel'),
+    appearance: t('modelsSettingsUi.appearance'), browser: t('browser.title'),
+    shortcuts: t('modelsSettingsUi.shortcuts'), engine: t('modelsSettingsUi.engine'),
+    storage: t('modelsSettingsUi.storage'), help: t('modelsSettingsUi.help'),
     developer: t('dev.tabLabel'),
   }
-
-  const computeCopy = dictionary.compute
-  const NAV_HINTS: Partial<Record<SettingsTab, string>> = {
-    compute: computeCopy.nextSession, performance: computeCopy.nextSession,
-  }
+  const NAV_HINTS: Partial<Record<SettingsTab, string>> = { engine: dictionary.compute.nextSession }
 
   return (
     <div className="settings-page">
@@ -116,16 +109,18 @@ export function SettingsPage() {
         </div>
         <div className="settings-panels">
           <TabsContent value="general" className="tabs__panel"><GeneralTab settings={settings} /></TabsContent>
+          <TabsContent value="shortcuts" className="tabs__panel"><ShortcutsTab settings={settings} /></TabsContent>
           <TabsContent value="audio" className="tabs__panel"><AudioTab settings={settings} /></TabsContent>
-          <TabsContent value="translation" className="tabs__panel"><TranslationTab settings={settings} /></TabsContent>
-          <TabsContent value="compute" className="tabs__panel"><ComputeTab settings={settings} /></TabsContent>
-          <TabsContent value="performance" className="tabs__panel"><PerformanceTab settings={settings} /></TabsContent>
+          <TabsContent value="engine" className="tabs__panel"><div className="settings-panel">
+            <ComputeTab settings={settings} />
+            <PerformanceTab settings={settings} />
+            <EngineDiagnostics />
+          </div></TabsContent>
           <TabsContent value="appearance" className="tabs__panel"><AppearanceTab settings={settings} /></TabsContent>
           <TabsContent value="storage" className="tabs__panel"><StorageTab settings={settings} /></TabsContent>
-          <TabsContent value="advanced" className="tabs__panel"><AdvancedTab settings={settings} /></TabsContent>
-          <TabsContent value="more" className="tabs__panel"><MoreTab /></TabsContent>
+          <TabsContent value="help" className="tabs__panel"><MoreTab /></TabsContent>
           <TabsContent value="browser" className="tabs__panel"><BrowserTab /></TabsContent>
-          <TabsContent value="developer" className="tabs__panel"><DeveloperTab /></TabsContent>
+          {import.meta.env.DEV ? <TabsContent value="developer" className="tabs__panel"><DeveloperTab /></TabsContent> : null}
         </div>
       </TabsRoot>
     </div>

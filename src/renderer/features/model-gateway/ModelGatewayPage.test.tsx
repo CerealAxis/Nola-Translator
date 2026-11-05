@@ -53,13 +53,13 @@ it('shows a toast when a gateway settings write fails', async () => {
   expect(notifyError).toHaveBeenCalledWith('操作失败，请检查本地服务和日志后重试。', expect.objectContaining({ cause: expect.any(Error) }))
 })
 
-it('shows the six model rows in order and resets keys after confirmation', async () => {
+it('shows the seven model rows in order and resets keys after confirmation', async () => {
   render(<ModelGatewayPage />)
   await screen.findByText('启动模型')
   const card = document.querySelector<HTMLElement>('[data-onboarding="gateway-capabilities"]')!
   const table = within(within(card).getByRole('table'))
   expect(table.getAllByRole('combobox').map(element => element.getAttribute('aria-label')))
-    .toEqual(['选择 ASR 模型', '选择 MT 模型', '选择 TTS 模型', 'S2S 模型', '选择大语言模型', '备用 MT 模型'])
+    .toEqual(['选择 ASR 模型', '选择 MT 模型', '选择 TTS 模型', 'S2S 模型', '选择 大语言模型', '选择 文字识别（OCR）', '备用 MT 模型'])
   expect(within(table.getByRole('row', { name: /^TTS 模型/ })).getByRole('button', { name: '复制模型 ID：nola-tts' })).toBeInTheDocument()
   expect(screen.queryByRole('switch', { name: '语音识别' })).not.toBeInTheDocument()
   expect(screen.queryByText('对外 API 模型映射')).not.toBeInTheDocument()
@@ -206,7 +206,7 @@ it('binds a custom LLM without changing the translation default', async () => {
   render(<ModelGatewayPage />)
   await screen.findByText('启动模型')
   const user = userEvent.setup()
-  await user.click(screen.getByRole('combobox', { name: '选择大语言模型' }))
+  await user.click(screen.getByRole('combobox', { name: '选择 大语言模型' }))
   await user.click(await screen.findByRole('option', { name: 'Chat profile' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { llmModel: 'custom:chat', llm: true }, modelPolicy: { enabled: { 'llm:custom:chat': true }, defaults: {}, selections: {} } }))
   expect(update).not.toHaveBeenCalledWith(expect.objectContaining({ translation: expect.anything() }))
@@ -264,4 +264,20 @@ it.each([
   await user.click(await screen.findByRole('combobox', { name: `选择 ${label}` }))
   await user.click(await screen.findByRole('option', { name: 'Local candidate' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { [`${kind}Model`]: `resource:${id}`, [kind]: true }, modelPolicy: { enabled: { [`${kind}:resource:${id}`]: true }, defaults: {}, selections: {} } }))
+})
+
+it('selects downloaded OCR weights for gateway startup without changing scene models', async () => {
+  store.stores.models.setState({ resources: [{ resourceId: 'pp-ocrv5-mobile-onnx', kind: 'ocrModel', provider: 'pp-ocrv5',
+    name: 'PP-OCRv5 mobile', description: 'OCR', languages: ['zh', 'en', 'ja', 'ko'], installed: true,
+    installedBytes: 34939630, state: 'idle', cancellable: false }] })
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
+  render(<ModelGatewayPage />)
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('combobox', { name: '选择 文字识别（OCR）' }))
+  await user.click(await screen.findByRole('option', { name: 'PP-OCRv5 mobile' }))
+  await waitFor(() => expect(update).toHaveBeenCalledWith(expect.objectContaining({
+    modelGateway: { ocr: true, ocrModel: 'resource:pp-ocrv5-mobile-onnx' },
+  })))
+  expect(update.mock.calls[0][0]).not.toHaveProperty('translation')
+  expect(update.mock.calls[0][0]).not.toHaveProperty('recognition')
 })

@@ -18,7 +18,7 @@ export function TranslationTab({ settings }: SettingsPanelProps) {
 
   return (
     <div className="settings-panel" data-onboarding="translation-settings">
-      <SettingGroup onboardingTarget="translation-service" legend={t('settings.groupProvider')}>
+      <SettingGroup id="translation-settings" onboardingTarget="translation-service" legend={t('settings.groupProvider')}>
         <SettingsRow label={t('settings.translateIntermediate')} desc={t('settings.translateIntermediateHint')} descriptionTooltip>
           <SettingSwitch isSelected={translation.translateIntermediate} ariaLabel={t('settings.translateIntermediate')}
             onChange={next => { void updateSettings({ translation: { translateIntermediate: next } }).catch(() => undefined) }} />

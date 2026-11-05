@@ -12,7 +12,7 @@ import { configurationOf, recognitionLanguages } from '../shared/model-capabilit
 import { INDEX_TRANSLATE_LANGUAGES, INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from '../shared/index-translate'
 import { LANGUAGE_CODES } from '../shared/languages'
 import { defaultModelBinding, isModelEnabled, modelEnablePatch, modelPolicyOf, sceneModelBinding, sceneModelPatch } from '../shared/model-policy'
-import { notifyError, notifyGatewayModelUnavailable, notifyWarning } from '@/components/primitives/notify'
+import { notifyError, notifyGatewayStartIssue, notifyWarning } from '@/components/primitives/notify'
 import { cloudModelsOf } from '../shared/cloud-models'
 
 const imageTranslationIds = new Set<string>([...INDEX_TRANSLATE_MODEL_IDS, ...INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS])
@@ -82,7 +82,7 @@ export interface CatalogInput {
 }
 
 const readyService = (snapshot: ModelGatewaySnapshot | null, kind: GatewayCapability) =>
-  snapshot?.state === 'running' && snapshot.services[kind].state === 'ready' ? snapshot.services[kind] : undefined
+  snapshot?.state === 'running' && snapshot.services[kind]?.state === 'ready' ? snapshot.services[kind] : undefined
 
 /**
  * What a consumer may select right now: the local model the gateway has loaded for that capability,
@@ -93,7 +93,7 @@ const readyService = (snapshot: ModelGatewaySnapshot | null, kind: GatewayCapabi
  * pages report it instead of triggering it.
  */
 export function buildAvailableModels({ settings, resources, credentials, snapshot, names = {} }: CatalogInput): AvailableModels {
-  const empty: AvailableModels = { asr: [], mt: [], tts: [], llm: [] }
+  const empty: AvailableModels = { asr: [], mt: [], tts: [], llm: [], ocr: [] }
   const displayName = (binding: string, fallback: string) => names[binding] || fallback || binding
   const loaded = (kind: GatewayCapability): AvailableModel | undefined => {
     const service = readyService(snapshot, kind)
@@ -104,14 +104,14 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
     if (!record?.installed) return undefined
     const capability = configurationOf(record)
     return { binding, name: displayName(binding, service.name || record?.name || ''), kind, origin: 'gateway', free: true,
-      ...(record ? { sourceLanguages: record.kind === 'recognitionModel' ? recognitionLanguages(record) : capability?.sourceLanguages } : {}),
+      ...(record ? { sourceLanguages: record.kind === 'ocrModel' ? ['auto', ...record.languages] : record.kind === 'recognitionModel' ? recognitionLanguages(record) : capability?.sourceLanguages } : {}),
       ...(capability ? { targetLanguages: capability.targetLanguages } : {}),
       images: record ? imageTranslationIds.has(record.resourceId) : false }
   }
   const asrLoaded = loaded('asr')
   const realtime = (kind: GatewayCapability): AvailableModel[] => {
     if (snapshot?.state !== 'running') return []
-    const operation = { asr: 'transcribe', mt: 'translate', tts: 'synthesize', llm: 'generate' }[kind]
+    const operation = { asr: 'transcribe', mt: 'translate', tts: 'synthesize', llm: 'generate', ocr: 'recognize_image' }[kind]
     return (snapshot?.realtime?.models ?? []).flatMap(model => {
       if (!model.enabled || !model.operations.includes(operation)) return []
       const id = kind === 'llm' ? model.model_id.replace(/^llm:/, '') : model.model_id
@@ -165,6 +165,7 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
       { binding: MIMO_TTS_BINDING, name: MIMO_TTS_NAME, kind: 'tts', origin: 'cloud', free: false, targetLanguages: ['zh', 'en'] },
     ] : []),
     llm: merge('llm', loaded('llm') ? [loaded('llm')!] : [], realtime('llm'), llmClouds),
+    ocr: loaded('ocr') ? [loaded('ocr')!] : [],
   }
 }
 
@@ -194,7 +195,7 @@ export function useAvailableModels(): AvailableModels {
   }, [resources, settings, credentials, t])
   if (snapshot?.availableModels) {
     const catalog = snapshot.availableModels
-    const forKind = (kind: GatewayCapability) => catalog[kind]
+    const forKind = (kind: GatewayCapability) => (catalog[kind] ?? [])
       .filter(model => bindingIsLocal(model.binding)
         && isModelEnabled(settings, kind, model.binding)
         && resources.some(resource => resource.resourceId === model.binding.slice(9) && resource.installed)
@@ -206,7 +207,7 @@ export function useAvailableModels(): AvailableModels {
       const seen = new Set<string>()
       return models.filter(model => !seen.has(model.binding) && !!seen.add(model.binding))
     }
-    return { asr: combine('asr'), mt: combine('mt'), tts: combine('tts'), llm: combine('llm') }
+    return { asr: combine('asr'), mt: combine('mt'), tts: combine('tts'), llm: combine('llm'), ocr: combine('ocr') }
   }
   return buildAvailableModels({ settings, resources, credentials, snapshot, names })
 }
@@ -257,7 +258,7 @@ export function modelBindingPatch(kind: GatewayCapability, binding: string, sett
 function legacyModelBindingPatch(kind: GatewayCapability, binding: string, settings: AppSettings): AppSettingsPatch {
   const normalized = normalizeModelBinding(kind, binding)
   if (!normalized) return {}
-  if (kind === 'llm') return sceneModelPatch(settings, kind, normalized)
+  if (kind === 'llm' || kind === 'ocr') return sceneModelPatch(settings, kind, normalized)
   if (kind === 'tts') return { synthesis: { modelId: bindingIsLocal(normalized) ? normalized.slice(9) : normalized, voice: '' } }
   if (kind === 'asr') {
     return bindingIsLocal(normalized)
@@ -281,6 +282,7 @@ function legacyModelBindingPatch(kind: GatewayCapability, binding: string, setti
 export function gatewayBindingPatch(kind: GatewayCapability, binding: string): AppSettingsPatch {
   const normalized = normalizeModelBinding(kind, binding)
   if (!normalized) return {}
+  if (kind === 'ocr') return { modelGateway: { ocrModel: normalized } }
   if (kind === 'llm') return { modelGateway: { llmModel: normalized } }
   if (kind === 'asr') return { modelGateway: { asrModel: normalized } }
   if (kind === 'tts') return { modelGateway: { ttsModel: normalized } }
@@ -342,8 +344,7 @@ export function useModelSelection(kind: GatewayCapability, options: readonly Ava
     if (!resolution.unavailable) { hadAvailable.current = true; return }
     if (!hadAvailable.current || gatewaySnapshot?.state !== 'running' || gatewaySnapshot.services?.[kind]?.state !== 'failed') return
     hadAvailable.current = false
-    const label = kind === 'asr' ? t('session.recognitionModel') : kind === 'mt' ? t('session.translationModel') : t(`gateway.${kind}`)
-    notifyGatewayModelUnavailable(t('gateway.modelNone', { name: label }), t('gateway.modelNoneHint'), t('gateway.title'))
+    void notifyGatewayStartIssue(t, kind)
   }, [resolution.unavailable, locked, off, kind, t, gatewaySnapshot])
   // Do not leak a stale saved binding into the UI when nothing can serve it.
   const binding = locked ? saved : resolution.unavailable ? '' : resolution.binding

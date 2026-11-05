@@ -20,12 +20,14 @@ import { createGatewayWorker, GatewayWorkerError, type GatewayWorker, type Gatew
 import { GatewayInternalServer, type GatewayCapabilityLease } from './gateway-internal-server'
 import { createGatewayLanguageModel, type GatewayLanguageModel } from './gateway-language-model'
 import { directModelRequestSchema, type DirectModelRequest, type DirectModelResult } from '../shared/agent-workspace'
-import { backendCloudAsr, backendCloudMt, type BackendInferenceOptions, type openBackendAsrStream } from './backend-direct-model'
+import { BackendModelError, backendCloudAsr, backendCloudMt, type BackendInferenceOptions, type openBackendAsrStream } from './backend-direct-model'
 import type { DirectModelServices } from './direct-model'
+import type { ScreenOcrRequest, ScreenOcrResult } from '../shared/screen-translation'
+import type { GatewayServiceSnapshot } from '../shared/model-gateway'
 
 const WORKER_KINDS = ['asr', 'mt', 'tts'] as const
 type WorkerKind = typeof WORKER_KINDS[number]
-const KINDS: GatewayCapability[] = [...WORKER_KINDS, 'llm']
+const KINDS: GatewayCapability[] = [...WORKER_KINDS, 'llm', 'ocr']
 const RESOURCE_KIND = { asr: 'recognitionModel', mt: 'translationModel', tts: 'ttsModel' } as const
 const MAX_BODY = 24 * 1024 * 1024
 const MAX_TEXT = 64_000
@@ -53,6 +55,7 @@ interface WorkerPlan {
   signature: string
 }
 export interface ModelGatewayOptions {
+  ocr?: { load(resourceId: string): Promise<void>; release(): Promise<void>; infer(request: ScreenOcrRequest, signal: AbortSignal): Promise<ScreenOcrResult> }
   getSettings(): AppSettings
   directLaunch(model: string): Promise<EngineLaunchSpec>
   listResources(): Promise<ResourceRecord[]>
@@ -67,6 +70,10 @@ export interface ModelGatewayOptions {
 }
 class GatewayError extends Error { constructor(readonly status: number, message: string, readonly code = 'invalid_request_error') { super(message) } }
 const clientError = (error: unknown): unknown => {
+  if (error instanceof BackendModelError) {
+    const code = error.engineCode.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)
+    return new GatewayError(error.status, 'The model request failed. Check the capability status in Nola.', code)
+  }
   if (!(error instanceof GatewayWorkerError)) return error
   const status = { invalid_request: 400, authentication_failed: 502, rate_limited: 429, network_unavailable: 503, request_timeout: 504, out_of_memory: 503, inference_failed: 500 }[error.code]
   return new GatewayError(status, error.message, error.code)
@@ -104,10 +111,12 @@ export class ModelGateway {
   private readonly retiring = new Set<WorkerSlot>()
   private readonly eager = new Map<WorkerKind, string>()
   private readonly creating = new Map<string, Promise<WorkerSlot>>()
-  private services: ModelGatewaySnapshot['services'] = { asr: { state: 'stopped', model: '', name: '' }, mt: { state: 'stopped', model: '', name: '' }, tts: { state: 'stopped', model: '', name: '' }, llm: { state: 'stopped', model: '', name: '' } }
+  private services: Record<GatewayCapability, GatewayServiceSnapshot> = { asr: { state: 'stopped', model: '', name: '' }, mt: { state: 'stopped', model: '', name: '' }, tts: { state: 'stopped', model: '', name: '' }, llm: { state: 'stopped', model: '', name: '' }, ocr: { state: 'stopped', model: '', name: '' } }
+  private ocrLoaded = false
+  private ocrRefs = 0
   private internal?: GatewayInternalServer
   private internalStarting?: Promise<void>
-  private cloudCatalog: Record<GatewayCapability, AvailableGatewayModel[]> = { asr: [], mt: [], tts: [], llm: [] }
+  private cloudCatalog: Record<GatewayCapability, AvailableGatewayModel[]> = { asr: [], mt: [], tts: [], llm: [], ocr: [] }
   private inventory: ResourceRecord[] = []
   private readonly cloudLanguageLeases = new Set<() => void>()
   private readonly cloudLanguageControllers = new Set<AbortController>()
@@ -143,7 +152,8 @@ export class ModelGateway {
   }
 
   resourceInUse(resourceId: string): boolean {
-    return this.requests.some(request => request.status === 'running' && request.model === `resource:${resourceId}`)
+    return (this.ocrLoaded || this.services.ocr.state === 'loading') && this.services.ocr.model === `resource:${resourceId}`
+      || this.requests.some(request => request.status === 'running' && request.model === `resource:${resourceId}`)
       || [...this.slots.values(), ...this.retiring].some(slot => slot.resources.includes(resourceId) || slot.binding === `resource:${resourceId}`)
       || [...this.retiredLanguageModels, ...(this.llm ? [this.llm] : [])].some(slot => slot.runtime.profile.id === `resource:${resourceId}`)
   }
@@ -153,6 +163,14 @@ export class ModelGateway {
     const settings = this.options.getSettings()
     for (const kind of KINDS) {
       const binding = this.services[kind].model
+      if (kind === 'ocr') {
+        if (this.ocrRefs && (patch.modelGateway?.ocr === false
+          || patch.modelGateway?.ocrModel !== undefined && normalizeModelBinding('ocr', patch.modelGateway.ocrModel) !== binding
+          || patch.modelPolicy && !isModelEnabled({ ...settings, modelPolicy: mergeModelPolicy(settings, patch.modelPolicy) }, 'ocr', binding))) {
+          throw new GatewayError(409, 'RESOURCE_IN_USE', 'resource_in_use')
+        }
+        continue
+      }
       const slot = kind === 'llm' ? this.llm : this.slots.get(`${kind}:${binding}`)
       const active = this.requests.some(request => request.kind === kind && request.model === binding && request.status === 'running')
       if ((!slot?.refs && !active) || !bindingIsLocal(binding)) continue
@@ -160,6 +178,37 @@ export class ModelGateway {
       const disabled = patch.modelPolicy && !isModelEnabled({ ...settings, modelPolicy: mergeModelPolicy(settings, patch.modelPolicy) }, kind, binding)
       if (disabled || patch.compute || patch.modelGateway?.[kind] === false || changed !== undefined && normalizeModelBinding(kind, changed) !== binding) throw new GatewayError(409, 'RESOURCE_IN_USE', 'resource_in_use')
     }
+  }
+
+  acquireOcr(language = 'auto'): () => void {
+    if (this.state !== 'running' || this.stopping || !this.ocrLoaded || this.services.ocr.state !== 'ready'
+      || !isModelEnabled(this.options.getSettings(), 'ocr', this.services.ocr.model)) throw new Error('ocrNotReady')
+    const resource = this.inventory.find(item => `resource:${item.resourceId}` === this.services.ocr.model)
+    if (language !== 'auto' && !resource?.languages.includes(language)) throw new Error('invalidConfig')
+    this.ocrRefs++
+    let released = false
+    return () => { if (!released) { released = true; this.ocrRefs-- } }
+  }
+
+  async inferOcr(request: ScreenOcrRequest, signal: AbortSignal): Promise<ScreenOcrResult> {
+    const release = this.acquireOcr(request.language)
+    const controller = new AbortController()
+    this.controllers.add(controller)
+    let entry: GatewayRequestSnapshot | undefined
+    try {
+      signal.throwIfAborted()
+      entry = this.begin('ocr', this.services.ocr.model)
+      const result = await this.options.ocr!.infer(request, AbortSignal.any([signal, controller.signal]))
+      if (signal.aborted || controller.signal.aborted) throw new Error('OCR request cancelled')
+      this.finish(entry)
+      return result
+    } catch (error) {
+      if (entry) this.finish(entry, error, signal.aborted || controller.signal.aborted)
+      if (error instanceof Error && ['ocrNotReady', 'ocrMissing', 'ocrCorrupt', 'ocrRuntimeUnavailable', 'backendUnavailable'].includes(error.message)) {
+        this.services.ocr = { ...this.services.ocr, state: 'failed', error: error.message }; this.changed()
+      }
+      throw error
+    } finally { release(); this.controllers.delete(controller) }
   }
 
   async leaseCapability(kind: WorkerKind, binding?: string): Promise<GatewayCapabilityLease> {
@@ -244,7 +293,8 @@ export class ModelGateway {
         const configuration = resource && configurationOf(resource)
         local.push({ binding: service.model, name: service.name, kind, origin: 'gateway', free: true,
           images: [...INDEX_TRANSLATE_MODEL_IDS, ...INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS].some(id => `resource:${id}` === service.model),
-          ...(configuration ? { sourceLanguages: kind === 'asr' ? recognitionLanguages(resource!) : configuration.sourceLanguages, targetLanguages: configuration.targetLanguages } : {}) })
+          ...(kind === 'ocr' ? { sourceLanguages: ['auto', ...(resource?.languages ?? [])] }
+            : configuration ? { sourceLanguages: kind === 'asr' ? recognitionLanguages(resource!) : configuration.sourceLanguages, targetLanguages: configuration.targetLanguages } : {}) })
       }
       return [kind, [...local, ...this.cloudCatalog[kind].filter(model => model.binding !== 'cloud:recognition' || nativeTranslation)]]
     })) as Record<GatewayCapability, AvailableGatewayModel[]>
@@ -299,6 +349,8 @@ export class ModelGateway {
     this.stopping = true
     this.stopVersion++
     this.loadingLanguageModel?.abort()
+    for (const controller of this.onDemandLocalLanguageControllers) controller.abort()
+    for (const release of this.onDemandLocalLanguageLeases) release()
     for (const slot of this.slots.values()) if (bindingIsLocal(slot.binding)) void slot.worker.close()
     return this.serialize(() => this.stopInternal())
   }
@@ -327,8 +379,9 @@ export class ModelGateway {
     await this.ensureInternal()
     const resolveLocal = (kind: 'asr' | 'mt', binding: string): string => {
       if (!bindingIsLocal(binding)) return binding
+      if (this.state !== 'running' || this.stopping) throw new GatewayError(503, 'Start Model Gateway before using a local model.', 'gateway_not_running')
       const service = this.services[kind]
-      if (this.state === 'running' && service.state === 'ready' && bindingIsLocal(service.model) && isModelEnabled(this.options.getSettings(), kind, service.model)) return service.model
+      if (service.state === 'ready' && bindingIsLocal(service.model) && isModelEnabled(this.options.getSettings(), kind, service.model)) return service.model
       throw new GatewayError(503, 'The selected local model is not loaded in Model Gateway.', 'model_not_loaded')
     }
     const asrBinding = resolveLocal('asr', normalizeModelBinding('asr', config.recognitionBinding || recognitionBindingOf(config)))
@@ -350,31 +403,37 @@ export class ModelGateway {
     await this.ensureSlot('mt', mtBinding)
   }
 
+  private readonly onDemandLocalLanguageControllers = new Set<AbortController>()
+  private readonly onDemandLocalLanguageLeases = new Set<(error?: unknown) => void>()
+
   async acquireLanguageModel(binding?: string) {
     const settings = this.options.getSettings()
     const wanted = normalizeModelBinding('llm', binding) || defaultModelBinding(settings, 'llm')
     if (!wanted || (bindingIsLocal(wanted) && !isModelEnabled(settings, 'llm', wanted))) throw new GatewayError(503, 'The language model is not enabled in Model Management', 'model_disabled')
-    if (bindingIsLocal(wanted)) return this.languageModel(wanted)
+    const local = bindingIsLocal(wanted)
+    if (local && this.services.llm.state === 'ready' && this.services.llm.model === wanted) return this.languageModel(wanted)
     const controller = new AbortController()
     this.cloudLanguageControllers.add(controller)
+    if (local) this.onDemandLocalLanguageControllers.add(controller)
     let runtime: GatewayLanguageModel
     try {
       runtime = await (this.options.createLanguageModel ?? createGatewayLanguageModel)({ getSettings: this.options.getSettings,
         directLaunch: this.options.directLaunch, getCredential: provider => this.options.getCredential?.(provider) ?? Promise.resolve('') }, wanted, controller.signal)
       if (controller.signal.aborted) { await runtime.close(); throw new Error('Cloud model initialization cancelled') }
-    } catch (error) { this.cloudLanguageControllers.delete(controller); throw error }
+    } catch (error) { this.cloudLanguageControllers.delete(controller); this.onDemandLocalLanguageControllers.delete(controller); throw error }
     let entry: GatewayRequestSnapshot
     try { entry = this.begin('llm', wanted) }
-    catch (error) { this.cloudLanguageControllers.delete(controller); controller.abort(); await runtime.close(); throw error }
+    catch (error) { this.cloudLanguageControllers.delete(controller); this.onDemandLocalLanguageControllers.delete(controller); controller.abort(); await runtime.close(); throw error }
     let released = false
     const release = (error?: unknown) => {
       if (released) return
-      released = true; this.cloudLanguageLeases.delete(release); this.finish(entry, error); controller.abort()
-      this.cloudLanguageControllers.delete(controller)
+      released = true; this.cloudLanguageLeases.delete(release); this.onDemandLocalLanguageLeases.delete(release); this.finish(entry, error); controller.abort()
+      this.cloudLanguageControllers.delete(controller); this.onDemandLocalLanguageControllers.delete(controller)
       const closing = runtime.close().catch(error => console.error('[gateway] cloud language model close failed', error)).finally(() => this.cloudLanguageClosing.delete(closing))
       this.cloudLanguageClosing.add(closing)
     }
     this.cloudLanguageLeases.add(release)
+    if (local) this.onDemandLocalLanguageLeases.add(release)
     return { ...runtime, signal: controller.signal, release }
   }
 
@@ -571,11 +630,44 @@ export class ModelGateway {
   private async configureWorkers(): Promise<void> {
     const stored = this.options.getSettings()
     const config = modelGatewaySettingsSchema.parse(stored.modelGateway)
-    const needsInventory = WORKER_KINDS.some(kind => config[kind] && (bindingIsLocal(this.bindingFor(kind, config, stored))
+    const needsInventory = config.ocr || WORKER_KINDS.some(kind => config[kind] && (bindingIsLocal(this.bindingFor(kind, config, stored))
       || (kind === 'mt' && (bindingIsLocal(this.fallbackBindingFor(config)) || stored.translation.fallback.provider === 'local'))))
     const resources = needsInventory ? await this.options.listResources().catch(() => []) : []
     this.inventory = resources
-    await Promise.all([...WORKER_KINDS.map(kind => this.configureCapability(kind, config, stored, resources)), this.configureLanguageModel()])
+    await Promise.all([...WORKER_KINDS.map(kind => this.configureCapability(kind, config, stored, resources)), this.configureLanguageModel(), this.configureOcr(resources)])
+  }
+
+  private async configureOcr(resources: ResourceRecord[]): Promise<void> {
+    const settings = this.options.getSettings()
+    const binding = normalizeModelBinding('ocr', settings.modelGateway.ocrModel) || defaultModelBinding(settings, 'ocr')
+    if (!settings.modelGateway.ocr) {
+      if (this.ocrLoaded) await this.options.ocr?.release()
+      this.ocrLoaded = false
+      this.services.ocr = { state: 'stopped', model: '', name: '' }; this.changed(); return
+    }
+    if (this.ocrLoaded && this.services.ocr.model === binding && this.services.ocr.state === 'ready'
+      && isModelEnabled(settings, 'ocr', binding) && resources.some(item => item.installed && `resource:${item.resourceId}` === binding)) return
+    if (this.ocrLoaded) { await this.options.ocr?.release(); this.ocrLoaded = false }
+    const resource = resources.find(item => `resource:${item.resourceId}` === binding && item.kind === 'ocrModel')
+    this.services.ocr = { state: 'loading', model: binding, name: resource?.name ?? '' }; this.changed()
+    let attemptedLoad = false
+    try {
+      if (!resource?.installed || !this.options.ocr) throw new Error('ocrMissing')
+      if (!isModelEnabled(settings, 'ocr', binding)) throw new Error('model_disabled')
+      attemptedLoad = true
+      await this.options.ocr.load(resource.resourceId)
+      this.ocrLoaded = true
+      if (!this.stopping) this.services.ocr = { state: 'ready', model: binding, name: resource.name }
+    } catch (error) {
+      if (attemptedLoad) {
+        // A timed-out HTTP load can still finish natively; release it before allowing another owner.
+        try { await this.options.ocr!.release(); this.ocrLoaded = false }
+        catch { this.ocrLoaded = true }
+      }
+      if (!this.stopping) this.services.ocr = { state: 'failed', model: binding, name: resource?.name ?? '',
+        error: error instanceof Error ? error.message : 'ocrFailed' }
+    }
+    this.changed()
   }
 
   private async configureCapability(kind: WorkerKind, config: ModelGatewaySettings, stored: AppSettings, resources: ResourceRecord[]): Promise<void> {
@@ -661,7 +753,7 @@ export class ModelGateway {
 
   private async createSlot(kind: WorkerKind, binding: string, plan: WorkerPlan, lazy: boolean): Promise<WorkerSlot> {
     const launch = await this.options.directLaunch(binding)
-    if (this.stopping && bindingIsLocal(binding)) throw new Error('Gateway stopped')
+    if (this.stopping && bindingIsLocal(binding)) throw new GatewayError(503, 'Model Gateway stopped while opening the model.', 'gateway_not_running')
     const key = `${kind}:${binding}`
     const slot: WorkerSlot = { worker: undefined as unknown as GatewayWorker, kind, binding, signature: plan.signature, refs: 0, retired: false,
       lazy, resources: [...new Set([...(plan.resourceId ? [plan.resourceId] : []), ...(plan.fallbackResourceId ? [plan.fallbackResourceId] : [])])] }
@@ -724,8 +816,9 @@ export class ModelGateway {
 
   private requireLocalBinding(kind: WorkerKind, binding: string, settings: AppSettings): void {
     const policyBinding = binding === 'native:cloud' ? 'mt-custom:legacy-fallback' : binding.startsWith('native:') ? `cloud:${binding.slice(7)}` : binding
+    if (this.state !== 'running' || this.stopping) throw new GatewayError(503, 'Start Model Gateway before using a local model.', 'gateway_not_running')
     if (!isModelEnabled(settings, kind, policyBinding)) throw new GatewayError(503, 'Enable this model in Model Management before using it.', 'model_disabled')
-    if (this.state !== 'running' || this.stopping || !settings.modelGateway[kind]) throw new GatewayError(503, `${kind.toUpperCase()} is not loaded in Model Gateway.`, 'model_not_loaded')
+    if (!settings.modelGateway[kind]) throw new GatewayError(503, `${kind.toUpperCase()} is not loaded in Model Gateway.`, 'model_not_loaded')
     if (binding !== this.eager.get(kind)) throw new GatewayError(404, 'This local model is not loaded in Model Gateway. Load it there or pick a cloud interface.', 'model_not_found')
     const service = this.services[kind]
     if (this.usesBackend(kind, binding, settings) && (service.model !== binding || service.state !== 'ready')) {
@@ -759,10 +852,14 @@ export class ModelGateway {
     this.stopping = true; this.state = 'stopping'; this.changed()
     for (const controller of this.controllers) controller.abort()
     this.loadingLanguageModel?.abort()
+    for (const controller of this.onDemandLocalLanguageControllers) controller.abort()
+    for (const release of this.onDemandLocalLanguageLeases) release()
+    await Promise.all(this.cloudLanguageClosing)
     const languageModels = [...this.retiredLanguageModels, ...(this.llm ? [this.llm] : [])]
     for (const slot of languageModels) slot.controller.abort()
     const workers = [...this.slots.values(), ...this.retiring].filter(slot => bindingIsLocal(slot.binding))
-    await Promise.all([this.stopListener(), ...workers.map(slot => this.closeSlot(slot)), ...languageModels.map(slot => slot.runtime.close())])
+    await Promise.all([this.stopListener(), ...workers.map(slot => this.closeSlot(slot)), ...languageModels.map(slot => slot.runtime.close()),
+      ...(this.ocrLoaded ? [this.options.ocr!.release().finally(() => { this.ocrLoaded = false })] : [])])
     this.llm = undefined; this.retiredLanguageModels.clear()
     for (const slot of workers) { this.slots.delete(`${slot.kind}:${slot.binding}`); this.retiring.delete(slot) }
     this.eager.clear()
@@ -912,7 +1009,7 @@ export class ModelGateway {
           if (settings.modelGateway.externalCapabilities?.[kind] === false
             || (!settings.modelGateway[kind] && !normalizeModelBinding(kind, settings.modelGateway.externalModels?.[kind]))) return false
           const binding = this.publicBinding(kind)
-          return binding !== 'cloud:recognition' && catalog[kind].some(model => model.binding === binding)
+          return binding !== 'cloud:recognition' && (catalog[kind] ?? []).some(model => model.binding === binding)
         }).map(async kind => {
           const model = { id: `nola-${kind}`, object: 'model', created: 0, owned_by: 'nola', capabilities: [kind] }
           if (kind !== 'tts') return model
@@ -1009,7 +1106,7 @@ export class ModelGateway {
     let entry: GatewayRequestSnapshot | undefined; let unsubscribe: (() => void) | undefined
     let opened = false; let finished = false; let queuedBytes = 0; let queue = Promise.resolve()
     const send = (event: Record<string, unknown>) => { if (client.readyState === WebSocket.OPEN) { if (client.bufferedAmount > MAX_BODY) { client.terminate(); return }; client.send(JSON.stringify({ event_id: `event_${randomUUID()}`, ...event })) } }
-    const error = (message: string) => send({ type: 'error', error: { type: 'invalid_request_error', code: 'invalid_request', message } })
+    const error = (message: string, code = 'invalid_request') => send({ type: 'error', error: { type: code === 'invalid_request' ? 'invalid_request_error' : code, code, message } })
     const session: { id: string; object: string; model?: string; input_audio_format: string; sample_rate: number; input_audio_transcription: { language: string }; turn_detection: { type: string; silence_duration_ms: number } | null } = { id, object: 'realtime.session', model: new URL(request.url ?? '/', 'http://localhost').searchParams.get('model') ?? undefined, input_audio_format: 'pcm16', sample_rate: 16000, input_audio_transcription: { language: 'auto' }, turn_detection: { type: 'server_vad', silence_duration_ms: 800 } }
     this.clients.add(client); this.changed(); send({ type: 'session.created', session })
     const open = async () => {
@@ -1022,12 +1119,13 @@ export class ModelGateway {
         if (bindingIsLocal(binding)) this.requireLocalBinding('asr', binding, settings)
         else await this.plan('asr', binding, [], settings, settings.modelGateway)
         backend = await this.options.openBackendAsr(binding, controller.signal, send)
-        void backend?.closed.then(() => {
+        void backend?.closed.then(failure => {
           if (controller.signal.aborted || finished) return
           finished = true
-          const reason = new GatewayError(503, 'Realtime recognition disconnected', 'network_unavailable')
+          const reason = clientError(failure) ?? new GatewayError(503, 'Realtime recognition disconnected', 'network_unavailable')
           if (entry) this.finish(entry, reason)
-          error(reason.message)
+          if (reason instanceof GatewayError) error(reason.message, reason.code)
+          else error('Realtime recognition disconnected', 'network_unavailable')
           client.close(1011, 'Recognition disconnected')
         })
       }
@@ -1035,7 +1133,7 @@ export class ModelGateway {
         slot = await this.ensureSlot('asr', binding)
         slot.refs++; this.clearIdle(slot)
         unsubscribe = slot.worker.subscribe(event => {
-          if (event.fatal) { error('ASR worker is unavailable'); client.close(1011, 'ASR worker failed'); return }
+          if (event.fatal) { error('ASR worker is unavailable', 'engine_transport_unavailable'); client.close(1011, 'ASR worker failed'); return }
           if (event.session === id && event.event) send(object(event.event))
         })
       }
@@ -1088,8 +1186,9 @@ export class ModelGateway {
       }).catch(reason => {
         if (finished || controller.signal.aborted) return
         const cause = clientError(reason)
-        error(cause instanceof GatewayError ? cause.message : 'Realtime transcription failed')
-        if (!(cause instanceof GatewayError) || backend && reason instanceof GatewayWorkerError) {
+        if (cause instanceof GatewayError) error(cause.message, cause.status === 400 && cause.code === 'invalid_request_error' ? 'invalid_request' : cause.code)
+        else error('Realtime transcription failed', 'inference_failed')
+        if (!(cause instanceof GatewayError) || backend && (reason instanceof GatewayWorkerError || reason instanceof BackendModelError)) {
           finished = true; if (entry) this.finish(entry, cause); client.close(1011, 'Transcription failed')
         }
       }).finally(() => { queuedBytes -= length })

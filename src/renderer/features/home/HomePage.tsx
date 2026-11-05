@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Mic, Captions, Clock, SlidersHorizontal, Network, MessageSquareText } from 'lucide-react'
+import { Mic, PanelsTopLeft, Clock, SlidersHorizontal, Network, MessageSquareText } from 'lucide-react'
 import { ErrorBoundary } from '@/components/primitives'
 import { requestFeatureStart } from '@/components/primitives/FeatureActivityNotice'
 import { notifyError } from '@/components/primitives/notify'
@@ -43,7 +43,7 @@ export function HomePage(): ReactNode {
           <FeatureCard onboardingTarget="home-models" variant="tertiary" icon={<SlidersHorizontal aria-hidden="true" />} title={t('home.models')} description={t('homeRecordsUi.modelsDescription')} buttonText={t('homeRecordsUi.openModels')} onButtonClick={() => navigate(pathOf('models'))} />
           <FeatureCard variant="quaternary" icon={<Network aria-hidden="true" />} title={t('homeRecordsUi.gatewayTitle')} description={t('homeRecordsUi.gatewayDescription')} buttonText={t('homeRecordsUi.openGateway')} onButtonClick={() => navigate(pathOf('model-gateway'))} />
           <FeatureCard onboardingTarget="home-quick" variant="primary" icon={<Mic aria-hidden="true" />} title={t('home.quickStart')} description={t('homeRecordsUi.quickDescription')} buttonText={t('workspace.start')} onButtonClick={goWorkspace} />
-          <FeatureCard onboardingTarget="home-overlay" variant="secondary" className="nola-entry--browser" icon={<Captions aria-hidden="true" />} title={t('home.overlayCaptions')} description={t('homeRecordsUi.overlayDescription')} buttonText={t('homeRecordsUi.openOverlay')} onButtonClick={() => navigate('#/video-captions')} />
+          <FeatureCard onboardingTarget="home-browser" variant="secondary" className="nola-entry--browser" icon={<PanelsTopLeft aria-hidden="true" />} title={t('browser.title')} description={t('browser.settingsDescription')} buttonText={t('browser.manage')} onButtonClick={() => navigate('#/settings/browser')} />
           <FeatureCard variant="secondary" className="nola-entry--workbench" icon={<MessageSquareText aria-hidden="true" />} title={t('workbench.title')} description={t('homeRecordsUi.workbenchDescription')} buttonText={t('homeRecordsUi.openWorkbench')} onButtonClick={() => { void requestFeatureStart(async () => getBridge()?.app.openWorkbench?.('chat'), 'workbench').catch(error => notifyError(t('workbench.actionFailed'), { cause: error })) }} />
         </div>
         <RecentMeetings meetings={meetings} loading={loading} failed={loadFailed} onRetry={retryLoad} onOpen={(id) => navigate(recordPath(id))} onStart={goWorkspace} onOpenAll={goRecords} />

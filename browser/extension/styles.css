@@ -1,11 +1,13 @@
 @import 'tailwindcss' source(none);
 @source './';
-@source '../../src/renderer/components/ui/button.tsx';
+@source '../../src/renderer/components/ui';
 @import '../../src/renderer/theme/index.css';
 
 @layer components {
-  :host { all: initial; font: var(--font-body); color: var(--foreground); color-scheme: light; }
+  :host { all: initial; font: var(--font-body); color: var(--foreground); }
+  :host([data-theme='dark']) { color-scheme: dark; }
   :host(.z-overlay) { z-index: var(--z-overlay); }
+  :host(.z-popup) { z-index: var(--z-popup); }
   :host([hidden]) { display: none !important; }
   .nola-extension { font: var(--font-body); color: var(--foreground); }
   .nola-extension, .nola-extension * { box-sizing: border-box; }
@@ -19,7 +21,7 @@
   .nola-panel-header, .nola-panel-brand { display: flex; align-items: center; gap: var(--space-1); }
   .nola-panel-header { justify-content: space-between; }
   .nola-panel-brand > svg { width: var(--space-3); height: var(--space-3); }
-  .nola-panel-controls { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1); }
+  .nola-panel-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1); }
   .nola-heading { font: var(--font-title); margin: 0; }
   .nola-row { display: grid; grid-template-columns: 1fr 1.1fr; gap: var(--space-1); align-items: center; }
   .nola-choice { min-width: 0; }
@@ -41,6 +43,12 @@
   .nola-error { font: var(--font-caption); color: var(--danger); margin: 0; }
   .nola-warning { font: var(--font-caption); color: var(--foreground); margin: 0; padding: var(--space-1); background: color-mix(in oklab, var(--warning) 14%, var(--surface)); border-radius: var(--radius-md); }
   .nola-muted { font: var(--font-caption); color: var(--muted); margin: 0; }
+  .nola-options-page { display: grid; gap: var(--space-3); max-width: calc(var(--browser-panel-width) * 2); padding: var(--space-3); margin-inline: auto; }
+  .nola-options-header { display: flex; align-items: center; gap: var(--space-2); }
+  .nola-options-header > svg { width: var(--space-4); height: var(--space-4); }
+  .nola-options-header > h1 { font: var(--font-h2); }
+  .nola-options-page [data-slot='tabs-content'] { padding-top: var(--space-2); }
+  .nola-preview { display: flex; align-items: end; justify-content: center; min-height: var(--space-8); border-radius: var(--radius-lg); background: var(--surface-tertiary); padding-inline: var(--space-2); }
   /* The block hangs from the bottom edge the renderer anchors it to, so a bilingual phrase growing
      from one line to two extends upward and leaves the anchor where it was. Its width follows the
      text up to the video bounds. White glyphs over a translucent black fill keep their contrast over
@@ -57,6 +65,7 @@
 @layer utilities {
   /* Website rem scales (YouTube uses 10px) escape Shadow DOM. Pin every control to desktop tokens. */
   .nola-panel .button, .nola-popup .button { font: var(--font-body-strong); width: 100%; height: var(--space-5); min-width: 0; padding: 0 var(--space-2); gap: var(--space-1); border-radius: var(--radius-xl); }
+  .nola-panel-controls .button { height: auto; min-height: var(--space-5); white-space: normal; }
   .nola-panel .button > svg { width: var(--space-2); height: var(--space-2); flex-shrink: 0; }
   .nola-panel .nola-panel-close { width: var(--space-4); height: var(--space-4); padding: 0; }
   .nola-trigger .button > svg { width: var(--space-3); height: var(--space-3); margin: 0; }
@@ -92,3 +101,212 @@
 
 :host([data-reduce-motion='true']) .nola-caption[data-phase='appearing'] { animation-name: nola-caption-block-fade-in; }
 :host([data-reduce-motion='true']) .nola-caption[data-phase='fading'] { animation-name: nola-caption-block-fade-out; }
+
+/* Extension theme is independent from the desktop product palette. */
+:root, :root[lang], :host, :host([lang]) {
+  --background: oklch(1 0 0); --surface: oklch(1 0 0);
+  --surface-secondary: oklch(.985 0 0); --surface-tertiary: oklch(.96 0 0);
+  --foreground: oklch(.205 0 0); --muted: oklch(.556 0 0);
+  --border: oklch(.922 0 0); --separator: var(--border);
+  --primary: oklch(.205 0 0); --primary-foreground: oklch(.985 0 0);
+  --accent: var(--primary); --accent-foreground: var(--primary-foreground);
+  --focus: oklch(.708 0 0); --field-border: var(--border);
+  --field-background: var(--surface); --field-background-disabled: var(--surface-secondary);
+  --overlay: var(--surface); --overlay-foreground: var(--foreground);
+  --nola-ui-popover: var(--surface); --nola-ui-popover-foreground: var(--foreground);
+  --nola-ui-input: var(--border); --nola-ui-field-background: var(--surface);
+  --font-ui: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft JhengHei UI', 'Malgun Gothic', 'Yu Gothic UI', system-ui, sans-serif;
+  --font-sans: var(--font-ui); --field-control-height: 36px;
+  --extension-popup-width: 376px; --extension-settings-width: 1040px;
+  --extension-sidebar-width: 248px;
+  --floating-button-width: 44px; --floating-button-height: 40px;
+}
+:root[data-theme='dark'], :host([data-theme='dark']) {
+  --background: oklch(.145 0 0); --surface: oklch(.205 0 0);
+  --surface-secondary: oklch(.18 0 0); --surface-tertiary: oklch(.269 0 0);
+  --foreground: oklch(.985 0 0); --muted: oklch(.708 0 0);
+  --border: oklch(.32 0 0); --primary: oklch(.922 0 0); --primary-foreground: oklch(.205 0 0);
+  --focus: oklch(.556 0 0); color-scheme: dark;
+}
+@layer base {
+  html, body, input, textarea, button { font-family: var(--font-ui); }
+  body { margin: 0; background: var(--background); color: var(--foreground); }
+  /* Toolbar popups derive their viewport from the document, so viewport-relative width caps collapse it. */
+  html.nola-popup-document { width: var(--extension-popup-width); min-width: var(--extension-popup-width); }
+}
+@layer components {
+  .nola-settings-shell { display: grid; grid-template-columns: var(--extension-sidebar-width) minmax(0,1fr); min-height: 100vh; font: var(--font-body); }
+  .nola-settings-sidebar { padding: var(--space-3) var(--space-2); background: var(--surface-secondary); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-3); position: sticky; top: 0; height: 100vh; overflow: auto; }
+  .nola-options-header { gap: var(--space-1); padding-inline: var(--space-1); }
+  .nola-options-header > svg { width: var(--space-4); height: var(--space-4); }
+  .nola-settings-sidebar nav, .nola-nav-group { display: flex; flex-direction: column; gap: calc(var(--space-1) / 2); }
+  .nola-settings-sidebar nav { gap: var(--space-2); }
+  .nola-nav-group > p { color: var(--muted); font: var(--font-label); margin: 0 var(--space-1) var(--space-1); }
+  .nola-settings-main { width: 100%; max-width: var(--extension-settings-width); margin-inline: auto; padding: var(--space-6) var(--space-7) var(--space-8); display: flex; flex-direction: column; gap: var(--space-5); }
+  .nola-settings-title h1 { margin: 0 0 var(--space-2); font: var(--font-h2); }
+  .nola-settings-title p { margin: 0; font: var(--font-body); color: var(--muted); }
+  .nola-settings-section h2 { font: var(--font-title); margin: 0; padding-bottom: var(--space-2); border-bottom: 1px solid var(--border); }
+  .nola-setting-copy { min-width: 0; display: flex; flex-direction: column; gap: calc(var(--space-1) / 2); }
+  .nola-setting-copy p { margin: 0; color: var(--muted); font: var(--font-caption); }
+  .nola-two-columns { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--space-2); }
+  .nola-provider-tabs { display: flex; flex-wrap: wrap; gap: var(--space-1); padding-block: var(--space-2); }
+  .nola-settings-shell details > summary { cursor: pointer; color: var(--muted); padding: var(--space-2) 0; }
+  .nola-setting-range { display: grid; grid-template-columns: minmax(0,1fr) var(--space-7); align-items: center; gap: var(--space-2); }
+  .nola-setting-range output { color: var(--muted); font: var(--font-caption); text-align: end; font-variant-numeric: tabular-nums; }
+  .nola-color-field { display: flex; align-items: center; gap: var(--space-1); }
+  .nola-color-swatch { width: var(--space-3); height: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); flex: none; }
+  .nola-file-action input { display: none; }
+  .nola-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); padding-top: var(--space-2); }
+  .nola-translation-result { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-3); }
+  .nola-translation-result h3 { font: var(--font-title); margin: 0; }
+  .nola-translation-result p { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .nola-table-scroll { overflow: auto; }
+  .nola-table-scroll table { width: 100%; border-collapse: collapse; }
+  .nola-table-scroll th, .nola-table-scroll td { text-align: start; padding: var(--space-2) var(--space-1); border-bottom: 1px solid var(--border); }
+  .nola-table-scroll th { color: var(--muted); font: var(--font-caption); }
+  .nola-settings-section code { overflow-wrap: anywhere; }
+  .nola-feature-preview { margin: 0; }
+  .nola-preview-stage { display: grid; place-items: center; padding: var(--space-5); min-height: 300px; border: 1px solid var(--border); border-radius: var(--radius-xl); background: radial-gradient(ellipse at 25% 20%, var(--surface-tertiary), transparent 70%), var(--surface-secondary); }
+  .nola-demo-browser { width: min(100%, 460px); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); overflow: hidden; }
+  .nola-demo-chrome { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-1); background: var(--surface-tertiary); color: var(--muted); }
+  .nola-demo-chrome > svg { width: 12px; height: 12px; }
+  .nola-demo-chrome > span { flex: 1; text-align: center; font: var(--font-label); background: var(--surface); border-radius: var(--radius-sm); }
+  .nola-demo-dots { display: flex; gap: 4px; padding-inline: 4px; }
+  .nola-demo-dots i { width: 5px; height: 5px; border-radius: var(--radius-full); background: var(--muted); opacity: .4; }
+  .nola-demo-page { position: relative; min-height: 220px; }
+  .nola-demo-article { padding: var(--space-3) var(--space-5); font: var(--font-caption); }
+  .nola-demo-eyebrow { font: var(--font-label); color: var(--muted); letter-spacing: .12em; }
+  .nola-demo-article h3 { margin: var(--space-1) 0 var(--space-2); font: var(--font-title); }
+  .nola-demo-article p { margin: var(--space-1) 0; }
+  .nola-demo-lines { display: grid; gap: var(--space-1); margin-top: var(--space-2); }
+  .nola-demo-lines i { height: 5px; width: 100%; background: var(--surface-tertiary); border-radius: var(--radius-sm); }
+  .nola-demo-lines i:last-child { width: 60%; }
+  .nola-demo-translation[data-style='underline'] { text-decoration: underline; text-decoration-style: dashed; text-underline-offset: 4px; }
+  .nola-demo-translation[data-style='block'] { padding: var(--space-1); border-left: 2px solid var(--foreground); background: var(--surface-secondary); }
+  .nola-demo-floating { position: absolute; transform: translateY(-50%); }
+  .nola-demo-floating[data-side='right'] { right: var(--space-1); }
+  .nola-demo-floating[data-side='left'] { left: var(--space-1); }
+  .nola-demo-sidebar { position: absolute; inset: 0 0 0 auto; width: 55%; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2); background: var(--surface); border-left: 1px solid var(--border); font: var(--font-caption); }
+  .nola-demo-sidebar > header { display: flex; align-items: center; justify-content: space-between; }
+  .nola-demo-sidebar > span, .nola-demo-context > span { display: flex; align-items: center; gap: var(--space-1); }
+  .nola-demo-sidebar svg, .nola-demo-context svg, .nola-demo-toolbar > svg { width: var(--space-2); height: var(--space-2); }
+  .nola-demo-selected { background: var(--surface-tertiary); width: fit-content; }
+  .nola-demo-toolbar { position: absolute; top: 120px; left: var(--space-5); display: flex; align-items: center; gap: var(--space-2); padding: calc(var(--space-1) / 2) var(--space-1); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
+  .nola-demo-context { position: absolute; top: var(--space-8); right: var(--space-3); display: grid; gap: var(--space-2); padding: var(--space-2); border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); box-shadow: var(--shadow-md); font: var(--font-caption); }
+  .nola-demo-floating { display: flex; flex-direction: column; gap: var(--space-1); align-items: end; }
+  .nola-demo-floating[data-side='right'] { right: 0; }
+  .nola-demo-floating[data-side='left'] { left: 0; align-items: start; }
+  .nola-demo-floating .nola-demo-dock { width: var(--floating-button-width); height: var(--floating-button-height); transform: translateX(var(--space-3)); opacity: .6; border-radius: var(--radius-xl) 0 0 var(--radius-xl); }
+  .nola-demo-floating[data-side='left'] .nola-demo-dock { transform: translateX(calc(var(--space-3) * -1)); border-radius: 0 var(--radius-xl) var(--radius-xl) 0; }
+  .nola-demo-floating:hover .nola-demo-dock, .nola-demo-floating[data-pinned='true'] .nola-demo-dock { transform: none; opacity: 1; }
+  .nola-demo-floating-action { visibility: hidden; margin-inline: var(--space-1); }
+  .nola-demo-floating:hover .nola-demo-floating-action { visibility: visible; }
+  .nola-demo-input { border: 1px solid var(--border); padding: var(--space-2); border-radius: var(--radius-md); }
+  .nola-demo-video { position: relative; height: 220px; overflow: hidden; background: var(--surface-tertiary); }
+  .nola-demo-landscape { position: absolute; inset: 0; overflow: hidden; background: linear-gradient(160deg, var(--surface-secondary), var(--border)); }
+  .nola-demo-landscape i { position: absolute; width: 300px; height: 300px; transform: rotate(45deg); background: var(--muted); opacity: .16; top: 120px; left: -60px; border-radius: var(--radius-xl); }
+  .nola-demo-landscape i:nth-child(2) { left: 160px; top: 100px; opacity: .12; }
+  .nola-demo-landscape i:last-child { width: 38px; height: 38px; top: 25px; left: 70%; background: var(--surface); border-radius: var(--radius-full); opacity: 1; }
+  .nola-demo-captions { position: absolute; display: grid; justify-items: center; gap: 3px; width: 92%; transform: translateX(-50%); text-align: center; line-height: 1.5; }
+  .nola-demo-captions > span { padding: 2px 6px; max-width: 100%; border-radius: var(--radius-sm); }
+  .nola-demo-player { position: absolute; bottom: 0; inset-inline: 0; padding: var(--space-1); display: flex; align-items: center; gap: var(--space-1); background: var(--surface); }
+  .nola-demo-player svg { width: 12px; height: 12px; }
+  .nola-demo-player span { flex: 1; height: 3px; background: var(--border); }
+  .nola-feature-preview figcaption { display: flex; gap: var(--space-2); padding-top: var(--space-1); font: var(--font-label); color: var(--muted); }
+  .nola-feature-preview figcaption > span:first-child { flex: none; }
+  .nola-transcript { display: flex; flex-direction: column; gap: var(--space-1); padding-block: var(--space-1); }
+  .nola-transcript .button { display: flex; flex-direction: column; align-items: start; height: auto; white-space: normal; text-align: start; padding: var(--space-1); }
+  .nola-transcript .button span + span { color: var(--muted); }
+}
+@layer utilities {
+  .nola-floating-controls { position: relative; width: var(--floating-button-width); height: var(--floating-button-height); }
+  .nola-floating-rail { position: absolute; top: calc((var(--space-4) + var(--space-1)) * -1); inset-inline: 0; display: flex; flex-direction: column; align-items: end; gap: var(--space-1); }
+  .nola-floating-controls[data-side='left'] .nola-floating-rail { align-items: start; }
+  .nola-floating-main { position: relative; width: var(--floating-button-width); height: var(--floating-button-height); }
+  .nola-floating-controls .nola-floating-trigger { width: var(--floating-button-width); height: var(--floating-button-height); padding: var(--space-1); background: var(--surface); box-shadow: var(--shadow-md); touch-action: none; transform: translateX(var(--space-3)); opacity: .6; transition: transform var(--dur-enter), opacity var(--dur-enter); border-radius: var(--radius-xl) 0 0 var(--radius-xl); border-right: 0; }
+  .nola-floating-controls[data-side='left'] .nola-floating-trigger { transform: translateX(calc(var(--space-3) * -1)); border-radius: 0 var(--radius-xl) var(--radius-xl) 0; border-right: 1px solid var(--border); border-left: 0; }
+  .nola-floating-controls[data-expanded='true'] .nola-floating-trigger, .nola-floating-controls[data-pinned='true'] .nola-floating-trigger, .nola-floating-controls[data-dragging='true'] .nola-floating-trigger { transform: none; opacity: 1; }
+  .nola-floating-controls .nola-floating-trigger > svg { width: var(--space-3); height: var(--space-3); }
+  .nola-floating-controls .nola-floating-tool { width: var(--space-4); height: var(--space-4); margin-inline: var(--space-1); padding: 0; background: var(--surface); box-shadow: var(--shadow-sm); }
+  .nola-floating-controls .nola-floating-tool[data-active='true'] { border-color: var(--foreground); }
+  .nola-floating-controls .nola-floating-dismiss-trigger, .nola-floating-controls .nola-floating-pin { position: absolute; right: 100%; padding: 0; background: var(--surface); border: 1px solid var(--border); width: var(--space-3); height: var(--space-3); }
+  .nola-floating-controls[data-side='left'] .nola-floating-dismiss-trigger, .nola-floating-controls[data-side='left'] .nola-floating-pin { right: auto; left: 100%; }
+  .nola-floating-dismiss-trigger { bottom: 65%; }
+  .nola-floating-pin { top: 65%; }
+  .nola-floating-controls .nola-floating-tool, .nola-floating-dismiss-trigger, .nola-floating-pin { visibility: hidden; opacity: 0; pointer-events: none; }
+  .nola-floating-controls[data-expanded='true']:not([data-dragging='true']) .nola-floating-tool, .nola-floating-controls[data-expanded='true']:not([data-dragging='true']) .nola-floating-dismiss-trigger, .nola-floating-controls[data-expanded='true']:not([data-dragging='true']) .nola-floating-pin { visibility: visible; opacity: 1; pointer-events: auto; }
+  .nola-floating-controls[data-dragging='true'] .nola-floating-trigger { cursor: grabbing; }
+  .nola-floating-menu, .nola-floating-notice { position: absolute; bottom: calc(100% + var(--space-2)); right: var(--space-5); width: max-content; max-width: min(280px, calc(100vw - var(--space-7))); display: flex; flex-direction: column; gap: var(--space-1); background: var(--surface); padding: var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); }
+  .nola-floating-controls[data-side='left'] .nola-floating-menu, .nola-floating-controls[data-side='left'] .nola-floating-notice { right: auto; left: var(--space-5); }
+  .nola-floating-menu .button { justify-content: start; }
+  .nola-settings-sidebar nav .button { justify-content: flex-start; border-color: transparent; background: transparent; border-radius: var(--radius-xl); height: var(--space-5); gap: var(--space-1); font: var(--font-body); }
+  .nola-settings-sidebar nav .button:hover, .nola-settings-sidebar nav .button[aria-current='page'] { background: var(--surface-tertiary); color: var(--foreground); }
+  .nola-settings-sidebar nav .button > svg { color: var(--muted); }
+  .nola-settings-section > [data-slot='field-group'] { gap: 0; }
+  .nola-settings-section [data-slot='field'] { display: grid; grid-template-columns: minmax(0,1fr) minmax(180px, 300px); align-items: center; gap: var(--space-3); padding-block: var(--space-2); }
+  .nola-settings-section [data-slot='field'] > :last-child { min-width: 0; }
+  .nola-settings-section [data-slot='field-group'] > .button { align-self: flex-start; margin-block: var(--space-1); }
+  .nola-settings-section .nola-setting-toggle { display: flex; flex-direction: row; justify-content: space-between; }
+  .nola-settings-section .nola-two-columns [data-slot='field'], .nola-settings-section [data-slot='field'].nola-field-stack { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1); }
+  .nola-settings-section .nola-field-stack > textarea { min-height: var(--space-8); }
+  .nola-settings-section [data-slot='switch'] { flex-shrink: 0; }
+  .nola-settings-section .nola-row { padding-block: var(--space-2); }
+  .nola-settings-main .nola-actions { justify-content: flex-start; flex-wrap: wrap; }
+  .nola-popup { width: 100%; background: var(--surface); padding: 0; gap: 0; }
+  .nola-popup-body { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); }
+  .nola-popup-header, .nola-popup-header-tools, .nola-popup-provider-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); }
+  .nola-popup-header .nola-panel-brand { min-width: 0; }
+  .nola-popup-header h1 { font: var(--font-body-strong); margin: 0; white-space: nowrap; }
+  .nola-popup .nola-popup-header-tools .button { width: var(--space-4); height: var(--space-4); padding: 0; }
+  .nola-popup-languages { display: grid; grid-template-columns: minmax(0,1fr) var(--space-2) minmax(0,1fr); align-items: center; gap: var(--space-1); }
+  .nola-popup .nola-popup-language-card { height: var(--space-8); padding: var(--space-1) var(--space-2); justify-content: space-between; gap: var(--space-1); background: var(--surface); }
+  .nola-popup-language-card > span { display: flex; flex-direction: column; align-items: start; min-width: 0; }
+  .nola-popup-language-card strong { font: var(--font-body-strong); max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .nola-popup-language-card small { font: var(--font-caption); color: var(--muted); }
+  .nola-language-arrow { width: var(--space-2); color: var(--muted); }
+  .nola-popup-language-list { width: calc(var(--extension-popup-width) - var(--space-4)); max-width: calc(100vw - var(--space-2)); padding: var(--space-1); }
+  .nola-popup-language-list [role='listbox'] { max-height: min(300px, var(--available-height)); overflow-y: auto; padding-top: var(--space-1); }
+  .nola-popup-language-list .select__item { display: flex; justify-content: space-between; gap: var(--space-1); }
+  .nola-popup-language-list .select__item[data-highlighted] { background: var(--surface-tertiary); }
+  .nola-popup-language-list .select__item svg { width: var(--space-2); height: var(--space-2); }
+  .nola-popup-provider-row { min-height: var(--space-4); font: var(--font-body-strong); }
+  .nola-popup .nola-provider-summary { width: auto; height: var(--space-4); padding: 0; }
+  .nola-provider-avatars { display: flex; align-items: center; padding-left: var(--space-1); }
+  .nola-provider-avatars > * { margin-left: calc(var(--space-1) * -1); }
+  .nola-provider-avatar { display: flex; align-items: center; justify-content: center; width: var(--space-4); height: var(--space-4); background: var(--surface); border: 2px solid var(--surface); border-radius: var(--radius-full); box-shadow: 0 0 0 1px var(--border); font: var(--font-body-strong); }
+  .nola-provider-avatar svg { width: var(--space-2); height: var(--space-2); }
+  .nola-provider-count { background: var(--surface-secondary); font: var(--font-caption); color: var(--muted); }
+  .nola-popup-drawer.nola-dialog-content { position: fixed; inset: auto 0 0; transform: none; width: 100%; max-width: none; max-height: 90vh; overflow-y: auto; border-radius: var(--radius-xl) var(--radius-xl) 0 0; padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); }
+  .nola-popup-drawer > header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+  .nola-popup-drawer [data-slot='dialog-title'] { font: var(--font-title); margin: 0; }
+  .nola-popup-provider-fields { display: flex; flex-direction: column; gap: var(--space-2); }
+  .nola-popup-provider-fields [data-slot='field'] { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.2fr); align-items: center; gap: var(--space-1); }
+  .nola-popup-translate-row { display: grid; grid-template-columns: var(--space-5) minmax(0,1fr); gap: var(--space-1); }
+  .nola-popup .nola-popup-translate-row > .button:first-child { padding: 0; }
+  .nola-popup-translate [data-slot='kbd'] { background: color-mix(in srgb, var(--primary-foreground) 20%, transparent); color: var(--primary-foreground); }
+  .nola-popup-switches { display: flex; flex-direction: column; gap: var(--space-1); }
+  .nola-popup-switches [data-slot='field'], .nola-popup-hover-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: var(--space-1); min-height: var(--space-4); }
+  .nola-popup-switches [data-slot='field-label'] { font: var(--font-body); }
+  .nola-popup-hotkey { flex: 1; min-width: 0; }
+  .nola-popup-hotkey [data-slot='field-label'] { display: none; }
+  .nola-popup-hotkey .select__trigger { border: 0; background: transparent; box-shadow: none; padding: 0; height: var(--space-4); font: var(--font-body); }
+  .nola-popup-video { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1); }
+  .nola-popup-video .button { font: var(--font-caption); padding-inline: var(--space-1); }
+  .nola-provider-status { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); font: var(--font-caption); color: var(--muted); }
+  .nola-popup .nola-provider-status .button { width: auto; height: var(--space-3); padding: 0; font: var(--font-caption); }
+  .nola-popup-footer { display: flex; align-items: center; justify-content: space-between; background: var(--surface-tertiary); padding: var(--space-1); }
+  .nola-popup .nola-popup-footer .button { width: auto; height: var(--space-4); padding-inline: var(--space-1); }
+  .nola-popup-more { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-1); padding: var(--space-1); }
+  @media(max-width:1100px) { .nola-settings-main { padding-inline: var(--space-4); } }
+  @media(max-width:760px) {
+    .nola-settings-shell { grid-template-columns: minmax(0,1fr); }
+    .nola-settings-sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: var(--space-2); }
+    .nola-settings-sidebar nav { flex-direction: row; flex-wrap: wrap; }
+    .nola-nav-group { flex: 1; min-width: 150px; }
+    .nola-settings-main { padding: var(--space-3) var(--space-2); }
+    .nola-settings-section [data-slot='field'] { grid-template-columns: minmax(0,1fr); gap: var(--space-1); }
+    .nola-two-columns { grid-template-columns: minmax(0,1fr); }
+    .nola-preview-stage { padding: var(--space-2); min-height: 260px; }
+    .nola-feature-preview figcaption { flex-direction: column; gap: 0; }
+  }
+}

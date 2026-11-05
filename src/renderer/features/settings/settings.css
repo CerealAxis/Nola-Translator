@@ -31,6 +31,33 @@
 .settings-row:last-child { border-bottom:0; }
 .settings-row__label { min-width:0; display:flex; flex-direction:column; gap:3px; }
 .settings-row__control { display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px; min-width:0; }
+.shortcuts-page__card { padding-bottom:0; gap:var(--space-2); }
+.shortcuts-page__header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-2); }
+.shortcuts-page__toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-1); min-width:0; max-width:100%; }
+.shortcuts-page__search { width:calc(var(--space-8) * 3); max-width:100%; }
+.shortcuts-page__table { overflow:hidden; min-width:0; padding-inline:0; }
+.shortcuts-page__table table { table-layout:fixed; }
+.shortcuts-page__table thead tr { background:transparent; }
+.shortcuts-page__table tr { border-color:var(--separator); }
+.shortcuts-page__table th { color:var(--muted); }
+.shortcuts-page__table :is(th, td) { padding:var(--space-2); white-space:normal; overflow-wrap:anywhere; }
+.shortcuts-page__table th:nth-child(1) { width:35%; }
+.shortcuts-page__table th:nth-child(2) { width:33%; }
+.shortcuts-page__table th:nth-child(3) { width:17%; }
+.shortcuts-page__table th:nth-child(4) { width:15%; }
+.shortcuts-page__table td { height:var(--space-7); }
+.shortcuts-page__table td:nth-child(3) { color:var(--muted); font:var(--font-caption); }
+.shortcuts-page__binding, .shortcuts-page__operations { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-1); }
+.shortcuts-page__recording { display:flex; flex-direction:column; align-items:flex-start; min-width:0; gap:var(--space-1); }
+.shortcuts-page__operations { justify-content:flex-end; }
+.shortcuts-page__table th:last-child { text-align:end; }
+@media (max-width:1000px) {
+ .shortcuts-page__table :is(th, td) { padding:var(--space-1); }
+ .shortcuts-page__table th:nth-child(1) { width:30%; }
+ .shortcuts-page__table th:nth-child(2) { width:35%; }
+ .shortcuts-page__table th:nth-child(3) { width:15%; }
+ .shortcuts-page__table th:nth-child(4) { width:20%; }
+}
 .settings-row__control > .settings-control-field, .settings-row__control > .number-field { width:100%; min-width:0; max-width:var(--settings-control-max-width); flex:0 1 var(--settings-control-max-width); }
 .settings-row__control > .meter { width:100%; min-width:0; }
 /* Keep the folder path readable at normal widths while letting its row wrap around the browse action. */

@@ -61,14 +61,45 @@ Object.assign(LANGUAGE_LABELS, {
   none: specialLabel('none', '不翻译', 'No translation', { zhTW: '不翻譯', zhHK: '不翻譯', ko: '번역 안 함', ja: '翻訳しない' }),
   zh: specialLabel('zh', '中文（简体）', 'Chinese (Simplified)', { zhTW: '簡體中文', zhHK: '簡體中文', ko: '중국어(간체)', ja: '中国語（簡体字）' }),
   'zh-Hant': specialLabel('zh-Hant', '中文（繁体）', 'Chinese (Traditional)', { zhTW: '繁體中文', zhHK: '繁體中文', ko: '중국어(번체)', ja: '中国語（繁体字）' }),
-  bo: specialLabel('bo', '藏语', 'Tibetan', { zhTW: '藏語', zhHK: '藏語' }),
+  bo: specialLabel('bo', '藏语', 'Tibetan', { zhTW: '藏語', zhHK: '藏語', ja: 'チベット語', ko: '티베트어' }),
   yue: specialLabel('yue', '粤语', 'Cantonese', { zhTW: '粵語', zhHK: '粵語' }),
+  pi: specialLabel('pi', '巴利语', 'Pali', { zhTW: '巴利語', zhHK: '巴利語', ja: 'パーリ語', ko: '팔리어' }),
+  ff: specialLabel('ff', '富拉语', 'Fulah', { zhTW: '富拉語', zhHK: '富拉語', ja: 'フラ語', ko: '풀라어' }),
+  // M2M100 uses its own "ns" code for Northern Sotho; keep the inference code intact.
+  ns: specialLabel('ns', '北索托语', 'Northern Sotho', { zhTW: '北索托語', zhHK: '北索托語', ja: '北ソト語', ko: '북소토어' }),
+  abq: specialLabel('abq', '阿巴扎语', 'Abaza', { zhTW: '阿巴扎語', zhHK: '阿巴扎語', ja: 'アバザ語', ko: '아바자어' }),
+  lbe: specialLabel('lbe', '拉克语', 'Lak', { zhTW: '拉克語', zhHK: '拉克語', ja: 'ラク語', ko: '라크어' }),
+  tab: specialLabel('tab', '塔巴萨兰语', 'Tabassaran', { zhTW: '塔巴薩蘭語', zhHK: '塔巴薩蘭語', ja: 'タバサラン語', ko: '타바사란어' }),
+  sck: specialLabel('sck', '萨德里语', 'Sadri', { zhTW: '薩德里語', zhHK: '薩德里語', ja: 'サドリ語', ko: '사드리어' }),
+  // Electron's ICU omits these CLDR names even when the development Node runtime has them.
+  ba: specialLabel('ba', '巴什基尔语', 'Bashkir', { zhTW: '巴什喀爾文', zhHK: '巴什基爾文', ja: 'バシキール語', ko: '바슈키르어' }),
+  ss: specialLabel('ss', '斯瓦蒂语', 'Swati', { zhTW: '斯瓦特文', zhHK: '斯瓦特文', ja: 'スワジ語', ko: '시스와티어' }),
+  bal: specialLabel('bal', '俾路支语', 'Baluchi', { zhTW: '俾路支文', zhHK: '俾路支文', ja: 'バルーチー語', ko: '발루치어' }),
+  ady: specialLabel('ady', '阿迪格语', 'Adyghe', { zhTW: '阿迪各文', zhHK: '阿迪各文', ja: 'アディゲ語', ko: '아디게어' }),
+  bua: specialLabel('bua', '布里亚特语', 'Buriat', { zhTW: '布里阿特文', zhHK: '布里阿特文', ja: 'ブリヤート語', ko: '부리아타' }),
+  cv: specialLabel('cv', '楚瓦什语', 'Chuvash', { zhTW: '楚瓦什文', zhHK: '楚瓦什文', ja: 'チュヴァシ語', ko: '추바시어' }),
+  dar: specialLabel('dar', '达尔格瓦语', 'Dargwa', { zhTW: '達爾格瓦文', zhHK: '達爾格瓦文', ja: 'ダルグワ語', ko: '다르그와어' }),
+  inh: specialLabel('inh', '印古什语', 'Ingush', { zhTW: '印古什文', zhHK: '印古什文', ja: 'イングーシ語', ko: '인귀시어' }),
+  kaa: specialLabel('kaa', '卡拉卡尔帕克语', 'Kara-Kalpak', { zhTW: '卡拉卡爾帕克文', zhHK: '卡拉卡爾帕克文', ja: 'カラカルパク語', ko: '카라칼파크어' }),
+  kbd: specialLabel('kbd', '卡巴尔德语', 'Kabardian', { zhTW: '卡巴爾達文', zhHK: '卡巴爾達文', ja: 'カバルド語', ko: '카바르디어' }),
+  kv: specialLabel('kv', '科米语', 'Komi', { zhTW: '科米文', zhHK: '科米文', ja: 'コミ語', ko: '코미어' }),
+  lez: specialLabel('lez', '列兹金语', 'Lezghian', { zhTW: '列茲干文', zhHK: '列茲干文', ja: 'レズギ語', ko: '레즈기안어' }),
+  os: specialLabel('os', '奥塞梯语', 'Ossetic', { zhTW: '奧塞提文', zhHK: '奧塞提文', ja: 'オセット語', ko: '오세트어' }),
+  sah: specialLabel('sah', '萨哈语', 'Yakut', { zhTW: '雅庫特文', zhHK: '雅庫特文', ja: 'サハ語', ko: '야쿠트어' }),
+  tyv: specialLabel('tyv', '图瓦语', 'Tuvinian', { zhTW: '圖瓦文', zhHK: '圖瓦文', ja: 'トゥヴァ語', ko: '투비니안어' }),
+  udm: specialLabel('udm', '乌德穆尔特语', 'Udmurt', { zhTW: '烏德穆爾特文', zhHK: '烏德穆爾特文', ja: 'ウドムルト語', ko: '우드말트어' }),
+  xal: specialLabel('xal', '卡尔梅克语', 'Kalmyk', { zhTW: '卡爾梅克文', zhHK: '卡爾梅克文', ja: 'カルムイク語', ko: '칼미크어' }),
+  ang: specialLabel('ang', '古英语', 'Old English', { zhTW: '古英文', zhHK: '古英文', ja: '古英語', ko: '고대 영어' }),
+  bgc: specialLabel('bgc', '哈里亚纳语', 'Haryanvi', { zhTW: '哈里亞納文', zhHK: '哈里亞納文', ja: 'ハリヤーンウィー語', ko: '하리안비어' }),
+  new: specialLabel('new', '尼瓦尔语', 'Newari', { zhTW: '尼瓦爾文', zhHK: '尼瓦爾文', ja: 'ネワール語', ko: '네와르어' }),
 })
 LANGUAGE_LABELS.fil = { ...LANGUAGE_LABELS.tl, code: 'fil' }
 
 export function languageName(code: string, locale: UiLanguage): string {
   const label = LANGUAGE_LABELS[normalizeLanguage(code)] ?? LANGUAGE_LABELS[code]
-  if (!label) return code
+  if (!label) {
+    try { return languageNames(locale)?.of(code) ?? code } catch { return code }
+  }
   if (locale === 'zh-CN') return label.zh
   if (locale === 'zh-TW') return label.zhTW
   if (locale === 'zh-HK') return label.zhHK

@@ -21,7 +21,35 @@ export function validateCapture(stream: MediaStream, expectedHandle: string | un
 }
 export interface AudioChunk { buffer: ArrayBuffer; sampleRate: number; epoch: number; sourcePeak?: number; workletPeak?: number }
 export interface AudioCapture { enable(enabled: boolean, epoch: number): void; close(): Promise<void> }
-export async function createAudioCapture(stream: MediaStream, onChunk: (chunk: AudioChunk) => void, onDebug?: (event: string, data: Record<string, unknown>) => void): Promise<AudioCapture> {
+export async function capturePlayerAudio(video: HTMLVideoElement): Promise<MediaStream> {
+  if (globalThis.isSecureContext === false || location.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) throw new BrowserFailure('browserCaptureUnsupported')
+  if (!navigator.userAgent.includes('Firefox/')) {
+    const response = await chrome.runtime.sendMessage({ type: 'captureTabAudio' }) as { id?: string } | undefined
+    if (!response?.id) throw new BrowserFailure('browserTabCapturePermission')
+    return navigator.mediaDevices.getUserMedia({
+      audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: response.id } } as MediaTrackConstraints,
+    })
+  }
+  const player = video as HTMLVideoElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream }
+  const capture = player.captureStream ?? player.mozCaptureStream
+  if (!capture) throw new BrowserFailure('browserCaptureUnsupported')
+  const stream = capture.call(player)
+  if (!stream.getAudioTracks().length) {
+    await new Promise<void>(resolve => {
+      const finish = () => { clearTimeout(timeout); stream.removeEventListener('addtrack', onTrack); resolve() }
+      const onTrack = (event: MediaStreamTrackEvent) => { if (event.track.kind === 'audio') finish() }
+      const timeout = setTimeout(finish, 1500)
+      stream.addEventListener('addtrack', onTrack)
+    })
+  }
+  for (const track of stream.getVideoTracks()) { stream.removeTrack(track); track.stop() }
+  if (!stream.getAudioTracks().length) {
+    releaseTracks(stream)
+    throw new BrowserFailure('browserCaptureUnsupported')
+  }
+  return stream
+}
+export async function createAudioCapture(stream: MediaStream, onChunk: (chunk: AudioChunk) => void, onDebug?: (event: string, data: Record<string, unknown>) => void, monitor = false): Promise<AudioCapture> {
   const report = (event: string, data: Record<string, unknown>): void => { try { onDebug?.(event, data) } catch { /* a diagnostic never fails capture */ } }
   const track = stream.getAudioTracks()[0]
   const trackRate = track.getSettings().sampleRate ?? 0
@@ -49,13 +77,20 @@ export async function createAudioCapture(stream: MediaStream, onChunk: (chunk: A
     const silent = context.createGain()
     silent.gain.value = 0
     source.connect(probe); source.connect(processor); processor.connect(silent); silent.connect(context.destination)
+    if (monitor) source.connect(context.destination)
     processor.port.onmessage = (event: MessageEvent<AudioChunk>) => {
       probe.getFloatTimeDomainData(probeBuffer)
       let peak = 0
       for (let index = 0; index < probeBuffer.length; index++) { const value = Math.abs(probeBuffer[index]); if (value > peak) peak = value }
       onChunk({ ...event.data, sourcePeak: peak })
     }
-    await context.resume()
+    let resumeTimer: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([
+        context.resume(),
+        new Promise<never>((_, reject) => { resumeTimer = setTimeout(() => reject(new BrowserFailure('browserCaptureUnsupported')), 5000) }),
+      ])
+    } finally { clearTimeout(resumeTimer) }
     // The context state and sample rate decide what the worklet actually emits: a suspended
     // context delivers nothing, and a resampled rate changes every downstream duration.
     report('ext.worklet', { state: context.state, sampleRate: context.sampleRate, trackSampleRate: trackRate, trackRateMatched: trackRate === context.sampleRate, modulePath })

@@ -31,10 +31,10 @@ const OVERLAY_PAGE_TO_ROUTE: Record<OverlayTargetPage, { route: RouteId; path: s
   appearance: { route: 'settings', path: '#/settings/appearance' },
   captions: { route: 'overlay', path: '#/overlay' },
   resources: { route: 'models', path: '#/models' },
-  translation: { route: 'settings', path: '#/settings/translation' },
-  torch: { route: 'settings', path: '#/settings/compute?component=engine' },
-  llama: { route: 'settings', path: '#/settings/compute?component=llama' },
-  crisp: { route: 'settings', path: '#/settings/compute?component=crisp' },
+  translation: { route: 'settings', path: '#/settings/audio' },
+  torch: { route: 'settings', path: '#/settings/engine?component=engine' },
+  llama: { route: 'settings', path: '#/settings/engine?component=llama' },
+  crisp: { route: 'settings', path: '#/settings/engine?component=crisp' },
 }
 
 class MissingIpcApiError extends Error {
@@ -98,6 +98,8 @@ function subscribe<T>(method: keyof NolaTranslatorApi, run: (injected: NolaTrans
 
 export function createIpcBridge(): NolaBridge {
   return {
+    screenTranslation: injectedApi()?.screenTranslation,
+    workspaceView: injectedApi()?.workspaceView,
     requestQuit: () => call('requestQuit', api => api.requestQuit?.() ?? Promise.reject(new MissingIpcApiError('requestQuit'))),
     confirmQuit: () => call('confirmQuit', api => api.confirmQuit?.() ?? Promise.reject(new MissingIpcApiError('confirmQuit'))),
     onQuitRequested: cb => injectedApi()?.onQuitRequested?.(cb) ?? (() => undefined),
@@ -114,6 +116,15 @@ export function createIpcBridge(): NolaBridge {
       stop: () => call('activity', api => api.activity?.stop() ?? Promise.reject(new MissingIpcApiError('activity.stop'))),
       onChanged: cb => subscribe('activity', api => api.activity?.onChanged ?? (() => () => undefined), cb),
     },
+    meetingMode: injectedApi()?.meetingMode ? {
+      snapshot: () => call('meetingMode', api => api.meetingMode!.snapshot()),
+      start: settings => call('meetingMode', api => api.meetingMode!.start(settings)),
+      stop: () => call('meetingMode', api => api.meetingMode!.stop()),
+      setPaused: paused => call('meetingMode', api => api.meetingMode!.setPaused(paused)),
+      testAudio: request => call('meetingMode', api => api.meetingMode!.testAudio(request)),
+      cancelAudioTest: () => call('meetingMode', api => api.meetingMode!.cancelAudioTest()),
+      onChanged: cb => subscribe('meetingMode', api => api.meetingMode?.onChanged ?? (() => () => undefined), cb),
+    } : undefined,
     onboardingCard: {
       available: () => !!injectedApi()?.onboardingCard,
       show: () => injectedApi()?.onboardingCard?.show(),
@@ -182,6 +193,7 @@ export function createIpcBridge(): NolaBridge {
        * `call()`'s `MissingIpcApiError` rather than a plausible-looking value.
        */
       getEngineState: () => call('getEngineState', (injected) => injected.getEngineState()),
+      getSessionSnapshot: injectedApi()?.getSessionSnapshot ? () => call('getSessionSnapshot', injected => injected.getSessionSnapshot!()) : undefined,
     },
     overlay: {
       openMenu: request => call('openOverlayMenu', injected => injected.openOverlayMenu(request)),

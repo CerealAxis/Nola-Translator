@@ -34,9 +34,9 @@ it('shows separate real browser icons and installation states with per-browser a
     expect(image).toHaveAttribute('aria-hidden', 'true')
     expect(image).toHaveAttribute('alt', '')
   }
-  fireEvent.click(within(edgeRow).getByRole('button', { name: '下载 Microsoft Edge 扩展' }))
+  fireEvent.click(within(edgeRow).getByRole('button', { name: '下载 Microsoft Edge 插件' }))
   expect(settingsActions.browserConnectionAction).toHaveBeenCalledWith('download', undefined, 'edge')
-  fireEvent.click(within(chromeRow).getByRole('button', { name: '下载 Google Chrome 扩展' }))
+  fireEvent.click(within(chromeRow).getByRole('button', { name: '下载 Google Chrome 插件' }))
   expect(settingsActions.browserConnectionAction).toHaveBeenCalledWith('download', undefined, 'chrome')
   fireEvent.click(within(chromeRow).getByRole('switch', { name: '允许 Google Chrome 连接' }))
   expect(settingsActions.browserConnectionAction).toHaveBeenCalledWith('browserEnable', false, 'chrome')
@@ -46,19 +46,19 @@ it('shows separate real browser icons and installation states with per-browser a
 
 it('keeps Manage inside settings and dispatches browser-specific detail actions', () => {
   render(<BrowserTab />)
-  fireEvent.click(screen.getByRole('button', { name: '管理 Google Chrome 扩展' }))
+  fireEvent.click(screen.getByRole('button', { name: '管理 Google Chrome 插件' }))
   expect(screen.queryByRole('list')).not.toBeInTheDocument()
   expect(screen.getByRole('heading', { name: 'Google Chrome' })).toBeInTheDocument()
   expect(screen.getByText('已连接')).toBeInTheDocument()
   expect(settingsActions.browserConnectionAction).not.toHaveBeenCalledWith('manage', undefined, 'chrome')
-  fireEvent.click(screen.getByRole('button', { name: '管理浏览器扩展' }))
+  fireEvent.click(screen.getByRole('button', { name: '管理浏览器插件' }))
   expect(settingsActions.browserConnectionAction).toHaveBeenCalledWith('manage', undefined, 'chrome')
-  fireEvent.click(screen.getByRole('button', { name: '下载扩展' }))
+  fireEvent.click(screen.getByRole('button', { name: '下载插件' }))
   expect(settingsActions.browserConnectionAction).toHaveBeenCalledWith('download', undefined, 'chrome')
   expect(screen.queryByRole('button', { name: '重新安装' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '移除' })).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '返回浏览器列表' }))
-  expect(screen.getByRole('list', { name: '浏览器扩展' })).toBeInTheDocument()
+  expect(screen.getByRole('list', { name: '浏览器插件' })).toBeInTheDocument()
 })
 
 it('does not infer installation for unknown or disabled extensions', () => {
@@ -67,8 +67,8 @@ it('does not infer installation for unknown or disabled extensions', () => {
   const chromeRow = screen.getByRole('listitem', { name: 'Google Chrome' })
   const edgeRow = screen.getByRole('listitem', { name: 'Microsoft Edge' })
   expect(within(chromeRow).getByRole('status')).toHaveTextContent('无法确认扩展状态')
-  expect(within(chromeRow).getByRole('button', { name: '下载 Google Chrome 扩展' })).toBeEnabled()
-  expect(within(chromeRow).queryByRole('button', { name: '管理 Google Chrome 扩展' })).not.toBeInTheDocument()
+  expect(within(chromeRow).getByRole('button', { name: '下载 Google Chrome 插件' })).toBeEnabled()
+  expect(within(chromeRow).queryByRole('button', { name: '管理 Google Chrome 插件' })).not.toBeInTheDocument()
   expect(within(chromeRow).queryByRole('switch')).not.toBeInTheDocument()
   expect(within(edgeRow).getByRole('status')).toHaveTextContent('已停用')
   const toggle = within(edgeRow).getByRole('switch', { name: '允许 Microsoft Edge 连接' })
@@ -80,11 +80,11 @@ it('does not infer installation for unknown or disabled extensions', () => {
 
 it('updates the detail connection state and disables mutations while an action is pending', () => {
   render(<BrowserTab />)
-  fireEvent.click(screen.getByRole('button', { name: '管理 Google Chrome 扩展' }))
+  fireEvent.click(screen.getByRole('button', { name: '管理 Google Chrome 插件' }))
   act(() => settingsStore.setState({ browser: { enabled: true, registered: true, captionServiceActive: false, sessionActive: false, connections: 0, browsers: [{ ...chrome, connected: false }, edge] }, browserBusy: true }))
   expect(screen.getByText('等待连接')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '下载扩展' })).toBeDisabled()
-  expect(screen.getByRole('button', { name: '管理浏览器扩展' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: '下载插件' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: '管理浏览器插件' })).toBeDisabled()
   expect(screen.getByRole('switch', { name: '允许 Google Chrome 连接' })).toBeDisabled()
   expect(screen.getByRole('button', { name: '返回浏览器列表' })).toBeEnabled()
 })
@@ -127,7 +127,7 @@ it('offers a real retry after a browser extension download fails without showing
   vi.mocked(settingsActions.browserConnectionAction).mockClear()
   const edgeRow = screen.getByRole('listitem', { name: 'Microsoft Edge' })
 
-  await act(async () => { fireEvent.click(within(edgeRow).getByRole('button', { name: '下载 Microsoft Edge 扩展' })) })
+  await act(async () => { fireEvent.click(within(edgeRow).getByRole('button', { name: '下载 Microsoft Edge 插件' })) })
   await waitFor(() => expect(notifyRetryableFailure).toHaveBeenCalledOnce())
   expect(notifyRetryableFailure).toHaveBeenCalledWith('浏览器扩展下载失败', expect.objectContaining({
     description: '请检查网络后重试；仍失败可从项目发布页获取。',
@@ -140,4 +140,20 @@ it('offers a real retry after a browser extension download fails without showing
   expect(settingsActions.browserConnectionAction).toHaveBeenCalledTimes(2)
   expect(settingsActions.browserConnectionAction).toHaveBeenCalledWith('download', undefined, 'edge')
   await waitFor(() => expect(notifyRetryableFailure).toHaveBeenCalledTimes(2))
+})
+
+
+it('lets an available browser recover its denied Nola connection without claiming installation', () => {
+  settingsStore.setState({ browser: { enabled: true, registered: true, captionServiceActive: false, sessionActive: false, connections: 0,
+    browsers: [{ browser: 'firefox', available: true, extensionStatus: 'unknown', connected: false, enabled: false }] } })
+  render(<BrowserTab />)
+  const row = screen.getByRole('listitem', { name: 'Mozilla Firefox' })
+  expect(within(row).getByRole('status')).toHaveTextContent('无法确认扩展状态')
+  expect(within(row).queryByRole('button', { name: '管理 Mozilla Firefox 插件' })).not.toBeInTheDocument()
+  const permission = within(row).getByRole('switch', { name: '允许 Mozilla Firefox 连接' })
+  expect(permission).not.toBeChecked()
+  expect(permission).toBeEnabled()
+  expect(permission).toHaveAttribute('title', '允许 Mozilla Firefox 连接')
+  fireEvent.click(permission)
+  expect(settingsActions.browserConnectionAction).toHaveBeenCalledWith('browserEnable', true, 'firefox')
 })

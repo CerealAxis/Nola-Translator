@@ -44,7 +44,6 @@ export function MoreTab() {
   const updateChecking = useStore(stores.settings, state => state.appUpdateChecking)
   const sessionBusy = useStore(stores.session, state => ['starting', 'running', 'paused', 'stopping'].includes(state.status))
   const runtimeBusy = useStore(stores.settings, state => state.runtimeBusy)
-  const browserBusy = useStore(stores.settings, state => state.browser?.captionServiceActive === true || state.captionService === 'loading' || state.captionService === 'ready')
   const [announcement, setAnnouncement] = useState<AppUpdateCheckResult | null>(null)
   const [announcementOpen, setAnnouncementOpen] = useState(false)
   const [announcementOpening, setAnnouncementOpening] = useState(false)
@@ -114,7 +113,7 @@ export function MoreTab() {
     <div className="settings-panel settings-more">
       <SettingGroup legend={t('onboarding.title')}>
         <SettingsRow label={t('onboarding.title')} desc={t('onboarding.replayHint')}>
-          <Button variant="secondary" size="sm" data-onboarding="replay" disabled={sessionBusy || runtimeBusy || browserBusy}
+          <Button variant="secondary" size="sm" data-onboarding="replay" disabled={sessionBusy || runtimeBusy}
             onClick={() => { actions.settings.startOnboarding('welcome') }}>{t('onboarding.replay')}</Button>
         </SettingsRow>
       </SettingGroup>
@@ -132,6 +131,19 @@ export function MoreTab() {
           </div>} />
         <SettingsRow label={t('settings.thirdPartyNotices')} desc={t('settings.thirdPartyNoticesHint')} descriptionTooltip>
           <ThirdPartyNotices />
+        </SettingsRow>
+      </SettingGroup>
+
+      <SettingGroup legend={t('settings.groupReport')}>
+        <SettingsRow label={t('settings.copyDiagnostics')}><CopyDiagnostics /></SettingsRow>
+        <SettingsRow label={t('settings.openLogs')} desc={t('settings.openLogsHint')} descriptionTooltip>
+          <Button variant="tertiary" size="sm" onClick={() => { void openLogsDirectory() }}>{t('settings.openLogs')}</Button>
+        </SettingsRow>
+        <SettingsRow label={t('settings.githubIssue')} desc={t('settings.githubIssueHint')} descriptionTooltip>
+          <ExternalAction href={`${REPOSITORY_URL}/issues`} label={t('settings.openInBrowser')} />
+        </SettingsRow>
+        <SettingsRow label={t('settings.qqGroup')}>
+          <code className="settings-more__code nola-mono text-foreground">701699932</code>
         </SettingsRow>
       </SettingGroup>
 
@@ -158,18 +170,7 @@ export function MoreTab() {
         </div>
       </SettingGroup>
 
-      <SettingGroup legend={t('settings.groupReport')}>
-        <SettingsRow label={t('settings.copyDiagnostics')}><CopyDiagnostics /></SettingsRow>
-        <SettingsRow label={t('settings.openLogs')} desc={t('settings.openLogsHint')} descriptionTooltip>
-          <Button variant="tertiary" size="sm" onClick={() => { void openLogsDirectory() }}>{t('settings.openLogs')}</Button>
-        </SettingsRow>
-        <SettingsRow label={t('settings.githubIssue')} desc={t('settings.githubIssueHint')} descriptionTooltip>
-          <ExternalAction href={`${REPOSITORY_URL}/issues`} label={t('settings.openInBrowser')} />
-        </SettingsRow>
-        <SettingsRow label={t('settings.qqGroup')}>
-          <code className="settings-more__code nola-mono text-foreground">701699932</code>
-        </SettingsRow>
-      </SettingGroup>
+
       {announcement ? <AppUpdateDialog result={announcement} isOpen={announcementOpen} isCurrentVersion
         onOpenChange={setAnnouncementOpen} onOpenRelease={url => { void openAnnouncement(url) }} isOpening={announcementOpening} /> : null}
     </div>

@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 
 import { BrowserWindow, ipcMain, net, screen } from 'electron'
 
-import type { AudioDevice, EngineEvent, EngineProcessState, PrewarmConfig, PrewarmResult, SessionConfig } from '../shared/contracts'
+import type { AudioDevice, EngineEvent, EngineProcessState, PrewarmConfig, PrewarmResult, ResourceRecord, SessionConfig } from '../shared/contracts'
 import { DEFAULT_SETTINGS, NO_TRANSLATION_LANGUAGE, type AppSettings, type CredentialProvider } from '../shared/settings'
 import type { EngineProcess } from './engine-process'
 import type { MeetingStore } from './meeting-store'
@@ -38,6 +38,7 @@ export const IPC_CHANNELS = {
   resolvePlayback: 'engine:resolve-playback',
   event: 'engine:event',
   getEngineState: 'engine:get-state',
+  getSessionSnapshot: 'engine:session-snapshot',
   showOverlay: 'overlay:show',
   hideOverlay: 'overlay:hide',
   getOverlayVisibility: 'overlay:is-visible',
@@ -90,6 +91,7 @@ export function registerEngineIpc(
   resourceInUse: (resourceId: string) => boolean = () => false,
   listProcessSources: () => Promise<AudioDevice[]> = async () => [],
   canOpenOverlay: () => boolean = () => true,
+  manageSpecialResource?: (resourceId: string, action: 'install' | 'remove' | 'cancel' | 'pause' | 'resume') => Promise<ResourceRecord | undefined>,
 ): () => void {
   const controller = sharedController ?? new SessionController({ engine, meetings, getSettings, getCredential: getTranslationCredential, prepare: prepareEnvironment, whenReady: whenRuntimeReady, startingChanged: onStartingChanged, hideOverlay: () => getOverlayWindow()?.hide() })
   let overlayCloseStopsSession = false
@@ -154,6 +156,8 @@ export function registerEngineIpc(
         throw new Error('INVALID_ARGUMENT')
       }
       if ((action === 'remove' || action === 'install') && resourceInUse(resourceId)) throw new Error('resourceInUse')
+      const special = await manageSpecialResource?.(resourceId, action as 'install' | 'remove' | 'cancel' | 'pause' | 'resume')
+      if (special) return special
       await ensureReady()
       const response = await engine.request(
         {
@@ -287,6 +291,7 @@ export function registerEngineIpc(
     }
   )
 
+  loggedHandle(IPC_CHANNELS.getSessionSnapshot, () => controller.readerSnapshot())
   loggedHandle(IPC_CHANNELS.startSession, async (_event, config: unknown) => {
     const started = await controller.start(config, 'desktop')
     broadcast({ protocolVersion: 1, type: 'sessionStarted', requestId: `attached-${randomUUID()}`, ...started })

@@ -7,11 +7,11 @@ import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { BrowserConnection, browserCaptionConfig, browserSessionConfig } from '../../../src/main/browser-connection'
+import { BrowserConnection, browserCaptionConfig, browserSessionConfig, type BrowserConnectionOptions } from '../../../src/main/browser-connection'
 import { FeatureActivity } from '../../../src/main/feature-activity'
 import { SessionController } from '../../../src/main/session-controller'
 import { DEFAULT_SETTINGS, REALTIME_S2S_MODELS } from '../../../src/shared/settings'
-import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, type BrowserResponse } from '../../../src/shared/browser'
+import { BROWSER_EXTENSION_ID, BROWSER_EXTENSION_VERSION, BROWSER_PROTOCOL_VERSION, type BrowserResponse } from '../../../src/shared/browser'
 import type { EngineProcess } from '../../../src/main/engine-process'
 import type { EngineCommand } from '../../../src/shared/contracts'
 import { ipcMain } from 'electron'
@@ -52,14 +52,14 @@ class TestEngine extends EventEmitter {
   })
 }
 
-async function fixture(integrations?: BrowserIntegrations, activity?: FeatureActivity) {
+async function fixture(integrations?: BrowserIntegrations, activity?: FeatureActivity, translateText?: BrowserConnectionOptions['translateText'], extra: Partial<BrowserConnectionOptions> = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'nola-browser-test-'))
   vi.stubEnv('LOCALAPPDATA', directory)
   const engine = new TestEngine()
   const typed = engine as unknown as EngineProcess
   const sessions = new SessionController({ activity, engine: typed, meetings: null, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', prepare: async () => {}, whenReady: async () => {}, startingChanged: () => {}, hideOverlay: () => {} })
   engine.on('state', () => sessions.releaseOnLoss())
-  const connection = new BrowserConnection({ activity, engine: typed, sessions, integrations, getSettings: () => DEFAULT_SETTINGS, setEnabled: async () => {} })
+  const connection = new BrowserConnection({ activity, engine: typed, sessions, integrations, translateText, ...extra, getSettings: () => DEFAULT_SETTINGS, setEnabled: async () => {} })
   disposers.push(async () => { await connection.dispose(); await rm(directory, { recursive: true, force: true }) })
   await connection.setEnabled(true)
   connection.setCaptionServiceActive(true)
@@ -85,6 +85,31 @@ function send(socket: Socket, value: unknown) { socket.write(`${JSON.stringify(v
 const start = { id: 'start', type: 'start', source: 'tab', streamId: 'stream', sourceLanguage: 'auto', targetLanguage: 'en', epoch: 0, videoTimeMs: 0, playbackRate: 1 }
 
 describe('native pipe boundary', () => {
+  it('translates text without starting a caption session and aborts only the owned request', async () => {
+    const translateText = vi.fn<NonNullable<BrowserConnectionOptions['translateText']>>()
+      .mockResolvedValueOnce('你好')
+      .mockImplementationOnce((_request, signal) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })))
+      .mockRejectedValueOnce(new Error('gatewayNotRunning'))
+    const f = await fixture(undefined, undefined, translateText)
+    await f.connection.stopCaptionService()
+    const socket = await connect(f.descriptor.pipe)
+    const values = responses(socket)
+    const translation = { type: 'translate', text: 'Hello', sourceLanguage: 'en', targetLanguage: 'zh' }
+    send(socket, f.descriptor)
+    send(socket, { id: 'hello', type: 'hello', extensionVersion: BROWSER_EXTENSION_VERSION })
+    await expect.poll(() => values.find(value => value.type === 'result' && value.id === 'hello')).toMatchObject({ value: { protocolVersion: 2, textTranslation: true, captionServiceActive: false } })
+    send(socket, { id: 'text', ...translation })
+    await expect.poll(() => values.find(value => value.type === 'result' && value.id === 'text')).toMatchObject({ value: { text: '你好' } })
+    expect(f.connection.status().sessionActive).toBe(false)
+    send(socket, { id: 'pending', ...translation })
+    await expect.poll(() => translateText.mock.calls.length).toBe(2)
+    send(socket, { id: 'cancel', type: 'cancelTranslation', requestId: 'pending' })
+    await expect.poll(() => translateText.mock.calls[1][1].aborted).toBe(true)
+    expect(values.some(value => 'id' in value && value.id === 'pending')).toBe(false)
+    send(socket, { id: 'gateway', ...translation })
+    await expect.poll(() => values.find(value => value.type === 'error' && value.id === 'gateway')).toMatchObject({ code: 'gatewayNotRunning' })
+    socket.destroy()
+  })
   it('sends distinct runtime failures to the extension', async () => {
     const f = await fixture()
     const socket = await connect(f.descriptor.pipe); const values = responses(socket)
@@ -334,4 +359,78 @@ it('unloads models and releases ownership after browser preparation fails', asyn
   expect(f.connection.status().captionServiceActive).toBe(false)
   expect(activity.snapshot().owner).toBeNull()
   expect(f.engine.request).toHaveBeenCalledWith(expect.objectContaining({ type: 'releaseModels' }), 'modelsReleased', 60_000)
+})
+
+
+it('negotiates independent releases and chunks private speech results below the frame bound', async () => {
+  const inferCapability = vi.fn().mockResolvedValue({ text: '', audio: `data:audio/wav;base64,${'A'.repeat(200000)}` })
+  const f = await fixture(undefined, undefined, undefined, { useGateway: true, inferCapability })
+  await f.connection.stopCaptionService()
+  const socket = await connect(f.descriptor.pipe)
+  const values = responses(socket)
+  send(socket, f.descriptor)
+  send(socket, { id: 'hello-new', type: 'hello', protocolVersion: 3, extensionVersion: '99.0.0' })
+  await expect.poll(() => values.find(value => value.type === 'result' && value.id === 'hello-new')).toMatchObject({ value: { extensionCompatible: true, capabilities: { asr: true, tts: true, llm: true }, captionServiceActive: true } })
+  send(socket, { id: 'speech', type: 'synthesize', text: 'Hello' })
+  await expect.poll(() => values.find(value => value.type === 'result' && value.id === 'speech')).toMatchObject({ value: { audioChunks: 4, format: 'audio/wav' } })
+  const chunks = values.filter(value => value.type === 'capabilityEvent')
+  expect(chunks).toHaveLength(4)
+  expect(chunks.every(value => JSON.stringify(value).length < 160 * 1024)).toBe(true)
+  socket.destroy()
+})
+
+it('aborts a private model operation when its owner cancels', async () => {
+  const inferCapability = vi.fn<NonNullable<BrowserConnectionOptions['inferCapability']>>()
+    .mockImplementation((_request, signal) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })))
+  const f = await fixture(undefined, undefined, undefined, { inferCapability })
+  const socket = await connect(f.descriptor.pipe)
+  const values = responses(socket)
+  send(socket, f.descriptor)
+  send(socket, { id: 'hello', type: 'hello', protocolVersion: 3 })
+  send(socket, { id: 'generate', type: 'generate', messages: [{ role: 'user', content: 'Hello' }] })
+  await expect.poll(() => inferCapability.mock.calls.length).toBe(1)
+  send(socket, { id: 'cancel', type: 'cancel', requestId: 'generate' })
+  await expect.poll(() => inferCapability.mock.calls[0][1].aborted).toBe(true)
+  await expect.poll(() => values.some(value => value.type === 'result' && value.id === 'cancel')).toBe(true)
+  socket.destroy()
+})
+
+
+it('owns and closes a streaming ASR session independently from caption activation', async () => {
+  const request = vi.fn().mockResolvedValue(undefined)
+  const close = vi.fn()
+  const openAsrStream = vi.fn<NonNullable<BrowserConnectionOptions['openAsrStream']>>()
+    .mockResolvedValue({ request, close })
+  const f = await fixture(undefined, undefined, undefined, { openAsrStream, useGateway: true })
+  await f.connection.stopCaptionService()
+  const socket = await connect(f.descriptor.pipe)
+  const values = responses(socket)
+  send(socket, f.descriptor)
+  send(socket, { id: 'hello', type: 'hello', protocolVersion: 3 })
+  send(socket, { id: 'stream', type: 'streamStart', sourceLanguage: 'en' })
+  await expect.poll(() => values.find(value => value.type === 'result' && value.id === 'stream')).toMatchObject({ value: { streamId: 'stream' } })
+  send(socket, { id: 'audio', type: 'streamAudio', streamId: 'stream', pcmBase64: 'AAAA', sampleRate: 16000 })
+  await expect.poll(() => request.mock.calls.length).toBe(0)
+  send(socket, { id: 'audio-even', type: 'streamAudio', streamId: 'stream', pcmBase64: 'AAA=', sampleRate: 16000 })
+  await expect.poll(() => request.mock.calls.length).toBe(1)
+  expect(request).toHaveBeenCalledWith({ op: 'session.append', session: 'stream', audio: 'AAA=' })
+  socket.destroy()
+  await expect.poll(() => close.mock.calls.length).toBe(1)
+  expect(openAsrStream.mock.calls[0][1].aborted).toBe(true)
+})
+
+
+it('enforces the per-browser connection switch for gateway capabilities too', async () => {
+  const integrations = new BrowserIntegrations({ localAppData: tmpdir(), userData: tmpdir() })
+  vi.spyOn(integrations, 'allows').mockReturnValue(false)
+  const inferCapability = vi.fn().mockResolvedValue({ text: 'must not run' })
+  const f = await fixture(integrations, undefined, undefined, { useGateway: true, inferCapability })
+  const socket = await connect(f.descriptor.pipe)
+  const values = responses(socket)
+  send(socket, f.descriptor)
+  send(socket, { id: 'hello', type: 'hello', protocolVersion: 3, browser: 'chrome' })
+  await expect.poll(() => values.find(value => value.type === 'error' && value.id === 'hello')).toMatchObject({ code: 'browserIntegrationDisabled' })
+  expect(inferCapability).not.toHaveBeenCalled()
+  expect(f.connection.status().connections).toBe(0)
+  socket.destroy()
 })

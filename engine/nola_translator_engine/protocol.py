@@ -474,7 +474,7 @@ class ModelProgressEvent(Envelope):
 
 class ResourceRecord(ProtocolModel):
     resourceId: str = Field(min_length=1, max_length=256)
-    kind: Literal["recognitionModel", "translationModel", "ttsModel"]
+    kind: Literal["recognitionModel", "translationModel", "ttsModel", "ocrModel"]
     # See `resources.py` for the values.
     provider: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=256)
@@ -599,6 +599,10 @@ ErrorCode = Literal[
     "audioDeviceDisconnected",
     "audioBufferOverflow",
     "modelUnavailable",
+    "modelDisabled",
+    "modelNotLoaded",
+    "gatewayNotRunning",
+    "invalidCredential",
     "modelLoadFailed",
     "modelDependencyMissing",
     "modelWeightsInvalid",

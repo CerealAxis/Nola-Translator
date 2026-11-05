@@ -17,8 +17,8 @@
  * and spill over the row below it, instead of the body scrolling. */
 .model-configuration-dialog__body > * { flex-shrink:0; }
 /* The dialog body gap already spaces the rows, so rows inside it carry no divider, padding or minimum height. */
-.model-configuration-dialog .settings-row { border-bottom:0; padding-block:0; min-height:0; }
-.model-configuration-dialog .model-configuration-dialog__language { grid-template-columns:minmax(0,1fr); align-items:stretch; gap:var(--space-1); padding-block:0; }
+:is(.model-configuration-dialog, [data-model-family="ocr"]) .settings-row { border-bottom:0; padding-block:0; min-height:0; }
+:is(.model-configuration-dialog, [data-model-family="ocr"]) .model-configuration-dialog__language { grid-template-columns:minmax(0,1fr); align-items:stretch; gap:var(--space-1); padding-block:0; }
 .model-configuration-dialog__language .settings-row__control { display:block; }
 .models-source-dialog.modal__dialog { width:min(calc(100vw - var(--space-4)), calc(var(--space-8) * 8)); max-width:calc(var(--space-8) * 8); gap:var(--space-2); padding-block-start:var(--space-3); padding-inline:var(--space-3); border:1px solid var(--border); border-radius:var(--radius-xl); }
 .models-source-dialog .modal__header + .modal__body { margin-top:0; }
@@ -36,7 +36,7 @@
 .models-tabs .tabs__tab[data-selected="true"] { color:var(--accent); font-weight:650; }
 .models-tabs .tabs__indicator { background:var(--accent); }
 .models-tabs .tabs__panel { padding:0; min-width:0; }
-.models-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; min-width:0; }
+.models-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--space-2); min-width:0; }
 .models-family-card .card__footer > .button { flex-basis:100%; }
 .models-family-dialog.modal__dialog { width:min(calc(100vw - var(--space-4)), 780px); max-width:780px; border-radius:var(--radius-xl); }
 .models-family-dialog .modal__header { padding-inline-end:var(--space-6); }
@@ -140,3 +140,9 @@
 .models-family-dialog__model-list [data-slot='select-item'] > span:first-child { display:flex; align-items:center; gap:var(--space-1); min-width:0; width:100%; }
 .model-search-filters { flex-wrap:wrap; gap:var(--space-1); height:auto; justify-content:flex-start; }
 .model-detail-drawer.nola-dialog-content { inset:0 auto 0 0; width:min(calc(var(--space-8) * 7), 100vw); max-height:100dvh; transform:none; border-radius:0 var(--radius-xl) var(--radius-xl) 0; }
+
+.models-catalog-sections { display:flex; flex-direction:column; gap:var(--space-3); }
+.models-catalog-section { display:flex; flex-direction:column; gap:calc(var(--space-3) / 2); }
+[data-model-family="ocr"].models-family-dialog { display:flex; flex-direction:column; max-height:calc(100dvh - var(--space-4)); }
+[data-model-family="ocr"] .models-family-dialog__body { min-height:0; overflow:auto; }
+[data-model-family="ocr"] .models-family-dialog__body > * { flex-shrink:0; }

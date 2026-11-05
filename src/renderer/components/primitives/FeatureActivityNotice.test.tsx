@@ -65,7 +65,7 @@ describe('independent feature activity', () => {
     const failed = { ...ready, services: { ...ready.services, asr: { ...ready.services.asr, state: 'failed' as const, error: 'CUDA out of memory: private traceback' } } }
     act(() => { receive(failed); receive({ ...failed, connections: 2 }) })
     expect(notifyError).toHaveBeenCalledOnce()
-    expect(notifyError).toHaveBeenCalledWith('ASR模型 已停止响应', { description: '可用内存不足。请关闭其他模型或选择更小的模型后重试。' })
+    expect(notifyError).toHaveBeenCalledWith('ASR 模型不可用', { description: '可用内存不足。请关闭其他模型或选择更小的模型后重试。' })
   })
 
   it('does not report capability failures emitted during a normal gateway shutdown', async () => {

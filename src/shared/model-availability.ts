@@ -8,7 +8,7 @@ import { isModelEnabled } from './model-policy'
 
 /** The main process supplies credential presence; this catalog never reads or returns secrets. */
 export function buildConfiguredCloudModels(settings: AppSettings, credentials: Readonly<Record<CredentialProvider, boolean>>): Record<GatewayCapability, AvailableGatewayModel[]> {
-  const result: Record<GatewayCapability, AvailableGatewayModel[]> = { asr: [], mt: [], tts: [], llm: [] }
+  const result: Record<GatewayCapability, AvailableGatewayModel[]> = { asr: [], mt: [], tts: [], llm: [], ocr: [] }
   if (credentials['mimo-tts'] && isModelEnabled(settings, 'tts', MIMO_TTS_BINDING)) {
     result.tts.push({ binding: MIMO_TTS_BINDING, name: MIMO_TTS_NAME, kind: 'tts', origin: 'cloud', free: false, targetLanguages: ['zh', 'en'] })
   }

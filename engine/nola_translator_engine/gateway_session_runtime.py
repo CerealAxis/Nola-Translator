@@ -8,6 +8,7 @@ from .gateway_client import (GATEWAY_TRANSLATION_TIMEOUT_SECONDS, GatewayRecogni
                              GatewayTranslationProvider, gateway_status, private_gateway_address)
 from .protocol import ModelsPrewarmedEvent, StartSessionCommand
 from .recognition.base import ModelUnavailable
+from .resources import ResourceActionError
 from .runtime import EngineRuntime, RemoteRecognitionRuntime
 from .translation.scheduler import TranslationScheduler
 
@@ -28,24 +29,33 @@ class GatewaySessionRuntime(EngineRuntime):
         return 'nola-asr', []
 
     async def _check_capabilities(self, config):
-        status = await gateway_status(self.gateway_address, self.gateway_key)
+        try:
+            status = await gateway_status(self.gateway_address, self.gateway_key)
+        except ModelUnavailable as error:
+            raise ResourceActionError('engineTransportUnavailable') from error
         services = status.get('services', {})
-        required = ['asr']
+        required = {'asr': config.recognitionBinding}
         if config.targetLanguages and config.translationProvider != 'recognition':
-            required.append('mt')
-        for kind in required:
+            required['mt'] = config.translationBinding
+        for kind, binding in required.items():
+            if binding.startswith(('cloud:', 'mt-custom:')):
+                # Electron has already validated the explicit binding. The status describes the default slot.
+                continue
+            if status.get('state', 'running') != 'running':
+                raise ResourceActionError('gatewayNotRunning')
             if services.get(kind, {}).get('state') != 'ready':
-                raise ModelUnavailable(f'The {kind.upper()} gateway capability is not ready')
+                raise ResourceActionError('modelNotLoaded', {'capability': kind})
         if (config.targetLanguages and config.translationProvider == 'recognition'
+                and not config.recognitionBinding.startswith('cloud:')
                 and not services.get('asr', {}).get('nativeTranslation')):
-            raise ModelUnavailable('The ASR gateway does not provide native translation')
+            raise ResourceActionError('invalidConfiguration')
         return services
 
     async def _prewarm(self, command):
         try:
             await self._check_capabilities(command.config)
-        except ModelUnavailable:
-            return [self._resource_error(command.requestId, 'modelUnavailable')]
+        except ResourceActionError as error:
+            return [self._resource_error(command.requestId, error.code, error.details)]
         return [ModelsPrewarmedEvent(protocolVersion=1, type='modelsPrewarmed',
             requestId=command.requestId, state='ready', recognitionModelId='nola-asr',
             translationModelId='nola-mt' if command.config.targetLanguages else None,

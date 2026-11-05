@@ -40,6 +40,7 @@ const cardListener = (channel, fn) => { const wrapped = (_e, value) => fn(value)
 contextBridge.exposeInMainWorld('nolaTranslator', {
   getSettings: () => ipcRenderer.invoke('onboarding-fixture:get'), updateSettings: update,
   onSettingsChanged: fn => { listeners.add(fn); return () => listeners.delete(fn); },
+  onOverlayVisibilityChanged: () => () => {}, getOverlayVisibility: async () => false,
   onOverlayMenuChanged: () => () => {}, onOverlayLockChanged: () => () => {}, onEngineEvent: () => () => {}, onOpenAppearance: () => () => {}, getEngineState: async () => 'ready',
   listMeetings: async () => [], listDevices: async () => [],
   listResources: async () => ({ storagePath: '', resources: ${JSON.stringify(resources)} }),
@@ -173,7 +174,7 @@ async function run() {
     window.setSize(width, height)
     settings = { ...settings, appearance: { ...settings.appearance, reduceMotion: language !== 'en' }, uiLanguage: language, theme, onboardingSeen: false, onboardingVersion: 0, onboardingStep: 'W0', onboardingCompletedVersion: 0 }
     await window.loadURL('about:blank')
-    await window.loadFile(resolve('out/renderer/index.html'), { hash: '/settings/more' })
+    await window.loadFile(resolve('out/renderer/index.html'), { hash: '/settings/help' })
     await waitFor(window, `document.querySelector('.onboarding-welcome') && !document.getElementById('splash')`)
     const welcome = await window.webContents.executeJavaScript(`(() => { const d = document.querySelector('.onboarding-welcome').getBoundingClientRect(); const f = document.querySelector('.onboarding-welcome .nola-dialog-footer').getBoundingClientRect(); return { left: f.left - d.left, right: d.right - f.right }; })()`)
     assert.ok(Math.abs(welcome.left) <= 2 && Math.abs(welcome.right) <= 2, JSON.stringify(welcome))
@@ -253,7 +254,7 @@ async function run() {
     assert.equal(settings.onboardingCompletedVersion, 2)
     assert.equal(sideEffects, 0)
     const replaySnapshot = JSON.stringify([settings.onboardingStep, settings.onboardingCompletedVersion])
-    await window.loadFile(resolve('out/renderer/index.html'), { hash: '/settings/more' })
+    await window.loadFile(resolve('out/renderer/index.html'), { hash: '/settings/help' })
     await waitFor(window, `document.querySelector('[data-onboarding="replay"]') && !document.getElementById('splash')`)
     await click(window, target('replay'))
     await waitFor(window, `document.querySelector('.onboarding-welcome')`)

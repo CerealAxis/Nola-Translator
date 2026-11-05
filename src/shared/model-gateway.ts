@@ -1,8 +1,8 @@
 import { z } from 'zod'
 import type { SessionConfig } from './contracts'
 
-export type GatewayCapability = 'asr' | 'mt' | 'tts' | 'llm'
-type PublicGatewayCapability = Exclude<GatewayCapability, 'llm'>
+export type GatewayCapability = 'asr' | 'mt' | 'tts' | 'llm' | 'ocr'
+type PublicGatewayCapability = Exclude<GatewayCapability, 'llm' | 'ocr'>
 export type GatewayServiceState = 'stopped' | 'loading' | 'ready' | 'failed'
 export interface ModelGatewaySettings {
   host: '127.0.0.1' | '0.0.0.0'
@@ -11,6 +11,7 @@ export interface ModelGatewaySettings {
   mt: boolean
   tts: boolean
   llm?: boolean
+  ocr?: boolean
   /**
    * Which model each capability is bound to, in binding form (see `normalizeModelBinding`). Empty
    * means "follow the legacy default model settings", which keeps profiles written before the
@@ -20,6 +21,7 @@ export interface ModelGatewaySettings {
   mtModel?: string
   ttsModel?: string
   llmModel?: string
+  ocrModel?: string
   /** Translation used when the bound one fails. Same binding form; empty disables the fallback. */
   mtFallbackModel?: string
   externalEnabled?: boolean
@@ -29,17 +31,17 @@ export interface ModelGatewaySettings {
   targetLanguage: string
 }
 export const DEFAULT_MODEL_GATEWAY: ModelGatewaySettings = {
-  host: '127.0.0.1', port: 17860, asr: false, mt: true, tts: false, llm: false,
-  asrModel: '', mtModel: '', ttsModel: '', llmModel: '', mtFallbackModel: '', externalEnabled: true, targetLanguage: 'zh',
+  host: '127.0.0.1', port: 17860, asr: false, mt: true, tts: false, llm: false, ocr: false,
+  asrModel: '', mtModel: '', ttsModel: '', llmModel: '', ocrModel: '', mtFallbackModel: '', externalEnabled: true, targetLanguage: 'zh',
 }
 const binding = z.string().max(512).optional()
 export const modelGatewaySettingsSchema = z.object({
   host: z.enum(['127.0.0.1', '0.0.0.0']), port: z.number().int().min(1024).max(65535),
   asr: z.boolean(), mt: z.boolean(), tts: z.boolean(), targetLanguage: z.string().min(1).max(32),
-  llm: z.boolean().optional(), externalEnabled: z.boolean().optional(),
+  llm: z.boolean().optional(), ocr: z.boolean().optional(), externalEnabled: z.boolean().optional(),
   externalModels: z.object({ asr: binding, mt: binding, tts: binding }).optional(),
   externalCapabilities: z.object({ asr: z.boolean().optional(), mt: z.boolean().optional(), tts: z.boolean().optional() }).optional(),
-  asrModel: binding, mtModel: binding, ttsModel: binding, llmModel: binding, mtFallbackModel: binding,
+  asrModel: binding, mtModel: binding, ttsModel: binding, llmModel: binding, ocrModel: binding, mtFallbackModel: binding,
 })
 
 /**
@@ -56,8 +58,9 @@ const CLOUD_TRANSLATION = new Set(['microsoft', 'google', 'mymemory', 'index-tra
 
 export function normalizeModelBinding(kind: GatewayCapability, value: unknown): string {
   const raw = typeof value === 'string' ? value.trim() : ''
-  if (!raw || raw === kind || (kind !== 'llm' && raw === GATEWAY_MODEL_ALIAS[kind])) return ''
+  if (!raw || raw === kind || (kind !== 'llm' && kind !== 'ocr' && raw === GATEWAY_MODEL_ALIAS[kind])) return ''
   if (raw.startsWith('resource:')) return raw.slice(9) ? raw : ''
+  if (kind === 'ocr') return raw.includes(':') ? '' : `resource:${raw}`
   if (raw.startsWith('fallback:')) return kind === 'mt' && CLOUD_TRANSLATION.has(raw.slice(9)) ? `cloud:${raw.slice(9)}` : ''
   if (raw.startsWith('mt-custom:')) return kind === 'mt' && raw.slice(10) ? raw : ''
   if (raw.startsWith('custom:')) {
@@ -142,9 +145,9 @@ export interface ModelGatewaySnapshot {
   port: number
   connections: number
   activeRequests: number
-  services: Record<GatewayCapability, GatewayServiceSnapshot>
+  services: Record<Exclude<GatewayCapability, 'ocr'>, GatewayServiceSnapshot> & { ocr?: GatewayServiceSnapshot }
   requests: GatewayRequestSnapshot[]
-  availableModels?: Record<GatewayCapability, AvailableGatewayModel[]>
+  availableModels?: Partial<Record<GatewayCapability, AvailableGatewayModel[]>>
   realtime?: {
     models: { model_id: string; enabled: boolean; kinds: string[]; operations: string[] }[]
     instances: { instance_id: string; model_id: string; state: string; active_leases: number }[]

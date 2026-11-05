@@ -194,7 +194,8 @@ class S2SAudioOutput:
         response_id = observation.response_id
         if observation.status != "completed":
             self._fence()
-            self._report("PROVIDER_DISCONNECTED", "s2sAudioResponseFailed", {"response_id": response_id, "status": observation.status})
+            if observation.status != "cancelled":
+                self._report("SYNTHESIS_FAILED", "s2sAudioResponseFailed", {"response_id": response_id, "status": observation.status})
             self._drop_all()
             return
         stream_ids = self._response_streams.get(response_id, [])
@@ -262,7 +263,13 @@ class S2SAudioOutput:
     def _fence(self) -> int:
         self.generation = max(self.generation, int(getattr(self.session, "playback_generation", 0))) + 1
         setattr(self.session, "playback_generation", self.generation)
-        self._report("PLAYBACK_UNKNOWN", "s2sPlaybackFenced", {}, state="cancelled")
+        if self.event_sink:
+            self.event_sink("playback_state", {
+                "audio_stream_id": self._active_stream_id or "s2s",
+                "playback_generation": self.generation,
+                "owner_id": self.owner_id,
+                "state": "cancelled",
+            })
         return self.generation
 
     def _drop_all(self) -> None:
@@ -295,15 +302,8 @@ class S2SAudioOutput:
     async def wait_idle(self) -> None:
         await self._idle.wait()
 
-    def _report(self, code: str, message_key: str, details: dict[str, Any], *, state: str | None = None) -> None:
+    def _report(self, code: str, message_key: str, details: dict[str, Any]) -> None:
         if self.event_sink:
-            if state:
-                self.event_sink("playback_state", {
-                    "audio_stream_id": self._active_stream_id or "s2s",
-                    "playback_generation": self.generation,
-                    "owner_id": self.owner_id,
-                    "state": state,
-                })
             error = ErrorPayload(code=code, stage="playback", scope="consumer",
                                  message_key=message_key, safe_details={k: str(v) for k, v in details.items()})
             result = self.event_sink("error", {"error": error.model_dump(mode="json")})

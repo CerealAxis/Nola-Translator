@@ -4,10 +4,15 @@ import { WebSocket } from 'ws'
 import type { DirectModelRequest, DirectModelResult } from '../shared/agent-workspace'
 import { normalizeModelBinding } from '../shared/model-gateway'
 import { MIMO_TTS_BINDING, MIMO_TTS_MODEL } from '../shared/settings'
-import type { SessionConfig } from '../shared/contracts'
+import type { ResourceRecord, SessionConfig } from '../shared/contracts'
 import type { BackendSupervisor } from './backend-supervisor'
 import { GatewayWorkerError } from './model-gateway-worker'
 import type { GatewayWorkerResult } from './model-gateway-worker'
+import { backendError, backendFailure, readBackendFailure } from './backend-error'
+import { resourceSchema } from '../shared/schemas'
+import type { AppSettings } from '../shared/settings'
+import { screenAppearanceSchema, type ScreenOcrRequest, type ScreenOcrResult, type ScreenOcrStatus } from '../shared/screen-translation'
+import { resolveModelNetwork } from './network-region'
 
 const catalog = z.object({ models: z.array(z.object({
   model_id: z.string(), enabled: z.boolean(), operations: z.array(z.string()),
@@ -15,6 +20,29 @@ const catalog = z.object({ models: z.array(z.object({
 const result = z.object({ text: z.string(), audio: z.string().optional(), voices: z.array(z.string()).optional() })
 const operations = { asr: 'transcribe', mt: 'translate', tts: 'synthesize' } as const
 type BackendConnection = Pick<BackendSupervisor, 'baseUrl' | 'authorizationHeader'>
+export class BackendModelError extends Error {
+  constructor(readonly status: number, readonly engineCode: string, readonly correlationId?: string) {
+    super(engineCode)
+  }
+}
+
+async function rejectBackendModel(response: Response): Promise<never> {
+  throw backendModelFailure(response.status, await readBackendFailure(response))
+}
+
+function backendModelFailure(status: number, failure?: z.infer<typeof backendError>): Error {
+  const provider = failure?.provider_code
+  if (provider === 'authentication_failed') return new GatewayWorkerError(provider, 'The model provider rejected its credentials')
+  if (provider === 'rate_limited') return new GatewayWorkerError(provider, 'The model provider rate limit was reached')
+  if (provider === 'network_unavailable') return new GatewayWorkerError(provider, 'Could not reach the model provider')
+  if (provider === 'request_timeout' || failure?.message_key === 'gateway.TIMEOUT') {
+    return new GatewayWorkerError('request_timeout', 'The model request timed out')
+  }
+  if (status === 400) return new GatewayWorkerError('invalid_request', 'Invalid inference input')
+  if (failure) return new BackendModelError(status, backendFailure(failure).message, failure.correlation_id)
+  return new BackendModelError(status, 'engineTransportUnavailable')
+}
+
 export interface BackendInferenceOptions { batchAsr?: boolean; mp3?: boolean; inspect?: boolean }
 const CLOUD_MT_MODELS = ['google', 'microsoft', 'mymemory', 'index-translate'] as const
 export function backendCloudMt(binding: string) {
@@ -65,25 +93,34 @@ export async function openBackendAsrStream(
   url.searchParams.set('model', backendCloudAsr(binding) ?? binding.slice('resource:'.length))
   const socket = new WebSocket(url, { headers: { ...backend.authorizationHeader(), ...headers }, handshakeTimeout: 10_000, maxPayload: 1024 * 1024 })
   let pending: { op: string; resolve: () => void; reject: (error: Error) => void } | undefined
+  let failure: Error | undefined
   const unavailable = () => new GatewayWorkerError('network_unavailable', 'Realtime recognition disconnected')
   const close = () => socket.terminate()
-  const closed = new Promise<void>(resolve => { socket.once('close', () => resolve()) })
+  const closed = new Promise<Error | void>(resolve => { socket.once('close', () => resolve(failure)) })
   signal.addEventListener('abort', close, { once: true })
   const ready = new Promise<void>((resolve, reject) => {
     socket.once('open', resolve)
     socket.once('close', () => {
       signal.removeEventListener('abort', close)
       reject(unavailable())
-      pending?.reject(unavailable())
+      pending?.reject(failure ?? unavailable())
       pending = undefined
     })
     socket.on('error', () => { reject(unavailable()); close() })
   })
-  const frame = z.object({ ack: z.string().optional(), event: z.record(z.string(), z.unknown()).optional() })
+  const frame = z.object({
+    ack: z.string().optional(), event: z.record(z.string(), z.unknown()).optional(),
+    error: backendError.optional(), status: z.number().int().min(400).max(599).optional(),
+  })
   socket.on('message', raw => {
     try {
       const value = frame.parse(JSON.parse(raw.toString()))
-      if (value.event) emit(value.event)
+      if (value.error) {
+        failure = backendModelFailure(value.status ?? 500, value.error)
+        const rejected = pending
+        pending = undefined
+        rejected?.reject(failure)
+      } else if (value.event) emit(value.event)
       else if (pending && value.ack === pending.op) {
         const ack = pending
         pending = undefined
@@ -102,7 +139,7 @@ export async function openBackendAsrStream(
 export async function openBackendLanguageModel(backend: BackendConnection, model: string, signal: AbortSignal) {
   const headers = backend.authorizationHeader()
   const list = await fetch(new URL('/api/v2/gateway/capabilities', backend.baseUrl), { headers, signal })
-  if (!list.ok) throw new Error('Realtime model catalog is unavailable')
+  if (!list.ok) return rejectBackendModel(list)
   if (!catalog.parse(await list.json()).models.some(entry =>
     entry.enabled && entry.model_id === `llm:${model}` && entry.operations.includes('generate'))) return
   const leaseId = randomUUID()
@@ -118,7 +155,7 @@ export async function openBackendLanguageModel(backend: BackendConnection, model
       method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, signal,
       body: JSON.stringify({ model, lease_id: leaseId }),
     })
-    if (!response.ok) throw new Error('Realtime language model is unavailable')
+    if (!response.ok) await rejectBackendModel(response)
     lease = schema.parse(await response.json())
   } catch (error) {
     await release()
@@ -151,7 +188,7 @@ export async function inferBackendModel(
   const model = mimo ? MIMO_TTS_MODEL : cloudAsr ?? cloudMt ?? binding.slice('resource:'.length)
   const headers = backend.authorizationHeader()
   const list = await fetch(new URL('/api/v2/gateway/capabilities', backend.baseUrl), { headers, signal })
-  if (!list.ok) throw new Error('Realtime model catalog is unavailable')
+  if (!list.ok) return rejectBackendModel(list)
   if (!catalog.parse(await list.json()).models.some(entry =>
     entry.enabled && entry.model_id === model && entry.operations.includes(operations[request.kind]))) return
 
@@ -170,14 +207,102 @@ export async function inferBackendModel(
     }, signal,
     body: JSON.stringify({ id, model, kind: inspect ? 'tts-voices' : kind, ...parameters }),
   })
-  if (!response.ok) {
-    if (response.status === 400) throw new GatewayWorkerError('invalid_request', 'Invalid inference input')
-    const failure = z.object({ error: z.object({ code: z.string(), provider_code: z.string().nullish() }) }).safeParse(await response.json())
-    const code = failure.success ? failure.data.error.provider_code : undefined
-    if (code === 'authentication_failed' || code === 'rate_limited' || code === 'request_timeout' || code === 'network_unavailable') {
-      throw new GatewayWorkerError(code, 'Inference provider unavailable')
-    }
-    throw new Error(failure.success ? failure.data.error.code : 'Realtime inference failed')
-  }
+  if (!response.ok) return rejectBackendModel(response)
   return result.parse(await response.json())
+}
+
+
+const screenOcrResult = z.object({ width: z.number().positive(), height: z.number().positive(), blocks: z.array(z.object({
+  id: z.union([z.string(), z.number()]).transform(String), text: z.string().max(64000), confidence: z.number().min(0).max(1),
+  quad: z.array(z.tuple([z.number().finite(), z.number().finite()])).length(4),
+  appearance: screenAppearanceSchema.optional(),
+})).max(2048) })
+const screenOcrStatus = z.object({ installed: z.boolean(), state: z.string(),
+  progress: z.number().nullish().transform(value => value ?? undefined), error: z.string().nullish().transform(value => value ?? undefined),
+  languages: z.array(z.string()).optional(),
+  resource: z.preprocess(value => value && typeof value === 'object'
+    ? Object.fromEntries(Object.entries(value).filter(([, item]) => item !== null)) : value, resourceSchema).optional(),
+})
+
+/** Model management owns installation; Model Gateway alone loads and releases OCR weights. */
+export class BackendScreenOcr {
+  private poll?: NodeJS.Timeout
+  private polling = false
+  private disposed = false
+  private readonly current = new Map<string, ScreenOcrStatus>()
+  private activeResource = 'pp-ocrv5-mobile-onnx'
+  constructor(private readonly options: {
+    backend(): BackendSupervisor | undefined
+    ensureBackend(): Promise<unknown>
+    settings(): AppSettings
+    changed(resource: ResourceRecord): void
+  }) {}
+
+  private async request(path = '', method = 'GET', body?: unknown, signal?: AbortSignal, resourceId = 'pp-ocrv5-mobile-onnx'): Promise<unknown> {
+    await this.options.ensureBackend()
+    const backend = this.options.backend()
+    if (!backend?.ready) throw new Error('backendUnavailable')
+    const response = await fetch(new URL(`/api/v2/screen/ocr${path}${this.query(resourceId)}`, backend.baseUrl), {
+      method, headers: { ...backend.authorizationHeader(), 'Content-Type': 'application/json' },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000),
+    })
+    if (!response.ok) {
+      const failure = await response.json().catch(() => null) as { detail?: unknown } | null
+      const detail = failure?.detail
+      const errors: Record<string, string> = { resourceBusy: 'resourceBusy', modelMissing: 'ocrMissing',
+        modelCorrupt: 'ocrCorrupt', runtimeUnavailable: 'ocrRuntimeUnavailable', modelNotLoaded: 'ocrNotReady' }
+      throw new Error(typeof detail === 'string' ? errors[detail] ?? 'ocrFailed' : 'ocrFailed')
+    }
+    return response.json()
+  }
+
+  private query(resourceId: string): string {
+    return resourceId === 'pp-ocrv5-mobile-onnx' ? '' : `?resource_id=${encodeURIComponent(resourceId)}`
+  }
+  async status(resourceId = 'pp-ocrv5-mobile-onnx'): Promise<ScreenOcrStatus> {
+    const status = screenOcrStatus.parse(await this.request('', 'GET', undefined, undefined, resourceId))
+    if (this.disposed) return status
+    this.current.set(resourceId, status)
+    if (status.resource) this.options.changed(status.resource)
+    this.schedulePoll()
+    return status
+  }
+  private schedulePoll(): void {
+    const pending = [...this.current].filter(([, status]) => status.state === 'running' || status.state === 'cancelling')
+    if (this.disposed || this.poll || this.polling || !pending.length) return
+    this.poll = setTimeout(() => {
+      this.poll = undefined; this.polling = true
+      void Promise.all(pending.map(async ([id]) => {
+        try { await this.status(id) }
+        catch {
+          const resource = this.current.get(id)?.resource
+          if (resource && !this.disposed) this.options.changed({ ...resource,
+            state: 'failed', phase: undefined, errorCode: 'backendUnavailable', cancellable: false })
+          this.current.delete(id)
+        }
+      })).finally(() => { this.polling = false; this.schedulePoll() })
+    }, 1000)
+    this.poll.unref()
+  }
+  async install(resourceId = 'pp-ocrv5-mobile-onnx'): Promise<ScreenOcrStatus> {
+    await this.request('/install', 'POST', { network: await resolveModelNetwork(this.options.settings().network) }, undefined, resourceId)
+    return this.status(resourceId)
+  }
+  async cancel(resourceId = 'pp-ocrv5-mobile-onnx'): Promise<ScreenOcrStatus> { await this.request('/install', 'DELETE', undefined, undefined, resourceId); return this.status(resourceId) }
+  async remove(resourceId = 'pp-ocrv5-mobile-onnx'): Promise<ScreenOcrStatus> { await this.request('', 'DELETE', undefined, undefined, resourceId); return this.status(resourceId) }
+  async load(resourceId = 'pp-ocrv5-mobile-onnx'): Promise<void> { this.activeResource = resourceId; await this.request('/load', 'POST', undefined, undefined, resourceId) }
+  async release(): Promise<void> {
+    // Shutdown must not restart a backend that has already exited.
+    const backend = this.options.backend()
+    if (!backend?.ready) return
+    const response = await fetch(new URL(`/api/v2/screen/ocr/release${this.query(this.activeResource)}`, backend.baseUrl), {
+      method: 'POST', headers: backend.authorizationHeader(), signal: AbortSignal.timeout(30000),
+    })
+    if (!response.ok) throw new Error('ocrFailed')
+  }
+  async infer(request: ScreenOcrRequest, signal: AbortSignal): Promise<ScreenOcrResult> {
+    return screenOcrResult.parse(await this.request('', 'POST', request, signal, this.activeResource))
+  }
+  dispose(): void { this.disposed = true; if (this.poll) clearTimeout(this.poll); this.poll = undefined }
 }

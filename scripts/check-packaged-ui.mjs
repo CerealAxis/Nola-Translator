@@ -214,7 +214,7 @@ try {
   }
 
   // -- 主窗：设置页与翻译开关（沿用旧版的实质检查，换成新选择器） -------------------
-  await evaluate(target, `(() => { location.hash = '#/settings/translation' })()`)
+  await evaluate(target, `(() => { location.hash = '#/settings/audio' })()`)
   await pageWait(target, `document.querySelector('[data-page]')?.getAttribute('data-page') === 'settings'`)
   await delay(250)
   /**
@@ -226,7 +226,7 @@ try {
   const settingsProbe = await evaluate(target, `(async () => {
     const panels = document.querySelector('.settings-panels');
     const groups = document.querySelectorAll('.settings-panels .settings-group');
-    const switches = [...document.querySelectorAll('.settings-panels [role="switch"], .settings-panels input[type="checkbox"]')];
+    const switches = [...document.querySelectorAll('#translation-settings [role="switch"], #translation-settings input[type="checkbox"]')];
     const visible = switches.filter((el) => el.getBoundingClientRect().width > 0);
     const before = await window.nolaTranslator.getSettings().then((s) => s.translation.translateIntermediate);
     let after = before;

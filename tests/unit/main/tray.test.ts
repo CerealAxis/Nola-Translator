@@ -32,10 +32,25 @@ it('shows a localized menu without stopping the feature', async () => {
   expect(mocks.destroy).toHaveBeenCalledOnce()
 })
 
-it('refreshes the tray menu when activity changes', () => {
+it('refreshes the tray menu when activity changes', async () => {
   const tray = new NolaTray({ getSettings: () => ({ ...DEFAULT_SETTINGS, uiLanguage: 'zh-CN' }),
     getActivity: () => ({ owner: null, phase: 'idle' }), show: () => {}, stop: async () => {}, quit: () => {},
   })
+  await tray.initialize()
   tray.activityChanged()
-  expect(mocks.menus).toHaveLength(1)
+  expect(mocks.menus).toHaveLength(2)
+})
+
+it('keeps screen controls reachable while the translation overlay ignores input', async () => {
+  const control = { status: () => 'paused', open: vi.fn(), pause: vi.fn(async () => {}), resume: vi.fn(async () => {}), stop: vi.fn(async () => {}) }
+  const tray = new NolaTray({ getSettings: () => ({ ...DEFAULT_SETTINGS, uiLanguage: 'en' }),
+    getActivity: () => ({ owner: 'screen-translation', phase: 'running' }), show: () => {}, stop: async () => {}, quit: () => {}, screenTranslation: control,
+  })
+  await tray.initialize()
+  const menu = mocks.menus.at(-1)!
+  menu.find(item => item.label === 'Screen translation').click()
+  menu.find(item => item.label === 'Resume').click()
+  expect(control.open).toHaveBeenCalledOnce()
+  expect(control.resume).toHaveBeenCalledOnce()
+  expect(control.pause).not.toHaveBeenCalled()
 })

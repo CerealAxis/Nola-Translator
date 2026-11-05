@@ -38,6 +38,12 @@ function renderWithI18n(node: ReactElement) {
 
 const noop = () => undefined
 
+it('shows an installed OCR model without requesting a speech configuration', () => {
+  renderWithI18n(<ModelCard record={record({ resourceId: 'pp-ocrv5-mobile-onnx', kind: 'ocrModel', installed: true })} busy={false} onInstall={noop} onCancel={noop} />)
+  expect(screen.getByText('已安装')).toBeInTheDocument()
+  expect(screen.queryByText('待配置')).not.toBeInTheDocument()
+})
+
 describe('事实格式化（只写事实，不写形容词）', () => {
   it('字节数带单位，且单位随量级走', () => {
     expect(formatBytes(0)).toBe('0 B')

@@ -8,8 +8,8 @@ export interface ModelPolicy {
   selections: Partial<Record<GatewayCapability, string>>
 }
 
-export const MODEL_CAPABILITIES: readonly GatewayCapability[] = ['asr', 'mt', 'tts', 'llm']
-const capabilityBindings = z.object({ asr: z.string().max(512), mt: z.string().max(512), tts: z.string().max(512), llm: z.string().max(512) }).partial()
+export const MODEL_CAPABILITIES: readonly GatewayCapability[] = ['asr', 'mt', 'tts', 'llm', 'ocr']
+const capabilityBindings = z.object({ asr: z.string().max(512), mt: z.string().max(512), tts: z.string().max(512), llm: z.string().max(512), ocr: z.string().max(512) }).partial()
 export const modelPolicySchema = z.object({
   enabled: z.record(z.string().max(520), z.boolean()),
   defaults: capabilityBindings,
@@ -22,6 +22,7 @@ export function modelPolicyKey(kind: GatewayCapability, binding: string): string
 }
 
 function legacySceneBinding(settings: AppSettings, kind: GatewayCapability): string {
+  if (kind === 'ocr') return normalizeModelBinding(kind, settings.modelGateway.ocrModel)
   if (kind === 'llm') return normalizeModelBinding(kind, settings.modelGateway.llmModel)
   if (kind === 'tts') return normalizeModelBinding(kind, settings.synthesis.modelId)
   if (kind === 'asr') return settings.recognition.provider && settings.recognition.provider !== 'local'

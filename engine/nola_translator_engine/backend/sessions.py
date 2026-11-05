@@ -12,6 +12,7 @@ import asyncio
 import hashlib
 import json
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Callable
 from uuid import UUID, uuid4
@@ -157,6 +158,7 @@ class SessionManager:
         #: The single realtime slot: held from create (preparing counts) until
         #: closed/failed release.
         self._slot_session_id: UUID | None = None
+        self._meeting_sessions: tuple[Session, ...] | None = None
         self._slot_lock = asyncio.Lock()
 
     # -- creation -----------------------------------------------------------
@@ -179,37 +181,8 @@ class SessionManager:
                     )
                 return existing
 
-            if self._slot_session_id is not None:
-                holder = self._sessions.get(self._slot_session_id)
-                raise SessionError(
-                    ErrorPayload(
-                        code="SESSION_SLOT_BUSY",
-                        stage="session",
-                        scope="session",
-                        message_key="session.slotBusy",
-                        message_args={"owner": holder.owner if holder else "unknown"},
-                        safe_details={
-                            "current_owner": holder.owner if holder else "unknown",
-                        },
-                    ),
-                    status=409,
-                )
-
-            session_id = uuid4()
-            pipeline_id = uuid4()
-            session = Session(
-                session_id=session_id,
-                owner=request.owner,
-                config=request.config,
-                pipeline_id=pipeline_id,
-                _log=SessionEventLog(  # type: ignore[arg-type]
-                    session_id=session_id,
-                    server_instance_id=self.server_instance_id,
-                    pipeline_id=pipeline_id,
-                    journal=self._journal if request.owner == "quick_interpret" else None,
-                ),
-            )
-            self._sessions[session.session_id] = session
+            self._require_free_slot()
+            session = self._new_session(request.owner, request.config)
             self._slot_session_id = session.session_id
             session._commands[request.command_id] = _CommandRecord(
                 fingerprint=fingerprint,
@@ -220,11 +193,53 @@ class SessionManager:
                     result_state=session.state,
                 ),
             )
-            session._log.submit(
-                "pipeline_state",
-                {"state": "created", "reason": "", "required_actions": []},
-            )
         return session
+
+    def _require_free_slot(self) -> None:
+        if self._slot_session_id is not None:
+            owner = self._sessions[self._slot_session_id].owner
+            raise SessionError(ErrorPayload(
+                code="SESSION_SLOT_BUSY", stage="session", message_key="session.slotBusy",
+                message_args={"owner": owner}, safe_details={"current_owner": owner},
+            ))
+
+    def _new_session(self, owner: SessionOwner, config: SessionConfig) -> Session:
+        session_id, pipeline_id = uuid4(), uuid4()
+        session = Session(
+            session_id=session_id, owner=owner, config=config, pipeline_id=pipeline_id,
+            _log=SessionEventLog(
+                session_id=session_id, server_instance_id=self.server_instance_id, pipeline_id=pipeline_id,
+                journal=self._journal if owner == "quick_interpret" else None,
+            ),
+        )
+        self._sessions[session_id] = session
+        session._log.submit("pipeline_state", {"state": "created", "reason": "", "required_actions": []})
+        return session
+
+    async def reserve_meeting(self, uplink: SessionConfig | None, downlink: SessionConfig | None) -> tuple[Session, ...]:
+        async with self._slot_lock:
+            self._require_free_slot()
+            self._meeting_sessions = tuple(self._new_session("meeting", lane) for lane in (uplink, downlink) if lane is not None)
+            if not self._meeting_sessions:
+                raise ValueError("At least one meeting direction is required")
+            self._slot_session_id = self._meeting_sessions[0].session_id
+            return self._meeting_sessions
+
+    @asynccontextmanager
+    async def audio_test_slot(self):
+        async with self._slot_lock:
+            self._require_free_slot()
+            yield
+
+    async def release_meeting(self, session_id: UUID) -> None:
+        async with self._slot_lock:
+            if self._meeting_sessions and self._slot_session_id == session_id:
+                self._meeting_sessions = None
+                self._slot_session_id = None
+
+    def forget_meeting(self, sessions: tuple[Session, ...]) -> None:
+        for session in sessions:
+            self._sessions.pop(session.session_id, None)
 
     def _find_by_command_id(self, command_id: str) -> Session | None:
         for session in self._sessions.values():
@@ -363,7 +378,7 @@ class SessionManager:
 
     async def _release_slot(self, session_id: UUID) -> None:
         async with self._slot_lock:
-            if self._slot_session_id == session_id:
+            if self._slot_session_id == session_id and self._meeting_sessions is None:
                 self._slot_session_id = None
 
 

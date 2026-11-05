@@ -20,6 +20,17 @@ async function dataRootPair(): Promise<{ source: string; destination: string }> 
 }
 
 describe('data root migration', () => {
+  it('retains screen regions and the shared conversation window preferences', async () => {
+    const { source, destination } = await dataRootPair()
+    for (const filename of ['screen-translation.json', 'workspace-window.json']) {
+      await writeFile(join(source, filename), JSON.stringify({ saved: filename }))
+    }
+    const report = await migrateDataRoot(source, destination)
+    expect(report.failed).toEqual([])
+    for (const filename of ['screen-translation.json', 'workspace-window.json']) {
+      expect(JSON.parse(await readFile(join(destination, filename), 'utf8'))).toEqual({ saved: filename })
+    }
+  })
   it('does not overwrite destination edits when retrying deletion after a completed copy', async () => {
     const { source, destination } = await dataRootPair()
     await writeFile(join(source, 'settings.json'), '{"old":true}')

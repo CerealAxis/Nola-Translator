@@ -109,7 +109,7 @@ export function connectDemo(initial: AppSettings, onOverlay: (open: boolean) => 
     },
     runtimes: {
       list: async () => runtimes, prepare: async () => runtimes,
-      openSettings: async component => { location.hash = `#/settings/compute?component=${component}` },
+      openSettings: async component => { location.hash = `#/settings/engine?component=${component}` },
       install: async id => {
         const recipe = runtimes.recipes.find(item => item.id === id)
         const pkg = runtimes.packages.find(item => item.id === id)

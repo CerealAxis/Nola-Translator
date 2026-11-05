@@ -1,7 +1,6 @@
-import { OfflineResources } from '../../offline'
 import { SettingsRow } from '../SettingsRow'
 /**
- * Advanced diagnostics: engine state, versions and paths, factory reset.
+ * Engine diagnostics and the separately composed factory reset group.
  *
  * Factory reset confirms through `AlertDialog`, which is the only destructive path in the app
  * that is not a single click.
@@ -22,7 +21,6 @@ import { actions, stores, updateSettings, useStore } from '@/store'
 import type { EngineStatus } from '@/store'
 import { reportSettingsFailure } from '../settingsErrorChannel'
 import { SettingGroup } from '../SettingsPage'
-import type { SettingsPanelProps } from '../SettingsPage'
 
 /**
  * Engine state, keyed exhaustively: a new `EngineStatus` fails to compile here instead of
@@ -56,12 +54,11 @@ const ENGINE_STATUS_LABELS: Record<string, TranslationKey> = {
   failed: 'titleBar.engineFailed',
 }
 
-export function AdvancedTab(_props: SettingsPanelProps) {
+export function EngineDiagnostics() {
   const { t } = useI18n()
   const engineVersion = useStore(stores.models, (state) => state.engineVersion)
   const engineStatus = useStore(stores.session, (state) => state.engineStatus)
   const storage = useStore(stores.settings, (state) => state.storage)
-  const pending = useStore(stores.settings, (state) => state.pending)
   const engineRow = ENGINE_STATUS_ROW[engineStatus]
 
   return (
@@ -75,14 +72,6 @@ export function AdvancedTab(_props: SettingsPanelProps) {
         <CodeRow label={t('settings.protocolVersion')} value={String(PROTOCOL_VERSION)} />
       </SettingGroup>
 
-      <OfflineResources />
-
-      <SettingGroup legend={t('settings.resetAll')}>
-        <SettingsRow label={t('settings.resetAll')}>
-          <ResetAll pending={pending} />
-        </SettingsRow>
-      </SettingGroup>
-
       {/*
         The individual diagnostics rows. Copying alone hands the user JSON they have to open
         somewhere else to read, while what they need during a failure is to be told now.
@@ -94,6 +83,14 @@ export function AdvancedTab(_props: SettingsPanelProps) {
       </SettingGroup>
     </div>
   )
+}
+
+export function ResetSettingsGroup() {
+  const { t } = useI18n()
+  const pending = useStore(stores.settings, state => state.pending)
+  return <SettingGroup legend={t('settings.resetAll')}>
+    <SettingsRow label={t('settings.resetAll')}><ResetAll pending={pending} /></SettingsRow>
+  </SettingGroup>
 }
 
 /**

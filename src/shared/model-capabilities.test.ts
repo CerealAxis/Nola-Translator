@@ -3,7 +3,7 @@ import type { ResourceRecord } from './contracts'
 import { parseCommandLine, parseEventLine } from './schemas'
 import { configurationOf, isModelReady, modelConfigurationSchema, recognitionLanguages, supportsTranslation, translationLanguages } from './model-capabilities'
 import type { ModelConfiguration } from './model-capabilities'
-import { LANGUAGE_LABELS } from './languages'
+import { LANGUAGE_LABELS, languageName, normalizeLanguage } from './languages'
 import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } from './index-translate'
 import { modelEngines } from './model-engines'
 
@@ -13,6 +13,16 @@ function record(id: string, configuration?: ModelConfiguration): ResourceRecord 
 const bilingual: ModelConfiguration = { slot: 'translation', engine: 'llama', languages: [], supportsAutoDetection: true, sourceLanguages: ['auto', 'en', 'ja'], targetLanguages: ['en', 'ja'] }
 
 describe('model language capabilities', () => {
+  it('names every catalog language in all six UI locales without rewriting inference codes', () => {
+    expect(languageName('ff', 'zh-CN')).toBe('富拉语')
+    expect(languageName('ns', 'zh-CN')).toBe('北索托语')
+    for (const code of ['ff', 'ns', 'abq', 'lbe', 'tab', 'sck']) expect(normalizeLanguage(code)).toBe(code)
+    for (const code of Object.keys(LANGUAGE_LABELS)) {
+      for (const locale of ['zh-CN', 'zh-TW', 'zh-HK', 'en', 'ja', 'ko'] as const) {
+        expect(languageName(code, locale).toLowerCase(), `${locale}: ${code}`).not.toBe(code.toLowerCase())
+      }
+    }
+  })
   it('selects backend by weight loader for both tasks', () => {
     expect(modelEngines({ provider: 'llama-asr' })).toEqual(['llama'])
     expect(modelEngines({ provider: 'transformers-causal' })).toEqual(['pytorch'])

@@ -156,3 +156,51 @@ it('clears the interim revision of a segment when a stale final for it arrives',
   expect(sessionStore.getState().interim).toBeNull()
   expect(sessionStore.getState().segments).toHaveLength(1)
 })
+
+
+it('hydrates a late reader and replays newer caption revisions without duplicate rows', async () => {
+  const bridge = createIpcBridge()
+  let receive: Parameters<typeof bridge.events.onEngineEvent>[0] = () => undefined
+  vi.spyOn(bridge.events, 'onEngineEvent').mockImplementation(callback => { receive = callback; return () => undefined })
+  vi.spyOn(bridge.engine, 'getEngineState').mockResolvedValue('ready')
+  let finish!: (value: import('../../shared/session-reader').SessionReaderSnapshot | null) => void
+  bridge.engine.getSessionSnapshot = () => new Promise(resolve => { finish = resolve })
+  attachSessionStore(bridge)
+  const segment = { segmentId: 'line', revision: 1, startedAtMs: 0, sourceText: 'Old', isFinal: true, translations: [] }
+  receive({ protocolVersion: 1, requestId: 'newer', type: 'caption', sessionId: 'shared', segment: { ...segment, revision: 2, sourceText: 'Latest' } })
+  finish({ sessionId: 'shared', meetingId: 'record', startedAtMs: Date.now() - 1000, status: 'running', elapsedMs: 1000, segments: [segment] })
+  await vi.waitFor(() => expect(sessionStore.getState().segments).toEqual([{ ...segment, revision: 2, sourceText: 'Latest' }]))
+  receive({ protocolVersion: 1, requestId: 'stale', type: 'caption', sessionId: 'foreign', segment })
+  expect(sessionStore.getState().segments).toHaveLength(1)
+})
+
+
+it('does not replay the previous session pause across a new-session snapshot fence', async () => {
+  const bridge = createIpcBridge()
+  let receive: Parameters<typeof bridge.events.onEngineEvent>[0] = () => undefined
+  vi.spyOn(bridge.events, 'onEngineEvent').mockImplementation(callback => { receive = callback; return () => undefined })
+  vi.spyOn(bridge.engine, 'getEngineState').mockResolvedValue('ready')
+  let finish!: (value: import('../../shared/session-reader').SessionReaderSnapshot | null) => void
+  bridge.engine.getSessionSnapshot = () => new Promise(resolve => { finish = resolve })
+  attachSessionStore(bridge)
+  receive({ protocolVersion: 1, requestId: 'pause-old', type: 'status', code: 'paused' })
+  receive({ protocolVersion: 1, requestId: 'stop-old', type: 'sessionStopped', sessionId: 'old' })
+  receive({ protocolVersion: 1, requestId: 'new', type: 'sessionStarted', sessionId: 'new' })
+  finish({ sessionId: 'new', meetingId: null, startedAtMs: Date.now(), status: 'running', elapsedMs: 0, segments: [] })
+  await vi.waitFor(() => expect(sessionStore.getState()).toMatchObject({ sessionId: 'new', status: 'running' }))
+})
+
+
+it.each(['paused', 'stopped'] as const)('applies a %s edge received while the reader snapshot is in flight', async outcome => {
+  const bridge = createIpcBridge()
+  let receive: Parameters<typeof bridge.events.onEngineEvent>[0] = () => undefined
+  vi.spyOn(bridge.events, 'onEngineEvent').mockImplementation(callback => { receive = callback; return () => undefined })
+  vi.spyOn(bridge.engine, 'getEngineState').mockResolvedValue('ready')
+  let finish!: (value: import('../../shared/session-reader').SessionReaderSnapshot | null) => void
+  bridge.engine.getSessionSnapshot = () => new Promise(resolve => { finish = resolve })
+  attachSessionStore(bridge)
+  if (outcome === 'paused') receive({ protocolVersion: 1, requestId: 'pause', type: 'status', code: 'paused' })
+  else receive({ protocolVersion: 1, requestId: 'stop', type: 'sessionStopped', sessionId: 'held' })
+  finish({ sessionId: 'held', meetingId: null, startedAtMs: Date.now(), status: 'running', elapsedMs: 0, segments: [] })
+  await vi.waitFor(() => expect(sessionStore.getState()).toMatchObject(outcome === 'paused' ? { sessionId: 'held', status: 'paused' } : { sessionId: null, status: 'idle' }))
+})

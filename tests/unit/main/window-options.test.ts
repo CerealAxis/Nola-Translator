@@ -22,10 +22,12 @@ it('trusts only application entry documents, including queries and hash routes',
   const entry = pathToFileURL(join(directory, '../renderer/index.html')).href
   expect(isTrustedRendererUrl(`${entry}?theme=dark#/home`, directory)).toBe(true)
   expect(isTrustedRendererUrl(pathToFileURL(join(directory, '../renderer/workbench.html')).href, directory)).toBe(true)
+  expect(isTrustedRendererUrl(pathToFileURL(join(directory, '../renderer/screen.html')).href + '?role=capture', directory)).toBe(true)
   expect(isTrustedRendererUrl('file:///C:/Users/user/Downloads/index.html', directory)).toBe(false)
   expect(isTrustedRendererUrl('https://example.com/index.html', directory)).toBe(false)
   expect(isTrustedRendererUrl('not a URL', directory)).toBe(false)
   expect(isTrustedRendererUrl('http://localhost:5173/workbench.html?theme=dark', directory, 'http://localhost:5173/')).toBe(true)
+  expect(isTrustedRendererUrl('http://localhost:5173/screen.html?role=editor', directory, 'http://localhost:5173/')).toBe(true)
   expect(isTrustedRendererUrl('http://localhost:5173/?theme=dark', directory, 'http://localhost:5173/')).toBe(true)
   expect(isTrustedRendererUrl('http://localhost:5173/other.html', directory, 'http://localhost:5173/')).toBe(false)
   expect(isTrustedRendererUrl('http://localhost:5174/', directory, 'http://localhost:5173/')).toBe(false)

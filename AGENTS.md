@@ -1,168 +1,417 @@
 # AGENTS.md
 
-本文件约束 Nola Translator 仓库中的 AI 编程助手。优先完成用户当前任务，遵守项目既有架构与明确的操作边界。视觉规范见 [DESIGN.MD](./DESIGN.MD)，shadcn-ui文档见 [./llms.txt]，Assistant-ui 文档见 [ https://www.assistant-ui.com/llms-full.txt]
+本文件定义 Nola Translator 仓库中 AI 编程助手的工作规范。
+
+**核心原则：优先完成任务、遵循现有架构、控制修改范围、验证实际结果、尊重用户决策。**
+
+相关资源：
+
+- 视觉规范：[DESIGN.MD](./DESIGN.MD)
+- shadcn/ui 文档：[llms.txt](./llms.txt)
+- assistant-ui 文档：https://www.assistant-ui.com/llms-full.txt
+- 项目 Skills：`./skills/`
 
 ## 1. 工作原则
 
-- **以任务为中心**：先定位相关代码与约束，再修改；按需阅读本文列出的入口，不必在每次任务开始时遍历全仓或阅读所有文档。
-- **完成闭环**：对于已明确授权的任务，自主完成实现、必要验证和由本次改动引起的修复；不要只给方案或完成一半便停下来。信息不足但不影响正确性时，基于现有代码作合理判断；关键产品决策、破坏性操作和受保护文件修改按下文确认。
-- **控制范围**：优先做最小且完整的改动，沿用现有抽象；不借机重构无关模块、增加依赖或改变用户未要求的行为。保留工作区已有修改，不覆盖其他人或 Agent 的成果。
-- **按风险验证**：运行与改动有关的检查；失败则定位并修复本次改动引入的问题。通过后无需无理由重复全套测试。可能下载模型、使用云服务、覆盖用户数据或产生高成本的操作，先核实影响。
-- **说明结果**：结束时简述变更内容、验证结果及未验证事项，不把未执行的检查描述为已通过。
-- **项目skills**：./skills/
+### 1.1 任务执行
 
-## 2. 技术栈与代码入口
+- **任务优先**：先理解目标并定位相关代码，再开展修改。按需查阅文档，不必每次遍历整个仓库。
+- **自主闭环**：对已授权任务，完成实现、必要验证及本次改动引发的修复，不停留在建议或半成品。
+- **合理判断**：非关键细节可根据现有代码和项目惯例自主决定；涉及重要产品决策、破坏性操作或受保护文件时，必须取得授权。
+- **最小完整改动**：优先复用现有抽象，不借机重构无关模块、不无故引入依赖、不改变未要求的行为。
+- **保护工作区**：保留用户和其他 Agent 已有的修改，不擅自覆盖或清理。
+- **善于借鉴**：优先研究成熟项目及已有实现，避免重复造轮子；借鉴外部代码时注意许可证及兼容性。
 
-| 领域 | 技术或入口 |
+### 1.2 验证与交付
+
+- 根据改动范围选择测试，而非每次执行完整测试套件。
+- 发现本次改动导致的问题，应定位并修复。
+- 测试通过后，无需无理由重复执行。
+- 可能下载模型、调用付费云服务、覆盖数据或产生高成本的操作，先明确影响。
+- 完成任务后简要说明：
+  - 实际修改内容
+  - 已执行的验证及结果
+  - 尚未验证的内容或已知限制
+- 严禁将未执行、未通过的检查描述为已通过。
+
+## 2. 技术架构与代码入口
+
+### 2.1 技术栈
+
+| 领域 | 技术与架构 |
 | --- | --- |
-| 桌面端 | Electron + React + TypeScript；`electron-vite` 构建 |
-| UI | Tailwind CSS v4 + shadcn/ui（Base UI）；`src/renderer/components/ui/` 为基础组件源码入口，独立透明子窗口承载悬浮字幕 |
-| 状态与通信 | `NolaBridge`、5 个领域 Store、`useSyncExternalStore`、IPC |
-| 实时后端 | Electron 监督内置 Python 3.12 的 FastAPI 服务，私有 v2 REST / WebSocket 管理音频、会话和事件 |
-| 模型运行时 | Python 模型网关管理能力匹配、模型租约和本地 Worker；PyTorch / llama.cpp / CrispASR 按需安装或复用 |
-| 本地识别 | PyTorch、llama.cpp 或 CrispASR；根据已安装加载器选择 |
-| 本地翻译 | PyTorch 或 llama.cpp；支持 Index-Translate 官方权重及独立免费 API |
-| 云端能力 | 阿里云 LiveTranslate 独立 S2S；兼容阿里云、MiniMax 识别及传统云端定稿翻译 |
-| 浏览器扩展 | Chrome / Edge / Firefox MV3；Python Native Messaging 连接桌面程序 |
-| 文档与演示 | VitePress 多语言站；Vue 容器挂载 React，复用桌面 UI、主题及演示入口 |
-| 质量保障 | Vitest + Testing Library；JSONL 诊断日志 |
+| 桌面端 | Electron + React + TypeScript，electron-vite |
+| UI | Tailwind CSS v4 + shadcn/ui（Base UI） |
+| 状态管理 | NolaBridge、5 个领域 Store、useSyncExternalStore |
+| 进程通信 | contextBridge、IPC |
+| 实时后端 | Electron 监督的 Python 3.12 + FastAPI，私有 v2 REST / WebSocket |
+| 模型网关 | 能力匹配、模型租约、本地 Worker 生命周期 |
+| 本地运行时 | PyTorch / llama.cpp / CrispASR |
+| 本地 ASR | PyTorch、llama.cpp、CrispASR，按已安装加载器选择 |
+| 本地 MT | PyTorch、llama.cpp、Index-Translate 官方权重 |
+| 云端能力 | 阿里云 LiveTranslate S2S、阿里云与 MiniMax ASR、云端 MT、独立免费 API |
+| 浏览器扩展 | Chrome / Edge / Firefox MV3 + Native Messaging |
+| 文档系统 | VitePress 多语言站，Vue 容器挂载 React |
+| 测试诊断 | Vitest、Testing Library、JSONL 诊断日志 |
 
-按任务定位以下目录；结构调整后必须同步更新本节索引。
+悬浮字幕使用独立透明子窗口。浏览器扩展拥有独立的提供商配置和语言设置。
 
-```
+### 2.2 目录与入口索引
+
+按任务查阅对应目录，不需要预先阅读全部代码。
+
+```text
 src/
-  main/                   Electron 主进程：IPC、窗口、设置、引擎与会话、工作台、模型网关、托盘和功能互斥
-    backend-supervisor.ts 私有 v2 后端启动、鉴权和退出
-    backend-session.ts    快速同传和浏览器字幕的 v2 会话客户端
-    backend-browser-input.ts 浏览器音频接入
-    backend-playback.ts   单播放所有者、音频帧和播放确认
-    backend-direct-model.ts v2 单次推理与本地 LLM 租约客户端
-    model-gateway.ts      公开 v1 协议及仍依赖旧 Worker 的兼容入口
-  preload/                单文件 contextBridge → window.nolaTranslator
-  shared/                 跨进程类型、Zod 校验、默认值和浏览器契约
+  main/                      Electron 主进程
+    backend-supervisor.ts     v2 后端启动、鉴权、退出
+    backend-session.ts        快速同传与浏览器字幕会话
+    backend-browser-input.ts  浏览器音频接入
+    backend-playback.ts       音频播放与确认
+    backend-direct-model.ts   单次推理及本地 LLM 租约
+    model-gateway.ts          v1 协议及旧 Worker 兼容
+    screen-translation.ts     屏幕翻译与捕获
+    workbench.ts              独立工作台窗口
+    latency-window.ts         延迟检测窗口
+    latency-session.ts        延迟采集点与会话汇总
+    meeting-mode.ts           会议口译会话组
+
+  preload/                   contextBridge
+  shared/                    类型、Zod、默认值与协议
+
   renderer/
-    available-models.ts   业务可调用模型目录、绑定选择与失效选择回退
-    application.tsx       桌面与文档站共用的页面及导航注册
-    bridge/               渲染进程唯一数据出口（NolaBridge）
-    store/                5 个领域 Store 与 useSyncExternalStore 实现
+    application.tsx          页面及导航注册
+    available-models.ts      模型目录与选择回退
+    bridge/                  NolaBridge 数据出口
+    store/                   5 个领域 Store
+    theme/                   设计 token 与 CJK 字体
+    i18n/                    多语言字典
+
     components/
-      assistant-ui/       工作台 Agent 对话、附件、模型选择等组件源码
-      ui/                 shadcn/ui Base UI 基础组件源码
-      primitives/         Nola 产品级 primitives 与通知适配
-      reading/            阅读与播放器组件
-      notes/              笔记组件
-      home/               首页展示组件
-    features/             home、workspace、overlay 等功能模块
-      workbench/          正式工作台 Agent 对话界面；workbench.html 为独立窗口入口
-      model-gateway/      模型网关服务控制、能力开关、连接状态与 API 接入示例
-    i18n/                 完整语言字典及组装逻辑
-    theme/                设计 token 唯一来源及 CJK 字体样式
-    assets/browsers/      Chrome / Edge / Firefox 图标
-    assets/fonts/         随应用打包的 Noto CJK 区域可变字体
+      ui/                    shadcn/ui Base UI 组件
+      assistant-ui/
+        native/              官方 Elements 源码
+      primitives/            产品级组件及通知
+      reading/               阅读与播放器
+      notes/                 笔记
+      home/                  首页
+
+    features/
+      home/                  首页
+      workspace/             工作区
+      overlay/               悬浮字幕
+      workbench/             Agent 工作台
+        NativeAgentSurface.tsx
+        native-agent-tools.tsx
+        NativeAgentSettings.tsx
+      model-gateway/         模型网关 UI
+      meeting/
+        MeetingModePage.tsx  会议口译与音频路由
+      screen/                屏幕翻译
+      latency/               延迟检测 UI
+
+    workbench.html           工作台独立入口
+    workbench-entry.tsx
+    workbench-entry.css
+    latency.html             延迟检测独立入口
+    latency-entry.tsx
+    screen.html              屏幕翻译独立入口
+
+    assets/
+      browsers/              浏览器图标
+      fonts/                 Noto CJK 可变字体
+
 engine/
-  nola_translator_engine/ Python 翻译引擎、模型资源和旧运行时
-    backend/             FastAPI v2、音频接入、双流水线、事件与历史
-      gateway/           模型能力、Provider、资源准入和 Worker 生命周期
-  contracts/v2/           生成的 v2 协议快照
-  tests/backend/          v2 后端、流水线和模型网关回归测试
+  nola_translator_engine/
+    backend/
+      gateway/               Provider、资源与 Worker
+      screen_ocr.py          PP-OCRv5 mobile
+      latency.py             延迟检测采集
+      meeting.py             会议会话组
+      meeting_audio.py       原声音频混合
+
+  contracts/v2/              生成的 v2 协议
+  tests/backend/             后端与流水线测试
+
 browser/
-  version.json            扩展版本信息
-  CHANGELOG.md            扩展发布记录
-  extension/              MV3 扩展
-  native_host/            stdio Native Messaging 主机与帧协议测试
-  tests/                  浏览器冒烟测试
+  version.json
+  CHANGELOG.md
+  extension/
+    providers.ts             Provider 配置
+    provider-runtime.ts      请求调度
+    translation-cache.ts     持久翻译缓存
+    speech-runtime.ts        ASR / S2S 与字幕翻译
+    offscreen.ts             独立音频采集与回放
+    tab-audio-runtime.ts     PCM 与播放生命周期
+    native-provider.ts       Native Messaging
+    content.tsx              网页覆盖层
+    content-lifecycle.ts     脚本清理与重注入
+    popup.tsx                工具栏弹窗与原生侧栏共用界面
+    sidepanel.html           Chrome / Edge / Firefox 原生侧栏入口
+    floating/                悬浮按钮
+    components/
+      SettingsPreview.tsx    设置效果预览
+    locale-base.ts           中英字典
+    locale-regions.ts        其他区域字典
+  native_host/               Native Messaging 主机
+  tests/                     扩展测试
+
 docs/
-  nola-docs/              终端用户文档及多语言首页
-  .vitepress/             站点配置、主题和语言入口
-  media-src/              文档站演示环境与截图素材
-  scripts/                构建演示、生成素材及截图的脚本
-  public/                 静态资源与文档配图
-  PRD/                    内部需求与架构文档，不参与站点构建
-assets/brand/             App Logo 与 GitHub 官方头像
-scripts/                  PowerShell 构建与运行时管理脚本
+  nola-docs/                 用户文档
+  .vitepress/                站点配置
+  media-src/                 演示及截图素材
+  scripts/                   文档构建脚本
+  public/                    静态资源
+  PRD/                       内部需求与架构文档
+
+assets/brand/                品牌资源
+scripts/                     构建与运行时管理
+skills/                      项目 Skills
 ```
 
-## 3. i18n 与视觉规范
+### 2.3 特殊架构约束
 
-### 国际化
+**工作台**
 
-- 所有界面字符串使用 `t()`；语言偏好可取 `auto`、`zh-CN`、`zh-TW`、`zh-HK`、`ko`、`ja`、`en`，`auto` 根据系统区域解析。
-- 六个具体区域语言必须各有完整 `Dictionary`。`t()` 的 key 类型为 `Leaves<Dictionary>`，错误 key 应触发编译错误。
-- 新增或修改 key 时同步更新六个区域语言。`zh-CN.ts` 从各 `*-ui.ts` 子字典组装，因此可在相应子字典定义新 key。
-- TS2741 对单个对象可能只报告第一个缺失字段；改动字典时应执行**全语言 key 全量比对**，不能只依靠 `tsc`。
+- 工作台窗口由 `src/main/workbench.ts` 注册。
+- 独立加载 `workbench.html`、`workbench-entry.tsx`、`workbench-entry.css`。
+- 不加载主页面的 `index.css` 或 Nola 产品主题。
+- 官方 Elements 源码位于 `components/assistant-ui/native/`。
+- Agent 界面、原生工具卡片及设置分别由 `NativeAgentSurface.tsx`、`native-agent-tools.tsx`、`NativeAgentSettings.tsx` 管理。
+- 旧聊天组件、旧侧栏和旧工作区组件已移除，不应重新依赖。
 
-### 样式
+**实时后端与模型**
 
-- 需要变更 UI 时阅读 [DESIGN.MD](./DESIGN.MD)；颜色、间距、圆角和字号以 `src/renderer/theme/` 的 token 为准，不引入任意字面值。
-- 按钮统一使用 `--radius-xl`，禁止 `ghost` 变体；图标按钮可使用透明背景。
-- 非按钮圆角按语义选 token；主题中没有 `rounded-pill` 档位。
+- 使用现有 FastAPI v2 会话与模型网关架构。
+- 模型能力调用须遵循现有能力匹配、资源准入和租约生命周期。
+- v1 接口属于兼容入口，不应未经要求扩大旧架构的使用范围。
 
-## 4. 注释规范
+**浏览器扩展**
 
-- 代码注释统一使用**英文**。注释解释原因、边界、特殊取值和不明显的副作用，而非重复代码已经表达的行为。
-- 仅对复杂函数、组件、类型或常量添加有价值的注释；需要时写明参数限制、返回值、副作用及单位或范围。行内注释放在对应代码上方，避免行尾堆叠。
-- `TODO` 标记待完成事项，`FIXME` 标记已知问题；说明原因或下一步，解决后删除。
-- 不保留过期、错误、与实现矛盾的注释；不写无用途的作者、日期、修改历史，也不机械要求每个函数或变量都有注释。
+- 扩展私有配置、语言及缓存与桌面端分离。
+- Native Messaging 是浏览器调用桌面模型能力的既有通道。
+- 修改音频路由时，保留既有防反馈及生命周期管理约束。
+
+## 3. 前端与国际化规范
+
+### 3.1 视觉规范
+
+修改 UI 前阅读 `DESIGN.MD`。
+
+- 颜色、字号、间距、圆角等以 `src/renderer/theme/` 的设计 token 为准。
+- 不新增无依据的硬编码视觉值。
+- 按钮统一采用 `--radius-xl`，禁止 `ghost` 变体；图标按钮允许透明背景。
+- 非按钮元素按语义选择圆角 token；不存在 `rounded-pill` 档位。
+- 优先复用现有 shadcn/ui 和项目 primitives，不自行实现重复基础组件。
+- 对受保护的视觉规范或设计系统变更，遵循第 6 节的授权要求。
+
+### 3.2 前端设计原则
+
+**让界面本身解释功能，而不是依赖大量说明文字。**
+
+- 避免不必要的次要标签、辅助文案、重复描述及装饰元素。
+- 利用布局、视觉层级、间距、分组和明确的操作名称表达信息。
+- 不默认给每个区块添加说明、教学提示或“智能建议”。
+- 简单补充信息优先使用 info 图标 + tooltip；复杂或关键内容仍应提供适当的可见说明。
+- 保留必要的表单标签、状态反馈、错误信息和可访问性名称。
+- 删除、支付、永久提交等不可逆操作必须经过明确确认。
+- 移除说明文案后，首次使用者仍应能判断下一步操作及其结果。
+- 重做界面时先识别冗余信息；必要内容应融入布局、控件文案或适当的帮助入口。
+- 不以极简为由牺牲可发现性、操作反馈、可访问性和功能完整性。
+
+### 3.3 国际化
+
+支持以下语言偏好：
+
+`auto`、`zh-CN`、`zh-TW`、`zh-HK`、`ko`、`ja`、`en`
+
+- `auto` 根据系统区域解析。
+- 所有用户可见界面字符串使用 `t()`。
+- 六个具体区域语言各自拥有完整 `Dictionary`。
+- `t()` 的 key 类型为 `Leaves<Dictionary>`，错误 key 应触发编译错误。
+- 修改 key 时同步更新六个区域语言。
+- `zh-CN.ts` 由各 `*-ui.ts` 子字典组装，可以在对应子字典中定义新 key。
+- TS2741 可能仅报告第一个缺失字段，因此须执行**全语言 key 全量比对**，不可仅依靠 TypeScript 编译结果。
+
+## 4. 代码与注释规范
+
+- 遵循项目既有命名、类型、模块拆分和错误处理方式。
+- 新增抽象前，先判断是否能复用现有实现。
+- 避免与任务无关的格式化、文件搬迁和依赖升级。
+- 不随意绕过已有类型、校验、权限及生命周期管理。
+
+**注释规范**
+
+- 代码注释统一使用英文。
+- 解释原因、边界、特殊值和不明显的副作用，而非复述代码。
+- 仅在复杂函数、组件、类型或常量处添加有价值的注释。
+- 必要时记录参数限制、返回值、副作用、单位和范围。
+- 行内注释放在代码上方，避免行尾堆叠。
+- `TODO` 表示待办，`FIXME` 表示已知问题，应附带原因或下一步。
+- 问题解决后删除对应标记。
+- 不保留过期或与实现矛盾的注释。
+- 不添加无意义的作者、日期、修改历史，不强制每个函数都有注释。
 
 ## 5. 构建与验证
 
-按改动范围选择相关命令，无需每次全部执行：
+根据任务风险选择验证范围。
+
+| 场景 | 优先验证 |
+| --- | --- |
+| 普通 TS / React 修改 | 相关单测、typecheck |
+| UI 改动 | 页面、主题、窗口尺寸 |
+| i18n 改动 | 六语言 key 比对与显示检查 |
+| 首次引导 | test:onboarding |
+| 文档站演示 | test:demo |
+| 浏览器扩展 | build:browser 与相关测试 |
+| 跨进程 / 后端 | IPC、协议及专项回归 |
+| 模型网关 / 音频 | 资源生命周期与相关后端测试 |
+| 安装器 / 发布 | 构建与安装路径专项检查 |
+
+### 5.1 常用命令
 
 ```bash
-npm run dev              # Electron 开发环境
-npm run typecheck        # tsc --noEmit
-npm test                 # vitest run
-npm run build            # typecheck + electron-vite build
-npm run test:demo        # 文档站演示、侧栏切换、主题、语言与窗口尺寸
-npm run test:onboarding  # 首次引导、再次查看、六语言、双主题、三种尺寸
-npm run build:browser    # MV3 浏览器扩展
-npm run package:browser  # release/Nola-Browser-Extension.zip
-npm run build:browser-host # PyInstaller Native Messaging EXE
-npm run build:python     # Python 3.12 基础组件，不含 Torch / llama
-npm run dist:win         # build → build:python → electron-builder（EXE + MSI）
-node scripts/check-installer-paths.mjs [makensis.exe] # NSIS 安装目录回归检查
+npm run dev
+npm run typecheck
+npm test
+npm run build
+
+npm run test:demo
+npm run test:onboarding
+
+npm run build:browser
+npm run package:browser
+npm run build:browser-host
+
+npm run build:python
+npm run dist:win
+
+node scripts/check-installer-paths.mjs [makensis.exe]
 ```
 
-- 普通代码更改：先做相关单测及类型检查；跨进程、安装器、模型运行时或发布链路变更，再执行对应专项检查。
-- UI 或 i18n 更改：按影响范围检查相应页面、语言、主题与窗口尺寸；改动引导流程时使用 `test:onboarding`，改动演示环境时使用 `test:demo`。
-- 不因纯文案或低风险局部调整机械执行完整打包。若环境缺失导致无法验证，应明确说明限制。
+命令用途：
 
-## 6. 协作、提交与文件权限
+- `dev`：Electron 开发环境
+- `typecheck`：TypeScript 类型检查
+- `test`：Vitest
+- `build`：类型检查及 electron-vite 构建
+- `test:demo`：文档站演示回归
+- `test:onboarding`：首次引导、语言、主题、尺寸
+- `build:browser`：构建 MV3 扩展
+- `package:browser`：扩展 ZIP 发布包
+- `build:browser-host`：Native Messaging EXE
+- `build:python`：Python 3.12 基础组件
+- `dist:win`：Windows EXE + MSI
+- `check-installer-paths`：NSIS 安装目录回归检查
 
-### Git 与多 Agent
+### 5.2 验证边界
 
-- 修改前检查相关文件及工作区状态；进行并行任务时先运行 `git status --porcelain -uall`，识别现有修改与未跟踪文件，避免覆盖或路径冲突。
-- 多 Agent 并行须明确**文件所有权边界**，同一文件不得交由两个 Worker 同时修改。
-- 审计与修复分离：Verifier 只报告问题与证据，Worker 负责修复。任务足够独立且并行有收益时再拆分，无需为简单改动强制启动子 Agent。
+- 优先执行与修改直接相关的检查。
+- 跨进程、安装器、模型运行时及发布链路改动，增加专项验证。
+- 不因低风险文案调整机械执行完整打包。
+- 测试失败须区分既有问题与本次引入的问题。
+- 缺少环境、依赖或测试条件时，如实说明。
+- 不以构建通过代替实际功能验证，也不声称未执行的测试已通过。
 
-### Commit
+## 6. Git、协作与权限边界
 
-- 格式：`<type>[optional scope][!]: <description>`；类型为 `feat` / `fix` / `docs` / `style` / `refactor` / `perf` / `test` / `build` / `ci` / `chore`。
-- 破坏性变更使用 `!`；描述使用**英文祈使语气**，首字母小写，不以句号结尾。
-- **不得自行提交。** 需要提交时先完成改动及验证，再把拟议提交信息放在**单独代码块**中发给用户，收到确认后才执行 Git Commit。
+### 6.1 工作区保护
 
-### 文档与规则维护
+修改前检查相关文件及工作区状态。
 
-- 未经用户明确授权，不修改 `docs/`（含文档站与内部 PRD）、`README*` 或其他文档；先提出可审阅的修改内容。用户在当前任务中明确批准具体文件与改动时，不必重复确认。
-- `AGENTS.md` 的既有规范不得因无关任务被擅自改写。项目结构变化时，**必须同步维护第 2 节的目录和入口索引，修改前提醒用户校对**；其他规范仅在用户要求或明确批准时更改。
-- 简体中文帮助文档位于 `docs/nola-docs/zh-CN/`，使用 `/zh-CN/` URL 前缀；`docs/nola-docs/index.md` 保留产品首页。帮助内容沿用既定大纲，截图由脚本生成。
-- 文档配图放在 `docs/public/docs-image/{语言代码}/{文档分类}/{文章名}/`，采用有意义文件名，以 `/docs-image/` 引用；不同语言分别保存图片副本。
-- `docs/PRD/` 仅保存内部需求和架构文档；`docs/nola-docs/` 只放终端用户指引，不混放。
+多 Agent 并行前执行：
 
-未经用户同意，不准修改以上章节的内容，如果却有需要记录的，请分点记录在下面。
-
+```bash
+git status --porcelain -uall
 ```
+
+- 识别已有修改、未跟踪文件及潜在冲突。
+- 不覆盖用户或其他 Agent 的成果。
+- 并行任务须明确文件所有权；同一文件不可由多个 Worker 同时修改。
+- Verifier 负责审计、提供问题与证据；Worker 负责修复。
+- 仅在任务独立、并行有实际收益时拆分子 Agent。
+- 简单任务无需强制并行。
+
+### 6.2 Git Commit
+
+采用 Conventional Commits：
+
+```text
+<type>[optional scope][!]: <description>
+```
+
+允许类型：
+
+`feat`、`fix`、`docs`、`style`、`refactor`、`perf`、`test`、`build`、`ci`、`chore`
+
+要求：
+
+- 描述使用英文祈使语气。
+- 首字母小写。
+- 末尾不添加句号。
+- 破坏性变更使用 `!`。
+
+**未经用户确认，不得执行 Git Commit。**
+
+需要提交时：
+
+1. 完成修改及验证。
+2. 在独立代码块中给出拟议提交信息。
+3. 获得用户确认后再提交。
+
+### 6.3 受保护文件
+
+未经当前任务的明确授权，不修改：
+
+- `AGENTS.md` 中的既有规则
+- `DESIGN.MD`
+- `README*`
+- `docs/` 下的用户文档、内部 PRD 与其他文档
+- 其他用户明确声明受保护的文件
+
+需要修改时，先提出可审阅的变更内容。
+
+用户已在当前任务中明确批准具体文件及修改内容时，无需重复确认。
+
+### 6.4 项目结构与规则维护
+
+- 项目结构变更必须同步维护第 2 节代码入口索引。
+- 更新 `AGENTS.md` 前，提醒用户校对涉及的结构变化，并遵循受保护文件授权要求。
+- 不因无关任务自行改写既有规则。
+- 发现现有规范过时、矛盾或缺失时，先向用户说明并提出修改建议。
+- 未经授权，不以“整理规则”为理由删除或弱化既有约束。
+- 用户未批准的新增规则，记录在文末「待确认补充」中，不直接覆盖正式规则。
+
+### 6.5 文档规范
+
+- 简体中文用户文档位于 `docs/nola-docs/zh-CN/`，使用 `/zh-CN/` URL 前缀。
+- `docs/nola-docs/index.md` 保留产品首页。
+- 用户文档沿用既有大纲，截图通过脚本生成。
+- 文档图片存放于：
+
+```text
+docs/public/docs-image/{语言代码}/{文档分类}/{文章名}/
+```
+
+- 图片采用有意义的文件名，通过 `/docs-image/` 引用。
+- 不同语言分别保存图片副本。
+- `docs/PRD/` 只存内部需求及架构文档。
+- `docs/nola-docs/` 只存终端用户指引。
+- 不在用户文档与内部 PRD 之间混放内容。
+
+## 7. 待确认补充
+
+未经用户同意，不得直接修改前述正式规则。
+
+需要新增、调整或记录规则时，先在本节按以下格式提出：
+
+```markdown
 ### 章节名
 
-- 分点
+- 拟新增或修改的规则
+- 修改原因
+- 涉及范围
 ```
 
-### 独立工作台入口
+获得用户明确批准后，方可合并至对应章节。
 
-- 正式工作台 Agent 对话窗口使用 `src/renderer/workbench.html`、`workbench-entry.tsx` 和 `workbench-entry.css`，不加载主页面的 `index.css` 或 Nola 产品主题。窗口由 `src/main/workbench.ts` 注册，开发环境与正式构建均可打开。
-- 官方 Elements 源码位于 `src/renderer/components/assistant-ui/native/`；实际界面组合、原生卡片工具和渲染状态分别位于 `features/workbench/NativeAgentSurface.tsx`、`native-agent-tools.tsx` 和 `NativeAgentSettings.tsx`。旧聊天组件、旧侧栏和旧工作区组件已移除。
-
-### 延迟检测窗口入口
-
-- 快速同传的延迟检测窗口由 `src/main/latency-window.ts` 管理，入口为 `src/renderer/latency.html` 和 `latency-entry.tsx`，界面位于 `src/renderer/features/latency/`。
-- 后端采集位于 `engine/nola_translator_engine/backend/latency.py`，主进程在 `src/main/latency-session.ts` 按会话汇总采集点。
+已纳入正式目录索引的工作台、延迟检测及会议口译入口，不再在此重复记录。

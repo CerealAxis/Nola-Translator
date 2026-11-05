@@ -13,15 +13,14 @@ import { SettingsRow } from '../SettingsRow'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TabsRoot, TabsList, TabsTrigger } from '@/components/ui'
-import { LoaderCircle } from 'lucide-react'
 
 import { useNolaTheme } from '@/components/primitives'
-import { notifyError, notifySuccess } from '@/components/primitives/notify'
+import { notifyError } from '@/components/primitives/notify'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
 import type { UiLanguagePreference } from '@/i18n'
-import { actions, stores, updateSettings, useStore } from '@/store'
+import { updateSettings } from '@/store'
 import { GITHUB_PROXY_AUTO, GITHUB_PROXY_DEFAULT, GITHUB_PROXY_NODES, GITHUB_PROXY_OFF, findGithubProxyNode } from '../../../../shared/github-proxies'
 import { findPypiMirrorNode, findPytorchWheelMirrorNode, PYPI_MIRROR_AUTO, PYPI_MIRROR_NODES, PYPI_MIRROR_OFF, PYTORCH_WHEEL_MIRROR_AUTO, PYTORCH_WHEEL_MIRROR_OFF, PYTORCH_WHEEL_MIRRORS } from '../../../../shared/pypi-mirrors'
 import { SettingGroup, SettingSelect, SettingSwitch } from '../SettingsPage'
@@ -30,7 +29,6 @@ import type { PickerOption, SettingsPanelProps } from '../SettingsPage'
 export function GeneralTab({ settings }: SettingsPanelProps) {
   const { t, uiLanguage, setLanguage } = useI18n()
   const reduceMotion = settings.appearance?.reduceMotion ?? false
-  const appUpdateChecking = useStore(stores.settings, (state) => state.appUpdateChecking)
 
   useEffect(() => {
     document.documentElement.dataset.reduceMotion = reduceMotion ? 'true' : 'false'
@@ -86,29 +84,6 @@ export function GeneralTab({ settings }: SettingsPanelProps) {
           <SettingSelect value={settings.closeBehavior ?? 'tray'} ariaLabel={t('titleBar.closeWindow')}
             options={[{ value: 'tray', label: t('gateway.closeTray') }, { value: 'quit', label: t('gateway.closeQuit') }]}
             onChange={value => { if (value === 'tray' || value === 'quit') void updateSettings({ closeBehavior: value }).catch(() => undefined) }} />
-        </SettingsRow>
-      </SettingGroup>
-
-      <SettingGroup legend={t('appUpdate.group')}>
-        <SettingsRow label={t('appUpdate.versionCheck')}>
-          <Button
-            variant="tertiary"
-            size="sm"
-            disabled={appUpdateChecking}
-            onClick={() => {
-              void actions.settings.checkForAppUpdate(true).then((result) => {
-                if (!result || result.latestVersion === null) {
-                  notifyError(t('appUpdate.checkFailed'))
-                  return
-                }
-                const message = t(result.updateAvailable ? 'appUpdate.availableStatus' : 'appUpdate.upToDateStatus', { version: result.latestVersion })
-                if (!result.updateAvailable) notifySuccess(message)
-              })
-            }}
-          >
-            {appUpdateChecking ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
-            {t('appUpdate.checkNow')}
-          </Button>
         </SettingsRow>
       </SettingGroup>
 

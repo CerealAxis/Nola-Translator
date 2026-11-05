@@ -778,3 +778,119 @@ it('does not expose a disabled capability through its cloud default', async () =
   expect(response.status).toBe(503)
   expect(await response.json()).toMatchObject({ error: { code: 'capability_disabled' } })
 })
+
+
+describe('OCR capability ownership', () => {
+  async function ocrFixture() {
+    const test = await fixture()
+    const runtime = { load: vi.fn(async () => {}), release: vi.fn(async () => {}),
+      infer: vi.fn(async () => ({ width: 200, height: 80, blocks: [] })) }
+    test.settings.modelGateway = { ...test.settings.modelGateway, externalEnabled: false, asr: false, mt: false, tts: false,
+      ocr: true, ocrModel: 'resource:pp-ocrv5-mobile-onnx' }
+    enable(test.settings, 'ocr', 'resource:pp-ocrv5-mobile-onnx')
+    test.resources.push({ resourceId: 'pp-ocrv5-mobile-onnx', kind: 'ocrModel', name: 'PP-OCRv5 mobile', installed: true, languages: ['zh', 'en', 'ja', 'ko'] } as ResourceRecord)
+    const gateway = new ModelGateway({ getSettings: () => test.settings, listResources: async () => test.resources,
+      directLaunch: vi.fn(), getKey: async () => 'fixture-key', setKey: vi.fn(), ocr: runtime })
+    gateways.push(gateway)
+    return { ...test, gateway, runtime }
+  }
+  const input = { image: 'data:image/png;base64,fixture', language: 'auto' as const }
+  it('loads OCR only from the gateway and keeps weights loaded after a screen lease ends', async () => {
+    const { gateway, runtime } = await ocrFixture()
+    await expect(gateway.inferOcr(input, new AbortController().signal)).rejects.toThrow('ocrNotReady')
+    expect(runtime.load).not.toHaveBeenCalled()
+    await gateway.start()
+    expect(gateway.snapshot().services.ocr).toMatchObject({ state: 'ready', name: 'PP-OCRv5 mobile' })
+    expect(gateway.snapshot().availableModels?.ocr?.[0].binding).toBe('resource:pp-ocrv5-mobile-onnx')
+    const release = gateway.acquireOcr()
+    release(); release()
+    expect(runtime.release).not.toHaveBeenCalled()
+    await gateway.inferOcr(input, new AbortController().signal)
+    expect(gateway.snapshot().requests[0]).toMatchObject({ kind: 'ocr', status: 'completed' })
+    expect(runtime.load).toHaveBeenCalledOnce()
+    expect(gateway.resourceInUse('pp-ocrv5-mobile-onnx')).toBe(true)
+    await gateway.stop()
+    expect(runtime.release).toHaveBeenCalledOnce()
+    expect(gateway.resourceInUse('pp-ocrv5-mobile-onnx')).toBe(false)
+    await expect(gateway.inferOcr(input, new AbortController().signal)).rejects.toThrow('ocrNotReady')
+  })
+  it('rejects disruptive capability edits while a screen session holds the model', async () => {
+    const { gateway } = await ocrFixture()
+    await gateway.start()
+    const release = gateway.acquireOcr()
+    expect(() => gateway.assertSettingsChange({ modelGateway: { ocr: false } })).toThrow('RESOURCE_IN_USE')
+    release()
+    expect(() => gateway.assertSettingsChange({ modelGateway: { ocr: false } })).not.toThrow()
+  })
+  it('cleans up a model whose cold load completes after stop was requested', async () => {
+    const { gateway, runtime } = await ocrFixture()
+    const pending = deferred<void>()
+    runtime.load.mockImplementation(() => pending.promise)
+    const starting = gateway.start()
+    await vi.waitFor(() => expect(runtime.load).toHaveBeenCalledOnce())
+    const stopping = gateway.stop()
+    pending.resolve()
+    await starting; await stopping
+    expect(gateway.snapshot().services.ocr?.state).toBe('stopped')
+    expect(runtime.release).toHaveBeenCalledOnce()
+    expect(gateway.snapshot().availableModels?.ocr).toEqual([])
+  })
+  it('switches OCR language packs through the gateway and validates each pack language', async () => {
+    const { gateway, runtime, settings, resources } = await ocrFixture()
+    await gateway.start()
+    const binding = 'resource:pp-ocrv5-mobile-latin-onnx'
+    settings.modelGateway.ocrModel = binding
+    enable(settings, 'ocr', binding)
+    resources.push({ resourceId: binding.slice(9), kind: 'ocrModel', name: 'Latin', installed: true, languages: ['fr', 'de', 'es'] } as ResourceRecord)
+    await gateway.reconfigure()
+    expect(runtime.release).toHaveBeenCalledOnce()
+    expect(runtime.load).toHaveBeenLastCalledWith('pp-ocrv5-mobile-latin-onnx')
+    await gateway.inferOcr({ ...input, language: 'fr' }, new AbortController().signal)
+    await expect(gateway.inferOcr({ ...input, language: 'ja' }, new AbortController().signal)).rejects.toThrow('invalidConfig')
+    expect(runtime.infer).toHaveBeenCalledOnce()
+  })
+  it('releases native weights after a failed or timed-out load', async () => {
+    const { gateway, runtime } = await ocrFixture()
+    runtime.load.mockRejectedValueOnce(new Error('Load timed out'))
+    await gateway.start()
+    expect(gateway.snapshot().services.ocr?.state).toBe('failed')
+    expect(runtime.release).toHaveBeenCalledOnce()
+    expect(gateway.resourceInUse('pp-ocrv5-mobile-onnx')).toBe(false)
+  })
+  it('does not load missing weights or automatically reload a crashed backend during inference', async () => {
+    const { gateway, runtime, resources } = await ocrFixture()
+    resources.find(resource => resource.kind === 'ocrModel')!.installed = false
+    await gateway.start()
+    expect(gateway.snapshot().services.ocr?.state).toBe('failed')
+    expect(runtime.load).not.toHaveBeenCalled()
+    resources.find(resource => resource.kind === 'ocrModel')!.installed = true
+    await gateway.reconfigure()
+    runtime.infer.mockRejectedValueOnce(new Error('ocrNotReady'))
+    await expect(gateway.inferOcr(input, new AbortController().signal)).rejects.toThrow('ocrNotReady')
+    expect(gateway.snapshot().services.ocr?.state).toBe('failed')
+    await expect(gateway.inferOcr(input, new AbortController().signal)).rejects.toThrow('ocrNotReady')
+    expect(runtime.load).toHaveBeenCalledOnce()
+  })
+})
+
+
+it('leases an enabled local LLM on demand without starting the public gateway and releases it on stop', async () => {
+  const close = vi.fn(async () => {})
+  const create = vi.fn<typeof createGatewayLanguageModel>(async (_services, binding) => ({ close, local: true, name: binding,
+    profile: { id: binding, model: 'local-test', endpoint: 'http://127.0.0.1:1234/v1', apiFormat: 'chat-completions', contextWindow: 4096, maxOutputTokens: 512 },
+    model: () => 'fixture', redact: value => value }))
+  const test = await fixture(undefined, create)
+  enable(test.settings, 'llm', 'resource:local-test')
+  const lease = await test.gateway.acquireLanguageModel('resource:local-test')
+  expect(test.gateway.snapshot().state).toBe('stopped')
+  expect(create).toHaveBeenCalledOnce()
+  expect(test.gateway.snapshot().activeRequests).toBe(1)
+  await test.gateway.stop()
+  expect(lease.signal.aborted).toBe(true)
+  expect(close).toHaveBeenCalledOnce()
+  expect(test.gateway.snapshot().activeRequests).toBe(0)
+  lease.release()
+  expect(close).toHaveBeenCalledOnce()
+  Object.assign(test.settings, modelEnablePatch(test.settings, 'llm', 'resource:local-test', false))
+  await expect(test.gateway.acquireLanguageModel('resource:local-test')).rejects.toMatchObject({ code: 'model_disabled' })
+})

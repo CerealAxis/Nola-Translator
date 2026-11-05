@@ -18,6 +18,26 @@ export function RealtimePipelineLabel({ followDefault = false }: { followDefault
   </div>} />
 }
 
+type ProcessingMode = 'default' | 'cascade' | 's2s'
+
+export function RealtimeProcessingField({ value, onChange, disabled, className, id }: {
+  value: ProcessingMode
+  onChange: (value: ProcessingMode) => void
+  disabled?: boolean
+  className?: string
+  id?: string
+}) {
+  const { t } = useI18n()
+  return <div data-slot="field" className={className}>
+    <RealtimePipelineLabel followDefault />
+    <SettingSelect id={id} ariaLabel={t('session.pipeline')} isDisabled={disabled} value={value} options={[
+      { value: 'default', label: t('session.followDefault') },
+      { value: 'cascade', label: t('session.cascade') },
+      { value: 's2s', label: t('session.directSpeech') },
+    ]} onChange={next => { if (next === 'default' || next === 'cascade' || next === 's2s') onChange(next) }} />
+  </div>
+}
+
 export function RealtimePipelineFields({ model, gatewayModel, s2sReady, onChange, disabled, className, hideInheritedModel }: {
   model: RealtimeS2sModel | null | undefined
   gatewayModel: RealtimeS2sModel | null
@@ -30,20 +50,13 @@ export function RealtimePipelineFields({ model, gatewayModel, s2sReady, onChange
   const { t } = useI18n()
   const effectiveModel = model === undefined ? gatewayModel : model
   return <>
-    <div className={className}>
-      <RealtimePipelineLabel followDefault />
-      <SettingSelect ariaLabel={t('session.pipeline')} isDisabled={disabled} value={model === undefined ? 'default' : model ? 's2s' : 'cascade'} options={[
-        { value: 'default', label: t('session.followDefault') },
-        { value: 'cascade', label: t('session.cascade') },
-        { value: 's2s', label: t('session.directSpeech') },
-      ]} onChange={value => {
-        if (!s2sReady && (value === 's2s' || value === 'default' && gatewayModel)) {
-          notifyWarning(t('session.s2sModelRequired'))
-          return
-        }
-        onChange(value === 'default' ? undefined : value === 's2s' ? effectiveModel ?? REALTIME_S2S_MODELS[0] : null)
-      }} />
-    </div>
+    <RealtimeProcessingField className={className} disabled={disabled} value={model === undefined ? 'default' : model ? 's2s' : 'cascade'} onChange={value => {
+      if (!s2sReady && (value === 's2s' || value === 'default' && gatewayModel)) {
+        notifyWarning(t('session.s2sModelRequired'))
+        return
+      }
+      onChange(value === 'default' ? undefined : value === 's2s' ? effectiveModel ?? REALTIME_S2S_MODELS[0] : null)
+    }} />
     {s2sReady && effectiveModel && (!hideInheritedModel || model !== undefined) ? <div className={className}>
       <ModelAvailabilityLabel label={t('models.s2sModels')} hint={t('models.s2sModelsHint')} />
       {model === undefined ? <span>{realtimeS2sNames[effectiveModel]} · {t('session.followDefault')}</span>

@@ -157,20 +157,21 @@ export function RecordsPage(): ReactNode {
           <Button variant="default" className="nola-record-page__start" onClick={startSession}><Mic aria-hidden="true" size={22} />{t('workspace.start')}</Button>
         </header>
         <div className="nola-record-page__search">
-          <InputGroup className="nola-record-page__search-field">
-            <InputGroupInput type="search" value={filterText} onChange={(event) => { setFilterText(event.target.value); setPage(1); setSelection(new Set()) }} aria-label={t('records.search')} placeholder={t('records.searchPlaceholder')} />
-            <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
-          </InputGroup>
-          <span>{t('records.total', { count: filtered.length })}</span>
+          <div className="nola-record-page__search-summary">
+            <InputGroup className="nola-record-page__search-field">
+              <InputGroupInput type="search" value={filterText} onChange={(event) => { setFilterText(event.target.value); setPage(1); setSelection(new Set()) }} aria-label={t('records.search')} placeholder={t('records.searchPlaceholder')} />
+              <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
+            </InputGroup>
+            <span>{t('records.total', { count: filtered.length })}</span>
+          </div>
+          <div className={`nola-record-page__bulk${selectedCount === 0 ? ' invisible' : ''}`}>
+            <Button variant="secondary" size="sm" onClick={() => setSelection(new Set())}>{t('records.clearSelection')}</Button>
+            <Button variant="danger" size="sm" onClick={() => setPendingDelete({ kind: 'bulk' })}>{t('records.deleteSelected', { count: selectedCount })}</Button>
+          </div>
         </div>
         <Card className="nola-record-card">
           <CardContent className="flex flex-1 flex-col">
             {loading && !loaded ? <div className="nola-record-loading">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} data-testid="skeleton-row" className="h-12 w-full rounded-lg" />)}</div> : loadFailed ? <div className="nola-record-empty"><p className="nola-body text-muted">{t('errors.meetingsLoadFailed')}</p><Button variant="default" onClick={retryLoad}>{t('common.retry')}</Button></div> : filtered.length === 0 ? <Empty className="nola-record-empty"><EmptyHeader><EmptyTitle>{isSearching ? t('records.noResults') : t('records.noRecords')}</EmptyTitle><EmptyDescription>{isSearching ? t('records.noResultsHint') : t('records.noRecordsHint')}</EmptyDescription></EmptyHeader><EmptyContent><Button variant="default" onClick={isSearching ? () => setFilterText('') : startSession}>{isSearching ? t('records.clearSearch') : t('records.startFirst')}</Button></EmptyContent></Empty> : <>
-              {selectedCount > 0 ? <div className="nola-record-page__bulk">
-                <span className="nola-record-page__bulk-count">{t('records.selectedCount', { count: selectedCount })}</span>
-                <Button variant="secondary" size="sm" onClick={() => setSelection(new Set())} className="nola-record-page__bulk-dismiss">{t('records.clearSelection')}</Button>
-                <Button variant="danger" size="sm" onClick={() => setPendingDelete({ kind: 'bulk' })}>{t('records.deleteSelected', { count: selectedCount })}</Button>
-              </div> : null}
               <RecordsTable meetings={visible} pendingIds={pendingIds} sortAscending={sortAscending} onSortChange={setSortAscending} selectedKeys={selection} onSelectionChange={setSelection} onOpen={(id) => navigate(recordPath(id))} onRename={setRenaming} onExport={setExporting} onDelete={(meeting) => setPendingDelete({ kind: 'single', meeting })} />
             </>}
           </CardContent>

@@ -31,6 +31,21 @@ afterEach(() => { cleanup(); stores.models.setState(initialModels); stores.setti
 
 const section = (name: string) => within(screen.getByRole('heading', { name }).closest('section')!)
 
+it('manages OCR model details and deletion within model management', () => {
+  stores.models.setState({ resources: [{
+    resourceId: 'pp-ocrv5-mobile-onnx', kind: 'ocrModel', provider: 'onnx', name: 'PP-OCRv5 mobile',
+    description: '', languages: ['zh', 'en', 'ja', 'ko'], installed: true, installedBytes: 34939630,
+    state: 'idle', cancellable: false,
+  }] })
+  render(<ModelsPage />)
+  const card = screen.getByText('PP-OCRv5 mobile').closest('[data-slot="card"]')!
+  fireEvent.click(within(card as HTMLElement).getByRole('button', { name: '开始配置' }))
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByRole('button', { name: '删除模型' })).toBeInTheDocument()
+  expect(within(dialog).queryByText('本地加载器')).not.toBeInTheDocument()
+  expect(within(card as HTMLElement).queryByRole('button', { name: '屏幕翻译' })).not.toBeInTheDocument()
+})
+
 it('shows the synthesis default and initializes its voice from discovered metadata', async () => {
   const modelId = 'tts-qwen3-tts-crisp-0.6b-base-q8-0'
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, synthesis: { modelId, voice: '' } } })
@@ -306,3 +321,25 @@ it('uses the selected custom model language inventory and blocks an empty select
   fireEvent.click(screen.getByRole('button', { name: '全选语言' }))
   expect(screen.getByRole('button', { name: '保存配置' })).toBeEnabled()
 }, 20_000)
+
+it('opens the OCR family selector and downloads the chosen language variant', async () => {
+  const make = (group: string, languages: string[]) => ({ resourceId: `pp-ocrv5-mobile-${group}-onnx`, kind: 'ocrModel' as const,
+    provider: 'pp-ocrv5', name: `PP-OCRv5 mobile · ${group}`, description: 'OCR', languages, installed: false, installedBytes: 0,
+    downloadBytes: 12724089, state: 'idle' as const, cancellable: false })
+  stores.models.setState({ resources: [make('ch', ['zh', 'en', 'ja']), make('latin', ['fr', 'de', 'es'])] })
+  const manage = vi.spyOn(actions.models, 'manageResource').mockResolvedValue(make('latin', ['fr', 'de', 'es']))
+  render(<ModelsPage />)
+  const ocr = section('OCR 模型')
+  expect(ocr.queryByRole('button', { name: '安装' })).not.toBeInTheDocument()
+  fireEvent.click(ocr.getByRole('button', { name: '开始配置' }))
+  const dialog = screen.getByRole('dialog'), user = userEvent.setup()
+  expect(within(dialog).queryByText(/模型管理负责下载/)).not.toBeInTheDocument()
+  expect(dialog.querySelector('.model-language-field .model-language-chip')).toBeInTheDocument()
+  expect(within(dialog).getByRole('combobox', { name: '支持的识别语言' })).toBeDisabled()
+  await user.click(within(dialog).getByRole('combobox', { name: '模型' }))
+  await user.click(await screen.findByRole('option', { name: /PP-OCRv5 mobile · latin/ }))
+  expect(within(dialog).getByText('法语')).toBeInTheDocument()
+  expect(within(dialog).getByText('德语')).toBeInTheDocument()
+  await user.click(within(dialog).getByRole('button', { name: '安装' }))
+  await waitFor(() => expect(manage).toHaveBeenCalledWith('pp-ocrv5-mobile-latin-onnx', 'install', 'modelscope'))
+})

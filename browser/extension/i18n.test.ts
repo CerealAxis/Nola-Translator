@@ -11,7 +11,7 @@ describe('browser failure guidance', () => {
 
   it('gives the action for an ended session, disabled service, or stale extension', () => {
     expect(t(errorKey('browserSessionNotRunning'))).toContain('重新开启字幕')
-    expect(t(errorKey('browserCaptionServiceDisabled'))).toContain('开启字幕服务')
+    expect(t(errorKey('browserCaptionServiceDisabled'))).toContain('实时服务尚未就绪')
     expect(t(errorKey('browserExtensionVersionMismatch'))).toContain('重装当前版本扩展')
   })
 

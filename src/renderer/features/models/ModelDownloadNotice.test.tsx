@@ -62,12 +62,12 @@ it('does not announce failed tasks already present when the app opens', () => {
   expect(showToast).not.toHaveBeenCalled()
 })
 
-it('routes disk-full download failures to storage settings', () => {
+it.each(['diskSpaceInsufficient', 'resourceDiskSpaceInsufficient'])('routes %s download failures to storage settings', errorCode => {
   const showToast = vi.spyOn(toastQueue, 'showToast').mockImplementation(() => '')
   stores.models.setState({ resources: [] })
   render(<ModelDownloadNotice />)
-  act(() => { stores.models.setState({ resources: [record] }) })
-  act(() => { stores.models.setState({ resources: [{ ...record, state: 'failed', errorCode: 'diskSpaceInsufficient' }] }) })
+  act(() => { stores.models.setState({ resources: [{ ...record, phase: 'resolve' }] }) })
+  act(() => { stores.models.setState({ resources: [{ ...record, state: 'failed', errorCode }] }) })
   const failure = showToast.mock.calls.find(([payload]) => payload.type === 'error')?.[0]
   expect(failure).toEqual(expect.objectContaining({
     title: '磁盘空间不足',

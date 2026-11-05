@@ -31,6 +31,7 @@ import { Card } from '@/components/ui/card'
 import { Lock, Minus, Monitor, Pin, PinOff, SlidersHorizontal, Unlock, X } from 'lucide-react'
 
 import { DEFAULT_SETTINGS, NO_TRANSLATION_LANGUAGE } from '@/bridge'
+import { DEFAULT_MEETING_MODE } from '../../../shared/meeting-mode'
 import { formatChineseCaption } from '@/chinese-script'
 import { actions, getBridge, sessionStore, stores, useStore } from '@/store'
 import { useI18n } from '@/i18n'
@@ -58,7 +59,16 @@ export function OverlayRoot() {
   const sourceOnly = useStore(stores.settings, state => state.settings?.translation.targetLanguage === NO_TRANSLATION_LANGUAGE)
   const sourceLanguage = useStore(stores.settings, state => state.settings?.recognition.sourceLanguage ?? DEFAULT_SETTINGS.recognition.sourceLanguage)
   const latency = useStore(stores.settings, state => state.settings?.realtime?.latencyDetection === true)
-  const session = useStore(sessionStore, (state) => state)
+  const quick = useStore(sessionStore, (state) => state)
+  const meetingSettings = useStore(stores.settings, state => state.settings?.meetingMode) ?? DEFAULT_MEETING_MODE
+  const meeting = quick.meeting
+  const meetingActive = !!meeting && ['running', 'starting', 'stopping', 'unknown'].includes(meeting.state)
+  const meetingRows = meeting?.segments?.filter(segment => meetingSettings.captionScope === 'both' || segment.direction === meetingSettings.captionScope) ?? []
+  const session = meetingActive ? { ...quick, status: 'running' as const, sessionId: meeting.meetingId ?? null, segments: meetingRows, interim: null } : quick
+  const labelOf = (segment: typeof meetingRows[number]) => {
+    const speakers = [...new Set(meetingRows.filter(item => item.direction === segment.direction).map(item => item.speakerId).filter(Boolean))]
+    return `${t(segment.direction === 'uplink' ? 'meeting.me' : 'meeting.remote')}${meetingSettings.showSpeaker && segment.speakerId ? ` · ${t('meeting.speaker', { number: segment.speakerNumber ?? speakers.indexOf(segment.speakerId) + 1 })}` : ''}`
+  }
   const [hovered, setHovered] = useState(false)
   /*
    * Session state rather than a setting: locking exists to make this window behave like a burned-in
@@ -164,10 +174,10 @@ export function OverlayRoot() {
     }
   }, [failedSignature, session.sessionId, t])
   const sourceTrackLines = orderedSegments.flatMap((segment): TrackLine[] =>
-    segment.sourceText ? [{ key: segment.segmentId, text: formatChineseCaption(segment.sourceText, sourceLanguage) }] : [])
+    segment.sourceText ? [{ key: segment.segmentId, text: `${meetingActive ? `${labelOf(segment as typeof meetingRows[number])} · ` : ''}${formatChineseCaption(segment.sourceText, segment.sourceLanguage ?? sourceLanguage)}` }] : [])
   const translatedTrackLines = orderedSegments.map((segment): TrackLine => {
     const entry = segment.translations.find((item) => item.state !== 'failed' && item.text)
-    if (entry?.text) return { key: segment.segmentId, text: entry.text, stableText: entry.stableText }
+    if (entry?.text) return { key: segment.segmentId, text: `${meetingActive ? `${labelOf(segment as typeof meetingRows[number])} · ` : ''}${entry.text}`, stableText: meetingActive ? undefined : entry.stableText }
     return { key: segment.segmentId, text: '' }
   })
   const originalOnly = !!current && current.translations.length === 0
@@ -445,7 +455,7 @@ export function OverlayRoot() {
           </GhostButton>
         </div>
 
-        <OverlayControls active={active} locked={locked} />
+        {!meetingActive ? <OverlayControls active={active} locked={locked} /> : !locked ? <div className="nola-caption-controls"><Button variant="secondary" size="sm" onClick={() => void getBridge()?.meetingMode?.setPaused(!meeting?.paused).catch(error => notifyError(t('meeting.pipelineFailed'), { cause: error }))}>{t(meeting?.paused ? 'workspace.resume' : 'workspace.pause')}</Button></div> : null}
 
       </section>
     </main>

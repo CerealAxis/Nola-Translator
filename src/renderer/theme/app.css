@@ -183,6 +183,57 @@
   padding-inline-start: calc(max(0px, (100% - var(--nola-content-max)) / 2) + var(--nola-page-padding) - var(--space-1));
 }
 
+/* The scene is decorative; its four wires reflect independent capture and playback evidence. */
+.nola-meeting-settings.card { container-type: inline-size; --card-spacing: calc(var(--space-2) + var(--space-1) / 2); gap: var(--space-1); }
+.nola-meeting-settings .nola-overlay-field { display: grid; grid-template-columns: calc(var(--space-8) + var(--space-2)) minmax(0, 1fr); align-items: center; gap: calc(var(--space-3) / 2); }
+.nola-meeting-routes { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: inherit; }
+.nola-meeting-route-heading { display: flex; flex-direction: row; justify-content: space-between; align-items: center; min-height: var(--field-control-height); padding-inline-end: var(--space-2); }
+.nola-meeting-languages { width: calc(var(--space-8) * 4); max-width: calc(100vi - var(--space-4)); }
+.nola-meeting-languages > .nola-overlay-field { display: flex; align-items: stretch; }
+.nola-meeting-preferences > .nola-overlay-field { grid-column: 1; }
+.nola-meeting-preference-label { display: inline-flex; align-items: center; gap: calc(var(--space-1) / 2); }
+.nola-meeting-volume-control { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.nola-meeting-volume-control > .slider { flex: 1; }
+.nola-meeting-volume-value { min-width: var(--space-5); text-align: end; font-variant-numeric: tabular-nums; }
+.nola-meeting-speaker-control { display: flex; justify-content: end; padding-inline-end: var(--space-2); }
+@container (max-width: 900px) { .nola-meeting-routes { grid-template-columns: minmax(0, 1fr); } }
+.nola-meeting-preview.card { gap: var(--space-1); }
+.nola-meeting-scene { display: grid; grid-template-columns: var(--space-5) minmax(var(--space-2), 1fr) minmax(0, min(60%, calc(var(--space-8) * 6))) minmax(var(--space-2), 1fr) var(--space-5); align-items: center; margin-inline: 0; }
+.nola-meeting-call { width: 100%; padding: var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--overlay-shadow); }
+.nola-meeting-call__participants { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1); }
+.nola-meeting-participant { overflow: hidden; border-radius: var(--radius-md); background: color-mix(in oklch, var(--accent) 15%, var(--surface-secondary)); }
+.nola-meeting-participant[data-person=remote] { background: color-mix(in oklch, var(--color-purple) 12%, var(--surface-secondary)); }
+.nola-meeting-room { position: relative; display: grid; place-items: center; height: calc(var(--space-8) + var(--space-2)); overflow: hidden; }
+.nola-meeting-room__window { position: absolute; inset-inline-start: 9%; top: 12%; width: 23%; height: 50%; border: calc(var(--space-1) / 2) solid color-mix(in oklch, var(--surface) 70%, transparent); border-radius: var(--radius-sm); background: linear-gradient(90deg, transparent 46%, var(--surface) 47%, var(--surface) 53%, transparent 54%); }
+.nola-meeting-room__shelf { position: absolute; inset-inline-end: 8%; top: 24%; width: 19%; height: var(--space-1); background: color-mix(in oklch, var(--muted) 20%, transparent); box-shadow: 0 var(--space-4) 0 color-mix(in oklch, var(--muted) 20%, transparent); }
+.nola-meeting-room [data-slot=avatar] { width: var(--space-6); height: var(--space-6); }
+.nola-meeting-room [data-slot=avatar-fallback] { background: var(--surface); color: var(--accent); }
+.nola-meeting-room [data-slot=avatar-fallback] svg { width: var(--space-4); height: var(--space-4); stroke-width: 1; }
+.nola-meeting-participant__name { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); padding: calc(var(--space-1) / 2) var(--space-1); font: var(--font-label); background: color-mix(in oklch, var(--surface) 75%, transparent); }
+.nola-meeting-participant__name svg { flex: none; width: var(--space-2); height: var(--space-2); color: var(--muted); }
+.nola-meeting-participant__name svg[data-active=true] { color: var(--success); }
+.nola-meeting-link { position: relative; width: 100%; height: var(--space-6); }
+.nola-meeting-wires { width: 100%; height: 100%; overflow: visible; }
+.nola-meeting-wire-hit { position: absolute; inset-inline: 0; top: calc(var(--space-1) / 2); height: calc(var(--space-2) + var(--space-1)); }
+.nola-meeting-wire-hit[data-output=true] { top: calc(var(--space-2) + var(--space-1)); }
+.nola-meeting-wire-hit:focus-visible { outline: 2px solid var(--focus); border-radius: var(--radius-sm); }
+.nola-meeting-endpoint { display: grid; place-items: center; width: var(--space-5); height: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--muted); }
+.nola-meeting-endpoint svg { width: var(--space-3); height: var(--space-3); }
+.nola-meeting-wire, .nola-meeting-marker { color: var(--border); }
+.nola-meeting-wire[data-state=connected], .nola-meeting-wire[data-state=active], .nola-meeting-marker[data-state=connected], .nola-meeting-marker[data-state=active] { color: var(--success); }
+.nola-meeting-wire[data-state=failed], .nola-meeting-marker[data-state=failed] { color: var(--danger); }
+.nola-meeting-wire__track { fill: none; stroke: currentColor; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.nola-meeting-wire__pulse { fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 3 17; vector-effect: non-scaling-stroke; animation: nola-meeting-flow calc(var(--dur-enter) * 6) linear infinite; }
+html[data-reduce-motion=true] .nola-meeting-wire__pulse { animation: none; }
+@keyframes nola-meeting-flow { to { stroke-dashoffset: -20; } }
+@media (prefers-reduced-motion: reduce) { .nola-meeting-wire__pulse { animation: none; } }
+@media (max-width: 900px) {
+  .nola-meeting-scene { padding-inline: var(--space-2); }
+  .nola-meeting-call { width: 100%; padding: var(--space-1); }
+  .nola-meeting-room { height: calc(var(--space-8) + var(--space-2)); }
+  .nola-meeting-room [data-slot=avatar] { width: var(--space-6); height: var(--space-6); }
+  .nola-meeting-room [data-slot=avatar-fallback] svg { width: var(--space-4); height: var(--space-4); }
+}
 /* Action surfaces may provide a compact corner without changing navigation geometry. */
 .button:not(.nola-titlebar-icon):not(.nola-window-control):not(.nola-web-controls .button),
 .toggle-button {

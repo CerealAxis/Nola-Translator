@@ -1,7 +1,6 @@
 import { ALIYUN_S2S_SPEECH_LANGUAGES, recognitionFieldsOf, remoteSourceLanguages } from '../../../shared/cloud-config'
 
 import { useModelSelection, useAvailableModels, savedBindingOf, type AvailableModel } from '@/available-models'
-import { featureConflictOwner } from '../../../shared/feature-activity'
 /**
  * Control bar at the bottom of the caption window.
  *
@@ -39,7 +38,7 @@ import { checkCredential } from '@/store/modelStore'
 import { audioDeviceNameOf, translationFieldsOf } from '@/session-config'
 import { useI18n } from '@/i18n'
 import { aliyunConnectionReady } from '../../../shared/cloud-models'
-import { notifyError, notifyInfo, notifyGatewayStartIssue } from '@/components/primitives/notify'
+import { notifyError, notifyInfo, notifyGatewayStartIssue, sessionConflictMessage } from '@/components/primitives/notify'
 
 import { OverlayDisplayMenu, OverlayLayoutMenu } from './OverlayDisplayMenu'
 import { LANGUAGE_MENU_MAX_HEIGHT, LANGUAGE_MENU_SCREEN_FRACTION } from '../../../shared/overlay-menu'
@@ -302,11 +301,8 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
       setLastIntent('start')
       const config = { ...startConfigOf(settings, devices, outputMode, tts.binding, target), ...(!s2sModel ? { recognitionBinding: asr.binding } : {}), ...(needsMt ? { translationBinding: mt.binding } : {}) }
       void actions.session.startSession(config).catch((error: unknown) => {
-        const owner = featureConflictOwner(error)
-        if (owner) {
-          notifyError(t('errors.serviceConflict', { running: t(`gateway.${owner}`) }))
-        } else if (isSessionAlreadyRunningError(error)) {
-          notifyError(t('errors.serviceConflict', { running: t('videoCaptions.title') }))
+        if (isSessionAlreadyRunningError(error)) {
+          notifyError(sessionConflictMessage(t, error))
         } else if (unsupportedRecognitionLanguageOf(error)) {
           notifyError(t('errors.unsupportedRecognitionLanguage', { language: unsupportedRecognitionLanguageOf(error) ?? '' }))
         } else if (sessionStore.getState().errorCode === 'AUDIODEVICEUNAVAILABLE') {

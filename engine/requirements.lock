@@ -33,6 +33,7 @@ networkx==3.6.1
 loguru==0.7.3
 numpy==2.5.1
 onnxruntime==1.23.2
+opencv-python-headless==4.11.0.86
 opentelemetry-api==1.45.2
 packaging==26.2
 pefile==2024.8.26

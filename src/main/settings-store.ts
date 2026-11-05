@@ -11,6 +11,7 @@ import { settingsPatchSchema } from './settings-schema'
 import { customModelSchema, synchronizeCustomModel } from '../shared/custom-models'
 import { LANGUAGE_CODES } from '../shared/languages'
 import { mergeModelPolicy, modelPolicyOf, modelPolicySchema } from '../shared/model-policy'
+import { meetingModeSettingsSchema } from '../shared/meeting-mode'
 
 // Store-internal patches may also touch fields the IPC schema exposes only through their own channels.
 export type StorePatch = AppSettingsPatch & { modelStoragePath?: string; version?: 3; browserConnection?: { enabled: boolean } }
@@ -337,6 +338,7 @@ export class SettingsStore {
         ...raw,
         version: 3,
         realtime,
+        meetingMode: meetingModeSettingsSchema.safeParse(raw.meetingMode).data,
         onboardingSeen: raw.onboardingSeen === true,
         onboardingVersion: settingsPatchSchema.safeParse({ onboardingVersion: raw.onboardingVersion }).data?.onboardingVersion ?? 0,
         onboardingStep: settingsPatchSchema.safeParse({ onboardingStep: raw.onboardingStep }).data?.onboardingStep ?? 'W0',
