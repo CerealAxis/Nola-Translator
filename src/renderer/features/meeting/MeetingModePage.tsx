@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowRightLeft, ChevronDown, Languages, Check, Captions, CircleHelp, MessagesSquare, RefreshCw, Keyboard } from 'lucide-react'
-import { ALIYUN_S2S_SPEECH_LANGUAGES } from '../../../shared/cloud-config'
+import { Check, Captions, CircleHelp, MessagesSquare, RefreshCw, Keyboard } from 'lucide-react'
+import { ALIYUN_LANGUAGES, ALIYUN_S2S_SPEECH_LANGUAGES } from '../../../shared/cloud-config'
 import { SUPPORT_ERROR_CATALOG, supportErrorCodeForCause } from '../../../shared/error-catalog'
-import { LANGUAGE_CODES, languageName } from '../../../shared/languages'
+import { normalizeLanguage } from '../../../shared/languages'
+import { useModelOptions } from '@/model-options'
+import { resolveModelBinding, useAvailableModels } from '@/available-models'
+import { sceneModelBinding } from '../../../shared/model-policy'
+import { LanguageDirectionSelect } from '@/components/primitives/LanguageDirectionSelect'
 import { DEFAULT_MEETING_MODE, type MeetingAudioTestResult, type MeetingModeSettings, type MeetingModeSnapshot } from '../../../shared/meeting-mode'
 import { vbCablePair } from '../../../shared/virtual-audio'
 import { DEFAULT_SETTINGS, defaultRealtimeS2s } from '../../../shared/settings'
@@ -10,11 +14,10 @@ import { PageHeader } from '@/components/primitives'
 import { notifyError } from '@/components/primitives/notify'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogCloseButton, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Separator } from '@/components/ui/separator'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RealtimeProcessingField } from '../workspace/RealtimePipelineSelect'
 import { SliderControl, SliderIndicator, SliderRoot, SliderThumb, SliderTrack } from '@/components/ui/slider'
 import { Spinner } from '@/components/ui/spinner'
@@ -25,6 +28,7 @@ import { meetingZh } from '@/i18n/meeting-ui'
 import { actions, getBridge, stores, useStore } from '@/store'
 import { SettingSelect, type PickerOption } from '../settings/SettingsPage'
 import { MeetingStage } from './MeetingStage'
+import { ModelAvailabilityLabel } from '../workspace/ModelAvailabilityLabel'
 
 const IDLE: MeetingModeSnapshot = { state: 'idle', passthroughActive: false }
 const deviceFields = ['microphoneId', 'uplinkOutputId', 'downlinkInputId', 'headphonesId'] as const
@@ -48,6 +52,10 @@ export function MeetingModePage() {
   const settings = useStore(stores.settings, state => state.settings) ?? DEFAULT_SETTINGS
   const saved = settings.meetingMode
   const devices = useStore(stores.models, state => state.devices)
+  const catalog = useAvailableModels()
+  const modelOptions = useModelOptions()
+  const ttsBinding = resolveModelBinding('tts', sceneModelBinding(settings, 'tts') || settings.synthesis.modelId, catalog.tts).binding
+  const speechLanguages = catalog.tts.find(model => model.binding === ttsBinding)?.targetLanguages ?? []
   const [draft, setDraft] = useState<MeetingModeSettings>()
   const [snapshot, setSnapshot] = useState(IDLE)
   const [testOpen, setTestOpen] = useState(false)
@@ -104,16 +112,22 @@ export function MeetingModePage() {
   const applications = devices.filter(device => device.kind === 'processAudio')
   const hasDevice = (field: DeviceField) => routes[field].some(device => device.deviceId === mode[field])
   const directSpeech = mode.pipeline === 's2s' || mode.pipeline === 'auto' && !!defaultRealtimeS2s(settings)
-  const codes = directSpeech ? ALIYUN_S2S_SPEECH_LANGUAGES : LANGUAGE_CODES
-  const languages = codes.map(value => ({ value, label: languageName(value, language) }))
-    .sort((left, right) => left.label.localeCompare(right.label, language))
+  const recognitionSources = modelOptions.recognitionSourceLanguages.length === 1 && modelOptions.recognitionSourceLanguages[0] === 'auto' && modelOptions.recognitionProvider === 'aliyun'
+    ? ALIYUN_LANGUAGES : modelOptions.recognitionSourceLanguages
+  const sources = recognitionSources.filter(code => !modelOptions.translationSourceLanguages.length || modelOptions.translationSourceLanguages.map(normalizeLanguage).includes(normalizeLanguage(code)))
+  const targets = modelOptions.translationTargetLanguages.filter(code => speechLanguages.includes(code))
+  const codes = directSpeech ? ALIYUN_S2S_SPEECH_LANGUAGES : [...new Set([...sources, ...targets].map(normalizeLanguage))].filter(code => code !== 'auto' && code !== 'none')
+  const localCodes = codes.filter(code => directSpeech || (!mode.uplinkEnabled || sources.includes(code) && modelOptions.supportsTranslation(code, mode.remoteLanguage)) && (!mode.downlinkEnabled || targets.includes(code) && modelOptions.supportsTranslation(mode.remoteLanguage, code)))
+  const remoteCodes = codes.filter(code => directSpeech || (!mode.downlinkEnabled || sources.includes(code) && modelOptions.supportsTranslation(code, mode.localLanguage)) && (!mode.uplinkEnabled || targets.includes(code) && modelOptions.supportsTranslation(mode.localLanguage, code)))
   const valid = (mode.uplinkEnabled || mode.downlinkEnabled)
     && (!mode.uplinkEnabled || hasDevice('microphoneId') && hasDevice('uplinkOutputId'))
     && (!mode.downlinkEnabled || hasDevice('headphonesId') && (mode.downlinkSource === 'application'
       ? applications.some(device => device.deviceId === mode.applicationId) : hasDevice('downlinkInputId')))
     && !(mode.uplinkEnabled && mode.downlinkEnabled && (mode.uplinkOutputId === mode.headphonesId
       || mode.downlinkSource === 'cable' && (mode.microphoneId === mode.downlinkInputId || !!uplink && uplink === downlink)))
-    && mode.localLanguage !== mode.remoteLanguage && codes.includes(mode.localLanguage) && codes.includes(mode.remoteLanguage)
+    && mode.localLanguage !== mode.remoteLanguage
+    && (directSpeech || !modelOptions.translationAvailable || (!mode.uplinkEnabled || modelOptions.supportsTranslation(mode.localLanguage, mode.remoteLanguage))
+      && (!mode.downlinkEnabled || modelOptions.supportsTranslation(mode.remoteLanguage, mode.localLanguage)))
 
   const change = <Key extends keyof MeetingModeSettings>(key: Key, value: MeetingModeSettings[Key]) => {
     setDraft(previous => ({ ...(previous ?? mode), [key]: value }))
@@ -122,7 +136,7 @@ export function MeetingModePage() {
     }
   }
   const select = (key: keyof MeetingModeSettings, label: TranslationKey, value: string, options: readonly PickerOption[], onChange: (value: string) => void) =>
-    <Field key={key} className="nola-overlay-field">
+    <Field key={key} className="nola-settings-field">
       <FieldLabel htmlFor={`meeting-${key}`}>{t(label)}</FieldLabel>
       <SettingSelect id={`meeting-${key}`} value={value} ariaLabel={t(label)} options={options} onChange={onChange} isDisabled={locked} />
     </Field>
@@ -202,6 +216,10 @@ export function MeetingModePage() {
   const run = async (testTrial = false) => {
     const version = generation.current
     if (!api) return
+    if (!canStop && !valid) {
+      setSnapshot({ state: 'failed', passthroughActive: false, error: { key: 'meeting.invalidRoute' } })
+      return
+    }
     if (!canStop && valid) {
       setSnapshot({ state: 'starting', passthroughActive: false })
       try {
@@ -231,52 +249,53 @@ export function MeetingModePage() {
   }
   const activeFields = deviceFields.filter(field => field === 'microphoneId' || field === 'uplinkOutputId' ? mode.uplinkEnabled : mode.downlinkEnabled)
   const originalVolume = new Intl.NumberFormat(language, { style: 'percent' }).format(mode.duckVolume / 100)
-  const preferences = <FieldGroup className="nola-overlay-fields nola-meeting-preferences grid">
-      <h3 className="nola-realtime-settings__heading">{t('meeting.translation')}</h3>
-      {mode.downlinkSource === 'cable' && mode.downlinkEnabled ? <Field className="nola-overlay-field">
+  const preferences = <FieldGroup className="nola-settings-fields">
+      <div className="col-span-full flex flex-wrap items-center justify-between gap-2">
+        <h2 className="nola-settings-heading">{t('meeting.translation')}</h2>
+        <Button data-testid="meeting-audio-test" variant="outline" size="sm" disabled={!api || pending || !!testing} onClick={() => setTestOpen(true)}>{t('meeting.testAudio')}</Button>
+      </div>
+      {mode.downlinkSource === 'cable' && mode.downlinkEnabled ? <Field className="nola-settings-field">
         <div className="nola-meeting-preference-label"><FieldLabel id="meeting-duck-volume">{t('meeting.duckVolume')}</FieldLabel><Tooltip>
           <TooltipTrigger render={<button type="button" className="inline-flex text-muted" aria-label={t('meeting.duckVolume')} />}><CircleHelp className="size-3.5" aria-hidden="true" /></TooltipTrigger>
           <TooltipContent className="max-w-80 whitespace-normal">{t('meeting.duckVolumeHint')}</TooltipContent>
         </Tooltip></div>
         <div className="nola-meeting-volume-control"><SliderRoot value={mode.duckVolume} min={0} max={100} step={1} onValueChange={value => change('duckVolume', value)} disabled={locked}><SliderControl><SliderTrack><SliderIndicator /><SliderThumb aria-labelledby="meeting-duck-volume" aria-valuetext={originalVolume} /></SliderTrack></SliderControl></SliderRoot><span className="nola-meeting-volume-value">{originalVolume}</span></div>
       </Field> : null}
-      <Field className="nola-overlay-field"><FieldLabel htmlFor="meeting-captionScope">{t('meeting.captionScope')}</FieldLabel><SettingSelect id="meeting-captionScope" value={mode.captionScope} ariaLabel={t('meeting.captionScope')} options={[{value:'uplink',label:t('meeting.me')},{value:'downlink',label:t('meeting.remote')},{value:'both',label:t('meeting.both')}]} onChange={value => { if(value === 'uplink' || value === 'downlink' || value === 'both') change('captionScope',value) }} /></Field>
-      <Field className="nola-overlay-field"><FieldLabel htmlFor="meeting-speakers">{t('meeting.showSpeaker')}</FieldLabel><div className="nola-meeting-speaker-control"><Switch id="meeting-speakers" checked={mode.showSpeaker} onCheckedChange={value => change('showSpeaker',value)}><SwitchThumb /></Switch></div></Field>
+      <Field className="nola-meeting-route-heading"><FieldLabel htmlFor="meeting-speakers">{t('meeting.showSpeaker')}</FieldLabel><Switch id="meeting-speakers" checked={mode.showSpeaker} onCheckedChange={value => change('showSpeaker',value)}><SwitchThumb /></Switch></Field>
+      <Field className="nola-settings-field"><FieldLabel htmlFor="meeting-captionScope">{t('meeting.captionScope')}</FieldLabel><SettingSelect id="meeting-captionScope" value={mode.captionScope} ariaLabel={t('meeting.captionScope')} options={[{value:'uplink',label:t('meeting.me')},{value:'downlink',label:t('meeting.remote')},{value:'both',label:t('meeting.both')}]} onChange={value => { if(value === 'uplink' || value === 'downlink' || value === 'both') change('captionScope',value) }} /></Field>
     </FieldGroup>
 
   return <section data-slot="meeting-page" className="flex min-w-0 flex-col gap-6">
     <PageHeader title={t('meeting.title')} subtitle={t('meeting.singlePageHint')} actions={<>
       <Button variant="outline" onClick={() => void actions.settings.showWorkspace().catch(error => notifyError(t('workspaceUi.windowFailed'), { cause: error }))}><MessagesSquare data-icon="inline-start" />{t('meeting.conversation')}</Button>
       <Button variant="outline" onClick={() => void actions.settings.showOverlay('workspace').then(opened => { if (opened === false) notifyError(t('workspaceUi.overlayFailed')) }).catch(error => notifyError(t('workspaceUi.overlayFailed'), { cause: error }))}><Captions data-icon="inline-start" />{t('workspaceUi.openOverlay')}</Button>
-      <Button disabled={!api || pending || !!testing || (!canStop && !valid)} onClick={() => void run()}>
+      <Button disabled={!api || pending || !!testing} onClick={() => void run()}>
         {pending ? <Spinner data-icon="inline-start" /> : null}{t(snapshot.state === 'starting' ? 'gateway.starting' : snapshot.state === 'stopping' ? 'gateway.stopping' : canStop ? 'meeting.stop' : 'meeting.start')}
       </Button>
     </>} />
     {localizedError ? <Alert variant="danger"><AlertDescription>{snapshot.error?.direction ? <strong>{t(`meeting.${snapshot.error.direction}`)} · </strong> : null}{t(localizedError)}</AlertDescription></Alert> : null}
     <MeetingStage mode={mode} snapshot={snapshot} checks={results} heard={heard} />
-    <Card data-slot="meeting-settings" className="nola-section-card nola-meeting-settings">
-      <CardHeader><CardTitle>{t('settings.title')}</CardTitle><CardAction className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" disabled={locked || deviceState === 'loading'} onClick={() => void refresh()}>{deviceState === 'loading' && api ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t('meeting.refresh')}</Button>
-        <Button nativeButton={false} variant="outline" size="sm" render={<a href="#/settings/shortcuts" />}><Keyboard data-icon="inline-start" />{t('shortcuts.title')}</Button>
-      </CardAction></CardHeader>
-      <CardContent className="nola-realtime-settings">
-        <FieldGroup className="nola-overlay-fields grid">
-          <h3 className="nola-realtime-settings__heading">{t('session.processingGroup')}</h3>
-          <RealtimeProcessingField id="meeting-pipeline" className="nola-overlay-field" disabled={locked} value={mode.pipeline === 'auto' ? 'default' : mode.pipeline} onChange={value => change('pipeline', value === 'default' ? 'auto' : value)} />
-        </FieldGroup>
-        <FieldGroup className="nola-overlay-fields grid">
-          <h3 className="nola-realtime-settings__heading">{t('session.audioLanguageGroup')}</h3>
-          <Field className="nola-overlay-field">
-            <FieldLabel htmlFor="meeting-languages">{t('shellUi.languageDirection')}</FieldLabel>
-            <Popover><PopoverTrigger id="meeting-languages" render={<Button variant="tertiary" />} className="nola-overlay-language-trigger" disabled={locked}
-              aria-label={`${t('shellUi.languageDirection')}: ${languageName(mode.localLanguage, language)} ⇄ ${languageName(mode.remoteLanguage, language)}`}>
-              <Languages aria-hidden="true" /><span>{languageName(mode.localLanguage, language)} ⇄ {languageName(mode.remoteLanguage, language)}</span><ChevronDown aria-hidden="true" />
-            </PopoverTrigger><PopoverContent className="nola-meeting-languages" align="start" side="top" aria-label={t('shellUi.languageDirection')}>
-              <Button variant="outline" disabled={locked} onClick={() => setDraft(previous => ({ ...(previous ?? mode), localLanguage: mode.remoteLanguage, remoteLanguage: mode.localLanguage }))}><ArrowRightLeft data-icon="inline-start" />{t('session.swapLanguages')}</Button>
-              {select('localLanguage', 'meeting.localLanguage', mode.localLanguage, languages, value => change('localLanguage', value))}
-              {select('remoteLanguage', 'meeting.remoteLanguage', mode.remoteLanguage, languages, value => change('remoteLanguage', value))}
-            </PopoverContent></Popover>
+    <Card data-slot="meeting-settings" className="nola-section-card nola-settings-card nola-meeting-settings">
+      <CardContent className="nola-settings-content">
+        <FieldGroup className="nola-settings-fields">
+          <div className="col-span-full flex flex-wrap items-center justify-between gap-2">
+            <h2 className="nola-settings-heading">{t('session.processingGroup')}</h2>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" disabled={locked || deviceState === 'loading'} onClick={() => void refresh()}>{deviceState === 'loading' && api ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t('meeting.refresh')}</Button>
+              <Button nativeButton={false} variant="outline" size="sm" render={<a href="#/settings/shortcuts" />}><Keyboard data-icon="inline-start" />{t('shortcuts.title')}</Button>
+            </div>
+          </div>
+          <RealtimeProcessingField id="meeting-pipeline" className="nola-settings-field" disabled={locked} value={mode.pipeline === 'auto' ? 'default' : mode.pipeline} onChange={value => change('pipeline', value === 'default' ? 'auto' : value)} />
+          <Field className="nola-settings-field nola-language-pair-field">
+            <ModelAvailabilityLabel label={t('shellUi.languageDirection')} hint={t('meeting.languageDirectionHint')} />
+            <LanguageDirectionSelect source={mode.localLanguage} target={mode.remoteLanguage} sourceCodes={localCodes} targetCodes={remoteCodes} disabled={locked}
+              sourceLabel={t('meeting.localLanguage')} targetLabel={t('meeting.remoteLanguage')}
+              onSourceChange={value => change('localLanguage', value)} onTargetChange={value => change('remoteLanguage', value)}
+              onSwap={localCodes.includes(mode.remoteLanguage) && remoteCodes.includes(mode.localLanguage) ? () => setDraft(previous => ({ ...(previous ?? mode), localLanguage: mode.remoteLanguage, remoteLanguage: mode.localLanguage })) : undefined} />
           </Field>
+        </FieldGroup>
+        <FieldGroup className="nola-settings-fields">
+          <h2 className="nola-settings-heading">{t('meeting.routing')}</h2>
           {deviceState === 'failed' ? <Alert variant="danger"><AlertDescription>{t('meeting.deviceListFailed')}</AlertDescription></Alert> : null}
           <div className="nola-meeting-routes">
             <FieldGroup>
@@ -293,9 +312,6 @@ export function MeetingModePage() {
           </div>
         </FieldGroup>
         {preferences}
-        <div className="flex justify-end">
-          <Button data-testid="meeting-audio-test" variant="outline" size="sm" disabled={!api || pending || !!testing} onClick={() => setTestOpen(true)}>{t('meeting.testAudio')}</Button>
-        </div>
       </CardContent>
     </Card>
     <Dialog open={testOpen} onOpenChange={closeTests}><DialogContent className="max-h-full overflow-y-auto"><DialogHeader><DialogTitle>{t('meeting.testAudio')}</DialogTitle><DialogDescription>{t('meeting.localTestOnly')}</DialogDescription></DialogHeader><DialogCloseButton />
@@ -307,7 +323,7 @@ export function MeetingModePage() {
           {testControls(field)}
         </Field>)}
         <Separator /><FieldDescription>{t('meeting.trialHint')}</FieldDescription>
-        <Button disabled={!api || pending || !!testing || (!canStop && !valid)} onClick={() => { if(!canStop) setTrialStarted(true); void run(true) }}>{t(canStop ? 'meeting.stop' : 'meeting.start')}</Button>
+        <Button disabled={!api || pending || !!testing} onClick={() => { if(!canStop && valid) setTrialStarted(true); void run(true) }}>{t(canStop ? 'meeting.stop' : 'meeting.start')}</Button>
       </FieldGroup>
     </DialogContent></Dialog>
   </section>

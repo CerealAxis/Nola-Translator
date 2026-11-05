@@ -2,7 +2,7 @@ import { useId } from 'react'
 import { AudioLines, Headphones, Mic, UserRound } from 'lucide-react'
 import type { MeetingAudioTestResult, MeetingModeSettings, MeetingModeSnapshot } from '../../../shared/meeting-mode'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { useI18n, type TranslationKey } from '@/i18n'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -60,8 +60,7 @@ export function MeetingStage({ mode, snapshot, checks, heard }: {
     })}
   </div>
 
-  return <Card data-slot="meeting-stage" className="nola-meeting-preview">
-    <CardHeader><CardTitle>{t('meeting.sceneTitle')}</CardTitle></CardHeader>
+  return <Card data-slot="meeting-stage" className="nola-meeting-preview" role="region" aria-label={t('meeting.sceneTitle')}>
     <CardContent>
       <div className="nola-overlay-stage nola-meeting-scene">
         <span className="nola-meeting-endpoint" aria-label={t('meeting.sendDirection')}><Mic aria-hidden="true" /></span>

@@ -37,9 +37,8 @@ export function cloudModelsOf(settings: AppSettings | null, credentials: Readonl
     { id: 'aliyun', kind: 'recognitionModel', free: false, ready: aliyunReady },
     { id: 'minimax', kind: 'recognitionModel', free: false, ready: !!credentials['minimax-asr'] && validEndpoint(recognition?.minimaxEndpoint) },
     ...(['cloud', 'microsoft', 'mymemory', 'google', 'index-translate', 'recognition'] as const).map(id => ({
-      id, kind: 'translationModel' as const, free: id === 'mymemory' || id === 'index-translate',
-      ready: id === 'cloud' ? false : id === 'microsoft' ? credentials.microsoft && validEndpoint(translation?.microsoftEndpoint)
-        : id === 'google' ? credentials.google : id === 'recognition' ? nativeReady : id === 'mymemory' ? validEndpoint(translation?.mymemoryEndpoint ?? DEFAULT_SETTINGS.translation.mymemoryEndpoint) : true,
+      id, kind: 'translationModel' as const, free: id === 'mymemory' || id === 'index-translate' || id === 'google' || id === 'microsoft',
+      ready: id === 'cloud' ? false : id === 'recognition' ? nativeReady : id === 'mymemory' ? validEndpoint(translation?.mymemoryEndpoint ?? DEFAULT_SETTINGS.translation.mymemoryEndpoint) : true,
     })),
     ...(translation ? customModelsOf(translation).map(profile => ({
       id: `custom:${profile.id}` as const, profile, kind: 'translationModel' as const, free: false,

@@ -58,14 +58,14 @@ async def test_provider_rejects_provisional_before_network_and_translates_commit
 
     def handle(message):
         requests.append(message)
+        assert "test-secret" not in str(message.headers)
+        assert "test-secret" not in str(message.url)
         if model == "google":
-            assert message.url.params["key"] == "test-secret"
-            assert json.loads(message.content) == {"q": "Hello.", "target": "zh", "format": "text"}
-            return httpx.Response(200, json={"data": {"translations": [{"translatedText": "你好。"}]}})
+            assert json.loads(message.content) == [[["Hello."], "auto", "zh-CN"], "wt_lib"]
+            return httpx.Response(200, json=[["你好。"]])
         if model == "microsoft":
-            assert message.headers["Ocp-Apim-Subscription-Key"] == "test-secret"
-            assert message.headers["Ocp-Apim-Subscription-Region"] == "test-region"
-            assert message.url.host == "translator.example.test"
+            assert message.url.host == "edge.microsoft.com"
+            assert json.loads(message.content) == ["Hello."]
             assert "from" not in message.url.params
             assert message.url.params["to"] == "zh-Hans"
             return httpx.Response(200, json=[{"translations": [{"text": "你好。"}]}])
@@ -116,18 +116,18 @@ async def test_provider_rejects_provisional_before_network_and_translates_commit
 
 
 @pytest.mark.parametrize("model", ["google", "microsoft"])
-async def test_missing_provider_key_fails_before_http(gateway, monkeypatch, model):
-    def fail(*args):
-        pytest.fail("provider must not send an unauthenticated request")
+async def test_free_provider_works_without_credentials(gateway, monkeypatch, model):
+    def client(provider):
+        result = [["你好"]] if model == "google" else [{"translations": [{"text": "你好"}]}]
+        provider._http = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: httpx.Response(200, json=result)))
+        return provider._http
 
-    monkeypatch.setattr(GoogleTranslateProvider, "_client", fail)
-    monkeypatch.setattr(MicrosoftTranslatorProvider, "_client", fail)
-    with pytest.raises(GatewayError, match="credential is missing") as error:
-        await gateway.translate(
-            CallContext(Operation.TRANSLATE, "mt"), text="Hello.", source="en", target="zh",
-            request=request(model),
-        )
-    assert error.value.code is GatewayErrorCode.PROVIDER_ERROR
+    monkeypatch.setattr(GoogleTranslateProvider if model == "google" else MicrosoftTranslatorProvider, "_client", client)
+    result = await gateway.translate(
+        CallContext(Operation.TRANSLATE, "mt"), text="Hello.", source="en", target="zh",
+        request=request(model),
+    )
+    assert result.text == "你好"
     await gateway.shutdown()
 
 

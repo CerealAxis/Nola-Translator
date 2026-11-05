@@ -25,7 +25,7 @@ export function recognitionFieldsOf(settings: RecognitionSettings): Pick<Session
 export function translationOptionsOf(settings: TranslationSettings): SessionConfig['translationOptions'] {
   switch (settings.provider) {
     case 'cloud': return { endpoint: settings.cloudEndpoint, model: settings.cloudModel, apiFormat: settings.cloudApiFormat, contextWindow: settings.cloudContextWindow, maxOutputTokens: settings.cloudMaxOutputTokens }
-    case 'microsoft': return { endpoint: settings.microsoftEndpoint, region: settings.microsoftRegion }
+    case 'microsoft': return { endpoint: DEFAULT_SETTINGS.translation.microsoftEndpoint }
     case 'mymemory': return { endpoint: settings.mymemoryEndpoint ?? DEFAULT_SETTINGS.translation.mymemoryEndpoint, email: settings.mymemoryEmail ?? '' }
     case 'google': return { endpoint: GOOGLE_TRANSLATE_ENDPOINT }
     case 'index-translate': return { endpoint: INDEX_TRANSLATE_ENDPOINT, model: INDEX_TRANSLATE_PUBLIC_MODEL, apiFormat: 'chat-completions', contextWindow: 32768, maxOutputTokens: 1024 }
@@ -49,7 +49,7 @@ export function translationOptionsFor(settings: TranslationSettings, provider: T
       return { endpoint: profile.endpoint, model: profile.model, apiFormat: profile.apiFormat,
         contextWindow: profile.contextWindow, maxOutputTokens: profile.maxOutputTokens }
     }
-    case 'microsoft': return { endpoint: settings.microsoftEndpoint, region: settings.microsoftRegion }
+    case 'microsoft': return { endpoint: DEFAULT_SETTINGS.translation.microsoftEndpoint }
     case 'mymemory': return { endpoint: settings.mymemoryEndpoint ?? DEFAULT_SETTINGS.translation.mymemoryEndpoint, email: settings.mymemoryEmail ?? '' }
     case 'google': return { endpoint: GOOGLE_TRANSLATE_ENDPOINT }
     case 'index-translate': return { endpoint: INDEX_TRANSLATE_ENDPOINT, model: INDEX_TRANSLATE_PUBLIC_MODEL, apiFormat: 'chat-completions', contextWindow: 32768, maxOutputTokens: 1024 }
@@ -66,7 +66,7 @@ export function fallbackTranslationFieldsOf(settings: TranslationSettings): Part
       endpoint: fallback.cloudEndpoint, model: fallback.cloudModel, apiFormat: fallback.cloudApiFormat,
       contextWindow: fallback.cloudContextWindow, maxOutputTokens: fallback.cloudMaxOutputTokens,
     } }
-    case 'microsoft': return { fallbackTranslationProvider: 'microsoft', fallbackTranslationOptions: { endpoint: fallback.microsoftEndpoint, region: fallback.microsoftRegion } }
+    case 'microsoft': return { fallbackTranslationProvider: 'microsoft', fallbackTranslationOptions: { endpoint: DEFAULT_SETTINGS.translation.microsoftEndpoint } }
     case 'mymemory': return { fallbackTranslationProvider: 'mymemory', fallbackTranslationOptions: { endpoint: fallback.mymemoryEndpoint, email: fallback.mymemoryEmail } }
     case 'google': return { fallbackTranslationProvider: 'google', fallbackTranslationOptions: { endpoint: GOOGLE_TRANSLATE_ENDPOINT } }
     case 'index-translate': return { fallbackTranslationProvider: 'index-translate', fallbackTranslationOptions: {

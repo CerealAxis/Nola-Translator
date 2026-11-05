@@ -1,2 +1,2 @@
-/** Official Google Cloud Translation - Basic REST endpoint. */
-export const GOOGLE_TRANSLATE_ENDPOINT = 'https://translation.googleapis.com/language/translate/v2'
+/** Public web translation endpoint; no user API key is required. */
+export const GOOGLE_TRANSLATE_ENDPOINT = 'https://translate-pa.googleapis.com/v1/translateHtml'

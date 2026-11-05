@@ -29,6 +29,8 @@ class _DirectRequest(BaseModel):
 
     id: UUID
     model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=512)]
+    task_mode: Literal["realtime", "offline"] = "offline"
+    max_concurrency: int = Field(default=1, ge=1, le=10)
 
 
 class DirectAsrRequest(_DirectRequest):
@@ -142,6 +144,7 @@ async def run_direct_inference(
         request_id=str(request.id),
         deadline=deadline,
         provider_options=provider_options or {},
+        task_mode=request.task_mode, max_concurrency=request.max_concurrency,
     )
     match = MatchRequest(operation=operation, model_id=request.model)
     try:
@@ -154,10 +157,21 @@ async def run_direct_inference(
                 if not segments:
                     gateway.match(match)
                 transcript = []
-                for pcm in segments:
-                    observation = await gateway.transcribe(ctx, audio=pcm, language=request.source, request=match)
-                    if observation.text:
-                        transcript.append(observation.text)
+                batch_size = min(5, request.max_concurrency) if request.task_mode == "offline" else 1
+                for offset in range(0, len(segments), batch_size):
+                    tasks = [asyncio.create_task(gateway.transcribe(ctx, audio=pcm, language=request.source, request=match))
+                        for pcm in segments[offset:offset + batch_size]]
+                    try:
+                        await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+                        observations = await asyncio.gather(*tasks)
+                    finally:
+                        if any(not task.done() or task.cancelled() or task.exception() is not None for task in tasks):
+                            ctx.cancel_token.cancel()
+                        for task in tasks:
+                            if not task.done():
+                                task.cancel()
+                        await asyncio.gather(*tasks, return_exceptions=True)
+                    transcript.extend(observation.text for observation in observations if observation.text)
                 return DirectInferenceResult(text=" ".join(transcript))
             if isinstance(request, DirectMtRequest):
                 match.source_language = request.source
@@ -185,6 +199,7 @@ async def run_direct_inference(
         ctx.cancel_token.cancel()
         raise
     except GatewayError as error:
+        ctx.cancel_token.cancel()
         # Provider diagnostics can contain opaque credentials that string redaction cannot recognize.
         raise GatewayError(
             error.code, stage=request.kind, message="Inference failed", retryable=error.retryable,
@@ -192,4 +207,5 @@ async def run_direct_inference(
             fatal_scope=error.fatal_scope, retry_after_ms=error.retry_after_ms, correlation_id=error.correlation_id,
         ) from None
     except Exception:
+        ctx.cancel_token.cancel()
         raise GatewayError(GatewayErrorCode.INTERNAL, stage=request.kind, message="Inference failed") from None

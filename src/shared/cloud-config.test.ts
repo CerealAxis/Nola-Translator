@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { DEFAULT_SETTINGS } from './settings'
+import { DEFAULT_SETTINGS, isCredentialProvider } from './settings'
 import { recognitionFieldsOf, recognitionLabel, remoteSourceLanguages, supportsRecognitionNativeTranslation, translationOptionsOf } from './cloud-config'
 import { sessionConfigSchema } from './schemas'
 import { INDEX_TRANSLATE_ENDPOINT, INDEX_TRANSLATE_PUBLIC_MODEL } from './index-translate'
@@ -27,8 +27,15 @@ it('passes MyMemory public settings while native translation has no separate con
   expect(translationOptionsOf({ ...DEFAULT_SETTINGS.translation, provider: 'recognition' })).toBeUndefined()
 })
 
-it('builds the official Google Translation endpoint without putting the API key in settings', () => {
+it('builds the free Google Translation endpoint without user credentials', () => {
   expect(translationOptionsOf({ ...DEFAULT_SETTINGS.translation, provider: 'google' })).toEqual({ endpoint: GOOGLE_TRANSLATE_ENDPOINT })
+})
+
+it('ignores legacy Microsoft endpoints and refuses to save obsolete translation credentials', () => {
+  expect(translationOptionsOf({ ...DEFAULT_SETTINGS.translation, provider: 'microsoft', microsoftEndpoint: 'https://old.example', microsoftRegion: 'old-region' }))
+    .toEqual({ endpoint: 'https://edge.microsoft.com/translate' })
+  for (const provider of ['google', 'microsoft', 'fallback-google']) expect(isCredentialProvider(provider)).toBe(false)
+  expect(isCredentialProvider('cloud')).toBe(true)
 })
 
 it('fixes the public Index-Translate connection independently of saved cloud settings', () => {

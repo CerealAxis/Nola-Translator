@@ -195,8 +195,9 @@ def test_workbench_lease_is_held_until_explicit_release(monkeypatch):
     async def release():
         releases.append(True)
 
-    async def acquire(gateway, model):
+    async def acquire(gateway, model, *, max_concurrency=1):
         assert model == "qwen-fixture"
+        assert max_concurrency == 1
         return SimpleNamespace(endpoint="http://127.0.0.1:5000/v1", context_window=4096, release=release)
 
     async def shutdown():
@@ -253,3 +254,25 @@ async def test_workbench_http_disconnect_cancels_inflight_inference():
             "server": ("127.0.0.1", 80), "client": ("127.0.0.1", 9000),
         }, receive, send), 2)
         assert cancelled.is_set()
+
+
+@pytest.mark.parametrize("task_mode", ["realtime", "offline"])
+def test_private_inference_api_accepts_explicit_task_mode(monkeypatch, task_mode):
+    from nola_translator_engine.backend import api
+    from nola_translator_engine.backend.direct_inference import DirectInferenceResult
+    seen = []
+    async def infer(gateway, request, **kwargs):
+        seen.append((request.task_mode, request.max_concurrency))
+        return DirectInferenceResult(text="translated")
+    async def shutdown():
+        pass
+    monkeypatch.setattr(api, "run_direct_inference", infer)
+    body = {"kind": "mt", "id": str(uuid4()), "model": "fixture", "text": "hello", "source": "en", "target": "zh",
+            "task_mode": task_mode, "max_concurrency": 5}
+    with TestClient(create_app(control_token="local-control", gateway=SimpleNamespace(shutdown=shutdown))) as client:
+        response = client.post("/api/v2/gateway/infer", headers={"Authorization": "Bearer local-control"}, json=body)
+        assert response.status_code == 200
+        assert response.json()["text"] == "translated"
+        body["task_mode"] = "unknown"
+        assert client.post("/api/v2/gateway/infer", headers={"Authorization": "Bearer local-control"}, json=body).status_code == 422
+    assert seen == [(task_mode, 5)]

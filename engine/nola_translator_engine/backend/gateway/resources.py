@@ -127,46 +127,65 @@ class ResourceAdmission:
             budget = self._devices.get(device_id)
             if budget is not None:
                 budget.release(instance_id)
+                for key in list(budget._holds):
+                    if key.startswith(f"{instance_id}:parallel:"):
+                        budget.release(key)
+
+    def reserve_parallel(self, instance_id: str, device_id: str, count: int, slot_mb: float) -> None:
+        with self._lock:
+            budget = self._devices.get(device_id)
+            if budget is None:
+                return
+            added = []
+            for index in range(1, count):
+                key = f"{instance_id}:parallel:{index}"
+                if key in budget._holds:
+                    continue
+                if not budget.try_reserve(key, slot_mb):
+                    for reserved in added:
+                        budget.release(reserved)
+                    raise ResourceExhausted(device_id, slot_mb, budget.available_mb)
+                added.append(key)
 
 
 class ConcurrencyGate:
-    """Per-instance active-inference admission (doc 08 §8: default one active
-    inference per local instance unless re-entrancy + context isolation were
-    verified)."""
+    """Realtime calls are exclusive and take priority over queued offline work."""
 
     def __init__(self) -> None:
-        self._lock = threading.Lock()
         self._active: dict[str, int] = {}
-        self._waiters: dict[str, asyncio.Queue] = {}
+        self._realtime: set[str] = set()
+        self._realtime_waiters: dict[str, int] = {}
+        self._events: dict[str, asyncio.Event] = {}
 
-    def _queue(self, instance_id: str) -> asyncio.Queue:
-        queue = self._waiters.get(instance_id)
-        if queue is None:
-            queue = asyncio.Queue()
-            self._waiters[instance_id] = queue
-        return queue
-
-    async def acquire(self, instance_id: str, limit: int) -> None:
-        queue = self._queue(instance_id)
-        while True:
-            with self._lock:
+    async def acquire(self, instance_id: str, limit: int, *, realtime: bool = False) -> None:
+        event = self._events.setdefault(instance_id, asyncio.Event())
+        if realtime:
+            self._realtime_waiters[instance_id] = self._realtime_waiters.get(instance_id, 0) + 1
+        try:
+            while True:
                 current = self._active.get(instance_id, 0)
-                if current < limit:
+                allowed = current == 0 if realtime else (
+                    current < limit and instance_id not in self._realtime
+                    and not self._realtime_waiters.get(instance_id, 0)
+                )
+                if allowed:
                     self._active[instance_id] = current + 1
+                    if realtime:
+                        self._realtime.add(instance_id)
                     return
-            await queue.get()
+                event.clear()
+                await event.wait()
+        finally:
+            if realtime:
+                self._realtime_waiters[instance_id] -= 1
+                event.set()
 
     def release(self, instance_id: str) -> None:
-        with self._lock:
-            current = self._active.get(instance_id, 0)
-            self._active[instance_id] = max(0, current - 1)
-        queue = self._waiters.get(instance_id)
-        if queue is not None:
-            try:
-                queue.put_nowait(None)
-            except asyncio.QueueFull:  # pragma: no cover - unbounded queue
-                pass
+        self._active[instance_id] = max(0, self._active.get(instance_id, 0) - 1)
+        if not self._active[instance_id]:
+            self._realtime.discard(instance_id)
+        if event := self._events.get(instance_id):
+            event.set()
 
     def active(self, instance_id: str) -> int:
-        with self._lock:
-            return self._active.get(instance_id, 0)
+        return self._active.get(instance_id, 0)

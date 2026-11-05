@@ -253,7 +253,7 @@ describe('设置存储', () => {
   it.each([
     ['qwen3.8-livetranslate-flash-realtime', 'qwen3.8-livetranslate-flash-realtime'],
     ['qwen3.5-livetranslate-flash-realtime', 'qwen3.5-livetranslate-flash-realtime'],
-  ] as const)('将 v2 Aliyun LiveTranslate %s 迁移为原生语音输出', async (aliyunModel, expectedModel) => {
+  ] as const)('migrates v2 LiveTranslate %s without enabling speech playback', async (aliyunModel, expectedModel) => {
     const directory = await mkdtemp(join(tmpdir(), 'nola-realtime-migration-'))
     const path = join(directory, 'settings.json')
     try {
@@ -267,7 +267,7 @@ describe('设置存储', () => {
 
       const store = new SettingsStore(path)
       const migrated = await store.load()
-      expect(migrated).toMatchObject({ version: 3, realtime: { outputMode: 'speech', s2sModel: expectedModel } })
+      expect(migrated).toMatchObject({ version: 3, realtime: { outputMode: 'translation', s2sModel: expectedModel } })
       expect(migrated.realtime).not.toHaveProperty('speakerDetection')
       expect(migrated.recognition).toMatchObject({ provider: 'aliyun', aliyunModel, aliyunWorkspaceId: 'kept-workspace', aliyunRegion: 'ap-southeast-1' })
       expect(migrated.translation).toMatchObject({ provider: 'mymemory', targetLanguage: 'ja', mymemoryEmail: 'kept@example.test' })
@@ -276,6 +276,18 @@ describe('设置存储', () => {
 
       const again = await new SettingsStore(path).load()
       expect(again.realtime).toEqual(migrated.realtime)
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+
+  it.each(['translation', 'speech'] as const)('preserves explicitly saved %s playback during migration', async outputMode => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-realtime-playback-'))
+    const path = join(directory, 'settings.json')
+    try {
+      await writeFile(path, JSON.stringify({ version: 2,
+        recognition: { provider: 'aliyun', aliyunModel: 'qwen3.5-livetranslate-flash-realtime' },
+        translation: { provider: 'mymemory', targetLanguage: 'en' }, realtime: { outputMode },
+      }))
+      expect((await new SettingsStore(path).load()).realtime).toMatchObject({ outputMode, s2sModel: 'qwen3.5-livetranslate-flash-realtime' })
     } finally { await rm(directory, { recursive: true, force: true }) }
   })
 

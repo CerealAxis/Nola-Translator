@@ -21,6 +21,7 @@ from ..models.manager import ModelIntegrityError, ModelManager
 from ..models.ocr_catalog import OCR_DETECTOR, OCR_RECOGNIZERS, PP_OCRV5_MOBILE, OCR_SPECS, OCR_LANGUAGES, OCR_RESOURCE_ID
 from ..protocol import NetworkSettings, ResourceRecord
 from ..debug_log import exception_fields, write as write_diagnostic
+from .gateway.resources import ConcurrencyGate
 
 MAX_IMAGE_BYTES = 12 * 1024 * 1024
 MAX_IMAGE_PIXELS = 12_000_000
@@ -32,6 +33,8 @@ class OcrRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     image: str = Field(min_length=24, max_length=MAX_IMAGE_BYTES * 4 // 3 + 64)
     appearance: bool = False
+    task_mode: Literal["realtime", "offline"] = "realtime"
+    max_concurrency: int = Field(default=1, ge=1, le=5)
     language: str = Field(default="auto", min_length=1, max_length=32, pattern=r"^[a-zA-Z][a-zA-Z0-9-]*$")
 
 
@@ -230,6 +233,8 @@ class ScreenOcr:
         # engine process must never remove a currently downloading OCR snapshot.
         self.models.cleanup_stale([self.spec])
         self._lock = asyncio.Lock()
+        self._inference_gate = ConcurrencyGate()
+        self._session_lock = threading.Lock()
         self._cancel = threading.Event()
         self._install: asyncio.Task | None = None
         self._state: dict = {}
@@ -386,16 +391,21 @@ class ScreenOcr:
         import onnxruntime as ort
 
         key = str(path)
-        if key not in self._sessions:
-            options = ort.SessionOptions()
-            options.intra_op_num_threads = min(2, os.cpu_count() or 1)
-            options.inter_op_num_threads = 1
-            options.log_severity_level = 3
-            self._sessions[key] = ort.InferenceSession(key, options, providers=["CPUExecutionProvider"])
+        with self._session_lock:
+            if key not in self._sessions:
+                options = ort.SessionOptions()
+                options.intra_op_num_threads = min(2, os.cpu_count() or 1)
+                options.inter_op_num_threads = 1
+                options.log_severity_level = 3
+                self._sessions[key] = ort.InferenceSession(key, options, providers=["CPUExecutionProvider"])
         return self._sessions[key]
 
     @staticmethod
     def _recognize(crop, recognizer) -> tuple[str, float]:
+        return ScreenOcr._recognize_batch([crop], recognizer)[0]
+
+    @staticmethod
+    def _recognize_batch(crops, recognizer):
         import cv2
         import numpy as np
 
@@ -405,27 +415,35 @@ class ScreenOcr:
         characters = [""] + metadata["character"].splitlines() + [" "]
         shape = recognizer.get_inputs()[0].shape
         height = shape[2] if isinstance(shape[2], int) else 48
-        width = shape[3] if isinstance(shape[3], int) else min(2048, max(320, math.ceil(crop.shape[1] * height / crop.shape[0])))
-        resized_width = min(width, math.ceil(crop.shape[1] * height / crop.shape[0]))
+        width = shape[3] if isinstance(shape[3], int) else min(2048, max(320, max(math.ceil(crop.shape[1] * height / crop.shape[0]) for crop in crops)))
 
-        def recognize(image):
-            tensor = np.zeros((1, 3, height, width), dtype=np.float32)
-            resized = cv2.resize(image, (resized_width, height)).astype(np.float32) / 127.5 - 1
-            tensor[0, :, :, :resized_width] = resized.transpose(2, 0, 1)
+        def recognize(images):
+            tensor = np.zeros((len(images), 3, height, width), dtype=np.float32)
+            for index, image in enumerate(images):
+                resized_width = min(width, math.ceil(image.shape[1] * height / image.shape[0]))
+                resized = cv2.resize(image, (resized_width, height)).astype(np.float32) / 127.5 - 1
+                tensor[index, :, :, :resized_width] = resized.transpose(2, 0, 1)
             prediction = recognizer.run(None, {recognizer.get_inputs()[0].name: tensor})[0]
-            return ctc_decode(prediction, characters)
+            if len(prediction) != len(images):
+                raise ValueError("modelCorrupt")
+            return [ctc_decode(prediction[index:index + 1], characters) for index in range(len(images))]
 
-        result = recognize(crop)
-        if result[1] < 0.7:
-            # Retry uncertain text upside-down without loading a separate orientation model.
-            result = max(result, recognize(np.rot90(crop, 2)), key=recognition_quality)
-        return result
+        batch_size = min(5, shape[0]) if isinstance(shape[0], int) else 5
+        results = []
+        for offset in range(0, len(crops), batch_size):
+            images = crops[offset:offset + batch_size]
+            batch = recognize(images)
+            for index, result in enumerate(batch):
+                if result[1] < 0.7:
+                    # Retry uncertain text upside-down without loading a separate orientation model.
+                    batch[index] = max(result, recognize([np.rot90(images[index], 2)])[0], key=recognition_quality)
+            results.extend(batch)
+        return results
 
     def _infer(self, request: OcrRequest) -> dict:
         import cv2
         import numpy as np
 
-        cv2.setNumThreads(1)
         directory = self._verify()
         image = decode_image(request.image)
         height, width = image.shape[:2]
@@ -442,15 +460,22 @@ class ScreenOcr:
         else:
             paths = [entry.path for entry in self.spec.files if "_rec_" in entry.path]
         recognizers = [self._session(directory / path) for path in paths]
-        blocks = []
-        for quad in detected_quads(prediction, width, height):
+        blocks, crops = [], []
+        quads = detected_quads(prediction, width, height)
+        for quad in quads:
             crop_width = max(1, round(max(np.linalg.norm(quad[0] - quad[1]), np.linalg.norm(quad[2] - quad[3]))))
             crop_height = max(1, round(max(np.linalg.norm(quad[0] - quad[3]), np.linalg.norm(quad[1] - quad[2]))))
             target = np.array([[0, 0], [crop_width - 1, 0], [crop_width - 1, crop_height - 1], [0, crop_height - 1]], dtype=np.float32)
             crop = cv2.warpPerspective(image, cv2.getPerspectiveTransform(quad, target), (crop_width, crop_height), borderMode=cv2.BORDER_REPLICATE)
             if crop_height > crop_width * 1.5:
                 crop = np.rot90(crop)
-            text, confidence = max((self._recognize(crop, recognizer) for recognizer in recognizers), key=recognition_quality)
+            crops.append(crop)
+        batch_size = request.max_concurrency if request.task_mode == "offline" else 1
+        recognized = []
+        for offset in range(0, len(crops), batch_size):
+            candidates = [self._recognize_batch(crops[offset:offset + batch_size], recognizer) for recognizer in recognizers]
+            recognized.extend(max(items, key=recognition_quality) for items in zip(*candidates))
+        for quad, (text, confidence) in zip(quads, recognized):
             if self.spec.model_id == "pp-ocrv5-mobile-arabic-onnx":
                 text = arabic_logical_order(text)
             if text.strip() and confidence >= 0.5:
@@ -467,14 +492,30 @@ class ScreenOcr:
             raise ValueError("modelNotLoaded")
         if self._closed or self._lock.locked() or (self._install and not self._install.done()):
             raise ValueError("resourceBusy")
-        async with self._lock:
+        key = self.spec.model_id
+        await self._inference_gate.acquire(key, request.max_concurrency, realtime=request.task_mode == "realtime")
+        try:
+            if self._closed or self._lock.locked():
+                raise ValueError("resourceBusy")
+            if not self._loaded:
+                raise ValueError("modelNotLoaded")
             # Shield keeps the slot occupied until native inference finishes after disconnect.
             task = asyncio.create_task(asyncio.to_thread(self._infer, request))
             try:
                 return await asyncio.shield(task)
             except asyncio.CancelledError:
-                await task
+                while not task.done():
+                    try:
+                        await asyncio.shield(task)
+                    except asyncio.CancelledError:
+                        continue
+                    except Exception:
+                        break
+                if not task.cancelled():
+                    task.exception()
                 raise
+        finally:
+            self._inference_gate.release(key)
 
     async def close(self) -> None:
         self._closed = True
@@ -483,13 +524,18 @@ class ScreenOcr:
         await self.release()
 
     async def release(self) -> dict:
-        async with self._lock:
-            self._loaded = False
-            self._sessions.clear()
+        key = self.spec.model_id
+        await self._inference_gate.acquire(key, 1, realtime=True)
+        try:
+            async with self._lock:
+                self._loaded = False
+                self._sessions.clear()
+        finally:
+            self._inference_gate.release(key)
         return self.status()
 
     async def load(self) -> dict:
-        if self._closed or self._lock.locked() or (self._install and not self._install.done()):
+        if self._closed or self._lock.locked() or self._inference_gate.active(self.spec.model_id) or (self._install and not self._install.done()):
             raise ValueError("resourceBusy")
         async with self._lock:
             def load_weights():

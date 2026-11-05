@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
 import { Languages, Pin, PinOff, Settings2, X } from 'lucide-react'
 import { Button } from '../../../src/renderer/components/ui/button'
 import { Alert, AlertDescription } from '../../../src/renderer/components/ui/alert'
+import { Popover, PopoverTrigger } from '../../../src/renderer/components/ui/popover'
 import { browserText, errorKey } from '../i18n'
 import { NolaLogo } from '../logo'
 import type { Preferences } from '../preferences'
@@ -21,6 +23,7 @@ interface Props {
 }
 export function FloatingControls({ preferences, active, error, onTranslate, onRestore, onPosition, onLock, onHide }: Props) {
   const [menu, setMenu] = useState(false)
+  const [menuContainer, setMenuContainer] = useState<HTMLDivElement | null>(null)
   const [hovered, setHovered] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [panelError, setPanelError] = useState<string>()
@@ -58,6 +61,7 @@ export function FloatingControls({ preferences, active, error, onTranslate, onRe
   const toggleTranslation = () => { if (active) onRestore(); else onTranslate() }
   const expanded = hovered || menu || Boolean(panelError) || showError
   const openPanel = () => {
+    setPanelError(undefined)
     void chrome.runtime.sendMessage({ type: 'openTranslationPanel' }).then(result => {
       if (!(result as { ok?: boolean })?.ok) setPanelError('openPanelFromToolbar')
     }).catch(() => setPanelError('openPanelFromToolbar'))
@@ -71,12 +75,18 @@ export function FloatingControls({ preferences, active, error, onTranslate, onRe
           if (preferences.floatingClickAction === 'translate') toggleTranslation()
           else openPanel()
         }}><NolaLogo /></Button>
-        <Button className="nola-floating-dismiss-trigger" variant="bare" size="icon-xs" aria-label={t('close')} title={t('close')} aria-expanded={menu} onClick={() => setMenu(value => !value)}><X /></Button>
+        <Popover open={menu} onOpenChange={setMenu}>
+          <PopoverTrigger render={<Button className="nola-floating-dismiss-trigger" variant="bare" size="icon-xs" aria-label={t('close')} title={t('close')} />}><X /></PopoverTrigger>
+          {menuContainer && <PopoverPrimitive.Portal container={menuContainer}><PopoverPrimitive.Positioner side={preferences.floatingSide === 'right' ? 'left' : 'right'} align="start" sideOffset={8} className="z-popup"><PopoverPrimitive.Popup className="nola-floating-popover" aria-label={t('close')}>
+            <Button variant="bare" onClick={() => { setMenu(false); onHide('site') }}>{t('floatingHideSite')}</Button>
+            <Button variant="bare" onClick={() => { setMenu(false); onHide('all') }}>{t('floatingHideAll')}</Button>
+          </PopoverPrimitive.Popup></PopoverPrimitive.Positioner></PopoverPrimitive.Portal>}
+        </Popover>
         <Button className="nola-floating-pin" variant="bare" size="icon-xs" aria-label={t(preferences.floatingLocked ? 'unpinFloating' : 'pinFloating')} title={t(preferences.floatingLocked ? 'unpinFloating' : 'pinFloating')} onClick={onLock}>{preferences.floatingLocked ? <PinOff /> : <Pin />}</Button>
       </div>
       <Button className="nola-floating-tool" variant="outline" size="icon" aria-label={t('settings')} title={t('settings')} onClick={() => window.open(chrome.runtime.getURL('options.html#floatingButton'), '_blank')}><Settings2 /></Button>
     </div>
-    {menu && <section className="nola-floating-menu" aria-label={t('close')}><Button variant="bare" onClick={() => onHide('site')}>{t('floatingHideSite')}</Button><Button variant="bare" onClick={() => onHide('all')}>{t('floatingHideAll')}</Button></section>}
+    <div ref={setMenuContainer} style={{ display: 'contents' }} />
     {(panelError || showError && error) && <div className="nola-floating-notice"><Alert variant="danger"><AlertDescription>{t(errorKey(panelError || error!))}</AlertDescription></Alert><Button variant="outline" size="sm" onClick={() => window.open(chrome.runtime.getURL('options.html#apiProviders'), '_blank')}>{t('apiProviders')}</Button></div>}
   </div>
 }

@@ -398,10 +398,18 @@ def test_resolve_llama_dir_env_precedence(monkeypatch, tmp_path) -> None:
     assert resolve_llama_dir() == custom
 
 
-def test_resolve_llama_dir_dev_fallback(monkeypatch) -> None:
+def test_resolve_llama_dir_dev_fallback(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("NOLA_TRANSLATOR_LLAMA_DIR", "   ")
-    resolved = resolve_llama_dir()
-    assert resolved == Path(__file__).resolve().parents[3] / "vendor" / "llama"
+    import nola_translator_engine.translation.llama_server as llama_server
+
+    project = tmp_path / "project"
+    source = project / "engine" / "nola_translator_engine" / "translation" / "llama_server.py"
+    monkeypatch.setattr(llama_server, "__file__", str(source))
+    monkeypatch.setattr(sys, "frozen", False, raising=False)
+    vendor = project / "vendor" / "llama"
+    assert resolve_llama_dir() is None
+    vendor.mkdir(parents=True)
+    assert resolve_llama_dir() == vendor
 
 
 def test_resolve_llama_dir_packaged(monkeypatch, tmp_path) -> None:
@@ -423,3 +431,32 @@ async def test_openvino_passes_native_device_to_child(tmp_path):
     assert await manager.start(timeout_s=5) == "Intel GPU"
     assert popen.calls[0]["kwargs"]["env"]["GGML_OPENVINO_DEVICE"] == "GPU.0"
     assert popen.calls[0]["args"][popen.calls[0]["args"].index("--device") + 1] == "OPENVINO1"
+
+
+
+async def test_parallel_slots_preserve_each_requests_context_budget(tmp_path, monkeypatch):
+    popen = FakePopen()
+    manager, _, _ = make_manager(tmp_path, popen, health=lambda *_args, **_kwargs: 200)
+    manager.configure_parallel(5)
+    await manager.start()
+    args = popen.calls[0]["args"]
+    assert args[args.index("-np") + 1] == "5"
+    assert int(args[args.index("-c") + 1]) == manager._compute.contextSize * 5
+    active, peak = 0, 0
+    lock = threading.Lock()
+    def chat(messages, **kwargs):
+        nonlocal active, peak
+        with lock:
+            active += 1
+            peak = max(peak, active)
+        threading.Event().wait(0.02)
+        with lock:
+            active -= 1
+        return messages[0]["content"]
+    monkeypatch.setattr(manager, "_chat_locked", chat)
+    try:
+        messages = [[{"role": "user", "content": str(index)}] for index in range(5)]
+        assert manager.chat_batch_sync(messages) == [str(index) for index in range(5)]
+        assert peak > 1
+    finally:
+        await manager.stop()

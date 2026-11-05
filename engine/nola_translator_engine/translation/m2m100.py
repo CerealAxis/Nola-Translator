@@ -166,6 +166,23 @@ class M2M100Runtime:
         with self._inference_lock:
             return self._translate_locked(text, source, target)
 
+    def translate_batch_sync(self, texts: list[str], source: str, target: str) -> list[str]:
+        with self._inference_lock:
+            return self._translate_batch_locked(texts, source, target)
+
+    def _translate_batch_locked(self, texts: list[str], source: str, target: str) -> list[str]:
+        import torch
+
+        self.load()
+        bundle = self._bundle
+        bundle.tokenizer.src_lang = source
+        bundle.tokenizer.set_tgt_lang_special_tokens(target)
+        inputs = bundle.tokenizer(texts, return_tensors="pt", padding=True)
+        inputs = {key: value.to(bundle.model.device) for key, value in inputs.items()}
+        with torch.inference_mode():
+            output = bundle.model.generate(**inputs, forced_bos_token_id=bundle.tokenizer.get_lang_id(target), max_new_tokens=MAX_NEW_TOKENS)
+        return [text.strip() for text in bundle.tokenizer.batch_decode(output, skip_special_tokens=True)]
+
     def _translate_locked(self, text: str, source: str, target: str) -> str:
         import torch
 
@@ -219,3 +236,10 @@ class M2M100TranslationProvider:
             self.runtime.translate_sync, text, source_code, target_code
         )
         return ProviderTranslation(content, (source, target))
+
+    async def translate_batch(self, texts: list[str], source: str, target: str) -> list[ProviderTranslation]:
+        source_code, target_code = _normalize_language_code(source), _normalize_language_code(target)
+        if source_code is None or target_code is None:
+            raise UnsupportedLanguagePair(source, target)
+        results = await asyncio.to_thread(self.runtime.translate_batch_sync, texts, source_code, target_code)
+        return [ProviderTranslation(content, (source, target)) for content in results]

@@ -106,6 +106,74 @@ class LocalModelWorker:
         self.exited = False
         self.exit_code: int | None = None
         self._stderr_tail: list[str] = []
+        self._batch_queue: list[tuple[WorkerRequest, asyncio.Future, float | None, int]] = []
+        self._batch_task: asyncio.Task | None = None
+
+    async def request_batch(self, request: WorkerRequest, *, limit: int, timeout: float | None = None) -> dict[str, Any]:
+        future = asyncio.get_running_loop().create_future()
+        self._batch_queue.append((request, future, timeout, limit))
+        if self._batch_task is None:
+            self._batch_task = asyncio.create_task(self._flush_batches())
+        try:
+            return await asyncio.shield(future)
+        except asyncio.CancelledError:
+            queued = next((item for item in self._batch_queue if item[1] is future), None)
+            if queued is not None:
+                self._batch_queue.remove(queued)
+                future.cancel()
+                raise
+            # Native batch inference cannot cancel just one item; keep its lease until completion.
+            while not future.done():
+                try:
+                    await asyncio.shield(future)
+                except asyncio.CancelledError:
+                    continue
+                except Exception:
+                    break
+            if not future.cancelled():
+                future.exception()
+            raise
+
+    async def _flush_batches(self) -> None:
+        try:
+            while self._batch_queue:
+                await asyncio.sleep(0.005)
+                if not self._batch_queue:
+                    break
+                first = self._batch_queue.pop(0)
+                request, _, _, limit = first
+                key = (request.kind, request.config, request.resource_id, request.gateway_device,
+                       request.payload.get("source"), request.payload.get("target"))
+                group = [first]
+                size = len(request.to_line("0"))
+                for item in list(self._batch_queue):
+                    candidate = item[0]
+                    other = (candidate.kind, candidate.config, candidate.resource_id, candidate.gateway_device,
+                             candidate.payload.get("source"), candidate.payload.get("target"))
+                    candidate_size = len(candidate.to_line("0"))
+                    if other == key and len(group) < min(limit, item[3]) and size + candidate_size < 39_000_000 and not candidate.payload.get("inspect"):
+                        self._batch_queue.remove(item)
+                        group.append(item)
+                        size += candidate_size
+                        limit = min(limit, item[3])
+                try:
+                    if len(group) == 1:
+                        response = await self.request(request, timeout=first[2])
+                        results = [response]
+                    else:
+                        body = [json.loads(item[0].to_line(str(index))) for index, item in enumerate(group)]
+                        response = await self.request(WorkerRequest("batch", request.config,
+                            payload={"requests": body}), timeout=max(item[2] or 600 for item in group))
+                        results = [{"error": response["error"]} for _ in group] if response.get("error") else response.get("results")
+                        if not isinstance(results, list) or len(results) != len(group) or not all(isinstance(item, dict) for item in results):
+                            raise ValueError("Invalid batch inference response")
+                    for item, result in zip(group, results):
+                        item[1].set_result(result)
+                except Exception as error:
+                    for item in group:
+                        item[1].set_exception(error)
+        finally:
+            self._batch_task = None
 
     @property
     def running(self) -> bool:

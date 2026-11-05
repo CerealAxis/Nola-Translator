@@ -72,11 +72,11 @@ describe('会议展示格式', () => {
   it('会议时长按分钟/小时折算, 不足一分钟按一分钟', () => {
     const base = new Date(2026, 8, 29, 22, 0, 0).getTime()
     const at = (ms: number) => meeting({ startedAtMs: base, endedAtMs: base + ms + 30_000, durationMs: ms })
-    expect(meetingDurationLabel(at(20_000), t)).toBe('1分钟')
-    expect(meetingDurationLabel(at(60_000), t)).toBe('1分钟')
-    expect(meetingDurationLabel(at(5 * 60_000), t)).toBe('5分钟')
-    expect(meetingDurationLabel(at(60 * 60_000), t)).toBe('1小时')
-    expect(meetingDurationLabel(at(95 * 60_000), t)).toBe('1小时35分钟')
+    expect(meetingDurationLabel(at(20_000), t)).toBe('1 分钟')
+    expect(meetingDurationLabel(at(60_000), t)).toBe('1 分钟')
+    expect(meetingDurationLabel(at(5 * 60_000), t)).toBe('5 分钟')
+    expect(meetingDurationLabel(at(60 * 60_000), t)).toBe('1 小时')
+    expect(meetingDurationLabel(at(95 * 60_000), t)).toBe('1 小时 35 分钟')
   })
 
   it('结束时间缺省时回落到开始时间', () => {

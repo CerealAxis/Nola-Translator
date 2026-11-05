@@ -142,7 +142,7 @@ export function ScreenRegionEditor({ api, snapshot }: { api: ScreenTranslationBr
     {regions.map((region, index) => <div key={region.id} data-region-id={region.id} role="button" tabIndex={0} aria-label={`${t('screen.regions')} ${index + 1}`} aria-pressed={selected === region.id}
       onFocus={() => setSelected(region.id)} className={cn('screen-editor__region', selected === region.id && 'screen-editor__region--selected')}
       style={{ left: `${region.x * 100}%`, top: `${region.y * 100}%`, width: `${region.width * 100}%`, height: `${region.height * 100}%` }}>
-      <Badge variant="secondary">{index + 1}</Badge>{['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map(edge => <span key={edge} data-resize={edge} className="screen-editor__resize" />)}
+      {['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map(edge => <span key={edge} data-resize={edge} className="screen-editor__resize" />)}
     </div>)}
     <div className="screen-editor__toolbar" onPointerDown={event => event.stopPropagation()}>
       <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{regions.length} / {MAX_SCREEN_REGIONS}</Badge>

@@ -105,7 +105,7 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
     const capability = configurationOf(record)
     return { binding, name: displayName(binding, service.name || record?.name || ''), kind, origin: 'gateway', free: true,
       ...(record ? { sourceLanguages: record.kind === 'ocrModel' ? ['auto', ...record.languages] : record.kind === 'recognitionModel' ? recognitionLanguages(record) : capability?.sourceLanguages } : {}),
-      ...(capability ? { targetLanguages: capability.targetLanguages } : {}),
+      ...(record.kind === 'ttsModel' ? { targetLanguages: record.resourceId.includes('kokoro') ? ['en'] : record.languages } : capability ? { targetLanguages: capability.targetLanguages } : {}),
       images: record ? imageTranslationIds.has(record.resourceId) : false }
   }
   const asrLoaded = loaded('asr')
@@ -121,8 +121,8 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
       const capability = configurationOf(record)
       return [{
         binding, name: displayName(binding, record.name), kind, origin: 'gateway' as const, free: true,
-        sourceLanguages: kind === 'asr' ? recognitionLanguages(record) : capability?.sourceLanguages,
-        targetLanguages: capability?.targetLanguages,
+        sourceLanguages: kind === 'asr' ? recognitionLanguages(record) : kind === 'ocr' ? ['auto', ...record.languages] : capability?.sourceLanguages,
+        targetLanguages: kind === 'tts' ? record.resourceId.includes('kokoro') ? ['en'] : record.languages : capability?.targetLanguages,
         images: imageTranslationIds.has(id),
       }]
     })
@@ -147,7 +147,11 @@ export function buildAvailableModels({ settings, resources, credentials, snapsho
     const languages = model.id === 'recognition' ? ALIYUN_LANGUAGES : model.id === 'index-translate' ? INDEX_TRANSLATE_LANGUAGES : profile ? profile.languages : [...LANGUAGE_CODES]
     return { binding, name: displayName(binding, profile?.name ?? ''),
       kind: 'mt' as const, origin: 'cloud' as const, free: model.free, images: model.id === 'index-translate',
-      sourceLanguages: ['auto', ...LANGUAGE_CODES] as readonly string[], targetLanguages: languages as readonly string[] }
+      sourceLanguages: profile ? profile.sourceLanguages ?? ['auto', ...profile.languages]
+        : model.id === 'recognition' ? ['auto', ...ALIYUN_LANGUAGES]
+          : model.id === 'index-translate' ? ['auto', ...INDEX_TRANSLATE_LANGUAGES]
+            : model.id === 'mymemory' ? LANGUAGE_CODES : ['auto', ...LANGUAGE_CODES],
+      targetLanguages: languages as readonly string[] }
   })
   const llmClouds = clouds.filter(model => model.profile).map(model => {
     const profile = model.profile!

@@ -1,4 +1,5 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
+import "../../ui/close-button.css"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
@@ -48,6 +49,8 @@ function Button({
   return (
     <ButtonPrimitive
       data-slot="button"
+      data-size={size}
+      data-variant={variant}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

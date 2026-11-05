@@ -221,7 +221,7 @@ export const MIMO_TTS_MODEL = 'mimo-v2.5-tts'
 export const MIMO_TTS_BINDING = `cloud:${MIMO_TTS_MODEL}`
 export const MIMO_TTS_NAME = 'MiMo V2.5 TTS'
 export type CredentialProvider = 'cloud' | 'fallback-cloud' | 'microsoft' | 'google' | 'fallback-google' | 'aliyun-asr' | 'minimax-asr' | 'mimo-tts' | `cloud-model:${string}`
-export const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'fallback-cloud', 'microsoft', 'google', 'fallback-google', 'aliyun-asr', 'minimax-asr', 'mimo-tts']
+export const CREDENTIAL_PROVIDERS: readonly CredentialProvider[] = ['cloud', 'fallback-cloud', 'aliyun-asr', 'minimax-asr', 'mimo-tts']
 
 export function isCredentialProvider(value: unknown): value is CredentialProvider {
   return typeof value === 'string' && (CREDENTIAL_PROVIDERS.includes(value as CredentialProvider) || /^cloud-model:[a-zA-Z0-9_-]{1,64}$/.test(value))
@@ -443,7 +443,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     cloudName: '',
     cloudContextWindow: 128000,
     cloudMaxOutputTokens: 4096,
-    microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com',
+    microsoftEndpoint: 'https://edge.microsoft.com/translate',
     microsoftRegion: '',
     mymemoryEndpoint: 'https://api.mymemory.translated.net/get',
     mymemoryEmail: '',
@@ -457,7 +457,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
       cloudApiFormat: 'chat-completions',
       cloudContextWindow: 128000,
       cloudMaxOutputTokens: 4096,
-      microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com',
+      microsoftEndpoint: 'https://edge.microsoft.com/translate',
       microsoftRegion: '',
       mymemoryEndpoint: 'https://api.mymemory.translated.net/get',
       mymemoryEmail: '',

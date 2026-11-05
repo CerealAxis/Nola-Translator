@@ -127,3 +127,69 @@ def test_device_defaults_to_cpu_and_honours_opt_in(monkeypatch) -> None:
     monkeypatch.setenv(m2m100_module.DEVICE_ENV_VAR, "cuda")
     no_cuda = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False))
     assert m2m100_module._resolve_device(no_cuda) == "cpu"
+
+
+
+def test_batch_translation_generates_once_for_a_shared_language_pair(tmp_path, monkeypatch):
+    import torch
+
+    class Tokenizer:
+        def set_tgt_lang_special_tokens(self, target):
+            assert target == "zh"
+        def get_lang_id(self, target):
+            return 42
+        def __call__(self, texts, **kwargs):
+            assert texts == ["one", "two"] and kwargs["padding"]
+            return {"input_ids": torch.ones((2, 3), dtype=torch.long)}
+        def batch_decode(self, output, **kwargs):
+            assert output.shape[0] == 2
+            return [" first ", " second "]
+
+    calls = []
+    def generate(**kwargs):
+        calls.append(kwargs)
+        assert kwargs["input_ids"].shape == (2, 3)
+        assert kwargs["forced_bos_token_id"] == 42
+        return torch.ones((2, 4), dtype=torch.long)
+    runtime = M2M100Runtime(tmp_path)
+    runtime._loaded = True
+    runtime._bundle = m2m100_module._Bundle(model=SimpleNamespace(device="cpu", generate=generate), tokenizer=Tokenizer())
+    assert runtime.translate_batch_sync(["one", "two"], "en", "zh") == ["first", "second"]
+    assert len(calls) == 1
+
+
+
+@pytest.mark.parametrize("causal", [True, False])
+def test_generic_transformers_batches_inputs_and_restores_causal_padding(tmp_path, causal):
+    import torch
+    from nola_translator_engine.translation.transformers_causal import CausalTranslationRuntime, Seq2SeqTranslationRuntime
+
+    class Batch(dict):
+        def to(self, _device):
+            return self
+    class Tokenizer:
+        chat_template = None
+        padding_side = "right"
+        pad_token = None
+        eos_token = "EOS"
+        def __call__(self, texts, **kwargs):
+            assert len(texts) == 2 and kwargs["padding"]
+            assert texts[0].endswith("one\n") if causal else texts[0].endswith("one")
+            if causal:
+                assert self.padding_side == "left" and self.pad_token == "EOS"
+            return Batch(input_ids=torch.zeros((2, 4), dtype=torch.long))
+        def batch_decode(self, output, **kwargs):
+            assert output.shape[0] == 2
+            return ["first", "second"]
+    tokenizer = Tokenizer()
+    calls = []
+    def generate(**kwargs):
+        calls.append(kwargs)
+        return torch.zeros((2, 6), dtype=torch.long)
+    runtime = (CausalTranslationRuntime if causal else Seq2SeqTranslationRuntime)(tmp_path)
+    runtime.device = "cpu"
+    runtime._loaded = True
+    runtime._bundle = m2m100_module._Bundle(model=SimpleNamespace(config=SimpleNamespace(max_position_embeddings=2048), generate=generate), tokenizer=tokenizer)
+    assert runtime.translate_batch_sync(["one", "two"], "en", "zh") == ["first", "second"]
+    assert len(calls) == 1
+    assert tokenizer.padding_side == "right" and tokenizer.pad_token is None

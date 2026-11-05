@@ -64,6 +64,39 @@ class CausalTranslationRuntime(M2M100Runtime):
             torch_dtype=resolve_dtype(self.device, self.precision)).to(self.device).eval()
         return _Bundle(model=model, tokenizer=tokenizer)
 
+    def _translate_batch_locked(self, texts, source, target):
+        import torch
+        from ..model_capabilities import normalize
+        from ..hub import HYMT2_LANGUAGES
+
+        self.load()
+        bundle = self._bundle
+        target_name = HYMT2_LANGUAGES.get(normalize(target)) or LANGUAGE_NAMES.get(normalize(target), target)
+        prompts = [f"Translate the following text into {target_name}. Only output the translation:\n{text}" for text in texts]
+        rendered = [bundle.tokenizer.apply_chat_template([{"role": "user", "content": prompt}], tokenize=False,
+            add_generation_prompt=True, enable_thinking=False) if bundle.tokenizer.chat_template else prompt + '\n' for prompt in prompts]
+        previous_padding = bundle.tokenizer.padding_side
+        previous_pad_token = bundle.tokenizer.pad_token
+        try:
+            bundle.tokenizer.padding_side = "left"
+            if bundle.tokenizer.pad_token is None:
+                bundle.tokenizer.pad_token = bundle.tokenizer.eos_token
+            inputs = bundle.tokenizer(rendered, return_tensors="pt", add_special_tokens=False, padding=True).to(self.device)
+            count = inputs["input_ids"].shape[1]
+            limit = min(self.context_size, getattr(bundle.model.config, "max_position_embeddings", self.context_size))
+            output_tokens = min(512, limit - count)
+            if output_tokens < 32:
+                raise ValueError("Translation batch exceeds the model context window")
+            with torch.inference_mode():
+                output = bundle.model.generate(**inputs, max_new_tokens=output_tokens, do_sample=False)
+            generated = output[:, count:]
+            if generated.shape[1] >= output_tokens:
+                raise ValueError("Translation batch reached the output limit")
+            return [item.strip() for item in bundle.tokenizer.batch_decode(generated, skip_special_tokens=True)]
+        finally:
+            bundle.tokenizer.padding_side = previous_padding
+            bundle.tokenizer.pad_token = previous_pad_token
+
     def _translate_locked(self, text, source, target):
         import torch
         from ..model_capabilities import normalize
@@ -100,6 +133,10 @@ class CausalTranslationProvider:
         content = await asyncio.to_thread(self.runtime.translate_sync, text, source, target)
         return ProviderTranslation(content, (source, target))
 
+    async def translate_batch(self, texts, source, target):
+        results = await asyncio.to_thread(self.runtime.translate_batch_sync, texts, source, target)
+        return [ProviderTranslation(content, (source, target)) for content in results]
+
 
 class Seq2SeqTranslationRuntime(CausalTranslationRuntime):
     model_label = "Transformers sequence-to-sequence"
@@ -114,6 +151,25 @@ class Seq2SeqTranslationRuntime(CausalTranslationRuntime):
         model = load_verified_model(AutoModelForSeq2SeqLM, self.model_dir,
             torch_dtype=resolve_dtype(self.device, self.precision)).to(self.device).eval()
         return _Bundle(model=model, tokenizer=tokenizer)
+
+    def _translate_batch_locked(self, texts, source, target):
+        import torch
+
+        self.load()
+        tokenizer = self._bundle.tokenizer
+        build_translation = getattr(tokenizer, '_build_translation_inputs', None)
+        if build_translation is not None and hasattr(tokenizer, 'src_lang'):
+            inputs = build_translation(texts, return_tensors='pt', padding=True,
+                src_lang=tokenizer_language(tokenizer, source), tgt_lang=tokenizer_language(tokenizer, target))
+        else:
+            params = getattr(self._bundle.model.config, 'task_specific_params', None) or {}
+            prefix = params.get(f'translation_{source}_to_{target}', {}).get('prefix', getattr(self._bundle.model.config, 'prefix', None))
+            prompts = [(prefix or f'translate {LANGUAGE_NAMES.get(source, source)} to {LANGUAGE_NAMES.get(target, target)}: ') + text for text in texts]
+            inputs = tokenizer(prompts, return_tensors='pt', padding=True)
+        inputs = {key: value.to(self.device) if hasattr(value, 'to') else value for key, value in inputs.items()}
+        with torch.inference_mode():
+            output = self._bundle.model.generate(**inputs, max_new_tokens=min(512, self.context_size), do_sample=False)
+        return [item.strip() for item in tokenizer.batch_decode(output, skip_special_tokens=True)]
 
     def _translate_locked(self, text, source, target):
         import torch

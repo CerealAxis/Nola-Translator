@@ -162,15 +162,15 @@ it('starts the public Index-Translate service without reading or forwarding a cl
   expect(request).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ translationProvider: 'index-translate', translationOptions: {} }) }), 'sessionStarted', expect.any(Number))
 })
 
-it('injects a stored Google Translate key and removes caller-supplied credentials', async () => {
+it.each(['google', 'microsoft'] as const)('uses %s without loading stored credentials and removes caller-supplied keys', async provider => {
   const request = vi.fn(async () => ({ sessionId: 'google-session' }))
   const getCredential = vi.fn(async () => 'stored-google-key')
   const sessions = new SessionController({ engine: { currentState: 'ready', request } as unknown as EngineProcess, meetings: null,
     getSettings: () => DEFAULT_SETTINGS, getCredential, whenReady: async () => {}, prepare: async () => {}, startingChanged: () => {}, hideOverlay: () => {},
   })
-  await sessions.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: ['zh'], translationProvider: 'google', translationOptions: { apiKey: 'caller-google-key' } }, 'desktop')
-  expect(getCredential).toHaveBeenCalledExactlyOnceWith('google')
-  expect(request).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ translationProvider: 'google', translationOptions: { apiKey: 'stored-google-key' } }) }), 'sessionStarted', expect.any(Number))
+  await sessions.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime', sourceLanguage: 'auto', targetLanguages: ['zh'], translationProvider: provider, translationOptions: { apiKey: 'caller-google-key' } }, 'desktop')
+  expect(getCredential).not.toHaveBeenCalled()
+  expect(request).toHaveBeenCalledWith(expect.objectContaining({ config: expect.objectContaining({ translationProvider: provider, translationOptions: {} }) }), 'sessionStarted', expect.any(Number))
 })
 
 

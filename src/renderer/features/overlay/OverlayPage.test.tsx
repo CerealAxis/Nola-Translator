@@ -41,6 +41,12 @@ it('keeps latency detection off by default and saves the opt-in', () => {
   expect(update).toHaveBeenCalledWith({ realtime: { latencyDetection: true } })
 })
 
+it('leaves speech playback off by default', () => {
+  render(<OverlayPage />)
+  expect(screen.getByRole('switch', { name: '播报译音' })).toHaveAttribute('aria-checked', 'false')
+  expect(screen.queryByRole('combobox', { name: '输出设备' })).not.toBeInTheDocument()
+})
+
 it('lists enabled configured cloud translators and recognition services before they are selected', () => {
   render(<OverlayPage />)
   const translation = within(screen.getByRole('combobox', { name: '翻译模型' }))

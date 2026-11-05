@@ -28,6 +28,15 @@ def _clear_runtime_cache():
 @pytest.fixture(autouse=True)
 def _clean_quant_env(monkeypatch):
     monkeypatch.delenv(qwen_runtime.QUANT_ENV_VAR, raising=False)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(torch.version, "hip", None)
+
+
+@pytest.fixture
+def cuda_quantization(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    # Loader tests simulate CUDA without allocating GPU memory or clearing a real cache.
+    monkeypatch.setattr(qwen_runtime, "release_device_cache", lambda _device: None)
 
 
 class FakeTokenizer:
@@ -125,7 +134,7 @@ def make_pipeline(processor=None, model=None):
     )
 
 
-def test_load_defaults_to_nf4_and_second_load_is_noop(monkeypatch) -> None:
+def test_load_defaults_to_nf4_and_second_load_is_noop(monkeypatch, cuda_quantization) -> None:
     pipeline = make_pipeline()
     calls = patch_loader(monkeypatch, lambda quant: pipeline)
 
@@ -141,7 +150,7 @@ def test_load_defaults_to_nf4_and_second_load_is_noop(monkeypatch) -> None:
     assert runtime.quant == "nf4"
 
 
-def test_nf4_failure_falls_back_to_8bit(monkeypatch) -> None:
+def test_nf4_failure_falls_back_to_8bit(monkeypatch, cuda_quantization) -> None:
     pipeline = make_pipeline()
 
     def handler(quant: str):
@@ -157,7 +166,7 @@ def test_nf4_failure_falls_back_to_8bit(monkeypatch) -> None:
     assert runtime.quant == "8bit"
 
 
-def test_both_quantizations_fail_raises_unavailable_with_chained_reason(monkeypatch) -> None:
+def test_both_quantizations_fail_raises_unavailable_with_chained_reason(monkeypatch, cuda_quantization) -> None:
     def handler(quant: str):
         raise RuntimeError(f"{quant} failed")
 
@@ -175,7 +184,7 @@ def test_both_quantizations_fail_raises_unavailable_with_chained_reason(monkeypa
     assert runtime.quant is None
 
 
-def test_checkpoint_layout_mismatch_fails_without_quant_retry(monkeypatch) -> None:
+def test_checkpoint_layout_mismatch_fails_without_quant_retry(monkeypatch, cuda_quantization) -> None:
     def handler(quant: str):
         raise CheckpointLayoutMismatch("708 个参数缺失")
 
@@ -192,7 +201,7 @@ def test_checkpoint_layout_mismatch_fails_without_quant_retry(monkeypatch) -> No
     assert runtime.loaded is False
 
 
-def test_explicit_and_env_quant_resolution(monkeypatch) -> None:
+def test_explicit_and_env_quant_resolution(monkeypatch, cuda_quantization) -> None:
     pipeline = make_pipeline()
 
     explicit_calls = patch_loader(monkeypatch, lambda quant: pipeline)
@@ -309,3 +318,58 @@ def test_transcribe_empty_output_and_empty_samples(monkeypatch) -> None:
     assert untouched.transcribe(np.zeros(0, dtype=np.float32)) == ("", None)
     assert untouched.loaded is False
     assert model.generate_calls == 1
+
+
+
+def test_batch_transcription_uses_padded_inputs_and_restores_tokenizer(monkeypatch):
+    class Processor(FakeProcessor):
+        def __call__(self, *, text, audio, return_tensors, padding):
+            assert len(text) == len(audio) == 2
+            assert self.tokenizer.padding_side == "left"
+            return FakeBatch({"input_ids": torch.zeros((2, 4), dtype=torch.long)})
+        def decode(self, ids, **kwargs):
+            assert ids.shape[0] == 2
+            return ["language English<asr_text>first", "language English<asr_text>second"]
+
+    processor = Processor()
+    processor.tokenizer.padding_side = "right"
+    model = FakeModel(torch.zeros((2, 6), dtype=torch.long))
+    patch_loader(monkeypatch, lambda _: make_pipeline(processor, model))
+    runtime = QwenRuntime(Path("fixture"), device="cpu", quant="none")
+    result = runtime.transcribe_batch([np.ones(160), np.ones(320)], language="en")
+    assert result == [("first", "en"), ("second", "en")]
+    assert model.generate_calls == 1
+    assert processor.tokenizer.padding_side == "right"
+
+
+
+def test_llama_asr_batch_preserves_empty_audio_and_language_prefill():
+    from unittest.mock import Mock
+    from nola_translator_engine.recognition.llama_asr import LlamaAsrRuntime
+
+    batch = Mock(return_value=["first", "language English<asr_text>second"])
+    runtime = LlamaAsrRuntime(SimpleNamespace(chat_batch_sync=batch))
+    result = runtime.transcribe_batch([np.ones(160), np.array([]), np.ones(320)], language="en")
+    assert result == [("first", "en"), ("", None), ("second", "en")]
+    messages = batch.call_args.args[0]
+    assert len(messages) == 2
+    assert all(item[-1] == {"role": "assistant", "content": "language English<asr_text>"} for item in messages)
+
+
+@pytest.mark.parametrize("quant", [None, "none"])
+def test_cpu_load_uses_unquantized_model_even_with_cuda_quant_env(monkeypatch, quant):
+    monkeypatch.setenv(qwen_runtime.QUANT_ENV_VAR, "nf4")
+    calls = patch_loader(monkeypatch, lambda _quant: make_pipeline())
+    runtime = QwenRuntime(Path("models/cpu"), quant=quant)
+    runtime.load()
+    runtime.load()
+    assert runtime.device == "cpu"
+    assert calls == ["none"]
+    assert runtime.quant == "none"
+
+
+def test_cpu_rejects_explicit_cuda_only_quantization_before_loading(monkeypatch):
+    calls = patch_loader(monkeypatch, lambda _quant: make_pipeline())
+    with pytest.raises(ValueError, match="不量化"):
+        QwenRuntime(Path("models/cpu"), device="cpu", quant="8bit").load()
+    assert calls == []

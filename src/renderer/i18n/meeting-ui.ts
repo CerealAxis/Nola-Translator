@@ -1,4 +1,5 @@
 export const meetingZh = {
+  languageDirectionHint: '双方语言也用于译音输出，因此需要明确指定；清单由当前识别、翻译及语音合成模型共同决定。',
   navTitle: '会议口译',
   singlePageHint: "持续翻译双方发言，按需要开启一个或两个方向。",
   testAudio: "测试音频",
@@ -39,7 +40,7 @@ export const meetingZh = {
   microphone: '我的麦克风', uplinkOutput: '发送译音的线缆（播放端 Input）', downlinkInput: '接收会议的线缆（录音端 Output）', headphones: '我的耳机',
   twoCables: '请连接两组不同的 VB-CABLE 虚拟线缆后刷新设备。',
   refresh: '刷新设备', deviceListFailed: '无法读取音频设备，请检查系统音频设置后重试。', select: '请选择',
-  translation: '口译设置', localLanguage: '我的语言', remoteLanguage: '对方语言', pipeline: '口译流水线',
+  translation: '字幕与原声', localLanguage: '我的语言', remoteLanguage: '对方语言', pipeline: '口译流水线',
   cascade: '语音识别 → 翻译 → 语音合成', s2s: 'LiveTranslate 端到端语音翻译',
   duckVolume: '原声音量', duckVolumeHint: '播放译音时，对方原声保留的音量；译音结束后恢复。', passthroughKey: '按住说原声',
   shortcutHint: '会议软件在前台时也可按住此键，将麦克风原声直接送入会议。松开后恢复口译。',
@@ -94,6 +95,7 @@ export const meetingZh = {
 type MeetingCopy = typeof meetingZh
 
 export const meetingEn: MeetingCopy = {
+  languageDirectionHint: 'Both languages are also speech output targets, so choose explicit languages. Choices follow the current recognition, translation and speech models.',
   navTitle: 'Meeting',
   singlePageHint: "Interpret either or both directions as you need.",
   testAudio: "Test audio",
@@ -134,7 +136,7 @@ export const meetingEn: MeetingCopy = {
   microphone: 'My microphone', uplinkOutput: 'Cable sending interpretation (playback Input)', downlinkInput: 'Cable receiving meeting audio (recording Output)', headphones: 'My headphones',
   twoCables: 'Connect two separate VB-CABLE devices and refresh the list.',
   refresh: 'Refresh devices', deviceListFailed: 'Could not list audio devices. Check your system audio settings and try again.', select: 'Select an option',
-  translation: 'Interpretation settings', localLanguage: 'My language', remoteLanguage: 'Other participants’ language', pipeline: 'Interpretation pipeline',
+  translation: 'Captions and original audio', localLanguage: 'My language', remoteLanguage: 'Other participants’ language', pipeline: 'Interpretation pipeline',
   cascade: 'ASR → translation → TTS', s2s: 'LiveTranslate speech-to-speech',
   duckVolume: 'Original audio', duckVolumeHint: 'How much of the other participants’ original audio to keep during interpretation playback. The original level returns when playback ends.', passthroughKey: 'Hold to send original audio',
   shortcutHint: 'Hold this key to send your microphone directly to the meeting, even while the meeting app is in focus. Release to resume interpretation.',
@@ -187,6 +189,7 @@ export const meetingEn: MeetingCopy = {
 }
 
 export const meetingTw: MeetingCopy = {
+  languageDirectionHint: '雙方語言也用於譯音輸出，因此需要明確指定；清單由目前辨識、翻譯及語音合成模型共同決定。',
   navTitle: '會議口譯',
   singlePageHint: "依需要開啟單向或雙向即時口譯。",
   testAudio: "測試音訊",
@@ -227,7 +230,7 @@ export const meetingTw: MeetingCopy = {
   microphone: '我的麥克風', uplinkOutput: '傳送譯音的線路（播放端 Input）', downlinkInput: '接收會議的線路（錄音端 Output）', headphones: '我的耳機',
   twoCables: '請連接兩組不同的 VB-CABLE 虛擬音訊線路，再重新整理裝置。',
   refresh: '重新整理裝置', deviceListFailed: '無法讀取音訊裝置。請檢查系統音訊設定後再試一次。', select: '請選擇',
-  translation: '口譯設定', localLanguage: '我的語言', remoteLanguage: '對方語言', pipeline: '口譯流程',
+  translation: '字幕與原聲', localLanguage: '我的語言', remoteLanguage: '對方語言', pipeline: '口譯流程',
   cascade: '語音辨識 → 翻譯 → 語音合成', s2s: 'LiveTranslate 語音對語音翻譯',
   duckVolume: '原聲音量', duckVolumeHint: '播放譯音時，對方原聲保留的音量；譯音結束後恢復。', passthroughKey: '按住傳送原聲',
   shortcutHint: '會議軟體在前景時，也可按住此鍵直接傳送麥克風原聲。放開後恢復口譯。',
@@ -314,7 +317,7 @@ export const meetingHk: MeetingCopy = {
   applicationUnavailable: "應用程式已結束或無法擷取音訊，請重新整理並選擇。",
   recordingEndpoint: "配對錄音端",
 
-  title: '會議傳譯', translation: '傳譯設定', pipeline: '傳譯流程',
+  title: '會議傳譯', translation: '字幕與原聲', pipeline: '傳譯流程',
   routingHint: '在會議應用程式中，咪高峰選上行線路的 Output，揚聲器選下行線路的 Input。請用耳機避免回音。',
   microphone: '我的咪高峰', refresh: '重新整理裝置',
   shortcutHint: '即使會議應用程式在前景，亦可按住此鍵直接傳送咪高峰原聲。放開後恢復傳譯。',
@@ -340,6 +343,7 @@ export const meetingHk: MeetingCopy = {
 }
 
 export const meetingJa: MeetingCopy = {
+  languageDirectionHint: '双方の言語は翻訳音声の出力先にもなるため、明示的に選択してください。選択肢は現在の認識・翻訳・音声合成モデルに応じて変わります。',
   navTitle: '会議通訳',
   singlePageHint: "必要に応じて片方向または双方向の通訳を有効にします。",
   testAudio: "音声テスト",
@@ -380,7 +384,7 @@ export const meetingJa: MeetingCopy = {
   microphone: '自分のマイク', uplinkOutput: '通訳を送るケーブル（再生側 Input）', downlinkInput: '会議音声を受けるケーブル（録音側 Output）', headphones: '自分のヘッドホン',
   twoCables: '別々の VB-CABLE を 2 組接続してから、デバイス一覧を更新してください。',
   refresh: 'デバイスを更新', deviceListFailed: 'オーディオデバイスを取得できませんでした。システムの音声設定を確認して再試行してください。', select: '選択してください',
-  translation: '通訳設定', localLanguage: '自分の言語', remoteLanguage: '相手の言語', pipeline: '通訳パイプライン',
+  translation: '字幕と原音', localLanguage: '自分の言語', remoteLanguage: '相手の言語', pipeline: '通訳パイプライン',
   cascade: '音声認識 → 翻訳 → 音声合成', s2s: 'LiveTranslate 音声間翻訳',
   duckVolume: '原音の音量', duckVolumeHint: '通訳音声の再生中に残す相手の原音の音量です。再生が終わると元の音量に戻ります。', passthroughKey: '長押しで原音を送信',
   shortcutHint: '会議アプリが前面にあるときも、このキーを押している間はマイクの原音を送信します。離すと通訳に戻ります。',
@@ -433,6 +437,7 @@ export const meetingJa: MeetingCopy = {
 }
 
 export const meetingKo: MeetingCopy = {
+  languageDirectionHint: '양쪽 언어는 번역 음성의 출력 언어로도 사용되므로 명확히 선택해야 합니다. 목록은 현재 인식, 번역 및 음성 합성 모델에 따라 달라집니다.',
   navTitle: '회의 통역',
   singlePageHint: "필요에 따라 한 방향 또는 양방향 통역을 켜세요.",
   testAudio: "오디오 테스트",
@@ -473,7 +478,7 @@ export const meetingKo: MeetingCopy = {
   microphone: '내 마이크', uplinkOutput: '통역 전송 케이블(재생 단자 Input)', downlinkInput: '회의 수신 케이블(녹음 단자 Output)', headphones: '내 헤드폰',
   twoCables: '서로 다른 VB-CABLE 두 개를 연결한 뒤 장치 목록을 새로 고침하세요.',
   refresh: '장치 새로 고침', deviceListFailed: '오디오 장치를 불러오지 못했습니다. 시스템 오디오 설정을 확인하고 다시 시도하세요.', select: '선택하세요',
-  translation: '통역 설정', localLanguage: '내 언어', remoteLanguage: '상대방 언어', pipeline: '통역 파이프라인',
+  translation: '자막 및 원본 음성', localLanguage: '내 언어', remoteLanguage: '상대방 언어', pipeline: '통역 파이프라인',
   cascade: '음성 인식 → 번역 → 음성 합성', s2s: 'LiveTranslate 음성 간 번역',
   duckVolume: '원음 볼륨', duckVolumeHint: '통역 음성을 재생하는 동안 유지할 상대방 원음의 볼륨입니다. 재생이 끝나면 원래 볼륨으로 돌아갑니다.', passthroughKey: '길게 눌러 원음 전송',
   shortcutHint: '회의 앱이 활성화된 상태에서도 이 키를 누르면 마이크 원음이 바로 전달됩니다. 키를 놓으면 통역이 재개됩니다.',

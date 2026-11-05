@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 import { TextActions } from '../text-actions'
 import { DEFAULT_PREFERENCES } from '../preferences'
@@ -50,4 +51,46 @@ it('executes the context-menu speak action through the configured provider', asy
   render(<TextActions preferences={{ ...DEFAULT_PREFERENCES, ttsProvider: 'my-voice', sourceLanguage: 'en' }} selection={{ text: 'Hello', x: 0, y: 0, autoSpeak: true }} dismiss={() => {}} />)
   await waitFor(() => expect(play).toHaveBeenCalledOnce())
   expect(synthesize).toHaveBeenCalledWith('Hello', 'en', expect.any(AbortSignal), 'my-voice')
+})
+
+it('uses a compact icon toolbar and keeps secondary actions in its keyboard-accessible menu', async () => {
+  const user = userEvent.setup(); const dismiss = vi.fn()
+  render(<TextActions preferences={{ ...DEFAULT_PREFERENCES, uiLanguage: 'en' }} selection={{ text: 'Hello', x: 0, y: 0 }} dismiss={dismiss} />)
+  const toolbar = screen.getByRole('toolbar')
+  expect(toolbar.querySelectorAll('button')).toHaveLength(3)
+  expect(screen.getByRole('button', { name: 'Translate selection' })).toHaveAttribute('title', 'Translate selection')
+  expect(screen.queryByRole('button', { name: 'Copy translation' })).not.toBeInTheDocument()
+  screen.getByRole('button', { name: 'Translate selection' }).focus()
+  await user.keyboard('{ArrowRight}')
+  expect(screen.getByRole('button', { name: 'Read aloud' })).toHaveFocus()
+  await user.keyboard('{End}{Enter}')
+  expect(await screen.findByRole('button', { name: 'Copy translation' })).toBeVisible()
+  await user.keyboard('{Escape}')
+  expect(screen.queryByRole('button', { name: 'Copy translation' })).not.toBeInTheDocument()
+  expect(dismiss).not.toHaveBeenCalled()
+})
+
+it('renders translation separately and restores input from the more menu', async () => {
+  const user = userEvent.setup()
+  vi.mocked(translate).mockResolvedValue('你好')
+  const target = document.createElement('textarea'); target.value = 'Hello'; document.body.append(target)
+  const view = render(<TextActions preferences={{ ...DEFAULT_PREFERENCES, uiLanguage: 'en' }} selection={{ target, text: 'Hello', x: 0, y: 0 }} dismiss={() => {}} />)
+  await user.click(screen.getByRole('button', { name: 'Translate input' }))
+  expect(await screen.findByText('你好')).toBeVisible()
+  expect(view.container.querySelector('.nola-selection-result')).toHaveTextContent('你好')
+  expect(target.value).toBe('你好')
+  await user.click(screen.getByRole('button', { name: 'More' }))
+  await user.click(await screen.findByRole('button', { name: 'Restore input' }))
+  expect(target.value).toBe('Hello')
+})
+
+it('does not start delayed speech after dismissal', async () => {
+  let finish!: (sound: { audioBase64: string; contentType: string }) => void
+  vi.mocked(synthesize).mockImplementation(() => new Promise(resolve => { finish = resolve }))
+  const play = vi.fn(); vi.stubGlobal('Audio', class { play = play })
+  const view = render(<TextActions preferences={DEFAULT_PREFERENCES} selection={{ text: 'Hello', x: 0, y: 0, autoSpeak: true }} dismiss={() => {}} />)
+  await waitFor(() => expect(synthesize).toHaveBeenCalled())
+  view.unmount()
+  await act(async () => finish({ audioBase64: btoa('audio'), contentType: 'audio/mpeg' }))
+  expect(play).not.toHaveBeenCalled()
 })

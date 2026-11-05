@@ -31,9 +31,28 @@ class LlamaAsrRuntime:
         await self.manager.stop()
 
     def transcribe(self, samples, *, prefix=None, language=None):
+        messages, prefill = self._messages(samples, language)
+        if not messages:
+            return "", None
+        raw = self.manager.chat_sync(messages, timeout_s=120, max_tokens=512)
+        return self._parse(raw, prefill, language)
+
+    def transcribe_batch(self, samples, *, language=None):
+        inputs = [self._messages(item, language) for item in samples]
+        indices = [index for index, item in enumerate(inputs) if item[0]]
+        output = [("", None)] * len(samples)
+        if indices:
+            results = self.manager.chat_batch_sync([inputs[index][0] for index in indices], timeout_s=120, max_tokens=512)
+            if len(results) != len(indices):
+                raise ValueError("ASR batch result count mismatch")
+            for index, raw in zip(indices, results):
+                output[index] = self._parse(raw, inputs[index][1], language)
+        return output
+
+    def _messages(self, samples, language):
         audio = np.asarray(samples, dtype=np.float32).reshape(-1)
         if not audio.size:
-            return "", None
+            return [], ""
         buffer = io.BytesIO()
         with wave.open(buffer, "wb") as output:
             output.setnchannels(1)
@@ -53,7 +72,10 @@ class LlamaAsrRuntime:
         prefill = f"language {hint}<asr_text>" if hint else ""
         if prefill:
             messages.append({"role": "assistant", "content": prefill})
-        raw = self.manager.chat_sync(messages, timeout_s=120, max_tokens=512)
+        return messages, prefill
+
+    @staticmethod
+    def _parse(raw, prefill, language):
         # Some server templates emit the prefilled header again; parse one header.
         if not re.match(r"language\s+[^<]+<asr_text>", raw):
             raw = prefill + raw

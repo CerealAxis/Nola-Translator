@@ -254,3 +254,82 @@ def test_cloud_asr_uses_final_source_text_and_keeps_runtime_until_worker_shutdow
     assert runtime_instances[0].closed
     assert not (tmp_path / ".runtime" / "engine-status.json").exists()
 
+
+
+async def test_offline_batch_calls_native_batch_once_and_keeps_result_order(monkeypatch):
+    from unittest.mock import AsyncMock
+    from nola_translator_engine.translation.base import ProviderTranslation
+
+    batch = AsyncMock(return_value=[ProviderTranslation("first", ("en", "zh")), ProviderTranslation("second", ("en", "zh"))])
+    runtime = SimpleNamespace(translation_provider=SimpleNamespace(translate_batch=batch))
+    prepare = AsyncMock()
+    monkeypatch.setattr(local_call, "infer", prepare)
+    requests = [{"kind": "mt", "config": {}, "resourceId": "fixture", "text": text, "source": "en", "target": "zh"}
+                for text in ("one", "two")]
+    assert await local_call.infer_batch(requests, runtime) == [{"text": "first"}, {"text": "second"}]
+    batch.assert_awaited_once_with(["one", "two"], "en", "zh")
+    prepare.assert_awaited_once_with(requests[0], runtime, prepare_only=True)
+    requests[1]["target"] = "ja"
+    with pytest.raises(ValueError, match="language pair"):
+        await local_call.infer_batch(requests, runtime)
+
+
+def test_qwen_tts_batch_generates_and_encodes_each_result(tmp_path, monkeypatch):
+    from nola_translator_engine.compute import ComputeOptions
+    from unittest.mock import Mock
+
+    (tmp_path / "config.json").write_text(json.dumps({"model_type": "qwen3_tts", "tts_model_type": "custom_voice"}))
+    compute = ComputeOptions()
+    requests = [{"resourceId": "tts-fixture", "text": "one", "voice": "Alice"},
+                {"resourceId": "tts-fixture", "text": "two", "voice": "Bob"}]
+    generate = Mock(return_value=([np.ones(16), np.ones(32)], 22050))
+    model = SimpleNamespace(get_supported_speakers=lambda: ["Alice", "Bob"], generate_custom_voice=generate)
+    key = ("tts-fixture", compute.recognitionDevice, compute.cpuThreads, compute.precision, compute.quantization)
+    monkeypatch.setitem(local_call._TTS_CACHE, key, model)
+    resources = SimpleNamespace(model_path=lambda _: tmp_path)
+    monkeypatch.setattr(local_call, "synthesize", lambda *args: {"voices": ["Alice", "Bob"]})
+    results = local_call.synthesize_batch(resources, requests, compute)
+    assert [item["text"] for item in results] == ["one", "two"]
+    assert all(item["audio"].startswith("data:audio/wav;base64,") for item in results)
+    generate.assert_called_once_with(text=["one", "two"], speaker=["Alice", "Bob"], language="Auto")
+
+
+@pytest.mark.parametrize('initial_slots', [1, 3])
+async def test_llama_asr_offline_slots_configure_actual_manager_before_start(monkeypatch, tmp_path, initial_slots):
+    from nola_translator_engine.runtime import EngineRuntime
+    from nola_translator_engine.translation.llama_server import LlamaServerManager
+    from nola_translator_engine.compute import ComputeDevice
+    from unittest.mock import AsyncMock
+
+    starts = []
+    async def start(manager, **kwargs):
+        assert not manager.ready
+        starts.append(manager.parallel_requests)
+        manager._ready = True
+        return 'cpu'
+
+    monkeypatch.setattr(LlamaServerManager, 'start', start)
+    monkeypatch.setattr(LlamaServerManager, '_chat_locked', lambda self, *args, **kwargs: 'language English<asr_text>hello')
+    runtime = EngineRuntime.__new__(EngineRuntime)
+    runtime.llama_manager = LlamaServerManager()
+    runtime.resources = SimpleNamespace(
+        record=lambda _: SimpleNamespace(installed=True, kind='recognitionModel'),
+        model_path=lambda _: tmp_path, adapter_for=lambda _: 'llama-asr', registry={},
+        translation_gguf_path=lambda _: tmp_path / 'model.gguf',
+        audio_projector_path=lambda _: tmp_path / 'audio.gguf', translation_chat_template=lambda _: None)
+    runtime.active_model_id = None
+    runtime._active_recognition_runtime = None
+    runtime._recognition_device = runtime._translation_device = ComputeDevice('cpu', 'CPU', 'cpu', 'cpu', recognition=True)
+    runtime._llama_threads = 2
+    runtime._emit_update = lambda _: None
+    runtime._configure_device_plan = AsyncMock()
+    config = {'recognitionProvider': 'local', 'recognitionModelId': 'fixture', 'sourceLanguage': 'en',
+              'targetLanguages': [], 'translationProvider': 'local'}
+    first = {'kind': 'asr', 'resourceId': 'fixture', 'config': config, 'audio': wav_data_url(), 'max_concurrency': initial_slots}
+    await local_call.infer(first, runtime, prepare_only=True)
+    manager = runtime._recognition_runtime().manager
+    assert manager is not runtime.llama_manager
+    requests = [{**first, 'max_concurrency': 3} for _ in range(3)]
+    assert await local_call.infer_batch(requests, runtime) == [{'text': 'hello', 'language': 'en'}] * 3
+    assert starts == ([1, 3] if initial_slots == 1 else [3])
+    assert manager.parallel_requests == 3

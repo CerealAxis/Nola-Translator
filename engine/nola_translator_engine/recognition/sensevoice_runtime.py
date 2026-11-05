@@ -152,6 +152,17 @@ class SenseVoiceRuntime:
         return _parse_text(str(results[0].get("text") or ""))
 
 
+    def transcribe_batch(self, samples, *, language=None):
+        with self._inference_lock:
+            self.load()
+            hint = language if language in SUPPORTED_LANGUAGES else "auto"
+            results = self._model.generate(input=[np.ascontiguousarray(item, dtype=np.float32) for item in samples],
+                cache={}, language=hint, use_itn=True, batch_size=len(samples), batch_size_s=BATCH_SIZE_S)
+            if len(results) != len(samples):
+                raise ValueError("ASR batch result count mismatch")
+            return [_parse_text(str(item.get("text") or "")) for item in results]
+
+
 def _parse_text(raw: str) -> tuple[str, str | None]:
     """``<|lang|><|emo|><|event|><|itn|>body`` → (body, protocol language code)."""
     text = raw.strip()

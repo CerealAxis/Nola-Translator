@@ -24,7 +24,7 @@ import type { AppSettings, OverlaySettings } from '../shared/settings'
 import { defaultRealtimeS2s, MIMO_TTS_BINDING, NO_TRANSLATION_LANGUAGE, REALTIME_S2S_MODELS } from '../shared/settings'
 import { z } from 'zod'
 import { isModelEnabled, sceneModelBinding } from '../shared/model-policy'
-import { bindingIsLocal, resolveSessionModelBindings } from '../shared/model-gateway'
+import { gatewayConcurrency, bindingIsLocal, resolveSessionModelBindings } from '../shared/model-gateway'
 import { meetingAudioTestRequestSchema, meetingModeSettingsSchema } from '../shared/meeting-mode'
 import type { SessionConfig } from '../shared/contracts'
 import type { MainErrorNotification } from '../shared/bridge'
@@ -532,6 +532,9 @@ if (!hasSingleInstanceLock) {
     if (initialSettings.modelStoragePath) await cleanupStorageCaches(initialSettings.modelStoragePath)
     const meetings = new MeetingStore(join(dataRoot, 'meetings'))
     const credentials = new SecureCredentialStore(join(dataRoot, 'credentials.json'), safeStorage)
+    for (const provider of ['google', 'fallback-google', 'microsoft']) {
+      await credentials.remove(provider).catch(error => console.error('[credentials] obsolete translator key removal failed', error))
+    }
     // A read-only data root must not take the window down with it; the store degrades to empty.
     await meetings.initialize(join(dataRoot, 'history.jsonl')).catch((error) =>
       console.error('meeting storage is unavailable', error),
@@ -834,15 +837,12 @@ if (!hasSingleInstanceLock) {
       }
       if (provider === 'google' || provider === 'microsoft' || provider === 'mymemory') {
         resolved.translationOptions = translationOptionsFor(current.translation, provider)
-        if (provider !== 'mymemory') resolved.translationOptions = {
-          ...resolved.translationOptions, apiKey: await credentials.get(provider),
-        }
       }
       const fallback = fallbackTranslationFieldsOf(current.translation)
       if (config.fallbackTranslationProvider && config.fallbackTranslationProvider === fallback.fallbackTranslationProvider) {
         resolved.fallbackTranslationOptions = fallback.fallbackTranslationOptions
         const kind = fallback.fallbackTranslationProvider
-        const slot = kind === 'cloud' ? 'fallback-cloud' : kind === 'google' ? 'fallback-google' : kind === 'microsoft' ? 'microsoft' : undefined
+        const slot = kind === 'cloud' ? 'fallback-cloud' : undefined
         if (slot) resolved.fallbackTranslationOptions = { ...resolved.fallbackTranslationOptions, apiKey: await credentials.get(slot) }
       }
       return resolved
@@ -1284,11 +1284,6 @@ if (!hasSingleInstanceLock) {
               { ...translation, apiKey: await credentials.get(customCredentialSlot(id)) })
           }
           const translation = provider ? translationOptionsFor(current.translation, provider) : undefined
-          if (provider === 'google' || provider === 'microsoft') {
-            const apiKey = await credentials.get(provider)
-            if (!apiKey) return
-            return inferBackendModel(backend, request, signal, options, undefined, { ...translation, apiKey })
-          }
           return inferBackendModel(backend, request, signal, options, mimo ? await credentials.get('mimo-tts') : undefined, translation)
         }
       },
@@ -1296,7 +1291,8 @@ if (!hasSingleInstanceLock) {
         ...services,
         openLocalLanguageModel: async (resourceId, localSignal) => {
           await ensureRealtimeBackend()
-          return backend?.ready ? openBackendLanguageModel(backend, resourceId, localSignal) : undefined
+          const concurrency = gatewayConcurrency(`resource:${resourceId}`, settings.current().modelGateway.concurrency?.llm)
+          return backend?.ready ? openBackendLanguageModel(backend, resourceId, localSignal, concurrency) : undefined
         },
       }, binding, signal),
       getSettings: () => settings.current(), directLaunch,
@@ -1350,6 +1346,8 @@ if (!hasSingleInstanceLock) {
     let lastScreenStatus = ''
     screenTranslation = new ScreenTranslation({
       mainDir: __dirname, configPath: join(dataRoot, 'screen-translation.json'),
+      gatewaySnapshot: () => gateway!.snapshot(),
+      getMainWindow: () => mainWindow,
       prepareOcr: async () => gateway!.acquireOcr(), inferOcr: (request, signal) => gateway!.inferOcr(request, signal),
       settings: () => settings.current(), inferModel: (request, signal) => gateway!.infer(request, signal), activity,
       publish: snapshot => {

@@ -86,7 +86,7 @@ class HyMt2TranslationProvider:
         self.manager = manager
         self.languages = languages if languages is not None else SUPPORTED_LANGUAGES
 
-    async def translate(self, text: str, source: str, target: str) -> ProviderTranslation:
+    def _messages(self, text: str, source: str, target: str) -> list[dict]:
         from ..model_capabilities import normalize
         source_key = next((code for code in self.languages if normalize(code) == normalize(source)), None)
         target_key = next((code for code in self.languages if normalize(code) == normalize(target)), None)
@@ -104,6 +104,12 @@ class HyMt2TranslationProvider:
                 f"without any additional explanation:\n{text}"
             )
         )
-        messages = [{"role": "user", "content": prompt}]
-        content = await asyncio.to_thread(self.manager.chat_sync, messages)
+        return [{"role": "user", "content": prompt}]
+
+    async def translate_batch(self, texts: list[str], source: str, target: str) -> list[ProviderTranslation]:
+        results = await asyncio.to_thread(self.manager.chat_batch_sync, [self._messages(text, source, target) for text in texts])
+        return [ProviderTranslation(content, (source, target)) for content in results]
+
+    async def translate(self, text: str, source: str, target: str) -> ProviderTranslation:
+        content = await asyncio.to_thread(self.manager.chat_sync, self._messages(text, source, target))
         return ProviderTranslation(content, (source, target))

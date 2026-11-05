@@ -41,8 +41,8 @@ async function main() {
       colors.push({ locale, theme, width, ...computed })
       console.log({ locale, theme, font: computed.font, headingFont: computed.headingFont })
       assert.ok(computed.font.includes('sans-serif') && computed.headingFont.includes('Segoe UI'), 'Extension typography must use the independent system sans stack')
-      if (theme === 'light') { assert.ok(computed.input.rgba[0] > 230, 'Light input must be near white'); assert.ok(computed.selected.rgba[0] > 220, 'Selected navigation must be pale gray') }
-      else assert.ok(computed.input.rgba[0] < 100, 'Dark input must be dark neutral')
+      if (theme === 'light') { assert.ok(computed.input.rgba[0] > 230, 'Light input must be near white'); assert.ok(computed.selected.rgba[0] > 220, 'Selected navigation must use the soft Nola surface') }
+      else assert.ok(computed.input.rgba[0] < 100, 'Dark input must use the dark Nola surface')
       await page.screenshot({ path: path.join(output, `settings-${locale}-${theme}-${width}.png`), fullPage: true, animations: 'disabled' }); screenshots++
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)
       assert.equal(overflow, false, `Horizontal overflow: ${locale} ${theme} ${width}`)
@@ -75,15 +75,15 @@ async function main() {
     await page.waitForFunction(async () => (await chrome.storage.local.get('floatingLocked')).floatingLocked === true)
     await page.getByRole('textbox', { name: 'Hidden on these websites' }).fill('example.com')
     await page.locator('.nola-demo-dock').click()
-    await page.locator('.nola-demo-translation').waitFor()
+    await page.locator('.nola-illustration-translation').waitFor()
     await page.reload()
     await page.getByRole('switch', { name: 'Keep button visible' }).waitFor()
     assert.equal(await page.getByRole('switch', { name: 'Keep button visible' }).getAttribute('aria-checked'), 'true')
     await page.locator('aside nav button').nth(5).click()
     await page.getByRole('switch', { name: 'Copy translation' }).click()
-    await page.waitForFunction(() => document.querySelectorAll('.nola-demo-toolbar > svg').length === 1)
+    await page.waitForFunction(() => document.querySelectorAll('.nola-illustration-toolbar > svg').length === 1)
     await page.getByRole('slider', { name: 'Opacity' }).focus(); await page.keyboard.press('Home')
-    await page.waitForFunction(() => getComputedStyle(document.querySelector('.nola-demo-toolbar')).opacity === '0.2')
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.nola-illustration-toolbar')).opacity === '0.2')
     await page.evaluate(() => chrome.storage.local.set({ uiLanguage: 'zh-CN', theme: 'light', floatingSide: 'right', floatingPosition: 0.65, floatingLocked: false, floatingDisabledSites: [], selectionCopy: true, selectionOpacity: 0.95 }))
     await page.waitForFunction(() => document.documentElement.lang === 'zh-CN')
     for (const index of [1, 4, 5, 9, 11, 12]) {

@@ -134,7 +134,7 @@ def build_default_gateway(*, model_dir: Path | None = None, worker_factory: Call
     ):
         registry.register(
             committed_mt_definition(provider, adapter_id=provider, auto_detection=True),
-            cloud_configuration(provider, ModelKind.MT, endpoint=endpoint, credential_ref=provider),
+            cloud_configuration(provider, ModelKind.MT, endpoint=endpoint),
         )
     if root is not None:
         register_local_mt(registry, root)

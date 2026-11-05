@@ -346,12 +346,17 @@ async def _start_qwen_server(runtime, model_id: str, compute) -> None:
     await runtime.llama_manager.start()
 
 
-async def infer(request, runtime):
+async def infer(request, runtime, *, prepare_only=False):
     from .protocol import PrewarmConfig, PrewarmModelsCommand
 
+    if request['kind'] == 'batch':
+        return {'results': await infer_batch(request['requests'], runtime)}
     config = PrewarmConfig.model_validate(request['config'])
+    if request.get('max_concurrency', 1) > 1:
+        runtime.llama_manager.configure_parallel(request['max_concurrency'])
     # A gateway worker may fall back to CPU, but may only allocate on its reserved GPU.
     runtime.gateway_device = request.get('gatewayDevice')
+    runtime._local_call_asr_concurrency = request.get('max_concurrency', 1)
     command = PrewarmModelsCommand(protocolVersion=1, requestId='direct', type='prewarmModels', config=config)
     if request['kind'] == 'llm':
         from .models.qwen35_catalog import QWEN35_SPECS
@@ -376,6 +381,8 @@ async def infer(request, runtime):
         if (not record.installed and not legacy_text_model) or record.kind != expected:
             raise ValueError('Selected model is not installed or has the wrong task type')
     if request['kind'] == 'tts':
+        if prepare_only:
+            return None
         return await asyncio.to_thread(synthesize, runtime.resources, request, config.compute)
     if request['kind'] == 'mt':
         from .models.qwen35_catalog import QWEN35_SPECS
@@ -390,6 +397,8 @@ async def infer(request, runtime):
             from .translation.network import LocalQwenTranslationProvider
 
             await _start_qwen_server(runtime, model_id, config.compute)
+            if prepare_only:
+                return None
             async with aclosing(LocalQwenTranslationProvider(
                 endpoint=runtime.llama_manager.api_base_url,
                 model=model_id,
@@ -406,6 +415,8 @@ async def infer(request, runtime):
             runtime._configure_translation(command)
             runtime._local_call_translation_key = translation_key
         await runtime._ensure_translation_server(command)
+        if prepare_only:
+            return None
         text = await translate_image(runtime, request) if request.get('image') else (
             await runtime.translation_provider.translate(request['text'], request['source'], request['target'])).text
         return {'text': text}
@@ -413,6 +424,13 @@ async def infer(request, runtime):
     if config.recognitionProvider == 'local':
         if runtime.active_model_id != request['resourceId'] or runtime._active_recognition_runtime is None:
             await runtime._create_recognizer(command)
+        manager = getattr(runtime._recognition_runtime(), 'manager', None)
+        if manager is not None:
+            manager.configure_parallel(runtime._local_call_asr_concurrency)
+            if not manager.ready:
+                await manager.start()
+        if prepare_only:
+            return None
         text, language = await asyncio.to_thread(runtime._recognition_runtime().transcribe, samples,
             language=None if config.sourceLanguage == 'auto' else config.sourceLanguage)
         return {'text': text, 'language': language}
@@ -434,6 +452,63 @@ async def infer(request, runtime):
         return {'text': ' '.join(update.source_text for update in sorted(updates.values(), key=lambda item: item.started_at_ms))}
     finally:
         await recognizer.close()
+
+
+async def infer_batch(requests, runtime):
+    if not isinstance(requests, list) or not 1 <= len(requests) <= 5 or not all(isinstance(item, dict) for item in requests):
+        raise ValueError('Invalid inference batch')
+    first = requests[0]
+    if first.get('kind') not in ('asr', 'mt', 'tts'):
+        raise ValueError('Unsupported batch operation')
+    for request in requests:
+        if any(request.get(key) != first.get(key) for key in ('kind', 'config', 'resourceId', 'gatewayDevice', 'source', 'target')):
+            raise ValueError('Batch requests must share a model and language pair')
+        if request.get('inspect'):
+            raise ValueError('Voice inspection cannot be batched')
+        if request['kind'] in ('mt', 'tts') and (not isinstance(request.get('text'), str) or not request['text'].strip() or len(request['text']) > 64000):
+            raise ValueError('Invalid batch text')
+    if first['kind'] == 'tts':
+        from .protocol import PrewarmConfig
+        config = PrewarmConfig.model_validate(first['config'])
+        await infer(first, runtime, prepare_only=True)
+        return await asyncio.to_thread(synthesize_batch, runtime.resources, requests, config.compute)
+    await infer(first, runtime, prepare_only=True)
+    if first['kind'] == 'asr':
+        recognizer = runtime._recognition_runtime()
+        batch = getattr(recognizer, 'transcribe_batch', None)
+        if batch is not None:
+            samples = [decode_audio(item['audio']) for item in requests]
+            language = first['config'].get('sourceLanguage')
+            results = await asyncio.to_thread(batch, samples, language=None if language == 'auto' else language)
+            if len(results) != len(requests):
+                raise ValueError('ASR batch result count mismatch')
+            return [{'text': text, 'language': language} for text, language in results]
+    elif not any(item.get('image') or 'history' in item for item in requests):
+        batch = getattr(runtime.translation_provider, 'translate_batch', None)
+        if batch is not None:
+            results = await batch([item['text'] for item in requests], first['source'], first['target'])
+            if len(results) != len(requests):
+                raise ValueError('Translation batch result count mismatch')
+            return [{'text': result.text} for result in results]
+    if first['kind'] == 'mt' and 'history' in first:
+        return await asyncio.gather(*(infer(item, runtime) for item in requests))
+    return [await infer(item, runtime) for item in requests]
+
+
+def synthesize_batch(resources, requests, compute):
+    model_id = requests[0].get('resourceId')
+    root = resources.model_path(model_id)
+    config_path = root / 'config.json'
+    config = json.loads(config_path.read_text(encoding='utf8')) if config_path.is_file() else {}
+    if config.get('model_type') != 'qwen3_tts':
+        return [synthesize(resources, request, compute) for request in requests]
+    voices = synthesize(resources, {**requests[0], 'inspect': True}, compute)['voices']
+    model = _TTS_CACHE[(model_id, compute.recognitionDevice, compute.cpuThreads, compute.precision, compute.quantization)]
+    speakers = [request.get('voice') or (voices[0] if voices else None) for request in requests]
+    wavs, rate = generate_qwen3_tts(model, config.get('tts_model_type'), [request['text'] for request in requests], speakers)
+    if len(wavs) != len(requests):
+        raise ValueError('TTS batch result count mismatch')
+    return [{'text': request['text'], 'audio': encode_audio(audio, rate), 'voices': voices} for request, audio in zip(requests, wavs)]
 
 
 def main():

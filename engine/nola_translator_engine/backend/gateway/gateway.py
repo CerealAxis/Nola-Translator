@@ -32,7 +32,7 @@ from .operations import (
     SynthesisResult,
     TranslationResult,
 )
-from .resources import ConcurrencyGate, ResourceAdmission
+from .resources import ConcurrencyGate, ResourceAdmission, ResourceExhausted
 from .worker import LocalModelWorker
 
 
@@ -56,6 +56,12 @@ class ModelRegistry:
         self._entries: dict[str, RegistryEntry] = {}
 
     def register(self, definition: ModelDefinition, configuration: ProviderConfiguration, *, enabled: bool = True) -> None:
+        if not configuration.is_cloud and definition.capabilities.adapter_id == "local-call":
+            crisp = configuration.runtime in ("crisp", "crisp-asr", "crisp-tts")
+            definition.capabilities.concurrency.max_active_requests = 1 if crisp else 5
+            definition.capabilities.concurrency.batching = not crisp and configuration.runtime in (
+                "pytorch", "llama", "transformers-causal", "transformers-seq2seq", "transformers-tts",
+            )
         definition.capabilities.validate_kinds()
         self._entries[definition.model_id] = RegistryEntry(definition, configuration, enabled)
 
@@ -175,9 +181,18 @@ class ModelGateway:
         instance, lease = await self.manager.acquire(definition, self._resolve_configuration(matched.entry))
         return instance, lease, adapter, matched
 
-    async def _enter(self, instance: ModelInstance) -> None:
-        limit = instance.definition.capabilities.concurrency.max_active_requests
-        await self.concurrency.acquire(instance.instance_id, max(1, limit))
+    async def _enter(self, instance: ModelInstance, ctx: CallContext | None = None) -> None:
+        realtime = ctx is None or ctx.task_mode == "realtime"
+        maximum = 10 if instance.configuration.is_cloud else 1 if instance.configuration.runtime in ("crisp", "crisp-asr", "crisp-tts") else 5
+        limit = 1 if realtime else min(maximum, max(1, ctx.max_concurrency))
+        if not instance.configuration.is_cloud and limit > 1:
+            compute = instance.configuration.compute_options.get("compute", {})
+            slot_mb = compute.get("contextSize", 2048) / 4 if instance.configuration.runtime == "llama" else 1024
+            try:
+                self.admission.reserve_parallel(instance.instance_id, instance.configuration.device, limit, slot_mb)
+            except ResourceExhausted as error:
+                raise GatewayError(GatewayErrorCode.RESOURCE_EXHAUSTED, stage="admission", message="Insufficient memory for concurrency") from error
+        await self.concurrency.acquire(instance.instance_id, limit, realtime=realtime)
 
     def _exit(self, instance: ModelInstance) -> None:
         self.concurrency.release(instance.instance_id)
@@ -196,7 +211,7 @@ class ModelGateway:
         match_request = request or MatchRequest(operation=Operation.TRANSCRIBE, source_language=language)
         instance, lease, adapter, _ = await self.acquire(match_request)
         try:
-            await self._enter(instance)
+            await self._enter(instance, ctx)
             try:
                 return await adapter.transcribe(instance, ctx, audio=audio, language=language)  # type: ignore[attr-defined]
             finally:
@@ -210,7 +225,8 @@ class ModelGateway:
         try:
             if not isinstance(adapter, CloudAsrAdapter):
                 raise GatewayError(GatewayErrorCode.NOT_SUPPORTED, stage="asr", message="Cloud ASR adapter required")
-            await self._enter(instance)
+            # A stream lease covers the connection; each stream preserves its own frame order.
+            await self.concurrency.acquire(instance.instance_id, instance.definition.capabilities.concurrency.max_streams)
             try:
                 yield adapter.selection(options, request.source_language or "auto")
             finally:
@@ -229,7 +245,7 @@ class ModelGateway:
         ctx = replace(ctx, source_is_provisional=provisional)
         instance, lease, adapter, _ = await self.acquire(match_request)
         try:
-            await self._enter(instance)
+            await self._enter(instance, ctx)
             try:
                 return await adapter.translate(instance, ctx, text=text, source=source, target=target)  # type: ignore[attr-defined]
             finally:
@@ -243,7 +259,7 @@ class ModelGateway:
         match_request = request or MatchRequest(operation=Operation.SYNTHESIZE)
         instance, lease, adapter, _ = await self.acquire(match_request)
         try:
-            await self._enter(instance)
+            await self._enter(instance, ctx)
             try:
                 return await adapter.synthesize(instance, ctx, text=text, voice=voice)  # type: ignore[attr-defined]
             finally:
@@ -254,7 +270,7 @@ class ModelGateway:
     async def tts_voices(self, ctx: CallContext, request: MatchRequest) -> list[str]:
         instance, lease, adapter, _ = await self.acquire(request)
         try:
-            await self._enter(instance)
+            await self._enter(instance, ctx)
             try:
                 if not isinstance(adapter, LocalWorkerAdapter):
                     raise GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage="tts", message="Voice inspection is unavailable")
@@ -268,7 +284,7 @@ class ModelGateway:
     async def s2s_session(self, ctx: CallContext, *, request: MatchRequest, config: dict):
         instance, lease, adapter, _ = await self.acquire(request)
         try:
-            await self._enter(instance)
+            await self.concurrency.acquire(instance.instance_id, instance.definition.capabilities.concurrency.max_streams)
             try:
                 session = await adapter.open(instance, ctx, config=config)
                 try:

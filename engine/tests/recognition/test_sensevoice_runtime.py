@@ -215,3 +215,22 @@ def test_get_sensevoice_runtime_caches_by_resolved_path(tmp_path) -> None:
     assert first is again
     assert first is variant
     assert first is not other
+
+
+def test_batch_transcription_uses_one_generate_for_multiple_clips(monkeypatch):
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    calls = []
+    def generate(**kwargs):
+        calls.append(kwargs)
+        return [{"text": "<|en|><|NEUTRAL|><|Speech|><|withitn|>first"},
+                {"text": "<|en|><|NEUTRAL|><|Speech|><|withitn|>second"}]
+
+    runtime = SenseVoiceRuntime(Path("fixture"))
+    monkeypatch.setattr(runtime, "load", lambda: None)
+    runtime._model = SimpleNamespace(generate=generate)
+    output = runtime.transcribe_batch([np.ones(160), np.ones(320)], language="en")
+    assert output == [("first", "en"), ("second", "en")]
+    assert len(calls) == 1 and len(calls[0]["input"]) == 2
+    assert calls[0]["batch_size"] == 2

@@ -1,7 +1,12 @@
-import { render, screen } from '@testing-library/react'
-import { expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { beforeEach, expect, it, vi } from 'vitest'
 import { createExtensionStore } from '../store'
+import { DEFAULT_PREFERENCES, savePreferences } from '../preferences'
 import { Panel } from './Panel'
+
+vi.mock('../preferences', async importOriginal => ({ ...await importOriginal<typeof import('../preferences')>(), savePreferences: vi.fn(async () => {}) }))
+beforeEach(() => vi.clearAllMocks())
 
 it('limits the panel to connection controls without repeating desktop settings', () => {
   const store = createExtensionStore({ bridge: { request: vi.fn(async () => undefined), subscribe: () => () => {}, close: vi.fn() } })
@@ -12,4 +17,37 @@ it('limits the panel to connection controls without repeating desktop settings',
   expect(screen.queryByText('Audio source')).not.toBeInTheDocument()
   expect(screen.queryByText('Font size')).not.toBeInTheDocument()
   expect(screen.queryByText('Bottom offset')).not.toBeInTheDocument()
+})
+
+function setup() {
+  const store = createExtensionStore({ bridge: { request: vi.fn(async () => undefined), subscribe: () => () => {}, close: vi.fn() } })
+  store.setPreferences({ ...DEFAULT_PREFERENCES, uiLanguage: 'en' })
+  store.updateVideos([document.createElement('video')])
+  const toggleSubtitles = vi.fn()
+  render(<Panel store={store} subtitles={{ active: false, tracks: [] }} toggleSubtitles={toggleSubtitles} />)
+  return { store, toggleSubtitles }
+}
+
+it('starts existing subtitles with a compact switch and keeps implementation details out of the menu', () => {
+  const { toggleSubtitles } = setup()
+  fireEvent.click(screen.getByRole('switch', { name: 'Translate existing subtitles' }))
+  expect(toggleSubtitles).toHaveBeenCalledOnce()
+  expect(screen.queryByText(/ASR|Step|Tab audio/)).not.toBeInTheDocument()
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+})
+
+it('navigates through settings and style, saves changes, and goes back with Escape', async () => {
+  const user = userEvent.setup()
+  setup()
+  await user.click(screen.getByRole('button', { name: 'Subtitle settings' }))
+  expect(screen.getByRole('combobox', { name: 'Target language' })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Subtitle style' }))
+  fireEvent.change(screen.getByLabelText('Subtitle background opacity'), { target: { value: '0.5' } })
+  expect(savePreferences).toHaveBeenCalledWith({ subtitleBackgroundOpacity: 0.5 })
+  await user.click(screen.getByRole('button', { name: 'Reset style' }))
+  expect(savePreferences).toHaveBeenLastCalledWith(expect.objectContaining({ subtitleBackgroundOpacity: DEFAULT_PREFERENCES.subtitleBackgroundOpacity }))
+  fireEvent.keyDown(screen.getByRole('region', { name: /Nola/ }), { key: 'Escape' })
+  expect(screen.getByRole('button', { name: 'Subtitle style' })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Back' }))
+  expect(screen.getByRole('switch', { name: 'Translate existing subtitles' })).toBeInTheDocument()
 })

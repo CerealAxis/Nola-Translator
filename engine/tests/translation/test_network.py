@@ -11,17 +11,30 @@ from nola_translator_engine.translation.network import (
 
 
 @pytest.mark.asyncio
-async def test_microsoft_translator_uses_v3_contract() -> None:
+async def test_microsoft_translator_uses_free_edge_contract_without_credentials() -> None:
     captured = {}
 
     def request(url, payload, headers):
         captured.update(url=url, payload=payload, headers=headers)
         return [{"translations": [{"text": "你好"}]}]
 
-    result = await MicrosoftTranslatorProvider("secret", requester=request).translate("hello", "en", "zh")
+    result = await MicrosoftTranslatorProvider(requester=request).translate("hello", "en", "zh")
     assert result.text == "你好"
-    assert "api-version=3.0" in captured["url"] and "to=zh-Hans" in captured["url"]
-    assert captured["headers"]["Ocp-Apim-Subscription-Key"] == "secret"
+    assert captured["url"] == "https://edge.microsoft.com/translate/translatetext?to=zh-Hans&isEnterpriseClient=false&from=en"
+    assert captured["payload"] == ["hello"]
+    assert captured["headers"] == {}
+
+
+@pytest.mark.asyncio
+async def test_microsoft_escapes_comparison_text_and_preserves_literal_entities():
+    def request(url, payload, headers):
+        assert "from=" not in url
+        assert not headers
+        return [{"translations": [{"text": payload[0]}]}]
+
+    source = "a < b &amp; c > d"
+    result = await MicrosoftTranslatorProvider(requester=request).translate(source, "auto", "zh")
+    assert result.text == source
 
 
 @pytest.mark.asyncio

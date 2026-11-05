@@ -181,3 +181,70 @@ async def test_direct_inference_drops_provider_error_details():
 def test_direct_request_rejects_private_and_unsupported_fields(fields):
     with pytest.raises(ValidationError):
         request("mt", **{"text": "Hello", "target": "zh", **fields})
+
+
+@pytest.mark.parametrize("mode", ["realtime", "offline"])
+async def test_direct_call_passes_explicit_task_mode_and_concurrency_to_gateway(mode):
+    gateway = AsyncMock(spec=ModelGateway)
+    gateway.transcribe.return_value = AsrObservation("hello")
+    await run_direct_inference(gateway, request("asr", audio=wav(), task_mode=mode, max_concurrency=5))
+    ctx, = gateway.transcribe.await_args.args
+    assert ctx.task_mode == mode
+    assert ctx.max_concurrency == 5
+
+
+@pytest.mark.parametrize("fields", [{"max_concurrency": 0}, {"max_concurrency": 11}, {"task_mode": "unknown"}])
+def test_direct_call_rejects_invalid_scheduling_options(fields):
+    with pytest.raises(ValidationError):
+        request("mt", text="hello", source="en", target="zh", **fields)
+
+
+@pytest.mark.parametrize('failure', [GatewayError(GatewayErrorCode.PROVIDER_ERROR, stage='asr', message='private'), RuntimeError('private')])
+async def test_asr_batch_failure_cancels_and_joins_siblings_before_return(monkeypatch, failure):
+    from nola_translator_engine.backend import direct_inference
+
+    monkeypatch.setattr(direct_inference, '_batch_asr_pcm', lambda *args, **kwargs: [PCM, PCM])
+    started = asyncio.Event()
+    released = asyncio.Event()
+    contexts = []
+    calls = 0
+    async def transcribe(ctx, **kwargs):
+        nonlocal calls
+        calls += 1
+        contexts.append(ctx)
+        if calls == 1:
+            await started.wait()
+            raise failure
+        started.set()
+        try:
+            await asyncio.Future()
+        finally:
+            assert ctx.cancel_token.cancelled
+            await asyncio.sleep(0)
+            released.set()
+
+    gateway = AsyncMock(spec=ModelGateway)
+    gateway.transcribe.side_effect = transcribe
+    with pytest.raises(GatewayError) as caught:
+        await run_direct_inference(gateway, request('asr', audio=wav(), batch=True, task_mode='offline', max_concurrency=2))
+    assert caught.value.code is (GatewayErrorCode.PROVIDER_ERROR if isinstance(failure, GatewayError) else GatewayErrorCode.INTERNAL)
+    assert released.is_set()
+    assert calls == 2 and all(ctx.cancel_token.cancelled for ctx in contexts)
+
+
+async def test_asr_batch_timeout_signals_cancellation_before_releasing_siblings(monkeypatch):
+    from nola_translator_engine.backend import direct_inference
+
+    monkeypatch.setattr(direct_inference, '_batch_asr_pcm', lambda *args, **kwargs: [PCM, PCM])
+    released = []
+    async def transcribe(ctx, **kwargs):
+        try:
+            await asyncio.Future()
+        finally:
+            released.append(ctx.cancel_token.cancelled)
+    gateway = AsyncMock(spec=ModelGateway)
+    gateway.transcribe.side_effect = transcribe
+    with pytest.raises(GatewayError) as caught:
+        await run_direct_inference(gateway, request('asr', audio=wav(), batch=True, task_mode='offline', max_concurrency=2), timeout_s=0.05)
+    assert caught.value.code is GatewayErrorCode.TIMEOUT
+    assert released == [True, True]

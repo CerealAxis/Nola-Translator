@@ -214,7 +214,12 @@ class LocalWorkerAdapter(Adapter):
             raise GatewayError(GatewayErrorCode.WORKER_EXITED, stage=stage, message="local worker unavailable")
         if instance.configuration.device != "auto":
             request.gateway_device = instance.configuration.device
-        response = await worker.request(request, timeout=timeout)
+        limit = 1 if ctx.task_mode == "realtime" else min(5, instance.definition.capabilities.concurrency.max_active_requests, max(1, ctx.max_concurrency))
+        request.payload["max_concurrency"] = limit
+        if ctx.task_mode == "offline" and instance.definition.capabilities.concurrency.batching and limit > 1 and request.kind != "llm" and not request.payload.get("inspect"):
+            response = await worker.request_batch(request, limit=limit, timeout=timeout)
+        else:
+            response = await worker.request(request, timeout=timeout)
         if response.get("error"):
             error = map_local_error(str(response["error"]), stage=stage)
             if error.code == GatewayErrorCode.WORKER_OOM:
@@ -377,15 +382,6 @@ class _NetworkMtAdapter(Adapter):
         return TranslationResult(text=result.text, source=source, target=target)
 
 
-def _api_key(options: dict[str, str]) -> str:
-    key = options.get("api_key", "").strip()
-    if not key:
-        raise GatewayError(
-            GatewayErrorCode.PROVIDER_ERROR, stage="mt", message="translation provider credential is missing"
-        )
-    return key
-
-
 class CustomMtAdapter(_NetworkMtAdapter):
     adapter_id = "custom-mt"
     requires_commit = False
@@ -408,7 +404,7 @@ class GoogleMtAdapter(_NetworkMtAdapter):
     adapter_id = "google"
 
     def _provider(self, instance: ModelInstance, options: dict[str, str]) -> GoogleTranslateProvider:
-        return GoogleTranslateProvider(api_key=_api_key(options))
+        return GoogleTranslateProvider()
 
 
 class IndexPublicMtAdapter(_NetworkMtAdapter):
@@ -422,12 +418,7 @@ class MicrosoftMtAdapter(_NetworkMtAdapter):
     adapter_id = "microsoft"
 
     def _provider(self, instance: ModelInstance, options: dict[str, str]) -> MicrosoftTranslatorProvider:
-        config = instance.configuration
-        return MicrosoftTranslatorProvider(
-            _api_key(options),
-            endpoint=options.get("endpoint", config.endpoint),
-            region=options.get("region", config.region or ""),
-        )
+        return MicrosoftTranslatorProvider()
 
 
 class MyMemoryMtAdapter(_NetworkMtAdapter):

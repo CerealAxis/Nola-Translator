@@ -29,6 +29,35 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); store.stores.settings.setState(initialSettings); store.stores.models.setState(initialModels); vi.restoreAllMocks() })
 
+it('saves a per-capability concurrency limit and restores invalid or failed edits', async () => {
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockImplementation(async patch => {
+    const settings = store.stores.settings.getState().settings!
+    store.stores.settings.setState({ settings: { ...settings, modelGateway: { ...settings.modelGateway,
+      concurrency: { ...settings.modelGateway.concurrency, ...patch.modelGateway?.concurrency } } } })
+  })
+  render(<ModelGatewayPage />)
+  const input = await screen.findByRole('spinbutton', { name: 'MT 模型并发上限' })
+  expect(input).toHaveValue(10)
+  expect(screen.getAllByRole('spinbutton', { name: /并发上限$/ })).toHaveLength(5)
+  expect(screen.getByText('与 MT 共用')).toBeInTheDocument()
+  fireEvent.change(input, { target: { value: '3' } })
+  fireEvent.blur(input)
+  await waitFor(() => expect(screen.getByRole('spinbutton', { name: 'MT 模型并发上限' })).toHaveValue(3))
+  expect(update).toHaveBeenCalledWith({ modelGateway: { concurrency: { mt: 3 } } })
+  const saved = screen.getByRole('spinbutton', { name: 'MT 模型并发上限' })
+  for (const value of ['', '0', '17', '1.5']) {
+    fireEvent.change(saved, { target: { value } })
+    fireEvent.blur(saved)
+    expect(saved).toHaveValue(3)
+  }
+  expect(update).toHaveBeenCalledOnce()
+  update.mockRejectedValueOnce(new Error('write failed'))
+  fireEvent.change(saved, { target: { value: '4' } })
+  fireEvent.blur(saved)
+  await waitFor(() => expect(saved).toHaveValue(3))
+  expect(notifyError).toHaveBeenCalled()
+})
+
 it('renders real service updates without showing diagnostics or exposing its key', async () => {
   render(<ModelGatewayPage />)
   await screen.findByText('启动模型')
@@ -59,7 +88,7 @@ it('shows the seven model rows in order and resets keys after confirmation', asy
   const card = document.querySelector<HTMLElement>('[data-onboarding="gateway-capabilities"]')!
   const table = within(within(card).getByRole('table'))
   expect(table.getAllByRole('combobox').map(element => element.getAttribute('aria-label')))
-    .toEqual(['选择 ASR 模型', '选择 MT 模型', '选择 TTS 模型', 'S2S 模型', '选择 大语言模型', '选择 文字识别（OCR）', '备用 MT 模型'])
+    .toEqual(['选择 ASR 模型', '选择 MT 模型', '选择 TTS 模型', 'S2S 模型', '选择 LLM 模型', '选择 OCR 模型', '备用 MT 模型'])
   expect(within(table.getByRole('row', { name: /^TTS 模型/ })).getByRole('button', { name: '复制模型 ID：nola-tts' })).toBeInTheDocument()
   expect(screen.queryByRole('switch', { name: '语音识别' })).not.toBeInTheDocument()
   expect(screen.queryByText('对外 API 模型映射')).not.toBeInTheDocument()
@@ -133,7 +162,7 @@ it('shows usable protocol examples with stable model aliases and one API prefix'
   expect(mt).toContain('http://127.0.0.1:17860/v2/chat/completions')
   expect(mt).not.toContain('/v2/v2')
   expect(mt).toContain('"model":"nola-mt"')
-  expect(screen.queryByRole('tab', { name: '大语言模型' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('tab', { name: 'LLM 模型' })).not.toBeInTheDocument()
   expect(screen.queryByText('nola-llm')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('tab', { name: 'TTS 模型' }))
   expect(screen.getByText(/response_format/)).toHaveTextContent('"response_format":"wav"')
@@ -156,7 +185,7 @@ it('selects an enabled loadable local model without changing business defaults',
 })
 
 it.each([
-  ['ASR 模型', 'asr'], ['MT 模型', 'mt'], ['大语言模型', 'llm'], ['TTS 模型', 'tts'],
+  ['ASR 模型', 'asr'], ['MT 模型', 'mt'], ['LLM 模型', 'llm'], ['TTS 模型', 'tts'],
 ] as const)('disables %s and clears its gateway binding', async (label, kind) => {
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue(undefined)
   render(<ModelGatewayPage />)
@@ -206,7 +235,7 @@ it('binds a custom LLM without changing the translation default', async () => {
   render(<ModelGatewayPage />)
   await screen.findByText('启动模型')
   const user = userEvent.setup()
-  await user.click(screen.getByRole('combobox', { name: '选择 大语言模型' }))
+  await user.click(screen.getByRole('combobox', { name: '选择 LLM 模型' }))
   await user.click(await screen.findByRole('option', { name: 'Chat profile' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith({ modelGateway: { llmModel: 'custom:chat', llm: true }, modelPolicy: { enabled: { 'llm:custom:chat': true }, defaults: {}, selections: {} } }))
   expect(update).not.toHaveBeenCalledWith(expect.objectContaining({ translation: expect.anything() }))
@@ -250,7 +279,7 @@ it('starts and stops the service from the page', async () => {
 
 it.each([
   ['mt', 'MT 模型', 'hy-mt2-1.8b-q4-k-m', 'hymt2', 'translationModel'],
-  ['llm', '大语言模型', 'qwen35-0.8b-q4-k-m', 'llama.cpp', 'translationModel'],
+  ['llm', 'LLM 模型', 'qwen35-0.8b-q4-k-m', 'llama.cpp', 'translationModel'],
   ['tts', 'TTS 模型', 'voice', 'transformers-tts', 'ttsModel'],
 ] as const)('binds a loadable local %s model and enables the capability', async (kind, label, id, provider, resourceKind) => {
   const settings = store.stores.settings.getState().settings!
@@ -273,11 +302,28 @@ it('selects downloaded OCR weights for gateway startup without changing scene mo
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
   render(<ModelGatewayPage />)
   const user = userEvent.setup()
-  await user.click(await screen.findByRole('combobox', { name: '选择 文字识别（OCR）' }))
+  await user.click(await screen.findByRole('combobox', { name: '选择 OCR 模型' }))
   await user.click(await screen.findByRole('option', { name: 'PP-OCRv5 mobile' }))
   await waitFor(() => expect(update).toHaveBeenCalledWith(expect.objectContaining({
     modelGateway: { ocr: true, ocrModel: 'resource:pp-ocrv5-mobile-onnx' },
   })))
   expect(update.mock.calls[0][0]).not.toHaveProperty('translation')
   expect(update.mock.calls[0][0]).not.toHaveProperty('recognition')
+})
+
+
+it('defaults local concurrency to one and locks CrispASR models', async () => {
+  render(<ModelGatewayPage />)
+  const local = await screen.findByRole('spinbutton', { name: 'ASR 模型并发上限' })
+  expect(local).toHaveValue(1)
+  expect(local).toHaveAttribute('max', '5')
+  expect(local).not.toBeDisabled()
+  act(() => store.stores.models.setState({ resources: [{ ...asrResource, provider: 'crisp-asr' }] }))
+  const crisp = screen.getByRole('spinbutton', { name: 'ASR 模型并发上限' })
+  expect(crisp).toHaveValue(1)
+  expect(crisp).toHaveAttribute('max', '1')
+  expect(crisp).toBeDisabled()
+  const user = userEvent.setup()
+  await user.hover(screen.getByRole('button', { name: '并发上限' }))
+  expect(await screen.findByText(/本地模型并发上限为 5，API 接口为 10/)).toBeInTheDocument()
 })

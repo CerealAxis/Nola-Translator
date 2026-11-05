@@ -1,32 +1,53 @@
 .screen-page { display: flex; min-width: 0; flex-direction: column; gap: var(--space-3); container-type: inline-size; }
-.screen-page > .card { --card-spacing: calc(var(--space-2) + var(--space-1) / 2); }
+.screen-page > .card:not(.nola-settings-card) { --card-spacing: calc(var(--space-2) + var(--space-1) / 2); }
+.screen-scene-card.card { gap: var(--space-1); }
+.screen-scene.nola-overlay-stage { place-items: center; margin-inline: 0; }
+.screen-scene__art { display: grid; grid-template-columns: var(--space-5) minmax(var(--space-2), 1fr) minmax(0, min(60%, calc(var(--space-8) * 5))) minmax(var(--space-2), 1fr) var(--space-5); align-items: center; width: min(100%, calc(var(--space-8) * 12)); padding-bottom: var(--space-2); }
+.screen-scene__endpoint { display: grid; place-items: center; width: var(--space-5); height: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--accent); }
+.screen-scene__endpoint svg { width: var(--space-3); height: var(--space-3); stroke-width: 1.5; }
+.screen-scene__link { border-top: 2px dashed color-mix(in oklch, var(--accent) 30%, transparent); }
+.screen-scene__monitor { position: relative; min-width: 0; padding: var(--space-1); border: calc(var(--space-1) / 2) solid color-mix(in oklch, var(--accent) 25%, var(--surface)); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--surface-shadow); }
+.screen-scene__monitor::before, .screen-scene__monitor::after { content: ''; position: absolute; background: color-mix(in oklch, var(--accent) 30%, var(--surface-secondary)); }
+.screen-scene__monitor::before { top: 100%; left: 45%; width: 10%; height: var(--space-2); }
+.screen-scene__monitor::after { top: calc(100% + var(--space-2)); left: 35%; width: 30%; height: calc(var(--space-1) / 2); border-radius: var(--radius-sm); }
+.screen-scene__window { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2); border-radius: var(--radius-md); background: var(--surface-secondary); }
+.screen-scene__toolbar { border-top: 1px solid var(--border); }
+.screen-scene__document { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; gap: var(--space-2); }
+.screen-scene__copy { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); }
+.screen-scene__copy > span { height: calc(var(--space-1) / 2); border-radius: var(--radius-sm); background: color-mix(in oklch, var(--accent) 13%, transparent); }
+.screen-scene__copy > span:first-child { width: 65%; height: var(--space-1); }
+.screen-scene__copy > span:nth-child(3) { width: 85%; }
+.screen-scene__picture { display: grid; place-items: center; margin-top: calc(var(--space-1) / 2); border-radius: var(--radius-sm); background: color-mix(in oklch, var(--accent) 10%, transparent); color: color-mix(in oklch, var(--accent) 35%, transparent); }
+.screen-scene__picture svg { width: 100%; height: auto; }
+.screen-scene__selection { position: relative; display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--space-1) / 2); padding: var(--space-2) var(--space-1); border: 2px dashed color-mix(in oklch, var(--accent) 65%, transparent); background: var(--surface); text-align: center; font: var(--font-caption); }
+.screen-scene__source { color: var(--muted); }
+.screen-scene__selection > svg { width: var(--space-3); height: var(--space-3); color: var(--accent); stroke-width: 1.5; }
+.screen-scene__translation { max-width: 100%; padding: calc(var(--space-1) / 2) var(--space-1); border-radius: var(--radius-md); background: color-mix(in oklch, var(--accent) 12%, transparent); color: var(--accent); font-weight: 600; overflow-wrap: anywhere; }
+.screen-scene__corner { position: absolute; width: var(--space-2); height: var(--space-2); border: calc(var(--space-1) / 2) solid var(--accent); }
+.screen-scene__corner[data-corner=tl] { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
+.screen-scene__corner[data-corner=tr] { top: -2px; right: -2px; border-left: 0; border-bottom: 0; }
+.screen-scene__corner[data-corner=bl] { bottom: -2px; left: -2px; border-right: 0; border-top: 0; }
+.screen-scene__corner[data-corner=br] { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
+@container (max-width: 600px) {
+  .screen-scene__art { grid-template-columns: var(--space-5) var(--space-2) minmax(0, 1fr) var(--space-2) var(--space-5); }
+  .screen-scene__window { padding: var(--space-1); }
+  .screen-scene__document { gap: var(--space-1); }
+}
 .screen-page__actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); }
-.screen-settings__section + .screen-settings__section { margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--separator); }
-.screen-settings__heading { margin-bottom: var(--space-2); }
-.screen-settings__heading h2 { margin: 0; font: var(--font-title); }
-.screen-settings__heading p { margin: var(--space-1) 0 0; font: var(--font-caption); color: var(--muted); }
-.screen-settings__fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-3); }
-.screen-setting-field[data-slot="field"] { display: grid; grid-template-columns: calc(var(--space-8) + var(--space-6)) minmax(0, 1fr); align-items: center; gap: calc(var(--space-3) / 2); min-width: 0; min-height: var(--field-control-height); }
-.screen-setting-field > [data-slot="field-label"] { min-width: 0; }
-.screen-setting-field .select, .screen-setting-field .select__trigger { width: 100%; min-width: 0; }
-.screen-settings__footer { justify-content: flex-end; margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--separator); }
+.screen-settings__footer { justify-content: flex-end; padding-top: var(--space-3); border-top: 1px solid var(--separator); }
 html[data-screen-window] body, html[data-screen-window] #root { background: transparent; }
 .screen-editor { position: relative; width: 100%; height: 100%; overflow: hidden; touch-action: none; user-select: none; cursor: crosshair; }
 .screen-editor__region { position: absolute; border: 2px solid var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); cursor: move; }
-.screen-editor__region--selected { outline: 2px solid var(--foreground); outline-offset: 2px; }
-.screen-editor__resize { position: absolute; width: var(--space-2); height: var(--space-2); border-radius: var(--radius-sm); background: var(--primary); cursor: nwse-resize; }
+.screen-editor__region--selected, .screen-editor__region:focus-visible { outline: none; }
+.screen-editor__resize { position: absolute; width: var(--space-2); height: var(--space-2); transform: translate(-50%, -50%); cursor: nwse-resize; }
+.screen-editor__resize::after { content: ''; position: absolute; left: 50%; top: 50%; width: calc(var(--space-1) / 2); height: calc(var(--space-1) / 2); transform: translate(-50%, -50%); border-radius: var(--radius-full); background: var(--primary); }
+.screen-editor__region:not(.screen-editor__region--selected) .screen-editor__resize { visibility: hidden; }
 .screen-editor__toolbar { position: absolute; left: 50%; bottom: var(--space-2); transform: translateX(-50%); width: max-content; display: flex; flex-direction: column; align-items: center; gap: var(--space-1); max-width: calc(100% - var(--space-4)); padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--overlay-shadow); cursor: default; }
 .screen-editor__toolbar p { margin: 0; font: var(--nola-text-caption); }
 .screen-overlay { position: relative; width: 100%; height: 100%; overflow: hidden; pointer-events: none; }
 .screen-overlay__block { position: absolute; box-sizing: border-box; overflow: hidden; color: var(--foreground); font-family: var(--font-ui); font-size: var(--screen-font-size); line-height: 1.45; overflow-wrap: anywhere; }
 .screen-overlay__text { position: absolute; left: 50%; top: 50%; box-sizing: border-box; overflow: hidden; padding: var(--screen-text-padding); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--surface) var(--screen-opacity), transparent); }
 .screen-overlay__block p { margin: 0; white-space: pre-wrap; }
-@container (max-width: 900px) { .screen-settings__fields { grid-template-columns: minmax(0, 1fr); } }
-@container (max-width: 600px) {
-  .screen-setting-field[data-slot="field"] { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
-}
-
-.screen-regions-field[data-slot="field"] { grid-template-columns: calc(var(--space-8) + var(--space-6)) minmax(0, 1fr); }
 .screen-region-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); min-width: 0; }
 .screen-region-controls > [data-slot="select-trigger"] { flex: 1; width: auto; min-width: var(--space-8); max-width: calc(var(--space-8) * 5); }
 .screen-preset-menu { display: flex; flex-direction: column; gap: var(--space-1); width: auto; }
@@ -35,12 +56,11 @@ html[data-screen-window] body, html[data-screen-window] #root { background: tran
 .screen-region-highlights { position: relative; width: 100%; height: 100%; pointer-events: none; }
 .screen-region-highlights > div { position: absolute; border: 2px solid var(--primary); background: color-mix(in srgb, var(--primary) 20%, transparent); }
 .screen-overlay__patch { position: absolute; pointer-events: none; }
-@container (max-width: 600px) { .screen-regions-field[data-slot="field"] { grid-template-columns: minmax(0, 1fr); } }
 
 .screen-editor__resize[data-resize*="n"] { top: 0; }
-.screen-editor__resize[data-resize*="s"] { bottom: 0; }
+.screen-editor__resize[data-resize*="s"] { top: 100%; }
 .screen-editor__resize[data-resize*="w"] { left: 0; }
-.screen-editor__resize[data-resize*="e"] { right: 0; }
+.screen-editor__resize[data-resize*="e"] { left: 100%; }
 .screen-editor__resize[data-resize="n"], .screen-editor__resize[data-resize="s"] { left: 50%; cursor: ns-resize; }
 .screen-editor__resize[data-resize="e"], .screen-editor__resize[data-resize="w"] { top: 50%; cursor: ew-resize; }
 .screen-editor__resize[data-resize="ne"], .screen-editor__resize[data-resize="sw"] { cursor: nesw-resize; }

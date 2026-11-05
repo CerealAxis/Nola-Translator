@@ -3,3 +3,13 @@
   background: none !important;
   border-color: transparent !important;
 }
+
+/* Icon actions stay unfilled even when a caller supplies a filled variant or state style. */
+[data-slot='button'][data-size^='icon']:not([data-variant='nav']):not(.nola-color-picker__preset) {
+  background: none !important;
+  border-color: transparent !important;
+}
+
+[data-slot='button'][data-size^='icon'][data-variant='default'] {
+  color: var(--foreground) !important;
+}

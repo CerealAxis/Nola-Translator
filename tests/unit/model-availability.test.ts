@@ -8,11 +8,11 @@ const settings = (): AppSettings => ({ ...structuredClone(DEFAULT_SETTINGS), mod
 describe('configured cloud catalog', () => {
   it('offers ready free interfaces without enablement and still validates endpoints', () => {
     const value = settings()
-    expect(buildConfiguredCloudModels(value, credentials).mt.map(model => model.binding)).toEqual(['cloud:mymemory', 'cloud:index-translate'])
+    expect(buildConfiguredCloudModels(value, credentials).mt.map(model => model.binding)).toEqual(['cloud:microsoft', 'cloud:mymemory', 'cloud:google', 'cloud:index-translate'])
     value.modelPolicy!.enabled['mt:cloud:mymemory'] = false
     expect(buildConfiguredCloudModels(value, credentials).mt.map(model => model.binding)).toContain('cloud:mymemory')
     value.translation.mymemoryEndpoint = 'file:///tmp/private'
-    expect(buildConfiguredCloudModels(value, credentials).mt.map(model => model.binding)).toEqual(['cloud:index-translate'])
+    expect(buildConfiguredCloudModels(value, credentials).mt.map(model => model.binding)).toEqual(['cloud:microsoft', 'cloud:google', 'cloud:index-translate'])
   })
 
   it('requires complete credentials and connection fields for paid recognition services', () => {

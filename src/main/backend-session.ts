@@ -105,19 +105,17 @@ export function mapSessionConfig(
       if (!mt || !enabledModelIds.has(mt)) return
       const credentials = config.translationOptions
       if (provider === 'cloud' && (!credentials?.endpoint || !credentials.model)) return
-      if ((provider === 'google' || provider === 'microsoft') && !credentials?.apiKey) return
       if (provider === 'index-translate' && credentials?.endpoint && credentials.endpoint !== INDEX_TRANSLATE_ENDPOINT) return
-      if (provider !== 'local' && provider !== 'index-translate') Object.assign(headers, backendMtHeaders(credentials))
+      if (provider === 'cloud' || provider === 'mymemory') Object.assign(headers, backendMtHeaders(credentials))
       pipeline.translation_model = mt
       const fallback = config.fallbackTranslationProvider
       if (fallback) {
         const fallbackModel = fallback === 'local' ? config.translationModelId : fallback === 'cloud' ? 'custom-mt' : fallback
         const backup = config.fallbackTranslationOptions
         if (!fallbackModel || !enabledModelIds.has(fallbackModel)) return
-        if ((fallback === 'google' || fallback === 'microsoft') && !backup?.apiKey) return
         if (fallback === 'cloud' && (!backup?.endpoint || !backup.model)) return
         pipeline.fallback_translation_model = fallbackModel
-        Object.assign(headers, backendMtHeaders(backup, 'x-nola-fallback-'))
+        if (fallback === 'cloud' || fallback === 'mymemory') Object.assign(headers, backendMtHeaders(backup, 'x-nola-fallback-'))
       }
     }
     if (speech) {

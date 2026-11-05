@@ -17,6 +17,14 @@ const config: SessionConfig = {
 }
 
 describe('desktop backend session', () => {
+  it.each(['google', 'microsoft'] as const)('maps keyless %s primary and fallback without forwarding old credentials', provider => {
+    const ids = new Set([...models, provider])
+    const mapped = mapSessionConfig({ ...config, translationProvider: provider, translationOptions: undefined,
+      fallbackTranslationProvider: provider, fallbackTranslationOptions: { apiKey: 'obsolete-backup-key' },
+    }, DEFAULT_SETTINGS, ids)
+    expect(mapped?.config.pipeline).toMatchObject({ translation_model: provider, fallback_translation_model: provider })
+    expect(mapped?.headers).toEqual({})
+  })
   it('routes Index Translate with MiMo synthesis and sends its key only in the private header', () => {
     const session = { ...config, translationProvider: 'index-translate' as const, translationOptions: { endpoint: INDEX_TRANSLATE_ENDPOINT } }
     const settings = { ...DEFAULT_SETTINGS, synthesis: { modelId: MIMO_TTS_BINDING, voice: '' } }
@@ -37,7 +45,7 @@ describe('desktop backend session', () => {
       speech_target_language: 'zh',
     })
     expect(JSON.stringify(mapped?.config)).not.toContain('private-provider-key')
-    expect(mapped?.headers).toEqual({ 'x-nola-provider-key': 'private-provider-key' })
+    expect(mapped?.headers).toEqual({})
     expect(mapSessionConfig({ ...config, recognitionModelId: 'unregistered' }, settings, models)).toBeUndefined()
     expect(mapSessionConfig({ ...config, audioSource: { kind: 'systemOutput', deviceId: 'selected' } },
       settings, models, { output: 'speech' })).toBeUndefined()
@@ -347,8 +355,9 @@ describe('desktop backend session', () => {
         owner: 'quick_interpret', config: { recording_path: '/trusted/meeting.mp3' },
       })
       expect(requests.find(request => request.body.type === 'start')?.headers).toMatchObject({
-        authorization: 'Bearer control', 'x-nola-provider-key': 'private-provider-key',
+        authorization: 'Bearer control',
       })
+      expect(requests.find(request => request.body.type === 'start')?.headers).not.toHaveProperty('x-nola-provider-key')
     } finally {
       client.close()
       await new Promise<void>(resolve => ws.close(() => resolve()))

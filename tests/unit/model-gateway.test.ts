@@ -113,7 +113,78 @@ it('excludes workbench LLMs from both public API versions', async () => {
   }
 })
 
+it('rejects excess realtime streams before opening a backend connection', async () => {
+  const closed = deferred<void>()
+  const open = vi.fn<NonNullable<ModelGatewayOptions['openBackendAsr']>>(async () => ({
+    close: () => closed.resolve(), closed: closed.promise, request: async () => {},
+  }))
+  const test = await fixture(undefined, undefined, undefined, async () => undefined, open)
+  test.settings.modelGateway.concurrency = { asr: 1 }
+  await test.gateway.start()
+  const connect = async () => {
+    const client = new WebSocket(test.base.replace('http:', 'ws:') + '/v2/realtime', { headers: await test.headers() })
+    const events: Array<Record<string, unknown>> = []
+    client.on('message', bytes => events.push(JSON.parse(bytes.toString())))
+    await once(client, 'open')
+    client.send(JSON.stringify({ type: 'session.update', session: { turn_detection: null } }))
+    return { client, events }
+  }
+  const first = await connect()
+  await vi.waitFor(() => expect(first.events.some(event => event.type === 'session.updated')).toBe(true))
+  const second = await connect()
+  await vi.waitFor(() => expect(second.events).toContainEqual(expect.objectContaining({ type: 'error', error: expect.objectContaining({ code: 'rate_limited' }) })))
+  expect(open).toHaveBeenCalledOnce()
+  second.client.close(); await once(second.client, 'close')
+  first.client.close(); await once(first.client, 'close')
+  await vi.waitFor(() => expect(test.gateway.snapshot().activeRequests).toBe(0))
+})
+
 describe('local gateway', () => {
+  it('shares a capability limit between leases and public calls and applies changes without interrupting leases', async () => {
+    const test = await fixture()
+    test.settings.modelGateway.concurrency = { mt: 2, tts: 1 }
+    await test.gateway.start()
+    const first = await test.gateway.leaseCapability('mt')
+    const second = await test.gateway.leaseCapability('mt')
+    test.settings.modelGateway.concurrency.mt = 1
+    await expect(test.gateway.leaseCapability('mt')).rejects.toMatchObject({ status: 429, code: 'rate_limited' })
+    const speech = await test.gateway.leaseCapability('tts')
+    speech.release()
+    first.release(); first.release()
+    const rejected = await fetch(test.base + '/v2/chat/completions', { method: 'POST', headers: await test.headers(),
+      body: JSON.stringify({ model: 'nola-mt', messages: [{ role: 'user', content: 'Hello' }] }) })
+    expect(rejected.status).toBe(429)
+    expect(await rejected.json()).toMatchObject({ error: { code: 'rate_limited' } })
+    second.release()
+    const next = await test.gateway.leaseCapability('mt')
+    next.release()
+    expect(test.gateway.snapshot().activeRequests).toBe(0)
+  })
+
+  it('delegates concurrency admission to the backend and tracks cancelled calls', async () => {
+    const infer = vi.fn<NonNullable<ModelGatewayOptions['inferBackend']>>(async (_request, signal) =>
+      new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })))
+    const test = await fixture(undefined, undefined, undefined, infer)
+    test.settings.modelGateway.concurrency = { mt: 3 }
+    await test.gateway.start()
+    const controller = new AbortController()
+    const request = { kind: 'mt' as const, model: 'resource:mt-test', id: randomUUID(), text: 'Hello', target: 'zh' }
+    const first = test.gateway.infer(request, controller.signal)
+    const second = test.gateway.infer(request, controller.signal)
+    const settled = Promise.allSettled([first, second])
+    expect(test.gateway.snapshot().activeRequests).toBe(2)
+    expect(infer).toHaveBeenCalledTimes(2)
+    expect(infer).toHaveBeenCalledWith(expect.anything(), expect.any(AbortSignal), { concurrency: 3 })
+    controller.abort(new Error('cancelled'))
+    expect((await settled).every(result => result.status === 'rejected')).toBe(true)
+    expect(test.gateway.snapshot().activeRequests).toBe(0)
+    infer.mockRejectedValueOnce(new Error('backend failed'))
+    await expect(test.gateway.infer(request, new AbortController().signal)).rejects.toThrow('backend failed')
+    infer.mockResolvedValueOnce({ text: 'translated' })
+    await expect(test.gateway.infer(request, new AbortController().signal)).resolves.toEqual({ text: 'translated' })
+    expect(test.gateway.snapshot().activeRequests).toBe(0)
+  })
+
   it('routes the enabled MiMo default through the backend without a local TTS worker', async () => {
     const audio = `data:audio/wav;base64,${wav().toString('base64')}`
     const infer = vi.fn<NonNullable<ModelGatewayOptions['inferBackend']>>().mockResolvedValue({ text: '', audio })
@@ -129,7 +200,7 @@ describe('local gateway', () => {
     })
     expect(speech.status).toBe(200)
     expect(Buffer.from(await speech.arrayBuffer())).toEqual(wav())
-    expect(infer).toHaveBeenCalledWith(expect.objectContaining({ kind: 'tts', model: MIMO_TTS_BINDING }), expect.any(AbortSignal), { batchAsr: false, mp3: false })
+    expect(infer).toHaveBeenCalledWith(expect.objectContaining({ kind: 'tts', model: MIMO_TTS_BINDING }), expect.any(AbortSignal), { batchAsr: false, mp3: false, concurrency: 10 })
     expect(test.workers).toHaveLength(0)
   })
 
@@ -159,19 +230,19 @@ describe('local gateway', () => {
     await expect(test.gateway.infer({ kind: 'tts', id: randomUUID(), model: 'resource:tts-test' },
       new AbortController().signal, true)).resolves.toEqual({ text: '', voices: ['Voice'] })
     expect(infer).toHaveBeenCalledWith(expect.objectContaining({ kind: 'tts' }),
-      expect.any(AbortSignal), { inspect: true })
+      expect.any(AbortSignal), { inspect: true, concurrency: 1 })
 
     const speech = await post('/v2/audio/speech', { model: 'nola-tts', input: 'Hello' })
     expect(speech.headers.get('content-type')).toBe('audio/mpeg')
     expect(Buffer.from(await speech.arrayBuffer())).toEqual(mp3)
     expect(infer).toHaveBeenCalledWith(expect.objectContaining({ kind: 'tts', voice: 'Voice' }),
-      expect.any(AbortSignal), { batchAsr: false, mp3: true })
+      expect.any(AbortSignal), { batchAsr: false, mp3: true, concurrency: 1 })
     const pcm = await post('/v2/audio/speech', { model: 'nola-tts', input: 'Hello', response_format: 'pcm' })
     expect(Buffer.from(await pcm.arrayBuffer())).toEqual(wav().subarray(44))
 
     const transcription = await postTranscription(test.base, (await test.headers()).Authorization)
     expect(await transcription.json()).toEqual({ text: 'backend transcript' })
-    expect(infer).toHaveBeenCalledWith(expect.objectContaining({ kind: 'asr' }), expect.any(AbortSignal), { batchAsr: true, mp3: false })
+    expect(infer).toHaveBeenCalledWith(expect.objectContaining({ kind: 'asr' }), expect.any(AbortSignal), { batchAsr: true, mp3: false, concurrency: 1 })
 
     const request = { kind: 'mt' as const, id: randomUUID(), model: 'resource:mt-test', text: 'Hello', target: 'zh' }
     await expect(test.gateway.infer(request, new AbortController().signal)).resolves.toEqual({ text: 'backend translation' })
@@ -515,7 +586,12 @@ describe('local gateway', () => {
     lease.release()
     const config = initialized.find(init => init.kind === 'mt')!
     expect(config.fallbackUsesPrimary).toBe(true)
-    expect((config.config as any).translationOptions.apiKey).toBe(`secret-for-fallback-${provider}`)
+    if (provider === 'cloud') expect((config.config as any).translationOptions.apiKey).toBe('secret-for-fallback-cloud')
+    else {
+      expect((config.config as any).translationOptions).not.toHaveProperty('apiKey')
+      expect(credentials).not.toHaveBeenCalledWith('google')
+      expect(credentials).not.toHaveBeenCalledWith('fallback-google')
+    }
     expect(credentials).not.toHaveBeenCalledWith('cloud-model:unrelated-primary')
     expect(JSON.stringify(test.gateway.snapshot())).not.toContain('secret-for-')
   })

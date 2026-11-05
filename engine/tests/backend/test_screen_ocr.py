@@ -191,7 +191,7 @@ async def test_same_size_corruption_is_detected_and_repaired(tmp_path, tiny_spec
     assert service.status()["installed"] is True
 
 
-async def test_inference_rejects_parallel_work_and_shutdown_waits(tmp_path, tiny_spec, monkeypatch):
+async def test_realtime_inference_queues_serially_and_shutdown_waits(tmp_path, tiny_spec, monkeypatch):
     service = screen_ocr.ScreenOcr(tmp_path)
     started = threading.Event()
     finish = threading.Event()
@@ -205,8 +205,12 @@ async def test_inference_rejects_parallel_work_and_shutdown_waits(tmp_path, tiny
     monkeypatch.setattr(service, "_infer", infer)
     task = asyncio.create_task(service.infer(screen_ocr.OcrRequest(image=image_url())))
     assert await asyncio.to_thread(started.wait, 3)
-    with pytest.raises(ValueError, match="resourceBusy"):
-        await service.infer(screen_ocr.OcrRequest(image=image_url()))
+    queued = asyncio.create_task(service.infer(screen_ocr.OcrRequest(image=image_url())))
+    await asyncio.sleep(0)
+    assert not queued.done()
+    queued.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await queued
     task.cancel()
     closing = asyncio.create_task(service.close())
     await asyncio.sleep(0)
@@ -320,3 +324,53 @@ def test_text_repair_erases_glyphs_and_preserves_the_surrounding_image(dark, gra
     assert after < before * .2
     assert np.array_equal(rendered[:15], original[:15])
     assert len(result["color"]) == 7 and len(result["background"]) == 7
+
+
+@pytest.mark.parametrize("fixed_batch,expected_calls", [(1, 2), (None, 1)])
+def test_recognition_batches_only_when_the_exported_model_accepts_it(fixed_batch, expected_calls):
+    class Recognizer:
+        def __init__(self):
+            self.calls = []
+        def get_modelmeta(self):
+            return SimpleNamespace(custom_metadata_map={"character": "a\nb"})
+        def get_inputs(self):
+            return [SimpleNamespace(shape=[fixed_batch, 3, 48, 320], name="image")]
+        def run(self, _, inputs):
+            self.calls.append(inputs["image"].shape)
+            result = np.zeros((inputs["image"].shape[0], 2, 4), dtype=np.float32)
+            result[:, 0, 1] = 0.99
+            result[:, 1, 2] = 0.99
+            return [result]
+
+    recognizer = Recognizer()
+    crops = [np.ones((20, 60, 3), dtype=np.uint8), np.ones((30, 80, 3), dtype=np.uint8)]
+    results = screen_ocr.ScreenOcr._recognize_batch(crops, recognizer)
+    assert [text for text, _ in results] == ["ab", "ab"]
+    assert len(recognizer.calls) == expected_calls
+    assert sum(shape[0] for shape in recognizer.calls) == 2
+
+
+async def test_offline_ocr_runs_concurrently_and_release_waits_for_every_native_call(tmp_path, monkeypatch):
+    service = screen_ocr.ScreenOcr(tmp_path)
+    service._loaded = True
+    ready = threading.Barrier(3)
+    finish = threading.Event()
+    def infer(request):
+        ready.wait(3)
+        assert finish.wait(3)
+        return {"blocks": [], "width": 1, "height": 1}
+    monkeypatch.setattr(service, "_infer", infer)
+    request = screen_ocr.OcrRequest(image=image_url(), task_mode="offline", max_concurrency=3)
+    tasks = [asyncio.create_task(service.infer(request)) for _ in range(3)]
+    for _ in range(100):
+        if service._inference_gate.active(service.spec.model_id) == 3:
+            break
+        await asyncio.sleep(0.001)
+    assert service._inference_gate.active(service.spec.model_id) == 3
+    closing = asyncio.create_task(service.release())
+    await asyncio.sleep(0)
+    assert not closing.done()
+    finish.set()
+    assert len(await asyncio.gather(*tasks)) == 3
+    await closing
+    assert not service._loaded

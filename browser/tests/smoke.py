@@ -15,11 +15,14 @@ def main():
     parser.add_argument('--name', default='chromium')
     parser.add_argument('--cdp-load', action='store_true', help='Use Extensions.loadUnpacked for branded Chrome')
     parser.add_argument('--pipeline', action='store_true', help='Also exercise the legacy sharing fallback with real fixture PCM and simulated captions')
+    parser.add_argument('--trigger-only', action='store_true', help='Check subtitle trigger appearance across languages and themes')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     output = root / 'artifacts' / 'browser-smoke' / args.name
     output.mkdir(parents=True, exist_ok=True)
     fixture = (root / 'browser/extension/fixtures/player.html').read_text(encoding='utf-8')
+    if args.trigger_only:
+        fixture = fixture.replace('<video id="first" controls width="640" height="360"></video>', '<div id="movie_player" style="position:relative;width:640px;height:408px;background:#333"><video id="first" controls width="640" height="360"></video><div class="ytp-chrome-bottom" style="position:absolute;bottom:0;right:0;height:48px"><div class="ytp-right-controls" style="display:flex;height:48px"><button style="width:48px;height:48px;padding:8px;border:0;background:transparent"><svg width="32" height="32"><rect x="4" y="4" width="24" height="24" fill="white"/></svg></button></div></div></div>')
     with tempfile.TemporaryDirectory(dir=output) as directory:
         extension = Path(directory) / 'extension'
         shutil.copytree(root / 'browser/extension/dist', extension)
@@ -79,6 +82,43 @@ def main():
                 trigger = page.locator('[data-nola-extension="trigger"]')
                 trigger.wait_for(state='visible')
                 assert trigger.count() == 1
+                def check_trigger(label):
+                    badge = trigger.locator('.nola-trigger-state')
+                    assert badge.inner_text() == label
+                    paint = trigger.evaluate("""host => {const button=getComputedStyle(host.shadowRoot.querySelector('button'));const badge=getComputedStyle(host.shadowRoot.querySelector('.nola-trigger-state'));return {background:button.backgroundColor,fill:badge.backgroundColor,color:badge.color,radius:parseFloat(badge.borderRadius),height:parseFloat(badge.height)}}""")
+                    assert paint['background'] == 'rgba(0, 0, 0, 0)', paint
+                    assert paint['fill'] in ['oklch(0 0 0)', 'rgb(0, 0, 0)'], paint
+                    assert paint['color'] == 'rgb(255, 255, 255)', paint
+                    assert paint['radius'] >= paint['height'] / 2, paint
+                check_trigger('OFF')
+                if args.trigger_only:
+                    page.evaluate("document.documentElement.style.fontSize='10px'")
+                    geometry = trigger.evaluate("""host=>{const rect=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}};return{button:rect(host.shadowRoot.querySelector('button')),logo:rect(host.shadowRoot.querySelector('svg')),badge:rect(host.shadowRoot.querySelector('.nola-trigger-state'))}}""")
+                    assert geometry['button']['width'] == 48 and geometry['logo']['width'] == 32, geometry
+                    assert geometry['badge']['y'] >= geometry['logo']['y'] + geometry['logo']['height'] * .75, geometry
+                    assert geometry['badge']['right'] >= geometry['logo']['right'] + 8, geometry
+                    for theme in ['light', 'dark']:
+                        for locale in ['en', 'zh-CN', 'zh-TW', 'zh-HK', 'ja', 'ko']:
+                            worker.evaluate('value => chrome.storage.local.set(value)', {'uiLanguage': locale, 'theme': theme})
+                            page.wait_for_function("([locale,theme])=>{const host=document.querySelector('[data-nola-extension=trigger]');return host.lang===locale&&host.dataset.theme===theme}", arg=[locale, theme])
+                            trigger.get_by_role('button').hover()
+                            check_trigger('OFF')
+                            trigger.get_by_role('button').click()
+                            page.locator('[data-nola-extension="panel"]').wait_for(state='visible')
+                            check_trigger('OFF')
+                            worker.evaluate("async()=>{const [tab]=await chrome.tabs.query({url:'https://nola.test/player'});return chrome.tabs.sendMessage(tab.id,{type:'toggleSubtitles'})}")
+                            trigger.locator('.nola-trigger-state', has_text='ON').wait_for()
+                            check_trigger('ON')
+                            if locale == 'zh-CN': trigger.screenshot(path=str(output / f'trigger-{theme}-on.png'))
+                            worker.evaluate("async()=>{const [tab]=await chrome.tabs.query({url:'https://nola.test/player'});return chrome.tabs.sendMessage(tab.id,{type:'toggleSubtitles'})}")
+                            trigger.locator('.nola-trigger-state', has_text='OFF').wait_for()
+                            check_trigger('OFF')
+                            if locale == 'zh-CN': trigger.screenshot(path=str(output / f'trigger-{theme}-off.png'))
+                            trigger.get_by_role('button').click()
+                    assert not errors, errors
+                    page.locator('#movie_player').screenshot(path=str(output / 'player-controls.png'))
+                    print(json.dumps({'checks':24,'locales':6,'themes':2,'errors':errors}),flush=True)
+                    return
                 assert page.locator('html').get_attribute('data-nola-capture-handle')
                 panel = page.locator('[data-nola-extension="panel"]')
                 assert panel.is_hidden(), 'Panel must stay hidden before the user opens it'
@@ -86,6 +126,7 @@ def main():
                 page.screenshot(path=str(output / 'player.png'))
                 trigger.get_by_role('button').click()
                 panel.wait_for(state='visible')
+                check_trigger('OFF')
                 start_label = 'Start' if args.pipeline else 'Start live translation'
                 panel.get_by_role('button', name=start_label, exact=True).wait_for()
                 assert panel.get_by_role('button', name='Refresh', exact=True).count() == 1
@@ -96,17 +137,34 @@ def main():
                 assert panel.get_attribute('data-theme') == 'dark'
                 assert panel.evaluate("(host) => getComputedStyle(host).getPropertyValue('--surface').trim()").startswith('oklch(27%')
                 page.screenshot(path=str(output / 'panel.png'))
+                panel.get_by_role('button', name='Subtitle settings', exact=True).click()
+                assert panel.get_by_text('Live pipeline', exact=True).count() == 0
+                page.screenshot(path=str(output / 'subtitle-settings.png'))
+                panel.get_by_role('combobox', name='Target language', exact=True).click()
+                panel.get_by_role('combobox', name='Search languages', exact=True).fill('Japanese')
+                panel.get_by_role('option', name='Japanese', exact=True).click()
+                panel.get_by_role('combobox', name='Target language', exact=True).get_by_text('Japanese', exact=True).wait_for()
+                assert worker.evaluate("async () => (await chrome.storage.local.get('videoLanguage')).videoLanguage") == 'ja'
+                worker.evaluate("() => chrome.storage.local.set({videoLanguage: 'zh'})")
+                panel.get_by_role('button', name='Subtitle style', exact=True).click()
+                page.screenshot(path=str(output / 'subtitle-style.png'))
+                panel.get_by_role('button', name='Back', exact=True).click()
+                panel.get_by_role('button', name='Back', exact=True).click()
                 page.locator('#sample-paragraph').get_by_text('Fixture translation: A fixture paragraph for translation.', exact=True).wait_for()
-                panel.get_by_role('button', name='Translate existing subtitles', exact=True).click()
+                panel.get_by_role('switch', name='Translate existing subtitles', exact=True).click()
                 overlay = page.locator('[data-nola-extension="overlay"]')
                 overlay.get_by_text('Fixture translation: A fixture subtitle.', exact=True).wait_for()
-                panel.get_by_role('button', name='Stop subtitle translation', exact=True).click()
+                check_trigger('ON')
+                trigger.screenshot(path=str(output / 'trigger-on.png'))
+                panel.get_by_role('switch', name='Translate existing subtitles', exact=True).click()
                 overlay.wait_for(state='hidden')
+                check_trigger('OFF')
+                trigger.screenshot(path=str(output / 'trigger-off.png'))
                 options = context.new_page()
                 options.goto(worker.url.rsplit('/', 1)[0] + '/options.html')
-                options.get_by_role('heading', name='Extension settings', exact=True).wait_for()
-                options.get_by_role('tab', name='Video subtitles', exact=True).click()
-                options.get_by_text('This is a subtitle preview.', exact=True).wait_for()
+                options.get_by_role('heading', name='General', exact=True).wait_for()
+                options.locator('aside nav').get_by_role('button', name='Video subtitles', exact=True).click()
+                options.locator('[data-preview=video] .nola-demo-browser').wait_for()
                 options.close()
                 if args.pipeline:
                     page.locator('#tone').click()
@@ -118,7 +176,7 @@ def main():
                     # YouTube's root rem scale must not shrink the extension controls.
                     page.evaluate("document.documentElement.style.fontSize = '10px'")
                     font = panel.get_by_role('button', name='Refresh', exact=True).evaluate('(button) => getComputedStyle(button).fontSize')
-                    assert font == '14px', font
+                    assert font == '13px', font
                     page.screenshot(path=str(output / 'captions.png'))
                     (output / 'pipeline.json').write_text(json.dumps(worker.evaluate('self.pipeline'), indent=2))
                 panel.get_by_role('button', name='Close', exact=True).click()

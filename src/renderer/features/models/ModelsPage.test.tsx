@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, renderHook, screen, within, waitFor } from 
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { actions, stores } from '@/store'
-import { DEFAULT_SETTINGS, MIMO_TTS_BINDING } from '../../../shared/settings'
+import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import { ModelsPage } from './ModelsPage'
 import { CloudModelDialog, cloudModelsOf, removeCloudModel } from './CloudModels'
 import { LANGUAGE_CODES } from '../../../shared/languages'
@@ -11,8 +11,6 @@ import { useModelOptions } from '../../model-options'
 import * as settingsActions from '@/store/settingsStore'
 import * as storeModule from '@/store'
 import type { NolaBridge } from '@/bridge'
-import { mergeModelPolicy } from '../../../shared/model-policy'
-import { OverlayPage } from '../overlay/OverlayPage'
 
 // Publisher avatars pull in an emoji picker with browser-only JSON imports.
 vi.mock('@lobehub/icons/es/features/IconAvatar', () => ({ default: () => null }))
@@ -30,6 +28,16 @@ beforeEach(() => {
 afterEach(() => { cleanup(); stores.models.setState(initialModels); stores.settings.setState(initialSettings); vi.restoreAllMocks() })
 
 const section = (name: string) => within(screen.getByRole('heading', { name }).closest('section')!)
+
+it.each(['google', 'microsoft'] as const)('shows %s details without credential, region, save or delete controls', id => {
+  render(<CloudModelDialog id={id} onClose={() => undefined} />)
+  expect(screen.getByRole('dialog')).toBeInTheDocument()
+  expect(screen.queryByLabelText('API 密钥')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('区域')).not.toBeInTheDocument()
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '保存' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '删除模型' })).not.toBeInTheDocument()
+})
 
 it('manages OCR model details and deletion within model management', () => {
   stores.models.setState({ resources: [{
@@ -56,26 +64,27 @@ it('shows the synthesis default and initializes its voice from discovered metada
     onChanged: () => () => undefined,
   } } as unknown as NolaBridge)
   render(<ModelsPage />)
-  const summary = screen.getByText('默认 TTS 模型').closest('[data-slot="card"]')!
-  expect(within(summary as HTMLElement).getByText('Installed synthesis')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
+  expect(section('TTS 模型').getByText('Installed synthesis')).toBeInTheDocument()
+  expect(screen.queryByText('默认 TTS 模型')).not.toBeInTheDocument()
   await waitFor(() => expect(update).toHaveBeenCalledExactlyOnceWith({ synthesis: { voice: 'Discovered voice' } }))
 })
 
 it('groups remote and local cards by capability with icons inside their headers', () => {
   render(<ModelsPage />)
-  const recognition = section('ASR模型')
+  const recognition = section('ASR 模型')
   expect(recognition.getByText('MiniMax 语音识别')).toBeInTheDocument()
-  expect(recognition.getByText('阿里云ASR')).toBeInTheDocument()
+  expect(recognition.getByText('阿里云 ASR')).toBeInTheDocument()
   const local = recognition.getByText('SenseVoiceSmall').closest('[data-slot="card"]')!
   expect(within(local as HTMLElement).getByText('本地模型')).toBeInTheDocument()
   expect(within(local as HTMLElement).getByRole('button', { name: '开始配置' })).toBeInTheDocument()
-  const aliyunAsr = recognition.getByText('阿里云ASR').closest('[data-slot="card"]')!
-  expect(within(aliyunAsr as HTMLElement).getByRole('button', { name: '配置阿里云ASR' })).toBeInTheDocument()
-  const translation = section('MT模型')
+  const aliyunAsr = recognition.getByText('阿里云 ASR').closest('[data-slot="card"]')!
+  expect(within(aliyunAsr as HTMLElement).getByRole('button', { name: '配置阿里云 ASR' })).toBeInTheDocument()
+  const translation = section('MT 模型')
   const card = translation.getByText('MyMemory 免费翻译').closest('[data-slot="card"]')!
   expect(card.querySelector('[data-slot="card-header"] [data-slot="card-action"] svg')).not.toBeNull()
   expect(within(card as HTMLElement).getByRole('button', { name: '开始配置' })).toBeInTheDocument()
-  const speech = section('S2S模型')
+  const speech = section('S2S 模型')
   expect(speech.getByText('阿里云 S2S')).toBeInTheDocument()
   expect(speech.getAllByRole('button', { name: '开始配置' })).toHaveLength(1)
   expect(recognition.queryByText('阿里云 S2S')).not.toBeInTheDocument()
@@ -83,29 +92,33 @@ it('groups remote and local cards by capability with icons inside their headers'
   expect(screen.queryByRole('heading', { name: '云端模型' })).not.toBeInTheDocument()
 })
 
-it('shows both free services in installed with no local downloads or active cloud selection', () => {
+it('shows all four free services in installed with no local downloads or cloud selection', () => {
   stores.models.setState({ resources: [] })
   render(<ModelsPage />)
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
-  const translation = section('MT模型')
+  const translation = section('MT 模型')
   expect(translation.getByText('MyMemory 免费翻译')).toBeInTheDocument()
-  expect(translation.getByText('Index Translate 免费API')).toBeInTheDocument()
-  expect(translation.getAllByText('免费')).toHaveLength(2)
-  expect(translation.getAllByText('云端模型')).toHaveLength(2)
+  expect(translation.getByText('Index Translate 免费 API')).toBeInTheDocument()
+  expect(translation.getByText('Google 翻译')).toBeInTheDocument()
+  expect(translation.getByText('Microsoft Translator')).toBeInTheDocument()
+  expect(translation.getAllByText('免费')).toHaveLength(4)
+  expect(translation.getAllByText('云端模型')).toHaveLength(4)
   expect(translation.queryByText('未安装')).not.toBeInTheDocument()
 })
 
-it('shows the active cloud translation capsule and the provider logo in the overview', () => {
+it('shows a configured free translation provider without the removed default capsule', () => {
   stores.models.setState({ resources: [] })
   stores.settings.setState({ settings: {
     ...DEFAULT_SETTINGS,
     translation: { ...DEFAULT_SETTINGS.translation, provider: 'index-translate', targetLanguage: 'en' },
   } })
   render(<ModelsPage />)
-  const card = screen.getByText('默认 MT 模型').closest('[data-slot="card"]')!
-  expect(within(card as HTMLElement).getByText('已启用')).toBeInTheDocument()
-  expect(card.querySelector('[data-cloud-model="index-translate"] svg')).not.toBeNull()
-  expect(within(card as HTMLElement).getByRole('button', { name: '更改' })).toBeInTheDocument()
+  const card = section('MT 模型').getByText('Index Translate 免费 API').closest('[data-slot="card"]')!
+  expect(within(card as HTMLElement).getByText('已安装')).toBeInTheDocument()
+  expect(card.getAttribute('data-cloud-model')).toBe('index-translate')
+  expect(card.querySelector('svg')).not.toBeNull()
+  expect(within(card as HTMLElement).getByRole('button', { name: '开始配置' })).toBeInTheDocument()
+  expect(screen.queryByText('默认 MT 模型')).not.toBeInTheDocument()
 })
 
 it('keeps configured inactive providers installed and excludes providers missing credentials', () => {
@@ -113,16 +126,16 @@ it('keeps configured inactive providers installed and excludes providers missing
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, aliyunWorkspaceId: 'workspace' } } })
   render(<ModelsPage />)
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
-  expect(section('MT模型').getByText('Google 翻译')).toBeInTheDocument()
-  expect(section('ASR模型').getByText('阿里云ASR')).toBeInTheDocument()
-  expect(section('S2S模型').getByText('阿里云 S2S')).toBeInTheDocument()
+  expect(section('MT 模型').getByText('Google 翻译')).toBeInTheDocument()
+  expect(section('ASR 模型').getByText('阿里云 ASR')).toBeInTheDocument()
+  expect(section('S2S 模型').getByText('阿里云 S2S')).toBeInTheDocument()
   expect(screen.queryByText('MiniMax 语音识别')).not.toBeInTheDocument()
 })
 
 it('configures MiMo as a cloud speech synthesis model with its own credential', async () => {
   const credential = vi.spyOn(actions.models, 'setTranslationCredential').mockResolvedValue()
   render(<ModelsPage />)
-  const card = section('TTS模型').getByText('MiMo V2.5 TTS').closest<HTMLElement>('[data-slot="card"]')!
+  const card = section('TTS 模型').getByText('MiMo V2.5 TTS').closest<HTMLElement>('[data-slot="card"]')!
   fireEvent.click(within(card).getByRole('button', { name: '开始配置' }))
   const dialog = within(screen.getByRole('dialog', { name: 'MiMo V2.5 TTS' }))
   expect(dialog.getByRole('button', { name: '保存配置' })).toBeDisabled()
@@ -131,34 +144,27 @@ it('configures MiMo as a cloud speech synthesis model with its own credential', 
   await waitFor(() => expect(credential).toHaveBeenCalledExactlyOnceWith('mimo-tts', 'test-mimo-key'))
 })
 
-it('sets configured MiMo as the default and selects it for quick interpretation', async () => {
+it('keeps MiMo configuration separate from the selected speech model', async () => {
+  const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
+  const credential = vi.spyOn(actions.models, 'setTranslationCredential').mockResolvedValue()
   stores.models.setState({ credentials: { ...initialModels.credentials, 'mimo-tts': true } })
-  const settings = stores.settings.getState().settings!
-  stores.settings.setState({ settings: { ...settings, realtime: { ...settings.realtime, quickS2sModel: null } } })
-  const update = vi.spyOn(settingsActions, 'updateSettings').mockImplementation(async patch => {
-    const current = stores.settings.getState().settings!
-    stores.settings.setState({ settings: { ...current, modelPolicy: mergeModelPolicy(current, patch.modelPolicy),
-      synthesis: { ...current.synthesis, ...patch.synthesis }, realtime: { ...current.realtime, ...patch.realtime } } })
-  })
-  const { unmount } = render(<ModelsPage />)
+  render(<ModelsPage />)
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
-  const card = section('TTS模型').getByText('MiMo V2.5 TTS').closest<HTMLElement>('[data-slot="card"]')!
-  fireEvent.click(within(card).getByRole('button', { name: '设为默认' }))
-  await waitFor(() => expect(within(card).getByRole('button', { name: '当前使用' })).toBeDisabled())
-  expect(update).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ synthesis: { modelId: MIMO_TTS_BINDING, voice: '' }, realtime: { outputMode: 'speech' } }))
-  expect(screen.getByText('默认 TTS 模型').closest('[data-slot="card"]')).toHaveTextContent('MiMo V2.5 TTS')
-  unmount()
-  render(<OverlayPage />)
-  expect(screen.getByRole('combobox', { name: '语音合成模型' })).toHaveTextContent('MiMo V2.5 TTS')
-  expect(screen.getByRole('combobox', { name: '输出设备' })).toBeEnabled()
+  const card = section('TTS 模型').getByText('MiMo V2.5 TTS').closest<HTMLElement>('[data-slot="card"]')!
+  expect(within(card).queryByRole('button', { name: '设为默认' })).not.toBeInTheDocument()
+  fireEvent.click(within(card).getByRole('button', { name: '查看详情' }))
+  fireEvent.change(screen.getByLabelText('API 密钥', { selector: 'input' }), { target: { value: 'replacement-key' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存配置' }))
+  await waitFor(() => expect(credential).toHaveBeenCalledExactlyOnceWith('mimo-tts', 'replacement-key'))
+  expect(update).not.toHaveBeenCalled()
 })
 
-it.each(['保存配置', '设为默认'])('persists the selected S2S model with %s without changing the ASR or MT selection', async (action) => {
+it.each(['保存配置'])('persists the selected S2S model with %s without changing the ASR or MT selection', async (action) => {
   const user = userEvent.setup()
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
   const credential = vi.spyOn(actions.models, 'setTranslationCredential').mockResolvedValue()
   render(<ModelsPage />)
-  fireEvent.click(section('S2S模型').getByRole('button', { name: '开始配置' }))
+  fireEvent.click(section('S2S 模型').getByRole('button', { name: '开始配置' }))
   const dialog = within(screen.getByRole('dialog', { name: '阿里云 S2S' }))
   const model = dialog.getByRole('combobox', { name: '模型' })
   expect(model).toHaveTextContent('qwen3.8-livetranslate-flash-realtime')
@@ -179,9 +185,9 @@ it.each(['保存配置', '设为默认'])('persists the selected S2S model with 
   expect(credential).toHaveBeenCalledExactlyOnceWith('aliyun-asr', 's2s-key')
 })
 
-it('requires credentials for paid services even if selected, and supports keyless Ollama', () => {
+it('keeps Google and Microsoft free and ready without credentials, and supports keyless Ollama', () => {
   const selected = { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'google' as const } }
-  expect(cloudModelsOf(selected, initialModels.credentials).find(model => model.id === 'google')).toMatchObject({ ready: false, active: true })
+  for (const id of ['google', 'microsoft']) expect(cloudModelsOf(selected, initialModels.credentials).find(model => model.id === id)).toMatchObject({ ready: true, free: true })
   const ollama = { ...selected, translation: { ...selected.translation, cloudApiFormat: 'ollama' as const, cloudEndpoint: 'http://127.0.0.1:11434', cloudModel: 'qwen3:4b' } }
   expect(cloudModelsOf(ollama, initialModels.credentials).find(model => model.id === 'custom:legacy')?.ready).toBe(true)
 })
@@ -197,7 +203,7 @@ it('keeps free services available when the local catalog fails', () => {
   stores.models.setState({ resources: [], loaded: false, loading: false, error: 'catalog unavailable' })
   render(<ModelsPage />)
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
-  expect(section('MT模型').getAllByText('免费')).toHaveLength(2)
+  expect(section('MT 模型').getAllByText('免费')).toHaveLength(4)
   expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument()
 })
 
@@ -206,7 +212,7 @@ it('opens credential configuration without enabling an unconfigured provider', (
   expect(screen.getByLabelText('API 密钥', { selector: 'input' })).toHaveAttribute('type', 'password')
   expect(screen.queryByRole('button', { name: '检查密钥' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '删除密钥' })).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '设为默认' })).toBeDisabled()
+  expect(screen.queryByRole('button', { name: '设为默认' })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: '保存配置' })).toBeDisabled()
   expect(screen.queryByText('请先完成模型配置，再将它设为默认模型。')).not.toBeInTheDocument()
 })
@@ -228,27 +234,25 @@ it('saves an Aliyun connection explicitly without selecting it as the default', 
   expect(close).toHaveBeenCalledOnce()
 })
 
-it('sets the legacy native translation default without changing the selected scene', async () => {
+it('does not change scene selection from legacy native translation configuration', () => {
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
   stores.models.setState({ credentials: { ...initialModels.credentials, 'aliyun-asr': true } })
   stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, recognition: { ...DEFAULT_SETTINGS.recognition, aliyunWorkspaceId: 'workspace', aliyunModel: 'qwen3.8-livetranslate-flash-realtime', provider: 'minimax' }, translation: { ...DEFAULT_SETTINGS.translation, targetLanguage: 'none' } } })
   render(<CloudModelDialog id="recognition" onClose={() => undefined} />)
-  fireEvent.click(screen.getByRole('button', { name: '设为默认' }))
-  await waitFor(() => expect(update).toHaveBeenCalledWith(expect.objectContaining({
-    modelPolicy: expect.objectContaining({ defaults: expect.objectContaining({ mt: 'cloud:recognition' }), enabled: expect.objectContaining({ 'mt:cloud:recognition': true }), selections: expect.objectContaining({ asr: 'cloud:minimax' }) }),
-  })))
-  expect(update.mock.calls[0][0]).not.toHaveProperty('recognition')
-  expect(update.mock.calls[0][0]).not.toHaveProperty('translation')
+  expect(screen.queryByRole('button', { name: '设为默认' })).not.toBeInTheDocument()
+  expect(update).not.toHaveBeenCalled()
 })
 
-it('sets the MiniMax recognition default without retiring the selected native translation', async () => {
+it('saves MiniMax credentials without retiring the selected local model', async () => {
   const update = vi.spyOn(settingsActions, 'updateSettings').mockResolvedValue()
-  stores.models.setState({ credentials: { ...initialModels.credentials, 'minimax-asr': true } })
-  stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, translation: { ...DEFAULT_SETTINGS.translation, provider: 'recognition' } } })
+  const credential = vi.spyOn(actions.models, 'setTranslationCredential').mockResolvedValue()
   render(<CloudModelDialog id="minimax" onClose={() => undefined} />)
-  fireEvent.click(screen.getByRole('button', { name: '设为默认' }))
-  await waitFor(() => expect(update).toHaveBeenCalledWith({ modelPolicy: expect.objectContaining({ defaults: expect.objectContaining({ asr: 'cloud:minimax' }), enabled: expect.objectContaining({ 'asr:cloud:minimax': true }), selections: expect.objectContaining({ mt: 'cloud:recognition' }) }) }))
+  fireEvent.change(screen.getByLabelText('API 密钥', { selector: 'input' }), { target: { value: 'minimax-key' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存配置' }))
+  await waitFor(() => expect(credential).toHaveBeenCalledExactlyOnceWith('minimax-asr', 'minimax-key'))
+  expect(update).not.toHaveBeenCalled()
 })
+
 
 const customModel = { id: 'custom-first', name: 'First model', endpoint: 'https://example.com/v1', model: 'fast-model', apiFormat: 'chat-completions' as const, contextWindow: 32768, maxOutputTokens: 1024, languages: ['zh', 'en'] }
 
@@ -273,7 +277,8 @@ it('offers a saved custom model as the default translation model once its key is
   fireEvent.click(screen.getByRole('tab', { name: /已安装/ }))
   const card = section('大语言模型').getByText('First model').closest('[data-slot="card"]') as HTMLElement
   expect(within(card).getByText('已安装')).toBeInTheDocument()
-  expect(within(card).getByRole('button', { name: '设置为默认翻译模型' })).toBeEnabled()
+  expect(within(card).getByRole('button', { name: '查看详情' })).toBeEnabled()
+  expect(within(card).queryByRole('button', { name: '设置为默认翻译模型' })).not.toBeInTheDocument()
 })
 
 // Rendering the complete source and target language inventories needs integration-test headroom in JSDOM.

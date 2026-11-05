@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import json
 import math
 import re
@@ -20,7 +21,7 @@ from .base import ProviderTranslation, revision_context
 JsonRequester = Callable[[str, object, dict[str, str]], object]
 
 #: Default base URLs, defined in one place so the runtime dispatch cannot disagree with them.
-DEFAULT_MICROSOFT_ENDPOINT = "https://api.cognitive.microsofttranslator.com"
+DEFAULT_MICROSOFT_ENDPOINT = "https://edge.microsoft.com/translate"
 #: Versioned base: the user types the address *including* the version, and the fixed suffix
 #: (`/chat/completions`, `/responses`, `/api/chat`) is appended to it.
 DEFAULT_OPENAI_ENDPOINT = "https://api.openai.com/v1"
@@ -225,46 +226,30 @@ class MicrosoftTranslatorProvider(_NetworkTransport):
 
     def __init__(
         self,
-        api_key: str,
         *,
-        endpoint: str = DEFAULT_MICROSOFT_ENDPOINT,
-        region: str = "",
         requester: JsonRequester = _post_json,
     ) -> None:
-        if not api_key:
-            raise ValueError("Microsoft Translator API 密钥为空")
-        # Checked here rather than at request time, for the same reason the other four
-        # providers check their own endpoint: an empty address only ever builds the relative
-        # URL `/translate?…`, which surfaces as a connection error that names nothing.
-        if not endpoint:
-            raise ValueError(
-                "Microsoft Translator 接口的地址为空：请填写服务根地址，"
-                f"例如 {DEFAULT_MICROSOFT_ENDPOINT}"
-            )
-        self.api_key = api_key
-        self.endpoint = endpoint.rstrip("/")
-        self.region = region
+        self.endpoint = DEFAULT_MICROSOFT_ENDPOINT
         self.requester = requester
 
     async def translate(self, text: str, source: str, target: str) -> ProviderTranslation:
         aliases = {"zh": "zh-Hans"}
-        parameters = {"api-version": "3.0", "to": aliases.get(target, target)}
+        parameters = {"to": aliases.get(target, target), "isEnterpriseClient": "false"}
         if source != "auto":
             parameters["from"] = aliases.get(source, source)
         query = urlencode(parameters)
-        headers = {"Ocp-Apim-Subscription-Key": self.api_key}
-        if self.region:
-            headers["Ocp-Apim-Subscription-Region"] = self.region
         result = await self._request_json(
-            f"{self.endpoint}/translate?{query}",
-            [{"Text": text}],
-            headers,
+            f"{self.endpoint}/translatetext?{query}",
+            [html.escape(text, quote=False)],
+            {},
         )
         try:
             translated = result[0]["translations"][0]["text"]  # type: ignore[index]
         except (KeyError, IndexError, TypeError) as error:
             raise RuntimeError("Microsoft Translator 响应格式无效") from error
-        return ProviderTranslation(str(translated), (source, target))
+        if not isinstance(translated, str):
+            raise RuntimeError("Microsoft Translator 响应格式无效")
+        return ProviderTranslation(html.unescape(translated), (source, target))
 
 
 def _system_prompt(source: str, target: str) -> str:

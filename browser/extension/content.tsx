@@ -86,6 +86,14 @@ function install(): void {
   const actions = shadow('text-actions', 'auto')
   const actionsRoot = createRoot(actions.mount)
   let actionRevision = 0
+  let actionAnchor = { x: 0, y: 0 }
+  const positionActions = () => {
+    const rect = actions.mount.getBoundingClientRect()
+    actions.host.style.left = `${Math.max(0, Math.min(actionAnchor.x, innerWidth - rect.width))}px`
+    actions.host.style.top = `${Math.max(0, Math.min(actionAnchor.y, innerHeight - rect.height))}px`
+  }
+  const actionsResize = new ResizeObserver(positionActions)
+  actionsResize.observe(actions.mount)
   const closeActions = () => { actions.host.hidden = true; actionsRoot.render(null) }
   const showActions = (target?: HTMLElement, autoTranslate = false, autoSpeak = false) => {
     if (!siteEnabled(preferences, location.href)) return
@@ -96,8 +104,8 @@ function install(): void {
     const rect = target?.getBoundingClientRect() ?? (current?.rangeCount ? current.getRangeAt(0).getBoundingClientRect() : undefined)
     const selection: TextActionState = { text, target, x: rect?.left ?? 0, y: rect?.bottom ?? 0, autoTranslate, autoSpeak }
     actions.host.hidden = false
-    actions.host.style.left = `${Math.max(0, Math.min(selection.x, innerWidth - 360))}px`
-    actions.host.style.top = `${Math.max(0, Math.min(selection.y, innerHeight - 200))}px`
+    actionAnchor = { x: selection.x, y: selection.y }
+    positionActions()
     actions.host.style.maxWidth = '100vw'
     actionsRoot.render(<TextActions key={++actionRevision} selection={selection} preferences={preferences} dismiss={closeActions} />)
   }
@@ -106,7 +114,7 @@ function install(): void {
     if (preferences.selectionTranslation && !editableTarget(event.target instanceof Element ? event.target : null)) showActions()
   }
   const onKey = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') { closeActions(); return }
+    if (event.key === 'Escape') { closeActions(); store.closePanel(); return }
     if (event.repeat || event.isComposing || !siteEnabled(preferences, location.href)) { inputTrigger(event); return }
     const target = editableTarget(document.activeElement)
     if (preferences.inputTranslation && preferences.inputTrigger === 'tripleSpace' && inputTrigger(event, target ?? undefined)) { event.preventDefault(); showActions(target!, true); return }
@@ -120,11 +128,29 @@ function install(): void {
   window.addEventListener('pointerover', hoverPage)
   window.addEventListener('pointerup', onSelection)
   window.addEventListener('keydown', onKey)
+  const onOutsidePress = (event: PointerEvent) => {
+    const path = event.composedPath()
+    if (store.getSnapshot().panelOpen && !path.includes(panel.host) && !path.includes(trigger.host)) store.closePanel()
+    if (!path.includes(actions.host)) closeActions()
+  }
+  window.addEventListener('pointerdown', onOutsidePress)
   const nativeCueStyles = document.createElement('style')
   nativeCueStyles.dataset.nolaCaptionStyles = 'true'
   ;(document.head ?? document.documentElement).append(nativeCueStyles)
   const triggerRoot = createRoot(trigger.mount)
   const panelRoot = createRoot(panel.mount)
+  const positionPanel = () => {
+    const video = store.getSnapshot().selectedVideo
+    if (!video) return
+    const rect = video.getBoundingClientRect()
+    const box = panel.mount.getBoundingClientRect()
+    const spacing = Number.parseFloat(getComputedStyle(panel.host).getPropertyValue('--space-1')) || 8
+    const adapter = playerAdapter(video)
+    panel.host.style.left = `${Math.max(spacing, Math.min(innerWidth - box.width - spacing, rect.right - box.width))}px`
+    panel.host.style.top = `${Math.max(spacing, Math.min(innerHeight - box.height - spacing, rect.bottom - visibleControlReserve(adapter.controlBar, adapter.container, rect) - box.height - spacing))}px`
+  }
+  const panelResize = new ResizeObserver(positionPanel)
+  panelResize.observe(panel.mount)
   const caption = document.createElement('div'); caption.className = 'nola-caption'; caption.setAttribute('aria-live', 'polite'); overlay.mount.append(caption)
   const nativeTrack = new NativeCaptionTrack()
   const overlayHoverPause = new SubtitleHoverPause()
@@ -275,7 +301,7 @@ function install(): void {
     floating.host.style.left = preferences.floatingSide === 'left' ? '0px' : ''
     floating.host.style.right = preferences.floatingSide === 'right' ? '0px' : ''
     floating.host.style.top = `${Math.max(48, Math.min(innerHeight - 96, innerHeight * preferences.floatingPosition))}px`
-    floatingRoot.render(<FloatingControls preferences={preferences} active={page.state().pageActive} error={page.state().pageError} onTranslate={() => { if (siteEnabled(preferences, location.href)) page.start(); refresh() }} onRestore={() => { page.stop(); refresh() }} onPosition={(position, commit) => { preferences = { ...preferences, ...position }; if (commit) void savePreferences(position); refresh() }} onLock={() => { void savePreferences({ floatingLocked: !preferences.floatingLocked }) }} onHide={scope => {
+    floatingRoot.render(floating.host.hidden ? null : <FloatingControls preferences={preferences} active={page.state().pageActive} error={page.state().pageError} onTranslate={() => { if (siteEnabled(preferences, location.href)) page.start(); refresh() }} onRestore={() => { page.stop(); refresh() }} onPosition={(position, commit) => { preferences = { ...preferences, ...position }; if (commit) void savePreferences(position); refresh() }} onLock={() => { void savePreferences({ floatingLocked: !preferences.floatingLocked }) }} onHide={scope => {
       if (scope === 'page') floatingHiddenPage = true
       else if (scope === 'site') void savePreferences({ floatingDisabledSites: [...preferences.floatingDisabledSites, location.origin] })
       else void savePreferences({ floatingButton: false })
@@ -302,7 +328,6 @@ function install(): void {
     const theme = getComputedStyle(panel.host)
     const token = (name: string): number => Number.parseFloat(theme.getPropertyValue(name)) || 0
     const spacing = token('--space-1')
-    const panelWidth = Math.min(token('--browser-panel-width'), innerWidth - token('--space-3'))
     if (!adapter.controls) { trigger.host.style.left = `${Math.max(0, rect.right - trigger.host.getBoundingClientRect().width - token('--space-2'))}px`; trigger.host.style.top = `${rect.top + spacing}px` }
     trigger.host.hidden = fullscreen === video || rect.width < 160
     // A failed session clears the caption block, so the trigger is the only place left that can
@@ -311,14 +336,14 @@ function install(): void {
     const triggerLabel = failure ? `${t('button')} — ${failure}` : t('button')
     // The native hover tooltip rides on the trigger host.
     trigger.host.title = triggerLabel
-    triggerRoot.render(<Button size="icon-sm" variant="secondary" className={failure ? 'nola-trigger-error' : undefined} aria-label={triggerLabel} aria-expanded={state.panelOpen} onClick={store.togglePanel}><NolaLogo /></Button>)
+    const subtitleVisible = subtitles.state().active || state.status === 'active'
+    triggerRoot.render(<Button size="icon-sm" variant="bare" aria-label={triggerLabel} aria-expanded={state.panelOpen} onClick={store.togglePanel}><NolaLogo /><span className="nola-trigger-state" data-active={subtitleVisible}>{t(subtitleVisible ? 'subtitleOn' : 'subtitleOff')}</span></Button>)
     const controls = adapter.controls
     if (controls) requestAnimationFrame(() => {
       if (!trigger.host.hidden && trigger.host.parentElement === controls) alignPlayerTrigger(controls, trigger.host)
     })
     panel.host.hidden = !state.panelOpen || fullscreen === video
-    panel.host.style.left = `${Math.max(spacing, Math.min(innerWidth - panelWidth - spacing, rect.right - panelWidth))}px`
-    panel.host.style.top = `${Math.max(spacing, Math.min(innerHeight - panel.mount.getBoundingClientRect().height - spacing, rect.top + token('--space-6')))}px`
+    positionPanel()
     panelRoot.render(<Panel store={store} subtitles={subtitles.state()} toggleSubtitles={toggleSubtitles} selectTrack={id => { void subtitles.start(id) }} subtitleController={subtitles} />)
     overlay.host.style.left = `${rect.left + rect.width * 0.08}px`
     overlay.host.style.width = `${rect.width * 0.84}px`
@@ -512,11 +537,11 @@ function install(): void {
     // Browser API objects can already be invalid during an extension replacement.
     // Each release must run even if another one can no longer reach the old context.
     for (const release of [
-      () => { mutation.disconnect(); resize.disconnect(); clearInterval(interval); nativeTrack.restore(); unsubscribe() },
+      () => { mutation.disconnect(); resize.disconnect(); actionsResize.disconnect(); panelResize.disconnect(); clearInterval(interval); nativeTrack.restore(); unsubscribe() },
       () => unobservePreferences(),
       () => { colorScheme.removeEventListener('change', refresh); chrome.runtime.onMessage.removeListener(onCommand) },
       () => { for (const name of playerEvents) window.removeEventListener(name, refresh, true) },
-      () => { window.removeEventListener('pointerover', hoverPage); window.removeEventListener('pointerup', onSelection); window.removeEventListener('keydown', onKey); window.removeEventListener('pagehide', destroy) },
+      () => { window.removeEventListener('pointerdown', onOutsidePress); window.removeEventListener('pointerover', hoverPage); window.removeEventListener('pointerup', onSelection); window.removeEventListener('keydown', onKey); window.removeEventListener('pagehide', destroy) },
       () => contextController?.abort(),
       () => { overlayHoverPause.leave(); nativeHoverPause.leave(); caption.removeEventListener('pointerenter', hoverEnter); caption.removeEventListener('pointerleave', hoverLeave); window.removeEventListener('pointermove', nativeHover, true) },
       () => { closeActions(); actionsRoot.unmount(); floatingRoot.unmount() },

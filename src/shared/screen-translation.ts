@@ -1,6 +1,9 @@
 import { z } from 'zod'
 import type { ResourceRecord } from './contracts'
 import { isSupportedShortcut } from './keyboard-shortcuts'
+import type { AppSettings } from './settings'
+import { defaultModelBinding } from './model-policy'
+import { normalizeModelBinding } from './model-gateway'
 
 export const MAX_SCREEN_REGIONS = 64
 
@@ -26,6 +29,7 @@ export const screenConfigSchema = z.object({
   reviewRequired: z.boolean().default(false),
   sourceLanguage: z.string().min(1).max(32).regex(/^[a-zA-Z][a-zA-Z0-9-]*$/).default('auto'),
   targetLanguage: z.string().min(1).max(32).default('zh'), model: z.string().max(512).default(''),
+  processingMode: z.enum(['default', 'cascade']).optional(),
   intervalMs: z.number().int().min(250).max(3000).default(600),
   fontSize: z.union([z.literal(0), z.number().int().min(12).max(36)]).default(0), opacity: z.number().min(0.35).max(1).default(1),
   showSource: z.boolean().default(false),
@@ -37,6 +41,14 @@ export const screenConfigSchema = z.object({
     up: editorBinding, down: editorBinding, fastLeft: editorBinding, fastRight: editorBinding, fastUp: editorBinding, fastDown: editorBinding }).optional(),
 })
 export type ScreenConfig = z.infer<typeof screenConfigSchema>
+export function screenProcessingMode(config: ScreenConfig): 'default' | 'cascade' {
+  return config.processingMode ?? 'default'
+}
+export function screenTranslationModel(config: ScreenConfig, settings: AppSettings): string {
+  return screenProcessingMode(config) === 'default'
+    ? normalizeModelBinding('mt', settings.modelGateway.mtModel) || defaultModelBinding(settings, 'mt')
+    : config.model
+}
 export const screenShortcutsSchema = screenConfigSchema.pick({ toggleShortcut: true, editShortcut: true, stopShortcut: true, showRegionsShortcut: true, editorShortcuts: true })
 export type ScreenShortcuts = z.input<typeof screenShortcutsSchema>
 export interface ScreenSource { id: string; name: string; kind: 'screen' | 'window'; preview: string }
@@ -48,7 +60,7 @@ export interface ScreenTextBlock {
   status: 'stabilizing' | 'translating' | 'ready' | 'error'
 }
 export type ScreenStatus = 'ready' | 'starting' | 'running' | 'paused' | 'waiting' | 'editing' | 'error'
-export type ScreenError = 'captureFailed' | 'targetUnavailable' | 'targetChanged' | 'ocrFailed' | 'ocrMissing' | 'ocrNotReady' | 'ocrCorrupt' | 'ocrRuntimeUnavailable' | 'translationFailed' | 'shortcutConflict' | 'invalidConfig' | 'backendUnavailable'
+export type ScreenError = 'captureFailed' | 'targetUnavailable' | 'targetChanged' | 'ocrFailed' | 'ocrMissing' | 'ocrNotReady' | 'ocrCorrupt' | 'ocrRuntimeUnavailable' | 'translationFailed' | 'shortcutConflict' | 'invalidConfig' | 'backendUnavailable' | 's2sUnsupported' | 'gatewayNotReady' | 'translationModelMissing' | 'translationModelNotReady' | 'regionsMissing' | 'sameLanguage'
 export interface ScreenOcrStatus { installed: boolean; state: string; progress?: number; error?: string; languages?: string[]; resource?: ResourceRecord }
 export const screenAppearanceSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/), background: z.string().regex(/^#[0-9a-fA-F]{6}$/),
@@ -56,14 +68,14 @@ export const screenAppearanceSchema = z.object({
     x: z.number().min(0).max(1), y: z.number().min(0).max(1), width: z.number().positive().max(1), height: z.number().positive().max(1) })).max(256),
 })
 export type ScreenAppearance = z.infer<typeof screenAppearanceSchema>
-export interface ScreenOcrRequest { image: string; language: string; appearance?: boolean }
+export interface ScreenOcrRequest { image: string; language: string; appearance?: boolean; taskMode?: 'realtime' | 'offline' }
 export interface ScreenOcrResult {
   width: number; height: number;
   blocks: Array<{ id: string; text: string; confidence: number; quad: Array<[number, number]>; appearance?: ScreenAppearance }>
 }
 export interface ScreenSnapshot {
   status: ScreenStatus; config: ScreenConfig; sessionId: string; epoch: number;
-  blocks: ScreenTextBlock[]; error?: ScreenError; shortcutError: boolean;
+  blocks: ScreenTextBlock[]; error?: ScreenError; errorId?: string; shortcutError: boolean;
   frames: number; ocrMs: number; translationMs: number;
   presets?: ScreenRegionPreset[]; regionsVisible?: boolean;
 }

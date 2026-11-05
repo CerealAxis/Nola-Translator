@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { Popup } from './popup'
@@ -9,7 +9,7 @@ let settings = { ...DEFAULT_PREFERENCES }
 vi.mock('./preferences', async original => ({ ...await original<typeof import('./preferences')>(), savePreferences: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('./settings-fields', async original => ({ ...await original<typeof import('./settings-fields')>(), usePreferences: () => [settings, 'en', browserText('en')], ConnectionStatus: () => <p>Nola diagnostic status</p> }))
 vi.mock('./providers', async original => { const actual = await original<typeof import('./providers')>(); return { ...actual, loadProviders: vi.fn().mockResolvedValue(actual.DEFAULT_PROVIDERS), requestProviderAccess: vi.fn().mockResolvedValue(true) } })
-beforeEach(() => { vi.clearAllMocks(); settings = { ...DEFAULT_PREFERENCES }; vi.stubGlobal('chrome', { storage: { onChanged: { addListener: vi.fn(), removeListener: vi.fn() } }, runtime: { getManifest: () => ({ version: '2.0.0' }), openOptionsPage: vi.fn() } }) })
+beforeEach(() => { vi.clearAllMocks(); settings = { ...DEFAULT_PREFERENCES }; vi.stubGlobal('chrome', { storage: { onChanged: { addListener: vi.fn(), removeListener: vi.fn() } }, runtime: { getManifest: () => ({ version: '2.0.0' }), openOptionsPage: vi.fn().mockResolvedValue(undefined) } }) })
 function store(error?: string, video = false) { const state = { enabled: true, pending: false, origin: 'https://example.com', url: 'https://example.com/article', video, error, pageError: error }; return { getSnapshot: () => state, subscribe: () => () => {}, enable: vi.fn(), send: vi.fn().mockResolvedValue(undefined) } as unknown as ReturnType<typeof createPopupStore> }
 it('keeps translation controls usable without an initial native-connection error', async () => {
   render(<Popup store={store()} />)
@@ -57,4 +57,32 @@ it('retains languages and provider configuration on a restricted page', async ()
   expect(screen.getByRole('button', { name: 'API connections' })).toBeEnabled()
   expect(screen.getByRole('button', { name: 'Enable on this website' })).toBeDisabled()
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+it('swaps explicit languages together and leaves automatic detection out of the target', async () => {
+  const user = userEvent.setup(); const rendered = render(<Popup store={store()} />)
+  expect(screen.getByRole('button', { name: browserText('en')('swapLanguages') })).toBeDisabled()
+  settings = { ...settings, sourceLanguage: 'en', pageLanguage: 'zh' }
+  rendered.rerender(<Popup store={store()} />)
+  await user.click(screen.getByRole('button', { name: browserText('en')('swapLanguages') }))
+  expect(savePreferences).toHaveBeenCalledWith({ sourceLanguage: 'zh', pageLanguage: 'en' })
+})
+it('keeps the popup height stable and dismisses More with Escape', async () => {
+  const user = userEvent.setup(); render(<Popup store={store()} />)
+  await user.click(screen.getByRole('button', { name: 'More' }))
+  expect(screen.getByRole('button', { name: 'Keyboard shortcuts' })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'More' })).toHaveAttribute('aria-expanded', 'true')
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(screen.getByRole('button', { name: 'More' })).toHaveAttribute('aria-expanded', 'false'))
+})
+it('reports a failed preference save instead of swallowing it', async () => {
+  const user = userEvent.setup(); render(<Popup store={store()} />)
+  vi.mocked(savePreferences).mockRejectedValueOnce(new Error('write failed'))
+  await user.click(screen.getByRole('switch', { name: 'Disable on this website' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent(browserText('en')('internalError'))
+})
+it('disables video actions until website access has been enabled', async () => {
+  const value = store(undefined, true); const state = { enabled: false, pending: false, video: true, origin: 'https://example.com', url: 'https://example.com/article' }; value.getSnapshot = () => state
+  render(<Popup store={value} />)
+  expect(screen.getByRole('button', { name: browserText('en')('translateSubtitles') })).toBeDisabled()
+  expect(screen.getByRole('button', { name: browserText('en')('live') })).toBeDisabled()
 })

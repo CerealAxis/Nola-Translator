@@ -26,7 +26,6 @@
   .nola-workspace-picker > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
   .nola-workspace-picker:disabled { opacity: .65; }
   .nola-workspace-overlay { height: var(--field-control-height); min-width: 0; border: 1px solid var(--accent); border-radius: var(--radius-xl); color: var(--accent); font: var(--font-body); }
-  .nola-workspace-languages { display: flex; flex-direction: column; gap: var(--space-1); width: calc(var(--space-8) * 4); max-width: calc(100vi - var(--space-4)); max-height: var(--available-height); overflow-y: auto; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--overlay); color: var(--overlay-foreground); box-shadow: var(--overlay-shadow); outline: none; }
   .nola-workspace-view-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 20px; padding-top: 14px; }
   /* The TabsList supplies the shared segmented track and selection state. */
   .nola-workspace-font-control { display: flex; align-items: center; gap: 12px; font-size: 13px; }

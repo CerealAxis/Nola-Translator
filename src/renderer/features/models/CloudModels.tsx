@@ -137,7 +137,7 @@ function FixedCloudModelDialog({ id, onClose }: FixedCloudModelDialogProps) {
   const recognition = { ...settings.recognition, ...draft.recognition }
   const translation = { ...settings.translation, ...draft.translation, fallback: { ...settings.translation.fallback, ...draft.translation?.fallback } }
   const mimo = id === MIMO_TTS_MODEL
-  const slot: CredentialProvider | null = mimo ? 'mimo-tts' : s2s || id === 'aliyun' || id === 'recognition' ? 'aliyun-asr' : id === 'minimax' ? 'minimax-asr' : id === 'microsoft' || id === 'google' ? id : null
+  const slot: CredentialProvider | null = mimo ? 'mimo-tts' : s2s || id === 'aliyun' || id === 'recognition' ? 'aliyun-asr' : id === 'minimax' ? 'minimax-asr' : null
   const stored = slot ? !!credentials[slot] : false
   const draftCredentials = slot ? { ...credentials, [slot]: stored || !!key.trim() } : credentials
   const model = cloudModelsOf({ ...settings, recognition, translation }, draftCredentials).find(model => model.id === (s2s ? 'aliyun' : id))
@@ -202,18 +202,15 @@ function FixedCloudModelDialog({ id, onClose }: FixedCloudModelDialogProps) {
           : id === 'minimax' ? <><CloudRecognitionLanguageSupport codes={remoteSourceLanguages(recognition)} /><MiniMaxConnection recognition={recognition} stored={stored} onUpdate={edit} credentialField={credentialField} showNotice={false} /></>
           : id === 'microsoft' ? <>
             <CloudLanguageSupport sourceCodes={SOURCE_LANGUAGE_OPTIONS} targetCodes={LANGUAGE_CODES} />
-            <TextRow label={t('settings.endpoint')} value={translation.microsoftEndpoint} onCommit={microsoftEndpoint => { void edit({ translation: { microsoftEndpoint: microsoftEndpoint.trim() } }) }} />
-            <TextRow label={t('settings.region')} value={translation.microsoftRegion} onCommit={microsoftRegion => { void edit({ translation: { microsoftRegion: microsoftRegion.trim() } }) }} />
-            {credentialField}
+            <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{DEFAULT_SETTINGS.translation.microsoftEndpoint}/translatetext</span></SettingsRow>
           </> : id === 'mymemory' ? <>
-            <CloudLanguageSupport sourceCodes={SOURCE_LANGUAGE_OPTIONS} targetCodes={LANGUAGE_CODES} />
+            <CloudLanguageSupport sourceCodes={LANGUAGE_CODES} targetCodes={LANGUAGE_CODES} />
             <TextRow label={t('settings.endpoint')} value={translation.mymemoryEndpoint ?? DEFAULT_SETTINGS.translation.mymemoryEndpoint!} onCommit={mymemoryEndpoint => { void edit({ translation: { mymemoryEndpoint: mymemoryEndpoint.trim() } }) }} />
           </> : id === 'google' ? <>
             <CloudLanguageSupport sourceCodes={SOURCE_LANGUAGE_OPTIONS} targetCodes={LANGUAGE_CODES} />
             <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{GOOGLE_TRANSLATE_ENDPOINT}</span></SettingsRow>
-            {credentialField}
           </> : <>
-            <CloudLanguageSupport sourceCodes={INDEX_TRANSLATE_LANGUAGES} targetCodes={INDEX_TRANSLATE_LANGUAGES} />
+            <CloudLanguageSupport sourceCodes={['auto', ...INDEX_TRANSLATE_LANGUAGES]} targetCodes={INDEX_TRANSLATE_LANGUAGES} />
             <SettingsRow label={t('settings.model')}><span className="nola-caption">{INDEX_TRANSLATE_PUBLIC_MODEL}</span></SettingsRow>
             <SettingsRow label={t('settings.endpoint')}><span className="nola-caption text-muted">{INDEX_TRANSLATE_ENDPOINT}</span></SettingsRow>
           </>}
@@ -221,7 +218,7 @@ function FixedCloudModelDialog({ id, onClose }: FixedCloudModelDialogProps) {
       <DialogFooter>
         {canRemove ? <Button variant="danger" disabled={saving || removing} aria-busy={removing} onClick={() => void remove()}><Trash2 aria-hidden="true" />{t('modelsSettingsUi.deleteModel')}</Button> : null}
         <Button variant="secondary" disabled={saving || removing} onClick={onClose}>{t('common.close')}</Button>
-        {id !== 'index-translate' && id !== 'recognition' ? <Button variant="secondary" disabled={!canSave || saving || removing} aria-busy={saving} onClick={() => void save()}>{t('modelConfig.save')}</Button> : null}
+        {id !== 'index-translate' && id !== 'recognition' && id !== 'microsoft' && id !== 'google' ? <Button variant="secondary" disabled={!canSave || saving || removing} aria-busy={saving} onClick={() => void save()}>{t('modelConfig.save')}</Button> : null}
       </DialogFooter>
     </DialogContent>
   </Dialog>

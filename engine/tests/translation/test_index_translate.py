@@ -184,3 +184,33 @@ def test_transformers_revision_drops_optional_draft_when_context_would_overflow(
     assert 'previousTranslation' in messages[0]
     assert messages[1].endswith('\n\nHello world')
     assert 'previousTranslation' not in messages[1]
+
+
+
+def test_index_batch_preserves_official_prompt_and_decodes_every_item(tmp_path):
+    import torch
+    from types import SimpleNamespace
+    from nola_translator_engine.translation.m2m100 import _Bundle
+
+    calls = []
+    class Batch(dict):
+        def to(self, _device):
+            return self
+    class Processor:
+        tokenizer = SimpleNamespace(padding_side="right")
+        def apply_chat_template(self, messages, **kwargs):
+            calls.append(messages)
+            assert len(messages) == 2 and kwargs["padding"]
+            assert all("直接输出翻译结果" in item[0]["content"] for item in messages)
+            return Batch(input_ids=torch.zeros((2, 4), dtype=torch.long))
+        def batch_decode(self, _output, **kwargs):
+            return ["<think>hidden</think>first", "second"]
+    processor = Processor()
+    model = SimpleNamespace(config=SimpleNamespace(max_position_embeddings=2048),
+        generate=lambda **kwargs: torch.zeros((2, 6), dtype=torch.long))
+    runtime = IndexTranslateTransformersRuntime(tmp_path)
+    runtime.device = "cpu"
+    runtime._loaded = True
+    runtime._bundle = _Bundle(model=model, tokenizer=processor)
+    assert runtime.translate_batch_sync(["one", "two"], "en", "zh") == ["first", "second"]
+    assert len(calls) == 1 and processor.tokenizer.padding_side == "right"

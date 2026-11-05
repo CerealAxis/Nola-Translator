@@ -5,6 +5,7 @@ import { expect, it } from 'vitest'
 import { SettingsStore } from '../../../src/main/settings-store'
 import { settingsPatchSchema } from '../../../src/main/settings-schema'
 import { DEFAULT_SETTINGS } from '../../../src/shared/settings'
+import { gatewayConcurrency, gatewayConcurrencyMaximum } from '../../../src/shared/model-gateway'
 
 it('migrates existing profiles to tray close and independent gateway defaults', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'nola-gateway-settings-'))
@@ -46,4 +47,29 @@ it('sanitizes corrupt persisted gateway and synthesis groups on load', async () 
   expect(restored.closeBehavior).toBe('tray')
   expect(restored.modelGateway).toEqual(DEFAULT_SETTINGS.modelGateway)
   expect(restored.synthesis).toEqual(DEFAULT_SETTINGS.synthesis)
+})
+
+it('validates and persists per-capability concurrency without losing sibling limits', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'nola-gateway-concurrency-'))
+  const path = join(directory, 'settings.json')
+  const store = new SettingsStore(path)
+  await store.update({ modelGateway: { concurrency: { mt: 2, ocr: 1 } } })
+  await store.update({ modelGateway: { concurrency: { asr: 4, mt: 3 } } })
+  expect((await new SettingsStore(path).load()).modelGateway.concurrency).toEqual({ asr: 4, mt: 3, ocr: 1 })
+  for (const concurrency of [{ mt: 0 }, { mt: 17 }, { mt: 1.5 }, { mt: '2' }, { s2s: 2 }]) {
+    expect(settingsPatchSchema.safeParse({ modelGateway: { concurrency } }).success).toBe(false)
+  }
+})
+
+
+it('applies loader-specific concurrency defaults and safely reads older limits', () => {
+  expect(gatewayConcurrency('', undefined)).toBe(1)
+  expect(gatewayConcurrency('resource:model', undefined)).toBe(1)
+  expect(gatewayConcurrencyMaximum('resource:model')).toBe(5)
+  expect(gatewayConcurrency('resource:model', 16)).toBe(1)
+  expect(gatewayConcurrency('resource:model', 5)).toBe(5)
+  expect(gatewayConcurrency('resource:model', 5, { provider: 'crisp-asr' })).toBe(1)
+  expect(gatewayConcurrencyMaximum('resource:model', { provider: 'crisp-tts' })).toBe(1)
+  expect(gatewayConcurrency('cloud:provider', undefined)).toBe(10)
+  expect(gatewayConcurrency('cloud:provider', 16)).toBe(10)
 })

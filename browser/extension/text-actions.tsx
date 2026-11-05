@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
+import { Copy, Languages, MoreVertical, Undo2, Volume2, X } from 'lucide-react'
 import { Button } from '../../src/renderer/components/ui/button'
+import { Popover, PopoverTrigger } from '../../src/renderer/components/ui/popover'
+import { Spinner } from '../../src/renderer/components/ui/spinner'
 import { browserText, errorKey } from './i18n'
 import { siteEnabled, type Preferences } from './preferences'
 import { synthesize, translate as translateText } from './provider-client'
@@ -39,6 +43,8 @@ export function TextActions({ selection, preferences, dismiss }: { selection: Te
   const [result, setResult] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [more, setMore] = useState(false)
+  const [menuContainer, setMenuContainer] = useState<HTMLDivElement | null>(null)
   const [restorable, setRestorable] = useState<string>()
   const translate = async () => {
     if (!siteEnabled(preferences, location.href)) return
@@ -57,6 +63,7 @@ export function TextActions({ selection, preferences, dismiss }: { selection: Te
     setBusy(true); setError('')
     try {
       const sound = await synthesize(result || selection.text, result ? selection.target ? preferences.inputTargetLanguage : preferences.pageLanguage : selection.target ? preferences.inputSourceLanguage : preferences.sourceLanguage ?? 'auto', controller.current.signal, preferences.ttsProvider)
+      if (controller.current.signal.aborted) return
       const bytes = Uint8Array.from(atob(sound.audioBase64), value => value.charCodeAt(0))
       const url = URL.createObjectURL(new Blob([bytes], { type: sound.contentType }))
       audio.current?.pause()
@@ -72,14 +79,39 @@ export function TextActions({ selection, preferences, dismiss }: { selection: Te
   }
   useEffect(() => { if (selection.autoSpeak) void speak() }, [])
   const copy = async () => { try { await navigator.clipboard.writeText(result || selection.text) } catch { setError(t(errorKey('internalError'))) } }
-  return <section className="nola-panel" style={{ opacity: preferences.selectionOpacity }} aria-label={t(selection.target ? 'translateInput' : 'translateSelection')}>
-    <div className="flex flex-wrap gap-2">
-      {(selection.target || preferences.selectionTranslate) && <Button disabled={busy} onClick={() => void translate()}>{t(selection.target ? 'translateInput' : 'translateSelection')}</Button>}
-      {selection.target && restorable !== undefined && <Button variant="secondary" onClick={() => { if (selection.target && editableText(selection.target) === restorable) { if (originalNodes.current) { selection.target.replaceChildren(...originalNodes.current); selection.target.dispatchEvent(new Event('input', { bubbles: true })) } else replaceEditable(selection.target, selection.text) }; setRestorable(undefined) }}>{t('restoreInput')}</Button>}
-      {(selection.target || preferences.selectionCopy) && <Button variant="secondary" disabled={busy} onClick={() => void copy()}>{t('copyTranslation')}</Button>}
-      {(selection.target || preferences.selectionSpeak) && <Button variant="secondary" disabled={busy} onClick={() => void speak()}>{t('readAloud')}</Button>}
-      <Button variant="secondary" onClick={dismiss}>{t('close')}</Button>
+  const restore = () => {
+    if (selection.target && editableText(selection.target) === restorable) {
+      if (originalNodes.current) { selection.target.replaceChildren(...originalNodes.current); selection.target.dispatchEvent(new Event('input', { bubbles: true })) }
+      else replaceEditable(selection.target, selection.text)
+    }
+    setRestorable(undefined); setMore(false)
+  }
+  return <section className="nola-text-actions" style={{ opacity: preferences.selectionOpacity }} aria-label={t(selection.target ? 'translateInput' : 'translateSelection')} onKeyDown={event => { if (event.key === 'Escape' && !more) dismiss() }}>
+    <div className="nola-selection-toolbar" role="toolbar" aria-label={t('selection')} aria-busy={busy} onPointerDown={event => { if (event.pointerType === 'mouse') event.preventDefault() }} onKeyDown={event => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+      const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
+      const index = buttons.indexOf(event.target as HTMLButtonElement)
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length
+      event.preventDefault(); buttons[next]?.focus()
+    }}>
+      {(selection.target || preferences.selectionTranslate) && <Button variant="bare" size="icon-sm" disabled={busy} aria-label={t(selection.target ? 'translateInput' : 'translateSelection')} title={t(selection.target ? 'translateInput' : 'translateSelection')} onClick={() => void translate()}>{busy ? <Spinner className="animate-spin" /> : <Languages />}</Button>}
+      {(selection.target || preferences.selectionSpeak) && <Button variant="bare" size="icon-sm" disabled={busy} aria-label={t('readAloud')} title={t('readAloud')} onClick={() => void speak()}><Volume2 /></Button>}
+      <Popover open={more} onOpenChange={setMore}>
+        <PopoverTrigger render={<Button variant="bare" size="icon-sm" aria-label={t('more')} title={t('more')} />}><MoreVertical /></PopoverTrigger>
+        {menuContainer && <PopoverPrimitive.Portal container={menuContainer}><PopoverPrimitive.Positioner align="start" sideOffset={4} className="z-popup"><PopoverPrimitive.Popup className="nola-selection-menu" aria-label={t('more')}>
+          {(selection.target || preferences.selectionCopy) && <Button variant="bare" disabled={busy} onClick={() => { void copy(); setMore(false) }}><Copy data-icon="inline-start" />{t('copyTranslation')}</Button>}
+          {selection.target && restorable !== undefined && <Button variant="bare" onClick={restore}><Undo2 data-icon="inline-start" />{t('restoreInput')}</Button>}
+          <Button variant="bare" onClick={dismiss}><X data-icon="inline-start" />{t('close')}</Button>
+        </PopoverPrimitive.Popup></PopoverPrimitive.Positioner></PopoverPrimitive.Portal>}
+      </Popover>
     </div>
-    {result && <p dir="auto">{result}</p>}{error && <p role="alert">{error}</p>}
+    <div ref={setMenuContainer} style={{ display: 'contents' }} />
+    {(result || error) && <div className="nola-selection-result" aria-live="polite">
+      <div className="nola-selection-result-actions">
+        {(selection.target || preferences.selectionCopy) && result && <Button variant="bare" size="icon-sm" aria-label={t('copyTranslation')} title={t('copyTranslation')} onClick={() => void copy()}><Copy /></Button>}
+        <Button variant="bare" size="icon-sm" aria-label={t('close')} title={t('close')} onClick={dismiss}><X /></Button>
+      </div>
+      {result && <p dir="auto">{result}</p>}{error && <p className="nola-error" role="alert">{error}</p>}
+    </div>}
   </section>
 }

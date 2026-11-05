@@ -80,6 +80,12 @@ class IndexTranslateLocalProvider:
     def __init__(self, manager: LlamaServerManager) -> None:
         self.manager = manager
 
+    async def translate_batch(self, texts: list[str], source: str, target: str) -> list[ProviderTranslation]:
+        messages = [[{"role": "user", "content": f"{prompt_header(source, target)}\n\n{prompt_text(text)}"}] for text in texts]
+        contents = await asyncio.to_thread(self.manager.chat_batch_sync, messages,
+            chat_template_kwargs={"enable_thinking": False}, max_tokens=1024)
+        return [ProviderTranslation(content, (source, target)) for content in contents]
+
     async def translate(self, text: str, source: str, target: str) -> ProviderTranslation:
         messages = [{"role": "user", "content": f"{prompt_header(source, target)}\n\n{prompt_text(text)}"}]
         content = await asyncio.to_thread(self.manager.chat_sync, messages,
@@ -111,6 +117,38 @@ class IndexTranslateTransformersRuntime(CausalTranslationRuntime):
             torch_dtype=resolve_dtype(self.device, self.precision),
         ).to(self.device).eval()
         return _Bundle(model=model, tokenizer=processor)
+
+    def _translate_batch_locked(self, texts, source, target):
+        import torch
+
+        self.load()
+        bundle = self._bundle
+        tokenizer = bundle.tokenizer.tokenizer
+        previous_padding = tokenizer.padding_side
+        try:
+            tokenizer.padding_side = "left"
+            conversations = [[{"role": "user", "content": f"{prompt_header(source, target)}\n\n{prompt_text(text)}"}] for text in texts]
+            inputs = bundle.tokenizer.apply_chat_template(conversations, tokenize=True, add_generation_prompt=True,
+                enable_thinking=False, return_tensors="pt", return_dict=True, padding=True).to(self.device)
+            count = inputs["input_ids"].shape[1]
+            limit = min(self.context_size, getattr(bundle.model.config, "max_position_embeddings", self.context_size))
+            if any(revision_context(text) for text in texts) and count + min(512, limit // 2) > limit:
+                conversations = [[{"role": "user", "content": f"{prompt_header(source, target)}\n\n{(revision_context(text) or {}).get('currentSource', text).strip()}"}] for text in texts]
+                inputs = bundle.tokenizer.apply_chat_template(conversations, tokenize=True, add_generation_prompt=True,
+                    enable_thinking=False, return_tensors="pt", return_dict=True, padding=True).to(self.device)
+                count = inputs["input_ids"].shape[1]
+            output_tokens = min(512, limit - count)
+            if output_tokens < 32:
+                raise ValueError("Translation batch exceeds the model context window")
+            with torch.inference_mode():
+                output = bundle.model.generate(**inputs, max_new_tokens=output_tokens, do_sample=False)
+            generated = output[:, count:]
+            if generated.shape[1] >= output_tokens:
+                raise ValueError("Translation batch reached the output limit")
+            return [item.strip().removeprefix("<think>").split("</think>", 1)[-1].strip()
+                for item in bundle.tokenizer.batch_decode(generated, skip_special_tokens=True)]
+        finally:
+            tokenizer.padding_side = previous_padding
 
     def _translate_locked(self, text, source, target):
         import torch
@@ -160,3 +198,7 @@ class IndexTranslateTransformersProvider:
     async def translate(self, text: str, source: str, target: str) -> ProviderTranslation:
         content = await asyncio.to_thread(self.runtime.translate_sync, text, source, target)
         return ProviderTranslation(content, (source, target))
+
+    async def translate_batch(self, texts: list[str], source: str, target: str) -> list[ProviderTranslation]:
+        results = await asyncio.to_thread(self.runtime.translate_batch_sync, texts, source, target)
+        return [ProviderTranslation(content, (source, target)) for content in results]

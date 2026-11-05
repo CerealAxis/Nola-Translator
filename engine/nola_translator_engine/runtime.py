@@ -118,12 +118,11 @@ from .translation.network import (
     DEFAULT_CONTEXT_WINDOW,
     custom_translation_provider,
     DEFAULT_MAX_OUTPUT_TOKENS,
-    DEFAULT_MICROSOFT_ENDPOINT,
     MicrosoftTranslatorProvider,
 )
 from .translation.scheduler import TranslationScheduler
 from .translation.mymemory import DEFAULT_MYMEMORY_ENDPOINT, MyMemoryTranslationProvider
-from .translation.google_translate import DEFAULT_GOOGLE_TRANSLATE_ENDPOINT, GoogleTranslateProvider
+from .translation.google_translate import GoogleTranslateProvider
 from .translation.index_translate import IndexTranslateLocalProvider, IndexTranslatePublicProvider
 
 
@@ -1166,7 +1165,6 @@ class EngineRuntime:
             return
         endpoint = options.endpoint if options else ""
         api_key = options.apiKey if options else ""
-        region = options.region if options else ""
         model = options.model if options else ""
         # A missing `translationOptions` and an emptied field are different states, and only the
         # former earns a default: the settings default is non-empty, so "" can only mean the user
@@ -1184,22 +1182,12 @@ class EngineRuntime:
         if provider_name == "local":
             provider = self._local_translation_provider(config)
         elif provider_name == "microsoft":
-            # The endpoint guard lives in `MicrosoftTranslatorProvider`, like the other four:
-            # an empty address reaches the provider as an empty string and is refused there
-            # with the message written for the user to read.
-            provider = MicrosoftTranslatorProvider(
-                api_key,
-                endpoint=resolved(endpoint, DEFAULT_MICROSOFT_ENDPOINT),
-                region=region,
-            )
+            provider = MicrosoftTranslatorProvider()
         elif provider_name == "mymemory":
             provider = MyMemoryTranslationProvider(endpoint=resolved(endpoint, DEFAULT_MYMEMORY_ENDPOINT),
                 email=options.email if options else "")
         elif provider_name == "google":
-            provider = GoogleTranslateProvider(
-                api_key=api_key,
-                endpoint=resolved(endpoint, DEFAULT_GOOGLE_TRANSLATE_ENDPOINT),
-            )
+            provider = GoogleTranslateProvider()
         elif provider_name == "index-translate":
             # Public API configuration is fixed and never consumes a cloud credential.
             provider = IndexTranslatePublicProvider()
@@ -1350,6 +1338,7 @@ class EngineRuntime:
             if not isinstance(runtime, LlamaAsrRuntime):
                 runtime = LlamaAsrRuntime(LlamaServerManager())
             manager = runtime.manager
+            manager.configure_parallel(getattr(self, '_local_call_asr_concurrency', 1))
             manager.switch_gguf(self.resources.translation_gguf_path(model_id))
             manager.mmproj_path = self.resources.audio_projector_path(model_id)
             if self.resources.registry.get(model_id):

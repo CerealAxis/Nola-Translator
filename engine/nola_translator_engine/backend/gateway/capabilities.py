@@ -344,3 +344,5 @@ class CallContext:
     provider_options: dict[str, str] = field(default_factory=dict, repr=False)
     translation_context: dict[str, object] = field(default_factory=dict, repr=False)
     source_is_provisional: bool = False
+    task_mode: Literal["realtime", "offline"] = "realtime"
+    max_concurrency: int = 1

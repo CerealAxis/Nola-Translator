@@ -35,6 +35,28 @@ const renderDialog = () => {
   return { onSubmit, onDraftChange }
 }
 
+it.each(['zh', 'none'])('enforces custom MT source restrictions only with translation enabled (%s)', targetLanguage => {
+  state.catalog.asr[0].sourceLanguages = ['auto', 'en', 'ja']
+  state.catalog.mt = [{ binding: 'mt-custom:limited', name: 'Limited', kind: 'mt', origin: 'cloud', free: false, sourceLanguages: ['en'], targetLanguages: ['zh'] }]
+  const settings = stores.settings.getState().settings!
+  stores.settings.setState({ settings: { ...settings,
+    recognition: { ...settings.recognition, sourceLanguage: 'ja' },
+    translation: { ...settings.translation, targetLanguage },
+    modelPolicy: { enabled: {}, defaults: {}, ...settings.modelPolicy, selections: { ...settings.modelPolicy?.selections, mt: 'mt-custom:limited' } },
+  } })
+  const { onSubmit } = renderDialog()
+  const start = screen.getByRole('button', { name: '开始' })
+  if (targetLanguage === 'none') {
+    expect(start).toBeEnabled()
+    fireEvent.click(start)
+    expect(onSubmit).toHaveBeenCalled()
+  } else {
+    expect(start).toBeDisabled()
+    fireEvent.click(start)
+    expect(onSubmit).not.toHaveBeenCalled()
+  }
+})
+
 it('hides repeated configuration and submits the loaded local replacement', () => {
   const { onSubmit: submit, onDraftChange } = renderDialog()
   expect(screen.getAllByRole('textbox')).toEqual([screen.getByRole('textbox', { name: '名称' })])

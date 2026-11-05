@@ -14,7 +14,7 @@ import { INDEX_TRANSLATE_MODEL_IDS, INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS } fro
 import { customCredentialSlot, customModelsOf } from '../shared/custom-models'
 import type { AppSettings, AppSettingsPatch, CredentialProvider, TranslationProvider } from '../shared/settings'
 import { MIMO_TTS_BINDING, MIMO_TTS_NAME } from '../shared/settings'
-import { DEFAULT_MODEL_GATEWAY, bindingIsLocal, modelGatewaySettingsSchema, normalizeModelBinding, type AvailableGatewayModel, type GatewayCapability, type GatewayRequestSnapshot, type ModelGatewaySettings, type ModelGatewaySnapshot } from '../shared/model-gateway'
+import { DEFAULT_MODEL_GATEWAY, gatewayConcurrency, bindingIsLocal, modelGatewaySettingsSchema, normalizeModelBinding, type AvailableGatewayModel, type GatewayCapability, type GatewayRequestSnapshot, type ModelGatewaySettings, type ModelGatewaySnapshot } from '../shared/model-gateway'
 import type { EngineLaunchSpec } from './engine-process'
 import { createGatewayWorker, GatewayWorkerError, type GatewayWorker, type GatewayWorkerFactory, type GatewayWorkerResult } from './model-gateway-worker'
 import { GatewayInternalServer, type GatewayCapabilityLease } from './gateway-internal-server'
@@ -176,7 +176,8 @@ export class ModelGateway {
       if ((!slot?.refs && !active) || !bindingIsLocal(binding)) continue
       const changed = patch.modelGateway?.[`${kind}Model`] ?? (!settings.modelGateway[`${kind}Model`] ? patch.modelPolicy?.defaults[kind] : undefined)
       const disabled = patch.modelPolicy && !isModelEnabled({ ...settings, modelPolicy: mergeModelPolicy(settings, patch.modelPolicy) }, kind, binding)
-      if (disabled || patch.compute || patch.modelGateway?.[kind] === false || changed !== undefined && normalizeModelBinding(kind, changed) !== binding) throw new GatewayError(409, 'RESOURCE_IN_USE', 'resource_in_use')
+      const concurrencyChanged = kind === 'llm' && patch.modelGateway?.concurrency?.llm !== undefined && patch.modelGateway.concurrency.llm !== settings.modelGateway.concurrency?.llm
+      if (disabled || concurrencyChanged || patch.compute || patch.modelGateway?.[kind] === false || changed !== undefined && normalizeModelBinding(kind, changed) !== binding) throw new GatewayError(409, 'RESOURCE_IN_USE', 'resource_in_use')
     }
   }
 
@@ -229,31 +230,34 @@ export class ModelGateway {
     const binding = normalizeModelBinding(kind, request.model)
     const settings = this.options.getSettings()
     const cloudMt = kind === 'mt' && backendCloudMt(binding)
-    if ((!inspect || kind === 'tts' && this.usesBackend(kind, binding, settings))
-      && (cloudMt || kind === 'asr' && backendCloudAsr(binding) || binding.startsWith('resource:') || kind === 'tts' && binding === MIMO_TTS_BINDING) && isModelEnabled(settings, kind, binding)) {
-      const result = await this.options.inferBackend?.({ ...request, model: binding }, signal, inspect ? { inspect: true } : undefined)
-      if (result) return result
-    }
-    if (kind === 'tts' && binding === MIMO_TTS_BINDING) throw new GatewayError(503, 'MiMo TTS is unavailable.', 'model_unavailable')
-    const slot = await this.ensureSlot(kind, binding)
-    if (inspect) {
-      const ready = await slot.worker.ready
-      return { text: '', voices: Array.isArray(ready.voices) ? ready.voices.filter((voice): voice is string => typeof voice === 'string') : [] }
-    }
-    const entry = this.begin(kind, slot.binding)
-    slot.refs++
-    this.clearIdle(slot)
+    let entry: GatewayRequestSnapshot | undefined
+    let held: WorkerSlot | undefined
     try {
+      signal.throwIfAborted()
+      if (this.options.inferBackend && (!inspect || kind === 'tts' && this.usesBackend(kind, binding, settings))
+        && (cloudMt || kind === 'asr' && backendCloudAsr(binding) || binding.startsWith('resource:') || kind === 'tts' && binding === MIMO_TTS_BINDING) && isModelEnabled(settings, kind, binding)) {
+        if (!inspect) entry = this.begin(kind, binding, false)
+        const result = await this.options.inferBackend({ ...request, model: binding }, signal, { ...(inspect ? { inspect: true } : {}), concurrency: this.concurrencyFor(kind, binding) })
+        if (result) return result
+      }
+      if (kind === 'tts' && binding === MIMO_TTS_BINDING) throw new GatewayError(503, 'MiMo TTS is unavailable.', 'model_unavailable')
+      const slot = await this.ensureSlot(kind, binding)
+      if (inspect) {
+        const ready = await slot.worker.ready
+        return { text: '', voices: Array.isArray(ready.voices) ? ready.voices.filter((voice): voice is string => typeof voice === 'string') : [] }
+      }
+      entry ??= this.begin(kind, slot.binding)
+      slot.refs++; held = slot
+      this.clearIdle(slot)
       const result = await slot.worker.request({ ...request, op: 'infer',
         audio: request.audio?.replace(/^data:audio\/wav;base64,/, ''), response_format: 'wav' }, signal)
-      this.finish(entry)
       return result as unknown as DirectModelResult
     } catch (error) {
-      this.finish(entry, error, signal.aborted)
+      if (entry) this.finish(entry, error, signal.aborted)
       throw error
     } finally {
-      if (entry.status === 'running') this.finish(entry)
-      this.unhold(slot)
+      if (entry?.status === 'running') this.finish(entry)
+      if (held) this.unhold(held)
     }
   }
 
@@ -307,8 +311,8 @@ export class ModelGateway {
     return this.snapshot()
   }
   private async credentialPresence(settings: AppSettings): Promise<Record<CredentialProvider, boolean>> {
-    const slots: CredentialProvider[] = ['aliyun-asr', 'minimax-asr', 'microsoft', 'google', 'cloud',
-      'fallback-cloud', 'fallback-google', 'mimo-tts',
+    const slots: CredentialProvider[] = ['aliyun-asr', 'minimax-asr', 'cloud',
+      'fallback-cloud', 'mimo-tts',
       ...customModelsOf(settings.translation).map(profile => customCredentialSlot(profile.id))]
     return Object.fromEntries(await Promise.all(slots.map(async slot => [slot, !!await this.options.getCredential?.(slot)]))) as Record<CredentialProvider, boolean>
   }
@@ -575,8 +579,7 @@ export class ModelGateway {
           : translationOptionsFor(settings.translation, translationProvider, binding.startsWith('mt-custom:') ? binding.slice(10) : undefined)
         const credential: CredentialProvider | undefined = translationProvider === 'cloud'
           ? backup ? 'fallback-cloud' : customCredentialSlot(binding.slice(10))
-          : translationProvider === 'google' ? backup ? 'fallback-google' : 'google'
-            : translationProvider === 'microsoft' ? 'microsoft' : undefined
+          : undefined
         // A missing key stays a request-time failure rather than a load failure, the way a cloud
         // translation binding behaved before the gateway owned several instances per capability.
         const key = credential ? await this.options.getCredential?.(credential) : undefined
@@ -608,8 +611,7 @@ export class ModelGateway {
           else {
             fallbackConfig = { ...workerConfig, translationProvider: provider,
               translationOptions: legacy.fallbackTranslationOptions as object }
-            const credential: CredentialProvider | undefined = provider === 'cloud' ? 'fallback-cloud'
-              : provider === 'google' ? 'fallback-google' : provider === 'microsoft' ? 'microsoft' : undefined
+            const credential: CredentialProvider | undefined = provider === 'cloud' ? 'fallback-cloud' : undefined
             if (credential && this.options.getCredential) {
               const apiKey = await this.options.getCredential(credential)
               fallbackConfig.translationOptions = { ...legacy.fallbackTranslationOptions as object, ...(apiKey ? { apiKey } : {}) }
@@ -897,7 +899,7 @@ export class ModelGateway {
         if (!configured) throw new Error('The selected cloud LLM is not configured or ready')
         cloudName = configured.name
       }
-      signature = createHash('sha256').update(JSON.stringify([binding, settings.compute, profile])).digest('hex')
+      signature = createHash('sha256').update(JSON.stringify([binding, settings.compute, profile, this.concurrencyFor('llm', binding)])).digest('hex')
     } catch {
       if (this.stopping) return
       this.services.llm = { state: 'failed', model: binding, name: '', error: 'LLM credentials are unavailable' }
@@ -947,8 +949,15 @@ export class ModelGateway {
     const left = Buffer.from(offered); const right = Buffer.from(this.key)
     if (!right.length || left.length !== right.length || !timingSafeEqual(left, right)) throw new GatewayError(401, 'Invalid API key', 'authentication_error')
   }
-  private begin(kind: GatewayCapability, model: string): GatewayRequestSnapshot {
-    if (this.requests.filter(request => request.status === 'running').length >= 16) throw new GatewayError(429, 'Too many active requests')
+  private concurrencyFor(kind: GatewayCapability, binding: string): number {
+    return gatewayConcurrency(binding, this.options.getSettings().modelGateway.concurrency?.[kind],
+      this.inventory.find(resource => `resource:${resource.resourceId}` === binding))
+  }
+  private begin(kind: GatewayCapability, model: string, admit = true): GatewayRequestSnapshot {
+    const active = this.requests.filter(request => request.status === 'running' && request.kind === kind && request.model === model)
+    if (admit && active.length >= this.concurrencyFor(kind, model)) {
+      throw new GatewayError(429, 'Too many active requests', 'rate_limited')
+    }
     const request: GatewayRequestSnapshot = { id: randomUUID(), kind, model, status: 'running', startedAt: Date.now() }
     this.requests.unshift(request)
     while (this.requests.length > 64) { const index = this.requests.map(item => item.status !== 'running').lastIndexOf(true); if (index < 0) break; this.requests.splice(index, 1) }
@@ -1050,14 +1059,14 @@ export class ModelGateway {
       }
       const settings = this.options.getSettings()
       let result: GatewayWorkerResult | DirectModelResult | undefined
-      entry = this.begin(kind, publicBinding)
+      entry = this.begin(kind, publicBinding, !this.usesBackend(kind, publicBinding, settings))
       if (this.options.inferBackend && this.usesBackend(kind, publicBinding, settings)) {
         if (bindingIsLocal(publicBinding)) this.requireLocalBinding(kind, publicBinding, settings)
         else await this.plan(kind, publicBinding, [], settings, settings.modelGateway)
         const direct = directModelRequestSchema.safeParse({ ...payload, kind, model: publicBinding, id: randomUUID() })
         if (direct.success) {
           result = await this.options.inferBackend(direct.data, controller.signal, {
-            batchAsr: kind === 'asr', mp3: kind === 'tts' && payload.response_format === 'mp3',
+            batchAsr: kind === 'asr', mp3: kind === 'tts' && payload.response_format === 'mp3', concurrency: this.concurrencyFor(kind, publicBinding),
           })
         }
       }
@@ -1114,6 +1123,7 @@ export class ModelGateway {
       const binding = this.publicBinding('asr')
       const wanted = normalizeModelBinding('asr', session.model)
       if (wanted && wanted !== binding) throw new GatewayError(404, 'The public API only serves its configured model alias', 'model_not_found')
+      entry = this.begin('asr', binding)
       const settings = this.options.getSettings()
       if (this.options.openBackendAsr && this.usesBackend('asr', binding, settings)) {
         if (bindingIsLocal(binding)) this.requireLocalBinding('asr', binding, settings)
@@ -1138,7 +1148,6 @@ export class ModelGateway {
         })
       }
       controller.signal.throwIfAborted()
-      entry = this.begin('asr', binding)
       await call('session.open', { language: session.input_audio_transcription.language, silenceMs: session.turn_detection?.silence_duration_ms ?? 800,
         manual: session.turn_detection === null, ...(backend ? { maxSegmentMs: settings.recognition.max_segment_ms ?? 10000 } : {}) })
       opened = true
@@ -1188,7 +1197,7 @@ export class ModelGateway {
         const cause = clientError(reason)
         if (cause instanceof GatewayError) error(cause.message, cause.status === 400 && cause.code === 'invalid_request_error' ? 'invalid_request' : cause.code)
         else error('Realtime transcription failed', 'inference_failed')
-        if (!(cause instanceof GatewayError) || backend && (reason instanceof GatewayWorkerError || reason instanceof BackendModelError)) {
+        if (entry && !opened || !(cause instanceof GatewayError) || backend && (reason instanceof GatewayWorkerError || reason instanceof BackendModelError)) {
           finished = true; if (entry) this.finish(entry, cause); client.close(1011, 'Transcription failed')
         }
       }).finally(() => { queuedBytes -= length })

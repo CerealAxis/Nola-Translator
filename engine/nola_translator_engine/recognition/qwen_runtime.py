@@ -375,6 +375,31 @@ class QwenRuntime:
             return "", None
         return text, _language_code(parsed.get("language")) or forced_code
 
+    def transcribe_batch(self, samples, *, language=None):
+        import torch
+
+        with self._inference_lock:
+            self.load()
+            pipeline = self._pipeline
+            hint = _language_name(language) if language and language != "auto" else None
+            prompt = self._build_prompt(prefix=None, hint=hint)
+            tokenizer = pipeline.processor.tokenizer
+            previous_padding = tokenizer.padding_side
+            try:
+                tokenizer.padding_side = "left"
+                with torch.inference_mode():
+                    inputs = pipeline.processor(text=[prompt] * len(samples), audio=samples, return_tensors="pt", padding=True)
+                    inputs = inputs.to(pipeline.model.device, self._compute_dtype)
+                    output = pipeline.model.generate(**inputs, max_new_tokens=MAX_NEW_TOKENS)
+                sequences = output.sequences if hasattr(output, "sequences") else output
+                decoded = pipeline.processor.decode(sequences[:, inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+                if not isinstance(decoded, list) or len(decoded) != len(samples):
+                    raise ValueError("ASR batch result count mismatch")
+                parsed = [pipeline.processor.parse_output(raw) for raw in decoded]
+                return [(str(item.get("transcription") or "").strip(), _language_code(item.get("language")) or language) for item in parsed]
+            finally:
+                tokenizer.padding_side = previous_padding
+
     def _build_prompt(self, *, prefix: str | None, hint: str | None) -> str:
         """Official message skeleton; the language hint and the prefix are appended after
         the generation prompt, in that order.

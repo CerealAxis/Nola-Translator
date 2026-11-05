@@ -20,7 +20,7 @@ export const meetingModeSettingsSchema = z.object({
   headphonesId: deviceId,
   localLanguage: language,
   remoteLanguage: language,
-  pipeline: z.enum(['auto', 'cascade', 's2s']),
+  pipeline: z.enum(['auto', 'cascade', 's2s']).default('auto'),
   duckVolume: z.number().min(0).max(100).int(),
   passthroughKey: z.string().max(100).refine(isSupportedShortcut),
 })

@@ -13,6 +13,16 @@ const workingEncryption = {
 }
 
 describe('SecureCredentialStore', () => {
+  it('removes retired translator keys without decryption and preserves unrelated credentials', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nola-free-translators-'))
+    const path = join(directory, 'credentials.json')
+    try {
+      await writeFile(path, JSON.stringify({ google: 'old-google', 'fallback-google': 'old-backup', microsoft: 'old-microsoft', 'mimo-tts': 'keep' }))
+      const store = new SecureCredentialStore(path, { ...workingEncryption, isEncryptionAvailable: () => false })
+      for (const key of ['google', 'fallback-google', 'microsoft']) await store.remove(key)
+      expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({ 'mimo-tts': 'keep' })
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
   it('只把加密后的密钥写入磁盘', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'fluent-secrets-'))
     const path = join(directory, 'credentials.json')

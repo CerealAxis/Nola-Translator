@@ -114,6 +114,8 @@ class LlamaServerManager:
         self._port: int | None = None
         self._ready = False
         self._inference_lock = threading.Lock()
+        self.parallel_requests = 1
+
         self._device: str | None = None
         self._compute = ComputeOptions()
         self._selected_device: ComputeDevice | None = None
@@ -124,6 +126,12 @@ class LlamaServerManager:
         self.chat_template: str | None = None
         self.model_alias: str | None = None
         self.mmproj_path: Path | None = None
+
+    def configure_parallel(self, count: int) -> None:
+        count = max(1, min(5, count))
+        if count > self.parallel_requests:
+            self.parallel_requests = count
+            self._ready = False
 
     def configure_compute(self, device: ComputeDevice, options: ComputeOptions) -> None:
         # Free VRAM and probe scores change while weights are resident; only launch arguments
@@ -230,8 +238,8 @@ class LlamaServerManager:
                 "--host", _HOST,
                 "--port", str(port),
                 "-ngl", str(ngl),
-                "-c", str(self._compute.contextSize),
-                "-np", "1",
+                "-c", str(self._compute.contextSize * self.parallel_requests),
+                "-np", str(self.parallel_requests),
                 "-b", "128",
                 "-ub", "128",
                 "-t", str(thread_count),
@@ -327,6 +335,15 @@ class LlamaServerManager:
         """A cancelled HTTP worker can still be using the resident native server."""
         with self._inference_lock:
             pass
+
+    def chat_batch_sync(self, messages: list[list[dict]], **options) -> list[str]:
+        from concurrent.futures import ThreadPoolExecutor
+
+        if not 1 <= len(messages) <= self.parallel_requests:
+            raise ValueError("Batch exceeds the reserved llama-server slots")
+        with self._inference_lock, ThreadPoolExecutor(max_workers=len(messages)) as executor:
+            return list(executor.map(lambda item: self._chat_locked(item, timeout_s=options.get("timeout_s", 120),
+                chat_template_kwargs=options.get("chat_template_kwargs"), max_tokens=options.get("max_tokens")), messages))
 
     def _chat_locked(self, messages: list[dict], *, timeout_s: float,
                      chat_template_kwargs: dict[str, object] | None = None,

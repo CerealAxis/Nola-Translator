@@ -52,9 +52,10 @@ def _connection(response: dict) -> tuple[str, int]:
     return f"http://127.0.0.1:{url.port}/v1", context_window
 
 
-async def open_direct_language_model(gateway: ModelGateway, model_id: str) -> DirectLanguageModelLease:
+async def open_direct_language_model(gateway: ModelGateway, model_id: str, *, max_concurrency: int = 1) -> DirectLanguageModelLease:
     match = MatchRequest(operation=Operation.GENERATE, model_id=LOCAL_LLM_MODEL_PREFIX + model_id)
-    ctx = CallContext(operation=Operation.GENERATE, task_id=str(uuid4()), deadline=time.monotonic() + LLM_START_TIMEOUT_S)
+    ctx = CallContext(operation=Operation.GENERATE, task_id=str(uuid4()), deadline=time.monotonic() + LLM_START_TIMEOUT_S,
+        task_mode="offline", max_concurrency=max_concurrency)
     try:
         async with asyncio.timeout(LLM_START_TIMEOUT_S):
             instance, lease, adapter, _ = await gateway.acquire(match)
@@ -65,7 +66,11 @@ async def open_direct_language_model(gateway: ModelGateway, model_id: str) -> Di
                 # A second startup request could abort the worker serving the first SDK stream.
                 if instance.active_leases > 1:
                     raise GatewayError(GatewayErrorCode.RESOURCE_EXHAUSTED, stage="llm", message="Local model is busy")
-                endpoint, context_window = _connection(await adapter.llm_endpoint(instance, ctx))
+                await gateway._enter(instance, ctx)
+                try:
+                    endpoint, context_window = _connection(await adapter.llm_endpoint(instance, ctx))
+                finally:
+                    gateway._exit(instance)
                 opened = True
                 return DirectLanguageModelLease(endpoint, context_window, gateway, instance, lease)
             finally:

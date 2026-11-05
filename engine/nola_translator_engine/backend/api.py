@@ -65,6 +65,7 @@ API_PREFIX = "/api/v2"
 class LanguageModelOpenRequest(BaseModel):
     lease_id: UUID
     model: str = Field(min_length=1, max_length=256)
+    max_concurrency: int = Field(default=1, ge=1, le=5)
 
 
 def cloud_asr_options(headers):
@@ -458,7 +459,7 @@ def build_router() -> APIRouter:
             ), ctx.server_instance_id)
 
         async def acquire():
-            lease = await open_direct_language_model(ctx.gateway, body.model)
+            lease = await open_direct_language_model(ctx.gateway, body.model, max_concurrency=body.max_concurrency)
             ctx.language_model_leases[token] = lease
             return lease
 

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { screenConfigSchema, type ScreenFrame } from '../../../src/shared/screen-translation'
+import { screenConfigSchema, screenProcessingMode, screenTranslationModel, type ScreenFrame } from '../../../src/shared/screen-translation'
 import { DEFAULT_SETTINGS, type AppSettings } from '../../../src/shared/settings'
+import type { ModelGatewaySnapshot } from '../../../src/shared/model-gateway'
 import { readFile as readConfig, writeFile as writeConfig } from 'node:fs/promises'
 import { BrowserWindow, globalShortcut } from 'electron'
 import { EventEmitter } from 'node:events'
@@ -26,14 +27,44 @@ import { ScreenTranslation } from '../../../src/main/screen-translation'
 let services: ScreenTranslation[] = []
 beforeEach(() => { fixture.sources.mockClear(); fixture.handlers.clear() })
 afterEach(async () => { for (const service of services) await service.dispose(); services = []; vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
-function create(prepare = async () => {}, _connected = false, settings: AppSettings = DEFAULT_SETTINGS) {
+function create(prepare = async () => {}, _connected = false, settings: AppSettings = DEFAULT_SETTINGS, getMainWindow?: () => BrowserWindow | null) {
   const activity = new FeatureActivity(), publish = vi.fn()
+  const gateway: Pick<ModelGatewaySnapshot, 'state' | 'availableModels'> = { state: 'running', availableModels: { mt: [...new Set(['cloud:google', 'cloud:mymemory', 'cloud:microsoft', screenTranslationModel(screenConfigSchema.parse({}), settings)])].map(binding => ({ binding, kind: 'mt', name: binding, origin: 'cloud', free: true })) } }
   const service = new ScreenTranslation({ mainDir: 'D:/Nola/out/main', configPath: 'D:/Nola/screen.json', prepareOcr: async () => { await prepare(); return () => {} },
+    gatewaySnapshot: () => gateway,
+    getMainWindow,
     inferOcr: async () => { throw new Error('resourceBusy') },
     settings: () => settings, inferModel: vi.fn(async () => ({ text: 'translated' })), publish, activity })
   services.push(service)
-  return { service, activity, publish }
+  return { service, activity, publish, gateway }
 }
+
+it('defaults legacy settings to follow-gateway while preserving explicit processing choices', () => {
+  const settings = structuredClone(DEFAULT_SETTINGS)
+  settings.modelGateway.mtModel = 'cloud:microsoft'
+  const config = screenConfigSchema.parse({ model: 'cloud:google' })
+  expect(screenProcessingMode(config)).toBe('default')
+  expect(screenTranslationModel(config, settings)).toBe('cloud:microsoft')
+  config.processingMode = 'cascade'
+  expect(screenTranslationModel(config, settings)).toBe('cloud:google')
+  config.processingMode = 'default'
+  expect(screenTranslationModel(config, settings)).toBe('cloud:microsoft')
+  settings.modelGateway.mtModel = 'cloud:mymemory'
+  expect(screenTranslationModel(config, settings)).toBe('cloud:mymemory')
+  expect(screenProcessingMode(screenConfigSchema.parse({}))).toBe('default')
+})
+
+it.each(['start', 'resume'] as const)('refuses S2S inherited from the gateway before %s opens capture or OCR', async action => {
+  const settings = structuredClone(DEFAULT_SETTINGS)
+  settings.realtime = { ...settings.realtime, defaultPipeline: 's2s', s2sModel: 'qwen3.5-livetranslate-flash-realtime' }
+  const prepare = vi.fn(async () => {})
+  const { service, activity } = create(prepare, false, settings)
+  await service.configure(screenConfigSchema.parse({ processingMode: 'default' }))
+  await service[action]()
+  expect(service.snapshot()).toMatchObject({ status: 'error', error: 's2sUnsupported' })
+  expect(prepare).not.toHaveBeenCalled()
+  expect(activity.has('screen-translation')).toBe(false)
+})
 
 it('discovers only desktop displays without requesting previews', async () => {
   const { service } = create()
@@ -132,6 +163,72 @@ it('releases the feature reservation after a fatal backend startup error and ret
   expect(activity.has('screen-translation')).toBe(false)
 })
 
+it('checks OCR readiness before missing regions or translation configuration', async () => {
+  const prepare = vi.fn(async () => { throw new Error('ocrNotReady') })
+  const { service, activity } = create(prepare)
+  await service.configure(screenConfigSchema.parse({ regions: [], model: '' }))
+  fixture.sources.mockClear()
+  await service.start()
+  expect(prepare).toHaveBeenCalledOnce()
+  expect(service.snapshot()).toMatchObject({ status: 'error', error: 'ocrNotReady' })
+  expect(fixture.sources).not.toHaveBeenCalled()
+  await vi.waitFor(() => expect(activity.has('screen-translation')).toBe(false))
+})
+
+it.each(['stopped', 'starting', 'stopping', 'failed'] as const)('reports the %s gateway before checking models or regions', async state => {
+  const prepare = vi.fn(async () => { throw new Error('ocrNotReady') })
+  const { service, gateway, activity } = create(prepare)
+  gateway.state = state
+  await service.configure(screenConfigSchema.parse({ regions: [], model: '' }))
+  await service.start()
+  expect(service.snapshot()).toMatchObject({ status: 'error', error: 'gatewayNotReady', errorId: expect.any(String) })
+  expect(prepare).not.toHaveBeenCalled()
+  expect(activity.has('screen-translation')).toBe(false)
+})
+
+it.each([
+  ['', 'translationModelMissing'],
+  ['resource:unloaded', 'translationModelNotReady'],
+] as const)('reports translation model %s before missing regions', async (model, error) => {
+  const { service } = create()
+  await service.configure(screenConfigSchema.parse({ processingMode: 'cascade', regions: [], model }))
+  await service.start()
+  expect(service.snapshot()).toMatchObject({ status: 'error', error })
+})
+
+it('reports equal languages separately after models and regions are ready', async () => {
+  const { service } = create()
+  await (service as unknown as { ready: Promise<void> }).ready
+  await service.configure({ ...service.snapshot().config, processingMode: 'cascade', model: 'cloud:google', sourceLanguage: 'zh', targetLanguage: 'zh' })
+  await service.start()
+  expect(service.snapshot()).toMatchObject({ status: 'error', error: 'sameLanguage' })
+})
+
+it('keeps one error identity through cleanup and assigns a new one on retry', async () => {
+  const { service, gateway, publish } = create()
+  gateway.state = 'stopped'
+  await (service as unknown as { ready: Promise<void> }).ready
+  publish.mockClear()
+  await service.start()
+  await vi.waitFor(() => expect(publish.mock.calls.length).toBeGreaterThanOrEqual(2))
+  const first = service.snapshot().errorId
+  expect(new Set(publish.mock.calls.map(([value]) => value.errorId))).toEqual(new Set([first]))
+  await service.start()
+  expect(service.snapshot().errorId).not.toBe(first)
+})
+
+it('reports missing regions after OCR is ready and releases the OCR lease', async () => {
+  const release = vi.fn()
+  const { service, activity } = create()
+  const options = service as unknown as { options: { prepareOcr: () => Promise<() => void> } }
+  options.options.prepareOcr = vi.fn(async () => release)
+  await service.configure(screenConfigSchema.parse({ regions: [], model: 'cloud:google' }))
+  await service.start()
+  expect(service.snapshot()).toMatchObject({ status: 'error', error: 'regionsMissing' })
+  await vi.waitFor(() => expect(release).toHaveBeenCalledOnce())
+  expect(activity.has('screen-translation')).toBe(false)
+})
+
 it('skips transient native OCR busy responses instead of failing the recovered session', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ detail: 'resourceBusy' }), { status: 409 })))
   const { service } = create(undefined, true)
@@ -165,6 +262,62 @@ it('does not reopen region editing after the service has been disposed', async (
   expect(service.snapshot().status).toBe('ready')
 })
 
+function editorFixture(visible = true) {
+  const owner = { isVisible: () => visible, isDestroyed: vi.fn(() => false), hide: vi.fn(), show: vi.fn(), focus: vi.fn() }
+  const { service } = create(undefined, false, DEFAULT_SETTINGS, () => owner as unknown as BrowserWindow)
+  const frame = { url: 'file:///D:/Nola/out/renderer/screen.html' }
+  const editor = Object.assign(new EventEmitter(), {
+    webContents: { mainFrame: frame, isDestroyed: () => false, isLoadingMainFrame: () => true },
+    isDestroyed: () => false, destroy: vi.fn(),
+  })
+  editor.destroy.mockImplementation(() => { editor.emit('closed') })
+  const open = vi.spyOn(service as unknown as { openWindow(): BrowserWindow }, 'openWindow').mockReturnValue(editor as unknown as BrowserWindow)
+  return { service, owner, editor, frame, open }
+}
+
+it.each(['cancelEdit', 'regions'] as const)('hides the main window for editing and restores it after %s', async action => {
+  const { service, owner, editor, frame } = editorFixture()
+  await service.edit()
+  expect(owner.hide).toHaveBeenCalledOnce()
+  expect(owner.show).not.toHaveBeenCalled()
+  await fixture.handlers.get('screen:command')!({ sender: editor.webContents, senderFrame: frame }, action === 'regions'
+    ? { action, regions: service.snapshot().config.regions } : { action })
+  expect(owner.show).toHaveBeenCalledOnce()
+  expect(owner.focus).toHaveBeenCalledOnce()
+  await service.stop()
+  expect(owner.show).toHaveBeenCalledOnce()
+})
+
+it('restores the main window if the region editor closes unexpectedly', async () => {
+  const { service, owner, editor } = editorFixture()
+  await service.edit()
+  editor.emit('closed')
+  await vi.waitFor(() => expect(owner.show).toHaveBeenCalledOnce())
+})
+
+it('does not reopen a main window that was already hidden before editing', async () => {
+  const { service, owner } = editorFixture(false)
+  await service.edit()
+  await service.stop()
+  expect(owner.hide).not.toHaveBeenCalled()
+  expect(owner.show).not.toHaveBeenCalled()
+})
+
+it('does not restore a destroyed main window after editing', async () => {
+  const { service, owner } = editorFixture()
+  await service.edit()
+  owner.isDestroyed.mockReturnValue(true)
+  await service.stop()
+  expect(owner.show).not.toHaveBeenCalled()
+})
+
+it('leaves the main window visible when the editor cannot open', async () => {
+  const { service, owner, open } = editorFixture()
+  open.mockImplementation(() => { throw new Error('window unavailable') })
+  await expect(service.edit()).rejects.toThrow('window unavailable')
+  expect(owner.hide).not.toHaveBeenCalled()
+})
+
 it('does not expose model management commands through screen translation', async () => {
   const { screenCommandSchema } = await import('../../../src/shared/screen-translation')
   for (const action of ['installOcr', 'deleteOcr', 'cancelOcr', 'ocrStatus']) {
@@ -176,6 +329,7 @@ it('releases a late OCR lease when start was stopped during readiness checking',
   let finish!: () => void
   const release = vi.fn()
   const service = new ScreenTranslation({ mainDir: 'D:/Nola/out/main', configPath: 'D:/Nola/screen.json',
+    gatewaySnapshot: () => ({ state: 'running' }),
     prepareOcr: async () => { await new Promise<void>(resolve => { finish = resolve }); return release },
     inferOcr: vi.fn(), settings: () => DEFAULT_SETTINGS, inferModel: vi.fn(), publish: vi.fn() })
   services.push(service)

@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { browserText, errorKey } from './i18n'
+import { browserEn, browserZh } from './locale-base'
+import { browserJa, browserKo, browserZhHK, browserZhTW } from './locale-regions'
+import { extensionCopy } from './extension-copy'
+
+it('keeps the complete key set and nonempty UI copy in all six locales', () => {
+  const keys = Object.keys(browserZh).sort()
+  for (const dictionary of [browserEn, browserZhTW, browserZhHK, browserKo, browserJa]) expect(Object.keys(dictionary).sort()).toEqual(keys)
+  for (const translations of Object.values(extensionCopy)) {
+    expect(translations).toHaveLength(6)
+    expect(translations.every(text => text.trim().length > 0)).toBe(true)
+  }
+})
 
 describe('browser failure guidance', () => {
   const t = browserText('zh-CN')

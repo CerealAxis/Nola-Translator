@@ -49,13 +49,34 @@ async function main() {
       await chrome.storage.local.set({ uiLanguage: 'en', pageProvider: 'fixture', inputProvider: 'fixture', selectionProvider: 'fixture', pageLanguage: 'zh', sourceLanguage: 'en', inputSourceLanguage: 'en', inputTargetLanguage: 'zh', inputTranslation: true, inputTrigger: 'tripleSpace', translateTitle: false, contextAware: false, floatingButton: true, floatingSide: 'right', floatingPosition: 0.55, floatingLocked: false, floatingClickAction: 'translate', floatingDisabledSites: [], siteBlacklist: [], providerRevision: 'fixture' })
     }, api)
     const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message)); await page.goto(origin + '/test')
+    if (process.argv.includes('--subtitles-only')) {
+      await settings.evaluate(() => chrome.storage.local.set({ subtitleProvider: 'fixture', batchSize: 1 }))
+      await page.evaluate(() => {
+        const video = document.createElement('video'); video.width = 640; video.height = 360; document.body.append(video)
+        const track = video.addTextTrack('captions', 'English', 'en'); track.mode = 'hidden'
+        for (let i = 0; i < 5; i++) track.addCue(new VTTCue(i * 120, i * 120 + 5, 'Preload cue ' + i))
+      })
+      await page.locator('[data-nola-extension="trigger"]').waitFor()
+      await settings.evaluate(async url => { const [tab] = await chrome.tabs.query({ url }); await chrome.tabs.sendMessage(tab.id, { type: 'toggleSubtitles' }) }, origin + '/test')
+      for (let i = 0; i < 150 && requests.length < 5; i++) await page.waitForTimeout(100)
+      assert.equal(requests.length, 5, 'All five cues must be requested while the video remains paused at zero')
+      assert.equal(await page.locator('video').evaluate(video => video.currentTime), 0)
+      assert.ok(await page.locator('video').evaluate(video => video.paused))
+      assert.deepEqual(errors, [])
+      const result = { pausedAt: 0, lastCueAt: 480, translatedBeforePlayback: requests.length, errors }
+      await fs.writeFile(path.join(output, 'subtitle-prefetch.json'), JSON.stringify(result, null, 2)); console.log(JSON.stringify(result)); return
+    }
     const floating = page.locator('[data-nola-extension="floating"]')
     const trigger = floating.locator('.nola-floating-trigger')
     await trigger.waitFor({ state: 'visible' })
     const patch = values => settings.evaluate(values => chrome.storage.local.set(values), values)
     const prefs = keys => settings.evaluate(keys => chrome.storage.local.get(keys), keys)
     await trigger.hover({ position: { x: 5, y: 20 } }); await trigger.click()
-    await page.locator('#paragraph [data-nola-translation]').waitFor()
+    await page.locator('#paragraph [data-nola-translation]').waitFor().catch(async error => {
+      await page.screenshot({ path: path.join(output, 'failure.png'), fullPage: true })
+      console.error({ requests, errors, floating: await floating.innerText(), preferences: await prefs(['pageProvider', 'pageLanguage', 'sourceLanguage', 'pageDisplay', 'floatingClickAction']) })
+      throw error
+    })
     assert.equal(await page.locator('#paragraph [data-nola-translation]').textContent(), '固定测试译文')
     await trigger.click()
     await page.waitForFunction(() => !document.querySelector('[data-nola-translation]'))
@@ -81,6 +102,7 @@ async function main() {
     const input = page.locator('#input'); await input.fill('Hello input'); await input.press('Space'); await input.press('Space'); await input.press('Space')
     await page.waitForFunction(() => document.querySelector('#input').value === '固定测试译文')
     const actions = page.locator('[data-nola-extension="text-actions"]')
+    await actions.getByRole('button', { name: 'More', exact: true }).click()
     await actions.getByRole('button', { name: 'Restore input', exact: true }).click()
     assert.equal(await input.inputValue(), 'Hello input  ')
     await input.press('Escape')

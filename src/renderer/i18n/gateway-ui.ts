@@ -1,5 +1,7 @@
 export const gatewayZh = {
-  ocr: '文字识别（OCR）', ocrHint: '选择 OCR 模型，识别屏幕文字；在模型管理下载，在模型网关启动。',
+  concurrency: '并发上限', concurrencyFor: '{name}并发上限', concurrencySharedMt: '与 MT 共用',
+  concurrencyHint: '实时翻译串行处理。非实时任务：非 CrispASR 本地模型并发上限为 {local}，API 接口为 {api}；CrispASR 模型因能力限制固定为 1，不支持修改。',
+  ocr: 'OCR 模型', ocrHint: '选择 OCR 模型，识别屏幕文字；在模型管理下载，在模型网关启动。',
   startupStatusUnavailable: '无法读取模型网关状态',
   startupFailed: '模型网关启动失败',
   startupRetryHint: '打开模型网关查看状态并重试。',
@@ -16,7 +18,7 @@ export const gatewayZh = {
   mtHint: '选择 MT 模型，将文字翻译为目标语言。',
   llmHint: '选择 LLM 模型，用于工作台对话和文本处理。',
   ttsHint: '选择 TTS 模型，将文字转换为音频。',
-  llm: '大语言模型', selectModel: '选择 {name}', protocol: '连接协议',
+  llm: 'LLM 模型', selectModel: '选择 {name}', protocol: '连接协议',
   externalApi: '对外 API', externalHint: '关闭对外 API 后，应用内功能仍可使用已启动的能力。',
   /** A selection that no longer matches what is callable, and why it moved. */
   modelSwitched: '已改用 {name}', modelSwitchedLoaded: '模型网关当前加载的本地模型。',
@@ -71,7 +73,9 @@ export const gatewayZh = {
 }
 
 export const gatewayEn: Record<keyof typeof gatewayZh, string> = {
-  ocr: 'Text recognition (OCR)', ocrHint: 'Select an OCR model for screen text. Download in Model Management and load here.',
+  concurrency: 'Concurrency limit', concurrencyFor: '{name} concurrency limit', concurrencySharedMt: 'Shared with MT',
+  concurrencyHint: 'Realtime translation runs serially. For offline tasks, non-CrispASR local models allow up to {local} concurrent requests and APIs up to {api}. CrispASR models are fixed at 1 due to runtime limitations and cannot be changed.',
+  ocr: 'OCR models', ocrHint: 'Select an OCR model for screen text. Download in Model Management and load here.',
   startupStatusUnavailable: 'Could not read Model Gateway status',
   startupFailed: 'Model Gateway failed to start',
   startupRetryHint: 'Open Model Gateway to check its status and try again.',
@@ -142,7 +146,9 @@ export const gatewayEn: Record<keyof typeof gatewayZh, string> = {
 }
 
 export const gatewayTw: typeof gatewayEn = {
-  ocr: '文字辨識（OCR）', ocrHint: '選擇 OCR 模型辨識螢幕文字；在模型管理下載，在模型閘道啟動。',
+  concurrency: '並行上限', concurrencyFor: '{name}並行上限', concurrencySharedMt: '與 MT 共用',
+  concurrencyHint: '即時翻譯循序處理。非即時工作：非 CrispASR 本機模型並行上限為 {local}，API 介面為 {api}；CrispASR 模型因能力限制固定為 1，不支援修改。',
+  ocr: 'OCR 模型', ocrHint: '選擇 OCR 模型辨識螢幕文字；在模型管理下載，在模型閘道啟動。',
   startupStatusUnavailable: '無法讀取模型閘道狀態',
   startupFailed: '模型閘道啟動失敗',
   startupRetryHint: '開啟模型閘道查看狀態，再試一次。',
@@ -159,7 +165,7 @@ export const gatewayTw: typeof gatewayEn = {
   mtHint: '選擇 MT 模型，將文字翻譯為目標語言。',
   llmHint: '選擇 LLM 模型，用於工作台對話與文字處理。',
   ttsHint: '選擇 TTS 模型，將文字轉換為音訊。',
-  llm: '大型語言模型', selectModel: '選擇 {name}', protocol: '連線協定',
+  llm: 'LLM 模型', selectModel: '選擇 {name}', protocol: '連線協定',
   externalApi: '對外 API', externalHint: '關閉對外 API 後，應用程式內的功能仍可使用已啟動的能力。',
   modelSwitched: '已改用 {name}', modelSwitchedLoaded: '模型閘道目前載入的本機模型。',
   modelSwitchedCloud: '已改用一個設定完成的雲端介面。', modelNoneShort: '請選擇模型',
@@ -202,7 +208,9 @@ export const gatewayTw: typeof gatewayEn = {
 }
 export const gatewayHk: typeof gatewayEn = { ...gatewayTw, closeTray: '保留在系統匣', interpretation: '即時傳譯', lan: '本地網絡', actionFailed: '操作失敗，請檢查本機服務和記錄後重試。' }
 export const gatewayJa: typeof gatewayEn = {
-  ocr: '文字認識（OCR）', ocrHint: '画面の文字を認識するOCRモデルを選択します。モデル管理でダウンロードし、ここで起動します。',
+  concurrency: '同時リクエスト上限', concurrencyFor: '{name}の同時リクエスト上限', concurrencySharedMt: 'MT と共有',
+  concurrencyHint: 'リアルタイム翻訳は逐次処理します。非リアルタイムタスクの同時実行上限は、CrispASR以外のローカルモデルが {local}、APIが {api} です。CrispASRモデルは機能上の制限により1に固定され、変更できません。',
+  ocr: 'OCR モデル', ocrHint: '画面の文字を認識するOCRモデルを選択します。モデル管理でダウンロードし、ここで起動します。',
   startupStatusUnavailable: 'モデルゲートウェイの状態を取得できません',
   startupFailed: 'モデルゲートウェイを起動できませんでした',
   startupRetryHint: 'モデルゲートウェイで状態を確認してから、もう一度お試しください。',
@@ -219,7 +227,7 @@ export const gatewayJa: typeof gatewayEn = {
   mtHint: 'テキストを対象言語に翻訳する MT モデルを選択します。',
   llmHint: 'ワークベンチの会話やテキスト処理に使う LLM モデルを選択します。',
   ttsHint: 'テキストを音声に変換する TTS モデルを選択します。',
-  llm: '大規模言語モデル（LLM）', selectModel: '{name} を選択', protocol: '接続プロトコル',
+  llm: 'LLM モデル', selectModel: '{name} を選択', protocol: '接続プロトコル',
   externalApi: '外部 API', externalHint: '外部 API を無効にしても、アプリ内の機能は起動済みのモデルを利用できます。',
   modelSwitched: '{name} に切り替えました', modelSwitchedLoaded: 'モデルゲートウェイが現在読み込んでいるローカルモデルです。',
   modelSwitchedCloud: '設定済みのクラウドインターフェースに切り替えました。', modelNoneShort: 'モデルを選択してください',
@@ -258,7 +266,9 @@ export const gatewayJa: typeof gatewayEn = {
   examples: '接続例', examplesHint: 'YOUR_API_KEY を上のキーに置き換えてください。モデル ID は GET /v2/models で取得できます。', network: '接続範囲', loopback: 'このコンピューターのみ', lan: 'ローカルネットワーク', lanHint: '他の端末はこのコンピューターの実際の IP アドレスとファイアウォールの許可が必要です。信頼できるアプリとのみキーを共有してください。', port: 'ポート', targetLanguage: '既定の翻訳先言語', synthesisDefault: '既定の TTS モデル', change: '変更', voice: '既定の音声', voiceHint: 'TTS を起動するとモデルで利用可能な音声を表示します。', closeBehavior: '終了時の動作', closeHint: 'メインウィンドウを閉じた後、Nola をシステムトレイに残してローカルサービスを続けるか、アプリを終了するか選びます。', closeTray: 'システムトレイに常駐', closeQuit: 'アプリを終了', workbench: 'ワークベンチ', interpretation: '同時通訳', 'browser-captions': 'ブラウザー字幕', 'model-gateway': 'モデルゲートウェイ', requestFailed: 'リクエスト失敗', duration: '{value} ミリ秒', refresh: '状態を更新',
 }
 export const gatewayKo: typeof gatewayEn = {
-  ocr: '문자 인식(OCR)', ocrHint: '화면 문자를 인식할 OCR 모델을 선택하세요. 모델 관리에서 다운로드하고 여기에서 시작하세요.',
+  concurrency: '동시 요청 한도', concurrencyFor: '{name} 동시 요청 한도', concurrencySharedMt: 'MT와 공유',
+  concurrencyHint: '실시간 번역은 순차 처리합니다. 비실시간 작업의 동시 요청 한도는 CrispASR 이외의 로컬 모델은 {local}, API는 {api}입니다. CrispASR 모델은 런타임 제한으로 1로 고정되며 변경할 수 없습니다.',
+  ocr: 'OCR 모델', ocrHint: '화면 문자를 인식할 OCR 모델을 선택하세요. 모델 관리에서 다운로드하고 여기에서 시작하세요.',
   startupStatusUnavailable: '모델 게이트웨이 상태를 확인할 수 없습니다',
   startupFailed: '모델 게이트웨이를 시작하지 못했습니다',
   startupRetryHint: '모델 게이트웨이에서 상태를 확인한 뒤 다시 시도하세요.',
@@ -275,7 +285,7 @@ export const gatewayKo: typeof gatewayEn = {
   mtHint: '텍스트를 대상 언어로 번역할 MT 모델을 선택하세요.',
   llmHint: '워크벤치 대화와 텍스트 처리에 사용할 LLM 모델을 선택하세요.',
   ttsHint: '텍스트를 음성으로 변환할 TTS 모델을 선택하세요.',
-  llm: '대규모 언어 모델(LLM)', selectModel: '{name} 선택', protocol: '연결 프로토콜',
+  llm: 'LLM 모델', selectModel: '{name} 선택', protocol: '연결 프로토콜',
   externalApi: '외부 API', externalHint: '외부 API 를 꺼도 앱 내부 기능은 시작된 모델을 계속 사용할 수 있습니다.',
   modelSwitched: '{name}(으)로 전환했습니다', modelSwitchedLoaded: '모델 게이트웨이가 현재 불러온 로컬 모델입니다.',
   modelSwitchedCloud: '구성된 클라우드 인터페이스로 전환했습니다.', modelNoneShort: '모델을 선택하세요',

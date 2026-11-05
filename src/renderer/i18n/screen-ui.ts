@@ -86,12 +86,12 @@ const ko: ScreenDictionary = {
   errors: { captureFailed: '대상을 캡처할 수 없습니다. 실행 상태를 확인하고 다시 선택하세요. 독점 전체 화면 대신 창 또는 테두리 없는 모드를 사용하세요.', targetUnavailable: '대상 창을 사용할 수 없습니다. 창을 복원하거나 다시 선택하세요.', targetChanged: '대상, 해상도 또는 화면 배율이 변경되었습니다. 대상과 영역을 다시 선택하세요.', ocrFailed: '문자 인식에 실패했습니다. OCR 모델과 로컬 서비스를 확인하고 다시 시도하세요.', ocrMissing: '먼저 PP-OCRv5 mobile OCR 모델을 모두 다운로드하세요.', translationFailed: '일부 텍스트를 번역하지 못했습니다. 모델과 연결을 확인한 후 일시 정지하고 계속하세요.', shortcutConflict: '단축키를 등록할 수 없습니다. 변경하거나 페이지 또는 트레이에서 조작하세요.', invalidConfig: '캡처 대상, 번역 모델, 하나 이상의 영역과 서로 다른 원문 및 번역 언어를 선택하세요.', backendUnavailable: '로컬 인식 서비스를 사용할 수 없습니다. 다시 시도하세요.' },
 }
 const ocrErrors = {
-  'zh-CN': { ocrNotReady: '请先在模型管理下载并启用 OCR 模型，再到模型网关加载。', ocrCorrupt: '识别模型校验失败。请删除识别模型并重新下载。', ocrRuntimeUnavailable: '当前运行组件缺少 OCR 依赖。请更新或重新安装 Python 运行组件后重试。' },
-  'zh-TW': { ocrNotReady: '請先在模型管理下載並啟用 OCR 模型，再到模型閘道載入。', ocrCorrupt: '辨識模型驗證失敗。請刪除辨識模型並重新下載。', ocrRuntimeUnavailable: '目前執行元件缺少 OCR 相依套件。請更新或重新安裝 Python 執行元件後重試。' },
-  'zh-HK': { ocrNotReady: '請先在模型管理下載並啟用 OCR 模型，再到模型閘道載入。', ocrCorrupt: '辨識模型驗證失敗。請刪除辨識模型並重新下載。', ocrRuntimeUnavailable: '目前執行元件缺少 OCR 相依套件。請更新或重新安裝 Python 執行元件後重試。' },
-  en: { ocrNotReady: 'Download and enable an OCR model in Model Management, then load it in Model Gateway.', ocrCorrupt: 'OCR model verification failed. Delete the OCR models and download them again.', ocrRuntimeUnavailable: 'The runtime is missing OCR dependencies. Update or reinstall the Python runtime, then retry.' },
-  ja: { ocrNotReady: 'モデル管理でOCRモデルをダウンロードして有効にし、モデルゲートウェイで読み込んでください。', ocrCorrupt: 'OCRモデルの検証に失敗しました。削除して再ダウンロードしてください。', ocrRuntimeUnavailable: 'OCRの依存パッケージがありません。Pythonランタイムを更新または再インストールしてください。' },
-  ko: { ocrNotReady: '모델 관리에서 OCR 모델을 다운로드하고 활성화한 후 모델 게이트웨이에서 불러오세요.', ocrCorrupt: 'OCR 모델 검증에 실패했습니다. 삭제하고 다시 다운로드하세요.', ocrRuntimeUnavailable: 'OCR 의존 패키지가 없습니다. Python 런타임을 업데이트하거나 다시 설치하세요.' },
+  'zh-CN': { ocrCorrupt: '识别模型校验失败。请删除识别模型并重新下载。', ocrRuntimeUnavailable: '当前运行组件缺少 OCR 依赖。请更新或重新安装 Python 运行组件后重试。' },
+  'zh-TW': { ocrCorrupt: '辨識模型驗證失敗。請刪除辨識模型並重新下載。', ocrRuntimeUnavailable: '目前執行元件缺少 OCR 相依套件。請更新或重新安裝 Python 執行元件後重試。' },
+  'zh-HK': { ocrCorrupt: '辨識模型驗證失敗。請刪除辨識模型並重新下載。', ocrRuntimeUnavailable: '目前執行元件缺少 OCR 相依套件。請更新或重新安裝 Python 執行元件後重試。' },
+  en: { ocrCorrupt: 'OCR model verification failed. Delete the OCR models and download them again.', ocrRuntimeUnavailable: 'The runtime is missing OCR dependencies. Update or reinstall the Python runtime, then retry.' },
+  ja: { ocrCorrupt: 'OCRモデルの検証に失敗しました。削除して再ダウンロードしてください。', ocrRuntimeUnavailable: 'OCRの依存パッケージがありません。Pythonランタイムを更新または再インストールしてください。' },
+  ko: { ocrCorrupt: 'OCR 모델 검증에 실패했습니다. 삭제하고 다시 다운로드하세요.', ocrRuntimeUnavailable: 'OCR 의존 패키지가 없습니다. Python 런타임을 업데이트하거나 다시 설치하세요.' },
 }
 const inPlaceHints = {
   'zh-CN': '译文覆盖在屏幕原文对应位置，鼠标操作直接穿透到下方应用。',
@@ -103,6 +103,11 @@ const inPlaceHints = {
 }
 const ocrLifecycleHints = {"zh-CN": "模型管理负责下载、删除；模型网关负责加载。启动后可在屏幕原文位置覆盖译文。", "zh-TW": "模型管理負責下載與刪除，模型閘道負責載入。啟動後可在螢幕原文位置覆蓋譯文。", "zh-HK": "模型管理負責下載與刪除，模型閘道負責載入。啟動後可在螢幕原文位置覆蓋譯文。", "en": "Download and remove models here; load them in Model Gateway to translate screen text in place.", "ja": "ここでモデルのダウンロードと削除を行い、モデルゲートウェイで読み込むと画面の原文位置に訳文を表示できます。", "ko": "여기에서 모델을 다운로드하거나 삭제하고 모델 게이트웨이에서 불러와 화면 원문 위치에 번역을 표시하세요."}
 const regionUi = {
+  sceneTitle: ['屏幕场景', '螢幕場景', '螢幕場景', 'Screen scene', '画面翻訳シーン', '화면 번역 장면'],
+  sceneDescription: ['屏幕翻译示意：框选显示器中的文字，在原位置显示译文。', '螢幕翻譯示意：框選顯示器中的文字，在原位置顯示譯文。', '螢幕翻譯示意：框選顯示器中的文字，在原位置顯示譯文。', 'Illustration: select text on a display and show its translation in place.', '画面翻訳のイメージ：文字を範囲選択し、元の位置に訳文を表示します。', '화면 번역 예시: 디스플레이의 텍스트를 선택하고 원래 위치에 번역을 표시합니다.'],
+  sceneSource: ['Hello, world!', 'Hello, world!', 'Hello, world!', 'Bonjour le monde !', 'Hello, world!', 'Hello, world!'],
+  sceneTranslation: ['你好，世界！', '你好，世界！', '你好，世界！', 'Hello, world!', 'こんにちは、世界！', '안녕하세요, 세계!'],
+  cascade: ['分步翻译', '分步翻譯', '分步翻譯', 'Step-by-step translation', '段階的に翻訳', '단계별 번역'],
   layoutHint: ['部分译文超出选区，请扩大区域或调小字号。', '部分譯文超出選區，請擴大區域或調小字級。', '部分譯文超出選區，請擴大區域或調小字體。', 'Some translations do not fit. Enlarge the area or reduce the font size.', '訳文が領域に収まりません。領域を広げるか文字を小さくしてください。', '일부 번역이 영역에 맞지 않습니다. 영역을 넓히거나 글자 크기를 줄이세요.'],
   edit: ['选择区域', '選擇區域', '選擇區域', 'Select areas', '領域を選択', '영역 선택'],
   description: ['圈选桌面文字，在原位置持续显示译文。', '框選桌面文字，持續在原位置顯示譯文。', '框選桌面文字，持續在原位置顯示譯文。', 'Select desktop text and translate it continuously in place.', 'デスクトップの文字領域を選び、元の位置に訳文を表示します。', '바탕 화면의 텍스트 영역을 선택하고 원래 위치에 번역을 표시합니다.'],
@@ -131,6 +136,9 @@ const regionCopy = (locale: keyof typeof ocrErrors) => {
 const regionErrorCopy = (locale: keyof typeof ocrErrors) => {
   const index = ['zh-CN', 'zh-TW', 'zh-HK', 'en', 'ja', 'ko'].indexOf(locale)
   return {
+    regionsMissing: ['请选择翻译区域。', '請選擇翻譯區域。', '請選擇翻譯區域。', 'Select a translation area.', '翻訳する領域を選択してください。', '번역 영역을 선택하세요.'][index],
+    sameLanguage: ['原文与译文语言不能相同。', '原文與譯文語言不能相同。', '原文與譯文語言不能相同。', 'Source and target languages must be different.', '原文と訳文には異なる言語を選択してください。', '원문과 번역 언어는 달라야 합니다.'][index],
+    s2sUnsupported: ['屏幕翻译不支持当前 S2S 处理方式，请切换为分步翻译或更改网关处理方式。', '螢幕翻譯不支援目前的 S2S 處理方式，請切換為分步翻譯或變更閘道處理方式。', '螢幕翻譯不支援目前的 S2S 處理方式，請切換為分步翻譯或更改閘道處理方式。', 'Screen translation does not support the current S2S mode. Choose step-by-step translation or change the gateway mode.', '画面翻訳は現在の S2S 方式に対応していません。段階的な翻訳を選ぶか、ゲートウェイの方式を変更してください。', '화면 번역은 현재 S2S 방식을 지원하지 않습니다. 단계별 번역을 선택하거나 게이트웨이 방식을 변경하세요.'][index],
     invalidConfig: ['请选择翻译模型和至少一个区域，并使用不同的原文与译文语言。', '請選擇翻譯模型及至少一個區域，並使用不同的原文與譯文語言。', '請選擇翻譯模型及至少一個區域，並使用不同的原文與譯文語言。', 'Select a translation model and at least one area, with different source and target languages.', '翻訳モデル、1つ以上の領域と、異なる原文・訳文言語を選択してください。', '번역 모델과 하나 이상의 영역을 선택하고 원문과 번역 언어를 다르게 설정하세요.'][index],
     targetUnavailable: ['显示器不可用，请连接后重新选择区域。', '顯示器無法使用，請連接後重新選擇區域。', '顯示器無法使用，請連接後重新選擇區域。', 'The display is unavailable. Reconnect it and select areas again.', '画面を利用できません。接続して領域を選び直してください。', '디스플레이를 사용할 수 없습니다. 연결한 후 영역을 다시 선택하세요.'][index],
     targetChanged: ['显示器、分辨率或缩放已变化，请重新调整区域。', '顯示器、解析度或縮放已變更，請重新調整區域。', '顯示器、解像度或縮放已變更，請重新調整區域。', 'The display, resolution or scaling changed. Adjust the selected areas.', '画面、解像度、拡大率が変わりました。領域を調整してください。', '디스플레이, 해상도 또는 배율이 변경되었습니다. 영역을 조정하세요.'][index],

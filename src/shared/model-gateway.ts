@@ -1,7 +1,22 @@
 import { z } from 'zod'
 import type { SessionConfig } from './contracts'
+import type { ResourceRecord } from './contracts'
 
 export type GatewayCapability = 'asr' | 'mt' | 'tts' | 'llm' | 'ocr'
+export const MAX_GATEWAY_REQUESTS = 16
+export const MAX_LOCAL_CONCURRENCY = 5
+export const MAX_API_CONCURRENCY = 10
+
+export function gatewayConcurrencyMaximum(binding: string, resource?: Pick<ResourceRecord, 'provider'>): number {
+  if (binding && !binding.startsWith('resource:')) return MAX_API_CONCURRENCY
+  return resource?.provider === 'crisp-asr' || resource?.provider === 'crisp-tts' ? 1 : MAX_LOCAL_CONCURRENCY
+}
+
+export function gatewayConcurrency(binding: string, saved: number | undefined, resource?: Pick<ResourceRecord, 'provider'>): number {
+  const maximum = gatewayConcurrencyMaximum(binding, resource)
+  const fallback = !binding || binding.startsWith('resource:') ? 1 : MAX_API_CONCURRENCY
+  return saved !== undefined && Number.isInteger(saved) && saved >= 1 && saved <= maximum ? saved : fallback
+}
 type PublicGatewayCapability = Exclude<GatewayCapability, 'llm' | 'ocr'>
 export type GatewayServiceState = 'stopped' | 'loading' | 'ready' | 'failed'
 export interface ModelGatewaySettings {
@@ -29,6 +44,7 @@ export interface ModelGatewaySettings {
   externalModels?: Partial<Record<PublicGatewayCapability, string>>
   externalCapabilities?: Partial<Record<PublicGatewayCapability, boolean>>
   targetLanguage: string
+  concurrency?: Partial<Record<GatewayCapability, number>>
 }
 export const DEFAULT_MODEL_GATEWAY: ModelGatewaySettings = {
   host: '127.0.0.1', port: 17860, asr: false, mt: true, tts: false, llm: false, ocr: false,
@@ -42,6 +58,7 @@ export const modelGatewaySettingsSchema = z.object({
   externalModels: z.object({ asr: binding, mt: binding, tts: binding }).optional(),
   externalCapabilities: z.object({ asr: z.boolean().optional(), mt: z.boolean().optional(), tts: z.boolean().optional() }).optional(),
   asrModel: binding, mtModel: binding, ttsModel: binding, llmModel: binding, ocrModel: binding, mtFallbackModel: binding,
+  concurrency: z.partialRecord(z.enum(['asr', 'mt', 'tts', 'llm', 'ocr']), z.number().int().min(1).max(MAX_GATEWAY_REQUESTS)).optional(),
 })
 
 /**

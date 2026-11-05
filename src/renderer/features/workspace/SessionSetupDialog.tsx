@@ -1,6 +1,5 @@
 import { modelBindingPatch, resolveModelBinding, savedBindingOf, useAvailableModels } from '@/available-models'
-import { useModelOptions } from '@/model-options'
-import { supportsTranslation } from '../../../shared/model-capabilities'
+import { modelSupportsTranslation, useModelOptions } from '@/model-options'
 import { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -89,15 +88,15 @@ export function SessionSetupDialog({
   const effectiveRecognition = s2sModel
     ? { ...recognition, provider: 'aliyun' as const, aliyunModel: s2sModel }
     : { ...recognition, ...modelBindingPatch('asr', asr.binding, settings).recognition }
-  const selectedAsr = catalog.asr.find(model => model.binding === asr.binding)
-  const sourceLanguages = s2sModel ? remoteSourceLanguages(effectiveRecognition) : selectedAsr?.sourceLanguages ?? modelOptions.sourceLanguages
+  const sourceLanguages = s2sModel ? remoteSourceLanguages(effectiveRecognition) : modelOptions.sourceLanguages
   const sourceLanguage = s2sModel && !sourceLanguages.includes(recognition.sourceLanguage) ? 'auto' : recognition.sourceLanguage
   const unsupportedSource = (!!s2sModel || !asr.unavailable) && !sourceLanguages.includes(sourceLanguage)
   const s2sReady = aliyunConnectionReady(settings, aliyunCredential)
   const s2sTargets: readonly string[] = outputMode === 'speech' ? ALIYUN_S2S_SPEECH_LANGUAGES : ALIYUN_LANGUAGES
   const s2sTargetValid = !s2sModel || s2sTargets.includes(targetLanguage)
   const selectedTranslation = mt.binding.startsWith('resource:') ? resources.find(model => model.resourceId === mt.binding.slice(9)) : undefined
-  const incompatible = needsMt && !mt.unavailable && !!selectedTranslation && !supportsTranslation(selectedTranslation, sourceLanguage, targetLanguage)
+  const incompatible = needsMt && !mt.unavailable
+    && !modelSupportsTranslation(catalog.mt.find(model => model.binding === mt.binding), selectedTranslation, sourceLanguage, targetLanguage)
   const audioSource = realtime?.virtualInputDeviceId
     ? { kind: 'virtualInput' as const, deviceId: realtime.virtualInputDeviceId }
     : audioSourceFrom(devices.find(device => device.deviceId === recognition.audioSource), recognition.audioSource)

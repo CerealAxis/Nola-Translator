@@ -22,7 +22,7 @@ export function buildConfiguredCloudModels(settings: AppSettings, credentials: R
       add({ binding: `custom:${profile.id}`, name: profile.name, kind: 'llm', origin: 'cloud', free: false,
         sourceLanguages: profile.sourceLanguages, targetLanguages: profile.languages })
       add({ binding: `mt-custom:${profile.id}`, name: profile.name, kind: 'mt', origin: 'cloud', free: false,
-        sourceLanguages: profile.sourceLanguages ?? ['auto', ...LANGUAGE_CODES], targetLanguages: profile.languages })
+        sourceLanguages: profile.sourceLanguages ?? ['auto', ...profile.languages], targetLanguages: profile.languages })
       continue
     }
     if (model.kind === 'recognitionModel' && (model.id === 'aliyun' || model.id === 'minimax')) {
@@ -33,7 +33,7 @@ export function buildConfiguredCloudModels(settings: AppSettings, credentials: R
     }
     if (model.id === 'cloud' || model.id === 'recognition') continue
     add({ binding: `cloud:${model.id}`, name: providers[model.id] ?? model.id, kind: 'mt', origin: 'cloud', free: model.free,
-      sourceLanguages: model.id === 'index-translate' ? INDEX_TRANSLATE_LANGUAGES : ['auto', ...LANGUAGE_CODES],
+      sourceLanguages: model.id === 'index-translate' ? ['auto', ...INDEX_TRANSLATE_LANGUAGES] : model.id === 'mymemory' ? LANGUAGE_CODES : ['auto', ...LANGUAGE_CODES],
       targetLanguages: model.id === 'index-translate' ? INDEX_TRANSLATE_LANGUAGES : LANGUAGE_CODES,
       images: model.id === 'index-translate' })
   }

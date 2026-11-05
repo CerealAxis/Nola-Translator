@@ -6,7 +6,8 @@ import { BROWSER_PROTOCOL_VERSION } from '../../src/shared/browser'
 import { BrowserFailure, createBridge } from './bridge'
 import { ChoiceField } from './components/ChoiceField'
 import { browserText, errorKey } from './i18n'
-import { DEFAULT_PREFERENCES, observePreferences, type Preferences } from './preferences'
+import { DEFAULT_PREFERENCES, observePreferences, savePreferences, type Preferences } from './preferences'
+import { requestProviderAccess, type ProviderConnection } from './providers'
 
 export const languageOptions = (locale: UiLanguage) => LANGUAGE_CODES.map(code => ({ value: code, label: languageName(code, locale) }))
 export function usePreferences(): [Preferences, UiLanguage, ReturnType<typeof browserText>] {
@@ -49,4 +50,25 @@ export function ConnectionStatus({ t, compact = false }: { t: ReturnType<typeof 
 
 export function TargetLanguageField({ value, onChange, locale, t }: { value: string; onChange: (value: string) => void; locale: UiLanguage; t: ReturnType<typeof browserText> }) {
   return <ChoiceField label={t('target')} value={value} options={languageOptions(locale)} onChange={onChange} />
+}
+
+export function LiveServiceField({ settings, providers, t }: { settings: Preferences; providers: ProviderConnection[]; t: ReturnType<typeof browserText> }) {
+  const [error, setError] = useState('')
+  const currentProvider = settings.pipeline === 's2s' ? settings.s2sProvider : settings.asrProvider
+  const value = currentProvider === 'desktop' ? 'desktop' : `${settings.pipeline === 's2s' ? 's2s' : 'asr'}:${currentProvider}`
+  const options = providers.flatMap(provider => {
+    const asr = provider.capabilities.includes('asr'), s2s = provider.capabilities.includes('s2s')
+    if (provider.id === 'desktop') return asr || s2s ? [{ value: 'desktop', label: provider.name }] : []
+    return [...(asr ? [{ value: `asr:${provider.id}`, label: s2s ? `${provider.name} · ${t('asr')}` : provider.name }] : []), ...(s2s ? [{ value: `s2s:${provider.id}`, label: asr ? `${provider.name} · ${t('live')}` : provider.name }] : [])]
+  })
+  return <><ChoiceField label={t('liveService')} value={value} options={options} onChange={value => {
+    const direct = value === 'desktop' ? settings.pipeline === 's2s' && settings.s2sProvider === 'desktop' : value.startsWith('s2s:')
+    const id = value === 'desktop' ? 'desktop' : value.slice(value.indexOf(':') + 1)
+    const provider = providers.find(provider => provider.id === id)
+    if (!provider) return
+    void requestProviderAccess(provider).then(granted => {
+      if (!granted) throw new Error('permissionFailed')
+      return savePreferences(direct ? { pipeline: 's2s', s2sProvider: id } : { pipeline: 'cascade', asrProvider: id })
+    }).then(() => setError('')).catch(error => setError(t(errorKey(error instanceof Error ? error.message : 'internalError'))))
+  }} />{error && <p role="alert" className="nola-error">{error}</p>}</>
 }

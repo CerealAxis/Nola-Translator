@@ -12,3 +12,11 @@ it('preserves gateway and synthesis siblings during optimistic updates', () => {
   expect(next.closeBehavior).toBe('quit')
   expect(base.synthesis.voice).toBe('voice-a')
 })
+
+it('merges optimistic concurrency edits independently for each capability', () => {
+  const base = structuredClone(DEFAULT_SETTINGS)
+  base.modelGateway.concurrency = { mt: 2, ocr: 1 }
+  const next = mergeSettings(base, { modelGateway: { concurrency: { mt: 3, asr: 4 } } })
+  expect(next.modelGateway.concurrency).toEqual({ mt: 3, ocr: 1, asr: 4 })
+  expect(base.modelGateway.concurrency).toEqual({ mt: 2, ocr: 1 })
+})

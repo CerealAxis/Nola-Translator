@@ -1,18 +1,146 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PREFERENCES, savePreferences } from './preferences'
 import { browserText } from './i18n'
 import { Options } from './options'
 import { testProvider, translate } from './provider-client'
-import { requestProviderAccess, saveProviders } from './providers'
+import { createProvider, DEFAULT_PROVIDERS, requestProviderAccess, saveProviders } from './providers'
+import { LiveServiceField } from './settings-fields'
+
+let settings = { ...DEFAULT_PREFERENCES }
 
 vi.mock('./preferences', async original => ({ ...await original<typeof import('./preferences')>(), savePreferences: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('./settings-fields', async original => ({ ...await original<typeof import('./settings-fields')>(), usePreferences: () => [DEFAULT_PREFERENCES, 'en', browserText('en')], ConnectionStatus: () => null }))
-vi.mock('./provider-client', () => ({ translate: vi.fn().mockResolvedValue('Translated text'), testProvider: vi.fn().mockResolvedValue('OK'), clearTranslationCache: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('./settings-fields', async original => ({ ...await original<typeof import('./settings-fields')>(), usePreferences: () => [settings, 'en', browserText('en')], ConnectionStatus: () => null }))
+vi.mock('./provider-client', () => ({ translate: vi.fn().mockResolvedValue('Translated text'), synthesize: vi.fn(), testProvider: vi.fn().mockResolvedValue('OK'), clearTranslationCache: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('./providers', async original => { const actual = await original<typeof import('./providers')>(); return { ...actual, loadProviders: vi.fn().mockResolvedValue(actual.DEFAULT_PROVIDERS), saveProviders: vi.fn().mockResolvedValue(undefined), requestProviderAccess: vi.fn().mockResolvedValue(true) } })
-beforeEach(() => { vi.clearAllMocks(); window.scrollTo = vi.fn(); vi.mocked(requestProviderAccess).mockResolvedValue(true); vi.stubGlobal('chrome', { storage: { onChanged: { addListener: vi.fn(), removeListener: vi.fn() } } }) })
+beforeEach(() => { vi.clearAllMocks(); settings = { ...DEFAULT_PREFERENCES }; window.history.replaceState(null, '', '#general'); window.scrollTo = vi.fn(); vi.mocked(requestProviderAccess).mockResolvedValue(true); vi.stubGlobal('chrome', { storage: { onChanged: { addListener: vi.fn(), removeListener: vi.fn() } } }) })
 describe('extension settings', () => {
+  it('chooses a live service without showing pipeline implementation terms', async () => {
+    const user = userEvent.setup(); const cloud = { ...createProvider('alibaba'), id: 'cloud' }; const t = browserText('en')
+    render(<LiveServiceField settings={settings} providers={[...DEFAULT_PROVIDERS, cloud]} t={t} />)
+    await user.click(screen.getByRole('combobox', { name: t('liveService') }))
+    expect(screen.getAllByRole('option', { name: 'Nola Translator' })).toHaveLength(1)
+    expect(screen.queryByText(/cascade|s2s/i)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('option', { name: `Alibaba Cloud · ${t('live')}` }))
+    expect(requestProviderAccess).toHaveBeenCalledWith(cloud)
+    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ pipeline: 's2s', s2sProvider: 'cloud' }))
+  })
+  it('returns to recognition when a regular live service is selected', async () => {
+    const user = userEvent.setup(); const cloud = { ...createProvider('alibaba'), id: 'cloud' }; const t = browserText('en')
+    render(<LiveServiceField settings={{ ...settings, pipeline: 's2s', s2sProvider: 'cloud' }} providers={[...DEFAULT_PROVIDERS, cloud]} t={t} />)
+    await user.click(screen.getByRole('combobox', { name: t('liveService') }))
+    await user.click(screen.getByRole('option', { name: `Alibaba Cloud · ${t('asr')}` }))
+    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ pipeline: 'cascade', asrProvider: 'cloud' }))
+  })
+  it('shows a denied live service permission and keeps its previous binding', async () => {
+    const user = userEvent.setup(); const cloud = { ...createProvider('alibaba'), id: 'cloud' }; const t = browserText('en')
+    render(<LiveServiceField settings={settings} providers={[...DEFAULT_PROVIDERS, cloud]} t={t} />)
+    vi.mocked(requestProviderAccess).mockResolvedValueOnce(false)
+    await user.click(screen.getByRole('combobox', { name: t('liveService') }))
+    await user.click(screen.getByRole('option', { name: `Alibaba Cloud · ${t('live')}` }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(t('permissionFailed'))
+    expect(savePreferences).not.toHaveBeenCalled()
+  })
+  it('adds the chosen provider and keeps its API key masked until requested', async () => {
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'API connections' }))
+    await user.click(await screen.findByRole('button', { name: 'Add' }))
+    await user.click(screen.getByRole('button', { name: /^OpenAI$/ }))
+    await waitFor(() => expect(saveProviders).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ preset: 'openai' })])))
+    const key = await screen.findByLabelText('API key')
+    expect(key).toHaveAttribute('type', 'password')
+    await user.click(screen.getByRole('switch', { name: browserText('en')('showApiKey') }))
+    expect(key).toHaveAttribute('type', 'text')
+  })
+  it('preserves unsaved drafts when switching providers', async () => {
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'API connections' }))
+    await user.click(await screen.findByRole('button', { name: 'Google Translate' }))
+    await user.clear(screen.getByRole('textbox', { name: 'Name' })); await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Draft Google')
+    await user.click(screen.getByRole('button', { name: 'Microsoft Translator' }))
+    await user.click(screen.getByRole('button', { name: 'Google Translate' }))
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Draft Google')
+  })
+  it('confirms provider removal and restores every affected binding first', async () => {
+    const id = 'edge-tts'; settings = { ...settings, ttsProvider: id }
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'API connections' }))
+    await user.click(await screen.findByRole('button', { name: /Microsoft Edge TTS/ }))
+    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    expect(saveProviders).not.toHaveBeenCalled()
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }))
+    await waitFor(() => expect(saveProviders).toHaveBeenCalledWith(expect.not.arrayContaining([expect.objectContaining({ id })])))
+    expect(savePreferences).toHaveBeenCalledWith({ ttsProvider: 'desktop' })
+    expect(vi.mocked(savePreferences).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(saveProviders).mock.invocationCallOrder[0])
+  })
+  it('keeps the connection when restoring its bindings fails', async () => {
+    settings = { ...settings, ttsProvider: 'edge-tts' }
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'API connections' }))
+    await user.click(await screen.findByRole('button', { name: /Microsoft Edge TTS/ }))
+    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    vi.mocked(savePreferences).mockRejectedValueOnce(new Error('write failed'))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }))
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(saveProviders).not.toHaveBeenCalled()
+  })
+  it('records a shortcut from the keyboard and focuses search with Ctrl+K', async () => {
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'Keyboard shortcuts' }))
+    await user.click(screen.getByRole('textbox', { name: browserText('en')('translatePage') }))
+    await user.keyboard('{Control>}{Shift>}y{/Shift}{/Control}')
+    expect(savePreferences).toHaveBeenCalledWith({ shortcutPage: 'Ctrl+Shift+Y' })
+    await user.keyboard('{Control>}k{/Control}')
+    expect(screen.getByRole('textbox', { name: 'Search settings' })).toHaveFocus()
+  })
+  it('rejects a shortcut already used by another action', async () => {
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'Keyboard shortcuts' }))
+    const input = screen.getByRole('textbox', { name: browserText('en')('translateSelection') })
+    await user.click(input); await user.keyboard('{Alt>}t{/Alt}')
+    expect(savePreferences).not.toHaveBeenCalled()
+    expect(input).toHaveValue(settings.shortcutSelection)
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByText(browserText('en')('shortcutConflict'))).toBeVisible()
+  })
+  it('requires confirmation before removing a term or a site rule', async () => {
+    settings = { ...settings, glossary: [{ source: 'API', target: '接口', sites: '' }], siteRules: [{ host: 'example.com', includeSelectors: '', excludeSelectors: '' }] }
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'Terminology' }))
+    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    expect(savePreferences).not.toHaveBeenCalled()
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }))
+    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ glossary: [] }))
+    await user.click(screen.getByRole('button', { name: browserText('en')('web') }))
+    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    expect(savePreferences).toHaveBeenCalledTimes(1)
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }))
+    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ siteRules: [] }))
+  })
+  it('confirms resetting settings without a native browser dialog', async () => {
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: browserText('en')('backup') }))
+    await user.click(screen.getByRole('button', { name: browserText('en')('resetSettings') }))
+    expect(savePreferences).not.toHaveBeenCalled()
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: browserText('en')('resetSettings') }))
+    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith(DEFAULT_PREFERENCES))
+  })
+  it('cancels an in-flight result when its provider card is closed', async () => {
+    let finish!: (value: string) => void
+    vi.mocked(translate).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const user = userEvent.setup(); render(<Options />)
+    await user.click(screen.getByRole('button', { name: 'Translation center' }))
+    await user.type(screen.getByRole('textbox', { name: 'Text to translate' }), 'Hello')
+    await user.click(screen.getByRole('button', { name: 'Translate text' }))
+    await waitFor(() => expect(translate).toHaveBeenCalled())
+    const signal = vi.mocked(translate).mock.calls[0][4]
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(signal?.aborted).toBe(true)
+    await act(async () => finish('Late translation'))
+    expect(screen.queryByText('Late translation')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Translate text' })).toBeDisabled()
+  })
   it('tests the built-in Nola desktop connection without saving or asking for an API key', async () => {
     vi.mocked(testProvider).mockResolvedValueOnce('OK')
     const user = userEvent.setup(); render(<Options />)
@@ -85,7 +213,7 @@ describe('extension settings', () => {
     await user.click(screen.getByRole('button', { name: 'Translation center' }))
     await user.type(screen.getByRole('textbox', { name: 'Text to translate' }), 'Hello')
     await user.click(screen.getByRole('button', { name: 'Translate text' }))
-    await waitFor(() => expect(translate).toHaveBeenCalledWith('Hello', 'auto', 'zh', 'selection', undefined, 'desktop'))
+    await waitFor(() => expect(translate).toHaveBeenCalledWith('Hello', 'auto', 'zh', 'selection', expect.any(AbortSignal), 'desktop'))
     expect(await screen.findByText('Translated text')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Terminology' }))
     await user.type(screen.getByRole('textbox', { name: 'Source term' }), 'API')

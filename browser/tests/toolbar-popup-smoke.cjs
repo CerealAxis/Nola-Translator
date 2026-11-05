@@ -5,17 +5,27 @@ const os = require('node:os')
 const http = require('node:http')
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')
 
-// Uses a real browser action popup, never a normal tab or a mocked tabs.query result.
+// Uses a real browser action popup and a local API fixture, with no external translation dependency.
 async function main() {
   const root = path.resolve(__dirname, '../..')
   const executable = process.env.POPUP_BROWSER || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
   const name = /quark/i.test(executable) ? 'quark' : /msedge/i.test(executable) ? 'edge' : 'chrome'
   const output = path.join(root, 'artifacts/browser-toolbar', name)
   await fs.mkdir(output, { recursive: true })
-  const server = http.createServer((_request, response) => { response.setHeader('Content-Type', 'text/html; charset=utf-8'); response.end('<!doctype html><html lang="en"><head><title>Nola toolbar acceptance</title></head><body><main style="max-width:650px;margin:80px auto;font:18px/1.7 sans-serif"><h1>Browser translation test</h1><p id="source">Good ideas can travel across languages.</p><p>This page checks the actual browser toolbar and the floating translation button.</p></main></body></html>') })
+  const apiRequests = []
+  const server = http.createServer((request, response) => {
+    response.setHeader('Access-Control-Allow-Origin', '*'); response.setHeader('Access-Control-Allow-Headers', '*')
+    if (request.method === 'OPTIONS') { response.writeHead(204); response.end(); return }
+    if (request.method === 'POST' && request.url === '/v1/chat/completions') {
+      let body = ''; request.on('data', chunk => { body += chunk })
+      request.on('end', () => { apiRequests.push(JSON.parse(body)); response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify({ choices: [{ message: { content: '固定测试译文' } }] })) })
+      return
+    }
+    response.setHeader('Content-Type', 'text/html; charset=utf-8'); response.end('<!doctype html><html lang="en"><head><title>Nola toolbar acceptance</title></head><body><main style="max-width:650px;margin:80px auto;font:18px/1.7 sans-serif"><h1>Browser translation test</h1><p id="source">Good ideas can travel across languages.</p><p>This page checks the actual browser toolbar and the floating translation button.</p></main></body></html>')
+  })
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'nola-toolbar-'))
-  const context = await chromium.launchPersistentContext(profile, { executablePath: executable, headless: false, viewport: null, ignoreDefaultArgs: ['--disable-extensions'], args: ['--enable-unsafe-extension-debugging', '--window-size=1100,850', '--disable-features=msEdgeTranslate,Translate'] })
+  const context = await chromium.launchPersistentContext(profile, { executablePath: executable, headless: process.env.POPUP_HEADLESS === '1', viewport: null, ignoreDefaultArgs: ['--disable-extensions'], args: ['--enable-unsafe-extension-debugging', '--window-size=1100,850', '--disable-features=msEdgeTranslate,Translate'] })
   const results = []; const errors = []; const externalErrors = []; const worlds = new Map()
   const cdp = await context.browser().newBrowserCDPSession()
   const pending = new Map(); let nextId = 0
@@ -54,6 +64,15 @@ async function main() {
   try {
     const { id } = await cdp.send('Extensions.loadUnpacked', { path: path.join(root, 'browser/extension/dist') })
     const worker = context.serviceWorkers().find(worker => worker.url().includes(id)) || await context.waitForEvent('serviceworker')
+    await worker.evaluate(async endpoint => {
+      const database = await new Promise((resolve, reject) => { const request = indexedDB.open('nola-extension-providers', 1); request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains('settings')) request.result.createObjectStore('settings') }; request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error) })
+      const providers = [
+        { id: 'desktop', name: 'Nola Translator', preset: 'nola', baseUrl: '', apiKey: '', model: '', capabilities: ['asr', 'mt', 'tts', 's2s', 'llm'], headers: {}, options: {} },
+        { id: 'fixture', name: 'Local fixture', preset: 'openai-compatible', baseUrl: endpoint, apiKey: '', model: 'fixture', capabilities: ['mt', 'llm'], headers: {}, options: {} },
+      ]
+      await new Promise((resolve, reject) => { const transaction = database.transaction('settings', 'readwrite'); transaction.objectStore('settings').put(providers, 'connections'); transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error) }); database.close()
+      await chrome.storage.local.set({ providerRevision: 'toolbar-fixture', translateTitle: false })
+    }, `http://127.0.0.1:${server.address().port}/v1`)
     console.log('Extension loaded:', id)
     const page = context.pages()[0]
     await page.goto(`http://127.0.0.1:${server.address().port}/`)
@@ -107,8 +126,8 @@ async function main() {
     assert.ok(drawer.x >= -1 && drawer.y >= -1 && drawer.right <= drawer.width + 1 && drawer.bottom <= drawer.height + 1, JSON.stringify(drawer))
     await popup.screenshot('providers.png')
     await popup.click(`document.querySelector('[role=dialog] [role=combobox]')`)
-    await popup.click(`Array.from(document.querySelectorAll('[role=option]')).find(e=>e.textContent.includes('Microsoft Translator'))`)
-    await popup.wait(`document.querySelector('[role=dialog] [role=combobox]').textContent.includes('Microsoft')`)
+    await popup.click(`Array.from(document.querySelectorAll('[role=option]')).find(e=>e.textContent.includes('Local fixture'))`)
+    await popup.wait(`document.querySelector('[role=dialog] [role=combobox]').textContent.includes('Local fixture')`)
     await popup.click(`document.querySelector('[role=dialog] [aria-label="Close"]')`)
     await popup.wait(`!document.querySelector('[role=dialog]')`)
     await popup.click(`document.querySelector('.nola-popup-translate')`)
@@ -118,7 +137,7 @@ async function main() {
     await popup.wait(`document.querySelector('.nola-popup-translate').getAttribute('aria-label') === 'Restore original'`)
     await popup.click(`document.querySelector('.nola-popup-translate')`)
     await page.locator('#source [data-nola-translation]').waitFor({ state: 'detached' })
-    results.push({ check: 'real popup search, provider drawer, Microsoft translation and restore' })
+    results.push({ check: 'real popup search, provider drawer, local API translation and restore' })
     await popup.evaluate('window.close()')
     await dock.hover({ position: { x: 5, y: 20 } })
     await dock.click()
@@ -126,7 +145,7 @@ async function main() {
     await dock.click()
     await page.locator('#source [data-nola-translation]').waitFor({ state: 'detached' })
     await page.screenshot({ path: path.join(output, 'floating-translation-restored.png') })
-    results.push({ check: 'floating main button translates and restores using real provider' })
+    results.push({ check: 'floating main button translates and restores using local API fixture' })
     const panelPopup = await openPopup('en', 'light')
     await panelPopup.click(`document.querySelector('[aria-label="Open translation sidebar"]')`)
     let panelTarget
@@ -148,6 +167,7 @@ async function main() {
     await second.close()
     results.push({ check: 'native sidebar opens from popup and translates the newly active tab' })
     assert.deepEqual(errors, [])
+    assert.ok(apiRequests.length > 0, 'Browser actions reached the local API fixture')
     await fs.writeFile(path.join(output, 'result.json'), JSON.stringify({ browser: name, version: await worker.evaluate(() => chrome.runtime.getManifest().version), results, errors, externalErrors, limits: ['No paid ASR or audio test in this focused popup regression'] }, null, 2))
     console.log(JSON.stringify({ browser: name, checks: results.length, errors, externalErrors: externalErrors.length }))
     if (process.argv.includes('--inspect')) { await worker.evaluate(() => chrome.storage.local.set({ uiLanguage: 'zh-CN', theme: 'light' })); console.log('Ready for native toolbar click inspection; send Enter to close.'); await new Promise(resolve => process.stdin.once('data', resolve)) }

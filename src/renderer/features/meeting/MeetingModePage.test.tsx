@@ -1,11 +1,16 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
 import type { NolaBridge } from '@/bridge'
 import { DEFAULT_SETTINGS } from '../../../shared/settings'
 import { DEFAULT_MEETING_MODE, type MeetingAudioTestResult, type MeetingModeSnapshot } from '../../../shared/meeting-mode'
 import * as store from '@/store'
 import { MeetingModePage } from './MeetingModePage'
 import type { SettingSelectProps } from '../settings/SettingsPage'
+import type { AvailableModels } from '@/available-models'
+
+const models = vi.hoisted(() => ({ catalog: { asr: [], mt: [], tts: [], llm: [], ocr: [] } as AvailableModels }))
+vi.mock('@/available-models', async importOriginal => ({ ...await importOriginal<typeof import('@/available-models')>(), useAvailableModels: () => models.catalog }))
 
 vi.mock('../settings/SettingsPage', () => ({ SettingSelect: ({ id, value, options, onChange, ariaLabel, isDisabled }: SettingSelectProps) =>
   <select id={id} value={value} disabled={isDisabled} aria-label={ariaLabel} onChange={event => onChange(event.target.value)}>
@@ -27,6 +32,12 @@ const testAudio = vi.fn()
 const start = vi.fn()
 let changed: (snapshot: MeetingModeSnapshot) => void
 beforeEach(() => {
+  models.catalog = {
+    asr: [{ binding: 'resource:asr', name: 'ASR', kind: 'asr', origin: 'gateway', free: true, sourceLanguages: ['auto', 'zh', 'en', 'ja'] }],
+    mt: [{ binding: 'resource:mt', name: 'MT', kind: 'mt', origin: 'gateway', free: true, sourceLanguages: ['auto', 'zh', 'en', 'ja'], targetLanguages: ['zh', 'en', 'ja'] }],
+    tts: [{ binding: 'resource:tts', name: 'TTS', kind: 'tts', origin: 'gateway', free: true, targetLanguages: ['zh', 'en', 'ja'] }],
+    ocr: [], llm: [],
+  }
   store.stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, uiLanguage: 'zh-CN', meetingMode: mode } })
   store.stores.models.setState({ devices: [...devices] })
   vi.spyOn(store.actions.models, 'probeAudioDevices').mockResolvedValue([...devices])
@@ -44,6 +55,36 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); store.stores.settings.setState(initialSettings); store.stores.models.setState(initialModels) })
 const ready = async (testDialog = true) => { render(<MeetingModePage />); await waitFor(() => expect(screen.getByRole('button', { name: '刷新设备' })).toBeEnabled()); if(testDialog) fireEvent.click(screen.getByTestId('meeting-audio-test')) }
 
+it('rejects a saved meeting source unsupported by its custom translator', async () => {
+  models.catalog.mt = [{ binding: 'mt-custom:limited', name: 'Limited', kind: 'mt', origin: 'cloud', free: false, sourceLanguages: ['en'], targetLanguages: ['zh'] }]
+  const settings = store.stores.settings.getState().settings!
+  store.stores.settings.setState({ settings: { ...settings,
+    modelPolicy: { enabled: {}, defaults: {}, ...settings.modelPolicy, selections: { ...settings.modelPolicy?.selections, mt: 'mt-custom:limited' } },
+    meetingMode: { ...mode, pipeline: 'cascade', uplinkEnabled: true, downlinkEnabled: false, localLanguage: 'ja', remoteLanguage: 'zh' },
+  } })
+  await ready(false)
+  fireEvent.click(screen.getByRole('button', { name: '开始会议口译' }))
+  expect(start).not.toHaveBeenCalled()
+})
+
+it('limits bidirectional choices to the selected recognition, translation and speech models', async () => {
+  models.catalog.asr[0].sourceLanguages = ['auto', 'zh', 'en', 'ja', 'fr']
+  models.catalog.mt[0].targetLanguages = ['zh', 'en', 'ja', 'de']
+  models.catalog.tts[0].targetLanguages = ['zh', 'en']
+  await ready(false)
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('combobox', { name: '我的语言' }))
+  expect(within(await screen.findByRole('listbox')).getAllByRole('option').map(option => option.textContent)).toEqual(['简体中文', '英语 (English)'])
+  expect(screen.queryByRole('option', { name: '自动检测' })).not.toBeInTheDocument()
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(screen.getByRole('combobox', { name: '我的语言' })).toHaveAttribute('aria-expanded', 'false'))
+  fireEvent.click(screen.getByRole('switch', { name: '对方说给我' }))
+  await user.click(screen.getByRole('combobox', { name: '我的语言' }))
+  expect(await screen.findByRole('option', { name: '日语 (日本語)' })).toBeInTheDocument()
+  expect(screen.queryByRole('option', { name: '法语 (français)' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('option', { name: '德语 (Deutsch)' })).not.toBeInTheDocument()
+})
+
 it('tests the paired render endpoint and requires human confirmation for headphones', async () => {
   testAudio.mockImplementation(async request => ({ kind: request.kind, hasSignal: request.kind === 'cable', peak: 0.2, playbackSent: true }))
   await ready()
@@ -57,7 +98,7 @@ it('tests the paired render endpoint and requires human confirmation for headpho
   expect(screen.getByText('已确认听到')).toBeInTheDocument()
   act(() => store.stores.models.setState({ devices: devices.filter(device => device.deviceId !== 'mic') }))
   expect(screen.queryByText('已确认听到')).not.toBeInTheDocument()
-  expect(screen.getAllByRole('button', { name: '开始会议口译' }).every(button => button.hasAttribute('disabled'))).toBe(true)
+  expect(screen.getAllByRole('button', { name: '开始会议口译' }).every(button => !button.hasAttribute('disabled'))).toBe(true)
 })
 
 it('shows a typed device failure and does not mark a silent microphone as passed', async () => {
@@ -122,10 +163,23 @@ it('supports receive-only application audio without a cable or microphone', asyn
   expect(screen.getByText('先让会议应用播放声音，再运行检测。')).toBeVisible()
 })
 
-it('rejects disabling both directions', async () => {
+it('explains invalid routing when start is clicked instead of disabling the action', async () => {
   store.stores.settings.setState({ settings: { ...DEFAULT_SETTINGS, uiLanguage: 'zh-CN', meetingMode: { ...mode, uplinkEnabled: false, downlinkEnabled: false } } })
   await ready(false)
-  expect(screen.getByRole('button', { name: '开始会议口译' })).toBeDisabled()
+  const button = screen.getByRole('button', { name: '开始会议口译' })
+  expect(button).toBeEnabled()
+  fireEvent.click(button)
+  expect(await screen.findByRole('alert')).toHaveTextContent('请选择有效设备和不同语言，并至少开启一个方向。')
+  expect(start).not.toHaveBeenCalled()
+})
+
+it('keeps start available without loaded gateway models and delegates model validation', async () => {
+  models.catalog = { asr: [], mt: [], tts: [], ocr: [], llm: [] }
+  await ready(false)
+  const button = screen.getByRole('button', { name: '开始会议口译' })
+  expect(button).toBeEnabled()
+  fireEvent.click(button)
+  await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ pipeline: 'auto' })))
 })
 
 
@@ -154,11 +208,13 @@ it('selects application or device input in one field and passes the correspondin
 
 it('updates both language directions through the shared language pair and swap action', async () => {
   await ready(false)
-  fireEvent.click(screen.getByRole('button', { name: /^语言方向:/ }))
-  fireEvent.change(await screen.findByRole('combobox', { name: '我的语言' }), { target: { value: 'ja' } })
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('combobox', { name: '我的语言' }))
+  await user.type(await screen.findByRole('combobox', { name: '搜索语言…' }), '日本語')
+  await user.click(await screen.findByRole('option', { name: '日语 (日本語)' }))
   fireEvent.click(screen.getByRole('button', { name: '交换语言' }))
-  expect(screen.getByRole('combobox', { name: '我的语言' })).toHaveValue('en')
-  expect(screen.getByRole('combobox', { name: '对方语言' })).toHaveValue('ja')
+  expect(screen.getByRole('combobox', { name: '我的语言' })).toHaveTextContent('英语')
+  expect(screen.getByRole('combobox', { name: '对方语言' })).toHaveTextContent('日语')
   fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
   fireEvent.click(screen.getByRole('button', { name: '开始会议口译' }))
   await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ localLanguage: 'en', remoteLanguage: 'ja' })))

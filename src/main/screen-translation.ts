@@ -5,6 +5,9 @@ import { BrowserWindow, desktopCapturer, globalShortcut, ipcMain, screen, sessio
 import type { IpcMainInvokeEvent, Rectangle, WebContents } from 'electron'
 import { electronShortcut } from '../shared/keyboard-shortcuts'
 import type { AppSettings } from '../shared/settings'
+import { defaultRealtimeS2s } from '../shared/settings'
+import type { ModelGatewaySnapshot } from '../shared/model-gateway'
+import { screenProcessingMode, screenTranslationModel } from '../shared/screen-translation'
 import type { DirectModelRequest, DirectModelResult } from '../shared/agent-workspace'
 import { screenCommandSchema, screenConfigSchema, screenFrameSchema, screenShortcutsSchema, screenPresetSchema, screenRegionSetSchema, type ScreenRegionSet, type ScreenRegionPreset, type ScreenShortcuts, type ScreenConfig, type ScreenFrame, type ScreenSnapshot, type ScreenSource, type ScreenOcrRequest, type ScreenOcrResult } from '../shared/screen-translation'
 import type { FeatureActivity, FeatureLease } from './feature-activity'
@@ -13,6 +16,8 @@ import { ScreenPipeline, mergeScreenLines, type OcrBlock } from './screen-pipeli
 
 interface ScreenTranslationOptions {
   mainDir: string; configPath: string; prepareOcr(): Promise<() => void>
+  gatewaySnapshot(): Pick<ModelGatewaySnapshot, 'state' | 'availableModels'>
+  getMainWindow?(): BrowserWindow | null
   inferOcr(request: ScreenOcrRequest, signal: AbortSignal): Promise<ScreenOcrResult>
   settings(): AppSettings; inferModel(request: DirectModelRequest, signal: AbortSignal): Promise<DirectModelResult>
   publish(snapshot: ScreenSnapshot): void; activity?: FeatureActivity
@@ -23,6 +28,7 @@ export class ScreenTranslation {
   private capture?: BrowserWindow
   private overlay?: BrowserWindow
   private editor?: BrowserWindow
+  private hiddenMainWindow?: BrowserWindow
   private highlights?: BrowserWindow
   private highlightTimer?: ReturnType<typeof setTimeout>
   private escapeRegistered = false
@@ -262,22 +268,31 @@ export class ScreenTranslation {
     if (this.state.status === 'starting' || this.state.status === 'running' || this.editor) return
     if (this.capture && this.lease) { await this.resume(); return }
     if (this.disposed) return
+    if (this.options.gatewaySnapshot().state !== 'running') { this.fail('gatewayNotReady'); return }
+    if (screenProcessingMode(this.state.config) === 'default' && defaultRealtimeS2s(this.options.settings())) {
+      this.fail('s2sUnsupported'); return
+    }
     const lifecycle = ++this.lifecycle
     this.state.status = 'starting'; this.state.error = undefined; this.publish()
-    let stage: 'backend' | 'capture' = 'capture'
+    let stage: 'backend' | 'capture' = 'backend'
     try {
+      this.lease = this.options.activity?.acquire('screen-translation', () => this.stop())
+      const release = await this.options.prepareOcr()
+      if (lifecycle !== this.lifecycle || this.disposed) { release(); return }
+      this.releaseOcr = release
+      const model = screenTranslationModel(this.state.config, this.options.settings())
+      if (!model) { this.fail('translationModelMissing'); return }
+      if (!this.options.gatewaySnapshot().availableModels?.mt?.some(candidate => candidate.binding === model && model !== 'cloud:recognition')) {
+        this.fail('translationModelNotReady'); return
+      }
+      stage = 'capture'
       const changed = await this.desktopSource()
       if (lifecycle !== this.lifecycle || this.disposed) return
       if (changed) { await this.edit(); this.editReturn = 'running'; return }
       const config = this.state.config
-      if (!config.regions.length || !config.model || config.sourceLanguage === config.targetLanguage) { this.fail('invalidConfig'); return }
-      this.lease = this.options.activity?.acquire('screen-translation', () => this.stop())
-      stage = 'backend'
-      const release = await this.options.prepareOcr()
-      if (lifecycle !== this.lifecycle || this.disposed) { release(); return }
-      this.releaseOcr = release
+      if (!config.regions.length) { this.fail('regionsMissing'); return }
+      if (config.sourceLanguage === config.targetLanguage) { this.fail('sameLanguage'); return }
       this.state.sessionId = randomUUID()
-      stage = 'capture'
       this.state.frames = 0
       this.userPaused = false
       await this.openCapture(lifecycle)
@@ -288,6 +303,7 @@ export class ScreenTranslation {
       this.publish()
     } catch (error) {
       if (lifecycle !== this.lifecycle || this.disposed) return
+      if (this.options.gatewaySnapshot().state !== 'running') { this.fail('gatewayNotReady'); return }
       this.fail(error instanceof Error && error.message === 'targetChanged' ? 'targetChanged' : error instanceof Error && error.message === 'targetUnavailable' ? 'targetUnavailable' : stage === 'backend' ? 'ocrNotReady' : 'captureFailed')
     }
   }
@@ -303,6 +319,11 @@ export class ScreenTranslation {
   }
 
   async resume(): Promise<void> {
+    await this.ready
+    if (this.options.gatewaySnapshot().state !== 'running') { this.fail('gatewayNotReady'); return }
+    if (screenProcessingMode(this.state.config) === 'default' && defaultRealtimeS2s(this.options.settings())) {
+      this.fail('s2sUnsupported'); return
+    }
     if (!this.capture || !this.lease && this.options.activity) { await this.stop(); await this.start(); return }
     if (this.editor) return
     this.userPaused = false
@@ -319,6 +340,7 @@ export class ScreenTranslation {
     this.lease?.stopping(); this.invalidate()
     const editor = this.editor; this.editor = undefined
     this.state.status = 'ready'; editor?.destroy()
+    this.restoreMainWindow()
     const task = (async () => {
       await this.closeCapture()
       this.releaseOcr?.(); this.releaseOcr = undefined
@@ -344,6 +366,11 @@ export class ScreenTranslation {
     this.state.status = 'editing'
     const window = this.openWindow('editor', this.bounds!)
     this.editor = window
+    const mainWindow = this.options.getMainWindow?.()
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+      this.hiddenMainWindow = mainWindow
+      mainWindow.hide()
+    }
     window.once('closed', () => { if (this.editor === window) { this.editor = undefined; void this.finishEdit().catch(() => this.fail('captureFailed')) } })
     this.publish()
   }
@@ -396,14 +423,15 @@ export class ScreenTranslation {
   private resetPipeline(): void {
     this.invalidate()
     const epoch = this.state.epoch
-    this.pipeline = new ScreenPipeline(this.state.config, async (text, signal) => {
+    const model = screenTranslationModel(this.state.config, this.options.settings())
+    this.pipeline = new ScreenPipeline({ ...this.state.config, model }, async (text, signal) => {
       const started = Date.now()
-      const result = await this.options.inferModel({ id: randomUUID(), kind: 'mt', model: this.state.config.model,
+      const result = await this.options.inferModel({ id: randomUUID(), kind: 'mt', model, taskMode: 'realtime',
         text, source: this.state.config.sourceLanguage, target: this.state.config.targetLanguage }, AbortSignal.any([signal, AbortSignal.timeout(25000)]))
       if (epoch === this.state.epoch) this.state.translationMs = Date.now() - started
       return result.text
     }, () => { if (epoch === this.state.epoch) { this.state.blocks = this.pipeline?.blocks() ?? []; this.publish() } },
-    () => { if (epoch === this.state.epoch) { this.state.error = 'translationFailed'; this.publish() } })
+    () => { if (epoch === this.state.epoch) { if (this.state.error !== 'translationFailed') this.state.errorId = randomUUID(); this.state.error = 'translationFailed'; this.publish() } })
   }
 
   private invalidate(): void {
@@ -419,7 +447,7 @@ export class ScreenTranslation {
   private fail(error: ScreenSnapshot['error']): void {
     const cleanup = this.stop()
     const lifecycle = this.lifecycle
-    this.state.status = 'error'; this.state.error = error; this.publish()
+    this.state.status = 'error'; this.state.error = error; this.state.errorId = randomUUID(); this.publish()
     void cleanup.then(() => {
       if (this.disposed || lifecycle !== this.lifecycle) return
       this.state.status = 'error'; this.state.error = error; this.publish()
@@ -486,10 +514,17 @@ export class ScreenTranslation {
   private async finishEdit(): Promise<void> {
     const editor = this.editor; this.editor = undefined
     this.state.status = 'paused'; editor?.destroy()
+    this.restoreMainWindow()
     if (this.state.config.reviewRequired) await this.stop()
     else if (this.editReturn === 'running' && this.state.config.regions.length) await this.resume()
     else if (this.editReturn === 'ready') await this.stop()
     else { this.userPaused = true; this.publish() }
+  }
+
+  private restoreMainWindow(): void {
+    const window = this.hiddenMainWindow
+    this.hiddenMainWindow = undefined
+    if (window && !window.isDestroyed()) { window.show(); window.focus() }
   }
 
   private updateBounds(): void {

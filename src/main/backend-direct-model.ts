@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import { WebSocket } from 'ws'
 import type { DirectModelRequest, DirectModelResult } from '../shared/agent-workspace'
-import { normalizeModelBinding } from '../shared/model-gateway'
+import { gatewayConcurrency, normalizeModelBinding } from '../shared/model-gateway'
 import { MIMO_TTS_BINDING, MIMO_TTS_MODEL } from '../shared/settings'
 import type { ResourceRecord, SessionConfig } from '../shared/contracts'
 import type { BackendSupervisor } from './backend-supervisor'
@@ -43,7 +43,7 @@ function backendModelFailure(status: number, failure?: z.infer<typeof backendErr
   return new BackendModelError(status, 'engineTransportUnavailable')
 }
 
-export interface BackendInferenceOptions { batchAsr?: boolean; mp3?: boolean; inspect?: boolean }
+export interface BackendInferenceOptions { batchAsr?: boolean; mp3?: boolean; inspect?: boolean; concurrency?: number }
 const CLOUD_MT_MODELS = ['google', 'microsoft', 'mymemory', 'index-translate'] as const
 export function backendCloudMt(binding: string) {
   return binding.startsWith('mt-custom:') && binding !== 'mt-custom:legacy-fallback' ? 'custom-mt'
@@ -136,7 +136,7 @@ export async function openBackendAsrStream(
   }) }
 }
 
-export async function openBackendLanguageModel(backend: BackendConnection, model: string, signal: AbortSignal) {
+export async function openBackendLanguageModel(backend: BackendConnection, model: string, signal: AbortSignal, concurrency = 1) {
   const headers = backend.authorizationHeader()
   const list = await fetch(new URL('/api/v2/gateway/capabilities', backend.baseUrl), { headers, signal })
   if (!list.ok) return rejectBackendModel(list)
@@ -153,7 +153,7 @@ export async function openBackendLanguageModel(backend: BackendConnection, model
   try {
     const response = await fetch(new URL('/api/v2/gateway/language-models', backend.baseUrl), {
       method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, signal,
-      body: JSON.stringify({ model, lease_id: leaseId }),
+      body: JSON.stringify({ model, lease_id: leaseId, max_concurrency: concurrency }),
     })
     if (!response.ok) await rejectBackendModel(response)
     lease = schema.parse(await response.json())
@@ -205,7 +205,8 @@ export async function inferBackendModel(
       ...(cloudAsr ? recognition : {}),
       ...(cloudMt ? backendMtHeaders(translation) : {}),
     }, signal,
-    body: JSON.stringify({ id, model, kind: inspect ? 'tts-voices' : kind, ...parameters }),
+    body: JSON.stringify({ id, model, kind: inspect ? 'tts-voices' : kind,
+      task_mode: request.taskMode ?? 'offline', max_concurrency: options?.concurrency ?? 1, ...parameters }),
   })
   if (!response.ok) return rejectBackendModel(response)
   return result.parse(await response.json())
@@ -302,7 +303,10 @@ export class BackendScreenOcr {
     if (!response.ok) throw new Error('ocrFailed')
   }
   async infer(request: ScreenOcrRequest, signal: AbortSignal): Promise<ScreenOcrResult> {
-    return screenOcrResult.parse(await this.request('', 'POST', request, signal, this.activeResource))
+    const { taskMode = 'realtime', ...payload } = request
+    const concurrency = gatewayConcurrency(`resource:${this.activeResource}`, this.options.settings().modelGateway.concurrency?.ocr)
+    return screenOcrResult.parse(await this.request('', 'POST', { ...payload, task_mode: taskMode,
+      max_concurrency: taskMode === 'realtime' ? 1 : concurrency }, signal, this.activeResource))
   }
   dispose(): void { this.disposed = true; if (this.poll) clearTimeout(this.poll); this.poll = undefined }
 }

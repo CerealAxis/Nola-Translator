@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 export const directModelRequestSchema = z.object({
   id: z.string().uuid(), model: z.string().min(1).max(512),
+  taskMode: z.enum(['realtime', 'offline']).optional(),
   kind: z.enum(['asr', 'mt', 'tts']), text: z.string().max(64000).default(''),
   source: z.string().max(32).default('auto'), target: z.string().max(32).default('zh'),
   voice: z.string().max(256).default(''), audio: z.string().max(32 * 1024 * 1024 + 64).optional(),

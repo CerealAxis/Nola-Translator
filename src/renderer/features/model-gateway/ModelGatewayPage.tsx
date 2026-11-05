@@ -19,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { GatewayCapability, ModelGatewaySnapshot } from '../../../shared/model-gateway'
-import { bindingIsLocal, normalizeModelBinding } from '../../../shared/model-gateway'
+import { MAX_API_CONCURRENCY, MAX_LOCAL_CONCURRENCY, gatewayConcurrency, gatewayConcurrencyMaximum, bindingIsLocal, normalizeModelBinding } from '../../../shared/model-gateway'
 import { defaultModelBinding, modelEnablePatch } from '../../../shared/model-policy'
 import { defaultRealtimeS2s, MIMO_TTS_BINDING, MIMO_TTS_NAME, REALTIME_S2S_MODELS } from '../../../shared/settings'
 import { SettingSelect } from '../settings/SettingsPage'
@@ -42,7 +42,7 @@ const REQUEST_ICONS = { asr: Mic, mt: Languages, tts: Volume2, llm: Bot, ocr: Sc
 export function ModelGatewayPage() {
   const { t, language } = useI18n()
   const settings = useStore(stores.settings, state => state.settings)
-  const modelOptions = useModelOptions()
+  const modelOptions = useModelOptions(undefined, settings ? settings.modelGateway.mtModel || defaultModelBinding(settings, 'mt') : undefined)
   const runtimes = useStore(stores.settings, state => state.runtimes)
   const resources = useStore(stores.models, state => state.resources)
   const credentials = useStore(stores.models, state => state.credentials)
@@ -127,7 +127,12 @@ export function ModelGatewayPage() {
     : kind === 'asr' ? config.asrModel : kind === 'tts' ? config.ttsModel : config.mtModel)
     || defaultModelBinding(settings, kind)
   const fallbackBinding = () => normalizeModelBinding('mt', config.mtFallbackModel)
-  const targetLanguages = [...new Set([config.targetLanguage, ...modelOptions.targetLanguages.filter(code => code !== 'none')])]
+  const concurrencyFor = (kind: GatewayCapability) => {
+    const binding = gatewayBinding(kind)
+    const resource = resources.find(item => `resource:${item.resourceId}` === binding)
+    return { value: gatewayConcurrency(binding, config.concurrency?.[kind], resource), maximum: gatewayConcurrencyMaximum(binding, resource) }
+  }
+  const targetLanguages = [...new Set(modelOptions.translationTargetLanguages)]
   const running = snapshot.state === 'running' || snapshot.state === 'starting'
   const changing = busy || snapshot.state === 'starting' || snapshot.state === 'stopping'
   const perform = async (action: () => Promise<unknown>, operation: 'action' | 'runtime' | 'settings' = 'action') => {
@@ -249,7 +254,7 @@ socket.on('open', async () => {
     <Card data-onboarding="gateway-capabilities"><CardHeader><CardTitle className="flex items-center gap-2">{t('gateway.capabilities')}<Tooltip><TooltipTrigger delay={300} render={<Button variant="tertiary" size="icon-xs" className="border-transparent bg-transparent text-muted hover:bg-surface-secondary" aria-label={t('common.info')}><CircleHelp aria-hidden="true" className="size-3.5" /></Button>} /><TooltipContent className="z-popup max-w-96 whitespace-normal">{t('gateway.gatewayBindingHint')}</TooltipContent></Tooltip></CardTitle></CardHeader><CardContent><FieldGroup>
       <div className="model-gateway-table-scroll">
         <table className="model-gateway-table" aria-label={t('gateway.capabilities')}>
-          <thead><tr><th scope="col">{t('gateway.capabilityColumn')}</th><th scope="col">{t('gateway.modelColumn')}</th><th scope="col">{t('gateway.stateColumn')}</th><th scope="col">{t('gateway.modelId')}</th></tr></thead>
+          <thead><tr><th scope="col">{t('gateway.capabilityColumn')}</th><th scope="col">{t('gateway.modelColumn')}</th><th scope="col">{t('gateway.stateColumn')}</th><th scope="col"><Tooltip><TooltipTrigger className="cursor-help text-start">{t('gateway.concurrency')}</TooltipTrigger><TooltipContent className="max-w-96 whitespace-normal">{t('gateway.concurrencyHint', { local: MAX_LOCAL_CONCURRENCY, api: MAX_API_CONCURRENCY })}</TooltipContent></Tooltip></th><th scope="col">{t('gateway.modelId')}</th></tr></thead>
           <tbody>{(['asr', 'mt', 'tts', 's2s', 'llm', 'ocr', 'fallback'] as const).map(row => <tr key={row} data-onboarding={`gateway-${row}`}>
             <th scope="row" className="font-normal"><Tooltip><TooltipTrigger type="button" className="cursor-help text-start">{modelLabel(row)}</TooltipTrigger><TooltipContent>{t(row === 's2s' ? 'models.s2sModelsHint' : row === 'fallback' ? 'gateway.fallbackHint' : `gateway.${row}Hint`)}</TooltipContent></Tooltip></th>
             <td>{row === 's2s'
@@ -270,6 +275,18 @@ socket.on('open', async () => {
                 ? <FieldDescription>{t('session.s2sSessionHint')}</FieldDescription>
                 : <Badge variant="outline" className="text-muted">{t('gateway.proxyDisabled')}</Badge>
               : modelStatus(row)}</td>
+            <td>{row === 's2s' ? <span className="text-muted">—</span> : row === 'fallback' ? <span className="text-muted">{t('gateway.concurrencySharedMt')}</span> : <Field data-disabled={changing || concurrencyFor(row).maximum === 1 || undefined}>
+              <FieldLabel className="sr-only" htmlFor={`gateway-concurrency-${row}`}>{t('gateway.concurrencyFor', { name: modelLabel(row) })}</FieldLabel>
+              <Input key={`${gatewayBinding(row)}:${concurrencyFor(row).value}`} id={`gateway-concurrency-${row}`} type="number" min={1} max={concurrencyFor(row).maximum} step={1} disabled={changing || concurrencyFor(row).maximum === 1}
+                defaultValue={concurrencyFor(row).value} onBlur={event => {
+                  const input = event.currentTarget
+                  const value = Number(input.value)
+                  const current = concurrencyFor(row).value
+                  if (Number.isInteger(value) && value >= 1 && value <= concurrencyFor(row).maximum && value !== current) {
+                    void perform(() => updateSettings({ modelGateway: { concurrency: { [row]: value } } }), 'settings').then(() => { input.value = String(gatewayConcurrency(gatewayBinding(row), stores.settings.getState().settings?.modelGateway.concurrency?.[row], resources.find(item => `resource:${item.resourceId}` === gatewayBinding(row)))) })
+                  } else input.value = String(current)
+                }} />
+            </Field>}</td>
             <td>{row === 'asr' || row === 'mt' || row === 'tts' ? modelId(row) : <span className="text-muted">—</span>}</td>
           </tr>)}</tbody>
         </table>
@@ -290,8 +307,7 @@ socket.on('open', async () => {
       <Field><FieldLabel htmlFor="gateway-port">{t('gateway.port')}</FieldLabel><Input key={config.port} id="gateway-port" type="number" min={1024} max={65535} defaultValue={config.port} onBlur={event => { const port = Number(event.currentTarget.value); if (Number.isInteger(port) && port >= 1024 && port <= 65535 && port !== config.port) void perform(() => updateSettings({ modelGateway: { port } }), 'settings'); else event.currentTarget.value = String(config.port) }} /></Field>
       <Field><FieldLabel htmlFor="gateway-target">{t('gateway.targetLanguage')}</FieldLabel><Select value={config.targetLanguage} onValueChange={targetLanguage => { if (targetLanguage) void perform(() => updateSettings({ modelGateway: { targetLanguage } }), 'settings') }}><SelectTrigger id="gateway-target"><SelectValue>{languageName(config.targetLanguage, language)}</SelectValue></SelectTrigger><SelectContent><SelectGroup>{targetLanguages.map(code => <SelectItem key={code} value={code}>{languageName(code, language)}</SelectItem>)}</SelectGroup></SelectContent></Select></Field>
     </FieldGroup></CardContent></Card>
-    <Card data-onboarding="gateway-service"><CardHeader><CardTitle>{t('gateway.service')}</CardTitle><CardDescription><Badge variant={snapshot.state === 'running' ? 'success' : snapshot.state === 'failed' ? 'danger' : 'secondary'}>{t(`gateway.${snapshot.state}`)}</Badge></CardDescription></CardHeader>
-      <CardContent><FieldGroup>
+    <Card data-onboarding="gateway-service"><CardContent><FieldGroup>
         <Field>
           <FieldLabel htmlFor="gateway-address">{t('gateway.address')}</FieldLabel>
           <InputGroup>

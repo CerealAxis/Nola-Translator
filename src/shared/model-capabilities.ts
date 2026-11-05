@@ -47,8 +47,8 @@ export const RECOMMENDED_CONFIGURATIONS: Record<string, ModelConfiguration> = {
   'hy-mt2-1.8b-iq2-m': translation(HYMT2_LANGUAGES, 'llama'),
   'hy-mt2-7b-q4-k-m': translation(HYMT2_LANGUAGES, 'llama'),
   'm2m100-418m': translation(M2M100_LANGUAGES, 'pytorch'),
-  ...Object.fromEntries(INDEX_TRANSLATE_MODEL_IDS.map(id => [id, translation(LANGUAGE_CODES, 'llama', INDEX_TRANSLATE_LANGUAGES)])),
-  ...Object.fromEntries(INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS.map(id => [id, translation(LANGUAGE_CODES, 'pytorch', INDEX_TRANSLATE_LANGUAGES)])),
+  ...Object.fromEntries(INDEX_TRANSLATE_MODEL_IDS.map(id => [id, translation(INDEX_TRANSLATE_LANGUAGES, 'llama')])),
+  ...Object.fromEntries(INDEX_TRANSLATE_TRANSFORMERS_MODEL_IDS.map(id => [id, translation(INDEX_TRANSLATE_LANGUAGES, 'pytorch')])),
   ...Object.fromEntries(['0.8b', '2b', '4b'].map(size => [`qwen35-${size}-q4-k-m`, translation(LANGUAGE_CODES, 'llama')])),
 }
 export function configurationOf(model: Pick<ResourceRecord, 'resourceId' | 'configuration'> | undefined): ModelConfiguration | undefined {

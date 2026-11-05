@@ -663,3 +663,117 @@ def test_management_endpoints_are_private_and_report_state() -> None:
         instances = client.get("/api/v2/gateway/instances", headers=headers)
         assert instances.status_code == 200
         assert instances.json()["instances"] == []  # nothing loaded yet
+
+
+async def test_realtime_admission_is_exclusive_and_precedes_waiting_offline_calls():
+    from nola_translator_engine.backend.gateway.resources import ConcurrencyGate
+
+    gate = ConcurrencyGate()
+    await gate.acquire("shared", 5)
+    order = []
+
+    async def run(name, realtime):
+        await gate.acquire("shared", 5, realtime=realtime)
+        order.append(name)
+        await asyncio.sleep(0)
+        gate.release("shared")
+
+    realtime = asyncio.create_task(run("realtime", True))
+    await asyncio.sleep(0)
+    offline = asyncio.create_task(run("offline", False))
+    await asyncio.sleep(0)
+    assert not order
+    gate.release("shared")
+    await asyncio.gather(realtime, offline)
+    assert order == ["realtime", "offline"]
+    assert gate.active("shared") == 0
+
+
+@pytest.mark.parametrize("runtime,cloud,mode,maximum", [
+    ("crisp", False, "offline", 1), ("crisp-tts", False, "offline", 1),
+    ("pytorch", False, "offline", 5), ("llama", False, "realtime", 1),
+    (None, True, "offline", 10),
+])
+async def test_gateway_enforces_runtime_caps_at_the_backend(runtime, cloud, mode, maximum):
+    gw, _ = gateway_with()
+    instance, lease, _, _ = await gw.acquire(MatchRequest(Operation.TRANSCRIBE))
+    instance.configuration.runtime = runtime
+    instance.configuration.is_cloud = cloud
+    ctx = CallContext(Operation.TRANSCRIBE, "limit", task_mode=mode, max_concurrency=10)
+    peak = 0
+
+    async def call():
+        nonlocal peak
+        await gw._enter(instance, ctx)
+        peak = max(peak, gw.concurrency.active(instance.instance_id))
+        await asyncio.sleep(0.001)
+        gw._exit(instance)
+
+    try:
+        await asyncio.gather(*(call() for _ in range(12)))
+        assert peak == maximum
+    finally:
+        await gw.release(instance, lease)
+        await gw.shutdown()
+
+
+def test_parallel_memory_reservations_are_atomic_and_released_with_the_model():
+    admission = ResourceAdmission()
+    admission.register_device("gpu", 1000)
+    admission.reserve("model", "gpu", 500)
+    with pytest.raises(ResourceExhausted):
+        admission.reserve_parallel("model", "gpu", 4, 200)
+    assert admission.snapshot("gpu").reserved_mb == 500
+    admission.reserve_parallel("model", "gpu", 3, 200)
+    assert admission.snapshot("gpu").reserved_mb == 900
+    admission.reserve_parallel("model", "gpu", 3, 200)
+    assert admission.snapshot("gpu").reserved_mb == 900
+    admission.release("model", "gpu")
+    assert admission.snapshot("gpu").reserved_mb == 0
+
+
+async def test_offline_worker_coalesces_compatible_requests_and_isolates_cancellation():
+    from nola_translator_engine.backend.gateway.worker import WorkerRequest
+
+    started, finish = asyncio.Event(), asyncio.Event()
+
+    class Worker(LocalModelWorker):
+        def __init__(self):
+            super().__init__()
+            self.calls = []
+
+        async def request(self, request, **kwargs):
+            self.calls.append(request)
+            started.set()
+            await finish.wait()
+            return {"results": [{"text": item["text"]} for item in request.payload["requests"]]}
+
+    worker = Worker()
+    calls = [asyncio.create_task(worker.request_batch(WorkerRequest("mt", {}, payload={"text": text, "source": "en", "target": "zh"}), limit=5))
+             for text in ("first", "second", "third")]
+    await started.wait()
+    assert len(worker.calls) == 1
+    assert worker.calls[0].kind == "batch"
+    calls[0].cancel()
+    await asyncio.sleep(0)
+    assert not calls[0].done()
+    finish.set()
+    results = await asyncio.gather(*calls, return_exceptions=True)
+    assert isinstance(results[0], asyncio.CancelledError)
+    assert results[1:] == [{"text": "second"}, {"text": "third"}]
+
+
+async def test_cancelling_a_queued_batch_item_does_not_dispatch_it():
+    from unittest.mock import AsyncMock
+    from nola_translator_engine.backend.gateway.worker import WorkerRequest
+
+    worker = LocalModelWorker()
+    worker.request = AsyncMock(return_value={"text": "unused"})
+    task = asyncio.create_task(worker.request_batch(WorkerRequest("mt", {}, payload={"text": "cancel"}), limit=5))
+    await asyncio.sleep(0)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    if worker._batch_task:
+        await worker._batch_task
+    worker.request.assert_not_awaited()

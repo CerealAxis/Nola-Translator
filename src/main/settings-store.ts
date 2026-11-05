@@ -322,7 +322,6 @@ export class SettingsStore {
       }
       if (raw.version !== 3 && raw.realtime?.s2sModel === undefined && raw.recognition?.provider === 'aliyun' && knownLiveTranslate && rawTranslation.provider !== 'recognition') {
         realtime.s2sModel = legacyAliyunModel
-        if (realtime.outputMode === 'translation') realtime.outputMode = legacyTarget === 'none' ? 'source' : 'speech'
       } else if (raw.realtime?.s2sModel === undefined && raw.recognition?.provider === 'aliyun' &&
         (knownLiveTranslate || legacyAliyunModel === undefined) && realtime.outputMode !== 'source' &&
         (realtime.outputMode === 'speech' || rawTranslation.provider === 'recognition')) {
@@ -507,7 +506,8 @@ export class SettingsStore {
       version: 3,
       realtime: realtimeSettings({ ...this.settings.realtime, ...patch.realtime }),
       synthesis: { ...this.settings.synthesis, ...patch.synthesis },
-      modelGateway: { ...this.settings.modelGateway, ...patch.modelGateway },
+      modelGateway: { ...this.settings.modelGateway, ...patch.modelGateway,
+        ...(patch.modelGateway?.concurrency ? { concurrency: { ...this.settings.modelGateway.concurrency, ...patch.modelGateway.concurrency } } : {}) },
       recognition: { ...this.settings.recognition, ...(patch.recognition ?? {}) },
       recording: { ...this.settings.recording, ...(patch.recording ?? {}) },
       appearance: { ...this.settings.appearance, ...(patch.appearance ?? {}) },
