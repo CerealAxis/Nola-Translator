@@ -2,6 +2,67 @@
 @source './';
 @source '../../src/renderer/components/ui';
 @import '../../src/renderer/theme/index.css';
+@import '../../src/renderer/components/ui/color-picker.css';
+
+/* Keep shadcn's neutral palette local to extension documents and shadow roots. */
+@layer base {
+  :root, [data-theme='light'] {
+    --background: oklch(1 0 0);
+    --foreground: oklch(.145 0 0);
+    --surface: oklch(1 0 0);
+    --surface-secondary: oklch(.985 0 0);
+    --surface-tertiary: oklch(.97 0 0);
+    --primary: oklch(.205 0 0);
+    --primary-foreground: oklch(.985 0 0);
+    --muted: oklch(.556 0 0);
+    --border: oklch(.922 0 0);
+    --focus: oklch(.708 0 0);
+    --backdrop: oklch(0 0 0 / .35);
+    --overlay-shadow: 0 12px 36px oklch(0 0 0 / .14);
+    --surface-shadow: 0 2px 10px oklch(0 0 0 / .04);
+  }
+
+  .dark, [data-theme='dark'] {
+    --background: oklch(.145 0 0);
+    --foreground: oklch(.985 0 0);
+    --surface: oklch(.205 0 0);
+    --surface-secondary: oklch(.205 0 0);
+    --surface-tertiary: oklch(.269 0 0);
+    --primary: oklch(.922 0 0);
+    --primary-foreground: oklch(.205 0 0);
+    --muted: oklch(.708 0 0);
+    --border: oklch(1 0 0 / .1);
+    --focus: oklch(.556 0 0);
+    --backdrop: oklch(0 0 0 / .65);
+    --overlay-shadow: 0 12px 36px oklch(0 0 0 / .32);
+    --surface-shadow: 0 2px 10px oklch(0 0 0 / .12);
+  }
+
+  :root, [data-theme='light'], .dark, [data-theme='dark'] {
+    --separator: var(--border);
+    --accent: var(--primary);
+    --accent-foreground: var(--primary-foreground);
+    --field-background: var(--surface);
+    --field-border: var(--border);
+    --field-border-focus: var(--focus);
+    --overlay: var(--surface);
+    --default: var(--surface-tertiary);
+    --segment: var(--surface-secondary);
+    --danger-foreground: oklch(.985 0 0);
+    --nola-primary-gradient: linear-gradient(var(--primary), var(--primary));
+    --field-shadow: 0 1px 2px oklch(0 0 0 / .025);
+    --shadow-sm: 0 1px 2px oklch(0 0 0 / .05);
+    --shadow-md: 0 4px 6px -1px oklch(0 0 0 / .1), 0 2px 4px -1px oklch(0 0 0 / .06);
+    --shadow-lg: 0 10px 15px -3px oklch(0 0 0 / .1), 0 4px 6px -2px oklch(0 0 0 / .05);
+  }
+}
+
+/* Hide scroll chrome without disabling wheel, touch or keyboard scrolling. */
+@layer utilities {
+  :root, :host, * { scrollbar-width: none; }
+  ::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  .button[data-size='sm'] { font: var(--font-caption); font-weight: 500; }
+}
 
 @layer components {
   :host { all: initial; font: var(--font-body); color: var(--foreground); }
@@ -47,7 +108,7 @@
      from one line to two extends upward and leaves the anchor where it was. Its width follows the
      text up to the video bounds. White glyphs over a translucent black fill keep their contrast over
      the frame underneath, so the block needs no stroke to stay legible. */
-  .nola-caption { position: absolute; left: 0; right: 0; bottom: 0; margin-inline: auto; display: grid; justify-items: center; gap: calc(var(--space-1) / 2); width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; text-align: center; color: var(--accent-foreground); font-family: var(--font-ui); line-height: var(--browser-caption-line-height); pointer-events: auto; }
+  .nola-caption { position: absolute; left: 0; right: 0; bottom: 0; margin-inline: auto; display: grid; justify-items: center; gap: calc(var(--space-1) / 2); width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; text-align: center; color: var(--color-white); font-family: var(--font-ui); line-height: var(--browser-caption-line-height); pointer-events: auto; }
   .nola-caption-line { width: fit-content; max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; padding: var(--space-1) var(--space-2); border-radius: var(--radius-md); background: color-mix(in oklab, var(--caption-fill, var(--browser-caption-fill)) var(--caption-fill-opacity, var(--browser-caption-background-mix)), transparent); }
   /* One phrase is one animation: the block settles in from half a space-1, and a phrase that replaces
      another fades out first, so text is never revealed a character at a time. */
@@ -59,10 +120,7 @@
 @layer utilities {
   /* Keep player geometry independent of website rem sizes and the base button size utility. */
   .nola-trigger .button { width: var(--space-6); min-width: var(--space-6); height: var(--space-6); min-height: var(--space-6); padding: 0; background: transparent; }
-  /* Website rem scales (YouTube uses 10px) escape Shadow DOM. Pin every control to desktop tokens. */
-  .nola-panel .button, .nola-popup .button { font: var(--font-body-strong); width: 100%; height: var(--space-5); min-width: 0; padding: 0 var(--space-2); gap: var(--space-1); border-radius: var(--radius-xl); }
-  .nola-panel-controls .button { height: auto; min-height: var(--space-5); white-space: normal; }
-  .nola-panel .button > svg { width: var(--space-2); height: var(--space-2); flex-shrink: 0; }
+  .nola-panel-controls .button:not([data-size^='icon']) { height: auto; min-height: var(--field-control-height); white-space: normal; }
   .nola-panel .nola-panel-close { width: var(--space-4); height: var(--space-4); padding: 0; }
   .nola-trigger .button > svg { width: var(--space-4); height: var(--space-4); margin: 0; }
 }
@@ -98,10 +156,14 @@
 :host([data-reduce-motion='true']) .nola-caption[data-phase='appearing'] { animation-name: nola-caption-block-fade-in; }
 :host([data-reduce-motion='true']) .nola-caption[data-phase='fading'] { animation-name: nola-caption-block-fade-out; }
 
-/* Extension surfaces share the desktop palette while keeping browser-specific geometry. */
+/* Browser-specific geometry stays independent of the desktop layout. */
 :root, :root[lang], :host, :host([lang]) {
   --font-ui: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft JhengHei UI', 'Malgun Gothic', 'Yu Gothic UI', system-ui, sans-serif;
   --font-sans: var(--font-ui); --field-control-height: 36px;
+  /* Pin the shadcn scale inside shadow roots even when the website changes rem. */
+  --spacing: calc(var(--space-1) / 2);
+  --text-xs: 12px; --text-sm: 14px; --text-base: 14px; --text-lg: 16px;
+  --text-sm--line-height: 1.65; --text-base--line-height: 1.65;
   --extension-popup-width: 376px; --extension-settings-width: 1040px;
   --extension-sidebar-width: 248px;
   --floating-button-width: 44px; --floating-button-height: 40px;
@@ -128,7 +190,7 @@
   .nola-setting-copy p { margin: 0; color: var(--muted); font: var(--font-caption); }
   .nola-two-columns { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--space-2); }
   .nola-settings-shell details > summary { cursor: pointer; color: var(--muted); padding: var(--space-2) 0; }
-  .nola-setting-range { display: grid; grid-template-columns: minmax(0,1fr) var(--space-7); align-items: center; gap: var(--space-2); }
+  .nola-setting-range { display: grid; grid-template-columns: minmax(0,1fr) var(--space-4); align-items: center; gap: var(--space-2); min-width: 0; min-height: var(--field-control-height); }
   .nola-setting-range output { color: var(--muted); font: var(--font-caption); text-align: end; font-variant-numeric: tabular-nums; }
   .nola-file-action input { display: none; }
   .nola-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); padding-top: var(--space-2); }
@@ -211,23 +273,21 @@
   .nola-popup-header h1 { font: var(--font-body-strong); margin: 0; white-space: nowrap; }
   .nola-popup .nola-popup-header-tools .button { width: var(--space-4); height: var(--space-4); padding: 0; }
   .nola-popup-languages { display: grid; grid-template-columns: minmax(0,1fr) var(--space-2) minmax(0,1fr); align-items: center; gap: var(--space-1); }
-  .nola-popup .nola-popup-language-card { height: var(--space-8); padding: var(--space-1) var(--space-2); justify-content: space-between; gap: var(--space-1); background: var(--surface); }
+  .nola-popup-language-card { height: var(--space-8); padding: var(--space-1) var(--space-2); }
+  .nola-popup-language-card[data-size='sm'] { height: var(--space-7); }
   .nola-popup-language-card > span { display: flex; flex-direction: column; align-items: start; min-width: 0; }
   .nola-popup-language-card strong { font: var(--font-body-strong); max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .nola-popup-language-card small { font: var(--font-caption); color: var(--muted); }
   .nola-language-arrow { width: var(--space-2); color: var(--muted); }
   .nola-popup-language-list { width: calc(var(--extension-popup-width) - var(--space-4)); max-width: calc(100vw - var(--space-2)); padding: var(--space-1); }
   .nola-popup-language-list [role='listbox'] { max-height: min(300px, var(--available-height)); overflow-y: auto; padding-top: var(--space-1); }
-  .nola-popup-language-list .select__item { display: flex; justify-content: space-between; gap: var(--space-1); }
-  .nola-popup-language-list .select__item[data-highlighted] { background: var(--surface-tertiary); }
-  .nola-popup-language-list .select__item svg { width: var(--space-2); height: var(--space-2); }
   .nola-popup-provider-row { min-height: var(--space-4); font: var(--font-body-strong); }
   .nola-popup .nola-provider-summary { width: auto; height: var(--space-4); padding: 0; }
   .nola-provider-avatars { display: flex; align-items: center; padding-left: var(--space-1); }
   .nola-provider-avatars > * { margin-left: calc(var(--space-1) * -1); }
-  .nola-provider-avatar { display: flex; align-items: center; justify-content: center; width: var(--space-4); height: var(--space-4); background: var(--surface); border: 2px solid var(--surface); border-radius: var(--radius-full); box-shadow: 0 0 0 1px var(--border); font: var(--font-body-strong); }
+  .nola-provider-avatar { width: var(--space-4); height: var(--space-4); }
   .nola-provider-avatar svg { width: var(--space-2); height: var(--space-2); }
-  .nola-provider-count { background: var(--surface-secondary); font: var(--font-caption); color: var(--muted); }
+  .nola-provider-count { height: var(--space-4); }
   .nola-popup-drawer.nola-dialog-content { position: fixed; inset: auto 0 0; transform: none; width: 100%; max-width: none; max-height: 90vh; overflow-y: auto; border-radius: var(--radius-xl) var(--radius-xl) 0 0; padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); }
   .nola-popup-drawer > header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
   .nola-popup-drawer [data-slot='dialog-title'] { font: var(--font-title); margin: 0; }
@@ -238,14 +298,13 @@
   .nola-popup-translate [data-slot='kbd'] { background: color-mix(in srgb, var(--primary-foreground) 20%, transparent); color: var(--primary-foreground); }
   .nola-popup-switches { display: flex; flex-direction: column; gap: var(--space-1); }
   .nola-popup-switches [data-slot='field'], .nola-popup-hover-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: var(--space-1); min-height: var(--space-4); }
-  .nola-popup-switches [data-slot='field-label'] { font: var(--font-body); }
   .nola-popup-hotkey { flex: 1; min-width: 0; }
   .nola-popup-hotkey [data-slot='field-label'] { display: none; }
   .nola-popup-hotkey .select__trigger { border: 0; background: transparent; box-shadow: none; padding: 0; height: var(--space-4); font: var(--font-body); }
   .nola-popup-video { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1); }
-  .nola-popup-video .button { font: var(--font-caption); padding-inline: var(--space-1); }
+  .nola-popup-video .button { padding-inline: var(--space-1); }
   .nola-provider-status { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); font: var(--font-caption); color: var(--muted); }
-  .nola-popup .nola-provider-status .button { width: auto; height: var(--space-3); padding: 0; font: var(--font-caption); }
+  .nola-popup .nola-provider-status .button { width: auto; padding: 0; }
   .nola-popup-footer { display: flex; align-items: center; justify-content: space-between; background: var(--surface-tertiary); padding: var(--space-1); }
   .nola-popup .nola-popup-footer .button { width: auto; height: var(--space-4); padding-inline: var(--space-1); }
   @media(max-width:1100px) { .nola-settings-main { padding-inline: var(--space-4); } }
@@ -266,13 +325,13 @@
   .nola-text-actions { display: flex; flex-direction: column; align-items: start; gap: var(--space-1); max-width: calc(100vw - var(--space-2)); }
   .nola-selection-toolbar { display: inline-flex; align-items: center; padding: calc(var(--space-1) / 2); background: var(--surface); border: var(--browser-field-border-width) solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--overlay-shadow); }
   .nola-selection-toolbar .button:hover, .nola-selection-result-actions .button:hover, .nola-selection-menu .button:hover { background: var(--surface-tertiary); }
-  .nola-selection-menu { display: flex; flex-direction: column; gap: calc(var(--space-1) / 2); padding: var(--space-1); background: var(--surface); color: var(--foreground); border: var(--browser-field-border-width) solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--overlay-shadow); max-width: calc(100vw - var(--space-2)); }
+  .nola-selection-menu { width: max-content; max-width: calc(100vw - var(--space-2)); }
   .nola-selection-result { width: var(--browser-panel-width); max-width: calc(100vw - var(--space-2)); max-height: calc(var(--space-8) * 4); overflow: auto; padding: var(--space-1) var(--space-2) var(--space-2); background: var(--surface); border: var(--browser-field-border-width) solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--overlay-shadow); }
   .nola-selection-result-actions { display: flex; justify-content: end; }
   .nola-selection-result p { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 }
 
-/* Settings illustrations share the app's ice-blue canvas and one compact browser frame. */
+/* Settings illustrations use the extension palette and one compact browser frame. */
 @layer components {
   .nola-illustration .nola-preview-stage { min-height: calc(var(--space-8) * 4); padding: var(--space-5) var(--space-3); border: 0; background: radial-gradient(ellipse at 75% 10%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 65%), linear-gradient(135deg, var(--background) 30%, var(--surface-tertiary)); }
   .nola-illustration .nola-demo-browser { width: min(100%, calc(var(--space-8) * 4)); box-shadow: var(--surface-shadow); }
@@ -315,24 +374,22 @@
 
 /* Floating controls keep menus inside the extension's shadow tree and the viewport. */
 @layer components {
-  .nola-floating-popover { display: flex; flex-direction: column; gap: calc(var(--space-1) / 2); padding: var(--space-1); max-width: calc(100vw - var(--space-2)); background: var(--surface); color: var(--foreground); border: var(--browser-field-border-width) solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--overlay-shadow); }
+  .nola-floating-popover { width: max-content; max-width: calc(100vw - var(--space-2)); }
   .nola-floating-popover .button { white-space: normal; text-align: start; }
   .nola-floating-popover .button:hover { background: var(--surface-tertiary); }
 }
 
 @layer components {
-  .nola-choice-search-trigger { justify-content: space-between; width: 100%; min-width: 0; font: var(--font-body); }
+  .nola-portal-container { display: contents; }
+  .combobox__list { max-height: calc(var(--space-8) * 3); overflow: auto; }
+  .nola-choice-search-trigger { width: 100%; min-width: 0; }
   .nola-choice-search-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nola-choice-search-list { width: max(var(--anchor-width), calc(var(--space-8) * 3)); max-width: var(--available-width); padding: var(--space-1); }
   .nola-choice-search-list [data-slot='input-group'] { margin-bottom: var(--space-1); }
   .nola-choice-search-list [role='listbox'] { max-height: calc(var(--space-8) * 3); overflow: auto; }
-  .nola-choice-search-list .select__item > span:first-child { flex: 1; }
-  .nola-choice-search-list .select__item svg { width: var(--space-2); height: var(--space-2); }
 }
 
 @layer utilities {
-  /* Website rem sizes must not shrink selection controls inside Shadow DOM. */
-  .nola-text-actions .button, .nola-floating-popover .button { font: var(--font-body); color: var(--foreground); }
   .nola-selection-toolbar .button, .nola-selection-result-actions .button { width: var(--space-4); height: var(--space-4); padding: 0; }
   .nola-text-actions .button > svg { width: var(--space-2); height: var(--space-2); flex-shrink: 0; }
   .nola-selection-menu .button, .nola-floating-popover .button { justify-content: start; gap: var(--space-1); min-height: var(--space-4); padding: var(--space-1); }
@@ -348,23 +405,18 @@
   .nola-subtitle-toggle > p { grid-column: 1 / -1; }
   .nola-subtitle-page { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-1); }
   .nola-subtitle-page [data-slot='field'] { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--space-1); }
-  .nola-subtitle-page [data-slot='field-label'] { font: var(--font-caption); flex: 1; }
-  .nola-subtitle-page [data-slot='select-trigger'], .nola-subtitle-page .nola-choice-search-trigger { width: 55%; font: var(--font-caption); }
+  .nola-subtitle-page [data-slot='field-label'] { flex: 1; }
+  .nola-subtitle-page [data-slot='select-trigger'], .nola-subtitle-page .nola-choice-search-trigger { min-width: 0; }
   .nola-subtitle-languages { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-1); }
   .nola-subtitle-style-group { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; min-width: 0; padding: var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-lg); }
   .nola-subtitle-style-group legend { font: var(--font-caption); }
-  .nola-subtitle-style-row input[type='range'] { width: var(--space-8); accent-color: var(--primary); }
-  .nola-subtitle-style-row input[type='color'] { width: var(--space-4); height: var(--space-4); padding: 0; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
-  .nola-subtitle-style-row output { font: var(--font-label); min-width: var(--space-4); text-align: end; }
   .nola-trigger .button { position: relative; }
   .nola-trigger-state { position: absolute; right: 0; bottom: calc(var(--space-1) / 2); min-width: calc(var(--space-3) + var(--space-1) / 2); padding: calc(var(--space-1) / 4) calc(var(--space-1) / 2); border-radius: var(--radius-full); background: var(--browser-caption-fill); color: var(--color-white); font: var(--font-label); font-size: var(--space-1); font-weight: 600; line-height: 1; text-align: center; }
 }
 @layer utilities {
-  .nola-subtitle-menu .button { height: var(--space-4); font: var(--font-caption); }
   .nola-subtitle-menu .nola-subtitle-menu-item { display: flex; justify-content: start; gap: var(--space-1); padding-inline: var(--space-1); }
   .nola-subtitle-menu-item > span { flex: 1; text-align: start; }
   .nola-subtitle-menu .nola-panel-close, .nola-subtitle-menu .nola-panel-controls > .button:last-child { width: var(--space-4); min-width: var(--space-4); padding: 0; }
-  .nola-subtitle-menu .nola-popup-language-card { width: 100%; height: auto; padding: var(--space-1); }
 }
 /* Settings provider editor and translation center. */
 @layer components {
@@ -375,7 +427,7 @@
   .nola-provider-list-item > span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
   .nola-provider-list-item[aria-pressed='true'] { border-color: var(--primary); background: var(--surface-secondary); }
   .nola-provider-editor { min-width: 0; gap: var(--space-2); padding: var(--space-2); }
-  .nola-provider-editor .card__title, .nola-hub-result .card__title { display: flex; align-items: center; gap: var(--space-1); min-width: 0; font: var(--font-body-strong); }
+  .nola-provider-editor .card__title, .nola-hub-result .card__title { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
   .nola-settings-section .nola-provider-editor [data-slot='field'] { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1); padding-block: var(--space-1); }
   .nola-provider-editor [data-slot='field-group'] { gap: var(--space-1); }
   .nola-settings-section .nola-provider-editor .nola-setting-toggle { flex-direction: row; align-items: center; }
@@ -386,7 +438,7 @@
   .nola-translation-center { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); align-items: start; }
   .nola-hub-source, .nola-hub-results { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
   .nola-hub-languages { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--space-1); }
-  .nola-hub-languages .nola-popup-language-card { height: var(--space-6); padding: var(--space-1) var(--space-2); min-width: 0; width: 100%; }
+  .nola-hub-languages .nola-popup-language-card { min-width: 0; width: 100%; }
   .nola-hub-input { border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
   .nola-hub-input:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
   .nola-hub-input textarea { min-height: calc(var(--space-8) * 4); border: 0; box-shadow: none; resize: vertical; background: transparent; }
@@ -415,12 +467,11 @@
 
 @layer utilities {
   .nola-subtitle-page [data-slot='field'] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; gap: var(--space-1); }
-  .nola-subtitle-page [data-slot='select-trigger'], .nola-subtitle-page .nola-choice-search-trigger { width: 100%; min-width: 0; font: var(--font-caption); }
-  .nola-subtitle-page .nola-subtitle-style-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .nola-subtitle-page [data-slot='select-trigger'], .nola-subtitle-page .nola-choice-search-trigger { width: 100%; min-width: 0; }
+  .nola-subtitle-page .nola-subtitle-style-row { grid-template-columns: minmax(0, 1fr) auto; }
 }
 
 @layer utilities {
   .nola-hub-input textarea { min-height: calc(var(--space-8) * 4); padding: 0; border: 0; box-shadow: none; background: transparent; }
-  .nola-hub-languages .nola-popup-language-card { height: var(--space-6); }
   @media(max-width:700px) { .nola-hub-input textarea { min-height: calc(var(--space-8) * 2); } }
 }

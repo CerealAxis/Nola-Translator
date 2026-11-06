@@ -57,20 +57,33 @@ def _blocking(char: str) -> bool:
 def resolve_comic_terms(document: dict, selection: dict, project_id: str, text: str, target: str) -> list[GlossaryTerm]:
     if not document.get("enabled") or selection.get("mode") == "off":
         return []
-    trie = {}
-    for order, library in enumerate(document.get("libraries", [])):
+    libraries = []
+    for library in document.get("libraries", []):
         if not library.get("enabled") or selection.get("mode") == "selected" and library["id"] not in selection.get("libraryIds", []):
             continue
         scope = library["scope"]
         if scope["mode"] != "global" and not any(item["kind"] == "comic" and (item["ids"] == "*" or project_id in item["ids"]) for item in scope["targets"]):
             continue
-        for index, entry in enumerate(library["entries"]):
-            if entry["enabled"] and entry["targetLanguage"] in ("*", target):
+        libraries.append([entry for entry in library["entries"] if entry["enabled"]])
+    return _match_trie(_make_trie(libraries, target), text)
+
+
+def _make_trie(libraries: list[list[dict]], target: str) -> dict:
+    trie = {}
+    for order, entries in enumerate(libraries):
+        for index, entry in enumerate(entries):
+            if entry["targetLanguage"] in ("*", target):
                 source = _normal(entry["source"])
                 branch = trie
                 for char in _fold(source):
                     branch = branch.setdefault(char, {})
                 branch.setdefault(None, []).append((source, entry, order, index))
+    return trie
+
+
+def _match_trie(trie: dict, text: str) -> list[GlossaryTerm]:
+    if not trie:
+        return []
     # Normalization is used only to locate terms; keep captures always retain original text.
     units = []
     for index, char in enumerate(text):
@@ -116,3 +129,39 @@ def resolve_comic_terms(document: dict, selection: dict, project_id: str, text: 
     terms = [result[key] for key in sorted(result)]
     glossary_prompt(terms)
     return terms
+
+
+class RealtimeRule(GlossaryTerm):
+    targetLanguage: str = Field(min_length=1, max_length=32)
+
+
+class RealtimeGlossaryUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    revision: int = Field(ge=0)
+    libraries: list[list[RealtimeRule]] = Field(max_length=1000)
+
+    @model_validator(mode="after")
+    def check_size(self):
+        if sum(map(len, self.libraries)) > 20000:
+            raise ValueError("capReached")
+        return self
+
+
+class RealtimeGlossary:
+    def __init__(self):
+        self.revision = -1
+        self.libraries = []
+        self.tries = {}
+
+    def update(self, snapshot: RealtimeGlossaryUpdate) -> bool:
+        if snapshot.revision <= self.revision:
+            return False
+        self.libraries = [[rule.model_dump() for rule in library] for library in snapshot.libraries]
+        self.tries.clear()
+        self.revision = snapshot.revision
+        return True
+
+    def match(self, text: str, target: str) -> list[GlossaryTerm]:
+        if target not in self.tries:
+            self.tries[target] = _make_trie(self.libraries, target)
+        return _match_trie(self.tries[target], text)

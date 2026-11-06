@@ -1,4 +1,5 @@
 import { OfflineResources } from '../../offline'
+import { DesktopDataGroup } from '../DesktopDataGroup'
 import { ResetSettingsGroup } from './AdvancedTab'
 /**
  * Storage and downloads: data folder, how much of it is in use, restart prompt.
@@ -116,6 +117,7 @@ export function StorageTab({ settings }: SettingsPanelProps) {
             onChange={keepAudio => { void updateSettings({ recording: { keepAudio } }).catch(() => undefined) }} />
         </SettingsRow>
       </SettingGroup>
+      <DesktopDataGroup />
       <OfflineResources />
       <ResetSettingsGroup />
     </div>

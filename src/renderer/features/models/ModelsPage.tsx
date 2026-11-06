@@ -160,7 +160,7 @@ export function ModelsPage() {
 
   const run = (record: ResourceRecord, action: 'install' | 'cancel') => () => {
     if (action === 'install') {
-      if (record.kind === 'ocrModel') {
+      if (record.kind === 'ocrModel' || record.kind === 'inpaintModel') {
         void actions.models.manageResource(record.resourceId, 'install').catch((cause: unknown) => notifyError(t('models.downloadFailed'), { cause }))
         return
       }
@@ -186,6 +186,7 @@ export function ModelsPage() {
   }
 
   const footerOf = (record: ResourceRecord) => {
+    if (record.kind === 'inpaintModel') return record.installed ? <Button onClick={() => setConfiguring({ record, readOnly: true })}>{t('models.openDetails')}</Button> : undefined
     if (record.kind === 'ocrModel') return <Button onClick={() => setOcrOpen(record.resourceId)}>{t('modelsSettingsUi.startConfiguration')}</Button>
     if (record.installed) {
       const readOnly = !record.resourceId.startsWith('hub:') || record.kind === 'ttsModel'
@@ -269,6 +270,7 @@ export function ModelsPage() {
 
         <TabsContent className="tabs__panel" value="recommended" data-onboarding="model-downloads">
           <RecommendedCatalog
+            card={card}
             records={resources.filter(record => !record.resourceId.startsWith('hub:') && (record.resourceId !== 'pp-ocrv5-mobile-onnx' || record.installed))}
             loading={loading && !loaded}
             failed={loadFailed}
@@ -345,13 +347,13 @@ interface CatalogProps {
   emptyAction: ReactNode
 }
 
-function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, onOpenOcr, emptyAction, cloudModels, onOpenCloud }: Pick<CatalogProps, 'records' | 'loading' | 'failed' | 'onRetry' | 'emptyAction' | 'cloudModels' | 'onOpenCloud'> & { onOpen: (family: RecommendedFamily) => void; onOpenOcr(): void }) {
+function RecommendedCatalog({ card, records, loading, failed, onRetry, onOpen, onOpenOcr, emptyAction, cloudModels, onOpenCloud }: Pick<CatalogProps, 'records' | 'loading' | 'failed' | 'onRetry' | 'emptyAction' | 'cloudModels' | 'onOpenCloud' | 'card'> & { onOpen: (family: RecommendedFamily) => void; onOpenOcr(): void }) {
   const { t } = useI18n()
   if (!loading && !failed && records.length === 0 && cloudModels.length === 0) return <Empty className="flex flex-col items-start gap-4 py-8"><EmptyTitle>{t('models.notInstalled')}</EmptyTitle>{emptyAction}</Empty>
   const groups = new Map<RecommendedFamily, ResourceRecord[]>()
   for (const record of records) {
     // Keep legacy M2M100 installations available in Installed, but stop recommending it.
-    if (record.resourceId === 'm2m100-418m' || record.kind === 'ocrModel') continue
+    if (record.resourceId === 'm2m100-418m' || (record.kind === 'ocrModel' || record.kind === 'inpaintModel')) continue
     const family = familyOf(record)
     if (family === 'kokoro' || family === 'piper') continue
     groups.set(family, [...(groups.get(family) ?? []), record])
@@ -379,7 +381,9 @@ function RecommendedCatalog({ records, loading, failed, onRetry, onOpen, onOpenO
       return <Fragment key={family}>{familyRecords ? <RecommendedFamilyCard family={family} records={familyRecords} onOpen={() => onOpen(family)} /> : null}{family === 'index' && indexTranslation ? renderCloudModel(indexTranslation) : null}</Fragment>
     })}{otherCloudModels.map(renderCloudModel)}</div>
   </section>
-    })}</div>
+    })}
+    <Section title={t('suite.inpaintModels')} hint={t('suite.inpaintDescription')} records={records.filter(record => record.kind === 'inpaintModel')} card={card} />
+    </div>
 }
 
 /**
@@ -424,6 +428,7 @@ function Catalog({ records, loading, failed, onRetry, card, emptyAction, compute
       <Section title={t('models.mtModels')} hint={t('models.mtModelsHint')} records={mtModels} card={card}>{cloudModels.filter(model => model.kind === 'translationModel' && !model.profile && model.id !== 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.ttsModels')} hint={t('models.ttsModelsHint')} records={ordered.filter(record => record.kind === 'ttsModel')} card={card}>{cloudModels.filter(model => model.kind === 'ttsModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('screen.ocrTitle')} hint={t('screen.ocrDescription')} records={ordered.filter(record => record.kind === 'ocrModel')} card={card} />
+      <Section title={t('suite.inpaintModels')} hint={t('suite.inpaintDescription')} records={ordered.filter(record => record.kind === 'inpaintModel')} card={card} />
       <Section title={t('models.llmModels')} hint={t('models.llmModelsHint')} records={languageModels} card={card}>{cloudModels.filter(model => model.profile || model.id === 'cloud').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
       <Section title={t('models.s2sModels')} hint={t('models.s2sModelsHint')} records={[]} card={card}>{cloudModels.filter(model => model.kind === 's2sModel').map(model => <CloudModelCard key={model.id} model={model} installed onOpen={onOpenCloud} />)}</Section>
     </div>

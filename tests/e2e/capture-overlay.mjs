@@ -11,14 +11,19 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { app, BrowserWindow, ipcMain } from 'electron'
+import { build } from 'esbuild'
+
+const defaultsBundle = await build({ entryPoints: ['src/shared/settings.ts'], bundle: true, platform: 'node', format: 'esm', write: false })
+const { DEFAULT_SETTINGS } = await import('data:text/javascript;base64,' + Buffer.from(defaultsBundle.outputFiles[0].text).toString('base64'))
 
 const root = process.cwd()
 const out = resolve(root, 'artifacts/ui')
 const delay = (ms) => new Promise((done) => setTimeout(done, ms))
 
 const settings = {
+  ...structuredClone(DEFAULT_SETTINGS),
   version: 1, theme: 'system', uiLanguage: 'zh-CN', modelStoragePath: '',
-  recognition: { modelId: 'qwen3-asr-1.7b-hf', sourceLanguage: 'en', audioSource: 'defaultOutput' },
+  recognition: { ...DEFAULT_SETTINGS.recognition, modelId: 'qwen3-asr-1.7b-hf', sourceLanguage: 'en', audioSource: 'defaultOutput' },
   recording: { keepAudio: true },
   appearance: { reduceMotion: false },
   overlay: {
@@ -31,6 +36,7 @@ const settings = {
     showSource: true, showTranslation: true, layout: 'rolling',
   },
   translation: {
+    ...DEFAULT_SETTINGS.translation,
     provider: 'local', localModelId: 'hy-mt2-1.8b-q3-k-m', targetLanguage: 'zh',
     microsoftEndpoint: 'https://api.cognitive.microsofttranslator.com', microsoftRegion: '',
     cloudEndpoint: 'https://api.openai.com/v1', cloudModel: 'gpt-4.1-mini', cloudApiFormat: 'chat-completions',
@@ -68,10 +74,11 @@ void app.whenReady().then(async () => {
   // The screenshots are written before the run ends, so the folder has to exist
   // before the first capture rather than at the end.
   await mkdir(out, { recursive: true })
-  // Settings are the only channel this script drives. Close, minimise and session control
-  // only fire from user actions, so their handlers stay unregistered.
+  // Pause and resume use the real preload with a local acknowledgement; no engine is needed.
   ipcMain.handle('app:get-settings', () => settings)
   ipcMain.handle('app:update-settings', () => settings)
+  const pauseRequests = []
+  ipcMain.handle('engine:set-session-paused', (_event, sessionId, paused) => { pauseRequests.push({ sessionId, paused }) })
   const window = new BrowserWindow({
     width: 900, height: 218, show: false, frame: false, transparent: true,
     webPreferences: { preload: resolve(root, 'out/preload/index.cjs'), contextIsolation: true, sandbox: true },
@@ -97,6 +104,7 @@ void app.whenReady().then(async () => {
     bilingual: document.querySelector('.nola-caption-card')?.getAttribute('data-bilingual'),
     locked: document.querySelector('.nola-caption-card')?.getAttribute('data-locked'),
     scheme: document.querySelector('.nola-caption-card')?.getAttribute('data-scheme'),
+    micBackground: getComputedStyle(document.querySelector('.nola-caption-mic')).backgroundColor,
   }))()`)
   expectFound('overlay-window', structure.window)
   expectFound('caption-card', structure.card)
@@ -108,9 +116,42 @@ void app.whenReady().then(async () => {
   expectFound('overlay-controls', structure.controls)
   expectFound('caption-scrim', structure.scrims, 2)
   expectTrue('card state flags', structure.bilingual === 'true' && structure.locked === 'false' && structure.scheme === 'dark', structure)
+  expectTrue('idle microphone has a visible fill', structure.micBackground !== 'rgba(0, 0, 0, 0)', structure)
 
   // -- 2. First sentence: both tracks carry it and neither is empty ------------------
   await emit(window, 'sessionStarted')
+  await delay(200)
+  for (const scheme of ['dark', 'light']) {
+    settings.overlay.colorScheme = scheme
+    window.webContents.send('settings:changed', settings)
+    await window.webContents.executeJavaScript(`document.querySelector('.nola-caption-card').setAttribute('data-hover', 'true')`)
+    await delay(200)
+    for (const paused of [false, true]) {
+      const control = await window.webContents.executeJavaScript(`(() => {
+        const button = document.querySelector('.nola-caption-mic')
+        const style = getComputedStyle(button)
+        const rect = button.getBoundingClientRect()
+        return { label: button.getAttribute('aria-label'), title: button.title, disabled: button.disabled,
+          background: style.backgroundColor, color: style.color,
+          x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) }
+      })()`)
+      expectTrue('caption control remains filled and usable', !control.disabled
+        && control.label === (paused ? '继续字幕' : '暂停字幕')
+        && control.title === control.label
+        && control.background !== 'rgba(0, 0, 0, 0)' && control.background !== control.color, { scheme, paused, control })
+      if (!paused) expectTrue('recording fill contrasts with pause icon', control.background === (scheme === 'dark' ? 'rgb(255, 255, 255)' : 'rgb(27, 27, 27)'), { scheme, control })
+      window.webContents.sendInputEvent({ type: 'mouseMove', x: control.x, y: control.y })
+      await delay(180)
+      const hovered = await window.webContents.executeJavaScript(`getComputedStyle(document.querySelector('.nola-caption-mic')).backgroundColor`)
+      expectTrue('caption control keeps its fill on hover', hovered !== 'rgba(0, 0, 0, 0)', { scheme, paused, hovered })
+      await writeFile(resolve(out, `overlay-control-${scheme}-${paused ? 'paused' : 'running'}.png`), (await window.webContents.capturePage()).toPNG())
+      await window.webContents.executeJavaScript(`document.querySelector('.nola-caption-mic').click()`)
+      await delay(200)
+      expectTrue('caption control sends pause and resume requests', pauseRequests.at(-1)?.sessionId === 'preview' && pauseRequests.at(-1)?.paused === !paused, { scheme, paused, pauseRequests })
+    }
+  }
+  settings.overlay.colorScheme = 'dark'
+  window.webContents.send('settings:changed', settings)
   await caption({
     segmentId: 'preview-segment',
     sourceText: 'We will discuss why society makes us feel bad for resting.',

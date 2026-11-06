@@ -59,6 +59,8 @@ export class SecureCredentialStore {
     return result
   }
 
+  async flush(): Promise<void> { await this.pending }
+
   async has(key: string): Promise<boolean> {
     try {
       return Boolean(await this.get(key))

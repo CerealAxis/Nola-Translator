@@ -26,7 +26,7 @@ vi.mock('./glossary-store', async original => {
     onChanged: vi.fn(() => () => {}),
   }, restoreExtensionConfiguration: vi.fn(async () => {}) }
 })
-beforeEach(() => { vi.clearAllMocks(); glossaryDocument = undefined; settings = { ...DEFAULT_PREFERENCES }; window.history.replaceState(null, '', '#general'); window.scrollTo = vi.fn(); vi.mocked(requestProviderAccess).mockResolvedValue(true); vi.stubGlobal('chrome', { storage: { onChanged: { addListener: vi.fn(), removeListener: vi.fn() } } }) })
+beforeEach(() => { vi.clearAllMocks(); glossaryDocument = undefined; settings = { ...DEFAULT_PREFERENCES }; window.history.replaceState(null, '', '#general'); window.scrollTo = vi.fn(); vi.mocked(requestProviderAccess).mockReset().mockResolvedValue(true); vi.mocked(translate).mockReset().mockResolvedValue('Translated text'); vi.stubGlobal('chrome', { storage: { onChanged: { addListener: vi.fn(), removeListener: vi.fn() } } }) })
 describe('extension settings', () => {
   it('keeps a failed glossary save visible inside its open editor', async () => {
     const user = userEvent.setup(); render(<Options />)
@@ -42,9 +42,9 @@ describe('extension settings', () => {
     const user = userEvent.setup(); const cloud = { ...createProvider('alibaba'), id: 'cloud' }; const t = browserText('en')
     render(<LiveServiceField settings={settings} providers={[...DEFAULT_PROVIDERS, cloud]} t={t} />)
     await user.click(screen.getByRole('combobox', { name: t('liveService') }))
-    expect(screen.getAllByRole('option', { name: 'Nola Translator' })).toHaveLength(1)
+    expect(await screen.findAllByRole('option', { name: 'Nola Translator' })).toHaveLength(1)
     expect(screen.queryByText(/cascade|s2s/i)).not.toBeInTheDocument()
-    await user.click(screen.getByRole('option', { name: `Alibaba Cloud · ${t('live')}` }))
+    await user.click(await screen.findByRole('option', { name: `Alibaba Cloud · ${t('live')}` }))
     expect(requestProviderAccess).toHaveBeenCalledWith(cloud)
     await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ pipeline: 's2s', s2sProvider: 'cloud' }))
   })
@@ -52,7 +52,7 @@ describe('extension settings', () => {
     const user = userEvent.setup(); const cloud = { ...createProvider('alibaba'), id: 'cloud' }; const t = browserText('en')
     render(<LiveServiceField settings={{ ...settings, pipeline: 's2s', s2sProvider: 'cloud' }} providers={[...DEFAULT_PROVIDERS, cloud]} t={t} />)
     await user.click(screen.getByRole('combobox', { name: t('liveService') }))
-    await user.click(screen.getByRole('option', { name: `Alibaba Cloud · ${t('asr')}` }))
+    await user.click(await screen.findByRole('option', { name: `Alibaba Cloud · ${t('asr')}` }))
     await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ pipeline: 'cascade', asrProvider: 'cloud' }))
   })
   it('shows a denied live service permission and keeps its previous binding', async () => {
@@ -60,7 +60,7 @@ describe('extension settings', () => {
     render(<LiveServiceField settings={settings} providers={[...DEFAULT_PROVIDERS, cloud]} t={t} />)
     vi.mocked(requestProviderAccess).mockResolvedValueOnce(false)
     await user.click(screen.getByRole('combobox', { name: t('liveService') }))
-    await user.click(screen.getByRole('option', { name: `Alibaba Cloud · ${t('live')}` }))
+    await user.click(await screen.findByRole('option', { name: `Alibaba Cloud · ${t('live')}` }))
     expect(await screen.findByRole('alert')).toHaveTextContent(t('permissionFailed'))
     expect(savePreferences).not.toHaveBeenCalled()
   })

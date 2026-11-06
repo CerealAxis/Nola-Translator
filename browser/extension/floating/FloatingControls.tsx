@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
-import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
 import { Languages, Pin, PinOff, Settings2, X } from 'lucide-react'
 import { Button } from '../../../src/renderer/components/ui/button'
 import { Alert, AlertDescription } from '../../../src/renderer/components/ui/alert'
-import { Popover, PopoverTrigger } from '../../../src/renderer/components/ui/popover'
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../../src/renderer/components/ui/popover'
 import { browserText, errorKey } from '../i18n'
 import { NolaLogo } from '../logo'
 import type { Preferences } from '../preferences'
@@ -77,10 +76,10 @@ export function FloatingControls({ preferences, active, error, onTranslate, onRe
         }}><NolaLogo /></Button>
         <Popover open={menu} onOpenChange={setMenu}>
           <PopoverTrigger render={<Button className="nola-floating-dismiss-trigger" variant="bare" size="icon-xs" aria-label={t('close')} title={t('close')} />}><X /></PopoverTrigger>
-          {menuContainer && <PopoverPrimitive.Portal container={menuContainer}><PopoverPrimitive.Positioner side={preferences.floatingSide === 'right' ? 'left' : 'right'} align="start" sideOffset={8} className="z-popup"><PopoverPrimitive.Popup className="nola-floating-popover" aria-label={t('close')}>
+          {menuContainer && <PopoverContent container={menuContainer} side={preferences.floatingSide === 'right' ? 'left' : 'right'} align="start" className="nola-floating-popover"><PopoverTitle className="sr-only">{t('close')}</PopoverTitle>
             <Button variant="bare" onClick={() => { setMenu(false); onHide('site') }}>{t('floatingHideSite')}</Button>
             <Button variant="bare" onClick={() => { setMenu(false); onHide('all') }}>{t('floatingHideAll')}</Button>
-          </PopoverPrimitive.Popup></PopoverPrimitive.Positioner></PopoverPrimitive.Portal>}
+          </PopoverContent>}
         </Popover>
         <Button className="nola-floating-pin" variant="bare" size="icon-xs" aria-label={t(preferences.floatingLocked ? 'unpinFloating' : 'pinFloating')} title={t(preferences.floatingLocked ? 'unpinFloating' : 'pinFloating')} onClick={onLock}>{preferences.floatingLocked ? <PinOff /> : <Pin />}</Button>
       </div>

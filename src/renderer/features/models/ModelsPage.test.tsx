@@ -348,3 +348,19 @@ it('opens the OCR family selector and downloads the chosen language variant', as
   await user.click(within(dialog).getByRole('button', { name: '安装' }))
   await waitFor(() => expect(manage).toHaveBeenCalledWith('pp-ocrv5-mobile-latin-onnx', 'install', 'modelscope'))
 })
+
+
+it('manages installed manga inpainting weights without language configuration', () => {
+  stores.models.setState({ resources: [{
+    resourceId: 'lama-manga', kind: 'inpaintModel', provider: 'lama', name: 'LaMA Manga',
+    description: '', languages: [], installed: true, installedBytes: 204332996,
+    state: 'idle', cancellable: false,
+  }] })
+  render(<ModelsPage />)
+  const card = screen.getByText('LaMA Manga').closest<HTMLElement>('[data-slot="card"]')!
+  fireEvent.click(within(card).getByRole('button', { name: '查看详情' }))
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByRole('button', { name: '删除模型' })).toBeInTheDocument()
+  expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument()
+  expect(within(dialog).queryByRole('button', { name: '保存配置' })).not.toBeInTheDocument()
+})

@@ -191,6 +191,11 @@ const api: NolaTranslatorApi = {
       return () => ipcRenderer.off('comic:changed', receive)
     },
   },
+  desktopData: {
+    snapshot: () => invoke('desktop-data:snapshot'),
+    backup: options => invoke('desktop-data:backup', options),
+    restore: password => invoke('desktop-data:restore', password),
+  },
   glossary: {
     snapshot: () => invoke('glossary:snapshot'),
     command: request => invoke('glossary:command', request),

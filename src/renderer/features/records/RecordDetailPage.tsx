@@ -19,6 +19,7 @@ import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import { AudioPlayerBar, DualColumnView } from '@/components/reading'
 import type { DualColumnSegment } from '@/components/reading'
 import { ErrorBoundary, PageHeader, StatusPill } from '@/components/primitives'
+import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useI18n } from '@/i18n'
@@ -44,6 +45,7 @@ export function RecordDetailPage(): ReactNode {
   const detail = useStore(stores.meetings, (state) => state.detail)
   const detailLoading = useStore(stores.meetings, (state) => state.detailLoading)
 
+  const [query, setQuery] = useState('')
   const [fontScale, setFontScale] = useState(1)
   const [currentIndex, setCurrentIndex] = useState<number | undefined>(undefined)
   const [exportOpen, setExportOpen] = useState(false)
@@ -72,6 +74,7 @@ export function RecordDetailPage(): ReactNode {
 
   // Switching records resets the type scale and the playhead: a reading position should not carry over.
   useEffect(() => {
+    setQuery('')
     setFontScale(1)
     setCurrentIndex(undefined)
   }, [id])
@@ -100,6 +103,12 @@ export function RecordDetailPage(): ReactNode {
       }
     })
   }, [detail])
+
+  const gameRecord = detail?.meta.sourceKind === 'game'
+  const visibleSegments = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase()
+    return !gameRecord || !needle ? segments : segments.filter(row => row.source.toLocaleLowerCase().includes(needle) || row.target.toLocaleLowerCase().includes(needle))
+  }, [gameRecord, query, segments])
 
   const back = useCallback(() => navigate(pathOf('records')), [navigate])
 
@@ -192,6 +201,7 @@ export function RecordDetailPage(): ReactNode {
         </div>
 
         <Card className="nola-record-card nola-record-detail__reading"><CardContent className="card__content">
+          {gameRecord && <Input type="search" aria-label={t('suite.searchDialogueLog')} placeholder={t('suite.searchDialogueLog')} value={query} onChange={event => setQuery(event.target.value)} />}
           {detailLoading && !detail ? (
             <DualSkeleton t={t} />
           ) : detailFailed ? (
@@ -207,9 +217,9 @@ export function RecordDetailPage(): ReactNode {
                 {t('nav.records')}
               </Button>
             </div>
-          ) : (
+          ) : !visibleSegments.length ? <p role="status">{t('records.noResults')}</p> : (
             <DualColumnView
-              segments={segments}
+              segments={visibleSegments}
               sourceLabel={t('records.detailSource')}
               targetLabel={t('records.detailTranslation')}
               fontScale={fontScale}
@@ -220,7 +230,7 @@ export function RecordDetailPage(): ReactNode {
           )}
 
           </CardContent>
-          <CardFooter className="p-0">
+          {(!gameRecord || detail?.audioUrl) && <CardFooter className="p-0">
             <AudioPlayerBar
               audioUrl={detail?.audioUrl ?? null}
               durationMs={detail?.meta.audioDurationMs ?? null}
@@ -237,7 +247,7 @@ export function RecordDetailPage(): ReactNode {
                 setCurrentIndex(index)
               }}
             />
-          </CardFooter>
+          </CardFooter>}
         </Card>
 
         {/* Notes are stored as Markdown and rendered read-only in the meeting detail. */}

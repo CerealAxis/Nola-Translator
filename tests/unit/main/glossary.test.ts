@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { emptyGlossary, glossaryEntrySchema, type GlossaryDocument, type GlossaryEntry } from '../../../src/shared/glossary'
 import { resolveGlossaryTerms, glossaryPrompt, glossaryScopeMatches } from '../../../src/shared/glossary-match'
 import { parseGlossaryCsv, exportGlossaryCsv, planGlossaryImport } from '../../../src/shared/glossary-csv'
-import { GlossaryStore } from '../../../src/main/glossary-store'
+import { GlossaryStore, realtimeGlossarySnapshot, assertLegacyRealtimeGlossary } from '../../../src/main/glossary-store'
 import fixtures from '../../fixtures/glossary-matching.json'
 
 const entry = (source: string, target = '译', caseSensitive = false, targetLanguage = '*'): GlossaryEntry => ({ id: randomUUID(), source, target, caseSensitive, targetLanguage, enabled: true })
@@ -26,6 +26,17 @@ it('plans CSV conflicts without dropping untouched entries or replacing existing
 })
 
 describe('glossary matching', () => {
+  it('only sends enabled desktop speech rules and excludes private project and browser entries', () => {
+    const doc = document([entry('A小', 'A Short', true, 'en'), { ...entry('hidden'), enabled: false }])
+    const template = doc.libraries[0]
+    doc.libraries.push({ ...template, scope: { mode: 'selected', targets: [{ kind: 'website', patterns: [] }] } },
+      { ...template, scope: { mode: 'selected', targets: [{ kind: 'realtime' }] }, entries: [entry('Nola', '')] })
+    expect(realtimeGlossarySnapshot(doc).libraries).toEqual([
+      [{ source: 'A小', target: 'A Short', caseSensitive: true, targetLanguage: 'en', mode: 'fixed' }],
+      [{ source: 'Nola', target: '', caseSensitive: false, targetLanguage: '*', mode: 'keep' }],
+    ])
+    expect(realtimeGlossarySnapshot({ ...doc, enabled: false }).libraries).toEqual([])
+  })
   it('matches terminal website path wildcards without leaking to sibling paths or hosts', () => {
     for (const pattern of ['example.com/docs/*', '*.example.com/docs/*']) {
       const scope = { mode: 'selected' as const, targets: [{ kind: 'website' as const, patterns: [pattern] }] }
@@ -103,4 +114,30 @@ describe('CSV and persistence', () => {
     await expect(new GlossaryStore(path).snapshot()).rejects.toThrow()
     expect(await readFile(path, 'utf8')).toBe('{broken')
   })
+})
+
+
+it('gates only effective legacy speech-rule changes and preserves rejected edits on disk', async () => {
+  const doc = document([entry('A小', 'A Short', true, 'en')])
+  expect(() => assertLegacyRealtimeGlossary(doc, ['en'])).toThrow('realtimeGlossaryLegacyUnsupported')
+  expect(() => assertLegacyRealtimeGlossary(doc, ['zh'])).not.toThrow()
+  expect(() => assertLegacyRealtimeGlossary(doc, [])).not.toThrow()
+  const metadata = structuredClone(doc); metadata.libraries[0].name = 'Renamed'
+  expect(() => assertLegacyRealtimeGlossary(metadata, ['en'], doc)).not.toThrow()
+  expect(() => assertLegacyRealtimeGlossary({ ...doc, enabled: false }, ['en'], doc)).not.toThrow()
+  const changed = structuredClone(doc); changed.libraries[0].entries[0].target = 'A Tiny'
+  expect(() => assertLegacyRealtimeGlossary(changed, ['en'], doc)).toThrow('realtimeGlossaryLegacyUnsupported')
+  const root = await mkdtemp(join(tmpdir(), 'nola-legacy-glossary-')); temporary.push(root)
+  const path = join(root, 'glossary.json')
+  await writeFile(path, JSON.stringify({ document: doc, operations: [] }))
+  const before = await readFile(path, 'utf8')
+  const store = new GlossaryStore(path)
+  const request = { operationId: randomUUID(), expectedRevision: 0, command: { action: 'saveTerm' as const,
+    libraryId: doc.libraries[0].id, entry: changed.libraries[0].entries[0] } }
+  await expect(store.command(request, (next, current) => assertLegacyRealtimeGlossary(next, ['en'], current))).rejects.toThrow('realtimeGlossaryLegacyUnsupported')
+  expect(await readFile(path, 'utf8')).toBe(before)
+  expect((await store.snapshot()).revision).toBe(0)
+  const saved = await store.command(request)
+  expect(saved.libraries[0].entries[0].target).toBe('A Tiny')
+  await expect(store.command(request, () => { throw new Error('must replay without revalidation') })).resolves.toEqual(saved)
 })

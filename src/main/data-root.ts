@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, normalize } from 'node:path'
 
 import { app } from 'electron'
@@ -126,7 +127,15 @@ export function writeDataRootPointer(root: string): void {
   if (!isAbsolute(root)) throw new Error('The data root must be an absolute path')
   const file = dataLocationFile()
   mkdirSync(dirname(file), { recursive: true })
-  writeFileSync(file, `${JSON.stringify({ version: POINTER_VERSION, dataRoot: normalize(root) }, null, 2)}\n`, 'utf8')
+  const temporary = `${file}.${randomUUID()}.tmp`
+  try {
+    const handle = openSync(temporary, 'wx', 0o600)
+    try {
+      writeFileSync(handle, `${JSON.stringify({ version: POINTER_VERSION, dataRoot: normalize(root) }, null, 2)}\n`, 'utf8')
+      fsyncSync(handle)
+    } finally { closeSync(handle) }
+    renameSync(temporary, file)
+  } finally { rmSync(temporary, { force: true }) }
 }
 
 const PENDING_MIGRATION_FILE = 'data-migration-pending.json'

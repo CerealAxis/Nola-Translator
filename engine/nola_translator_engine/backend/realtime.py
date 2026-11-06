@@ -13,6 +13,7 @@ from .gateway.adapters import MIMO_TTS_MODEL
 from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, Operation
 from .gateway.gateway import MatchRequest, ModelGateway
 from .latency import LatencyCapture
+from .glossary import RealtimeGlossary
 from .playback_queue import PlaybackQueue
 from .s2s_audio import S2SAudioOutput
 from .s2s_pipeline import S2SPipeline
@@ -33,6 +34,13 @@ class RealtimePipelines:
         self.reconnected = set()
         self.recorders = {}
         self.translation_contexts = {}
+        self.desktop_glossary = RealtimeGlossary()
+        self.desktop_translators = set()
+
+    async def update_glossary(self, snapshot):
+        if self.desktop_glossary.update(snapshot):
+            for translator in tuple(self.desktop_translators):
+                await translator.refresh_glossary()
 
     @staticmethod
     def _latency_enabled(session):
@@ -120,6 +128,11 @@ class RealtimePipelines:
 
             def emit_translation(event, payload):
                 session._log.submit(event, payload)
+                if session.owner == "meeting":
+                    if event == "error" and payload["error"]["scope"] == "task":
+                        session.last_error = ErrorPayload.model_validate(payload["error"])
+                    elif event == "translation_committed" and session.last_error and session.last_error.scope == "task":
+                        session.last_error = None
                 if playback is not None and event == "translation_committed" and payload["target_language"] == speech_language:
                     playback.translation_committed(payload)
 
@@ -140,6 +153,7 @@ class RealtimePipelines:
                     fallback_model_id=config.fallback_translation_model,
                     fallback_provider_options=connection.get("fallback_mt_options"),
                     latency_detection=latency_detection,
+                    glossary=self.desktop_glossary if session.owner in ("quick_interpret", "meeting") else None,
                 )
             try:
                 if config.asr_model in ("aliyun", "minimax"):
@@ -206,6 +220,8 @@ class RealtimePipelines:
             if playback is not None and command == "resume":
                 playback.epoch = session.epoch
                 playback.resume()
+            if mt is not None and mt.glossary is not None:
+                self.desktop_translators.add(mt)
             self.active[key] = asyncio.create_task(self._run(session, pipeline, capture, mt, pending_source, provider_context))
             return "running"
         return session.state
@@ -312,6 +328,7 @@ class RealtimePipelines:
                 if provider_context is not None:
                     await provider_context.__aexit__(None, None, None)
             if mt is not None:
+                self.desktop_translators.discard(mt)
                 await mt.close()
             if capture is not None:
                 await capture.stop()

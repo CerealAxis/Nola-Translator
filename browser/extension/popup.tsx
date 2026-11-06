@@ -18,15 +18,14 @@ import { DEFAULT_PROVIDERS, loadProviders, requestProviderAccess, type ProviderC
 import { matchesSitePatterns, savePreferences } from './preferences'
 import { languageOptions, LiveServiceField, usePreferences } from './settings-fields'
 import './styles.css'
+import { ProviderAvatar } from './components/ProviderAvatar'
+import { Badge } from '../../src/renderer/components/ui/badge'
 
 const providerSlots = [
   ['pageProvider', 'web', 'mt'], ['subtitleProvider', 'video', 'mt'], ['selectionProvider', 'selection', 'mt'],
   ['inputProvider', 'inputTranslation', 'mt'], ['ttsProvider', 'tts', 'tts'], ['asrProvider', 'asr', 'asr'],
   ['s2sProvider', 's2s', 's2s'], ['llmProvider', 'llm', 'llm'],
 ] as const satisfies readonly (readonly [string, BrowserKey, Capability])[]
-function ProviderMark({ provider }: { provider?: ProviderConnection }) {
-  return <span className="nola-provider-avatar" title={provider?.name}>{provider?.id === 'desktop' ? <NolaLogo /> : <span aria-hidden="true">{provider?.name.slice(0, 1) ?? '?'}</span>}</span>
-}
 export interface PopupProps { store: ReturnType<typeof createPopupStore> }
 export function Popup({ store }: PopupProps) {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
@@ -87,7 +86,7 @@ export function Popup({ store }: PopupProps) {
         <PopupLanguage label={t('target')} value={settings.pageLanguage} options={languages} onChange={value => save({ pageLanguage: value })} t={t} />
       </div>
       <Dialog><div className="nola-popup-provider-row"><span>{t('provider')}</span><DialogTrigger render={<Button variant="bare" className="nola-provider-summary" aria-label={t('apiProviders')} />}>
-        <span className="nola-provider-avatars">{providerSlots.slice(0, 5).map(([key, label]) => <span key={key} title={`${t(label)}: ${providers.find(item => item.id === settings[key])?.name ?? ''}`}><ProviderMark provider={providers.find(item => item.id === settings[key])} /></span>)}<span className="nola-provider-avatar nola-provider-count">+{providerSlots.length - 5}</span></span>
+        <span className="nola-provider-avatars">{providerSlots.slice(0, 5).map(([key, label]) => <span key={key} title={`${t(label)}: ${providers.find(item => item.id === settings[key])?.name ?? ''}`}><ProviderAvatar provider={providers.find(item => item.id === settings[key])} /></span>)}<Badge variant="secondary" className="nola-provider-count">+{providerSlots.length - 5}</Badge></span>
       </DialogTrigger></div><DialogContent className="nola-popup-drawer"><header><DialogTitle>{t('provider')}</DialogTitle><DialogClose render={<Button variant="bare" size="icon-sm" aria-label={t('close')} />}><X /></DialogClose></header>
         <div className="nola-popup-provider-fields">{providerSlots.slice(0, 5).map(([key, label, capability]) => <ChoiceField key={key} label={t(label)} value={settings[key]} options={providers.filter(provider => provider.capabilities.includes(capability)).map(provider => ({ value: provider.id, label: provider.name }))} onChange={value => saveProvider(key, value)} />)}<LiveServiceField settings={settings} providers={providers} t={t} /><details><summary>{t('advancedSettings')}</summary><ChoiceField label={t('llm')} value={settings.llmProvider} options={providers.filter(provider => provider.capabilities.includes('llm')).map(provider => ({ value: provider.id, label: provider.name }))} onChange={value => saveProvider('llmProvider', value)} /></details></div>
         {localError && <Alert variant="danger"><AlertDescription>{t(errorKey(localError))}</AlertDescription></Alert>}

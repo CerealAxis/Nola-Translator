@@ -20,7 +20,8 @@ export function MeetingStage({ mode, snapshot, checks, heard }: {
   const states = (direction: 'uplink' | 'downlink'): [WireState, WireState] => {
     const enabled = direction === 'uplink' ? mode.uplinkEnabled : mode.downlinkEnabled
     if (!enabled || snapshot.state === 'unknown' || snapshot.state === 'stopping') return ['idle', 'idle']
-    if (snapshot.error && (!snapshot.error.direction || snapshot.error.direction === direction)) return ['failed', 'failed']
+    const glossaryWarning = snapshot.state === 'running' && (snapshot.error?.code === 'glossaryUnsupported' || snapshot.error?.code === 'glossaryBudgetExceeded')
+    if (snapshot.error && !glossaryWarning && (!snapshot.error.direction || snapshot.error.direction === direction)) return ['failed', 'failed']
     const input = checks[direction === 'uplink' ? 'microphoneId' : 'downlinkInputId']
     const output = checks[direction === 'uplink' ? 'uplinkOutputId' : 'headphonesId']
     const lane = snapshot.state === 'running' ? snapshot.telemetry?.[direction] : undefined

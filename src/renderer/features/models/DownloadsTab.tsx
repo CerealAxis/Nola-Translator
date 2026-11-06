@@ -78,7 +78,7 @@ export function DownloadsTab() {
                     record={record}
                     busy={busyIds.includes(record.resourceId)}
                     onRetry={() => {
-                      if (record.kind !== 'ocrModel') { setDownloadTarget(record); return }
+                      if (record.kind !== 'ocrModel' && record.kind !== 'inpaintModel') { setDownloadTarget(record); return }
                       void actions.models.manageResource(record.resourceId, 'install').catch((cause: unknown) => notifyError(t('models.downloadFailed'), { cause }))
                     }}
                   />
@@ -150,7 +150,7 @@ function Row({ record, busy, onRetry }: { record: ResourceRecordWithRate; busy: 
               {t('models.retry')}
             </Button>
           ) : null}
-          {!failed && !cancelling && record.kind !== 'ocrModel' ? <Button variant="secondary" size="sm" disabled={busy} onClick={() => {
+          {!failed && !cancelling && record.kind !== 'ocrModel' && record.kind !== 'inpaintModel' ? <Button variant="secondary" size="sm" disabled={busy} onClick={() => {
             void actions.models.manageResource(record.resourceId, paused ? 'resume' : 'pause').catch((cause: unknown) => {
               notifyError(t('errors.engineOperationFailed'), { cause })
             })

@@ -4,8 +4,8 @@
   border-color: transparent !important;
 }
 
-/* Icon actions stay unfilled even when a caller supplies a filled variant or state style. */
-[data-slot='button'][data-size^='icon']:not([data-variant='nav']):not(.nola-color-picker__preset) {
+/* Caption recording controls keep their state fill so the pause icon stays visible. */
+[data-slot='button'][data-size^='icon']:not([data-variant='nav']):not(.nola-color-picker__preset):not(.nola-caption-mic) {
   background: none !important;
   border-color: transparent !important;
 }

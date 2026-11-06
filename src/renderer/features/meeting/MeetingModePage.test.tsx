@@ -53,7 +53,14 @@ beforeEach(() => {
   } } as unknown as NolaBridge)
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); store.stores.settings.setState(initialSettings); store.stores.models.setState(initialModels) })
-const ready = async (testDialog = true) => { render(<MeetingModePage />); await waitFor(() => expect(screen.getByRole('button', { name: '刷新设备' })).toBeEnabled()); if(testDialog) fireEvent.click(screen.getByTestId('meeting-audio-test')) }
+const ready = async (testDialog = true) => {
+  await act(async () => { render(<MeetingModePage />) })
+  const refresh = screen.getByText('刷新设备', { selector: 'button' })
+  expect(refresh).toHaveRole('button')
+  expect(refresh).toHaveAccessibleName('刷新设备')
+  expect(refresh).toBeEnabled()
+  if (testDialog) fireEvent.click(screen.getByTestId('meeting-audio-test'))
+}
 
 it('keeps start disabled until the current meeting state is known and offers stop after a read failure', async () => {
   const api = store.getBridge()!.meetingMode!
@@ -157,10 +164,11 @@ it('ignores a test result from an outdated device selection', async () => {
   let finish!: (result: MeetingAudioTestResult) => void
   testAudio.mockReturnValue(new Promise<MeetingAudioTestResult>(resolve => { finish = resolve }))
   await ready()
-  fireEvent.click(screen.getByRole('button', { name: '播放测试音' }))
+  const dialog = within(screen.getByRole('dialog'))
+  fireEvent.click(dialog.getByRole('button', { name: '播放测试音' }))
   act(() => store.stores.models.setState({ devices: devices.filter(device => device.deviceId !== 'ears') }))
   await act(async () => finish({ kind: 'headphones', hasSignal: false, peak: 0, playbackSent: true }))
-  expect(screen.queryByRole('button', { name: '我听到了' })).not.toBeInTheDocument()
+  expect(dialog.queryByRole('button', { name: '我听到了' })).not.toBeInTheDocument()
 })
 
 it('supports receive-only application audio without a cable or microphone', async () => {

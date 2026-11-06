@@ -31,6 +31,8 @@ const causes: Readonly<Partial<Record<string, EngineErrorCode>>> = {
 
 // Several providers share the same v2 error code. Use the specific reason before the wire category.
 const reasons: Readonly<Partial<Record<string, EngineErrorCode>>> = {
+  glossaryUnsupported: 'glossaryUnsupported',
+  glossaryBudgetExceeded: 'glossaryBudgetExceeded',
   'backend.gatewayDisabled': 'gatewayNotRunning',
   'backend.shuttingDown': 'engineTransportUnavailable',
   'pipeline.s2sConfigurationUnavailable': 's2sConfigurationMissing',

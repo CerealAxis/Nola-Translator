@@ -225,7 +225,7 @@ def detected_quads(probability, width: int, height: int):
 class ScreenOcr:
     def __init__(self, model_root: Path, manager: ModelManager | None = None, spec=None) -> None:
         self.spec = spec or PP_OCRV5_MOBILE
-        self.languages = OCR_LANGUAGES[self.spec.model_id]
+        self.languages = OCR_LANGUAGES.get(self.spec.model_id, ())
         self._variants: dict[str, ScreenOcr] = {}
         self.models = manager or ModelManager(model_root)
         self.root = self.models.model_root
@@ -266,7 +266,7 @@ class ScreenOcr:
         installed_bytes = sum((directory / entry.path).stat().st_size for entry in self.spec.files
                               if (directory / entry.path).is_file())
         snapshot["resource"] = ResourceRecord(
-            resourceId=definition.resource_id, kind="ocrModel", provider=definition.provider,
+            resourceId=definition.resource_id, kind=definition.kind, provider=definition.provider,
             name=definition.name, description=definition.description, languages=list(definition.languages),
             installed=installed, installedBytes=installed_bytes, downloadBytes=self.spec.total_bytes,
             state=snapshot["state"], phase=snapshot.get("phase"), progress=snapshot.get("progress"),
@@ -569,6 +569,12 @@ class ScreenOcr:
     def variant(self, resource_id: str) -> ScreenOcr:
         if resource_id == self.spec.model_id:
             return self
+        from ..models.inpaint_catalog import INPAINT_RESOURCE_ID
+        if resource_id == INPAINT_RESOURCE_ID:
+            if resource_id not in self._variants:
+                from .comic_inpaint import ComicInpainter
+                self._variants[resource_id] = ComicInpainter(self.root)
+            return self._variants[resource_id]
         if resource_id not in OCR_SPECS:
             raise HTTPException(422, detail="invalidModel")
         if resource_id not in self._variants:
@@ -618,7 +624,7 @@ def build_screen_ocr_router(service: ScreenOcr) -> APIRouter:
     async def load(resource_id: str = OCR_RESOURCE_ID):
         target = service.variant(resource_id)
         for other in (service, *service._variants.values()):
-            if other is not target and other._loaded:
+            if other is not target and other.spec.model_id in OCR_SPECS and other._loaded:
                 await invoke(other.release())
         return await invoke(target.load())
 

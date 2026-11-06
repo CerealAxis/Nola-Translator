@@ -226,6 +226,7 @@ const update = async (patch) => {
 };
 const emit = (event) => eventListeners.forEach(fn => fn(event));
 contextBridge.exposeInMainWorld('nolaTranslator', {
+  desktopData: { snapshot: async () => ({ root: 'D:/Data', usage: { configuration: 10240, content: 10485760, audio: 204800, models: 1073741824, credentials: 512, logs: 1048576 } }), backup: async () => false, restore: async () => false },
   getSettings: async () => settings,
   updateSettings: update,
   onSettingsChanged: fn => { settingsListeners.add(fn); return () => settingsListeners.delete(fn) },
@@ -411,6 +412,39 @@ async function main() {
       }
     })
   })()`)
+
+  if (process.argv.includes('--desktop-data')) {
+    for (const language of ['zh-CN', 'zh-TW', 'zh-HK', 'en', 'ja', 'ko']) for (const theme of ['light', 'dark']) for (const width of [760, 1180]) {
+      window.setContentSize(width, 900)
+      await window.webContents.executeJavaScript(`window.nolaTranslator.updateSettings(${JSON.stringify({ uiLanguage: language, theme, appearance: { reduceMotion: true } })})`)
+      await goto(window, '#/settings/storage', 'settings')
+      await settle(window)
+      const state = await window.webContents.executeJavaScript(`(() => {
+        const group = document.querySelector('#desktop-data-backup');
+        group?.scrollIntoView({ block: 'center' });
+        return { buttons: group?.querySelectorAll('button').length, rows: document.querySelector('#desktop-data-usage')?.querySelectorAll('.settings-row').length,
+          overflow: document.documentElement.scrollWidth > innerWidth + 2 };
+      })()`)
+      scenarios++
+      if (state.buttons !== 2 || state.overflow || !state.rows) fail({ language, theme, width }, 'desktop data controls failed', { state })
+      if (language === 'zh-CN') await writeFile(resolve(output, `desktop-data-${theme}-${width}.png`), (await window.webContents.capturePage()).toPNG())
+      await window.webContents.executeJavaScript(`document.querySelector('#desktop-data-backup button').click()`)
+      await settle(window)
+      const modal = await window.webContents.executeJavaScript(`(() => {
+        const dialog = document.querySelector('[role="dialog"]'), rect = dialog?.getBoundingClientRect();
+        return { switches: dialog?.querySelectorAll('[role="switch"]').length, fits: rect && rect.x >= 0 && rect.right <= innerWidth + 1 && rect.y >= 0 && rect.bottom <= innerHeight + 1 };
+      })()`)
+      scenarios++
+      if (modal.switches !== 3 || !modal.fits) fail({ language, theme, width }, 'backup dialog failed', { modal })
+      if (language === 'zh-CN') await writeFile(resolve(output, `desktop-backup-${theme}-${width}.png`), (await window.webContents.capturePage()).toPNG())
+      window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
+      window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
+      await settle(window)
+    }
+    await writeFile(resolve(output, 'desktop-data-results.json'), JSON.stringify({ scenarios, failures }, null, 2))
+    console.log(JSON.stringify({ scenarios, failures }, null, 2))
+    window.destroy(); app.exit(failures.length ? 1 : 0); return
+  }
 
   if (process.argv.includes('--translation-suite')) {
     const pages = [

@@ -16,6 +16,7 @@ from uuid import uuid4
 from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, Operation
 from .gateway.gateway import MatchRequest, ModelGateway
 from .latency import unix_ms
+from .glossary import GlossaryTerm, RealtimeGlossary
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,8 @@ class _Task:
     model_fingerprint: str
     config_revision: int
     task_class: str
+    glossary: list[GlossaryTerm]
+    glossary_generation: int
     task_id: str = field(default_factory=lambda: str(uuid4()))
 
 
@@ -47,6 +50,8 @@ class _Segment:
     target_revisions: dict[str, int] = field(default_factory=dict)
     translation_ids: dict[str, str] = field(default_factory=dict)
     committed: set[str] = field(default_factory=set)
+    glossary_keys: dict[str, str] = field(default_factory=dict)
+    glossary_generations: dict[str, int] = field(default_factory=dict)
 
 
 class TranslationScheduler:
@@ -76,6 +81,7 @@ class TranslationScheduler:
         preview_deadline_s: float = 3.0,
         final_deadline_s: float = 10.0,
         latency_detection: bool = False,
+        glossary: RealtimeGlossary | None = None,
     ) -> None:
         self.gateway = gateway
         self.session_id = session_id
@@ -92,6 +98,7 @@ class TranslationScheduler:
         self.preview_deadline_s = preview_deadline_s
         self.final_deadline_s = final_deadline_s
         self.latency_detection = latency_detection
+        self.glossary = glossary
         self._segments: dict[tuple[str, int, str], _Segment] = {}
         self._finals: deque[_Task] = deque()
         self._wake = asyncio.Event()
@@ -145,6 +152,7 @@ class TranslationScheduler:
         pending_since = state.preview_since
         state.generation += 1
         state.source = new_source
+        state.glossary_keys.clear()
         state.context = new_context
         for language in self.target_languages:
             old = state.provisional.get(language)
@@ -179,9 +187,10 @@ class TranslationScheduler:
             policy = matched.entry.definition.capabilities.translation_policy
             if policy.min_source_state == "committed" or not policy.allow_preview:
                 continue
-            state.pending_preview[language] = self._make_task(
-                base_key, state, language, "preview", matched
-            )
+            try:
+                state.pending_preview[language] = self._make_task(base_key, state, language, "preview", matched)
+            except ValueError:
+                continue
         if state.pending_preview:
             self._start()
             self._idle.clear()
@@ -207,6 +216,7 @@ class TranslationScheduler:
         new_context = dict(context or {})
         state.generation += 1
         state.source, state.context = new_source, new_context
+        state.glossary_keys.clear()
         state.pending_preview.clear()
         state.preview_since = None
         state.preview_due = None
@@ -222,10 +232,10 @@ class TranslationScheduler:
                 continue
             try:
                 matched = self._match(new_source, language, accept_preview=True)
+                task = self._make_task(base_key, state, language, "final", matched)
             except Exception as error:
                 await self._emit("error", self._error_event_payload(segment_id, error))
                 continue
-            task = self._make_task(base_key, state, language, "final", matched)
             self._finals.append(task)
         if self._finals:
             self._start()
@@ -320,7 +330,8 @@ class TranslationScheduler:
                 operation=Operation.TRANSLATE, task_id=task.task_id,
                 session_id=self._uuid_or_none(self.session_id), pipeline_id=self.pipeline_id,
                 epoch=self.epoch, deadline=deadline, config_revision=task.config_revision,
-                provider_options=self.provider_options, translation_context=task.context,
+                provider_options=self.provider_options,
+                translation_context={**task.context, "glossary": task.glossary} if task.glossary else task.context,
             )
             arguments = {
                 "text": task.source["text"], "source": str(task.source.get("language") or "auto"),
@@ -433,6 +444,10 @@ class TranslationScheduler:
         state.committed.add(language)
 
     def _make_task(self, base_key: tuple[str, int, str], state: _Segment, language: str, task_class: str, matched: Any) -> _Task:
+        terms, term_key = self._glossary_terms(state.source["text"], language)
+        state.glossary_keys[language] = term_key
+        if terms is None:
+            raise ValueError(term_key)
         source_fingerprint = _hash({"text": state.source.get("text"), "span": state.source.get("audio_span")})
         context_fingerprint = _hash(state.context)
         config_revision = matched.entry.configuration.revision
@@ -449,14 +464,52 @@ class TranslationScheduler:
             "model": model_fingerprint,
             "source_language": state.source.get("language", "auto"),
             "target_language": language,
+            **({"glossary": term_key} if terms else {}),
         })
         return _Task(
             key=(*base_key, language), generation=state.generation,
             source=dict(state.source), context=dict(state.context),
             source_fingerprint=source_fingerprint, context_fingerprint=context_fingerprint,
             fingerprint=fingerprint, model_fingerprint=model_fingerprint,
-            config_revision=config_revision, task_class=task_class,
+            config_revision=config_revision, task_class=task_class, glossary=terms,
+            glossary_generation=state.glossary_generations.get(language, 0),
         )
+
+    def _glossary_terms(self, text: str, language: str) -> tuple[list[GlossaryTerm] | None, str]:
+        try:
+            terms = self.glossary.match(text, language) if self.glossary else []
+            return terms, _hash([term.model_dump() for term in terms]) if terms else ""
+        except ValueError as error:
+            return None, str(error)
+
+    async def refresh_glossary(self):
+        for key, state in tuple(self._segments.items()):
+            for lang in state.glossary_keys.keys() - state.committed:
+                _, signature = self._glossary_terms(state.source["text"], lang)
+                if signature == state.glossary_keys[lang]:
+                    continue
+                state.glossary_keys[lang] = signature
+                state.glossary_generations[lang] = state.glossary_generations.get(lang, 0) + 1
+                final = state.source.get("text_state") == "committed"
+                previous = state.provisional.pop(lang, None)
+                if previous:
+                    await self._emit("translated_text", self._translated_payload(
+                        state, key[2], lang, previous[0], previous[2], "provisional", ("stale",)))
+                try:
+                    matched = self._match(state.source, lang, accept_preview=True)
+                    task = self._make_task(key, state, lang, "final" if final else "preview", matched)
+                except Exception as error:
+                    if final:
+                        await self._emit("error", self._error_event_payload(key[2], error))
+                    continue
+                if final:
+                    self._finals.append(task)
+                else:
+                    state.pending_preview[lang] = task
+                    state.preview_due = time.monotonic()
+                self._start()
+                self._idle.clear()
+                self._wake.set()
 
     def _request(self, source: dict[str, Any], language: str, *, accept_preview: bool) -> MatchRequest:
         return MatchRequest(
@@ -473,6 +526,8 @@ class TranslationScheduler:
 
     def _current(self, task: _Task, state: _Segment | None) -> bool:
         if self._closed or state is None or task.generation != state.generation or task.key[0:2] != (self.pipeline_id, self.epoch):
+            return False
+        if task.glossary_generation != state.glossary_generations.get(task.key[3], 0):
             return False
         if _hash(state.source) != _hash(task.source) or _hash(state.context) != task.context_fingerprint:
             return False
@@ -514,14 +569,16 @@ class TranslationScheduler:
 
     def _error_event_payload(self, segment_id: str, error: Exception, task_id: str | None = None) -> dict[str, Any]:
         code = "TRANSLATION_TIMEOUT" if getattr(error, "code", None) == GatewayErrorCode.TIMEOUT else "INTERNAL_ERROR"
+        reason = next((value for value in (getattr(error, "provider_code", None), str(error))
+                       if value in ("glossaryUnsupported", "glossaryBudgetExceeded")), None)
         return {
             "error": {
-                "code": code,
+                "code": "CAPABILITY_MISMATCH" if reason else code,
                 "stage": "mt",
-                "scope": "pipeline",
+                "scope": "task" if reason else "pipeline",
                 "retryable": code == "TRANSLATION_TIMEOUT" or bool(getattr(error, "retryable", False)),
                 "fatal": False,
-                "message_key": "translation.failed",
+                "message_key": reason or "translation.failed",
                 "correlation_id": task_id or str(uuid4()),
                 "segment_id": segment_id,
                 "safe_details": {},

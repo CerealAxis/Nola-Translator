@@ -357,6 +357,7 @@ export function OverlayControls({ active, locked }: OverlayControlsProps) {
               onClick={toggleMic}
               disabled={pausePending || status === 'starting' || status === 'stopping'}
               aria-label={micLabel}
+              title={micLabel}
               aria-busy={starting || undefined}
               // `.nola-caption-mic` in `caption-card.css` paints the recording
               // state; this only supplies it.

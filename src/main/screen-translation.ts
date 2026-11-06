@@ -566,6 +566,7 @@ export class ScreenTranslation {
 
   async dispose(): Promise<void> {
     await this.stop(); this.disposed = true
+    await this.writeQueue.catch(() => {})
     this.stopShortcutRecording()
     for (const accelerator of this.registeredShortcuts) globalShortcut.unregister(accelerator)
     for (const channel of ['snapshot', 'sources', 'command', 'bootstrap', 'frame', 'capture-error']) ipcMain.removeHandler(`screen:${channel}`)

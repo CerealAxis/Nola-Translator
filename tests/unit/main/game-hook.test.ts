@@ -32,6 +32,8 @@ it('reports broken native command pipes without an unhandled stream error', asyn
   vi.mocked(spawn).mockReturnValue(child as never)
   const starting = hook.start('window:123:0', undefined, changed)
   await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce())
+  child.stdout.write('{"type":"thread","id":"1:2:0:0","name":"GDI","code":"HQ4@1","embed":false}\n')
+  await expect(hook.insert('HQ4@1')).rejects.toThrow('hookUnavailable')
   child.stdout.write('{"type":"ready"}\n')
   await starting
   expect(() => child.stdin.emit('error', new Error('EPIPE'))).not.toThrow()

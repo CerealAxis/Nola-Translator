@@ -148,3 +148,76 @@ it.each(['hook', 'ocr'] as const)('keeps the failed %s session associated with i
     expect(snapshot.sessionId).toBeUndefined()
   })
 })
+
+it('restores the selected rule on a new PID and ASLR base without enabling embedding', async () => {
+  const { service } = create()
+  await service.snapshot()
+  const internal = service as unknown as { state: Omit<GameSnapshot, 'profiles' | 'revision' | 'version'>; hookChanged(event: GameHookEvent): void }
+  const sessionId = crypto.randomUUID()
+  internal.state = { status: 'running', activeGameId: game.id, source: 'hook', lines: [], threads: [], sessionId, hookAvailable: true }
+  const data = { type: 'thread' as const, name: 'Dialogue', code: 'HQ4@14:game.exe', embed: true }
+  internal.hookChanged({ ...data, id: '42:100000:7ff11234:0' })
+  await service.command({ action: 'selectThreads', sessionId, ids: ['42:100000:7ff11234:0'] })
+  internal.state.threads = []
+  internal.hookChanged({ ...data, id: '99:200000:7ee21235:0' })
+  internal.hookChanged({ ...data, id: '99:300000:7ee21234:0' })
+  expect(internal.state.threads.map(thread => thread.selected)).toEqual([false, true])
+  expect(internal.state.embedThreadId).toBeUndefined()
+})
+
+it('holds the backup busy guard during window validation and ignores its completion after disposal', async () => {
+  const { service, screen } = create()
+  await service.command({ action: 'saveProfile', profile: { ...game, source: 'ocr' }, expectedRevision: 0 })
+  let sources!: (items: never[]) => void
+  screen.sources.mockImplementationOnce(() => new Promise(resolve => { sources = resolve }))
+  const request = service.command({ action: 'connect', id: game.id, sourceId: 'window:7:0' })
+  await vi.waitFor(() => expect(service.busy).toBe(true))
+  await service.dispose()
+  sources([{ id: 'window:7:0', kind: 'window' }] as never[])
+  await request
+  expect(service.busy).toBe(false)
+  expect(screen.startForGame).not.toHaveBeenCalled()
+})
+
+it.each(['glossary refresh', 'deselect and reselect', 'thread removal and recreation'] as const)('fences pending embedding and shared inference after %s', async change => {
+  const { service, inferModel } = create()
+  await service.snapshot()
+  const id = '7:abc:0:0', sessionId = crypto.randomUUID(), text = 'Shared dialogue'
+  const reply = vi.fn(), enableEmbed = vi.fn()
+  const internal = service as unknown as {
+    state: Omit<GameSnapshot, 'profiles' | 'revision' | 'version'>
+    hook: { reply: typeof reply; enableEmbed: typeof enableEmbed; stop(): Promise<void> }
+    hookChanged(event: GameHookEvent): void
+    flushHook(): void
+    embedTranslation(event: Extract<GameHookEvent, { type: 'embedRequest' }>): Promise<void>
+  }
+  internal.hook = { reply, enableEmbed, stop: async () => {} }
+  internal.state = { status: 'running', activeGameId: game.id, source: 'hook', lines: [], threads: [], sessionId, hookAvailable: true }
+  const thread = { type: 'thread' as const, id, name: 'Dialogue', code: 'HQ4@15:game.exe', embed: true }
+  internal.hookChanged(thread)
+  const enable = (threadId: string) => service.command({ action: 'embedHook', id: threadId, sessionId })
+  const embed = (token: string) => internal.embedTranslation({ type: 'embedRequest', token, id, text })
+  await enable(id)
+  let stale!: (value: { text: string }) => void, current!: (value: { text: string }) => void
+  inferModel.mockImplementationOnce(() => new Promise(resolve => { stale = resolve }))
+    .mockImplementationOnce(() => new Promise(resolve => { current = resolve }))
+  const oldRequest = embed('1')
+  await vi.waitFor(() => expect(inferModel).toHaveBeenCalledTimes(1))
+  if (change === 'glossary refresh') await service.refreshGlossary()
+  else {
+    if (change === 'deselect and reselect') await enable('')
+    else { internal.hookChanged({ type: 'remove', id }); internal.hookChanged(thread) }
+    await enable(id)
+  }
+  const newRequest = embed('2')
+  await vi.waitFor(() => expect(inferModel).toHaveBeenCalledTimes(2))
+  stale({ text: 'Stale' }); await oldRequest
+  expect(reply).not.toHaveBeenCalled()
+  internal.state.threads![0].selected = true
+  internal.hookChanged({ type: 'text', id, text }); internal.flushHook()
+  current({ text: 'Current' }); await newRequest
+  await vi.waitFor(() => expect(internal.state.lines.at(-1)).toMatchObject({ translation: 'Current' }))
+  await embed('3')
+  expect(inferModel).toHaveBeenCalledTimes(2)
+  expect(reply.mock.calls).toEqual([['2', 'Current'], ['3', 'Current']])
+})

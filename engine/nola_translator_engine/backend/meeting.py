@@ -358,9 +358,11 @@ class Meeting:
 
     def snapshot(self) -> dict:
         server = self.ctx.server_instance_id
+        last_error = self.last_error or next((route.session.last_error.model_copy(update={"safe_details": {"direction": route.name}})
+            for route in self.routes if route.session.last_error and route.session.last_error.scope == "task"), None)
         return {
             "meeting_id": str(self.config.command_id), "state": self.state, "passthrough_active": self.passthrough, "paused": self.paused,
-            "last_error": self.last_error.model_dump(mode="json") if self.last_error else None,
+            "last_error": last_error.model_dump(mode="json") if last_error else None,
             "telemetry": {route.name: route.telemetry() for route in self.routes},
             "segments": sorted((row for route in self.routes for row in route.transcript()), key=lambda row: row["startedAtMs"]),
             **{route.name: route.session.snapshot(server).model_dump(mode="json") for route in self.routes},

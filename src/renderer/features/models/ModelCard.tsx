@@ -46,6 +46,7 @@ export const BUILTIN_DESCRIPTION_KEYS: Readonly<Record<string, TranslationKey>> 
 }
 
 export function descriptionKeyOf(record: ResourceRecord): TranslationKey | undefined {
+  if (record.kind === 'inpaintModel') return 'suite.inpaintDescription'
   if (record.kind === 'ocrModel') return 'screen.ocrDescription'
   const builtIn = BUILTIN_DESCRIPTION_KEYS[record.resourceId]
   if (builtIn) return builtIn

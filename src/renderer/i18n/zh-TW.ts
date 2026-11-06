@@ -1,4 +1,5 @@
 import { suiteLocales } from './translation-suite-ui'
+import { desktopDataLocales } from './desktop-data-ui'
 import { modelPolicyTw } from './model-policy-ui'
 import { screenLocales } from './screen-ui'
 import { shortcutLocales } from './shortcuts-ui'
@@ -17,6 +18,7 @@ export const zhTW: Dictionary = {
   meeting: meetingTw,
   modelsPolicy: modelPolicyTw,
   suite: suiteLocales['zh-TW'],
+  desktopData: desktopDataLocales['zh-TW'],
   screen: screenLocales['zh-TW'],
   shortcuts: shortcutLocales['zh-TW'],
   workbench: workbenchTw,
@@ -411,6 +413,7 @@ export const zhTW: Dictionary = {
     "meetings": "會議與學習",
     "live": "直播場景",
     "quickDescription": "即時語音辨識與翻譯\n 支援多語言互譯",
+    "browserDescription": "安裝和管理瀏覽器擴充功能\n連接 Nola 使用翻譯功能",
     "gatewayTitle": "模型閘道",
     "gatewayDescription": "啟動並管理本機模型服務\n 為翻譯與辨識提供能力",
     "openGateway": "管理閘道",

@@ -63,6 +63,9 @@ def map_local_error(message: str, *, stage: str) -> GatewayError:
     substrings and always sanitize before the message can leave the process.
     """
 
+    reason = message.removeprefix("ValueError: ").strip()
+    if reason in ("glossaryUnsupported", "glossaryBudgetExceeded"):
+        return GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage=stage, message=reason, provider_code=reason)
     lowered = message.lower()
     if "not installed" in lowered or "wrong task type" in lowered:
         code = GatewayErrorCode.MODEL_NOT_INSTALLED
@@ -386,7 +389,11 @@ class _NetworkMtAdapter(Adapter):
                 GatewayErrorCode.PROVIDER_ERROR, stage="mt", message="Translation provider failed",
                 provider_code=error_code(error)[0],
             ) from None
-        except (httpx.HTTPError, OSError, RuntimeError, ValueError):
+        except ValueError as error:
+            if str(error) == "glossaryBudgetExceeded":
+                raise GatewayError(GatewayErrorCode.CAPABILITY_MISMATCH, stage="mt", message=str(error), provider_code=str(error)) from None
+            raise GatewayError(GatewayErrorCode.PROVIDER_ERROR, stage="mt", message="translation provider failed") from None
+        except (httpx.HTTPError, OSError, RuntimeError):
             raise GatewayError(GatewayErrorCode.PROVIDER_ERROR, stage="mt", message="translation provider failed") from None
         ctx.cancel_token.raise_if_cancelled()
         return TranslationResult(text=result.text, source=source, target=target)

@@ -5,6 +5,18 @@ import { featureConflictOwner } from '../shared/feature-activity'
 import { logDiagnostic } from './session-log'
 
 let assertSender: (event: Electron.IpcMainInvokeEvent) => void = () => { throw new Error('Access denied') }
+let pendingInvocations = 0
+const idleWaiters = new Set<() => void>()
+
+/** Disposing handlers prevents new requests; an offline snapshot also waits for admitted writes. */
+export function drainLoggedIpc(timeoutMs = 15_000): Promise<void> {
+  if (!pendingInvocations) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    const done = () => { clearTimeout(timer); idleWaiters.delete(done); resolve() }
+    const timer = setTimeout(() => { idleWaiters.delete(done); reject(new Error('DATA_WRITERS_NOT_CLOSED')) }, timeoutMs)
+    idleWaiters.add(done)
+  })
+}
 
 /** Install the application trust boundary before registering any handlers. */
 export function configureIpcSenderValidation(validate: typeof assertSender): void {
@@ -16,10 +28,11 @@ export function loggedHandle(channel: string, listener: Parameters<typeof ipcMai
   ipcMain.handle(channel, async (event, ...args: unknown[]) => {
     const operationId = randomUUID()
     const started = performance.now()
-    const privatePayload = /^(glossary|game):/.test(channel)
-    const privateArguments = privatePayload || /credential|meeting:(rename|set-notes)|hub:(search|model-card)|app:(agent-workspace|update-settings)|offline:select-model/.test(channel)
+    const privatePayload = /^(glossary|game|meeting|desktop-data):/.test(channel)
+    const privateArguments = privatePayload || /credential|hub:(search|model-card)|app:(agent-workspace|update-settings)|offline:select-model/.test(channel)
     logDiagnostic('ipc.request', { operationId, channel, windowId: event.sender?.id,
       arguments: privateArguments ? { count: args.length, contents: '[omitted]' } : args })
+    pendingInvocations++
     try {
       assertSender(event)
       const result: unknown = await listener(event, ...args)
@@ -35,6 +48,9 @@ export function loggedHandle(channel: string, listener: Parameters<typeof ipcMai
       const rendererError = new Error(owner ? `FEATURE_CONFLICT:${owner}` : classification.code)
       Object.assign(rendererError, classification)
       throw rendererError
+    } finally {
+      pendingInvocations--
+      if (!pendingInvocations) for (const resolve of [...idleWaiters]) resolve()
     }
   })
 }

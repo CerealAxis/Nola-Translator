@@ -40,6 +40,7 @@ from .models.catalog import (
     SENSEVOICE_SMALL,
 )
 from .models.manager import ModelManager, ModelSpec
+from .models.inpaint_catalog import INPAINT_RESOURCE_ID, LAMA_MANGA
 from .models.ocr_catalog import OCR_RESOURCE_ID, PP_OCRV5_MOBILE, OCR_SPECS, OCR_LANGUAGES, OCR_NAMES
 from .models.crisp_catalog import (ADDITIONAL_TTS_NAMES, ADDITIONAL_TTS_SPECS, CRISP_ASR_SPECS,
                                    QWEN3_TTS_NAMES, QWEN3_TTS_SPECS)
@@ -114,7 +115,7 @@ class ResourceOperationCancelled(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class ResourceDefinition:
     resource_id: str
-    kind: Literal["recognitionModel", "translationModel", "ttsModel", "ocrModel"]
+    kind: Literal["recognitionModel", "translationModel", "ttsModel", "ocrModel", "inpaintModel"]
     # Free-form, because a hub-installed model passes its adapter id straight through: the
     # built-ins below write `qwen3-asr`/`sensevoice`/`hymt2`/`m2m100`, and `llama.cpp` joins them
     # for a GGUF installed from the hub.
@@ -264,7 +265,10 @@ RESOURCE_DEFINITIONS = _definitions() + tuple(
 ) + tuple(ResourceDefinition(
     spec.model_id, "ocrModel", "pp-ocrv5", OCR_NAMES[spec.model_id],
     "PP-OCRv5 mobile multilingual OCR model.", OCR_LANGUAGES[spec.model_id], spec.total_bytes,
-) for spec in OCR_SPECS.values())
+) for spec in OCR_SPECS.values()) + (ResourceDefinition(
+    INPAINT_RESOURCE_ID, "inpaintModel", "lama", "LaMA Manga",
+    "Manga and anime image inpainting (local PyTorch).", (), LAMA_MANGA.total_bytes,
+),)
 RESOURCE_BY_ID = {item.resource_id: item for item in RESOURCE_DEFINITIONS}
 
 
@@ -307,7 +311,7 @@ class ResourceManager:
                 continue
             if languages:
                 self.registry.put(replace(entry, languages=languages))
-        specs = [self._spec(item.resource_id) for item in RESOURCE_DEFINITIONS if item.kind != "ocrModel"]
+        specs = [self._spec(item.resource_id) for item in RESOURCE_DEFINITIONS if item.kind not in ("ocrModel", "inpaintModel")]
         specs.extend(entry.spec() for entry in self.registry.all())
         self.models.cleanup_stale(specs)
 
@@ -438,7 +442,7 @@ class ResourceManager:
             cancellable=operation.cancellable if operation else False,
             errorCode=operation.error_code if operation else None,
         )
-        if resource_id in OCR_SPECS:
+        if resource_id in OCR_SPECS or resource_id == INPAINT_RESOURCE_ID:
             from .backend.screen_ocr import read_ocr_state
 
             state = read_ocr_state(self.model_root, resource_id)
@@ -456,7 +460,7 @@ class ResourceManager:
         download_source: str | None = None,
     ) -> ResourceRecord:
         self._definition(resource_id)
-        if resource_id in OCR_SPECS:
+        if resource_id in OCR_SPECS or resource_id == INPAINT_RESOURCE_ID:
             # The private backend owns OCR leases and operations across both processes.
             raise ResourceActionError("invalidConfiguration", {"reason": "ocrManagedByBackend"})
         if action == "cancel":
@@ -698,7 +702,7 @@ class ResourceManager:
         languages = list(definition.languages)
         if definition.kind == "recognitionModel":
             return recognition_configuration(languages, "crisp" if definition.provider == "crisp-asr" else "llama" if definition.provider == "llama-asr" else "pytorch")
-        if definition.kind in ("ttsModel", "ocrModel"):
+        if definition.kind in ("ttsModel", "ocrModel", "inpaintModel"):
             return None
         return translation_configuration(languages, "pytorch" if definition.provider in ("m2m100", "index-translate-transformers") else "llama")
 
@@ -765,6 +769,7 @@ class ResourceManager:
         # read from the module-level constants at call time so tests can swap the catalog spec.
         builtin = {
             **OCR_SPECS,
+            INPAINT_RESOURCE_ID: LAMA_MANGA,
             OCR_RESOURCE_ID: PP_OCRV5_MOBILE,
             QWEN_RESOURCE_ID: QWEN3_ASR_1_7B_HF,
             QWEN_06B_RESOURCE_ID: QWEN3_ASR_0_6B_HF,

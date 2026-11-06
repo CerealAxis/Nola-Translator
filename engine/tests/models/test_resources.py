@@ -9,6 +9,8 @@ import threading
 import pytest
 
 from nola_translator_engine import resources as resources_module
+from nola_translator_engine.models.inpaint_catalog import INPAINT_RESOURCE_ID
+from nola_translator_engine.models.ocr_catalog import OCR_SPECS
 from nola_translator_engine.models.manager import FileEntry, ModelSpec
 from nola_translator_engine.models.manager import ModelStorageError
 from nola_translator_engine.protocol import ResourceRecord
@@ -140,7 +142,8 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
         *(spec.model_id for spec in QWEN3_TTS_SPECS),
         *(spec.model_id for spec in ADDITIONAL_TTS_SPECS),
         *(spec.model_id for spec in QWEN35_SPECS),
-        OCR_RESOURCE_ID,
+        *OCR_SPECS,
+        INPAINT_RESOURCE_ID,
     ]
     assert QWEN_RESOURCE_ID == "qwen3-asr-1.7b-hf"
     assert QWEN_06B_RESOURCE_ID == "qwen3-asr-0.6b-hf"
@@ -192,17 +195,22 @@ def test_list_returns_every_builtin_resource(tmp_path: Path) -> None:
     assert m2m100.installed is False
 
     for record in records:
-        assert 0 < len(record.languages) <= 200
+        if record.kind == "inpaintModel":
+            assert record.languages == []
+        else:
+            assert 0 < len(record.languages) <= 200
         assert ResourceRecord.model_validate(record.model_dump()) == record
 
 
 @pytest.mark.parametrize("spec", INDEX_TRANSLATE_SPECS)
-def test_index_translate_presets_download_only_text_weights_and_use_llama(tmp_path, spec):
+def test_index_translate_presets_include_verified_vision_projector_and_use_llama(tmp_path, spec):
     manager = ResourceManager(tmp_path / "models", lambda _event: None)
     record = next(item for item in manager.list() if item.resourceId == spec.model_id)
-    assert len(spec.files) == 1
+    assert len(spec.files) == 2
     assert spec.files[0].path.endswith(".Q4_K_M.gguf")
-    assert record.downloadBytes == spec.files[0].size
+    assert spec.files[1].path.endswith(".mmproj-Q8_0.gguf")
+    assert all(entry.sha256 and len(entry.sha256) == 64 for entry in spec.files)
+    assert record.downloadBytes == spec.total_bytes
     assert manager.adapter_for(spec.model_id) == "llama.cpp"
     capability = manager.configuration(spec.model_id)
     assert capability.engine == "llama"
@@ -376,7 +384,7 @@ async def test_failed_install_skips_cleanup(
     assert not legacy.exists()
 
 
-async def test_install_hymt2_cleans_xdg_dirs_only(
+async def test_install_hymt2_preserves_argos_xdg_and_other_models(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     spec, payloads = _tiny_hymt2()
@@ -406,7 +414,7 @@ async def test_install_hymt2_cleans_xdg_dirs_only(
     assert manager.is_installed(HYMT2_RESOURCE_ID) is True
     assert manager.hymt2_gguf_path().is_file()
     for path in xdg_paths:
-        assert not path.exists()
+        assert (path / "argos" / "index").read_text(encoding="utf-8") == "x"
     assert legacy.is_dir()
     assert (model_root / "user-own-model").is_dir()
     assert (model_root / "ollama").is_dir()
@@ -509,3 +517,14 @@ async def test_remove_installed_resource(
     assert manager.is_installed(HYMT2_RESOURCE_ID) is False
     assert not target.exists()
     assert manager.record(HYMT2_RESOURCE_ID).installedBytes == 0
+
+
+@pytest.mark.parametrize("resource_id", (OCR_RESOURCE_ID, INPAINT_RESOURCE_ID))
+def test_resource_listing_preserves_backend_owned_visual_download_staging(tmp_path, resource_id):
+    staging = tmp_path / f".{resource_id}-abcdefgh"
+    staging.mkdir()
+    partial = staging / "weights.part"
+    partial.write_bytes(b"active-download")
+    manager = ResourceManager(tmp_path, lambda _: None)
+    assert any(record.resourceId == resource_id for record in manager.list())
+    assert partial.read_bytes() == b"active-download"

@@ -1,4 +1,5 @@
 import { suiteLocales } from './translation-suite-ui'
+import { desktopDataLocales } from './desktop-data-ui'
 import { modelPolicyHk } from './model-policy-ui'
 import { screenLocales } from './screen-ui'
 import { shortcutLocales } from './shortcuts-ui'
@@ -17,6 +18,7 @@ export const zhHK: Dictionary = {
   meeting: meetingHk,
   modelsPolicy: modelPolicyHk,
   suite: suiteLocales['zh-HK'],
+  desktopData: desktopDataLocales['zh-HK'],
   screen: screenLocales['zh-HK'],
   shortcuts: shortcutLocales['zh-HK'],
   workbench: workbenchHk,
@@ -411,6 +413,7 @@ export const zhHK: Dictionary = {
     "meetings": "會議與學習",
     "live": "直播場景",
     "quickDescription": "即時語音辨識與翻譯\n 支援多語言互譯",
+    "browserDescription": "安裝和管理瀏覽器擴充功能\n連接 Nola 使用翻譯功能",
     "gatewayTitle": "模型網關",
     "gatewayDescription": "啟動及管理本機模型服務\n 為翻譯與辨識提供能力",
     "openGateway": "管理網關",

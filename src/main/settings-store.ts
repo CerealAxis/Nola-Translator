@@ -491,6 +491,8 @@ export class SettingsStore {
     return structuredClone(this.settings)
   }
 
+  async flush(): Promise<void> { await this.writeQueue }
+
   update(patch: StorePatch): Promise<AppSettings> {
     const copy = structuredClone(patch)
     const result = this.writeQueue.then(() => this.persist(copy))

@@ -50,6 +50,7 @@ class PlaybackResolution(BaseModel):
     owner_id: str = Field(min_length=1, max_length=128)
 from .sessions import Session, SessionError
 from .direct_inference import PUBLIC_PROVIDER_CODES, DirectInferenceRequest, DirectInferenceResult, run_direct_inference
+from .glossary import RealtimeGlossaryUpdate
 from .gateway.adapters import MIMO_TTS_MODEL
 from .gateway.capabilities import CallContext, GatewayError, GatewayErrorCode, Operation
 from .gateway.gateway import MatchRequest
@@ -201,6 +202,14 @@ def build_router() -> APIRouter:
         }
 
     # -- sessions ---------------------------------------------------------------
+
+    @router.put("/realtime/glossary")
+    async def update_realtime_glossary(request: Request, body: RealtimeGlossaryUpdate):
+        ctx = backend(request)
+        if not ctx.realtime_enabled:
+            return _error_response(503, meeting_error("RESOURCE_BUSY", "session", "backendUnavailable"), ctx.server_instance_id)
+        await ctx.pipeline_registry.update_glossary(body)
+        return {"revision": ctx.pipeline_registry.desktop_glossary.revision}
 
     @router.post("/sessions", status_code=201)
     async def create_session(request: Request, body: CreateSessionRequest):

@@ -2,6 +2,7 @@ import { copyFile, lstat, mkdir, readFile, readdir, rename, rm, writeFile } from
 import { createReadStream, existsSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { dirname, join, resolve, sep } from 'node:path'
+import { DESKTOP_DATA_ENTRIES } from '../shared/desktop-data'
 
 /**
  * Every path the app owns inside a data root, in a stable order.
@@ -10,25 +11,7 @@ import { dirname, join, resolve, sep } from 'node:path'
  * where `resources/**` (app.asar, the bundled Python engine, llama.cpp) and the NSIS uninstaller
  * sit beside these entries, so a tree delete would uninstall the app.
  */
-export const DATA_ROOT_ENTRIES: readonly string[] = [
-  'settings.json',
-  'screen-translation.json',
-  'glossary.json',
-  'game-translation.json',
-  'comics',
-  'workspace-window.json',
-  'settings.json.migration-v3.json',
-  'settings.json.migration-v3.bak',
-  'credentials.json',
-  'history.jsonl',
-  'meetings',
-  'session-journal',
-  'models',
-  'cache',
-  'runtimes',
-  'logs',
-  'local-call',
-]
+export const DATA_ROOT_ENTRIES: readonly string[] = [...DESKTOP_DATA_ENTRIES.map(entry => entry.name), 'desktop-data-state.json']
 
 /**
  * The allowlisted entries a root actually holds.

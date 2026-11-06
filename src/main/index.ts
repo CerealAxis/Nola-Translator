@@ -3,7 +3,10 @@ import { FeatureActivity, type FeatureLease } from './feature-activity'
 import { ModelGateway } from './model-gateway'
 import { NolaTray } from './tray'
 import { ScreenTranslation } from './screen-translation'
-import { GlossaryStore } from './glossary-store'
+import { GlossaryStore, realtimeGlossarySnapshot, assertLegacyRealtimeGlossary } from './glossary-store'
+import { DesktopDataManager } from './desktop-data'
+import { drainLoggedIpc } from './logged-ipc'
+import { registerDesktopDataIpc } from './desktop-data-ipc'
 import { ComicTranslation } from './comic'
 import { GameTranslation } from './game-translation'
 import { glossaryMutationSchema, glossaryTestSchema } from '../shared/glossary'
@@ -87,6 +90,9 @@ let disposeAppIpc: (() => void) | null = null
 let disposeRuntimeIpc: (() => void) | null = null
 let disposeOfflineIpc: (() => Promise<void>) | null = null
 let quitting = false
+let desktopData: DesktopDataManager | undefined
+let disposeDesktopDataIpc: (() => void) | undefined
+let flushDesktopData: (() => Promise<void>) | undefined
 let browserConnection: BrowserConnection | null = null
 let tray: NolaTray | null = null
 let gateway: ModelGateway | null = null
@@ -123,6 +129,7 @@ function createMainWindow(theme: AppSettings['theme']): void {
 
   window.once('ready-to-show', () => window.show())
   window.on('close', event => {
+    if (quitting && desktopData?.pending) { event.preventDefault(); return }
     if (quitting) return
     event.preventDefault()
     if (closeBehavior() === 'quit') requestQuit()
@@ -858,6 +865,18 @@ if (!hasSingleInstanceLock) {
       }
       return resolved
     }
+    let glossaryAck: { instanceId: string; revision: number } | undefined
+    async function syncRealtimeGlossary(host: BackendSupervisor, document: Awaited<ReturnType<GlossaryStore['snapshot']>>) {
+      const instanceId = host.instanceId
+      if (glossaryAck?.instanceId === instanceId && glossaryAck.revision >= document.matchingRevision) return
+      const response = await fetch(new URL('/api/v2/realtime/glossary', host.baseUrl), {
+        method: 'PUT', headers: { ...host.authorizationHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(realtimeGlossarySnapshot(document)), signal: AbortSignal.timeout(10000),
+      }).catch((cause: unknown) => { throw new Error('realtimeGlossarySyncFailed', { cause }) })
+      if (!response.ok) throw new Error('realtimeGlossarySyncFailed')
+      if (host.instanceId === instanceId) glossaryAck = { instanceId, revision: Math.max(
+        glossaryAck?.instanceId === instanceId ? glossaryAck.revision : 0, document.matchingRevision) }
+    }
     const sessions: SessionController = new SessionController({
       engine: desktopEngine, audioTestEngine: engine, meetings, activity, useGateway: true,
       getSettings: () => settings.current(), getCredential: provider => credentials.get(provider),
@@ -865,6 +884,7 @@ if (!hasSingleInstanceLock) {
       startingChanged: starting => { sessionStarting = starting },
       hideOverlay: () => { if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.hide() },
       isOverlayVisible,
+      assertLegacyTranslationAllowed: async targets => assertLegacyRealtimeGlossary(await glossary.snapshot(), targets),
       prepareBackend: async (config, current) => {
         if (activity.has('meeting')) throw new Error('FEATURE_CONFLICT:meeting')
         const speech = config.outputMode === 'speech'
@@ -955,6 +975,7 @@ if (!hasSingleInstanceLock) {
           if (requiresBackend) throw new Error('realtimeBackendUnavailable')
           return
         }
+        if (!s2sModel && config.targetLanguages.length && config.outputMode !== 'source') await syncRealtimeGlossary(backend, await glossary.snapshot())
         if (measure) {
           mapped.config.latency_detection = true
           measurement = pendingLatency = new LatencySession(latencyMeta(mapped, resolved))
@@ -1038,6 +1059,7 @@ if (!hasSingleInstanceLock) {
           sourceLanguage: sourceOf(mode.remoteLanguage), targetLanguages: [mode.localLanguage] }) : undefined
         if (mode.uplinkEnabled && !uplink || mode.downlinkEnabled && !downlink) throw new MeetingModeError({ key: 'meeting.modelConfiguration' })
         if (downlink?.config.input.capture_backend === 'windows_process_include') await client.preflightProcess(downlink.config.input.process_selection_id!)
+        if (!s2sModel) await syncRealtimeGlossary(backend, await glossary.snapshot())
         return { backend, uplink, downlink }
       } finally { client.close() }
     }, snapshot => {
@@ -1141,7 +1163,7 @@ if (!hasSingleInstanceLock) {
       },
       () => gateway?.snapshot().state === 'running',
       async (resourceId, action) => {
-        if (!/^pp-ocrv5-mobile(?:-[a-z]+)?-onnx$/.test(resourceId)) return undefined
+        if (resourceId !== 'lama-manga' && !/^pp-ocrv5-mobile(?:-[a-z]+)?-onnx$/.test(resourceId)) return undefined
         if (!screenOcr) throw new Error('backendUnavailable')
         const status = action === 'install' || action === 'resume' ? await screenOcr.install(resourceId)
           : action === 'remove' ? await screenOcr.remove(resourceId) : await screenOcr.cancel(resourceId)
@@ -1362,9 +1384,16 @@ if (!hasSingleInstanceLock) {
       void gameTranslation?.refreshGlossary().catch(error => console.error('[game.glossary]', error))
     })
     loggedHandle('glossary:snapshot', event => { assertFeatureSender(event, true); return glossary.snapshot() })
-    loggedHandle('glossary:command', (event, request: unknown) => {
+    loggedHandle('glossary:command', async (event, request: unknown) => {
       assertFeatureSender(event, true)
-      return glossary.command(glossaryMutationSchema.parse(request))
+      const mutation = glossaryMutationSchema.parse(request)
+      const document = await glossary.command(mutation, (next, current) =>
+        assertLegacyRealtimeGlossary(next, sessions.legacyTranslationTargets, current))
+      if (backend?.ready && (sessions.busy || activity.has('meeting'))) {
+        try { await syncRealtimeGlossary(backend, document) }
+        catch { throw new Error('realtimeGlossarySavedSyncFailed') }
+      }
+      return document
     })
     loggedHandle('glossary:test', async (event, request: unknown) => {
       assertFeatureSender(event, true)
@@ -1424,6 +1453,7 @@ if (!hasSingleInstanceLock) {
       },
     })
     gameTranslation = new GameTranslation({
+      records: meetings,
       mainDir: __dirname,
       hookRoot: join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'build'), 'game-hook'),
       configPath: join(dataRoot, 'game-translation.json'), screen: screenTranslation,
@@ -1441,6 +1471,13 @@ if (!hasSingleInstanceLock) {
     loggedHandle('game:sources', event => { assertFeatureSender(event, true); return gameTranslation!.sources() })
     loggedHandle('game:command', (event, command: unknown) => { assertFeatureSender(event, true); return gameTranslation!.command(command) })
     createMainWindow(initialSettings.theme)
+    desktopData = new DesktopDataManager(dataRoot, safeStorage, app.getVersion(), () => settings.current().modelStoragePath || dataRoot)
+    flushDesktopData = async () => { await Promise.all([settings.flush(), credentials.flush(), glossary.flush(), meetings.flush()]) }
+    disposeDesktopDataIpc = registerDesktopDataIpc(desktopData, {
+      getWindow: () => mainWindow,
+      busy: () => quitting || activity.snapshot().owner !== null || !!gameTranslation?.busy || componentInstalling || readPendingDataMigration() !== null,
+      selectRoot: writeDataRootPointer,
+    })
     disposeAppIpc = registerAppIpc({
       isDevelopmentWindow: isWorkbenchWindow,
       isDevelopmentBuild: !app.isPackaged,
@@ -1571,8 +1608,9 @@ if (!hasSingleInstanceLock) {
   }).catch(error => { console.error('application startup failed', error); app.quit() })
 }
 
-app.on('window-all-closed', () => { if (quitting) app.quit() })
+app.on('window-all-closed', () => { if (quitting && !desktopData?.pending) app.quit() })
 app.on('before-quit', (event) => {
+  if (quitting && desktopData?.pending) { event.preventDefault(); return }
   if (quitting || !engine) return
   event.preventDefault()
   quitting = true
@@ -1581,15 +1619,21 @@ app.on('before-quit', (event) => {
   ipcMain.removeHandler('realtime:playback-ready')
   ipcMain.removeHandler('realtime:playback-device-lost')
   disposeAppIpc?.()
+  disposeDesktopDataIpc?.()
   disposeRuntimeIpc?.()
   tray?.dispose()
   stopOnboardingCard?.()
   void Promise.allSettled([gameTranslation?.dispose(), screenTranslation?.dispose(), comicTranslation?.dispose(), stopWorkbench?.(), stopSessions?.(), browserConnection?.dispose(), disposeOfflineIpc?.()])
+    .then(results => {
+      if (desktopData?.pending && results.some(result => result.status === 'rejected')) throw new Error('DATA_WRITERS_NOT_CLOSED')
+    })
+    .then(() => desktopData?.pending ? drainLoggedIpc() : undefined)
     .then(() => gateway?.dispose())
     .finally(() => screenOcr?.dispose())
     .finally(async () => { await backendInitialization?.catch(() => {}); await backend?.stop() })
     .finally(() => engine!.stop())
-    .catch((error) => console.error('engine shutdown failed', error))
+    .then(async () => { await flushDesktopData?.(); await desktopData?.execute() })
+    .catch(async (error) => { console.error('engine shutdown failed', error); await desktopData?.failPending() })
     .finally(() => app.quit())
     .catch((error) => console.error('application quit failed', error))
 })

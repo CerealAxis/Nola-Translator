@@ -40,3 +40,27 @@ it('shows real hook candidates and only sends the selected session and thread ID
   fireEvent.click(screen.getByRole('switch', { name: '启用 Dialogue' }))
   await waitFor(() => expect(command).toHaveBeenCalledWith({ action: 'selectThreads', sessionId: 'session', ids: ['thread-1'] }))
 })
+
+it('opens only this game’s saved records from its reading log while disconnected', async () => {
+  vi.spyOn(store, 'getBridge').mockReturnValue({
+    gameTranslation: { snapshot: async () => snapshot, sources: async () => [], onChanged: () => () => {} },
+    meetings: { list: async () => [{ sourceKind: 'game', gameId: 'game', meetingId: 'saved-record', startedAtMs: 0 },
+      { sourceKind: 'game', gameId: 'other', meetingId: 'other-record', startedAtMs: 100 }] },
+  } as unknown as NolaBridge)
+  render(<GameTranslationPage gameId="game" />)
+  await waitFor(() => expect(document.querySelector('a[href="#/records/saved-record"]')).toBeInTheDocument())
+  expect(document.querySelector('a[href="#/records/other-record"]')).toBeNull()
+})
+
+it('paginates large Hook thread lists without losing the selected IDs on another page', async () => {
+  const threads = Array.from({ length: 14 }, (_, index) => ({ id: String(index), name: 'Thread ' + index, preview: '', code: 'HQ4@10:game.exe', selected: index === 0, embedSupported: false }))
+  const value = { ...snapshot, activeGameId: 'game', sessionId: 'session', source: 'hook', status: 'running', threads }
+  const command = vi.fn(async () => value)
+  vi.spyOn(store, 'getBridge').mockReturnValue({ gameTranslation: { snapshot: async () => value, command, sources: async () => [], onChanged: () => () => {} } } as unknown as NolaBridge)
+  render(<GameTranslationPage gameId="game" />)
+  expect(await screen.findByText('Thread 0')).toBeInTheDocument()
+  expect(screen.queryByText('Thread 13')).toBeNull()
+  fireEvent.click(screen.getByText('2', { selector: 'button' }))
+  fireEvent.click(screen.getByRole('switch', { name: '启用 Thread 13' }))
+  await waitFor(() => expect(command).toHaveBeenCalledWith({ action: 'selectThreads', sessionId: 'session', ids: ['0', '13'] }))
+})

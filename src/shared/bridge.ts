@@ -78,6 +78,7 @@ export type EngineChannelEvent = EngineEvent | EngineLifecycleEvent
 export type OverlayTargetPage = 'appearance' | 'captions' | 'resources' | 'translation' | 'torch' | 'llama' | 'crisp'
 
 export type NolaTranslatorApi = {
+  desktopData?: import('./desktop-data').DesktopDataApi
   glossary?: import('./glossary').GlossaryBridge
   comic?: import('./comic').ComicBridge
   gameTranslation?: import('./game-translation').GameTranslationBridge

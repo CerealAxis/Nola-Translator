@@ -27,6 +27,19 @@ interface SupportErrorEntry {
 }
 
 export const SUPPORT_ERROR_CATALOG = {
+  'MT-023': { messageKey: 'suite.unsupportedMtTerms', retryable: false, causes: ['GLOSSARYUNSUPPORTED'] },
+  'MT-024': { messageKey: 'suite.glossaryBudget', retryable: false, causes: ['GLOSSARYBUDGETEXCEEDED'] },
+  'MT-025': { messageKey: 'suite.syncGlossaryFailed', retryable: true, causes: ['REALTIMEGLOSSARYSYNCFAILED'] },
+  'MT-026': { messageKey: 'suite.savedSyncFailed', retryable: true, causes: ['REALTIMEGLOSSARYSAVEDSYNCFAILED'] },
+  'MT-027': { messageKey: 'suite.legacyTermsUnavailable', retryable: false, causes: ['REALTIMEGLOSSARYLEGACYUNSUPPORTED'] },
+  'STO-032': { messageKey: 'desktopData.writers', retryable: false, causes: ['DATA_WRITERS_NOT_CLOSED'] },
+  'STO-031': { messageKey: 'desktopData.changed', retryable: false, causes: ['DATA_BACKUP_CHANGED'] },
+  'STO-030': { messageKey: 'desktopData.links', retryable: false, causes: ['DATA_LINK_UNSUPPORTED'] },
+  'STO-029': { messageKey: 'desktopData.location', retryable: false, causes: ['DATA_BACKUP_LOCATION'] },
+  'STO-028': { messageKey: 'desktopData.busy', retryable: false, causes: ['DATA_OPERATION_BUSY'] },
+  'STO-027': { messageKey: 'desktopData.passwordInvalid', retryable: false, causes: ['DATA_PASSWORD_INVALID'] },
+  'STO-026': { messageKey: 'desktopData.passwordRequired', retryable: false, causes: ['DATA_PASSWORD_REQUIRED'] },
+  'STO-025': { messageKey: 'desktopData.invalid', retryable: false, causes: ['DATA_BACKUP_INVALID'] },
   'MDL-024': { messageKey: 'modelsPolicy.modelDisabled', retryable: false, causes: ['MODELDISABLED'] },
   'MDL-025': { messageKey: 'modelsPolicy.modelNotLoaded', retryable: false, causes: ['MODELNOTLOADED', 'MODELNOTFOUND'] },
   'ARG-001': { messageKey: 'errors.invalidArgument', retryable: false, causes: ['INVALID_ARGUMENT', 'INVALID_REQUEST', 'INVALID_REQUEST_ERROR'] },

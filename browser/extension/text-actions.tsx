@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
 import { Copy, Languages, MoreVertical, Undo2, Volume2, X } from 'lucide-react'
 import { Button } from '../../src/renderer/components/ui/button'
-import { Popover, PopoverTrigger } from '../../src/renderer/components/ui/popover'
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../src/renderer/components/ui/popover'
 import { Spinner } from '../../src/renderer/components/ui/spinner'
 import { browserText, errorKey } from './i18n'
 import { siteEnabled, type Preferences } from './preferences'
@@ -98,11 +97,11 @@ export function TextActions({ selection, preferences, dismiss }: { selection: Te
       {(selection.target || preferences.selectionSpeak) && <Button variant="bare" size="icon-sm" disabled={busy} aria-label={t('readAloud')} title={t('readAloud')} onClick={() => void speak()}><Volume2 /></Button>}
       <Popover open={more} onOpenChange={setMore}>
         <PopoverTrigger render={<Button variant="bare" size="icon-sm" aria-label={t('more')} title={t('more')} />}><MoreVertical /></PopoverTrigger>
-        {menuContainer && <PopoverPrimitive.Portal container={menuContainer}><PopoverPrimitive.Positioner align="start" sideOffset={4} className="z-popup"><PopoverPrimitive.Popup className="nola-selection-menu" aria-label={t('more')}>
+        {menuContainer && <PopoverContent container={menuContainer} align="start" className="nola-selection-menu"><PopoverTitle className="sr-only">{t('more')}</PopoverTitle>
           {(selection.target || preferences.selectionCopy) && <Button variant="bare" disabled={busy} onClick={() => { void copy(); setMore(false) }}><Copy data-icon="inline-start" />{t('copyTranslation')}</Button>}
           {selection.target && restorable !== undefined && <Button variant="bare" onClick={restore}><Undo2 data-icon="inline-start" />{t('restoreInput')}</Button>}
           <Button variant="bare" onClick={dismiss}><X data-icon="inline-start" />{t('close')}</Button>
-        </PopoverPrimitive.Popup></PopoverPrimitive.Positioner></PopoverPrimitive.Portal>}
+        </PopoverContent>}
       </Popover>
     </div>
     <div ref={setMenuContainer} style={{ display: 'contents' }} />

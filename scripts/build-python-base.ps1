@@ -29,7 +29,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not install CrispASR Vulkan libraries' }
 & $buildPython (Join-Path $PSScriptRoot 'build-python-runtime.py')
 if ($LASTEXITCODE -ne 0) { throw 'Python runtime build failed' }
 $privatePython = Join-Path $projectRoot 'engine\dist\NolaPythonEngine\python.exe'
-& $privatePython -I -c "import sys,importlib.util; import onnxruntime,cv2; import nola_translator_engine.runtime; assert sys.version_info[:2] == (3,12); assert importlib.util.find_spec('torch') is None; assert importlib.util.find_spec('sympy') is None and importlib.util.find_spec('mpmath') is None"
+& $privatePython -I -c "import sys,importlib.util; import onnxruntime,cv2,pypdfium2; import nola_translator_engine.runtime; assert sys.version_info[:2] == (3,12); assert importlib.util.find_spec('torch') is None; assert importlib.util.find_spec('sympy') is None and importlib.util.find_spec('mpmath') is None"
 if ($LASTEXITCODE -ne 0) { throw 'Base runtime must work without Torch' }
 & $privatePython -I -c "import sys; from PIL import ImageFont; from nola_translator_engine.backend.comic import render_page; font=ImageFont.truetype(sys.argv[1],24); assert font.getbbox('漫画')[2] > 0" (Join-Path $projectRoot 'src\renderer\assets\fonts\NotoSansCJK-SC-VF.otf')
 if ($LASTEXITCODE -ne 0) { throw 'Comic runtime requires Pillow FreeType and the bundled CJK font' }

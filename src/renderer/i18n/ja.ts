@@ -1,4 +1,5 @@
 import { suiteEntries, suiteLocales } from './translation-suite-ui'
+import { desktopDataEntries, desktopDataLocales } from './desktop-data-ui'
 import { modelPolicyJa, modelPolicyEntries } from './model-policy-ui'
 import { screenEntries, screenLocales } from './screen-ui'
 import { shortcutEntries, shortcutLocales } from './shortcuts-ui'
@@ -12,6 +13,7 @@ import { onboardingEntries, onboardingJa } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const jaMessages: Record<DictionaryKey, string> = {
+  ...desktopDataEntries(desktopDataLocales.ja),
   ...suiteEntries(suiteLocales.ja),
   ...screenEntries(screenLocales.ja),
   ...shortcutEntries(shortcutLocales.ja),
@@ -405,6 +407,7 @@ const jaMessages: Record<DictionaryKey, string> = {
   'homeRecordsUi.meetings': '会議と学習',
   'homeRecordsUi.live': 'ライブ配信',
   'homeRecordsUi.quickDescription': '音声をリアルタイムで認識・翻訳\n 多言語の翻訳に対応',
+  'homeRecordsUi.browserDescription': 'ブラウザー拡張機能を管理\nNola に接続して翻訳',
   'homeRecordsUi.gatewayTitle': 'モデルゲートウェイ',
   'homeRecordsUi.gatewayDescription': 'ローカルモデルサービスを起動・管理\n 翻訳と認識を支援',
   'homeRecordsUi.openGateway': 'ゲートウェイ管理',

@@ -99,6 +99,7 @@ function subscribe<T>(method: keyof NolaTranslatorApi, run: (injected: NolaTrans
 export function createIpcBridge(): NolaBridge {
   return {
     screenTranslation: injectedApi()?.screenTranslation,
+    desktopData: injectedApi()?.desktopData,
     glossary: injectedApi()?.glossary,
     comic: injectedApi()?.comic,
     gameTranslation: injectedApi()?.gameTranslation,

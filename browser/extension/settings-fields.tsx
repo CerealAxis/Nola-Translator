@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { LANGUAGE_CODES, languageName, resolveUiLanguage, type UiLanguage } from '../../src/shared/languages'
 import { Alert, AlertDescription } from '../../src/renderer/components/ui/alert'
 import { Button } from '../../src/renderer/components/ui/button'
+import { Field, FieldLabel } from '../../src/renderer/components/ui/field'
+import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '../../src/renderer/components/ui/slider'
+import { ColorPicker } from '../../src/renderer/components/ui/color-picker'
 import { BROWSER_PROTOCOL_VERSION } from '../../src/shared/browser'
 import { BrowserFailure, createBridge } from './bridge'
 import { ChoiceField } from './components/ChoiceField'
@@ -10,6 +13,17 @@ import { DEFAULT_PREFERENCES, observePreferences, savePreferences, type Preferen
 import { requestProviderAccess, type ProviderConnection } from './providers'
 
 export const languageOptions = (locale: UiLanguage) => LANGUAGE_CODES.map(code => ({ value: code, label: languageName(code, locale) }))
+
+export function RangeField({ label, value, onChange, min = 0, max = 100, step = 1, suffix = '' }: { label: string; value: number; onChange(value: number): void; min?: number; max?: number; step?: number; suffix?: string }) {
+  const id = useId()
+  return <Field><FieldLabel id={id}>{label}</FieldLabel><div className="nola-setting-range"><SliderRoot value={value} min={min} max={max} step={step} onValueChange={onChange}><SliderControl className="relative"><SliderTrack><SliderIndicator /></SliderTrack><SliderThumb aria-labelledby={id} /></SliderControl></SliderRoot><output>{Number(value.toFixed(2))}{suffix}</output></div></Field>
+}
+
+export function ColorField({ label, value, onChange }: { label: string; value: string; onChange(value: string): void }) {
+  const [container, setContainer] = useState<HTMLDivElement | null>(null)
+  return <Field><FieldLabel>{label}</FieldLabel><ColorPicker label={label} value={value} presets={[]} onChange={onChange} container={container} /><div ref={setContainer} className="nola-portal-container" /></Field>
+}
+
 export function usePreferences(): [Preferences, UiLanguage, ReturnType<typeof browserText>] {
   const [settings, setSettings] = useState(DEFAULT_PREFERENCES)
   useEffect(() => observePreferences(setSettings), [])

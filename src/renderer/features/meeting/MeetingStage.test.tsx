@@ -52,3 +52,9 @@ it('exposes the current input and output state in keyboard-accessible tooltips',
   fireEvent.focus(screen.getByRole('img', { name: '对方说给我 · 输出 · 正在播放译音' }))
   expect(await screen.findByText('对方说给我 · 输出 · 正在播放译音')).toBeVisible()
 })
+
+it.each(['glossaryUnsupported', 'glossaryBudgetExceeded'] as const)('preserves live audio telemetry during a %s warning', code => {
+  render(<MeetingStage mode={DEFAULT_MEETING_MODE} snapshot={{ ...running, error: { key: code, code, direction: 'uplink' } }} checks={{}} heard={false} />)
+  expect(screen.getByTestId('meeting-wire-uplink-input')).toHaveAttribute('data-state', 'active')
+  expect(screen.getByTestId('meeting-wire-uplink-output')).toHaveAttribute('data-state', 'active')
+})

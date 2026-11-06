@@ -1,4 +1,5 @@
 import { suiteLocales } from './translation-suite-ui'
+import { desktopDataLocales } from './desktop-data-ui'
 import { modelPolicyEn } from './model-policy-ui'
 import { screenLocales } from './screen-ui'
 import { shortcutLocales } from './shortcuts-ui'
@@ -28,6 +29,7 @@ export const en: Dictionary = {
   meeting: meetingEn,
   modelsPolicy: modelPolicyEn,
   suite: suiteLocales['en'],
+  desktopData: desktopDataLocales['en'],
   screen: screenLocales['en'],
   shortcuts: shortcutLocales['en'],
   workbench: workbenchEn,

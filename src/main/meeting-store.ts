@@ -130,6 +130,8 @@ export class MeetingStore {
 
   constructor(private readonly root: string) {}
 
+  async flush(): Promise<void> { await Promise.all(this.queues.values()) }
+
   private directory(meetingId: string): string {
     return join(this.root, meetingId)
   }
@@ -189,6 +191,17 @@ export class MeetingStore {
       const state = meta.state ?? (meta.endedAtMs === undefined ? 'running' : 'completed')
       if (state !== 'running') continue
       const next: MeetingMeta = { ...meta, state: 'interrupted' }
+      // Game session metadata is finalized on stop; recover its duration and count from durable dialogue after a crash.
+      if (meta.sourceKind === 'game') {
+        const segments = await this.segments(meta.meetingId)
+        next.segmentCount = segments.length
+        if (segments.length) {
+          next.contentStartedAtMs = segments[0].startedAtMs
+          next.contentEndedAtMs = segments.reduce((end, item) => Math.max(end, item.endedAtMs ?? item.startedAtMs), 0)
+          next.durationMs = Math.max(0, next.contentEndedAtMs - next.contentStartedAtMs)
+          next.endedAtMs = next.startedAtMs + next.contentEndedAtMs
+        }
+      }
       this.cache.set(meta.meetingId, next)
       try {
         await this.serialize(meta.meetingId, () => writeMeta(this.directory(meta.meetingId), next))
@@ -266,13 +279,15 @@ export class MeetingStore {
     sourceLanguage: string
     targetLanguage: string
     recordAudio: boolean
+    game?: { id: string; name: string }
   }): Promise<MeetingMeta> {
     const startedAtMs = Date.now()
     const meetingId = meetingIdFor(new Date(startedAtMs))
     const meta: MeetingMeta = {
       meetingId,
-      title: '',
-      titleIsCustom: false,
+      title: input.game?.name ?? '',
+      titleIsCustom: !!input.game,
+      ...(input.game && { sourceKind: 'game' as const, gameId: input.game.id }),
       startedAtMs,
       state: 'running',
       durationMs: 0,

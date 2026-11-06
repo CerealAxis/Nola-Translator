@@ -65,7 +65,7 @@ async function main() {
     const { id } = await cdp.send('Extensions.loadUnpacked', { path: path.join(root, 'browser/extension/dist') })
     const worker = context.serviceWorkers().find(worker => worker.url().includes(id)) || await context.waitForEvent('serviceworker')
     await worker.evaluate(async endpoint => {
-      const database = await new Promise((resolve, reject) => { const request = indexedDB.open('nola-extension-providers', 1); request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains('settings')) request.result.createObjectStore('settings') }; request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error) })
+      const database = await new Promise((resolve, reject) => { const request = indexedDB.open('nola-extension-providers', 2); request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains('settings')) request.result.createObjectStore('settings'); if (!request.result.objectStoreNames.contains('glossary')) request.result.createObjectStore('glossary') }; request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error) })
       const providers = [
         { id: 'desktop', name: 'Nola Translator', preset: 'nola', baseUrl: '', apiKey: '', model: '', capabilities: ['asr', 'mt', 'tts', 's2s', 'llm'], headers: {}, options: {} },
         { id: 'fixture', name: 'Local fixture', preset: 'openai-compatible', baseUrl: endpoint, apiKey: '', model: 'fixture', capabilities: ['mt', 'llm'], headers: {}, options: {} },
@@ -105,6 +105,9 @@ async function main() {
       console.log('Checking toolbar', locale, theme)
       const popup = await openPopup(locale, theme)
       const size = await popup.evaluate(`(()=>{const r=document.querySelector('.nola-popup-footer').getBoundingClientRect();return{width:innerWidth,height:innerHeight,scroll:document.documentElement.scrollWidth,footerBottom:r.bottom,alerts:document.querySelectorAll('[role=alert]').length}})()`)
+      if (size.width >= 410 || size.scroll > size.width) {
+        console.log(await popup.evaluate(`Array.from(document.querySelectorAll('body *')).filter(e=>e.getBoundingClientRect().right>376).map(e=>({tag:e.tagName,cls:e.className,text:e.textContent.slice(0,80),width:e.getBoundingClientRect().width,right:e.getBoundingClientRect().right})).slice(0,20)`))
+      }
       assert.ok(size.width >= 376 && size.width < 410, JSON.stringify(size))
       assert.ok(size.scroll <= size.width, 'No clipped horizontal content')
       assert.ok(size.footerBottom <= size.height + 1, 'Footer fits the browser popup')

@@ -61,6 +61,38 @@ describe('meeting audio ownership', () => {
     expect(meeting.usesResource('tts')).toBe(false)
   })
 
+  it('reports glossary preparation failure before opening audio and releases the meeting lease', async () => {
+    const { meeting, prepare, changed, activity } = controller()
+    const request = vi.fn()
+    vi.stubGlobal('fetch', request)
+    prepare.mockRejectedValueOnce(new Error('realtimeGlossarySyncFailed'))
+    const failed = await meeting.start(DEFAULT_MEETING_MODE)
+    expect(failed).toMatchObject({ state: 'failed', error: { key: 'suite.syncGlossaryFailed', code: 'realtimeGlossarySyncFailed' } })
+    expect(changed).toHaveBeenLastCalledWith(failed)
+    expect(request).not.toHaveBeenCalled()
+    expect(activity.snapshot().owner).toBeNull()
+  })
+
+  it.each(['glossaryUnsupported', 'glossaryBudgetExceeded'])('publishes nonfatal %s and clears it after recovery without stopping the group', async reason => {
+    vi.useFakeTimers()
+    const { meeting, changed, activity } = controller()
+    const warning = backendError('CAPABILITY_MISMATCH', reason, { fatal: false, scope: 'task', stage: 'mt', safe_details: { direction: 'uplink' } }).error
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(snapshot('fixture', 'running'))
+      .mockResolvedValueOnce(Response.json({ meeting_id: 'fixture', state: 'running', passthrough_active: false, last_error: warning }))
+      .mockResolvedValueOnce(snapshot('fixture', 'running'))
+      .mockResolvedValueOnce(snapshot('fixture', 'closed')))
+    await meeting.start(DEFAULT_MEETING_MODE)
+    await vi.advanceTimersByTimeAsync(500)
+    expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({
+      state: 'running', error: expect.objectContaining({ key: reason, code: reason, direction: 'uplink' }),
+    }))
+    expect(activity.snapshot()).toMatchObject({ owner: 'meeting', phase: 'running' })
+    await vi.advanceTimersByTimeAsync(500)
+    expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({ state: 'running', error: undefined }))
+    await meeting.stop()
+  })
+
   it('preserves the failed direction and closes a group when startup fails', async () => {
     const { meeting, activity } = controller()
     const request = vi.fn()

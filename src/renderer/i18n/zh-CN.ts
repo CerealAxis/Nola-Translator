@@ -1,4 +1,5 @@
 import { suiteLocales } from './translation-suite-ui'
+import { desktopDataLocales } from './desktop-data-ui'
 import { modelPolicyZh } from './model-policy-ui'
 import { screenLocales } from './screen-ui'
 import { shortcutLocales } from './shortcuts-ui'
@@ -32,6 +33,7 @@ export const zhCN = {
   meeting: meetingZh,
   modelsPolicy: modelPolicyZh,
   suite: suiteLocales['zh-CN'],
+  desktopData: desktopDataLocales['zh-CN'],
   screen: screenLocales['zh-CN'],
   shortcuts: shortcutLocales['zh-CN'],
   workbench: workbenchZh,

@@ -51,6 +51,7 @@ export type { PrewarmErrorCode, PrewarmResult } from '../../shared/contracts'
 export type RouteId = 'home' | 'workspace' | 'overlay' | 'meeting' | 'screen-translation' | 'game-translation' | 'comic-translation' | 'model-gateway' | 'records' | 'record' | 'models' | 'settings'
 
 export interface NolaBridge {
+  desktopData?: import('../../shared/desktop-data').DesktopDataApi
   glossary?: import('../../shared/glossary').GlossaryBridge
   comic?: import('../../shared/comic').ComicBridge
   gameTranslation?: import('../../shared/game-translation').GameTranslationBridge

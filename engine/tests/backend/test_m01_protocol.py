@@ -39,6 +39,22 @@ def auth() -> dict[str, str]:
     return {"Authorization": f"Bearer {TOKEN}"}
 
 
+def test_realtime_glossary_is_authenticated_and_cannot_restore_an_older_revision():
+    from unittest.mock import AsyncMock
+
+    app = create_app(control_token=TOKEN, gateway=AsyncMock(), enable_gateway=True)
+    with TestClient(app) as client:
+        url = "/api/v2/realtime/glossary"
+        update = {"revision": 3, "libraries": [[{"source": "A小", "target": "A Short", "mode": "fixed",
+                                                  "caseSensitive": True, "targetLanguage": "en"}]]}
+        assert client.put(url, json=update).status_code == 401
+        assert client.put(url, headers=auth(), json=update).json() == {"revision": 3}
+        assert client.put(url, headers=auth(), json={"revision": 2, "libraries": []}).json() == {"revision": 3}
+        glossary = app.state.backend.pipeline_registry.desktop_glossary
+        assert [term.target for term in glossary.match("A小", "en")] == ["A Short"]
+        assert not glossary.match("A小", "ja")
+
+
 def cascade_config(**overrides) -> dict:
     config = {
         "pipeline": {"kind": "cascade", "asr_model": "resource:test-asr"},

@@ -23,10 +23,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .glossary import resolve_comic_terms
 
-MAX_PAGE_BYTES = 24 * 1024 * 1024
-MAX_IMPORT_BYTES = 512 * 1024 * 1024
-MAX_PIXELS = 12_000_000
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+from .comic_formats import (MAX_PAGE_BYTES, MAX_IMPORT_BYTES, MAX_PIXELS, PDF_DPI, epub_pages,
+                            kindle_images, pdf_pages, png_bytes, validate_archive, write_epub, write_pdf)
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff"}
 
 
 def now() -> str:
@@ -76,6 +75,7 @@ class ComicConfig(BaseModel):
     targetLanguage: str = Field(min_length=1, max_length=32)
     model: str = Field(max_length=512)
     readingDirection: Literal["rtl", "ltr"]
+    repairMethod: Literal["telea", "lama-manga"] = "telea"
     glossary: dict
 
 
@@ -244,6 +244,9 @@ class ComicRepository:
         page = next((page for page in project["pages"] if page["id"] == page_id), None)
         if not page:
             raise ValueError("pageNotFound")
+        return self._page_asset(page, kind)
+
+    def _page_asset(self, page, kind):
         digest = page.get({"source": "sourceAsset", "clean": "cleanAsset", "rendered": "renderedAsset"}[kind])
         if not digest or not re.fullmatch(r"[a-f0-9]{64}", digest):
             raise ValueError("assetMissing")
@@ -252,36 +255,77 @@ class ComicRepository:
             raise ValueError("assetIntegrity")
         return path
 
-    def import_sources(self, paths: list[str], title: str, project_id=None, chapter_id=None):
+    def import_sources(self, paths: list[str], title: str, project_id=None, chapter_id=None,
+                       dpi=PDF_DPI, first=1, last=None, first_frame=False):
         if len(paths) == 1 and Path(paths[0]).suffix.lower() == '.nola-comic':
             if project_id:
                 raise ValueError('projectImportMustCreate')
             return self.import_project(Path(paths[0]))
         sources = []
+        imported_chapters = {}
+        current_chapter = None
+        direction = "rtl"
         total = 0
 
-        def append(name, data):
+        def append_page(name, data, original=None):
             nonlocal total
             total += len(data)
             if total > MAX_IMPORT_BYTES or len(sources) >= 1000:
                 raise ValueError("importTooLarge")
             image = decode_image(data)
             encoded = encode_image(image)
-            sources.append((name, image.shape[1], image.shape[0], self.asset(encoded), self.asset(data, 'original')))
+            sources.append((name, image.shape[1], image.shape[0], self.asset(encoded), original or self.asset(data, 'original'), current_chapter))
+
+        def append(name, data):
+            from PIL import Image
+            if len(data) > MAX_PAGE_BYTES:
+                raise ValueError("imageTooLarge")
+            with Image.open(io.BytesIO(data)) as image:
+                if image.format in ("GIF", "TIFF") or image.format == "WEBP" and image.is_animated:
+                    original = self.asset(data, "original")
+                    for index in range(1001):
+                        try:
+                            image.seek(index)
+                        except EOFError:
+                            break
+                        if index == 1000 or image.width * image.height > MAX_PIXELS:
+                            raise ValueError("imageTooLarge")
+                        append_page(f"{Path(name).stem}-{index + 1:04}.png", png_bytes(image.convert("RGB")), original)
+                        if first_frame:
+                            break
+                    return
+            append_page(name, data)
 
         for raw in paths:
+            current_chapter = None
             path = Path(raw).resolve(strict=True)
-            if path.is_dir():
+            if path.is_file() and path.stat().st_size > MAX_IMPORT_BYTES:
+                raise ValueError("importTooLarge")
+            if path.suffix.lower() == ".pdf" and path.is_file():
+                for name, data in pdf_pages(path, dpi, first, last):
+                    append_page(name, data)
+            elif path.suffix.lower() == ".epub" and path.is_file():
+                for name, data, chapter, progression in epub_pages(path):
+                    if len(paths) == 1 and progression in ("rtl", "ltr"):
+                        direction = progression
+                    if chapter and not chapter_id:
+                        current_chapter = (raw, chapter[0])
+                        if current_chapter not in imported_chapters:
+                            imported_chapters[current_chapter] = {"id": str(uuid4()), "title": chapter[1] or title}
+                    append(name, data)
+            elif path.suffix.lower() in (".mobi", ".azw", ".azw3") and path.is_file():
+                for name, data in kindle_images(path):
+                    append(name, data)
+            elif path.is_dir():
                 for child in sorted(path.rglob("*"), key=lambda item: _natural(str(item))):
                     if child.is_file() and child.suffix.lower() in IMAGE_EXTENSIONS:
                         if not child.resolve().is_relative_to(path) or child.stat().st_size > MAX_PAGE_BYTES:
                             raise ValueError("unsafeImport")
                         append(child.name, child.read_bytes())
-            elif path.suffix.lower() in (".zip", ".cbz", ".nola-comic"):
+            elif path.suffix.lower() in (".zip", ".cbz"):
                 with zipfile.ZipFile(path) as archive:
+                    validate_archive(archive)
                     infos = archive.infolist()
-                    if len(infos) > 5000 or sum(info.file_size for info in infos) > MAX_IMPORT_BYTES:
-                        raise ValueError("unsafeArchive")
                     for info in sorted(infos, key=lambda item: _natural(item.filename)):
                         if info.is_dir() or Path(info.filename).suffix.lower() not in IMAGE_EXTENSIONS:
                             continue
@@ -301,17 +345,20 @@ class ComicRepository:
                 project = self._load(db, project_id)
             else:
                 project = {"id": str(uuid4()), "title": title, "revision": 0, "updatedAt": now(), "pageCount": 0, "chapterCount": 0,
-                           "config": {"sourceLanguage": "auto", "targetLanguage": "zh", "model": "", "readingDirection": "rtl", "glossary": {"mode": "auto"}}, "chapters": [], "pages": []}
+                           "config": {"sourceLanguage": "auto", "targetLanguage": "zh", "model": "", "readingDirection": direction, "glossary": {"mode": "auto"}}, "chapters": [], "pages": []}
             if chapter_id:
                 if not any(chapter["id"] == chapter_id for chapter in project["chapters"]):
                     raise ValueError("chapterNotFound")
             else:
-                chapter_id = str(uuid4())
-                project["chapters"].append({"id": chapter_id, "title": title})
+                if any(source[-1] is None for source in sources):
+                    chapter_id = str(uuid4())
+                    project["chapters"].append({"id": chapter_id, "title": title})
+                project["chapters"].extend(imported_chapters.values())
             if len(project["pages"]) + len(sources) > 1000:
                 raise ValueError("importTooLarge")
-            for name, width, height, digest, original in sources:
-                project["pages"].append({"id": str(uuid4()), "chapterId": chapter_id, "name": name, "width": width, "height": height,
+            for name, width, height, digest, original, chapter in sources:
+                page_chapter = imported_chapters[chapter]["id"] if chapter else chapter_id
+                project["pages"].append({"id": str(uuid4()), "chapterId": page_chapter, "name": name, "width": width, "height": height,
                                          "regions": [], "status": "imported", "sourceAsset": digest, "originalAsset": original, "hasClean": False, "hasRendered": False})
             project["revision"] += 1
             self._save(db, project)
@@ -320,9 +367,7 @@ class ComicRepository:
 
     def import_project(self, path: Path):
         with zipfile.ZipFile(path) as archive:
-            infos = archive.infolist()
-            if len(infos) > 5000 or sum(info.file_size for info in infos) > MAX_IMPORT_BYTES or len({info.filename for info in infos}) != len(infos):
-                raise ValueError('unsafeArchive')
+            validate_archive(archive)
             manifest = archive.getinfo('project.json')
             if manifest.file_size > 16 * 1024 * 1024:
                 raise ValueError('unsafeArchive')
@@ -378,7 +423,11 @@ class ComicRepository:
                     if info.file_size > MAX_PAGE_BYTES or info.file_size > max(info.compress_size, 1) * 300:
                         raise ValueError('unsafeArchive')
                     data = archive.read(info)
-                    decode_image(data)
+                    from PIL import Image
+                    with Image.open(io.BytesIO(data)) as header:
+                        if header.width * header.height > MAX_PIXELS:
+                            raise ValueError("imageTooLarge")
+                        header.verify()
                     if hashlib.sha256(data).hexdigest() != digest:
                         raise ValueError('assetIntegrity')
                     page['originalAsset'] = self.asset(data, 'original')
@@ -497,13 +546,50 @@ class ComicRepository:
             if input_snapshot is not None:
                 db.execute('UPDATE jobs SET input_snapshot=? WHERE id=?', (json.dumps(input_snapshot, ensure_ascii=False), job['id']))
 
-    def export(self, project_id: str, kind: str, page_ids: list[str] | None):
+    def export(self, project_id: str, kind: str, page_ids: list[str] | None, layer="rendered", directory=None):
         project = self.open(project_id)
         pages = project["pages"] if page_ids is None else [page for page in project["pages"] if page["id"] in page_ids]
         if not pages or page_ids is not None and len(pages) != len(set(page_ids)):
             raise ValueError("pageNotFound")
-        target = self.root / "exports" / f"{uuid4()}.zip"
+        extension = {"images": "zip", "project": "nola-comic", "labelplus": "zip"}.get(kind, kind)
+        target = self.root / "exports" / f"{uuid4()}.{extension}"
+
+        def images():
+            for page in pages:
+                if layer == "rendered" and not page["hasRendered"]:
+                    raise ValueError("pageNotRendered")
+                yield page, self._page_asset(page, layer)
+
         try:
+            if kind == "directory":
+                from tempfile import TemporaryDirectory
+                from shutil import copyfile
+                parent = Path(directory).resolve(strict=True)
+                with TemporaryDirectory(dir=parent, prefix=".nola-comic-") as stage:
+                    staged = Path(stage) / "pages"
+                    staged.mkdir()
+                    for index, (_, path) in enumerate(images(), 1):
+                        copyfile(path, staged / f"{index:04}.png")
+                    # A unique name prevents replacing any existing export or user folder.
+                    target_folder = parent / f"comic-{project_id[:8]}-{uuid4().hex[:8]}"
+                    staged.rename(target_folder)
+                    return target_folder
+            if kind == "pdf":
+                write_pdf(target, images())
+                return target
+            if kind == "epub":
+                write_epub(target, project, images())
+                return target
+            if kind == "png":
+                if len(pages) != 1:
+                    raise ValueError("invalidPageRange")
+                target.write_bytes(next(images())[1].read_bytes())
+                return target
+            metadata = {"schemaVersion": 1, "projectId": project["id"], "revision": project["revision"],
+                        "title": project["title"], "chapters": project["chapters"], "pages": pages}
+            if kind == "json":
+                target.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+                return target
             with zipfile.ZipFile(target, "x", compression=zipfile.ZIP_DEFLATED) as archive:
                 if kind == "project":
                     archive.writestr("project.json", json.dumps({"schemaVersion": 1, "project": project}, ensure_ascii=False))
@@ -516,18 +602,29 @@ class ComicRepository:
                         archive.write(self.root / "assets" / f"{digest}.png", f"assets/{digest}.png")
                     for digest in {page['originalAsset'] for page in project['pages'] if page.get('originalAsset')}:
                         archive.write(self.root / 'assets' / f'{digest}.original', f'originals/{digest}.original')
+                elif kind == "labelplus":
+                    lines = ["1,0", "-", "Bubble", "-", "Nola Translator", ""]
+                    for index, page in enumerate(pages, 1):
+                        name = f"{index:04}.png"
+                        archive.write(self._page_asset(page, "source"), name)
+                        lines.append(f">>>>>>>>[{name}]<<<<<<<<")
+                        for number, region in enumerate(page["regions"], 1):
+                            x = (region["x"] + region["width"] / 2) / page["width"]
+                            y = (region["y"] + region["height"] / 2) / page["height"]
+                            lines.extend([f"----------------[{number}]----------------[{x:.3f},{y:.3f},1]",
+                                          region.get("targetText") or region["sourceText"], ""])
+                    archive.writestr("labels.txt", "\r\n".join(lines).encode("utf-8-sig"))
+                    archive.writestr("mapping.json", json.dumps(metadata, ensure_ascii=False))
                 else:
-                    for index, page in enumerate(pages):
-                        if not page["hasRendered"]:
-                            raise ValueError("pageNotRendered")
-                        archive.write(self.asset_path(project_id, page["id"], "rendered"), f"{index + 1:04}.png")
+                    for index, (_, path) in enumerate(images(), 1):
+                        archive.write(path, f"{index:04}.png")
             return target
         except BaseException:
             target.unlink(missing_ok=True)
             raise
 
 
-def repair_page(image, regions: list[dict], strokes: list[dict] | None = None):
+def repair_page(image, regions: list[dict], strokes: list[dict] | None = None, *, mask_only=False):
     import cv2
     import numpy as np
 
@@ -575,6 +672,8 @@ def repair_page(image, regions: list[dict], strokes: list[dict] | None = None):
             cv2.circle(mask, tuple(point), radius, value, -1)
         if len(points) > 1:
             cv2.polylines(mask, [points], False, value, radius * 2)
+    if mask_only:
+        return image, mask
     # Telea repairs actual glyph pixels from their neighbours; no rectangle is filled.
     return cv2.inpaint(image, mask, 3, cv2.INPAINT_TELEA), mask
 
@@ -677,6 +776,10 @@ def render_page(image, regions: list[dict], font_path: Path):
 
 class ImportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    pdfDpi: int = Field(default=PDF_DPI, ge=72, le=600)
+    firstPage: int = Field(default=1, ge=1)
+    lastPage: int | None = Field(default=None, ge=1)
+    firstFrame: bool = False
     paths: list[str] = Field(min_length=1, max_length=1000)
     title: str = Field(min_length=1, max_length=200)
     projectId: UUID | None = None
@@ -696,7 +799,15 @@ class RunRequest(BaseModel):
 
 class ExportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["images", "cbz", "project"]
+    kind: Literal["images", "cbz", "project", "pdf", "epub", "png", "json", "labelplus"]
+    layer: Literal["source", "rendered"] = "rendered"
+    pageIds: list[UUID] | None = Field(default=None, min_length=1, max_length=1000)
+
+
+class DirectoryExportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    directory: str = Field(min_length=1, max_length=32767)
+    layer: Literal["source", "rendered"] = "rendered"
     pageIds: list[UUID] | None = Field(default=None, min_length=1, max_length=1000)
 
 
@@ -722,6 +833,10 @@ class ComicService:
         ids = [str(value) for value in request.pageIds]
         if len(set(ids)) != len(ids) or any(not any(page["id"] == value for page in project["pages"]) for value in ids):
             raise ValueError("pageNotFound")
+        if request.stage in ("full", "repair") and project["config"].get("repairMethod") == "lama-manga":
+            if self.ocr is None:
+                raise ValueError("modelMissing")
+            self.ocr.variant("lama-manga")._verify()
         job = {"id": str(request.jobId), "state": "running", "stage": request.stage, "completedPages": 0, "totalPages": len(ids)}
         self.repository.save_job(project_id, job, input_snapshot={'config': project['config'], 'request': request.model_dump(mode='json'),
             'sourceAssets': {page['id']: page['sourceAsset'] for page in project['pages'] if page['id'] in ids}})
@@ -735,7 +850,13 @@ class ComicService:
         from .screen_ocr import OcrRequest
 
         project_id, revision = project["id"], project["revision"]
+        neural_service = None
         try:
+            if request.stage in ("full", "repair") and project["config"].get("repairMethod") == "lama-manga":
+                candidate = self.ocr.variant("lama-manga")
+                await candidate._lease_lock.acquire()
+                neural_service = candidate
+                await neural_service.load()
             for page_id in request.pageIds:
                 if job["id"] in self.cancellations:
                     raise asyncio.CancelledError
@@ -786,7 +907,10 @@ class ComicService:
                     revision = self.repository.publish_page(project_id, revision, page)
                 if request.stage in ("full", "repair"):
                     job["stage"] = "repair"; self.repository.save_job(project_id, job)
-                    cleaned, mask = await asyncio.to_thread(repair_page, original, page["regions"], page.get('maskStrokes'))
+                    neural = project["config"].get("repairMethod") == "lama-manga"
+                    cleaned, mask = await asyncio.to_thread(repair_page, original, page["regions"], page.get('maskStrokes'), mask_only=neural)
+                    if neural:
+                        cleaned = await neural_service.repair(original, mask)
                     page["cleanAsset"] = self.repository.asset(encode_image(cleaned)); page["hasClean"] = True
                     page.pop("renderedAsset", None); page["hasRendered"] = False
                     if job["id"] in self.cancellations:
@@ -809,9 +933,14 @@ class ComicService:
             job["state"] = "cancelled"
         except Exception as error:
             job["state"] = "failed"
-            known = {"ocrUnavailable", "lockedRegions", "noRegions", "translationModelMissing", "emptyTranslation", "maskNeedsReview", "fontMissing", "textOverflow", "repairRequired", "editConflict", "modelNotLoaded", "modelMissing", "resourceBusy", "glossaryBudgetExceeded"}
+            known = {"ocrUnavailable", "lockedRegions", "noRegions", "translationModelMissing", "emptyTranslation", "maskNeedsReview", "fontMissing", "textOverflow", "repairRequired", "editConflict", "modelNotLoaded", "modelMissing", "runtimeUnavailable", "inpaintFailed", "modelCorrupt", "resourceBusy", "glossaryBudgetExceeded"}
             job["error"] = str(error) if str(error) in known else "processingFailed"
         finally:
+            if neural_service is not None:
+                try:
+                    await neural_service.release()
+                finally:
+                    neural_service._lease_lock.release()
             self.cancellations.discard(job["id"])
             self.repository.save_job(project_id, job)
 
@@ -844,7 +973,8 @@ def build_comic_router(service: ComicService) -> APIRouter:
     @router.post("/import")
     async def import_project(body: ImportRequest):
         return await asyncio.to_thread(invoke, service.repository.import_sources, body.paths, body.title,
-                                       str(body.projectId) if body.projectId else None, str(body.chapterId) if body.chapterId else None)
+                                       str(body.projectId) if body.projectId else None, str(body.chapterId) if body.chapterId else None,
+                                       body.pdfDpi, body.firstPage, body.lastPage, body.firstFrame)
 
     @router.post("/edit")
     async def edit_project(request: Request):
@@ -887,10 +1017,17 @@ def build_comic_router(service: ComicService) -> APIRouter:
         data, width, height = await asyncio.to_thread(thumbnail)
         return Response(data, media_type="image/png", headers={"x-image-width": str(width), "x-image-height": str(height)})
 
+    @router.post("/projects/{project_id}/export-directory")
+    async def export_directory(project_id: UUID, body: DirectoryExportRequest):
+        await asyncio.to_thread(invoke, service.repository.export, str(project_id), "directory",
+                                [str(value) for value in body.pageIds] if body.pageIds else None, body.layer, body.directory)
+        return {"ok": True}
+
     @router.post("/projects/{project_id}/export")
     async def export_project(project_id: UUID, body: ExportRequest):
         from starlette.background import BackgroundTask
-        path = await asyncio.to_thread(invoke, service.repository.export, str(project_id), body.kind, [str(value) for value in body.pageIds] if body.pageIds else None)
-        return FileResponse(path, media_type="application/zip", background=BackgroundTask(path.unlink, missing_ok=True))
+        path = await asyncio.to_thread(invoke, service.repository.export, str(project_id), body.kind, [str(value) for value in body.pageIds] if body.pageIds else None, body.layer)
+        media = {"pdf": "application/pdf", "epub": "application/epub+zip", "png": "image/png", "json": "application/json"}
+        return FileResponse(path, media_type=media.get(body.kind, "application/zip"), background=BackgroundTask(path.unlink, missing_ok=True))
 
     return router

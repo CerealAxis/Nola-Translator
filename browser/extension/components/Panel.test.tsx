@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { createExtensionStore } from '../store'
@@ -42,8 +42,17 @@ it('navigates through settings and style, saves changes, and goes back with Esca
   await user.click(screen.getByRole('button', { name: 'Subtitle settings' }))
   expect(screen.getByRole('combobox', { name: 'Target language' })).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Subtitle style' }))
-  fireEvent.change(screen.getByLabelText('Subtitle background opacity'), { target: { value: '0.5' } })
-  expect(savePreferences).toHaveBeenCalledWith({ subtitleBackgroundOpacity: 0.5 })
+  const opacity = screen.getByRole('slider', { name: 'Subtitle background opacity' })
+  act(() => opacity.focus())
+  await user.keyboard('{Home}')
+  expect(savePreferences).toHaveBeenLastCalledWith({ subtitleBackgroundOpacity: 0 })
+  await user.click(screen.getByRole('button', { name: 'Subtitle background color' }))
+  const color = screen.getByRole('textbox', { name: 'Subtitle background color · HEX' })
+  expect(screen.getByRole('region', { name: /Nola/ }).contains(color)).toBe(true)
+  await user.clear(color)
+  await user.type(color, '#ff0000')
+  expect(savePreferences).toHaveBeenLastCalledWith({ subtitleBackground: '#FF0000' })
+  await user.keyboard('{Escape}')
   await user.click(screen.getByRole('button', { name: 'Reset style' }))
   expect(savePreferences).toHaveBeenLastCalledWith(expect.objectContaining({ subtitleBackgroundOpacity: DEFAULT_PREFERENCES.subtitleBackgroundOpacity }))
   fireEvent.keyDown(screen.getByRole('region', { name: /Nola/ }), { key: 'Escape' })

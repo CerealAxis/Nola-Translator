@@ -77,6 +77,17 @@ describe('MeetingStore', () => {
     expect(stored.map((item) => item.sourceText)).toEqual(['hello', 'world'])
   })
 
+  it('recovers a game transcript interrupted before metadata finalization', async () => {
+    const game = { id: crypto.randomUUID(), name: 'Game' }
+    const meta = await store.begin({ game, sourceLanguage: 'ja', targetLanguage: 'en', recordAudio: false })
+    store.attach(meta.meetingId, 'game-session')
+    await store.append('game-session', segment('one', 1234, 'first'))
+    await store.append('game-session', segment('two', 2234, 'second'))
+    const reopened = new MeetingStore(join(root, 'meetings'))
+    await reopened.initialize(join(root, 'history.jsonl'))
+    expect(reopened.get(meta.meetingId)).toMatchObject({ sourceKind: 'game', gameId: game.id, segmentCount: 2, durationMs: 1000, state: 'interrupted' })
+  })
+
   it('persists source and completed translation without storing every streamed revision', async () => {
     const meeting = await store.begin({ sourceLanguage: 'en', targetLanguage: 'zh', recordAudio: false })
     store.attach(meeting.meetingId, 'stream-session')

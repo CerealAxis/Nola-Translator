@@ -159,6 +159,8 @@ export type Translation = {
  * and `daySequence`, so switching the UI language relabels every meeting without touching disk.
  */
 export type MeetingMeta = {
+  sourceKind?: 'meeting' | 'game'
+  gameId?: string
   meetingId: string
   title: string
   titleIsCustom: boolean
@@ -252,7 +254,7 @@ export type AudioDevice = {
 
 export type ResourceRecord = {
   resourceId: string
-  kind: 'recognitionModel' | 'translationModel' | 'ttsModel' | 'ocrModel'
+  kind: 'recognitionModel' | 'translationModel' | 'ttsModel' | 'ocrModel' | 'inpaintModel'
   /**
    * Names the loader that will run this model, and two vocabularies reach it: built-in models
    * report the provider in `resources.py` (`qwen3-asr`, `sensevoice`, `m2m100`, `hymt2`) while a
@@ -375,6 +377,8 @@ export type EngineErrorCode =
   | 'translationProviderUnavailable'
   | 'translationNetworkUnavailable'
   | 'translationTimeout'
+  | 'glossaryUnsupported'
+  | 'glossaryBudgetExceeded'
   | 'translationInvalidResponse'
   | 'translationUnsupportedLanguagePair'
   | 'resourceVerificationFailed'

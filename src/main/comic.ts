@@ -43,8 +43,10 @@ export class ComicTranslation {
     handle('comic:open', raw => this.openProject(projectIdSchema.parse(raw)))
     handle('comic:import', async raw => {
       const input = comicImportSchema.parse(raw)
+      const formats = { images: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'tif', 'tiff'],
+        archive: ['zip', 'cbz', 'nola-comic'], pdf: ['pdf'], ebook: ['epub', 'mobi', 'azw', 'azw3'] }
       const result = await dialog.showOpenDialog({ properties: input.kind === 'folder' ? ['openDirectory'] : ['openFile', 'multiSelections'],
-        ...(input.kind !== 'folder' ? { filters: [{ name: input.kind === 'archive' ? 'Comic archive' : 'Images', extensions: input.kind === 'archive' ? ['zip', 'cbz', 'nola-comic'] : ['png', 'jpg', 'jpeg', 'webp', 'bmp'] }] } : {}) })
+        ...(input.kind !== 'folder' ? { filters: [{ name: formats[input.kind].join(', ').toUpperCase(), extensions: formats[input.kind] }] } : {}) })
       if (result.canceled || !result.filePaths.length) return null
       const { kind: _kind, ...body } = input
       const project = await this.request<ComicProject>('/import', { ...body, paths: result.filePaths })
@@ -69,7 +71,13 @@ export class ComicTranslation {
     })
     handle('comic:export', async raw => {
       const input = comicExportSchema.parse(raw)
-      const extension = input.kind === 'project' ? 'nola-comic' : input.kind === 'cbz' ? 'cbz' : 'zip'
+      if (input.kind === 'directory') {
+        const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
+        if (result.canceled || !result.filePaths.length) return false
+        await this.request(`/projects/${input.projectId}/export-directory`, { directory: result.filePaths[0], pageIds: input.pageIds, layer: input.layer })
+        return true
+      }
+      const extension = input.kind === 'project' ? 'nola-comic' : ['images', 'labelplus'].includes(input.kind) ? 'zip' : input.kind
       const result = await dialog.showSaveDialog({ defaultPath: `comic.${extension}`, filters: [{ name: 'Comic', extensions: [extension] }] })
       if (result.canceled || !result.filePath) return false
       const { projectId, ...body } = input

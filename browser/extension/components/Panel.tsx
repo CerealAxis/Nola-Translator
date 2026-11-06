@@ -7,9 +7,9 @@ import { browserText, errorKey } from '../i18n'
 import { NolaLogo } from '../logo'
 import { ChoiceField } from './ChoiceField'
 import { PopupLanguage } from './PopupLanguage'
-import { languageOptions } from '../settings-fields'
+import { ColorField, languageOptions, RangeField } from '../settings-fields'
 import { resolveUiLanguage } from '../../../src/shared/languages'
-import { Field, FieldLabel } from '../../../src/renderer/components/ui/field'
+import { Field, FieldGroup, FieldLabel } from '../../../src/renderer/components/ui/field'
 import { Switch, SwitchThumb } from '../../../src/renderer/components/ui/switch'
 import { DEFAULT_PREFERENCES, savePreferences, type Preferences } from '../preferences'
 import type { SubtitleState, SubtitleTranslation } from '../subtitle-translation'
@@ -59,7 +59,7 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
   const primaryDisabled = state.status === 'active' ? false : blocked || locked
   const status = !state.connected ? 'statusDisconnected' : !compatible ? 'extensionVersionMismatch' : state.status === 'starting' ? 'starting' : state.status === 'stopping' ? 'stopping' : running ? 'statusRecognizing' : available ? 'statusReady' : 'captionServiceOff'
   const title = view === 'settings' ? t('subtitleSettings') : view === 'style' ? t('subtitleStyle') : view === 'download' ? t('downloadSrt') : view === 'study' ? t('transcript') : t('button')
-  const link = (next: typeof view, label: string, Icon: typeof Captions, disabled = false) => <Button variant="bare" className="nola-subtitle-menu-item" disabled={disabled} onClick={() => setView(next)}><Icon aria-hidden="true" /><span>{label}</span><ChevronRight aria-hidden="true" /></Button>
+  const link = (next: typeof view, label: string, Icon: typeof Captions, disabled = false) => <Button variant="bare" size="sm" className="nola-subtitle-menu-item" disabled={disabled} onClick={() => setView(next)}><Icon aria-hidden="true" /><span>{label}</span><ChevronRight aria-hidden="true" /></Button>
   return <section ref={panel} tabIndex={-1} className="nola-extension nola-panel nola-subtitle-menu" aria-label={t('button')} onKeyDown={event => {
     if (event.key !== 'Escape' || event.defaultPrevented) return
     event.stopPropagation()
@@ -69,7 +69,7 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
     <header className="nola-panel-header">
       {view !== 'main' && <Button variant="bare" size="icon-sm" className="nola-panel-close" aria-label={t('back')} onClick={() => setView(view === 'style' ? 'settings' : 'main')}><ArrowLeft /></Button>}
       <span className="nola-panel-brand">{view === 'main' && <NolaLogo />}<h2 className="nola-heading">{title}</h2></span>
-      <Button data-slot="button" variant="secondary" className="button button--secondary nola-panel-close" aria-label={t('close')} onClick={store.closePanel}><X aria-hidden="true" /></Button>
+      <Button variant="bare" size="icon-sm" className="nola-panel-close" aria-label={t('close')} onClick={store.closePanel}><X aria-hidden="true" /></Button>
     </header>
     {view === 'main' && <>
     {(state.liveAttempted || locked) && <p className="nola-status" role="status">{t(status)}</p>}
@@ -111,30 +111,30 @@ export function Panel({ store, subtitles, toggleSubtitles, selectTrack, subtitle
     </div>}
     {view === 'settings' && preferences && <div className="nola-subtitle-page">
       <div className="nola-subtitle-languages">
-        <PopupLanguage label={t('source')} value={trackSource ? subtitles?.trackId ?? subtitles?.tracks[0]?.id ?? '' : preferences.sourceLanguage} options={trackSource ? subtitles!.tracks.map(track => ({ value: track.id, label: track.label || track.language })) : [{ value: 'auto', label: t('autoDetect') }, ...languages]} onChange={value => { if (trackSource) selectTrack?.(value); else save({ sourceLanguage: value }) }} t={t} disabled={locked} />
-        <PopupLanguage label={t('target')} value={preferences.videoLanguage} options={languages} onChange={value => save({ videoLanguage: value })} t={t} disabled={locked} />
+        <PopupLanguage size="sm" label={t('source')} value={trackSource ? subtitles?.trackId ?? subtitles?.tracks[0]?.id ?? '' : preferences.sourceLanguage} options={trackSource ? subtitles!.tracks.map(track => ({ value: track.id, label: track.label || track.language })) : [{ value: 'auto', label: t('autoDetect') }, ...languages]} onChange={value => { if (trackSource) selectTrack?.(value); else save({ sourceLanguage: value }) }} t={t} disabled={locked} />
+        <PopupLanguage size="sm" label={t('target')} value={preferences.videoLanguage} options={languages} onChange={value => save({ videoLanguage: value })} t={t} disabled={locked} />
       </div>
       <ChoiceField t={t} label={t('display')} value={preferences.videoDisplay} options={[{ value: 'source', label: t('sourceSubtitles') }, { value: 'bilingual', label: t('bilingual') }, { value: 'translation', label: t('translationOnly') }]} onChange={value => save({ videoDisplay: value as Preferences['videoDisplay'] })} />
       {preferences.videoDisplay === 'bilingual' && <ChoiceField t={t} label={t('translationPosition')} value={preferences.subtitleTranslationFirst ? 'above' : 'below'} options={[{ value: 'above', label: t('aboveOriginal') }, { value: 'below', label: t('belowOriginal') }]} onChange={value => save({ subtitleTranslationFirst: value === 'above' })} />}
       {link('style', t('subtitleStyle'), Settings2)}
     </div>}
-    {view === 'style' && preferences && <div className="nola-subtitle-page">
-      <Field className="nola-subtitle-style-row"><FieldLabel htmlFor="nola-subtitle-opacity">{t('subtitleBackgroundOpacity')}</FieldLabel><input id="nola-subtitle-opacity" type="range" min={0} max={1} step={0.05} value={preferences.subtitleBackgroundOpacity} onChange={event => save({ subtitleBackgroundOpacity: Number(event.target.value) })} /></Field>
-      <Field className="nola-subtitle-style-row"><FieldLabel htmlFor="nola-subtitle-background">{t('subtitleBackground')}</FieldLabel><input id="nola-subtitle-background" type="color" value={preferences.subtitleBackground.slice(0, 7)} onChange={event => save({ subtitleBackground: event.target.value })} /></Field>
+    {view === 'style' && preferences && <FieldGroup className="nola-subtitle-page">
+      <RangeField label={t('subtitleBackgroundOpacity')} value={preferences.subtitleBackgroundOpacity} min={0} max={1} step={0.05} onChange={subtitleBackgroundOpacity => save({ subtitleBackgroundOpacity })} />
+      <ColorField label={t('subtitleBackground')} value={preferences.subtitleBackground} onChange={subtitleBackground => save({ subtitleBackground })} />
       {(['source', 'translation'] as const).map(kind => {
         const sizeKey = kind === 'source' ? 'subtitleSourceSize' : 'subtitleTranslationSize'
         const colorKey = kind === 'source' ? 'subtitleSourceColor' : 'subtitleTranslationColor'
         const fontKey = kind === 'source' ? 'subtitleSourceFont' : 'subtitleTranslationFont'
         return <fieldset key={kind} className="nola-subtitle-style-group"><legend>{t(kind === 'source' ? 'sourceCaption' : 'translatedCaption')}</legend>
-          <Field className="nola-subtitle-style-row"><FieldLabel htmlFor={`nola-${sizeKey}`}>{t('fontSize')}</FieldLabel><input id={`nola-${sizeKey}`} type="range" min={10} max={60} value={preferences[sizeKey]} onChange={event => save({ [sizeKey]: Number(event.target.value) })} /><output>{preferences[sizeKey]}px</output></Field>
-          <Field className="nola-subtitle-style-row"><FieldLabel htmlFor={`nola-${colorKey}`}>{t('subtitleColor')}</FieldLabel><input id={`nola-${colorKey}`} type="color" value={preferences[colorKey].slice(0, 7)} onChange={event => save({ [colorKey]: event.target.value })} /></Field>
+          <RangeField label={t('fontSize')} value={preferences[sizeKey]} min={10} max={60} suffix="px" onChange={value => save({ [sizeKey]: value })} />
+          <ColorField label={t('subtitleColor')} value={preferences[colorKey]} onChange={value => save({ [colorKey]: value })} />
           <ChoiceField t={t} label={t('subtitleFont')} value={preferences[fontKey]} options={[...new Set(['system-ui', 'sans-serif', 'serif', 'monospace', preferences[fontKey]])].map(value => ({ value, label: value }))} onChange={value => save({ [fontKey]: value })} />
         </fieldset>
       })}
       <Field className="nola-subtitle-style-row"><FieldLabel htmlFor="nola-subtitle-bold">{t('subtitleBold')}</FieldLabel><Switch id="nola-subtitle-bold" checked={preferences.subtitleBold} onCheckedChange={value => save({ subtitleBold: value })}><SwitchThumb /></Switch></Field>
       <Field className="nola-subtitle-style-row"><FieldLabel htmlFor="nola-subtitle-hover">{t('subtitlePauseOnHover')}</FieldLabel><Switch id="nola-subtitle-hover" checked={preferences.subtitlePauseOnHover} onCheckedChange={value => save({ subtitlePauseOnHover: value })}><SwitchThumb /></Switch></Field>
       <Button variant="outline" onClick={() => save(Object.fromEntries((['subtitleSourceSize', 'subtitleSourceColor', 'subtitleSourceFont', 'subtitleTranslationSize', 'subtitleTranslationColor', 'subtitleTranslationFont', 'subtitleBold', 'subtitleBackground', 'subtitleBackgroundOpacity', 'subtitlePauseOnHover'] as const).map(key => [key, DEFAULT_PREFERENCES[key]])))}><RefreshCw />{t('resetStyle')}</Button>
-    </div>}
+    </FieldGroup>}
     {subtitles?.error && <p role="alert" className="nola-error">{t(errorKey(subtitles.error))}</p>}
     {saveError && <p role="alert" className="nola-error">{t('internalError')}</p>}
   </section>

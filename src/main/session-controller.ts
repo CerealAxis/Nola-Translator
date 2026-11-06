@@ -55,6 +55,7 @@ export interface SessionControllerOptions {
   isOverlayVisible?(): boolean
   useGateway?: boolean
   audioTestEngine?: EngineProcess
+  assertLegacyTranslationAllowed?(targetLanguages: readonly string[]): Promise<void>
   prepareBackend?(config: SessionConfig, settings: AppSettings): Promise<{ client: BackendSession; mapped: MappedBackendSession } | undefined>
 }
 
@@ -71,6 +72,10 @@ export class SessionController {
   private featureLease: FeatureLease | null = null
   private localModelsInUse = false
   private readonly inFlight = new Set<Promise<unknown>>()
+  private legacyTranslationLanguages: readonly string[] = []
+  get legacyTranslationTargets(): readonly string[] {
+    return this.owner === 'desktop' && (this.starting || this.activeSessionId !== null) ? this.legacyTranslationLanguages : []
+  }
   private backendSession?: BackendSession
   private reader: SessionReaderSnapshot | null = null
   private readerPausedAt: number | null = null
@@ -217,6 +222,7 @@ export class SessionController {
     const checkCancelled = () => { if (operation !== this.operation) throw new Error('sessionStartCancelled') }
     this.owner = owner
     this.reader = null
+    this.legacyTranslationLanguages = []
     this.options.startingChanged(true)
     let meetingId: string | null = null
     try {
@@ -262,6 +268,11 @@ export class SessionController {
       if (!backend && parsed.outputMode === 'speech') throw new Error('realtimeSpeechUnavailable')
       if (backend) this.backendSession = backend.client
       else {
+        if (owner === 'desktop' && parsed.targetLanguages.length > 0) {
+          this.legacyTranslationLanguages = [...parsed.targetLanguages]
+          await this.options.assertLegacyTranslationAllowed?.(this.legacyTranslationLanguages)
+          checkCancelled()
+        }
         await this.options.prepare(parsed, () => operation !== this.operation)
         checkCancelled()
         await this.ensureReady()

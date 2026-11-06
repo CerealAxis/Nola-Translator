@@ -12,6 +12,7 @@ export interface ColorPickerProps {
   value: string
   presets: readonly string[]
   onChange: (value: string) => void
+  container?: HTMLElement | null
 }
 
 interface Hsv { h: number; s: number; v: number }
@@ -42,7 +43,7 @@ function toHex({ h, s, v }: Hsv): string {
 }
 
 /** Retains hue for achromatic colours so moving through black or white does not reset the hue. */
-export function ColorPicker({ label, value, presets, onChange }: ColorPickerProps) {
+export function ColorPicker({ label, value, presets, onChange, container }: ColorPickerProps) {
   const [hsv, setHsv] = useState(() => fromHex(value))
   const [draft, setDraft] = useState<string | null>(null)
   const emitted = useRef(value)
@@ -72,7 +73,7 @@ export function ColorPicker({ label, value, presets, onChange }: ColorPickerProp
     <Popover.Trigger render={<Button variant="secondary" />} className="nola-color-picker__trigger" aria-label={label}>
       <span className="nola-color-picker__swatch" style={{ backgroundColor: value }} aria-hidden="true" /><ChevronDown aria-hidden="true" />
     </Popover.Trigger>
-    <Popover.Portal><Popover.Positioner className="z-dropdown" sideOffset={8}><Popover.Popup className="nola-color-picker" aria-label={label} initialFocus={false}>
+    <Popover.Portal container={container}><Popover.Positioner className="z-dropdown" sideOffset={8}><Popover.Popup className="nola-color-picker" aria-label={label} initialFocus={false}>
       <Popover.Title className="sr-only">{label}</Popover.Title>
       <div className="nola-color-picker__area" role="group" aria-label={label}
         style={{ '--picker-hue': `hsl(${hsv.h} 100% 50%)` } as CSSProperties}

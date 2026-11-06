@@ -63,7 +63,7 @@ export interface MeetingModeSnapshot {
   state: 'idle' | 'starting' | 'running' | 'stopping' | 'failed' | 'unknown'
   passthroughActive: boolean
   telemetry?: { uplink?: MeetingRouteTelemetry; downlink?: MeetingRouteTelemetry }
-  error?: { key: string; code?: EngineErrorCode; direction?: 'uplink' | 'downlink'; correlationId?: string }
+  error?: { key: string; code?: EngineErrorCode | 'realtimeGlossarySyncFailed'; direction?: 'uplink' | 'downlink'; correlationId?: string }
 }
 
 export interface MeetingModeApi {

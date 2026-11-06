@@ -19,6 +19,7 @@ export const comicMaskStrokeSchema = z.object({ id, mode: z.enum(['erase', 'rest
 export type ComicMaskStroke = z.infer<typeof comicMaskStrokeSchema>
 export const comicConfigSchema = z.object({
   sourceLanguage: z.string().max(32).default('auto'), targetLanguage: z.string().min(1).max(32).default('zh'), model: z.string().max(512).default(''),
+  repairMethod: z.enum(['telea', 'lama-manga']).optional(),
   readingDirection: z.enum(['rtl', 'ltr']).default('rtl'), glossary: glossarySelectionSchema.default({ mode: 'auto' }),
 }).strict()
 export type ComicConfig = z.infer<typeof comicConfigSchema>
@@ -44,9 +45,11 @@ export type ComicMutation = z.infer<typeof comicMutationSchema>
 export const comicRunSchema = z.object({ projectId: id, expectedRevision: z.number().int().nonnegative(),
   pageIds: z.array(id).min(1).max(1000), stage: z.enum(['full', 'ocr', 'translate', 'repair', 'layout']) }).strict()
 export type ComicRunRequest = z.infer<typeof comicRunSchema>
-export const comicImportSchema = z.object({ projectId: id.optional(), chapterId: id.optional(), title: z.string().trim().min(1).max(200), kind: z.enum(['images', 'folder', 'archive']) }).strict()
+export const comicImportSchema = z.object({ projectId: id.optional(), chapterId: id.optional(), title: z.string().trim().min(1).max(200), kind: z.enum(['images', 'folder', 'archive', 'pdf', 'ebook']),
+  pdfDpi: z.number().int().min(72).max(600).optional(), firstPage: z.number().int().positive().optional(),
+  lastPage: z.number().int().positive().optional(), firstFrame: z.boolean().optional() }).strict()
 export type ComicImportRequest = z.infer<typeof comicImportSchema>
-export const comicExportSchema = z.object({ projectId: id, kind: z.enum(['images', 'cbz', 'project']), pageIds: z.array(id).min(1).max(1000).optional() }).strict()
+export const comicExportSchema = z.object({ projectId: id, kind: z.enum(['images', 'cbz', 'project', 'directory', 'png', 'pdf', 'epub', 'json', 'labelplus']), layer: z.enum(['source', 'rendered']).optional(), pageIds: z.array(id).min(1).max(1000).optional() }).strict()
 export type ComicExportRequest = z.infer<typeof comicExportSchema>
 export interface ComicBridge {
   listProjects(): Promise<ComicProjectSummary[]>

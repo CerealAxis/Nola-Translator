@@ -110,7 +110,7 @@ export class MeetingMode {
     if (!this.active || this.current.state !== 'running') return this.current
     try {
       const result = await this.request('PATCH', { paused })
-      return this.publish({ ...this.current, paused: result.paused, telemetry: result.telemetry, segments: result.segments })
+      return this.publish({ ...this.current, paused: result.paused, telemetry: result.telemetry, segments: result.segments, error: result.last_error ?? undefined })
     } catch (error) {
       return this.publish({ ...this.current, error: this.detail(error, 'meeting.pipelineFailed') })
     }
@@ -179,7 +179,7 @@ export class MeetingMode {
       if (result.state !== 'running') throw new MeetingModeError(result.last_error ?? { key: 'meeting.startFailed' })
       this.lease?.running()
       this.schedulePoll()
-      return this.publish({ state: 'running', passthroughActive: result.passthrough_active, telemetry: result.telemetry, meetingId: result.meeting_id, segments: result.segments, paused: result.paused })
+      return this.publish({ state: 'running', passthroughActive: result.passthrough_active, telemetry: result.telemetry, meetingId: result.meeting_id, segments: result.segments, paused: result.paused, error: result.last_error ?? undefined })
     } catch (error) {
       try {
         await this.deleteGroup()
@@ -236,15 +236,16 @@ export class MeetingMode {
         if (result.state !== 'running') {
           this.release()
           if (result.last_error) this.publish({ ...this.current, state: 'failed', passthroughActive: false, segments: result.segments ?? this.current.segments, error: result.last_error })
-          else this.publish({ ...this.current, state: 'idle', passthroughActive: false, segments: result.segments ?? this.current.segments })
+          else this.publish({ ...this.current, state: 'idle', error: undefined, passthroughActive: false, segments: result.segments ?? this.current.segments })
           return
         }
         if (this.current.state !== 'running' || result.passthrough_active !== this.current.passthroughActive
             || JSON.stringify(result.telemetry) !== JSON.stringify(this.current.telemetry)
             || result.paused !== this.current.paused
+            || JSON.stringify(result.last_error ?? null) !== JSON.stringify(this.current.error ?? null)
             || JSON.stringify(result.segments) !== JSON.stringify(this.current.segments)) {
           if (this.current.state !== 'running') this.lease?.running()
-          this.publish({ state: 'running', passthroughActive: result.passthrough_active, telemetry: result.telemetry, meetingId: result.meeting_id, segments: result.segments, paused: result.paused })
+          this.publish({ state: 'running', passthroughActive: result.passthrough_active, telemetry: result.telemetry, meetingId: result.meeting_id, segments: result.segments, paused: result.paused, error: result.last_error ?? undefined })
         }
       }).catch(error => {
         if (this.active !== active || this.stopping) return
@@ -273,6 +274,9 @@ export class MeetingMode {
 
   private detail(error: unknown, fallback: string): MeetingError {
     if (error instanceof MeetingModeError) return error.detail
+    if (error instanceof Error && error.message === 'realtimeGlossarySyncFailed') {
+      return { key: 'suite.syncGlossaryFailed', code: 'realtimeGlossarySyncFailed' }
+    }
     console.error(fallback, error)
     return { key: fallback }
   }

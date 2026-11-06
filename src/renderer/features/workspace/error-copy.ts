@@ -48,6 +48,14 @@ export interface ErrorCopy {
  * fix. Adding a code to the catalog now fails the build until it says what its button does.
  */
 const ERROR_ACTIONS: Record<SupportErrorCode, { target: ErrorActionTarget; label: TranslationKey; detail?: TranslationKey }> = {
+  'STO-032': { target: { kind: 'settings', tab: 'storage' }, label: 'errors.checkStorageAction' },
+  'STO-031': { target: { kind: 'settings', tab: 'storage' }, label: 'errors.checkStorageAction' },
+  'STO-030': { target: { kind: 'settings', tab: 'storage' }, label: 'errors.checkStorageAction' },
+  'STO-029': { target: { kind: 'settings', tab: 'storage' }, label: 'errors.checkStorageAction' },
+  'STO-028': { target: { kind: 'settings', tab: 'storage' }, label: 'errors.checkStorageAction' },
+  'STO-027': { target: { kind: 'settings', tab: 'storage' }, label: 'errors.checkStorageAction' },
+  'STO-026': { target: { kind: 'settings', tab: 'storage' }, label: 'errors.checkStorageAction' },
+  'STO-025': { target: { kind: 'settings', tab: 'storage' }, label: 'errors.checkStorageAction' },
   'ARG-001': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'ARG-002': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'ARG-003': { target: { kind: 'record' }, label: 'errors.engineLostAction' },
@@ -127,6 +135,11 @@ const ERROR_ACTIONS: Record<SupportErrorCode, { target: ErrorActionTarget; label
   'MT-020': { target: { kind: 'settings', tab: 'audio' }, label: 'errors.configureTranslationAction' },
   'MT-021': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
   'MT-022': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
+  'MT-023': { target: { kind: 'settings', tab: 'glossary' }, label: 'suite.manageGlossary' },
+  'MT-024': { target: { kind: 'settings', tab: 'glossary' }, label: 'suite.manageGlossary' },
+  'MT-025': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
+  'MT-026': { target: { kind: 'reset' }, label: 'errors.startFailedAction' },
+  'MT-027': { target: { kind: 'gateway' }, label: 'gateway.title' },
 
   // Download, search and network: a failed lookup is worth another try, a failed integrity
   // check is not, and it is settled by fetching the weights again.

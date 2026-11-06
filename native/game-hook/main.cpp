@@ -40,22 +40,63 @@ static void error(const char *code) { emit("\"type\":\"error\",\"code\":" + quot
 static std::string threadId(ThreadParam tp) {
     std::ostringstream value; value << tp.processId << ':' << std::hex << tp.addr << ':' << tp.ctx << ':' << tp.ctx2; return value.str();
 }
-static void connected(DWORD pid) { if (pid == targetPid) emit("\"type\":\"connected\""); }
-static void disconnected(DWORD pid) { if (pid == targetPid) emit("\"type\":\"disconnected\""); }
+#include "advanced.h"
+static void (*insertHook)(DWORD, const wchar_t *);
+static void *(*allocateHostString)(const wchar_t *);
+static std::atomic_bool commandReady{false};
+
+static void connected(DWORD pid) {
+    // A parser rejection is a side-effect-free round trip through the injected DLL's command loop.
+    // Luna's pipe connection, LoadLibrary return and early GDI callbacks can all precede that loop.
+    if (pid == targetPid) insertHook(pid, L"NOLA_COMMAND_PROBE");
+}
+static void disconnected(DWORD pid) { if (pid == targetPid) { commandReady = false; emit("\"type\":\"disconnected\""); } }
 static void created(const wchar_t *code, const char *name, ThreadParam tp, bool embed) {
+    if (tp.processId == targetPid && embed) { std::lock_guard<std::mutex> lock(embedMutex); if (capable.size() < 256) capable[threadId(tp)] = tp; }
     if (tp.processId == targetPid) emit("\"type\":\"thread\",\"id\":" + quote(threadId(tp)) + ",\"name\":" + quote(name ? name : "") + ",\"code\":" + quote(utf8(code ? code : L"")) + ",\"embed\":" + (embed ? "true" : "false"));
 }
-static void removed(const wchar_t *, const char *, ThreadParam tp) { if (tp.processId == targetPid) emit("\"type\":\"remove\",\"id\":" + quote(threadId(tp))); }
+static void removed(const wchar_t *, const char *, ThreadParam tp) {
+    if (tp.processId != targetPid) return;
+    const auto id = threadId(tp);
+    {
+        std::lock_guard<std::mutex> lock(embedMutex);
+        capable.erase(id);
+        if (enabled == id) { enabled.clear(); token.clear(); }
+    }
+    emit("\"type\":\"remove\",\"id\":" + quote(id));
+}
 static void text(const wchar_t *, const char *, ThreadParam tp, const wchar_t *value) {
     if (tp.processId != targetPid || !value) return;
     std::wstring bounded(value);
     if (bounded.size() > 16000) { error("textTooLong"); return; }
     emit("\"type\":\"text\",\"id\":" + quote(threadId(tp)) + ",\"text\":" + quote(utf8(bounded)));
 }
-static void info(int, const wchar_t *) {}
-static void inserted(DWORD, uint64_t, const wchar_t *) {}
-static void embed(const wchar_t *, ThreadParam) {}
-static wchar_t *i18n(const wchar_t *) { return nullptr; }
+static void info(int, const wchar_t *message) {
+    if (!message) return;
+    if (wcscmp(message, L"NOLA_INVALID_HOOK") == 0) {
+        if (!commandReady.exchange(true)) {
+            emit("\"type\":\"ready\"");
+            emit("\"type\":\"connected\"");
+        } else error("invalidHook");
+    } else if (commandReady) {
+        constexpr wchar_t prefix[] = L"NOLA_INSERT_FAILED ";
+        constexpr size_t length = sizeof(prefix) / sizeof(wchar_t) - 1;
+        if (wcsncmp(message, prefix, length) == 0)
+            emit("\"type\":\"insertFailed\",\"code\":" + quote(utf8(message + length)));
+    }
+}
+static void inserted(DWORD pid, uint64_t address, const wchar_t *code) {
+    if (pid != targetPid || !code) return;
+    std::ostringstream hex; hex << std::hex << address;
+    emit("\"type\":\"inserted\",\"address\":" + quote(hex.str()) + ",\"code\":" + quote(utf8(code)));
+}
+
+static wchar_t *i18n(const wchar_t *key) {
+    // Return tagged diagnostic strings through Luna's allocator, including when attaching to a previously localized DLL.
+    if (wcscmp(key, L"特殊码无效") == 0) return static_cast<wchar_t *>(allocateHostString(L"NOLA_INVALID_HOOK"));
+    if (wcscmp(key, L"钩子注入失败 %s") == 0) return static_cast<wchar_t *>(allocateHostString(L"NOLA_INSERT_FAILED %s"));
+    return nullptr;
+}
 static void emulator(const wchar_t *, const wchar_t *, const wchar_t *) {}
 
 int wmain(int argc, wchar_t **argv) {
@@ -91,8 +132,12 @@ int wmain(int argc, wchar_t **argv) {
     auto detach = reinterpret_cast<void (*)(DWORD)>(GetProcAddress(host, "Luna_DetachProcess"));
     auto needsInject = reinterpret_cast<bool (*)(DWORD)>(GetProcAddress(host, "Luna_CheckIfNeedInject"));
     auto settings = reinterpret_cast<void (*)(int,int,int,int,bool)>(GetProcAddress(host, "Luna_Settings"));
-    auto insertHook = reinterpret_cast<void (*)(DWORD,const wchar_t *)>(GetProcAddress(host, "Luna_InsertHookCode"));
-    if (!start || !connect || !detach || !needsInject || !settings || !insertHook) { error("hookUnavailable"); CloseHandle(process); return 4; }
+    insertHook = reinterpret_cast<void (*)(DWORD,const wchar_t *)>(GetProcAddress(host, "Luna_InsertHookCode"));
+    auto useEmbed = reinterpret_cast<void (*)(ThreadParam,bool)>(GetProcAddress(host, "Luna_UseEmbed"));
+    auto respond = reinterpret_cast<void (*)(ThreadParam,LPCWSTR,LPCWSTR)>(GetProcAddress(host, "Luna_EmbedCallback"));
+    auto configure = reinterpret_cast<void (*)(DWORD,UINT32,UINT8,bool,wchar_t*,int,bool,bool,bool,float,bool,LPCWSTR)>(GetProcAddress(host, "Luna_SettingsEx"));
+    allocateHostString = reinterpret_cast<decltype(allocateHostString)>(GetProcAddress(host, "Luna_AllocString"));
+    if (!allocateHostString || !useEmbed || !respond || !configure || !start || !connect || !detach || !needsInject || !settings || !insertHook) { error("hookUnavailable"); CloseHandle(process); return 4; }
     start(connected, disconnected, created, removed, text, info, inserted, embed, i18n, emulator);
     settings(100, 932, 16384, 16384, true);
     connect(targetPid);
@@ -111,18 +156,66 @@ int wmain(int argc, wchar_t **argv) {
         if (thread) CloseHandle(thread); CloseHandle(injectable);
         if (!completed || !loaded) { error(thread && !completed ? "injectionTimeout" : "injectionFailed"); detach(targetPid); CloseHandle(process); return 5; }
     }
-    emit("\"type\":\"ready\"");
+    unsigned mode = 0, scale = 100, charset = 0, clear = 0;
+    std::wstring font;
+    std::thread search;
     std::string command;
     while (std::getline(std::cin, command)) {
         if (command == "stop") break;
         if (WaitForSingleObject(process, 0) == WAIT_OBJECT_0) break;
-        if (command.size() > 1024) { error("invalidCommand"); break; }
+        if (!commandReady) { error("hookUnavailable"); continue; }
+        if (command.size() > 16384) { error("invalidCommand"); break; }
         if (command.rfind("hook\t", 0) == 0) {
             const auto code = wide(command.substr(5));
-            if (code.empty() || code.find_first_of(L"\r\n\t") != std::wstring::npos) { error("invalidCommand"); continue; }
+            if (code.empty() || code.size() > 400 || code.find_first_of(L"\r\n\t") != std::wstring::npos) { error("invalidCommand"); continue; }
             insertHook(targetPid, code.c_str());
+        } else if (command == "cancelSearch") {
+            cancelled = true;
+            if (search.joinable()) search.join();
+        } else if (command.rfind("search\t", 0) == 0) {
+            auto sep = command.find('\t', 7);
+            if (sep == std::string::npos) continue;
+            unsigned seconds = strtoul(command.substr(7, sep - 7).c_str(), nullptr, 10);
+            auto query = decodeHex(command.substr(sep + 1));
+            if (seconds < 1 || seconds > 120 || query.empty() || query.size() > 256) { error("invalidCommand"); continue; }
+            cancelled = true;
+            if (search.joinable()) search.join();
+            cancelled = false;
+            search = std::thread(searchText, query, seconds);
+        } else if (command.rfind("style\t", 0) == 0) {
+            std::istringstream input(command.substr(6));
+            unsigned newMode, newScale, newCharset, newClear;
+            std::string family;
+            if (!(input >> newMode >> newScale >> newCharset >> newClear) || newMode > 3 || newScale < 50 || newScale > 200 || newCharset > 255 || newClear > 1) { error("invalidCommand"); continue; }
+            input >> family;
+            auto decoded = decodeHex(family);
+            if (decoded.size() > 90) { error("invalidCommand"); continue; }
+            mode = newMode; scale = newScale; charset = newCharset; clear = newClear; font = decoded;
+        } else if (command.rfind("enable\t", 0) == 0) {
+            auto sep = command.find('\t', 7);
+            if (sep == std::string::npos) continue;
+            auto id = command.substr(sep + 1);
+            auto wait = strtoul(command.substr(7, sep - 7).c_str(), nullptr, 10);
+            std::lock_guard<std::mutex> lock(embedMutex);
+            if (wait > 3000 || (!id.empty() && !capable.count(id))) { error("threadUnavailable"); continue; }
+            if (capable.count(enabled)) useEmbed(capable.at(enabled), false);
+            enabled = id; token.clear(); waitMs = wait;
+            if (!id.empty()) {
+                configure(targetPid, wait, static_cast<UINT8>(charset), charset != 0, font.data(), mode, true, clear != 0, scale != 100, scale / 100.f, false, L"");
+                useEmbed(capable.at(id), true);
+            }
+        } else if (command.rfind("reply\t", 0) == 0) {
+            auto sep = command.find('\t', 6);
+            if (sep == std::string::npos) continue;
+            std::lock_guard<std::mutex> lock(embedMutex);
+            if (command.substr(6, sep - 6) != token || GetTickCount64() >= deadline || !capable.count(enabled)) continue;
+            auto translation = decodeHex(command.substr(sep + 1));
+            if (!translation.empty() && translation.size() < 1000 && translation.find(L'\0') == std::wstring::npos)
+                respond(capable.at(enabled), original.c_str(), translation.c_str());
+            token.clear();
         }
     }
+    cancelled = true; if (search.joinable()) search.join();
     detach(targetPid); CloseHandle(process);
     // LunaHost owns callback threads until process exit; unloading it can race those callbacks.
     return 0;

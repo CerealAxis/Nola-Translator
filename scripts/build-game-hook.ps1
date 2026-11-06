@@ -80,6 +80,7 @@ Build the helper with CMake from sources/nola-game-hook for each matching archit
 No model weights or fonts are distributed by this Hook package.
 "@ | Set-Content -LiteralPath (Join-Path $outputRoot 'SOURCE.txt') -Encoding utf8
 $manifest = @{
+  protocolVersion = 3
   source = 'https://github.com/HIllya51/LunaTranslator'; revision = $revision
   uchardetRevision = '06029ec3340cdf6bf9a6a537dafb3f39eda0560e'
   minhookRevision = '8af6b4acae5a9388fd742b56fa79ece89d96f823'

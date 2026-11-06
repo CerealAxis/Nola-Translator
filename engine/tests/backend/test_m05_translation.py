@@ -10,6 +10,7 @@ import pytest
 from nola_translator_engine.backend.gateway.capabilities import GatewayError, GatewayErrorCode, TranslationPolicy
 from nola_translator_engine.backend.gateway.operations import TranslationResult
 from nola_translator_engine.backend.translation_pipeline import TranslationScheduler
+from nola_translator_engine.backend.glossary import RealtimeGlossary, RealtimeGlossaryUpdate
 
 
 class FakeGateway:
@@ -94,6 +95,71 @@ async def test_failed_committed_translation_uses_separate_fallback_credentials()
         assert ready["at_ms"] >= start["at_ms"]
     finally:
         await scheduler.close()
+
+
+@pytest.mark.asyncio
+async def test_glossary_edit_fences_pending_final_and_keeps_other_target_private():
+    glossary = RealtimeGlossary()
+
+    def update(revision, target):
+        return glossary.update(RealtimeGlossaryUpdate.model_validate({"revision": revision, "libraries": [[
+            {"source": "A小", "target": target, "caseSensitive": True, "targetLanguage": "zh", "mode": "fixed"},
+            {"source": "A小", "target": "A Short", "caseSensitive": True, "targetLanguage": "en", "mode": "fixed"},
+        ]]}))
+
+    assert update(1, "旧译")
+    gateway, events = FakeGateway(), []
+    gateway.block = True
+    scheduler = make_scheduler(gateway, events, glossary=glossary)
+    try:
+        await scheduler.source_final(source("s1", 1, "A小"))
+        await asyncio.wait_for(gateway.started.wait(), 1)
+        assert update(2, "新译")
+        await scheduler.refresh_glossary()
+        assert not update(1, "失效")
+        gateway.release.set()
+        await asyncio.wait_for(scheduler.wait_idle(), 1)
+        assert [[term.target for term in ctx.translation_context["glossary"]] for ctx, *_ in gateway.calls] == [["旧译"], ["新译"]]
+        assert sum(event == "translation_committed" for event, _ in events) == 1
+        assert update(3, "后来改名")
+        await scheduler.refresh_glossary()
+        await scheduler.source_final(source("s2", 1, "No match."))
+        await asyncio.wait_for(scheduler.wait_idle(), 1)
+        assert len(gateway.calls) == 3 and "glossary" not in gateway.calls[-1][0].translation_context
+    finally:
+        gateway.release.set()
+        await scheduler.close()
+
+
+async def test_editing_queued_target_does_not_resubmit_another_languages_inflight_request():
+    glossary = RealtimeGlossary()
+    gateway, events = FakeGateway(), []
+    gateway.block = True
+    scheduler = make_scheduler(gateway, events, glossary=glossary)
+    scheduler.target_languages = ("ja", "zh")
+    try:
+        await scheduler.source_final(source("s1", 1, "A小"))
+        await asyncio.wait_for(gateway.started.wait(), 1)
+        glossary.update(RealtimeGlossaryUpdate.model_validate({"revision": 1, "libraries": [[
+            {"source": "A小", "target": "短道", "caseSensitive": True, "targetLanguage": "zh", "mode": "fixed"},
+        ]]}))
+        await scheduler.refresh_glossary()
+        gateway.release.set()
+        await asyncio.wait_for(scheduler.wait_idle(), 1)
+        assert [target for _, _, _, target, _ in gateway.calls] == ["ja", "zh"]
+        assert [payload["target_language"] for event, payload in events if event == "translation_committed"] == ["ja", "zh"]
+    finally:
+        gateway.release.set()
+        await scheduler.close()
+
+
+@pytest.mark.parametrize("reason", ["glossaryUnsupported", "glossaryBudgetExceeded"])
+def test_local_worker_term_failure_remains_a_localizable_segment_error(reason):
+    from nola_translator_engine.backend.gateway.adapters import map_local_error
+    scheduler = make_scheduler(FakeGateway(), [])
+    error = map_local_error(f"ValueError: {reason}", stage="mt")
+    payload = scheduler._error_event_payload("s1", error)["error"]
+    assert (payload["scope"], payload["message_key"]) == ("task", reason)
 
 
 @pytest.mark.asyncio

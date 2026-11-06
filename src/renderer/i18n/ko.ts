@@ -1,4 +1,5 @@
 import { suiteEntries, suiteLocales } from './translation-suite-ui'
+import { desktopDataEntries, desktopDataLocales } from './desktop-data-ui'
 import { modelPolicyKo, modelPolicyEntries } from './model-policy-ui'
 import { screenEntries, screenLocales } from './screen-ui'
 import { shortcutEntries, shortcutLocales } from './shortcuts-ui'
@@ -12,6 +13,7 @@ import { onboardingEntries, onboardingKo } from './onboarding-ui'
 import type { DictionaryKey } from './zh-CN'
 
 const koMessages: Record<DictionaryKey, string> = {
+  ...desktopDataEntries(desktopDataLocales.ko),
   ...suiteEntries(suiteLocales.ko),
   ...screenEntries(screenLocales.ko),
   ...shortcutEntries(shortcutLocales.ko),
@@ -405,6 +407,7 @@ const koMessages: Record<DictionaryKey, string> = {
   'homeRecordsUi.meetings': '회의와 학습',
   'homeRecordsUi.live': '라이브 방송',
   'homeRecordsUi.quickDescription': '실시간 음성 인식 및 번역\n 다국어 번역 지원',
+  'homeRecordsUi.browserDescription': '브라우저 확장 설치 및 관리\nNola에 연결하여 번역',
   'homeRecordsUi.gatewayTitle': '모델 게이트웨이',
   'homeRecordsUi.gatewayDescription': '로컬 모델 서비스를 시작하고 관리\n 번역 및 인식 기능 제공',
   'homeRecordsUi.openGateway': '게이트웨이 관리',

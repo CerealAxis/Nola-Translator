@@ -191,3 +191,48 @@ it('provides a late reader the current caption revisions without claiming playba
   sessions.handleEvent({ protocolVersion: 1, requestId: 'stop', type: 'sessionStopped', sessionId: 'reader' })
   expect(sessions.readerSnapshot()).toBeNull()
 })
+
+
+it('gates desktop legacy MT before capture when realtime glossary requires v2', async () => {
+  const request = vi.fn(async () => ({ sessionId: 'legacy' }))
+  const prepare = vi.fn()
+  const assertLegacyTranslationAllowed = vi.fn(async () => { throw new Error('realtimeGlossaryLegacyUnsupported') })
+  const sessions = new SessionController({ engine: { currentState: 'ready', request } as unknown as EngineProcess,
+    meetings: null, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', whenReady: async () => {},
+    prepare, startingChanged: () => {}, hideOverlay: () => {}, assertLegacyTranslationAllowed,
+    prepareBackend: async () => undefined,
+  })
+  await expect(sessions.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime',
+    sourceLanguage: 'zh', targetLanguages: ['en'], outputMode: 'translation' }, 'desktop')).rejects.toThrow('realtimeGlossaryLegacyUnsupported')
+  expect(assertLegacyTranslationAllowed).toHaveBeenCalledExactlyOnceWith(['en'])
+  expect(request).not.toHaveBeenCalled()
+  expect(prepare).not.toHaveBeenCalled()
+  expect(sessions.legacyTranslationTargets).toEqual([])
+})
+
+it('keeps browser legacy sessions outside the desktop glossary gate', async () => {
+  const assertLegacyTranslationAllowed = vi.fn(async () => { throw new Error('desktop data must stay private') })
+  const sessions = new SessionController({ engine: { currentState: 'ready', supports: () => true,
+    request: vi.fn(async () => ({ sessionId: 'browser-legacy' })) } as unknown as EngineProcess,
+    meetings: null, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', whenReady: async () => {},
+    prepare: async () => {}, startingChanged: () => {}, hideOverlay: () => {}, assertLegacyTranslationAllowed,
+    prepareBackend: async () => undefined,
+  })
+  await sessions.start({ audioSource: { kind: 'browserTab', streamId: 'browser' }, recognitionMode: 'realtime',
+    browserTimeline: { epoch: 0, videoTimeMs: 0, playbackRate: 1 }, sourceLanguage: 'zh', targetLanguages: ['en'] }, 'browser')
+  expect(assertLegacyTranslationAllowed).not.toHaveBeenCalled()
+  expect(sessions.legacyTranslationTargets).toEqual([])
+})
+
+it('exposes only the active desktop legacy translation languages for edit validation', async () => {
+  const sessions = new SessionController({ engine: { currentState: 'ready',
+    request: vi.fn(async () => ({ sessionId: 'desktop-legacy' })) } as unknown as EngineProcess,
+    meetings: null, getSettings: () => DEFAULT_SETTINGS, getCredential: async () => '', whenReady: async () => {},
+    prepare: async () => {}, startingChanged: () => {}, hideOverlay: () => {},
+  })
+  await sessions.start({ audioSource: { kind: 'defaultOutput' }, recognitionMode: 'realtime',
+    sourceLanguage: 'zh', targetLanguages: ['en'] }, 'desktop')
+  expect(sessions.legacyTranslationTargets).toEqual(['en'])
+  sessions.activeSessionId = null
+  expect(sessions.legacyTranslationTargets).toEqual([])
+})

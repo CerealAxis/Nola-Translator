@@ -72,6 +72,8 @@ function publish(): void {
   })
 }
 
+let gameRecordsChanged = false
+
 export async function loadMeetings(): Promise<void> {
   if (!bridge) return
   const state = meetingsStore.getState()
@@ -85,6 +87,11 @@ export async function loadMeetings(): Promise<void> {
   } catch (error) {
     meetingsStore.setState({ loading: false, error: errorMessage(error) })
     throw error
+  } finally {
+    if (gameRecordsChanged) {
+      gameRecordsChanged = false
+      void loadMeetings().catch(() => {})
+    }
   }
 }
 
@@ -278,16 +285,25 @@ export function clearMeetingsError(): void {
 export function attachMeetingsStore(next: NolaBridge): void {
   bridge = next
   unsubscribe?.()
-  unsubscribe = next.events.onEngineEvent((event) => {
+  const offEngine = next.events.onEngineEvent((event) => {
     // The engine fills in endedAtMs / durationMs only at session end, so this is the one moment to reload.
     if (event.type !== 'sessionStopped') return
     void loadMeetings().catch(() => {
       // Already in state.error; rethrowing from an event callback is an unhandled rejection.
     })
   })
+  let revision = 0
+  const offGame = next.gameTranslation?.onChanged(snapshot => {
+    if (!snapshot.recordRevision || snapshot.recordRevision === revision) return
+    revision = snapshot.recordRevision
+    if (meetingsStore.getState().loading) { gameRecordsChanged = true; return }
+    void loadMeetings().catch(() => {})
+  })
+  unsubscribe = () => { offEngine(); offGame?.() }
 }
 
 export function detachMeetingsStore(): void {
+  gameRecordsChanged = false
   unsubscribe?.()
   unsubscribe = null
   bridge = null

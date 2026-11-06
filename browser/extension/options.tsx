@@ -8,20 +8,19 @@ import { Textarea } from '../../src/renderer/components/ui/textarea'
 import { Alert, AlertDescription } from '../../src/renderer/components/ui/alert'
 import { Field, FieldGroup, FieldLabel } from '../../src/renderer/components/ui/field'
 import { Switch, SwitchThumb } from '../../src/renderer/components/ui/switch'
-import { SliderRoot, SliderControl, SliderTrack, SliderIndicator, SliderThumb } from '../../src/renderer/components/ui/slider'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../src/renderer/components/ui/input-group'
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from '../../src/renderer/components/ui/empty'
 import { Popover, PopoverContent, PopoverTrigger, PopoverTitle } from '../../src/renderer/components/ui/popover'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '../../src/renderer/components/ui/dialog'
 import { Card, CardHeader, CardTitle, CardContent } from '../../src/renderer/components/ui/card'
 import { Badge } from '../../src/renderer/components/ui/badge'
-import { ColorPicker } from '../../src/renderer/components/ui/color-picker'
 import { ChoiceField } from './components/ChoiceField'
 import { PopupLanguage } from './components/PopupLanguage'
+import { ProviderAvatar } from './components/ProviderAvatar'
 import { SettingsPreview, type PreviewKind } from './components/SettingsPreview'
 import { NolaLogo } from './logo'
 import { DEFAULT_PREFERENCES, readPreferences, savePreferences, UI_LANGUAGES, type Preferences } from './preferences'
-import { ConnectionStatus, languageOptions, LiveServiceField, TargetLanguageField, usePreferences } from './settings-fields'
+import { ColorField, ConnectionStatus, languageOptions, LiveServiceField, RangeField, TargetLanguageField, usePreferences } from './settings-fields'
 import { createProvider, loadProviders, saveProviders, requestProviderAccess, PROVIDER_PRESETS, exportProviderConfig, type ProviderConnection, type Capability } from './providers'
 import { GlossaryManager } from './components/GlossaryManager'
 import { parseOptionsRoute } from './options-route'
@@ -74,13 +73,6 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
 function NumberField({ label, value, onChange, min = 0, max = 100, step = 1 }: { label: string; value: number; onChange: (value: number) => void; min?: number; max?: number; step?: number }) {
   return <TextField label={label} value={String(value)} type="number" onChange={value => { const number = Number(value); if (Number.isFinite(number)) onChange(Math.max(min, Math.min(max, Math.round(number / step) * step))) }} />
 }
-function RangeField({ label, value, onChange, min = 0, max = 100, step = 1, suffix = '' }: { label: string; value: number; onChange: (value: number) => void; min?: number; max?: number; step?: number; suffix?: string }) {
-  const id = useId()
-  return <Field><FieldLabel id={id}>{label}</FieldLabel><div className="nola-setting-range"><SliderRoot value={value} min={min} max={max} step={step} onValueChange={onChange}><SliderControl className="relative"><SliderTrack><SliderIndicator /></SliderTrack><SliderThumb aria-labelledby={id} /></SliderControl></SliderRoot><output>{Number(value.toFixed(2))}{suffix}</output></div></Field>
-}
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <Field><FieldLabel>{label}</FieldLabel><ColorPicker label={label} value={value} presets={[]} onChange={onChange} /></Field>
-}
 function FileAction({ label, accept, disabled, onFile }: { label: string; accept: string; disabled?: boolean; onFile: (file: File) => void }) {
   const input = useRef<HTMLInputElement>(null)
   return <div className="nola-file-action"><Button variant="outline" disabled={disabled} onClick={() => input.current?.click()}><Upload data-icon="inline-start" />{label}</Button><input ref={input} type="file" aria-label={label} accept={accept} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) onFile(file) }} /></div>
@@ -114,9 +106,6 @@ function JsonField({ label, value, onChange, error }: { label: string; value: ob
   return <><TextField label={label} multiline value={draft} onChange={text => { setDraft(text); try { const parsed: unknown = JSON.parse(text); if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error(); onChange(parsed as Record<string, string>); setInvalid(false) } catch { setInvalid(true) } }} />{invalid && <p className="nola-error" role="alert">{error}</p>}</>
 }
 
-function ProviderMark({ provider }: { provider: ProviderConnection }) {
-  return <span className="nola-provider-avatar" aria-hidden="true">{provider.preset === 'nola' ? <NolaLogo /> : provider.name.slice(0, 1)}</span>
-}
 function ConfirmAction({ label, description, onConfirm, t }: { label: string; description: string; onConfirm(): Promise<void>; t: T }) {
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
@@ -168,10 +157,10 @@ function ProviderEditor({ providers, settings, onChange, t }: { providers: Provi
       }}>{p.name}</Button>)}</div></PopoverContent></Popover>
       {providers.map(p => {
         const count = ['pageProvider', 'selectionProvider', 'inputProvider', 'subtitleProvider', 'asrProvider', 'ttsProvider', 's2sProvider', 'llmProvider'].filter(key => settings[key as keyof Preferences] === p.id).length
-        return <Button className="nola-provider-list-item" key={p.id} variant="outline" aria-pressed={p.id === provider?.id} onClick={() => setSelected(p.id)}><ProviderMark provider={p} /><span>{p.name}</span>{count > 0 && <Badge variant="accent">{count}</Badge>}</Button>
+        return <Button className="nola-provider-list-item" key={p.id} variant="outline" aria-pressed={p.id === provider?.id} onClick={() => setSelected(p.id)}><ProviderAvatar provider={p} /><span>{p.name}</span>{count > 0 && <Badge variant="accent">{count}</Badge>}</Button>
       })}
     </aside>
-    {provider && <Card className="nola-provider-editor"><CardHeader><CardTitle><ProviderMark provider={provider} />{provider.name}</CardTitle></CardHeader><CardContent><FieldGroup>
+    {provider && <Card className="nola-provider-editor"><CardHeader><CardTitle><ProviderAvatar provider={provider} />{provider.name}</CardTitle></CardHeader><CardContent><FieldGroup>
       {provider.preset === 'nola' ? <p className="nola-muted">{t('nativeProviderHelp')}</p> : <TextField label={t('name')} value={provider.name} onChange={name => update({ name })} />}
       {provider.preset === 'nola' && <Button variant="outline" disabled={pending} onClick={() => void test()}>{pending ? t('translating') : t('testConnection')}</Button>}
       {provider.preset !== 'nola' && <>
@@ -247,11 +236,11 @@ function TranslationCenter({ settings, providers, locale, t }: { settings: Prefe
   }
   return <div className="nola-translation-center">
     <div className="nola-hub-source">
-      <div className="nola-hub-languages"><PopupLanguage label={t('source')} value={source} options={[{ value: 'auto', label: t('autoDetect') }, ...languageOptions(locale)]} onChange={setSource} t={t} /><Button variant="bare" size="icon-sm" aria-label={t('swapLanguages')} title={t('swapLanguages')} disabled={source === 'auto'} onClick={() => { setSource(target); setTarget(source) }}><ArrowLeftRight /></Button><PopupLanguage label={t('target')} value={target} options={languageOptions(locale)} onChange={setTarget} t={t} /></div>
+      <div className="nola-hub-languages"><PopupLanguage size="sm" label={t('source')} value={source} options={[{ value: 'auto', label: t('autoDetect') }, ...languageOptions(locale)]} onChange={setSource} t={t} /><Button variant="bare" size="icon-sm" aria-label={t('swapLanguages')} title={t('swapLanguages')} disabled={source === 'auto'} onClick={() => { setSource(target); setTarget(source) }}><ArrowLeftRight /></Button><PopupLanguage size="sm" label={t('target')} value={target} options={languageOptions(locale)} onChange={setTarget} t={t} /></div>
       <div className="nola-hub-input"><Textarea aria-label={t('inputText')} placeholder={t('inputText')} value={text} onChange={e => setText(e.target.value)} onKeyDown={event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && text.trim() && active.length && !pending) { event.preventDefault(); void run() } }} /><div className="nola-hub-input-actions"><Button variant="bare" size="icon-sm" disabled={!text.trim() || speaking} aria-label={t('readAloud')} title={t('readAloud')} onClick={() => void speak(text, source)}><Volume2 /></Button><Button disabled={pending || !text.trim() || !active.length} onClick={() => void run()}>{t(pending ? 'translating' : 'translateText')}</Button></div></div>
     </div>
     <div className="nola-hub-results"><div className="nola-hub-toolbar"><Popover><PopoverTrigger render={<Button variant="outline" />}><Languages data-icon="inline-start" />{t('provider')}<Badge>{active.length}</Badge><ChevronDown data-icon="inline-end" /></PopoverTrigger><PopoverContent className="nola-hub-provider-picker" align="end"><PopoverTitle>{t('selectProviders')}</PopoverTitle>{available.map(p => <Toggle key={p.id} label={p.name} checked={selected.includes(p.id)} onChange={checked => selectProvider(p.id, checked)} />)}</PopoverContent></Popover><Button variant="bare" size="icon-sm" aria-label={t('apiProviders')} title={t('apiProviders')} onClick={() => { window.location.hash = 'apiProviders' }}><Settings2 /></Button><Button variant="bare" size="icon-sm" disabled={!active.length} aria-label={t('expand')} title={t('expand')} onClick={() => setCollapsed([])}><ChevronDown /></Button><Button variant="bare" size="icon-sm" disabled={!active.length} aria-label={t('collapse')} title={t('collapse')} onClick={() => setCollapsed(active)}><ChevronUp /></Button></div>
-      {active.map(id => { const provider = available.find(p => p.id === id)!; const result = results[id]; const expanded = !collapsed.includes(id); return <Card className="nola-hub-result" key={id}><CardHeader><CardTitle><ProviderMark provider={provider} />{provider.name}</CardTitle><div className="nola-hub-card-actions"><Button variant="bare" size="icon-sm" disabled={!text.trim() || result?.pending} aria-label={t('refresh')} title={t('refresh')} onClick={() => void run([id])}><RefreshCw /></Button><Button variant="bare" size="icon-sm" disabled={!result?.text || speaking} aria-label={t('readAloud')} title={t('readAloud')} onClick={() => void speak(result!.text!, target)}><Volume2 /></Button><Button variant="bare" size="icon-sm" disabled={!result?.text} aria-label={t(copied === id ? 'copied' : 'copyTranslation')} title={t(copied === id ? 'copied' : 'copyTranslation')} onClick={() => { void navigator.clipboard.writeText(result!.text!).then(() => { setCopied(id); setTimeout(() => setCopied(''), 1500) }).catch(() => setFeedback(t('internalError'))) }}>{copied === id ? <Check /> : <Copy />}</Button><Button variant="bare" size="icon-sm" aria-label={t(expanded ? 'collapse' : 'expand')} aria-expanded={expanded} title={t(expanded ? 'collapse' : 'expand')} onClick={() => setCollapsed(current => expanded ? [...current, id] : current.filter(value => value !== id))}>{expanded ? <ChevronUp /> : <ChevronDown />}</Button><Button variant="bare" size="icon-sm" aria-label={t('close')} title={t('close')} onClick={() => selectProvider(id, false)}><X /></Button></div></CardHeader>{expanded && <CardContent aria-live="polite">{result?.pending ? <p className="nola-muted">{t('translating')}</p> : result?.error ? <p className="nola-error" role="alert">{result.error}</p> : <p>{result?.text || t('inputText')}</p>}</CardContent>}</Card> })}
+      {active.map(id => { const provider = available.find(p => p.id === id)!; const result = results[id]; const expanded = !collapsed.includes(id); return <Card className="nola-hub-result" key={id}><CardHeader><CardTitle><ProviderAvatar provider={provider} />{provider.name}</CardTitle><div className="nola-hub-card-actions"><Button variant="bare" size="icon-sm" disabled={!text.trim() || result?.pending} aria-label={t('refresh')} title={t('refresh')} onClick={() => void run([id])}><RefreshCw /></Button><Button variant="bare" size="icon-sm" disabled={!result?.text || speaking} aria-label={t('readAloud')} title={t('readAloud')} onClick={() => void speak(result!.text!, target)}><Volume2 /></Button><Button variant="bare" size="icon-sm" disabled={!result?.text} aria-label={t(copied === id ? 'copied' : 'copyTranslation')} title={t(copied === id ? 'copied' : 'copyTranslation')} onClick={() => { void navigator.clipboard.writeText(result!.text!).then(() => { setCopied(id); setTimeout(() => setCopied(''), 1500) }).catch(() => setFeedback(t('internalError'))) }}>{copied === id ? <Check /> : <Copy />}</Button><Button variant="bare" size="icon-sm" aria-label={t(expanded ? 'collapse' : 'expand')} aria-expanded={expanded} title={t(expanded ? 'collapse' : 'expand')} onClick={() => setCollapsed(current => expanded ? [...current, id] : current.filter(value => value !== id))}>{expanded ? <ChevronUp /> : <ChevronDown />}</Button><Button variant="bare" size="icon-sm" aria-label={t('close')} title={t('close')} onClick={() => selectProvider(id, false)}><X /></Button></div></CardHeader>{expanded && <CardContent aria-live="polite">{result?.pending ? <p className="nola-muted">{t('translating')}</p> : result?.error ? <p className="nola-error" role="alert">{result.error}</p> : <p>{result?.text || t('inputText')}</p>}</CardContent>}</Card> })}
     </div>
     {feedback && <p role="alert" className="nola-error">{feedback}</p>}
   </div>

@@ -4,7 +4,27 @@ import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { emptyGlossary, glossaryDocumentSchema, glossaryMutationSchema, type GlossaryDocument, type GlossaryMutation } from '../shared/glossary'
 import { applyGlossaryMutation, validateGlossaryIdentities } from '../shared/glossary-mutation'
+import { glossaryScopeMatches } from '../shared/glossary-match'
 export { applyGlossaryMutation } from '../shared/glossary-mutation'
+
+export function realtimeGlossarySnapshot(document: GlossaryDocument) {
+  const libraries = document.enabled ? document.libraries
+    .filter(library => library.enabled && glossaryScopeMatches(library.scope, { scenario: 'realtime' }))
+    .map(library => library.entries.filter(entry => entry.enabled).map(({ source, target, caseSensitive, targetLanguage }) =>
+      ({ source, target, caseSensitive, targetLanguage, mode: target ? 'fixed' : 'keep' })))
+    .filter(entries => entries.length > 0) : []
+  return { revision: document.matchingRevision, libraries }
+}
+
+export function assertLegacyRealtimeGlossary(document: GlossaryDocument, targets: readonly string[], previous?: GlossaryDocument): void {
+  const relevant = (value: GlossaryDocument) => realtimeGlossarySnapshot(value).libraries
+    .map(entries => entries.filter(entry => entry.targetLanguage === '*' || targets.includes(entry.targetLanguage)))
+    .filter(entries => entries.length > 0)
+  const rules = relevant(document)
+  if (targets.length && rules.length && (!previous || JSON.stringify(rules) !== JSON.stringify(relevant(previous)))) {
+    throw new Error('realtimeGlossaryLegacyUnsupported')
+  }
+}
 
 const savedSchema = z.object({ document: glossaryDocumentSchema, operations: z.array(z.object({ id: z.string().uuid(), request: z.string() })).max(100) }).strict()
 
@@ -27,11 +47,13 @@ export class GlossaryStore {
     }
     return this.state
   }
+  async flush(): Promise<void> { await this.queue.catch(() => {}) }
+
   async snapshot(): Promise<GlossaryDocument> {
     await this.queue.catch(() => {})
     return structuredClone((await this.load()).document)
   }
-  command(input: GlossaryMutation): Promise<GlossaryDocument> {
+  command(input: GlossaryMutation, beforeSave?: (next: GlossaryDocument, current: GlossaryDocument) => void): Promise<GlossaryDocument> {
     const request = glossaryMutationSchema.parse(input)
     const result = this.queue.catch(() => {}).then(async () => {
       const state = await this.load()
@@ -42,6 +64,7 @@ export class GlossaryStore {
         return structuredClone(state.document)
       }
       const document = applyGlossaryMutation(state.document, request)
+      beforeSave?.(document, state.document)
       const next = { document, operations: [...state.operations.slice(-99), { id: request.operationId, request: serialized }] }
       await mkdir(dirname(this.path), { recursive: true })
       const temporary = `${this.path}.${randomUUID()}.tmp`

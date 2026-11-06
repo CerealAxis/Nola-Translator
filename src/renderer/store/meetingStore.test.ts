@@ -17,3 +17,18 @@ it('keeps the current detail when its batch deletion fails and clears it only af
   expect(await removeMeetings(['kept'])).toEqual({ removed: ['kept'], failed: [] })
   expect(meetingsStore.getState().detail).toBeNull()
 })
+
+it('rereads records when a game finishes during an older list request', async () => {
+  let changed!: (value: { recordRevision: number }) => void
+  let finish!: (list: MeetingMeta[]) => void
+  const game = { meetingId: 'game', sourceKind: 'game' } as MeetingMeta
+  const list = vi.fn().mockImplementationOnce(() => new Promise(resolve => { finish = resolve })).mockResolvedValue([game])
+  attachMeetingsStore({ meetings: { list }, events: { onEngineEvent: () => () => {} },
+    gameTranslation: { onChanged: (callback: typeof changed) => { changed = callback; return () => {} } } } as unknown as NolaBridge)
+  const pending = loadMeetings()
+  changed({ recordRevision: 1 })
+  finish([]); await pending
+  await vi.waitFor(() => expect(meetingsStore.getState().meetings).toEqual([game]))
+  changed({ recordRevision: 1 })
+  expect(list).toHaveBeenCalledTimes(2)
+})
